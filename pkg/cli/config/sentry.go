@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
@@ -45,9 +46,11 @@ func (x *Sentry) Configure() error {
 		return nil
 	}
 
-	sentry.Init(sentry.ClientOptions{
+	if err := sentry.Init(sentry.ClientOptions{
 		Dsn:         x.dsn,
 		Environment: x.env,
-	})
+	}); err != nil {
+		return goerr.Wrap(err, "failed to initialize sentry")
+	}
 	return nil
 }
