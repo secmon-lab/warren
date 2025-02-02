@@ -57,10 +57,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
-      - uses: m-mizutani/xroute-action@main
-        with:
-          url: ${{ vars.XROUTE_URL }}
-          message: "Build and pushed image: ${{ env.GITHUB_IMAGE_NAME }}"
 
   release-ghcr:
     runs-on: ubuntu-latest
@@ -92,7 +88,3 @@ jobs:
         run: docker push "${{ env.GITHUB_IMAGE_REPO }}:${{ steps.tag.outputs.tag }}"
       - name: Push Docker image (latest)
         run: docker push "${{ env.GITHUB_IMAGE_REPO }}:latest"
-      - uses: m-mizutani/xroute-action@main
-        with:
-          url: ${{ vars.XROUTE_URL }}
-          message: "Build and pushed image: ${{ env.GITHUB_IMAGE_REPO }}"
