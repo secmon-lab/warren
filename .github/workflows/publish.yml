@@ -4,10 +4,10 @@ on:
   push:
 
 env:
-  TAG_NAME: alertchain:${{ github.sha }}
+  TAG_NAME: warren:${{ github.sha }}
   BUILD_VERSION: ${{ github.sha }}
-  GITHUB_IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/alertchain
-  GITHUB_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/alertchain:${{ github.sha }}
+  GITHUB_IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/warren
+  GITHUB_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/warren:${{ github.sha }}
 
 jobs:
   build:
