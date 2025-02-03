@@ -8,9 +8,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/secmon-lab/warren/pkg/action/urlscan"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/server"
+	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -25,6 +27,10 @@ func cmdServe() *cli.Command {
 		geminiCfg    config.GeminiCfg
 		firestoreCfg config.Firestore
 	)
+
+	actions := []interfaces.Action{
+		&urlscan.Action{},
+	}
 
 	flags := joinFlags(
 		[]cli.Flag{
@@ -43,6 +49,10 @@ func cmdServe() *cli.Command {
 		geminiCfg.Flags(),
 		firestoreCfg.Flags(),
 	)
+
+	for _, action := range actions {
+		flags = append(flags, action.Flags()...)
+	}
 
 	return &cli.Command{
 		Name:    "serve",
@@ -80,6 +90,17 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
+			var enabledActions []interfaces.Action
+			var enabledActionNames []string
+			for _, action := range actions {
+				if action.Enabled() {
+					enabledActions = append(enabledActions, action)
+					enabledActionNames = append(enabledActionNames, action.Spec().Name)
+				}
+			}
+			actionSvc := service.NewActionService(enabledActions)
+			logging.Default().Info("enabled actions", "actions", enabledActionNames)
+
 			uc := usecase.New(
 				func() interfaces.GenAIChatSession {
 					return geminiModel.StartChat()
@@ -87,6 +108,7 @@ func cmdServe() *cli.Command {
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithSlackService(slackSvc),
 				usecase.WithRepository(firestore),
+				usecase.WithActionService(actionSvc),
 			)
 
 			httpServer := http.Server{

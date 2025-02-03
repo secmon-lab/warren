@@ -9,6 +9,8 @@ import (
 	"github.com/m-mizutani/opac"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/urfave/cli/v3"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -536,8 +538,17 @@ var _ interfaces.Action = &ActionMock{}
 //
 //		// make and configure a mocked interfaces.Action
 //		mockedAction := &ActionMock{
+//			EnabledFunc: func() bool {
+//				panic("mock out the Enabled method")
+//			},
 //			ExecuteFunc: func(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (string, error) {
 //				panic("mock out the Execute method")
+//			},
+//			FlagsFunc: func() []cli.Flag {
+//				panic("mock out the Flags method")
+//			},
+//			LogValueFunc: func() slog.Value {
+//				panic("mock out the LogValue method")
 //			},
 //			SpecFunc: func() model.ActionSpec {
 //				panic("mock out the Spec method")
@@ -549,14 +560,26 @@ var _ interfaces.Action = &ActionMock{}
 //
 //	}
 type ActionMock struct {
+	// EnabledFunc mocks the Enabled method.
+	EnabledFunc func() bool
+
 	// ExecuteFunc mocks the Execute method.
 	ExecuteFunc func(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (string, error)
+
+	// FlagsFunc mocks the Flags method.
+	FlagsFunc func() []cli.Flag
+
+	// LogValueFunc mocks the LogValue method.
+	LogValueFunc func() slog.Value
 
 	// SpecFunc mocks the Spec method.
 	SpecFunc func() model.ActionSpec
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// Enabled holds details about calls to the Enabled method.
+		Enabled []struct {
+		}
 		// Execute holds details about calls to the Execute method.
 		Execute []struct {
 			// Ctx is the ctx argument value.
@@ -568,12 +591,48 @@ type ActionMock struct {
 			// Args is the args argument value.
 			Args model.Arguments
 		}
+		// Flags holds details about calls to the Flags method.
+		Flags []struct {
+		}
+		// LogValue holds details about calls to the LogValue method.
+		LogValue []struct {
+		}
 		// Spec holds details about calls to the Spec method.
 		Spec []struct {
 		}
 	}
-	lockExecute sync.RWMutex
-	lockSpec    sync.RWMutex
+	lockEnabled  sync.RWMutex
+	lockExecute  sync.RWMutex
+	lockFlags    sync.RWMutex
+	lockLogValue sync.RWMutex
+	lockSpec     sync.RWMutex
+}
+
+// Enabled calls EnabledFunc.
+func (mock *ActionMock) Enabled() bool {
+	if mock.EnabledFunc == nil {
+		panic("ActionMock.EnabledFunc: method is nil but Action.Enabled was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockEnabled.Lock()
+	mock.calls.Enabled = append(mock.calls.Enabled, callInfo)
+	mock.lockEnabled.Unlock()
+	return mock.EnabledFunc()
+}
+
+// EnabledCalls gets all the calls that were made to Enabled.
+// Check the length with:
+//
+//	len(mockedAction.EnabledCalls())
+func (mock *ActionMock) EnabledCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockEnabled.RLock()
+	calls = mock.calls.Enabled
+	mock.lockEnabled.RUnlock()
+	return calls
 }
 
 // Execute calls ExecuteFunc.
@@ -617,6 +676,60 @@ func (mock *ActionMock) ExecuteCalls() []struct {
 	mock.lockExecute.RLock()
 	calls = mock.calls.Execute
 	mock.lockExecute.RUnlock()
+	return calls
+}
+
+// Flags calls FlagsFunc.
+func (mock *ActionMock) Flags() []cli.Flag {
+	if mock.FlagsFunc == nil {
+		panic("ActionMock.FlagsFunc: method is nil but Action.Flags was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockFlags.Lock()
+	mock.calls.Flags = append(mock.calls.Flags, callInfo)
+	mock.lockFlags.Unlock()
+	return mock.FlagsFunc()
+}
+
+// FlagsCalls gets all the calls that were made to Flags.
+// Check the length with:
+//
+//	len(mockedAction.FlagsCalls())
+func (mock *ActionMock) FlagsCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockFlags.RLock()
+	calls = mock.calls.Flags
+	mock.lockFlags.RUnlock()
+	return calls
+}
+
+// LogValue calls LogValueFunc.
+func (mock *ActionMock) LogValue() slog.Value {
+	if mock.LogValueFunc == nil {
+		panic("ActionMock.LogValueFunc: method is nil but Action.LogValue was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockLogValue.Lock()
+	mock.calls.LogValue = append(mock.calls.LogValue, callInfo)
+	mock.lockLogValue.Unlock()
+	return mock.LogValueFunc()
+}
+
+// LogValueCalls gets all the calls that were made to LogValue.
+// Check the length with:
+//
+//	len(mockedAction.LogValueCalls())
+func (mock *ActionMock) LogValueCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockLogValue.RLock()
+	calls = mock.calls.LogValue
+	mock.lockLogValue.RUnlock()
 	return calls
 }
 
