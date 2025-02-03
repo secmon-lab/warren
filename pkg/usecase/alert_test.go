@@ -65,7 +65,7 @@ func TestPlanAction(t *testing.T) {
 	client, err := genai.NewClient(ctx, vars.Get("TEST_GEMINI_PROJECT_ID"), vars.Get("TEST_GEMINI_LOCATION"))
 	gt.NoError(t, err)
 	geminiModel := client.GenerativeModel("gemini-2.0-flash-exp")
-
+	geminiModel.GenerationConfig.ResponseMIMEType = "application/json"
 	ssn := geminiModel.StartChat()
 
 	actionSvc := service.NewActionService([]interfaces.Action{

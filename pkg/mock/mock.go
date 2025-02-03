@@ -536,7 +536,7 @@ var _ interfaces.Action = &ActionMock{}
 //
 //		// make and configure a mocked interfaces.Action
 //		mockedAction := &ActionMock{
-//			ExecuteFunc: func(ctx context.Context, ssn interfaces.GenAIChatSession, args model.Arguments) (string, error) {
+//			ExecuteFunc: func(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (string, error) {
 //				panic("mock out the Execute method")
 //			},
 //			SpecFunc: func() model.ActionSpec {
@@ -550,7 +550,7 @@ var _ interfaces.Action = &ActionMock{}
 //	}
 type ActionMock struct {
 	// ExecuteFunc mocks the Execute method.
-	ExecuteFunc func(ctx context.Context, ssn interfaces.GenAIChatSession, args model.Arguments) (string, error)
+	ExecuteFunc func(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (string, error)
 
 	// SpecFunc mocks the Spec method.
 	SpecFunc func() model.ActionSpec
@@ -561,6 +561,8 @@ type ActionMock struct {
 		Execute []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// Slack is the slack argument value.
+			Slack interfaces.SlackService
 			// Ssn is the ssn argument value.
 			Ssn interfaces.GenAIChatSession
 			// Args is the args argument value.
@@ -575,23 +577,25 @@ type ActionMock struct {
 }
 
 // Execute calls ExecuteFunc.
-func (mock *ActionMock) Execute(ctx context.Context, ssn interfaces.GenAIChatSession, args model.Arguments) (string, error) {
+func (mock *ActionMock) Execute(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (string, error) {
 	if mock.ExecuteFunc == nil {
 		panic("ActionMock.ExecuteFunc: method is nil but Action.Execute was just called")
 	}
 	callInfo := struct {
-		Ctx  context.Context
-		Ssn  interfaces.GenAIChatSession
-		Args model.Arguments
+		Ctx   context.Context
+		Slack interfaces.SlackService
+		Ssn   interfaces.GenAIChatSession
+		Args  model.Arguments
 	}{
-		Ctx:  ctx,
-		Ssn:  ssn,
-		Args: args,
+		Ctx:   ctx,
+		Slack: slack,
+		Ssn:   ssn,
+		Args:  args,
 	}
 	mock.lockExecute.Lock()
 	mock.calls.Execute = append(mock.calls.Execute, callInfo)
 	mock.lockExecute.Unlock()
-	return mock.ExecuteFunc(ctx, ssn, args)
+	return mock.ExecuteFunc(ctx, slack, ssn, args)
 }
 
 // ExecuteCalls gets all the calls that were made to Execute.
@@ -599,14 +603,16 @@ func (mock *ActionMock) Execute(ctx context.Context, ssn interfaces.GenAIChatSes
 //
 //	len(mockedAction.ExecuteCalls())
 func (mock *ActionMock) ExecuteCalls() []struct {
-	Ctx  context.Context
-	Ssn  interfaces.GenAIChatSession
-	Args model.Arguments
+	Ctx   context.Context
+	Slack interfaces.SlackService
+	Ssn   interfaces.GenAIChatSession
+	Args  model.Arguments
 } {
 	var calls []struct {
-		Ctx  context.Context
-		Ssn  interfaces.GenAIChatSession
-		Args model.Arguments
+		Ctx   context.Context
+		Slack interfaces.SlackService
+		Ssn   interfaces.GenAIChatSession
+		Args  model.Arguments
 	}
 	mock.lockExecute.RLock()
 	calls = mock.calls.Execute

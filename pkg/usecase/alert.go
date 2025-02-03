@@ -84,7 +84,7 @@ func (uc *UseCases) runWorkflow(ctx context.Context, alert model.Alert) error {
 		}
 		logger.Info("action planned", "action", actionPrompt)
 
-		actionResult, err := uc.actionService.Execute(ctx, actionPrompt.Action, ssn, actionPrompt.Args)
+		actionResult, err := uc.actionService.Execute(ctx, uc.slackService, actionPrompt.Action, ssn, actionPrompt.Args)
 		if err != nil {
 			return goerr.Wrap(err, "failed to execute action")
 		}
@@ -117,13 +117,10 @@ func planAction(ctx context.Context, ssn interfaces.GenAIChatSession, prePrompt 
 	if !ok || text == "" {
 		return nil, eb.New("no action prompt result")
 	}
-	raw := strings.TrimSpace(string(text))
-	raw = strings.TrimPrefix(raw, "```json")
-	raw = strings.TrimSuffix(raw, "```")
 
 	var result prompt.ActionPromptResult
-	if err := json.Unmarshal([]byte(raw), &result); err != nil {
-		return nil, eb.Wrap(err, "failed to unmarshal action prompt result", goerr.V("raw", raw))
+	if err := json.Unmarshal([]byte(text), &result); err != nil {
+		return nil, eb.Wrap(err, "failed to unmarshal action prompt result", goerr.V("text", text))
 	}
 
 	return &result, nil

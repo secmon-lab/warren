@@ -58,5 +58,6 @@ func (x *GeminiCfg) Configure(ctx context.Context) (*genai.GenerativeModel, erro
 	}
 
 	model := client.GenerativeModel(x.model)
+	model.GenerationConfig.ResponseMIMEType = "application/json"
 	return model, nil
 }
