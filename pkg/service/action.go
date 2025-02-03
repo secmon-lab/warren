@@ -37,11 +37,11 @@ func (x *ActionService) Spec() []model.ActionSpec {
 	return specs
 }
 
-func (x *ActionService) Execute(ctx context.Context, slack interfaces.SlackService, name string, ssn interfaces.GenAIChatSession, args model.Arguments) (string, error) {
+func (x *ActionService) Execute(ctx context.Context, slack interfaces.SlackService, name string, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
 	logger := logging.From(ctx)
 	action, ok := x.actions[name]
 	if !ok {
-		return "", goerr.New("unknown action", goerr.V("name", name))
+		return nil, goerr.New("unknown action", goerr.V("name", name))
 	}
 
 	logger.Info("executing action", "name", name, "args", args)

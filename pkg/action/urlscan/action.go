@@ -77,16 +77,16 @@ func (x *Action) Spec() model.ActionSpec {
 	}
 }
 
-func (x *Action) Execute(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (string, error) {
+func (x *Action) Execute(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
 	url, ok := args["url"]
 	if !ok {
-		return "", goerr.New("url is required")
+		return nil, goerr.New("url is required")
 	}
 
 	client := &http.Client{}
 	req, err := http.NewRequestWithContext(ctx, "POST", x.baseURL+"/scan", strings.NewReader(`{"url":"`+url+`"}`))
 	if err != nil {
-		return "", goerr.Wrap(err, "failed to create request")
+		return nil, goerr.Wrap(err, "failed to create request")
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -94,13 +94,13 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackService, ssn
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", goerr.Wrap(err, "failed to send request")
+		return nil, goerr.Wrap(err, "failed to send request")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", goerr.New("failed to scan URL", goerr.V("status_code", resp.StatusCode), goerr.V("body", string(body)))
+		return nil, goerr.New("failed to scan URL", goerr.V("status_code", resp.StatusCode), goerr.V("body", string(body)))
 	}
 
 	var result struct {
@@ -109,7 +109,7 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackService, ssn
 		Result  string `json:"result"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", goerr.Wrap(err, "failed to decode response")
+		return nil, goerr.Wrap(err, "failed to decode response")
 	}
 
 	// Poll the result API until scan is complete
@@ -119,12 +119,12 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackService, ssn
 
 		req, err := http.NewRequestWithContext(ctx, "GET", resultURL, nil)
 		if err != nil {
-			return "", goerr.Wrap(err, "failed to create result request")
+			return nil, goerr.Wrap(err, "failed to create result request")
 		}
 
 		resp, err := client.Do(req)
 		if err != nil {
-			return "", goerr.Wrap(err, "failed to get result")
+			return nil, goerr.Wrap(err, "failed to get result")
 		}
 		defer resp.Body.Close()
 
@@ -132,16 +132,20 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackService, ssn
 		case http.StatusOK:
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
-				return "", goerr.Wrap(err, "failed to read response body")
+				return nil, goerr.Wrap(err, "failed to read response body")
 			}
-			return string(body), nil
+			return &model.ActionResult{
+				Message: "Scan result of " + url,
+				Type:    model.ActionResultTypeJSON,
+				Data:    string(body),
+			}, nil
 		case http.StatusNotFound:
 			continue
 		default:
 			body, _ := io.ReadAll(resp.Body)
-			return "", goerr.New("failed to get scan result", goerr.V("status_code", resp.StatusCode), goerr.V("body", string(body)))
+			return nil, goerr.New("failed to get scan result", goerr.V("status_code", resp.StatusCode), goerr.V("body", string(body)))
 		}
 	}
 
-	return "", goerr.New("failed to get scan result")
+	return nil, goerr.New("failed to get scan result")
 }

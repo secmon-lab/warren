@@ -116,7 +116,7 @@ func TestURLScan(t *testing.T) {
 					}
 
 					gt.NoError(t, err)
-					gt.Value(t, resp).Equal(tc.wantResp)
+					gt.Value(t, resp.Data).Equal(tc.wantResp)
 					return nil
 				},
 			}
@@ -161,8 +161,9 @@ func TestSendRequest(t *testing.T) {
 		Action: func(ctx context.Context, c *cli.Command) error {
 			resp, err := action.Execute(ctx, nil, nil, model.Arguments{"url": "https://example.com"})
 			gt.NoError(t, err)
-			gt.NotEqual(t, resp, "")
-			t.Log(resp)
+			gt.NotEqual(t, resp, nil)
+			gt.Equal(t, resp.Type, model.ActionResultTypeJSON)
+			gt.String(t, resp.Data).Contains("https://example.com")
 			return nil
 		},
 	}

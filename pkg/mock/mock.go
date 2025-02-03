@@ -541,7 +541,7 @@ var _ interfaces.Action = &ActionMock{}
 //			EnabledFunc: func() bool {
 //				panic("mock out the Enabled method")
 //			},
-//			ExecuteFunc: func(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (string, error) {
+//			ExecuteFunc: func(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
 //				panic("mock out the Execute method")
 //			},
 //			FlagsFunc: func() []cli.Flag {
@@ -564,7 +564,7 @@ type ActionMock struct {
 	EnabledFunc func() bool
 
 	// ExecuteFunc mocks the Execute method.
-	ExecuteFunc func(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (string, error)
+	ExecuteFunc func(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error)
 
 	// FlagsFunc mocks the Flags method.
 	FlagsFunc func() []cli.Flag
@@ -636,7 +636,7 @@ func (mock *ActionMock) EnabledCalls() []struct {
 }
 
 // Execute calls ExecuteFunc.
-func (mock *ActionMock) Execute(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (string, error) {
+func (mock *ActionMock) Execute(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
 	if mock.ExecuteFunc == nil {
 		panic("ActionMock.ExecuteFunc: method is nil but Action.Execute was just called")
 	}

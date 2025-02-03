@@ -6,6 +6,20 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 )
 
+type ActionResultType string
+
+const (
+	ActionResultTypeString ActionResultType = "string"
+	ActionResultTypeJSON   ActionResultType = "json"
+	ActionResultTypeCVS    ActionResultType = "cvs"
+)
+
+type ActionResult struct {
+	Message string
+	Type    ActionResultType
+	Data    string
+}
+
 type ActionSpec struct {
 	Name        string
 	Description string
