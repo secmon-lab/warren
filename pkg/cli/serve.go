@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/secmon-lab/warren/pkg/action/otx"
 	"github.com/secmon-lab/warren/pkg/action/urlscan"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/interfaces"
@@ -30,6 +31,7 @@ func cmdServe() *cli.Command {
 
 	actions := []interfaces.Action{
 		&urlscan.Action{},
+		&otx.Action{},
 	}
 
 	flags := joinFlags(
