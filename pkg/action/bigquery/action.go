@@ -18,31 +18,36 @@ import (
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/urfave/cli/v3"
-	"google.golang.org/api/iterator"
 	"gopkg.in/yaml.v3"
 )
 
 type Action struct {
-	projectID string
-	cfgFile   string
-	cfg       BigQueryConfig
-	byteLimit int64
-	client    *bigquery.Client
+	projectID        string
+	cfgFile          string
+	cfg              bqConfig
+	byteLimit        int64
+	maxGenQueryRetry int
+	bqFactory        BigQueryClientFactory
 }
 
-type BigQueryConfig struct {
-	Tables []TableConfig `yaml:"tables"`
-	Limit  BigQueryLimit `yaml:"limit"`
+type bqConfig struct {
+	Tables []tableConfig `yaml:"tables"`
+	Limit  bqLimit       `yaml:"limit"`
+	Retry  bqRetry       `yaml:"retry"`
 }
 
-type BigQueryLimit struct {
+type bqLimit struct {
 	Bytes string `yaml:"bytes"`
 	Rows  int64  `yaml:"rows"`
 }
 
-type TableConfig struct {
+type tableConfig struct {
 	TableID     string `yaml:"id"`
 	Description string `yaml:"description"`
+}
+
+type bqRetry struct {
+	MaxGenQuery int `yaml:"max_gen_query"`
 }
 
 func (x *Action) Flags() []cli.Flag {
@@ -110,17 +115,20 @@ func (x *Action) Configure(ctx context.Context) error {
 		return goerr.Wrap(err, "failed to decode config file", goerr.V("file", x.cfgFile))
 	}
 
-	client, err := bigquery.NewClient(ctx, x.projectID)
-	if err != nil {
-		return goerr.Wrap(err, "failed to create bigquery client")
-	}
-	x.client = client
-
 	byteLimit, err := humanize.ParseBytes(x.cfg.Limit.Bytes)
 	if err != nil {
 		return goerr.Wrap(err, "failed to parse byte limit", goerr.V("byte_limit", x.cfg.Limit.Bytes))
 	}
 	x.byteLimit = int64(byteLimit)
+
+	x.maxGenQueryRetry = x.cfg.Retry.MaxGenQuery
+	if x.maxGenQueryRetry < 1 {
+		x.maxGenQueryRetry = 1
+	}
+
+	if x.bqFactory == nil {
+		x.bqFactory = newBigQueryClient
+	}
 
 	return nil
 }
@@ -151,14 +159,13 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackService, ssn
 	datasetID := parts[1]
 	tableID := parts[2]
 
-	metaClient, err := bigquery.NewClient(ctx, projectID)
+	client, err := x.bqFactory(ctx, projectID)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create bigquery client")
 	}
+	defer client.Close()
 
-	table := metaClient.Dataset(datasetID).Table(tableID)
-
-	meta, err := table.Metadata(ctx)
+	meta, err := client.GetMetadata(ctx, datasetID, tableID)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get table metadata")
 	}
@@ -166,65 +173,49 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackService, ssn
 
 	var finalQuery string
 	var comment string
-	for finalQuery == "" {
+
+	for i := 0; i < x.maxGenQueryRetry; i++ {
 		result, err := x.getNewQuery(ctx, ssn, fullTableID, meta, comment)
 		if err != nil {
 			return nil, err
 		}
 		eb = eb.With(goerr.V("query", result.Query))
 
-		query := x.client.Query(result.Query)
-		query.DryRun = true
-		job, err := query.Run(ctx)
+		status, err := client.DryRun(ctx, result.Query)
 		if err != nil {
 			return nil, eb.Wrap(err, "failed to run query")
 		}
 
-		js, err := job.Wait(ctx)
-		if err != nil {
-			return nil, eb.Wrap(err, "failed to wait for query job")
-		}
-
-		if js.Statistics.TotalBytesProcessed > x.byteLimit {
-			comment = fmt.Sprintf("The query result is too large. Please try again with a smaller query. The query result is %d bytes, but the limit is %d bytes.", js.Statistics.TotalBytesProcessed, x.byteLimit)
+		if status.Statistics.TotalBytesProcessed > x.byteLimit {
+			comment = fmt.Sprintf("The query result is too large. Please try again with a smaller query. The your generated query result is %d bytes, but the limit is %d bytes.", status.Statistics.TotalBytesProcessed, x.byteLimit)
 			continue
 		}
 
 		finalQuery = result.Query
+		break
 	}
-
-	query := x.client.Query(finalQuery)
-	eb = eb.With(goerr.V("query", finalQuery))
-
-	iter, err := query.Read(ctx)
-	if err != nil {
-		return nil, eb.Wrap(err, "failed to read query result")
+	if finalQuery == "" {
+		return nil, eb.New("failed to generate query")
 	}
 
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetIndent("", "  ")
-
-	// Write data rows as JSONL
-	for {
-		var row []bigquery.Value
-		err := iter.Next(&row)
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, eb.Wrap(err, "failed to read query result")
-		}
-
+	writer := func(row map[string]bigquery.Value) error {
 		if err := enc.Encode(row); err != nil {
-			return nil, eb.Wrap(err, "failed to encode row")
+			return goerr.Wrap(err, "failed to encode row")
 		}
+		return nil
+	}
+
+	if err = client.Query(ctx, finalQuery, writer); err != nil {
+		return nil, eb.Wrap(err, "failed to execute query")
 	}
 
 	return &model.ActionResult{
 		Type:    model.ActionResultTypeJSON,
 		Data:    buf.String(),
-		Message: fmt.Sprintf("Retrieved %d rows from %s", iter.TotalRows, fullTableID),
+		Message: fmt.Sprintf("Retrieved data from %s", fullTableID),
 	}, nil
 }
 

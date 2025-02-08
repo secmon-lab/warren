@@ -82,6 +82,13 @@ func (x ActionSpec) Validate(args Arguments) error {
 	// Check if all choices are valid
 	for _, arg := range x.Args {
 		if arg.Choices != nil {
+			if args[arg.Name] == nil {
+				if arg.Required {
+					return goerr.New("required argument is missing", goerr.V("name", arg.Name))
+				}
+				continue
+			}
+
 			if !arg.Choices.has(args[arg.Name].(string)) {
 				return goerr.New("invalid choice", goerr.V("name", arg.Name), goerr.V("value", args[arg.Name]))
 			}

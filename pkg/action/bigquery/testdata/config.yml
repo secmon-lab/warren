@@ -6,3 +6,5 @@ tables:
 limit:
   bytes: 100MB
   rows: 256
+retry:
+  max_gen_query: 3
