@@ -90,7 +90,7 @@ func (x *Action) Configure(ctx context.Context) error {
 	return nil
 }
 
-func (x *Action) Execute(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
+func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
 	if x.apiKey == "" {
 		return nil, goerr.New("OTX API key is required")
 	}

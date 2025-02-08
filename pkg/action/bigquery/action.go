@@ -140,7 +140,7 @@ type queryResult struct {
 	Query string `json:"query"`
 }
 
-func (x *Action) Execute(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
+func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
 	if err := x.Spec().Validate(args); err != nil {
 		return nil, err
 	}

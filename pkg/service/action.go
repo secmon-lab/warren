@@ -37,7 +37,7 @@ func (x *ActionService) Spec() []model.ActionSpec {
 	return specs
 }
 
-func (x *ActionService) Execute(ctx context.Context, slack interfaces.SlackService, name string, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
+func (x *ActionService) Execute(ctx context.Context, slack interfaces.SlackThreadService, name string, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
 	logger := logging.From(ctx)
 	action, ok := x.actions[name]
 	if !ok {

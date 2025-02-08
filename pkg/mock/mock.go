@@ -750,7 +750,7 @@ var _ interfaces.Action = &ActionMock{}
 //			ConfigureFunc: func(ctx context.Context) error {
 //				panic("mock out the Configure method")
 //			},
-//			ExecuteFunc: func(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
+//			ExecuteFunc: func(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
 //				panic("mock out the Execute method")
 //			},
 //			FlagsFunc: func() []cli.Flag {
@@ -773,7 +773,7 @@ type ActionMock struct {
 	ConfigureFunc func(ctx context.Context) error
 
 	// ExecuteFunc mocks the Execute method.
-	ExecuteFunc func(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error)
+	ExecuteFunc func(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error)
 
 	// FlagsFunc mocks the Flags method.
 	FlagsFunc func() []cli.Flag
@@ -796,7 +796,7 @@ type ActionMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Slack is the slack argument value.
-			Slack interfaces.SlackService
+			Slack interfaces.SlackThreadService
 			// Ssn is the ssn argument value.
 			Ssn interfaces.GenAIChatSession
 			// Args is the args argument value.
@@ -852,13 +852,13 @@ func (mock *ActionMock) ConfigureCalls() []struct {
 }
 
 // Execute calls ExecuteFunc.
-func (mock *ActionMock) Execute(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
+func (mock *ActionMock) Execute(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
 	if mock.ExecuteFunc == nil {
 		panic("ActionMock.ExecuteFunc: method is nil but Action.Execute was just called")
 	}
 	callInfo := struct {
 		Ctx   context.Context
-		Slack interfaces.SlackService
+		Slack interfaces.SlackThreadService
 		Ssn   interfaces.GenAIChatSession
 		Args  model.Arguments
 	}{
@@ -879,13 +879,13 @@ func (mock *ActionMock) Execute(ctx context.Context, slack interfaces.SlackServi
 //	len(mockedAction.ExecuteCalls())
 func (mock *ActionMock) ExecuteCalls() []struct {
 	Ctx   context.Context
-	Slack interfaces.SlackService
+	Slack interfaces.SlackThreadService
 	Ssn   interfaces.GenAIChatSession
 	Args  model.Arguments
 } {
 	var calls []struct {
 		Ctx   context.Context
-		Slack interfaces.SlackService
+		Slack interfaces.SlackThreadService
 		Ssn   interfaces.GenAIChatSession
 		Args  model.Arguments
 	}

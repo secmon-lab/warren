@@ -84,7 +84,7 @@ func (uc *UseCases) runWorkflow(ctx context.Context, alert model.Alert) error {
 		}
 		logger.Info("action planned", "action", actionPrompt)
 
-		actionResult, err := uc.actionService.Execute(ctx, uc.slackService, actionPrompt.Action, ssn, actionPrompt.Args)
+		actionResult, err := uc.actionService.Execute(ctx, thread, actionPrompt.Action, ssn, actionPrompt.Args)
 		if err != nil {
 			return goerr.Wrap(err, "failed to execute action")
 		}
