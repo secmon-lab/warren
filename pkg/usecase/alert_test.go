@@ -79,7 +79,7 @@ func TestPlanAction(t *testing.T) {
 							Type:        "string",
 							Description: "The name of the BigQuery table to query",
 							Required:    true,
-							Values: []model.ValueSpec{
+							Choices: []model.ChoiceSpec{
 								{
 									Value:       "cloudtrail_logs",
 									Description: "stored CloudTrail logs",

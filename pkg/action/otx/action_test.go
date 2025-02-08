@@ -116,7 +116,7 @@ func TestOTX_Enabled(t *testing.T) {
 		Name:  "otx",
 		Flags: action.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.False(t, action.Enabled())
+			gt.Equal(t, action.Configure(ctx), model.ErrActionUnavailable)
 			return nil
 		},
 	}

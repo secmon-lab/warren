@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/interfaces"
@@ -79,8 +80,14 @@ func (x *Action) LogValue() slog.Value {
 	)
 }
 
-func (x *Action) Enabled() bool {
-	return x.apiKey != ""
+func (x *Action) Configure(ctx context.Context) error {
+	if x.apiKey == "" {
+		return model.ErrActionUnavailable
+	}
+	if _, err := url.Parse(x.baseURL); err != nil {
+		return goerr.Wrap(err, "invalid base URL", goerr.V("base_url", x.baseURL))
+	}
+	return nil
 }
 
 func (x *Action) Execute(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
@@ -93,20 +100,20 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackService, ssn
 
 	// Determine which indicator type was provided
 	switch {
-	case args["domain"] != "":
-		indicator = args["domain"]
+	case args["domain"] != nil:
+		indicator = args["domain"].(string)
 		indicatorType = "domain"
-	case args["ipv4"] != "":
-		indicator = args["ipv4"]
+	case args["ipv4"] != nil:
+		indicator = args["ipv4"].(string)
 		indicatorType = "IPv4"
-	case args["ipv6"] != "":
-		indicator = args["ipv6"]
+	case args["ipv6"] != nil:
+		indicator = args["ipv6"].(string)
 		indicatorType = "IPv6"
-	case args["hostname"] != "":
-		indicator = args["hostname"]
+	case args["hostname"] != nil:
+		indicator = args["hostname"].(string)
 		indicatorType = "hostname"
-	case args["file_hash"] != "":
-		indicator = args["file_hash"]
+	case args["file_hash"] != nil:
+		indicator = args["file_hash"].(string)
 		indicatorType = "file"
 	default:
 		return nil, goerr.New("no valid indicator provided")

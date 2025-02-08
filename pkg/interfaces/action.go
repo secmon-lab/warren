@@ -12,6 +12,6 @@ type Action interface {
 	Spec() model.ActionSpec
 	Execute(ctx context.Context, slack SlackService, ssn GenAIChatSession, args model.Arguments) (*model.ActionResult, error)
 	Flags() []cli.Flag
-	Enabled() bool
+	Configure(ctx context.Context) error
 	LogValue() slog.Value
 }

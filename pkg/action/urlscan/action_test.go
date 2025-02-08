@@ -15,12 +15,12 @@ import (
 
 func TestURLScan(t *testing.T) {
 	testCases := []struct {
-		name        string
-		args        model.Arguments
-		scanResp    string
-		resultResps []string
-		wantResp    string
-		wantErr     bool
+		name            string
+		args            model.Arguments
+		scanResp        string
+		resultResponses []string
+		wantResp        string
+		wantErr         bool
 	}{
 		{
 			name: "valid response",
@@ -32,7 +32,7 @@ func TestURLScan(t *testing.T) {
 				"message": "Submission successful",
 				"result": "https://urlscan.io/result/test-uuid"
 			}`,
-			resultResps: []string{
+			resultResponses: []string{
 				`{"data": "test result"}`,
 			},
 			wantResp: `{"data": "test result"}`,
@@ -61,7 +61,7 @@ func TestURLScan(t *testing.T) {
 				"message": "Submission successful",
 				"result": "https://urlscan.io/result/test-uuid"
 			}`,
-			resultResps: []string{
+			resultResponses: []string{
 				"", "", "", "", "", // 5 not found responses
 			},
 			wantErr: true,
@@ -87,11 +87,11 @@ func TestURLScan(t *testing.T) {
 				}
 
 				if r.Method == "GET" {
-					if resultCallCount >= len(tc.resultResps) {
+					if resultCallCount >= len(tc.resultResponses) {
 						w.WriteHeader(http.StatusNotFound)
 						return
 					}
-					resp := tc.resultResps[resultCallCount]
+					resp := tc.resultResponses[resultCallCount]
 					resultCallCount++
 					if resp == "" {
 						w.WriteHeader(http.StatusNotFound)
@@ -134,11 +134,12 @@ func TestURLScan(t *testing.T) {
 func TestURLScan_Enabled(t *testing.T) {
 	var action urlscan.Action
 
+	t.Setenv("WARREN_URLSCAN_API_KEY", "")
 	cmd := cli.Command{
 		Name:  "urlscan",
 		Flags: action.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.False(t, action.Enabled())
+			gt.Equal(t, action.Configure(ctx), model.ErrActionUnavailable)
 			return nil
 		},
 	}

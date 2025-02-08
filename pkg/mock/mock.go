@@ -538,8 +538,8 @@ var _ interfaces.Action = &ActionMock{}
 //
 //		// make and configure a mocked interfaces.Action
 //		mockedAction := &ActionMock{
-//			EnabledFunc: func() bool {
-//				panic("mock out the Enabled method")
+//			ConfigureFunc: func(ctx context.Context) error {
+//				panic("mock out the Configure method")
 //			},
 //			ExecuteFunc: func(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
 //				panic("mock out the Execute method")
@@ -560,8 +560,8 @@ var _ interfaces.Action = &ActionMock{}
 //
 //	}
 type ActionMock struct {
-	// EnabledFunc mocks the Enabled method.
-	EnabledFunc func() bool
+	// ConfigureFunc mocks the Configure method.
+	ConfigureFunc func(ctx context.Context) error
 
 	// ExecuteFunc mocks the Execute method.
 	ExecuteFunc func(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error)
@@ -577,8 +577,10 @@ type ActionMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
-		// Enabled holds details about calls to the Enabled method.
-		Enabled []struct {
+		// Configure holds details about calls to the Configure method.
+		Configure []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
 		}
 		// Execute holds details about calls to the Execute method.
 		Execute []struct {
@@ -601,37 +603,42 @@ type ActionMock struct {
 		Spec []struct {
 		}
 	}
-	lockEnabled  sync.RWMutex
-	lockExecute  sync.RWMutex
-	lockFlags    sync.RWMutex
-	lockLogValue sync.RWMutex
-	lockSpec     sync.RWMutex
+	lockConfigure sync.RWMutex
+	lockExecute   sync.RWMutex
+	lockFlags     sync.RWMutex
+	lockLogValue  sync.RWMutex
+	lockSpec      sync.RWMutex
 }
 
-// Enabled calls EnabledFunc.
-func (mock *ActionMock) Enabled() bool {
-	if mock.EnabledFunc == nil {
-		panic("ActionMock.EnabledFunc: method is nil but Action.Enabled was just called")
+// Configure calls ConfigureFunc.
+func (mock *ActionMock) Configure(ctx context.Context) error {
+	if mock.ConfigureFunc == nil {
+		panic("ActionMock.ConfigureFunc: method is nil but Action.Configure was just called")
 	}
 	callInfo := struct {
-	}{}
-	mock.lockEnabled.Lock()
-	mock.calls.Enabled = append(mock.calls.Enabled, callInfo)
-	mock.lockEnabled.Unlock()
-	return mock.EnabledFunc()
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockConfigure.Lock()
+	mock.calls.Configure = append(mock.calls.Configure, callInfo)
+	mock.lockConfigure.Unlock()
+	return mock.ConfigureFunc(ctx)
 }
 
-// EnabledCalls gets all the calls that were made to Enabled.
+// ConfigureCalls gets all the calls that were made to Configure.
 // Check the length with:
 //
-//	len(mockedAction.EnabledCalls())
-func (mock *ActionMock) EnabledCalls() []struct {
+//	len(mockedAction.ConfigureCalls())
+func (mock *ActionMock) ConfigureCalls() []struct {
+	Ctx context.Context
 } {
 	var calls []struct {
+		Ctx context.Context
 	}
-	mock.lockEnabled.RLock()
-	calls = mock.calls.Enabled
-	mock.lockEnabled.RUnlock()
+	mock.lockConfigure.RLock()
+	calls = mock.calls.Configure
+	mock.lockConfigure.RUnlock()
 	return calls
 }
 

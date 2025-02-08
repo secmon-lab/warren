@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -50,8 +51,15 @@ func (x *Action) Flags() []cli.Flag {
 	}
 }
 
-func (x *Action) Enabled() bool {
-	return x.apiKey != ""
+func (x *Action) Configure(ctx context.Context) error {
+	if x.apiKey == "" {
+		return model.ErrActionUnavailable
+	}
+	if _, err := url.Parse(x.baseURL); err != nil {
+		return goerr.Wrap(err, "invalid base URL", goerr.V("base_url", x.baseURL))
+	}
+
+	return nil
 }
 
 func (x Action) LogValue() slog.Value {
@@ -78,7 +86,11 @@ func (x *Action) Spec() model.ActionSpec {
 }
 
 func (x *Action) Execute(ctx context.Context, slack interfaces.SlackService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
-	url, ok := args["url"]
+	if err := x.Spec().Validate(args); err != nil {
+		return nil, err
+	}
+
+	url, ok := args["url"].(string)
 	if !ok {
 		return nil, goerr.New("url is required")
 	}

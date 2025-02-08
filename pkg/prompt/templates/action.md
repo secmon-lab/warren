@@ -23,9 +23,8 @@ You have already investigated the alert and no further action is needed to decid
 
 Arguments are required to execute the action. Do not include any other arguments.
 {{ range .Args }}
-- `{{ .Name }}` ({{ .Type }}, {{ if .Required }}required{{ else }}optional{{ end }}): {{ .Description }} {{ if .Values }} Choose one of the following values: {{ end }}
-{{ if .Values }}{{ range .Values }}  - `{{ .Value }}`: {{ .Description }}
-{{ end }}
+- `{{ .Name }}` ({{ .Type }}, {{ if .Required }}required{{ else }}optional{{ end }}): {{ .Description }} {{ if .Choices }} Choose one of the following values: {{ end }}
+{{ range .Choices }}  - `{{ .Value }}`: {{ .Description }}
 {{ end }}
 {{ end }}
 {{ end }}
