@@ -58,12 +58,12 @@ func (uc *UseCases) runWorkflow(ctx context.Context, alert model.Alert) error {
 	}
 
 	// Post new alert to Slack and save the alert with Slack channel and message ID
-	threadID, msgID, err := uc.slackService.PostAlert(ctx, alert)
+	thread, err := uc.slackService.PostAlert(ctx, alert)
 	if err != nil {
 		return goerr.Wrap(err, "failed to post alert", goerr.V("alert", alert))
 	}
-	alert.SlackChannel = threadID
-	alert.SlackMessageID = msgID
+	alert.SlackChannel = thread.ChannelID()
+	alert.SlackMessageID = thread.ThreadID()
 
 	if err := uc.repository.PutAlert(ctx, alert); err != nil {
 		return goerr.Wrap(err, "failed to put alert", goerr.V("alert", alert))

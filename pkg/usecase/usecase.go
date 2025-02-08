@@ -75,11 +75,15 @@ func New(geminiStartChat interfaces.GetGeminiStartChat, opts ...Option) *UseCase
 	u := &UseCases{
 		geminiStartChat: geminiStartChat,
 		slackService: &mock.SlackServiceMock{
-			PostAlertFunc: func(ctx context.Context, alert model.Alert) (string, string, error) {
-				return "test", "test", nil
-			},
-			UpdateAlertFunc: func(ctx context.Context, alert model.Alert) error {
-				return nil
+			PostAlertFunc: func(ctx context.Context, alert model.Alert) (interfaces.SlackThreadService, error) {
+				return &mock.SlackThreadServiceMock{
+					ChannelIDFunc: func() string {
+						return "test"
+					},
+					ThreadIDFunc: func() string {
+						return "test"
+					},
+				}, nil
 			},
 			VerifyRequestFunc: func(header http.Header, body []byte) error {
 				return nil

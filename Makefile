@@ -3,7 +3,7 @@ all: mock
 # ---------------------------
 MOCK_OUT=pkg/mock/mock.go
 MOCK_SRC=./pkg/interfaces
-MOCK_INTERFACES=SlackService GenAIChatSession PolicyClient Repository Action
+MOCK_INTERFACES=SlackService SlackThreadService GenAIChatSession PolicyClient Repository Action
 
 mock: $(MOCK_OUT)
 

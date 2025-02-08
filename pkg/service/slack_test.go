@@ -6,16 +6,20 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 )
 
-func TestSlack(t *testing.T) {
+func newSlackService(t *testing.T) *service.Slack {
 	envs := test.NewEnvVars(t, "TEST_SLACK_CHANNEL_ID", "TEST_SLACK_OAUTH_TOKEN", "TEST_SLACK_SIGNING_SECRET")
+	return service.NewSlack(envs.Get("TEST_SLACK_OAUTH_TOKEN"), envs.Get("TEST_SLACK_SIGNING_SECRET"), envs.Get("TEST_SLACK_CHANNEL_ID"))
+}
 
-	svc := service.NewSlack(envs.Get("TEST_SLACK_OAUTH_TOKEN"), envs.Get("TEST_SLACK_SIGNING_SECRET"), envs.Get("TEST_SLACK_CHANNEL_ID"))
+func TestSlack(t *testing.T) {
+	svc := newSlackService(t)
 
-	_, _, err := svc.PostAlert(context.Background(), model.Alert{
+	_, err := svc.PostAlert(context.Background(), model.Alert{
 		Title:  "Test Alert Title",
 		Schema: "test.alert.v1",
 		Attributes: []model.Attribute{
@@ -42,19 +46,17 @@ func TestSlack(t *testing.T) {
 }
 
 func TestSlackUpdateAlert(t *testing.T) {
-	envs := test.NewEnvVars(t, "TEST_SLACK_CHANNEL_ID", "TEST_SLACK_OAUTH_TOKEN", "TEST_SLACK_SIGNING_SECRET")
-
-	svc := service.NewSlack(envs.Get("TEST_SLACK_OAUTH_TOKEN"), envs.Get("TEST_SLACK_SIGNING_SECRET"), envs.Get("TEST_SLACK_CHANNEL_ID"))
+	svc := newSlackService(t)
 
 	alert := model.Alert{
 		Title:  "Test Alert Title",
 		Schema: "test.alert.v1",
 	}
 
-	channelID, timestamp, err := svc.PostAlert(context.Background(), alert)
+	thread, err := svc.PostAlert(context.Background(), alert)
 	gt.NoError(t, err)
-	alert.SlackChannel = channelID
-	alert.SlackMessageID = timestamp
+	alert.SlackChannel = thread.ChannelID()
+	alert.SlackMessageID = thread.ThreadID()
 
 	alert.Title = "Updated Alert Title"
 	alert.Attributes = []model.Attribute{
@@ -64,5 +66,33 @@ func TestSlackUpdateAlert(t *testing.T) {
 		},
 	}
 
-	gt.NoError(t, svc.UpdateAlert(context.Background(), alert))
+	gt.NoError(t, thread.UpdateAlert(context.Background(), alert))
+}
+
+func TestSlackPostThreadMessages(t *testing.T) {
+	svc := newSlackService(t)
+
+	alert := model.Alert{
+		Title:  "Test Alert Title",
+		Schema: "test.alert.v1",
+	}
+
+	thread, err := svc.PostAlert(context.Background(), alert)
+	gt.NoError(t, err)
+	alert.SlackChannel = thread.ChannelID()
+	alert.SlackMessageID = thread.ThreadID()
+
+	gt.NoError(t, thread.PostNextAction(context.Background(), prompt.ActionPromptResult{
+		Action: "test",
+		Args: map[string]any{
+			"foo": "bar",
+			"baz": "qux",
+		},
+	}))
+
+	gt.NoError(t, thread.AttachFile(context.Background(),
+		"this is test data",
+		"test.csv",
+		[]byte("hoge,mage,fuga\nred,blue,green"),
+	))
 }
