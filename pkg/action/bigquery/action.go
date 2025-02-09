@@ -231,7 +231,9 @@ func (x *Action) getNewQuery(ctx context.Context, ssn interfaces.GenAIChatSessio
 	}
 
 	var queryRequest bytes.Buffer
-	tmpl.Execute(&queryRequest, queryArgs)
+	if err := tmpl.Execute(&queryRequest, queryArgs); err != nil {
+		return nil, goerr.Wrap(err, "failed to execute query template")
+	}
 
 	eb := goerr.NewBuilder(goerr.V("query", queryRequest.String()))
 

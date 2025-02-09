@@ -46,9 +46,15 @@ func TestFindSimilarAlert(t *testing.T) {
 		Title: "more different alert",
 		Attrs: []model.Attribute{{Key: "taste", Value: "sweet"}},
 	})
-	repo.PutAlert(ctx, alert1)
-	repo.PutAlert(ctx, alert2)
-	repo.PutAlert(ctx, alert3)
+	if err := repo.PutAlert(ctx, alert1); err != nil {
+		t.Fatal("failed to put alert1:", err)
+	}
+	if err := repo.PutAlert(ctx, alert2); err != nil {
+		t.Fatal("failed to put alert2:", err)
+	}
+	if err := repo.PutAlert(ctx, alert3); err != nil {
+		t.Fatal("failed to put alert3:", err)
+	}
 
 	alert, err := uc.FindSimilarAlert(ctx, newAlert)
 	gt.NoError(t, err)

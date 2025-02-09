@@ -54,9 +54,13 @@ func slackEventHandler(uc *usecase.UseCases) http.HandlerFunc {
 
 			switch ev := innerEvent.Data.(type) {
 			case *slackevents.AppMentionEvent:
-				uc.HandleSlackAppMention(r.Context(), ev)
+				if err := uc.HandleSlackAppMention(r.Context(), ev); err != nil {
+					logging.From(r.Context()).Error("failed to handle app mention", "error", err)
+				}
 			case *slackevents.MessageEvent:
-				uc.HandleSlackMessage(r.Context(), ev)
+				if err := uc.HandleSlackMessage(r.Context(), ev); err != nil {
+					logging.From(r.Context()).Error("failed to handle message", "error", err)
+				}
 			default:
 				logging.From(r.Context()).Warn("unknown event type", "event", ev, "body", string(body))
 			}

@@ -110,6 +110,7 @@ func cmdServe() *cli.Command {
 				enabledActions = append(enabledActions, action)
 				enabledActionNames = append(enabledActionNames, action.Spec().Name)
 			}
+			logging.Default().Info("enabled actions", "names", enabledActionNames)
 			actionSvc := service.NewActionService(enabledActions)
 
 			uc := usecase.New(

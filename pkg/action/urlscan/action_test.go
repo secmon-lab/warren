@@ -82,7 +82,9 @@ func TestURLScan(t *testing.T) {
 						return
 					}
 					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(tc.scanResp))
+					if _, err := w.Write([]byte(tc.scanResp)); err != nil {
+						t.Fatal("failed to write response:", err)
+					}
 					return
 				}
 
@@ -98,7 +100,9 @@ func TestURLScan(t *testing.T) {
 						return
 					}
 					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(resp))
+					if _, err := w.Write([]byte(resp)); err != nil {
+						t.Fatal("failed to write response:", err)
+					}
 					return
 				}
 			}))

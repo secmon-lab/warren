@@ -77,8 +77,8 @@ func TestOTX(t *testing.T) {
 					return
 				}
 				w.WriteHeader(tc.statusCode)
-				if tc.apiResp != "" {
-					w.Write([]byte(tc.apiResp))
+				if _, err := w.Write([]byte(tc.apiResp)); err != nil {
+					t.Fatal("failed to write response:", err)
 				}
 			}))
 			defer ts.Close()
