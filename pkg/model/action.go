@@ -62,16 +62,6 @@ type ChoiceSpec struct {
 
 type Arguments map[string]any
 
-// findArgumentSpec is kept for future use when implementing argument validation
-func findArgumentSpec(name string, spec []ArgumentSpec) *ArgumentSpec {
-	for _, s := range spec {
-		if s.Name == name {
-			return &s
-		}
-	}
-	return nil
-}
-
 func (x ActionSpec) Validate(args Arguments) error {
 	// Check if all required arguments are present
 	for _, arg := range x.Args {

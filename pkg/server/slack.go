@@ -40,14 +40,16 @@ func slackEventHandler(uc *usecase.UseCases) http.HandlerFunc {
 
 		switch eventsAPIEvent.Type {
 		case slackevents.URLVerification:
-			var r *slackevents.ChallengeResponse
-			err := json.Unmarshal([]byte(body), &r)
+			var response *slackevents.ChallengeResponse
+			err := json.Unmarshal([]byte(body), &response)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			w.Header().Set("Content-Type", "text")
-			w.Write([]byte(r.Challenge))
+			if _, err := w.Write([]byte(response.Challenge)); err != nil {
+				logging.From(r.Context()).Error("failed to write challenge response", "error", err)
+			}
 
 		case slackevents.CallbackEvent:
 			innerEvent := eventsAPIEvent.InnerEvent
