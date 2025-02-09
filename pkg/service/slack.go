@@ -47,7 +47,22 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 			slack.NewTextBlockObject("plain_text", alert.Title, false, false),
 		),
 		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", "*Schema:* "+alert.Schema, false, false),
+			slack.NewTextBlockObject("mrkdwn", "*Schema:* "+alert.Schema+"\n*Severity:* "+func() string {
+				switch alert.Severity {
+				case model.AlertSeverityCritical:
+					return ":rotating_light: *CRITICAL* :rotating_light:"
+				case model.AlertSeverityHigh:
+					return ":exclamation: *HIGH*"
+				case model.AlertSeverityMedium:
+					return ":warning: MEDIUM"
+				case model.AlertSeverityLow:
+					return ":eyes: LOW"
+				case model.AlertSeverityUnknown:
+					return ":question: unknown"
+				default:
+					return string(alert.Severity)
+				}
+			}(), false, false),
 			nil,
 			nil,
 		),

@@ -20,16 +20,27 @@ const (
 	AlertStatusClosed  AlertStatus = "closed"
 )
 
+type AlertSeverity string
+
+const (
+	AlertSeverityUnknown  AlertSeverity = "unknown"
+	AlertSeverityLow      AlertSeverity = "low"
+	AlertSeverityMedium   AlertSeverity = "medium"
+	AlertSeverityHigh     AlertSeverity = "high"
+	AlertSeverityCritical AlertSeverity = "critical"
+)
+
 type Alert struct {
-	ID         AlertID     `json:"id"`
-	Schema     string      `json:"schema"`
-	Title      string      `json:"title"`
-	Status     AlertStatus `json:"status"`
-	ParentID   AlertID     `json:"parent_id"`
-	CreatedAt  time.Time   `json:"created_at"`
-	UpdatedAt  time.Time   `json:"updated_at"`
-	Data       any         `json:"data"`
-	Attributes []Attribute `json:"attributes"`
+	ID         AlertID       `json:"id"`
+	Schema     string        `json:"schema"`
+	Title      string        `json:"title"`
+	Status     AlertStatus   `json:"status"`
+	Severity   AlertSeverity `json:"severity"`
+	ParentID   AlertID       `json:"parent_id"`
+	CreatedAt  time.Time     `json:"created_at"`
+	UpdatedAt  time.Time     `json:"updated_at"`
+	Data       any           `json:"data"`
+	Attributes []Attribute   `json:"attributes"`
 
 	SlackChannel   string `json:"slack_channel"`
 	SlackMessageID string `json:"slack_message_id"`
@@ -41,6 +52,7 @@ func NewAlert(ctx context.Context, schema string, data any, p PolicyAlert) Alert
 		Schema:     schema,
 		Title:      p.Title,
 		Status:     AlertStatusNew,
+		Severity:   AlertSeverityUnknown,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 		Data:       data,

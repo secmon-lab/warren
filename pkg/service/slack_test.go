@@ -48,10 +48,18 @@ func TestSlack(t *testing.T) {
 func TestSlackUpdateAlert(t *testing.T) {
 	svc := newSlackService(t)
 
-	alert := model.Alert{
-		Title:  "Test Alert Title",
-		Schema: "test.alert.v1",
-	}
+	alert := model.NewAlert(context.Background(), "test.alert.v1", map[string]interface{}{
+		"foo": "bar",
+		"baz": 123,
+	}, model.PolicyAlert{
+		Title: "Test Alert Title",
+		Attrs: []model.Attribute{
+			{
+				Key:   "severity",
+				Value: "high",
+			},
+		},
+	})
 
 	thread, err := svc.PostAlert(context.Background(), alert)
 	gt.NoError(t, err)
@@ -59,12 +67,7 @@ func TestSlackUpdateAlert(t *testing.T) {
 	alert.SlackMessageID = thread.ThreadID()
 
 	alert.Title = "Updated Alert Title"
-	alert.Attributes = []model.Attribute{
-		{
-			Key:   "severity",
-			Value: "low",
-		},
-	}
+	alert.Severity = model.AlertSeverityLow
 
 	gt.NoError(t, thread.UpdateAlert(context.Background(), alert))
 }
@@ -72,10 +75,18 @@ func TestSlackUpdateAlert(t *testing.T) {
 func TestSlackPostThreadMessages(t *testing.T) {
 	svc := newSlackService(t)
 
-	alert := model.Alert{
-		Title:  "Test Alert Title",
-		Schema: "test.alert.v1",
-	}
+	alert := model.NewAlert(context.Background(), "test.alert.v1", map[string]interface{}{
+		"foo": "bar",
+		"baz": 123,
+	}, model.PolicyAlert{
+		Title: "Test Alert Title",
+		Attrs: []model.Attribute{
+			{
+				Key:   "severity",
+				Value: "high",
+			},
+		},
+	})
 
 	thread, err := svc.PostAlert(context.Background(), alert)
 	gt.NoError(t, err)
