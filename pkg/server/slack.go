@@ -8,7 +8,9 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/usecase"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/slack-go/slack"
+	"github.com/slack-go/slack/slackevents"
 )
 
 func slackEventHandler(uc *usecase.UseCases) http.HandlerFunc {
@@ -27,23 +29,38 @@ func slackEventHandler(uc *usecase.UseCases) http.HandlerFunc {
 			return
 		}
 
-		var event slack.Event
-		if err := json.Unmarshal(body, &event); err != nil {
-			handleError(w, r, goerr.Wrap(err, "failed to unmarshal slack event",
+		eventsAPIEvent, err := slackevents.ParseEvent(json.RawMessage(body), slackevents.OptionNoVerifyToken())
+		if err != nil {
+			handleError(w, r, goerr.Wrap(err, "failed to parse slack event",
 				goerr.T(errBadRequest),
 				goerr.V("body", string(body)),
 			))
 			return
 		}
 
-		if err := uc.HandleSlackEvent(r.Context(), event); err != nil {
-			handleError(w, r, goerr.Wrap(err, "failed to handle slack event",
-				goerr.T(errBadRequest),
-				goerr.V("body", string(body)),
-			))
-			return
-		}
+		switch eventsAPIEvent.Type {
+		case slackevents.URLVerification:
+			var r *slackevents.ChallengeResponse
+			err := json.Unmarshal([]byte(body), &r)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "text")
+			w.Write([]byte(r.Challenge))
 
+		case slackevents.CallbackEvent:
+			innerEvent := eventsAPIEvent.InnerEvent
+
+			switch ev := innerEvent.Data.(type) {
+			case *slackevents.AppMentionEvent:
+				uc.HandleSlackAppMention(r.Context(), ev)
+			case *slackevents.MessageEvent:
+				uc.HandleSlackMessage(r.Context(), ev)
+			default:
+				logging.From(r.Context()).Warn("unknown event type", "event", ev, "body", string(body))
+			}
+		}
 		w.WriteHeader(http.StatusOK)
 	}
 }
@@ -75,6 +92,7 @@ func slackInteractionHandler(uc *usecase.UseCases) http.HandlerFunc {
 		}
 
 		var interaction slack.InteractionCallback
+		println(string(payload))
 		if err := json.Unmarshal([]byte(payload), &interaction); err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to unmarshal slack interaction",
 				goerr.T(errBadRequest),

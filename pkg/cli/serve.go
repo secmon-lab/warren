@@ -106,11 +106,11 @@ func cmdServe() *cli.Command {
 					continue
 				}
 
+				logging.Default().Info("action enabled", "name", action.Spec().Name, "config", action.LogValue())
 				enabledActions = append(enabledActions, action)
 				enabledActionNames = append(enabledActionNames, action.Spec().Name)
 			}
 			actionSvc := service.NewActionService(enabledActions)
-			logging.Default().Info("enabled actions", "actions", enabledActionNames)
 
 			uc := usecase.New(
 				func() interfaces.GenAIChatSession {

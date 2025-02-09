@@ -154,13 +154,19 @@ func (x *SlackThread) AttachFile(ctx context.Context, title, fileName string, da
 }
 
 func (x *Slack) VerifyRequest(header http.Header, body []byte) error {
-	sv, err := slack.NewSecretsVerifier(header, string(body))
+	eb := goerr.NewBuilder(goerr.V("header", header), goerr.V("body", body))
+
+	sv, err := slack.NewSecretsVerifier(header, x.signingSecret)
 	if err != nil {
-		return goerr.Wrap(err, "failed to create secrets verifier")
+		return eb.Wrap(err, "failed to create secrets verifier")
+	}
+
+	if _, err := sv.Write(body); err != nil {
+		return eb.Wrap(err, "failed to write request body")
 	}
 
 	if err := sv.Ensure(); err != nil {
-		return goerr.Wrap(err, "failed to verify request")
+		return eb.Wrap(err, "failed to verify request")
 	}
 
 	return nil
