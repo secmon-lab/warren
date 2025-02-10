@@ -32,6 +32,15 @@ func (r *Memory) GetAlert(ctx context.Context, alertID model.AlertID) (*model.Al
 	return &alert, nil
 }
 
+func (r *Memory) GetAlertBySlackThread(ctx context.Context, thread model.SlackThread) (*model.Alert, error) {
+	for _, alert := range r.alerts {
+		if alert.SlackThread != nil && alert.SlackThread.ChannelID == thread.ChannelID && alert.SlackThread.ThreadID == thread.ThreadID {
+			return &alert, nil
+		}
+	}
+	return nil, goerr.New("alert not found", goerr.V("slack_thread", thread))
+}
+
 func (r *Memory) FetchLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
 	var alerts []model.Alert
 	for _, alert := range r.alerts {

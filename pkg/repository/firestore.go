@@ -7,6 +7,7 @@ import (
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -36,6 +37,7 @@ const (
 )
 
 func (r *Firestore) PutAlert(ctx context.Context, alert model.Alert) error {
+	alert.UpdatedAt = clock.Now(ctx)
 	alertDoc := r.db.Collection(collectionAlerts).Doc(alert.ID.String())
 	_, err := alertDoc.Set(ctx, alert)
 	if err != nil {
@@ -57,6 +59,28 @@ func (r *Firestore) GetAlert(ctx context.Context, alertID model.AlertID) (*model
 	var alert model.Alert
 	if err := doc.DataTo(&alert); err != nil {
 		return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("alert_id", alertID))
+	}
+
+	return &alert, nil
+}
+
+func (r *Firestore) GetAlertBySlackThread(ctx context.Context, thread model.SlackThread) (*model.Alert, error) {
+	iter := r.db.Collection(collectionAlerts).
+		Where("SlackThread.ChannelID", "==", thread.ChannelID).
+		Where("SlackThread.ThreadID", "==", thread.ThreadID).
+		Documents(ctx)
+
+	doc, err := iter.Next()
+	if err != nil {
+		if err == iterator.Done {
+			return nil, goerr.New("alert not found", goerr.V("slack_channel", thread.ChannelID), goerr.V("slack_message_id", thread.ThreadID))
+		}
+		return nil, goerr.Wrap(err, "failed to get alert by slack thread", goerr.V("slack_thread", thread))
+	}
+
+	var alert model.Alert
+	if err := doc.DataTo(&alert); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("slack_message_id", thread.ThreadID))
 	}
 
 	return &alert, nil

@@ -21,8 +21,9 @@ type UseCases struct {
 	actionService   *service.ActionService
 
 	// configs
-	timeSpan  time.Duration
-	loopLimit int
+	timeSpan     time.Duration
+	actionLimit  int
+	findingLimit int
 }
 
 type Option func(*UseCases)
@@ -58,9 +59,15 @@ func WithTimeSpan(timeSpan time.Duration) Option {
 	}
 }
 
-func WithLoopLimit(loopLimit int) Option {
+func WithActionLimit(actionLimit int) Option {
 	return func(u *UseCases) {
-		u.loopLimit = loopLimit
+		u.actionLimit = actionLimit
+	}
+}
+
+func WithFindingLimit(findingLimit int) Option {
+	return func(u *UseCases) {
+		u.findingLimit = findingLimit
 	}
 }
 
@@ -93,8 +100,9 @@ func New(geminiStartChat interfaces.GetGeminiStartChat, opts ...Option) *UseCase
 		repository:    repository.NewMemory(),
 		actionService: service.NewActionService([]interfaces.Action{}),
 
-		timeSpan:  24 * time.Hour,
-		loopLimit: 10,
+		timeSpan:     24 * time.Hour,
+		actionLimit:  10,
+		findingLimit: 3,
 	}
 
 	for _, opt := range opts {

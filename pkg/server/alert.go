@@ -30,7 +30,7 @@ func alertPubSubHandler(uc *usecase.UseCases) http.HandlerFunc {
 			return
 		}
 
-		if err := uc.HandleAlert(r.Context(), schema, alertData); err != nil {
+		if _, err := uc.HandleAlert(r.Context(), schema, alertData); err != nil {
 			handleError(w, r, err)
 			return
 		}
@@ -54,7 +54,7 @@ func alertRawHandler(uc *usecase.UseCases) http.HandlerFunc {
 			return
 		}
 
-		if err := uc.HandleAlert(r.Context(), schema, alertData); err != nil {
+		if _, err := uc.HandleAlert(r.Context(), schema, alertData); err != nil {
 			handleError(w, r, err)
 			return
 		}

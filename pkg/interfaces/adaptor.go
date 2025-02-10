@@ -22,5 +22,6 @@ type PolicyClient interface {
 type Repository interface {
 	PutAlert(ctx context.Context, alert model.Alert) error
 	GetAlert(ctx context.Context, alertID model.AlertID) (*model.Alert, error)
+	GetAlertBySlackThread(ctx context.Context, thread model.SlackThread) (*model.Alert, error)
 	FetchLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error)
 }

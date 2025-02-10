@@ -98,7 +98,7 @@
         "Action": {
           "ActionType": "DNS_REQUEST",
           "DnsRequestAction": {
-            "Domain": "GeneratedFindingDomainName",
+            "Domain": "3322.org",
             "Protocol": "UDP",
             "Blocked": false
           }

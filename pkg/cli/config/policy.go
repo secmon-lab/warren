@@ -17,6 +17,7 @@ func (x *Policy) Flags() []cli.Flag {
 		&cli.StringSliceFlag{
 			Name:        "policy",
 			Usage:       "Policy file/dir path",
+			Aliases:     []string{"p"},
 			Destination: &x.filePaths,
 			Category:    "Policy",
 			Sources:     cli.EnvVars("WARREN_POLICY"),

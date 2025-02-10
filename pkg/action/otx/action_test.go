@@ -110,6 +110,7 @@ func TestOTX(t *testing.T) {
 }
 
 func TestOTX_Enabled(t *testing.T) {
+	t.Setenv("TEST_OTX_API_KEY", "")
 	var action otx.Action
 
 	cmd := cli.Command{

@@ -18,6 +18,7 @@ type Logger struct {
 	level  string
 	format string
 	output string
+	quiet  bool
 }
 
 func (x *Logger) Flags() []cli.Flag {
@@ -48,11 +49,23 @@ func (x *Logger) Flags() []cli.Flag {
 			Value:       "-",
 			Destination: &x.output,
 		},
+		&cli.BoolFlag{
+			Name:        "log-quiet",
+			Category:    "logging",
+			Aliases:     []string{"q"},
+			Usage:       "Quiet mode (no log output)",
+			Destination: &x.quiet,
+		},
 	}
 }
 
 // Configure sets up logger and returns closer function and error. You can call closer even if error is not nil.
 func (x *Logger) Configure() (func(), error) {
+	if x.quiet {
+		logging.Quiet()
+		return func() {}, nil
+	}
+
 	closer := func() {}
 	formatMap := map[string]logging.Format{
 		"console": logging.FormatConsole,

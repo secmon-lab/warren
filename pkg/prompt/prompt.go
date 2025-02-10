@@ -81,6 +81,10 @@ func BuildActionPrompt(actions []model.ActionSpec) (string, error) {
 //go:embed templates/aggregate.md
 var aggregateTemplate string
 
+type AggregatePromptResult struct {
+	AlertID string `json:"alert_id"`
+}
+
 func BuildAggregatePrompt(newAlert model.Alert, candidates []model.Alert) (string, error) {
 	tmpl, err := template.New("aggregate").Parse(aggregateTemplate)
 	if err != nil {
@@ -101,13 +105,45 @@ func BuildAggregatePrompt(newAlert model.Alert, candidates []model.Alert) (strin
 		rawCandidates = append(rawCandidates, rawCandidate)
 	}
 
+	schema, err := generateSchema(AggregatePromptResult{}).Stringify()
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to generate schema")
+	}
+
 	input := map[string]any{
 		"new":        rawNewAlert,
 		"candidates": rawCandidates,
+		"schema":     schema,
 	}
 
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "aggregate", input); err != nil {
+		return "", goerr.Wrap(err, "failed to execute template")
+	}
+
+	return buf.String(), nil
+}
+
+//go:embed templates/finding.md
+var findingTemplate string
+
+func BuildFindingPrompt() (string, error) {
+	tmpl, err := template.New("finding").Parse(findingTemplate)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to parse template")
+	}
+
+	schema, err := generateSchema(model.AlertFinding{}).Stringify()
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to generate schema")
+	}
+
+	input := map[string]any{
+		"schema": schema,
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "finding", input); err != nil {
 		return "", goerr.Wrap(err, "failed to execute template")
 	}
 

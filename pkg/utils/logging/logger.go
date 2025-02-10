@@ -29,6 +29,14 @@ func Default() *slog.Logger {
 	return logger
 }
 
+func Quiet() {
+	loggerMutex.Lock()
+	logger = slog.New(slog.NewJSONHandler(io.Discard, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+	loggerMutex.Unlock()
+}
+
 func ReconfigureLogger(w io.Writer, level slog.Level, format Format) {
 	filter := masq.New(
 		masq.WithTag("secret"),

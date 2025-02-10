@@ -42,7 +42,7 @@ func (x *Action) Flags() []cli.Flag {
 func (x *Action) Spec() model.ActionSpec {
 	return model.ActionSpec{
 		Name:        "otx",
-		Description: "OTX API",
+		Description: "You can search the indicator from OTX. Set indicator type and value. You can choose one of the following types: domain, ipv4, ipv6, hostname, file_hash. You need to extract actual value from the alert data. Do not set field name",
 		Args: []model.ArgumentSpec{
 			{
 				Name:        "domain",

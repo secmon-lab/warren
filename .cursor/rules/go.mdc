@@ -42,7 +42,7 @@ gt.Array(t, colors).Have("orange")                 // <- Fail
 
 In many cases, a developer does not care Go generics in using `gt`. However, a developer need to specify generic type (`Value`, `Array`, `Map`, `Error`, etc.) explicitly to use specific test functions for each types.
 
-See [reference](https://pkg.go.dev/github.com/m-mizutani/gt) for more detail.
+See [reference](mdc:https:/pkg.go.dev/github.com/m-mizutani/gt) for more detail.
 
 ### Value
 
@@ -120,8 +120,8 @@ var v any = &user{
     Name: "blue",
 }
 
-u1 := gt.Cast[user](t, v).NotNil()  // Fail (because v is *user, not user)
-gt.Cast[*user](t, v).Nil()          // Fail (because v is not nil)
+u1 := gt.Cast[user](mdc:t, v).NotNil()  // Fail (because v is *user, not user)
+gt.Cast[*user](mdc:t, v).Nil()          // Fail (because v is not nil)
 
-u2 := gt.Cast[*user](t, v).NotNil() // Pass
+u2 := gt.Cast[*user](mdc:t, v).NotNil() // Pass
 gt.Value(t, u2.Name).Equal("blue")       // Pass

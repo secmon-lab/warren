@@ -48,50 +48,53 @@ func TestSlack(t *testing.T) {
 func TestSlackUpdateAlert(t *testing.T) {
 	svc := newSlackService(t)
 
-	alert := model.NewAlert(context.Background(), "test.alert.v1", map[string]interface{}{
-		"foo": "bar",
-		"baz": 123,
-	}, model.PolicyAlert{
-		Title: "Test Alert Title",
-		Attrs: []model.Attribute{
-			{
-				Key:   "severity",
-				Value: "high",
-			},
-		},
-	})
+	alert := genDummyAlert()
 
 	thread, err := svc.PostAlert(context.Background(), alert)
 	gt.NoError(t, err)
-	alert.SlackChannel = thread.ChannelID()
-	alert.SlackMessageID = thread.ThreadID()
+	alert.SlackThread = &model.SlackThread{
+		ChannelID: thread.ChannelID(),
+		ThreadID:  thread.ThreadID(),
+	}
 
 	alert.Title = "Updated Alert Title"
-	alert.Severity = model.AlertSeverityLow
+	alert.Finding = &model.AlertFinding{
+		Severity:       model.AlertSeverityLow,
+		Summary:        "Updated Summary",
+		Reason:         "Updated Reason",
+		Recommendation: "Updated Recommendation",
+	}
 
 	gt.NoError(t, thread.UpdateAlert(context.Background(), alert))
+}
+
+func genDummyAlert() model.Alert {
+	return model.NewAlert(context.Background(), "test.alert.v1", model.PolicyAlert{
+		Title: "Test Alert Title",
+		Attrs: []model.Attribute{
+			{
+				Key:   "color",
+				Value: "red",
+			},
+		},
+		Data: map[string]any{
+			"foo": "bar",
+			"baz": 123,
+		},
+	})
 }
 
 func TestSlackPostThreadMessages(t *testing.T) {
 	svc := newSlackService(t)
 
-	alert := model.NewAlert(context.Background(), "test.alert.v1", map[string]interface{}{
-		"foo": "bar",
-		"baz": 123,
-	}, model.PolicyAlert{
-		Title: "Test Alert Title",
-		Attrs: []model.Attribute{
-			{
-				Key:   "severity",
-				Value: "high",
-			},
-		},
-	})
+	alert := genDummyAlert()
 
 	thread, err := svc.PostAlert(context.Background(), alert)
 	gt.NoError(t, err)
-	alert.SlackChannel = thread.ChannelID()
-	alert.SlackMessageID = thread.ThreadID()
+	alert.SlackThread = &model.SlackThread{
+		ChannelID: thread.ChannelID(),
+		ThreadID:  thread.ThreadID(),
+	}
 
 	gt.NoError(t, thread.PostNextAction(context.Background(), prompt.ActionPromptResult{
 		Action: "test",
@@ -106,4 +109,24 @@ func TestSlackPostThreadMessages(t *testing.T) {
 		"test.csv",
 		[]byte("hoge,mage,fuga\nred,blue,green"),
 	))
+}
+
+func TestSlackPostConclusion(t *testing.T) {
+	svc := newSlackService(t)
+
+	alert := genDummyAlert()
+
+	thread, err := svc.PostAlert(context.Background(), alert)
+	gt.NoError(t, err)
+	alert.SlackThread = &model.SlackThread{
+		ChannelID: thread.ChannelID(),
+		ThreadID:  thread.ThreadID(),
+	}
+
+	gt.NoError(t, thread.PostFinding(context.Background(), model.AlertFinding{
+		Severity:       model.AlertSeverityHigh,
+		Summary:        "Test Summary",
+		Reason:         "Test Reason",
+		Recommendation: "Test Recommendation",
+	}))
 }

@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -19,11 +20,15 @@ type Slack struct {
 	slackClient   *slack.Client
 }
 
+var _ interfaces.SlackService = &Slack{}
+
 type SlackThread struct {
 	channelID   string
 	threadID    string
 	slackClient *slack.Client
 }
+
+var _ interfaces.SlackThreadService = &SlackThread{}
 
 func (x *SlackThread) ChannelID() string {
 	return x.channelID
@@ -41,6 +46,14 @@ func NewSlack(oauthToken, signingSecret, channelID string) *Slack {
 	}
 }
 
+func (x *Slack) NewThread(alert model.Alert) interfaces.SlackThreadService {
+	return &SlackThread{
+		channelID:   x.channelID,
+		threadID:    alert.SlackThread.ThreadID,
+		slackClient: x.slackClient,
+	}
+}
+
 func buildAlertBlocks(alert model.Alert) []slack.Block {
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(
@@ -48,7 +61,11 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 		),
 		slack.NewSectionBlock(
 			slack.NewTextBlockObject("mrkdwn", "*Schema:* "+alert.Schema+"\n*Severity:* "+func() string {
-				switch alert.Severity {
+				if alert.Finding == nil {
+					return ":question: not available"
+				}
+
+				switch alert.Finding.Severity {
 				case model.AlertSeverityCritical:
 					return ":rotating_light: *CRITICAL* :rotating_light:"
 				case model.AlertSeverityHigh:
@@ -60,7 +77,7 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 				case model.AlertSeverityUnknown:
 					return ":question: unknown"
 				default:
-					return string(alert.Severity)
+					return string(alert.Finding.Severity)
 				}
 			}(), false, false),
 			nil,
@@ -83,6 +100,28 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 		blocks = append(blocks, slack.NewSectionBlock(nil, fields, nil))
 	}
 
+	// Add action buttons
+	blocks = append(blocks, slack.NewActionBlock(
+		"alert_actions",
+		slack.NewButtonBlockElement(
+			"investigate",
+			alert.ID.String(),
+			slack.NewTextBlockObject("plain_text", "Investigate", false, false),
+		).WithStyle(slack.StyleDefault),
+		/*
+			slack.NewButtonBlockElement(
+				"ack",
+				alert.ID.String(),
+				slack.NewTextBlockObject("plain_text", "Acknowledge", false, false),
+			).WithStyle(slack.StylePrimary),
+			slack.NewButtonBlockElement(
+				"close",
+				alert.ID.String(),
+				slack.NewTextBlockObject("plain_text", "Close", false, false),
+			).WithStyle(slack.StyleDanger),
+		*/
+	))
+
 	return blocks
 }
 
@@ -98,11 +137,24 @@ func (x *Slack) PostAlert(ctx context.Context, alert model.Alert) (interfaces.Sl
 		return nil, goerr.Wrap(err, "failed to post message to slack")
 	}
 
-	return &SlackThread{
+	thread := &SlackThread{
 		channelID:   channelID,
 		threadID:    timestamp,
 		slackClient: x.slackClient,
-	}, nil
+	}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(alert.Data); err != nil {
+		return nil, goerr.Wrap(err, "failed to encode alert data")
+	}
+
+	if err := thread.AttachFile(ctx, "Original Alert", "alert.json", buf.Bytes()); err != nil {
+		return nil, goerr.Wrap(err, "failed to attach file to slack")
+	}
+
+	return thread, nil
 }
 
 func (x *SlackThread) UpdateAlert(ctx context.Context, alert model.Alert) error {
@@ -110,8 +162,8 @@ func (x *SlackThread) UpdateAlert(ctx context.Context, alert model.Alert) error 
 
 	_, _, _, err := x.slackClient.UpdateMessageContext(
 		ctx,
-		alert.SlackChannel,
-		alert.SlackMessageID,
+		alert.SlackThread.ChannelID,
+		alert.SlackThread.ThreadID,
 		slack.MsgOptionBlocks(blocks...),
 	)
 	if err != nil {
@@ -131,7 +183,7 @@ func (x *SlackThread) PostNextAction(ctx context.Context, action prompt.ActionPr
 		slack.MsgOptionTS(x.threadID),
 	)
 	if err != nil {
-		return goerr.Wrap(err, "failed to update message to slack")
+		return goerr.Wrap(err, "failed to post next action to slack")
 	}
 
 	return nil
@@ -144,7 +196,7 @@ func buildNextActionBlocks(action prompt.ActionPromptResult) []slack.Block {
 		fields = append(fields, slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*%s:* `%s`", key, arg), false, false))
 	}
 
-	nextMsg := fmt.Sprintf("⏭️ Next: *%s*\n", action.Action)
+	nextMsg := fmt.Sprintf("🔜 Action: *%s*\n", action.Action)
 	blocks := []slack.Block{
 		slack.NewSectionBlock(
 			slack.NewTextBlockObject(slack.MarkdownType, nextMsg, false, false),
@@ -166,6 +218,60 @@ func (x *SlackThread) AttachFile(ctx context.Context, title, fileName string, da
 		ThreadTimestamp: x.threadID,
 	})
 	return err
+}
+
+func (x *SlackThread) Reply(ctx context.Context, message string) error {
+	_, _, err := x.slackClient.PostMessageContext(
+		ctx,
+		x.channelID,
+		slack.MsgOptionText(message, false),
+		slack.MsgOptionTS(x.threadID),
+	)
+
+	if err != nil {
+		return goerr.Wrap(err, "failed to reply to slack")
+	}
+
+	return nil
+}
+
+func (x *SlackThread) PostFinding(ctx context.Context, finding model.AlertFinding) error {
+	blocks := buildFindingBlocks(finding)
+
+	_, _, err := x.slackClient.PostMessageContext(
+		ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post finding to slack")
+	}
+
+	return nil
+}
+
+func buildFindingBlocks(finding model.AlertFinding) []slack.Block {
+	return []slack.Block{
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", "Severity: "+string(finding.Severity), false, false),
+		),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", "*Summary:*\n"+finding.Summary, false, false),
+			nil,
+			nil,
+		),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", "*Reason:*\n"+finding.Reason, false, false),
+			nil,
+			nil,
+		),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", "*Recommendation:*\n"+finding.Recommendation, false, false),
+			nil,
+			nil,
+		),
+	}
 }
 
 func (x *Slack) VerifyRequest(header http.Header, body []byte) error {

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
@@ -31,13 +32,16 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 	ctx := context.Background()
 
 	t.Run("PutAlert", func(t *testing.T) {
-		alert := model.NewAlert(ctx, "test", map[string]any{}, model.PolicyAlert{
+		alert := model.NewAlert(ctx, "test", model.PolicyAlert{
 			Title: "test",
 			Attrs: []model.Attribute{
 				{
 					Key:   "test",
 					Value: "test",
 				},
+			},
+			Data: map[string]any{
+				"test": "test",
 			},
 		})
 		gt.NoError(t, repo.PutAlert(ctx, alert))
@@ -54,10 +58,13 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		var alerts []model.Alert
 		now := time.Now()
 		for i := 0; i < 10; i++ {
-			newAlert := model.NewAlert(ctx, "test", map[string]any{}, model.PolicyAlert{
+			newAlert := model.NewAlert(ctx, "test", model.PolicyAlert{
 				Title: "test",
 				Attrs: []model.Attribute{
 					{Key: "test", Value: "test"},
+				},
+				Data: map[string]any{
+					"test": "test",
 				},
 			})
 			newAlert.CreatedAt = now.Add(time.Duration(i) * time.Second)
@@ -74,5 +81,35 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 			gt.True(t, alert.CreatedAt.After(now.Add(-24*time.Hour)))
 			gt.Equal(t, alert.ID, alerts[len(alerts)-i-1].ID)
 		}
+	})
+
+	t.Run("GetAlertBySlackMessageID", func(t *testing.T) {
+		alert := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "test",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+			Data: map[string]any{
+				"test": "test",
+			},
+		})
+		alert.SlackThread = &model.SlackThread{
+			ChannelID: "test",
+			ThreadID:  uuid.New().String(),
+		}
+		gt.NoError(t, repo.PutAlert(ctx, alert))
+
+		got, err := repo.GetAlertBySlackThread(ctx, *alert.SlackThread)
+		gt.NoError(t, err)
+		gt.Equal(t, alert.ID, got.ID)
+	})
+
+	t.Run("GetAlertBySlackMessageID_NotFound", func(t *testing.T) {
+		got, err := repo.GetAlertBySlackThread(ctx, model.SlackThread{
+			ChannelID: "test",
+			ThreadID:  uuid.New().String(),
+		})
+		gt.Error(t, err)
+		gt.Nil(t, got)
 	})
 }

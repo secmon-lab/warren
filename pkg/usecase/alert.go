@@ -1,49 +1,49 @@
 package usecase
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
-	"strings"
 	"time"
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
-	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
-func (uc *UseCases) HandleAlert(ctx context.Context, schema string, alertData any) error {
+func (uc *UseCases) HandleAlert(ctx context.Context, schema string, alertData any) ([]*model.Alert, error) {
 	logger := logging.From(ctx)
 
 	var result model.PolicyResult
-	if err := uc.policyClient.Query(ctx, "alert."+schema, alertData, &result); err != nil {
-		return goerr.Wrap(err, "failed to query policy", goerr.V("schema", schema), goerr.V("alert", alertData))
+	if err := uc.policyClient.Query(ctx, "data.alert."+schema, alertData, &result); err != nil {
+		return nil, goerr.Wrap(err, "failed to query policy", goerr.V("schema", schema), goerr.V("alert", alertData))
 	}
 
 	logger.Info("policy query result", "input", alertData, "output", result)
 
+	var results []*model.Alert
 	for _, a := range result.Alert {
-		alert := model.NewAlert(ctx, schema, alertData, a)
+		alert := model.NewAlert(ctx, schema, a)
 
-		if err := uc.runWorkflow(ctx, alert); err != nil {
-			return goerr.Wrap(err, "failed to handle alert", goerr.V("alert", a))
+		newAlert, err := uc.handleAlert(ctx, alert)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to handle alert", goerr.V("alert", a))
 		}
+		results = append(results, newAlert)
 	}
 
-	return nil
+	return results, nil
 }
 
-func (uc *UseCases) runWorkflow(ctx context.Context, alert model.Alert) error {
+func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.Alert, error) {
 	logger := logging.From(ctx)
 
 	// Check if the alert is similar to any existing alerts
 	similarAlert, err := uc.findSimilarAlert(ctx, alert)
 	if err != nil {
-		return goerr.Wrap(err, "failed to find similar alert")
+		return nil, goerr.Wrap(err, "failed to find similar alert")
 	}
 	if similarAlert != nil {
 		logger.Info("alert merged", "parent", similarAlert, "merged", alert)
@@ -51,79 +51,38 @@ func (uc *UseCases) runWorkflow(ctx context.Context, alert model.Alert) error {
 		alert.ParentID = similarAlert.ID
 		alert.Status = model.AlertStatusMerged
 		if err := uc.repository.PutAlert(ctx, alert); err != nil {
-			return goerr.Wrap(err, "failed to put alert", goerr.V("alert", alert))
+			return nil, goerr.Wrap(err, "failed to put alert", goerr.V("alert", alert))
 		}
 
-		return nil
+		thread := uc.slackService.NewThread(alert)
+
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(alert.Data); err != nil {
+			return nil, goerr.Wrap(err, "failed to encode alert data")
+		}
+
+		thread.AttachFile(ctx, "New merged alert", "alert.json", buf.Bytes())
+		return nil, nil
 	}
 
 	// Post new alert to Slack and save the alert with Slack channel and message ID
 	thread, err := uc.slackService.PostAlert(ctx, alert)
 	if err != nil {
-		return goerr.Wrap(err, "failed to post alert", goerr.V("alert", alert))
+		return nil, goerr.Wrap(err, "failed to post alert", goerr.V("alert", alert))
 	}
-	alert.SlackChannel = thread.ChannelID()
-	alert.SlackMessageID = thread.ThreadID()
+	alert.SlackThread = &model.SlackThread{
+		ChannelID: thread.ChannelID(),
+		ThreadID:  thread.ThreadID(),
+	}
 
 	if err := uc.repository.PutAlert(ctx, alert); err != nil {
-		return goerr.Wrap(err, "failed to put alert", goerr.V("alert", alert))
+		return nil, goerr.Wrap(err, "failed to put alert", goerr.V("alert", alert))
 	}
 	logger.Info("alert created", "alert", alert)
 
-	ssn := uc.geminiStartChat()
-
-	prePrompt, err := prompt.BuildInitPrompt(alert)
-	if err != nil {
-		return goerr.Wrap(err, "failed to build init prompt")
-	}
-
-	for i := 0; i < uc.loopLimit; i++ {
-		actionPrompt, err := planAction(ctx, ssn, prePrompt, uc.actionService)
-		if err != nil {
-			return goerr.Wrap(err, "failed to plan action")
-		}
-		logger.Info("action planned", "action", actionPrompt)
-
-		actionResult, err := uc.actionService.Execute(ctx, thread, actionPrompt.Action, ssn, actionPrompt.Args)
-		if err != nil {
-			return goerr.Wrap(err, "failed to execute action")
-		}
-
-		logger.Info("action executed", "action", actionResult)
-
-		prePrompt = fmt.Sprintf("Here is the result of the action:\n\n```\n%s\n```", actionResult)
-	}
-
-	return nil
-}
-
-func planAction(ctx context.Context, ssn interfaces.GenAIChatSession, prePrompt string, actionSvc *service.ActionService) (*prompt.ActionPromptResult, error) {
-	mainPrompt, err := prompt.BuildActionPrompt(actionSvc.Spec())
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to build action prompt")
-	}
-
-	resp, err := ssn.SendMessage(ctx, genai.Text(prePrompt), genai.Text(mainPrompt))
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to send message")
-	}
-	eb := goerr.NewBuilder(goerr.V("prompt", mainPrompt), goerr.V("response", resp))
-
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return nil, eb.New("no action prompt result")
-	}
-
-	text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
-	if !ok || text == "" {
-		return nil, eb.New("no action prompt result")
-	}
-
-	var result prompt.ActionPromptResult
-	if err := json.Unmarshal([]byte(text), &result); err != nil {
-		return nil, eb.Wrap(err, "failed to unmarshal action prompt result", goerr.V("text", text))
-	}
-
-	return &result, nil
+	return &alert, nil
 }
 
 func (uc *UseCases) findSimilarAlert(ctx context.Context, alert model.Alert) (*model.Alert, error) {
@@ -133,13 +92,13 @@ func (uc *UseCases) findSimilarAlert(ctx context.Context, alert model.Alert) (*m
 		return nil, goerr.Wrap(err, "failed to fetch latest alerts")
 	}
 
-	prompt, err := prompt.BuildAggregatePrompt(alert, alerts)
+	p, err := prompt.BuildAggregatePrompt(alert, alerts)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build aggregate prompt")
 	}
 
 	ssn := uc.geminiStartChat()
-	resp, err := ssn.SendMessage(ctx, genai.Text(prompt))
+	resp, err := ssn.SendMessage(ctx, genai.Text(p))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to send message")
 	}
@@ -153,7 +112,16 @@ func (uc *UseCases) findSimilarAlert(ctx context.Context, alert model.Alert) (*m
 		return nil, nil
 	}
 
-	alertID := model.AlertID(strings.TrimSpace(string(text)))
+	var result prompt.AggregatePromptResult
+	if err := json.Unmarshal([]byte(text), &result); err != nil {
+		return nil, goerr.Wrap(err, "failed to unmarshal aggregate prompt result", goerr.V("text", text))
+	}
+
+	if result.AlertID == "" {
+		return nil, nil
+	}
+
+	alertID := model.AlertID(result.AlertID)
 
 	for _, candidate := range alerts {
 		if candidate.ID == alertID {

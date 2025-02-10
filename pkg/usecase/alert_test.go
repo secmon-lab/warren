@@ -23,28 +23,33 @@ func TestFindSimilarAlert(t *testing.T) {
 	client, err := genai.NewClient(ctx, vars.Get("TEST_GEMINI_PROJECT_ID"), vars.Get("TEST_GEMINI_LOCATION"))
 	gt.NoError(t, err)
 	geminiModel := client.GenerativeModel("gemini-2.0-flash-exp")
+	geminiModel.GenerationConfig.ResponseMIMEType = "application/json"
 
 	repo := repository.NewMemory()
 	uc := usecase.New(func() interfaces.GenAIChatSession {
 		return geminiModel.StartChat()
 	}, usecase.WithRepository(repo))
 
-	newAlert := model.NewAlert(ctx, "my_schema", map[string]any{"test": "test"}, model.PolicyAlert{
+	newAlert := model.NewAlert(ctx, "my_schema", model.PolicyAlert{
 		Title: "test alert 1",
 		Attrs: []model.Attribute{{Key: "test", Value: "test"}},
+		Data:  map[string]any{"test": "test"},
 	})
 
-	alert1 := model.NewAlert(ctx, "my_schema", map[string]any{"test": "test"}, model.PolicyAlert{
+	alert1 := model.NewAlert(ctx, "my_schema", model.PolicyAlert{
 		Title: "test alert 0",
 		Attrs: []model.Attribute{{Key: "test", Value: "test"}},
+		Data:  map[string]any{"test": "test"},
 	})
-	alert2 := model.NewAlert(ctx, "some_other_schema", map[string]any{"color": "red"}, model.PolicyAlert{
+	alert2 := model.NewAlert(ctx, "some_other_schema", model.PolicyAlert{
 		Title: "this is different alert",
 		Attrs: []model.Attribute{{Key: "color", Value: "red"}},
+		Data:  map[string]any{"test": "test"},
 	})
-	alert3 := model.NewAlert(ctx, "some_big_schema", map[string]any{"test": "test"}, model.PolicyAlert{
+	alert3 := model.NewAlert(ctx, "some_big_schema", model.PolicyAlert{
 		Title: "more different alert",
 		Attrs: []model.Attribute{{Key: "taste", Value: "sweet"}},
+		Data:  map[string]any{"test": "test"},
 	})
 	if err := repo.PutAlert(ctx, alert1); err != nil {
 		t.Fatal("failed to put alert1:", err)
@@ -106,8 +111,9 @@ func TestPlanAction(t *testing.T) {
 		},
 	})
 
-	alert := model.NewAlert(ctx, "aws.guardduty", guarddutyJSON, model.PolicyAlert{
+	alert := model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
 		Title: "Amazon GuardDuty finding",
+		Data:  guarddutyJSON,
 	})
 
 	prePrompt, err := prompt.BuildInitPrompt(alert)

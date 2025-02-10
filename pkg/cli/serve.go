@@ -2,20 +2,14 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/action/bigquery"
-	"github.com/secmon-lab/warren/pkg/action/otx"
-	"github.com/secmon-lab/warren/pkg/action/urlscan"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/interfaces"
-	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/server"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -33,11 +27,6 @@ func cmdServe() *cli.Command {
 		firestoreCfg config.Firestore
 	)
 
-	actions := []interfaces.Action{
-		&urlscan.Action{},
-		&otx.Action{},
-		&bigquery.Action{},
-	}
 	flags := joinFlags(
 		[]cli.Flag{
 			&cli.StringFlag{
@@ -54,11 +43,8 @@ func cmdServe() *cli.Command {
 		slackCfg.Flags(),
 		geminiCfg.Flags(),
 		firestoreCfg.Flags(),
+		actions.Flags(),
 	)
-
-	for _, action := range actions {
-		flags = append(flags, action.Flags()...)
-	}
 
 	return &cli.Command{
 		Name:    "serve",
@@ -96,21 +82,11 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			var enabledActions []interfaces.Action
-			var enabledActionNames []string
-			for _, action := range actions {
-				if err := action.Configure(ctx); err != nil {
-					if !errors.Is(err, model.ErrActionUnavailable) {
-						return goerr.Wrap(err, "action is not available", goerr.V("action", action.Spec().Name))
-					}
-					continue
-				}
-
-				logging.Default().Info("action enabled", "name", action.Spec().Name, "config", action.LogValue())
-				enabledActions = append(enabledActions, action)
-				enabledActionNames = append(enabledActionNames, action.Spec().Name)
+			enabledActions, err := actions.Configure(ctx)
+			if err != nil {
+				return err
 			}
-			logging.Default().Info("enabled actions", "names", enabledActionNames)
+			logging.Default().Info("enabled actions", "actions", actions)
 			actionSvc := service.NewActionService(enabledActions)
 
 			uc := usecase.New(
