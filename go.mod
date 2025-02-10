@@ -13,7 +13,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/m-mizutani/clog v0.0.8
 	github.com/m-mizutani/goerr/v2 v2.0.0-alpha.3
-	github.com/m-mizutani/gt v0.0.13-0.20250210103858-3836fa29210c
+	github.com/m-mizutani/gt v0.0.13
 	github.com/m-mizutani/masq v0.1.10
 	github.com/m-mizutani/opac v0.2.2
 	github.com/slack-go/slack v0.15.0
