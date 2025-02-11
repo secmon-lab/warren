@@ -29,7 +29,6 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 	}
 
 	for i := 0; i < uc.actionLimit; i++ {
-		println("PrePrompt", prePrompt)
 		actionPrompt, err := planAction(ctx, ssn, prePrompt, uc.actionService)
 		if err != nil {
 			return goerr.Wrap(err, "failed to plan action")
@@ -46,6 +45,8 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 
 		actionResult, err := uc.actionService.Execute(ctx, thread, actionPrompt.Action, ssn, actionPrompt.Args)
 		if err != nil {
+			logger.Error("Action failed", "error", err, "action", actionPrompt.Action, "args", actionPrompt.Args)
+
 			msg := fmt.Sprintf("Action failed: %s. Retry...", err.Error())
 			if err := thread.Reply(ctx, msg); err != nil {
 				return goerr.Wrap(err, "failed to reply to slack")
@@ -55,6 +56,9 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 		}
 
 		logger.Info("action executed", "action", actionResult)
+		if err := thread.AttachFile(ctx, actionResult.Message, "result.json", []byte(actionResult.Data)); err != nil {
+			return goerr.Wrap(err, "failed to attach file")
+		}
 
 		prePrompt = fmt.Sprintf("Here is the result of the action.\n%s\n\n```json\n%s\n```", actionResult.Message, actionResult.Data)
 	}

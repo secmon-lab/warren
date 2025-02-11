@@ -1,6 +1,10 @@
 package bigquery
 
-import "context"
+import (
+	"context"
+
+	"cloud.google.com/go/bigquery"
+)
 
 func (x *Action) ByteLimit() int64 {
 	return x.byteLimit
@@ -20,4 +24,8 @@ func (x *Action) SetBQClientFactory(factory BigQueryClientFactory) {
 
 func NewBigQueryClient(ctx context.Context, projectID string) (BigQueryClient, error) {
 	return newBigQueryClient(ctx, projectID)
+}
+
+func GenerateQuery(fullTableID string, schema bigquery.Schema, limit int64) (string, error) {
+	return generateQuery(fullTableID, schema, limit)
 }

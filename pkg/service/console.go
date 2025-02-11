@@ -151,6 +151,9 @@ func (c *ConsoleThread) AttachFile(_ context.Context, comment, filename string, 
 
 	fmt.Fprintf(c.writer, "Comment: %s\n", comment)
 	color.New(color.FgCyan).Fprintf(c.writer, "Filename: %s\n", filename)
+	if len(content) > 10000 {
+		content = append(content[:10000], []byte("...(truncated)")...)
+	}
 	fmt.Fprintf(c.writer, "\nContent:\n%s\n", string(content))
 
 	fmt.Fprintln(c.writer, strings.Repeat("-", 80))

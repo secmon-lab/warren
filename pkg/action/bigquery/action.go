@@ -6,10 +6,10 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"os"
 	"strings"
+	"text/template"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/vertexai/genai"
@@ -172,27 +172,43 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 	eb := goerr.NewBuilder(goerr.V("table_id", fullTableID))
 
 	var finalQuery string
-	var comment string
 
-	for i := 0; i < x.maxGenQueryRetry; i++ {
-		result, err := x.getNewQuery(ctx, ssn, fullTableID, meta, comment)
+	prompt, err := generateQuery(fullTableID, meta.Schema, x.cfg.Limit.Rows)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < x.maxGenQueryRetry && finalQuery == ""; i++ {
+		result, err := x.requestNewQuery(ctx, ssn, prompt)
 		if err != nil {
 			return nil, err
 		}
-		eb = eb.With(goerr.V("query", result.Query))
 
+		eb = eb.With(goerr.V("query", result.Query))
 		status, err := client.DryRun(ctx, result.Query)
 		if err != nil {
-			return nil, eb.Wrap(err, "failed to run query")
+			if err := slack.Reply(ctx, fmt.Sprintf("Failed to run query. Retry...\nQuery: %s\nError: %s", result.Query, err.Error())); err != nil {
+				return nil, goerr.Wrap(err, "failed to reply to slack")
+			}
+			prompt = fmt.Sprintf("Failed to run query. Please try again. The query is: %s\nError: %s", result.Query, err.Error())
+			continue
 		}
 
 		if status.Statistics.TotalBytesProcessed > x.byteLimit {
-			comment = fmt.Sprintf("The query result is too large. Please try again with a smaller query. The your generated query result is %d bytes, but the limit is %d bytes.", status.Statistics.TotalBytesProcessed, x.byteLimit)
+			msg := fmt.Sprintf("The query result is too large. Retry...\nQuery: %s\nDry run result: %s\nLimit: %s",
+				result.Query,
+				humanize.Bytes(uint64(status.Statistics.TotalBytesProcessed)),
+				humanize.Bytes(uint64(x.byteLimit)),
+			)
+			if err := slack.Reply(ctx, msg); err != nil {
+				return nil, goerr.Wrap(err, "failed to reply to slack")
+			}
+
+			prompt = fmt.Sprintf("The query result is too large. Please try again with a smaller query. The your generated query result is %d bytes, but the limit is %d bytes.", status.Statistics.TotalBytesProcessed, x.byteLimit)
 			continue
 		}
 
 		finalQuery = result.Query
-		break
 	}
 	if finalQuery == "" {
 		return nil, eb.New("failed to generate query")
@@ -208,6 +224,10 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 		return nil
 	}
 
+	if err := slack.AttachFile(ctx, "Sending query to BigQuery", "query.sql", []byte(finalQuery)); err != nil {
+		return nil, goerr.Wrap(err, "failed to attach query")
+	}
+
 	if err = client.Query(ctx, finalQuery, writer); err != nil {
 		return nil, eb.Wrap(err, "failed to execute query")
 	}
@@ -219,25 +239,34 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 	}, nil
 }
 
-func (x *Action) getNewQuery(ctx context.Context, ssn interfaces.GenAIChatSession, fullTableID string, meta *bigquery.TableMetadata, comment string) (*queryResult, error) {
+func generateQuery(fullTableID string, schema bigquery.Schema, limit int64) (string, error) {
+	rawSchema, err := json.Marshal(schema)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to marshal schema")
+	}
+
 	queryArgs := map[string]any{
 		"table_id": fullTableID,
-		"schema":   meta.Schema,
-		"limit":    x.cfg.Limit.Rows,
+		"schema":   string(rawSchema),
+		"limit":    limit,
 	}
 	tmpl, err := template.New("query").Parse(queryPrompt)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to parse query prompt")
+		return "", goerr.Wrap(err, "failed to parse query prompt")
 	}
 
 	var queryRequest bytes.Buffer
 	if err := tmpl.Execute(&queryRequest, queryArgs); err != nil {
-		return nil, goerr.Wrap(err, "failed to execute query template")
+		return "", goerr.Wrap(err, "failed to execute query template")
 	}
 
-	eb := goerr.NewBuilder(goerr.V("query", queryRequest.String()))
+	return queryRequest.String(), nil
+}
 
-	queryResp, err := ssn.SendMessage(ctx, genai.Text(comment), genai.Text(queryRequest.String()))
+func (x *Action) requestNewQuery(ctx context.Context, ssn interfaces.GenAIChatSession, prompt string) (*queryResult, error) {
+	eb := goerr.NewBuilder(goerr.V("prompt", prompt))
+
+	queryResp, err := ssn.SendMessage(ctx, genai.Text(prompt))
 	if err != nil {
 		return nil, eb.Wrap(err, "failed to send message")
 	}
@@ -270,4 +299,5 @@ func (x *Action) getNewQuery(ctx context.Context, ssn interfaces.GenAIChatSessio
 	}
 
 	return &result, nil
+
 }

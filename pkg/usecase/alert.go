@@ -26,6 +26,9 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema string, alertData an
 	var results []*model.Alert
 	for _, a := range result.Alert {
 		alert := model.NewAlert(ctx, schema, a)
+		if alert.Data == nil {
+			alert.Data = alertData
+		}
 
 		newAlert, err := uc.handleAlert(ctx, alert)
 		if err != nil {

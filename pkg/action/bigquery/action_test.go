@@ -9,6 +9,7 @@ import (
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/gt"
 	bq "github.com/secmon-lab/warren/pkg/action/bigquery"
+	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/urfave/cli/v3"
 )
@@ -166,13 +167,20 @@ func TestActionExecute(t *testing.T) {
 					return tc.client, nil
 				})
 			}
-
+			threadMock := &mock.SlackThreadServiceMock{
+				ReplyFunc: func(ctx context.Context, msg string) error {
+					return nil
+				},
+				AttachFileFunc: func(ctx context.Context, comment, filename string, content []byte) error {
+					return nil
+				},
+			}
 			cmd := &cli.Command{
 				Name:  "bigquery",
 				Flags: action.Flags(),
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					gt.NoError(t, action.Configure(ctx))
-					got, err := action.Execute(context.Background(), nil, tc.ssn, tc.args)
+					got, err := action.Execute(context.Background(), threadMock, tc.ssn, tc.args)
 					if tc.wantErr {
 						gt.Error(t, err)
 						return nil
@@ -219,12 +227,20 @@ func TestActionExecuteWithLimit(t *testing.T) {
 		return client, nil
 	})
 
+	threadMock := &mock.SlackThreadServiceMock{
+		ReplyFunc: func(ctx context.Context, msg string) error {
+			return nil
+		},
+		AttachFileFunc: func(ctx context.Context, comment, filename string, content []byte) error {
+			return nil
+		},
+	}
 	cmd := &cli.Command{
 		Name:  "bigquery",
 		Flags: action.Flags(),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			gt.NoError(t, action.Configure(ctx))
-			got, err := action.Execute(context.Background(), nil, ssn, args)
+			got, err := action.Execute(context.Background(), threadMock, ssn, args)
 			gt.NoError(t, err)
 			gt.Equal(t, got.Type, model.ActionResultTypeJSON)
 			gt.Equal(t, got.Data, "{\n  \"test\": \"data\"\n}\n")
@@ -238,4 +254,31 @@ func TestActionExecuteWithLimit(t *testing.T) {
 	}))
 
 	gt.Equal(t, dryRunCount, 2)
+}
+
+//go:embed prompt/query.md
+var queryPrompt string
+
+func TestGenerateQuery(t *testing.T) {
+	schema := bigquery.Schema{
+		{
+			Name:     "name",
+			Type:     bigquery.StringFieldType,
+			Required: true,
+		},
+		{
+			Name:     "age",
+			Type:     bigquery.IntegerFieldType,
+			Required: false,
+		},
+		{
+			Name:     "created_at",
+			Type:     bigquery.TimestampFieldType,
+			Required: false,
+		},
+	}
+
+	query, err := bq.GenerateQuery("my-project.github.audit_logs_v1", schema, 1000)
+	gt.NoError(t, err)
+	t.Log(query)
 }
