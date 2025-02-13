@@ -5,12 +5,12 @@ import (
 	"time"
 )
 
-var ctxClockKey = struct{}{}
+type ctxClockKey struct{}
 
 type Clock func() time.Time
 
 func Now(ctx context.Context) time.Time {
-	clock, ok := ctx.Value(ctxClockKey).(Clock)
+	clock, ok := ctx.Value(ctxClockKey{}).(Clock)
 	if !ok {
 		return time.Now()
 	}
@@ -18,5 +18,5 @@ func Now(ctx context.Context) time.Time {
 }
 
 func With(ctx context.Context, clock Clock) context.Context {
-	return context.WithValue(ctx, ctxClockKey, clock)
+	return context.WithValue(ctx, ctxClockKey{}, clock)
 }

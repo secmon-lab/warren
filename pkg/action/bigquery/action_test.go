@@ -91,13 +91,13 @@ type ssnMock struct {
 
 func (x *ssnMock) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
 	return &genai.GenerateContentResponse{
-		Candidates: []*genai.Candidate{
-			{
-				Content: &genai.Content{
-					Parts: []genai.Part{genai.Text(x.resp)},
+		Candidates: []*genai.Candidate{{
+			Content: &genai.Content{
+				Parts: []genai.Part{
+					genai.Text(x.resp),
 				},
 			},
-		},
+		}},
 	}, nil
 }
 
@@ -255,9 +255,6 @@ func TestActionExecuteWithLimit(t *testing.T) {
 
 	gt.Equal(t, dryRunCount, 2)
 }
-
-//go:embed prompt/query.md
-var queryPrompt string
 
 func TestGenerateQuery(t *testing.T) {
 	schema := bigquery.Schema{
