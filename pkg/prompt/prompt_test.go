@@ -13,7 +13,7 @@ func TestPrompt(t *testing.T) {
 		"id":      123,
 		"message": "test",
 	}
-	d, err := prompt.BuildInitPrompt(alert)
+	d, err := prompt.BuildInitPrompt(alert, 3)
 	gt.NoError(t, err)
 
 	t.Log(d)

@@ -116,7 +116,7 @@ func TestPlanAction(t *testing.T) {
 		Data:  guarddutyJSON,
 	})
 
-	prePrompt, err := prompt.BuildInitPrompt(alert)
+	prePrompt, err := prompt.BuildInitPrompt(alert, 3)
 	gt.NoError(t, err)
 
 	resp, err := usecase.PlanAction(ctx, ssn, prePrompt, actionSvc)
