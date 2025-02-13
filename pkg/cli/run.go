@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/interfaces"
@@ -67,7 +68,7 @@ func cmdRun() *cli.Command {
 				return err
 			}
 
-			fd, err := os.Open(alertPath)
+			fd, err := os.Open(filepath.Clean(alertPath))
 			if err != nil {
 				return err
 			}
