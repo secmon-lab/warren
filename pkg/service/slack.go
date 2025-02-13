@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/interfaces"
@@ -98,6 +97,27 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 			)
 		}
 		blocks = append(blocks, slack.NewSectionBlock(nil, fields, nil))
+	}
+	if alert.Finding != nil {
+		blocks = append(blocks,
+			slack.NewSectionBlock(
+				slack.NewTextBlockObject("mrkdwn", "📝 *Summary:*\n"+alert.Finding.Summary, false, false),
+				nil,
+				nil,
+			),
+			slack.NewDividerBlock(),
+			slack.NewSectionBlock(
+				slack.NewTextBlockObject("mrkdwn", "🔍 *Reason:*\n"+alert.Finding.Reason, false, false),
+				nil,
+				nil,
+			),
+			slack.NewDividerBlock(),
+			slack.NewSectionBlock(
+				slack.NewTextBlockObject("mrkdwn", "💡 *Recommendation:*\n"+alert.Finding.Recommendation, false, false),
+				nil,
+				nil,
+			),
+		)
 	}
 
 	// Add action buttons
@@ -272,23 +292,4 @@ func buildFindingBlocks(finding model.AlertFinding) []slack.Block {
 			nil,
 		),
 	}
-}
-
-func (x *Slack) VerifyRequest(header http.Header, body []byte) error {
-	eb := goerr.NewBuilder(goerr.V("header", header), goerr.V("body", body))
-
-	sv, err := slack.NewSecretsVerifier(header, x.signingSecret)
-	if err != nil {
-		return eb.Wrap(err, "failed to create secrets verifier")
-	}
-
-	if _, err := sv.Write(body); err != nil {
-		return eb.Wrap(err, "failed to write request body")
-	}
-
-	if err := sv.Ensure(); err != nil {
-		return eb.Wrap(err, "failed to verify request")
-	}
-
-	return nil
 }

@@ -41,6 +41,12 @@ func TestSlack(t *testing.T) {
 			"foo": "bar",
 			"baz": 123,
 		},
+		Finding: &model.AlertFinding{
+			Severity:       model.AlertSeverityHigh,
+			Summary:        "Test Summary",
+			Reason:         "Test Reason",
+			Recommendation: "Test Recommendation",
+		},
 	})
 	gt.NoError(t, err)
 }

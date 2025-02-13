@@ -85,7 +85,7 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 		prePrompt = fmt.Sprintf("Here is the result of the action.\n%s\n\n```json\n%s\n```", actionResult.Message, actionResult.Data)
 	}
 
-	for i := 0; i < uc.findingLimit; i++ {
+	for i := 0; i < uc.findingLimit && alert.Finding == nil; i++ {
 		finding, err := uc.buildFinding(ctx, ssn)
 		if err != nil {
 			return goerr.Wrap(err, "failed to build finding")
@@ -105,11 +105,10 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 			Reason:         finding.Reason,
 			Recommendation: finding.Recommendation,
 		}
-		break
 	}
 
 	if alert.Finding == nil {
-		if err := thread.Reply(ctx, "Failed to build finding. Retry..."); err != nil {
+		if err := thread.Reply(ctx, "Failed to build finding. Exiting..."); err != nil {
 			return goerr.Wrap(err, "failed to reply to slack")
 		}
 		return nil
@@ -118,7 +117,9 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 	if err := thread.PostFinding(ctx, *alert.Finding); err != nil {
 		return goerr.Wrap(err, "failed to post conclusion")
 	}
-
+	if err := thread.UpdateAlert(ctx, alert); err != nil {
+		return goerr.Wrap(err, "failed to update alert")
+	}
 	return nil
 }
 
