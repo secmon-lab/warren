@@ -18,7 +18,10 @@ func New(uc *usecase.UseCases) *Server {
 
 	r.Route("/alert", func(r chi.Router) {
 		r.Post("/raw/{schema}", alertRawHandler(uc))
-		r.Post("/pubsub/{schema}", alertPubSubHandler(uc))
+		r.Route("/pubsub", func(r chi.Router) {
+			r.Use(validateGoogleIDToken)
+			r.Post("/{schema}", alertPubSubHandler(uc))
+		})
 	})
 	r.Route("/slack", func(r chi.Router) {
 		r.Post("/event", slackEventHandler(uc))

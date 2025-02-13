@@ -9,3 +9,7 @@ type PolicyAlert struct {
 	Attrs []Attribute `json:"attrs"`
 	Data  any         `json:"data"`
 }
+
+type PolicyAuth struct {
+	Allow bool `json:"allow"`
+}

@@ -10,8 +10,27 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
+	"github.com/secmon-lab/warren/pkg/utils/authctx"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
+
+func (uc *UseCases) HandleAlertWithAuth(ctx context.Context, schema string, alertData any) ([]*model.Alert, error) {
+	authCtx := authctx.Build(ctx)
+	if authCtx == nil {
+		return nil, goerr.New("failed to build auth context")
+	}
+
+	var result model.PolicyAuth
+	if err := uc.policyClient.Query(ctx, "data.auth", authCtx, &result); err != nil {
+		return nil, goerr.Wrap(err, "failed to query policy", goerr.V("auth", authCtx))
+	}
+
+	if !result.Allow {
+		return nil, goerr.New("unauthorized", goerr.V("auth", authCtx))
+	}
+
+	return uc.HandleAlert(ctx, schema, alertData)
+}
 
 func (uc *UseCases) HandleAlert(ctx context.Context, schema string, alertData any) ([]*model.Alert, error) {
 	logger := logging.From(ctx)
