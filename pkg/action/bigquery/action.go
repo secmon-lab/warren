@@ -194,7 +194,7 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 			continue
 		}
 
-		if uint64(status.Statistics.TotalBytesProcessed) > x.byteLimit {
+		if status.Statistics.TotalBytesProcessed < 0 || uint64(status.Statistics.TotalBytesProcessed) > x.byteLimit {
 			msg := fmt.Sprintf("The query result is too large. Retry...\nQuery: %s\nDry run result: %s\nLimit: %s",
 				result.Query,
 				humanize.Bytes(uint64(status.Statistics.TotalBytesProcessed)),
