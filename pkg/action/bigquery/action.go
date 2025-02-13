@@ -119,7 +119,7 @@ func (x *Action) Configure(ctx context.Context) error {
 	if err != nil {
 		return goerr.Wrap(err, "failed to parse byte limit", goerr.V("byte_limit", x.cfg.Limit.Bytes))
 	}
-	x.byteLimit = int64(byteLimit)
+	x.byteLimit = byteLimit
 
 	x.maxGenQueryRetry = x.cfg.Retry.MaxGenQuery
 	if x.maxGenQueryRetry < 1 {
@@ -194,7 +194,7 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 			continue
 		}
 
-		if status.Statistics.TotalBytesProcessed > x.byteLimit {
+		if uint64(status.Statistics.TotalBytesProcessed) > x.byteLimit {
 			msg := fmt.Sprintf("The query result is too large. Retry...\nQuery: %s\nDry run result: %s\nLimit: %s",
 				result.Query,
 				humanize.Bytes(uint64(status.Statistics.TotalBytesProcessed)),
