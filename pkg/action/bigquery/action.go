@@ -25,7 +25,7 @@ type Action struct {
 	projectID        string
 	cfgFile          string
 	cfg              bqConfig
-	byteLimit        int64
+	byteLimit        uint64
 	maxGenQueryRetry int
 	bqFactory        BigQueryClientFactory
 }

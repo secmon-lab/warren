@@ -66,6 +66,9 @@ func TestValidateGoogleIDToken(t *testing.T) {
 	})
 }
 
+//go:embed testdata/slack_interaction.json
+var slackInteractionJSON []byte
+
 func TestSlackInteractionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
 	uc := &mock.UseCaseMock{
@@ -77,7 +80,7 @@ func TestSlackInteractionHandler(t *testing.T) {
 
 	t.Run("with valid signature", func(t *testing.T) {
 		ts := fmt.Sprint(time.Now().Unix())
-		payload := `{"type":"block_actions","team":{"id":"T123","domain":"test"},"user":{"id":"U123","name":"testuser"},"api_app_id":"A123","token":"test_token","trigger_id":"123.123.123","response_url":"https://hooks.slack.com/actions/123","action_callback":{"block_actions":[{"type":"button","action_id":"test","block_id":"alert_actions","text":{"type":"plain_text","text":"Investigate","emoji":false},"value":"test-alert-id"}]},"type":"block_actions","actions":[{"type":"button","action_id":"investigate","block_id":"alert_actions","text":{"type":"plain_text","text":"Investigate","emoji":false},"value":"test-alert-id"}],"container":{"type":"message","message_ts":"123.123"},"channel":{"id":"C123","name":"test-channel"}}`
+		payload := string(slackInteractionJSON)
 
 		// Convert payload to form value format
 		form := url.Values{}
