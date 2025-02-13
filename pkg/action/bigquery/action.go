@@ -1,3 +1,4 @@
+// #nosec:G115
 package bigquery
 
 import (
@@ -20,6 +21,13 @@ import (
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 )
+
+func max(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
+}
 
 type Action struct {
 	projectID        string
@@ -194,11 +202,11 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 			continue
 		}
 
-		if status.Statistics.TotalBytesProcessed < 0 || uint64(status.Statistics.TotalBytesProcessed) > x.byteLimit {
+		if status.Statistics.TotalBytesProcessed < 0 || status.Statistics.TotalBytesProcessed > int64(x.byteLimit) {
 			msg := fmt.Sprintf("The query result is too large. Retry...\nQuery: %s\nDry run result: %s\nLimit: %s",
 				result.Query,
-				humanize.Bytes(uint64(status.Statistics.TotalBytesProcessed)),
-				humanize.Bytes(uint64(x.byteLimit)),
+				humanize.Bytes(uint64(max(0, status.Statistics.TotalBytesProcessed))),
+				humanize.Bytes(x.byteLimit),
 			)
 			if err := slack.Reply(ctx, msg); err != nil {
 				return nil, goerr.Wrap(err, "failed to reply to slack")

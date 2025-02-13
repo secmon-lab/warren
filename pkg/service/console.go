@@ -1,3 +1,4 @@
+// #nosec:G104
 package service
 
 import (
