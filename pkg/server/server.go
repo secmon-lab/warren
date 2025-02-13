@@ -4,17 +4,34 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/secmon-lab/warren/pkg/usecase"
+	"github.com/secmon-lab/warren/pkg/interfaces"
 )
 
 type Server struct {
-	router *chi.Mux
+	router             *chi.Mux
+	slackSigningSecret string
 }
 
-func New(uc *usecase.UseCases) *Server {
+type Options func(*Server)
+
+func WithSlackSigningSecret(secret string) Options {
+	return func(s *Server) {
+		s.slackSigningSecret = secret
+	}
+}
+
+func New(uc interfaces.UseCase, opts ...Options) *Server {
 	r := chi.NewRouter()
 
+	s := &Server{
+		router: r,
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+
 	r.Use(loggingMiddleware)
+	r.Use(panicRecoveryMiddleware)
 
 	r.Route("/alert", func(r chi.Router) {
 		r.Post("/raw/{schema}", alertRawHandler(uc))
@@ -24,13 +41,12 @@ func New(uc *usecase.UseCases) *Server {
 		})
 	})
 	r.Route("/slack", func(r chi.Router) {
+		r.Use(verifySlackRequest(s.slackSigningSecret))
 		r.Post("/event", slackEventHandler(uc))
 		r.Post("/interaction", slackInteractionHandler(uc))
 	})
 
-	return &Server{
-		router: r,
-	}
+	return s
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

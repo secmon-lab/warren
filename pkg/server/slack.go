@@ -1,31 +1,22 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/usecase"
+	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 )
 
-func slackEventHandler(uc *usecase.UseCases) http.HandlerFunc {
+func slackEventHandler(uc interfaces.UseCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to read request body"))
-			return
-		}
-
-		if err := uc.VerifySlackRequest(r.Context(), r.Header, body); err != nil {
-			handleError(w, r, goerr.Wrap(err, "failed to verify slack request",
-				goerr.T(errBadRequest),
-				goerr.V("body", string(body)),
-			))
 			return
 		}
 
@@ -73,34 +64,17 @@ func slackEventHandler(uc *usecase.UseCases) http.HandlerFunc {
 	}
 }
 
-func slackInteractionHandler(uc *usecase.UseCases) http.HandlerFunc {
+func slackInteractionHandler(uc interfaces.UseCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			handleError(w, r, goerr.Wrap(err, "failed to read request body"))
-			return
-		}
-
-		if err := uc.VerifySlackRequest(r.Context(), r.Header, body); err != nil {
-			handleError(w, r, goerr.Wrap(err, "failed to verify slack request",
-				goerr.T(errBadRequest),
-				goerr.V("body", string(body)),
-			))
-			return
-		}
-
-		r.Body = io.NopCloser(bytes.NewReader(body))
 		payload := r.FormValue("payload")
 		if payload == "" {
 			handleError(w, r, goerr.New("payload is required",
-				goerr.V("body", string(body)),
 				goerr.T(errBadRequest)),
 			)
 			return
 		}
 
 		var interaction slack.InteractionCallback
-		println(string(payload))
 		if err := json.Unmarshal([]byte(payload), &interaction); err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to unmarshal slack interaction",
 				goerr.T(errBadRequest),
@@ -110,7 +84,7 @@ func slackInteractionHandler(uc *usecase.UseCases) http.HandlerFunc {
 		}
 
 		if err := uc.HandleSlackInteraction(r.Context(), interaction); err != nil {
-			handleError(w, r, goerr.Wrap(err, "failed to handle slack interaction"))
+			handleError(w, r, err)
 			return
 		}
 

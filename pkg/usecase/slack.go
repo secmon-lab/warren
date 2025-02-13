@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/model"
@@ -10,10 +9,6 @@ import (
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 )
-
-func (uc *UseCases) VerifySlackRequest(ctx context.Context, header http.Header, body []byte) error {
-	return uc.slackService.VerifyRequest(header, body)
-}
 
 func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevents.AppMentionEvent) error {
 	logger := logging.From(ctx)

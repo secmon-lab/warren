@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"net/http"
 	"time"
 
 	"github.com/m-mizutani/opac"
@@ -25,6 +24,8 @@ type UseCases struct {
 	actionLimit  int
 	findingLimit int
 }
+
+var _ interfaces.UseCase = &UseCases{}
 
 type Option func(*UseCases)
 
@@ -91,9 +92,6 @@ func New(geminiStartChat interfaces.GetGeminiStartChat, opts ...Option) *UseCase
 						return "test"
 					},
 				}, nil
-			},
-			VerifyRequestFunc: func(header http.Header, body []byte) error {
-				return nil
 			},
 		},
 		policyClient:  policyClient,

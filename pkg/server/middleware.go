@@ -1,12 +1,16 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/utils/authctx"
+	"github.com/slack-go/slack"
 	"google.golang.org/api/idtoken"
 )
 
@@ -61,4 +65,49 @@ func GetGoogleIDTokenClaims(ctx context.Context) (map[string]interface{}, error)
 		return nil, goerr.New("Google ID token claims not found in context")
 	}
 	return claims, nil
+}
+
+func verifySlackRequest(signingSecret string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Read and restore body
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				handleError(w, r, goerr.Wrap(err, "failed to read request body"))
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewBuffer(body))
+
+			verifier, err := slack.NewSecretsVerifier(r.Header, signingSecret)
+			if err != nil {
+				handleError(w, r, goerr.Wrap(err, "failed to create secrets verifier"))
+				return
+			}
+
+			if _, err := verifier.Write(body); err != nil {
+				handleError(w, r, goerr.Wrap(err, "failed to write request body to verifier"))
+				return
+			}
+
+			if err := verifier.Ensure(); err != nil {
+				handleError(w, r, goerr.Wrap(err, "invalid slack signature",
+					goerr.T(errBadRequest),
+				))
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func panicRecoveryMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				handleError(w, r, goerr.New(fmt.Sprintf("%v", err)))
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
 }

@@ -3,11 +3,18 @@ package server_test
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opac"
@@ -17,6 +24,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/server"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/test"
+	"github.com/slack-go/slack"
 )
 
 //go:embed testdata/pubsub.json
@@ -55,5 +63,40 @@ func TestValidateGoogleIDToken(t *testing.T) {
 		gt.Equal(t, http.StatusOK, w.Code)
 		gt.A(t, policyMock.QueryCalls()).Length(2)
 		gt.True(t, calledAuthQuery)
+	})
+}
+
+func TestSlackInteractionHandler(t *testing.T) {
+	signingSecret := "test_signing_secret"
+	uc := &mock.UseCaseMock{
+		HandleSlackInteractionFunc: func(ctx context.Context, interaction slack.InteractionCallback) error {
+			return nil
+		},
+	}
+	server := server.New(uc, server.WithSlackSigningSecret(signingSecret))
+
+	t.Run("with valid signature", func(t *testing.T) {
+		ts := fmt.Sprint(time.Now().Unix())
+		payload := `{"type":"block_actions","team":{"id":"T123","domain":"test"},"user":{"id":"U123","name":"testuser"},"api_app_id":"A123","token":"test_token","trigger_id":"123.123.123","response_url":"https://hooks.slack.com/actions/123","action_callback":{"block_actions":[{"type":"button","action_id":"test","block_id":"alert_actions","text":{"type":"plain_text","text":"Investigate","emoji":false},"value":"test-alert-id"}]},"type":"block_actions","actions":[{"type":"button","action_id":"investigate","block_id":"alert_actions","text":{"type":"plain_text","text":"Investigate","emoji":false},"value":"test-alert-id"}],"container":{"type":"message","message_ts":"123.123"},"channel":{"id":"C123","name":"test-channel"}}`
+
+		// Convert payload to form value format
+		form := url.Values{}
+		form.Add("payload", payload)
+		body := form.Encode()
+
+		// Calculate signature
+		baseString := "v0:" + ts + ":" + body
+		mac := hmac.New(sha256.New, []byte(signingSecret))
+		mac.Write([]byte(baseString))
+		signature := "v0=" + hex.EncodeToString(mac.Sum(nil))
+
+		req := httptest.NewRequest("POST", "/slack/interaction", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Slack-Signature", signature)
+		req.Header.Set("X-Slack-Request-Timestamp", ts)
+		w := httptest.NewRecorder()
+		server.ServeHTTP(w, req)
+
+		gt.Equal(t, http.StatusOK, w.Code)
 	})
 }

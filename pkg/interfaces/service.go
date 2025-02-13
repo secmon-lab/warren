@@ -2,7 +2,6 @@ package interfaces
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
@@ -11,7 +10,6 @@ import (
 type SlackService interface {
 	NewThread(alert model.Alert) SlackThreadService
 	PostAlert(ctx context.Context, alert model.Alert) (SlackThreadService, error)
-	VerifyRequest(header http.Header, body []byte) error
 }
 
 type SlackThreadService interface {

@@ -6,10 +6,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/usecase"
+	"github.com/secmon-lab/warren/pkg/interfaces"
 )
 
-func alertPubSubHandler(uc *usecase.UseCases) http.HandlerFunc {
+func alertPubSubHandler(uc interfaces.UseCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		schema := chi.URLParam(r, "schema")
 
@@ -39,7 +39,7 @@ func alertPubSubHandler(uc *usecase.UseCases) http.HandlerFunc {
 	}
 }
 
-func alertRawHandler(uc *usecase.UseCases) http.HandlerFunc {
+func alertRawHandler(uc interfaces.UseCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		schema := chi.URLParam(r, "schema")
 
