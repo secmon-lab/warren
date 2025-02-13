@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
+	"time"
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
@@ -14,6 +16,23 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
+type throttleSession struct {
+	ssn  interfaces.GenAIChatSession
+	last time.Time
+	mu   sync.Mutex
+}
+
+func (x *throttleSession) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
+	x.mu.Lock()
+	if time.Since(x.last) < 3*time.Second {
+		time.Sleep(3 * time.Second)
+	}
+	x.last = time.Now()
+	defer x.mu.Unlock()
+
+	return x.ssn.SendMessage(ctx, msg...)
+}
+
 func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 	logger := logging.From(ctx)
 	thread := uc.slackService.NewThread(alert)
@@ -21,9 +40,12 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 		return goerr.Wrap(err, "failed to reply to slack")
 	}
 
-	ssn := uc.geminiStartChat()
+	ssn := &throttleSession{
+		ssn:  uc.geminiStartChat(),
+		last: time.Now(),
+	}
 
-	prePrompt, err := prompt.BuildInitPrompt(alert)
+	prePrompt, err := prompt.BuildInitPrompt(alert, uc.actionLimit)
 	if err != nil {
 		return goerr.Wrap(err, "failed to build init prompt")
 	}

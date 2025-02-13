@@ -23,7 +23,7 @@ func stringify(v any) (string, error) {
 //go:embed templates/init.md
 var initTemplate string
 
-func BuildInitPrompt(alert any) (string, error) {
+func BuildInitPrompt(alert any, maxRetry int) (string, error) {
 	tmpl, err := template.New("init").Parse(initTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
@@ -35,7 +35,8 @@ func BuildInitPrompt(alert any) (string, error) {
 	}
 
 	input := map[string]any{
-		"alert": string(rawAlert),
+		"alert":     string(rawAlert),
+		"max_retry": maxRetry,
 	}
 
 	var result bytes.Buffer
