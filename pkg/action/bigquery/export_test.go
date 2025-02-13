@@ -6,7 +6,7 @@ import (
 	"cloud.google.com/go/bigquery"
 )
 
-func (x *Action) ByteLimit() int64 {
+func (x *Action) ByteLimit() uint64 {
 	return x.byteLimit
 }
 
