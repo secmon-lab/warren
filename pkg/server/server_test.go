@@ -88,10 +88,7 @@ func TestSlackInteractionHandler(t *testing.T) {
 		body := form.Encode()
 
 		// Calculate signature
-		baseString := "v0:" + ts + ":" + body
-		mac := hmac.New(sha256.New, []byte(signingSecret))
-		mac.Write([]byte(baseString))
-		signature := "v0=" + hex.EncodeToString(mac.Sum(nil))
+		signature := calculateSlackSignature(body, ts, signingSecret)
 
 		req := httptest.NewRequest("POST", "/slack/interaction", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -102,4 +99,11 @@ func TestSlackInteractionHandler(t *testing.T) {
 
 		gt.Equal(t, http.StatusOK, w.Code)
 	})
+}
+
+func calculateSlackSignature(payload string, ts string, signingSecret string) string {
+	baseString := "v0:" + ts + ":" + payload
+	mac := hmac.New(sha256.New, []byte(signingSecret))
+	mac.Write([]byte(baseString))
+	return "v0=" + hex.EncodeToString(mac.Sum(nil))
 }
