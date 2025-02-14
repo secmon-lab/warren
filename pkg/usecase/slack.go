@@ -59,6 +59,9 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 		if err := thread.Reply(ctx, "Alert acknowledged by "+interaction.User.Name); err != nil {
 			return goerr.Wrap(err, "failed to reply to slack")
 		}
+		if err := thread.UpdateAlert(ctx, *alert); err != nil {
+			return goerr.Wrap(err, "failed to update slack thread")
+		}
 
 	case "close":
 		now := clock.Now(ctx)
@@ -71,6 +74,9 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 		thread := uc.slackService.NewThread(*alert)
 		if err := thread.Reply(ctx, "Alert closed by "+interaction.User.Name); err != nil {
 			return goerr.Wrap(err, "failed to reply to slack")
+		}
+		if err := thread.UpdateAlert(ctx, *alert); err != nil {
+			return goerr.Wrap(err, "failed to update slack thread")
 		}
 
 	case "inspect":

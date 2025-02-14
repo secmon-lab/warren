@@ -60,7 +60,18 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 			slack.NewTextBlockObject("plain_text", alert.Title, false, false),
 		),
 		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", "*Schema:* "+alert.Schema+"\n*Severity:* "+func() string {
+			slack.NewTextBlockObject("mrkdwn", "*Schema:* "+alert.Schema+"\n*Status:* "+func() string {
+				switch alert.Status {
+				case model.AlertStatusNew:
+					return ":new: NEW"
+				case model.AlertStatusAcknowledged:
+					return ":eyes: ACKNOWLEDGED"
+				case model.AlertStatusClosed:
+					return ":white_check_mark: CLOSED"
+				default:
+					return string(alert.Status)
+				}
+			}()+"\n*Severity:* "+func() string {
 				if alert.Finding == nil {
 					return ":question: not available"
 				}
