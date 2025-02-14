@@ -1,0 +1,10 @@
+tables:
+  - id: my-project.slack.audit_logs_v1
+    description: Slack audit logs
+  - id: my-project.github.audit_logs_v1
+    description: GitHub audit logs
+limit:
+  bytes: 100MB
+  rows: 256
+retry:
+  max_gen_query: 3

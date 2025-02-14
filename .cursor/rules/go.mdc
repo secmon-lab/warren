@@ -1,0 +1,127 @@
+---
+description: Rule for Go coding
+globs: *.go
+---
+
+# Error handling
+
+- Use `github.com/m-mizutani/goerr/v2`
+- Must wrap error by `goerr.Wrap`
+- Add helpful variables with `goerr.V` like following
+
+```go
+return goerr.Wrap(err, "failed something", goerr.V("args", args))
+```
+
+# Testing
+
+Use `github.com/m-mizutani/gt` package.
+
+`gt` is test library leveraging Go generics to check variable type in IDE and compiler.
+
+```go
+color := "blue"
+
+// gt.Value(t, color).Equal(5) // <- Compile error
+
+gt.Value(t, color).Equal("orange") // <- Fail
+gt.Value(t, color).Equal("blue")   // <- Pass
+```
+
+```go
+colors := ["red", "blue"]
+
+// gt.Array(t, colors).Equal("red")       // <- Compile error
+// gt.Array(t, colors).Equal([]int{1, 2}) // <- Compile error
+
+gt.Array(t, colors).Equal([]string{"red", "blue"}) // <- Pass
+gt.Array(t, colors).Have("orange")                 // <- Fail
+```
+
+## Usage
+
+In many cases, a developer does not care Go generics in using `gt`. However, a developer need to specify generic type (`Value`, `Array`, `Map`, `Error`, etc.) explicitly to use specific test functions for each types.
+
+See [reference](mdc:https:/pkg.go.dev/github.com/m-mizutani/gt) for more detail.
+
+### Value
+
+Generic test type has a minimum set of test methods.
+
+```go
+type user struct {
+    Name string
+}
+u1 := user{Name: "blue"}
+
+// gt.Value(t, u1).Equal(1)                  // Compile error
+// gt.Value(t, u1).Equal("blue")             // Compile error
+// gt.Value(t, u1).Equal(&user{Name:"blue"}) // Compile error
+
+gt.Value(t, u1).Equal(user{Name:"blue"}) // Pass
+```
+
+### Number
+
+Accepts only number types: `int`, `uint`, `int64`, `float64`, etc.
+
+```go
+var f float64 = 12.5
+gt.Number(t, f).
+    Equal(12.5).         // Pass
+    Greater(12).         // Pass
+    Less(10).            // Fail
+    GreaterOrEqual(12.5) // Pass
+```
+
+### Array
+
+Accepts array of any type not only primitive type but also struct.
+
+```go
+colors := []string{"red", "blue", "yellow"}
+
+gt.Array(t, colors).
+    Equal([]string{"red", "blue", "yellow"}) // Pass
+    Equal([]string{"red", "blue"})           // Fail
+    // Equal([]int{1, 2})                    // Compile error
+    Contain([]string{"red", "blue"})         // Pass
+    Have("yellow")                           // Pass
+    Length(3)                                // Pass
+
+gt.Array(t, colors).Must().Have("orange") // Fail and stop test
+```
+
+### Map
+
+```go
+colorMap := map[string]int{
+    "red": 1,
+    "yellow": 2,
+    "blue": 5,
+}
+
+gt.Map(t, colorMap)
+    .HaveKey("blue")           // Pass
+    .HaveValue(5)              // Pass
+    // .HaveValue("red")       // Compile error
+    .HaveKeyValue("yellow", 2) // Pass
+
+gt.Map(t, colorMap).Must().HaveKey("orange") // Fail and stop test
+```
+
+### Cast
+
+```go
+type user struct {
+    Name string
+}
+var v any = &user{
+    Name: "blue",
+}
+
+u1 := gt.Cast[user](mdc:t, v).NotNil()  // Fail (because v is *user, not user)
+gt.Cast[*user](mdc:t, v).Nil()          // Fail (because v is not nil)
+
+u2 := gt.Cast[*user](mdc:t, v).NotNil() // Pass
+gt.Value(t, u2.Name).Equal("blue")       // Pass

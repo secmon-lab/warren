@@ -1,0 +1,132 @@
+{
+  "Findings": [
+    {
+      "AccountId": "783957204773",
+      "Arn": "arn:aws:guardduty:ap-northeast-1:783957204773:detector/c6b248a96abef3c6dd24b07e13380b04/finding/034f3664616c49cb85349d0511ecd306",
+      "CreatedAt": "2023-04-16T06:11:53.438Z",
+      "Description": "EC2 instance i-99999999 is querying a domain name of a remote host that is known to hold credentials and other stolen data captured by malware.",
+      "Id": "034f3664616c49cb85349d0511ecd306",
+      "Partition": "aws",
+      "Region": "ap-northeast-1",
+      "Resource": {
+        "InstanceDetails": {
+          "AvailabilityZone": "GeneratedFindingInstaceAvailabilityZone",
+          "IamInstanceProfile": {
+            "Arn": "arn:aws:iam::783957204773:example/instance/profile",
+            "Id": "GeneratedFindingInstanceProfileId"
+          },
+          "ImageDescription": "GeneratedFindingInstaceImageDescription",
+          "ImageId": "ami-99999999",
+          "InstanceId": "i-99999999",
+          "InstanceState": "running",
+          "InstanceType": "m3.xlarge",
+          "OutpostArn": "arn:aws:outposts:us-west-2:123456789000:outpost/op-0fbc006e9abbc73c3",
+          "LaunchTime": "2016-11-12T23:25:58.000Z",
+          "NetworkInterfaces": [
+            {
+              "Ipv6Addresses": [],
+              "NetworkInterfaceId": "eni-bfcffe88",
+              "PrivateDnsName": "GeneratedFindingPrivateDnsName",
+              "PrivateIpAddress": "10.0.0.1",
+              "PrivateIpAddresses": [
+                {
+                  "PrivateDnsName": "GeneratedFindingPrivateName",
+                  "PrivateIpAddress": "10.0.0.1"
+                }
+              ],
+              "PublicDnsName": "GeneratedFindingPublicDNSName",
+              "PublicIp": "198.51.100.0",
+              "SecurityGroups": [
+                {
+                  "GroupId": "GeneratedFindingSecurityId",
+                  "GroupName": "GeneratedFindingSecurityGroupName"
+                }
+              ],
+              "SubnetId": "GeneratedFindingSubnetId",
+              "VpcId": "GeneratedFindingVPCId"
+            }
+          ],
+          "ProductCodes": [
+            {
+              "Code": "GeneratedFindingProductCodeId",
+              "ProductType": "GeneratedFindingProductCodeType"
+            }
+          ],
+          "Tags": [
+            {
+              "Key": "GeneratedFindingInstaceTag1",
+              "Value": "GeneratedFindingInstaceValue1"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag2",
+              "Value": "GeneratedFindingInstaceTagValue2"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag3",
+              "Value": "GeneratedFindingInstaceTagValue3"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag4",
+              "Value": "GeneratedFindingInstaceTagValue4"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag5",
+              "Value": "GeneratedFindingInstaceTagValue5"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag6",
+              "Value": "GeneratedFindingInstaceTagValue6"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag7",
+              "Value": "GeneratedFindingInstaceTagValue7"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag8",
+              "Value": "GeneratedFindingInstaceTagValue8"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag9",
+              "Value": "GeneratedFindingInstaceTagValue9"
+            }
+          ]
+        },
+        "ResourceType": "Instance"
+      },
+      "SchemaVersion": "2.0",
+      "Service": {
+        "Action": {
+          "ActionType": "DNS_REQUEST",
+          "DnsRequestAction": {
+            "Domain": "3322.org",
+            "Protocol": "UDP",
+            "Blocked": false
+          }
+        },
+        "Evidence": {
+          "ThreatIntelligenceDetails": [
+            {
+              "ThreatListName": "GeneratedFindingThreatListName",
+              "ThreatNames": ["GeneratedFindingThreatName"]
+            }
+          ]
+        },
+        "Archived": false,
+        "Count": 1,
+        "DetectorId": "c6b248a96abef3c6dd24b07e13380b04",
+        "EventFirstSeen": "2023-04-16T06:11:53.000Z",
+        "EventLastSeen": "2023-04-16T06:11:53.000Z",
+        "ResourceRole": "TARGET",
+        "ServiceName": "guardduty",
+        "AdditionalInfo": {
+          "Value": "{\"threatListName\":\"GeneratedFindingThreatListName\",\"sample\":true}",
+          "Type": "default"
+        }
+      },
+      "Severity": 8,
+      "Title": "Drop Point domain name queried by EC2 instance i-99999999.",
+      "Type": "Trojan:EC2/DropPoint!DNS",
+      "UpdatedAt": "2023-04-16T06:11:53.438Z"
+    }
+  ]
+}
