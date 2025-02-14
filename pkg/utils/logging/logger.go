@@ -21,27 +21,28 @@ const (
 )
 
 var (
-	logger      = slog.Default()
-	loggerMutex sync.Mutex
+	defaultLogger = slog.Default()
+	loggerMutex   sync.Mutex
 )
 
 func Default() *slog.Logger {
-	return logger
+	return defaultLogger
 }
 
 func Quiet() {
 	loggerMutex.Lock()
-	logger = slog.New(slog.NewJSONHandler(io.Discard, &slog.HandlerOptions{
+	defaultLogger = slog.New(slog.NewJSONHandler(io.Discard, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 	loggerMutex.Unlock()
 }
 
-func ReconfigureLogger(w io.Writer, level slog.Level, format Format) {
+func New(w io.Writer, level slog.Level, format Format) *slog.Logger {
 	filter := masq.New(
 		masq.WithTag("secret"),
 		masq.WithTag("quiet"),
 		masq.WithFieldPrefix("secret_"),
+		masq.WithFieldName("Authorization"),
 		masq.WithAllowedType(reflect.TypeOf(time.Time{})),
 	)
 
@@ -80,8 +81,12 @@ func ReconfigureLogger(w io.Writer, level slog.Level, format Format) {
 		panic("Unsupported log format: " + fmt.Sprintf("%d", format))
 	}
 
+	return slog.New(handler)
+}
+
+func SetDefault(logger *slog.Logger) {
 	loggerMutex.Lock()
-	logger = slog.New(handler)
+	defaultLogger = logger
 	loggerMutex.Unlock()
 }
 

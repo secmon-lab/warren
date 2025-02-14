@@ -116,7 +116,8 @@ func (x *Logger) Configure() (func(), error) {
 		}
 	}
 
-	logging.ReconfigureLogger(output, level, format)
+	logger := logging.New(output, level, format)
+	logging.SetDefault(logger)
 
 	return closer, nil
 }

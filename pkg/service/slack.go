@@ -73,9 +73,9 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 				}
 			}()+"\n*Assignee:* "+func() string {
 				if alert.Assignee == nil {
-					return ":bust_in_silhouette: unassigned"
+					return ":no_entry: unassigned"
 				}
-				return "<@" + alert.Assignee.ID + ">"
+				return ":bust_in_silhouette: <@" + alert.Assignee.ID + ">"
 			}()+"\n*Severity:* "+func() string {
 				if alert.Finding == nil {
 					return ":question: not available"

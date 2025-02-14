@@ -28,6 +28,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			slog.Any("method", r.Method),
 			slog.Any("path", r.URL.Path),
 			slog.Any("query", r.URL.Query()),
+			slog.Any("headers", r.Header),
 		}
 
 		if logger.Enabled(r.Context(), slog.LevelDebug) {
