@@ -125,3 +125,33 @@ func TestPlanAction(t *testing.T) {
 	gt.Equal(t, resp.Action, "bigquery")
 	gt.Equal(t, resp.Args, model.Arguments{"table_id": "vpc_flow_logs"})
 }
+
+func TestGenerateAlertMetadata(t *testing.T) {
+	ctx := context.Background()
+	vars := test.NewEnvVars(t, "TEST_GEMINI_PROJECT_ID", "TEST_GEMINI_LOCATION")
+	client, err := genai.NewClient(ctx, vars.Get("TEST_GEMINI_PROJECT_ID"), vars.Get("TEST_GEMINI_LOCATION"))
+	gt.NoError(t, err)
+	geminiModel := client.GenerativeModel("gemini-2.0-flash")
+	geminiModel.GenerationConfig.ResponseMIMEType = "application/json"
+	ssn := geminiModel.StartChat()
+
+	repo := repository.NewMemory()
+	uc := usecase.New(func() interfaces.GenAIChatSession {
+		return ssn
+	}, usecase.WithRepository(repo))
+
+	alert := model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
+		Title: "Amazon GuardDuty finding",
+		Data:  guarddutyJSON,
+		Attrs: []model.Attribute{{Key: "test", Value: "test"}},
+	})
+
+	newAlert, err := uc.GenerateAlertMetadata(ctx, alert)
+	gt.NoError(t, err)
+	// Title is not changed
+	gt.Equal(t, newAlert.Title, alert.Title)
+	// Description is not empty
+	gt.NotEqual(t, newAlert.Description, "")
+	// Attributes are not empty
+	gt.A(t, newAlert.Attributes).Longer(2)
+}

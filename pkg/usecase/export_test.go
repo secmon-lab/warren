@@ -10,4 +10,8 @@ func (uc *UseCases) FindSimilarAlert(ctx context.Context, alert model.Alert) (*m
 	return uc.findSimilarAlert(ctx, alert)
 }
 
+func (uc *UseCases) GenerateAlertMetadata(ctx context.Context, alert model.Alert) (*model.Alert, error) {
+	return uc.generateAlertMetadata(ctx, alert)
+}
+
 var PlanAction = planAction

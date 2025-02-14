@@ -15,7 +15,7 @@ func stringify(v any) (string, error) {
 	enc := json.NewEncoder(&buf)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(v); err != nil {
-		return "", goerr.Wrap(err, "failed to marshal")
+		return "", goerr.Wrap(err, "failed to marshal", goerr.V("data", v))
 	}
 	return buf.String(), nil
 }
@@ -31,12 +31,13 @@ func BuildInitPrompt(alert any, maxRetry int) (string, error) {
 
 	rawAlert, err := stringify(alert)
 	if err != nil {
-		return "", goerr.Wrap(err, "failed to marshal alert")
+		return "", err
 	}
 
 	input := map[string]any{
 		"alert":     string(rawAlert),
 		"max_retry": maxRetry,
+		"lang":      defaultLang.name(),
 	}
 
 	var result bytes.Buffer
@@ -63,12 +64,13 @@ func BuildActionPrompt(actions []model.ActionSpec) (string, error) {
 
 	schema, err := generateSchema(ActionPromptResult{}).Stringify()
 	if err != nil {
-		return "", goerr.Wrap(err, "failed to generate schema")
+		return "", err
 	}
 
 	input := map[string]any{
 		"actions": actions,
 		"schema":  schema,
+		"lang":    defaultLang.name(),
 	}
 
 	var buf bytes.Buffer
@@ -94,27 +96,28 @@ func BuildAggregatePrompt(newAlert model.Alert, candidates []model.Alert) (strin
 
 	rawNewAlert, err := stringify(newAlert)
 	if err != nil {
-		return "", goerr.Wrap(err, "failed to marshal new alert")
+		return "", err
 	}
 
 	rawCandidates := []string{}
 	for _, candidate := range candidates {
 		rawCandidate, err := stringify(candidate)
 		if err != nil {
-			return "", goerr.Wrap(err, "failed to marshal candidate")
+			return "", err
 		}
 		rawCandidates = append(rawCandidates, rawCandidate)
 	}
 
 	schema, err := generateSchema(AggregatePromptResult{}).Stringify()
 	if err != nil {
-		return "", goerr.Wrap(err, "failed to generate schema")
+		return "", err
 	}
 
 	input := map[string]any{
 		"new":        rawNewAlert,
 		"candidates": rawCandidates,
 		"schema":     schema,
+		"lang":       defaultLang.name(),
 	}
 
 	var buf bytes.Buffer
@@ -136,15 +139,55 @@ func BuildFindingPrompt() (string, error) {
 
 	schema, err := generateSchema(model.AlertFinding{}).Stringify()
 	if err != nil {
-		return "", goerr.Wrap(err, "failed to generate schema")
+		return "", err
 	}
 
 	input := map[string]any{
 		"schema": schema,
+		"lang":   defaultLang.name(),
 	}
 
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "finding", input); err != nil {
+		return "", goerr.Wrap(err, "failed to execute template")
+	}
+
+	return buf.String(), nil
+}
+
+//go:embed templates/meta.md
+var metaTemplate string
+
+type MetaPromptResult struct {
+	Title       string            `json:"title"`
+	Description string            `json:"description"`
+	Attrs       []model.Attribute `json:"attrs"`
+}
+
+func BuildMetaPrompt(alert model.Alert) (string, error) {
+	tmpl, err := template.New("meta").Parse(metaTemplate)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to parse template")
+	}
+
+	schema, err := generateSchema(MetaPromptResult{}).Stringify()
+	if err != nil {
+		return "", err
+	}
+
+	rawAlert, err := stringify(alert)
+	if err != nil {
+		return "", err
+	}
+
+	input := map[string]any{
+		"alert":  rawAlert,
+		"schema": schema,
+		"lang":   defaultLang.name(),
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "meta", input); err != nil {
 		return "", goerr.Wrap(err, "failed to execute template")
 	}
 

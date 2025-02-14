@@ -121,4 +121,5 @@ type Attribute struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
 	Link  string `json:"link"`
+	Auto  bool   `json:"auto"`
 }

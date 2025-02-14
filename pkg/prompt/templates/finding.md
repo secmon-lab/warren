@@ -6,6 +6,7 @@ Based on the investigation so far, please provide your conclusion about this ale
 {{ .schema }}
 ```
 
+Fields rules are as follows. Language of `summary`, `reason`, `recommendation` must be {{ .lang }}.
 ## `severity`: The severity of the alert.
 
 It can be one of the following:

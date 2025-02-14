@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"time"
 
-	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
+	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/utils/authctx"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
@@ -62,6 +62,12 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema string, alertData an
 func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.Alert, error) {
 	logger := logging.From(ctx)
 
+	newAlert, err := uc.generateAlertMetadata(ctx, alert)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to generate alert metadata")
+	}
+	alert = *newAlert
+
 	// Check if the alert is similar to any existing alerts
 	similarAlert, err := uc.findSimilarAlert(ctx, alert)
 	if err != nil {
@@ -109,6 +115,43 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.
 	return &alert, nil
 }
 
+func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert model.Alert) (*model.Alert, error) {
+	p, err := prompt.BuildMetaPrompt(alert)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to build meta prompt")
+	}
+
+	ssn := uc.geminiStartChat()
+	result, err := service.AskChat[prompt.MetaPromptResult](ctx, ssn, p)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to ask chat")
+	}
+
+	if alert.Title == "" {
+		alert.Title = result.Title
+	}
+
+	if alert.Description == "" {
+		alert.Description = result.Description
+	}
+
+	for _, resAttr := range result.Attrs {
+		found := false
+		for _, aAttr := range alert.Attributes {
+			if aAttr.Value == resAttr.Value {
+				found = true
+				break
+			}
+		}
+		if !found {
+			resAttr.Auto = true
+			alert.Attributes = append(alert.Attributes, resAttr)
+		}
+	}
+
+	return &alert, nil
+}
+
 func (uc *UseCases) findSimilarAlert(ctx context.Context, alert model.Alert) (*model.Alert, error) {
 	oldest := alert.CreatedAt.Add(-24 * time.Hour)
 	alerts, err := uc.repository.FetchLatestAlerts(ctx, oldest, 100)
@@ -122,26 +165,12 @@ func (uc *UseCases) findSimilarAlert(ctx context.Context, alert model.Alert) (*m
 	}
 
 	ssn := uc.geminiStartChat()
-	resp, err := ssn.SendMessage(ctx, genai.Text(p))
+	result, err := service.AskChat[prompt.AggregatePromptResult](ctx, ssn, p)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to send message")
+		return nil, goerr.Wrap(err, "failed to ask chat")
 	}
 
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return nil, nil
-	}
-
-	text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
-	if !ok || text == "" {
-		return nil, nil
-	}
-
-	var result prompt.AggregatePromptResult
-	if err := json.Unmarshal([]byte(text), &result); err != nil {
-		return nil, goerr.Wrap(err, "failed to unmarshal aggregate prompt result", goerr.V("text", text))
-	}
-
-	if result.AlertID == "" {
+	if result == nil || result.AlertID == "" {
 		return nil, nil
 	}
 

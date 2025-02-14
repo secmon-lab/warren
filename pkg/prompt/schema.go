@@ -34,7 +34,7 @@ func (x *jsonSchema) Stringify() (string, error) {
 	enc.SetIndent("", "  ")
 
 	if err := enc.Encode(x); err != nil {
-		return "", goerr.Wrap(err, "failed to marshal json schema")
+		return "", goerr.Wrap(err, "failed to marshal json schema", goerr.V("schema", x))
 	}
 	return buf.String(), nil
 }
