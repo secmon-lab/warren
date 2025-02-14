@@ -38,4 +38,5 @@ func TestLoggingMiddleware(t *testing.T) {
 	gt.S(t, buf.String()).Contains(`"path":"/"`)
 	gt.S(t, buf.String()).Contains(`"status":200`)
 	gt.S(t, buf.String()).NotContains(`test_token`)
+	gt.S(t, buf.String()).NotContains(`"REDACTED"`)
 }
