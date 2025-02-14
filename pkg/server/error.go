@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/getsentry/sentry-go"
@@ -13,23 +14,24 @@ var (
 )
 
 func handleError(w http.ResponseWriter, r *http.Request, err error) {
-	logger := logging.From(r.Context())
-
-	hub := sentry.CurrentHub().Clone()
-	hub.ConfigureScope(func(scope *sentry.Scope) {
-		for k, v := range goerr.Values(err) {
-			scope.SetExtra(k, v)
-		}
-	})
-	evID := hub.CaptureException(err)
-
-	logger.Error("Request error", "error", err, "sentry.id", evID)
+	logAttrs := []any{slog.Any("error", err)}
 
 	switch {
 	case goerr.HasTag(err, errBadRequest):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 
 	default:
+		hub := sentry.CurrentHub().Clone()
+		hub.ConfigureScope(func(scope *sentry.Scope) {
+			for k, v := range goerr.Values(err) {
+				scope.SetExtra(k, v)
+			}
+		})
+		evID := hub.CaptureException(err)
+		logAttrs = append(logAttrs, slog.Any("sentry.id", evID))
+
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+
+	logging.From(r.Context()).Error("Request error", logAttrs...)
 }
