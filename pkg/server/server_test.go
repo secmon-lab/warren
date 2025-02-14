@@ -22,6 +22,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/server"
+	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/slack-go/slack"
@@ -76,7 +77,7 @@ func TestSlackInteractionHandler(t *testing.T) {
 			return nil
 		},
 	}
-	server := server.New(uc, server.WithSlackSigningSecret(signingSecret))
+	server := server.New(uc, server.WithSlackVerifier(service.NewSlackPayloadVerifier(signingSecret)))
 
 	t.Run("with valid signature", func(t *testing.T) {
 		ts := fmt.Sprint(time.Now().Unix())
