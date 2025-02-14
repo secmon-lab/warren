@@ -78,21 +78,20 @@ func verifySlackRequest(signingSecret string) func(http.Handler) http.Handler {
 			}
 			r.Body = io.NopCloser(bytes.NewBuffer(body))
 
+			eb := goerr.NewBuilder(goerr.V("body", string(body)), goerr.V("header", r.Header), goerr.T(errBadRequest))
 			verifier, err := slack.NewSecretsVerifier(r.Header, signingSecret)
 			if err != nil {
-				handleError(w, r, goerr.Wrap(err, "failed to create secrets verifier"))
+				handleError(w, r, eb.Wrap(err, "failed to create secrets verifier"))
 				return
 			}
 
 			if _, err := verifier.Write(body); err != nil {
-				handleError(w, r, goerr.Wrap(err, "failed to write request body to verifier"))
+				handleError(w, r, eb.Wrap(err, "failed to write request body to verifier"))
 				return
 			}
 
 			if err := verifier.Ensure(); err != nil {
-				handleError(w, r, goerr.Wrap(err, "invalid slack signature",
-					goerr.T(errBadRequest),
-				))
+				handleError(w, r, eb.Wrap(err, "invalid slack signature"))
 				return
 			}
 
