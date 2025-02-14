@@ -78,6 +78,9 @@ func TestHandleSlackInteraction(t *testing.T) {
 						ReplyFunc: func(ctx context.Context, message string) error {
 							return nil
 						},
+						UpdateAlertFunc: func(ctx context.Context, alert model.Alert) error {
+							return nil
+						},
 					}
 				},
 			}
