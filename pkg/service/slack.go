@@ -121,26 +121,38 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 	}
 
 	// Add action buttons
-	blocks = append(blocks, slack.NewActionBlock(
-		"alert_actions",
-		slack.NewButtonBlockElement(
-			"investigate",
-			alert.ID.String(),
-			slack.NewTextBlockObject("plain_text", "Investigate", false, false),
-		).WithStyle(slack.StyleDefault),
-		/*
+	buttons := []slack.BlockElement{}
+	if alert.Finding == nil {
+		buttons = append(buttons,
+			slack.NewButtonBlockElement(
+				"inspect",
+				alert.ID.String(),
+				slack.NewTextBlockObject("plain_text", "Inspect", false, false),
+			).WithStyle(slack.StyleDefault),
+		)
+	}
+
+	if alert.Status == model.AlertStatusNew {
+		buttons = append(buttons,
 			slack.NewButtonBlockElement(
 				"ack",
 				alert.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Acknowledge", false, false),
 			).WithStyle(slack.StylePrimary),
+		)
+	}
+
+	if alert.Status != model.AlertStatusClosed {
+		buttons = append(buttons,
 			slack.NewButtonBlockElement(
 				"close",
 				alert.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Close", false, false),
 			).WithStyle(slack.StyleDanger),
-		*/
-	))
+		)
+	}
+
+	blocks = append(blocks, slack.NewActionBlock("alert_actions", buttons...))
 
 	return blocks
 }

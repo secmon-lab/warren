@@ -5,6 +5,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
@@ -49,7 +50,7 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 			ID:   interaction.User.ID,
 			Name: interaction.User.Name,
 		}
-
+		alert.Status = model.AlertStatusAcknowledged
 		if err := uc.repository.PutAlert(ctx, *alert); err != nil {
 			return goerr.Wrap(err, "failed to put alert")
 		}
@@ -59,7 +60,20 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 			return goerr.Wrap(err, "failed to reply to slack")
 		}
 
-	case "investigate":
+	case "close":
+		now := clock.Now(ctx)
+		alert.Status = model.AlertStatusClosed
+		alert.ClosedAt = &now
+		if err := uc.repository.PutAlert(ctx, *alert); err != nil {
+			return goerr.Wrap(err, "failed to put alert")
+		}
+
+		thread := uc.slackService.NewThread(*alert)
+		if err := thread.Reply(ctx, "Alert closed by "+interaction.User.Name); err != nil {
+			return goerr.Wrap(err, "failed to reply to slack")
+		}
+
+	case "inspect":
 		go func() {
 			if err := uc.RunWorkflow(ctx, *alert); err != nil {
 				logger.Error("failed to run workflow", "error", err)
