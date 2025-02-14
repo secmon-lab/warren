@@ -9,8 +9,9 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/utils/authctx"
-	"github.com/slack-go/slack"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"google.golang.org/api/idtoken"
 )
 
@@ -67,10 +68,15 @@ func GetGoogleIDTokenClaims(ctx context.Context) (map[string]interface{}, error)
 	return claims, nil
 }
 
-func verifySlackRequest(signingSecret string) func(http.Handler) http.Handler {
+func verifySlackRequest(verifier interfaces.SlackPayloadVerifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Read and restore body
+			if verifier == nil {
+				logging.From(r.Context()).Warn("slack signing secret is not set, skipping verification")
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
 				handleError(w, r, goerr.Wrap(err, "failed to read request body"))
@@ -78,20 +84,8 @@ func verifySlackRequest(signingSecret string) func(http.Handler) http.Handler {
 			}
 			r.Body = io.NopCloser(bytes.NewBuffer(body))
 
-			eb := goerr.NewBuilder(goerr.V("body", string(body)), goerr.V("header", r.Header), goerr.T(errBadRequest))
-			verifier, err := slack.NewSecretsVerifier(r.Header, signingSecret)
-			if err != nil {
-				handleError(w, r, eb.Wrap(err, "failed to create secrets verifier"))
-				return
-			}
-
-			if _, err := verifier.Write(body); err != nil {
-				handleError(w, r, eb.Wrap(err, "failed to write request body to verifier"))
-				return
-			}
-
-			if err := verifier.Ensure(); err != nil {
-				handleError(w, r, eb.Wrap(err, "invalid slack signature"))
+			if err := verifier(r.Context(), r.Header, body); err != nil {
+				handleError(w, r, goerr.Wrap(err, "failed to verify slack request", goerr.T(errBadRequest)))
 				return
 			}
 

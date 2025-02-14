@@ -2,6 +2,7 @@ package interfaces
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
@@ -22,3 +23,5 @@ type SlackThreadService interface {
 	AttachFile(ctx context.Context, title, fileName string, data []byte) error
 	Reply(ctx context.Context, message string) error
 }
+
+type SlackPayloadVerifier func(ctx context.Context, header http.Header, payload []byte) error

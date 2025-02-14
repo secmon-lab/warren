@@ -3,6 +3,7 @@ package config
 import (
 	"log/slog"
 
+	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/urfave/cli/v3"
 )
@@ -48,9 +49,17 @@ func (x Slack) LogValue() slog.Value {
 }
 
 func (x *Slack) Configure() *service.Slack {
-	if x.oauthToken == "" && x.signingSecret == "" {
+	if x.oauthToken == "" {
 		return nil
 	}
 
 	return service.NewSlack(x.oauthToken, x.signingSecret, x.channelID)
+}
+
+func (x *Slack) Verifier() interfaces.SlackPayloadVerifier {
+	if x.signingSecret == "" {
+		return nil
+	}
+
+	return service.NewSlackPayloadVerifier(x.signingSecret)
 }

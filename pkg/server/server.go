@@ -8,15 +8,15 @@ import (
 )
 
 type Server struct {
-	router             *chi.Mux
-	slackSigningSecret string
+	router   *chi.Mux
+	verifier interfaces.SlackPayloadVerifier
 }
 
 type Options func(*Server)
 
-func WithSlackSigningSecret(secret string) Options {
+func WithSlackVerifier(verifier interfaces.SlackPayloadVerifier) Options {
 	return func(s *Server) {
-		s.slackSigningSecret = secret
+		s.verifier = verifier
 	}
 }
 
@@ -41,7 +41,7 @@ func New(uc interfaces.UseCase, opts ...Options) *Server {
 		})
 	})
 	r.Route("/slack", func(r chi.Router) {
-		r.Use(verifySlackRequest(s.slackSigningSecret))
+		r.Use(verifySlackRequest(s.verifier))
 		r.Post("/event", slackEventHandler(uc))
 		r.Post("/interaction", slackInteractionHandler(uc))
 	})
