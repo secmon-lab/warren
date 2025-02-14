@@ -16,10 +16,19 @@ func (id AlertID) String() string { return string(id) }
 type AlertStatus string
 
 const (
-	AlertStatusNew    AlertStatus = "new"
-	AlertStatusMerged AlertStatus = "merged"
-	AlertStatusClosed AlertStatus = "closed"
+	AlertStatusNew          AlertStatus = "new"
+	AlertStatusAcknowledged AlertStatus = "acked"
+	AlertStatusMerged       AlertStatus = "merged"
+	AlertStatusClosed       AlertStatus = "closed"
 )
+
+func (s AlertStatus) Validate() error {
+	switch s {
+	case AlertStatusNew, AlertStatusAcknowledged, AlertStatusMerged, AlertStatusClosed:
+		return nil
+	}
+	return goerr.New("invalid alert status", goerr.V("status", s))
+}
 
 // AlertSeverity is the severity of the alert. This is set by the AI.
 type AlertSeverity string
@@ -75,6 +84,7 @@ type Alert struct {
 	ParentID    AlertID         `json:"parent_id"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
+	ClosedAt    *time.Time      `json:"closed_at"`
 	Data        any             `json:"data"`
 	Attributes  []Attribute     `json:"attributes"`
 	Conclusion  AlertConclusion `json:"conclusion"`
