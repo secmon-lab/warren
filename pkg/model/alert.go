@@ -67,17 +67,18 @@ type AlertFinding struct {
 }
 
 type Alert struct {
-	ID         AlertID         `json:"id"`
-	Schema     string          `json:"schema"`
-	Title      string          `json:"title"`
-	Status     AlertStatus     `json:"status"`
-	ParentID   AlertID         `json:"parent_id"`
-	CreatedAt  time.Time       `json:"created_at"`
-	UpdatedAt  time.Time       `json:"updated_at"`
-	Data       any             `json:"data"`
-	Attributes []Attribute     `json:"attributes"`
-	Conclusion AlertConclusion `json:"conclusion"`
-	Finding    *AlertFinding   `json:"finding"`
+	ID          AlertID         `json:"id"`
+	Schema      string          `json:"schema"`
+	Title       string          `json:"title"`
+	Description string          `json:"description"`
+	Status      AlertStatus     `json:"status"`
+	ParentID    AlertID         `json:"parent_id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Data        any             `json:"data"`
+	Attributes  []Attribute     `json:"attributes"`
+	Conclusion  AlertConclusion `json:"conclusion"`
+	Finding     *AlertFinding   `json:"finding"`
 
 	Assignee    *SlackUser   `json:"assignee"`
 	SlackThread *SlackThread `json:"slack_thread"`

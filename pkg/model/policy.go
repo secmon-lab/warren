@@ -5,9 +5,10 @@ type PolicyResult struct {
 }
 
 type PolicyAlert struct {
-	Title string      `json:"title"`
-	Attrs []Attribute `json:"attrs"`
-	Data  any         `json:"data"`
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	Attrs       []Attribute `json:"attrs"`
+	Data        any         `json:"data"`
 }
 
 type PolicyAuth struct {
