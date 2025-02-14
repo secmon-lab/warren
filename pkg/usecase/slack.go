@@ -67,6 +67,14 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 		now := clock.Now(ctx)
 		alert.Status = model.AlertStatusClosed
 		alert.ClosedAt = &now
+
+		if alert.Assignee == nil {
+			alert.Assignee = &model.SlackUser{
+				ID:   interaction.User.ID,
+				Name: interaction.User.Name,
+			}
+		}
+
 		if err := uc.repository.PutAlert(ctx, *alert); err != nil {
 			return goerr.Wrap(err, "failed to put alert")
 		}

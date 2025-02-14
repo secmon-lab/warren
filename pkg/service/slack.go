@@ -60,7 +60,7 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 			slack.NewTextBlockObject("plain_text", alert.Title, false, false),
 		),
 		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", "*Schema:* "+alert.Schema+"\n*Status:* "+func() string {
+			slack.NewTextBlockObject("mrkdwn", "*Schema:* `"+alert.Schema+"`\n*Status:* "+func() string {
 				switch alert.Status {
 				case model.AlertStatusNew:
 					return ":new: NEW"
@@ -71,6 +71,11 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 				default:
 					return string(alert.Status)
 				}
+			}()+"\n*Assignee:* "+func() string {
+				if alert.Assignee == nil {
+					return ":bust_in_silhouette: unassigned"
+				}
+				return "<@" + alert.Assignee.ID + ">"
 			}()+"\n*Severity:* "+func() string {
 				if alert.Finding == nil {
 					return ":question: not available"

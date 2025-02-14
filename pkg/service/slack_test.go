@@ -16,7 +16,7 @@ func newSlackService(t *testing.T) *service.Slack {
 	return service.NewSlack(envs.Get("TEST_SLACK_OAUTH_TOKEN"), envs.Get("TEST_SLACK_SIGNING_SECRET"), envs.Get("TEST_SLACK_CHANNEL_ID"))
 }
 
-func TestSlack(t *testing.T) {
+func TestSlackPostAlert(t *testing.T) {
 	svc := newSlackService(t)
 
 	_, err := svc.PostAlert(context.Background(), model.Alert{
@@ -37,6 +37,11 @@ func TestSlack(t *testing.T) {
 				Link:  "https://example.com/alert/details",
 			},
 		},
+		Assignee: &model.SlackUser{
+			ID:   "U0123456789",
+			Name: "John Doe",
+		},
+		Status: model.AlertStatusAcknowledged,
 		Data: map[string]interface{}{
 			"foo": "bar",
 			"baz": 123,
