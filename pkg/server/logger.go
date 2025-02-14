@@ -1,6 +1,9 @@
 package server
 
 import (
+	"bytes"
+	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -21,10 +24,26 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.From(r.Context()).With("request_id", uuid.New().String())
 
+		attrs := []any{
+			slog.Any("method", r.Method),
+			slog.Any("path", r.URL.Path),
+			slog.Any("query", r.URL.Query()),
+		}
+
+		if logger.Enabled(r.Context(), slog.LevelDebug) {
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				logger.Warn("failed to read request body", "error", err)
+			} else {
+				attrs = append(attrs, slog.Any("body", string(body)))
+			}
+			r.Body = io.NopCloser(bytes.NewBuffer(body))
+		}
+
 		sw := &statusResponseWriter{ResponseWriter: w}
-
 		next.ServeHTTP(sw, r)
+		attrs = append(attrs, slog.Int("status", sw.status))
 
-		logger.Info("Request", "method", r.Method, "path", r.URL.Path, "status", sw.status)
+		logger.Info("Access Log", attrs...)
 	})
 }

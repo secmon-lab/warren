@@ -19,14 +19,20 @@ func alertPubSubHandler(uc interfaces.UseCase) http.HandlerFunc {
 			} `json:"message"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
-			handleError(w, r, goerr.Wrap(err, "failed to decode message"))
+			handleError(w, r, goerr.Wrap(err, "failed to decode message",
+				goerr.T(errBadRequest),
+				goerr.V("body", r.Body),
+			))
 			return
 		}
 		r.Body = http.NoBody
 
 		var alertData any
 		if err := json.Unmarshal(msg.Message.Data, &alertData); err != nil {
-			handleError(w, r, goerr.Wrap(err, "failed to decode message"))
+			handleError(w, r, goerr.Wrap(err, "failed to decode message",
+				goerr.T(errBadRequest),
+				goerr.V("body", r.Body),
+			))
 			return
 		}
 
@@ -44,13 +50,18 @@ func alertRawHandler(uc interfaces.UseCase) http.HandlerFunc {
 		schema := chi.URLParam(r, "schema")
 
 		if r.Header.Get("Content-Type") != "application/json" {
-			handleError(w, r, goerr.New("invalid content type", goerr.T(errBadRequest)))
+			handleError(w, r, goerr.New("invalid content type",
+				goerr.T(errBadRequest),
+			))
 			return
 		}
 
 		var alertData any
 		if err := json.NewDecoder(r.Body).Decode(&alertData); err != nil {
-			handleError(w, r, goerr.Wrap(err, "failed to decode message"))
+			handleError(w, r, goerr.Wrap(err, "failed to decode message",
+				goerr.T(errBadRequest),
+				goerr.V("body", r.Body),
+			))
 			return
 		}
 

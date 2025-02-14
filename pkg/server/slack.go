@@ -34,7 +34,10 @@ func slackEventHandler(uc interfaces.UseCase) http.HandlerFunc {
 			var response *slackevents.ChallengeResponse
 			err := json.Unmarshal([]byte(body), &response)
 			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
+				handleError(w, r, goerr.Wrap(err, "failed to unmarshal slack challenge response",
+					goerr.T(errBadRequest),
+					goerr.V("body", string(body)),
+				))
 				return
 			}
 			w.Header().Set("Content-Type", "text")
