@@ -15,9 +15,11 @@ var (
 
 func handleError(w http.ResponseWriter, r *http.Request, err error) {
 	logAttrs := []any{slog.Any("error", err)}
+	logger := logging.From(r.Context())
 
 	switch {
 	case goerr.HasTag(err, errBadRequest):
+		logger.Warn("Bad Request", logAttrs...)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 
 	default:
@@ -30,8 +32,7 @@ func handleError(w http.ResponseWriter, r *http.Request, err error) {
 		evID := hub.CaptureException(err)
 		logAttrs = append(logAttrs, slog.Any("sentry.id", evID))
 
+		logger.Error("Request error", logAttrs...)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-
-	logging.From(r.Context()).Error("Request error", logAttrs...)
 }
