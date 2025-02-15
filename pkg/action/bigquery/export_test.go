@@ -22,8 +22,8 @@ func (x *Action) SetBQClientFactory(factory BigQueryClientFactory) {
 	x.bqFactory = factory
 }
 
-func NewBigQueryClient(ctx context.Context, projectID string) (BigQueryClient, error) {
-	return newBigQueryClient(ctx, projectID)
+func NewBigQueryClient(ctx context.Context, projectID, impersonationSA string) (BigQueryClient, error) {
+	return newBigQueryClient(ctx, projectID, impersonationSA)
 }
 
 func GenerateQuery(fullTableID string, schema bigquery.Schema, limit int64) (string, error) {

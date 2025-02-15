@@ -21,8 +21,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Action represents a BigQuery action.
+// Added impersonationSA field to allow specifying an impersonation service account.
 type Action struct {
 	projectID        string
+	impersonationSA  string
 	cfgFile          string
 	cfg              bqConfig
 	byteLimit        uint64
@@ -66,6 +69,13 @@ func (x *Action) Flags() []cli.Flag {
 			Category:    "Action",
 			Sources:     cli.EnvVars("WARREN_BIGQUERY_CONFIG"),
 		},
+		&cli.StringFlag{
+			Name:        "bigquery-impersonation-account",
+			Usage:       "Impersonation service account email for BigQuery queries",
+			Destination: &x.impersonationSA,
+			Category:    "Action",
+			Sources:     cli.EnvVars("WARREN_BIGQUERY_IMPERSONATION_ACCOUNT"),
+		},
 	}
 }
 
@@ -96,6 +106,7 @@ func (x *Action) Spec() model.ActionSpec {
 func (x *Action) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("project_id", x.projectID),
+		slog.String("impersonation_sa", x.impersonationSA),
 	)
 }
 
@@ -159,7 +170,7 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 	datasetID := parts[1]
 	tableID := parts[2]
 
-	client, err := x.bqFactory(ctx, projectID)
+	client, err := x.bqFactory(ctx, projectID, x.impersonationSA)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create bigquery client")
 	}

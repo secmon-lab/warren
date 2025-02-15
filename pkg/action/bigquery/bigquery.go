@@ -6,6 +6,9 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/m-mizutani/goerr/v2"
 	"google.golang.org/api/iterator"
+
+	"google.golang.org/api/impersonate"
+	"google.golang.org/api/option"
 )
 
 type BigQueryClient interface {
@@ -15,14 +18,27 @@ type BigQueryClient interface {
 	Close() error
 }
 
-type BigQueryClientFactory func(ctx context.Context, projectID string) (BigQueryClient, error)
+type BigQueryClientFactory func(ctx context.Context, projectID, impersonationSA string) (BigQueryClient, error)
 
 type BigQueryClientImpl struct {
 	client *bigquery.Client
 }
 
-func newBigQueryClient(ctx context.Context, projectID string) (BigQueryClient, error) {
-	client, err := bigquery.NewClient(ctx, projectID)
+func newBigQueryClient(ctx context.Context, projectID, impersonationSA string) (BigQueryClient, error) {
+	var opts []option.ClientOption
+	if impersonationSA != "" {
+		cfg := impersonate.CredentialsConfig{
+			TargetPrincipal: impersonationSA,
+			Scopes:          []string{"https://www.googleapis.com/auth/bigquery"},
+		}
+		ts, err := impersonate.CredentialsTokenSource(ctx, cfg)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to create impersonated token source")
+		}
+		opts = append(opts, option.WithTokenSource(ts))
+	}
+
+	client, err := bigquery.NewClient(ctx, projectID, opts...)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create bigquery client")
 	}

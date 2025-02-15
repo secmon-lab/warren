@@ -15,7 +15,7 @@ func TestBigQueryClient(t *testing.T) {
 	vars := test.NewEnvVars(t, "TEST_BIGQUERY_PROJECT_ID", "TEST_BIGQUERY_DATASET_ID", "TEST_BIGQUERY_TABLE_ID")
 
 	ctx := context.Background()
-	client, err := bq.NewBigQueryClient(ctx, vars.Get("TEST_BIGQUERY_PROJECT_ID"))
+	client, err := bq.NewBigQueryClient(ctx, vars.Get("TEST_BIGQUERY_PROJECT_ID"), "")
 	gt.NoError(t, err)
 	defer client.Close()
 

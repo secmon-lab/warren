@@ -163,7 +163,7 @@ func TestActionExecute(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			var action bq.Action
 			if tc.client != nil {
-				action.SetBQClientFactory(func(ctx context.Context, projectID string) (bq.BigQueryClient, error) {
+				action.SetBQClientFactory(func(ctx context.Context, projectID, impersonationSA string) (bq.BigQueryClient, error) {
 					return tc.client, nil
 				})
 			}
@@ -223,7 +223,7 @@ func TestActionExecuteWithLimit(t *testing.T) {
 	}
 
 	var action bq.Action
-	action.SetBQClientFactory(func(ctx context.Context, projectID string) (bq.BigQueryClient, error) {
+	action.SetBQClientFactory(func(ctx context.Context, projectID, impersonationSA string) (bq.BigQueryClient, error) {
 		return client, nil
 	})
 
