@@ -48,7 +48,7 @@ func NewSlack(oauthToken, signingSecret, channelID string) *Slack {
 
 func (x *Slack) NewThread(alert model.Alert) interfaces.SlackThreadService {
 	return &SlackThread{
-		channelID:   x.channelID,
+		channelID:   alert.SlackThread.ChannelID,
 		threadID:    alert.SlackThread.ThreadID,
 		slackClient: x.slackClient,
 	}
@@ -268,7 +268,11 @@ func (x *SlackThread) AttachFile(ctx context.Context, title, fileName string, da
 		Title:           title,
 		ThreadTimestamp: x.threadID,
 	})
-	return err
+	if err != nil {
+		return goerr.Wrap(err, "failed to upload file to slack")
+	}
+
+	return nil
 }
 
 func (x *SlackThread) Reply(ctx context.Context, message string) error {

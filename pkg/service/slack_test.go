@@ -141,3 +141,19 @@ func TestSlackPostConclusion(t *testing.T) {
 		Recommendation: "Test Recommendation",
 	}))
 }
+
+func TestAttachFile(t *testing.T) {
+	svc := newSlackService(t)
+
+	alert := genDummyAlert()
+
+	thread, err := svc.PostAlert(context.Background(), alert)
+	gt.NoError(t, err)
+	alert.SlackThread = &model.SlackThread{
+		ChannelID: thread.ChannelID(),
+		ThreadID:  thread.ThreadID(),
+	}
+
+	newThread := svc.NewThread(alert)
+	gt.NoError(t, newThread.AttachFile(context.Background(), "test", "test.txt", []byte("test")))
+}
