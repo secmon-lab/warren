@@ -105,9 +105,11 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 	if len(alert.Attributes) > 0 {
 		fields := make([]*slack.TextBlockObject, 0, len(alert.Attributes)*2)
 		for _, attr := range alert.Attributes {
-			value := attr.Value
+			var value string
 			if attr.Link != "" {
 				value = "<" + attr.Link + "|" + attr.Value + ">"
+			} else {
+				value = "`" + attr.Value + "`"
 			}
 			fields = append(fields,
 				slack.NewTextBlockObject("mrkdwn", "*"+attr.Key+":*\n"+value, false, false),
