@@ -78,6 +78,9 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.
 
 		alert.ParentID = similarAlert.ID
 		alert.Status = model.AlertStatusMerged
+		alert.SlackThread = similarAlert.SlackThread
+		alert.Assignee = similarAlert.Assignee
+
 		if err := uc.repository.PutAlert(ctx, alert); err != nil {
 			return nil, goerr.Wrap(err, "failed to put alert", goerr.V("alert", alert))
 		}
