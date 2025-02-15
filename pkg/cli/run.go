@@ -48,7 +48,6 @@ func cmdRun() *cli.Command {
 				},
 				&cli.StringFlag{
 					Name:        "lang",
-					Aliases:     []string{"l"},
 					Usage:       "Language of the text [en, ja]",
 					Destination: &lang,
 					Value:       "en",
