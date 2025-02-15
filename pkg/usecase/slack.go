@@ -6,6 +6,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/lang"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
@@ -89,10 +90,21 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 
 	case "inspect":
 		go func() {
-			if err := uc.RunWorkflow(ctx, *alert); err != nil {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("panic in workflow process", "error", r)
+				}
+			}()
+
+			newCtx := context.Background()
+			newCtx = lang.With(newCtx, lang.From(ctx))
+			newCtx = logging.With(newCtx, logging.From(ctx))
+
+			if err := uc.RunWorkflow(newCtx, *alert); err != nil {
 				logger.Error("failed to run workflow", "error", err)
 			}
 		}()
 	}
+
 	return nil
 }
