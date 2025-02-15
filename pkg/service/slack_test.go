@@ -20,8 +20,9 @@ func TestSlackPostAlert(t *testing.T) {
 	svc := newSlackService(t)
 
 	_, err := svc.PostAlert(context.Background(), model.Alert{
-		Title:  "Test Alert Title",
-		Schema: "test.alert.v1",
+		Title:       "Test Alert Title",
+		Schema:      "test.alert.v1",
+		Description: "Test Alert Description",
 		Attributes: []model.Attribute{
 			{
 				Key:   "severity",
