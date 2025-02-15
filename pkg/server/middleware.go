@@ -10,6 +10,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/interfaces"
+	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/utils/authctx"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"google.golang.org/api/idtoken"
@@ -85,7 +86,7 @@ func verifySlackRequest(verifier interfaces.SlackPayloadVerifier) func(http.Hand
 			r.Body = io.NopCloser(bytes.NewBuffer(body))
 
 			if err := verifier(r.Context(), r.Header, body); err != nil {
-				handleError(w, r, goerr.Wrap(err, "failed to verify slack request", goerr.T(errBadRequest)))
+				handleError(w, r, goerr.Wrap(err, "failed to verify slack request", goerr.T(model.ErrTagInvalidRequest)))
 				return
 			}
 

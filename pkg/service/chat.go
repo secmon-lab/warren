@@ -7,6 +7,7 @@ import (
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/interfaces"
+	"github.com/secmon-lab/warren/pkg/model"
 )
 
 func AskChat[T any](ctx context.Context, ssn interfaces.GenAIChatSession, prompt string) (*T, error) {
@@ -16,17 +17,17 @@ func AskChat[T any](ctx context.Context, ssn interfaces.GenAIChatSession, prompt
 	}
 
 	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return nil, nil
+		return nil, goerr.New("no response from LLM", goerr.V("tag", model.ErrTagInvalidLLMResponse))
 	}
 
 	text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
 	if !ok || text == "" {
-		return nil, nil
+		return nil, goerr.New("no text data from LLM", goerr.V("tag", model.ErrTagInvalidLLMResponse))
 	}
 
 	var result T
 	if err := json.Unmarshal([]byte(text), &result); err != nil {
-		return nil, goerr.Wrap(err, "failed to unmarshal text", goerr.V("text", text))
+		return nil, goerr.Wrap(err, "failed to unmarshal text", goerr.V("text", text), goerr.V("tag", model.ErrTagInvalidLLMResponse))
 	}
 
 	return &result, nil

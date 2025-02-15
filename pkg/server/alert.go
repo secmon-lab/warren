@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/interfaces"
+	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/utils/lang"
 )
 
@@ -21,7 +22,7 @@ func alertPubSubHandler(uc interfaces.UseCase) http.HandlerFunc {
 		}
 		if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to decode message",
-				goerr.T(errBadRequest),
+				goerr.T(model.ErrTagInvalidRequest),
 				goerr.V("body", r.Body),
 			))
 			return
@@ -31,7 +32,7 @@ func alertPubSubHandler(uc interfaces.UseCase) http.HandlerFunc {
 		var alertData any
 		if err := json.Unmarshal(msg.Message.Data, &alertData); err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to decode message",
-				goerr.T(errBadRequest),
+				goerr.T(model.ErrTagInvalidRequest),
 				goerr.V("body", r.Body),
 			))
 			return
@@ -53,7 +54,7 @@ func alertRawHandler(uc interfaces.UseCase) http.HandlerFunc {
 
 		if r.Header.Get("Content-Type") != "application/json" {
 			handleError(w, r, goerr.New("invalid content type",
-				goerr.T(errBadRequest),
+				goerr.T(model.ErrTagInvalidRequest),
 			))
 			return
 		}
@@ -61,7 +62,7 @@ func alertRawHandler(uc interfaces.UseCase) http.HandlerFunc {
 		var alertData any
 		if err := json.NewDecoder(r.Body).Decode(&alertData); err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to decode message",
-				goerr.T(errBadRequest),
+				goerr.T(model.ErrTagInvalidRequest),
 				goerr.V("body", r.Body),
 			))
 			return

@@ -69,10 +69,18 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.
 	alert = *newAlert
 
 	// Check if the alert is similar to any existing alerts
-	similarAlert, err := uc.findSimilarAlert(ctx, alert)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to find similar alert")
+	var similarAlert *model.Alert
+	for i := 0; i < 3 && similarAlert == nil; i++ {
+		similarAlert, err = uc.findSimilarAlert(ctx, alert)
+		if err != nil {
+			if goerr.HasTag(err, model.ErrTagInvalidLLMResponse) {
+				logger.Warn("invalid LLM response, retry to find similar alert", "error", err)
+				continue
+			}
+			return nil, goerr.Wrap(err, "failed to find similar alert")
+		}
 	}
+
 	if similarAlert != nil {
 		logger.Info("alert merged", "parent", similarAlert, "merged", alert)
 
