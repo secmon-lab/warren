@@ -101,8 +101,10 @@ func cmdServe() *cli.Command {
 			)
 
 			httpServer := http.Server{
-				Addr:              addr,
-				Handler:           server.New(uc),
+				Addr: addr,
+				Handler: server.New(uc,
+					server.WithSlackVerifier(slackCfg.Verifier()),
+				),
 				ReadTimeout:       30 * time.Second,
 				ReadHeaderTimeout: 10 * time.Second,
 				BaseContext: func(l net.Listener) context.Context {
