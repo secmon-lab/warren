@@ -2,11 +2,14 @@ Based on the investigation so far, please provide your conclusion about this ale
 
 # Output
 
+Output the result in JSON format. Schema is described below as a JSON schema.
+
 ```json
 {{ .schema }}
 ```
 
 Fields rules are as follows. Language of `summary`, `reason`, `recommendation` must be {{ .lang }}.
+
 ## `severity`: The severity of the alert.
 
 It can be one of the following:

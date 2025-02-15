@@ -8,6 +8,7 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/interfaces"
+	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -18,6 +19,7 @@ func cmdRun() *cli.Command {
 	var (
 		alertPath   string
 		alertSchema string
+		lang        string
 		policyCfg   config.Policy
 		geminiCfg   config.GeminiCfg
 	)
@@ -44,6 +46,14 @@ func cmdRun() *cli.Command {
 					Required:    true,
 					Sources:     cli.EnvVars("WARREN_ALERT_SCHEMA"),
 				},
+				&cli.StringFlag{
+					Name:        "lang",
+					Aliases:     []string{"l"},
+					Usage:       "Language of the text [en, ja]",
+					Destination: &lang,
+					Value:       "en",
+					Sources:     cli.EnvVars("WARREN_LANG"),
+				},
 			},
 			policyCfg.Flags(),
 			geminiCfg.Flags(),
@@ -56,7 +66,12 @@ func cmdRun() *cli.Command {
 				"schema", alertSchema,
 				"policy", policyCfg,
 				"gemini", geminiCfg,
+				"lang", lang,
 			)
+
+			if err := prompt.SetDefaultLang(lang); err != nil {
+				return err
+			}
 
 			policyClient, err := policyCfg.Configure()
 			if err != nil {
