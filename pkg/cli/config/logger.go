@@ -55,6 +55,7 @@ func (x *Logger) Flags() []cli.Flag {
 			Category:    "logging",
 			Aliases:     []string{"q"},
 			Usage:       "Quiet mode (no log output)",
+			Sources:     cli.EnvVars("WARREN_LOG_QUIET"),
 			Destination: &x.quiet,
 		},
 	}
