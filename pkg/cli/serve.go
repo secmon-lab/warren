@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/interfaces"
-	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/server"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -21,7 +21,6 @@ import (
 func cmdServe() *cli.Command {
 	var (
 		addr         string
-		lang         string
 		policyCfg    config.Policy
 		sentryCfg    config.Sentry
 		slackCfg     config.Slack
@@ -38,13 +37,6 @@ func cmdServe() *cli.Command {
 				Usage:       "Listen address (default: 127.0.0.1:8080)",
 				Value:       "127.0.0.1:8080",
 				Destination: &addr,
-			},
-			&cli.StringFlag{
-				Name:        "lang",
-				Usage:       "Language of the text [en, ja]",
-				Value:       "en",
-				Destination: &lang,
-				Sources:     cli.EnvVars("WARREN_LANG"),
 			},
 		},
 		policyCfg.Flags(),
@@ -63,17 +55,12 @@ func cmdServe() *cli.Command {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			logging.Default().Info("starting server",
 				"addr", addr,
-				"lang", lang,
 				"policy", policyCfg,
 				"sentry", sentryCfg,
 				"slack", slackCfg,
 				"gemini", geminiCfg,
 				"firestore", firestoreCfg,
 			)
-
-			if err := prompt.SetDefaultLang(lang); err != nil {
-				return err
-			}
 
 			policyClient, err := policyCfg.Configure()
 			if err != nil {
@@ -118,6 +105,9 @@ func cmdServe() *cli.Command {
 				Handler:           server.New(uc),
 				ReadTimeout:       30 * time.Second,
 				ReadHeaderTimeout: 10 * time.Second,
+				BaseContext: func(l net.Listener) context.Context {
+					return ctx
+				},
 			}
 
 			errCh := make(chan error, 1)

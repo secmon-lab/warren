@@ -116,7 +116,7 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.
 }
 
 func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert model.Alert) (*model.Alert, error) {
-	p, err := prompt.BuildMetaPrompt(alert)
+	p, err := prompt.BuildMetaPrompt(ctx, alert)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build meta prompt")
 	}
@@ -159,7 +159,7 @@ func (uc *UseCases) findSimilarAlert(ctx context.Context, alert model.Alert) (*m
 		return nil, goerr.Wrap(err, "failed to fetch latest alerts")
 	}
 
-	p, err := prompt.BuildAggregatePrompt(alert, alerts)
+	p, err := prompt.BuildAggregatePrompt(ctx, alert, alerts)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build aggregate prompt")
 	}

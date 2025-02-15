@@ -38,6 +38,7 @@ func (x *Logger) Flags() []cli.Flag {
 			Aliases:     []string{"f"},
 			Sources:     cli.EnvVars("WARREN_LOG_FORMAT"),
 			Usage:       "Set log format [console|json]",
+			Value:       "console",
 			Destination: &x.format,
 		},
 		&cli.StringFlag{
@@ -46,7 +47,7 @@ func (x *Logger) Flags() []cli.Flag {
 			Aliases:     []string{"o"},
 			Sources:     cli.EnvVars("WARREN_LOG_OUTPUT"),
 			Usage:       "Set log output (create file other than '-', 'stdout', 'stderr')",
-			Value:       "-",
+			Value:       "stdout",
 			Destination: &x.output,
 		},
 		&cli.BoolFlag{
@@ -57,6 +58,14 @@ func (x *Logger) Flags() []cli.Flag {
 			Destination: &x.quiet,
 		},
 	}
+}
+
+func (x Logger) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("level", x.level),
+		slog.String("format", x.format),
+		slog.String("output", x.output),
+	)
 }
 
 // Configure sets up logger and returns closer function and error. You can call closer even if error is not nil.

@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/interfaces"
+	"github.com/secmon-lab/warren/pkg/utils/lang"
 )
 
 func alertPubSubHandler(uc interfaces.UseCase) http.HandlerFunc {
@@ -48,6 +49,7 @@ func alertPubSubHandler(uc interfaces.UseCase) http.HandlerFunc {
 func alertRawHandler(uc interfaces.UseCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		schema := chi.URLParam(r, "schema")
+		println("lang", lang.From(r.Context()).Name())
 
 		if r.Header.Get("Content-Type") != "application/json" {
 			handleError(w, r, goerr.New("invalid content type",

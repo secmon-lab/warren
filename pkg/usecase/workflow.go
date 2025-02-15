@@ -45,7 +45,7 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 		last: time.Now(),
 	}
 
-	prePrompt, err := prompt.BuildInitPrompt(alert, uc.actionLimit)
+	prePrompt, err := prompt.BuildInitPrompt(ctx, alert, uc.actionLimit)
 	if err != nil {
 		return goerr.Wrap(err, "failed to build init prompt")
 	}
@@ -124,7 +124,7 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 }
 
 func planAction(ctx context.Context, ssn interfaces.GenAIChatSession, prePrompt string, actionSvc *service.ActionService) (*prompt.ActionPromptResult, error) {
-	mainPrompt, err := prompt.BuildActionPrompt(actionSvc.Spec())
+	mainPrompt, err := prompt.BuildActionPrompt(ctx, actionSvc.Spec())
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build action prompt")
 	}
@@ -153,7 +153,7 @@ func planAction(ctx context.Context, ssn interfaces.GenAIChatSession, prePrompt 
 }
 
 func (uc *UseCases) buildFinding(ctx context.Context, ssn interfaces.GenAIChatSession) (*model.AlertFinding, error) {
-	conclusionPrompt, err := prompt.BuildFindingPrompt()
+	conclusionPrompt, err := prompt.BuildFindingPrompt(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build conclusion prompt")
 	}

@@ -3,27 +3,43 @@ package cli
 import (
 	"context"
 
-	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
+	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/utils/lang"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
 
 func Run(ctx context.Context, args []string) error {
 	var loggerCfg config.Logger
+	var language model.Lang
 	var closer func()
 	app := &cli.Command{
 		Name:  "warren",
 		Usage: "warren",
-		Flags: loggerCfg.Flags(),
+		Flags: append(loggerCfg.Flags(),
+			&cli.StringFlag{
+				Name:        "lang",
+				Usage:       "Language of the text [en, ja]",
+				Value:       "en",
+				Sources:     cli.EnvVars("WARREN_LANG"),
+				Destination: (*string)(&language),
+			},
+		),
 		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
 			f, err := loggerCfg.Configure()
 			if err != nil {
-				return ctx, goerr.Wrap(err, "failed to configure logger")
+				return ctx, err
 			}
 			closer = f
 
-			return ctx, nil
+			logging.Default().Info("base options", "language", language, "logger", loggerCfg)
+
+			if err := language.Validate(); err != nil {
+				return ctx, err
+			}
+
+			return lang.With(ctx, language), nil
 		},
 		After: func(ctx context.Context, c *cli.Command) error {
 			if closer != nil {

@@ -2,12 +2,14 @@ package prompt
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"encoding/json"
 	"text/template"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/utils/lang"
 )
 
 func stringify(v any) (string, error) {
@@ -23,7 +25,7 @@ func stringify(v any) (string, error) {
 //go:embed templates/init.md
 var initTemplate string
 
-func BuildInitPrompt(alert any, maxRetry int) (string, error) {
+func BuildInitPrompt(ctx context.Context, alert any, maxRetry int) (string, error) {
 	tmpl, err := template.New("init").Parse(initTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
@@ -37,7 +39,7 @@ func BuildInitPrompt(alert any, maxRetry int) (string, error) {
 	input := map[string]any{
 		"alert":     string(rawAlert),
 		"max_retry": maxRetry,
-		"lang":      defaultLang.name(),
+		"lang":      lang.From(ctx).Name(),
 	}
 
 	var result bytes.Buffer
@@ -56,7 +58,7 @@ type ActionPromptResult struct {
 	Args   model.Arguments `json:"args" schema:"optional"`
 }
 
-func BuildActionPrompt(actions []model.ActionSpec) (string, error) {
+func BuildActionPrompt(ctx context.Context, actions []model.ActionSpec) (string, error) {
 	tmpl, err := template.New("action").Parse(actionTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
@@ -70,7 +72,7 @@ func BuildActionPrompt(actions []model.ActionSpec) (string, error) {
 	input := map[string]any{
 		"actions": actions,
 		"schema":  schema,
-		"lang":    defaultLang.name(),
+		"lang":    lang.From(ctx).Name(),
 	}
 
 	var buf bytes.Buffer
@@ -88,7 +90,7 @@ type AggregatePromptResult struct {
 	AlertID string `json:"alert_id"`
 }
 
-func BuildAggregatePrompt(newAlert model.Alert, candidates []model.Alert) (string, error) {
+func BuildAggregatePrompt(ctx context.Context, newAlert model.Alert, candidates []model.Alert) (string, error) {
 	tmpl, err := template.New("aggregate").Parse(aggregateTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
@@ -117,7 +119,7 @@ func BuildAggregatePrompt(newAlert model.Alert, candidates []model.Alert) (strin
 		"new":        rawNewAlert,
 		"candidates": rawCandidates,
 		"schema":     schema,
-		"lang":       defaultLang.name(),
+		"lang":       lang.From(ctx).Name(),
 	}
 
 	var buf bytes.Buffer
@@ -131,7 +133,7 @@ func BuildAggregatePrompt(newAlert model.Alert, candidates []model.Alert) (strin
 //go:embed templates/finding.md
 var findingTemplate string
 
-func BuildFindingPrompt() (string, error) {
+func BuildFindingPrompt(ctx context.Context) (string, error) {
 	tmpl, err := template.New("finding").Parse(findingTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
@@ -144,7 +146,7 @@ func BuildFindingPrompt() (string, error) {
 
 	input := map[string]any{
 		"schema": schema,
-		"lang":   defaultLang.name(),
+		"lang":   lang.From(ctx).Name(),
 	}
 
 	var buf bytes.Buffer
@@ -164,7 +166,7 @@ type MetaPromptResult struct {
 	Attrs       []model.Attribute `json:"attrs"`
 }
 
-func BuildMetaPrompt(alert model.Alert) (string, error) {
+func BuildMetaPrompt(ctx context.Context, alert model.Alert) (string, error) {
 	tmpl, err := template.New("meta").Parse(metaTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
@@ -183,7 +185,7 @@ func BuildMetaPrompt(alert model.Alert) (string, error) {
 	input := map[string]any{
 		"alert":  rawAlert,
 		"schema": schema,
-		"lang":   defaultLang.name(),
+		"lang":   lang.From(ctx).Name(),
 	}
 
 	var buf bytes.Buffer

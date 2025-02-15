@@ -1,6 +1,7 @@
 package prompt_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/m-mizutani/gt"
@@ -13,7 +14,7 @@ func TestPrompt(t *testing.T) {
 		"id":      123,
 		"message": "test",
 	}
-	d, err := prompt.BuildInitPrompt(alert, 3)
+	d, err := prompt.BuildInitPrompt(context.Background(), alert, 3)
 	gt.NoError(t, err)
 
 	t.Log(d)
@@ -27,7 +28,7 @@ func TestActionPrompt(t *testing.T) {
 	actions := []model.ActionSpec{
 		{Name: "action1", Description: "action1 description", Args: []model.ArgumentSpec{{Name: "arg1", Description: "arg1 description", Type: model.ArgumentTypeString, Required: true}}},
 	}
-	d, err := prompt.BuildActionPrompt(actions)
+	d, err := prompt.BuildActionPrompt(context.Background(), actions)
 	gt.NoError(t, err)
 
 	t.Log(d)
