@@ -55,7 +55,7 @@ func NewSlack(oauthToken, signingSecret, channelID string) (*Slack, error) {
 
 	authTest, err := s.slackClient.AuthTest()
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to auth test")
+		return nil, goerr.Wrap(err, "failed to auth test of slack", goerr.V("oauthToken.len", len(oauthToken)))
 	}
 
 	s.userID = authTest.UserID
