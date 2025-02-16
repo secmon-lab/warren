@@ -95,7 +95,7 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 		),
 		slack.NewDividerBlock(),
 		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", "*Schema:* `"+alert.Schema+"`\n*Status:* "+func() string {
+			slack.NewTextBlockObject("mrkdwn", "*ID:* `"+string(alert.ID)+"`\n*Schema:* `"+alert.Schema+"`\n*Status:* "+func() string {
 				switch alert.Status {
 				case model.AlertStatusNew:
 					return ":new: NEW"
