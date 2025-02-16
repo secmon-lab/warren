@@ -123,3 +123,10 @@ type Attribute struct {
 	Link  string `json:"link"`
 	Auto  bool   `json:"auto"`
 }
+
+type AlertComment struct {
+	AlertID   AlertID `json:"alert_id"`
+	Timestamp string  `json:"timestamp"`
+	Comment   string  `json:"comment"`
+	UserID    string  `json:"user_id"`
+}

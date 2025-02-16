@@ -13,7 +13,9 @@ import (
 
 func newSlackService(t *testing.T) *service.Slack {
 	envs := test.NewEnvVars(t, "TEST_SLACK_CHANNEL_ID", "TEST_SLACK_OAUTH_TOKEN", "TEST_SLACK_SIGNING_SECRET")
-	return service.NewSlack(envs.Get("TEST_SLACK_OAUTH_TOKEN"), envs.Get("TEST_SLACK_SIGNING_SECRET"), envs.Get("TEST_SLACK_CHANNEL_ID"))
+	client, err := service.NewSlack(envs.Get("TEST_SLACK_OAUTH_TOKEN"), envs.Get("TEST_SLACK_SIGNING_SECRET"), envs.Get("TEST_SLACK_CHANNEL_ID"))
+	gt.NoError(t, err).Must()
+	return client
 }
 
 func TestSlackPostAlert(t *testing.T) {
@@ -157,4 +159,14 @@ func TestAttachFile(t *testing.T) {
 
 	newThread := svc.NewThread(alert)
 	gt.NoError(t, newThread.AttachFile(context.Background(), "test", "test.txt", []byte("test")))
+}
+
+func TestTrimMention(t *testing.T) {
+	svc := service.NewDummySlackService("U0123456789")
+
+	gt.Equal(t, svc.TrimMention("<@U0123456789> test hoge"), "test hoge")
+	gt.Equal(t, svc.TrimMention("test"), "test")
+	gt.Equal(t, svc.TrimMention("test <@U0123456789>"), "")
+	gt.Equal(t, svc.TrimMention("test <@U0123456789> <@U0123456789> blue"), "blue")
+	gt.Equal(t, svc.TrimMention("<@NOT_EXIST> test"), "<@NOT_EXIST> test")
 }

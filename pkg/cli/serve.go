@@ -76,7 +76,10 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			slackSvc := slackCfg.Configure()
+			slackSvc, err := slackCfg.Configure()
+			if err != nil {
+				return err
+			}
 
 			firestore, err := firestoreCfg.Configure(ctx)
 			if err != nil {

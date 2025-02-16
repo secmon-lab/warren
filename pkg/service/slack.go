@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/interfaces"
@@ -18,6 +19,9 @@ type Slack struct {
 	signingSecret string
 	channelID     string
 	slackClient   *slack.Client
+	userID        string
+	teamID        string
+	botID         string
 }
 
 var _ interfaces.SlackService = &Slack{}
@@ -38,12 +42,37 @@ func (x *SlackThread) ThreadID() string {
 	return x.threadID
 }
 
-func NewSlack(oauthToken, signingSecret, channelID string) *Slack {
-	return &Slack{
+func NewSlack(oauthToken, signingSecret, channelID string) (*Slack, error) {
+	if oauthToken == "" {
+		return nil, goerr.New("oauthToken is empty")
+	}
+
+	s := &Slack{
 		signingSecret: signingSecret,
 		channelID:     channelID,
 		slackClient:   slack.New(oauthToken),
 	}
+
+	authTest, err := s.slackClient.AuthTest()
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to auth test")
+	}
+
+	s.userID = authTest.UserID
+	s.teamID = authTest.TeamID
+	s.botID = authTest.BotID
+
+	return s, nil
+}
+
+func (x *Slack) TrimMention(message string) string {
+	mention := "<@" + x.userID + ">"
+	idx := strings.LastIndex(message, mention)
+	if idx == -1 {
+		return message
+	}
+
+	return strings.TrimSpace(message[idx+len(mention):])
 }
 
 func (x *Slack) NewThread(alert model.Alert) interfaces.SlackThreadService {

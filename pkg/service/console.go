@@ -23,6 +23,10 @@ type Console struct {
 	writer    io.Writer
 }
 
+func (c *Console) TrimMention(message string) string {
+	return message
+}
+
 var _ interfaces.SlackService = &Console{}
 
 func (c *Console) NewThread(alert model.Alert) interfaces.SlackThreadService {

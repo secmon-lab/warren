@@ -14,13 +14,57 @@ import (
 
 func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevents.AppMentionEvent) error {
 	logger := logging.From(ctx)
-	logger.Info("slack app mention event", "event", event)
+	logger.Debug("slack app mention event", "event", event)
+
+	thread := model.SlackThread{
+		ChannelID: event.Channel,
+		ThreadID:  event.ThreadTimeStamp,
+	}
+	alert, err := uc.repository.GetAlertBySlackThread(ctx, thread)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alert by slack thread")
+	}
+	if alert == nil {
+		logger.Info("alert not found", "thread", thread)
+		return nil
+	}
+
+	args := uc.slackService.TrimMention(event.Text)
+	if args == "" {
+		logger.Warn("slack app mention event is empty", "event", event)
+		return nil
+	}
+
 	return nil
 }
 
 func (uc *UseCases) HandleSlackMessage(ctx context.Context, event *slackevents.MessageEvent) error {
 	logger := logging.From(ctx)
-	logger.Info("slack message event", "event", event)
+	logger.Debug("slack message event", "event", event)
+
+	thread := model.SlackThread{
+		ChannelID: event.Channel,
+		ThreadID:  event.ThreadTimeStamp,
+	}
+	alert, err := uc.repository.GetAlertBySlackThread(ctx, thread)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alert by slack thread")
+	}
+	if alert == nil {
+		logger.Info("alert not found", "thread", thread)
+		return nil
+	}
+
+	comment := model.AlertComment{
+		AlertID:   alert.ID,
+		Comment:   event.Text,
+		Timestamp: event.EventTimeStamp,
+		UserID:    event.User,
+	}
+	if err := uc.repository.InsertAlertComment(ctx, comment); err != nil {
+		return goerr.Wrap(err, "failed to insert alert comment", goerr.V("comment", comment))
+	}
+
 	return nil
 }
 

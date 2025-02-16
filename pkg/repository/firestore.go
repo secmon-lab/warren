@@ -6,6 +6,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"google.golang.org/api/iterator"
@@ -16,6 +17,8 @@ import (
 type Firestore struct {
 	db *firestore.Client
 }
+
+var _ interfaces.Repository = &Firestore{}
 
 func NewFirestore(ctx context.Context, projectID, databaseID string) (*Firestore, error) {
 	db, err := firestore.NewClientWithDatabase(ctx, projectID, databaseID)
@@ -115,4 +118,39 @@ func (r *Firestore) FetchLatestAlerts(ctx context.Context, oldest time.Time, lim
 	}
 
 	return alerts, nil
+}
+
+const commentCollection = "comments"
+
+func (r *Firestore) InsertAlertComment(ctx context.Context, comment model.AlertComment) error {
+	commentDoc := r.db.Collection(collectionAlerts).Doc(comment.AlertID.String()).Collection(commentCollection).Doc(comment.Timestamp)
+	_, err := commentDoc.Set(ctx, comment)
+	if err != nil {
+		return goerr.Wrap(err, "failed to insert alert comment")
+	}
+	return nil
+}
+
+func (r *Firestore) GetAlertComments(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error) {
+	iter := r.db.Collection(collectionAlerts).Doc(alertID.String()).Collection(commentCollection).OrderBy("Timestamp", firestore.Desc).Documents(ctx)
+
+	var comments []model.AlertComment
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next alert comment")
+		}
+
+		var comment model.AlertComment
+		if err := doc.DataTo(&comment); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert comment")
+		}
+
+		comments = append(comments, comment)
+	}
+
+	return comments, nil
 }

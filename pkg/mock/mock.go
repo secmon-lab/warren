@@ -34,6 +34,9 @@ var _ interfaces.SlackService = &SlackServiceMock{}
 //			PostAlertFunc: func(ctx context.Context, alert model.Alert) (interfaces.SlackThreadService, error) {
 //				panic("mock out the PostAlert method")
 //			},
+//			TrimMentionFunc: func(message string) string {
+//				panic("mock out the TrimMention method")
+//			},
 //		}
 //
 //		// use mockedSlackService in code that requires interfaces.SlackService
@@ -46,6 +49,9 @@ type SlackServiceMock struct {
 
 	// PostAlertFunc mocks the PostAlert method.
 	PostAlertFunc func(ctx context.Context, alert model.Alert) (interfaces.SlackThreadService, error)
+
+	// TrimMentionFunc mocks the TrimMention method.
+	TrimMentionFunc func(message string) string
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -61,9 +67,15 @@ type SlackServiceMock struct {
 			// Alert is the alert argument value.
 			Alert model.Alert
 		}
+		// TrimMention holds details about calls to the TrimMention method.
+		TrimMention []struct {
+			// Message is the message argument value.
+			Message string
+		}
 	}
-	lockNewThread sync.RWMutex
-	lockPostAlert sync.RWMutex
+	lockNewThread   sync.RWMutex
+	lockPostAlert   sync.RWMutex
+	lockTrimMention sync.RWMutex
 }
 
 // NewThread calls NewThreadFunc.
@@ -131,6 +143,38 @@ func (mock *SlackServiceMock) PostAlertCalls() []struct {
 	mock.lockPostAlert.RLock()
 	calls = mock.calls.PostAlert
 	mock.lockPostAlert.RUnlock()
+	return calls
+}
+
+// TrimMention calls TrimMentionFunc.
+func (mock *SlackServiceMock) TrimMention(message string) string {
+	if mock.TrimMentionFunc == nil {
+		panic("SlackServiceMock.TrimMentionFunc: method is nil but SlackService.TrimMention was just called")
+	}
+	callInfo := struct {
+		Message string
+	}{
+		Message: message,
+	}
+	mock.lockTrimMention.Lock()
+	mock.calls.TrimMention = append(mock.calls.TrimMention, callInfo)
+	mock.lockTrimMention.Unlock()
+	return mock.TrimMentionFunc(message)
+}
+
+// TrimMentionCalls gets all the calls that were made to TrimMention.
+// Check the length with:
+//
+//	len(mockedSlackService.TrimMentionCalls())
+func (mock *SlackServiceMock) TrimMentionCalls() []struct {
+	Message string
+} {
+	var calls []struct {
+		Message string
+	}
+	mock.lockTrimMention.RLock()
+	calls = mock.calls.TrimMention
+	mock.lockTrimMention.RUnlock()
 	return calls
 }
 
@@ -673,6 +717,12 @@ var _ interfaces.Repository = &RepositoryMock{}
 //			GetAlertBySlackThreadFunc: func(ctx context.Context, thread model.SlackThread) (*model.Alert, error) {
 //				panic("mock out the GetAlertBySlackThread method")
 //			},
+//			GetAlertCommentsFunc: func(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error) {
+//				panic("mock out the GetAlertComments method")
+//			},
+//			InsertAlertCommentFunc: func(ctx context.Context, comment model.AlertComment) error {
+//				panic("mock out the InsertAlertComment method")
+//			},
 //			PutAlertFunc: func(ctx context.Context, alert model.Alert) error {
 //				panic("mock out the PutAlert method")
 //			},
@@ -691,6 +741,12 @@ type RepositoryMock struct {
 
 	// GetAlertBySlackThreadFunc mocks the GetAlertBySlackThread method.
 	GetAlertBySlackThreadFunc func(ctx context.Context, thread model.SlackThread) (*model.Alert, error)
+
+	// GetAlertCommentsFunc mocks the GetAlertComments method.
+	GetAlertCommentsFunc func(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error)
+
+	// InsertAlertCommentFunc mocks the InsertAlertComment method.
+	InsertAlertCommentFunc func(ctx context.Context, comment model.AlertComment) error
 
 	// PutAlertFunc mocks the PutAlert method.
 	PutAlertFunc func(ctx context.Context, alert model.Alert) error
@@ -720,6 +776,20 @@ type RepositoryMock struct {
 			// Thread is the thread argument value.
 			Thread model.SlackThread
 		}
+		// GetAlertComments holds details about calls to the GetAlertComments method.
+		GetAlertComments []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// AlertID is the alertID argument value.
+			AlertID model.AlertID
+		}
+		// InsertAlertComment holds details about calls to the InsertAlertComment method.
+		InsertAlertComment []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Comment is the comment argument value.
+			Comment model.AlertComment
+		}
 		// PutAlert holds details about calls to the PutAlert method.
 		PutAlert []struct {
 			// Ctx is the ctx argument value.
@@ -731,6 +801,8 @@ type RepositoryMock struct {
 	lockFetchLatestAlerts     sync.RWMutex
 	lockGetAlert              sync.RWMutex
 	lockGetAlertBySlackThread sync.RWMutex
+	lockGetAlertComments      sync.RWMutex
+	lockInsertAlertComment    sync.RWMutex
 	lockPutAlert              sync.RWMutex
 }
 
@@ -843,6 +915,78 @@ func (mock *RepositoryMock) GetAlertBySlackThreadCalls() []struct {
 	mock.lockGetAlertBySlackThread.RLock()
 	calls = mock.calls.GetAlertBySlackThread
 	mock.lockGetAlertBySlackThread.RUnlock()
+	return calls
+}
+
+// GetAlertComments calls GetAlertCommentsFunc.
+func (mock *RepositoryMock) GetAlertComments(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error) {
+	if mock.GetAlertCommentsFunc == nil {
+		panic("RepositoryMock.GetAlertCommentsFunc: method is nil but Repository.GetAlertComments was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		AlertID model.AlertID
+	}{
+		Ctx:     ctx,
+		AlertID: alertID,
+	}
+	mock.lockGetAlertComments.Lock()
+	mock.calls.GetAlertComments = append(mock.calls.GetAlertComments, callInfo)
+	mock.lockGetAlertComments.Unlock()
+	return mock.GetAlertCommentsFunc(ctx, alertID)
+}
+
+// GetAlertCommentsCalls gets all the calls that were made to GetAlertComments.
+// Check the length with:
+//
+//	len(mockedRepository.GetAlertCommentsCalls())
+func (mock *RepositoryMock) GetAlertCommentsCalls() []struct {
+	Ctx     context.Context
+	AlertID model.AlertID
+} {
+	var calls []struct {
+		Ctx     context.Context
+		AlertID model.AlertID
+	}
+	mock.lockGetAlertComments.RLock()
+	calls = mock.calls.GetAlertComments
+	mock.lockGetAlertComments.RUnlock()
+	return calls
+}
+
+// InsertAlertComment calls InsertAlertCommentFunc.
+func (mock *RepositoryMock) InsertAlertComment(ctx context.Context, comment model.AlertComment) error {
+	if mock.InsertAlertCommentFunc == nil {
+		panic("RepositoryMock.InsertAlertCommentFunc: method is nil but Repository.InsertAlertComment was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Comment model.AlertComment
+	}{
+		Ctx:     ctx,
+		Comment: comment,
+	}
+	mock.lockInsertAlertComment.Lock()
+	mock.calls.InsertAlertComment = append(mock.calls.InsertAlertComment, callInfo)
+	mock.lockInsertAlertComment.Unlock()
+	return mock.InsertAlertCommentFunc(ctx, comment)
+}
+
+// InsertAlertCommentCalls gets all the calls that were made to InsertAlertComment.
+// Check the length with:
+//
+//	len(mockedRepository.InsertAlertCommentCalls())
+func (mock *RepositoryMock) InsertAlertCommentCalls() []struct {
+	Ctx     context.Context
+	Comment model.AlertComment
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Comment model.AlertComment
+	}
+	mock.lockInsertAlertComment.RLock()
+	calls = mock.calls.InsertAlertComment
+	mock.lockInsertAlertComment.RUnlock()
 	return calls
 }
 

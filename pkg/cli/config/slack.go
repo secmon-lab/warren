@@ -48,9 +48,9 @@ func (x Slack) LogValue() slog.Value {
 	)
 }
 
-func (x *Slack) Configure() *service.Slack {
+func (x *Slack) Configure() (*service.Slack, error) {
 	if x.oauthToken == "" {
-		return nil
+		return nil, nil
 	}
 
 	return service.NewSlack(x.oauthToken, x.signingSecret, x.channelID)

@@ -6,16 +6,21 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
 )
 
 type Memory struct {
-	alerts map[model.AlertID]model.Alert
+	alerts   map[model.AlertID]model.Alert
+	comments map[model.AlertID][]model.AlertComment
 }
+
+var _ interfaces.Repository = &Memory{}
 
 func NewMemory() *Memory {
 	return &Memory{
-		alerts: make(map[model.AlertID]model.Alert),
+		alerts:   make(map[model.AlertID]model.Alert),
+		comments: make(map[model.AlertID][]model.AlertComment),
 	}
 }
 
@@ -58,4 +63,23 @@ func (r *Memory) FetchLatestAlerts(ctx context.Context, oldest time.Time, limit 
 	}
 
 	return alerts, nil
+}
+
+func (r *Memory) InsertAlertComment(ctx context.Context, comment model.AlertComment) error {
+	r.comments[comment.AlertID] = append(r.comments[comment.AlertID], comment)
+	return nil
+}
+
+func (r *Memory) GetAlertComments(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error) {
+	comments, ok := r.comments[alertID]
+	if !ok {
+		return nil, goerr.New("comments not found", goerr.V("alert_id", alertID))
+	}
+
+	// Sort by timestamp in descending order
+	sort.Slice(comments, func(i, j int) bool {
+		return comments[i].Timestamp > comments[j].Timestamp
+	})
+
+	return comments, nil
 }
