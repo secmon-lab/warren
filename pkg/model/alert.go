@@ -49,6 +49,10 @@ func (s AlertSeverity) Validate() error {
 	return goerr.New("invalid alert severity", goerr.V("severity", s))
 }
 
+func (s AlertSeverity) String() string {
+	return string(s)
+}
+
 // AlertConclusion is the conclusion of the alert. This is set by the user.
 type AlertConclusion string
 

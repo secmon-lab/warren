@@ -190,6 +190,11 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 				slack.NewTextBlockObject(slack.PlainTextType, "🤖 AI Analysis Result", false, false),
 			),
 			slack.NewSectionBlock(
+				slack.NewTextBlockObject("mrkdwn", "Severity ➡️ *"+alert.Finding.Severity.String()+"*", false, false),
+				nil,
+				nil,
+			),
+			slack.NewSectionBlock(
 				slack.NewTextBlockObject("mrkdwn", "📝 *Summary:*\n"+alert.Finding.Summary, false, false),
 				nil,
 				nil,
