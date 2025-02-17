@@ -1,4 +1,7 @@
-Find a similar security alert with a new alert to aggregate them.
+Find a similar security alert with a new alert to aggregate them. Please pay close attention to the following points when looking for similar alerts:
+
+- Pay careful attention to the type of alert. As a general rule, try not to aggregate different types of alerts.
+- Even if the alert types are the same, do not aggregate them if they occur on different hosts, IP addresses, or resources where risk assessment and response should be conducted according to different criteria.
 
 # Input
 
