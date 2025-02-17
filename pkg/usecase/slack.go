@@ -42,6 +42,10 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, event *slackevents.M
 	logger := logging.From(ctx)
 	logger.Debug("slack message event", "event", event)
 
+	if event.ThreadTimeStamp == "" {
+		return nil
+	}
+
 	thread := model.SlackThread{
 		ChannelID: event.Channel,
 		ThreadID:  event.ThreadTimeStamp,
