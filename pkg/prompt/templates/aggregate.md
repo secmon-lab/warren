@@ -1,7 +1,11 @@
-Find a similar security alert with a new alert to aggregate them. Please pay close attention to the following points when looking for similar alerts:
+Compare the New alert with Candidate alerts to find alerts that appear to represent the same incident or event. Please pay attention to the following points when searching for alerts:
 
-- Pay careful attention to the type of alert. As a general rule, try not to aggregate different types of alerts.
-- Even if the alert types are the same, do not aggregate them if they occur on different hosts, IP addresses, or resources where risk assessment and response should be conducted according to different criteria.
+# Rules
+
+- Pay attention to the type of alerts. Generally, do not aggregate different types of alerts.
+- The discovered alerts must be ones that can be considered to represent the same incident or event. In principle, find alerts that are detected redundantly or can be determined to be the same event detected by different rules.
+- Alerts determined to be the same event will be risk-assessed together. Therefore, alerts that would lead to different risk assessment results are not considered the same event.
+- Even if the alert types are the same, do not find them if the hosts, IP addresses, or resources are different.
 
 # Input
 
