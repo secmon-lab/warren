@@ -239,7 +239,9 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 		)
 	}
 
-	blocks = append(blocks, slack.NewActionBlock("alert_actions", buttons...))
+	if len(buttons) > 0 {
+		blocks = append(blocks, slack.NewActionBlock("alert_actions", buttons...))
+	}
 
 	return blocks
 }
