@@ -128,12 +128,17 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 		}(),
 	}
 
+	title := alert.Title
+	if len(title) > 140 {
+		title = title[:140] + "..."
+	}
+
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(
-			slack.NewTextBlockObject("plain_text", alert.Title, false, false),
+			slack.NewTextBlockObject(slack.PlainTextType, title, false, false),
 		),
 		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", alert.Description, false, false),
+			slack.NewTextBlockObject(slack.MarkdownType, alert.Description, false, false),
 			nil,
 			nil,
 		),
