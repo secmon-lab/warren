@@ -359,6 +359,10 @@ func (x *Slack) ShowCloseAlertModal(ctx context.Context, alert model.Alert, trig
 			Type: slack.PlainTextType,
 			Text: "Close",
 		},
+		Close: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Cancel",
+		},
 	})
 	if err != nil {
 		return goerr.Wrap(err, "failed to open view")
