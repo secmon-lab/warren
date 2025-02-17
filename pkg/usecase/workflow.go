@@ -109,6 +109,9 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 		return nil
 	}
 
+	if err := uc.repository.PutAlert(ctx, alert); err != nil {
+		return goerr.Wrap(err, "failed to put alert")
+	}
 	if err := thread.PostFinding(ctx, *alert.Finding); err != nil {
 		return goerr.Wrap(err, "failed to post conclusion")
 	}
