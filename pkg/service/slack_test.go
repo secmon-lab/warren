@@ -22,6 +22,7 @@ func TestSlackPostAlert(t *testing.T) {
 	svc := newSlackService(t)
 
 	_, err := svc.PostAlert(context.Background(), model.Alert{
+		ID:          "1234567890",
 		Title:       "Test Alert Title",
 		Schema:      "test.alert.v1",
 		Description: "Test Alert Description",

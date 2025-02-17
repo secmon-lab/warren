@@ -84,6 +84,49 @@ func (x *Slack) NewThread(alert model.Alert) interfaces.SlackThreadService {
 }
 
 func buildAlertBlocks(alert model.Alert) []slack.Block {
+	lines := []string{
+		"*ID:* `" + alert.ID.String() + "`",
+		"*Schema:* `" + alert.Schema + "`",
+		"*Status:* " + func() string {
+			switch alert.Status {
+			case model.AlertStatusNew:
+				return ":new: NEW"
+			case model.AlertStatusAcknowledged:
+				return ":eyes: ACKNOWLEDGED"
+			case model.AlertStatusClosed:
+				return ":white_check_mark: CLOSED"
+			default:
+				return string(alert.Status)
+			}
+		}(),
+		"*Assignee:* " + func() string {
+			if alert.Assignee == nil {
+				return ":no_entry: unassigned"
+			}
+			return ":bust_in_silhouette: <@" + alert.Assignee.ID + ">"
+		}(),
+		"*Severity:* " + func() string {
+			if alert.Finding == nil {
+				return ":question: not available"
+			}
+
+			switch alert.Finding.Severity {
+			case model.AlertSeverityCritical:
+				return ":rotating_light: *CRITICAL* :rotating_light:"
+			case model.AlertSeverityHigh:
+				return ":exclamation: *HIGH*"
+			case model.AlertSeverityMedium:
+				return ":warning: MEDIUM"
+			case model.AlertSeverityLow:
+				return ":eyes: LOW"
+			case model.AlertSeverityUnknown:
+				return ":gray_question: unknown"
+			default:
+				return string(alert.Finding.Severity)
+			}
+		}(),
+	}
+
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(
 			slack.NewTextBlockObject("plain_text", alert.Title, false, false),
@@ -95,42 +138,7 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 		),
 		slack.NewDividerBlock(),
 		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", "*ID:* `"+string(alert.ID)+"`\n*Schema:* `"+alert.Schema+"`\n*Status:* "+func() string {
-				switch alert.Status {
-				case model.AlertStatusNew:
-					return ":new: NEW"
-				case model.AlertStatusAcknowledged:
-					return ":eyes: ACKNOWLEDGED"
-				case model.AlertStatusClosed:
-					return ":white_check_mark: CLOSED"
-				default:
-					return string(alert.Status)
-				}
-			}()+"\n*Assignee:* "+func() string {
-				if alert.Assignee == nil {
-					return ":no_entry: unassigned"
-				}
-				return ":bust_in_silhouette: <@" + alert.Assignee.ID + ">"
-			}()+"\n*Severity:* "+func() string {
-				if alert.Finding == nil {
-					return ":question: not available"
-				}
-
-				switch alert.Finding.Severity {
-				case model.AlertSeverityCritical:
-					return ":rotating_light: *CRITICAL* :rotating_light:"
-				case model.AlertSeverityHigh:
-					return ":exclamation: *HIGH*"
-				case model.AlertSeverityMedium:
-					return ":warning: MEDIUM"
-				case model.AlertSeverityLow:
-					return ":eyes: LOW"
-				case model.AlertSeverityUnknown:
-					return ":gray_question: unknown"
-				default:
-					return string(alert.Finding.Severity)
-				}
-			}(), false, false),
+			slack.NewTextBlockObject("mrkdwn", strings.Join(lines, "\n"), false, false),
 			nil,
 			nil,
 		),
@@ -220,7 +228,7 @@ func (x *Slack) PostAlert(ctx context.Context, alert model.Alert) (interfaces.Sl
 		slack.MsgOptionBlocks(blocks...),
 	)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to post message to slack")
+		return nil, goerr.Wrap(err, "failed to post message to slack", goerr.V("blocks", blocks))
 	}
 
 	thread := &SlackThread{
