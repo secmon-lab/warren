@@ -200,7 +200,7 @@ var _ interfaces.SlackThreadService = &SlackThreadServiceMock{}
 //			PostNextActionFunc: func(ctx context.Context, action prompt.ActionPromptResult) error {
 //				panic("mock out the PostNextAction method")
 //			},
-//			ReplyFunc: func(ctx context.Context, message string) error {
+//			ReplyFunc: func(ctx context.Context, message string)  {
 //				panic("mock out the Reply method")
 //			},
 //			ThreadIDFunc: func() string {
@@ -229,7 +229,7 @@ type SlackThreadServiceMock struct {
 	PostNextActionFunc func(ctx context.Context, action prompt.ActionPromptResult) error
 
 	// ReplyFunc mocks the Reply method.
-	ReplyFunc func(ctx context.Context, message string) error
+	ReplyFunc func(ctx context.Context, message string)
 
 	// ThreadIDFunc mocks the ThreadID method.
 	ThreadIDFunc func() string
@@ -438,7 +438,7 @@ func (mock *SlackThreadServiceMock) PostNextActionCalls() []struct {
 }
 
 // Reply calls ReplyFunc.
-func (mock *SlackThreadServiceMock) Reply(ctx context.Context, message string) error {
+func (mock *SlackThreadServiceMock) Reply(ctx context.Context, message string) {
 	if mock.ReplyFunc == nil {
 		panic("SlackThreadServiceMock.ReplyFunc: method is nil but SlackThreadService.Reply was just called")
 	}
@@ -452,7 +452,7 @@ func (mock *SlackThreadServiceMock) Reply(ctx context.Context, message string) e
 	mock.lockReply.Lock()
 	mock.calls.Reply = append(mock.calls.Reply, callInfo)
 	mock.lockReply.Unlock()
-	return mock.ReplyFunc(ctx, message)
+	mock.ReplyFunc(ctx, message)
 }
 
 // ReplyCalls gets all the calls that were made to Reply.

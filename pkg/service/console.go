@@ -172,11 +172,10 @@ func (c *ConsoleThread) PostFinding(_ context.Context, finding model.AlertFindin
 	return nil
 }
 
-func (c *ConsoleThread) Reply(_ context.Context, msg string) error {
+func (c *ConsoleThread) Reply(_ context.Context, msg string) {
 	c.printHeader("💬 Reply")
 	fmt.Fprintln(c.writer, msg)
 	fmt.Fprintln(c.writer, strings.Repeat("-", 80))
-	return nil
 }
 
 func (c *ConsoleThread) printHeader(title string) {

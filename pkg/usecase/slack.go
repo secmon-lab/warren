@@ -101,9 +101,8 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 		}
 
 		thread := uc.slackService.NewThread(*alert)
-		if err := thread.Reply(ctx, "Alert acknowledged by <@"+interaction.User.ID+">"); err != nil {
-			return goerr.Wrap(err, "failed to reply to slack")
-		}
+		thread.Reply(ctx, "Alert acknowledged by <@"+interaction.User.ID+">")
+
 		if err := thread.UpdateAlert(ctx, *alert); err != nil {
 			return goerr.Wrap(err, "failed to update slack thread")
 		}
@@ -125,9 +124,8 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 		}
 
 		thread := uc.slackService.NewThread(*alert)
-		if err := thread.Reply(ctx, "Alert closed by <@"+interaction.User.ID+">"); err != nil {
-			return goerr.Wrap(err, "failed to reply to slack")
-		}
+		thread.Reply(ctx, "Alert closed by <@"+interaction.User.ID+">")
+
 		if err := thread.UpdateAlert(ctx, *alert); err != nil {
 			return goerr.Wrap(err, "failed to update slack thread")
 		}

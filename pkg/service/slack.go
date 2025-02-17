@@ -12,6 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
+	"github.com/secmon-lab/warren/pkg/utils/errs"
 	"github.com/slack-go/slack"
 )
 
@@ -318,7 +319,7 @@ func (x *SlackThread) AttachFile(ctx context.Context, title, fileName string, da
 	return nil
 }
 
-func (x *SlackThread) Reply(ctx context.Context, message string) error {
+func (x *SlackThread) Reply(ctx context.Context, message string) {
 	_, _, err := x.slackClient.PostMessageContext(
 		ctx,
 		x.channelID,
@@ -327,10 +328,8 @@ func (x *SlackThread) Reply(ctx context.Context, message string) error {
 	)
 
 	if err != nil {
-		return goerr.Wrap(err, "failed to reply to slack")
+		errs.Handle(ctx, goerr.Wrap(err, "failed to reply to slack"))
 	}
-
-	return nil
 }
 
 func (x *SlackThread) PostFinding(ctx context.Context, finding model.AlertFinding) error {

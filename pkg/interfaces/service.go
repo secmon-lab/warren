@@ -22,7 +22,9 @@ type SlackThreadService interface {
 	PostNextAction(ctx context.Context, action prompt.ActionPromptResult) error
 	PostFinding(ctx context.Context, finding model.AlertFinding) error
 	AttachFile(ctx context.Context, title, fileName string, data []byte) error
-	Reply(ctx context.Context, message string) error
+
+	// Reply replies to the thread with a message. It does not return an error because the process should not be stopped even if it fails. Instead, the error should be logged and reported to sentry in the method.
+	Reply(ctx context.Context, message string)
 }
 
 type SlackPayloadVerifier func(ctx context.Context, header http.Header, payload []byte) error
