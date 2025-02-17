@@ -417,6 +417,14 @@ func buildNextActionBlocks(action prompt.ActionPromptResult) []slack.Block {
 }
 
 func (x *SlackThread) AttachFile(ctx context.Context, title, fileName string, data []byte) error {
+	if len(data) == 0 {
+		msg := fmt.Sprintf("No data to attach: %s", title)
+		if _, _, err := x.slackClient.PostMessageContext(ctx, x.channelID, slack.MsgOptionText(msg, false), slack.MsgOptionTS(x.threadID)); err != nil {
+			return goerr.Wrap(err, "failed to post no data message to slack", goerr.V("title", title), goerr.V("fileName", fileName))
+		}
+		return nil
+	}
+
 	_, err := x.slackClient.UploadFileV2Context(ctx, slack.UploadFileV2Parameters{
 		Channel:         x.channelID,
 		Reader:          bytes.NewReader(data),
