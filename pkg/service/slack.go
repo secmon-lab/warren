@@ -151,6 +151,23 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 	}
 	blocks = append(blocks, slack.NewDividerBlock())
 
+	if alert.Conclusion != "" {
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", "*Conclusion:*\n"+alert.Conclusion.Label(), false, false),
+			nil,
+			nil,
+		))
+
+		if alert.Comment != "" {
+			blocks = append(blocks, slack.NewSectionBlock(
+				slack.NewTextBlockObject("mrkdwn", "💬 *Comment:*\n"+alert.Comment, false, false),
+				nil,
+				nil,
+			))
+		}
+		blocks = append(blocks, slack.NewDividerBlock())
+	}
+
 	if len(alert.Attributes) > 0 {
 		fields := make([]*slack.TextBlockObject, 0, len(alert.Attributes)*2)
 		for _, attr := range alert.Attributes {
@@ -168,18 +185,20 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 	}
 	if alert.Finding != nil {
 		blocks = append(blocks,
+			slack.NewDividerBlock(),
+			slack.NewHeaderBlock(
+				slack.NewTextBlockObject(slack.PlainTextType, "🤖 AI Analysis Result", false, false),
+			),
 			slack.NewSectionBlock(
 				slack.NewTextBlockObject("mrkdwn", "📝 *Summary:*\n"+alert.Finding.Summary, false, false),
 				nil,
 				nil,
 			),
-			slack.NewDividerBlock(),
 			slack.NewSectionBlock(
 				slack.NewTextBlockObject("mrkdwn", "🔍 *Reason:*\n"+alert.Finding.Reason, false, false),
 				nil,
 				nil,
 			),
-			slack.NewDividerBlock(),
 			slack.NewSectionBlock(
 				slack.NewTextBlockObject("mrkdwn", "💡 *Recommendation:*\n"+alert.Finding.Recommendation, false, false),
 				nil,
@@ -266,22 +285,22 @@ func (x *Slack) ShowCloseAlertModal(ctx context.Context, alert model.Alert, trig
 	}{
 		{
 			Conclusion:  model.AlertConclusionUnaffected,
-			Label:       "Unaffected",
+			Label:       model.AlertConclusionUnaffected.Label(),
 			Description: "The alert indicates actual attack or vulnerability, but it is no impact.",
 		},
 		{
 			Conclusion:  model.AlertConclusionIntended,
-			Label:       "Intended",
+			Label:       model.AlertConclusionIntended.Label(),
 			Description: "The alert is intended behavior or configuration.",
 		},
 		{
 			Conclusion:  model.AlertConclusionFalsePositive,
-			Label:       "False Positive",
+			Label:       model.AlertConclusionFalsePositive.Label(),
 			Description: "The alert is not attack or impact on the system.",
 		},
 		{
 			Conclusion:  model.AlertConclusionTruePositive,
-			Label:       "True Positive",
+			Label:       model.AlertConclusionTruePositive.Label(),
 			Description: "The alert has actual impact on the system.",
 		},
 	}

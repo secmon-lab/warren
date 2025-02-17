@@ -71,6 +71,17 @@ func (r AlertConclusion) String() string {
 	return string(r)
 }
 
+var alertConclusionLabels = map[AlertConclusion]string{
+	AlertConclusionIntended:      "👍 Intended",
+	AlertConclusionUnaffected:    "🛡️ Unaffected",
+	AlertConclusionFalsePositive: "🚫 False Positive",
+	AlertConclusionTruePositive:  "🚨 True Positive",
+}
+
+func (r AlertConclusion) Label() string {
+	return alertConclusionLabels[r]
+}
+
 // AlertFinding is the conclusion of the alert. This is set by the AI.
 type AlertFinding struct {
 	Severity       AlertSeverity `json:"severity"`

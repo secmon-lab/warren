@@ -50,6 +50,8 @@ func TestSlackPostAlert(t *testing.T) {
 			"foo": "bar",
 			"baz": 123,
 		},
+		Conclusion: model.AlertConclusionFalsePositive,
+		Comment:    "Test Comment",
 		Finding: &model.AlertFinding{
 			Severity:       model.AlertSeverityHigh,
 			Summary:        "Test Summary",
