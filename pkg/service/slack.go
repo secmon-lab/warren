@@ -282,7 +282,7 @@ func buildNextActionBlocks(action prompt.ActionPromptResult) []slack.Block {
 		fields = append(fields, slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*%s:* `%s`", key, arg), false, false))
 	}
 
-	nextMsg := fmt.Sprintf("🔜 Action: *%s*\n", action.Action)
+	nextMsg := fmt.Sprintf("⚡ Action: *%s*\n", action.Action)
 	blocks := []slack.Block{
 		slack.NewSectionBlock(
 			slack.NewTextBlockObject(slack.MarkdownType, nextMsg, false, false),
