@@ -262,7 +262,7 @@ func (x *SlackThread) UpdateAlert(ctx context.Context, alert model.Alert) error 
 		slack.MsgOptionBlocks(blocks...),
 	)
 	if err != nil {
-		return goerr.Wrap(err, "failed to update message to slack")
+		return goerr.Wrap(err, "failed to update message to slack", goerr.V("channelID", x.channelID), goerr.V("threadID", x.threadID), goerr.V("blocks", blocks))
 	}
 
 	return nil
