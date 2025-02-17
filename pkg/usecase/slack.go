@@ -76,10 +76,80 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 	logger := logging.From(ctx)
 	logger.Info("slack interaction event", "event", interaction)
 
-	if interaction.Type != slack.InteractionTypeBlockActions {
-		logger.Warn("slack interaction event is not block actions", "event", interaction)
+	switch interaction.Type {
+	case slack.InteractionTypeBlockActions:
+		return uc.handleSlackInteractionBlockActions(ctx, interaction)
+	case slack.InteractionTypeViewSubmission:
+		return uc.handleSlackInteractionViewSubmission(ctx, interaction)
+	}
+
+	return nil
+}
+
+func (uc *UseCases) handleSlackInteractionViewSubmission(ctx context.Context, interaction slack.InteractionCallback) error {
+
+	logger := logging.From(ctx)
+
+	if interaction.View.CallbackID != "close_submit" {
 		return nil
 	}
+
+	alertID := model.AlertID(interaction.View.PrivateMetadata)
+	alert, err := uc.repository.GetAlert(ctx, alertID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alert")
+	}
+	if alert == nil {
+		logger.Error("alert not found", "alert_id", alertID)
+		return nil
+	}
+
+	var (
+		conclusion model.AlertConclusion
+		comment    string
+	)
+	if conclusionBlock, ok := interaction.View.State.Values["conclusion"]; ok {
+		if conclusionAction, ok := conclusionBlock["conclusion"]; ok {
+			conclusion = model.AlertConclusion(conclusionAction.SelectedOption.Value)
+		}
+	}
+	if commentBlock, ok := interaction.View.State.Values["comment"]; ok {
+		if commentAction, ok := commentBlock["comment"]; ok {
+			comment = commentAction.Value
+		}
+	}
+
+	if err := conclusion.Validate(); err != nil {
+		return goerr.Wrap(err, "invalid conclusion", goerr.V("conclusion", conclusion))
+	}
+
+	now := clock.Now(ctx)
+	alert.Status = model.AlertStatusClosed
+	alert.ClosedAt = &now
+	alert.Conclusion = conclusion
+	alert.Comment = comment
+	if alert.Assignee == nil {
+		alert.Assignee = &model.SlackUser{
+			ID:   interaction.User.ID,
+			Name: interaction.User.Name,
+		}
+	}
+
+	if err := uc.repository.PutAlert(ctx, *alert); err != nil {
+		return goerr.Wrap(err, "failed to put alert")
+	}
+
+	thread := uc.slackService.NewThread(*alert)
+	thread.Reply(ctx, "Alert closed by <@"+interaction.User.ID+">")
+
+	if err := thread.UpdateAlert(ctx, *alert); err != nil {
+		return goerr.Wrap(err, "failed to update slack thread")
+	}
+	return nil
+}
+
+func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, interaction slack.InteractionCallback) error {
+	logger := logging.From(ctx)
 
 	action := interaction.ActionCallback.BlockActions[0]
 
@@ -112,28 +182,35 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 		}
 
 	case "close":
-		now := clock.Now(ctx)
-		alert.Status = model.AlertStatusClosed
-		alert.ClosedAt = &now
+		triggerID := interaction.TriggerID
 
-		if alert.Assignee == nil {
-			alert.Assignee = &model.SlackUser{
-				ID:   interaction.User.ID,
-				Name: interaction.User.Name,
+		if err := uc.slackService.ShowCloseAlertModal(ctx, *alert, triggerID); err != nil {
+			return goerr.Wrap(err, "failed to show close alert modal")
+		}
+
+		/*
+			now := clock.Now(ctx)
+			alert.Status = model.AlertStatusClosed
+			alert.ClosedAt = &now
+
+			if alert.Assignee == nil {
+				alert.Assignee = &model.SlackUser{
+					ID:   interaction.User.ID,
+					Name: interaction.User.Name,
+				}
 			}
-		}
 
-		if err := uc.repository.PutAlert(ctx, *alert); err != nil {
-			return goerr.Wrap(err, "failed to put alert")
-		}
+			if err := uc.repository.PutAlert(ctx, *alert); err != nil {
+				return goerr.Wrap(err, "failed to put alert")
+			}
 
-		thread := uc.slackService.NewThread(*alert)
-		thread.Reply(ctx, "Alert closed by <@"+interaction.User.ID+">")
+			thread := uc.slackService.NewThread(*alert)
+			thread.Reply(ctx, "Alert closed by <@"+interaction.User.ID+">")
 
-		if err := thread.UpdateAlert(ctx, *alert); err != nil {
-			return goerr.Wrap(err, "failed to update slack thread")
-		}
-
+			if err := thread.UpdateAlert(ctx, *alert); err != nil {
+				return goerr.Wrap(err, "failed to update slack thread")
+			}
+		*/
 	case "inspect":
 		go func() {
 			defer func() {

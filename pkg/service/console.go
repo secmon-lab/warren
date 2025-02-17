@@ -41,6 +41,10 @@ func (c *Console) VerifyRequest(_ http.Header, _ []byte) error {
 	return nil
 }
 
+func (c *Console) ShowCloseAlertModal(_ context.Context, _ model.Alert, _ string) error {
+	return nil
+}
+
 type ConsoleThread struct {
 	channelID string
 	threadID  string

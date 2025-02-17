@@ -31,7 +31,9 @@ func TestHandleSlackInteraction(t *testing.T) {
 				},
 			},
 			checkAlert: func(t *testing.T, alert model.Alert) {
-				gt.Equal(t, alert.Status, model.AlertStatusClosed)
+				gt.Equal(t, alert.Status, model.AlertStatusNew) // still new
+				gt.Equal(t, alert.Conclusion, "")               // not set yet
+				gt.Equal(t, alert.Comment, "")                  // not set yet
 			},
 			wantErr: false,
 		},
@@ -82,6 +84,9 @@ func TestHandleSlackInteraction(t *testing.T) {
 							return nil
 						},
 					}
+				},
+				ShowCloseAlertModalFunc: func(ctx context.Context, alert model.Alert, triggerID string) error {
+					return nil
 				},
 			}
 

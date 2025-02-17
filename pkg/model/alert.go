@@ -53,7 +53,7 @@ func (s AlertSeverity) Validate() error {
 type AlertConclusion string
 
 const (
-	AlertConclusionUnknown       AlertConclusion = "unknown"
+	AlertConclusionIntended      AlertConclusion = "intended"
 	AlertConclusionUnaffected    AlertConclusion = "unaffected"
 	AlertConclusionFalsePositive AlertConclusion = "false_positive"
 	AlertConclusionTruePositive  AlertConclusion = "true_positive"
@@ -61,10 +61,14 @@ const (
 
 func (r AlertConclusion) Validate() error {
 	switch r {
-	case AlertConclusionUnknown, AlertConclusionUnaffected, AlertConclusionFalsePositive, AlertConclusionTruePositive:
+	case AlertConclusionIntended, AlertConclusionUnaffected, AlertConclusionFalsePositive, AlertConclusionTruePositive:
 		return nil
 	}
 	return goerr.New("invalid alert result", goerr.V("result", r))
+}
+
+func (r AlertConclusion) String() string {
+	return string(r)
 }
 
 // AlertFinding is the conclusion of the alert. This is set by the AI.
@@ -88,6 +92,7 @@ type Alert struct {
 	Data        any             `json:"data"`
 	Attributes  []Attribute     `json:"attributes"`
 	Conclusion  AlertConclusion `json:"conclusion"`
+	Comment     string          `json:"comment"`
 	Finding     *AlertFinding   `json:"finding"`
 
 	Assignee    *SlackUser   `json:"assignee"`

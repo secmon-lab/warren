@@ -257,6 +257,95 @@ func (x *Slack) PostAlert(ctx context.Context, alert model.Alert) (interfaces.Sl
 	return thread, nil
 }
 
+func (x *Slack) ShowCloseAlertModal(ctx context.Context, alert model.Alert, triggerID string) error {
+
+	conclusionOptions := []struct {
+		Conclusion  model.AlertConclusion
+		Label       string
+		Description string
+	}{
+		{
+			Conclusion:  model.AlertConclusionUnaffected,
+			Label:       "Unaffected",
+			Description: "The alert indicates actual attack or vulnerability, but it is no impact.",
+		},
+		{
+			Conclusion:  model.AlertConclusionIntended,
+			Label:       "Intended",
+			Description: "The alert is intended behavior or configuration.",
+		},
+		{
+			Conclusion:  model.AlertConclusionFalsePositive,
+			Label:       "False Positive",
+			Description: "The alert is not attack or impact on the system.",
+		},
+		{
+			Conclusion:  model.AlertConclusionTruePositive,
+			Label:       "True Positive",
+			Description: "The alert has actual impact on the system.",
+		},
+	}
+
+	conclusionOptionBlocks := make([]*slack.OptionBlockObject, 0, len(conclusionOptions))
+	for _, option := range conclusionOptions {
+		conclusionOptionBlocks = append(conclusionOptionBlocks,
+			slack.NewOptionBlockObject(
+				option.Conclusion.String(),
+				slack.NewTextBlockObject(slack.PlainTextType, option.Label, false, false),
+				slack.NewTextBlockObject(slack.PlainTextType, option.Description, false, false),
+			),
+		)
+	}
+
+	_, err := x.slackClient.OpenView(triggerID, slack.ModalViewRequest{
+		Type: slack.VTModal,
+		Title: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Close Alert",
+		},
+		Blocks: slack.Blocks{
+			BlockSet: []slack.Block{
+				slack.NewSectionBlock(
+					slack.NewTextBlockObject(slack.PlainTextType, "Please input the conclusion and comment.", false, false),
+					nil,
+					nil,
+				),
+				slack.NewInputBlock(
+					"conclusion",
+					slack.NewTextBlockObject(slack.PlainTextType, "Conclusion", false, false),
+					slack.NewTextBlockObject(slack.PlainTextType, "Select the conclusion", false, false),
+					slack.NewOptionsSelectBlockElement(
+						slack.OptTypeStatic,
+						slack.NewTextBlockObject(slack.PlainTextType, "Select a conclusion", false, false),
+						"conclusion",
+						conclusionOptionBlocks...,
+					),
+				),
+				slack.NewInputBlock(
+					"comment",
+					slack.NewTextBlockObject(slack.PlainTextType, "Comment", false, false),
+					slack.NewTextBlockObject(slack.PlainTextType, "Add any reason, context, or information.", false, false),
+					slack.NewPlainTextInputBlockElement(
+						slack.NewTextBlockObject(slack.PlainTextType, "comment", false, false),
+						"comment",
+					),
+				).WithOptional(true),
+			},
+		},
+		CallbackID:      "close_submit",
+		PrivateMetadata: alert.ID.String(),
+		Submit: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Close",
+		},
+	})
+	if err != nil {
+		return goerr.Wrap(err, "failed to open view")
+	}
+
+	return nil
+}
+
 func (x *SlackThread) UpdateAlert(ctx context.Context, alert model.Alert) error {
 	blocks := buildAlertBlocks(alert)
 
