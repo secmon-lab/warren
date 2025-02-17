@@ -17,17 +17,17 @@ func AskChat[T any](ctx context.Context, ssn interfaces.GenAIChatSession, prompt
 	}
 
 	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return nil, goerr.New("no response from LLM", goerr.V("tag", model.ErrTagInvalidLLMResponse))
+		return nil, goerr.New("no response from LLM", goerr.T(model.ErrTagInvalidLLMResponse))
 	}
 
 	text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
 	if !ok || text == "" {
-		return nil, goerr.New("no text data from LLM", goerr.V("tag", model.ErrTagInvalidLLMResponse))
+		return nil, goerr.New("no text data from LLM", goerr.T(model.ErrTagInvalidLLMResponse))
 	}
 
 	var result T
 	if err := json.Unmarshal([]byte(text), &result); err != nil {
-		return nil, goerr.Wrap(err, "failed to unmarshal text", goerr.V("text", text), goerr.V("tag", model.ErrTagInvalidLLMResponse))
+		return nil, goerr.Wrap(err, "failed to unmarshal text", goerr.V("text", text), goerr.T(model.ErrTagInvalidLLMResponse))
 	}
 
 	return &result, nil

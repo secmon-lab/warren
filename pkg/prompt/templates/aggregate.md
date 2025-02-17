@@ -22,10 +22,12 @@ Find a similar security alert with a new alert to aggregate them. Please pay clo
 
 ## Output
 
-The output is a JSON object that matches the following schema:
+The output must be a JSON object that matches the following schema:
 
 ```json
 {{ .schema }}
 ```
+
+DO NOT return array schema, just return a single JSON object including `alert_id` field.
 
 If you find a similar alert, return the alert ID. If not, return an empty string in `alert_id` field.
