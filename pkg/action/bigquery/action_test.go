@@ -168,8 +168,8 @@ func TestActionExecute(t *testing.T) {
 				})
 			}
 			threadMock := &mock.SlackThreadServiceMock{
-				ReplyFunc: func(ctx context.Context, msg string) error {
-					return nil
+				ReplyFunc: func(ctx context.Context, msg string) {
+					// do nothing
 				},
 				AttachFileFunc: func(ctx context.Context, comment, filename string, content []byte) error {
 					return nil
@@ -228,8 +228,8 @@ func TestActionExecuteWithLimit(t *testing.T) {
 	})
 
 	threadMock := &mock.SlackThreadServiceMock{
-		ReplyFunc: func(ctx context.Context, msg string) error {
-			return nil
+		ReplyFunc: func(ctx context.Context, msg string) {
+			// do nothing
 		},
 		AttachFileFunc: func(ctx context.Context, comment, filename string, content []byte) error {
 			return nil

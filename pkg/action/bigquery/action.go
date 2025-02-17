@@ -198,9 +198,7 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 		eb = eb.With(goerr.V("query", result.Query))
 		status, err := client.DryRun(ctx, result.Query)
 		if err != nil {
-			if err := slack.Reply(ctx, fmt.Sprintf("Failed to run query. Retry...\nQuery: %s\nError: %s", result.Query, err.Error())); err != nil {
-				return nil, goerr.Wrap(err, "failed to reply to slack")
-			}
+			slack.Reply(ctx, fmt.Sprintf("Failed to run query. Retry...\nQuery: %s\nError: %s", result.Query, err.Error()))
 			prompt = fmt.Sprintf("Failed to run query. Please try again. The query is: %s\nError: %s", result.Query, err.Error())
 			continue
 		}
@@ -211,9 +209,7 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 				humanize.Bytes(uint64(status.Statistics.TotalBytesProcessed)),
 				humanize.Bytes(uint64(x.byteLimit)),
 			)
-			if err := slack.Reply(ctx, msg); err != nil {
-				return nil, goerr.Wrap(err, "failed to reply to slack")
-			}
+			slack.Reply(ctx, msg)
 
 			prompt = fmt.Sprintf("The query result is too large. Please try again with a smaller query. The your generated query result is %d bytes, but the limit is %d bytes.", status.Statistics.TotalBytesProcessed, x.byteLimit)
 			continue
