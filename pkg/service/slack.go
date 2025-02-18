@@ -147,14 +147,14 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 	if alert.Conclusion != "" {
 		blocks = append(blocks, slack.NewDividerBlock())
 		blocks = append(blocks, slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", "*Conclusion:*\n"+alert.Conclusion.Label(), false, false),
+			slack.NewTextBlockObject("mrkdwn", "*Conclusion:* "+alert.Conclusion.Label(), false, false),
 			nil,
 			nil,
 		))
 
 		if alert.Comment != "" {
 			blocks = append(blocks, slack.NewSectionBlock(
-				slack.NewTextBlockObject("mrkdwn", "💬 *Comment:*\n"+alert.Comment, false, false),
+				slack.NewTextBlockObject("mrkdwn", alert.Comment, false, false),
 				nil,
 				nil,
 			))
