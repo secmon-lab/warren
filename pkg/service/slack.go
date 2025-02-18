@@ -142,16 +142,10 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 			nil,
 			nil,
 		),
-		slack.NewDividerBlock(),
-		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", strings.Join(lines, "\n"), false, false),
-			nil,
-			nil,
-		),
 	}
-	blocks = append(blocks, slack.NewDividerBlock())
 
 	if alert.Conclusion != "" {
+		blocks = append(blocks, slack.NewDividerBlock())
 		blocks = append(blocks, slack.NewSectionBlock(
 			slack.NewTextBlockObject("mrkdwn", "*Conclusion:*\n"+alert.Conclusion.Label(), false, false),
 			nil,
@@ -165,8 +159,17 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 				nil,
 			))
 		}
-		blocks = append(blocks, slack.NewDividerBlock())
 	}
+
+	blocks = append(blocks, []slack.Block{
+		slack.NewDividerBlock(),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", strings.Join(lines, "\n"), false, false),
+			nil,
+			nil,
+		),
+		slack.NewDividerBlock(),
+	}...)
 
 	if len(alert.Attributes) > 0 {
 		fields := make([]*slack.TextBlockObject, 0, len(alert.Attributes)*2)
