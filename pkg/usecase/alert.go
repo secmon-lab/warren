@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -127,15 +128,25 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.
 }
 
 func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert model.Alert) (*model.Alert, error) {
+	logger := logging.From(ctx)
 	p, err := prompt.BuildMetaPrompt(ctx, alert)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build meta prompt")
 	}
 
 	ssn := uc.geminiStartChat()
-	result, err := service.AskChat[prompt.MetaPromptResult](ctx, ssn, p)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to ask chat")
+
+	var result *prompt.MetaPromptResult
+	for i := 0; i < 3 && result == nil; i++ {
+		result, err = service.AskChat[prompt.MetaPromptResult](ctx, ssn, p)
+		if err != nil {
+			if goerr.HasTag(err, model.ErrTagInvalidLLMResponse) {
+				logger.Warn("invalid LLM response, retry to generate alert metadata", "error", err)
+				p = fmt.Sprintf("invalid format, please try again: %s", err.Error())
+				continue
+			}
+			return nil, goerr.Wrap(err, "failed to ask chat")
+		}
 	}
 
 	if alert.Title == "" {

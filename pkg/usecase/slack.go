@@ -87,7 +87,6 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 }
 
 func (uc *UseCases) handleSlackInteractionViewSubmission(ctx context.Context, interaction slack.InteractionCallback) error {
-
 	logger := logging.From(ctx)
 
 	if interaction.View.CallbackID != "close_submit" {
