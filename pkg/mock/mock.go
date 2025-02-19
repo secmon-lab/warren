@@ -6,7 +6,7 @@ package mock
 import (
 	"cloud.google.com/go/vertexai/genai"
 	"context"
-	"github.com/m-mizutani/opac"
+	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
@@ -674,7 +674,7 @@ var _ interfaces.PolicyClient = &PolicyClientMock{}
 //
 //		// make and configure a mocked interfaces.PolicyClient
 //		mockedPolicyClient := &PolicyClientMock{
-//			QueryFunc: func(contextMoqParam context.Context, s string, v1 any, v2 any, queryOptions ...opac.QueryOption) error {
+//			QueryFunc: func(contextMoqParam context.Context, s string, v1 any, v2 any, queryOptions ...opaq.QueryOption) error {
 //				panic("mock out the Query method")
 //			},
 //		}
@@ -685,7 +685,7 @@ var _ interfaces.PolicyClient = &PolicyClientMock{}
 //	}
 type PolicyClientMock struct {
 	// QueryFunc mocks the Query method.
-	QueryFunc func(contextMoqParam context.Context, s string, v1 any, v2 any, queryOptions ...opac.QueryOption) error
+	QueryFunc func(contextMoqParam context.Context, s string, v1 any, v2 any, queryOptions ...opaq.QueryOption) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -700,14 +700,14 @@ type PolicyClientMock struct {
 			// V2 is the v2 argument value.
 			V2 any
 			// QueryOptions is the queryOptions argument value.
-			QueryOptions []opac.QueryOption
+			QueryOptions []opaq.QueryOption
 		}
 	}
 	lockQuery sync.RWMutex
 }
 
 // Query calls QueryFunc.
-func (mock *PolicyClientMock) Query(contextMoqParam context.Context, s string, v1 any, v2 any, queryOptions ...opac.QueryOption) error {
+func (mock *PolicyClientMock) Query(contextMoqParam context.Context, s string, v1 any, v2 any, queryOptions ...opaq.QueryOption) error {
 	if mock.QueryFunc == nil {
 		panic("PolicyClientMock.QueryFunc: method is nil but PolicyClient.Query was just called")
 	}
@@ -716,7 +716,7 @@ func (mock *PolicyClientMock) Query(contextMoqParam context.Context, s string, v
 		S               string
 		V1              any
 		V2              any
-		QueryOptions    []opac.QueryOption
+		QueryOptions    []opaq.QueryOption
 	}{
 		ContextMoqParam: contextMoqParam,
 		S:               s,
@@ -739,14 +739,14 @@ func (mock *PolicyClientMock) QueryCalls() []struct {
 	S               string
 	V1              any
 	V2              any
-	QueryOptions    []opac.QueryOption
+	QueryOptions    []opaq.QueryOption
 } {
 	var calls []struct {
 		ContextMoqParam context.Context
 		S               string
 		V1              any
 		V2              any
-		QueryOptions    []opac.QueryOption
+		QueryOptions    []opaq.QueryOption
 	}
 	mock.lockQuery.RLock()
 	calls = mock.calls.Query

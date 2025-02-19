@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/m-mizutani/opac"
+	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/model"
@@ -13,6 +13,7 @@ import (
 )
 
 type UseCases struct {
+	// services and adapters
 	slackService    interfaces.SlackService
 	policyClient    interfaces.PolicyClient
 	geminiStartChat interfaces.GetGeminiStartChat
@@ -23,6 +24,10 @@ type UseCases struct {
 	timeSpan     time.Duration
 	actionLimit  int
 	findingLimit int
+
+	// test data
+	detectData map[string]any
+	ignoreData map[string]any
 }
 
 var _ interfaces.UseCase = &UseCases{}
@@ -72,10 +77,15 @@ func WithFindingLimit(findingLimit int) Option {
 	}
 }
 
+func WithTestData(detectData map[string]any, ignoreData map[string]any) Option {
+	return func(u *UseCases) {
+		u.detectData = detectData
+		u.ignoreData = ignoreData
+	}
+}
+
 func New(geminiStartChat interfaces.GetGeminiStartChat, opts ...Option) *UseCases {
-	policyClient, err := opac.New(opac.Data(map[string]string{
-		"policy": "package alert.dummy",
-	}))
+	policyClient, err := opaq.New(opaq.Data("policy", "package alert.dummy"))
 	if err != nil {
 		panic(err)
 	}
@@ -101,6 +111,9 @@ func New(geminiStartChat interfaces.GetGeminiStartChat, opts ...Option) *UseCase
 		timeSpan:     24 * time.Hour,
 		actionLimit:  10,
 		findingLimit: 3,
+
+		detectData: make(map[string]any),
+		ignoreData: make(map[string]any),
 	}
 
 	for _, opt := range opts {

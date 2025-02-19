@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/m-mizutani/gt"
-	"github.com/m-mizutani/opac"
+	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/model"
@@ -35,7 +35,7 @@ func TestValidateGoogleIDToken(t *testing.T) {
 	vars := test.NewEnvVars(t, "TEST_GOOGLE_ID_TOKEN", "TEST_GOOGLE_ID_TOKEN_EMAIL")
 	calledAuthQuery := false
 	policyMock := &mock.PolicyClientMock{
-		QueryFunc: func(contextMoqParam context.Context, s string, v1, v2 any, queryOptions ...opac.QueryOption) error {
+		QueryFunc: func(contextMoqParam context.Context, s string, v1, v2 any, queryOptions ...opaq.QueryOption) error {
 			if s == "data.auth" {
 				calledAuthQuery = true
 				m1 := v1.(*model.AuthContext)

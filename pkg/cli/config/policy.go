@@ -4,7 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/opac"
+	"github.com/m-mizutani/opaq"
 	"github.com/urfave/cli/v3"
 )
 
@@ -31,10 +31,10 @@ func (x Policy) LogValue() slog.Value {
 	)
 }
 
-func (x *Policy) Configure() (*opac.Client, error) {
-	client, err := opac.New(opac.Files(x.filePaths...))
+func (x *Policy) Configure() (*opaq.Client, error) {
+	client, err := opaq.New(opaq.Files(x.filePaths...))
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create opac client", goerr.V("file_paths", x.filePaths))
+		return nil, goerr.Wrap(err, "failed to create opaq client", goerr.V("file_paths", x.filePaths))
 	}
 
 	return client, nil

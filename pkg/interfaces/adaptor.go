@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/vertexai/genai"
-	"github.com/m-mizutani/opac"
+	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/model"
 )
 
@@ -16,7 +16,7 @@ type GenAIChatSession interface {
 }
 
 type PolicyClient interface {
-	Query(context.Context, string, any, any, ...opac.QueryOption) error
+	Query(context.Context, string, any, any, ...opaq.QueryOption) error
 }
 
 type Repository interface {
