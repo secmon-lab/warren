@@ -133,12 +133,17 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 		title = title[:140] + "..."
 	}
 
+	description := "_no description_"
+	if alert.Description != "" {
+		description = alert.Description
+	}
+
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(
 			slack.NewTextBlockObject(slack.PlainTextType, title, false, false),
 		),
 		slack.NewSectionBlock(
-			slack.NewTextBlockObject(slack.MarkdownType, alert.Description, false, false),
+			slack.NewTextBlockObject(slack.MarkdownType, description, false, false),
 			nil,
 			nil,
 		),
@@ -262,6 +267,7 @@ func (x *Slack) PostAlert(ctx context.Context, alert model.Alert) (interfaces.Sl
 		x.channelID,
 		slack.MsgOptionBlocks(blocks...),
 	)
+
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to post message to slack", goerr.V("blocks", blocks))
 	}

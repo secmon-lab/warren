@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
@@ -21,8 +22,13 @@ func (uc *UseCases) HandleAlertWithAuth(ctx context.Context, schema string, aler
 		return nil, goerr.New("failed to build auth context")
 	}
 
+	policyClient, err := uc.policyService.NewClient(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to create policy client")
+	}
+
 	var result model.PolicyAuth
-	if err := uc.policyClient.Query(ctx, "data.auth", authCtx, &result); err != nil {
+	if err := policyClient.Query(ctx, "data.auth", authCtx, &result); err != nil {
 		return nil, goerr.Wrap(err, "failed to query policy", goerr.V("auth", authCtx))
 	}
 
@@ -30,14 +36,14 @@ func (uc *UseCases) HandleAlertWithAuth(ctx context.Context, schema string, aler
 		return nil, goerr.New("unauthorized", goerr.V("auth", authCtx))
 	}
 
-	return uc.HandleAlert(ctx, schema, alertData)
+	return uc.HandleAlert(ctx, schema, alertData, policyClient)
 }
 
-func (uc *UseCases) HandleAlert(ctx context.Context, schema string, alertData any) ([]*model.Alert, error) {
+func (uc *UseCases) HandleAlert(ctx context.Context, schema string, alertData any, policyClient interfaces.PolicyClient) ([]*model.Alert, error) {
 	logger := logging.From(ctx)
 
 	var result model.PolicyResult
-	if err := uc.policyClient.Query(ctx, "data.alert."+schema, alertData, &result); err != nil {
+	if err := policyClient.Query(ctx, "data.alert."+schema, alertData, &result); err != nil {
 		return nil, goerr.Wrap(err, "failed to query policy", goerr.V("schema", schema), goerr.V("alert", alertData))
 	}
 

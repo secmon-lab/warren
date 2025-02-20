@@ -15,7 +15,7 @@ type UseCase interface {
 	HandleSlackInteraction(ctx context.Context, interaction slack.InteractionCallback) error
 
 	// Alert related handlers
-	HandleAlert(ctx context.Context, schema string, alertData any) ([]*model.Alert, error)
+	HandleAlert(ctx context.Context, schema string, alertData any, policyClient PolicyClient) ([]*model.Alert, error)
 	HandleAlertWithAuth(ctx context.Context, schema string, alertData any) ([]*model.Alert, error)
 
 	// Workflow related handlers

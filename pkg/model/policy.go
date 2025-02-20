@@ -3,6 +3,7 @@ package model
 import (
 	"log/slog"
 	"sort"
+	"time"
 )
 
 type PolicyResult struct {
@@ -41,4 +42,10 @@ func (x TestData) LogValue() slog.Value {
 	}
 
 	return slog.GroupValue(values...)
+}
+
+type PolicyData struct {
+	Hash      string            `firestore:"hash"`
+	Data      map[string]string `firestore:"data"`
+	CreatedAt time.Time         `firestore:"created_at"`
 }

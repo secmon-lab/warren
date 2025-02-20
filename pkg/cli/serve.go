@@ -9,11 +9,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/server"
 	"github.com/secmon-lab/warren/pkg/service"
+	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -94,12 +94,6 @@ func cmdServe() *cli.Command {
 			if err != nil {
 				return err
 			}
-			if errs := service.DoTestPolicy(ctx, policyClient, testDataSet); len(errs) > 0 {
-				for _, e := range errs {
-					logging.Default().Error("test failed", "error", e)
-				}
-				return goerr.New("test failed", goerr.V("errors", errs))
-			}
 
 			enabledActions, err := actions.Configure(ctx)
 			if err != nil {
@@ -108,11 +102,13 @@ func cmdServe() *cli.Command {
 			logging.Default().Info("enabled actions", "actions", actions)
 			actionSvc := service.NewActionService(enabledActions)
 
+			policyService := policy.New(firestore, policyClient, testDataSet)
+
 			uc := usecase.New(
 				func() interfaces.GenAIChatSession {
 					return geminiModel.StartChat()
 				},
-				usecase.WithPolicyClient(policyClient),
+				usecase.WithPolicyService(policyService),
 				usecase.WithSlackService(slackSvc),
 				usecase.WithRepository(firestore),
 				usecase.WithActionService(actionSvc),

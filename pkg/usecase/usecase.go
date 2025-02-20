@@ -10,15 +10,16 @@ import (
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service"
+	"github.com/secmon-lab/warren/pkg/service/policy"
 )
 
 type UseCases struct {
 	// services and adapters
 	slackService    interfaces.SlackService
-	policyClient    interfaces.PolicyClient
 	geminiStartChat interfaces.GetGeminiStartChat
 	repository      interfaces.Repository
 	actionService   *service.ActionService
+	policyService   *policy.Service
 
 	// configs
 	timeSpan     time.Duration
@@ -40,9 +41,9 @@ func WithSlackService(slackService interfaces.SlackService) Option {
 	}
 }
 
-func WithPolicyClient(policyClient interfaces.PolicyClient) Option {
+func WithPolicyService(policyService *policy.Service) Option {
 	return func(u *UseCases) {
-		u.policyClient = policyClient
+		u.policyService = policyService
 	}
 }
 
@@ -104,7 +105,7 @@ func New(geminiStartChat interfaces.GetGeminiStartChat, opts ...Option) *UseCase
 				}, nil
 			},
 		},
-		policyClient:  policyClient,
+		policyService: policy.New(repository.NewMemory(), policyClient, &model.TestDataSet{}),
 		repository:    repository.NewMemory(),
 		actionService: service.NewActionService([]interfaces.Action{}),
 

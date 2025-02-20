@@ -9,7 +9,9 @@ import (
 )
 
 type Policy struct {
-	filePaths []string
+	filePaths      []string
+	detectDataPath string
+	ignoreDataPath string
 }
 
 func (x *Policy) Flags() []cli.Flag {
@@ -22,12 +24,28 @@ func (x *Policy) Flags() []cli.Flag {
 			Category:    "Policy",
 			Sources:     cli.EnvVars("WARREN_POLICY"),
 		},
+		&cli.StringFlag{
+			Name:        "detect-test-data",
+			Usage:       "Detect test data path",
+			Destination: &x.detectDataPath,
+			Category:    "Policy",
+			Sources:     cli.EnvVars("WARREN_DETECT_TEST_DATA"),
+		},
+		&cli.StringFlag{
+			Name:        "ignore-test-data",
+			Usage:       "Ignore test data path",
+			Destination: &x.ignoreDataPath,
+			Category:    "Policy",
+			Sources:     cli.EnvVars("WARREN_IGNORE_TEST_DATA"),
+		},
 	}
 }
 
 func (x Policy) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.Any("file_paths", x.filePaths),
+		slog.String("detect_test_data", x.detectDataPath),
+		slog.String("ignore_test_data", x.ignoreDataPath),
 	)
 }
 
