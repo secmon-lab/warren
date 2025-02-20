@@ -103,7 +103,7 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.
 			return nil, goerr.Wrap(err, "failed to encode alert data")
 		}
 
-		if err := thread.AttachFile(ctx, "New: "+alert.Title, "alert.json", buf.Bytes()); err != nil {
+		if err := thread.AttachFile(ctx, "New: "+alert.Title, "alert."+alert.ID.String()+".json", buf.Bytes()); err != nil {
 			return nil, goerr.Wrap(err, "failed to attach alert data")
 		}
 		return nil, nil

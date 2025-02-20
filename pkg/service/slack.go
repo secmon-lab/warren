@@ -279,7 +279,7 @@ func (x *Slack) PostAlert(ctx context.Context, alert model.Alert) (interfaces.Sl
 		return nil, goerr.Wrap(err, "failed to encode alert data")
 	}
 
-	if err := thread.AttachFile(ctx, "Original Alert", "alert.json", buf.Bytes()); err != nil {
+	if err := thread.AttachFile(ctx, "Original Alert", "alert."+alert.ID.String()+".json", buf.Bytes()); err != nil {
 		return nil, goerr.Wrap(err, "failed to attach file to slack")
 	}
 

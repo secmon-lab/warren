@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/server"
@@ -26,6 +27,7 @@ func cmdServe() *cli.Command {
 		slackCfg     config.Slack
 		geminiCfg    config.GeminiCfg
 		firestoreCfg config.Firestore
+		testDataCfg  config.TestData
 	)
 
 	flags := joinFlags(
@@ -44,6 +46,7 @@ func cmdServe() *cli.Command {
 		slackCfg.Flags(),
 		geminiCfg.Flags(),
 		firestoreCfg.Flags(),
+		testDataCfg.Flags(),
 		actions.Flags(),
 	)
 
@@ -60,6 +63,7 @@ func cmdServe() *cli.Command {
 				"slack", slackCfg,
 				"gemini", geminiCfg,
 				"firestore", firestoreCfg,
+				"testdata", testDataCfg,
 			)
 
 			policyClient, err := policyCfg.Configure()
@@ -84,6 +88,17 @@ func cmdServe() *cli.Command {
 			firestore, err := firestoreCfg.Configure(ctx)
 			if err != nil {
 				return err
+			}
+
+			testDataSet, err := testDataCfg.Configure()
+			if err != nil {
+				return err
+			}
+			if errs := service.DoTestPolicy(ctx, policyClient, testDataSet); len(errs) > 0 {
+				for _, e := range errs {
+					logging.Default().Error("test failed", "error", e)
+				}
+				return goerr.New("test failed", goerr.V("errors", errs))
 			}
 
 			enabledActions, err := actions.Configure(ctx)

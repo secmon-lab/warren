@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/urfave/cli/v3"
 )
 
@@ -28,29 +29,31 @@ func (x *TestData) IgnoreDataPath() string {
 func (x *TestData) Flags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
-			Name:        "test-detect-data-path",
-			Usage:       "Path to the detect data file",
+			Name:        "test-detect-data",
+			Usage:       "Path to the alert data JSON file should be detected. File path under the path will be used as [schema]/[filename].json",
+			Category:    "Test",
 			Destination: &x.detectDataPath,
-			Sources:     cli.EnvVars("WARREN_TEST_DETECT_DATA_PATH"),
+			Sources:     cli.EnvVars("WARREN_TEST_DETECT_DATA"),
 		},
 		&cli.StringFlag{
-			Name:        "test-ignore-data-path",
-			Usage:       "Path to the ignore data file",
+			Name:        "test-ignore-data",
+			Usage:       "Path to the alert data JSON file should be ignored. File path under the path will be used as [schema]/[filename].json",
+			Category:    "Test",
 			Destination: &x.ignoreDataPath,
-			Sources:     cli.EnvVars("WARREN_TEST_IGNORE_DATA_PATH"),
+			Sources:     cli.EnvVars("WARREN_TEST_IGNORE_DATA"),
 		},
 	}
 }
 
-func (x *TestData) LogValue() slog.Value {
+func (x TestData) LogValue() slog.Value {
 	return slog.GroupValue(
-		slog.String("test-detect-data-path", x.detectDataPath),
-		slog.String("test-ignore-data-path", x.ignoreDataPath),
+		slog.String("test-detect-data", x.detectDataPath),
+		slog.String("test-ignore-data", x.ignoreDataPath),
 	)
 }
 
-func loadFiles(basePath string) (map[string]any, error) {
-	result := make(map[string]any)
+func loadTestFiles(basePath string) (model.TestData, error) {
+	result := make(model.TestData)
 	if basePath == "" {
 		return result, nil
 	}
@@ -78,28 +81,54 @@ func loadFiles(basePath string) (map[string]any, error) {
 			return goerr.Wrap(err, "failed to unmarshal json", goerr.V("path", path))
 		}
 
-		result[path] = v
+		// Get relative path from basePath
+		relPath, err := filepath.Rel(basePath, path)
+		if err != nil {
+			return goerr.Wrap(err, "failed to get relative path", goerr.V("path", path))
+		}
+
+		// Get first directory as key
+		parts := strings.Split(filepath.Dir(relPath), string(filepath.Separator))
+		if len(parts) == 0 || parts[0] == "." {
+			return nil
+		}
+		firstDir := parts[0]
+
+		// Get remaining path
+		remainPath := relPath[len(firstDir)+1:]
+		if remainPath == "" {
+			remainPath = filepath.Base(relPath)
+		}
+
+		// Initialize map for first directory if not exists
+		if _, ok := result[firstDir]; !ok {
+			result[firstDir] = make(map[string]any)
+		}
+
+		// Store value with remaining path as key
+		result[firstDir][remainPath] = v
 		return nil
 	})
-
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to walk directory")
 	}
 
 	return result, nil
-
 }
 
-func (x *TestData) Configure() (map[string]any, map[string]any, error) {
-	detectData, err := loadFiles(x.detectDataPath)
+func (x *TestData) Configure() (*model.TestDataSet, error) {
+	detectData, err := loadTestFiles(x.detectDataPath)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	ignoreData, err := loadFiles(x.ignoreDataPath)
+	ignoreData, err := loadTestFiles(x.ignoreDataPath)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return detectData, ignoreData, nil
+	return &model.TestDataSet{
+		Detect: detectData,
+		Ignore: ignoreData,
+	}, nil
 }
