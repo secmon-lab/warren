@@ -24,8 +24,8 @@ type throttleSession struct {
 
 func (x *throttleSession) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
 	x.mu.Lock()
-	if time.Since(x.last) < 3*time.Second {
-		time.Sleep(3 * time.Second)
+	if time.Since(x.last) < 1*time.Second {
+		time.Sleep(time.Until(x.last.Add(1 * time.Second)))
 	}
 	x.last = time.Now()
 	defer x.mu.Unlock()

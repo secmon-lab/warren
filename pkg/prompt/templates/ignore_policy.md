@@ -71,3 +71,14 @@ The updated policy should be output according to the following schema. The schem
 ```json
 {{ .schema }}
 ```
+
+Example of the correct output:
+
+```json
+{
+    "policy": {
+        "some_dir/some_file.rego": "package alert.aws.guardduty\n\nalert contains {}\n\nignore if { input.SeverityScore < 7 }",
+        "some_dir/some_other_file.rego": "package alert.aws.guardduty\n\nignore if { input.Name == \"example-alert\" }"
+    }
+}
+```

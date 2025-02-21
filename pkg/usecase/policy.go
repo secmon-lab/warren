@@ -44,11 +44,11 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 		newTestData.Detect[alert.Schema][alert.ID.String()+".json"] = alert.Data
 	}
 
-	for i := 0; i < maxRetryCountForIgnorePolicy; i++ {
+	for i := 0; i < maxRetryCountForIgnorePolicy && newSvc == nil; i++ {
 		resp, err := service.AskChat[prompt.IgnorePolicyPromptResult](ctx, ssn, p)
 		if err != nil {
 			if goerr.HasTag(err, model.ErrTagInvalidLLMResponse) {
-				thread.Reply(ctx, fmt.Sprintf("Failed to generate ignore policy: %v\n\nRetry...", err))
+				thread.Reply(ctx, fmt.Sprintf("💥 Failed to generate ignore policy: \n> %v\n\nRetry...", err))
 				p = "Your response is invalid. Please try again: " + err.Error()
 				continue
 			}
@@ -58,35 +58,37 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 
 		c, err := opaq.New(opaq.DataMap(resp.Policy))
 		if err != nil {
-			thread.Reply(ctx, fmt.Sprintf("Failed to build new policy: %v\n\nRetry...", err))
+			thread.Reply(ctx, fmt.Sprintf("💥 Failed to build new policy: \n> %v\n\nRetry...", err))
 			p = "Failed to build new policy client: " + err.Error()
 			continue
 		}
 
-		if errs := policy.Test(ctx, c, uc.policyService.TestData()); len(errs) > 0 {
+		svc := uc.policyService.Clone(c, newTestData)
+
+		if errs := policy.Test(ctx, c, newTestData); len(errs) > 0 {
 			var runtimeErrs []error
 			var replyLines []string
 			for _, err := range errs {
 				if goerr.HasTag(err, model.ErrTagTestFailed) {
-					replyLines = append(replyLines, "❌ Test failed: "+err.Error())
+					replyLines = append(replyLines, "❌ FAILED: "+err.Error())
 					p = "Failed to test new policy: " + err.Error()
 				} else {
 					runtimeErrs = append(runtimeErrs, err)
 				}
 			}
 
-			if len(replyLines) > 0 {
-				p = "Failed to test new policy: " + strings.Join(replyLines, "\n")
-				thread.Reply(ctx, strings.Join(replyLines, "\n"))
-				continue
-			}
 			if len(runtimeErrs) > 0 {
 				return nil, errors.New("failed to test new policy")
 			}
+			if len(replyLines) > 0 {
+				p = "Failed to test new policy:\n" + strings.Join(replyLines, "\n")
+				thread.Reply(ctx, strings.Join(replyLines, "\n"))
+				continue
+			}
 		}
 
-		thread.Reply(ctx, "✅ Test passed")
-		newSvc = uc.policyService.Clone(c, uc.policyService.TestData())
+		thread.Reply(ctx, "✅ Test PASSED")
+		newSvc = svc
 	}
 
 	if newSvc == nil {
