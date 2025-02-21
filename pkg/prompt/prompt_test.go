@@ -3,6 +3,7 @@ package prompt_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/model"
@@ -34,4 +35,30 @@ func TestActionPrompt(t *testing.T) {
 	t.Log(d)
 	gt.S(t, d).Contains("## `action1`")
 	gt.S(t, d).Contains("- `arg1` (string, required): arg1 description")
+}
+
+func TestIgnorePolicyPrompt(t *testing.T) {
+	policy := map[string]string{
+		"test.rego": `package alert.aws.guardduty
+
+alert contains {} # Detected as an alert`,
+	}
+	alerts := []model.Alert{
+		{
+			ID:        "123",
+			Schema:    "aws.guardduty",
+			Data:      map[string]any{"Findings": map[string]any{"Severity": 7}},
+			CreatedAt: time.Now(),
+		},
+	}
+	policyData := model.PolicyData{
+		Data: policy,
+	}
+	d, err := prompt.BuildIgnorePolicyPrompt(context.Background(), policyData, alerts, "test")
+	gt.NoError(t, err)
+
+	gt.S(t, d).Contains("# Rules")
+	gt.S(t, d).Contains("## Policy")
+	gt.S(t, d).Contains("## Alerts")
+	gt.S(t, d).Contains("# Output")
 }

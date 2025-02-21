@@ -17,7 +17,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
-func DoTest(ctx context.Context, policy interfaces.PolicyClient, testDataSet *model.TestDataSet) []error {
+func Test(ctx context.Context, policy interfaces.PolicyClient, testDataSet *model.TestDataSet) []error {
 	var errs []error
 	for schema, dataSets := range testDataSet.Detect {
 		for filename, data := range dataSets {
@@ -87,12 +87,43 @@ type Service struct {
 	factory      Factory
 }
 
-type Option func(*Service)
-
-func WithFactory(factory Factory) Option {
-	return func(s *Service) {
-		s.factory = factory
+func (s *Service) TestData() *model.TestDataSet {
+	newTestData := &model.TestDataSet{
+		Detect: make(model.TestData),
+		Ignore: make(model.TestData),
 	}
+
+	for schema, dataSets := range s.testData.Detect {
+		newTestData.Detect[schema] = make(map[string]any)
+		for filename, data := range dataSets {
+			newTestData.Detect[schema][filename] = data
+		}
+	}
+
+	for schema, dataSets := range s.testData.Ignore {
+		newTestData.Ignore[schema] = make(map[string]any)
+		for filename, data := range dataSets {
+			newTestData.Ignore[schema][filename] = data
+		}
+	}
+
+	return newTestData
+}
+
+func (s *Service) Clone(policyClient interfaces.PolicyClient, testData *model.TestDataSet) *Service {
+	newSvc := &Service{
+		repo:         s.repo,
+		policyClient: policyClient,
+		testData:     testData,
+		baseHash:     hashPolicyData(policyClient.Sources()),
+		factory:      s.factory,
+	}
+
+	return newSvc
+}
+
+func (s *Service) Test(ctx context.Context) []error {
+	return Test(ctx, s.policyClient, s.testData)
 }
 
 func New(repo interfaces.Repository, policyClient interfaces.PolicyClient, testData *model.TestDataSet, opts ...Option) *Service {
@@ -111,6 +142,14 @@ func New(repo interfaces.Repository, policyClient interfaces.PolicyClient, testD
 	}
 
 	return svc
+}
+
+type Option func(*Service)
+
+func WithFactory(factory Factory) Option {
+	return func(s *Service) {
+		s.factory = factory
+	}
 }
 
 func (s *Service) NewClient(ctx context.Context) (interfaces.PolicyClient, error) {

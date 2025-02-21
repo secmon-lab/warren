@@ -44,7 +44,7 @@ func cmdTest() *cli.Command {
 			logger.Info("Starting test", "testDataSet", testDataSet)
 
 			var runtimeErrors []error
-			errs := policy.DoTest(ctx, policyClient, testDataSet)
+			errs := policy.Test(ctx, policyClient, testDataSet)
 			failed := false
 			for _, err := range errs {
 				if goerr.HasTag(err, model.ErrTagTestFailed) {
