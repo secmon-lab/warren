@@ -100,7 +100,7 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.
 			return nil, goerr.Wrap(err, "failed to put alert", goerr.V("alert", alert))
 		}
 
-		thread := uc.slackService.NewThread(alert)
+		thread := uc.slackService.NewThread(*alert.SlackThread)
 
 		var buf bytes.Buffer
 		enc := json.NewEncoder(&buf)

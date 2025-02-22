@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"unicode/utf8"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/model"
@@ -12,6 +13,86 @@ import (
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 )
+
+// ParseArgs parses a string into arguments, handling various types of quotes
+func parseArgs(input string) []string {
+	var result []string
+	var current []rune
+	var inQuotes bool
+	var quoteChar rune
+
+	// Unicode code points for quotes
+	const (
+		leftDoubleQuote  = '\u201c' // "
+		rightDoubleQuote = '\u201d' // "
+		leftSingleQuote  = '\u2018' // '
+		rightSingleQuote = '\u2019' // '
+	)
+
+	// isMatchingQuote checks if two quote characters form a matching pair
+	isMatchingQuote := func(open, close rune) bool {
+		return open == close || // Same quotes
+			(open == leftDoubleQuote && close == rightDoubleQuote) || // Unicode double quotes
+			(open == leftSingleQuote && close == rightSingleQuote) // Unicode single quotes
+	}
+
+	for i := 0; i < len(input); {
+		char, size := utf8.DecodeRuneInString(input[i:])
+		i += size
+
+		switch char {
+		case '\\':
+			if i < len(input) {
+				nextChar, size := utf8.DecodeRuneInString(input[i:])
+				if nextChar == '\\' || nextChar == '"' || nextChar == '\'' ||
+					nextChar == leftDoubleQuote || nextChar == rightDoubleQuote ||
+					nextChar == leftSingleQuote || nextChar == rightSingleQuote ||
+					nextChar == '`' {
+					current = append(current, nextChar)
+					i += size
+				} else {
+					current = append(current, char)
+				}
+			} else {
+				current = append(current, char)
+			}
+		case '"', '\'', leftDoubleQuote, rightDoubleQuote, leftSingleQuote, rightSingleQuote, '`':
+			if inQuotes {
+				if isMatchingQuote(quoteChar, char) {
+					inQuotes = false
+					if len(current) > 0 {
+						result = append(result, string(current))
+						current = nil
+					}
+				} else {
+					current = append(current, char)
+				}
+			} else {
+				inQuotes = true
+				quoteChar = char
+				if len(current) > 0 {
+					result = append(result, string(current))
+					current = nil
+				}
+			}
+		case ' ':
+			if inQuotes {
+				current = append(current, char)
+			} else if len(current) > 0 {
+				result = append(result, string(current))
+				current = nil
+			}
+		default:
+			current = append(current, char)
+		}
+	}
+
+	if len(current) > 0 {
+		result = append(result, string(current))
+	}
+
+	return result
+}
 
 func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevents.AppMentionEvent) error {
 	logger := logging.From(ctx)
@@ -26,15 +107,27 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 		return goerr.Wrap(err, "failed to get alert by slack thread")
 	}
 	if alert == nil {
-		logger.Info("alert not found", "thread", thread)
-		return nil
+		thread = model.SlackThread{
+			ChannelID: event.Channel,
+			ThreadID:  event.TimeStamp,
+		}
 	}
 
-	args := uc.slackService.TrimMention(event.Text)
-	if args == "" {
+	mention := uc.slackService.TrimMention(event.Text)
+	if mention == "" {
 		logger.Warn("slack app mention event is empty", "event", event)
 		return nil
 	}
+
+	args := parseArgs(mention)
+
+	logger.Info("slack app mention event", "mention", mention, "thread", thread)
+	for _, arg := range args {
+		logger.Info("arg", "value", arg)
+	}
+
+	th := uc.slackService.NewThread(thread)
+	th.Reply(ctx, "Hello, world!")
 
 	return nil
 }
@@ -139,7 +232,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmission(ctx context.Context, in
 		return goerr.Wrap(err, "failed to put alert")
 	}
 
-	th := uc.slackService.NewThread(*alert)
+	th := uc.slackService.NewThread(*alert.SlackThread)
 	ctx = thread.WithReplyFunc(ctx, th.Reply)
 	th.Reply(ctx, "Alert closed by <@"+interaction.User.ID+">")
 
@@ -205,7 +298,7 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 			return goerr.Wrap(err, "failed to put alert")
 		}
 
-		thread := uc.slackService.NewThread(*alert)
+		thread := uc.slackService.NewThread(*alert.SlackThread)
 		thread.Reply(ctx, "Alert acknowledged by <@"+interaction.User.ID+">")
 
 		if err := thread.UpdateAlert(ctx, *alert); err != nil {

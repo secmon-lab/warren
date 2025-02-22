@@ -29,10 +29,10 @@ func (c *Console) TrimMention(message string) string {
 
 var _ interfaces.SlackService = &Console{}
 
-func (c *Console) NewThread(alert model.Alert) interfaces.SlackThreadService {
+func (c *Console) NewThread(thread model.SlackThread) interfaces.SlackThreadService {
 	return &ConsoleThread{
-		channelID: c.channelID,
-		threadID:  c.threadID,
+		channelID: thread.ChannelID,
+		threadID:  thread.ThreadID,
 		writer:    c.writer,
 	}
 }

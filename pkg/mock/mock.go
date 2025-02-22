@@ -28,7 +28,7 @@ var _ interfaces.SlackService = &SlackServiceMock{}
 //
 //		// make and configure a mocked interfaces.SlackService
 //		mockedSlackService := &SlackServiceMock{
-//			NewThreadFunc: func(alert model.Alert) interfaces.SlackThreadService {
+//			NewThreadFunc: func(thread model.SlackThread) interfaces.SlackThreadService {
 //				panic("mock out the NewThread method")
 //			},
 //			PostAlertFunc: func(ctx context.Context, alert model.Alert) (interfaces.SlackThreadService, error) {
@@ -48,7 +48,7 @@ var _ interfaces.SlackService = &SlackServiceMock{}
 //	}
 type SlackServiceMock struct {
 	// NewThreadFunc mocks the NewThread method.
-	NewThreadFunc func(alert model.Alert) interfaces.SlackThreadService
+	NewThreadFunc func(thread model.SlackThread) interfaces.SlackThreadService
 
 	// PostAlertFunc mocks the PostAlert method.
 	PostAlertFunc func(ctx context.Context, alert model.Alert) (interfaces.SlackThreadService, error)
@@ -63,8 +63,8 @@ type SlackServiceMock struct {
 	calls struct {
 		// NewThread holds details about calls to the NewThread method.
 		NewThread []struct {
-			// Alert is the alert argument value.
-			Alert model.Alert
+			// Thread is the thread argument value.
+			Thread model.SlackThread
 		}
 		// PostAlert holds details about calls to the PostAlert method.
 		PostAlert []struct {
@@ -95,19 +95,19 @@ type SlackServiceMock struct {
 }
 
 // NewThread calls NewThreadFunc.
-func (mock *SlackServiceMock) NewThread(alert model.Alert) interfaces.SlackThreadService {
+func (mock *SlackServiceMock) NewThread(thread model.SlackThread) interfaces.SlackThreadService {
 	if mock.NewThreadFunc == nil {
 		panic("SlackServiceMock.NewThreadFunc: method is nil but SlackService.NewThread was just called")
 	}
 	callInfo := struct {
-		Alert model.Alert
+		Thread model.SlackThread
 	}{
-		Alert: alert,
+		Thread: thread,
 	}
 	mock.lockNewThread.Lock()
 	mock.calls.NewThread = append(mock.calls.NewThread, callInfo)
 	mock.lockNewThread.Unlock()
-	return mock.NewThreadFunc(alert)
+	return mock.NewThreadFunc(thread)
 }
 
 // NewThreadCalls gets all the calls that were made to NewThread.
@@ -115,10 +115,10 @@ func (mock *SlackServiceMock) NewThread(alert model.Alert) interfaces.SlackThrea
 //
 //	len(mockedSlackService.NewThreadCalls())
 func (mock *SlackServiceMock) NewThreadCalls() []struct {
-	Alert model.Alert
+	Thread model.SlackThread
 } {
 	var calls []struct {
-		Alert model.Alert
+		Thread model.SlackThread
 	}
 	mock.lockNewThread.RLock()
 	calls = mock.calls.NewThread

@@ -76,10 +76,10 @@ func (x *Slack) TrimMention(message string) string {
 	return strings.TrimSpace(message[idx+len(mention):])
 }
 
-func (x *Slack) NewThread(alert model.Alert) interfaces.SlackThreadService {
+func (x *Slack) NewThread(thread model.SlackThread) interfaces.SlackThreadService {
 	return &SlackThread{
-		channelID:   alert.SlackThread.ChannelID,
-		threadID:    alert.SlackThread.ThreadID,
+		channelID:   thread.ChannelID,
+		threadID:    thread.ThreadID,
 		slackClient: x.slackClient,
 	}
 }
