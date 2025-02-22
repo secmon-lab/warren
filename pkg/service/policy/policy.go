@@ -87,6 +87,10 @@ type Service struct {
 	factory      Factory
 }
 
+func (s *Service) Sources() map[string]string {
+	return s.policyClient.Sources()
+}
+
 func (s *Service) TestData() *model.TestDataSet {
 	newTestData := &model.TestDataSet{
 		Detect: make(model.TestData),

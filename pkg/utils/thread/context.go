@@ -8,8 +8,16 @@ type ctxKey struct{}
 
 type ReplyFunc func(ctx context.Context, msg string)
 
-func WithReply(ctx context.Context, replyFunc ReplyFunc) context.Context {
+func WithReplyFunc(ctx context.Context, replyFunc ReplyFunc) context.Context {
 	return context.WithValue(ctx, ctxKey{}, replyFunc)
+}
+
+func ReplyFuncFrom(ctx context.Context) ReplyFunc {
+	replyFunc, ok := ctx.Value(ctxKey{}).(ReplyFunc)
+	if !ok {
+		return func(ctx context.Context, msg string) {}
+	}
+	return replyFunc
 }
 
 func Reply(ctx context.Context, msg string) {

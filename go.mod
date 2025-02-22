@@ -15,7 +15,7 @@ require (
 	github.com/m-mizutani/goerr/v2 v2.0.0-alpha.3
 	github.com/m-mizutani/gt v0.0.13
 	github.com/m-mizutani/masq v0.1.10
-	github.com/m-mizutani/opaq v0.2.0
+	github.com/m-mizutani/opaq v0.2.1-0.20250222003843-b0e8fa8233e6
 	github.com/slack-go/slack v0.15.0
 	github.com/urfave/cli/v3 v3.0.0-beta1
 	google.golang.org/api v0.220.0

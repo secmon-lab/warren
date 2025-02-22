@@ -72,7 +72,7 @@ func TestGenerateIgnorePolicy(t *testing.T) {
 		},
 	}
 
-	ctx = thread.WithReply(ctx, func(ctx context.Context, msg string) {
+	ctx = thread.WithReplyFunc(ctx, func(ctx context.Context, msg string) {
 		t.Log(msg)
 	})
 	policy, err := uc.GenerateIgnorePolicy(ctx, alerts, "")

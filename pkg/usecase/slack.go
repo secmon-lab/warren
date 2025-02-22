@@ -6,8 +6,9 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
-	"github.com/secmon-lab/warren/pkg/utils/lang"
+	"github.com/secmon-lab/warren/pkg/utils/errs"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/thread"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 )
@@ -138,12 +139,43 @@ func (uc *UseCases) handleSlackInteractionViewSubmission(ctx context.Context, in
 		return goerr.Wrap(err, "failed to put alert")
 	}
 
-	thread := uc.slackService.NewThread(*alert)
-	thread.Reply(ctx, "Alert closed by <@"+interaction.User.ID+">")
+	th := uc.slackService.NewThread(*alert)
+	ctx = thread.WithReplyFunc(ctx, th.Reply)
+	th.Reply(ctx, "Alert closed by <@"+interaction.User.ID+">")
 
-	if err := thread.UpdateAlert(ctx, *alert); err != nil {
+	if err := th.UpdateAlert(ctx, *alert); err != nil {
 		return goerr.Wrap(err, "failed to update slack thread")
 	}
+
+	newCtx := newBackgroundContext(ctx)
+	genIgnorePolicy := func() {
+		defer func() {
+			if r := recover(); r != nil {
+				errs.Handle(newCtx, goerr.New("panic", goerr.V("recover", r)))
+			}
+		}()
+
+		newPolicy, err := uc.GenerateIgnorePolicy(newCtx, []model.Alert{*alert}, "")
+		if err != nil {
+			errs.Handle(newCtx, err)
+		}
+
+		diff := diffPolicy(uc.policyService.Sources(), newPolicy.Sources())
+		if diff != "" {
+			if err := th.AttachFile(newCtx, "New policy diff", "policy.diff", []byte(diff)); err != nil {
+				errs.Handle(newCtx, err)
+			}
+		} else {
+			th.Reply(newCtx, "No changes in ignore policy")
+		}
+	}
+
+	if alert.Conclusion == model.AlertConclusionFalsePositive ||
+		alert.Conclusion == model.AlertConclusionIntended ||
+		alert.Conclusion == model.AlertConclusionUnaffected {
+		go genIgnorePolicy()
+	}
+
 	return nil
 }
 
@@ -187,43 +219,18 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 			return goerr.Wrap(err, "failed to show close alert modal")
 		}
 
-		/*
-			now := clock.Now(ctx)
-			alert.Status = model.AlertStatusClosed
-			alert.ClosedAt = &now
-
-			if alert.Assignee == nil {
-				alert.Assignee = &model.SlackUser{
-					ID:   interaction.User.ID,
-					Name: interaction.User.Name,
-				}
-			}
-
-			if err := uc.repository.PutAlert(ctx, *alert); err != nil {
-				return goerr.Wrap(err, "failed to put alert")
-			}
-
-			thread := uc.slackService.NewThread(*alert)
-			thread.Reply(ctx, "Alert closed by <@"+interaction.User.ID+">")
-
-			if err := thread.UpdateAlert(ctx, *alert); err != nil {
-				return goerr.Wrap(err, "failed to update slack thread")
-			}
-		*/
 	case "inspect":
+		newCtx := newBackgroundContext(ctx)
+
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					logger.Error("panic in workflow process", "error", r)
+					errs.Handle(newCtx, goerr.New("panic", goerr.V("recover", r)))
 				}
 			}()
 
-			newCtx := context.Background()
-			newCtx = lang.With(newCtx, lang.From(ctx))
-			newCtx = logging.With(newCtx, logging.From(ctx))
-
 			if err := uc.RunWorkflow(newCtx, *alert); err != nil {
-				logger.Error("failed to run workflow", "error", err)
+				errs.Handle(newCtx, err)
 			}
 		}()
 	}
