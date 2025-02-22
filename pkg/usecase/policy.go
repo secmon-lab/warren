@@ -21,6 +21,8 @@ const (
 )
 
 func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Alert, note string) (*policy.Service, error) {
+	thread.Reply(ctx, "📝 Generating ignore policy...")
+
 	base, err := uc.policyService.NewClient(ctx)
 	if err != nil {
 		return nil, err
@@ -40,6 +42,9 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 	var newSvc *policy.Service
 
 	newTestData := uc.policyService.TestData()
+	if newTestData == nil {
+		newTestData = model.NewTestDataSet()
+	}
 	for _, alert := range alerts {
 		newTestData.Detect[alert.Schema][alert.ID.String()+".json"] = alert.Data
 	}

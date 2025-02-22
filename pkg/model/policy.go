@@ -26,6 +26,13 @@ type TestDataSet struct {
 	Ignore TestData `json:"ignore"`
 }
 
+func NewTestDataSet() *TestDataSet {
+	return &TestDataSet{
+		Detect: make(TestData),
+		Ignore: make(TestData),
+	}
+}
+
 type TestData map[string]map[string]any
 
 func (x TestData) LogValue() slog.Value {
