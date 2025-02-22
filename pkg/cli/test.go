@@ -30,18 +30,22 @@ func cmdTest() *cli.Command {
 		Usage:   "Run test",
 		Flags:   flags,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
+			logger := logging.From(ctx)
+			logger.Info("Starting test", "testDataCfg", testDataCfg, "policyCfg", policyCfg)
+
 			policyClient, err := policyCfg.Configure()
 			if err != nil {
 				return err
+			}
+			if len(policyClient.Sources()) == 0 {
+				return goerr.New("no policy sources")
 			}
 
 			testDataSet, err := testDataCfg.Configure()
 			if err != nil {
 				return err
 			}
-
-			logger := logging.From(ctx)
-			logger.Info("Starting test", "testDataSet", testDataSet)
+			logger.Info("Test data", "detect", testDataSet.Detect, "ignore", testDataSet.Ignore)
 
 			var runtimeErrors []error
 			errs := policy.Test(ctx, policyClient, testDataSet)

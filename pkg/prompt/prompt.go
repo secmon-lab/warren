@@ -209,21 +209,12 @@ func BuildIgnorePolicyPrompt(ctx context.Context, policy model.PolicyData, alert
 		return "", goerr.Wrap(err, "failed to parse template")
 	}
 
-	schema, err := generateSchema(IgnorePolicyPromptResult{}).Stringify()
+	outputSchema, err := generateSchema(IgnorePolicyPromptResult{}).Stringify()
 	if err != nil {
 		return "", err
 	}
 
-	rawAlerts := []string{}
-	for _, alert := range alerts {
-		rawAlert, err := stringify(alert)
-		if err != nil {
-			return "", err
-		}
-		rawAlerts = append(rawAlerts, rawAlert)
-	}
-
-	rawPolicy, err := stringify(policy)
+	rawPolicy, err := stringify(policy.Data)
 	if err != nil {
 		return "", err
 	}
@@ -231,8 +222,8 @@ func BuildIgnorePolicyPrompt(ctx context.Context, policy model.PolicyData, alert
 	input := map[string]any{
 		"note":   note,
 		"policy": rawPolicy,
-		"alerts": rawAlerts,
-		"schema": schema,
+		"alerts": alerts,
+		"output": outputSchema,
 		"lang":   lang.From(ctx).Name(),
 	}
 

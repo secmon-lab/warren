@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
 )
 
@@ -21,6 +22,7 @@ const (
 )
 
 func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Alert, note string) (*policy.Service, error) {
+	logger := logging.From(ctx)
 	thread.Reply(ctx, "📝 Generating ignore policy...")
 
 	base, err := uc.policyService.NewClient(ctx)
@@ -41,12 +43,12 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 	ssn := uc.geminiStartChat()
 	var newSvc *policy.Service
 
-	newTestData := uc.policyService.TestData()
+	newTestData := uc.policyService.TestDataSet()
 	if newTestData == nil {
 		newTestData = model.NewTestDataSet()
 	}
 	for _, alert := range alerts {
-		newTestData.Detect[alert.Schema][alert.ID.String()+".json"] = alert.Data
+		newTestData.Ignore.Add(alert.Schema, alert.ID.String()+".json", alert.Data)
 	}
 
 	for i := 0; i < maxRetryCountForIgnorePolicy && newSvc == nil; i++ {
@@ -60,6 +62,7 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 
 			return nil, err
 		}
+		logger.Debug("generated policy", "policy", resp.Policy)
 
 		c, err := opaq.New(opaq.DataMap(resp.Policy))
 		if err != nil {
@@ -76,6 +79,7 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 			for _, err := range errs {
 				if goerr.HasTag(err, model.ErrTagTestFailed) {
 					replyLines = append(replyLines, "❌ FAILED: "+err.Error())
+					logger.Debug("test failed", "error", err)
 					p = "Failed to test new policy: " + err.Error()
 				} else {
 					runtimeErrs = append(runtimeErrs, err)

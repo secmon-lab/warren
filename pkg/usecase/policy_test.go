@@ -45,14 +45,18 @@ func TestGenerateIgnorePolicy(t *testing.T) {
 
 	repo := repository.NewMemory()
 	policyService := policy.New(repo, policyClient, &model.TestDataSet{
-		Detect: model.TestData{
-			"guardduty": map[string]any{
-				"alert/detect.json": loadJson(t, ignoreTestData, "testdata/ignore/alert/detect.json"),
+		Detect: &model.TestData{
+			Data: map[string]map[string]any{
+				"guardduty": {
+					"alert/detect.json": loadJson(t, ignoreTestData, "testdata/ignore/alert/detect.json"),
+				},
 			},
 		},
-		Ignore: model.TestData{
-			"guardduty": map[string]any{
-				"alert/ignore.json": loadJson(t, ignoreTestData, "testdata/ignore/alert/ignore.json"),
+		Ignore: &model.TestData{
+			Data: map[string]map[string]any{
+				"guardduty": {
+					"alert/ignore.json": loadJson(t, ignoreTestData, "testdata/ignore/alert/ignore.json"),
+				},
 			},
 		},
 	})
@@ -78,5 +82,4 @@ func TestGenerateIgnorePolicy(t *testing.T) {
 	policy, err := uc.GenerateIgnorePolicy(ctx, alerts, "")
 	gt.NoError(t, err)
 	gt.NotNil(t, policy)
-
 }

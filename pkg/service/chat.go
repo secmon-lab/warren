@@ -25,7 +25,6 @@ func AskChat[T any](ctx context.Context, ssn interfaces.GenAIChatSession, prompt
 		return nil, goerr.New("no text data from LLM", goerr.T(model.ErrTagInvalidLLMResponse))
 	}
 
-	println("Text:", text)
 	var result T
 	if err := json.Unmarshal([]byte(text), &result); err != nil {
 		return nil, goerr.Wrap(err, "failed to unmarshal text", goerr.V("text", text), goerr.T(model.ErrTagInvalidLLMResponse))

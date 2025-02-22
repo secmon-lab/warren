@@ -4,13 +4,13 @@ Please update the given Rego policy to ignore the data of the provided alerts.
 
 ## Policy
 
-- The `schema` field of the alert indicates which package is evaluated. For example, if the `schema` field is `aws.guardduty`, the Rego policy of `package alert.aws.guardduty` will be evaluated.
+- The `schema` field of the alert indicates which package is evaluated. For example, if the `schema` field is `guardduty`, the Rego policy of `package alert.guardduty` will be evaluated.
 - The `data` field of the alert is stored in `input`.
 
 A Rego policy detects an alert when an object is stored in the set named `alert`. Here is a specific example:
 
 ```rego
-package alert.aws.guardduty
+package alert.guardduty
 
 alert contains {} # Detected as an alert
 ```
@@ -18,7 +18,7 @@ alert contains {} # Detected as an alert
 Conversely, if nothing is stored in the set named `alert`, no alert is detected. In the example below, `ignore` becomes true when `input.Findings.Severity < 7`, and no alert is detected.
 
 ```rego
-package alert.aws.guardduty
+package alert.guardduty
 
 alert contains {} if { not ignore } # Alert is detected if ignore is false
 
@@ -28,6 +28,18 @@ ignore if {
 ```
 
 The `input` contains the structured data from the `data` field of the `alert`. Use this data to set appropriate ignore conditions.
+
+Example of the `input` variable in above policy:
+
+```json
+{
+    "Findings": {
+        "Severity": 5
+    }
+}
+```
+
+The `input` field is stored in the `data` field of the `alert`.
 
 ## Restrictions
 
@@ -69,7 +81,7 @@ The alerts that should be ignored are as follows.
 The updated policy should be output according to the following schema. The schema is represented in JSON schema. Even if you do not update the existing policy, please store the data under the same key.
 
 ```json
-{{ .schema }}
+{{ .output }}
 ```
 
 Example of the correct output:
@@ -77,8 +89,8 @@ Example of the correct output:
 ```json
 {
     "policy": {
-        "some_dir/some_file.rego": "package alert.aws.guardduty\n\nalert contains {}\n\nignore if { input.SeverityScore < 7 }",
-        "some_dir/some_other_file.rego": "package alert.aws.guardduty\n\nignore if { input.Name == \"example-alert\" }"
+        "some_dir/some_file.rego": "package alert.guardduty\n\nalert contains {}\n\nignore if { input.SeverityScore < 7 }",
+        "some_dir/some_other_file.rego": "package alert.guardduty\n\nignore if { input.Name == \"example-alert\" }"
     }
 }
 ```

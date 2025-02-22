@@ -55,6 +55,7 @@ func New(w io.Writer, level slog.Level, format Format) *slog.Logger {
 			clog.WithReplaceAttr(filter),
 			// clog.WithSource(true),
 			// clog.WithTimeFmt("2006-01-02 15:04:05"),
+			clog.WithAttrHook(clog.GoerrHook),
 			clog.WithColorMap(&clog.ColorMap{
 				Level: map[slog.Level]*color.Color{
 					slog.LevelDebug: color.New(color.FgGreen, color.Bold),
