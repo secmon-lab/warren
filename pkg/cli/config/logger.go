@@ -15,10 +15,11 @@ import (
 )
 
 type Logger struct {
-	level  string
-	format string
-	output string
-	quiet  bool
+	level      string
+	format     string
+	output     string
+	quiet      bool
+	stacktrace bool
 }
 
 func (x *Logger) Flags() []cli.Flag {
@@ -57,6 +58,14 @@ func (x *Logger) Flags() []cli.Flag {
 			Usage:       "Quiet mode (no log output)",
 			Sources:     cli.EnvVars("WARREN_LOG_QUIET"),
 			Destination: &x.quiet,
+		},
+		&cli.BoolFlag{
+			Name:        "log-stacktrace",
+			Category:    "logging",
+			Aliases:     []string{"s"},
+			Usage:       "Show stacktrace (only for console format)",
+			Sources:     cli.EnvVars("WARREN_LOG_STACKTRACE"),
+			Destination: &x.stacktrace,
 		},
 	}
 }
@@ -126,7 +135,7 @@ func (x *Logger) Configure() (func(), error) {
 		}
 	}
 
-	logger := logging.New(output, level, format)
+	logger := logging.New(output, level, format, x.stacktrace)
 	logging.SetDefault(logger)
 
 	return closer, nil

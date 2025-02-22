@@ -13,7 +13,7 @@ import (
 func TestLogger(t *testing.T) {
 	t.Run("default logger", func(t *testing.T) {
 		var buf bytes.Buffer
-		logger := logging.New(&buf, slog.LevelInfo, logging.FormatJSON)
+		logger := logging.New(&buf, slog.LevelInfo, logging.FormatJSON, false)
 		logging.SetDefault(logger)
 		logger.Info("hello",
 			slog.String("secret_key", "xxx"),
