@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"sort"
 	"time"
 
@@ -19,36 +21,52 @@ import (
 
 func Test(ctx context.Context, policy interfaces.PolicyClient, testDataSet *model.TestDataSet) []error {
 	var errs []error
-	for schema, dataSets := range testDataSet.Detect {
-		for filename, data := range dataSets {
-			var resp model.PolicyResult
-			if err := policy.Query(ctx, "data.alert."+schema, data, &resp); err != nil {
-				if errors.Is(err, opaq.ErrNoEvalResult) {
-					errs = append(errs, goerr.Wrap(err, "should be detected, but not detected", goerr.V("schema", schema), goerr.V("data", data), goerr.V("filename", filename), goerr.T(model.ErrTagTestFailed)))
-				} else {
-					errs = append(errs, goerr.Wrap(err, "failed to query policy", goerr.V("schema", schema), goerr.V("data", data), goerr.V("filename", filename)))
-				}
-			}
-		}
-	}
 
-	for schema, dataSets := range testDataSet.Ignore {
-		for filename, data := range dataSets {
+	errs = append(errs, runTest(ctx, policy, testDataSet.Detect.Data, true)...)
+	errs = append(errs, runTest(ctx, policy, testDataSet.Ignore.Data, false)...)
+
+	return errs
+}
+
+func runTest(ctx context.Context, policy interfaces.PolicyClient, dataSets map[string]map[string]any, shouldDetect bool) []error {
+	var errs []error
+	for schema, dataSet := range dataSets {
+		for filename, testData := range dataSet {
 			var resp model.PolicyResult
-			if err := policy.Query(ctx, "data.alert."+schema, data, &resp); err != nil {
+			if err := policy.Query(ctx, "data.alert."+schema, testData, &resp); err != nil {
 				if errors.Is(err, opaq.ErrNoEvalResult) {
+					if shouldDetect {
+						errs = append(errs, goerr.Wrap(err, "should be detected, but not detected",
+							goerr.V("schema", schema),
+							goerr.V("filename", filename),
+							goerr.T(model.ErrTagTestFailed)))
+					}
+					continue
+				}
+				if len(resp.Alert) == 0 && shouldDetect {
+					errs = append(errs, goerr.Wrap(err, "should be detected, but not detected",
+						goerr.V("schema", schema),
+						goerr.V("filename", filename),
+						goerr.T(model.ErrTagTestFailed)))
 					continue
 				}
 
-				errs = append(errs, goerr.Wrap(err, "failed to query policy", goerr.V("schema", schema), goerr.V("data", data), goerr.V("filename", filename)))
+				if len(resp.Alert) > 0 && !shouldDetect {
+					errs = append(errs, goerr.Wrap(err, "should be ignored, but detected",
+						goerr.V("schema", schema),
+						goerr.V("filename", filename),
+						goerr.T(model.ErrTagTestFailed)))
+				}
 			}
 
-			if len(resp.Alert) > 0 {
-				errs = append(errs, goerr.New("should be ignored, but detected", goerr.V("schema", schema), goerr.V("data", data), goerr.V("filename", filename), goerr.T(model.ErrTagTestFailed)))
+			if !shouldDetect && len(resp.Alert) > 0 {
+				errs = append(errs, goerr.New("should be ignored, but detected",
+					goerr.V("schema", schema),
+					goerr.V("filename", filename),
+					goerr.T(model.ErrTagTestFailed)))
 			}
 		}
 	}
-
 	return errs
 }
 
@@ -91,24 +109,10 @@ func (s *Service) Sources() map[string]string {
 	return s.policyClient.Sources()
 }
 
-func (s *Service) TestData() *model.TestDataSet {
+func (s *Service) TestDataSet() *model.TestDataSet {
 	newTestData := &model.TestDataSet{
-		Detect: make(model.TestData),
-		Ignore: make(model.TestData),
-	}
-
-	for schema, dataSets := range s.testData.Detect {
-		newTestData.Detect[schema] = make(map[string]any)
-		for filename, data := range dataSets {
-			newTestData.Detect[schema][filename] = data
-		}
-	}
-
-	for schema, dataSets := range s.testData.Ignore {
-		newTestData.Ignore[schema] = make(map[string]any)
-		for filename, data := range dataSets {
-			newTestData.Ignore[schema][filename] = data
-		}
+		Detect: s.testData.Detect.Clone(),
+		Ignore: s.testData.Ignore.Clone(),
 	}
 
 	return newTestData
@@ -196,6 +200,58 @@ func (s *Service) UpdatePolicy(ctx context.Context, data map[string]string) erro
 
 	if err := s.repo.SavePolicy(ctx, policyData); err != nil {
 		return goerr.Wrap(err, "failed to save policy", goerr.V("hash", s.baseHash), goerr.V("data", data))
+	}
+
+	return nil
+}
+
+func (s *Service) Save(ctx context.Context, rootDir string) error {
+	logger := logging.From(ctx)
+	sources := s.policyClient.Sources()
+
+	for filename, source := range sources {
+		path := filepath.Join(rootDir, filename)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			return goerr.Wrap(err, "failed to create directory", goerr.V("path", path))
+		}
+
+		if err := os.WriteFile(path, []byte(source), 0644); err != nil {
+			return goerr.Wrap(err, "failed to save policy", goerr.V("filename", filename))
+		}
+
+		logger.Debug("saved policy", "file", path)
+	}
+
+	testDataSet := s.TestDataSet()
+	saveTestData := func(d *model.TestData) error {
+		for schema, dataSets := range d.Data {
+			for filename, testData := range dataSets {
+				jsonData, err := json.MarshalIndent(testData, "", "  ")
+				if err != nil {
+					return goerr.Wrap(err, "failed to marshal test data", goerr.V("schema", schema), goerr.V("filename", filename))
+				}
+
+				path := filepath.Join(rootDir, d.BasePath, schema, filename)
+				if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+					return goerr.Wrap(err, "failed to create directory", goerr.V("path", path))
+				}
+
+				if err := os.WriteFile(path, jsonData, 0644); err != nil {
+					return goerr.Wrap(err, "failed to save test data", goerr.V("schema", schema), goerr.V("filename", filename))
+				}
+
+				logger.Debug("saved test data", "file", path)
+			}
+		}
+		return nil
+	}
+
+	if err := saveTestData(testDataSet.Detect); err != nil {
+		return err
+	}
+
+	if err := saveTestData(testDataSet.Ignore); err != nil {
+		return err
 	}
 
 	return nil

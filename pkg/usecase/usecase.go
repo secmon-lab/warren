@@ -25,10 +25,6 @@ type UseCases struct {
 	timeSpan     time.Duration
 	actionLimit  int
 	findingLimit int
-
-	// test data
-	detectData model.TestData
-	ignoreData model.TestData
 }
 
 var _ interfaces.UseCase = &UseCases{}
@@ -78,13 +74,6 @@ func WithFindingLimit(findingLimit int) Option {
 	}
 }
 
-func WithTestData(detectData model.TestData, ignoreData model.TestData) Option {
-	return func(u *UseCases) {
-		u.detectData = detectData
-		u.ignoreData = ignoreData
-	}
-}
-
 func New(geminiStartChat interfaces.GetGeminiStartChat, opts ...Option) *UseCases {
 	policyClient, err := opaq.New(opaq.Data("policy", "package alert.dummy"))
 	if err != nil {
@@ -112,9 +101,6 @@ func New(geminiStartChat interfaces.GetGeminiStartChat, opts ...Option) *UseCase
 		timeSpan:     24 * time.Hour,
 		actionLimit:  10,
 		findingLimit: 3,
-
-		detectData: make(model.TestData),
-		ignoreData: make(model.TestData),
 	}
 
 	for _, opt := range opts {

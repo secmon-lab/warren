@@ -52,11 +52,14 @@ func (x TestData) LogValue() slog.Value {
 	)
 }
 
-func loadTestFiles(basePath string) (model.TestData, error) {
-	result := make(model.TestData)
+func loadTestFiles(basePath string) (*model.TestData, error) {
+	result := model.NewTestData()
+
 	if basePath == "" {
 		return result, nil
 	}
+
+	result.BasePath = basePath
 
 	err := filepath.WalkDir(basePath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -67,7 +70,7 @@ func loadTestFiles(basePath string) (model.TestData, error) {
 			return nil
 		}
 
-		if !strings.HasSuffix(d.Name(), ".json") {
+		if filepath.Ext(d.Name()) != ".json" {
 			return nil
 		}
 
@@ -101,12 +104,12 @@ func loadTestFiles(basePath string) (model.TestData, error) {
 		}
 
 		// Initialize map for first directory if not exists
-		if _, ok := result[firstDir]; !ok {
-			result[firstDir] = make(map[string]any)
+		if _, ok := result.Data[firstDir]; !ok {
+			result.Data[firstDir] = make(map[string]any)
 		}
 
 		// Store value with remaining path as key
-		result[firstDir][remainPath] = v
+		result.Data[firstDir][remainPath] = v
 		return nil
 	})
 	if err != nil {

@@ -3,7 +3,6 @@ package prompt_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/model"
@@ -45,12 +44,11 @@ alert contains {} # Detected as an alert`,
 	}
 	alerts := []model.Alert{
 		{
-			ID:        "123",
-			Schema:    "aws.guardduty",
-			Data:      map[string]any{"Findings": map[string]any{"Severity": 7}},
-			CreatedAt: time.Now(),
+			Schema: "aws.guardduty",
+			Data:   map[string]any{"Findings": map[string]any{"Severity": 7}},
 		},
 	}
+
 	policyData := model.PolicyData{
 		Data: policy,
 	}

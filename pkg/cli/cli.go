@@ -51,6 +51,7 @@ func Run(ctx context.Context, args []string) error {
 			cmdServe(),
 			cmdRun(),
 			cmdTest(),
+			cmdPolicy(),
 		},
 	}
 
