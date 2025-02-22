@@ -71,7 +71,7 @@ func loadTestFiles(basePath string) (model.TestData, error) {
 			return nil
 		}
 
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(filepath.Clean(path))
 		if err != nil {
 			return goerr.Wrap(err, "failed to read file", goerr.V("path", path))
 		}
