@@ -1,4 +1,4 @@
-FROM golang:1.23 AS build-go
+FROM golang:1.24 AS build-go
 ENV CGO_ENABLED=0
 ARG BUILD_VERSION
 
