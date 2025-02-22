@@ -35,7 +35,7 @@ func (x *throttleSession) SendMessage(ctx context.Context, msg ...genai.Part) (*
 
 func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 	logger := logging.From(ctx)
-	thread := uc.slackService.NewThread(alert)
+	thread := uc.slackService.NewThread(*alert.SlackThread)
 	thread.Reply(ctx, "Starting investigation...")
 
 	ssn := &throttleSession{

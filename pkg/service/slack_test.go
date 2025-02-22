@@ -160,7 +160,7 @@ func TestAttachFile(t *testing.T) {
 		ThreadID:  thread.ThreadID(),
 	}
 
-	newThread := svc.NewThread(alert)
+	newThread := svc.NewThread(*alert.SlackThread)
 	gt.NoError(t, newThread.AttachFile(context.Background(), "test", "test.txt", []byte("test")))
 }
 

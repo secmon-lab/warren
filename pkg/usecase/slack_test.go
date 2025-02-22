@@ -75,7 +75,7 @@ func TestHandleSlackInteraction(t *testing.T) {
 			testCase.interaction.ActionCallback.BlockActions[0].Value = alert.ID.String()
 
 			slackMock := &mock.SlackServiceMock{
-				NewThreadFunc: func(alert model.Alert) interfaces.SlackThreadService {
+				NewThreadFunc: func(thread model.SlackThread) interfaces.SlackThreadService {
 					return &mock.SlackThreadServiceMock{
 						ReplyFunc: func(ctx context.Context, message string) {
 							// do nothing
@@ -100,6 +100,73 @@ func TestHandleSlackInteraction(t *testing.T) {
 				alert, err := repo.GetAlert(ctx, alert.ID)
 				gt.NoError(t, err).Must()
 				testCase.checkAlert(t, *alert)
+			}
+		})
+	}
+}
+
+func TestParseArgs(t *testing.T) {
+	testCases := map[string]struct {
+		input    string
+		expected []string
+	}{
+		"simple": {
+			input:    "hello world",
+			expected: []string{"hello", "world"},
+		},
+		"with quotes": {
+			input:    `hello "world with spaces"`,
+			expected: []string{"hello", "world with spaces"},
+		},
+		"with single quotes": {
+			input:    `hello 'world with spaces'`,
+			expected: []string{"hello", "world with spaces"},
+		},
+		"with escaped quotes": {
+			input:    `hello \"world\" test`,
+			expected: []string{"hello", `"world"`, "test"},
+		},
+		"with Japanese quotes": {
+			input:    `hello "world" test`,
+			expected: []string{"hello", "world", "test"},
+		},
+		"with multiple spaces": {
+			input:    "hello   world",
+			expected: []string{"hello", "world"},
+		},
+		"empty": {
+			input:    "",
+			expected: nil,
+		},
+		"with backslash": {
+			input:    `hello\\world`,
+			expected: []string{"hello\\world"},
+		},
+		"mixed quotes": {
+			input:    `"hello" 'world' "test"`,
+			expected: []string{"hello", "world", "test"},
+		},
+		"with backticks": {
+			input:    "hello \\`world\\` test",
+			expected: []string{"hello", "`world`", "test"},
+		},
+		"with utf-8 quotes": {
+			input:    `ok “this is” “hello world”`,
+			expected: []string{"ok", "this is", "hello world"},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			result := usecase.ParseArgs(tc.input)
+			if len(result) != len(tc.expected) {
+				t.Errorf("expected %d args, got %d", len(tc.expected), len(result))
+				return
+			}
+			for i := range result {
+				if result[i] != tc.expected[i] {
+					t.Errorf("arg %d: expected %q, got %q", i, tc.expected[i], result[i])
+				}
 			}
 		})
 	}

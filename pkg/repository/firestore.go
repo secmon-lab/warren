@@ -77,7 +77,7 @@ func (r *Firestore) GetAlertBySlackThread(ctx context.Context, thread model.Slac
 	doc, err := iter.Next()
 	if err != nil {
 		if err == iterator.Done {
-			return nil, goerr.New("alert not found", goerr.V("slack_channel", thread.ChannelID), goerr.V("slack_message_id", thread.ThreadID))
+			return nil, nil
 		}
 		return nil, goerr.Wrap(err, "failed to get alert by slack thread", goerr.V("slack_thread", thread))
 	}
