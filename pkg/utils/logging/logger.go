@@ -10,6 +10,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/m-mizutani/clog"
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/masq"
 )
 
@@ -37,7 +38,24 @@ func Quiet() {
 	loggerMutex.Unlock()
 }
 
-func New(w io.Writer, level slog.Level, format Format) *slog.Logger {
+func goerrNoStacktrace(_ []string, attr slog.Attr) *clog.HandleAttr {
+	if goErr, ok := attr.Value.Any().(*goerr.Error); ok {
+		var attrs []any
+		for k, v := range goErr.Values() {
+			attrs = append(attrs, slog.Any(k, v))
+		}
+		attrs = append(attrs, slog.Any("cause", goErr.Error()))
+		newAttr := slog.Group(attr.Key, attrs...)
+
+		return &clog.HandleAttr{
+			NewAttr: &newAttr,
+		}
+	}
+
+	return nil
+}
+
+func New(w io.Writer, level slog.Level, format Format, stacktrace bool) *slog.Logger {
 	filter := masq.New(
 		masq.WithTag("secret"),
 		masq.WithTag("quiet"),
@@ -45,6 +63,11 @@ func New(w io.Writer, level slog.Level, format Format) *slog.Logger {
 		masq.WithFieldName("Authorization"),
 		masq.WithAllowedType(reflect.TypeOf(time.Time{})),
 	)
+
+	attrHook := clog.GoerrHook
+	if !stacktrace {
+		attrHook = goerrNoStacktrace
+	}
 
 	var handler slog.Handler
 	switch format {
@@ -55,7 +78,7 @@ func New(w io.Writer, level slog.Level, format Format) *slog.Logger {
 			clog.WithReplaceAttr(filter),
 			// clog.WithSource(true),
 			// clog.WithTimeFmt("2006-01-02 15:04:05"),
-			clog.WithAttrHook(clog.GoerrHook),
+			clog.WithAttrHook(attrHook),
 			clog.WithColorMap(&clog.ColorMap{
 				Level: map[slog.Level]*color.Color{
 					slog.LevelDebug: color.New(color.FgGreen, color.Bold),

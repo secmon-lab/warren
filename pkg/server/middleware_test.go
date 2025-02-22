@@ -18,7 +18,7 @@ func TestLoggingMiddleware(t *testing.T) {
 	r := chi.NewRouter()
 	r.Use(func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			logger := logging.New(&buf, slog.LevelDebug, logging.FormatJSON)
+			logger := logging.New(&buf, slog.LevelDebug, logging.FormatJSON, false)
 			h.ServeHTTP(w, r.WithContext(logging.With(r.Context(), logger)))
 		})
 	})
