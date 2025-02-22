@@ -211,11 +211,11 @@ func (s *Service) Save(ctx context.Context, rootDir string) error {
 
 	for filename, source := range sources {
 		path := filepath.Join(rootDir, filename)
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Clean(filepath.Dir(path)), 0755); err != nil {
 			return goerr.Wrap(err, "failed to create directory", goerr.V("path", path))
 		}
 
-		if err := os.WriteFile(path, []byte(source), 0644); err != nil {
+		if err := os.WriteFile(filepath.Clean(path), []byte(source), 0644); err != nil {
 			return goerr.Wrap(err, "failed to save policy", goerr.V("filename", filename))
 		}
 
@@ -232,11 +232,11 @@ func (s *Service) Save(ctx context.Context, rootDir string) error {
 				}
 
 				path := filepath.Join(rootDir, d.BasePath, schema, filename)
-				if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				if err := os.MkdirAll(filepath.Clean(filepath.Dir(path)), 0755); err != nil {
 					return goerr.Wrap(err, "failed to create directory", goerr.V("path", path))
 				}
 
-				if err := os.WriteFile(path, jsonData, 0644); err != nil {
+				if err := os.WriteFile(filepath.Clean(path), jsonData, 0644); err != nil {
 					return goerr.Wrap(err, "failed to save test data", goerr.V("schema", schema), goerr.V("filename", filename))
 				}
 

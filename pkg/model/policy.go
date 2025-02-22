@@ -71,7 +71,8 @@ func (x *TestData) Save(dir string) error {
 				return goerr.Wrap(err, "failed to marshal test data", goerr.V("schema", schema), goerr.V("filename", filename))
 			}
 
-			if err := os.WriteFile(filepath.Join(x.BasePath, dir, schema, filename), jsonData, 0644); err != nil {
+			fpath := filepath.Join(x.BasePath, dir, schema, filename)
+			if err := os.WriteFile(filepath.Clean(fpath), jsonData, 0644); err != nil {
 				return goerr.Wrap(err, "failed to save test data", goerr.V("schema", schema), goerr.V("filename", filename))
 			}
 		}
