@@ -4,25 +4,31 @@ import (
 	"context"
 	"time"
 
-	"github.com/m-mizutani/opac"
+	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service"
+	"github.com/secmon-lab/warren/pkg/service/policy"
 )
 
 type UseCases struct {
+	// services and adapters
 	slackService    interfaces.SlackService
-	policyClient    interfaces.PolicyClient
 	geminiStartChat interfaces.GetGeminiStartChat
 	repository      interfaces.Repository
 	actionService   *service.ActionService
+	policyService   *policy.Service
 
 	// configs
 	timeSpan     time.Duration
 	actionLimit  int
 	findingLimit int
+
+	// test data
+	detectData model.TestData
+	ignoreData model.TestData
 }
 
 var _ interfaces.UseCase = &UseCases{}
@@ -35,9 +41,9 @@ func WithSlackService(slackService interfaces.SlackService) Option {
 	}
 }
 
-func WithPolicyClient(policyClient interfaces.PolicyClient) Option {
+func WithPolicyService(policyService *policy.Service) Option {
 	return func(u *UseCases) {
-		u.policyClient = policyClient
+		u.policyService = policyService
 	}
 }
 
@@ -72,10 +78,15 @@ func WithFindingLimit(findingLimit int) Option {
 	}
 }
 
+func WithTestData(detectData model.TestData, ignoreData model.TestData) Option {
+	return func(u *UseCases) {
+		u.detectData = detectData
+		u.ignoreData = ignoreData
+	}
+}
+
 func New(geminiStartChat interfaces.GetGeminiStartChat, opts ...Option) *UseCases {
-	policyClient, err := opac.New(opac.Data(map[string]string{
-		"policy": "package alert.dummy",
-	}))
+	policyClient, err := opaq.New(opaq.Data("policy", "package alert.dummy"))
 	if err != nil {
 		panic(err)
 	}
@@ -94,13 +105,16 @@ func New(geminiStartChat interfaces.GetGeminiStartChat, opts ...Option) *UseCase
 				}, nil
 			},
 		},
-		policyClient:  policyClient,
+		policyService: policy.New(repository.NewMemory(), policyClient, &model.TestDataSet{}),
 		repository:    repository.NewMemory(),
 		actionService: service.NewActionService([]interfaces.Action{}),
 
 		timeSpan:     24 * time.Hour,
 		actionLimit:  10,
 		findingLimit: 3,
+
+		detectData: make(model.TestData),
+		ignoreData: make(model.TestData),
 	}
 
 	for _, opt := range opts {

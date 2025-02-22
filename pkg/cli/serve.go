@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/server"
 	"github.com/secmon-lab/warren/pkg/service"
+	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -26,6 +27,7 @@ func cmdServe() *cli.Command {
 		slackCfg     config.Slack
 		geminiCfg    config.GeminiCfg
 		firestoreCfg config.Firestore
+		testDataCfg  config.TestData
 	)
 
 	flags := joinFlags(
@@ -44,6 +46,7 @@ func cmdServe() *cli.Command {
 		slackCfg.Flags(),
 		geminiCfg.Flags(),
 		firestoreCfg.Flags(),
+		testDataCfg.Flags(),
 		actions.Flags(),
 	)
 
@@ -60,6 +63,7 @@ func cmdServe() *cli.Command {
 				"slack", slackCfg,
 				"gemini", geminiCfg,
 				"firestore", firestoreCfg,
+				"testdata", testDataCfg,
 			)
 
 			policyClient, err := policyCfg.Configure()
@@ -86,6 +90,11 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
+			testDataSet, err := testDataCfg.Configure()
+			if err != nil {
+				return err
+			}
+
 			enabledActions, err := actions.Configure(ctx)
 			if err != nil {
 				return err
@@ -93,11 +102,13 @@ func cmdServe() *cli.Command {
 			logging.Default().Info("enabled actions", "actions", actions)
 			actionSvc := service.NewActionService(enabledActions)
 
+			policyService := policy.New(firestore, policyClient, testDataSet)
+
 			uc := usecase.New(
 				func() interfaces.GenAIChatSession {
 					return geminiModel.StartChat()
 				},
-				usecase.WithPolicyClient(policyClient),
+				usecase.WithPolicyService(policyService),
 				usecase.WithSlackService(slackSvc),
 				usecase.WithRepository(firestore),
 				usecase.WithActionService(actionSvc),

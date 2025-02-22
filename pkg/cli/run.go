@@ -8,7 +8,10 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/interfaces"
+	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service"
+	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -88,12 +91,12 @@ func cmdRun() *cli.Command {
 				func() interfaces.GenAIChatSession {
 					return geminiModel.StartChat()
 				},
-				usecase.WithPolicyClient(policyClient),
+				usecase.WithPolicyService(policy.New(repository.NewMemory(), policyClient, &model.TestDataSet{})),
 				usecase.WithSlackService(service.NewConsole(os.Stdout)),
 				usecase.WithActionService(actionSvc),
 			)
 
-			alerts, err := uc.HandleAlert(ctx, alertSchema, alertData)
+			alerts, err := uc.HandleAlert(ctx, alertSchema, alertData, policyClient)
 			if err != nil {
 				return err
 			}

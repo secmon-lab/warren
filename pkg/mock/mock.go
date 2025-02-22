@@ -6,7 +6,7 @@ package mock
 import (
 	"cloud.google.com/go/vertexai/genai"
 	"context"
-	"github.com/m-mizutani/opac"
+	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
@@ -674,8 +674,11 @@ var _ interfaces.PolicyClient = &PolicyClientMock{}
 //
 //		// make and configure a mocked interfaces.PolicyClient
 //		mockedPolicyClient := &PolicyClientMock{
-//			QueryFunc: func(contextMoqParam context.Context, s string, v1 any, v2 any, queryOptions ...opac.QueryOption) error {
+//			QueryFunc: func(contextMoqParam context.Context, s string, v1 any, v2 any, queryOptions ...opaq.QueryOption) error {
 //				panic("mock out the Query method")
+//			},
+//			SourcesFunc: func() map[string]string {
+//				panic("mock out the Sources method")
 //			},
 //		}
 //
@@ -685,7 +688,10 @@ var _ interfaces.PolicyClient = &PolicyClientMock{}
 //	}
 type PolicyClientMock struct {
 	// QueryFunc mocks the Query method.
-	QueryFunc func(contextMoqParam context.Context, s string, v1 any, v2 any, queryOptions ...opac.QueryOption) error
+	QueryFunc func(contextMoqParam context.Context, s string, v1 any, v2 any, queryOptions ...opaq.QueryOption) error
+
+	// SourcesFunc mocks the Sources method.
+	SourcesFunc func() map[string]string
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -700,14 +706,18 @@ type PolicyClientMock struct {
 			// V2 is the v2 argument value.
 			V2 any
 			// QueryOptions is the queryOptions argument value.
-			QueryOptions []opac.QueryOption
+			QueryOptions []opaq.QueryOption
+		}
+		// Sources holds details about calls to the Sources method.
+		Sources []struct {
 		}
 	}
-	lockQuery sync.RWMutex
+	lockQuery   sync.RWMutex
+	lockSources sync.RWMutex
 }
 
 // Query calls QueryFunc.
-func (mock *PolicyClientMock) Query(contextMoqParam context.Context, s string, v1 any, v2 any, queryOptions ...opac.QueryOption) error {
+func (mock *PolicyClientMock) Query(contextMoqParam context.Context, s string, v1 any, v2 any, queryOptions ...opaq.QueryOption) error {
 	if mock.QueryFunc == nil {
 		panic("PolicyClientMock.QueryFunc: method is nil but PolicyClient.Query was just called")
 	}
@@ -716,7 +726,7 @@ func (mock *PolicyClientMock) Query(contextMoqParam context.Context, s string, v
 		S               string
 		V1              any
 		V2              any
-		QueryOptions    []opac.QueryOption
+		QueryOptions    []opaq.QueryOption
 	}{
 		ContextMoqParam: contextMoqParam,
 		S:               s,
@@ -739,18 +749,45 @@ func (mock *PolicyClientMock) QueryCalls() []struct {
 	S               string
 	V1              any
 	V2              any
-	QueryOptions    []opac.QueryOption
+	QueryOptions    []opaq.QueryOption
 } {
 	var calls []struct {
 		ContextMoqParam context.Context
 		S               string
 		V1              any
 		V2              any
-		QueryOptions    []opac.QueryOption
+		QueryOptions    []opaq.QueryOption
 	}
 	mock.lockQuery.RLock()
 	calls = mock.calls.Query
 	mock.lockQuery.RUnlock()
+	return calls
+}
+
+// Sources calls SourcesFunc.
+func (mock *PolicyClientMock) Sources() map[string]string {
+	if mock.SourcesFunc == nil {
+		panic("PolicyClientMock.SourcesFunc: method is nil but PolicyClient.Sources was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockSources.Lock()
+	mock.calls.Sources = append(mock.calls.Sources, callInfo)
+	mock.lockSources.Unlock()
+	return mock.SourcesFunc()
+}
+
+// SourcesCalls gets all the calls that were made to Sources.
+// Check the length with:
+//
+//	len(mockedPolicyClient.SourcesCalls())
+func (mock *PolicyClientMock) SourcesCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockSources.RLock()
+	calls = mock.calls.Sources
+	mock.lockSources.RUnlock()
 	return calls
 }
 
@@ -776,11 +813,17 @@ var _ interfaces.Repository = &RepositoryMock{}
 //			GetAlertCommentsFunc: func(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error) {
 //				panic("mock out the GetAlertComments method")
 //			},
+//			GetPolicyFunc: func(ctx context.Context, hash string) (*model.PolicyData, error) {
+//				panic("mock out the GetPolicy method")
+//			},
 //			InsertAlertCommentFunc: func(ctx context.Context, comment model.AlertComment) error {
 //				panic("mock out the InsertAlertComment method")
 //			},
 //			PutAlertFunc: func(ctx context.Context, alert model.Alert) error {
 //				panic("mock out the PutAlert method")
+//			},
+//			SavePolicyFunc: func(ctx context.Context, policy *model.PolicyData) error {
+//				panic("mock out the SavePolicy method")
 //			},
 //		}
 //
@@ -801,11 +844,17 @@ type RepositoryMock struct {
 	// GetAlertCommentsFunc mocks the GetAlertComments method.
 	GetAlertCommentsFunc func(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error)
 
+	// GetPolicyFunc mocks the GetPolicy method.
+	GetPolicyFunc func(ctx context.Context, hash string) (*model.PolicyData, error)
+
 	// InsertAlertCommentFunc mocks the InsertAlertComment method.
 	InsertAlertCommentFunc func(ctx context.Context, comment model.AlertComment) error
 
 	// PutAlertFunc mocks the PutAlert method.
 	PutAlertFunc func(ctx context.Context, alert model.Alert) error
+
+	// SavePolicyFunc mocks the SavePolicy method.
+	SavePolicyFunc func(ctx context.Context, policy *model.PolicyData) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -839,6 +888,13 @@ type RepositoryMock struct {
 			// AlertID is the alertID argument value.
 			AlertID model.AlertID
 		}
+		// GetPolicy holds details about calls to the GetPolicy method.
+		GetPolicy []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Hash is the hash argument value.
+			Hash string
+		}
 		// InsertAlertComment holds details about calls to the InsertAlertComment method.
 		InsertAlertComment []struct {
 			// Ctx is the ctx argument value.
@@ -853,13 +909,22 @@ type RepositoryMock struct {
 			// Alert is the alert argument value.
 			Alert model.Alert
 		}
+		// SavePolicy holds details about calls to the SavePolicy method.
+		SavePolicy []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Policy is the policy argument value.
+			Policy *model.PolicyData
+		}
 	}
 	lockFetchLatestAlerts     sync.RWMutex
 	lockGetAlert              sync.RWMutex
 	lockGetAlertBySlackThread sync.RWMutex
 	lockGetAlertComments      sync.RWMutex
+	lockGetPolicy             sync.RWMutex
 	lockInsertAlertComment    sync.RWMutex
 	lockPutAlert              sync.RWMutex
+	lockSavePolicy            sync.RWMutex
 }
 
 // FetchLatestAlerts calls FetchLatestAlertsFunc.
@@ -1010,6 +1075,42 @@ func (mock *RepositoryMock) GetAlertCommentsCalls() []struct {
 	return calls
 }
 
+// GetPolicy calls GetPolicyFunc.
+func (mock *RepositoryMock) GetPolicy(ctx context.Context, hash string) (*model.PolicyData, error) {
+	if mock.GetPolicyFunc == nil {
+		panic("RepositoryMock.GetPolicyFunc: method is nil but Repository.GetPolicy was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Hash string
+	}{
+		Ctx:  ctx,
+		Hash: hash,
+	}
+	mock.lockGetPolicy.Lock()
+	mock.calls.GetPolicy = append(mock.calls.GetPolicy, callInfo)
+	mock.lockGetPolicy.Unlock()
+	return mock.GetPolicyFunc(ctx, hash)
+}
+
+// GetPolicyCalls gets all the calls that were made to GetPolicy.
+// Check the length with:
+//
+//	len(mockedRepository.GetPolicyCalls())
+func (mock *RepositoryMock) GetPolicyCalls() []struct {
+	Ctx  context.Context
+	Hash string
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Hash string
+	}
+	mock.lockGetPolicy.RLock()
+	calls = mock.calls.GetPolicy
+	mock.lockGetPolicy.RUnlock()
+	return calls
+}
+
 // InsertAlertComment calls InsertAlertCommentFunc.
 func (mock *RepositoryMock) InsertAlertComment(ctx context.Context, comment model.AlertComment) error {
 	if mock.InsertAlertCommentFunc == nil {
@@ -1079,6 +1180,42 @@ func (mock *RepositoryMock) PutAlertCalls() []struct {
 	mock.lockPutAlert.RLock()
 	calls = mock.calls.PutAlert
 	mock.lockPutAlert.RUnlock()
+	return calls
+}
+
+// SavePolicy calls SavePolicyFunc.
+func (mock *RepositoryMock) SavePolicy(ctx context.Context, policy *model.PolicyData) error {
+	if mock.SavePolicyFunc == nil {
+		panic("RepositoryMock.SavePolicyFunc: method is nil but Repository.SavePolicy was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		Policy *model.PolicyData
+	}{
+		Ctx:    ctx,
+		Policy: policy,
+	}
+	mock.lockSavePolicy.Lock()
+	mock.calls.SavePolicy = append(mock.calls.SavePolicy, callInfo)
+	mock.lockSavePolicy.Unlock()
+	return mock.SavePolicyFunc(ctx, policy)
+}
+
+// SavePolicyCalls gets all the calls that were made to SavePolicy.
+// Check the length with:
+//
+//	len(mockedRepository.SavePolicyCalls())
+func (mock *RepositoryMock) SavePolicyCalls() []struct {
+	Ctx    context.Context
+	Policy *model.PolicyData
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Policy *model.PolicyData
+	}
+	mock.lockSavePolicy.RLock()
+	calls = mock.calls.SavePolicy
+	mock.lockSavePolicy.RUnlock()
 	return calls
 }
 
@@ -1331,7 +1468,7 @@ var _ interfaces.UseCase = &UseCaseMock{}
 //
 //		// make and configure a mocked interfaces.UseCase
 //		mockedUseCase := &UseCaseMock{
-//			HandleAlertFunc: func(ctx context.Context, schema string, alertData any) ([]*model.Alert, error) {
+//			HandleAlertFunc: func(ctx context.Context, schema string, alertData any, policyClient interfaces.PolicyClient) ([]*model.Alert, error) {
 //				panic("mock out the HandleAlert method")
 //			},
 //			HandleAlertWithAuthFunc: func(ctx context.Context, schema string, alertData any) ([]*model.Alert, error) {
@@ -1357,7 +1494,7 @@ var _ interfaces.UseCase = &UseCaseMock{}
 //	}
 type UseCaseMock struct {
 	// HandleAlertFunc mocks the HandleAlert method.
-	HandleAlertFunc func(ctx context.Context, schema string, alertData any) ([]*model.Alert, error)
+	HandleAlertFunc func(ctx context.Context, schema string, alertData any, policyClient interfaces.PolicyClient) ([]*model.Alert, error)
 
 	// HandleAlertWithAuthFunc mocks the HandleAlertWithAuth method.
 	HandleAlertWithAuthFunc func(ctx context.Context, schema string, alertData any) ([]*model.Alert, error)
@@ -1384,6 +1521,8 @@ type UseCaseMock struct {
 			Schema string
 			// AlertData is the alertData argument value.
 			AlertData any
+			// PolicyClient is the policyClient argument value.
+			PolicyClient interfaces.PolicyClient
 		}
 		// HandleAlertWithAuth holds details about calls to the HandleAlertWithAuth method.
 		HandleAlertWithAuth []struct {
@@ -1432,23 +1571,25 @@ type UseCaseMock struct {
 }
 
 // HandleAlert calls HandleAlertFunc.
-func (mock *UseCaseMock) HandleAlert(ctx context.Context, schema string, alertData any) ([]*model.Alert, error) {
+func (mock *UseCaseMock) HandleAlert(ctx context.Context, schema string, alertData any, policyClient interfaces.PolicyClient) ([]*model.Alert, error) {
 	if mock.HandleAlertFunc == nil {
 		panic("UseCaseMock.HandleAlertFunc: method is nil but UseCase.HandleAlert was just called")
 	}
 	callInfo := struct {
-		Ctx       context.Context
-		Schema    string
-		AlertData any
+		Ctx          context.Context
+		Schema       string
+		AlertData    any
+		PolicyClient interfaces.PolicyClient
 	}{
-		Ctx:       ctx,
-		Schema:    schema,
-		AlertData: alertData,
+		Ctx:          ctx,
+		Schema:       schema,
+		AlertData:    alertData,
+		PolicyClient: policyClient,
 	}
 	mock.lockHandleAlert.Lock()
 	mock.calls.HandleAlert = append(mock.calls.HandleAlert, callInfo)
 	mock.lockHandleAlert.Unlock()
-	return mock.HandleAlertFunc(ctx, schema, alertData)
+	return mock.HandleAlertFunc(ctx, schema, alertData, policyClient)
 }
 
 // HandleAlertCalls gets all the calls that were made to HandleAlert.
@@ -1456,14 +1597,16 @@ func (mock *UseCaseMock) HandleAlert(ctx context.Context, schema string, alertDa
 //
 //	len(mockedUseCase.HandleAlertCalls())
 func (mock *UseCaseMock) HandleAlertCalls() []struct {
-	Ctx       context.Context
-	Schema    string
-	AlertData any
+	Ctx          context.Context
+	Schema       string
+	AlertData    any
+	PolicyClient interfaces.PolicyClient
 } {
 	var calls []struct {
-		Ctx       context.Context
-		Schema    string
-		AlertData any
+		Ctx          context.Context
+		Schema       string
+		AlertData    any
+		PolicyClient interfaces.PolicyClient
 	}
 	mock.lockHandleAlert.RLock()
 	calls = mock.calls.HandleAlert

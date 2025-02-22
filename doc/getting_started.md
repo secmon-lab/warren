@@ -22,3 +22,20 @@
 6. Create a Slack channel (if you don't have one)
     - It will be used as `WARREN_SLACK_CHANNEL_NAME`. It's not required `#` prefix.
 
+## Google Cloud Configuration
+
+### Initialize Google Cloud Project
+1. Create a Google Cloud Project
+2. Enable the following APIs
+    - Cloud Run API
+    - Secret Manager API
+    - Firestore API
+    - Pub/Sub API (if you want to use Pub/Sub as a trigger)
+
+### Create a service account
+1. Move IAM & Admin -> Service Accounts
+2. Click "Create Service Account"
+3. Set the following permissions
+    - `roles/secretmanager.secretAccessor`
+    - `roles/firestore.user`
+

@@ -195,3 +195,51 @@ func BuildMetaPrompt(ctx context.Context, alert model.Alert) (string, error) {
 
 	return buf.String(), nil
 }
+
+//go:embed templates/ignore_policy.md
+var ignorePolicyTemplate string
+
+type IgnorePolicyPromptResult struct {
+	Policy map[string]string `json:"policy"`
+}
+
+func BuildIgnorePolicyPrompt(ctx context.Context, policy model.PolicyData, alerts []model.Alert, note string) (string, error) {
+	tmpl, err := template.New("ignore_policy").Parse(ignorePolicyTemplate)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to parse template")
+	}
+
+	schema, err := generateSchema(IgnorePolicyPromptResult{}).Stringify()
+	if err != nil {
+		return "", err
+	}
+
+	rawAlerts := []string{}
+	for _, alert := range alerts {
+		rawAlert, err := stringify(alert)
+		if err != nil {
+			return "", err
+		}
+		rawAlerts = append(rawAlerts, rawAlert)
+	}
+
+	rawPolicy, err := stringify(policy)
+	if err != nil {
+		return "", err
+	}
+
+	input := map[string]any{
+		"note":   note,
+		"policy": rawPolicy,
+		"alerts": rawAlerts,
+		"schema": schema,
+		"lang":   lang.From(ctx).Name(),
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "ignore_policy", input); err != nil {
+		return "", goerr.Wrap(err, "failed to execute template")
+	}
+
+	return buf.String(), nil
+}

@@ -110,7 +110,6 @@ func TestOTX(t *testing.T) {
 }
 
 func TestOTX_Enabled(t *testing.T) {
-	t.Setenv("TEST_OTX_API_KEY", "")
 	var action otx.Action
 
 	cmd := cli.Command{
@@ -122,7 +121,9 @@ func TestOTX_Enabled(t *testing.T) {
 		},
 	}
 
-	gt.NoError(t, cmd.Run(context.Background(), []string{
+	t.Setenv("WARREN_OTX_API_KEY", "")
+	t.Setenv("TEST_OTX_API_KEY", "")
+	gt.NoError(t, cmd.Run(t.Context(), []string{
 		"otx",
 		"--otx-base-url", "https://otx.alienvault.com",
 	}))

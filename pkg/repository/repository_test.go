@@ -150,4 +150,22 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Equal(t, got[1].Timestamp, comment1.Timestamp)
 		gt.Equal(t, got[1].UserID, comment1.UserID)
 	})
+
+	t.Run("GetPolicy_and_SavePolicy", func(t *testing.T) {
+		policy := model.PolicyData{
+			Hash:      uuid.New().String(),
+			Data:      map[string]string{"test": "test"},
+			CreatedAt: time.Now(),
+		}
+
+		gt.NoError(t, repo.SavePolicy(ctx, &policy))
+
+		got, err := repo.GetPolicy(ctx, policy.Hash)
+		gt.NoError(t, err).Must()
+		gt.NotNil(t, got)
+		gt.Equal(t, policy.Hash, got.Hash)
+		gt.Equal(t, policy.Data, got.Data)
+		// NOTE: Firestore returns time in UTC and has microseconds precision
+		gt.Equal(t, policy.CreatedAt.Unix(), got.CreatedAt.Unix())
+	})
 }

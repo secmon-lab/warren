@@ -17,12 +17,14 @@ import (
 	"time"
 
 	"github.com/m-mizutani/gt"
-	"github.com/m-mizutani/opac"
+	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/server"
 	"github.com/secmon-lab/warren/pkg/service"
+	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/slack-go/slack"
@@ -35,7 +37,7 @@ func TestValidateGoogleIDToken(t *testing.T) {
 	vars := test.NewEnvVars(t, "TEST_GOOGLE_ID_TOKEN", "TEST_GOOGLE_ID_TOKEN_EMAIL")
 	calledAuthQuery := false
 	policyMock := &mock.PolicyClientMock{
-		QueryFunc: func(contextMoqParam context.Context, s string, v1, v2 any, queryOptions ...opac.QueryOption) error {
+		QueryFunc: func(contextMoqParam context.Context, s string, v1, v2 any, queryOptions ...opaq.QueryOption) error {
 			if s == "data.auth" {
 				calledAuthQuery = true
 				m1 := v1.(*model.AuthContext)
@@ -46,12 +48,20 @@ func TestValidateGoogleIDToken(t *testing.T) {
 			}
 			return nil
 		},
+		SourcesFunc: func() map[string]string {
+			return map[string]string{
+				"auth": "package auth",
+			}
+		},
 	}
 	ssnMock := func() interfaces.GenAIChatSession {
 		ssn := &mock.GenAIChatSessionMock{}
 		return ssn
 	}
-	uc := usecase.New(ssnMock, usecase.WithPolicyClient(policyMock))
+	policyService := policy.New(repository.NewMemory(), policyMock, &model.TestDataSet{}, policy.WithFactory(func(data policy.PolicyData) (interfaces.PolicyClient, error) {
+		return policyMock, nil
+	}))
+	uc := usecase.New(ssnMock, usecase.WithPolicyService(policyService))
 
 	server := server.New(uc)
 

@@ -14,4 +14,7 @@ func (uc *UseCases) GenerateAlertMetadata(ctx context.Context, alert model.Alert
 	return uc.generateAlertMetadata(ctx, alert)
 }
 
-var PlanAction = planAction
+var (
+	PlanAction = planAction
+	DiffPolicy = diffPolicy
+)

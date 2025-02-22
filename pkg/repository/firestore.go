@@ -36,7 +36,8 @@ func (r *Firestore) Close() error {
 }
 
 const (
-	collectionAlerts = "alerts"
+	collectionAlerts   = "alerts"
+	collectionPolicies = "policies"
 )
 
 func (r *Firestore) PutAlert(ctx context.Context, alert model.Alert) error {
@@ -153,4 +154,46 @@ func (r *Firestore) GetAlertComments(ctx context.Context, alertID model.AlertID)
 	}
 
 	return comments, nil
+}
+
+const (
+	policyVersionCollection = "versions"
+)
+
+func (r *Firestore) GetPolicy(ctx context.Context, hash string) (*model.PolicyData, error) {
+	// Get all versions ordered by timestamp descending to get latest
+	iter := r.db.
+		Collection(collectionPolicies).Doc(hash).
+		Collection(policyVersionCollection).
+		OrderBy("created_at", firestore.Desc).
+		Limit(1).
+		Documents(ctx)
+
+	doc, err := iter.Next()
+	if err != nil {
+		if err == iterator.Done {
+			return nil, nil
+		}
+		return nil, goerr.Wrap(err, "failed to get policy")
+	}
+
+	var policy model.PolicyData
+	if err := doc.DataTo(&policy); err != nil {
+		return nil, goerr.Wrap(err, "failed to unmarshal policy data")
+	}
+
+	return &policy, nil
+}
+
+func (r *Firestore) SavePolicy(ctx context.Context, policy *model.PolicyData) error {
+	// Save under versions collection using timestamp as document ID
+	timestamp := policy.CreatedAt.Format(time.RFC3339)
+	_, err := r.db.
+		Collection(collectionPolicies).Doc(policy.Hash).
+		Collection("versions").Doc(timestamp).
+		Set(ctx, policy)
+	if err != nil {
+		return goerr.Wrap(err, "failed to save policy", goerr.V("policy", policy))
+	}
+	return nil
 }

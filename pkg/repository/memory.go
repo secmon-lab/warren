@@ -13,6 +13,7 @@ import (
 type Memory struct {
 	alerts   map[model.AlertID]model.Alert
 	comments map[model.AlertID][]model.AlertComment
+	policies map[string]model.PolicyData
 }
 
 var _ interfaces.Repository = &Memory{}
@@ -21,6 +22,7 @@ func NewMemory() *Memory {
 	return &Memory{
 		alerts:   make(map[model.AlertID]model.Alert),
 		comments: make(map[model.AlertID][]model.AlertComment),
+		policies: make(map[string]model.PolicyData),
 	}
 }
 
@@ -82,4 +84,17 @@ func (r *Memory) GetAlertComments(ctx context.Context, alertID model.AlertID) ([
 	})
 
 	return comments, nil
+}
+
+func (r *Memory) GetPolicy(ctx context.Context, hash string) (*model.PolicyData, error) {
+	policy, ok := r.policies[hash]
+	if !ok {
+		return nil, nil
+	}
+	return &policy, nil
+}
+
+func (r *Memory) SavePolicy(ctx context.Context, policy *model.PolicyData) error {
+	r.policies[policy.Hash] = *policy
+	return nil
 }

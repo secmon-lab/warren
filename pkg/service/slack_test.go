@@ -68,7 +68,7 @@ func TestSlackUpdateAlert(t *testing.T) {
 	alert := genDummyAlert()
 
 	thread, err := svc.PostAlert(context.Background(), alert)
-	gt.NoError(t, err)
+	gt.NoError(t, err).Must()
 	alert.SlackThread = &model.SlackThread{
 		ChannelID: thread.ChannelID(),
 		ThreadID:  thread.ThreadID(),

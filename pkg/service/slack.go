@@ -133,12 +133,17 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 		title = title[:140] + "..."
 	}
 
+	description := "_no description_"
+	if alert.Description != "" {
+		description = alert.Description
+	}
+
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(
 			slack.NewTextBlockObject(slack.PlainTextType, title, false, false),
 		),
 		slack.NewSectionBlock(
-			slack.NewTextBlockObject(slack.MarkdownType, alert.Description, false, false),
+			slack.NewTextBlockObject(slack.MarkdownType, description, false, false),
 			nil,
 			nil,
 		),
@@ -147,14 +152,14 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 	if alert.Conclusion != "" {
 		blocks = append(blocks, slack.NewDividerBlock())
 		blocks = append(blocks, slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", "*Conclusion:*\n"+alert.Conclusion.Label(), false, false),
+			slack.NewTextBlockObject("mrkdwn", "*Conclusion:* "+alert.Conclusion.Label(), false, false),
 			nil,
 			nil,
 		))
 
 		if alert.Comment != "" {
 			blocks = append(blocks, slack.NewSectionBlock(
-				slack.NewTextBlockObject("mrkdwn", "💬 *Comment:*\n"+alert.Comment, false, false),
+				slack.NewTextBlockObject("mrkdwn", alert.Comment, false, false),
 				nil,
 				nil,
 			))
@@ -262,6 +267,7 @@ func (x *Slack) PostAlert(ctx context.Context, alert model.Alert) (interfaces.Sl
 		x.channelID,
 		slack.MsgOptionBlocks(blocks...),
 	)
+
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to post message to slack", goerr.V("blocks", blocks))
 	}
@@ -279,7 +285,7 @@ func (x *Slack) PostAlert(ctx context.Context, alert model.Alert) (interfaces.Sl
 		return nil, goerr.Wrap(err, "failed to encode alert data")
 	}
 
-	if err := thread.AttachFile(ctx, "Original Alert", "alert.json", buf.Bytes()); err != nil {
+	if err := thread.AttachFile(ctx, "Original Alert", "alert."+alert.ID.String()+".json", buf.Bytes()); err != nil {
 		return nil, goerr.Wrap(err, "failed to attach file to slack")
 	}
 
