@@ -11,18 +11,20 @@ import (
 )
 
 type Memory struct {
-	alerts   map[model.AlertID]model.Alert
-	comments map[model.AlertID][]model.AlertComment
-	policies map[string]model.PolicyData
+	alerts      map[model.AlertID]model.Alert
+	comments    map[model.AlertID][]model.AlertComment
+	policies    map[string]model.PolicyData
+	alertGroups map[model.AlertGroupID]model.AlertGroup
 }
 
 var _ interfaces.Repository = &Memory{}
 
 func NewMemory() *Memory {
 	return &Memory{
-		alerts:   make(map[model.AlertID]model.Alert),
-		comments: make(map[model.AlertID][]model.AlertComment),
-		policies: make(map[string]model.PolicyData),
+		alerts:      make(map[model.AlertID]model.Alert),
+		comments:    make(map[model.AlertID][]model.AlertComment),
+		policies:    make(map[string]model.PolicyData),
+		alertGroups: make(map[model.AlertGroupID]model.AlertGroup),
 	}
 }
 
@@ -45,7 +47,7 @@ func (r *Memory) GetAlertBySlackThread(ctx context.Context, thread model.SlackTh
 			return &alert, nil
 		}
 	}
-	return nil, goerr.New("alert not found", goerr.V("slack_thread", thread))
+	return nil, nil
 }
 
 func (r *Memory) FetchLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
@@ -97,4 +99,41 @@ func (r *Memory) GetPolicy(ctx context.Context, hash string) (*model.PolicyData,
 func (r *Memory) SavePolicy(ctx context.Context, policy *model.PolicyData) error {
 	r.policies[policy.Hash] = *policy
 	return nil
+}
+
+func (r *Memory) GetAlertsByStatus(ctx context.Context, status model.AlertStatus) ([]model.Alert, error) {
+	var alerts []model.Alert
+	for _, alert := range r.alerts {
+		if alert.Status == status {
+			alerts = append(alerts, alert)
+		}
+	}
+	return alerts, nil
+}
+
+func (r *Memory) BatchGetAlerts(ctx context.Context, alertIDs []model.AlertID) ([]model.Alert, error) {
+	var alerts []model.Alert
+	for _, alertID := range alertIDs {
+		alert, ok := r.alerts[alertID]
+		if !ok {
+			return nil, goerr.New("alert not found", goerr.V("alert_id", alertID))
+		}
+		alerts = append(alerts, alert)
+	}
+	return alerts, nil
+}
+
+func (r *Memory) PutAlertGroups(ctx context.Context, groups []model.AlertGroup) error {
+	for _, group := range groups {
+		r.alertGroups[group.ID] = group
+	}
+	return nil
+}
+
+func (r *Memory) GetAlertGroup(ctx context.Context, groupID model.AlertGroupID) (*model.AlertGroup, error) {
+	group, ok := r.alertGroups[groupID]
+	if !ok {
+		return nil, goerr.New("alert group not found", goerr.V("group_id", groupID))
+	}
+	return &group, nil
 }

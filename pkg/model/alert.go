@@ -150,3 +150,21 @@ type AlertComment struct {
 	Comment   string  `json:"comment"`
 	UserID    string  `json:"user_id"`
 }
+
+type AlertGroupID string
+
+func (id AlertGroupID) String() string { return string(id) }
+
+type AlertGroup struct {
+	ID        AlertGroupID `json:"id"`
+	CreatedAt time.Time    `json:"created_at"`
+	UpdatedAt time.Time    `json:"updated_at"`
+
+	AlertGroupMetadata
+}
+
+type AlertGroupMetadata struct {
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	AlertIDs    []AlertID `json:"alert_ids"`
+}

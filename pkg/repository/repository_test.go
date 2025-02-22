@@ -109,7 +109,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 			ChannelID: "test",
 			ThreadID:  uuid.New().String(),
 		})
-		gt.Error(t, err)
+		gt.NoError(t, err)
 		gt.Nil(t, got)
 	})
 
@@ -167,5 +167,106 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Equal(t, policy.Data, got.Data)
 		// NOTE: Firestore returns time in UTC and has microseconds precision
 		gt.Equal(t, policy.CreatedAt.Unix(), got.CreatedAt.Unix())
+	})
+
+	t.Run("GetAlertsByStatus", func(t *testing.T) {
+		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "test",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert1.Status = model.AlertStatusNew
+		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "test",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert2.Status = model.AlertStatusClosed
+		gt.NoError(t, repo.PutAlert(ctx, alert1))
+		gt.NoError(t, repo.PutAlert(ctx, alert2))
+
+		got, err := repo.GetAlertsByStatus(ctx, model.AlertStatusNew)
+		gt.NoError(t, err)
+		gt.A(t, got).Longer(0).Any(func(v model.Alert) bool {
+			return v.ID == alert1.ID
+		}).All(func(v model.Alert) bool {
+			return v.ID != alert2.ID
+		}).All(func(v model.Alert) bool {
+			return v.Status == model.AlertStatusNew
+		})
+	})
+
+	t.Run("BatchGetAlerts", func(t *testing.T) {
+		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "test",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "test",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert2.Status = model.AlertStatusClosed
+		gt.NoError(t, repo.PutAlert(ctx, alert1))
+		gt.NoError(t, repo.PutAlert(ctx, alert2))
+
+		got, err := repo.BatchGetAlerts(ctx, []model.AlertID{alert1.ID, alert2.ID})
+		gt.NoError(t, err)
+		gt.A(t, got).
+			Length(2).
+			Any(func(v model.Alert) bool {
+				return v.ID == alert1.ID
+			}).
+			Any(func(v model.Alert) bool {
+				return v.ID == alert2.ID
+			})
+	})
+
+	t.Run("PutAlertGroups", func(t *testing.T) {
+		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "test",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "test",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+
+		group1 := model.AlertGroup{
+			ID: model.AlertGroupID(uuid.New().String()),
+			AlertGroupMetadata: model.AlertGroupMetadata{
+				AlertIDs: []model.AlertID{alert1.ID, alert2.ID},
+			},
+		}
+		group2 := model.AlertGroup{
+			ID: model.AlertGroupID(uuid.New().String()),
+			AlertGroupMetadata: model.AlertGroupMetadata{
+				AlertIDs: []model.AlertID{alert1.ID, alert2.ID},
+			},
+		}
+		gt.NoError(t, repo.PutAlertGroups(ctx, []model.AlertGroup{group1, group2}))
+
+		got, err := repo.GetAlertGroup(ctx, group1.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, group1.ID, got.ID)
+
+		got, err = repo.GetAlertGroup(ctx, group2.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, group2.ID, got.ID)
+	})
+
+	t.Run("GetAlertGroup_NotFound", func(t *testing.T) {
+		got, err := repo.GetAlertGroup(ctx, model.AlertGroupID(uuid.New().String()))
+		gt.Error(t, err)
+		gt.Nil(t, got)
 	})
 }
