@@ -298,11 +298,15 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 			return goerr.Wrap(err, "failed to put alert")
 		}
 
-		thread := uc.slackService.NewThread(*alert.SlackThread)
-		thread.Reply(ctx, "Alert acknowledged by <@"+interaction.User.ID+">")
+		if alert.SlackThread != nil {
+			thread := uc.slackService.NewThread(*alert.SlackThread)
+			thread.Reply(ctx, "Alert acknowledged by <@"+interaction.User.ID+">")
 
-		if err := thread.UpdateAlert(ctx, *alert); err != nil {
-			return goerr.Wrap(err, "failed to update slack thread")
+			if err := thread.UpdateAlert(ctx, *alert); err != nil {
+				return goerr.Wrap(err, "failed to update slack thread")
+			}
+		} else {
+			logger.Warn("slack thread not found", "alert_id", alertID)
 		}
 
 	case "close":
