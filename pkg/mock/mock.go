@@ -250,6 +250,9 @@ var _ interfaces.SlackThreadService = &SlackThreadServiceMock{}
 //			ChannelIDFunc: func() string {
 //				panic("mock out the ChannelID method")
 //			},
+//			PostAlertGroupsFunc: func(ctx context.Context, alertGroups []model.AlertGroup) error {
+//				panic("mock out the PostAlertGroups method")
+//			},
 //			PostFindingFunc: func(ctx context.Context, finding model.AlertFinding) error {
 //				panic("mock out the PostFinding method")
 //			},
@@ -277,6 +280,9 @@ type SlackThreadServiceMock struct {
 
 	// ChannelIDFunc mocks the ChannelID method.
 	ChannelIDFunc func() string
+
+	// PostAlertGroupsFunc mocks the PostAlertGroups method.
+	PostAlertGroupsFunc func(ctx context.Context, alertGroups []model.AlertGroup) error
 
 	// PostFindingFunc mocks the PostFinding method.
 	PostFindingFunc func(ctx context.Context, finding model.AlertFinding) error
@@ -308,6 +314,13 @@ type SlackThreadServiceMock struct {
 		}
 		// ChannelID holds details about calls to the ChannelID method.
 		ChannelID []struct {
+		}
+		// PostAlertGroups holds details about calls to the PostAlertGroups method.
+		PostAlertGroups []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// AlertGroups is the alertGroups argument value.
+			AlertGroups []model.AlertGroup
 		}
 		// PostFinding holds details about calls to the PostFinding method.
 		PostFinding []struct {
@@ -341,13 +354,14 @@ type SlackThreadServiceMock struct {
 			Alert model.Alert
 		}
 	}
-	lockAttachFile     sync.RWMutex
-	lockChannelID      sync.RWMutex
-	lockPostFinding    sync.RWMutex
-	lockPostNextAction sync.RWMutex
-	lockReply          sync.RWMutex
-	lockThreadID       sync.RWMutex
-	lockUpdateAlert    sync.RWMutex
+	lockAttachFile      sync.RWMutex
+	lockChannelID       sync.RWMutex
+	lockPostAlertGroups sync.RWMutex
+	lockPostFinding     sync.RWMutex
+	lockPostNextAction  sync.RWMutex
+	lockReply           sync.RWMutex
+	lockThreadID        sync.RWMutex
+	lockUpdateAlert     sync.RWMutex
 }
 
 // AttachFile calls AttachFileFunc.
@@ -418,6 +432,42 @@ func (mock *SlackThreadServiceMock) ChannelIDCalls() []struct {
 	mock.lockChannelID.RLock()
 	calls = mock.calls.ChannelID
 	mock.lockChannelID.RUnlock()
+	return calls
+}
+
+// PostAlertGroups calls PostAlertGroupsFunc.
+func (mock *SlackThreadServiceMock) PostAlertGroups(ctx context.Context, alertGroups []model.AlertGroup) error {
+	if mock.PostAlertGroupsFunc == nil {
+		panic("SlackThreadServiceMock.PostAlertGroupsFunc: method is nil but SlackThreadService.PostAlertGroups was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		AlertGroups []model.AlertGroup
+	}{
+		Ctx:         ctx,
+		AlertGroups: alertGroups,
+	}
+	mock.lockPostAlertGroups.Lock()
+	mock.calls.PostAlertGroups = append(mock.calls.PostAlertGroups, callInfo)
+	mock.lockPostAlertGroups.Unlock()
+	return mock.PostAlertGroupsFunc(ctx, alertGroups)
+}
+
+// PostAlertGroupsCalls gets all the calls that were made to PostAlertGroups.
+// Check the length with:
+//
+//	len(mockedSlackThreadService.PostAlertGroupsCalls())
+func (mock *SlackThreadServiceMock) PostAlertGroupsCalls() []struct {
+	Ctx         context.Context
+	AlertGroups []model.AlertGroup
+} {
+	var calls []struct {
+		Ctx         context.Context
+		AlertGroups []model.AlertGroup
+	}
+	mock.lockPostAlertGroups.RLock()
+	calls = mock.calls.PostAlertGroups
+	mock.lockPostAlertGroups.RUnlock()
 	return calls
 }
 

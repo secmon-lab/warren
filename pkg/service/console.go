@@ -205,3 +205,7 @@ func (c *ConsoleThread) printFinding(finding model.AlertFinding) {
 		color.New(color.FgGreen).Fprintf(c.writer, "Recommendation: %s\n", finding.Recommendation)
 	}
 }
+
+func (c *ConsoleThread) PostAlertGroups(_ context.Context, _ []model.AlertGroup) error {
+	return nil
+}
