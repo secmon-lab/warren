@@ -12,6 +12,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/thread"
 )
 
+const maxAlertsToGroup = 256
+
 func (x *UseCases) GroupUnclosedAlerts(ctx context.Context, th interfaces.SlackThreadService) error {
 	thread.Reply(ctx, "👥 Starting to make groups of alerts...")
 
@@ -31,7 +33,11 @@ func (x *UseCases) GroupUnclosedAlerts(ctx context.Context, th interfaces.SlackT
 		return nil
 	}
 
-	thread.Reply(ctx, fmt.Sprintf("👥 Found %d alerts to be grouped", len(alerts)))
+	thread.Reply(ctx, fmt.Sprintf("🏃 Found %d alerts to be grouped", len(alerts)))
+	if len(alerts) > maxAlertsToGroup {
+		thread.Reply(ctx, fmt.Sprintf("⚠️ Too many alerts to be grouped. Let's make groups of first %d alerts.", maxAlertsToGroup))
+		alerts = alerts[:maxAlertsToGroup]
+	}
 
 	p, err := prompt.BuildMakeGroupPrompt(ctx, alerts)
 	if err != nil {
@@ -43,7 +49,7 @@ func (x *UseCases) GroupUnclosedAlerts(ctx context.Context, th interfaces.SlackT
 
 	const maxRetry = 3
 	for i := range maxRetry {
-		thread.Reply(ctx, fmt.Sprintf("👥 Making groups of alerts... (%d/%d)", i+1, maxRetry))
+		thread.Reply(ctx, fmt.Sprintf("🏃 Making groups of alerts... (%d/%d)", i+1, maxRetry))
 		resp, err := service.AskChat[prompt.MakeGroupPromptResult](ctx, chat, p)
 		if err != nil {
 			if goerr.HasTag(err, model.ErrTagInvalidLLMResponse) {

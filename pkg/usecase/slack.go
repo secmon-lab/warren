@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"unicode/utf8"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -140,9 +141,19 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 
 	switch args[0] {
 	case "group":
-		if err := uc.GroupUnclosedAlerts(ctx, th); err != nil {
-			return goerr.Wrap(err, "failed to group unclosed alerts")
-		}
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					th.Reply(ctx, fmt.Sprintf("💥 Crushed by panic: %v", r))
+					errs.Handle(ctx, goerr.New("panic", goerr.V("recover", r)))
+				}
+			}()
+
+			if err := uc.GroupUnclosedAlerts(ctx, th); err != nil {
+				th.Reply(ctx, "😫 Failed to group unclosed alerts: "+err.Error())
+				errs.Handle(ctx, err)
+			}
+		}()
 	}
 
 	return nil
