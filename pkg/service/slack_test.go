@@ -215,7 +215,4 @@ func TestPostAlertGroups(t *testing.T) {
 	gt.NoError(t, err)
 
 	gt.NoError(t, thread.PostAlertGroups(context.Background(), groups))
-
-	link := fmt.Sprintf("slack://channel?id=%s&message=%s", thread.ChannelID(), thread.ThreadID())
-	svc.PostMessage(context.Background(), "test link: "+link)
 }
