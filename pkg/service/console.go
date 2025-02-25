@@ -206,6 +206,22 @@ func (c *ConsoleThread) printFinding(finding model.AlertFinding) {
 	}
 }
 
-func (c *ConsoleThread) PostAlertGroups(_ context.Context, _ []model.AlertGroup) error {
+func (c *ConsoleThread) PostAlertGroups(_ context.Context, groups []model.AlertGroup) error {
+	c.printHeader("🔍 Alert Groups")
+
+	for _, group := range groups {
+		fmt.Fprintln(c.writer, strings.Repeat("=", 80))
+		color.New(color.FgCyan, color.Bold).Fprintf(c.writer, "📦 Group: %s\n", group.Title)
+		color.New(color.FgWhite).Fprintf(c.writer, "%s\n", group.Description)
+
+		fmt.Fprintln(c.writer)
+		color.New(color.FgYellow).Fprintln(c.writer, "Alerts in this group:")
+		for _, alert := range group.Alerts {
+			color.New(color.FgGreen).Fprintf(c.writer, "  • %s\n", alert.Title)
+		}
+		fmt.Fprintln(c.writer)
+	}
+
+	fmt.Fprintln(c.writer, strings.Repeat("=", 80))
 	return nil
 }

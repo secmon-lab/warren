@@ -71,28 +71,49 @@ func (x *UseCases) GroupUnclosedAlerts(ctx context.Context, th interfaces.SlackT
 
 	thread.Reply(ctx, fmt.Sprintf("✅ Successfully made groups of alerts (%d groups)", len(groups)))
 
+	getRequiredAlertIDs := func(alertIDs []model.AlertID) []model.AlertID {
+		// pick 3 alerts from alerts
+		var alertIDSet []model.AlertID
+		if len(alertIDs) > 3 {
+			alertIDSet = alertIDs[:3]
+		} else {
+			alertIDSet = alertIDs
+		}
+		return alertIDSet
+	}
+
+	var requiredAlertIDs []model.AlertID
+	for _, group := range groups {
+		requiredAlertIDs = append(requiredAlertIDs, getRequiredAlertIDs(group.AlertIDs)...)
+	}
+	requiredAlerts, err := x.repository.BatchGetAlerts(ctx, requiredAlertIDs)
+	if err != nil {
+		return err
+	}
+	alertMap := make(map[model.AlertID]model.Alert)
+	for _, alert := range requiredAlerts {
+		alertMap[alert.ID] = alert
+	}
+
 	alertGroups := make([]model.AlertGroup, len(groups))
+
 	for i, group := range groups {
 		alertGroups[i] = model.NewAlertGroup(ctx, group)
 
-		// pick 3 alerts from alerts
-		var alertIDSet []model.AlertID
-		if len(group.AlertIDs) > 3 {
-			alertIDSet = group.AlertIDs[:3]
-		} else {
-			alertIDSet = group.AlertIDs
+		requiredAlertIDs := getRequiredAlertIDs(group.AlertIDs)
+		alerts := make([]model.Alert, len(requiredAlertIDs))
+		for i, alertID := range requiredAlertIDs {
+			alerts[i] = alertMap[alertID]
 		}
 
-		alerts, err := x.repository.BatchGetAlerts(ctx, alertIDSet)
-		if err != nil {
-			return err
-		}
 		alertGroups[i].Alerts = alerts
 	}
 
-	if err := x.repository.PutAlertGroups(ctx, alertGroups); err != nil {
-		return err
-	}
+	/*
+		if err := x.repository.PutAlertGroups(ctx, alertGroups); err != nil {
+			return err
+		}
+	*/
 
 	if err := th.PostAlertGroups(ctx, alertGroups); err != nil {
 		return err

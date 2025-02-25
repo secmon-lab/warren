@@ -264,7 +264,7 @@ func (r *Firestore) PutAlertGroups(ctx context.Context, groups []model.AlertGrou
 		go func(group model.AlertGroup) {
 			defer wg.Done()
 			if _, err := job.Results(); err != nil {
-				errCh <- err
+				errCh <- goerr.Wrap(err, "failed to save alert group", goerr.V("group", group))
 			}
 		}(group)
 	}
@@ -285,6 +285,9 @@ func (r *Firestore) GetAlertGroup(ctx context.Context, groupID model.AlertGroupI
 	groupDoc := r.db.Collection(collectionAlertGroups).Doc(groupID.String())
 	doc, err := groupDoc.Get(ctx)
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
 		return nil, goerr.Wrap(err, "failed to get alert group", goerr.V("group_id", groupID))
 	}
 

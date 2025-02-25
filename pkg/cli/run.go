@@ -14,10 +14,73 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/thread"
 	"github.com/urfave/cli/v3"
 )
 
 func cmdRun() *cli.Command {
+	return &cli.Command{
+		Name:    "run",
+		Aliases: []string{"r"},
+		Usage:   "Run alert investigation on local",
+		Commands: []*cli.Command{
+			cmdInspect(),
+			cmdGroup(),
+		},
+	}
+}
+
+func cmdGroup() *cli.Command {
+	var (
+		firestoreCfg config.Firestore
+		geminiCfg    config.GeminiCfg
+	)
+
+	flags := joinFlags(
+		firestoreCfg.Flags(),
+		geminiCfg.Flags(),
+	)
+
+	return &cli.Command{
+		Name:    "group",
+		Aliases: []string{"g"},
+		Usage:   "Group alerts",
+		Flags:   flags,
+		Action: func(ctx context.Context, c *cli.Command) error {
+			logger := logging.From(ctx)
+			logger.Info("group mode", "firestore", firestoreCfg, "gemini", geminiCfg)
+
+			console := service.NewConsole(os.Stdout)
+			firestore, err := firestoreCfg.Configure(ctx)
+			if err != nil {
+				return err
+			}
+
+			geminiModel, err := geminiCfg.Configure(ctx)
+			if err != nil {
+				return err
+			}
+
+			uc := usecase.New(
+				func() interfaces.GenAIChatSession {
+					return geminiModel.StartChat()
+				},
+				usecase.WithRepository(firestore),
+				usecase.WithSlackService(service.NewConsole(os.Stdout)),
+			)
+
+			th := console.NewThread(model.SlackThread{})
+			ctx = thread.WithReplyFunc(ctx, th.Reply)
+			err = uc.GroupUnclosedAlerts(ctx, th)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+}
+
+func cmdInspect() *cli.Command {
 	var (
 		alertPath   string
 		alertSchema string
@@ -26,9 +89,9 @@ func cmdRun() *cli.Command {
 	)
 
 	return &cli.Command{
-		Name:    "run",
-		Aliases: []string{"r"},
-		Usage:   "Run alert investigation on local",
+		Name:    "inspect",
+		Aliases: []string{"i"},
+		Usage:   "Inspect alert",
 		Flags: joinFlags(
 			[]cli.Flag{
 				&cli.StringFlag{
