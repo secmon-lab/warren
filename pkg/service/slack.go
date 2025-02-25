@@ -20,9 +20,14 @@ type Slack struct {
 	signingSecret string
 	channelID     string
 	slackClient   *slack.Client
-	userID        string
-	teamID        string
-	botID         string
+	slackMetadata
+}
+
+type slackMetadata struct {
+	teamID   string
+	teamName string
+	botID    string
+	userID   string
 }
 
 var _ interfaces.SlackService = &Slack{}
@@ -31,6 +36,7 @@ type SlackThread struct {
 	channelID   string
 	threadID    string
 	slackClient *slack.Client
+	slackMetadata
 }
 
 var _ interfaces.SlackThreadService = &SlackThread{}
@@ -61,6 +67,7 @@ func NewSlack(oauthToken, signingSecret, channelID string) (*Slack, error) {
 
 	s.userID = authTest.UserID
 	s.teamID = authTest.TeamID
+	s.teamName = authTest.Team
 	s.botID = authTest.BotID
 
 	return s, nil
@@ -76,11 +83,26 @@ func (x *Slack) TrimMention(message string) string {
 	return strings.TrimSpace(message[idx+len(mention):])
 }
 
+func (x *Slack) PostMessage(ctx context.Context, message string) (*SlackThread, error) {
+	channelID, timestamp, err := x.slackClient.PostMessageContext(ctx, x.channelID, slack.MsgOptionText(message, false))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to post message to slack")
+	}
+
+	return &SlackThread{
+		slackMetadata: x.slackMetadata,
+		channelID:     channelID,
+		threadID:      timestamp,
+		slackClient:   x.slackClient,
+	}, nil
+}
+
 func (x *Slack) NewThread(thread model.SlackThread) interfaces.SlackThreadService {
 	return &SlackThread{
-		channelID:   thread.ChannelID,
-		threadID:    thread.ThreadID,
-		slackClient: x.slackClient,
+		slackMetadata: x.slackMetadata,
+		channelID:     thread.ChannelID,
+		threadID:      thread.ThreadID,
+		slackClient:   x.slackClient,
 	}
 }
 
@@ -530,4 +552,73 @@ func NewSlackPayloadVerifier(signingSecret string) interfaces.SlackPayloadVerifi
 
 		return nil
 	}
+}
+
+func (x *SlackThread) PostAlertGroups(ctx context.Context, groups []model.AlertGroup) error {
+	blocks := buildAlertGroupsBlocks(groups, x.teamName)
+
+	_, _, err := x.slackClient.PostMessageContext(ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+		slack.MsgOptionBroadcast(),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post alert groups to slack")
+	}
+
+	return nil
+}
+
+func buildAlertGroupsBlocks(groups []model.AlertGroup, teamName string) []slack.Block {
+	blocks := []slack.Block{
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", "Summary of Groups", false, false),
+		),
+	}
+
+	for _, group := range groups {
+		blocks = append(blocks, buildAlertGroupBlocks(group, teamName)...)
+	}
+
+	return blocks
+}
+
+func buildAlertGroupBlocks(group model.AlertGroup, teamName string) []slack.Block {
+	blocks := []slack.Block{
+		slack.NewDividerBlock(),
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", "Group: "+group.Title, false, false),
+		),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", group.Description, false, false),
+			nil,
+			nil,
+		),
+	}
+
+	alertList := ""
+	// slack link format: https://{team_id}.slack.com/archives/{channel_id}/p{timestamp}
+	// Example: https://xxx.slack.com/archives/C07AR2FPG1F/p1740438108890669
+	for _, alert := range group.Alerts {
+		if alert.SlackThread != nil {
+			link := fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", teamName, alert.SlackThread.ChannelID, alert.SlackThread.ThreadID)
+			alertList += fmt.Sprintf("• <%s|%s>\n", link, alert.Title)
+		} else {
+			alertList += fmt.Sprintf("• %s\n", alert.Title)
+		}
+	}
+	if len(group.AlertIDs) > 3 {
+		alertList += fmt.Sprintf("... and %d more alerts", len(group.AlertIDs)-3)
+	}
+
+	if alertList != "" {
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", alertList, false, false),
+			nil,
+			nil,
+		))
+	}
+
+	return blocks
 }

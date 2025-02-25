@@ -2,7 +2,9 @@ package service_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/model"
@@ -101,6 +103,15 @@ func genDummyAlert() model.Alert {
 	})
 }
 
+func genDummyAlertWithSlackThread() model.Alert {
+	alert := genDummyAlert()
+	alert.SlackThread = &model.SlackThread{
+		ChannelID: "C0123456789",
+		ThreadID:  fmt.Sprintf("%d", time.Now().Unix()),
+	}
+	return alert
+}
+
 func TestSlackPostThreadMessages(t *testing.T) {
 	svc := newSlackService(t)
 
@@ -172,4 +183,36 @@ func TestTrimMention(t *testing.T) {
 	gt.Equal(t, svc.TrimMention("test <@U0123456789>"), "")
 	gt.Equal(t, svc.TrimMention("test <@U0123456789> <@U0123456789> blue"), "blue")
 	gt.Equal(t, svc.TrimMention("<@NOT_EXIST> test"), "<@NOT_EXIST> test")
+}
+
+func TestPostAlertGroups(t *testing.T) {
+	svc := newSlackService(t)
+
+	groups := []model.AlertGroup{
+		{
+			AlertGroupMetadata: model.AlertGroupMetadata{
+				Title:       "Group 1",
+				Description: "Group 1 Description. This is a test group.",
+			},
+			Alerts: []model.Alert{
+				genDummyAlertWithSlackThread(),
+				genDummyAlertWithSlackThread(),
+			},
+		},
+		{
+			AlertGroupMetadata: model.AlertGroupMetadata{
+				Title:       "Group 2",
+				Description: "Group 2 Description. This is another test group.",
+			},
+			Alerts: []model.Alert{
+				genDummyAlertWithSlackThread(),
+				genDummyAlertWithSlackThread(),
+			},
+		},
+	}
+
+	thread, err := svc.PostMessage(context.Background(), "group test")
+	gt.NoError(t, err)
+
+	gt.NoError(t, thread.PostAlertGroups(context.Background(), groups))
 }

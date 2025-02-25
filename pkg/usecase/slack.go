@@ -98,16 +98,16 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 	logger := logging.From(ctx)
 	logger.Debug("slack app mention event", "event", event)
 
-	thread := model.SlackThread{
+	threadData := model.SlackThread{
 		ChannelID: event.Channel,
 		ThreadID:  event.ThreadTimeStamp,
 	}
-	alert, err := uc.repository.GetAlertBySlackThread(ctx, thread)
+	alert, err := uc.repository.GetAlertBySlackThread(ctx, threadData)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert by slack thread")
 	}
 	if alert == nil {
-		thread = model.SlackThread{
+		threadData = model.SlackThread{
 			ChannelID: event.Channel,
 			ThreadID:  event.TimeStamp,
 		}
@@ -121,13 +121,25 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 
 	args := parseArgs(mention)
 
-	logger.Info("slack app mention event", "mention", mention, "thread", thread)
+	logger.Info("slack app mention event", "mention", mention, "thread", threadData)
 	for _, arg := range args {
 		logger.Info("arg", "value", arg)
 	}
 
-	th := uc.slackService.NewThread(thread)
-	th.Reply(ctx, "Hello, world!")
+	th := uc.slackService.NewThread(threadData)
+	ctx = thread.WithReplyFunc(ctx, th.Reply)
+
+	if len(args) == 0 {
+		th.Reply(ctx, "⏸️ No action specified")
+		return nil
+	}
+
+	switch args[0] {
+	case "group":
+		if err := uc.GroupUnclosedAlerts(ctx, th); err != nil {
+			return goerr.Wrap(err, "failed to group unclosed alerts")
+		}
+	}
 
 	return nil
 }

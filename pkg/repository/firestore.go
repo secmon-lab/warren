@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -36,8 +37,9 @@ func (r *Firestore) Close() error {
 }
 
 const (
-	collectionAlerts   = "alerts"
-	collectionPolicies = "policies"
+	collectionAlerts      = "alerts"
+	collectionPolicies    = "policies"
+	collectionAlertGroups = "groups"
 )
 
 func (r *Firestore) PutAlert(ctx context.Context, alert model.Alert) error {
@@ -196,4 +198,100 @@ func (r *Firestore) SavePolicy(ctx context.Context, policy *model.PolicyData) er
 		return goerr.Wrap(err, "failed to save policy", goerr.V("policy", policy))
 	}
 	return nil
+}
+
+func (r *Firestore) GetAlertsByStatus(ctx context.Context, status model.AlertStatus) ([]model.Alert, error) {
+	iter := r.db.Collection(collectionAlerts).Where("Status", "==", status).Documents(ctx)
+
+	var alerts []model.Alert
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next alert")
+		}
+
+		var alert model.Alert
+		if err := doc.DataTo(&alert); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert")
+		}
+
+		alerts = append(alerts, alert)
+	}
+
+	return alerts, nil
+}
+
+func (r *Firestore) BatchGetAlerts(ctx context.Context, alertIDs []model.AlertID) ([]model.Alert, error) {
+	iter := r.db.Collection(collectionAlerts).Where("ID", "in", alertIDs).Documents(ctx)
+
+	var alerts []model.Alert
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next alert")
+		}
+
+		var alert model.Alert
+		if err := doc.DataTo(&alert); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert")
+		}
+
+		alerts = append(alerts, alert)
+	}
+
+	return alerts, nil
+}
+
+func (r *Firestore) PutAlertGroups(ctx context.Context, groups []model.AlertGroup) error {
+	batch := r.db.BulkWriter(ctx)
+	wg := sync.WaitGroup{}
+	errCh := make(chan error, len(groups))
+
+	for _, group := range groups {
+		groupDoc := r.db.Collection(collectionAlertGroups).Doc(group.ID.String())
+		job, err := batch.Create(groupDoc, group)
+		if err != nil {
+			return goerr.Wrap(err, "failed to create alert group", goerr.V("group", group))
+		}
+
+		wg.Add(1)
+		go func(group model.AlertGroup) {
+			defer wg.Done()
+			if _, err := job.Results(); err != nil {
+				errCh <- err
+			}
+		}(group)
+	}
+
+	batch.End()
+	wg.Wait()
+
+	close(errCh)
+
+	for err := range errCh {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Firestore) GetAlertGroup(ctx context.Context, groupID model.AlertGroupID) (*model.AlertGroup, error) {
+	groupDoc := r.db.Collection(collectionAlertGroups).Doc(groupID.String())
+	doc, err := groupDoc.Get(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get alert group", goerr.V("group_id", groupID))
+	}
+
+	var group model.AlertGroup
+	if err := doc.DataTo(&group); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert data to alert group")
+	}
+
+	return &group, nil
 }

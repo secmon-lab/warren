@@ -11,6 +11,10 @@ import (
 
 type AlertID string
 
+func NewAlertID() AlertID {
+	return AlertID(uuid.New().String())
+}
+
 func (id AlertID) String() string { return string(id) }
 
 type AlertStatus string
@@ -115,6 +119,7 @@ type Alert struct {
 }
 
 type SlackThread struct {
+	TeamID    string `json:"team_id"`
 	ChannelID string `json:"channel_id"`
 	ThreadID  string `json:"thread_id"`
 }
@@ -126,7 +131,7 @@ type SlackUser struct {
 
 func NewAlert(ctx context.Context, schema string, p PolicyAlert) Alert {
 	return Alert{
-		ID:         AlertID(uuid.New().String()),
+		ID:         NewAlertID(),
 		Schema:     schema,
 		Title:      p.Title,
 		Status:     AlertStatusNew,
@@ -149,4 +154,34 @@ type AlertComment struct {
 	Timestamp string  `json:"timestamp"`
 	Comment   string  `json:"comment"`
 	UserID    string  `json:"user_id"`
+}
+
+type AlertGroupID string
+
+func NewAlertGroupID() AlertGroupID { return AlertGroupID(uuid.New().String()) }
+
+func (id AlertGroupID) String() string { return string(id) }
+
+type AlertGroup struct {
+	ID        AlertGroupID `json:"id"`
+	CreatedAt time.Time    `json:"created_at"`
+	UpdatedAt time.Time    `json:"updated_at"`
+	Alerts    []Alert      `firestore:"-" json:"-"`
+
+	AlertGroupMetadata
+}
+
+func NewAlertGroup(ctx context.Context, metadata AlertGroupMetadata) AlertGroup {
+	return AlertGroup{
+		ID:                 NewAlertGroupID(),
+		CreatedAt:          clock.Now(ctx),
+		UpdatedAt:          clock.Now(ctx),
+		AlertGroupMetadata: metadata,
+	}
+}
+
+type AlertGroupMetadata struct {
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	AlertIDs    []AlertID `json:"alert_ids"`
 }

@@ -60,3 +60,17 @@ alert contains {} # Detected as an alert`,
 	gt.S(t, d).Contains("## Alerts")
 	gt.S(t, d).Contains("# Output")
 }
+
+func TestMakeGroupPrompt(t *testing.T) {
+	alerts := []model.Alert{
+		{ID: model.NewAlertID()},
+		{ID: model.NewAlertID()},
+	}
+
+	d, err := prompt.BuildMakeGroupPrompt(context.Background(), alerts)
+	gt.NoError(t, err)
+
+	t.Log(d)
+	gt.S(t, d).Contains("# Input")
+	gt.S(t, d).Contains("# Output")
+}
