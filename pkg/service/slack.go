@@ -505,7 +505,7 @@ func (x *SlackThread) PostFinding(ctx context.Context, finding model.AlertFindin
 		slack.MsgOptionTS(x.threadID),
 	)
 	if err != nil {
-		return goerr.Wrap(err, "failed to post finding to slack")
+		return goerr.Wrap(err, "failed to post finding to slack", goerr.V("blocks", blocks))
 	}
 
 	return nil
@@ -564,7 +564,7 @@ func (x *SlackThread) PostAlertGroups(ctx context.Context, groups []model.AlertG
 		slack.MsgOptionBroadcast(),
 	)
 	if err != nil {
-		return goerr.Wrap(err, "failed to post alert groups to slack")
+		return goerr.Wrap(err, "failed to post alert groups to slack", goerr.V("groups", groups), goerr.V("blocks", blocks))
 	}
 
 	return nil
