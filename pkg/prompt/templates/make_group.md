@@ -1,10 +1,11 @@
-Please group the given alerts according to the specified rules.
+Please group the given alerts by similarity according to the specified rules. This aggregation aims to facilitate the bulk processing of a large number of alerts.
 
 # Rules
 
 - Alerts with different `schema` should not be grouped together.
-- An alert can belong to only one group.
+- An alert must belong to only one group.
 - Similar types of alerts should belong to the same group.
+- Aim to have a maximum of {{ .max_groups }} groups. However, if aggregation proves difficult, this limit may be exceeded.
 
 # Input
 

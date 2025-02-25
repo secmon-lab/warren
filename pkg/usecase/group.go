@@ -39,7 +39,7 @@ func (x *UseCases) GroupUnclosedAlerts(ctx context.Context, th interfaces.SlackT
 		alerts = alerts[:maxAlertsToGroup]
 	}
 
-	p, err := prompt.BuildMakeGroupPrompt(ctx, alerts)
+	p, err := prompt.BuildMakeGroupPrompt(ctx, alerts, 16)
 	if err != nil {
 		return err
 	}

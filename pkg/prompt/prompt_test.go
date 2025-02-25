@@ -67,7 +67,7 @@ func TestMakeGroupPrompt(t *testing.T) {
 		{ID: model.NewAlertID()},
 	}
 
-	d, err := prompt.BuildMakeGroupPrompt(context.Background(), alerts)
+	d, err := prompt.BuildMakeGroupPrompt(context.Background(), alerts, 10)
 	gt.NoError(t, err)
 
 	t.Log(d)

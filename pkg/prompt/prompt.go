@@ -242,7 +242,7 @@ type MakeGroupPromptResult struct {
 	Groups []model.AlertGroupMetadata `json:"groups"`
 }
 
-func BuildMakeGroupPrompt(ctx context.Context, alerts []model.Alert) (string, error) {
+func BuildMakeGroupPrompt(ctx context.Context, alerts []model.Alert, maxGroups int) (string, error) {
 	tmpl, err := template.New("make_group").Parse(makeGroupTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
@@ -277,10 +277,11 @@ func BuildMakeGroupPrompt(ctx context.Context, alerts []model.Alert) (string, er
 	}
 
 	input := map[string]any{
-		"alerts":  rawAlerts,
-		"schema":  schema,
-		"example": string(rawExample),
-		"lang":    lang.From(ctx).Name(),
+		"alerts":     rawAlerts,
+		"schema":     schema,
+		"example":    string(rawExample),
+		"max_groups": maxGroups,
+		"lang":       lang.From(ctx).Name(),
 	}
 
 	var buf bytes.Buffer
