@@ -12,7 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/thread"
 )
 
-const maxAlertsToGroup = 256
+const maxAlertsToGroup = 128
 
 func (x *UseCases) GroupUnclosedAlerts(ctx context.Context, th interfaces.SlackThreadService) error {
 	thread.Reply(ctx, "👥 Starting to make groups of alerts...")
