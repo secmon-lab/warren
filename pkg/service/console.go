@@ -215,13 +215,12 @@ func (c *ConsoleThread) PostAlertGroups(_ context.Context, groups []model.AlertG
 		color.New(color.FgWhite).Fprintf(c.writer, "%s\n", group.Description)
 
 		fmt.Fprintln(c.writer)
-		color.New(color.FgYellow).Fprintln(c.writer, "Alerts in this group:")
+		color.New(color.FgYellow).Fprintf(c.writer, "Alerts in this group: (total %d)\n", len(group.Alerts))
 		for _, alert := range group.Alerts {
 			color.New(color.FgGreen).Fprintf(c.writer, "  • %s\n", alert.Title)
 		}
 		fmt.Fprintln(c.writer)
 	}
-
 	fmt.Fprintln(c.writer, strings.Repeat("=", 80))
 	return nil
 }

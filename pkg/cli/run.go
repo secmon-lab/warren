@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
@@ -13,16 +14,34 @@ import (
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/usecase"
+	"github.com/secmon-lab/warren/pkg/utils/lang"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
 	"github.com/urfave/cli/v3"
 )
 
 func cmdRun() *cli.Command {
+	var language model.Lang
 	return &cli.Command{
 		Name:    "run",
 		Aliases: []string{"r"},
 		Usage:   "Run alert investigation on local",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "lang",
+				Aliases:     []string{"l"},
+				Usage:       "Language of GenAI output [en, ja]",
+				Sources:     cli.EnvVars("WARREN_LANG"),
+				Destination: (*string)(&language),
+				Value:       "en",
+			},
+		},
+		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
+			if err := language.Validate(); err != nil {
+				return nil, goerr.Wrap(err, "invalid language")
+			}
+			return lang.With(ctx, language), nil
+		},
 		Commands: []*cli.Command{
 			cmdInspect(),
 			cmdGroup(),
@@ -71,6 +90,7 @@ func cmdGroup() *cli.Command {
 
 			th := console.NewThread(model.SlackThread{})
 			ctx = thread.WithReplyFunc(ctx, th.Reply)
+
 			err = uc.GroupUnclosedAlerts(ctx, th)
 			if err != nil {
 				return err

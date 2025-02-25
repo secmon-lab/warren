@@ -8,9 +8,11 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 func AskChat[T any](ctx context.Context, ssn interfaces.GenAIChatSession, prompt string) (*T, error) {
+	logger := logging.From(ctx)
 	resp, err := ssn.SendMessage(ctx, genai.Text(prompt))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to send message")
@@ -27,6 +29,7 @@ func AskChat[T any](ctx context.Context, ssn interfaces.GenAIChatSession, prompt
 
 	var result T
 	if err := json.Unmarshal([]byte(text), &result); err != nil {
+		logger.Debug("failed to unmarshal text", "text", text, "error", err)
 		return nil, goerr.Wrap(err, "failed to unmarshal text", goerr.V("text", text), goerr.T(model.ErrTagInvalidLLMResponse))
 	}
 

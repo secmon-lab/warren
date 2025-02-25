@@ -225,24 +225,34 @@ func (r *Firestore) GetAlertsByStatus(ctx context.Context, status model.AlertSta
 }
 
 func (r *Firestore) BatchGetAlerts(ctx context.Context, alertIDs []model.AlertID) ([]model.Alert, error) {
-	iter := r.db.Collection(collectionAlerts).Where("ID", "in", alertIDs).Documents(ctx)
-
 	var alerts []model.Alert
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
+
+	// Process in batches of 30
+	for i := 0; i < len(alertIDs); i += 30 {
+		end := i + 30
+		if end > len(alertIDs) {
+			end = len(alertIDs)
+		}
+
+		batch := alertIDs[i:end]
+		iter := r.db.Collection(collectionAlerts).Where("ID", "in", batch).Documents(ctx)
+
+		for {
+			doc, err := iter.Next()
+			if err != nil {
+				if err == iterator.Done {
+					break
+				}
+				return nil, goerr.Wrap(err, "failed to get next alert")
 			}
-			return nil, goerr.Wrap(err, "failed to get next alert")
-		}
 
-		var alert model.Alert
-		if err := doc.DataTo(&alert); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to alert")
-		}
+			var alert model.Alert
+			if err := doc.DataTo(&alert); err != nil {
+				return nil, goerr.Wrap(err, "failed to convert data to alert")
+			}
 
-		alerts = append(alerts, alert)
+			alerts = append(alerts, alert)
+		}
 	}
 
 	return alerts, nil

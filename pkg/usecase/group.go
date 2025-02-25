@@ -9,12 +9,14 @@ import (
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
 )
 
 const maxAlertsToGroup = 128
 
 func (x *UseCases) GroupUnclosedAlerts(ctx context.Context, th interfaces.SlackThreadService) error {
+	logger := logging.From(ctx)
 	thread.Reply(ctx, "👥 Starting to make groups of alerts...")
 
 	newAlerts, err := x.repository.GetAlertsByStatus(ctx, model.AlertStatusNew)
@@ -39,7 +41,7 @@ func (x *UseCases) GroupUnclosedAlerts(ctx context.Context, th interfaces.SlackT
 		alerts = alerts[:maxAlertsToGroup]
 	}
 
-	p, err := prompt.BuildMakeGroupPrompt(ctx, alerts, 16)
+	p, err := prompt.BuildMakeGroupPrompt(ctx, alerts, 10)
 	if err != nil {
 		return err
 	}
@@ -54,6 +56,7 @@ func (x *UseCases) GroupUnclosedAlerts(ctx context.Context, th interfaces.SlackT
 		if err != nil {
 			if goerr.HasTag(err, model.ErrTagInvalidLLMResponse) {
 				thread.Reply(ctx, "💥 Failed to make groups of alerts. Retry...")
+				logger.Debug("failed to make group prompt", "error", err)
 				p = "invalid response, please try again: " + err.Error()
 				continue
 			}
