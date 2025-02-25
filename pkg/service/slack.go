@@ -24,10 +24,19 @@ type Slack struct {
 }
 
 type slackMetadata struct {
-	teamID   string
-	teamName string
-	botID    string
-	userID   string
+	teamID       string
+	teamName     string
+	botID        string
+	userID       string
+	enterpriseID string
+}
+
+func (x slackMetadata) ToMsgURL(channelID, threadID string) string {
+	if x.enterpriseID == "" {
+		return fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", x.teamName, channelID, threadID)
+	}
+
+	return fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", x.enterpriseID, channelID, threadID)
 }
 
 var _ interfaces.SlackService = &Slack{}
@@ -68,6 +77,8 @@ func NewSlack(oauthToken, signingSecret, channelID string) (*Slack, error) {
 	s.userID = authTest.UserID
 	s.teamID = authTest.TeamID
 	s.teamName = authTest.Team
+	s.enterpriseID = authTest.EnterpriseID
+
 	s.botID = authTest.BotID
 
 	return s, nil
@@ -555,7 +566,7 @@ func NewSlackPayloadVerifier(signingSecret string) interfaces.SlackPayloadVerifi
 }
 
 func (x *SlackThread) PostAlertGroups(ctx context.Context, groups []model.AlertGroup) error {
-	blocks := buildAlertGroupsBlocks(groups, x.teamName)
+	blocks := buildAlertGroupsBlocks(groups, x.slackMetadata)
 
 	_, _, err := x.slackClient.PostMessageContext(ctx,
 		x.channelID,
@@ -570,7 +581,7 @@ func (x *SlackThread) PostAlertGroups(ctx context.Context, groups []model.AlertG
 	return nil
 }
 
-func buildAlertGroupsBlocks(groups []model.AlertGroup, teamName string) []slack.Block {
+func buildAlertGroupsBlocks(groups []model.AlertGroup, metadata slackMetadata) []slack.Block {
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(
 			slack.NewTextBlockObject("plain_text", "Summary of Groups", false, false),
@@ -578,13 +589,13 @@ func buildAlertGroupsBlocks(groups []model.AlertGroup, teamName string) []slack.
 	}
 
 	for _, group := range groups {
-		blocks = append(blocks, buildAlertGroupBlocks(group, teamName)...)
+		blocks = append(blocks, buildAlertGroupBlocks(group, metadata)...)
 	}
 
 	return blocks
 }
 
-func buildAlertGroupBlocks(group model.AlertGroup, teamName string) []slack.Block {
+func buildAlertGroupBlocks(group model.AlertGroup, metadata slackMetadata) []slack.Block {
 	blocks := []slack.Block{
 		slack.NewDividerBlock(),
 		slack.NewHeaderBlock(
@@ -602,7 +613,7 @@ func buildAlertGroupBlocks(group model.AlertGroup, teamName string) []slack.Bloc
 	// Example: https://xxx.slack.com/archives/C07AR2FPG1F/p1740438108890669
 	for _, alert := range group.Alerts {
 		if alert.SlackThread != nil {
-			link := fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", teamName, alert.SlackThread.ChannelID, alert.SlackThread.ThreadID)
+			link := metadata.ToMsgURL(alert.SlackThread.ChannelID, alert.SlackThread.ThreadID)
 			alertList += fmt.Sprintf("• <%s|%s>\n", link, alert.Title)
 		} else {
 			alertList += fmt.Sprintf("• %s\n", alert.Title)
