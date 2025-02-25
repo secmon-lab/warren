@@ -142,6 +142,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 	switch args[0] {
 	case "group":
 		go func() {
+			ctx = newBackgroundContext(ctx)
 			defer func() {
 				if r := recover(); r != nil {
 					th.Reply(ctx, fmt.Sprintf("💥 Crushed by panic: %v", r))
