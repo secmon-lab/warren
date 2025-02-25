@@ -102,6 +102,10 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 		ChannelID: event.Channel,
 		ThreadID:  event.ThreadTimeStamp,
 	}
+	if threadData.ThreadID == "" {
+		threadData.ThreadID = event.TimeStamp
+	}
+
 	alert, err := uc.repository.GetAlertBySlackThread(ctx, threadData)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert by slack thread")
