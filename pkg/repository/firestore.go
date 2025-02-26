@@ -225,24 +225,34 @@ func (r *Firestore) GetAlertsByStatus(ctx context.Context, status model.AlertSta
 }
 
 func (r *Firestore) BatchGetAlerts(ctx context.Context, alertIDs []model.AlertID) ([]model.Alert, error) {
-	iter := r.db.Collection(collectionAlerts).Where("ID", "in", alertIDs).Documents(ctx)
-
 	var alerts []model.Alert
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
+
+	// Process in batches of 30
+	for i := 0; i < len(alertIDs); i += 30 {
+		end := i + 30
+		if end > len(alertIDs) {
+			end = len(alertIDs)
+		}
+
+		batch := alertIDs[i:end]
+		iter := r.db.Collection(collectionAlerts).Where("ID", "in", batch).Documents(ctx)
+
+		for {
+			doc, err := iter.Next()
+			if err != nil {
+				if err == iterator.Done {
+					break
+				}
+				return nil, goerr.Wrap(err, "failed to get next alert")
 			}
-			return nil, goerr.Wrap(err, "failed to get next alert")
-		}
 
-		var alert model.Alert
-		if err := doc.DataTo(&alert); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to alert")
-		}
+			var alert model.Alert
+			if err := doc.DataTo(&alert); err != nil {
+				return nil, goerr.Wrap(err, "failed to convert data to alert")
+			}
 
-		alerts = append(alerts, alert)
+			alerts = append(alerts, alert)
+		}
 	}
 
 	return alerts, nil
@@ -264,7 +274,7 @@ func (r *Firestore) PutAlertGroups(ctx context.Context, groups []model.AlertGrou
 		go func(group model.AlertGroup) {
 			defer wg.Done()
 			if _, err := job.Results(); err != nil {
-				errCh <- err
+				errCh <- goerr.Wrap(err, "failed to save alert group", goerr.V("group", group))
 			}
 		}(group)
 	}
@@ -285,6 +295,9 @@ func (r *Firestore) GetAlertGroup(ctx context.Context, groupID model.AlertGroupI
 	groupDoc := r.db.Collection(collectionAlertGroups).Doc(groupID.String())
 	doc, err := groupDoc.Get(ctx)
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
 		return nil, goerr.Wrap(err, "failed to get alert group", goerr.V("group_id", groupID))
 	}
 
