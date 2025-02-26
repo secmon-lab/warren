@@ -8,7 +8,6 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
-	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service"
@@ -81,9 +80,7 @@ func cmdGroup() *cli.Command {
 			}
 
 			uc := usecase.New(
-				func() interfaces.GenAIChatSession {
-					return geminiModel.StartChat()
-				},
+				usecase.WithLLMClient(geminiModel),
 				usecase.WithRepository(firestore),
 				usecase.WithSlackService(service.NewConsole(os.Stdout)),
 			)
@@ -171,9 +168,7 @@ func cmdInspect() *cli.Command {
 			logging.Default().Info("enabled actions", "actions", actions)
 
 			uc := usecase.New(
-				func() interfaces.GenAIChatSession {
-					return geminiModel.StartChat()
-				},
+				usecase.WithLLMClient(geminiModel),
 				usecase.WithPolicyService(policy.New(repository.NewMemory(), policyClient, &model.TestDataSet{})),
 				usecase.WithSlackService(service.NewConsole(os.Stdout)),
 				usecase.WithActionService(actionSvc),

@@ -46,7 +46,7 @@ func (x *UseCases) GroupUnclosedAlerts(ctx context.Context, th interfaces.SlackT
 		return err
 	}
 
-	chat := x.geminiStartChat()
+	chat := x.llmClient.StartChat()
 	var groups []model.AlertGroupMetadata
 
 	const maxRetry = 3

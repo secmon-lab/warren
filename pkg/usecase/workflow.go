@@ -17,7 +17,7 @@ import (
 )
 
 type throttleSession struct {
-	ssn  interfaces.GenAIChatSession
+	ssn  interfaces.LLMSession
 	last time.Time
 	mu   sync.Mutex
 }
@@ -39,7 +39,7 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 	thread.Reply(ctx, "Starting investigation...")
 
 	ssn := &throttleSession{
-		ssn:  uc.geminiStartChat(),
+		ssn:  uc.llmClient.StartChat(),
 		last: time.Now(),
 	}
 
@@ -121,7 +121,7 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 	return nil
 }
 
-func planAction(ctx context.Context, ssn interfaces.GenAIChatSession, prePrompt string, actionSvc *service.ActionService) (*prompt.ActionPromptResult, error) {
+func planAction(ctx context.Context, ssn interfaces.LLMSession, prePrompt string, actionSvc *service.ActionService) (*prompt.ActionPromptResult, error) {
 	mainPrompt, err := prompt.BuildActionPrompt(ctx, actionSvc.Spec())
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build action prompt")
@@ -150,7 +150,7 @@ func planAction(ctx context.Context, ssn interfaces.GenAIChatSession, prePrompt 
 	return &result, nil
 }
 
-func (uc *UseCases) buildFinding(ctx context.Context, ssn interfaces.GenAIChatSession) (*model.AlertFinding, error) {
+func (uc *UseCases) buildFinding(ctx context.Context, ssn interfaces.LLMSession) (*model.AlertFinding, error) {
 	conclusionPrompt, err := prompt.BuildFindingPrompt(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build conclusion prompt")

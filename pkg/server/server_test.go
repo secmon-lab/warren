@@ -54,14 +54,10 @@ func TestValidateGoogleIDToken(t *testing.T) {
 			}
 		},
 	}
-	ssnMock := func() interfaces.GenAIChatSession {
-		ssn := &mock.GenAIChatSessionMock{}
-		return ssn
-	}
 	policyService := policy.New(repository.NewMemory(), policyMock, &model.TestDataSet{}, policy.WithFactory(func(data policy.PolicyData) (interfaces.PolicyClient, error) {
 		return policyMock, nil
 	}))
-	uc := usecase.New(ssnMock, usecase.WithPolicyService(policyService))
+	uc := usecase.New(usecase.WithPolicyService(policyService))
 
 	server := server.New(uc)
 

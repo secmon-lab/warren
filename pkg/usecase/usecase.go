@@ -16,7 +16,8 @@ import (
 type UseCases struct {
 	// services and adapters
 	slackService    interfaces.SlackService
-	geminiStartChat interfaces.GetGeminiStartChat
+	llmClient       interfaces.LLMClient
+	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
 	actionService   *service.ActionService
 	policyService   *policy.Service
@@ -30,6 +31,18 @@ type UseCases struct {
 var _ interfaces.UseCase = &UseCases{}
 
 type Option func(*UseCases)
+
+func WithLLMClient(llmClient interfaces.LLMClient) Option {
+	return func(u *UseCases) {
+		u.llmClient = llmClient
+	}
+}
+
+func WithEmbeddingClient(embeddingClient interfaces.EmbeddingClient) Option {
+	return func(u *UseCases) {
+		u.embeddingClient = embeddingClient
+	}
+}
 
 func WithSlackService(slackService interfaces.SlackService) Option {
 	return func(u *UseCases) {
@@ -74,14 +87,13 @@ func WithFindingLimit(findingLimit int) Option {
 	}
 }
 
-func New(geminiStartChat interfaces.GetGeminiStartChat, opts ...Option) *UseCases {
+func New(opts ...Option) *UseCases {
 	policyClient, err := opaq.New(opaq.Data("policy", "package alert.dummy"))
 	if err != nil {
 		panic(err)
 	}
 
 	u := &UseCases{
-		geminiStartChat: geminiStartChat,
 		slackService: &mock.SlackServiceMock{
 			PostAlertFunc: func(ctx context.Context, alert model.Alert) (interfaces.SlackThreadService, error) {
 				return &mock.SlackThreadServiceMock{

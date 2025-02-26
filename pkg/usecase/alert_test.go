@@ -17,18 +17,27 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/test"
 )
 
-func TestFindSimilarAlert(t *testing.T) {
-	ctx := context.Background()
+type geminiClient struct {
+	model *genai.GenerativeModel
+}
+
+func (c *geminiClient) StartChat() interfaces.LLMSession {
+	return c.model.StartChat()
+}
+
+func genGeminiClient(t *testing.T) *geminiClient {
 	vars := test.NewEnvVars(t, "TEST_GEMINI_PROJECT_ID", "TEST_GEMINI_LOCATION")
-	client, err := genai.NewClient(ctx, vars.Get("TEST_GEMINI_PROJECT_ID"), vars.Get("TEST_GEMINI_LOCATION"))
+	client, err := genai.NewClient(t.Context(), vars.Get("TEST_GEMINI_PROJECT_ID"), vars.Get("TEST_GEMINI_LOCATION"))
 	gt.NoError(t, err)
 	geminiModel := client.GenerativeModel("gemini-2.0-flash-exp")
 	geminiModel.GenerationConfig.ResponseMIMEType = "application/json"
+	return &geminiClient{model: geminiModel}
+}
 
+func TestFindSimilarAlert(t *testing.T) {
+	ctx := context.Background()
 	repo := repository.NewMemory()
-	uc := usecase.New(func() interfaces.GenAIChatSession {
-		return geminiModel.StartChat()
-	}, usecase.WithRepository(repo))
+	uc := usecase.New(usecase.WithLLMClient(genGeminiClient(t)), usecase.WithRepository(repo))
 
 	newAlert := model.NewAlert(ctx, "my_schema", model.PolicyAlert{
 		Title: "test alert 1",
@@ -128,17 +137,8 @@ func TestPlanAction(t *testing.T) {
 
 func TestGenerateAlertMetadata(t *testing.T) {
 	ctx := context.Background()
-	vars := test.NewEnvVars(t, "TEST_GEMINI_PROJECT_ID", "TEST_GEMINI_LOCATION")
-	client, err := genai.NewClient(ctx, vars.Get("TEST_GEMINI_PROJECT_ID"), vars.Get("TEST_GEMINI_LOCATION"))
-	gt.NoError(t, err)
-	geminiModel := client.GenerativeModel("gemini-2.0-flash")
-	geminiModel.GenerationConfig.ResponseMIMEType = "application/json"
-	ssn := geminiModel.StartChat()
-
 	repo := repository.NewMemory()
-	uc := usecase.New(func() interfaces.GenAIChatSession {
-		return ssn
-	}, usecase.WithRepository(repo))
+	uc := usecase.New(usecase.WithLLMClient(genGeminiClient(t)), usecase.WithRepository(repo))
 
 	alert := model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
 		Title: "Amazon GuardDuty finding",

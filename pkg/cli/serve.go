@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/secmon-lab/warren/pkg/cli/config"
-	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/server"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/policy"
@@ -105,9 +104,7 @@ func cmdServe() *cli.Command {
 			policyService := policy.New(firestore, policyClient, testDataSet)
 
 			uc := usecase.New(
-				func() interfaces.GenAIChatSession {
-					return geminiModel.StartChat()
-				},
+				usecase.WithLLMClient(geminiModel),
 				usecase.WithPolicyService(policyService),
 				usecase.WithSlackService(slackSvc),
 				usecase.WithRepository(firestore),

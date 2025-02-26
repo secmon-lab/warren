@@ -5,30 +5,18 @@ import (
 	"embed"
 	"testing"
 
-	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/usecase"
-	"github.com/secmon-lab/warren/pkg/utils/test"
 )
-
-func buildGenAIModelForTest(t *testing.T) *genai.GenerativeModel {
-	vars := test.NewEnvVars(t, "TEST_GEMINI_PROJECT_ID", "TEST_GEMINI_LOCATION")
-	ai, err := genai.NewClient(t.Context(), vars.Get("TEST_GEMINI_PROJECT_ID"), vars.Get("TEST_GEMINI_LOCATION"))
-	gt.NoError(t, err)
-	geminiModel := ai.GenerativeModel("gemini-2.0-flash")
-	geminiModel.GenerationConfig.ResponseMIMEType = "application/json"
-	return geminiModel
-}
 
 //go:embed testdata/group
 var groupTestData embed.FS
 
 func TestGroupUnclosedAlerts(t *testing.T) {
-	genaiModel := buildGenAIModelForTest(t)
+	geminiClient := genGeminiClient(t)
 	repo := repository.NewMemory()
 
 	alerts := []model.Alert{
@@ -62,9 +50,7 @@ func TestGroupUnclosedAlerts(t *testing.T) {
 			return nil
 		},
 	}
-	uc := usecase.New(func() interfaces.GenAIChatSession {
-		return genaiModel.StartChat()
-	}, usecase.WithRepository(repo))
+	uc := usecase.New(usecase.WithLLMClient(geminiClient), usecase.WithRepository(repo))
 
 	gt.NoError(t, uc.GroupUnclosedAlerts(context.Background(), mockSlackThread)).Must()
 	gt.A(t, mockSlackThread.PostAlertGroupsCalls()).Length(1)

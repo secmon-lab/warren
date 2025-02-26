@@ -6,16 +6,12 @@ import (
 	"encoding/json"
 	"testing"
 
-	"cloud.google.com/go/vertexai/genai"
-
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opaq"
-	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/usecase"
-	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
 )
 
@@ -34,12 +30,7 @@ func loadJson(t *testing.T, fd embed.FS, name string) any {
 func TestGenerateIgnorePolicy(t *testing.T) {
 	ctx := t.Context()
 
-	vars := test.NewEnvVars(t, "TEST_GEMINI_PROJECT_ID", "TEST_GEMINI_LOCATION")
-	ai, err := genai.NewClient(ctx, vars.Get("TEST_GEMINI_PROJECT_ID"), vars.Get("TEST_GEMINI_LOCATION"))
-	gt.NoError(t, err)
-	geminiModel := ai.GenerativeModel("gemini-2.0-flash")
-	geminiModel.GenerationConfig.ResponseMIMEType = "application/json"
-
+	geminiClient := genGeminiClient(t)
 	policyClient, err := opaq.New(opaq.Files("./testdata/ignore/policy"))
 	gt.NoError(t, err)
 
@@ -64,9 +55,7 @@ func TestGenerateIgnorePolicy(t *testing.T) {
 	errs := policyService.Test(ctx)
 	gt.A(t, errs).Length(0)
 
-	uc := usecase.New(func() interfaces.GenAIChatSession {
-		return geminiModel.StartChat()
-	}, usecase.WithPolicyService(policyService))
+	uc := usecase.New(usecase.WithLLMClient(geminiClient), usecase.WithPolicyService(policyService))
 
 	alerts := []model.Alert{
 		{

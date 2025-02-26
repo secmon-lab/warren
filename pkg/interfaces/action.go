@@ -10,7 +10,7 @@ import (
 
 type Action interface {
 	Spec() model.ActionSpec
-	Execute(ctx context.Context, slack SlackThreadService, ssn GenAIChatSession, args model.Arguments) (*model.ActionResult, error)
+	Execute(ctx context.Context, slack SlackThreadService, ssn LLMSession, args model.Arguments) (*model.ActionResult, error)
 	Flags() []cli.Flag
 	Configure(ctx context.Context) error
 	LogValue() slog.Value

@@ -133,7 +133,7 @@ func (r *Memory) PutAlertGroups(ctx context.Context, groups []model.AlertGroup) 
 func (r *Memory) GetAlertGroup(ctx context.Context, groupID model.AlertGroupID) (*model.AlertGroup, error) {
 	group, ok := r.alertGroups[groupID]
 	if !ok {
-		return nil, goerr.New("alert group not found", goerr.V("group_id", groupID))
+		return nil, nil
 	}
 	return &group, nil
 }

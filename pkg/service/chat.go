@@ -11,7 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
-func AskChat[T any](ctx context.Context, ssn interfaces.GenAIChatSession, prompt string) (*T, error) {
+func AskChat[T any](ctx context.Context, ssn interfaces.LLMSession, prompt string) (*T, error) {
 	logger := logging.From(ctx)
 	resp, err := ssn.SendMessage(ctx, genai.Text(prompt))
 	if err != nil {

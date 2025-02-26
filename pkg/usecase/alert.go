@@ -140,7 +140,7 @@ func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert model.Alert
 		return nil, goerr.Wrap(err, "failed to build meta prompt")
 	}
 
-	ssn := uc.geminiStartChat()
+	ssn := uc.llmClient.StartChat()
 
 	var result *prompt.MetaPromptResult
 	for i := 0; i < 3 && result == nil; i++ {
@@ -192,7 +192,7 @@ func (uc *UseCases) findSimilarAlert(ctx context.Context, alert model.Alert) (*m
 		return nil, goerr.Wrap(err, "failed to build aggregate prompt")
 	}
 
-	ssn := uc.geminiStartChat()
+	ssn := uc.llmClient.StartChat()
 	result, err := service.AskChat[prompt.AggregatePromptResult](ctx, ssn, p)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to ask chat")
