@@ -156,13 +156,21 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 			th.Reply(ctx, "💥 No alert found. Please run the command in the alert thread.")
 			return nil
 		}
+
+		alerts := []model.Alert{*alert}
+		childAlerts, err := uc.repository.GetAlertsByParentID(ctx, alert.ID)
+		if err != nil {
+			return goerr.Wrap(err, "failed to get child alerts")
+		}
+		alerts = append(alerts, childAlerts...)
+
 		var note string
 		if len(args) > 1 {
 			note = strings.Join(args[1:], " ")
 		}
 
 		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-			newPolicy, err := uc.GenerateIgnorePolicy(ctx, []model.Alert{*alert}, note)
+			newPolicy, err := uc.GenerateIgnorePolicy(ctx, alerts, note)
 			if err != nil {
 				return err
 			}
