@@ -633,3 +633,49 @@ func buildAlertGroupBlocks(group model.AlertGroup, metadata slackMetadata) []sla
 
 	return blocks
 }
+
+func (x *SlackThread) PostPolicyDiff(ctx context.Context, diff map[string]string) error {
+	blocks := buildPolicyDiffBlocks(diff)
+
+	_, _, err := x.slackClient.PostMessageContext(ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post policy diff to slack", goerr.V("blocks", blocks))
+	}
+
+	return nil
+}
+
+func buildPolicyDiffBlocks(diff map[string]string) []slack.Block {
+	blocks := []slack.Block{
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", "📒 Generated Policy", false, false),
+		),
+	}
+
+	for fileName, diff := range diff {
+		blocks = append(blocks, slack.NewDividerBlock())
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*%s*\n```\n%s\n```", fileName, diff), false, false),
+			nil,
+			nil,
+		))
+	}
+
+	/*
+		blocks = append(blocks, slack.NewDividerBlock())
+		blocks = append(blocks, slack.NewActionBlock(
+			"create_pr",
+			slack.NewButtonBlockElement(
+				"create_pr",
+				"create_pr",
+				slack.NewTextBlockObject("plain_text", "Create Pull Request", false, false),
+			),
+		))
+	*/
+
+	return blocks
+}

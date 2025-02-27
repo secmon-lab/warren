@@ -261,6 +261,9 @@ var _ interfaces.SlackThreadService = &SlackThreadServiceMock{}
 //			PostNextActionFunc: func(ctx context.Context, action prompt.ActionPromptResult) error {
 //				panic("mock out the PostNextAction method")
 //			},
+//			PostPolicyDiffFunc: func(ctx context.Context, diff map[string]string) error {
+//				panic("mock out the PostPolicyDiff method")
+//			},
 //			ReplyFunc: func(ctx context.Context, message string)  {
 //				panic("mock out the Reply method")
 //			},
@@ -291,6 +294,9 @@ type SlackThreadServiceMock struct {
 
 	// PostNextActionFunc mocks the PostNextAction method.
 	PostNextActionFunc func(ctx context.Context, action prompt.ActionPromptResult) error
+
+	// PostPolicyDiffFunc mocks the PostPolicyDiff method.
+	PostPolicyDiffFunc func(ctx context.Context, diff map[string]string) error
 
 	// ReplyFunc mocks the Reply method.
 	ReplyFunc func(ctx context.Context, message string)
@@ -338,6 +344,13 @@ type SlackThreadServiceMock struct {
 			// Action is the action argument value.
 			Action prompt.ActionPromptResult
 		}
+		// PostPolicyDiff holds details about calls to the PostPolicyDiff method.
+		PostPolicyDiff []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Diff is the diff argument value.
+			Diff map[string]string
+		}
 		// Reply holds details about calls to the Reply method.
 		Reply []struct {
 			// Ctx is the ctx argument value.
@@ -361,6 +374,7 @@ type SlackThreadServiceMock struct {
 	lockPostAlertGroups sync.RWMutex
 	lockPostFinding     sync.RWMutex
 	lockPostNextAction  sync.RWMutex
+	lockPostPolicyDiff  sync.RWMutex
 	lockReply           sync.RWMutex
 	lockThreadID        sync.RWMutex
 	lockUpdateAlert     sync.RWMutex
@@ -542,6 +556,42 @@ func (mock *SlackThreadServiceMock) PostNextActionCalls() []struct {
 	mock.lockPostNextAction.RLock()
 	calls = mock.calls.PostNextAction
 	mock.lockPostNextAction.RUnlock()
+	return calls
+}
+
+// PostPolicyDiff calls PostPolicyDiffFunc.
+func (mock *SlackThreadServiceMock) PostPolicyDiff(ctx context.Context, diff map[string]string) error {
+	if mock.PostPolicyDiffFunc == nil {
+		panic("SlackThreadServiceMock.PostPolicyDiffFunc: method is nil but SlackThreadService.PostPolicyDiff was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Diff map[string]string
+	}{
+		Ctx:  ctx,
+		Diff: diff,
+	}
+	mock.lockPostPolicyDiff.Lock()
+	mock.calls.PostPolicyDiff = append(mock.calls.PostPolicyDiff, callInfo)
+	mock.lockPostPolicyDiff.Unlock()
+	return mock.PostPolicyDiffFunc(ctx, diff)
+}
+
+// PostPolicyDiffCalls gets all the calls that were made to PostPolicyDiff.
+// Check the length with:
+//
+//	len(mockedSlackThreadService.PostPolicyDiffCalls())
+func (mock *SlackThreadServiceMock) PostPolicyDiffCalls() []struct {
+	Ctx  context.Context
+	Diff map[string]string
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Diff map[string]string
+	}
+	mock.lockPostPolicyDiff.RLock()
+	calls = mock.calls.PostPolicyDiff
+	mock.lockPostPolicyDiff.RUnlock()
 	return calls
 }
 

@@ -1,6 +1,7 @@
 package usecase_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/m-mizutani/gt"
@@ -15,5 +16,8 @@ func TestDiffPolicy(t *testing.T) {
 	gt.NoError(t, err)
 
 	diff := usecase.DiffPolicy(oldPolicy.Sources(), newPolicy.Sources())
-	println(diff)
+	for fileName, diff := range diff {
+		fmt.Println(fileName)
+		fmt.Println(diff)
+	}
 }

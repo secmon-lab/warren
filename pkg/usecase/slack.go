@@ -176,8 +176,8 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 			}
 
 			diff := diffPolicy(uc.policyService.Sources(), newPolicy.Sources())
-			if diff != "" {
-				if err := th.AttachFile(ctx, "New policy diff", "policy.diff", []byte(diff)); err != nil {
+			if diff != nil {
+				if err := th.PostPolicyDiff(ctx, diff); err != nil {
 					return err
 				}
 			} else {

@@ -5,83 +5,96 @@ import (
 	"strings"
 )
 
-func diffPolicy(oldPolicy, newPolicy map[string]string) string {
-	var result string
+func diffPolicy(oldPolicy, newPolicy map[string]string) map[string]string {
+	result := make(map[string]string)
 
-	// Find modified, added and deleted files
-	modifiedFiles := make(map[string]struct{})
-	addedFiles := make(map[string]struct{})
-	deletedFiles := make(map[string]struct{})
+	// Handle deleted files
+	for fileName := range oldPolicy {
+		if _, exists := newPolicy[fileName]; !exists {
+			lines := strings.Split(strings.TrimSpace(oldPolicy[fileName]), "\n")
+			var diff strings.Builder
+			for _, line := range lines {
+				if line != "" {
+					fmt.Fprintf(&diff, "- %s\n", line)
+				}
+			}
+			result[fileName] = diff.String()
+		}
+	}
 
-	for fname := range oldPolicy {
-		if _, ok := newPolicy[fname]; ok {
-			if oldPolicy[fname] != newPolicy[fname] {
-				modifiedFiles[fname] = struct{}{}
+	// Handle new and modified files
+	for fileName, newContent := range newPolicy {
+		if oldContent, exists := oldPolicy[fileName]; exists {
+			if oldContent != newContent {
+				// File was modified
+				oldLines := strings.Split(strings.TrimSpace(oldContent), "\n")
+				newLines := strings.Split(strings.TrimSpace(newContent), "\n")
+
+				var diff strings.Builder
+				var i, j int
+				for i < len(oldLines) && j < len(newLines) {
+					if oldLines[i] == newLines[j] {
+						// Lines match, keep going
+						fmt.Fprintf(&diff, "  %s\n", oldLines[i])
+						i++
+						j++
+					} else {
+						// Find next matching line
+						matchFound := false
+						for k := 1; k < 3; k++ {
+							if i+k < len(oldLines) && oldLines[i+k] == newLines[j] {
+								// Found match ahead in old lines - lines were deleted
+								for x := 0; x < k; x++ {
+									fmt.Fprintf(&diff, "- %s\n", oldLines[i+x])
+								}
+								i += k
+								matchFound = true
+								break
+							}
+							if j+k < len(newLines) && oldLines[i] == newLines[j+k] {
+								// Found match ahead in new lines - lines were added
+								for x := 0; x < k; x++ {
+									fmt.Fprintf(&diff, "+ %s\n", newLines[j+x])
+								}
+								j += k
+								matchFound = true
+								break
+							}
+						}
+						if !matchFound {
+							// No nearby match found - line was modified
+							fmt.Fprintf(&diff, "- %s\n+ %s\n", oldLines[i], newLines[j])
+							i++
+							j++
+						}
+					}
+				}
+
+				// Handle remaining lines
+				for ; i < len(oldLines); i++ {
+					fmt.Fprintf(&diff, "- %s\n", oldLines[i])
+				}
+				for ; j < len(newLines); j++ {
+					fmt.Fprintf(&diff, "+ %s\n", newLines[j])
+				}
+
+				result[fileName] = diff.String()
 			}
 		} else {
-			deletedFiles[fname] = struct{}{}
-		}
-	}
-
-	for fname := range newPolicy {
-		if _, ok := oldPolicy[fname]; !ok {
-			addedFiles[fname] = struct{}{}
-		}
-	}
-
-	// Generate diff for modified files
-	for fname := range modifiedFiles {
-		oldLines := strings.Split(oldPolicy[fname], "\n")
-		newLines := strings.Split(newPolicy[fname], "\n")
-
-		result += fmt.Sprintf("diff old/%s new/%s\n", fname, fname)
-
-		// Simple diff implementation showing changed lines with context
-		for i := 0; i < len(oldLines) || i < len(newLines); i++ {
-			if i >= len(oldLines) {
-				// Added lines in new file
-				result += fmt.Sprintf("+ %s\n", newLines[i])
-				continue
-			}
-			if i >= len(newLines) {
-				// Deleted lines from old file
-				result += fmt.Sprintf("- %s\n", oldLines[i])
-				continue
-			}
-			if oldLines[i] != newLines[i] {
-				// Show context (3 lines before)
-				start := max(0, i-3)
-				for j := start; j < i; j++ {
-					result += fmt.Sprintf("  %s\n", oldLines[j])
+			// New file added
+			lines := strings.Split(strings.TrimSpace(newContent), "\n")
+			var diff strings.Builder
+			for _, line := range lines {
+				if line != "" {
+					fmt.Fprintf(&diff, "+ %s\n", line)
 				}
-				result += fmt.Sprintf("- %s\n", oldLines[i])
-				result += "---\n"
-				result += fmt.Sprintf("+ %s\n", newLines[i])
 			}
+			result[fileName] = diff.String()
 		}
 	}
 
-	// Show added files
-	for fname := range addedFiles {
-		result += fmt.Sprintf("Only in new: %s\n", fname)
-		result += "--- /dev/null\n"
-		result += fmt.Sprintf("+++ b/%s\n", fname)
-		lines := strings.Split(newPolicy[fname], "\n")
-		for _, line := range lines {
-			result += fmt.Sprintf("+ %s\n", line)
-		}
+	if len(result) == 0 {
+		return nil
 	}
-
-	// Show deleted files
-	for fname := range deletedFiles {
-		result += fmt.Sprintf("Only in old: %s\n", fname)
-		result += "+++ /dev/null\n"
-		result += fmt.Sprintf("--- a/%s\n", fname)
-		lines := strings.Split(oldPolicy[fname], "\n")
-		for _, line := range lines {
-			result += fmt.Sprintf("- %s\n", line)
-		}
-	}
-
-	return strings.TrimSpace(result)
+	return result
 }

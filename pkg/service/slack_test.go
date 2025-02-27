@@ -216,3 +216,24 @@ func TestPostAlertGroups(t *testing.T) {
 
 	gt.NoError(t, thread.PostAlertGroups(context.Background(), groups))
 }
+
+func TestPostPolicyDiff(t *testing.T) {
+	svc := newSlackService(t)
+
+	diff := map[string]string{
+		"test.rego": `+ test
++ test2
+- test3
+  moge
+`,
+		"test2.rego": `- test1
++ test2
++ test3
+hoge
+`,
+	}
+
+	thread, err := svc.PostMessage(context.Background(), "policy diff test")
+	gt.NoError(t, err)
+	gt.NoError(t, thread.PostPolicyDiff(context.Background(), diff))
+}

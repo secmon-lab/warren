@@ -224,3 +224,15 @@ func (c *ConsoleThread) PostAlertGroups(_ context.Context, groups []model.AlertG
 	fmt.Fprintln(c.writer, strings.Repeat("=", 80))
 	return nil
 }
+
+func (c *ConsoleThread) PostPolicyDiff(_ context.Context, diff map[string]string) error {
+	c.printHeader("🔍 Policy Diff")
+	for fileName, diff := range diff {
+		fmt.Fprintln(c.writer, strings.Repeat("-", 80))
+		fmt.Fprintf(c.writer, "File: %s\n", fileName)
+
+		fmt.Fprintf(c.writer, "```\n%s\n```\n", diff)
+	}
+	fmt.Fprintln(c.writer, strings.Repeat("-", 80))
+	return nil
+}
