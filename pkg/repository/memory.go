@@ -15,6 +15,7 @@ type Memory struct {
 	comments    map[model.AlertID][]model.AlertComment
 	policies    map[string]model.PolicyData
 	alertGroups map[model.AlertGroupID]model.AlertGroup
+	policyDiffs map[model.PolicyDiffID]model.PolicyDiff
 }
 
 var _ interfaces.Repository = &Memory{}
@@ -25,6 +26,7 @@ func NewMemory() *Memory {
 		comments:    make(map[model.AlertID][]model.AlertComment),
 		policies:    make(map[string]model.PolicyData),
 		alertGroups: make(map[model.AlertGroupID]model.AlertGroup),
+		policyDiffs: make(map[model.PolicyDiffID]model.PolicyDiff),
 	}
 }
 
@@ -146,4 +148,17 @@ func (r *Memory) GetAlertsByParentID(ctx context.Context, parentID model.AlertID
 		}
 	}
 	return alerts, nil
+}
+
+func (r *Memory) GetPolicyDiff(ctx context.Context, id model.PolicyDiffID) (*model.PolicyDiff, error) {
+	diff, ok := r.policyDiffs[id]
+	if !ok {
+		return nil, nil
+	}
+	return &diff, nil
+}
+
+func (r *Memory) PutPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error {
+	r.policyDiffs[diff.ID] = *diff
+	return nil
 }

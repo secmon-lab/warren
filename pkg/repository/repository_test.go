@@ -308,4 +308,19 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 				return v.ID == alert3.ID
 			})
 	})
+
+	t.Run("GetPolicyDiff", func(t *testing.T) {
+		diff := model.NewPolicyDiff(ctx, "test", "test", map[string]string{"test": "test"}, map[string]string{}, model.NewTestDataSet())
+		gt.NoError(t, repo.PutPolicyDiff(ctx, diff))
+
+		got, err := repo.GetPolicyDiff(ctx, diff.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, diff.ID, got.ID)
+	})
+
+	t.Run("GetPolicyDiff_NotFound", func(t *testing.T) {
+		got, err := repo.GetPolicyDiff(ctx, model.PolicyDiffID(uuid.New().String()))
+		gt.NoError(t, err)
+		gt.Nil(t, got)
+	})
 }

@@ -43,6 +43,8 @@ type Repository interface {
 	FetchLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error)
 	GetPolicy(ctx context.Context, hash string) (*model.PolicyData, error)
 	SavePolicy(ctx context.Context, policy *model.PolicyData) error
+	GetPolicyDiff(ctx context.Context, id model.PolicyDiffID) (*model.PolicyDiff, error)
+	PutPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error
 }
 
 type GitHubAppClient interface {

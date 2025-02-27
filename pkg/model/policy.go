@@ -114,8 +114,14 @@ type PolicyData struct {
 	CreatedAt time.Time         `firestore:"created_at"`
 }
 
+type PolicyDiffID string
+
+func (x PolicyDiffID) String() string {
+	return string(x)
+}
+
 type PolicyDiff struct {
-	ID          string            `json:"id"`
+	ID          PolicyDiffID      `json:"id"`
 	Title       string            `json:"title"`
 	Description string            `json:"description"`
 	CreatedAt   time.Time         `json:"created_at"`
@@ -126,7 +132,7 @@ type PolicyDiff struct {
 
 func NewPolicyDiff(ctx context.Context, title, description string, new, old map[string]string, testDataSet *TestDataSet) *PolicyDiff {
 	return &PolicyDiff{
-		ID:          uuid.New().String(),
+		ID:          PolicyDiffID(uuid.New().String()),
 		Title:       title,
 		Description: description,
 		New:         new,

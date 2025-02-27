@@ -930,6 +930,9 @@ var _ interfaces.Repository = &RepositoryMock{}
 //			GetPolicyFunc: func(ctx context.Context, hash string) (*model.PolicyData, error) {
 //				panic("mock out the GetPolicy method")
 //			},
+//			GetPolicyDiffFunc: func(ctx context.Context, id model.PolicyDiffID) (*model.PolicyDiff, error) {
+//				panic("mock out the GetPolicyDiff method")
+//			},
 //			InsertAlertCommentFunc: func(ctx context.Context, comment model.AlertComment) error {
 //				panic("mock out the InsertAlertComment method")
 //			},
@@ -938,6 +941,9 @@ var _ interfaces.Repository = &RepositoryMock{}
 //			},
 //			PutAlertGroupsFunc: func(ctx context.Context, groups []model.AlertGroup) error {
 //				panic("mock out the PutAlertGroups method")
+//			},
+//			PutPolicyDiffFunc: func(ctx context.Context, diff *model.PolicyDiff) error {
+//				panic("mock out the PutPolicyDiff method")
 //			},
 //			SavePolicyFunc: func(ctx context.Context, policy *model.PolicyData) error {
 //				panic("mock out the SavePolicy method")
@@ -976,6 +982,9 @@ type RepositoryMock struct {
 	// GetPolicyFunc mocks the GetPolicy method.
 	GetPolicyFunc func(ctx context.Context, hash string) (*model.PolicyData, error)
 
+	// GetPolicyDiffFunc mocks the GetPolicyDiff method.
+	GetPolicyDiffFunc func(ctx context.Context, id model.PolicyDiffID) (*model.PolicyDiff, error)
+
 	// InsertAlertCommentFunc mocks the InsertAlertComment method.
 	InsertAlertCommentFunc func(ctx context.Context, comment model.AlertComment) error
 
@@ -984,6 +993,9 @@ type RepositoryMock struct {
 
 	// PutAlertGroupsFunc mocks the PutAlertGroups method.
 	PutAlertGroupsFunc func(ctx context.Context, groups []model.AlertGroup) error
+
+	// PutPolicyDiffFunc mocks the PutPolicyDiff method.
+	PutPolicyDiffFunc func(ctx context.Context, diff *model.PolicyDiff) error
 
 	// SavePolicyFunc mocks the SavePolicy method.
 	SavePolicyFunc func(ctx context.Context, policy *model.PolicyData) error
@@ -1055,6 +1067,13 @@ type RepositoryMock struct {
 			// Hash is the hash argument value.
 			Hash string
 		}
+		// GetPolicyDiff holds details about calls to the GetPolicyDiff method.
+		GetPolicyDiff []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID model.PolicyDiffID
+		}
 		// InsertAlertComment holds details about calls to the InsertAlertComment method.
 		InsertAlertComment []struct {
 			// Ctx is the ctx argument value.
@@ -1076,6 +1095,13 @@ type RepositoryMock struct {
 			// Groups is the groups argument value.
 			Groups []model.AlertGroup
 		}
+		// PutPolicyDiff holds details about calls to the PutPolicyDiff method.
+		PutPolicyDiff []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Diff is the diff argument value.
+			Diff *model.PolicyDiff
+		}
 		// SavePolicy holds details about calls to the SavePolicy method.
 		SavePolicy []struct {
 			// Ctx is the ctx argument value.
@@ -1093,9 +1119,11 @@ type RepositoryMock struct {
 	lockGetAlertsByParentID   sync.RWMutex
 	lockGetAlertsByStatus     sync.RWMutex
 	lockGetPolicy             sync.RWMutex
+	lockGetPolicyDiff         sync.RWMutex
 	lockInsertAlertComment    sync.RWMutex
 	lockPutAlert              sync.RWMutex
 	lockPutAlertGroups        sync.RWMutex
+	lockPutPolicyDiff         sync.RWMutex
 	lockSavePolicy            sync.RWMutex
 }
 
@@ -1427,6 +1455,42 @@ func (mock *RepositoryMock) GetPolicyCalls() []struct {
 	return calls
 }
 
+// GetPolicyDiff calls GetPolicyDiffFunc.
+func (mock *RepositoryMock) GetPolicyDiff(ctx context.Context, id model.PolicyDiffID) (*model.PolicyDiff, error) {
+	if mock.GetPolicyDiffFunc == nil {
+		panic("RepositoryMock.GetPolicyDiffFunc: method is nil but Repository.GetPolicyDiff was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		ID  model.PolicyDiffID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockGetPolicyDiff.Lock()
+	mock.calls.GetPolicyDiff = append(mock.calls.GetPolicyDiff, callInfo)
+	mock.lockGetPolicyDiff.Unlock()
+	return mock.GetPolicyDiffFunc(ctx, id)
+}
+
+// GetPolicyDiffCalls gets all the calls that were made to GetPolicyDiff.
+// Check the length with:
+//
+//	len(mockedRepository.GetPolicyDiffCalls())
+func (mock *RepositoryMock) GetPolicyDiffCalls() []struct {
+	Ctx context.Context
+	ID  model.PolicyDiffID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  model.PolicyDiffID
+	}
+	mock.lockGetPolicyDiff.RLock()
+	calls = mock.calls.GetPolicyDiff
+	mock.lockGetPolicyDiff.RUnlock()
+	return calls
+}
+
 // InsertAlertComment calls InsertAlertCommentFunc.
 func (mock *RepositoryMock) InsertAlertComment(ctx context.Context, comment model.AlertComment) error {
 	if mock.InsertAlertCommentFunc == nil {
@@ -1532,6 +1596,42 @@ func (mock *RepositoryMock) PutAlertGroupsCalls() []struct {
 	mock.lockPutAlertGroups.RLock()
 	calls = mock.calls.PutAlertGroups
 	mock.lockPutAlertGroups.RUnlock()
+	return calls
+}
+
+// PutPolicyDiff calls PutPolicyDiffFunc.
+func (mock *RepositoryMock) PutPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error {
+	if mock.PutPolicyDiffFunc == nil {
+		panic("RepositoryMock.PutPolicyDiffFunc: method is nil but Repository.PutPolicyDiff was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Diff *model.PolicyDiff
+	}{
+		Ctx:  ctx,
+		Diff: diff,
+	}
+	mock.lockPutPolicyDiff.Lock()
+	mock.calls.PutPolicyDiff = append(mock.calls.PutPolicyDiff, callInfo)
+	mock.lockPutPolicyDiff.Unlock()
+	return mock.PutPolicyDiffFunc(ctx, diff)
+}
+
+// PutPolicyDiffCalls gets all the calls that were made to PutPolicyDiff.
+// Check the length with:
+//
+//	len(mockedRepository.PutPolicyDiffCalls())
+func (mock *RepositoryMock) PutPolicyDiffCalls() []struct {
+	Ctx  context.Context
+	Diff *model.PolicyDiff
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Diff *model.PolicyDiff
+	}
+	mock.lockPutPolicyDiff.RLock()
+	calls = mock.calls.PutPolicyDiff
+	mock.lockPutPolicyDiff.RUnlock()
 	return calls
 }
 

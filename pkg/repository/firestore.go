@@ -40,6 +40,7 @@ const (
 	collectionAlerts      = "alerts"
 	collectionPolicies    = "policies"
 	collectionAlertGroups = "groups"
+	collectionPolicyDiffs = "diffs"
 )
 
 func (r *Firestore) PutAlert(ctx context.Context, alert model.Alert) error {
@@ -331,4 +332,30 @@ func (r *Firestore) GetAlertGroup(ctx context.Context, groupID model.AlertGroupI
 	}
 
 	return &group, nil
+}
+
+func (r *Firestore) GetPolicyDiff(ctx context.Context, id model.PolicyDiffID) (*model.PolicyDiff, error) {
+	doc, err := r.db.Collection(collectionPolicyDiffs).Doc(id.String()).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
+		return nil, goerr.Wrap(err, "failed to get policy diff", goerr.V("id", id))
+	}
+
+	var policyDiff model.PolicyDiff
+	if err := doc.DataTo(&policyDiff); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert data to policy diff")
+	}
+
+	return &policyDiff, nil
+}
+
+func (r *Firestore) PutPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error {
+	doc := r.db.Collection(collectionPolicyDiffs).Doc(diff.ID.String())
+	_, err := doc.Set(ctx, diff)
+	if err != nil {
+		return goerr.Wrap(err, "failed to put policy diff", goerr.V("id", diff.ID))
+	}
+	return nil
 }

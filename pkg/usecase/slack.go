@@ -175,6 +175,10 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 				return err
 			}
 
+			if err := uc.repository.PutPolicyDiff(ctx, newPolicyDiff); err != nil {
+				return err
+			}
+
 			if err := th.PostPolicyDiff(ctx, newPolicyDiff); err != nil {
 				return err
 			}
