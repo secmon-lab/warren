@@ -2,9 +2,11 @@ package interfaces
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"cloud.google.com/go/vertexai/genai"
+	"github.com/google/go-github/v69/github"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/model"
 )
@@ -40,4 +42,12 @@ type Repository interface {
 	FetchLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error)
 	GetPolicy(ctx context.Context, hash string) (*model.PolicyData, error)
 	SavePolicy(ctx context.Context, policy *model.PolicyData) error
+}
+
+type GitHubAppClient interface {
+	GetDefaultBranch(ctx context.Context, owner, repo string) (string, error)
+	DownloadArchive(ctx context.Context, owner, repo, ref string) (io.ReadCloser, error)
+	CommitChanges(ctx context.Context, owner, repo, branch string, files map[string][]byte, message string) error
+	CreateBranch(ctx context.Context, owner, repo, baseBranch, newBranch string) error
+	CreatePullRequest(ctx context.Context, owner, repo, title, body, head, base string) (*github.PullRequest, error)
 }

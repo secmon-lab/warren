@@ -1,4 +1,4 @@
-package github
+package githubapp
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"github.com/google/go-github/v69/github"
 	"github.com/jferrl/go-githubauth"
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/interfaces"
 	"golang.org/x/oauth2"
 )
 
@@ -16,7 +17,9 @@ type Client struct {
 	httpClient *http.Client
 }
 
-func NewClient(ctx context.Context, appID int64, installationID int64, privateKey []byte) (*Client, error) {
+var _ interfaces.GitHubAppClient = &Client{}
+
+func New(ctx context.Context, appID int64, installationID int64, privateKey []byte) (*Client, error) {
 	appTokenSource, err := githubauth.NewApplicationTokenSource(appID, privateKey)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create application token source", goerr.V("appID", appID), goerr.V("installationID", installationID))
@@ -60,32 +63,35 @@ func (c *Client) DownloadArchive(ctx context.Context, owner, repo, ref string) (
 	return resp.Body, nil
 }
 
-func (c *Client) CommitChanges(ctx context.Context, owner, repo, branch, path, message string, content []byte) error {
+func (c *Client) CommitChanges(ctx context.Context, owner, repo, branch string, files map[string][]byte, message string) error {
 	// Get current commit SHA
 	ref, _, err := c.client.Git.GetRef(ctx, owner, repo, "refs/heads/"+branch)
 	if err != nil {
 		return err
 	}
 
-	// Create blob with file content
-	blob := &github.Blob{
-		Content:  github.Ptr(string(content)),
-		Encoding: github.Ptr("utf-8"),
-	}
-	blob, _, err = c.client.Git.CreateBlob(ctx, owner, repo, blob)
-	if err != nil {
-		return err
-	}
+	entries := make([]*github.TreeEntry, 0, len(files))
 
-	// Create tree
-	entries := []*github.TreeEntry{
-		{
+	// Create blobs for each file
+	for path, content := range files {
+		blob := &github.Blob{
+			Content:  github.Ptr(string(content)),
+			Encoding: github.Ptr("utf-8"),
+		}
+		blob, _, err = c.client.Git.CreateBlob(ctx, owner, repo, blob)
+		if err != nil {
+			return err
+		}
+
+		entries = append(entries, &github.TreeEntry{
 			Path: github.Ptr(path),
 			Mode: github.Ptr("100644"),
 			Type: github.Ptr("blob"),
 			SHA:  blob.SHA,
-		},
+		})
 	}
+
+	// Create tree with all files
 	tree, _, err := c.client.Git.CreateTree(ctx, owner, repo, *ref.Object.SHA, entries)
 	if err != nil {
 		return err

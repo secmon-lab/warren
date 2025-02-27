@@ -1,4 +1,4 @@
-package github_test
+package githubapp_test
 
 import (
 	"archive/zip"
@@ -8,14 +8,15 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/adapter/github"
+	"github.com/secmon-lab/warren/pkg/adapter/githubapp"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 )
 
-func genTestClient(t *testing.T) *github.Client {
+func genTestClient(t *testing.T) *githubapp.Client {
 	appID := os.Getenv("TEST_GITHUB_APP_ID")
 	privateKey := os.Getenv("TEST_GITHUB_PRIVATE_KEY")
 	installationID := os.Getenv("TEST_GITHUB_INSTALLATION_ID")
@@ -34,7 +35,7 @@ func genTestClient(t *testing.T) *github.Client {
 		t.Fatalf("failed to parse installationID: %v", err)
 	}
 
-	client, err := github.NewClient(t.Context(), appIDInt, installationIDInt, []byte(privateKey))
+	client, err := githubapp.New(t.Context(), appIDInt, installationIDInt, []byte(privateKey))
 	if err != nil {
 		t.Fatalf("failed to create client: %v", err)
 	}
@@ -102,9 +103,6 @@ func TestGitHubCreatePR(t *testing.T) {
 		gt.NoError(t, err)
 	}
 
-	err = os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("test\n"), 0644)
-	gt.NoError(t, err)
-
 	// Create new branch
 	newBranch := "test-branch/" + uuid.New().String()
 	err = client.CreateBranch(ctx, owner, repo, defaultBranch, newBranch)
@@ -114,14 +112,19 @@ func TestGitHubCreatePR(t *testing.T) {
 
 	// Add test line to README.md
 	content := []byte("test\n")
+	files := map[string][]byte{
+		"README.md": content,
+		"newfile":   []byte("new file"),
+	}
 
-	err = client.CommitChanges(ctx, owner, repo, newBranch, "README.md", "Add test line", content)
+	err = client.CommitChanges(ctx, owner, repo, newBranch, files, "Add test line")
 	if err != nil {
 		t.Fatalf("failed to commit changes: %v", err)
 	}
 
 	// Create pull request
-	pr, err := client.CreatePullRequest(ctx, owner, repo, "Test PR", "Add test line to README", newBranch, defaultBranch)
+	title := "Test PR: " + time.Now().Format("2006-01-02 15:04:05")
+	pr, err := client.CreatePullRequest(ctx, owner, repo, title, "Add test line to README", newBranch, defaultBranch)
 	if err != nil {
 		t.Fatalf("failed to create pull request: %v", err)
 	}
