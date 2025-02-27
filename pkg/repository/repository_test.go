@@ -269,4 +269,43 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.NoError(t, err)
 		gt.Nil(t, got)
 	})
+
+	t.Run("GetAlertsByParentID", func(t *testing.T) {
+		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "test",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "test",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert3 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "test",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+
+		alert2.ParentID = alert1.ID
+		alert3.ParentID = alert1.ID
+		gt.NoError(t, repo.PutAlert(ctx, alert1))
+		gt.NoError(t, repo.PutAlert(ctx, alert2))
+		gt.NoError(t, repo.PutAlert(ctx, alert3))
+
+		got, err := repo.GetAlertsByParentID(ctx, alert1.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, len(got), 2)
+		gt.A(t, got).
+			Length(2).
+			Any(func(v model.Alert) bool {
+				return v.ID == alert2.ID
+			}).
+			Any(func(v model.Alert) bool {
+				return v.ID == alert3.ID
+			})
+	})
 }

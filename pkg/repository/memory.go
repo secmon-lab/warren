@@ -137,3 +137,13 @@ func (r *Memory) GetAlertGroup(ctx context.Context, groupID model.AlertGroupID) 
 	}
 	return &group, nil
 }
+
+func (r *Memory) GetAlertsByParentID(ctx context.Context, parentID model.AlertID) ([]model.Alert, error) {
+	var alerts []model.Alert
+	for _, alert := range r.alerts {
+		if alert.ParentID == parentID {
+			alerts = append(alerts, alert)
+		}
+	}
+	return alerts, nil
+}

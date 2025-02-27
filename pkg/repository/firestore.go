@@ -200,6 +200,30 @@ func (r *Firestore) SavePolicy(ctx context.Context, policy *model.PolicyData) er
 	return nil
 }
 
+func (r *Firestore) GetAlertsByParentID(ctx context.Context, parentID model.AlertID) ([]model.Alert, error) {
+	iter := r.db.Collection(collectionAlerts).Where("ParentID", "==", parentID).Documents(ctx)
+
+	var alerts []model.Alert
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next alert")
+		}
+
+		var alert model.Alert
+		if err := doc.DataTo(&alert); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert")
+		}
+
+		alerts = append(alerts, alert)
+	}
+
+	return alerts, nil
+}
+
 func (r *Firestore) GetAlertsByStatus(ctx context.Context, status model.AlertStatus) ([]model.Alert, error) {
 	iter := r.db.Collection(collectionAlerts).Where("Status", "==", status).Documents(ctx)
 

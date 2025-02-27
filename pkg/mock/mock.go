@@ -871,6 +871,9 @@ var _ interfaces.Repository = &RepositoryMock{}
 //			GetAlertGroupFunc: func(ctx context.Context, groupID model.AlertGroupID) (*model.AlertGroup, error) {
 //				panic("mock out the GetAlertGroup method")
 //			},
+//			GetAlertsByParentIDFunc: func(ctx context.Context, parentID model.AlertID) ([]model.Alert, error) {
+//				panic("mock out the GetAlertsByParentID method")
+//			},
 //			GetAlertsByStatusFunc: func(ctx context.Context, status model.AlertStatus) ([]model.Alert, error) {
 //				panic("mock out the GetAlertsByStatus method")
 //			},
@@ -913,6 +916,9 @@ type RepositoryMock struct {
 
 	// GetAlertGroupFunc mocks the GetAlertGroup method.
 	GetAlertGroupFunc func(ctx context.Context, groupID model.AlertGroupID) (*model.AlertGroup, error)
+
+	// GetAlertsByParentIDFunc mocks the GetAlertsByParentID method.
+	GetAlertsByParentIDFunc func(ctx context.Context, parentID model.AlertID) ([]model.Alert, error)
 
 	// GetAlertsByStatusFunc mocks the GetAlertsByStatus method.
 	GetAlertsByStatusFunc func(ctx context.Context, status model.AlertStatus) ([]model.Alert, error)
@@ -978,6 +984,13 @@ type RepositoryMock struct {
 			// GroupID is the groupID argument value.
 			GroupID model.AlertGroupID
 		}
+		// GetAlertsByParentID holds details about calls to the GetAlertsByParentID method.
+		GetAlertsByParentID []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ParentID is the parentID argument value.
+			ParentID model.AlertID
+		}
 		// GetAlertsByStatus holds details about calls to the GetAlertsByStatus method.
 		GetAlertsByStatus []struct {
 			// Ctx is the ctx argument value.
@@ -1027,6 +1040,7 @@ type RepositoryMock struct {
 	lockGetAlertBySlackThread sync.RWMutex
 	lockGetAlertComments      sync.RWMutex
 	lockGetAlertGroup         sync.RWMutex
+	lockGetAlertsByParentID   sync.RWMutex
 	lockGetAlertsByStatus     sync.RWMutex
 	lockGetPolicy             sync.RWMutex
 	lockInsertAlertComment    sync.RWMutex
@@ -1252,6 +1266,42 @@ func (mock *RepositoryMock) GetAlertGroupCalls() []struct {
 	mock.lockGetAlertGroup.RLock()
 	calls = mock.calls.GetAlertGroup
 	mock.lockGetAlertGroup.RUnlock()
+	return calls
+}
+
+// GetAlertsByParentID calls GetAlertsByParentIDFunc.
+func (mock *RepositoryMock) GetAlertsByParentID(ctx context.Context, parentID model.AlertID) ([]model.Alert, error) {
+	if mock.GetAlertsByParentIDFunc == nil {
+		panic("RepositoryMock.GetAlertsByParentIDFunc: method is nil but Repository.GetAlertsByParentID was just called")
+	}
+	callInfo := struct {
+		Ctx      context.Context
+		ParentID model.AlertID
+	}{
+		Ctx:      ctx,
+		ParentID: parentID,
+	}
+	mock.lockGetAlertsByParentID.Lock()
+	mock.calls.GetAlertsByParentID = append(mock.calls.GetAlertsByParentID, callInfo)
+	mock.lockGetAlertsByParentID.Unlock()
+	return mock.GetAlertsByParentIDFunc(ctx, parentID)
+}
+
+// GetAlertsByParentIDCalls gets all the calls that were made to GetAlertsByParentID.
+// Check the length with:
+//
+//	len(mockedRepository.GetAlertsByParentIDCalls())
+func (mock *RepositoryMock) GetAlertsByParentIDCalls() []struct {
+	Ctx      context.Context
+	ParentID model.AlertID
+} {
+	var calls []struct {
+		Ctx      context.Context
+		ParentID model.AlertID
+	}
+	mock.lockGetAlertsByParentID.RLock()
+	calls = mock.calls.GetAlertsByParentID
+	mock.lockGetAlertsByParentID.RUnlock()
 	return calls
 }
 
