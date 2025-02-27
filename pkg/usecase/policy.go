@@ -8,6 +8,8 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/opaq"
+	"github.com/open-policy-agent/opa/v1/ast"
+	"github.com/open-policy-agent/opa/v1/format"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
@@ -64,7 +66,14 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 		}
 		logger.Debug("generated policy", "policy", resp.Policy)
 
-		c, err := opaq.New(opaq.DataMap(resp.Policy))
+		formattedPolicy, err := formatPolicy(resp.Policy)
+		if err != nil {
+			thread.Reply(ctx, fmt.Sprintf("💥 Invalid Rego policy format: \n> %v\n\nRetry...", err))
+			p = "Invalid Rego policy format: " + err.Error() + "\n\nPlease retry."
+			continue
+		}
+
+		c, err := opaq.New(opaq.DataMap(formattedPolicy))
 		if err != nil {
 			thread.Reply(ctx, fmt.Sprintf("💥 Failed to build new policy: \n> %v\n\nRetry...", err))
 			p = "Failed to build new policy client: " + err.Error()
@@ -106,4 +115,28 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 	}
 
 	return newSvc, nil
+}
+
+func formatPolicy(policy map[string]string) (map[string]string, error) {
+	formattedPolicy := make(map[string]string)
+	for fileName, contents := range policy {
+		formatted, err := formatRegoPolicy(fileName, []byte(contents))
+		if err != nil {
+			return nil, err
+		}
+		formattedPolicy[fileName] = string(formatted)
+	}
+	return formattedPolicy, nil
+}
+
+func formatRegoPolicy(fileName string, contents []byte) ([]byte, error) {
+	var opts format.Opts
+	opts.ParserOptions = &ast.ParserOptions{RegoVersion: ast.RegoV1}
+
+	formatted, err := format.SourceWithOpts(fileName, contents, opts)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to format rego policy", goerr.V("fileName", fileName), goerr.V("contents", string(contents)))
+	}
+
+	return formatted, nil
 }
