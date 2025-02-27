@@ -6,6 +6,7 @@ import (
 
 	aiplatform "cloud.google.com/go/aiplatform/apiv1"
 	"cloud.google.com/go/aiplatform/apiv1/aiplatformpb"
+	"github.com/m-mizutani/goerr/v2"
 	"google.golang.org/api/option"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -30,7 +31,7 @@ func WithModelName(modelName string) GeminiOption {
 	}
 }
 
-func NewGemini(ctx context.Context, projectID string, opts ...GeminiOption) *Gemini {
+func NewGemini(projectID string, opts ...GeminiOption) *Gemini {
 	gemini := &Gemini{
 		projectID: projectID,
 		location:  "us-central1",
@@ -47,7 +48,7 @@ func (x *Gemini) Embeddings(ctx context.Context, texts []string, dimensionality 
 
 	client, err := aiplatform.NewPredictionClient(ctx, option.WithEndpoint(apiEndpoint))
 	if err != nil {
-		return nil, err
+		return nil, goerr.Wrap(err, "failed to create aiplatform client")
 	}
 	defer client.Close()
 
@@ -75,8 +76,9 @@ func (x *Gemini) Embeddings(ctx context.Context, texts []string, dimensionality 
 	}
 	resp, err := client.Predict(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, goerr.Wrap(err, "failed to predict", goerr.V("endpoint", endpoint), goerr.V("dimensionality", dimensionality))
 	}
+
 	embeddings := make([][]float32, len(resp.Predictions))
 	for i, prediction := range resp.Predictions {
 		values := prediction.GetStructValue().Fields["embeddings"].GetStructValue().Fields["values"].GetListValue().Values

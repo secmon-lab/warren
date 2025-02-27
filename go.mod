@@ -3,6 +3,7 @@ module github.com/secmon-lab/warren
 go 1.24.0
 
 require (
+	cloud.google.com/go/aiplatform v1.72.0
 	cloud.google.com/go/bigquery v1.66.2
 	cloud.google.com/go/firestore v1.18.0
 	cloud.google.com/go/vertexai v0.13.3
@@ -20,12 +21,12 @@ require (
 	github.com/urfave/cli/v3 v3.0.0-beta1
 	google.golang.org/api v0.220.0
 	google.golang.org/grpc v1.70.0
+	google.golang.org/protobuf v1.36.5
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
 	cloud.google.com/go v0.118.2 // indirect
-	cloud.google.com/go/aiplatform v1.72.0 // indirect
 	cloud.google.com/go/auth v0.14.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.7 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
@@ -92,6 +93,5 @@ require (
 	google.golang.org/genproto v0.0.0-20250207221924-e9438ea467c6 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250207221924-e9438ea467c6 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250207221924-e9438ea467c6 // indirect
-	google.golang.org/protobuf v1.36.5 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )

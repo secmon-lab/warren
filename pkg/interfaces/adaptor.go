@@ -14,7 +14,7 @@ type LLMClient interface {
 }
 
 type EmbeddingClient interface {
-	Embeddings(ctx context.Context, text string) ([]float32, error)
+	Embeddings(ctx context.Context, texts []string, dimensionality int) ([][]float32, error)
 }
 
 type LLMSession interface {

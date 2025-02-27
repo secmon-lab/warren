@@ -10,13 +10,16 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/test"
 )
 
-func TestGemini(t *testing.T) {
+func genClient(t *testing.T) *embedding.Gemini {
 	vars := test.NewEnvVars(t, "TEST_GEMINI_PROJECT_ID", "TEST_GEMINI_LOCATION")
-	gemini := embedding.NewGemini(t.Context(),
+	return embedding.NewGemini(
 		vars.Get("TEST_GEMINI_PROJECT_ID"),
 		embedding.WithLocation(vars.Get("TEST_GEMINI_LOCATION")),
 		embedding.WithModelName("text-embedding-004"),
 	)
+}
+func TestGemini(t *testing.T) {
+	gemini := genClient(t)
 
 	embeddings, err := gemini.Embeddings(context.Background(), []string{"Hello, world!"}, 5)
 	gt.NoError(t, err)
@@ -29,12 +32,7 @@ func TestGemini(t *testing.T) {
 var guarddutyJSON []byte
 
 func TestGemini_Embeddings_GuardDuty(t *testing.T) {
-	vars := test.NewEnvVars(t, "TEST_GEMINI_PROJECT_ID", "TEST_GEMINI_LOCATION")
-	gemini := embedding.NewGemini(t.Context(),
-		vars.Get("TEST_GEMINI_PROJECT_ID"),
-		embedding.WithLocation(vars.Get("TEST_GEMINI_LOCATION")),
-		embedding.WithModelName("text-embedding-004"),
-	)
+	gemini := genClient(t)
 
 	embeddings, err := gemini.Embeddings(context.Background(), []string{string(guarddutyJSON)}, 256)
 	gt.NoError(t, err)

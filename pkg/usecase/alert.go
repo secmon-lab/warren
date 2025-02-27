@@ -75,6 +75,22 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.
 	}
 	alert = *newAlert
 
+	if uc.embeddingClient != nil {
+		rawData, err := json.Marshal(alert.Data)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to marshal alert data")
+		}
+		embedding, err := uc.embeddingClient.Embeddings(ctx, []string{string(rawData)}, 256)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to embed alert data")
+		}
+		if len(embedding) == 0 {
+			return nil, goerr.New("failed to embed alert data")
+		}
+		logger.Info("alert embedding", "embedding", embedding[0], "alert", alert.ID)
+		alert.Embedding = embedding[0]
+	}
+
 	// Check if the alert is similar to any existing alerts
 	var similarAlert *model.Alert
 	for i := 0; i < 3 && similarAlert == nil; i++ {

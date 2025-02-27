@@ -2117,7 +2117,7 @@ var _ interfaces.EmbeddingClient = &EmbeddingClientMock{}
 //
 //		// make and configure a mocked interfaces.EmbeddingClient
 //		mockedEmbeddingClient := &EmbeddingClientMock{
-//			EmbeddingsFunc: func(ctx context.Context, text string) ([]float32, error) {
+//			EmbeddingsFunc: func(ctx context.Context, texts []string, dimensionality int) ([][]float32, error) {
 //				panic("mock out the Embeddings method")
 //			},
 //		}
@@ -2128,7 +2128,7 @@ var _ interfaces.EmbeddingClient = &EmbeddingClientMock{}
 //	}
 type EmbeddingClientMock struct {
 	// EmbeddingsFunc mocks the Embeddings method.
-	EmbeddingsFunc func(ctx context.Context, text string) ([]float32, error)
+	EmbeddingsFunc func(ctx context.Context, texts []string, dimensionality int) ([][]float32, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -2136,29 +2136,33 @@ type EmbeddingClientMock struct {
 		Embeddings []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Text is the text argument value.
-			Text string
+			// Texts is the texts argument value.
+			Texts []string
+			// Dimensionality is the dimensionality argument value.
+			Dimensionality int
 		}
 	}
 	lockEmbeddings sync.RWMutex
 }
 
 // Embeddings calls EmbeddingsFunc.
-func (mock *EmbeddingClientMock) Embeddings(ctx context.Context, text string) ([]float32, error) {
+func (mock *EmbeddingClientMock) Embeddings(ctx context.Context, texts []string, dimensionality int) ([][]float32, error) {
 	if mock.EmbeddingsFunc == nil {
 		panic("EmbeddingClientMock.EmbeddingsFunc: method is nil but EmbeddingClient.Embeddings was just called")
 	}
 	callInfo := struct {
-		Ctx  context.Context
-		Text string
+		Ctx            context.Context
+		Texts          []string
+		Dimensionality int
 	}{
-		Ctx:  ctx,
-		Text: text,
+		Ctx:            ctx,
+		Texts:          texts,
+		Dimensionality: dimensionality,
 	}
 	mock.lockEmbeddings.Lock()
 	mock.calls.Embeddings = append(mock.calls.Embeddings, callInfo)
 	mock.lockEmbeddings.Unlock()
-	return mock.EmbeddingsFunc(ctx, text)
+	return mock.EmbeddingsFunc(ctx, texts, dimensionality)
 }
 
 // EmbeddingsCalls gets all the calls that were made to Embeddings.
@@ -2166,12 +2170,14 @@ func (mock *EmbeddingClientMock) Embeddings(ctx context.Context, text string) ([
 //
 //	len(mockedEmbeddingClient.EmbeddingsCalls())
 func (mock *EmbeddingClientMock) EmbeddingsCalls() []struct {
-	Ctx  context.Context
-	Text string
+	Ctx            context.Context
+	Texts          []string
+	Dimensionality int
 } {
 	var calls []struct {
-		Ctx  context.Context
-		Text string
+		Ctx            context.Context
+		Texts          []string
+		Dimensionality int
 	}
 	mock.lockEmbeddings.RLock()
 	calls = mock.calls.Embeddings
