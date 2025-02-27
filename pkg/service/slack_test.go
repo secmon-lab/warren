@@ -220,18 +220,24 @@ func TestPostAlertGroups(t *testing.T) {
 func TestPostPolicyDiff(t *testing.T) {
 	svc := newSlackService(t)
 
-	diff := map[string]string{
-		"test.rego": `+ test
-+ test2
-- test3
-  moge
+	diff := model.NewPolicyDiff(context.Background(), "Policy Diff", "This is a test policy diff", map[string]string{
+		"test.rego": `package test
+
+allow if {
+  input.color == "red"
+}
 `,
-		"test2.rego": `- test1
-+ test2
-+ test3
-hoge
+	},
+		map[string]string{
+			"test.rego": `package test
+
+allow if {
+  input.color == "blue"
+}
 `,
-	}
+		},
+		model.NewTestDataSet(),
+	)
 
 	thread, err := svc.PostMessage(context.Background(), "policy diff test")
 	gt.NoError(t, err)

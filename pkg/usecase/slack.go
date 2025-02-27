@@ -170,18 +170,13 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 		}
 
 		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-			newPolicy, err := uc.GenerateIgnorePolicy(ctx, alerts, note)
+			newPolicyDiff, err := uc.GenerateIgnorePolicy(ctx, alerts, note)
 			if err != nil {
 				return err
 			}
 
-			diff := diffPolicy(uc.policyService.Sources(), newPolicy.Sources())
-			if diff != nil {
-				if err := th.PostPolicyDiff(ctx, diff); err != nil {
-					return err
-				}
-			} else {
-				th.Reply(ctx, "No changes in ignore policy")
+			if err := th.PostPolicyDiff(ctx, newPolicyDiff); err != nil {
+				return err
 			}
 
 			return nil

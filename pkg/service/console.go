@@ -225,9 +225,9 @@ func (c *ConsoleThread) PostAlertGroups(_ context.Context, groups []model.AlertG
 	return nil
 }
 
-func (c *ConsoleThread) PostPolicyDiff(_ context.Context, diff map[string]string) error {
+func (c *ConsoleThread) PostPolicyDiff(_ context.Context, diff *model.PolicyDiff) error {
 	c.printHeader("🔍 Policy Diff")
-	for fileName, diff := range diff {
+	for fileName, diff := range diff.DiffPolicy() {
 		fmt.Fprintln(c.writer, strings.Repeat("-", 80))
 		fmt.Fprintf(c.writer, "File: %s\n", fileName)
 

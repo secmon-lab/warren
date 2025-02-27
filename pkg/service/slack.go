@@ -634,7 +634,7 @@ func buildAlertGroupBlocks(group model.AlertGroup, metadata slackMetadata) []sla
 	return blocks
 }
 
-func (x *SlackThread) PostPolicyDiff(ctx context.Context, diff map[string]string) error {
+func (x *SlackThread) PostPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error {
 	blocks := buildPolicyDiffBlocks(diff)
 
 	_, _, err := x.slackClient.PostMessageContext(ctx,
@@ -649,14 +649,19 @@ func (x *SlackThread) PostPolicyDiff(ctx context.Context, diff map[string]string
 	return nil
 }
 
-func buildPolicyDiffBlocks(diff map[string]string) []slack.Block {
+func buildPolicyDiffBlocks(diff *model.PolicyDiff) []slack.Block {
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(
-			slack.NewTextBlockObject("plain_text", "📒 Generated Policy", false, false),
+			slack.NewTextBlockObject("plain_text", "📒 New Ignore Policy: "+diff.Title, false, false),
+		),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", diff.Description, false, false),
+			nil,
+			nil,
 		),
 	}
 
-	for fileName, diff := range diff {
+	for fileName, diff := range diff.DiffPolicy() {
 		blocks = append(blocks, slack.NewDividerBlock())
 		blocks = append(blocks, slack.NewSectionBlock(
 			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*%s*\n```\n%s\n```", fileName, diff), false, false),

@@ -118,7 +118,7 @@ func cmdPolicyIgnore() *cli.Command {
 			ctx = thread.WithReplyFunc(ctx, func(ctx context.Context, msg string) {
 				fmt.Println(msg)
 			})
-			svc, err := uc.GenerateIgnorePolicy(ctx, []model.Alert{alert}, "")
+			newPolicyDiff, err := uc.GenerateIgnorePolicy(ctx, []model.Alert{alert}, "")
 			if err != nil {
 				return err
 			}
@@ -132,6 +132,7 @@ func cmdPolicyIgnore() *cli.Command {
 			}
 			logger.Info("Output directory", "outputDir", outputDir)
 
+			svc := policy.New(repository.NewMemory(), policyClient, newPolicyDiff.TestDataSet)
 			if err := svc.Save(ctx, outputDir); err != nil {
 				return goerr.Wrap(err, "failed to save policy")
 			}

@@ -23,7 +23,7 @@ const (
 	maxRetryCountForIgnorePolicy = 8
 )
 
-func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Alert, note string) (*policy.Service, error) {
+func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Alert, note string) (*model.PolicyDiff, error) {
 	logger := logging.From(ctx)
 	thread.Reply(ctx, "📝 Generating ignore policy...")
 
@@ -43,7 +43,6 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 	}
 
 	ssn := uc.llmClient.StartChat()
-	var newSvc *policy.Service
 
 	newTestData := uc.policyService.TestDataSet()
 	if newTestData == nil {
@@ -53,7 +52,8 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 		newTestData.Ignore.Add(alert.Schema, alert.ID.String()+".json", alert.Data)
 	}
 
-	for i := 0; i < maxRetryCountForIgnorePolicy && newSvc == nil; i++ {
+	var result *model.PolicyDiff
+	for i := 0; i < maxRetryCountForIgnorePolicy && result == nil; i++ {
 		resp, err := service.AskChat[prompt.IgnorePolicyPromptResult](ctx, ssn, p)
 		if err != nil {
 			if goerr.HasTag(err, model.ErrTagInvalidLLMResponse) {
@@ -80,8 +80,6 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 			continue
 		}
 
-		svc := uc.policyService.Clone(c, newTestData)
-
 		if errs := policy.Test(ctx, c, newTestData); len(errs) > 0 {
 			var runtimeErrs []error
 			var replyLines []string
@@ -106,15 +104,15 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 		}
 
 		thread.Reply(ctx, "✅ Test PASSED")
-		newSvc = svc
+		result = model.NewPolicyDiff(ctx, resp.Title, resp.Description, resp.Policy, uc.policyService.Sources(), newTestData)
 	}
 
-	if newSvc == nil {
+	if result == nil {
 		thread.Reply(ctx, "🛑 Failed to generate a new ignore policy. Stop generating.")
 		return nil, errors.New("failed to generate a new ignore policy")
 	}
 
-	return newSvc, nil
+	return result, nil
 }
 
 func formatPolicy(policy map[string]string) (map[string]string, error) {
