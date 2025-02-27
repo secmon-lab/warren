@@ -255,11 +255,16 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 }
 
 func (uc *UseCases) handleSlackInteractionViewSubmission(ctx context.Context, interaction slack.InteractionCallback) error {
-	logger := logging.From(ctx)
-
-	if interaction.View.CallbackID != "close_submit" {
-		return nil
+	switch interaction.View.CallbackID {
+	case "close_submit":
+		return uc.handleSlackInteractionViewSubmissionClose(ctx, interaction)
 	}
+
+	return nil
+}
+
+func (uc *UseCases) handleSlackInteractionViewSubmissionClose(ctx context.Context, interaction slack.InteractionCallback) error {
+	logger := logging.From(ctx)
 
 	alertID := model.AlertID(interaction.View.PrivateMetadata)
 	alert, err := uc.repository.GetAlert(ctx, alertID)
