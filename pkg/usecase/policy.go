@@ -40,7 +40,7 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 		return nil, err
 	}
 
-	ssn := uc.geminiStartChat()
+	ssn := uc.llmClient.StartChat()
 	var newSvc *policy.Service
 
 	newTestData := uc.policyService.TestDataSet()

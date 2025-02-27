@@ -90,7 +90,7 @@ func TestHandleSlackInteraction(t *testing.T) {
 				},
 			}
 
-			uc := usecase.New(nil, usecase.WithRepository(repo), usecase.WithSlackService(slackMock))
+			uc := usecase.New(usecase.WithRepository(repo), usecase.WithSlackService(slackMock))
 			err := uc.HandleSlackInteraction(ctx, testCase.interaction)
 
 			if testCase.wantErr {

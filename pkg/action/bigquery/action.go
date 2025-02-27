@@ -151,7 +151,7 @@ type queryResult struct {
 	Query string `json:"query"`
 }
 
-func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
+func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.LLMSession, args model.Arguments) (*model.ActionResult, error) {
 	if err := x.Spec().Validate(args); err != nil {
 		return nil, err
 	}
@@ -271,7 +271,7 @@ func generateQuery(fullTableID string, schema bigquery.Schema, limit int64) (str
 	return queryRequest.String(), nil
 }
 
-func (x *Action) requestNewQuery(ctx context.Context, ssn interfaces.GenAIChatSession, prompt string) (*queryResult, error) {
+func (x *Action) requestNewQuery(ctx context.Context, ssn interfaces.LLMSession, prompt string) (*queryResult, error) {
 	eb := goerr.NewBuilder(goerr.V("prompt", prompt))
 
 	queryResp, err := ssn.SendMessage(ctx, genai.Text(prompt))

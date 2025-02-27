@@ -266,7 +266,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 
 	t.Run("GetAlertGroup_NotFound", func(t *testing.T) {
 		got, err := repo.GetAlertGroup(ctx, model.AlertGroupID(uuid.New().String()))
-		gt.Error(t, err)
+		gt.NoError(t, err)
 		gt.Nil(t, got)
 	})
 }

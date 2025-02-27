@@ -642,26 +642,26 @@ func (mock *SlackThreadServiceMock) UpdateAlertCalls() []struct {
 	return calls
 }
 
-// Ensure, that GenAIChatSessionMock does implement interfaces.GenAIChatSession.
+// Ensure, that LLMSessionMock does implement interfaces.LLMSession.
 // If this is not the case, regenerate this file with moq.
-var _ interfaces.GenAIChatSession = &GenAIChatSessionMock{}
+var _ interfaces.LLMSession = &LLMSessionMock{}
 
-// GenAIChatSessionMock is a mock implementation of interfaces.GenAIChatSession.
+// LLMSessionMock is a mock implementation of interfaces.LLMSession.
 //
-//	func TestSomethingThatUsesGenAIChatSession(t *testing.T) {
+//	func TestSomethingThatUsesLLMSession(t *testing.T) {
 //
-//		// make and configure a mocked interfaces.GenAIChatSession
-//		mockedGenAIChatSession := &GenAIChatSessionMock{
+//		// make and configure a mocked interfaces.LLMSession
+//		mockedLLMSession := &LLMSessionMock{
 //			SendMessageFunc: func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
 //				panic("mock out the SendMessage method")
 //			},
 //		}
 //
-//		// use mockedGenAIChatSession in code that requires interfaces.GenAIChatSession
+//		// use mockedLLMSession in code that requires interfaces.LLMSession
 //		// and then make assertions.
 //
 //	}
-type GenAIChatSessionMock struct {
+type LLMSessionMock struct {
 	// SendMessageFunc mocks the SendMessage method.
 	SendMessageFunc func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
 
@@ -679,9 +679,9 @@ type GenAIChatSessionMock struct {
 }
 
 // SendMessage calls SendMessageFunc.
-func (mock *GenAIChatSessionMock) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
+func (mock *LLMSessionMock) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
 	if mock.SendMessageFunc == nil {
-		panic("GenAIChatSessionMock.SendMessageFunc: method is nil but GenAIChatSession.SendMessage was just called")
+		panic("LLMSessionMock.SendMessageFunc: method is nil but LLMSession.SendMessage was just called")
 	}
 	callInfo := struct {
 		Ctx context.Context
@@ -699,8 +699,8 @@ func (mock *GenAIChatSessionMock) SendMessage(ctx context.Context, msg ...genai.
 // SendMessageCalls gets all the calls that were made to SendMessage.
 // Check the length with:
 //
-//	len(mockedGenAIChatSession.SendMessageCalls())
-func (mock *GenAIChatSessionMock) SendMessageCalls() []struct {
+//	len(mockedLLMSession.SendMessageCalls())
+func (mock *LLMSessionMock) SendMessageCalls() []struct {
 	Ctx context.Context
 	Msg []genai.Part
 } {
@@ -1482,7 +1482,7 @@ var _ interfaces.Action = &ActionMock{}
 //			ConfigureFunc: func(ctx context.Context) error {
 //				panic("mock out the Configure method")
 //			},
-//			ExecuteFunc: func(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
+//			ExecuteFunc: func(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.LLMSession, args model.Arguments) (*model.ActionResult, error) {
 //				panic("mock out the Execute method")
 //			},
 //			FlagsFunc: func() []cli.Flag {
@@ -1505,7 +1505,7 @@ type ActionMock struct {
 	ConfigureFunc func(ctx context.Context) error
 
 	// ExecuteFunc mocks the Execute method.
-	ExecuteFunc func(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error)
+	ExecuteFunc func(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.LLMSession, args model.Arguments) (*model.ActionResult, error)
 
 	// FlagsFunc mocks the Flags method.
 	FlagsFunc func() []cli.Flag
@@ -1530,7 +1530,7 @@ type ActionMock struct {
 			// Slack is the slack argument value.
 			Slack interfaces.SlackThreadService
 			// Ssn is the ssn argument value.
-			Ssn interfaces.GenAIChatSession
+			Ssn interfaces.LLMSession
 			// Args is the args argument value.
 			Args model.Arguments
 		}
@@ -1584,14 +1584,14 @@ func (mock *ActionMock) ConfigureCalls() []struct {
 }
 
 // Execute calls ExecuteFunc.
-func (mock *ActionMock) Execute(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.GenAIChatSession, args model.Arguments) (*model.ActionResult, error) {
+func (mock *ActionMock) Execute(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.LLMSession, args model.Arguments) (*model.ActionResult, error) {
 	if mock.ExecuteFunc == nil {
 		panic("ActionMock.ExecuteFunc: method is nil but Action.Execute was just called")
 	}
 	callInfo := struct {
 		Ctx   context.Context
 		Slack interfaces.SlackThreadService
-		Ssn   interfaces.GenAIChatSession
+		Ssn   interfaces.LLMSession
 		Args  model.Arguments
 	}{
 		Ctx:   ctx,
@@ -1612,13 +1612,13 @@ func (mock *ActionMock) Execute(ctx context.Context, slack interfaces.SlackThrea
 func (mock *ActionMock) ExecuteCalls() []struct {
 	Ctx   context.Context
 	Slack interfaces.SlackThreadService
-	Ssn   interfaces.GenAIChatSession
+	Ssn   interfaces.LLMSession
 	Args  model.Arguments
 } {
 	var calls []struct {
 		Ctx   context.Context
 		Slack interfaces.SlackThreadService
-		Ssn   interfaces.GenAIChatSession
+		Ssn   interfaces.LLMSession
 		Args  model.Arguments
 	}
 	mock.lockExecute.RLock()
@@ -2045,5 +2045,142 @@ func (mock *UseCaseMock) RunWorkflowCalls() []struct {
 	mock.lockRunWorkflow.RLock()
 	calls = mock.calls.RunWorkflow
 	mock.lockRunWorkflow.RUnlock()
+	return calls
+}
+
+// Ensure, that LLMClientMock does implement interfaces.LLMClient.
+// If this is not the case, regenerate this file with moq.
+var _ interfaces.LLMClient = &LLMClientMock{}
+
+// LLMClientMock is a mock implementation of interfaces.LLMClient.
+//
+//	func TestSomethingThatUsesLLMClient(t *testing.T) {
+//
+//		// make and configure a mocked interfaces.LLMClient
+//		mockedLLMClient := &LLMClientMock{
+//			StartChatFunc: func() interfaces.LLMSession {
+//				panic("mock out the StartChat method")
+//			},
+//		}
+//
+//		// use mockedLLMClient in code that requires interfaces.LLMClient
+//		// and then make assertions.
+//
+//	}
+type LLMClientMock struct {
+	// StartChatFunc mocks the StartChat method.
+	StartChatFunc func() interfaces.LLMSession
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// StartChat holds details about calls to the StartChat method.
+		StartChat []struct {
+		}
+	}
+	lockStartChat sync.RWMutex
+}
+
+// StartChat calls StartChatFunc.
+func (mock *LLMClientMock) StartChat() interfaces.LLMSession {
+	if mock.StartChatFunc == nil {
+		panic("LLMClientMock.StartChatFunc: method is nil but LLMClient.StartChat was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockStartChat.Lock()
+	mock.calls.StartChat = append(mock.calls.StartChat, callInfo)
+	mock.lockStartChat.Unlock()
+	return mock.StartChatFunc()
+}
+
+// StartChatCalls gets all the calls that were made to StartChat.
+// Check the length with:
+//
+//	len(mockedLLMClient.StartChatCalls())
+func (mock *LLMClientMock) StartChatCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockStartChat.RLock()
+	calls = mock.calls.StartChat
+	mock.lockStartChat.RUnlock()
+	return calls
+}
+
+// Ensure, that EmbeddingClientMock does implement interfaces.EmbeddingClient.
+// If this is not the case, regenerate this file with moq.
+var _ interfaces.EmbeddingClient = &EmbeddingClientMock{}
+
+// EmbeddingClientMock is a mock implementation of interfaces.EmbeddingClient.
+//
+//	func TestSomethingThatUsesEmbeddingClient(t *testing.T) {
+//
+//		// make and configure a mocked interfaces.EmbeddingClient
+//		mockedEmbeddingClient := &EmbeddingClientMock{
+//			EmbeddingsFunc: func(ctx context.Context, texts []string, dimensionality int) ([][]float32, error) {
+//				panic("mock out the Embeddings method")
+//			},
+//		}
+//
+//		// use mockedEmbeddingClient in code that requires interfaces.EmbeddingClient
+//		// and then make assertions.
+//
+//	}
+type EmbeddingClientMock struct {
+	// EmbeddingsFunc mocks the Embeddings method.
+	EmbeddingsFunc func(ctx context.Context, texts []string, dimensionality int) ([][]float32, error)
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// Embeddings holds details about calls to the Embeddings method.
+		Embeddings []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Texts is the texts argument value.
+			Texts []string
+			// Dimensionality is the dimensionality argument value.
+			Dimensionality int
+		}
+	}
+	lockEmbeddings sync.RWMutex
+}
+
+// Embeddings calls EmbeddingsFunc.
+func (mock *EmbeddingClientMock) Embeddings(ctx context.Context, texts []string, dimensionality int) ([][]float32, error) {
+	if mock.EmbeddingsFunc == nil {
+		panic("EmbeddingClientMock.EmbeddingsFunc: method is nil but EmbeddingClient.Embeddings was just called")
+	}
+	callInfo := struct {
+		Ctx            context.Context
+		Texts          []string
+		Dimensionality int
+	}{
+		Ctx:            ctx,
+		Texts:          texts,
+		Dimensionality: dimensionality,
+	}
+	mock.lockEmbeddings.Lock()
+	mock.calls.Embeddings = append(mock.calls.Embeddings, callInfo)
+	mock.lockEmbeddings.Unlock()
+	return mock.EmbeddingsFunc(ctx, texts, dimensionality)
+}
+
+// EmbeddingsCalls gets all the calls that were made to Embeddings.
+// Check the length with:
+//
+//	len(mockedEmbeddingClient.EmbeddingsCalls())
+func (mock *EmbeddingClientMock) EmbeddingsCalls() []struct {
+	Ctx            context.Context
+	Texts          []string
+	Dimensionality int
+} {
+	var calls []struct {
+		Ctx            context.Context
+		Texts          []string
+		Dimensionality int
+	}
+	mock.lockEmbeddings.RLock()
+	calls = mock.calls.Embeddings
+	mock.lockEmbeddings.RUnlock()
 	return calls
 }

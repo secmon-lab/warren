@@ -9,9 +9,15 @@ import (
 	"github.com/secmon-lab/warren/pkg/model"
 )
 
-type GetGeminiStartChat func() GenAIChatSession
+type LLMClient interface {
+	StartChat() LLMSession
+}
 
-type GenAIChatSession interface {
+type EmbeddingClient interface {
+	Embeddings(ctx context.Context, texts []string, dimensionality int) ([][]float32, error)
+}
+
+type LLMSession interface {
 	SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
 }
 
