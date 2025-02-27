@@ -84,10 +84,18 @@ The updated policy should be output according to the following schema. The schem
 {{ .output }}
 ```
 
+- The `title` field is the title. It should be a short description of the policy changes.
+- The `description` field is the description. It should be a detailed description of the policy changes.
+- The `policy` field is the updated policy. It should be a map of the file name and the updated policy.
+
+`title` and `description` should be in {{ .lang }}. They would be used as the title and description of the pull request.
+
 Example of the correct output:
 
 ```json
 {
+    "title": "Ignore alerts with severity less than 7",
+    "description": "Ignore alerts with severity less than 7. This is a test.",
     "policy": {
         "some_dir/some_file.rego": "package alert.guardduty\n\nalert contains {}\n\nignore if { input.SeverityScore < 7 }",
         "some_dir/some_other_file.rego": "package alert.guardduty\n\nignore if { input.Name == \"example-alert\" }"

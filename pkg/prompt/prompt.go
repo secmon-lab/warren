@@ -200,7 +200,9 @@ func BuildMetaPrompt(ctx context.Context, alert model.Alert) (string, error) {
 var ignorePolicyTemplate string
 
 type IgnorePolicyPromptResult struct {
-	Policy map[string]string `json:"policy"`
+	Title       string            `json:"title"`
+	Description string            `json:"description"`
+	Policy      map[string]string `json:"policy"`
 }
 
 func BuildIgnorePolicyPrompt(ctx context.Context, policy model.PolicyData, alerts []model.Alert, note string) (string, error) {
