@@ -2,7 +2,7 @@ package usecase
 
 import (
 	"context"
-	"fmt"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -141,23 +141,61 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 
 	switch args[0] {
 	case "group":
-		go func() {
-			ctx = newBackgroundContext(ctx)
-			defer func() {
-				if r := recover(); r != nil {
-					th.Reply(ctx, fmt.Sprintf("💥 Crushed by panic: %v", r))
-					errs.Handle(ctx, goerr.New("panic", goerr.V("recover", r)))
-				}
-			}()
-
+		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
 			if err := uc.GroupUnclosedAlerts(ctx, th); err != nil {
 				th.Reply(ctx, "😫 Failed to group unclosed alerts: "+err.Error())
-				errs.Handle(ctx, err)
+				return err
 			}
-		}()
+
+			th.Reply(ctx, "✅ Grouped unclosed alerts")
+			return nil
+		})
+
+	case "ignore":
+		if alert == nil {
+			th.Reply(ctx, "💥 No alert found. Please run the command in the alert thread.")
+			return nil
+		}
+		var note string
+		if len(args) > 1 {
+			note = strings.Join(args[1:], " ")
+		}
+
+		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
+			newPolicy, err := uc.GenerateIgnorePolicy(ctx, []model.Alert{*alert}, note)
+			if err != nil {
+				return err
+			}
+
+			diff := diffPolicy(uc.policyService.Sources(), newPolicy.Sources())
+			if diff != "" {
+				if err := th.AttachFile(ctx, "New policy diff", "policy.diff", []byte(diff)); err != nil {
+					return err
+				}
+			} else {
+				th.Reply(ctx, "No changes in ignore policy")
+			}
+
+			return nil
+		})
 	}
 
 	return nil
+}
+
+func (uc *UseCases) dispatchSlackAction(ctx context.Context, action func(ctx context.Context) error) {
+	newCtx := newBackgroundContext(ctx)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				errs.Handle(newCtx, goerr.New("panic", goerr.V("recover", r)))
+			}
+		}()
+
+		if err := action(newCtx); err != nil {
+			errs.Handle(newCtx, err)
+		}
+	}()
 }
 
 func (uc *UseCases) HandleSlackMessage(ctx context.Context, event *slackevents.MessageEvent) error {
@@ -266,35 +304,6 @@ func (uc *UseCases) handleSlackInteractionViewSubmission(ctx context.Context, in
 
 	if err := th.UpdateAlert(ctx, *alert); err != nil {
 		return goerr.Wrap(err, "failed to update slack thread")
-	}
-
-	newCtx := newBackgroundContext(ctx)
-	genIgnorePolicy := func() {
-		defer func() {
-			if r := recover(); r != nil {
-				errs.Handle(newCtx, goerr.New("panic", goerr.V("recover", r)))
-			}
-		}()
-
-		newPolicy, err := uc.GenerateIgnorePolicy(newCtx, []model.Alert{*alert}, "")
-		if err != nil {
-			errs.Handle(newCtx, err)
-		}
-
-		diff := diffPolicy(uc.policyService.Sources(), newPolicy.Sources())
-		if diff != "" {
-			if err := th.AttachFile(newCtx, "New policy diff", "policy.diff", []byte(diff)); err != nil {
-				errs.Handle(newCtx, err)
-			}
-		} else {
-			th.Reply(newCtx, "No changes in ignore policy")
-		}
-	}
-
-	if alert.Conclusion == model.AlertConclusionFalsePositive ||
-		alert.Conclusion == model.AlertConclusionIntended ||
-		alert.Conclusion == model.AlertConclusionUnaffected {
-		go genIgnorePolicy()
 	}
 
 	return nil
