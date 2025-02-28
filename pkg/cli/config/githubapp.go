@@ -75,10 +75,11 @@ func (c *GitHubAppCfg) Flags() []cli.Flag {
 			Destination: &c.detectTestDir,
 		},
 		&cli.StringFlag{
-			Name:     "github-app-ignore-test-dir",
-			Usage:    "GitHub App Ignore Test Directory",
-			Category: "GitHub App",
-			Sources:  cli.EnvVars("WARREN_GITHUB_APP_IGNORE_TEST_DIR"),
+			Name:        "github-app-ignore-test-dir",
+			Usage:       "GitHub App Ignore Test Directory",
+			Category:    "GitHub App",
+			Sources:     cli.EnvVars("WARREN_GITHUB_APP_IGNORE_TEST_DIR"),
+			Destination: &c.ignoreTestDir,
 		},
 	}
 }

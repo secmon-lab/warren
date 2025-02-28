@@ -45,6 +45,7 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 
 	now := clock.Now(ctx)
 	newBranch := "warren/" + now.Format("2006-01-02") + "/" + diff.ID.String()
+	eb = eb.With(goerr.V("new_branch", newBranch))
 	err = x.appClient.CreateBranch(ctx, x.config.Owner, x.config.Repo, defaultBranch, newBranch)
 	if err != nil {
 		return nil, eb.Wrap(err, "failed to create branch")
@@ -83,6 +84,11 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 	}
 
 	logger.Debug("Set files", "files", files)
+	eb = eb.With(goerr.V("files", files))
+
+	if err := x.appClient.CommitChanges(ctx, x.config.Owner, x.config.Repo, newBranch, files, diff.Title); err != nil {
+		return nil, eb.Wrap(err, "failed to commit changes")
+	}
 
 	// Create pull request
 	pr, err := x.appClient.CreatePullRequest(ctx,
@@ -96,6 +102,8 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 	if err != nil {
 		return nil, eb.Wrap(err, "failed to create pull request")
 	}
+
+	logger.Debug("Created pull request", "pr", pr)
 
 	prURL, err := url.Parse(pr.GetHTMLURL())
 	if err != nil {
