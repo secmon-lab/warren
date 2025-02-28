@@ -46,9 +46,13 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 	now := clock.Now(ctx)
 	newBranch := "warren/" + now.Format("2006-01-02") + "/" + diff.ID.String()
 	eb = eb.With(goerr.V("new_branch", newBranch))
-	err = x.appClient.CreateBranch(ctx, x.config.Owner, x.config.Repo, defaultBranch, newBranch)
-	if err != nil {
-		return nil, eb.Wrap(err, "failed to create branch")
+
+	if ref, err := x.appClient.LookupBranch(ctx, x.config.Owner, x.config.Repo, newBranch); err != nil {
+		return nil, eb.Wrap(err, "failed to lookup branch")
+	} else if ref == nil {
+		if err := x.appClient.CreateBranch(ctx, x.config.Owner, x.config.Repo, defaultBranch, newBranch); err != nil {
+			return nil, eb.Wrap(err, "failed to create branch")
+		}
 	}
 
 	// Add test line to README.md

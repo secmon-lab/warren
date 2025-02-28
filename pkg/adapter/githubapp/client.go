@@ -123,6 +123,19 @@ func (c *Client) CommitChanges(ctx context.Context, owner, repo, branch string, 
 	return err
 }
 
+func (c *Client) LookupBranch(ctx context.Context, owner, repo, branch string) (*github.Reference, error) {
+	ref, _, err := c.client.Git.GetRef(ctx, owner, repo, "refs/heads/"+branch)
+	if err != nil {
+		if err, ok := err.(*github.ErrorResponse); ok {
+			if err.Response.StatusCode == http.StatusNotFound {
+				return nil, nil
+			}
+		}
+		return nil, err
+	}
+	return ref, nil
+}
+
 func (c *Client) CreateBranch(ctx context.Context, owner, repo, baseBranch, newBranch string) error {
 	// Get SHA of base branch
 	ref, _, err := c.client.Git.GetRef(ctx, owner, repo, "refs/heads/"+baseBranch)
