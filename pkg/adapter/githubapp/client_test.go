@@ -115,6 +115,7 @@ func TestGitHubCreatePR(t *testing.T) {
 	files := map[string][]byte{
 		"README.md": content,
 		"newfile":   []byte("new file"),
+		"test.md":   []byte("Hello!\n"),
 	}
 
 	err = client.CommitChanges(ctx, owner, repo, newBranch, files, "Add test line")

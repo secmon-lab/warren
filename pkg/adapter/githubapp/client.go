@@ -71,9 +71,18 @@ func (c *Client) CommitChanges(ctx context.Context, owner, repo, branch string, 
 	}
 
 	entries := make([]*github.TreeEntry, 0, len(files))
-
 	// Create blobs for each file
 	for path, content := range files {
+		if len(content) == 0 {
+			entries = append(entries, &github.TreeEntry{
+				Path: github.Ptr(path),
+				Mode: github.Ptr("100644"),
+				Type: github.Ptr("blob"),
+				SHA:  nil,
+			})
+			continue
+		}
+
 		blob := &github.Blob{
 			Content:  github.Ptr(string(content)),
 			Encoding: github.Ptr("utf-8"),

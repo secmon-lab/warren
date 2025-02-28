@@ -326,18 +326,16 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 
 	action := interaction.ActionCallback.BlockActions[0]
 
-	alertID := model.AlertID(action.Value)
-	alert, err := uc.repository.GetAlert(ctx, alertID)
-	if err != nil {
-		return goerr.Wrap(err, "failed to get alert")
-	}
-	if alert == nil {
-		logger.Error("alert not found", "alert_id", alertID)
-		return nil
-	}
-
 	switch action.ActionID {
 	case "ack":
+		alert, err := uc.repository.GetAlert(ctx, model.AlertID(action.Value))
+		if err != nil {
+			return goerr.Wrap(err, "failed to get alert")
+		} else if alert == nil {
+			logger.Error("alert not found", "alert_id", action.Value)
+			return nil
+		}
+
 		alert.Assignee = &model.SlackUser{
 			ID:   interaction.User.ID,
 			Name: interaction.User.Name,
@@ -355,10 +353,18 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 				return goerr.Wrap(err, "failed to update slack thread")
 			}
 		} else {
-			logger.Warn("slack thread not found", "alert_id", alertID)
+			logger.Warn("slack thread not found", "alert_id", alert.ID)
 		}
 
 	case "close":
+		alert, err := uc.repository.GetAlert(ctx, model.AlertID(action.Value))
+		if err != nil {
+			return goerr.Wrap(err, "failed to get alert")
+		} else if alert == nil {
+			logger.Error("alert not found", "alert_id", action.Value)
+			return nil
+		}
+
 		triggerID := interaction.TriggerID
 
 		if err := uc.slackService.ShowCloseAlertModal(ctx, *alert, triggerID); err != nil {
@@ -366,19 +372,54 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 		}
 
 	case "inspect":
-		newCtx := newBackgroundContext(ctx)
+		alert, err := uc.repository.GetAlert(ctx, model.AlertID(action.Value))
+		if err != nil {
+			return goerr.Wrap(err, "failed to get alert")
+		} else if alert == nil {
+			logger.Error("alert not found", "alert_id", action.Value)
+			return nil
+		}
 
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					errs.Handle(newCtx, goerr.New("panic", goerr.V("recover", r)))
-				}
-			}()
-
-			if err := uc.RunWorkflow(newCtx, *alert); err != nil {
-				errs.Handle(newCtx, err)
+		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
+			if err := uc.RunWorkflow(ctx, *alert); err != nil {
+				return err
 			}
-		}()
+
+			return nil
+		})
+
+	case "create_pr":
+		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
+			th := uc.slackService.NewThread(model.SlackThread{
+				ChannelID: interaction.Channel.ID,
+				ThreadID:  interaction.Message.ThreadTimestamp,
+			})
+
+			diffID := model.PolicyDiffID(action.Value)
+			diff, err := uc.repository.GetPolicyDiff(ctx, diffID)
+			if err != nil {
+				th.Reply(ctx, "💥 Failed to get policy diff")
+				return goerr.Wrap(err, "failed to get policy diff")
+			} else if diff == nil {
+				th.Reply(ctx, "💥 Policy diff not found")
+				return nil
+			}
+
+			if uc.gitHubApp == nil {
+				th.Reply(ctx, "💥 GitHub is not enabled")
+				return nil
+			}
+
+			prURL, err := uc.gitHubApp.CreatePullRequest(ctx, diff)
+			if err != nil {
+				th.Reply(ctx, "💥 Failed to create pull request")
+				return err
+			}
+
+			th.Reply(ctx, "✅️ Created: <"+diff.Title+"|"+prURL.String()+">")
+
+			return nil
+		})
 	}
 
 	return nil

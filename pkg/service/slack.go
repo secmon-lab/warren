@@ -670,17 +670,15 @@ func buildPolicyDiffBlocks(diff *model.PolicyDiff) []slack.Block {
 		))
 	}
 
-	/*
-		blocks = append(blocks, slack.NewDividerBlock())
-		blocks = append(blocks, slack.NewActionBlock(
+	blocks = append(blocks, slack.NewDividerBlock())
+	blocks = append(blocks, slack.NewActionBlock(
+		"create_pr",
+		slack.NewButtonBlockElement(
 			"create_pr",
-			slack.NewButtonBlockElement(
-				"create_pr",
-				"create_pr",
-				slack.NewTextBlockObject("plain_text", "Create Pull Request", false, false),
-			),
-		))
-	*/
+			diff.ID.String(),
+			slack.NewTextBlockObject("plain_text", "Create Pull Request", false, false),
+		),
+	))
 
 	return blocks
 }

@@ -21,7 +21,7 @@ type UseCases struct {
 	repository      interfaces.Repository
 	actionService   *service.ActionService
 	policyService   *policy.Service
-	githubAppClient interfaces.GitHubAppClient
+	gitHubApp       *service.GitHubApp
 
 	// configs
 	timeSpan     time.Duration
@@ -69,9 +69,9 @@ func WithActionService(actionService *service.ActionService) Option {
 	}
 }
 
-func WithGitHubAppClient(githubAppClient interfaces.GitHubAppClient) Option {
+func WithGitHubApp(githubApp *service.GitHubApp) Option {
 	return func(u *UseCases) {
-		u.githubAppClient = githubAppClient
+		u.gitHubApp = githubApp
 	}
 }
 
