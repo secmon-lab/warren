@@ -5,16 +5,17 @@ import (
 	"encoding/json"
 	"net/url"
 	"path/filepath"
+	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/adapter/githubapp"
+	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 type GitHubApp struct {
-	appClient *githubapp.Client
+	appClient interfaces.GitHubAppClient
 	config    GitHubAppConfig
 }
 
@@ -27,7 +28,7 @@ type GitHubAppConfig struct {
 	IgnoreTestDir string
 }
 
-func NewGitHubApp(appClient *githubapp.Client, config GitHubAppConfig) *GitHubApp {
+func NewGitHubApp(appClient interfaces.GitHubAppClient, config GitHubAppConfig) *GitHubApp {
 	return &GitHubApp{
 		appClient: appClient,
 		config:    config,
@@ -62,29 +63,34 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 	// Set policy files
 	for path, content := range diff.New {
 		fpath := filepath.Join(x.config.PolicyRootDir, path)
+		if !strings.HasSuffix(content, "\n") {
+			content += "\n"
+		}
 		files[fpath] = []byte(content)
 	}
 
-	for schema, testData := range diff.TestDataSet.Detect.Data {
-		for fname, content := range testData {
-			fpath := filepath.Join(x.config.DetectTestDir, schema, fname)
-			raw, err := json.MarshalIndent(content, "", "  ")
-			if err != nil {
-				return nil, eb.Wrap(err, "failed to marshal test data", goerr.V("schema", schema), goerr.V("fname", fname), goerr.V("content", content))
+	setTestData := func(dir string, testData map[string]map[string]any) error {
+		for schema, testData := range testData {
+			for fname, content := range testData {
+				fpath := filepath.Join(dir, schema, fname)
+				raw, err := json.MarshalIndent(content, "", "  ")
+				if err != nil {
+					return eb.Wrap(err, "failed to marshal test data", goerr.V("fname", fname), goerr.V("content", content))
+				}
+				if !strings.HasSuffix(string(raw), "\n") {
+					raw = append(raw, '\n')
+				}
+				files[fpath] = raw
 			}
-			files[fpath] = raw
 		}
+		return nil
 	}
 
-	for schema, testData := range diff.TestDataSet.Ignore.Data {
-		for fname, content := range testData {
-			fpath := filepath.Join(x.config.IgnoreTestDir, schema, fname)
-			raw, err := json.MarshalIndent(content, "", "  ")
-			if err != nil {
-				return nil, eb.Wrap(err, "failed to marshal test data", goerr.V("schema", schema), goerr.V("fname", fname), goerr.V("content", content))
-			}
-			files[fpath] = raw
-		}
+	if err := setTestData(x.config.DetectTestDir, diff.TestDataSet.Detect.Data); err != nil {
+		return nil, eb.Wrap(err, "failed to set detect test data")
+	}
+	if err := setTestData(x.config.IgnoreTestDir, diff.TestDataSet.Ignore.Data); err != nil {
+		return nil, eb.Wrap(err, "failed to set ignore test data")
 	}
 
 	logger.Debug("Set files", "files", files)

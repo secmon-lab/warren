@@ -120,6 +120,10 @@ func (x PolicyDiffID) String() string {
 	return string(x)
 }
 
+func NewPolicyDiffID() PolicyDiffID {
+	return PolicyDiffID(uuid.New().String())
+}
+
 type PolicyDiff struct {
 	ID          PolicyDiffID      `json:"id"`
 	Title       string            `json:"title"`
@@ -132,7 +136,7 @@ type PolicyDiff struct {
 
 func NewPolicyDiff(ctx context.Context, title, description string, new, old map[string]string, testDataSet *TestDataSet) *PolicyDiff {
 	return &PolicyDiff{
-		ID:          PolicyDiffID(uuid.New().String()),
+		ID:          NewPolicyDiffID(),
 		Title:       title,
 		Description: description,
 		New:         new,

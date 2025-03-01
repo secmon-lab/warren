@@ -14,7 +14,6 @@ import (
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	"github.com/urfave/cli/v3"
-	"io"
 	"log/slog"
 	"sync"
 	"time"
@@ -2406,11 +2405,11 @@ var _ interfaces.GitHubAppClient = &GitHubAppClientMock{}
 //			CreatePullRequestFunc: func(ctx context.Context, owner string, repo string, title string, body string, head string, base string) (*github.PullRequest, error) {
 //				panic("mock out the CreatePullRequest method")
 //			},
-//			DownloadArchiveFunc: func(ctx context.Context, owner string, repo string, ref string) (io.ReadCloser, error) {
-//				panic("mock out the DownloadArchive method")
-//			},
 //			GetDefaultBranchFunc: func(ctx context.Context, owner string, repo string) (string, error) {
 //				panic("mock out the GetDefaultBranch method")
+//			},
+//			LookupBranchFunc: func(ctx context.Context, owner string, repo string, branch string) (*github.Reference, error) {
+//				panic("mock out the LookupBranch method")
 //			},
 //		}
 //
@@ -2428,11 +2427,11 @@ type GitHubAppClientMock struct {
 	// CreatePullRequestFunc mocks the CreatePullRequest method.
 	CreatePullRequestFunc func(ctx context.Context, owner string, repo string, title string, body string, head string, base string) (*github.PullRequest, error)
 
-	// DownloadArchiveFunc mocks the DownloadArchive method.
-	DownloadArchiveFunc func(ctx context.Context, owner string, repo string, ref string) (io.ReadCloser, error)
-
 	// GetDefaultBranchFunc mocks the GetDefaultBranch method.
 	GetDefaultBranchFunc func(ctx context.Context, owner string, repo string) (string, error)
+
+	// LookupBranchFunc mocks the LookupBranch method.
+	LookupBranchFunc func(ctx context.Context, owner string, repo string, branch string) (*github.Reference, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -2481,17 +2480,6 @@ type GitHubAppClientMock struct {
 			// Base is the base argument value.
 			Base string
 		}
-		// DownloadArchive holds details about calls to the DownloadArchive method.
-		DownloadArchive []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Owner is the owner argument value.
-			Owner string
-			// Repo is the repo argument value.
-			Repo string
-			// Ref is the ref argument value.
-			Ref string
-		}
 		// GetDefaultBranch holds details about calls to the GetDefaultBranch method.
 		GetDefaultBranch []struct {
 			// Ctx is the ctx argument value.
@@ -2501,12 +2489,23 @@ type GitHubAppClientMock struct {
 			// Repo is the repo argument value.
 			Repo string
 		}
+		// LookupBranch holds details about calls to the LookupBranch method.
+		LookupBranch []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Owner is the owner argument value.
+			Owner string
+			// Repo is the repo argument value.
+			Repo string
+			// Branch is the branch argument value.
+			Branch string
+		}
 	}
 	lockCommitChanges     sync.RWMutex
 	lockCreateBranch      sync.RWMutex
 	lockCreatePullRequest sync.RWMutex
-	lockDownloadArchive   sync.RWMutex
 	lockGetDefaultBranch  sync.RWMutex
+	lockLookupBranch      sync.RWMutex
 }
 
 // CommitChanges calls CommitChangesFunc.
@@ -2665,50 +2664,6 @@ func (mock *GitHubAppClientMock) CreatePullRequestCalls() []struct {
 	return calls
 }
 
-// DownloadArchive calls DownloadArchiveFunc.
-func (mock *GitHubAppClientMock) DownloadArchive(ctx context.Context, owner string, repo string, ref string) (io.ReadCloser, error) {
-	if mock.DownloadArchiveFunc == nil {
-		panic("GitHubAppClientMock.DownloadArchiveFunc: method is nil but GitHubAppClient.DownloadArchive was just called")
-	}
-	callInfo := struct {
-		Ctx   context.Context
-		Owner string
-		Repo  string
-		Ref   string
-	}{
-		Ctx:   ctx,
-		Owner: owner,
-		Repo:  repo,
-		Ref:   ref,
-	}
-	mock.lockDownloadArchive.Lock()
-	mock.calls.DownloadArchive = append(mock.calls.DownloadArchive, callInfo)
-	mock.lockDownloadArchive.Unlock()
-	return mock.DownloadArchiveFunc(ctx, owner, repo, ref)
-}
-
-// DownloadArchiveCalls gets all the calls that were made to DownloadArchive.
-// Check the length with:
-//
-//	len(mockedGitHubAppClient.DownloadArchiveCalls())
-func (mock *GitHubAppClientMock) DownloadArchiveCalls() []struct {
-	Ctx   context.Context
-	Owner string
-	Repo  string
-	Ref   string
-} {
-	var calls []struct {
-		Ctx   context.Context
-		Owner string
-		Repo  string
-		Ref   string
-	}
-	mock.lockDownloadArchive.RLock()
-	calls = mock.calls.DownloadArchive
-	mock.lockDownloadArchive.RUnlock()
-	return calls
-}
-
 // GetDefaultBranch calls GetDefaultBranchFunc.
 func (mock *GitHubAppClientMock) GetDefaultBranch(ctx context.Context, owner string, repo string) (string, error) {
 	if mock.GetDefaultBranchFunc == nil {
@@ -2746,5 +2701,49 @@ func (mock *GitHubAppClientMock) GetDefaultBranchCalls() []struct {
 	mock.lockGetDefaultBranch.RLock()
 	calls = mock.calls.GetDefaultBranch
 	mock.lockGetDefaultBranch.RUnlock()
+	return calls
+}
+
+// LookupBranch calls LookupBranchFunc.
+func (mock *GitHubAppClientMock) LookupBranch(ctx context.Context, owner string, repo string, branch string) (*github.Reference, error) {
+	if mock.LookupBranchFunc == nil {
+		panic("GitHubAppClientMock.LookupBranchFunc: method is nil but GitHubAppClient.LookupBranch was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		Owner  string
+		Repo   string
+		Branch string
+	}{
+		Ctx:    ctx,
+		Owner:  owner,
+		Repo:   repo,
+		Branch: branch,
+	}
+	mock.lockLookupBranch.Lock()
+	mock.calls.LookupBranch = append(mock.calls.LookupBranch, callInfo)
+	mock.lockLookupBranch.Unlock()
+	return mock.LookupBranchFunc(ctx, owner, repo, branch)
+}
+
+// LookupBranchCalls gets all the calls that were made to LookupBranch.
+// Check the length with:
+//
+//	len(mockedGitHubAppClient.LookupBranchCalls())
+func (mock *GitHubAppClientMock) LookupBranchCalls() []struct {
+	Ctx    context.Context
+	Owner  string
+	Repo   string
+	Branch string
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Owner  string
+		Repo   string
+		Branch string
+	}
+	mock.lockLookupBranch.RLock()
+	calls = mock.calls.LookupBranch
+	mock.lockLookupBranch.RUnlock()
 	return calls
 }
