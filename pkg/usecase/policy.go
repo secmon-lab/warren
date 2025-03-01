@@ -55,32 +55,11 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 		allTestData.Ignore.Add(alert.Schema, fpath, alert.Data)
 	}
 
-	// Generate README for test data
-	alertSchemaMap := make(map[string][]model.Alert)
-	for _, alert := range alerts {
-		alertSchemaMap[alert.Schema] = append(alertSchemaMap[alert.Schema], alert)
-	}
-
-	for schema, alerts := range alertSchemaMap {
-		p, err := prompt.BuildTestDataReadmePrompt(ctx, "ignore", alerts)
-		if err != nil {
-			return nil, err
-		}
-
-		resp, err := service.AskPrompt[prompt.TestDataReadmePromptResult](ctx, uc.llmClient, p)
-		if err != nil {
-			logger.Warn("failed to generate test data readme, not fill readme", "error", err)
-			continue
-		}
-
-		newTestData.Ignore.Readme[schema] = resp.Content
-	}
-
 	// Generate ignore policy
 	ssn := uc.llmClient.StartChat()
 
-	var result *model.PolicyDiff
-	for i := 0; i < maxRetryCountForIgnorePolicy && result == nil; i++ {
+	var validResult *prompt.IgnorePolicyPromptResult
+	for i := 0; i < maxRetryCountForIgnorePolicy && validResult == nil; i++ {
 		resp, err := service.AskChat[prompt.IgnorePolicyPromptResult](ctx, ssn, p)
 		if err != nil {
 			if goerr.HasTag(err, model.ErrTagInvalidLLMResponse) {
@@ -131,13 +110,50 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 		}
 
 		thread.Reply(ctx, "✅ Test PASSED")
-		result = model.NewPolicyDiff(ctx, diffID, resp.Title, resp.Description, resp.Policy, uc.policyService.Sources(), newTestData)
+		validResult = resp
 	}
 
-	if result == nil {
+	if validResult == nil {
 		thread.Reply(ctx, "🛑 Failed to generate a new ignore policy. Stop generating.")
 		return nil, errors.New("failed to generate a new ignore policy")
 	}
+
+	// Fill generated README for test data
+	thread.Reply(ctx, "📝 Generating README for test data...")
+	alertSchemaMap := make(map[string][]model.Alert)
+	for _, alert := range alerts {
+		alertSchemaMap[alert.Schema] = append(alertSchemaMap[alert.Schema], alert)
+	}
+
+	for schema, alerts := range alertSchemaMap {
+		p, err := prompt.BuildTestDataReadmePrompt(ctx, "ignore", alerts)
+		if err != nil {
+			return nil, err
+		}
+
+		resp, err := service.AskPrompt[prompt.TestDataReadmePromptResult](ctx, uc.llmClient, p)
+		if err != nil {
+			thread.Reply(ctx, fmt.Sprintf("💥 Failed to generate README for test data: \n> %v\n\nSkip README generation.", err))
+			logger.Warn("failed to generate test data readme, not fill readme", "error", err)
+			continue
+		}
+
+		if newTestData.Ignore.Metafiles[schema] == nil {
+			newTestData.Ignore.Metafiles[schema] = make(map[string]string)
+		}
+		fpath := filepath.Join(diffID.String(), "README.md")
+		newTestData.Ignore.Metafiles[schema][fpath] = resp.Content
+	}
+	thread.Reply(ctx, "✅ Successfully generated README")
+
+	result := model.NewPolicyDiff(ctx,
+		diffID,
+		validResult.Title,
+		validResult.Description,
+		validResult.Policy,
+		uc.policyService.Sources(),
+		newTestData,
+	)
 
 	return result, nil
 }

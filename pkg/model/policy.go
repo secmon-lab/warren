@@ -40,8 +40,8 @@ func NewTestDataSet() *TestDataSet {
 }
 
 type TestData struct {
-	Readme map[string]string
-	Data   map[string]map[string]any
+	Metafiles map[string]map[string]string
+	Data      map[string]map[string]any
 }
 
 func (x *TestData) Add(schema string, filename string, data any) {
@@ -60,13 +60,20 @@ func (x *TestData) Clone() *TestData {
 			clone.Data[schema][filename] = data
 		}
 	}
+	clone.Metafiles = make(map[string]map[string]string)
+	for schema, metafiles := range x.Metafiles {
+		clone.Metafiles[schema] = make(map[string]string)
+		for filename, content := range metafiles {
+			clone.Metafiles[schema][filename] = content
+		}
+	}
 	return clone
 }
 
 func NewTestData() *TestData {
 	return &TestData{
-		Readme: make(map[string]string),
-		Data:   make(map[string]map[string]any),
+		Metafiles: make(map[string]map[string]string),
+		Data:      make(map[string]map[string]any),
 	}
 }
 

@@ -67,9 +67,9 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 		files[fpath] = []byte(content)
 	}
 
-	setTestData := func(dir string, testData map[string]map[string]any) error {
-		for schema, testData := range testData {
-			for fname, content := range testData {
+	setTestData := func(dir string, testData *model.TestData) error {
+		for schema, data := range testData.Data {
+			for fname, content := range data {
 				fpath := filepath.Join(dir, schema, fname)
 				raw, err := json.MarshalIndent(content, "", "  ")
 				if err != nil {
@@ -80,18 +80,21 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 				}
 				files[fpath] = raw
 			}
+		}
 
-			if readme, ok := diff.NewTestDataSet.Detect.Readme[schema]; ok {
-				files[filepath.Join(dir, schema, "README.md")] = []byte(readme)
+		for schema, files := range testData.Metafiles {
+			for fname, content := range files {
+				fpath := filepath.Join(dir, schema, fname)
+				files[fpath] = content
 			}
 		}
 		return nil
 	}
 
-	if err := setTestData(x.config.DetectTestDir, diff.NewTestDataSet.Detect.Data); err != nil {
+	if err := setTestData(x.config.DetectTestDir, diff.NewTestDataSet.Detect); err != nil {
 		return nil, eb.Wrap(err, "failed to set detect test data")
 	}
-	if err := setTestData(x.config.IgnoreTestDir, diff.NewTestDataSet.Ignore.Data); err != nil {
+	if err := setTestData(x.config.IgnoreTestDir, diff.NewTestDataSet.Ignore); err != nil {
 		return nil, eb.Wrap(err, "failed to set ignore test data")
 	}
 
