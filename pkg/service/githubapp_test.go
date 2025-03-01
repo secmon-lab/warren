@@ -49,7 +49,7 @@ func TestGitHubApp_CreatePullRequest(t *testing.T) {
 		New: map[string]string{
 			"test.rego": "package color\n\nalert contains {} if {\n  input.color == \"red\"\n}",
 		},
-		TestDataSet: &model.TestDataSet{
+		NewTestDataSet: &model.TestDataSet{
 			Detect: &model.TestData{
 				Data: map[string]map[string]any{
 					"schema": {

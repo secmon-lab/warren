@@ -84,10 +84,10 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 		return nil
 	}
 
-	if err := setTestData(x.config.DetectTestDir, diff.TestDataSet.Detect.Data); err != nil {
+	if err := setTestData(x.config.DetectTestDir, diff.NewTestDataSet.Detect.Data); err != nil {
 		return nil, eb.Wrap(err, "failed to set detect test data")
 	}
-	if err := setTestData(x.config.IgnoreTestDir, diff.TestDataSet.Ignore.Data); err != nil {
+	if err := setTestData(x.config.IgnoreTestDir, diff.NewTestDataSet.Ignore.Data); err != nil {
 		return nil, eb.Wrap(err, "failed to set ignore test data")
 	}
 

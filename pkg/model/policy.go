@@ -2,17 +2,13 @@ package model
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
 
@@ -44,8 +40,7 @@ func NewTestDataSet() *TestDataSet {
 }
 
 type TestData struct {
-	BasePath string
-	Data     map[string]map[string]any
+	Data map[string]map[string]any
 }
 
 func (x *TestData) Add(schema string, filename string, data any) {
@@ -57,7 +52,6 @@ func (x *TestData) Add(schema string, filename string, data any) {
 
 func (x *TestData) Clone() *TestData {
 	clone := NewTestData()
-	clone.BasePath = x.BasePath
 	clone.Data = make(map[string]map[string]any)
 	for schema, dataSets := range x.Data {
 		clone.Data[schema] = make(map[string]any)
@@ -66,24 +60,6 @@ func (x *TestData) Clone() *TestData {
 		}
 	}
 	return clone
-}
-
-func (x *TestData) Save(dir string) error {
-	for schema, dataSets := range x.Data {
-		for filename, data := range dataSets {
-			jsonData, err := json.Marshal(data)
-			if err != nil {
-				return goerr.Wrap(err, "failed to marshal test data", goerr.V("schema", schema), goerr.V("filename", filename))
-			}
-
-			fpath := filepath.Join(x.BasePath, dir, schema, filename)
-			if err := os.WriteFile(filepath.Clean(fpath), jsonData, 0644); err != nil {
-				return goerr.Wrap(err, "failed to save test data", goerr.V("schema", schema), goerr.V("filename", filename))
-			}
-		}
-	}
-
-	return nil
 }
 
 func NewTestData() *TestData {
@@ -125,24 +101,24 @@ func NewPolicyDiffID() PolicyDiffID {
 }
 
 type PolicyDiff struct {
-	ID          PolicyDiffID      `json:"id"`
-	Title       string            `json:"title"`
-	Description string            `json:"description"`
-	CreatedAt   time.Time         `json:"created_at"`
-	New         map[string]string `json:"new"`
-	Old         map[string]string `json:"old"`
-	TestDataSet *TestDataSet      `json:"test_data_set"`
+	ID             PolicyDiffID      `json:"id"`
+	Title          string            `json:"title"`
+	Description    string            `json:"description"`
+	CreatedAt      time.Time         `json:"created_at"`
+	New            map[string]string `json:"new"`
+	Old            map[string]string `json:"old"`
+	NewTestDataSet *TestDataSet      `json:"new_test_data_set"`
 }
 
-func NewPolicyDiff(ctx context.Context, id PolicyDiffID, title, description string, new, old map[string]string, testDataSet *TestDataSet) *PolicyDiff {
+func NewPolicyDiff(ctx context.Context, id PolicyDiffID, title, description string, new, old map[string]string, newTestDataSet *TestDataSet) *PolicyDiff {
 	return &PolicyDiff{
-		ID:          id,
-		Title:       title,
-		Description: description,
-		New:         new,
-		Old:         old,
-		TestDataSet: testDataSet,
-		CreatedAt:   clock.Now(ctx),
+		ID:             id,
+		Title:          title,
+		Description:    description,
+		New:            new,
+		Old:            old,
+		NewTestDataSet: newTestDataSet,
+		CreatedAt:      clock.Now(ctx),
 	}
 }
 

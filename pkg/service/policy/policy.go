@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"os"
-	"path/filepath"
 	"sort"
 	"time"
 
@@ -200,58 +198,6 @@ func (s *Service) UpdatePolicy(ctx context.Context, data map[string]string) erro
 
 	if err := s.repo.SavePolicy(ctx, policyData); err != nil {
 		return goerr.Wrap(err, "failed to save policy", goerr.V("hash", s.baseHash), goerr.V("data", data))
-	}
-
-	return nil
-}
-
-func (s *Service) Save(ctx context.Context, rootDir string) error {
-	logger := logging.From(ctx)
-	sources := s.policyClient.Sources()
-
-	for filename, source := range sources {
-		path := filepath.Join(rootDir, filename)
-		if err := os.MkdirAll(filepath.Clean(filepath.Dir(path)), 0755); err != nil {
-			return goerr.Wrap(err, "failed to create directory", goerr.V("path", path))
-		}
-
-		if err := os.WriteFile(filepath.Clean(path), []byte(source), 0644); err != nil {
-			return goerr.Wrap(err, "failed to save policy", goerr.V("filename", filename))
-		}
-
-		logger.Debug("saved policy", "file", path)
-	}
-
-	testDataSet := s.TestDataSet()
-	saveTestData := func(d *model.TestData) error {
-		for schema, dataSets := range d.Data {
-			for filename, testData := range dataSets {
-				jsonData, err := json.MarshalIndent(testData, "", "  ")
-				if err != nil {
-					return goerr.Wrap(err, "failed to marshal test data", goerr.V("schema", schema), goerr.V("filename", filename))
-				}
-
-				path := filepath.Join(rootDir, d.BasePath, schema, filename)
-				if err := os.MkdirAll(filepath.Clean(filepath.Dir(path)), 0755); err != nil {
-					return goerr.Wrap(err, "failed to create directory", goerr.V("path", path))
-				}
-
-				if err := os.WriteFile(filepath.Clean(path), jsonData, 0644); err != nil {
-					return goerr.Wrap(err, "failed to save test data", goerr.V("schema", schema), goerr.V("filename", filename))
-				}
-
-				logger.Debug("saved test data", "file", path)
-			}
-		}
-		return nil
-	}
-
-	if err := saveTestData(testDataSet.Detect); err != nil {
-		return err
-	}
-
-	if err := saveTestData(testDataSet.Ignore); err != nil {
-		return err
 	}
 
 	return nil

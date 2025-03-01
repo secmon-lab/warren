@@ -59,8 +59,6 @@ func loadTestFiles(basePath string) (*model.TestData, error) {
 		return result, nil
 	}
 
-	result.BasePath = basePath
-
 	err := filepath.WalkDir(basePath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
