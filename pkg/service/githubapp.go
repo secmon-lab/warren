@@ -22,7 +22,7 @@ type GitHubAppConfig struct {
 	Owner string
 	Repo  string
 
-	PolicyBaseDir string
+	PolicyRootDir string
 	DetectTestDir string
 	IgnoreTestDir string
 }
@@ -61,7 +61,7 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 
 	// Set policy files
 	for path, content := range diff.New {
-		fpath := filepath.Join(x.config.PolicyBaseDir, path)
+		fpath := filepath.Join(x.config.PolicyRootDir, path)
 		files[fpath] = []byte(content)
 	}
 

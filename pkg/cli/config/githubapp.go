@@ -18,7 +18,7 @@ type GitHubAppCfg struct {
 	owner string
 	repo  string
 
-	policyBaseDir string
+	policyRootDir string
 	detectTestDir string
 	ignoreTestDir string
 }
@@ -61,11 +61,11 @@ func (c *GitHubAppCfg) Flags() []cli.Flag {
 			Destination: &c.repo,
 		},
 		&cli.StringFlag{
-			Name:        "github-app-policy-base-dir",
-			Usage:       "GitHub App Policy Base Directory",
+			Name:        "github-app-policy-root-dir",
+			Usage:       "GitHub App Policy Root Directory",
 			Category:    "GitHub App",
-			Sources:     cli.EnvVars("WARREN_GITHUB_APP_POLICY_BASE_DIR"),
-			Destination: &c.policyBaseDir,
+			Sources:     cli.EnvVars("WARREN_GITHUB_APP_POLICY_ROOT_DIR"),
+			Destination: &c.policyRootDir,
 		},
 		&cli.StringFlag{
 			Name:        "github-app-detect-test-dir",
@@ -91,7 +91,7 @@ func (c GitHubAppCfg) LogValue() slog.Value {
 		slog.Int("private-key.len", len(c.privateKey)),
 		slog.String("owner", c.owner),
 		slog.String("repo", c.repo),
-		slog.String("policy-base-dir", c.policyBaseDir),
+		slog.String("policy-root-dir", c.policyRootDir),
 		slog.String("detect-test-dir", c.detectTestDir),
 		slog.String("ignore-test-dir", c.ignoreTestDir),
 	)
@@ -115,7 +115,7 @@ func (c GitHubAppCfg) Configure(ctx context.Context) (*service.GitHubApp, error)
 		Owner: c.owner,
 		Repo:  c.repo,
 
-		PolicyBaseDir: c.policyBaseDir,
+		PolicyRootDir: c.policyRootDir,
 		DetectTestDir: c.detectTestDir,
 		IgnoreTestDir: c.ignoreTestDir,
 	})
