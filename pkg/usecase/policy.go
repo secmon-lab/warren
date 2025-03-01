@@ -119,7 +119,7 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 	}
 
 	// Fill generated README for test data
-	thread.Reply(ctx, "📝 Generating README for test data...")
+	thread.Reply(ctx, "📝 Generating metadata for test data...")
 	alertSchemaMap := make(map[string][]model.Alert)
 	for _, alert := range alerts {
 		alertSchemaMap[alert.Schema] = append(alertSchemaMap[alert.Schema], alert)
@@ -144,7 +144,7 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 		fpath := filepath.Join(diffID.String(), "README.md")
 		newTestData.Ignore.Metafiles[schema][fpath] = resp.Content
 	}
-	thread.Reply(ctx, "✅ Successfully generated README")
+	thread.Reply(ctx, "✅ Successfully generated metadata for test data")
 
 	result := model.NewPolicyDiff(ctx,
 		diffID,

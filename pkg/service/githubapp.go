@@ -56,7 +56,7 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 		}
 	}
 
-	files := map[string][]byte{}
+	files := map[string]string{}
 
 	// Set policy files
 	for path, content := range diff.New {
@@ -64,7 +64,7 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 		if !strings.HasSuffix(content, "\n") {
 			content += "\n"
 		}
-		files[fpath] = []byte(content)
+		files[fpath] = content
 	}
 
 	setTestData := func(dir string, testData *model.TestData) error {
@@ -75,15 +75,16 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 				if err != nil {
 					return eb.Wrap(err, "failed to marshal test data", goerr.V("fname", fname), goerr.V("content", content))
 				}
-				if !strings.HasSuffix(string(raw), "\n") {
-					raw = append(raw, '\n')
+				data := string(raw)
+				if !strings.HasSuffix(data, "\n") {
+					data += "\n"
 				}
-				files[fpath] = raw
+				files[fpath] = data
 			}
 		}
 
-		for schema, files := range testData.Metafiles {
-			for fname, content := range files {
+		for schema, metaFiles := range testData.Metafiles {
+			for fname, content := range metaFiles {
 				fpath := filepath.Join(dir, schema, fname)
 				files[fpath] = content
 			}
@@ -101,7 +102,12 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 	logger.Debug("Set files", "files", files)
 	eb = eb.With(goerr.V("files", files))
 
-	if err := x.appClient.CommitChanges(ctx, x.config.Owner, x.config.Repo, newBranch, files, diff.Title); err != nil {
+	binData := map[string][]byte{}
+	for fpath, content := range files {
+		binData[fpath] = []byte(content)
+	}
+
+	if err := x.appClient.CommitChanges(ctx, x.config.Owner, x.config.Repo, newBranch, binData, diff.Title); err != nil {
 		return nil, eb.Wrap(err, "failed to commit changes")
 	}
 
