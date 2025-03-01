@@ -310,7 +310,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 	})
 
 	t.Run("GetPolicyDiff", func(t *testing.T) {
-		diff := model.NewPolicyDiff(ctx, "test", "test", map[string]string{"test": "test"}, map[string]string{}, model.NewTestDataSet())
+		diff := model.NewPolicyDiff(ctx, model.NewPolicyDiffID(), "test", "test", map[string]string{"test": "test"}, map[string]string{}, model.NewTestDataSet())
 		gt.NoError(t, repo.PutPolicyDiff(ctx, diff))
 
 		got, err := repo.GetPolicyDiff(ctx, diff.ID)

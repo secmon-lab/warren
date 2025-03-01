@@ -134,9 +134,9 @@ type PolicyDiff struct {
 	TestDataSet *TestDataSet      `json:"test_data_set"`
 }
 
-func NewPolicyDiff(ctx context.Context, title, description string, new, old map[string]string, testDataSet *TestDataSet) *PolicyDiff {
+func NewPolicyDiff(ctx context.Context, id PolicyDiffID, title, description string, new, old map[string]string, testDataSet *TestDataSet) *PolicyDiff {
 	return &PolicyDiff{
-		ID:          NewPolicyDiffID(),
+		ID:          id,
 		Title:       title,
 		Description: description,
 		New:         new,

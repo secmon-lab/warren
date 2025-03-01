@@ -56,8 +56,6 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 		}
 	}
 
-	// Add test line to README.md
-
 	files := map[string][]byte{}
 
 	// Set policy files

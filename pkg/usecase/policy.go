@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -27,6 +28,7 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 	logger := logging.From(ctx)
 	thread.Reply(ctx, "📝 Generating ignore policy...")
 
+	diffID := model.NewPolicyDiffID()
 	base, err := uc.policyService.NewClient(ctx)
 	if err != nil {
 		return nil, err
@@ -49,7 +51,8 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 		newTestData = model.NewTestDataSet()
 	}
 	for _, alert := range alerts {
-		newTestData.Ignore.Add(alert.Schema, alert.ID.String()+".json", alert.Data)
+		fpath := filepath.Join(diffID.String(), alert.ID.String()+".json")
+		newTestData.Ignore.Add(alert.Schema, fpath, alert.Data)
 	}
 
 	var result *model.PolicyDiff
@@ -104,7 +107,7 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 		}
 
 		thread.Reply(ctx, "✅ Test PASSED")
-		result = model.NewPolicyDiff(ctx, resp.Title, resp.Description, resp.Policy, uc.policyService.Sources(), newTestData)
+		result = model.NewPolicyDiff(ctx, diffID, resp.Title, resp.Description, resp.Policy, uc.policyService.Sources(), newTestData)
 	}
 
 	if result == nil {

@@ -220,7 +220,7 @@ func TestPostAlertGroups(t *testing.T) {
 func TestPostPolicyDiff(t *testing.T) {
 	svc := newSlackService(t)
 
-	diff := model.NewPolicyDiff(context.Background(), "Policy Diff", "This is a test policy diff", map[string]string{
+	diff := model.NewPolicyDiff(context.Background(), model.NewPolicyDiffID(), "Policy Diff", "This is a test policy diff", map[string]string{
 		"test.rego": `package test
 
 allow if {
