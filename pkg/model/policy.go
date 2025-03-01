@@ -34,13 +34,14 @@ type TestDataSet struct {
 
 func NewTestDataSet() *TestDataSet {
 	return &TestDataSet{
-		Detect: &TestData{},
-		Ignore: &TestData{},
+		Detect: NewTestData(),
+		Ignore: NewTestData(),
 	}
 }
 
 type TestData struct {
-	Data map[string]map[string]any
+	Readme map[string]string
+	Data   map[string]map[string]any
 }
 
 func (x *TestData) Add(schema string, filename string, data any) {
@@ -64,7 +65,8 @@ func (x *TestData) Clone() *TestData {
 
 func NewTestData() *TestData {
 	return &TestData{
-		Data: make(map[string]map[string]any),
+		Readme: make(map[string]string),
+		Data:   make(map[string]map[string]any),
 	}
 }
 

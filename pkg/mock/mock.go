@@ -2259,6 +2259,9 @@ var _ interfaces.LLMClient = &LLMClientMock{}
 //
 //		// make and configure a mocked interfaces.LLMClient
 //		mockedLLMClient := &LLMClientMock{
+//			SendMessageFunc: func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
+//				panic("mock out the SendMessage method")
+//			},
 //			StartChatFunc: func() interfaces.LLMSession {
 //				panic("mock out the StartChat method")
 //			},
@@ -2269,16 +2272,63 @@ var _ interfaces.LLMClient = &LLMClientMock{}
 //
 //	}
 type LLMClientMock struct {
+	// SendMessageFunc mocks the SendMessage method.
+	SendMessageFunc func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
+
 	// StartChatFunc mocks the StartChat method.
 	StartChatFunc func() interfaces.LLMSession
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// SendMessage holds details about calls to the SendMessage method.
+		SendMessage []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Msg is the msg argument value.
+			Msg []genai.Part
+		}
 		// StartChat holds details about calls to the StartChat method.
 		StartChat []struct {
 		}
 	}
-	lockStartChat sync.RWMutex
+	lockSendMessage sync.RWMutex
+	lockStartChat   sync.RWMutex
+}
+
+// SendMessage calls SendMessageFunc.
+func (mock *LLMClientMock) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
+	if mock.SendMessageFunc == nil {
+		panic("LLMClientMock.SendMessageFunc: method is nil but LLMClient.SendMessage was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		Msg []genai.Part
+	}{
+		Ctx: ctx,
+		Msg: msg,
+	}
+	mock.lockSendMessage.Lock()
+	mock.calls.SendMessage = append(mock.calls.SendMessage, callInfo)
+	mock.lockSendMessage.Unlock()
+	return mock.SendMessageFunc(ctx, msg...)
+}
+
+// SendMessageCalls gets all the calls that were made to SendMessage.
+// Check the length with:
+//
+//	len(mockedLLMClient.SendMessageCalls())
+func (mock *LLMClientMock) SendMessageCalls() []struct {
+	Ctx context.Context
+	Msg []genai.Part
+} {
+	var calls []struct {
+		Ctx context.Context
+		Msg []genai.Part
+	}
+	mock.lockSendMessage.RLock()
+	calls = mock.calls.SendMessage
+	mock.lockSendMessage.RUnlock()
+	return calls
 }
 
 // StartChat calls StartChatFunc.

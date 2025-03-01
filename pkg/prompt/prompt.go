@@ -293,3 +293,45 @@ func BuildMakeGroupPrompt(ctx context.Context, alerts []model.Alert, maxGroups i
 
 	return buf.String(), nil
 }
+
+//go:embed templates/test_data_readme.md
+var testDataReadmeTemplate string
+
+type TestDataReadmePromptResult struct {
+	Content string `json:"content"`
+}
+
+func BuildTestDataReadmePrompt(ctx context.Context, action string, alerts []model.Alert) (string, error) {
+	tmpl, err := template.New("test_data_readme").Parse(testDataReadmeTemplate)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to parse template")
+	}
+
+	rawAlerts := []string{}
+	for _, alert := range alerts {
+		rawAlert, err := stringify(alert)
+		if err != nil {
+			return "", err
+		}
+		rawAlerts = append(rawAlerts, rawAlert)
+	}
+
+	schema, err := generateSchema(TestDataReadmePromptResult{}).Stringify()
+	if err != nil {
+		return "", err
+	}
+
+	input := map[string]any{
+		"alerts": rawAlerts,
+		"schema": schema,
+		"action": action,
+		"lang":   lang.From(ctx).Name(),
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "test_data_readme", input); err != nil {
+		return "", goerr.Wrap(err, "failed to execute template")
+	}
+
+	return buf.String(), nil
+}

@@ -80,6 +80,10 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 				}
 				files[fpath] = raw
 			}
+
+			if readme, ok := diff.NewTestDataSet.Detect.Readme[schema]; ok {
+				files[filepath.Join(dir, schema, "README.md")] = []byte(readme)
+			}
 		}
 		return nil
 	}

@@ -44,16 +44,40 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 		return nil, err
 	}
 
-	ssn := uc.llmClient.StartChat()
-
-	newTestData := uc.policyService.TestDataSet()
-	if newTestData == nil {
-		newTestData = model.NewTestDataSet()
+	newTestData := model.NewTestDataSet()
+	allTestData := uc.policyService.TestDataSet()
+	if allTestData == nil {
+		allTestData = model.NewTestDataSet()
 	}
 	for _, alert := range alerts {
 		fpath := filepath.Join(diffID.String(), alert.ID.String()+".json")
 		newTestData.Ignore.Add(alert.Schema, fpath, alert.Data)
+		allTestData.Ignore.Add(alert.Schema, fpath, alert.Data)
 	}
+
+	// Generate README for test data
+	alertSchemaMap := make(map[string][]model.Alert)
+	for _, alert := range alerts {
+		alertSchemaMap[alert.Schema] = append(alertSchemaMap[alert.Schema], alert)
+	}
+
+	for schema, alerts := range alertSchemaMap {
+		p, err := prompt.BuildTestDataReadmePrompt(ctx, "ignore", alerts)
+		if err != nil {
+			return nil, err
+		}
+
+		resp, err := service.AskPrompt[prompt.TestDataReadmePromptResult](ctx, uc.llmClient, p)
+		if err != nil {
+			logger.Warn("failed to generate test data readme, not fill readme", "error", err)
+			continue
+		}
+
+		newTestData.Ignore.Readme[schema] = resp.Content
+	}
+
+	// Generate ignore policy
+	ssn := uc.llmClient.StartChat()
 
 	var result *model.PolicyDiff
 	for i := 0; i < maxRetryCountForIgnorePolicy && result == nil; i++ {
@@ -83,7 +107,7 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 			continue
 		}
 
-		if errs := policy.Test(ctx, c, newTestData); len(errs) > 0 {
+		if errs := policy.Test(ctx, c, allTestData); len(errs) > 0 {
 			var runtimeErrs []error
 			var replyLines []string
 			for _, err := range errs {
@@ -100,7 +124,7 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Ale
 				return nil, errors.New("failed to test new policy")
 			}
 			if len(replyLines) > 0 {
-				p = "Failed to test new policy:\n" + strings.Join(replyLines, "\n")
+				p = "Failed to test new policy:\n> " + strings.Join(replyLines, "\n> ")
 				thread.Reply(ctx, strings.Join(replyLines, "\n"))
 				continue
 			}

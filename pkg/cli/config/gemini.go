@@ -60,6 +60,10 @@ func (x *GeminiClient) StartChat() interfaces.LLMSession {
 	return x.model.StartChat()
 }
 
+func (x *GeminiClient) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
+	return x.model.GenerateContent(ctx, msg...)
+}
+
 func (x *GeminiCfg) Configure(ctx context.Context) (*GeminiClient, error) {
 	client, err := genai.NewClient(ctx, x.projectID, x.location)
 	if err != nil {

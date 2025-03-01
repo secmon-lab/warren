@@ -25,6 +25,10 @@ func (c *geminiClient) StartChat() interfaces.LLMSession {
 	return c.model.StartChat()
 }
 
+func (c *geminiClient) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
+	return c.model.GenerateContent(ctx, msg...)
+}
+
 func genGeminiClient(t *testing.T) *geminiClient {
 	vars := test.NewEnvVars(t, "TEST_GEMINI_PROJECT_ID", "TEST_GEMINI_LOCATION")
 	client, err := genai.NewClient(t.Context(), vars.Get("TEST_GEMINI_PROJECT_ID"), vars.Get("TEST_GEMINI_LOCATION"))

@@ -12,6 +12,7 @@ import (
 
 type LLMClient interface {
 	StartChat() LLMSession
+	SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
 }
 
 type EmbeddingClient interface {
