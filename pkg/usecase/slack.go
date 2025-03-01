@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"unicode/utf8"
 
@@ -394,29 +395,32 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 				ChannelID: interaction.Channel.ID,
 				ThreadID:  interaction.Message.ThreadTimestamp,
 			})
+			ctx = thread.WithReplyFunc(ctx, th.Reply)
+
+			th.Reply(ctx, "✏️ Creating pull request...")
 
 			diffID := model.PolicyDiffID(action.Value)
 			diff, err := uc.repository.GetPolicyDiff(ctx, diffID)
 			if err != nil {
-				th.Reply(ctx, "💥 Failed to get policy diff")
+				thread.Reply(ctx, "💥 Failed to get policy diff")
 				return goerr.Wrap(err, "failed to get policy diff")
 			} else if diff == nil {
-				th.Reply(ctx, "💥 Policy diff not found")
+				thread.Reply(ctx, "💥 Policy diff not found")
 				return nil
 			}
 
 			if uc.gitHubApp == nil {
-				th.Reply(ctx, "💥 GitHub is not enabled")
+				thread.Reply(ctx, "💥 GitHub is not enabled")
 				return nil
 			}
 
 			prURL, err := uc.gitHubApp.CreatePullRequest(ctx, diff)
 			if err != nil {
-				th.Reply(ctx, "💥 Failed to create pull request")
+				thread.Reply(ctx, "💥 Failed to create pull request")
 				return err
 			}
 
-			th.Reply(ctx, "✅️ Created: <"+diff.Title+"|"+prURL.String()+">")
+			thread.Reply(ctx, fmt.Sprintf("✅️ Created: <%s|%s>", prURL.String(), diff.Title))
 
 			return nil
 		})
