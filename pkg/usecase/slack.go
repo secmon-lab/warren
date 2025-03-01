@@ -402,7 +402,7 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 			diffID := model.PolicyDiffID(action.Value)
 			diff, err := uc.repository.GetPolicyDiff(ctx, diffID)
 			if err != nil {
-				thread.Reply(ctx, "💥 Failed to get policy diff")
+				thread.Reply(ctx, "💥 Failed to get policy diff\n> "+err.Error())
 				return goerr.Wrap(err, "failed to get policy diff")
 			} else if diff == nil {
 				thread.Reply(ctx, "💥 Policy diff not found")
@@ -416,7 +416,7 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 
 			prURL, err := uc.gitHubApp.CreatePullRequest(ctx, diff)
 			if err != nil {
-				thread.Reply(ctx, "💥 Failed to create pull request")
+				thread.Reply(ctx, "💥 Failed to create pull request\n> "+err.Error())
 				return err
 			}
 
