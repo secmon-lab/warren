@@ -65,21 +65,7 @@ func (x *UseCases) RunCommand(ctx context.Context, args []string, alert *model.A
 		Name:  "warren",
 		Usage: "Slack bot for security monitoring",
 		Commands: []*cli.Command{
-			{
-				Name:    "group",
-				Usage:   "Create group of unclosed alerts",
-				Aliases: []string{"g"},
-				Action: func(ctx context.Context, c *cli.Command) error {
-					if err := x.GroupUnclosedAlerts(ctx, th); err != nil {
-						th.Reply(ctx, "😫 Failed to group unclosed alerts: "+err.Error())
-						return err
-					}
-
-					th.Reply(ctx, "✅ Grouped unclosed alerts")
-
-					return nil
-				},
-			},
+			x.cmdList(th),
 			{
 				Name:    "ignore",
 				Usage:   "Ignore alerts",
