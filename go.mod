@@ -11,7 +11,9 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/getsentry/sentry-go v0.31.1
 	github.com/go-chi/chi/v5 v5.2.1
+	github.com/google/go-github/v69 v69.2.0
 	github.com/google/uuid v1.6.0
+	github.com/jferrl/go-githubauth v1.1.1
 	github.com/m-mizutani/clog v0.0.8
 	github.com/m-mizutani/goerr/v2 v2.0.0-alpha.3
 	github.com/m-mizutani/gt v0.0.13
@@ -19,6 +21,7 @@ require (
 	github.com/m-mizutani/opaq v0.2.1-0.20250222003843-b0e8fa8233e6
 	github.com/slack-go/slack v0.15.0
 	github.com/urfave/cli/v3 v3.0.0-beta1
+	golang.org/x/oauth2 v0.26.0
 	google.golang.org/api v0.220.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/protobuf v1.36.5
@@ -45,8 +48,11 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/google/flatbuffers v25.1.24+incompatible // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-github/v64 v64.0.0 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
@@ -83,7 +89,6 @@ require (
 	golang.org/x/exp v0.0.0-20250207012021-f9890c6ad9f3 // indirect
 	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/net v0.34.0 // indirect
-	golang.org/x/oauth2 v0.26.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect

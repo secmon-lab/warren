@@ -118,23 +118,29 @@ func cmdPolicyIgnore() *cli.Command {
 			ctx = thread.WithReplyFunc(ctx, func(ctx context.Context, msg string) {
 				fmt.Println(msg)
 			})
-			svc, err := uc.GenerateIgnorePolicy(ctx, []model.Alert{alert}, "")
+			newPolicyDiff, err := uc.GenerateIgnorePolicy(ctx, []model.Alert{alert}, "")
 			if err != nil {
 				return err
 			}
 
-			if outputDir == "" {
-				tmpDir, err := os.MkdirTemp("", "warren-policy")
-				if err != nil {
-					return goerr.Wrap(err, "failed to create temporary directory")
-				}
-				outputDir = tmpDir
-			}
-			logger.Info("Output directory", "outputDir", outputDir)
+			logger.Info("New policy diff", "newPolicyDiff", newPolicyDiff)
 
-			if err := svc.Save(ctx, outputDir); err != nil {
-				return goerr.Wrap(err, "failed to save policy")
-			}
+			// TODO: Revise output of policy diff
+			/*
+				if outputDir == "" {
+					tmpDir, err := os.MkdirTemp("", "warren-policy")
+					if err != nil {
+						return goerr.Wrap(err, "failed to create temporary directory")
+					}
+					outputDir = tmpDir
+				}
+
+				svc := policy.New(repository.NewMemory(), policyClient, newPolicyDiff.NewTestDataSet)
+
+				if err := svc.Save(ctx, outputDir); err != nil {
+					return goerr.Wrap(err, "failed to save policy")
+				}
+			*/
 
 			return nil
 		},

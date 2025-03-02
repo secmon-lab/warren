@@ -198,7 +198,7 @@ func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert model.Alert
 
 func (uc *UseCases) findSimilarAlert(ctx context.Context, alert model.Alert) (*model.Alert, error) {
 	oldest := alert.CreatedAt.Add(-24 * time.Hour)
-	alerts, err := uc.repository.FetchLatestAlerts(ctx, oldest, 100)
+	alerts, err := uc.repository.GetLatestAlerts(ctx, oldest, 100)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to fetch latest alerts")
 	}

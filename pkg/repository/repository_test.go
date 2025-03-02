@@ -54,7 +54,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Equal(t, alert.Data, got.Data)
 	})
 
-	t.Run("FetchLatestAlerts", func(t *testing.T) {
+	t.Run("GetLatestAlerts", func(t *testing.T) {
 		var alerts []model.Alert
 		now := time.Now()
 		for i := 0; i < 10; i++ {
@@ -74,7 +74,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 			gt.NoError(t, repo.PutAlert(ctx, alert))
 		}
 
-		got, err := repo.FetchLatestAlerts(ctx, now.Add(-24*time.Hour), 5)
+		got, err := repo.GetLatestAlerts(ctx, now.Add(-24*time.Hour), 5)
 		gt.NoError(t, err)
 		gt.Equal(t, len(got), 5)
 		for i, alert := range got {
@@ -266,6 +266,60 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 
 	t.Run("GetAlertGroup_NotFound", func(t *testing.T) {
 		got, err := repo.GetAlertGroup(ctx, model.AlertGroupID(uuid.New().String()))
+		gt.NoError(t, err)
+		gt.Nil(t, got)
+	})
+
+	t.Run("GetAlertsByParentID", func(t *testing.T) {
+		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "GetAlerts test 1",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "GetAlerts test 2",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert3 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "GetAlerts test 3",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+
+		alert2.ParentID = alert1.ID
+		alert3.ParentID = alert1.ID
+		gt.NoError(t, repo.PutAlert(ctx, alert1))
+		gt.NoError(t, repo.PutAlert(ctx, alert2))
+		gt.NoError(t, repo.PutAlert(ctx, alert3))
+
+		got, err := repo.GetAlertsByParentID(ctx, alert1.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, len(got), 2)
+		gt.A(t, got).
+			Length(2).
+			Any(func(v model.Alert) bool {
+				return v.ID == alert2.ID
+			}).
+			Any(func(v model.Alert) bool {
+				return v.ID == alert3.ID
+			})
+	})
+
+	t.Run("GetPolicyDiff", func(t *testing.T) {
+		diff := model.NewPolicyDiff(ctx, model.NewPolicyDiffID(), "test", "test", map[string]string{"test": "test"}, map[string]string{}, model.NewTestDataSet())
+		gt.NoError(t, repo.PutPolicyDiff(ctx, diff))
+
+		got, err := repo.GetPolicyDiff(ctx, diff.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, diff.ID, got.ID)
+	})
+
+	t.Run("GetPolicyDiff_NotFound", func(t *testing.T) {
+		got, err := repo.GetPolicyDiff(ctx, model.PolicyDiffID(uuid.New().String()))
 		gt.NoError(t, err)
 		gt.Nil(t, got)
 	})

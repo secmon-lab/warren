@@ -26,6 +26,10 @@ const (
 	AlertStatusClosed       AlertStatus = "closed"
 )
 
+func (s AlertStatus) String() string {
+	return string(s)
+}
+
 func (s AlertStatus) Validate() error {
 	switch s {
 	case AlertStatusNew, AlertStatusAcknowledged, AlertStatusMerged, AlertStatusClosed:

@@ -35,3 +35,29 @@ func AskChat[T any](ctx context.Context, ssn interfaces.LLMSession, prompt strin
 
 	return &result, nil
 }
+
+func AskPrompt[T any](ctx context.Context, client interfaces.LLMClient, prompt string) (*T, error) {
+	logger := logging.From(ctx)
+
+	resp, err := client.SendMessage(ctx, genai.Text(prompt))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to send message")
+	}
+
+	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+		return nil, goerr.New("no response from LLM", goerr.T(model.ErrTagInvalidLLMResponse))
+	}
+
+	text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
+	if !ok || text == "" {
+		return nil, goerr.New("no text data from LLM", goerr.T(model.ErrTagInvalidLLMResponse))
+	}
+
+	var result T
+	if err := json.Unmarshal([]byte(text), &result); err != nil {
+		logger.Debug("failed to unmarshal text", "text", text, "error", err)
+		return nil, goerr.Wrap(err, "failed to unmarshal text", goerr.V("text", text), goerr.T(model.ErrTagInvalidLLMResponse))
+	}
+
+	return &result, nil
+}

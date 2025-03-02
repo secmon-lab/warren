@@ -224,3 +224,28 @@ func (c *ConsoleThread) PostAlertGroups(_ context.Context, groups []model.AlertG
 	fmt.Fprintln(c.writer, strings.Repeat("=", 80))
 	return nil
 }
+
+func (c *ConsoleThread) PostPolicyDiff(_ context.Context, diff *model.PolicyDiff) error {
+	c.printHeader("🔍 Policy Diff")
+	for fileName, diff := range diff.DiffPolicy() {
+		fmt.Fprintln(c.writer, strings.Repeat("-", 80))
+		fmt.Fprintf(c.writer, "File: %s\n", fileName)
+
+		fmt.Fprintf(c.writer, "```\n%s\n```\n", diff)
+	}
+	fmt.Fprintln(c.writer, strings.Repeat("-", 80))
+	return nil
+}
+
+func (c *ConsoleThread) PostAlerts(_ context.Context, alerts []model.Alert) error {
+	c.printHeader("🔍 Alerts")
+	for _, alert := range alerts {
+		fmt.Fprintln(c.writer, strings.Repeat("-", 80))
+		fmt.Fprintf(c.writer, "Title: %s\n", alert.Title)
+		fmt.Fprintf(c.writer, "Status: %s\n", alert.Status)
+		fmt.Fprintf(c.writer, "Assignee: %s\n", alert.Assignee)
+		fmt.Fprintf(c.writer, "Created at: %s\n", alert.CreatedAt)
+		fmt.Fprintf(c.writer, "Updated at: %s\n", alert.UpdatedAt)
+	}
+	return nil
+}

@@ -633,3 +633,131 @@ func buildAlertGroupBlocks(group model.AlertGroup, metadata slackMetadata) []sla
 
 	return blocks
 }
+
+func (x *SlackThread) PostPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error {
+	blocks := buildPolicyDiffBlocks(diff)
+
+	_, _, err := x.slackClient.PostMessageContext(ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post policy diff to slack", goerr.V("blocks", blocks))
+	}
+
+	return nil
+}
+
+func buildPolicyDiffBlocks(diff *model.PolicyDiff) []slack.Block {
+	blocks := []slack.Block{
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", "📒 New Ignore Policy: "+diff.Title, false, false),
+		),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", diff.Description, false, false),
+			nil,
+			nil,
+		),
+	}
+
+	for fileName, diff := range diff.DiffPolicy() {
+		blocks = append(blocks, slack.NewDividerBlock())
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*%s*\n```\n%s\n```", fileName, diff), false, false),
+			nil,
+			nil,
+		))
+	}
+
+	blocks = append(blocks, slack.NewDividerBlock())
+	blocks = append(blocks, slack.NewActionBlock(
+		"create_pr",
+		slack.NewButtonBlockElement(
+			"create_pr",
+			diff.ID.String(),
+			slack.NewTextBlockObject("plain_text", "Create Pull Request", false, false),
+		),
+	))
+
+	return blocks
+}
+
+func (x *SlackThread) PostAlerts(ctx context.Context, alerts []model.Alert) error {
+	blocks := buildAlertsBlocks(alerts, x.slackMetadata)
+
+	_, _, err := x.slackClient.PostMessageContext(ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post alerts to slack", goerr.V("blocks", blocks))
+	}
+
+	return nil
+}
+
+func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Block {
+	// Create map of parent ID to child alerts
+	childAlerts := make(map[model.AlertID][]model.Alert)
+	var topLevelAlerts []model.Alert
+
+	// First pass - organize alerts into parent/child relationships
+	for _, alert := range alerts {
+		if alert.ParentID != "" {
+			childAlerts[alert.ParentID] = append(childAlerts[alert.ParentID], alert)
+		} else {
+			topLevelAlerts = append(topLevelAlerts, alert)
+		}
+	}
+
+	// Build message text for all alerts
+	var messageText strings.Builder
+
+	// Recursively add alerts and their children
+	var addAlertWithChildren func(alert model.Alert, indent string)
+	addAlertWithChildren = func(alert model.Alert, indent string) {
+		var statusEmoji string
+		switch alert.Status {
+		case model.AlertStatusNew:
+			statusEmoji = "🆕"
+		case model.AlertStatusAcknowledged:
+			statusEmoji = "👀"
+		case model.AlertStatusClosed:
+			statusEmoji = "✅"
+		case model.AlertStatusMerged:
+			statusEmoji = "🔗"
+		default:
+			statusEmoji = "❓"
+		}
+
+		assigneeText := ""
+		if alert.Assignee != nil {
+			assigneeText = fmt.Sprintf(" (👤 <@%s>)", alert.Assignee.ID)
+		}
+
+		msgURL := metadata.ToMsgURL(alert.SlackThread.ChannelID, alert.SlackThread.ThreadID)
+		messageText.WriteString(fmt.Sprintf("%s- %s %s <%s|%s>%s\n", indent, statusEmoji, alert.CreatedAt.Format("01/02 15:04"), msgURL, alert.Title, assigneeText))
+
+		// Add child alerts if any exist
+		if children, ok := childAlerts[alert.ID]; ok {
+			for _, child := range children {
+				addAlertWithChildren(child, indent+"  ")
+			}
+		}
+	}
+
+	// Add all top level alerts and their children
+	for _, alert := range topLevelAlerts {
+		addAlertWithChildren(alert, "")
+	}
+
+	return []slack.Block{
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", messageText.String(), false, false),
+			nil,
+			nil,
+		),
+	}
+}

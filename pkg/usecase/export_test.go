@@ -15,7 +15,7 @@ func (uc *UseCases) GenerateAlertMetadata(ctx context.Context, alert model.Alert
 }
 
 var (
-	PlanAction = planAction
-	DiffPolicy = diffPolicy
-	ParseArgs  = parseArgs
+	PlanAction       = planAction
+	ParseArgs        = parseArgs
+	FormatRegoPolicy = formatRegoPolicy
 )

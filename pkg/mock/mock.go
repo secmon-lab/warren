@@ -6,6 +6,7 @@ package mock
 import (
 	"cloud.google.com/go/vertexai/genai"
 	"context"
+	"github.com/google/go-github/v69/github"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
@@ -253,11 +254,17 @@ var _ interfaces.SlackThreadService = &SlackThreadServiceMock{}
 //			PostAlertGroupsFunc: func(ctx context.Context, alertGroups []model.AlertGroup) error {
 //				panic("mock out the PostAlertGroups method")
 //			},
+//			PostAlertsFunc: func(ctx context.Context, alerts []model.Alert) error {
+//				panic("mock out the PostAlerts method")
+//			},
 //			PostFindingFunc: func(ctx context.Context, finding model.AlertFinding) error {
 //				panic("mock out the PostFinding method")
 //			},
 //			PostNextActionFunc: func(ctx context.Context, action prompt.ActionPromptResult) error {
 //				panic("mock out the PostNextAction method")
+//			},
+//			PostPolicyDiffFunc: func(ctx context.Context, diff *model.PolicyDiff) error {
+//				panic("mock out the PostPolicyDiff method")
 //			},
 //			ReplyFunc: func(ctx context.Context, message string)  {
 //				panic("mock out the Reply method")
@@ -284,11 +291,17 @@ type SlackThreadServiceMock struct {
 	// PostAlertGroupsFunc mocks the PostAlertGroups method.
 	PostAlertGroupsFunc func(ctx context.Context, alertGroups []model.AlertGroup) error
 
+	// PostAlertsFunc mocks the PostAlerts method.
+	PostAlertsFunc func(ctx context.Context, alerts []model.Alert) error
+
 	// PostFindingFunc mocks the PostFinding method.
 	PostFindingFunc func(ctx context.Context, finding model.AlertFinding) error
 
 	// PostNextActionFunc mocks the PostNextAction method.
 	PostNextActionFunc func(ctx context.Context, action prompt.ActionPromptResult) error
+
+	// PostPolicyDiffFunc mocks the PostPolicyDiff method.
+	PostPolicyDiffFunc func(ctx context.Context, diff *model.PolicyDiff) error
 
 	// ReplyFunc mocks the Reply method.
 	ReplyFunc func(ctx context.Context, message string)
@@ -322,6 +335,13 @@ type SlackThreadServiceMock struct {
 			// AlertGroups is the alertGroups argument value.
 			AlertGroups []model.AlertGroup
 		}
+		// PostAlerts holds details about calls to the PostAlerts method.
+		PostAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Alerts is the alerts argument value.
+			Alerts []model.Alert
+		}
 		// PostFinding holds details about calls to the PostFinding method.
 		PostFinding []struct {
 			// Ctx is the ctx argument value.
@@ -335,6 +355,13 @@ type SlackThreadServiceMock struct {
 			Ctx context.Context
 			// Action is the action argument value.
 			Action prompt.ActionPromptResult
+		}
+		// PostPolicyDiff holds details about calls to the PostPolicyDiff method.
+		PostPolicyDiff []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Diff is the diff argument value.
+			Diff *model.PolicyDiff
 		}
 		// Reply holds details about calls to the Reply method.
 		Reply []struct {
@@ -357,8 +384,10 @@ type SlackThreadServiceMock struct {
 	lockAttachFile      sync.RWMutex
 	lockChannelID       sync.RWMutex
 	lockPostAlertGroups sync.RWMutex
+	lockPostAlerts      sync.RWMutex
 	lockPostFinding     sync.RWMutex
 	lockPostNextAction  sync.RWMutex
+	lockPostPolicyDiff  sync.RWMutex
 	lockReply           sync.RWMutex
 	lockThreadID        sync.RWMutex
 	lockUpdateAlert     sync.RWMutex
@@ -471,6 +500,42 @@ func (mock *SlackThreadServiceMock) PostAlertGroupsCalls() []struct {
 	return calls
 }
 
+// PostAlerts calls PostAlertsFunc.
+func (mock *SlackThreadServiceMock) PostAlerts(ctx context.Context, alerts []model.Alert) error {
+	if mock.PostAlertsFunc == nil {
+		panic("SlackThreadServiceMock.PostAlertsFunc: method is nil but SlackThreadService.PostAlerts was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		Alerts []model.Alert
+	}{
+		Ctx:    ctx,
+		Alerts: alerts,
+	}
+	mock.lockPostAlerts.Lock()
+	mock.calls.PostAlerts = append(mock.calls.PostAlerts, callInfo)
+	mock.lockPostAlerts.Unlock()
+	return mock.PostAlertsFunc(ctx, alerts)
+}
+
+// PostAlertsCalls gets all the calls that were made to PostAlerts.
+// Check the length with:
+//
+//	len(mockedSlackThreadService.PostAlertsCalls())
+func (mock *SlackThreadServiceMock) PostAlertsCalls() []struct {
+	Ctx    context.Context
+	Alerts []model.Alert
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Alerts []model.Alert
+	}
+	mock.lockPostAlerts.RLock()
+	calls = mock.calls.PostAlerts
+	mock.lockPostAlerts.RUnlock()
+	return calls
+}
+
 // PostFinding calls PostFindingFunc.
 func (mock *SlackThreadServiceMock) PostFinding(ctx context.Context, finding model.AlertFinding) error {
 	if mock.PostFindingFunc == nil {
@@ -540,6 +605,42 @@ func (mock *SlackThreadServiceMock) PostNextActionCalls() []struct {
 	mock.lockPostNextAction.RLock()
 	calls = mock.calls.PostNextAction
 	mock.lockPostNextAction.RUnlock()
+	return calls
+}
+
+// PostPolicyDiff calls PostPolicyDiffFunc.
+func (mock *SlackThreadServiceMock) PostPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error {
+	if mock.PostPolicyDiffFunc == nil {
+		panic("SlackThreadServiceMock.PostPolicyDiffFunc: method is nil but SlackThreadService.PostPolicyDiff was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Diff *model.PolicyDiff
+	}{
+		Ctx:  ctx,
+		Diff: diff,
+	}
+	mock.lockPostPolicyDiff.Lock()
+	mock.calls.PostPolicyDiff = append(mock.calls.PostPolicyDiff, callInfo)
+	mock.lockPostPolicyDiff.Unlock()
+	return mock.PostPolicyDiffFunc(ctx, diff)
+}
+
+// PostPolicyDiffCalls gets all the calls that were made to PostPolicyDiff.
+// Check the length with:
+//
+//	len(mockedSlackThreadService.PostPolicyDiffCalls())
+func (mock *SlackThreadServiceMock) PostPolicyDiffCalls() []struct {
+	Ctx  context.Context
+	Diff *model.PolicyDiff
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Diff *model.PolicyDiff
+	}
+	mock.lockPostPolicyDiff.RLock()
+	calls = mock.calls.PostPolicyDiff
+	mock.lockPostPolicyDiff.RUnlock()
 	return calls
 }
 
@@ -854,8 +955,8 @@ var _ interfaces.Repository = &RepositoryMock{}
 //			BatchGetAlertsFunc: func(ctx context.Context, alertIDs []model.AlertID) ([]model.Alert, error) {
 //				panic("mock out the BatchGetAlerts method")
 //			},
-//			FetchLatestAlertsFunc: func(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
-//				panic("mock out the FetchLatestAlerts method")
+//			GetLatestAlertsFunc: func(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
+//				panic("mock out the GetLatestAlerts method")
 //			},
 //			GetAlertFunc: func(ctx context.Context, alertID model.AlertID) (*model.Alert, error) {
 //				panic("mock out the GetAlert method")
@@ -869,11 +970,20 @@ var _ interfaces.Repository = &RepositoryMock{}
 //			GetAlertGroupFunc: func(ctx context.Context, groupID model.AlertGroupID) (*model.AlertGroup, error) {
 //				panic("mock out the GetAlertGroup method")
 //			},
+//			GetAlertsFunc: func(ctx context.Context, duration time.Duration, limit int64, offset int64) ([]model.Alert, error) {
+//				panic("mock out the GetAlerts method")
+//			},
+//			GetAlertsByParentIDFunc: func(ctx context.Context, parentID model.AlertID) ([]model.Alert, error) {
+//				panic("mock out the GetAlertsByParentID method")
+//			},
 //			GetAlertsByStatusFunc: func(ctx context.Context, status model.AlertStatus) ([]model.Alert, error) {
 //				panic("mock out the GetAlertsByStatus method")
 //			},
 //			GetPolicyFunc: func(ctx context.Context, hash string) (*model.PolicyData, error) {
 //				panic("mock out the GetPolicy method")
+//			},
+//			GetPolicyDiffFunc: func(ctx context.Context, id model.PolicyDiffID) (*model.PolicyDiff, error) {
+//				panic("mock out the GetPolicyDiff method")
 //			},
 //			InsertAlertCommentFunc: func(ctx context.Context, comment model.AlertComment) error {
 //				panic("mock out the InsertAlertComment method")
@@ -883,6 +993,9 @@ var _ interfaces.Repository = &RepositoryMock{}
 //			},
 //			PutAlertGroupsFunc: func(ctx context.Context, groups []model.AlertGroup) error {
 //				panic("mock out the PutAlertGroups method")
+//			},
+//			PutPolicyDiffFunc: func(ctx context.Context, diff *model.PolicyDiff) error {
+//				panic("mock out the PutPolicyDiff method")
 //			},
 //			SavePolicyFunc: func(ctx context.Context, policy *model.PolicyData) error {
 //				panic("mock out the SavePolicy method")
@@ -897,8 +1010,8 @@ type RepositoryMock struct {
 	// BatchGetAlertsFunc mocks the BatchGetAlerts method.
 	BatchGetAlertsFunc func(ctx context.Context, alertIDs []model.AlertID) ([]model.Alert, error)
 
-	// FetchLatestAlertsFunc mocks the FetchLatestAlerts method.
-	FetchLatestAlertsFunc func(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error)
+	// GetLatestAlertsFunc mocks the GetLatestAlerts method.
+	GetLatestAlertsFunc func(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error)
 
 	// GetAlertFunc mocks the GetAlert method.
 	GetAlertFunc func(ctx context.Context, alertID model.AlertID) (*model.Alert, error)
@@ -912,11 +1025,20 @@ type RepositoryMock struct {
 	// GetAlertGroupFunc mocks the GetAlertGroup method.
 	GetAlertGroupFunc func(ctx context.Context, groupID model.AlertGroupID) (*model.AlertGroup, error)
 
+	// GetAlertsFunc mocks the GetAlerts method.
+	GetAlertsFunc func(ctx context.Context, duration time.Duration, limit int64, offset int64) ([]model.Alert, error)
+
+	// GetAlertsByParentIDFunc mocks the GetAlertsByParentID method.
+	GetAlertsByParentIDFunc func(ctx context.Context, parentID model.AlertID) ([]model.Alert, error)
+
 	// GetAlertsByStatusFunc mocks the GetAlertsByStatus method.
 	GetAlertsByStatusFunc func(ctx context.Context, status model.AlertStatus) ([]model.Alert, error)
 
 	// GetPolicyFunc mocks the GetPolicy method.
 	GetPolicyFunc func(ctx context.Context, hash string) (*model.PolicyData, error)
+
+	// GetPolicyDiffFunc mocks the GetPolicyDiff method.
+	GetPolicyDiffFunc func(ctx context.Context, id model.PolicyDiffID) (*model.PolicyDiff, error)
 
 	// InsertAlertCommentFunc mocks the InsertAlertComment method.
 	InsertAlertCommentFunc func(ctx context.Context, comment model.AlertComment) error
@@ -926,6 +1048,9 @@ type RepositoryMock struct {
 
 	// PutAlertGroupsFunc mocks the PutAlertGroups method.
 	PutAlertGroupsFunc func(ctx context.Context, groups []model.AlertGroup) error
+
+	// PutPolicyDiffFunc mocks the PutPolicyDiff method.
+	PutPolicyDiffFunc func(ctx context.Context, diff *model.PolicyDiff) error
 
 	// SavePolicyFunc mocks the SavePolicy method.
 	SavePolicyFunc func(ctx context.Context, policy *model.PolicyData) error
@@ -939,8 +1064,8 @@ type RepositoryMock struct {
 			// AlertIDs is the alertIDs argument value.
 			AlertIDs []model.AlertID
 		}
-		// FetchLatestAlerts holds details about calls to the FetchLatestAlerts method.
-		FetchLatestAlerts []struct {
+		// GetLatestAlerts holds details about calls to the GetLatestAlerts method.
+		GetLatestAlerts []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Oldest is the oldest argument value.
@@ -976,6 +1101,24 @@ type RepositoryMock struct {
 			// GroupID is the groupID argument value.
 			GroupID model.AlertGroupID
 		}
+		// GetAlerts holds details about calls to the GetAlerts method.
+		GetAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Duration is the duration argument value.
+			Duration time.Duration
+			// Limit is the limit argument value.
+			Limit int64
+			// Offset is the offset argument value.
+			Offset int64
+		}
+		// GetAlertsByParentID holds details about calls to the GetAlertsByParentID method.
+		GetAlertsByParentID []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ParentID is the parentID argument value.
+			ParentID model.AlertID
+		}
 		// GetAlertsByStatus holds details about calls to the GetAlertsByStatus method.
 		GetAlertsByStatus []struct {
 			// Ctx is the ctx argument value.
@@ -989,6 +1132,13 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Hash is the hash argument value.
 			Hash string
+		}
+		// GetPolicyDiff holds details about calls to the GetPolicyDiff method.
+		GetPolicyDiff []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID model.PolicyDiffID
 		}
 		// InsertAlertComment holds details about calls to the InsertAlertComment method.
 		InsertAlertComment []struct {
@@ -1011,6 +1161,13 @@ type RepositoryMock struct {
 			// Groups is the groups argument value.
 			Groups []model.AlertGroup
 		}
+		// PutPolicyDiff holds details about calls to the PutPolicyDiff method.
+		PutPolicyDiff []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Diff is the diff argument value.
+			Diff *model.PolicyDiff
+		}
 		// SavePolicy holds details about calls to the SavePolicy method.
 		SavePolicy []struct {
 			// Ctx is the ctx argument value.
@@ -1020,16 +1177,20 @@ type RepositoryMock struct {
 		}
 	}
 	lockBatchGetAlerts        sync.RWMutex
-	lockFetchLatestAlerts     sync.RWMutex
+	lockGetLatestAlerts     sync.RWMutex
 	lockGetAlert              sync.RWMutex
 	lockGetAlertBySlackThread sync.RWMutex
 	lockGetAlertComments      sync.RWMutex
 	lockGetAlertGroup         sync.RWMutex
+	lockGetAlerts             sync.RWMutex
+	lockGetAlertsByParentID   sync.RWMutex
 	lockGetAlertsByStatus     sync.RWMutex
 	lockGetPolicy             sync.RWMutex
+	lockGetPolicyDiff         sync.RWMutex
 	lockInsertAlertComment    sync.RWMutex
 	lockPutAlert              sync.RWMutex
 	lockPutAlertGroups        sync.RWMutex
+	lockPutPolicyDiff         sync.RWMutex
 	lockSavePolicy            sync.RWMutex
 }
 
@@ -1069,10 +1230,10 @@ func (mock *RepositoryMock) BatchGetAlertsCalls() []struct {
 	return calls
 }
 
-// FetchLatestAlerts calls FetchLatestAlertsFunc.
-func (mock *RepositoryMock) FetchLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
-	if mock.FetchLatestAlertsFunc == nil {
-		panic("RepositoryMock.FetchLatestAlertsFunc: method is nil but Repository.FetchLatestAlerts was just called")
+// GetLatestAlerts calls GetLatestAlertsFunc.
+func (mock *RepositoryMock) GetLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
+	if mock.GetLatestAlertsFunc == nil {
+		panic("RepositoryMock.GetLatestAlertsFunc: method is nil but Repository.GetLatestAlerts was just called")
 	}
 	callInfo := struct {
 		Ctx    context.Context
@@ -1083,17 +1244,17 @@ func (mock *RepositoryMock) FetchLatestAlerts(ctx context.Context, oldest time.T
 		Oldest: oldest,
 		Limit:  limit,
 	}
-	mock.lockFetchLatestAlerts.Lock()
-	mock.calls.FetchLatestAlerts = append(mock.calls.FetchLatestAlerts, callInfo)
-	mock.lockFetchLatestAlerts.Unlock()
-	return mock.FetchLatestAlertsFunc(ctx, oldest, limit)
+	mock.lockGetLatestAlerts.Lock()
+	mock.calls.GetLatestAlerts = append(mock.calls.GetLatestAlerts, callInfo)
+	mock.lockGetLatestAlerts.Unlock()
+	return mock.GetLatestAlertsFunc(ctx, oldest, limit)
 }
 
-// FetchLatestAlertsCalls gets all the calls that were made to FetchLatestAlerts.
+// GetLatestAlertsCalls gets all the calls that were made to GetLatestAlerts.
 // Check the length with:
 //
-//	len(mockedRepository.FetchLatestAlertsCalls())
-func (mock *RepositoryMock) FetchLatestAlertsCalls() []struct {
+//	len(mockedRepository.GetLatestAlertsCalls())
+func (mock *RepositoryMock) GetLatestAlertsCalls() []struct {
 	Ctx    context.Context
 	Oldest time.Time
 	Limit  int
@@ -1103,9 +1264,9 @@ func (mock *RepositoryMock) FetchLatestAlertsCalls() []struct {
 		Oldest time.Time
 		Limit  int
 	}
-	mock.lockFetchLatestAlerts.RLock()
-	calls = mock.calls.FetchLatestAlerts
-	mock.lockFetchLatestAlerts.RUnlock()
+	mock.lockGetLatestAlerts.RLock()
+	calls = mock.calls.GetLatestAlerts
+	mock.lockGetLatestAlerts.RUnlock()
 	return calls
 }
 
@@ -1253,6 +1414,86 @@ func (mock *RepositoryMock) GetAlertGroupCalls() []struct {
 	return calls
 }
 
+// GetAlerts calls GetAlertsFunc.
+func (mock *RepositoryMock) GetAlerts(ctx context.Context, duration time.Duration, limit int64, offset int64) ([]model.Alert, error) {
+	if mock.GetAlertsFunc == nil {
+		panic("RepositoryMock.GetAlertsFunc: method is nil but Repository.GetAlerts was just called")
+	}
+	callInfo := struct {
+		Ctx      context.Context
+		Duration time.Duration
+		Limit    int64
+		Offset   int64
+	}{
+		Ctx:      ctx,
+		Duration: duration,
+		Limit:    limit,
+		Offset:   offset,
+	}
+	mock.lockGetAlerts.Lock()
+	mock.calls.GetAlerts = append(mock.calls.GetAlerts, callInfo)
+	mock.lockGetAlerts.Unlock()
+	return mock.GetAlertsFunc(ctx, duration, limit, offset)
+}
+
+// GetAlertsCalls gets all the calls that were made to GetAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.GetAlertsCalls())
+func (mock *RepositoryMock) GetAlertsCalls() []struct {
+	Ctx      context.Context
+	Duration time.Duration
+	Limit    int64
+	Offset   int64
+} {
+	var calls []struct {
+		Ctx      context.Context
+		Duration time.Duration
+		Limit    int64
+		Offset   int64
+	}
+	mock.lockGetAlerts.RLock()
+	calls = mock.calls.GetAlerts
+	mock.lockGetAlerts.RUnlock()
+	return calls
+}
+
+// GetAlertsByParentID calls GetAlertsByParentIDFunc.
+func (mock *RepositoryMock) GetAlertsByParentID(ctx context.Context, parentID model.AlertID) ([]model.Alert, error) {
+	if mock.GetAlertsByParentIDFunc == nil {
+		panic("RepositoryMock.GetAlertsByParentIDFunc: method is nil but Repository.GetAlertsByParentID was just called")
+	}
+	callInfo := struct {
+		Ctx      context.Context
+		ParentID model.AlertID
+	}{
+		Ctx:      ctx,
+		ParentID: parentID,
+	}
+	mock.lockGetAlertsByParentID.Lock()
+	mock.calls.GetAlertsByParentID = append(mock.calls.GetAlertsByParentID, callInfo)
+	mock.lockGetAlertsByParentID.Unlock()
+	return mock.GetAlertsByParentIDFunc(ctx, parentID)
+}
+
+// GetAlertsByParentIDCalls gets all the calls that were made to GetAlertsByParentID.
+// Check the length with:
+//
+//	len(mockedRepository.GetAlertsByParentIDCalls())
+func (mock *RepositoryMock) GetAlertsByParentIDCalls() []struct {
+	Ctx      context.Context
+	ParentID model.AlertID
+} {
+	var calls []struct {
+		Ctx      context.Context
+		ParentID model.AlertID
+	}
+	mock.lockGetAlertsByParentID.RLock()
+	calls = mock.calls.GetAlertsByParentID
+	mock.lockGetAlertsByParentID.RUnlock()
+	return calls
+}
+
 // GetAlertsByStatus calls GetAlertsByStatusFunc.
 func (mock *RepositoryMock) GetAlertsByStatus(ctx context.Context, status model.AlertStatus) ([]model.Alert, error) {
 	if mock.GetAlertsByStatusFunc == nil {
@@ -1322,6 +1563,42 @@ func (mock *RepositoryMock) GetPolicyCalls() []struct {
 	mock.lockGetPolicy.RLock()
 	calls = mock.calls.GetPolicy
 	mock.lockGetPolicy.RUnlock()
+	return calls
+}
+
+// GetPolicyDiff calls GetPolicyDiffFunc.
+func (mock *RepositoryMock) GetPolicyDiff(ctx context.Context, id model.PolicyDiffID) (*model.PolicyDiff, error) {
+	if mock.GetPolicyDiffFunc == nil {
+		panic("RepositoryMock.GetPolicyDiffFunc: method is nil but Repository.GetPolicyDiff was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		ID  model.PolicyDiffID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockGetPolicyDiff.Lock()
+	mock.calls.GetPolicyDiff = append(mock.calls.GetPolicyDiff, callInfo)
+	mock.lockGetPolicyDiff.Unlock()
+	return mock.GetPolicyDiffFunc(ctx, id)
+}
+
+// GetPolicyDiffCalls gets all the calls that were made to GetPolicyDiff.
+// Check the length with:
+//
+//	len(mockedRepository.GetPolicyDiffCalls())
+func (mock *RepositoryMock) GetPolicyDiffCalls() []struct {
+	Ctx context.Context
+	ID  model.PolicyDiffID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  model.PolicyDiffID
+	}
+	mock.lockGetPolicyDiff.RLock()
+	calls = mock.calls.GetPolicyDiff
+	mock.lockGetPolicyDiff.RUnlock()
 	return calls
 }
 
@@ -1430,6 +1707,42 @@ func (mock *RepositoryMock) PutAlertGroupsCalls() []struct {
 	mock.lockPutAlertGroups.RLock()
 	calls = mock.calls.PutAlertGroups
 	mock.lockPutAlertGroups.RUnlock()
+	return calls
+}
+
+// PutPolicyDiff calls PutPolicyDiffFunc.
+func (mock *RepositoryMock) PutPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error {
+	if mock.PutPolicyDiffFunc == nil {
+		panic("RepositoryMock.PutPolicyDiffFunc: method is nil but Repository.PutPolicyDiff was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Diff *model.PolicyDiff
+	}{
+		Ctx:  ctx,
+		Diff: diff,
+	}
+	mock.lockPutPolicyDiff.Lock()
+	mock.calls.PutPolicyDiff = append(mock.calls.PutPolicyDiff, callInfo)
+	mock.lockPutPolicyDiff.Unlock()
+	return mock.PutPolicyDiffFunc(ctx, diff)
+}
+
+// PutPolicyDiffCalls gets all the calls that were made to PutPolicyDiff.
+// Check the length with:
+//
+//	len(mockedRepository.PutPolicyDiffCalls())
+func (mock *RepositoryMock) PutPolicyDiffCalls() []struct {
+	Ctx  context.Context
+	Diff *model.PolicyDiff
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Diff *model.PolicyDiff
+	}
+	mock.lockPutPolicyDiff.RLock()
+	calls = mock.calls.PutPolicyDiff
+	mock.lockPutPolicyDiff.RUnlock()
 	return calls
 }
 
@@ -2058,6 +2371,9 @@ var _ interfaces.LLMClient = &LLMClientMock{}
 //
 //		// make and configure a mocked interfaces.LLMClient
 //		mockedLLMClient := &LLMClientMock{
+//			SendMessageFunc: func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
+//				panic("mock out the SendMessage method")
+//			},
 //			StartChatFunc: func() interfaces.LLMSession {
 //				panic("mock out the StartChat method")
 //			},
@@ -2068,16 +2384,63 @@ var _ interfaces.LLMClient = &LLMClientMock{}
 //
 //	}
 type LLMClientMock struct {
+	// SendMessageFunc mocks the SendMessage method.
+	SendMessageFunc func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
+
 	// StartChatFunc mocks the StartChat method.
 	StartChatFunc func() interfaces.LLMSession
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// SendMessage holds details about calls to the SendMessage method.
+		SendMessage []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Msg is the msg argument value.
+			Msg []genai.Part
+		}
 		// StartChat holds details about calls to the StartChat method.
 		StartChat []struct {
 		}
 	}
-	lockStartChat sync.RWMutex
+	lockSendMessage sync.RWMutex
+	lockStartChat   sync.RWMutex
+}
+
+// SendMessage calls SendMessageFunc.
+func (mock *LLMClientMock) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
+	if mock.SendMessageFunc == nil {
+		panic("LLMClientMock.SendMessageFunc: method is nil but LLMClient.SendMessage was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		Msg []genai.Part
+	}{
+		Ctx: ctx,
+		Msg: msg,
+	}
+	mock.lockSendMessage.Lock()
+	mock.calls.SendMessage = append(mock.calls.SendMessage, callInfo)
+	mock.lockSendMessage.Unlock()
+	return mock.SendMessageFunc(ctx, msg...)
+}
+
+// SendMessageCalls gets all the calls that were made to SendMessage.
+// Check the length with:
+//
+//	len(mockedLLMClient.SendMessageCalls())
+func (mock *LLMClientMock) SendMessageCalls() []struct {
+	Ctx context.Context
+	Msg []genai.Part
+} {
+	var calls []struct {
+		Ctx context.Context
+		Msg []genai.Part
+	}
+	mock.lockSendMessage.RLock()
+	calls = mock.calls.SendMessage
+	mock.lockSendMessage.RUnlock()
+	return calls
 }
 
 // StartChat calls StartChatFunc.
@@ -2182,5 +2545,367 @@ func (mock *EmbeddingClientMock) EmbeddingsCalls() []struct {
 	mock.lockEmbeddings.RLock()
 	calls = mock.calls.Embeddings
 	mock.lockEmbeddings.RUnlock()
+	return calls
+}
+
+// Ensure, that GitHubAppClientMock does implement interfaces.GitHubAppClient.
+// If this is not the case, regenerate this file with moq.
+var _ interfaces.GitHubAppClient = &GitHubAppClientMock{}
+
+// GitHubAppClientMock is a mock implementation of interfaces.GitHubAppClient.
+//
+//	func TestSomethingThatUsesGitHubAppClient(t *testing.T) {
+//
+//		// make and configure a mocked interfaces.GitHubAppClient
+//		mockedGitHubAppClient := &GitHubAppClientMock{
+//			CommitChangesFunc: func(ctx context.Context, owner string, repo string, branch string, files map[string][]byte, message string) error {
+//				panic("mock out the CommitChanges method")
+//			},
+//			CreateBranchFunc: func(ctx context.Context, owner string, repo string, baseBranch string, newBranch string) error {
+//				panic("mock out the CreateBranch method")
+//			},
+//			CreatePullRequestFunc: func(ctx context.Context, owner string, repo string, title string, body string, head string, base string) (*github.PullRequest, error) {
+//				panic("mock out the CreatePullRequest method")
+//			},
+//			GetDefaultBranchFunc: func(ctx context.Context, owner string, repo string) (string, error) {
+//				panic("mock out the GetDefaultBranch method")
+//			},
+//			LookupBranchFunc: func(ctx context.Context, owner string, repo string, branch string) (*github.Reference, error) {
+//				panic("mock out the LookupBranch method")
+//			},
+//		}
+//
+//		// use mockedGitHubAppClient in code that requires interfaces.GitHubAppClient
+//		// and then make assertions.
+//
+//	}
+type GitHubAppClientMock struct {
+	// CommitChangesFunc mocks the CommitChanges method.
+	CommitChangesFunc func(ctx context.Context, owner string, repo string, branch string, files map[string][]byte, message string) error
+
+	// CreateBranchFunc mocks the CreateBranch method.
+	CreateBranchFunc func(ctx context.Context, owner string, repo string, baseBranch string, newBranch string) error
+
+	// CreatePullRequestFunc mocks the CreatePullRequest method.
+	CreatePullRequestFunc func(ctx context.Context, owner string, repo string, title string, body string, head string, base string) (*github.PullRequest, error)
+
+	// GetDefaultBranchFunc mocks the GetDefaultBranch method.
+	GetDefaultBranchFunc func(ctx context.Context, owner string, repo string) (string, error)
+
+	// LookupBranchFunc mocks the LookupBranch method.
+	LookupBranchFunc func(ctx context.Context, owner string, repo string, branch string) (*github.Reference, error)
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// CommitChanges holds details about calls to the CommitChanges method.
+		CommitChanges []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Owner is the owner argument value.
+			Owner string
+			// Repo is the repo argument value.
+			Repo string
+			// Branch is the branch argument value.
+			Branch string
+			// Files is the files argument value.
+			Files map[string][]byte
+			// Message is the message argument value.
+			Message string
+		}
+		// CreateBranch holds details about calls to the CreateBranch method.
+		CreateBranch []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Owner is the owner argument value.
+			Owner string
+			// Repo is the repo argument value.
+			Repo string
+			// BaseBranch is the baseBranch argument value.
+			BaseBranch string
+			// NewBranch is the newBranch argument value.
+			NewBranch string
+		}
+		// CreatePullRequest holds details about calls to the CreatePullRequest method.
+		CreatePullRequest []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Owner is the owner argument value.
+			Owner string
+			// Repo is the repo argument value.
+			Repo string
+			// Title is the title argument value.
+			Title string
+			// Body is the body argument value.
+			Body string
+			// Head is the head argument value.
+			Head string
+			// Base is the base argument value.
+			Base string
+		}
+		// GetDefaultBranch holds details about calls to the GetDefaultBranch method.
+		GetDefaultBranch []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Owner is the owner argument value.
+			Owner string
+			// Repo is the repo argument value.
+			Repo string
+		}
+		// LookupBranch holds details about calls to the LookupBranch method.
+		LookupBranch []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Owner is the owner argument value.
+			Owner string
+			// Repo is the repo argument value.
+			Repo string
+			// Branch is the branch argument value.
+			Branch string
+		}
+	}
+	lockCommitChanges     sync.RWMutex
+	lockCreateBranch      sync.RWMutex
+	lockCreatePullRequest sync.RWMutex
+	lockGetDefaultBranch  sync.RWMutex
+	lockLookupBranch      sync.RWMutex
+}
+
+// CommitChanges calls CommitChangesFunc.
+func (mock *GitHubAppClientMock) CommitChanges(ctx context.Context, owner string, repo string, branch string, files map[string][]byte, message string) error {
+	if mock.CommitChangesFunc == nil {
+		panic("GitHubAppClientMock.CommitChangesFunc: method is nil but GitHubAppClient.CommitChanges was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Owner   string
+		Repo    string
+		Branch  string
+		Files   map[string][]byte
+		Message string
+	}{
+		Ctx:     ctx,
+		Owner:   owner,
+		Repo:    repo,
+		Branch:  branch,
+		Files:   files,
+		Message: message,
+	}
+	mock.lockCommitChanges.Lock()
+	mock.calls.CommitChanges = append(mock.calls.CommitChanges, callInfo)
+	mock.lockCommitChanges.Unlock()
+	return mock.CommitChangesFunc(ctx, owner, repo, branch, files, message)
+}
+
+// CommitChangesCalls gets all the calls that were made to CommitChanges.
+// Check the length with:
+//
+//	len(mockedGitHubAppClient.CommitChangesCalls())
+func (mock *GitHubAppClientMock) CommitChangesCalls() []struct {
+	Ctx     context.Context
+	Owner   string
+	Repo    string
+	Branch  string
+	Files   map[string][]byte
+	Message string
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Owner   string
+		Repo    string
+		Branch  string
+		Files   map[string][]byte
+		Message string
+	}
+	mock.lockCommitChanges.RLock()
+	calls = mock.calls.CommitChanges
+	mock.lockCommitChanges.RUnlock()
+	return calls
+}
+
+// CreateBranch calls CreateBranchFunc.
+func (mock *GitHubAppClientMock) CreateBranch(ctx context.Context, owner string, repo string, baseBranch string, newBranch string) error {
+	if mock.CreateBranchFunc == nil {
+		panic("GitHubAppClientMock.CreateBranchFunc: method is nil but GitHubAppClient.CreateBranch was just called")
+	}
+	callInfo := struct {
+		Ctx        context.Context
+		Owner      string
+		Repo       string
+		BaseBranch string
+		NewBranch  string
+	}{
+		Ctx:        ctx,
+		Owner:      owner,
+		Repo:       repo,
+		BaseBranch: baseBranch,
+		NewBranch:  newBranch,
+	}
+	mock.lockCreateBranch.Lock()
+	mock.calls.CreateBranch = append(mock.calls.CreateBranch, callInfo)
+	mock.lockCreateBranch.Unlock()
+	return mock.CreateBranchFunc(ctx, owner, repo, baseBranch, newBranch)
+}
+
+// CreateBranchCalls gets all the calls that were made to CreateBranch.
+// Check the length with:
+//
+//	len(mockedGitHubAppClient.CreateBranchCalls())
+func (mock *GitHubAppClientMock) CreateBranchCalls() []struct {
+	Ctx        context.Context
+	Owner      string
+	Repo       string
+	BaseBranch string
+	NewBranch  string
+} {
+	var calls []struct {
+		Ctx        context.Context
+		Owner      string
+		Repo       string
+		BaseBranch string
+		NewBranch  string
+	}
+	mock.lockCreateBranch.RLock()
+	calls = mock.calls.CreateBranch
+	mock.lockCreateBranch.RUnlock()
+	return calls
+}
+
+// CreatePullRequest calls CreatePullRequestFunc.
+func (mock *GitHubAppClientMock) CreatePullRequest(ctx context.Context, owner string, repo string, title string, body string, head string, base string) (*github.PullRequest, error) {
+	if mock.CreatePullRequestFunc == nil {
+		panic("GitHubAppClientMock.CreatePullRequestFunc: method is nil but GitHubAppClient.CreatePullRequest was just called")
+	}
+	callInfo := struct {
+		Ctx   context.Context
+		Owner string
+		Repo  string
+		Title string
+		Body  string
+		Head  string
+		Base  string
+	}{
+		Ctx:   ctx,
+		Owner: owner,
+		Repo:  repo,
+		Title: title,
+		Body:  body,
+		Head:  head,
+		Base:  base,
+	}
+	mock.lockCreatePullRequest.Lock()
+	mock.calls.CreatePullRequest = append(mock.calls.CreatePullRequest, callInfo)
+	mock.lockCreatePullRequest.Unlock()
+	return mock.CreatePullRequestFunc(ctx, owner, repo, title, body, head, base)
+}
+
+// CreatePullRequestCalls gets all the calls that were made to CreatePullRequest.
+// Check the length with:
+//
+//	len(mockedGitHubAppClient.CreatePullRequestCalls())
+func (mock *GitHubAppClientMock) CreatePullRequestCalls() []struct {
+	Ctx   context.Context
+	Owner string
+	Repo  string
+	Title string
+	Body  string
+	Head  string
+	Base  string
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Owner string
+		Repo  string
+		Title string
+		Body  string
+		Head  string
+		Base  string
+	}
+	mock.lockCreatePullRequest.RLock()
+	calls = mock.calls.CreatePullRequest
+	mock.lockCreatePullRequest.RUnlock()
+	return calls
+}
+
+// GetDefaultBranch calls GetDefaultBranchFunc.
+func (mock *GitHubAppClientMock) GetDefaultBranch(ctx context.Context, owner string, repo string) (string, error) {
+	if mock.GetDefaultBranchFunc == nil {
+		panic("GitHubAppClientMock.GetDefaultBranchFunc: method is nil but GitHubAppClient.GetDefaultBranch was just called")
+	}
+	callInfo := struct {
+		Ctx   context.Context
+		Owner string
+		Repo  string
+	}{
+		Ctx:   ctx,
+		Owner: owner,
+		Repo:  repo,
+	}
+	mock.lockGetDefaultBranch.Lock()
+	mock.calls.GetDefaultBranch = append(mock.calls.GetDefaultBranch, callInfo)
+	mock.lockGetDefaultBranch.Unlock()
+	return mock.GetDefaultBranchFunc(ctx, owner, repo)
+}
+
+// GetDefaultBranchCalls gets all the calls that were made to GetDefaultBranch.
+// Check the length with:
+//
+//	len(mockedGitHubAppClient.GetDefaultBranchCalls())
+func (mock *GitHubAppClientMock) GetDefaultBranchCalls() []struct {
+	Ctx   context.Context
+	Owner string
+	Repo  string
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Owner string
+		Repo  string
+	}
+	mock.lockGetDefaultBranch.RLock()
+	calls = mock.calls.GetDefaultBranch
+	mock.lockGetDefaultBranch.RUnlock()
+	return calls
+}
+
+// LookupBranch calls LookupBranchFunc.
+func (mock *GitHubAppClientMock) LookupBranch(ctx context.Context, owner string, repo string, branch string) (*github.Reference, error) {
+	if mock.LookupBranchFunc == nil {
+		panic("GitHubAppClientMock.LookupBranchFunc: method is nil but GitHubAppClient.LookupBranch was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		Owner  string
+		Repo   string
+		Branch string
+	}{
+		Ctx:    ctx,
+		Owner:  owner,
+		Repo:   repo,
+		Branch: branch,
+	}
+	mock.lockLookupBranch.Lock()
+	mock.calls.LookupBranch = append(mock.calls.LookupBranch, callInfo)
+	mock.lockLookupBranch.Unlock()
+	return mock.LookupBranchFunc(ctx, owner, repo, branch)
+}
+
+// LookupBranchCalls gets all the calls that were made to LookupBranch.
+// Check the length with:
+//
+//	len(mockedGitHubAppClient.LookupBranchCalls())
+func (mock *GitHubAppClientMock) LookupBranchCalls() []struct {
+	Ctx    context.Context
+	Owner  string
+	Repo   string
+	Branch string
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Owner  string
+		Repo   string
+		Branch string
+	}
+	mock.lockLookupBranch.RLock()
+	calls = mock.calls.LookupBranch
+	mock.lockLookupBranch.RUnlock()
 	return calls
 }

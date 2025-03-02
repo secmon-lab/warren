@@ -28,6 +28,7 @@ func cmdServe() *cli.Command {
 		firestoreCfg config.Firestore
 		testDataCfg  config.TestData
 		embeddingCfg config.EmbeddingCfg
+		githubAppCfg config.GitHubAppCfg
 	)
 
 	flags := joinFlags(
@@ -49,6 +50,7 @@ func cmdServe() *cli.Command {
 		testDataCfg.Flags(),
 		actions.Flags(),
 		embeddingCfg.Flags(),
+		githubAppCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -94,6 +96,11 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
+			githubApp, err := githubAppCfg.Configure(ctx)
+			if err != nil {
+				return err
+			}
+
 			testDataSet, err := testDataCfg.Configure()
 			if err != nil {
 				return err
@@ -115,6 +122,7 @@ func cmdServe() *cli.Command {
 				usecase.WithSlackService(slackSvc),
 				usecase.WithRepository(firestore),
 				usecase.WithActionService(actionSvc),
+				usecase.WithGitHubApp(githubApp),
 			)
 
 			httpServer := http.Server{

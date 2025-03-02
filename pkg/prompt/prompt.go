@@ -200,7 +200,9 @@ func BuildMetaPrompt(ctx context.Context, alert model.Alert) (string, error) {
 var ignorePolicyTemplate string
 
 type IgnorePolicyPromptResult struct {
-	Policy map[string]string `json:"policy"`
+	Title       string            `json:"title"`
+	Description string            `json:"description"`
+	Policy      map[string]string `json:"policy"`
 }
 
 func BuildIgnorePolicyPrompt(ctx context.Context, policy model.PolicyData, alerts []model.Alert, note string) (string, error) {
@@ -286,6 +288,48 @@ func BuildMakeGroupPrompt(ctx context.Context, alerts []model.Alert, maxGroups i
 
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "make_group", input); err != nil {
+		return "", goerr.Wrap(err, "failed to execute template")
+	}
+
+	return buf.String(), nil
+}
+
+//go:embed templates/test_data_readme.md
+var testDataReadmeTemplate string
+
+type TestDataReadmePromptResult struct {
+	Content string `json:"content"`
+}
+
+func BuildTestDataReadmePrompt(ctx context.Context, action string, alerts []model.Alert) (string, error) {
+	tmpl, err := template.New("test_data_readme").Parse(testDataReadmeTemplate)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to parse template")
+	}
+
+	rawAlerts := []string{}
+	for _, alert := range alerts {
+		rawAlert, err := stringify(alert)
+		if err != nil {
+			return "", err
+		}
+		rawAlerts = append(rawAlerts, rawAlert)
+	}
+
+	schema, err := generateSchema(TestDataReadmePromptResult{}).Stringify()
+	if err != nil {
+		return "", err
+	}
+
+	input := map[string]any{
+		"alerts": rawAlerts,
+		"schema": schema,
+		"action": action,
+		"lang":   lang.From(ctx).Name(),
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "test_data_readme", input); err != nil {
 		return "", goerr.Wrap(err, "failed to execute template")
 	}
 

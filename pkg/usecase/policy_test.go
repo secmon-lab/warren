@@ -72,3 +72,24 @@ func TestGenerateIgnorePolicy(t *testing.T) {
 	gt.NoError(t, err)
 	gt.NotNil(t, policy)
 }
+
+func TestFormatRegoPolicy(t *testing.T) {
+	rawPolicy := `package example
+
+allow if {
+# no indent
+input.color == "red"
+}
+`
+	validPolicy := `package example
+
+allow if {
+	# no indent
+	input.color == "red"
+}
+`
+
+	contents, err := usecase.FormatRegoPolicy("test.rego", []byte(rawPolicy))
+	gt.NoError(t, err)
+	gt.Equal(t, string(contents), validPolicy)
+}
