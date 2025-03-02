@@ -237,63 +237,6 @@ func BuildIgnorePolicyPrompt(ctx context.Context, policy model.PolicyData, alert
 	return buf.String(), nil
 }
 
-//go:embed templates/make_group.md
-var makeGroupTemplate string
-
-type MakeGroupPromptResult struct {
-	Groups []model.AlertGroupMetadata `json:"groups"`
-}
-
-func BuildMakeGroupPrompt(ctx context.Context, alerts []model.Alert, maxGroups int) (string, error) {
-	tmpl, err := template.New("make_group").Parse(makeGroupTemplate)
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to parse template")
-	}
-
-	rawAlerts := []string{}
-	for _, alert := range alerts {
-		rawAlert, err := stringify(alert)
-		if err != nil {
-			return "", err
-		}
-		rawAlerts = append(rawAlerts, rawAlert)
-	}
-
-	schema, err := generateSchema(MakeGroupPromptResult{}).Stringify()
-	if err != nil {
-		return "", err
-	}
-
-	example := MakeGroupPromptResult{
-		Groups: []model.AlertGroupMetadata{
-			{
-				Title:       "Group 1",
-				Description: "Group 1 description",
-				AlertIDs:    []model.AlertID{model.NewAlertID(), model.NewAlertID()},
-			},
-		},
-	}
-	rawExample, err := json.MarshalIndent(example, "", "  ")
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to marshal example", goerr.V("example", example))
-	}
-
-	input := map[string]any{
-		"alerts":     rawAlerts,
-		"schema":     schema,
-		"example":    string(rawExample),
-		"max_groups": maxGroups,
-		"lang":       lang.From(ctx).Name(),
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "make_group", input); err != nil {
-		return "", goerr.Wrap(err, "failed to execute template")
-	}
-
-	return buf.String(), nil
-}
-
 //go:embed templates/test_data_readme.md
 var testDataReadmeTemplate string
 

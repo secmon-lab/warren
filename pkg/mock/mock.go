@@ -251,9 +251,6 @@ var _ interfaces.SlackThreadService = &SlackThreadServiceMock{}
 //			ChannelIDFunc: func() string {
 //				panic("mock out the ChannelID method")
 //			},
-//			PostAlertGroupsFunc: func(ctx context.Context, alertGroups []model.AlertGroup) error {
-//				panic("mock out the PostAlertGroups method")
-//			},
 //			PostAlertsFunc: func(ctx context.Context, alerts []model.Alert) error {
 //				panic("mock out the PostAlerts method")
 //			},
@@ -287,9 +284,6 @@ type SlackThreadServiceMock struct {
 
 	// ChannelIDFunc mocks the ChannelID method.
 	ChannelIDFunc func() string
-
-	// PostAlertGroupsFunc mocks the PostAlertGroups method.
-	PostAlertGroupsFunc func(ctx context.Context, alertGroups []model.AlertGroup) error
 
 	// PostAlertsFunc mocks the PostAlerts method.
 	PostAlertsFunc func(ctx context.Context, alerts []model.Alert) error
@@ -327,13 +321,6 @@ type SlackThreadServiceMock struct {
 		}
 		// ChannelID holds details about calls to the ChannelID method.
 		ChannelID []struct {
-		}
-		// PostAlertGroups holds details about calls to the PostAlertGroups method.
-		PostAlertGroups []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// AlertGroups is the alertGroups argument value.
-			AlertGroups []model.AlertGroup
 		}
 		// PostAlerts holds details about calls to the PostAlerts method.
 		PostAlerts []struct {
@@ -381,16 +368,15 @@ type SlackThreadServiceMock struct {
 			Alert model.Alert
 		}
 	}
-	lockAttachFile      sync.RWMutex
-	lockChannelID       sync.RWMutex
-	lockPostAlertGroups sync.RWMutex
-	lockPostAlerts      sync.RWMutex
-	lockPostFinding     sync.RWMutex
-	lockPostNextAction  sync.RWMutex
-	lockPostPolicyDiff  sync.RWMutex
-	lockReply           sync.RWMutex
-	lockThreadID        sync.RWMutex
-	lockUpdateAlert     sync.RWMutex
+	lockAttachFile     sync.RWMutex
+	lockChannelID      sync.RWMutex
+	lockPostAlerts     sync.RWMutex
+	lockPostFinding    sync.RWMutex
+	lockPostNextAction sync.RWMutex
+	lockPostPolicyDiff sync.RWMutex
+	lockReply          sync.RWMutex
+	lockThreadID       sync.RWMutex
+	lockUpdateAlert    sync.RWMutex
 }
 
 // AttachFile calls AttachFileFunc.
@@ -461,42 +447,6 @@ func (mock *SlackThreadServiceMock) ChannelIDCalls() []struct {
 	mock.lockChannelID.RLock()
 	calls = mock.calls.ChannelID
 	mock.lockChannelID.RUnlock()
-	return calls
-}
-
-// PostAlertGroups calls PostAlertGroupsFunc.
-func (mock *SlackThreadServiceMock) PostAlertGroups(ctx context.Context, alertGroups []model.AlertGroup) error {
-	if mock.PostAlertGroupsFunc == nil {
-		panic("SlackThreadServiceMock.PostAlertGroupsFunc: method is nil but SlackThreadService.PostAlertGroups was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		AlertGroups []model.AlertGroup
-	}{
-		Ctx:         ctx,
-		AlertGroups: alertGroups,
-	}
-	mock.lockPostAlertGroups.Lock()
-	mock.calls.PostAlertGroups = append(mock.calls.PostAlertGroups, callInfo)
-	mock.lockPostAlertGroups.Unlock()
-	return mock.PostAlertGroupsFunc(ctx, alertGroups)
-}
-
-// PostAlertGroupsCalls gets all the calls that were made to PostAlertGroups.
-// Check the length with:
-//
-//	len(mockedSlackThreadService.PostAlertGroupsCalls())
-func (mock *SlackThreadServiceMock) PostAlertGroupsCalls() []struct {
-	Ctx         context.Context
-	AlertGroups []model.AlertGroup
-} {
-	var calls []struct {
-		Ctx         context.Context
-		AlertGroups []model.AlertGroup
-	}
-	mock.lockPostAlertGroups.RLock()
-	calls = mock.calls.PostAlertGroups
-	mock.lockPostAlertGroups.RUnlock()
 	return calls
 }
 
@@ -955,9 +905,6 @@ var _ interfaces.Repository = &RepositoryMock{}
 //			BatchGetAlertsFunc: func(ctx context.Context, alertIDs []model.AlertID) ([]model.Alert, error) {
 //				panic("mock out the BatchGetAlerts method")
 //			},
-//			GetLatestAlertsFunc: func(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
-//				panic("mock out the GetLatestAlerts method")
-//			},
 //			GetAlertFunc: func(ctx context.Context, alertID model.AlertID) (*model.Alert, error) {
 //				panic("mock out the GetAlert method")
 //			},
@@ -967,17 +914,14 @@ var _ interfaces.Repository = &RepositoryMock{}
 //			GetAlertCommentsFunc: func(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error) {
 //				panic("mock out the GetAlertComments method")
 //			},
-//			GetAlertGroupFunc: func(ctx context.Context, groupID model.AlertGroupID) (*model.AlertGroup, error) {
-//				panic("mock out the GetAlertGroup method")
-//			},
-//			GetAlertsFunc: func(ctx context.Context, duration time.Duration, limit int64, offset int64) ([]model.Alert, error) {
-//				panic("mock out the GetAlerts method")
-//			},
 //			GetAlertsByParentIDFunc: func(ctx context.Context, parentID model.AlertID) ([]model.Alert, error) {
 //				panic("mock out the GetAlertsByParentID method")
 //			},
 //			GetAlertsByStatusFunc: func(ctx context.Context, status model.AlertStatus) ([]model.Alert, error) {
 //				panic("mock out the GetAlertsByStatus method")
+//			},
+//			GetLatestAlertsFunc: func(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
+//				panic("mock out the GetLatestAlerts method")
 //			},
 //			GetPolicyFunc: func(ctx context.Context, hash string) (*model.PolicyData, error) {
 //				panic("mock out the GetPolicy method")
@@ -990,9 +934,6 @@ var _ interfaces.Repository = &RepositoryMock{}
 //			},
 //			PutAlertFunc: func(ctx context.Context, alert model.Alert) error {
 //				panic("mock out the PutAlert method")
-//			},
-//			PutAlertGroupsFunc: func(ctx context.Context, groups []model.AlertGroup) error {
-//				panic("mock out the PutAlertGroups method")
 //			},
 //			PutPolicyDiffFunc: func(ctx context.Context, diff *model.PolicyDiff) error {
 //				panic("mock out the PutPolicyDiff method")
@@ -1010,9 +951,6 @@ type RepositoryMock struct {
 	// BatchGetAlertsFunc mocks the BatchGetAlerts method.
 	BatchGetAlertsFunc func(ctx context.Context, alertIDs []model.AlertID) ([]model.Alert, error)
 
-	// GetLatestAlertsFunc mocks the GetLatestAlerts method.
-	GetLatestAlertsFunc func(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error)
-
 	// GetAlertFunc mocks the GetAlert method.
 	GetAlertFunc func(ctx context.Context, alertID model.AlertID) (*model.Alert, error)
 
@@ -1022,17 +960,14 @@ type RepositoryMock struct {
 	// GetAlertCommentsFunc mocks the GetAlertComments method.
 	GetAlertCommentsFunc func(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error)
 
-	// GetAlertGroupFunc mocks the GetAlertGroup method.
-	GetAlertGroupFunc func(ctx context.Context, groupID model.AlertGroupID) (*model.AlertGroup, error)
-
-	// GetAlertsFunc mocks the GetAlerts method.
-	GetAlertsFunc func(ctx context.Context, duration time.Duration, limit int64, offset int64) ([]model.Alert, error)
-
 	// GetAlertsByParentIDFunc mocks the GetAlertsByParentID method.
 	GetAlertsByParentIDFunc func(ctx context.Context, parentID model.AlertID) ([]model.Alert, error)
 
 	// GetAlertsByStatusFunc mocks the GetAlertsByStatus method.
 	GetAlertsByStatusFunc func(ctx context.Context, status model.AlertStatus) ([]model.Alert, error)
+
+	// GetLatestAlertsFunc mocks the GetLatestAlerts method.
+	GetLatestAlertsFunc func(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error)
 
 	// GetPolicyFunc mocks the GetPolicy method.
 	GetPolicyFunc func(ctx context.Context, hash string) (*model.PolicyData, error)
@@ -1045,9 +980,6 @@ type RepositoryMock struct {
 
 	// PutAlertFunc mocks the PutAlert method.
 	PutAlertFunc func(ctx context.Context, alert model.Alert) error
-
-	// PutAlertGroupsFunc mocks the PutAlertGroups method.
-	PutAlertGroupsFunc func(ctx context.Context, groups []model.AlertGroup) error
 
 	// PutPolicyDiffFunc mocks the PutPolicyDiff method.
 	PutPolicyDiffFunc func(ctx context.Context, diff *model.PolicyDiff) error
@@ -1063,15 +995,6 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// AlertIDs is the alertIDs argument value.
 			AlertIDs []model.AlertID
-		}
-		// GetLatestAlerts holds details about calls to the GetLatestAlerts method.
-		GetLatestAlerts []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Oldest is the oldest argument value.
-			Oldest time.Time
-			// Limit is the limit argument value.
-			Limit int
 		}
 		// GetAlert holds details about calls to the GetAlert method.
 		GetAlert []struct {
@@ -1094,24 +1017,6 @@ type RepositoryMock struct {
 			// AlertID is the alertID argument value.
 			AlertID model.AlertID
 		}
-		// GetAlertGroup holds details about calls to the GetAlertGroup method.
-		GetAlertGroup []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// GroupID is the groupID argument value.
-			GroupID model.AlertGroupID
-		}
-		// GetAlerts holds details about calls to the GetAlerts method.
-		GetAlerts []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Duration is the duration argument value.
-			Duration time.Duration
-			// Limit is the limit argument value.
-			Limit int64
-			// Offset is the offset argument value.
-			Offset int64
-		}
 		// GetAlertsByParentID holds details about calls to the GetAlertsByParentID method.
 		GetAlertsByParentID []struct {
 			// Ctx is the ctx argument value.
@@ -1125,6 +1030,15 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Status is the status argument value.
 			Status model.AlertStatus
+		}
+		// GetLatestAlerts holds details about calls to the GetLatestAlerts method.
+		GetLatestAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Oldest is the oldest argument value.
+			Oldest time.Time
+			// Limit is the limit argument value.
+			Limit int
 		}
 		// GetPolicy holds details about calls to the GetPolicy method.
 		GetPolicy []struct {
@@ -1154,13 +1068,6 @@ type RepositoryMock struct {
 			// Alert is the alert argument value.
 			Alert model.Alert
 		}
-		// PutAlertGroups holds details about calls to the PutAlertGroups method.
-		PutAlertGroups []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Groups is the groups argument value.
-			Groups []model.AlertGroup
-		}
 		// PutPolicyDiff holds details about calls to the PutPolicyDiff method.
 		PutPolicyDiff []struct {
 			// Ctx is the ctx argument value.
@@ -1177,19 +1084,16 @@ type RepositoryMock struct {
 		}
 	}
 	lockBatchGetAlerts        sync.RWMutex
-	lockGetLatestAlerts     sync.RWMutex
 	lockGetAlert              sync.RWMutex
 	lockGetAlertBySlackThread sync.RWMutex
 	lockGetAlertComments      sync.RWMutex
-	lockGetAlertGroup         sync.RWMutex
-	lockGetAlerts             sync.RWMutex
 	lockGetAlertsByParentID   sync.RWMutex
 	lockGetAlertsByStatus     sync.RWMutex
+	lockGetLatestAlerts       sync.RWMutex
 	lockGetPolicy             sync.RWMutex
 	lockGetPolicyDiff         sync.RWMutex
 	lockInsertAlertComment    sync.RWMutex
 	lockPutAlert              sync.RWMutex
-	lockPutAlertGroups        sync.RWMutex
 	lockPutPolicyDiff         sync.RWMutex
 	lockSavePolicy            sync.RWMutex
 }
@@ -1227,46 +1131,6 @@ func (mock *RepositoryMock) BatchGetAlertsCalls() []struct {
 	mock.lockBatchGetAlerts.RLock()
 	calls = mock.calls.BatchGetAlerts
 	mock.lockBatchGetAlerts.RUnlock()
-	return calls
-}
-
-// GetLatestAlerts calls GetLatestAlertsFunc.
-func (mock *RepositoryMock) GetLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
-	if mock.GetLatestAlertsFunc == nil {
-		panic("RepositoryMock.GetLatestAlertsFunc: method is nil but Repository.GetLatestAlerts was just called")
-	}
-	callInfo := struct {
-		Ctx    context.Context
-		Oldest time.Time
-		Limit  int
-	}{
-		Ctx:    ctx,
-		Oldest: oldest,
-		Limit:  limit,
-	}
-	mock.lockGetLatestAlerts.Lock()
-	mock.calls.GetLatestAlerts = append(mock.calls.GetLatestAlerts, callInfo)
-	mock.lockGetLatestAlerts.Unlock()
-	return mock.GetLatestAlertsFunc(ctx, oldest, limit)
-}
-
-// GetLatestAlertsCalls gets all the calls that were made to GetLatestAlerts.
-// Check the length with:
-//
-//	len(mockedRepository.GetLatestAlertsCalls())
-func (mock *RepositoryMock) GetLatestAlertsCalls() []struct {
-	Ctx    context.Context
-	Oldest time.Time
-	Limit  int
-} {
-	var calls []struct {
-		Ctx    context.Context
-		Oldest time.Time
-		Limit  int
-	}
-	mock.lockGetLatestAlerts.RLock()
-	calls = mock.calls.GetLatestAlerts
-	mock.lockGetLatestAlerts.RUnlock()
 	return calls
 }
 
@@ -1378,86 +1242,6 @@ func (mock *RepositoryMock) GetAlertCommentsCalls() []struct {
 	return calls
 }
 
-// GetAlertGroup calls GetAlertGroupFunc.
-func (mock *RepositoryMock) GetAlertGroup(ctx context.Context, groupID model.AlertGroupID) (*model.AlertGroup, error) {
-	if mock.GetAlertGroupFunc == nil {
-		panic("RepositoryMock.GetAlertGroupFunc: method is nil but Repository.GetAlertGroup was just called")
-	}
-	callInfo := struct {
-		Ctx     context.Context
-		GroupID model.AlertGroupID
-	}{
-		Ctx:     ctx,
-		GroupID: groupID,
-	}
-	mock.lockGetAlertGroup.Lock()
-	mock.calls.GetAlertGroup = append(mock.calls.GetAlertGroup, callInfo)
-	mock.lockGetAlertGroup.Unlock()
-	return mock.GetAlertGroupFunc(ctx, groupID)
-}
-
-// GetAlertGroupCalls gets all the calls that were made to GetAlertGroup.
-// Check the length with:
-//
-//	len(mockedRepository.GetAlertGroupCalls())
-func (mock *RepositoryMock) GetAlertGroupCalls() []struct {
-	Ctx     context.Context
-	GroupID model.AlertGroupID
-} {
-	var calls []struct {
-		Ctx     context.Context
-		GroupID model.AlertGroupID
-	}
-	mock.lockGetAlertGroup.RLock()
-	calls = mock.calls.GetAlertGroup
-	mock.lockGetAlertGroup.RUnlock()
-	return calls
-}
-
-// GetAlerts calls GetAlertsFunc.
-func (mock *RepositoryMock) GetAlerts(ctx context.Context, duration time.Duration, limit int64, offset int64) ([]model.Alert, error) {
-	if mock.GetAlertsFunc == nil {
-		panic("RepositoryMock.GetAlertsFunc: method is nil but Repository.GetAlerts was just called")
-	}
-	callInfo := struct {
-		Ctx      context.Context
-		Duration time.Duration
-		Limit    int64
-		Offset   int64
-	}{
-		Ctx:      ctx,
-		Duration: duration,
-		Limit:    limit,
-		Offset:   offset,
-	}
-	mock.lockGetAlerts.Lock()
-	mock.calls.GetAlerts = append(mock.calls.GetAlerts, callInfo)
-	mock.lockGetAlerts.Unlock()
-	return mock.GetAlertsFunc(ctx, duration, limit, offset)
-}
-
-// GetAlertsCalls gets all the calls that were made to GetAlerts.
-// Check the length with:
-//
-//	len(mockedRepository.GetAlertsCalls())
-func (mock *RepositoryMock) GetAlertsCalls() []struct {
-	Ctx      context.Context
-	Duration time.Duration
-	Limit    int64
-	Offset   int64
-} {
-	var calls []struct {
-		Ctx      context.Context
-		Duration time.Duration
-		Limit    int64
-		Offset   int64
-	}
-	mock.lockGetAlerts.RLock()
-	calls = mock.calls.GetAlerts
-	mock.lockGetAlerts.RUnlock()
-	return calls
-}
-
 // GetAlertsByParentID calls GetAlertsByParentIDFunc.
 func (mock *RepositoryMock) GetAlertsByParentID(ctx context.Context, parentID model.AlertID) ([]model.Alert, error) {
 	if mock.GetAlertsByParentIDFunc == nil {
@@ -1527,6 +1311,46 @@ func (mock *RepositoryMock) GetAlertsByStatusCalls() []struct {
 	mock.lockGetAlertsByStatus.RLock()
 	calls = mock.calls.GetAlertsByStatus
 	mock.lockGetAlertsByStatus.RUnlock()
+	return calls
+}
+
+// GetLatestAlerts calls GetLatestAlertsFunc.
+func (mock *RepositoryMock) GetLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
+	if mock.GetLatestAlertsFunc == nil {
+		panic("RepositoryMock.GetLatestAlertsFunc: method is nil but Repository.GetLatestAlerts was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		Oldest time.Time
+		Limit  int
+	}{
+		Ctx:    ctx,
+		Oldest: oldest,
+		Limit:  limit,
+	}
+	mock.lockGetLatestAlerts.Lock()
+	mock.calls.GetLatestAlerts = append(mock.calls.GetLatestAlerts, callInfo)
+	mock.lockGetLatestAlerts.Unlock()
+	return mock.GetLatestAlertsFunc(ctx, oldest, limit)
+}
+
+// GetLatestAlertsCalls gets all the calls that were made to GetLatestAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.GetLatestAlertsCalls())
+func (mock *RepositoryMock) GetLatestAlertsCalls() []struct {
+	Ctx    context.Context
+	Oldest time.Time
+	Limit  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Oldest time.Time
+		Limit  int
+	}
+	mock.lockGetLatestAlerts.RLock()
+	calls = mock.calls.GetLatestAlerts
+	mock.lockGetLatestAlerts.RUnlock()
 	return calls
 }
 
@@ -1671,42 +1495,6 @@ func (mock *RepositoryMock) PutAlertCalls() []struct {
 	mock.lockPutAlert.RLock()
 	calls = mock.calls.PutAlert
 	mock.lockPutAlert.RUnlock()
-	return calls
-}
-
-// PutAlertGroups calls PutAlertGroupsFunc.
-func (mock *RepositoryMock) PutAlertGroups(ctx context.Context, groups []model.AlertGroup) error {
-	if mock.PutAlertGroupsFunc == nil {
-		panic("RepositoryMock.PutAlertGroupsFunc: method is nil but Repository.PutAlertGroups was just called")
-	}
-	callInfo := struct {
-		Ctx    context.Context
-		Groups []model.AlertGroup
-	}{
-		Ctx:    ctx,
-		Groups: groups,
-	}
-	mock.lockPutAlertGroups.Lock()
-	mock.calls.PutAlertGroups = append(mock.calls.PutAlertGroups, callInfo)
-	mock.lockPutAlertGroups.Unlock()
-	return mock.PutAlertGroupsFunc(ctx, groups)
-}
-
-// PutAlertGroupsCalls gets all the calls that were made to PutAlertGroups.
-// Check the length with:
-//
-//	len(mockedRepository.PutAlertGroupsCalls())
-func (mock *RepositoryMock) PutAlertGroupsCalls() []struct {
-	Ctx    context.Context
-	Groups []model.AlertGroup
-} {
-	var calls []struct {
-		Ctx    context.Context
-		Groups []model.AlertGroup
-	}
-	mock.lockPutAlertGroups.RLock()
-	calls = mock.calls.PutAlertGroups
-	mock.lockPutAlertGroups.RUnlock()
 	return calls
 }
 

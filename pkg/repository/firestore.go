@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -281,57 +280,6 @@ func (r *Firestore) BatchGetAlerts(ctx context.Context, alertIDs []model.AlertID
 	}
 
 	return alerts, nil
-}
-
-func (r *Firestore) PutAlertGroups(ctx context.Context, groups []model.AlertGroup) error {
-	batch := r.db.BulkWriter(ctx)
-	wg := sync.WaitGroup{}
-	errCh := make(chan error, len(groups))
-
-	for _, group := range groups {
-		groupDoc := r.db.Collection(collectionAlertGroups).Doc(group.ID.String())
-		job, err := batch.Create(groupDoc, group)
-		if err != nil {
-			return goerr.Wrap(err, "failed to create alert group", goerr.V("group", group))
-		}
-
-		wg.Add(1)
-		go func(group model.AlertGroup) {
-			defer wg.Done()
-			if _, err := job.Results(); err != nil {
-				errCh <- goerr.Wrap(err, "failed to save alert group", goerr.V("group", group))
-			}
-		}(group)
-	}
-
-	batch.End()
-	wg.Wait()
-
-	close(errCh)
-
-	for err := range errCh {
-		return err
-	}
-
-	return nil
-}
-
-func (r *Firestore) GetAlertGroup(ctx context.Context, groupID model.AlertGroupID) (*model.AlertGroup, error) {
-	groupDoc := r.db.Collection(collectionAlertGroups).Doc(groupID.String())
-	doc, err := groupDoc.Get(ctx)
-	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			return nil, nil
-		}
-		return nil, goerr.Wrap(err, "failed to get alert group", goerr.V("group_id", groupID))
-	}
-
-	var group model.AlertGroup
-	if err := doc.DataTo(&group); err != nil {
-		return nil, goerr.Wrap(err, "failed to convert data to alert group")
-	}
-
-	return &group, nil
 }
 
 func (r *Firestore) GetPolicyDiff(ctx context.Context, id model.PolicyDiffID) (*model.PolicyDiff, error) {

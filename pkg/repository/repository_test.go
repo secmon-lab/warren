@@ -227,49 +227,6 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 			})
 	})
 
-	t.Run("PutAlertGroups", func(t *testing.T) {
-		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-
-		group1 := model.AlertGroup{
-			ID: model.AlertGroupID(uuid.New().String()),
-			AlertGroupMetadata: model.AlertGroupMetadata{
-				AlertIDs: []model.AlertID{alert1.ID, alert2.ID},
-			},
-		}
-		group2 := model.AlertGroup{
-			ID: model.AlertGroupID(uuid.New().String()),
-			AlertGroupMetadata: model.AlertGroupMetadata{
-				AlertIDs: []model.AlertID{alert1.ID, alert2.ID},
-			},
-		}
-		gt.NoError(t, repo.PutAlertGroups(ctx, []model.AlertGroup{group1, group2}))
-
-		got, err := repo.GetAlertGroup(ctx, group1.ID)
-		gt.NoError(t, err)
-		gt.Equal(t, group1.ID, got.ID)
-
-		got, err = repo.GetAlertGroup(ctx, group2.ID)
-		gt.NoError(t, err)
-		gt.Equal(t, group2.ID, got.ID)
-	})
-
-	t.Run("GetAlertGroup_NotFound", func(t *testing.T) {
-		got, err := repo.GetAlertGroup(ctx, model.AlertGroupID(uuid.New().String()))
-		gt.NoError(t, err)
-		gt.Nil(t, got)
-	})
-
 	t.Run("GetAlertsByParentID", func(t *testing.T) {
 		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
 			Title: "GetAlerts test 1",

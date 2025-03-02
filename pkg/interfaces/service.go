@@ -23,7 +23,6 @@ type SlackThreadService interface {
 	PostNextAction(ctx context.Context, action prompt.ActionPromptResult) error
 	PostFinding(ctx context.Context, finding model.AlertFinding) error
 	AttachFile(ctx context.Context, title, fileName string, data []byte) error
-	PostAlertGroups(ctx context.Context, alertGroups []model.AlertGroup) error
 	PostPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error
 	PostAlerts(ctx context.Context, alerts []model.Alert) error
 

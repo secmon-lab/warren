@@ -14,7 +14,6 @@ type Memory struct {
 	alerts      map[model.AlertID]model.Alert
 	comments    map[model.AlertID][]model.AlertComment
 	policies    map[string]model.PolicyData
-	alertGroups map[model.AlertGroupID]model.AlertGroup
 	policyDiffs map[model.PolicyDiffID]model.PolicyDiff
 }
 
@@ -25,7 +24,6 @@ func NewMemory() *Memory {
 		alerts:      make(map[model.AlertID]model.Alert),
 		comments:    make(map[model.AlertID][]model.AlertComment),
 		policies:    make(map[string]model.PolicyData),
-		alertGroups: make(map[model.AlertGroupID]model.AlertGroup),
 		policyDiffs: make(map[model.PolicyDiffID]model.PolicyDiff),
 	}
 }
@@ -146,21 +144,6 @@ func (r *Memory) BatchGetAlerts(ctx context.Context, alertIDs []model.AlertID) (
 		alerts = append(alerts, alert)
 	}
 	return alerts, nil
-}
-
-func (r *Memory) PutAlertGroups(ctx context.Context, groups []model.AlertGroup) error {
-	for _, group := range groups {
-		r.alertGroups[group.ID] = group
-	}
-	return nil
-}
-
-func (r *Memory) GetAlertGroup(ctx context.Context, groupID model.AlertGroupID) (*model.AlertGroup, error) {
-	group, ok := r.alertGroups[groupID]
-	if !ok {
-		return nil, nil
-	}
-	return &group, nil
 }
 
 func (r *Memory) GetAlertsByParentID(ctx context.Context, parentID model.AlertID) ([]model.Alert, error) {

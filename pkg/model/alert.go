@@ -160,33 +160,3 @@ type AlertComment struct {
 	Comment   string  `json:"comment"`
 	UserID    string  `json:"user_id"`
 }
-
-type AlertGroupID string
-
-func NewAlertGroupID() AlertGroupID { return AlertGroupID(uuid.New().String()) }
-
-func (id AlertGroupID) String() string { return string(id) }
-
-type AlertGroup struct {
-	ID        AlertGroupID `json:"id"`
-	CreatedAt time.Time    `json:"created_at"`
-	UpdatedAt time.Time    `json:"updated_at"`
-	Alerts    []Alert      `firestore:"-" json:"-"`
-
-	AlertGroupMetadata
-}
-
-func NewAlertGroup(ctx context.Context, metadata AlertGroupMetadata) AlertGroup {
-	return AlertGroup{
-		ID:                 NewAlertGroupID(),
-		CreatedAt:          clock.Now(ctx),
-		UpdatedAt:          clock.Now(ctx),
-		AlertGroupMetadata: metadata,
-	}
-}
-
-type AlertGroupMetadata struct {
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	AlertIDs    []AlertID `json:"alert_ids"`
-}
