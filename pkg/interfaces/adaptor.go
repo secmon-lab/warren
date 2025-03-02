@@ -40,7 +40,7 @@ type Repository interface {
 
 	InsertAlertComment(ctx context.Context, comment model.AlertComment) error
 	GetAlertComments(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error)
-	FetchLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error)
+	GetLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error)
 	GetPolicy(ctx context.Context, hash string) (*model.PolicyData, error)
 	SavePolicy(ctx context.Context, policy *model.PolicyData) error
 	GetPolicyDiff(ctx context.Context, id model.PolicyDiffID) (*model.PolicyDiff, error)

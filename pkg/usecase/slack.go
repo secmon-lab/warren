@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -15,86 +14,6 @@ import (
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 )
-
-// ParseArgs parses a string into arguments, handling various types of quotes
-func parseArgs(input string) []string {
-	var result []string
-	var current []rune
-	var inQuotes bool
-	var quoteChar rune
-
-	// Unicode code points for quotes
-	const (
-		leftDoubleQuote  = '\u201c' // "
-		rightDoubleQuote = '\u201d' // "
-		leftSingleQuote  = '\u2018' // '
-		rightSingleQuote = '\u2019' // '
-	)
-
-	// isMatchingQuote checks if two quote characters form a matching pair
-	isMatchingQuote := func(open, close rune) bool {
-		return open == close || // Same quotes
-			(open == leftDoubleQuote && close == rightDoubleQuote) || // Unicode double quotes
-			(open == leftSingleQuote && close == rightSingleQuote) // Unicode single quotes
-	}
-
-	for i := 0; i < len(input); {
-		char, size := utf8.DecodeRuneInString(input[i:])
-		i += size
-
-		switch char {
-		case '\\':
-			if i < len(input) {
-				nextChar, size := utf8.DecodeRuneInString(input[i:])
-				if nextChar == '\\' || nextChar == '"' || nextChar == '\'' ||
-					nextChar == leftDoubleQuote || nextChar == rightDoubleQuote ||
-					nextChar == leftSingleQuote || nextChar == rightSingleQuote ||
-					nextChar == '`' {
-					current = append(current, nextChar)
-					i += size
-				} else {
-					current = append(current, char)
-				}
-			} else {
-				current = append(current, char)
-			}
-		case '"', '\'', leftDoubleQuote, rightDoubleQuote, leftSingleQuote, rightSingleQuote, '`':
-			if inQuotes {
-				if isMatchingQuote(quoteChar, char) {
-					inQuotes = false
-					if len(current) > 0 {
-						result = append(result, string(current))
-						current = nil
-					}
-				} else {
-					current = append(current, char)
-				}
-			} else {
-				inQuotes = true
-				quoteChar = char
-				if len(current) > 0 {
-					result = append(result, string(current))
-					current = nil
-				}
-			}
-		case ' ':
-			if inQuotes {
-				current = append(current, char)
-			} else if len(current) > 0 {
-				result = append(result, string(current))
-				current = nil
-			}
-		default:
-			current = append(current, char)
-		}
-	}
-
-	if len(current) > 0 {
-		result = append(result, string(current))
-	}
-
-	return result
-}
 
 func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevents.AppMentionEvent) error {
 	logger := logging.From(ctx)
@@ -140,53 +59,10 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 		return nil
 	}
 
-	switch args[0] {
-	case "group":
-		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-			if err := uc.GroupUnclosedAlerts(ctx, th); err != nil {
-				th.Reply(ctx, "😫 Failed to group unclosed alerts: "+err.Error())
-				return err
-			}
-
-			th.Reply(ctx, "✅ Grouped unclosed alerts")
-			return nil
-		})
-
-	case "ignore":
-		if alert == nil {
-			th.Reply(ctx, "💥 No alert found. Please run the command in the alert thread.")
-			return nil
-		}
-
-		alerts := []model.Alert{*alert}
-		childAlerts, err := uc.repository.GetAlertsByParentID(ctx, alert.ID)
-		if err != nil {
-			return goerr.Wrap(err, "failed to get child alerts")
-		}
-		alerts = append(alerts, childAlerts...)
-
-		var note string
-		if len(args) > 1 {
-			note = strings.Join(args[1:], " ")
-		}
-
-		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-			newPolicyDiff, err := uc.GenerateIgnorePolicy(ctx, alerts, note)
-			if err != nil {
-				return err
-			}
-
-			if err := uc.repository.PutPolicyDiff(ctx, newPolicyDiff); err != nil {
-				return err
-			}
-
-			if err := th.PostPolicyDiff(ctx, newPolicyDiff); err != nil {
-				return err
-			}
-
-			return nil
-		})
-	}
+	arguments := append([]string{"warren"}, args...)
+	uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
+		return uc.RunCommand(ctx, arguments, alert, th)
+	})
 
 	return nil
 }
@@ -427,4 +303,84 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 	}
 
 	return nil
+}
+
+// parseArgs parses a string into arguments, handling various types of quotes
+func parseArgs(input string) []string {
+	var result []string
+	var current []rune
+	var inQuotes bool
+	var quoteChar rune
+
+	// Unicode code points for quotes
+	const (
+		leftDoubleQuote  = '\u201c' // "
+		rightDoubleQuote = '\u201d' // "
+		leftSingleQuote  = '\u2018' // '
+		rightSingleQuote = '\u2019' // '
+	)
+
+	// isMatchingQuote checks if two quote characters form a matching pair
+	isMatchingQuote := func(open, close rune) bool {
+		return open == close || // Same quotes
+			(open == leftDoubleQuote && close == rightDoubleQuote) || // Unicode double quotes
+			(open == leftSingleQuote && close == rightSingleQuote) // Unicode single quotes
+	}
+
+	for i := 0; i < len(input); {
+		char, size := utf8.DecodeRuneInString(input[i:])
+		i += size
+
+		switch char {
+		case '\\':
+			if i < len(input) {
+				nextChar, size := utf8.DecodeRuneInString(input[i:])
+				if nextChar == '\\' || nextChar == '"' || nextChar == '\'' ||
+					nextChar == leftDoubleQuote || nextChar == rightDoubleQuote ||
+					nextChar == leftSingleQuote || nextChar == rightSingleQuote ||
+					nextChar == '`' {
+					current = append(current, nextChar)
+					i += size
+				} else {
+					current = append(current, char)
+				}
+			} else {
+				current = append(current, char)
+			}
+		case '"', '\'', leftDoubleQuote, rightDoubleQuote, leftSingleQuote, rightSingleQuote, '`':
+			if inQuotes {
+				if isMatchingQuote(quoteChar, char) {
+					inQuotes = false
+					if len(current) > 0 {
+						result = append(result, string(current))
+						current = nil
+					}
+				} else {
+					current = append(current, char)
+				}
+			} else {
+				inQuotes = true
+				quoteChar = char
+				if len(current) > 0 {
+					result = append(result, string(current))
+					current = nil
+				}
+			}
+		case ' ':
+			if inQuotes {
+				current = append(current, char)
+			} else if len(current) > 0 {
+				result = append(result, string(current))
+				current = nil
+			}
+		default:
+			current = append(current, char)
+		}
+	}
+
+	if len(current) > 0 {
+		result = append(result, string(current))
+	}
+
+	return result
 }

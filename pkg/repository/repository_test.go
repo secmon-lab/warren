@@ -54,7 +54,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Equal(t, alert.Data, got.Data)
 	})
 
-	t.Run("FetchLatestAlerts", func(t *testing.T) {
+	t.Run("GetLatestAlerts", func(t *testing.T) {
 		var alerts []model.Alert
 		now := time.Now()
 		for i := 0; i < 10; i++ {
@@ -74,7 +74,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 			gt.NoError(t, repo.PutAlert(ctx, alert))
 		}
 
-		got, err := repo.FetchLatestAlerts(ctx, now.Add(-24*time.Hour), 5)
+		got, err := repo.GetLatestAlerts(ctx, now.Add(-24*time.Hour), 5)
 		gt.NoError(t, err)
 		gt.Equal(t, len(got), 5)
 		for i, alert := range got {
@@ -272,19 +272,19 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 
 	t.Run("GetAlertsByParentID", func(t *testing.T) {
 		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
+			Title: "GetAlerts test 1",
 			Attrs: []model.Attribute{
 				{Key: "test", Value: "test"},
 			},
 		})
 		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
+			Title: "GetAlerts test 2",
 			Attrs: []model.Attribute{
 				{Key: "test", Value: "test"},
 			},
 		})
 		alert3 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
+			Title: "GetAlerts test 3",
 			Attrs: []model.Attribute{
 				{Key: "test", Value: "test"},
 			},

@@ -93,7 +93,7 @@ func (r *Firestore) GetAlertBySlackThread(ctx context.Context, thread model.Slac
 	return &alert, nil
 }
 
-func (r *Firestore) FetchLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
+func (r *Firestore) GetLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
 	iter := r.db.Collection(collectionAlerts).
 		Where("CreatedAt", ">=", oldest).
 		OrderBy("CreatedAt", firestore.Desc).

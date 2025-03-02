@@ -243,3 +243,28 @@ allow if {
 	gt.NoError(t, err)
 	gt.NoError(t, thread.PostPolicyDiff(context.Background(), diff))
 }
+
+func TestPostAlerts(t *testing.T) {
+	svc := newSlackService(t)
+
+	alerts := []model.Alert{
+		genDummyAlertWithSlackThread(),
+		genDummyAlertWithSlackThread(),
+		genDummyAlertWithSlackThread(),
+		genDummyAlertWithSlackThread(),
+	}
+	alerts[1].ParentID = alerts[0].ID
+	alerts[1].CreatedAt = alerts[0].CreatedAt.Add(time.Second)
+	alerts[1].Status = model.AlertStatusMerged
+	alerts[2].ParentID = alerts[0].ID
+	alerts[2].CreatedAt = alerts[0].CreatedAt.Add(time.Second * 2)
+	alerts[3].Assignee = &model.SlackUser{
+		ID:   "U0123456789",
+		Name: "John Doex",
+	}
+	alerts[3].Status = model.AlertStatusClosed
+
+	thread, err := svc.PostMessage(context.Background(), "alerts test")
+	gt.NoError(t, err)
+	gt.NoError(t, thread.PostAlerts(context.Background(), alerts))
+}

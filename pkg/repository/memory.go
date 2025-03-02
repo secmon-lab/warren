@@ -43,6 +43,29 @@ func (r *Memory) GetAlert(ctx context.Context, alertID model.AlertID) (*model.Al
 	return &alert, nil
 }
 
+func (r *Memory) GetAlerts(ctx context.Context, duration time.Duration, limit int64, offset int64) ([]model.Alert, error) {
+	var alerts []model.Alert
+	for _, alert := range r.alerts {
+		if alert.CreatedAt.After(time.Now().Add(-duration)) {
+			alerts = append(alerts, alert)
+		}
+	}
+
+	sort.Slice(alerts, func(i, j int) bool {
+		return alerts[i].CreatedAt.After(alerts[j].CreatedAt)
+	})
+
+	if offset > 0 && int(offset) < len(alerts) {
+		alerts = alerts[int(offset):]
+	}
+
+	if len(alerts) > int(limit) {
+		alerts = alerts[:int(limit)]
+	}
+
+	return alerts, nil
+}
+
 func (r *Memory) GetAlertBySlackThread(ctx context.Context, thread model.SlackThread) (*model.Alert, error) {
 	for _, alert := range r.alerts {
 		if alert.SlackThread != nil && alert.SlackThread.ChannelID == thread.ChannelID && alert.SlackThread.ThreadID == thread.ThreadID {
@@ -52,7 +75,7 @@ func (r *Memory) GetAlertBySlackThread(ctx context.Context, thread model.SlackTh
 	return nil, nil
 }
 
-func (r *Memory) FetchLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
+func (r *Memory) GetLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
 	var alerts []model.Alert
 	for _, alert := range r.alerts {
 		if alert.CreatedAt.After(oldest) {
