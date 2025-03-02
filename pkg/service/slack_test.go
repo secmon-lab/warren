@@ -236,3 +236,24 @@ func TestPostAlerts(t *testing.T) {
 	gt.NoError(t, err)
 	gt.NoError(t, thread.PostAlerts(context.Background(), alerts))
 }
+
+func TestPostAlertList(t *testing.T) {
+	svc := newSlackService(t)
+
+	alertList := model.NewAlertList(context.Background(), model.SlackThread{
+		ChannelID: "C0123456789",
+		ThreadID:  "T0123456789",
+	}, &model.SlackUser{
+		ID:   "U0123456789",
+		Name: "John Doe",
+	}, []model.Alert{
+		genDummyAlertWithSlackThread(),
+		genDummyAlertWithSlackThread(),
+		genDummyAlertWithSlackThread(),
+		genDummyAlertWithSlackThread(),
+	})
+
+	thread, err := svc.PostMessage(context.Background(), "alert list test")
+	gt.NoError(t, err)
+	gt.NoError(t, thread.PostAlertList(context.Background(), &alertList))
+}

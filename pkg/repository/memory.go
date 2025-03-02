@@ -15,6 +15,7 @@ type Memory struct {
 	comments    map[model.AlertID][]model.AlertComment
 	policies    map[string]model.PolicyData
 	policyDiffs map[model.PolicyDiffID]model.PolicyDiff
+	alertLists  map[model.AlertListID]model.AlertList
 }
 
 var _ interfaces.Repository = &Memory{}
@@ -25,6 +26,7 @@ func NewMemory() *Memory {
 		comments:    make(map[model.AlertID][]model.AlertComment),
 		policies:    make(map[string]model.PolicyData),
 		policyDiffs: make(map[model.PolicyDiffID]model.PolicyDiff),
+		alertLists:  make(map[model.AlertListID]model.AlertList),
 	}
 }
 
@@ -167,4 +169,36 @@ func (r *Memory) GetPolicyDiff(ctx context.Context, id model.PolicyDiffID) (*mod
 func (r *Memory) PutPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error {
 	r.policyDiffs[diff.ID] = *diff
 	return nil
+}
+
+func (r *Memory) GetAlertListByThread(ctx context.Context, thread model.SlackThread) (*model.AlertList, error) {
+	for _, list := range r.alertLists {
+		if list.SlackThread.ChannelID == thread.ChannelID && list.SlackThread.ThreadID == thread.ThreadID {
+			return &list, nil
+		}
+	}
+	return nil, nil
+}
+
+func (r *Memory) GetAlertList(ctx context.Context, listID model.AlertListID) (*model.AlertList, error) {
+	list, ok := r.alertLists[listID]
+	if !ok {
+		return nil, goerr.New("alert list not found", goerr.V("list_id", listID))
+	}
+	return &list, nil
+}
+
+func (r *Memory) PutAlertList(ctx context.Context, list model.AlertList) error {
+	r.alertLists[list.ID] = list
+	return nil
+}
+
+func (r *Memory) GetAlertsBySpan(ctx context.Context, begin, end time.Time) ([]model.Alert, error) {
+	var alerts []model.Alert
+	for _, alert := range r.alerts {
+		if alert.CreatedAt.After(begin) && alert.CreatedAt.Before(end) {
+			alerts = append(alerts, alert)
+		}
+	}
+	return alerts, nil
 }

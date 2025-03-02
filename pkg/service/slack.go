@@ -692,3 +692,67 @@ func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Blo
 		),
 	}
 }
+
+func (x *SlackThread) PostAlertList(ctx context.Context, list *model.AlertList) error {
+	blocks := buildAlertListBlocks(list, x.slackMetadata)
+
+	_, _, err := x.slackClient.PostMessageContext(ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+		slack.MsgOptionBroadcast(),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post alert list to slack", goerr.V("blocks", blocks))
+	}
+
+	return nil
+}
+
+func buildAlertListBlocks(list *model.AlertList, metadata slackMetadata) []slack.Block {
+	var messageText strings.Builder
+
+	displayCount := 32
+	if len(list.Alerts) > displayCount {
+		messageText.WriteString(fmt.Sprintf("Showing %d of %d alerts:\n", displayCount, len(list.Alerts)))
+	}
+
+	for i, alert := range list.Alerts {
+		if i >= displayCount {
+			break
+		}
+
+		var statusEmoji string
+		switch alert.Status {
+		case model.AlertStatusNew:
+			statusEmoji = "🆕"
+		case model.AlertStatusAcknowledged:
+			statusEmoji = "👀"
+		case model.AlertStatusClosed:
+			statusEmoji = "✅"
+		case model.AlertStatusMerged:
+			statusEmoji = "🔗"
+		default:
+			statusEmoji = "❓"
+		}
+
+		assigneeText := ""
+		if alert.Assignee != nil {
+			assigneeText = fmt.Sprintf(" (👤 <@%s>)", alert.Assignee.ID)
+		}
+
+		msgURL := metadata.ToMsgURL(alert.SlackThread.ChannelID, alert.SlackThread.ThreadID)
+		messageText.WriteString(fmt.Sprintf("%s <%s|%s>%s\n", statusEmoji, msgURL, alert.Title, assigneeText))
+	}
+
+	return []slack.Block{
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", "📑 New list: "+list.ID.String(), false, false),
+		),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", messageText.String(), false, false),
+			nil,
+			nil,
+		),
+	}
+}

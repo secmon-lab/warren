@@ -16,5 +16,5 @@ func TestRunCommand(t *testing.T) {
 		ChannelID: "C07000000000000000",
 		ThreadID:  "T07000000000000000",
 	})
-	gt.NoError(t, uc.RunCommand(t.Context(), []string{"warren", "help"}, nil, th)).Must()
+	gt.NoError(t, uc.RunCommand(t.Context(), []string{"warren", "help"}, nil, th, &model.SlackUser{})).Must()
 }

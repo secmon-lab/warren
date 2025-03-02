@@ -61,7 +61,10 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 
 	arguments := append([]string{"warren"}, args...)
 	uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-		return uc.RunCommand(ctx, arguments, alert, th)
+		return uc.RunCommand(ctx, arguments, alert, th, &model.SlackUser{
+			ID:   event.User,
+			Name: event.User,
+		})
 	})
 
 	return nil

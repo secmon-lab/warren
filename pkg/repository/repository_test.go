@@ -280,4 +280,92 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.NoError(t, err)
 		gt.Nil(t, got)
 	})
+
+	t.Run("GetAlertListByThread", func(t *testing.T) {
+		list := model.AlertList{
+			ID: model.AlertListID(uuid.New().String()),
+			AlertIDs: []model.AlertID{
+				model.AlertID(uuid.New().String()),
+			},
+			SlackThread: &model.SlackThread{
+				ChannelID: "test",
+				ThreadID:  uuid.New().String(),
+			},
+		}
+		gt.NoError(t, repo.PutAlertList(ctx, list))
+
+		got, err := repo.GetAlertListByThread(ctx, *list.SlackThread)
+		gt.NoError(t, err)
+		gt.Equal(t, list.ID, got.ID)
+	})
+
+	t.Run("GetAlertList", func(t *testing.T) {
+		list := model.AlertList{
+			ID: model.AlertListID(uuid.New().String()),
+			AlertIDs: []model.AlertID{
+				model.AlertID(uuid.New().String()),
+			},
+		}
+		gt.NoError(t, repo.PutAlertList(ctx, list))
+
+		got, err := repo.GetAlertList(ctx, list.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, list.ID, got.ID)
+	})
+
+	t.Run("PutAlertList", func(t *testing.T) {
+		list := model.AlertList{
+			ID: model.AlertListID(uuid.New().String()),
+			AlertIDs: []model.AlertID{
+				model.AlertID(uuid.New().String()),
+			},
+		}
+		gt.NoError(t, repo.PutAlertList(ctx, list))
+
+		got, err := repo.GetAlertList(ctx, list.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, list.ID, got.ID)
+	})
+
+	t.Run("GetAlertsBySpan", func(t *testing.T) {
+		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "GetAlertsBySpan test 1",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "GetAlertsBySpan test 2",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert3 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "GetAlertsBySpan test 3",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		now := time.Now()
+		alert1.CreatedAt = now.Add(-time.Second * 10)
+		alert2.CreatedAt = now.Add(-time.Second * 5)
+		alert3.CreatedAt = now
+		gt.NoError(t, repo.PutAlert(ctx, alert1))
+		gt.NoError(t, repo.PutAlert(ctx, alert2))
+		gt.NoError(t, repo.PutAlert(ctx, alert3))
+
+		got, err := repo.GetAlertsBySpan(ctx, now.Add(-time.Second*9), now.Add(time.Second*1))
+		gt.NoError(t, err)
+		gt.A(t, got).
+			Longer(1).
+			Any(func(v model.Alert) bool {
+				return v.ID == alert2.ID
+			}).
+			Any(func(v model.Alert) bool {
+				return v.ID == alert3.ID
+			}).
+			All(func(v model.Alert) bool {
+				return v.ID != alert1.ID
+			})
+	})
 }

@@ -278,3 +278,57 @@ func BuildTestDataReadmePrompt(ctx context.Context, action string, alerts []mode
 
 	return buf.String(), nil
 }
+
+//go:embed templates/filter_query.md
+var filterQueryTemplate string
+
+type FilterQueryPromptResult struct {
+	AlertIDs []model.AlertID `json:"alert_ids"`
+}
+
+func BuildFilterQueryPrompt(ctx context.Context, query string, alerts []model.Alert) (string, error) {
+	tmpl, err := template.New("filter_query").Parse(filterQueryTemplate)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to parse template")
+	}
+
+	example := FilterQueryPromptResult{
+		AlertIDs: []model.AlertID{
+			model.NewAlertID(),
+			model.NewAlertID(),
+			model.NewAlertID(),
+		},
+	}
+	schema, err := generateSchema(example).Stringify()
+	if err != nil {
+		return "", err
+	}
+
+	rawExample, err := stringify(example)
+	if err != nil {
+		return "", err
+	}
+
+	rawAlerts := []string{}
+	for _, alert := range alerts {
+		rawAlert, err := stringify(alert)
+		if err != nil {
+			return "", err
+		}
+		rawAlerts = append(rawAlerts, rawAlert)
+	}
+
+	input := map[string]any{
+		"query":   query,
+		"alerts":  rawAlerts,
+		"schema":  schema,
+		"example": rawExample,
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "filter_query", input); err != nil {
+		return "", goerr.Wrap(err, "failed to execute template")
+	}
+
+	return buf.String(), nil
+}

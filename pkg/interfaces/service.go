@@ -25,7 +25,7 @@ type SlackThreadService interface {
 	AttachFile(ctx context.Context, title, fileName string, data []byte) error
 	PostPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error
 	PostAlerts(ctx context.Context, alerts []model.Alert) error
-
+	PostAlertList(ctx context.Context, list *model.AlertList) error
 	// Reply replies to the thread with a message. It does not return an error because the process should not be stopped even if it fails. Instead, the error should be logged and reported to sentry in the method.
 	Reply(ctx context.Context, message string)
 }

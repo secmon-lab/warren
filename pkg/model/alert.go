@@ -160,3 +160,38 @@ type AlertComment struct {
 	Comment   string  `json:"comment"`
 	UserID    string  `json:"user_id"`
 }
+
+type AlertListID string
+
+func NewAlertListID() AlertListID {
+	return AlertListID(uuid.New().String())
+}
+
+func (id AlertListID) String() string {
+	return string(id)
+}
+
+type AlertList struct {
+	ID          AlertListID  `json:"id"`
+	AlertIDs    []AlertID    `json:"alert_ids"`
+	SlackThread *SlackThread `json:"slack_thread"`
+	CreatedAt   time.Time    `json:"created_at"`
+	CreatedBy   *SlackUser   `json:"created_by"`
+
+	Alerts []Alert `firestore:"-"`
+}
+
+func NewAlertList(ctx context.Context, thread SlackThread, createdBy *SlackUser, alerts []Alert) AlertList {
+	alertList := AlertList{
+		ID:          NewAlertListID(),
+		SlackThread: &thread,
+		CreatedAt:   clock.Now(ctx),
+		CreatedBy:   createdBy,
+	}
+	for _, alert := range alerts {
+		alertList.AlertIDs = append(alertList.AlertIDs, alert.ID)
+		alertList.Alerts = append(alertList.Alerts, alert)
+	}
+
+	return alertList
+}

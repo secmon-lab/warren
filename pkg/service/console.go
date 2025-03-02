@@ -230,3 +230,12 @@ func (c *ConsoleThread) PostAlerts(_ context.Context, alerts []model.Alert) erro
 	}
 	return nil
 }
+
+func (c *ConsoleThread) PostAlertList(_ context.Context, list *model.AlertList) error {
+	c.printHeader("🔍 Alert List")
+	for _, alert := range list.Alerts {
+		fmt.Fprintln(c.writer, strings.Repeat("-", 80))
+		fmt.Fprintf(c.writer, "Title: %s\n", alert.Title)
+	}
+	return nil
+}

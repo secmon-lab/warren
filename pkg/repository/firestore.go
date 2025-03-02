@@ -38,8 +38,8 @@ func (r *Firestore) Close() error {
 const (
 	collectionAlerts      = "alerts"
 	collectionPolicies    = "policies"
-	collectionAlertGroups = "groups"
 	collectionPolicyDiffs = "diffs"
+	collectionAlertLists  = "lists"
 )
 
 func (r *Firestore) PutAlert(ctx context.Context, alert model.Alert) error {
@@ -306,4 +306,72 @@ func (r *Firestore) PutPolicyDiff(ctx context.Context, diff *model.PolicyDiff) e
 		return goerr.Wrap(err, "failed to put policy diff", goerr.V("id", diff.ID))
 	}
 	return nil
+}
+
+func (r *Firestore) GetAlertListByThread(ctx context.Context, thread model.SlackThread) (*model.AlertList, error) {
+	iter := r.db.Collection(collectionAlertLists).Where("SlackThread.ChannelID", "==", thread.ChannelID).Where("SlackThread.ThreadID", "==", thread.ThreadID).Documents(ctx)
+
+	doc, err := iter.Next()
+	if err != nil {
+		if err == iterator.Done {
+			return nil, nil
+		}
+		return nil, goerr.Wrap(err, "failed to get alert list by thread", goerr.V("slack_thread", thread))
+	}
+
+	var alertList model.AlertList
+	if err := doc.DataTo(&alertList); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert data to alert list")
+	}
+
+	return &alertList, nil
+}
+
+func (r *Firestore) GetAlertList(ctx context.Context, listID model.AlertListID) (*model.AlertList, error) {
+	doc, err := r.db.Collection(collectionAlertLists).Doc(listID.String()).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
+	}
+
+	var alertList model.AlertList
+	if err := doc.DataTo(&alertList); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert data to alert list")
+	}
+
+	return &alertList, nil
+}
+
+func (r *Firestore) PutAlertList(ctx context.Context, list model.AlertList) error {
+	doc := r.db.Collection(collectionAlertLists).Doc(list.ID.String())
+	_, err := doc.Set(ctx, list)
+	if err != nil {
+		return goerr.Wrap(err, "failed to put alert list", goerr.V("id", list.ID))
+	}
+	return nil
+}
+
+func (r *Firestore) GetAlertsBySpan(ctx context.Context, begin, end time.Time) ([]model.Alert, error) {
+	iter := r.db.Collection(collectionAlerts).Where("CreatedAt", ">=", begin).Where("CreatedAt", "<=", end).Documents(ctx)
+
+	var alerts []model.Alert
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next alert")
+		}
+
+		var alert model.Alert
+		if err := doc.DataTo(&alert); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert")
+		}
+
+		alerts = append(alerts, alert)
+	}
+
+	return alerts, nil
 }

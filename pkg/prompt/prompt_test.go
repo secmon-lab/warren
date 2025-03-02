@@ -77,3 +77,20 @@ func TestTestDataReadmePrompt(t *testing.T) {
 
 	t.Log(d)
 }
+
+func TestFilterQueryPrompt(t *testing.T) {
+	ctx := context.Background()
+	alerts := []model.Alert{
+		model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
+			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
+		}),
+		model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
+			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
+		}),
+	}
+
+	d, err := prompt.BuildFilterQueryPrompt(ctx, "test", alerts)
+	gt.NoError(t, err)
+
+	t.Log(d)
+}
