@@ -240,10 +240,8 @@ func (x *Service) actionStatus(args []string) action {
 				statusList = append(statusList, model.AlertStatusAcknowledged)
 			case "closed":
 				statusList = append(statusList, model.AlertStatusClosed)
-			case "merged":
-				statusList = append(statusList, model.AlertStatusMerged)
 			default:
-				return nil, goerr.New("invalid status, status must be one of new, ack, closed, merged", goerr.V("status", arg))
+				return nil, goerr.New("invalid status, status must be one of new, ack, closed", goerr.V("status", arg))
 			}
 		}
 

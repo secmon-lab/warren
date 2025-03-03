@@ -22,7 +22,6 @@ type AlertStatus string
 const (
 	AlertStatusNew          AlertStatus = "new"
 	AlertStatusAcknowledged AlertStatus = "acked"
-	AlertStatusMerged       AlertStatus = "merged"
 	AlertStatusClosed       AlertStatus = "closed"
 )
 
@@ -32,7 +31,7 @@ func (s AlertStatus) String() string {
 
 func (s AlertStatus) Validate() error {
 	switch s {
-	case AlertStatusNew, AlertStatusAcknowledged, AlertStatusMerged, AlertStatusClosed:
+	case AlertStatusNew, AlertStatusAcknowledged, AlertStatusClosed:
 		return nil
 	}
 	return goerr.New("invalid alert status", goerr.V("status", s))

@@ -223,7 +223,7 @@ func TestPostAlerts(t *testing.T) {
 	}
 	alerts[1].ParentID = alerts[0].ID
 	alerts[1].CreatedAt = alerts[0].CreatedAt.Add(time.Second)
-	alerts[1].Status = model.AlertStatusMerged
+	alerts[1].Status = model.AlertStatusAcknowledged
 	alerts[2].ParentID = alerts[0].ID
 	alerts[2].CreatedAt = alerts[0].CreatedAt.Add(time.Second * 2)
 	alerts[3].Assignee = &model.SlackUser{

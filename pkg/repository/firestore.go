@@ -114,10 +114,6 @@ func (r *Firestore) GetLatestAlerts(ctx context.Context, oldest time.Time, limit
 			return nil, goerr.Wrap(err, "failed to convert data to alert")
 		}
 
-		if alert.Status == model.AlertStatusMerged {
-			continue
-		}
-
 		alerts = append(alerts, alert)
 	}
 

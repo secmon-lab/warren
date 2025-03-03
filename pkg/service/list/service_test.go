@@ -78,7 +78,6 @@ func TestService_Run(t *testing.T) {
 				{Status: model.AlertStatusNew},
 				{Status: model.AlertStatusAcknowledged},
 				{Status: model.AlertStatusClosed},
-				{Status: model.AlertStatusMerged},
 			},
 			expected: []model.Alert{
 				{Status: model.AlertStatusNew},
@@ -97,7 +96,6 @@ func TestService_Run(t *testing.T) {
 				{Status: model.AlertStatusNew},
 				{Status: model.AlertStatusAcknowledged},
 				{Status: model.AlertStatusClosed},
-				{Status: model.AlertStatusMerged},
 			},
 			expected: nil,
 		},

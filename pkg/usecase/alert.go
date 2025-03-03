@@ -108,7 +108,7 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.
 		logger.Info("alert merged", "parent", similarAlert, "merged", alert)
 
 		alert.ParentID = similarAlert.ID
-		alert.Status = model.AlertStatusMerged
+		alert.Status = model.AlertStatusAcknowledged
 		alert.SlackThread = similarAlert.SlackThread
 		alert.Assignee = similarAlert.Assignee
 
@@ -202,8 +202,14 @@ func (uc *UseCases) findSimilarAlert(ctx context.Context, alert model.Alert) (*m
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to fetch latest alerts")
 	}
+	unclosedAlerts := make([]model.Alert, 0, len(alerts))
+	for _, a := range alerts {
+		if a.Status != model.AlertStatusClosed {
+			unclosedAlerts = append(unclosedAlerts, a)
+		}
+	}
 
-	p, err := prompt.BuildAggregatePrompt(ctx, alert, alerts)
+	p, err := prompt.BuildAggregatePrompt(ctx, alert, unclosedAlerts)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build aggregate prompt")
 	}

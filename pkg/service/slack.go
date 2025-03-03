@@ -660,8 +660,6 @@ func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Blo
 			statusEmoji = "👀"
 		case model.AlertStatusClosed:
 			statusEmoji = "✅"
-		case model.AlertStatusMerged:
-			statusEmoji = "🔗"
 		default:
 			statusEmoji = "❓"
 		}
