@@ -33,12 +33,6 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert by slack thread")
 	}
-	if alert == nil {
-		threadData = model.SlackThread{
-			ChannelID: event.Channel,
-			ThreadID:  event.TimeStamp,
-		}
-	}
 
 	mention := uc.slackService.TrimMention(event.Text)
 	if mention == "" {
