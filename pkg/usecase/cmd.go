@@ -12,6 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/list"
 	"github.com/secmon-lab/warren/pkg/service/source"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
 	"github.com/urfave/cli/v3"
 )
@@ -34,6 +35,7 @@ func (x *UseCases) RunCommand(ctx context.Context, args []string, alert *model.A
 	err := cmd.Run(ctx, args)
 	if err != nil {
 		thread.Reply(ctx, "💥 Failed to run command: "+err.Error())
+		logging.From(ctx).Error("Failed to run command", "error", err)
 	}
 
 	if buf.String() != "" {
