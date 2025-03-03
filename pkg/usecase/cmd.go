@@ -15,6 +15,32 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+func (x *UseCases) RunCommand(ctx context.Context, args []string, alert *model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) error {
+	ctx = thread.WithReplyFunc(ctx, th.Reply)
+
+	var buf bytes.Buffer
+	cmd := cli.Command{
+		Name:  "warren",
+		Usage: "Slack bot for security monitoring",
+		Commands: []*cli.Command{
+			x.cmdList(alert, th, user),
+			x.cmdIgnore(alert, th, user),
+		},
+		Writer: &buf,
+	}
+
+	err := cmd.Run(ctx, args)
+	if err != nil {
+		thread.Reply(ctx, "💥 Failed to run command: "+err.Error())
+	}
+
+	if buf.String() != "" {
+		thread.Reply(ctx, "```\n"+buf.String()+"\n```")
+	}
+
+	return nil
+}
+
 func parseTime(s string) (time.Time, error) {
 	if s == "" {
 		return time.Time{}, nil
@@ -141,65 +167,44 @@ func (x *UseCases) cmdList(alert *model.Alert, th interfaces.SlackThreadService,
 	}
 }
 
-func (x *UseCases) RunCommand(ctx context.Context, args []string, alert *model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) error {
-	ctx = thread.WithReplyFunc(ctx, th.Reply)
+func (x *UseCases) cmdIgnore(alert *model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) *cli.Command {
+	return &cli.Command{
+		Name:        "ignore",
+		Usage:       "Ignore alerts",
+		UsageText:   "@warren ignore [$list_id | last]",
+		Description: "Ignore alerts",
+		Action: func(ctx context.Context, c *cli.Command) error {
+			if alert == nil {
+				th.Reply(ctx, "💥 No alert found. Please run the command in the alert thread.")
+				return nil
+			}
 
-	var buf bytes.Buffer
-	cmd := cli.Command{
-		Name:  "warren",
-		Usage: "Slack bot for security monitoring",
-		Commands: []*cli.Command{
-			x.cmdList(alert, th, user),
-			{
-				Name:    "ignore",
-				Usage:   "Ignore alerts",
-				Aliases: []string{"i"},
-				Action: func(ctx context.Context, c *cli.Command) error {
-					if alert == nil {
-						th.Reply(ctx, "💥 No alert found. Please run the command in the alert thread.")
-						return nil
-					}
+			alerts := []model.Alert{*alert}
+			childAlerts, err := x.repository.GetAlertsByParentID(ctx, alert.ID)
+			if err != nil {
+				return goerr.Wrap(err, "failed to get child alerts")
+			}
+			alerts = append(alerts, childAlerts...)
 
-					alerts := []model.Alert{*alert}
-					childAlerts, err := x.repository.GetAlertsByParentID(ctx, alert.ID)
-					if err != nil {
-						return goerr.Wrap(err, "failed to get child alerts")
-					}
-					alerts = append(alerts, childAlerts...)
+			var note string
+			if c.Args().Len() > 1 {
+				note = strings.Join(c.Args().Slice()[1:], " ")
+			}
 
-					var note string
-					if len(args) > 1 {
-						note = strings.Join(args[1:], " ")
-					}
+			newPolicyDiff, err := x.GenerateIgnorePolicy(ctx, alerts, note)
+			if err != nil {
+				return err
+			}
 
-					newPolicyDiff, err := x.GenerateIgnorePolicy(ctx, alerts, note)
-					if err != nil {
-						return err
-					}
+			if err := x.repository.PutPolicyDiff(ctx, newPolicyDiff); err != nil {
+				return err
+			}
 
-					if err := x.repository.PutPolicyDiff(ctx, newPolicyDiff); err != nil {
-						return err
-					}
+			if err := th.PostPolicyDiff(ctx, newPolicyDiff); err != nil {
+				return err
+			}
 
-					if err := th.PostPolicyDiff(ctx, newPolicyDiff); err != nil {
-						return err
-					}
-
-					return nil
-				},
-			},
+			return nil
 		},
-		Writer: &buf,
 	}
-
-	err := cmd.Run(ctx, args)
-	if err != nil {
-		return goerr.Wrap(err, "failed to run command", goerr.V("args", args))
-	}
-
-	if buf.String() != "" {
-		thread.Reply(ctx, "```\n"+buf.String()+"\n```")
-	}
-
-	return nil
 }

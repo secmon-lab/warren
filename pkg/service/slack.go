@@ -714,7 +714,7 @@ func buildAlertListBlocks(list *model.AlertList, metadata slackMetadata) []slack
 
 	displayCount := 20
 	if len(list.Alerts) > displayCount {
-		messageText.WriteString(fmt.Sprintf("Showing %d of %d alerts:\n", displayCount, len(list.Alerts)))
+		messageText.WriteString(fmt.Sprintf("Showing %d of %d alerts:\n\n", displayCount, len(list.Alerts)))
 	}
 
 	for i, alert := range list.Alerts {

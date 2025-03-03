@@ -47,9 +47,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 	args := parseArgs(mention)
 
 	logger.Info("slack app mention event", "mention", mention, "thread", threadData)
-	for _, arg := range args {
-		logger.Info("arg", "value", arg)
-	}
+	logger.Debug("Parsed args", "args", args)
 
 	th := uc.slackService.NewThread(threadData)
 	ctx = thread.WithReplyFunc(ctx, th.Reply)

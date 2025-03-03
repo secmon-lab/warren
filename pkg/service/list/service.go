@@ -14,6 +14,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
 )
 
@@ -131,7 +132,7 @@ func (x *Service) Run(ctx context.Context, th interfaces.SlackThreadService, use
 		return err
 	}
 
-	pipe, err := x.newPipeline(args)
+	pipe, err := x.newPipeline(ctx, args)
 	if err != nil {
 		return err
 	}
@@ -376,7 +377,9 @@ func (x *Service) actionQuery(args []string) action {
 	}
 }
 
-func (x *Service) newPipeline(args []string) (*pipeline, error) {
+func (x *Service) newPipeline(ctx context.Context, args []string) (*pipeline, error) {
+	logger := logging.From(ctx)
+
 	// Arguments Example:
 	// `| filter | sort CreatedAt | limit 10 | offset 10`
 
@@ -419,6 +422,7 @@ func (x *Service) newPipeline(args []string) (*pipeline, error) {
 			if err != nil {
 				return err
 			}
+			logger.Debug("Matched action", "action", currentName, "args", currentArgs)
 			actions = append(actions, matchedFn(currentArgs))
 			currentName = ""
 			currentArgs = nil
