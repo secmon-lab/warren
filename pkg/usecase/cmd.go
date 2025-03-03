@@ -120,6 +120,7 @@ func (x *UseCases) cmdList(alert *model.Alert, th interfaces.SlackThreadService,
 			var src source.Source
 			now := clock.Now(ctx)
 
+			args := c.Args().Slice()
 			switch {
 			case spanFrom != "" || spanTo != "":
 				from, to := now, now
@@ -140,14 +141,16 @@ func (x *UseCases) cmdList(alert *model.Alert, th interfaces.SlackThreadService,
 				}
 				src = source.Span(from, to)
 
-			case c.Args().Len() == 1 && c.Args().First() == "last":
+			case len(args) > 0 && args[0] == "last":
 				src = source.LatestAlertList(model.SlackThread{
 					ChannelID: th.ChannelID(),
 					ThreadID:  th.ThreadID(),
 				})
+				args = args[1:]
 
-			case c.Args().Len() == 1:
-				src = source.AlertListID(model.AlertListID(c.Args().First()))
+			case len(args) > 0:
+				src = source.AlertListID(model.AlertListID(args[0]))
+				args = args[1:]
 
 			case duration != 0:
 				src = source.Span(now.Add(-duration), now)
@@ -160,7 +163,7 @@ func (x *UseCases) cmdList(alert *model.Alert, th interfaces.SlackThreadService,
 			}
 
 			svc := list.New(x.repository, list.WithLLM(x.llmClient))
-			if err := svc.Run(ctx, th, user, src, c.Args().Slice()); err != nil {
+			if err := svc.Run(ctx, th, user, src, args); err != nil {
 				return err
 			}
 
