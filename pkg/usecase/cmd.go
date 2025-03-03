@@ -57,7 +57,7 @@ func parseTime(s string) (time.Time, error) {
 	return time.Time{}, goerr.New("invalid time format: expected format: RFC3339, time only (15:04), date only (2/3), date+time (02-03T00:00), today, yesterday", goerr.V("time", s))
 }
 
-func (x *UseCases) cmdList(th interfaces.SlackThreadService, user *model.SlackUser) *cli.Command {
+func (x *UseCases) cmdList(alert *model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) *cli.Command {
 	var (
 		duration time.Duration
 		spanFrom string
@@ -74,7 +74,6 @@ func (x *UseCases) cmdList(th interfaces.SlackThreadService, user *model.SlackUs
 				Aliases:     []string{"d"},
 				Usage:       "Duration to list alerts",
 				Destination: &duration,
-				Value:       time.Hour * 24,
 			},
 			&cli.StringFlag{
 				Name:        "from",
@@ -124,6 +123,12 @@ func (x *UseCases) cmdList(th interfaces.SlackThreadService, user *model.SlackUs
 
 			case duration != 0:
 				src = list.SourceSpan(now.Add(-duration), now)
+
+			case alert != nil:
+				src = list.SourceAlert(alert)
+
+			default:
+				src = list.SourceSpan(now.Add(-time.Hour*24), now)
 			}
 
 			svc := list.New(x.repository, list.WithLLM(x.llmClient))
@@ -137,12 +142,14 @@ func (x *UseCases) cmdList(th interfaces.SlackThreadService, user *model.SlackUs
 }
 
 func (x *UseCases) RunCommand(ctx context.Context, args []string, alert *model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) error {
+	ctx = thread.WithReplyFunc(ctx, th.Reply)
+
 	var buf bytes.Buffer
 	cmd := cli.Command{
 		Name:  "warren",
 		Usage: "Slack bot for security monitoring",
 		Commands: []*cli.Command{
-			x.cmdList(th, user),
+			x.cmdList(alert, th, user),
 			{
 				Name:    "ignore",
 				Usage:   "Ignore alerts",

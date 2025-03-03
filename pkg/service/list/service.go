@@ -111,6 +111,20 @@ func SourceSpan(begin, end time.Time) Source {
 	}
 }
 
+func SourceAlert(alert *model.Alert) Source {
+	return func(ctx context.Context, repo interfaces.Repository) ([]model.Alert, error) {
+		thread.Reply(ctx, "🤖 Getting alerts from alert: "+alert.ID.String())
+
+		alerts, err := repo.GetAlertsByParentID(ctx, alert.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		alerts = append(alerts, *alert)
+		return alerts, nil
+	}
+}
+
 func (x *Service) Run(ctx context.Context, th interfaces.SlackThreadService, user *model.SlackUser, source Source, args []string) error {
 	alerts, err := source(ctx, x.repo)
 	if err != nil {
