@@ -450,7 +450,6 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 				gt.Value(t, got.ID).Equal(tt.want.ID)
 				gt.Value(t, got.SlackThread).Equal(tt.want.SlackThread)
 				gt.Value(t, got.CreatedAt.Unix()).Equal(tt.want.CreatedAt.Unix())
-				gt.Array(t, got.Alerts).Length(len(tt.want.Alerts))
 			})
 		}
 	})

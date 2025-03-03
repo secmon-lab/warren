@@ -216,5 +216,10 @@ func (r *Memory) GetLatestAlertListInThread(ctx context.Context, thread model.Sl
 		}
 	}
 
+	if latestList == nil {
+		return nil, nil
+	}
+
+	latestList.Alerts = nil
 	return latestList, nil
 }

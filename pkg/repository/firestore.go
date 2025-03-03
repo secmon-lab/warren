@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -380,22 +381,33 @@ func (r *Firestore) GetLatestAlertListInThread(ctx context.Context, thread model
 	iter := r.db.Collection(collectionAlertLists).
 		Where("SlackThread.ChannelID", "==", thread.ChannelID).
 		Where("SlackThread.ThreadID", "==", thread.ThreadID).
-		OrderBy("CreatedAt", firestore.Desc).
-		Limit(1).
 		Documents(ctx)
 
-	doc, err := iter.Next()
-	if err != nil {
-		if err == iterator.Done {
-			return nil, nil
+	var alertLists []model.AlertList
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next alert list")
 		}
-		return nil, goerr.Wrap(err, "failed to get alert list by thread", goerr.V("slack_thread", thread))
+
+		var alertList model.AlertList
+		if err := doc.DataTo(&alertList); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert list")
+		}
+
+		alertLists = append(alertLists, alertList)
 	}
 
-	var alertList model.AlertList
-	if err := doc.DataTo(&alertList); err != nil {
-		return nil, goerr.Wrap(err, "failed to convert data to alert list")
+	if len(alertLists) == 0 {
+		return nil, nil
 	}
 
-	return &alertList, nil
+	sort.Slice(alertLists, func(i, j int) bool {
+		return alertLists[i].CreatedAt.After(alertLists[j].CreatedAt)
+	})
+
+	return &alertLists[0], nil
 }
