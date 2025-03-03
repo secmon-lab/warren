@@ -61,20 +61,6 @@ alert contains {} # Detected as an alert`,
 	gt.S(t, d).Contains("# Output")
 }
 
-func TestMakeGroupPrompt(t *testing.T) {
-	alerts := []model.Alert{
-		{ID: model.NewAlertID()},
-		{ID: model.NewAlertID()},
-	}
-
-	d, err := prompt.BuildMakeGroupPrompt(context.Background(), alerts, 10)
-	gt.NoError(t, err)
-
-	t.Log(d)
-	gt.S(t, d).Contains("# Input")
-	gt.S(t, d).Contains("# Output")
-}
-
 func TestTestDataReadmePrompt(t *testing.T) {
 	ctx := context.Background()
 	alerts := []model.Alert{
@@ -87,6 +73,23 @@ func TestTestDataReadmePrompt(t *testing.T) {
 	}
 
 	d, err := prompt.BuildTestDataReadmePrompt(ctx, "ignore", alerts)
+	gt.NoError(t, err)
+
+	t.Log(d)
+}
+
+func TestFilterQueryPrompt(t *testing.T) {
+	ctx := context.Background()
+	alerts := []model.Alert{
+		model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
+			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
+		}),
+		model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
+			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
+		}),
+	}
+
+	d, err := prompt.BuildFilterQueryPrompt(ctx, "test", alerts)
 	gt.NoError(t, err)
 
 	t.Log(d)

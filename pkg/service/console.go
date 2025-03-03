@@ -206,25 +206,6 @@ func (c *ConsoleThread) printFinding(finding model.AlertFinding) {
 	}
 }
 
-func (c *ConsoleThread) PostAlertGroups(_ context.Context, groups []model.AlertGroup) error {
-	c.printHeader("🔍 Alert Groups")
-
-	for _, group := range groups {
-		fmt.Fprintln(c.writer, strings.Repeat("=", 80))
-		color.New(color.FgCyan, color.Bold).Fprintf(c.writer, "📦 Group: %s\n", group.Title)
-		color.New(color.FgWhite).Fprintf(c.writer, "%s\n", group.Description)
-
-		fmt.Fprintln(c.writer)
-		color.New(color.FgYellow).Fprintf(c.writer, "Alerts in this group: (total %d)\n", len(group.Alerts))
-		for _, alert := range group.Alerts {
-			color.New(color.FgGreen).Fprintf(c.writer, "  • %s\n", alert.Title)
-		}
-		fmt.Fprintln(c.writer)
-	}
-	fmt.Fprintln(c.writer, strings.Repeat("=", 80))
-	return nil
-}
-
 func (c *ConsoleThread) PostPolicyDiff(_ context.Context, diff *model.PolicyDiff) error {
 	c.printHeader("🔍 Policy Diff")
 	for fileName, diff := range diff.DiffPolicy() {
@@ -246,6 +227,15 @@ func (c *ConsoleThread) PostAlerts(_ context.Context, alerts []model.Alert) erro
 		fmt.Fprintf(c.writer, "Assignee: %s\n", alert.Assignee)
 		fmt.Fprintf(c.writer, "Created at: %s\n", alert.CreatedAt)
 		fmt.Fprintf(c.writer, "Updated at: %s\n", alert.UpdatedAt)
+	}
+	return nil
+}
+
+func (c *ConsoleThread) PostAlertList(_ context.Context, list *model.AlertList) error {
+	c.printHeader("🔍 Alert List")
+	for _, alert := range list.Alerts {
+		fmt.Fprintln(c.writer, strings.Repeat("-", 80))
+		fmt.Fprintf(c.writer, "Title: %s\n", alert.Title)
 	}
 	return nil
 }

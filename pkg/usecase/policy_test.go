@@ -11,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/policy"
+	"github.com/secmon-lab/warren/pkg/service/source"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
 )
@@ -68,7 +69,7 @@ func TestGenerateIgnorePolicy(t *testing.T) {
 	ctx = thread.WithReplyFunc(ctx, func(ctx context.Context, msg string) {
 		t.Log(msg)
 	})
-	policy, err := uc.GenerateIgnorePolicy(ctx, alerts, "")
+	policy, err := uc.GenerateIgnorePolicy(ctx, source.Static(alerts), "")
 	gt.NoError(t, err)
 	gt.NotNil(t, policy)
 }

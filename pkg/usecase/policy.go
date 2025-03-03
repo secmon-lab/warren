@@ -15,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/policy"
+	"github.com/secmon-lab/warren/pkg/service/source"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
@@ -24,9 +25,15 @@ const (
 	maxRetryCountForIgnorePolicy = 8
 )
 
-func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, alerts []model.Alert, note string) (*model.PolicyDiff, error) {
+func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, src source.Source, note string) (*model.PolicyDiff, error) {
 	logger := logging.From(ctx)
+
 	thread.Reply(ctx, "📝 Generating ignore policy...")
+
+	alerts, err := src(ctx, uc.repository)
+	if err != nil {
+		return nil, err
+	}
 
 	diffID := model.NewPolicyDiffID()
 	base, err := uc.policyService.NewClient(ctx)

@@ -16,7 +16,9 @@ import (
 )
 
 func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevents.AppMentionEvent) error {
-	logger := logging.From(ctx)
+	logger := logging.From(ctx).With("event_ts", event.EventTimeStamp)
+	ctx = logging.With(ctx, logger)
+
 	logger.Debug("slack app mention event", "event", event)
 
 	threadData := model.SlackThread{
@@ -31,12 +33,6 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert by slack thread")
 	}
-	if alert == nil {
-		threadData = model.SlackThread{
-			ChannelID: event.Channel,
-			ThreadID:  event.TimeStamp,
-		}
-	}
 
 	mention := uc.slackService.TrimMention(event.Text)
 	if mention == "" {
@@ -47,9 +43,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 	args := parseArgs(mention)
 
 	logger.Info("slack app mention event", "mention", mention, "thread", threadData)
-	for _, arg := range args {
-		logger.Info("arg", "value", arg)
-	}
+	logger.Debug("Parsed args", "args", args)
 
 	th := uc.slackService.NewThread(threadData)
 	ctx = thread.WithReplyFunc(ctx, th.Reply)
@@ -61,7 +55,10 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 
 	arguments := append([]string{"warren"}, args...)
 	uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-		return uc.RunCommand(ctx, arguments, alert, th)
+		return uc.RunCommand(ctx, arguments, alert, th, &model.SlackUser{
+			ID:   event.User,
+			Name: event.User,
+		})
 	})
 
 	return nil

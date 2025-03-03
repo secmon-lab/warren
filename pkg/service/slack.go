@@ -565,75 +565,6 @@ func NewSlackPayloadVerifier(signingSecret string) interfaces.SlackPayloadVerifi
 	}
 }
 
-func (x *SlackThread) PostAlertGroups(ctx context.Context, groups []model.AlertGroup) error {
-	blocks := buildAlertGroupsBlocks(groups, x.slackMetadata)
-
-	_, _, err := x.slackClient.PostMessageContext(ctx,
-		x.channelID,
-		slack.MsgOptionBlocks(blocks...),
-		slack.MsgOptionTS(x.threadID),
-		slack.MsgOptionBroadcast(),
-	)
-	if err != nil {
-		return goerr.Wrap(err, "failed to post alert groups to slack", goerr.V("groups", groups), goerr.V("blocks", blocks))
-	}
-
-	return nil
-}
-
-func buildAlertGroupsBlocks(groups []model.AlertGroup, metadata slackMetadata) []slack.Block {
-	blocks := []slack.Block{
-		slack.NewHeaderBlock(
-			slack.NewTextBlockObject("plain_text", "Summary of Groups", false, false),
-		),
-	}
-
-	for _, group := range groups {
-		blocks = append(blocks, buildAlertGroupBlocks(group, metadata)...)
-	}
-
-	return blocks
-}
-
-func buildAlertGroupBlocks(group model.AlertGroup, metadata slackMetadata) []slack.Block {
-	blocks := []slack.Block{
-		slack.NewDividerBlock(),
-		slack.NewHeaderBlock(
-			slack.NewTextBlockObject("plain_text", "Group: "+group.Title, false, false),
-		),
-		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", group.Description, false, false),
-			nil,
-			nil,
-		),
-	}
-
-	alertList := ""
-	// slack link format: https://{team_id}.slack.com/archives/{channel_id}/p{timestamp}
-	// Example: https://xxx.slack.com/archives/C07AR2FPG1F/p1740438108890669
-	for _, alert := range group.Alerts {
-		if alert.SlackThread != nil {
-			link := metadata.ToMsgURL(alert.SlackThread.ChannelID, alert.SlackThread.ThreadID)
-			alertList += fmt.Sprintf("• <%s|%s>\n", link, alert.Title)
-		} else {
-			alertList += fmt.Sprintf("• %s\n", alert.Title)
-		}
-	}
-	if len(group.AlertIDs) > 3 {
-		alertList += fmt.Sprintf("... and %d more alerts", len(group.AlertIDs)-3)
-	}
-
-	if alertList != "" {
-		blocks = append(blocks, slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", alertList, false, false),
-			nil,
-			nil,
-		))
-	}
-
-	return blocks
-}
-
 func (x *SlackThread) PostPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error {
 	blocks := buildPolicyDiffBlocks(diff)
 
@@ -699,25 +630,28 @@ func (x *SlackThread) PostAlerts(ctx context.Context, alerts []model.Alert) erro
 }
 
 func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Block {
-	// Create map of parent ID to child alerts
-	childAlerts := make(map[model.AlertID][]model.Alert)
-	var topLevelAlerts []model.Alert
-
-	// First pass - organize alerts into parent/child relationships
-	for _, alert := range alerts {
-		if alert.ParentID != "" {
-			childAlerts[alert.ParentID] = append(childAlerts[alert.ParentID], alert)
-		} else {
-			topLevelAlerts = append(topLevelAlerts, alert)
+	if len(alerts) == 0 {
+		return []slack.Block{
+			slack.NewSectionBlock(
+				slack.NewTextBlockObject("mrkdwn", "🈳 No alerts found", false, false),
+				nil,
+				nil,
+			),
 		}
 	}
 
-	// Build message text for all alerts
 	var messageText strings.Builder
 
-	// Recursively add alerts and their children
-	var addAlertWithChildren func(alert model.Alert, indent string)
-	addAlertWithChildren = func(alert model.Alert, indent string) {
+	displayCount := 20
+	if len(alerts) < displayCount {
+		displayCount = len(alerts)
+	}
+
+	for i, alert := range alerts {
+		if i >= displayCount {
+			break
+		}
+
 		var statusEmoji string
 		switch alert.Status {
 		case model.AlertStatusNew:
@@ -738,19 +672,7 @@ func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Blo
 		}
 
 		msgURL := metadata.ToMsgURL(alert.SlackThread.ChannelID, alert.SlackThread.ThreadID)
-		messageText.WriteString(fmt.Sprintf("%s- %s %s <%s|%s>%s\n", indent, statusEmoji, alert.CreatedAt.Format("01/02 15:04"), msgURL, alert.Title, assigneeText))
-
-		// Add child alerts if any exist
-		if children, ok := childAlerts[alert.ID]; ok {
-			for _, child := range children {
-				addAlertWithChildren(child, indent+"  ")
-			}
-		}
-	}
-
-	// Add all top level alerts and their children
-	for _, alert := range topLevelAlerts {
-		addAlertWithChildren(alert, "")
+		messageText.WriteString(fmt.Sprintf("%s <%s|%s>%s\n", statusEmoji, msgURL, alert.Title, assigneeText))
 	}
 
 	return []slack.Block{
@@ -759,5 +681,45 @@ func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Blo
 			nil,
 			nil,
 		),
+		slack.NewDividerBlock(),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("Showing %d of %d alerts", displayCount, len(alerts)), false, false),
+			nil,
+			nil,
+		),
 	}
+}
+
+func (x *SlackThread) PostAlertList(ctx context.Context, list *model.AlertList) error {
+	blocks := buildAlertListBlocks(list, x.slackMetadata)
+
+	_, _, err := x.slackClient.PostMessageContext(ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+		slack.MsgOptionBroadcast(),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post alert list to slack", goerr.V("blocks", blocks))
+	}
+
+	return nil
+}
+
+func buildAlertListBlocks(list *model.AlertList, metadata slackMetadata) []slack.Block {
+	blocks := []slack.Block{
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", "📑 New list", false, false),
+		),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", "ID: `"+list.ID.String()+"`", false, false),
+			nil,
+			nil,
+		),
+		slack.NewDividerBlock(),
+	}
+
+	blocks = append(blocks, buildAlertsBlocks(list.Alerts, metadata)...)
+
+	return blocks
 }

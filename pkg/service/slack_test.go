@@ -185,38 +185,6 @@ func TestTrimMention(t *testing.T) {
 	gt.Equal(t, svc.TrimMention("<@NOT_EXIST> test"), "<@NOT_EXIST> test")
 }
 
-func TestPostAlertGroups(t *testing.T) {
-	svc := newSlackService(t)
-
-	groups := []model.AlertGroup{
-		{
-			AlertGroupMetadata: model.AlertGroupMetadata{
-				Title:       "Group 1",
-				Description: "Group 1 Description. This is a test group.",
-			},
-			Alerts: []model.Alert{
-				genDummyAlertWithSlackThread(),
-				genDummyAlertWithSlackThread(),
-			},
-		},
-		{
-			AlertGroupMetadata: model.AlertGroupMetadata{
-				Title:       "Group 2",
-				Description: "Group 2 Description. This is another test group.",
-			},
-			Alerts: []model.Alert{
-				genDummyAlertWithSlackThread(),
-				genDummyAlertWithSlackThread(),
-			},
-		},
-	}
-
-	thread, err := svc.PostMessage(context.Background(), "group test")
-	gt.NoError(t, err)
-
-	gt.NoError(t, thread.PostAlertGroups(context.Background(), groups))
-}
-
 func TestPostPolicyDiff(t *testing.T) {
 	svc := newSlackService(t)
 
@@ -267,4 +235,25 @@ func TestPostAlerts(t *testing.T) {
 	thread, err := svc.PostMessage(context.Background(), "alerts test")
 	gt.NoError(t, err)
 	gt.NoError(t, thread.PostAlerts(context.Background(), alerts))
+}
+
+func TestPostAlertList(t *testing.T) {
+	svc := newSlackService(t)
+
+	alertList := model.NewAlertList(context.Background(), model.SlackThread{
+		ChannelID: "C0123456789",
+		ThreadID:  "T0123456789",
+	}, &model.SlackUser{
+		ID:   "U0123456789",
+		Name: "John Doe",
+	}, []model.Alert{
+		genDummyAlertWithSlackThread(),
+		genDummyAlertWithSlackThread(),
+		genDummyAlertWithSlackThread(),
+		genDummyAlertWithSlackThread(),
+	})
+
+	thread, err := svc.PostMessage(context.Background(), "alert list test")
+	gt.NoError(t, err)
+	gt.NoError(t, thread.PostAlertList(context.Background(), &alertList))
 }

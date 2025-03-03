@@ -14,8 +14,8 @@ type Memory struct {
 	alerts      map[model.AlertID]model.Alert
 	comments    map[model.AlertID][]model.AlertComment
 	policies    map[string]model.PolicyData
-	alertGroups map[model.AlertGroupID]model.AlertGroup
 	policyDiffs map[model.PolicyDiffID]model.PolicyDiff
+	alertLists  map[model.AlertListID]model.AlertList
 }
 
 var _ interfaces.Repository = &Memory{}
@@ -25,8 +25,8 @@ func NewMemory() *Memory {
 		alerts:      make(map[model.AlertID]model.Alert),
 		comments:    make(map[model.AlertID][]model.AlertComment),
 		policies:    make(map[string]model.PolicyData),
-		alertGroups: make(map[model.AlertGroupID]model.AlertGroup),
 		policyDiffs: make(map[model.PolicyDiffID]model.PolicyDiff),
+		alertLists:  make(map[model.AlertListID]model.AlertList),
 	}
 }
 
@@ -148,21 +148,6 @@ func (r *Memory) BatchGetAlerts(ctx context.Context, alertIDs []model.AlertID) (
 	return alerts, nil
 }
 
-func (r *Memory) PutAlertGroups(ctx context.Context, groups []model.AlertGroup) error {
-	for _, group := range groups {
-		r.alertGroups[group.ID] = group
-	}
-	return nil
-}
-
-func (r *Memory) GetAlertGroup(ctx context.Context, groupID model.AlertGroupID) (*model.AlertGroup, error) {
-	group, ok := r.alertGroups[groupID]
-	if !ok {
-		return nil, nil
-	}
-	return &group, nil
-}
-
 func (r *Memory) GetAlertsByParentID(ctx context.Context, parentID model.AlertID) ([]model.Alert, error) {
 	var alerts []model.Alert
 	for _, alert := range r.alerts {
@@ -184,4 +169,57 @@ func (r *Memory) GetPolicyDiff(ctx context.Context, id model.PolicyDiffID) (*mod
 func (r *Memory) PutPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error {
 	r.policyDiffs[diff.ID] = *diff
 	return nil
+}
+
+func (r *Memory) GetAlertListByThread(ctx context.Context, thread model.SlackThread) (*model.AlertList, error) {
+	for _, list := range r.alertLists {
+		if list.SlackThread.ChannelID == thread.ChannelID && list.SlackThread.ThreadID == thread.ThreadID {
+			return &list, nil
+		}
+	}
+	return nil, nil
+}
+
+func (r *Memory) GetAlertList(ctx context.Context, listID model.AlertListID) (*model.AlertList, error) {
+	list, ok := r.alertLists[listID]
+	if !ok {
+		return nil, goerr.New("alert list not found", goerr.V("list_id", listID))
+	}
+	return &list, nil
+}
+
+func (r *Memory) PutAlertList(ctx context.Context, list model.AlertList) error {
+	r.alertLists[list.ID] = list
+	return nil
+}
+
+func (r *Memory) GetAlertsBySpan(ctx context.Context, begin, end time.Time) ([]model.Alert, error) {
+	var alerts []model.Alert
+	for _, alert := range r.alerts {
+		if alert.CreatedAt.After(begin) && alert.CreatedAt.Before(end) {
+			alerts = append(alerts, alert)
+		}
+	}
+	return alerts, nil
+}
+
+func (r *Memory) GetLatestAlertListInThread(ctx context.Context, thread model.SlackThread) (*model.AlertList, error) {
+	var latestList *model.AlertList
+	var latestTime time.Time
+
+	for _, list := range r.alertLists {
+		if list.SlackThread != nil && list.SlackThread.ChannelID == thread.ChannelID && list.SlackThread.ThreadID == thread.ThreadID {
+			if latestList == nil || list.CreatedAt.After(latestTime) {
+				latestList = &list
+				latestTime = list.CreatedAt
+			}
+		}
+	}
+
+	if latestList == nil {
+		return nil, nil
+	}
+
+	latestList.Alerts = nil
+	return latestList, nil
 }

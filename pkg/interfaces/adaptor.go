@@ -35,9 +35,12 @@ type Repository interface {
 	GetAlertsByStatus(ctx context.Context, status model.AlertStatus) ([]model.Alert, error)
 	GetAlertsByParentID(ctx context.Context, parentID model.AlertID) ([]model.Alert, error)
 	BatchGetAlerts(ctx context.Context, alertIDs []model.AlertID) ([]model.Alert, error)
-	PutAlertGroups(ctx context.Context, groups []model.AlertGroup) error
-	GetAlertGroup(ctx context.Context, groupID model.AlertGroupID) (*model.AlertGroup, error)
+	GetAlertsBySpan(ctx context.Context, begin, end time.Time) ([]model.Alert, error)
 
+	GetAlertListByThread(ctx context.Context, thread model.SlackThread) (*model.AlertList, error)
+	GetAlertList(ctx context.Context, listID model.AlertListID) (*model.AlertList, error)
+	PutAlertList(ctx context.Context, list model.AlertList) error
+	GetLatestAlertListInThread(ctx context.Context, thread model.SlackThread) (*model.AlertList, error)
 	InsertAlertComment(ctx context.Context, comment model.AlertComment) error
 	GetAlertComments(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error)
 	GetLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error)

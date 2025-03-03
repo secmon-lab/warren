@@ -227,49 +227,6 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 			})
 	})
 
-	t.Run("PutAlertGroups", func(t *testing.T) {
-		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-
-		group1 := model.AlertGroup{
-			ID: model.AlertGroupID(uuid.New().String()),
-			AlertGroupMetadata: model.AlertGroupMetadata{
-				AlertIDs: []model.AlertID{alert1.ID, alert2.ID},
-			},
-		}
-		group2 := model.AlertGroup{
-			ID: model.AlertGroupID(uuid.New().String()),
-			AlertGroupMetadata: model.AlertGroupMetadata{
-				AlertIDs: []model.AlertID{alert1.ID, alert2.ID},
-			},
-		}
-		gt.NoError(t, repo.PutAlertGroups(ctx, []model.AlertGroup{group1, group2}))
-
-		got, err := repo.GetAlertGroup(ctx, group1.ID)
-		gt.NoError(t, err)
-		gt.Equal(t, group1.ID, got.ID)
-
-		got, err = repo.GetAlertGroup(ctx, group2.ID)
-		gt.NoError(t, err)
-		gt.Equal(t, group2.ID, got.ID)
-	})
-
-	t.Run("GetAlertGroup_NotFound", func(t *testing.T) {
-		got, err := repo.GetAlertGroup(ctx, model.AlertGroupID(uuid.New().String()))
-		gt.NoError(t, err)
-		gt.Nil(t, got)
-	})
-
 	t.Run("GetAlertsByParentID", func(t *testing.T) {
 		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
 			Title: "GetAlerts test 1",
@@ -322,5 +279,178 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		got, err := repo.GetPolicyDiff(ctx, model.PolicyDiffID(uuid.New().String()))
 		gt.NoError(t, err)
 		gt.Nil(t, got)
+	})
+
+	t.Run("GetAlertListByThread", func(t *testing.T) {
+		list := model.AlertList{
+			ID: model.AlertListID(uuid.New().String()),
+			AlertIDs: []model.AlertID{
+				model.AlertID(uuid.New().String()),
+			},
+			SlackThread: &model.SlackThread{
+				ChannelID: "test",
+				ThreadID:  uuid.New().String(),
+			},
+		}
+		gt.NoError(t, repo.PutAlertList(ctx, list))
+
+		got, err := repo.GetAlertListByThread(ctx, *list.SlackThread)
+		gt.NoError(t, err)
+		gt.Equal(t, list.ID, got.ID)
+	})
+
+	t.Run("GetAlertList", func(t *testing.T) {
+		list := model.AlertList{
+			ID: model.AlertListID(uuid.New().String()),
+			AlertIDs: []model.AlertID{
+				model.AlertID(uuid.New().String()),
+			},
+		}
+		gt.NoError(t, repo.PutAlertList(ctx, list))
+
+		got, err := repo.GetAlertList(ctx, list.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, list.ID, got.ID)
+	})
+
+	t.Run("PutAlertList", func(t *testing.T) {
+		list := model.AlertList{
+			ID: model.AlertListID(uuid.New().String()),
+			AlertIDs: []model.AlertID{
+				model.AlertID(uuid.New().String()),
+			},
+		}
+		gt.NoError(t, repo.PutAlertList(ctx, list))
+
+		got, err := repo.GetAlertList(ctx, list.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, list.ID, got.ID)
+	})
+
+	t.Run("GetAlertsBySpan", func(t *testing.T) {
+		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "GetAlertsBySpan test 1",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "GetAlertsBySpan test 2",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert3 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "GetAlertsBySpan test 3",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		now := time.Now()
+		alert1.CreatedAt = now.Add(-time.Second * 10)
+		alert2.CreatedAt = now.Add(-time.Second * 5)
+		alert3.CreatedAt = now
+		gt.NoError(t, repo.PutAlert(ctx, alert1))
+		gt.NoError(t, repo.PutAlert(ctx, alert2))
+		gt.NoError(t, repo.PutAlert(ctx, alert3))
+
+		got, err := repo.GetAlertsBySpan(ctx, now.Add(-time.Second*9), now.Add(time.Second*1))
+		gt.NoError(t, err)
+		gt.A(t, got).
+			Longer(1).
+			Any(func(v model.Alert) bool {
+				return v.ID == alert2.ID
+			}).
+			Any(func(v model.Alert) bool {
+				return v.ID == alert3.ID
+			}).
+			All(func(v model.Alert) bool {
+				return v.ID != alert1.ID
+			})
+	})
+
+	t.Run("GetLatestAlertListInThread", func(t *testing.T) {
+		ctx := context.Background()
+		thread := model.SlackThread{
+			ChannelID: "C123",
+			ThreadID:  uuid.New().String(),
+		}
+		now := time.Now()
+
+		list1 := model.AlertList{
+			ID:          model.NewAlertListID(),
+			SlackThread: &thread,
+			CreatedAt:   now.Add(-1 * time.Hour),
+			Alerts: []model.Alert{
+				{ID: model.NewAlertID()},
+			},
+		}
+		list2 := model.AlertList{
+			ID:          model.NewAlertListID(),
+			SlackThread: &thread,
+			CreatedAt:   now,
+			Alerts: []model.Alert{
+				{ID: model.NewAlertID()},
+				{ID: model.NewAlertID()},
+			},
+		}
+		otherList := model.AlertList{
+			ID: model.NewAlertListID(),
+			SlackThread: &model.SlackThread{
+				ChannelID: "C456",
+				ThreadID:  "T456",
+			},
+			CreatedAt: now,
+			Alerts: []model.Alert{
+				{ID: model.NewAlertID()},
+			},
+		}
+
+		cases := []struct {
+			name    string
+			setup   func(r interfaces.Repository) error
+			thread  model.SlackThread
+			want    *model.AlertList
+			wantErr bool
+		}{
+			{
+				name: "get latest list",
+				setup: func(r interfaces.Repository) error {
+					if err := r.PutAlertList(ctx, list1); err != nil {
+						return err
+					}
+					if err := r.PutAlertList(ctx, list2); err != nil {
+						return err
+					}
+					return r.PutAlertList(ctx, otherList)
+				},
+				thread: thread,
+				want:   &list2,
+			},
+		}
+
+		for _, tt := range cases {
+			t.Run(tt.name, func(t *testing.T) {
+				if tt.setup != nil {
+					gt.NoError(t, tt.setup(repo))
+				}
+
+				got, err := repo.GetLatestAlertListInThread(ctx, tt.thread)
+				if tt.wantErr {
+					gt.Error(t, err)
+					return
+				}
+				gt.NoError(t, err)
+
+				if tt.want == nil {
+					gt.Value(t, got).Equal(nil)
+					return
+				}
+
+				gt.Value(t, got.ID).Equal(tt.want.ID)
+				gt.Value(t, got.SlackThread).Equal(tt.want.SlackThread)
+				gt.Value(t, got.CreatedAt.Unix()).Equal(tt.want.CreatedAt.Unix())
+			})
+		}
 	})
 }

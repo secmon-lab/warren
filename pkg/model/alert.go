@@ -161,32 +161,37 @@ type AlertComment struct {
 	UserID    string  `json:"user_id"`
 }
 
-type AlertGroupID string
+type AlertListID string
 
-func NewAlertGroupID() AlertGroupID { return AlertGroupID(uuid.New().String()) }
-
-func (id AlertGroupID) String() string { return string(id) }
-
-type AlertGroup struct {
-	ID        AlertGroupID `json:"id"`
-	CreatedAt time.Time    `json:"created_at"`
-	UpdatedAt time.Time    `json:"updated_at"`
-	Alerts    []Alert      `firestore:"-" json:"-"`
-
-	AlertGroupMetadata
+func NewAlertListID() AlertListID {
+	return AlertListID(uuid.New().String())
 }
 
-func NewAlertGroup(ctx context.Context, metadata AlertGroupMetadata) AlertGroup {
-	return AlertGroup{
-		ID:                 NewAlertGroupID(),
-		CreatedAt:          clock.Now(ctx),
-		UpdatedAt:          clock.Now(ctx),
-		AlertGroupMetadata: metadata,
+func (id AlertListID) String() string {
+	return string(id)
+}
+
+type AlertList struct {
+	ID          AlertListID  `json:"id"`
+	AlertIDs    []AlertID    `json:"alert_ids"`
+	SlackThread *SlackThread `json:"slack_thread"`
+	CreatedAt   time.Time    `json:"created_at"`
+	CreatedBy   *SlackUser   `json:"created_by"`
+
+	Alerts []Alert `firestore:"-"`
+}
+
+func NewAlertList(ctx context.Context, thread SlackThread, createdBy *SlackUser, alerts []Alert) AlertList {
+	alertList := AlertList{
+		ID:          NewAlertListID(),
+		SlackThread: &thread,
+		CreatedAt:   clock.Now(ctx),
+		CreatedBy:   createdBy,
 	}
-}
+	for _, alert := range alerts {
+		alertList.AlertIDs = append(alertList.AlertIDs, alert.ID)
+		alertList.Alerts = append(alertList.Alerts, alert)
+	}
 
-type AlertGroupMetadata struct {
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	AlertIDs    []AlertID `json:"alert_ids"`
+	return alertList
 }
