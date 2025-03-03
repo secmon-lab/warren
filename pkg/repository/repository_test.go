@@ -368,4 +368,90 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 				return v.ID != alert1.ID
 			})
 	})
+
+	t.Run("GetLatestAlertListInThread", func(t *testing.T) {
+		ctx := context.Background()
+		thread := model.SlackThread{
+			ChannelID: "C123",
+			ThreadID:  uuid.New().String(),
+		}
+		now := time.Now()
+
+		list1 := model.AlertList{
+			ID:          model.NewAlertListID(),
+			SlackThread: &thread,
+			CreatedAt:   now.Add(-1 * time.Hour),
+			Alerts: []model.Alert{
+				{ID: model.NewAlertID()},
+			},
+		}
+		list2 := model.AlertList{
+			ID:          model.NewAlertListID(),
+			SlackThread: &thread,
+			CreatedAt:   now,
+			Alerts: []model.Alert{
+				{ID: model.NewAlertID()},
+				{ID: model.NewAlertID()},
+			},
+		}
+		otherList := model.AlertList{
+			ID: model.NewAlertListID(),
+			SlackThread: &model.SlackThread{
+				ChannelID: "C456",
+				ThreadID:  "T456",
+			},
+			CreatedAt: now,
+			Alerts: []model.Alert{
+				{ID: model.NewAlertID()},
+			},
+		}
+
+		cases := []struct {
+			name    string
+			setup   func(r interfaces.Repository) error
+			thread  model.SlackThread
+			want    *model.AlertList
+			wantErr bool
+		}{
+			{
+				name: "get latest list",
+				setup: func(r interfaces.Repository) error {
+					if err := r.PutAlertList(ctx, list1); err != nil {
+						return err
+					}
+					if err := r.PutAlertList(ctx, list2); err != nil {
+						return err
+					}
+					return r.PutAlertList(ctx, otherList)
+				},
+				thread: thread,
+				want:   &list2,
+			},
+		}
+
+		for _, tt := range cases {
+			t.Run(tt.name, func(t *testing.T) {
+				if tt.setup != nil {
+					gt.NoError(t, tt.setup(repo))
+				}
+
+				got, err := repo.GetLatestAlertListInThread(ctx, tt.thread)
+				if tt.wantErr {
+					gt.Error(t, err)
+					return
+				}
+				gt.NoError(t, err)
+
+				if tt.want == nil {
+					gt.Value(t, got).Equal(nil)
+					return
+				}
+
+				gt.Value(t, got.ID).Equal(tt.want.ID)
+				gt.Value(t, got.SlackThread).Equal(tt.want.SlackThread)
+				gt.Value(t, got.CreatedAt.Unix()).Equal(tt.want.CreatedAt.Unix())
+				gt.Array(t, got.Alerts).Length(len(tt.want.Alerts))
+			})
+		}
+	})
 }

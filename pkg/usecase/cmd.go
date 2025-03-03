@@ -64,8 +64,10 @@ func (x *UseCases) cmdList(th interfaces.SlackThreadService, user *model.SlackUs
 		spanTo   string
 	)
 	return &cli.Command{
-		Name:  "list",
-		Usage: "List alerts",
+		Name:        "list",
+		Usage:       "Create a list of alerts",
+		UsageText:   "@warren list [options] [$list_id | last]",
+		Description: "Create a list of alerts",
 		Flags: []cli.Flag{
 			&cli.DurationFlag{
 				Name:        "duration",
@@ -91,7 +93,8 @@ func (x *UseCases) cmdList(th interfaces.SlackThreadService, user *model.SlackUs
 			var src list.Source
 			now := clock.Now(ctx)
 
-			if spanFrom != "" || spanTo != "" {
+			switch {
+			case spanFrom != "" || spanTo != "":
 				from, to := now, now
 
 				if spanFrom != "" {
@@ -109,7 +112,17 @@ func (x *UseCases) cmdList(th interfaces.SlackThreadService, user *model.SlackUs
 					}
 				}
 				src = list.SourceSpan(from, to)
-			} else {
+
+			case c.Args().Len() == 1 && c.Args().First() == "last":
+				src = list.SourceLatestAlertList(model.SlackThread{
+					ChannelID: th.ChannelID(),
+					ThreadID:  th.ThreadID(),
+				})
+
+			case c.Args().Len() == 1:
+				src = list.SourceAlertListID(model.AlertListID(c.Args().First()))
+
+			case duration != 0:
 				src = list.SourceSpan(now.Add(-duration), now)
 			}
 

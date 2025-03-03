@@ -202,3 +202,19 @@ func (r *Memory) GetAlertsBySpan(ctx context.Context, begin, end time.Time) ([]m
 	}
 	return alerts, nil
 }
+
+func (r *Memory) GetLatestAlertListInThread(ctx context.Context, thread model.SlackThread) (*model.AlertList, error) {
+	var latestList *model.AlertList
+	var latestTime time.Time
+
+	for _, list := range r.alertLists {
+		if list.SlackThread != nil && list.SlackThread.ChannelID == thread.ChannelID && list.SlackThread.ThreadID == thread.ThreadID {
+			if latestList == nil || list.CreatedAt.After(latestTime) {
+				latestList = &list
+				latestTime = list.CreatedAt
+			}
+		}
+	}
+
+	return latestList, nil
+}

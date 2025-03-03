@@ -61,6 +61,25 @@ func SourceThread(slackThread model.SlackThread) Source {
 	}
 }
 
+func SourceLatestAlertList(slackThread model.SlackThread) Source {
+	return func(ctx context.Context, repo interfaces.Repository) ([]model.Alert, error) {
+		thread.Reply(ctx, "🤖 Getting latest alerts from slack thread")
+
+		alertList, err := repo.GetLatestAlertListInThread(ctx, slackThread)
+		if err != nil {
+			return nil, err
+		}
+		if alertList == nil {
+			return nil, goerr.New("no alert list found in this thread", goerr.V("slack_thread", slackThread))
+		}
+		alerts, err := repo.BatchGetAlerts(ctx, alertList.AlertIDs)
+		if err != nil {
+			return nil, err
+		}
+		return alerts, nil
+	}
+}
+
 func SourceAlertListID(alertListID model.AlertListID) Source {
 	return func(ctx context.Context, repo interfaces.Repository) ([]model.Alert, error) {
 		thread.Reply(ctx, "🤖 Getting alerts from alert list: "+alertListID.String())

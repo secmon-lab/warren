@@ -375,3 +375,27 @@ func (r *Firestore) GetAlertsBySpan(ctx context.Context, begin, end time.Time) (
 
 	return alerts, nil
 }
+
+func (r *Firestore) GetLatestAlertListInThread(ctx context.Context, thread model.SlackThread) (*model.AlertList, error) {
+	iter := r.db.Collection(collectionAlertLists).
+		Where("SlackThread.ChannelID", "==", thread.ChannelID).
+		Where("SlackThread.ThreadID", "==", thread.ThreadID).
+		OrderBy("CreatedAt", firestore.Desc).
+		Limit(1).
+		Documents(ctx)
+
+	doc, err := iter.Next()
+	if err != nil {
+		if err == iterator.Done {
+			return nil, nil
+		}
+		return nil, goerr.Wrap(err, "failed to get alert list by thread", goerr.V("slack_thread", thread))
+	}
+
+	var alertList model.AlertList
+	if err := doc.DataTo(&alertList); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert data to alert list")
+	}
+
+	return &alertList, nil
+}
