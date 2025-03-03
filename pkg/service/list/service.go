@@ -329,7 +329,7 @@ func (x *Service) newPipeline(ctx context.Context, args []string) (*pipeline, er
 			}
 		}
 		if matchedFn == nil {
-			return nil, goerr.New("unknown command", goerr.V("command", name))
+			return nil, goerr.New("unknown command: "+name, goerr.V("command", name))
 		}
 		return matchedFn, nil
 	}
