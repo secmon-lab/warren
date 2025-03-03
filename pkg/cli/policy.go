@@ -12,6 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/policy"
+	"github.com/secmon-lab/warren/pkg/service/source"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
@@ -118,7 +119,7 @@ func cmdPolicyIgnore() *cli.Command {
 			ctx = thread.WithReplyFunc(ctx, func(ctx context.Context, msg string) {
 				fmt.Println(msg)
 			})
-			newPolicyDiff, err := uc.GenerateIgnorePolicy(ctx, []model.Alert{alert}, "")
+			newPolicyDiff, err := uc.GenerateIgnorePolicy(ctx, source.Static([]model.Alert{alert}), "")
 			if err != nil {
 				return err
 			}

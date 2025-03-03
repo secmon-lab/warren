@@ -6,18 +6,12 @@ import (
 	"time"
 
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/list"
+	"github.com/secmon-lab/warren/pkg/service/source"
 )
-
-func sourceStatic(alerts []model.Alert) list.Source {
-	return func(_ context.Context, _ interfaces.Repository) ([]model.Alert, error) {
-		return alerts, nil
-	}
-}
 
 func TestService_Run(t *testing.T) {
 	cases := []struct {
@@ -140,7 +134,7 @@ func TestService_Run(t *testing.T) {
 				},
 			}
 			args := append([]string{"|"}, tt.args...)
-			err := svc.Run(t.Context(), &th, &model.SlackUser{}, sourceStatic(tt.alerts), args)
+			err := svc.Run(t.Context(), &th, &model.SlackUser{}, source.Static(tt.alerts), args)
 			if tt.wantErr {
 				gt.Error(t, err)
 				return

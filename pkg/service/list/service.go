@@ -7,13 +7,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
+	"github.com/secmon-lab/warren/pkg/service/source"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
 )
@@ -41,93 +41,8 @@ func New(repo interfaces.Repository, opts ...Option) *Service {
 	return s
 }
 
-type Source func(ctx context.Context, repo interfaces.Repository) ([]model.Alert, error)
-
-func SourceThread(slackThread model.SlackThread) Source {
-	return func(ctx context.Context, repo interfaces.Repository) ([]model.Alert, error) {
-		thread.Reply(ctx, "🤖 Getting alerts from slack thread...")
-
-		alertList, err := repo.GetAlertListByThread(ctx, slackThread)
-		if err != nil {
-			return nil, err
-		}
-		if alertList == nil {
-			return nil, nil
-		}
-		alerts, err := repo.BatchGetAlerts(ctx, alertList.AlertIDs)
-		if err != nil {
-			return nil, err
-		}
-		return alerts, nil
-	}
-}
-
-func SourceLatestAlertList(slackThread model.SlackThread) Source {
-	return func(ctx context.Context, repo interfaces.Repository) ([]model.Alert, error) {
-		thread.Reply(ctx, "🤖 Getting latest alerts from slack thread")
-
-		alertList, err := repo.GetLatestAlertListInThread(ctx, slackThread)
-		if err != nil {
-			return nil, err
-		}
-		if alertList == nil {
-			return nil, goerr.New("no alert list found in this thread", goerr.V("slack_thread", slackThread))
-		}
-		alerts, err := repo.BatchGetAlerts(ctx, alertList.AlertIDs)
-		if err != nil {
-			return nil, err
-		}
-		return alerts, nil
-	}
-}
-
-func SourceAlertListID(alertListID model.AlertListID) Source {
-	return func(ctx context.Context, repo interfaces.Repository) ([]model.Alert, error) {
-		thread.Reply(ctx, "🤖 Getting alerts from alert list: "+alertListID.String())
-
-		alertList, err := repo.GetAlertList(ctx, alertListID)
-		if err != nil {
-			return nil, err
-		}
-		if alertList == nil {
-			return nil, nil
-		}
-		alerts, err := repo.BatchGetAlerts(ctx, alertList.AlertIDs)
-		if err != nil {
-			return nil, err
-		}
-		return alerts, nil
-	}
-}
-
-func SourceSpan(begin, end time.Time) Source {
-	return func(ctx context.Context, repo interfaces.Repository) ([]model.Alert, error) {
-		thread.Reply(ctx, "🤖 Getting alerts from span: "+begin.Format("2006-01-02 15:04")+" to "+end.Format("2006-01-02 15:04"))
-
-		alerts, err := repo.GetAlertsBySpan(ctx, begin, end)
-		if err != nil {
-			return nil, err
-		}
-		return alerts, nil
-	}
-}
-
-func SourceAlert(alert *model.Alert) Source {
-	return func(ctx context.Context, repo interfaces.Repository) ([]model.Alert, error) {
-		thread.Reply(ctx, "🤖 Getting alerts from alert: "+alert.ID.String())
-
-		alerts, err := repo.GetAlertsByParentID(ctx, alert.ID)
-		if err != nil {
-			return nil, err
-		}
-
-		alerts = append(alerts, *alert)
-		return alerts, nil
-	}
-}
-
-func (x *Service) Run(ctx context.Context, th interfaces.SlackThreadService, user *model.SlackUser, source Source, args []string) error {
-	alerts, err := source(ctx, x.repo)
+func (x *Service) Run(ctx context.Context, th interfaces.SlackThreadService, user *model.SlackUser, src source.Source, args []string) error {
+	alerts, err := src(ctx, x.repo)
 	if err != nil {
 		return err
 	}
@@ -147,6 +62,10 @@ func (x *Service) Run(ctx context.Context, th interfaces.SlackThreadService, use
 		ThreadID:  th.ThreadID(),
 	}
 	alertList := model.NewAlertList(ctx, slackThread, user, newAlerts)
+
+	if err := x.repo.PutAlertList(ctx, alertList); err != nil {
+		return err
+	}
 
 	if err := th.PostAlertList(ctx, &alertList); err != nil {
 		return err

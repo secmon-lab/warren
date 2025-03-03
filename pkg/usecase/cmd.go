@@ -10,6 +10,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/service/list"
+	"github.com/secmon-lab/warren/pkg/service/source"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
 	"github.com/urfave/cli/v3"
@@ -24,7 +25,8 @@ func (x *UseCases) RunCommand(ctx context.Context, args []string, alert *model.A
 		Usage: "Slack bot for security monitoring",
 		Commands: []*cli.Command{
 			x.cmdList(alert, th, user),
-			x.cmdIgnore(alert, th, user),
+			x.cmdIgnore(alert, th),
+			x.cmdShow(alert, th),
 		},
 		Writer: &buf,
 	}
@@ -115,7 +117,7 @@ func (x *UseCases) cmdList(alert *model.Alert, th interfaces.SlackThreadService,
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			var src list.Source
+			var src source.Source
 			now := clock.Now(ctx)
 
 			switch {
@@ -136,25 +138,25 @@ func (x *UseCases) cmdList(alert *model.Alert, th interfaces.SlackThreadService,
 						to = v
 					}
 				}
-				src = list.SourceSpan(from, to)
+				src = source.Span(from, to)
 
 			case c.Args().Len() == 1 && c.Args().First() == "last":
-				src = list.SourceLatestAlertList(model.SlackThread{
+				src = source.LatestAlertList(model.SlackThread{
 					ChannelID: th.ChannelID(),
 					ThreadID:  th.ThreadID(),
 				})
 
 			case c.Args().Len() == 1:
-				src = list.SourceAlertListID(model.AlertListID(c.Args().First()))
+				src = source.AlertListID(model.AlertListID(c.Args().First()))
 
 			case duration != 0:
-				src = list.SourceSpan(now.Add(-duration), now)
+				src = source.Span(now.Add(-duration), now)
 
 			case alert != nil:
-				src = list.SourceAlert(alert)
+				src = source.Alert(alert)
 
 			default:
-				src = list.SourceSpan(now.Add(-time.Hour*24), now)
+				src = source.Span(now.Add(-time.Hour*24), now)
 			}
 
 			svc := list.New(x.repository, list.WithLLM(x.llmClient))
@@ -167,31 +169,64 @@ func (x *UseCases) cmdList(alert *model.Alert, th interfaces.SlackThreadService,
 	}
 }
 
-func (x *UseCases) cmdIgnore(alert *model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) *cli.Command {
+func sourceFromTarget(ctx context.Context, target string, th interfaces.SlackThreadService, alert *model.Alert) source.Source {
+	switch target {
+	case "last":
+		return source.LatestAlertList(model.SlackThread{
+			ChannelID: th.ChannelID(),
+			ThreadID:  th.ThreadID(),
+		})
+
+	case "thread":
+		if alert == nil {
+			th.Reply(ctx, "💥 No alert found. Please run the command in the alert thread.")
+			return nil
+		}
+		return source.Alert(alert)
+
+	case "":
+		if alert != nil {
+			return source.Alert(alert)
+		}
+		return source.LatestAlertList(model.SlackThread{
+			ChannelID: th.ChannelID(),
+			ThreadID:  th.ThreadID(),
+		})
+
+	default:
+		return source.AlertListID(model.AlertListID(target))
+	}
+}
+
+func (x *UseCases) cmdIgnore(alert *model.Alert, th interfaces.SlackThreadService) *cli.Command {
+	var targetAlerts string
+
 	return &cli.Command{
 		Name:        "ignore",
-		Usage:       "Ignore alerts",
-		UsageText:   "@warren ignore [$list_id | last]",
-		Description: "Ignore alerts",
+		Usage:       "Create a ignore policy",
+		UsageText:   "@warren ignore [-t last|thread|${list_id}] [query...]",
+		Description: "Create a ignore policy",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "target",
+				Aliases:     []string{"t"},
+				Usage:       "Target alerts to ignore",
+				Destination: &targetAlerts,
+				Value:       "",
+			},
+		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			if alert == nil {
-				th.Reply(ctx, "💥 No alert found. Please run the command in the alert thread.")
+			src := sourceFromTarget(ctx, targetAlerts, th, alert)
+			if src == nil {
 				return nil
 			}
 
-			alerts := []model.Alert{*alert}
-			childAlerts, err := x.repository.GetAlertsByParentID(ctx, alert.ID)
-			if err != nil {
-				return goerr.Wrap(err, "failed to get child alerts")
-			}
-			alerts = append(alerts, childAlerts...)
-
 			var note string
-			if c.Args().Len() > 1 {
-				note = strings.Join(c.Args().Slice()[1:], " ")
+			if c.Args().Len() > 0 {
+				note = strings.Join(c.Args().Slice(), " ")
 			}
 
-			newPolicyDiff, err := x.GenerateIgnorePolicy(ctx, alerts, note)
+			newPolicyDiff, err := x.GenerateIgnorePolicy(ctx, src, note)
 			if err != nil {
 				return err
 			}
@@ -201,6 +236,70 @@ func (x *UseCases) cmdIgnore(alert *model.Alert, th interfaces.SlackThreadServic
 			}
 
 			if err := th.PostPolicyDiff(ctx, newPolicyDiff); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+}
+
+func (x *UseCases) cmdShow(alert *model.Alert, th interfaces.SlackThreadService) *cli.Command {
+	var (
+		targetAlerts string
+		limit        int64
+		offset       int64
+	)
+
+	return &cli.Command{
+		Name:        "show",
+		Usage:       "Show a list of alerts",
+		UsageText:   "@warren show [-t last|thread|${list_id}]",
+		Description: "Show a list of alerts",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "target",
+				Aliases:     []string{"t"},
+				Usage:       "Target alerts to show",
+				Destination: &targetAlerts,
+				Value:       "",
+			},
+			&cli.IntFlag{
+				Name:        "limit",
+				Aliases:     []string{"l"},
+				Usage:       "Limit the number of alerts to show",
+				Destination: &limit,
+			},
+			&cli.IntFlag{
+				Name:        "offset",
+				Aliases:     []string{"o"},
+				Usage:       "Offset the number of alerts to show",
+				Destination: &offset,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			src := sourceFromTarget(ctx, targetAlerts, th, alert)
+			if src == nil {
+				return nil
+			}
+
+			alerts, err := src(ctx, x.repository)
+			if err != nil {
+				return err
+			}
+
+			if limit > 0 && int64(len(alerts)) > limit {
+				alerts = alerts[:limit]
+			}
+			if offset > 0 {
+				if offset > int64(len(alerts)) {
+					alerts = []model.Alert{}
+				} else {
+					alerts = alerts[offset:]
+				}
+			}
+
+			if err := th.PostAlerts(ctx, alerts); err != nil {
 				return err
 			}
 
