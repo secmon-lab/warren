@@ -7,6 +7,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
 )
 
@@ -34,6 +35,7 @@ func Thread(slackThread model.SlackThread) Source {
 func LatestAlertList(slackThread model.SlackThread) Source {
 	return func(ctx context.Context, repo interfaces.Repository) ([]model.Alert, error) {
 		thread.Reply(ctx, "🤖 Getting latest alerts from slack thread")
+		logging.From(ctx).Info("Getting latest alerts from slack thread", "slack_thread", slackThread)
 
 		alertList, err := repo.GetLatestAlertListInThread(ctx, slackThread)
 		if err != nil {

@@ -16,7 +16,9 @@ import (
 )
 
 func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevents.AppMentionEvent) error {
-	logger := logging.From(ctx)
+	logger := logging.From(ctx).With("event_ts", event.EventTimeStamp)
+	ctx = logging.With(ctx, logger)
+
 	logger.Debug("slack app mention event", "event", event)
 
 	threadData := model.SlackThread{
