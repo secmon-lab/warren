@@ -195,6 +195,8 @@ func (x *Service) actionStatus(args []string) action {
 				statusList = append(statusList, model.AlertStatusNew)
 			case "ack", "acked", "acknowledged":
 				statusList = append(statusList, model.AlertStatusAcknowledged)
+			case "blocked":
+				statusList = append(statusList, model.AlertStatusBlocked)
 			case "closed":
 				statusList = append(statusList, model.AlertStatusClosed)
 			default:
