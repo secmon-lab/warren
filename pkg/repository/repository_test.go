@@ -453,4 +453,114 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 			})
 		}
 	})
+
+	t.Run("BatchUpdateAlertStatus", func(t *testing.T) {
+		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "BatchUpdateAlertStatus test 1",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "BatchUpdateAlertStatus test 2",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert3 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "BatchUpdateAlertStatus test 3",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert4 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "BatchUpdateAlertStatus test 4",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+
+		alert1.Status = model.AlertStatusNew
+		alert2.Status = model.AlertStatusClosed
+		alert3.Status = model.AlertStatusBlocked
+		gt.NoError(t, repo.PutAlert(ctx, alert1))
+		gt.NoError(t, repo.PutAlert(ctx, alert2))
+		gt.NoError(t, repo.PutAlert(ctx, alert3))
+		gt.NoError(t, repo.PutAlert(ctx, alert4))
+
+		gt.NoError(t, repo.BatchUpdateAlertStatus(ctx, []model.AlertID{alert1.ID, alert2.ID, alert3.ID}, model.AlertStatusClosed))
+
+		got, err := repo.GetAlert(ctx, alert1.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, got.Status, model.AlertStatusClosed)
+
+		got, err = repo.GetAlert(ctx, alert2.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, got.Status, model.AlertStatusClosed)
+
+		got, err = repo.GetAlert(ctx, alert3.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, got.Status, model.AlertStatusClosed)
+
+		got, err = repo.GetAlert(ctx, alert4.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, got.Status, model.AlertStatusNew)
+	})
+
+	t.Run("BatchUpdateAlertConclusion", func(t *testing.T) {
+		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "BatchUpdateAlertConclusion test 1",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "BatchUpdateAlertConclusion test 2",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert3 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "BatchUpdateAlertConclusion test 3",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert4 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "BatchUpdateAlertConclusion test 4",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+
+		alert1.Conclusion = model.AlertConclusionIntended
+		alert2.Conclusion = model.AlertConclusionFalsePositive
+		alert3.Conclusion = model.AlertConclusionTruePositive
+		gt.NoError(t, repo.PutAlert(ctx, alert1))
+		gt.NoError(t, repo.PutAlert(ctx, alert2))
+		gt.NoError(t, repo.PutAlert(ctx, alert3))
+		gt.NoError(t, repo.PutAlert(ctx, alert4))
+
+		gt.NoError(t, repo.BatchUpdateAlertConclusion(ctx, []model.AlertID{alert1.ID, alert2.ID, alert3.ID}, model.AlertConclusionFalsePositive, "test"))
+
+		got, err := repo.GetAlert(ctx, alert1.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, got.Conclusion, model.AlertConclusionFalsePositive)
+		gt.Equal(t, got.Reason, "test")
+
+		got, err = repo.GetAlert(ctx, alert2.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, got.Conclusion, model.AlertConclusionFalsePositive)
+		gt.Equal(t, got.Reason, "test")
+
+		got, err = repo.GetAlert(ctx, alert3.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, got.Conclusion, model.AlertConclusionFalsePositive)
+		gt.Equal(t, got.Reason, "test")
+
+		got, err = repo.GetAlert(ctx, alert4.ID)
+		gt.NoError(t, err)
+		gt.Equal(t, got.Conclusion, "")
+		gt.Equal(t, got.Reason, "")
+	})
 }

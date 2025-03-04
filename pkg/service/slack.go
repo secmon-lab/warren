@@ -176,9 +176,9 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 			nil,
 		))
 
-		if alert.Comment != "" {
+		if alert.Reason != "" {
 			blocks = append(blocks, slack.NewSectionBlock(
-				slack.NewTextBlockObject("mrkdwn", alert.Comment, false, false),
+				slack.NewTextBlockObject("mrkdwn", alert.Reason, false, false),
 				nil,
 				nil,
 			))

@@ -151,7 +151,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionClose(ctx context.Contex
 
 	var (
 		conclusion model.AlertConclusion
-		comment    string
+		reason     string
 	)
 	if conclusionBlock, ok := interaction.View.State.Values["conclusion"]; ok {
 		if conclusionAction, ok := conclusionBlock["conclusion"]; ok {
@@ -160,7 +160,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionClose(ctx context.Contex
 	}
 	if commentBlock, ok := interaction.View.State.Values["comment"]; ok {
 		if commentAction, ok := commentBlock["comment"]; ok {
-			comment = commentAction.Value
+			reason = commentAction.Value
 		}
 	}
 
@@ -172,7 +172,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionClose(ctx context.Contex
 	alert.Status = model.AlertStatusClosed
 	alert.ClosedAt = &now
 	alert.Conclusion = conclusion
-	alert.Comment = comment
+	alert.Reason = reason
 	if alert.Assignee == nil {
 		alert.Assignee = &model.SlackUser{
 			ID:   interaction.User.ID,

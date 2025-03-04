@@ -223,3 +223,28 @@ func (r *Memory) GetLatestAlertListInThread(ctx context.Context, thread model.Sl
 	latestList.Alerts = nil
 	return latestList, nil
 }
+
+func (r *Memory) BatchUpdateAlertStatus(ctx context.Context, alertIDs []model.AlertID, status model.AlertStatus) error {
+	for _, alertID := range alertIDs {
+		alert, ok := r.alerts[alertID]
+		if !ok {
+			return goerr.New("alert not found", goerr.V("alert_id", alertID))
+		}
+		alert.Status = status
+		r.alerts[alertID] = alert
+	}
+	return nil
+}
+
+func (r *Memory) BatchUpdateAlertConclusion(ctx context.Context, alertIDs []model.AlertID, conclusion model.AlertConclusion, reason string) error {
+	for _, alertID := range alertIDs {
+		alert, ok := r.alerts[alertID]
+		if !ok {
+			return goerr.New("alert not found", goerr.V("alert_id", alertID))
+		}
+		alert.Conclusion = conclusion
+		alert.Reason = reason
+		r.alerts[alertID] = alert
+	}
+	return nil
+}

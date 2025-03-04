@@ -138,7 +138,7 @@ type Alert struct {
 	Data        any             `json:"data"`
 	Attributes  []Attribute     `json:"attributes"`
 	Conclusion  AlertConclusion `json:"conclusion"`
-	Comment     string          `json:"comment"`
+	Reason      string          `json:"reason"`
 	Finding     *AlertFinding   `json:"finding"`
 
 	Assignee    *SlackUser   `json:"assignee"`

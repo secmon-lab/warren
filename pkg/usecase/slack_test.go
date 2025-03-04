@@ -33,7 +33,7 @@ func TestHandleSlackInteraction(t *testing.T) {
 			checkAlert: func(t *testing.T, alert model.Alert) {
 				gt.Equal(t, alert.Status, model.AlertStatusNew) // still new
 				gt.Equal(t, alert.Conclusion, "")               // not set yet
-				gt.Equal(t, alert.Comment, "")                  // not set yet
+				gt.Equal(t, alert.Reason, "")                   // not set yet
 			},
 			wantErr: false,
 		},

@@ -3,6 +3,7 @@ package usecase
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -28,6 +29,8 @@ func (x *UseCases) RunCommand(ctx context.Context, args []string, alert *model.A
 			x.cmdList(alert, th, user),
 			x.cmdIgnore(alert, th),
 			x.cmdShow(alert, th),
+			x.cmdBlock(alert, th),
+			x.cmdClose(alert, th),
 		},
 		Writer: &buf,
 	}
@@ -306,6 +309,120 @@ func (x *UseCases) cmdShow(alert *model.Alert, th interfaces.SlackThreadService)
 
 			if err := th.PostAlerts(ctx, alerts); err != nil {
 				return err
+			}
+
+			return nil
+		},
+	}
+}
+
+func (x *UseCases) cmdBlock(alert *model.Alert, th interfaces.SlackThreadService) *cli.Command {
+	var targetAlerts string
+
+	return &cli.Command{
+		Name:      "block",
+		Aliases:   []string{"b"},
+		Usage:     "Change status of alerts to blocked",
+		UsageText: "@warren block [-t last|thread|${list_id}]",
+		Action: func(ctx context.Context, c *cli.Command) error {
+			src := sourceFromTarget(ctx, targetAlerts, th, alert)
+			if src == nil {
+				return nil
+			}
+
+			alerts, err := src(ctx, x.repository)
+			if err != nil {
+				return err
+			}
+
+			var baseAlert *model.Alert
+			alertIDs := make([]model.AlertID, len(alerts))
+			for i, a := range alerts {
+				alertIDs[i] = a.ID
+
+				if alert.ID == a.ID {
+					baseAlert = &a
+				}
+			}
+
+			if err := x.repository.BatchUpdateAlertStatus(ctx, alertIDs, model.AlertStatusBlocked); err != nil {
+				return err
+			}
+			thread.Reply(ctx, fmt.Sprintf("🚫 Update %d alerts to blocked", len(alertIDs)))
+
+			if baseAlert != nil {
+				if err := th.UpdateAlert(ctx, *baseAlert); err != nil {
+					return err
+				}
+			}
+
+			return nil
+		},
+	}
+}
+
+func (x *UseCases) cmdClose(alert *model.Alert, th interfaces.SlackThreadService) *cli.Command {
+	var (
+		targetAlerts string
+		conclusion   model.AlertConclusion
+		comment      string
+	)
+
+	return &cli.Command{
+		Name:        "close",
+		Aliases:     []string{"c"},
+		Usage:       "Change status of alerts to closed",
+		UsageText:   "@warren close [-t last|thread|${list_id}]",
+		Description: "Change status of alerts to closed",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "conclusion",
+				Aliases:     []string{"c"},
+				Usage:       "Conclusion of alerts",
+				Destination: (*string)(&conclusion),
+				Required:    true,
+			},
+			&cli.StringFlag{
+				Name:        "comment",
+				Aliases:     []string{"m"},
+				Usage:       "Comment of alerts",
+				Destination: &comment,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			if err := conclusion.Validate(); err != nil {
+				return err
+			}
+
+			src := sourceFromTarget(ctx, targetAlerts, th, alert)
+			if src == nil {
+				return nil
+			}
+
+			alerts, err := src(ctx, x.repository)
+			if err != nil {
+				return err
+			}
+
+			var baseAlert *model.Alert
+			alertIDs := make([]model.AlertID, len(alerts))
+			for i, a := range alerts {
+				alertIDs[i] = a.ID
+
+				if alert.ID == a.ID {
+					baseAlert = &a
+				}
+			}
+
+			if err := x.repository.BatchUpdateAlertStatus(ctx, alertIDs, model.AlertStatusClosed); err != nil {
+				return err
+			}
+			thread.Reply(ctx, fmt.Sprintf("✅ Update %d alerts to closed", len(alertIDs)))
+
+			if baseAlert != nil {
+				if err := th.UpdateAlert(ctx, *baseAlert); err != nil {
+					return err
+				}
 			}
 
 			return nil

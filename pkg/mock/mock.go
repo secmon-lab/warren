@@ -955,6 +955,12 @@ var _ interfaces.Repository = &RepositoryMock{}
 //			BatchGetAlertsFunc: func(ctx context.Context, alertIDs []model.AlertID) ([]model.Alert, error) {
 //				panic("mock out the BatchGetAlerts method")
 //			},
+//			BatchUpdateAlertConclusionFunc: func(ctx context.Context, alertIDs []model.AlertID, conclusion model.AlertConclusion, reason string) error {
+//				panic("mock out the BatchUpdateAlertConclusion method")
+//			},
+//			BatchUpdateAlertStatusFunc: func(ctx context.Context, alertIDs []model.AlertID, status model.AlertStatus) error {
+//				panic("mock out the BatchUpdateAlertStatus method")
+//			},
 //			GetAlertFunc: func(ctx context.Context, alertID model.AlertID) (*model.Alert, error) {
 //				panic("mock out the GetAlert method")
 //			},
@@ -1016,6 +1022,12 @@ type RepositoryMock struct {
 	// BatchGetAlertsFunc mocks the BatchGetAlerts method.
 	BatchGetAlertsFunc func(ctx context.Context, alertIDs []model.AlertID) ([]model.Alert, error)
 
+	// BatchUpdateAlertConclusionFunc mocks the BatchUpdateAlertConclusion method.
+	BatchUpdateAlertConclusionFunc func(ctx context.Context, alertIDs []model.AlertID, conclusion model.AlertConclusion, reason string) error
+
+	// BatchUpdateAlertStatusFunc mocks the BatchUpdateAlertStatus method.
+	BatchUpdateAlertStatusFunc func(ctx context.Context, alertIDs []model.AlertID, status model.AlertStatus) error
+
 	// GetAlertFunc mocks the GetAlert method.
 	GetAlertFunc func(ctx context.Context, alertID model.AlertID) (*model.Alert, error)
 
@@ -1075,6 +1087,26 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// AlertIDs is the alertIDs argument value.
 			AlertIDs []model.AlertID
+		}
+		// BatchUpdateAlertConclusion holds details about calls to the BatchUpdateAlertConclusion method.
+		BatchUpdateAlertConclusion []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// AlertIDs is the alertIDs argument value.
+			AlertIDs []model.AlertID
+			// Conclusion is the conclusion argument value.
+			Conclusion model.AlertConclusion
+			// Reason is the reason argument value.
+			Reason string
+		}
+		// BatchUpdateAlertStatus holds details about calls to the BatchUpdateAlertStatus method.
+		BatchUpdateAlertStatus []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// AlertIDs is the alertIDs argument value.
+			AlertIDs []model.AlertID
+			// Status is the status argument value.
+			Status model.AlertStatus
 		}
 		// GetAlert holds details about calls to the GetAlert method.
 		GetAlert []struct {
@@ -1201,6 +1233,8 @@ type RepositoryMock struct {
 		}
 	}
 	lockBatchGetAlerts             sync.RWMutex
+	lockBatchUpdateAlertConclusion sync.RWMutex
+	lockBatchUpdateAlertStatus     sync.RWMutex
 	lockGetAlert                   sync.RWMutex
 	lockGetAlertBySlackThread      sync.RWMutex
 	lockGetAlertComments           sync.RWMutex
@@ -1253,6 +1287,90 @@ func (mock *RepositoryMock) BatchGetAlertsCalls() []struct {
 	mock.lockBatchGetAlerts.RLock()
 	calls = mock.calls.BatchGetAlerts
 	mock.lockBatchGetAlerts.RUnlock()
+	return calls
+}
+
+// BatchUpdateAlertConclusion calls BatchUpdateAlertConclusionFunc.
+func (mock *RepositoryMock) BatchUpdateAlertConclusion(ctx context.Context, alertIDs []model.AlertID, conclusion model.AlertConclusion, reason string) error {
+	if mock.BatchUpdateAlertConclusionFunc == nil {
+		panic("RepositoryMock.BatchUpdateAlertConclusionFunc: method is nil but Repository.BatchUpdateAlertConclusion was just called")
+	}
+	callInfo := struct {
+		Ctx        context.Context
+		AlertIDs   []model.AlertID
+		Conclusion model.AlertConclusion
+		Reason     string
+	}{
+		Ctx:        ctx,
+		AlertIDs:   alertIDs,
+		Conclusion: conclusion,
+		Reason:     reason,
+	}
+	mock.lockBatchUpdateAlertConclusion.Lock()
+	mock.calls.BatchUpdateAlertConclusion = append(mock.calls.BatchUpdateAlertConclusion, callInfo)
+	mock.lockBatchUpdateAlertConclusion.Unlock()
+	return mock.BatchUpdateAlertConclusionFunc(ctx, alertIDs, conclusion, reason)
+}
+
+// BatchUpdateAlertConclusionCalls gets all the calls that were made to BatchUpdateAlertConclusion.
+// Check the length with:
+//
+//	len(mockedRepository.BatchUpdateAlertConclusionCalls())
+func (mock *RepositoryMock) BatchUpdateAlertConclusionCalls() []struct {
+	Ctx        context.Context
+	AlertIDs   []model.AlertID
+	Conclusion model.AlertConclusion
+	Reason     string
+} {
+	var calls []struct {
+		Ctx        context.Context
+		AlertIDs   []model.AlertID
+		Conclusion model.AlertConclusion
+		Reason     string
+	}
+	mock.lockBatchUpdateAlertConclusion.RLock()
+	calls = mock.calls.BatchUpdateAlertConclusion
+	mock.lockBatchUpdateAlertConclusion.RUnlock()
+	return calls
+}
+
+// BatchUpdateAlertStatus calls BatchUpdateAlertStatusFunc.
+func (mock *RepositoryMock) BatchUpdateAlertStatus(ctx context.Context, alertIDs []model.AlertID, status model.AlertStatus) error {
+	if mock.BatchUpdateAlertStatusFunc == nil {
+		panic("RepositoryMock.BatchUpdateAlertStatusFunc: method is nil but Repository.BatchUpdateAlertStatus was just called")
+	}
+	callInfo := struct {
+		Ctx      context.Context
+		AlertIDs []model.AlertID
+		Status   model.AlertStatus
+	}{
+		Ctx:      ctx,
+		AlertIDs: alertIDs,
+		Status:   status,
+	}
+	mock.lockBatchUpdateAlertStatus.Lock()
+	mock.calls.BatchUpdateAlertStatus = append(mock.calls.BatchUpdateAlertStatus, callInfo)
+	mock.lockBatchUpdateAlertStatus.Unlock()
+	return mock.BatchUpdateAlertStatusFunc(ctx, alertIDs, status)
+}
+
+// BatchUpdateAlertStatusCalls gets all the calls that were made to BatchUpdateAlertStatus.
+// Check the length with:
+//
+//	len(mockedRepository.BatchUpdateAlertStatusCalls())
+func (mock *RepositoryMock) BatchUpdateAlertStatusCalls() []struct {
+	Ctx      context.Context
+	AlertIDs []model.AlertID
+	Status   model.AlertStatus
+} {
+	var calls []struct {
+		Ctx      context.Context
+		AlertIDs []model.AlertID
+		Status   model.AlertStatus
+	}
+	mock.lockBatchUpdateAlertStatus.RLock()
+	calls = mock.calls.BatchUpdateAlertStatus
+	mock.lockBatchUpdateAlertStatus.RUnlock()
 	return calls
 }
 
