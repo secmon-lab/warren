@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/interfaces"
@@ -121,18 +122,7 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 	lines := []string{
 		"*ID:* `" + alert.ID.String() + "`",
 		"*Schema:* `" + alert.Schema + "`",
-		"*Status:* " + func() string {
-			switch alert.Status {
-			case model.AlertStatusNew:
-				return ":new: NEW"
-			case model.AlertStatusAcknowledged:
-				return ":eyes: ACKNOWLEDGED"
-			case model.AlertStatusClosed:
-				return ":white_check_mark: CLOSED"
-			default:
-				return string(alert.Status)
-			}
-		}(),
+		"*Status:* " + alert.Status.Label(),
 		"*Assignee:* " + func() string {
 			if alert.Assignee == nil {
 				return ":no_entry: unassigned"
@@ -141,29 +131,25 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 		}(),
 		"*Severity:* " + func() string {
 			if alert.Finding == nil {
-				return ":question: not available"
+				return model.AlertSeverityUnknown.Label()
 			}
 
-			switch alert.Finding.Severity {
-			case model.AlertSeverityCritical:
-				return ":rotating_light: *CRITICAL* :rotating_light:"
-			case model.AlertSeverityHigh:
-				return ":exclamation: *HIGH*"
-			case model.AlertSeverityMedium:
-				return ":warning: MEDIUM"
-			case model.AlertSeverityLow:
-				return ":eyes: LOW"
-			case model.AlertSeverityUnknown:
-				return ":gray_question: unknown"
-			default:
-				return string(alert.Finding.Severity)
-			}
+			return alert.Finding.Severity.Label()
 		}(),
 	}
 
 	title := alert.Title
-	if len(title) > 140 {
-		title = title[:140] + "..."
+	titleBytes := []byte(title)
+	if len(titleBytes) > 140 {
+		// Find the position to cut that doesn't break UTF-8 characters
+		pos := 0
+		count := 0
+		for pos < len(titleBytes) && count < 137 { // 137 to leave room for "..."
+			_, size := utf8.DecodeRune(titleBytes[pos:])
+			pos += size
+			count += size
+		}
+		title = string(titleBytes[:pos]) + "..."
 	}
 
 	description := "_no description_"
@@ -652,25 +638,13 @@ func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Blo
 			break
 		}
 
-		var statusEmoji string
-		switch alert.Status {
-		case model.AlertStatusNew:
-			statusEmoji = "🆕"
-		case model.AlertStatusAcknowledged:
-			statusEmoji = "👀"
-		case model.AlertStatusClosed:
-			statusEmoji = "✅"
-		default:
-			statusEmoji = "❓"
-		}
-
 		assigneeText := ""
 		if alert.Assignee != nil {
 			assigneeText = fmt.Sprintf(" (👤 <@%s>)", alert.Assignee.ID)
 		}
 
 		msgURL := metadata.ToMsgURL(alert.SlackThread.ChannelID, alert.SlackThread.ThreadID)
-		messageText.WriteString(fmt.Sprintf("%s <%s|%s>%s\n", statusEmoji, msgURL, alert.Title, assigneeText))
+		messageText.WriteString(fmt.Sprintf("%s <%s|%s>%s\n", alert.Status.Label(), msgURL, alert.Title, assigneeText))
 	}
 
 	return []slack.Block{

@@ -26,8 +26,19 @@ const (
 	AlertStatusClosed       AlertStatus = "closed"
 )
 
+var alertStatusLabels = map[AlertStatus]string{
+	AlertStatusNew:          "🆕 New",
+	AlertStatusAcknowledged: "👀 Acked",
+	AlertStatusBlocked:      "🚫 Blocked",
+	AlertStatusClosed:       "✅️ Closed",
+}
+
 func (s AlertStatus) String() string {
 	return string(s)
+}
+
+func (s AlertStatus) Label() string {
+	return alertStatusLabels[s]
 }
 
 func (s AlertStatus) Validate() error {
@@ -48,6 +59,18 @@ const (
 	AlertSeverityHigh     AlertSeverity = "high"
 	AlertSeverityCritical AlertSeverity = "critical"
 )
+
+var alertSeverityLabels = map[AlertSeverity]string{
+	AlertSeverityUnknown:  "❓️ Unknown",
+	AlertSeverityLow:      "🟢 Low",
+	AlertSeverityMedium:   "🟡 Medium",
+	AlertSeverityHigh:     "🔴 High",
+	AlertSeverityCritical: "🚨 Critical",
+}
+
+func (s AlertSeverity) Label() string {
+	return alertSeverityLabels[s]
+}
 
 func (s AlertSeverity) Validate() error {
 	switch s {
