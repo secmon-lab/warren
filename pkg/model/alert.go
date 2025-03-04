@@ -23,14 +23,14 @@ const (
 	AlertStatusNew          AlertStatus = "new"
 	AlertStatusAcknowledged AlertStatus = "acked"
 	AlertStatusBlocked      AlertStatus = "blocked"
-	AlertStatusClosed       AlertStatus = "closed"
+	AlertStatusResolved     AlertStatus = "resolved"
 )
 
 var alertStatusLabels = map[AlertStatus]string{
 	AlertStatusNew:          "🆕 New",
 	AlertStatusAcknowledged: "👀 Acked",
 	AlertStatusBlocked:      "🚫 Blocked",
-	AlertStatusClosed:       "✅️ Closed",
+	AlertStatusResolved:     "✅️ Resolved",
 }
 
 func (s AlertStatus) String() string {
@@ -43,7 +43,7 @@ func (s AlertStatus) Label() string {
 
 func (s AlertStatus) Validate() error {
 	switch s {
-	case AlertStatusNew, AlertStatusAcknowledged, AlertStatusBlocked, AlertStatusClosed:
+	case AlertStatusNew, AlertStatusAcknowledged, AlertStatusBlocked, AlertStatusResolved:
 		return nil
 	}
 	return goerr.New("invalid alert status", goerr.V("status", s))
@@ -134,7 +134,7 @@ type Alert struct {
 	ParentID    AlertID         `json:"parent_id"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
-	ClosedAt    *time.Time      `json:"closed_at"`
+	ResolvedAt  *time.Time      `json:"resolved_at"`
 	Data        any             `json:"data"`
 	Attributes  []Attribute     `json:"attributes"`
 	Conclusion  AlertConclusion `json:"conclusion"`

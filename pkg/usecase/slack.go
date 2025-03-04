@@ -169,8 +169,8 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionClose(ctx context.Contex
 	}
 
 	now := clock.Now(ctx)
-	alert.Status = model.AlertStatusClosed
-	alert.ClosedAt = &now
+	alert.Status = model.AlertStatusResolved
+	alert.ResolvedAt = &now
 	alert.Conclusion = conclusion
 	alert.Reason = reason
 	if alert.Assignee == nil {
@@ -186,7 +186,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionClose(ctx context.Contex
 
 	th := uc.slackService.NewThread(*alert.SlackThread)
 	ctx = thread.WithReplyFunc(ctx, th.Reply)
-	th.Reply(ctx, "Alert closed by <@"+interaction.User.ID+">")
+	th.Reply(ctx, "Alert resolved by <@"+interaction.User.ID+">")
 
 	if err := th.UpdateAlert(ctx, *alert); err != nil {
 		return goerr.Wrap(err, "failed to update slack thread")

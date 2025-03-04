@@ -261,7 +261,7 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 		)
 	}
 
-	if alert.Status != model.AlertStatusClosed {
+	if alert.Status != model.AlertStatusResolved {
 		buttons = append(buttons,
 			slack.NewButtonBlockElement(
 				"close",

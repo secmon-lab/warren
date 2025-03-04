@@ -197,8 +197,8 @@ func (x *Service) actionStatus(args []string) action {
 				statusList = append(statusList, model.AlertStatusAcknowledged)
 			case "blocked":
 				statusList = append(statusList, model.AlertStatusBlocked)
-			case "closed":
-				statusList = append(statusList, model.AlertStatusClosed)
+			case "resolved":
+				statusList = append(statusList, model.AlertStatusResolved)
 			default:
 				return nil, goerr.New("invalid status, status must be one of new, ack, closed", goerr.V("status", arg))
 			}

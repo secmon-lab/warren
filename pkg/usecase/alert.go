@@ -205,14 +205,14 @@ func (uc *UseCases) findSimilarAlert(ctx context.Context, alert model.Alert) (*m
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to fetch latest alerts")
 	}
-	unclosedAlerts := make([]model.Alert, 0, len(alerts))
+	unresolvedAlerts := make([]model.Alert, 0, len(alerts))
 	for _, a := range alerts {
-		if a.Status != model.AlertStatusClosed {
-			unclosedAlerts = append(unclosedAlerts, a)
+		if a.Status != model.AlertStatusResolved {
+			unresolvedAlerts = append(unresolvedAlerts, a)
 		}
 	}
 
-	p, err := prompt.BuildAggregatePrompt(ctx, alert, unclosedAlerts)
+	p, err := prompt.BuildAggregatePrompt(ctx, alert, unresolvedAlerts)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build aggregate prompt")
 	}

@@ -230,7 +230,7 @@ func TestPostAlerts(t *testing.T) {
 		ID:   "U0123456789",
 		Name: "John Doex",
 	}
-	alerts[3].Status = model.AlertStatusClosed
+	alerts[3].Status = model.AlertStatusResolved
 
 	thread, err := svc.PostMessage(context.Background(), "alerts test")
 	gt.NoError(t, err)

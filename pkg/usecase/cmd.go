@@ -30,7 +30,7 @@ func (x *UseCases) RunCommand(ctx context.Context, args []string, alert *model.A
 			x.cmdIgnore(alert, th),
 			x.cmdShow(alert, th),
 			x.cmdBlock(alert, th),
-			x.cmdClose(alert, th),
+			x.cmdResolve(alert, th),
 		},
 		Writer: &buf,
 	}
@@ -361,7 +361,7 @@ func (x *UseCases) cmdBlock(alert *model.Alert, th interfaces.SlackThreadService
 	}
 }
 
-func (x *UseCases) cmdClose(alert *model.Alert, th interfaces.SlackThreadService) *cli.Command {
+func (x *UseCases) cmdResolve(alert *model.Alert, th interfaces.SlackThreadService) *cli.Command {
 	var (
 		targetAlerts string
 		conclusion   model.AlertConclusion
@@ -369,11 +369,11 @@ func (x *UseCases) cmdClose(alert *model.Alert, th interfaces.SlackThreadService
 	)
 
 	return &cli.Command{
-		Name:        "close",
-		Aliases:     []string{"c"},
-		Usage:       "Change status of alerts to closed",
-		UsageText:   "@warren close [-t last|thread|${list_id}]",
-		Description: "Change status of alerts to closed",
+		Name:        "resolve",
+		Aliases:     []string{"r"},
+		Usage:       "Change status of alerts to resolved",
+		UsageText:   "@warren resolve [-t last|thread|${list_id}]",
+		Description: "Change status of alerts to resolved",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "conclusion",
@@ -414,10 +414,10 @@ func (x *UseCases) cmdClose(alert *model.Alert, th interfaces.SlackThreadService
 				}
 			}
 
-			if err := x.repository.BatchUpdateAlertStatus(ctx, alertIDs, model.AlertStatusClosed); err != nil {
+			if err := x.repository.BatchUpdateAlertStatus(ctx, alertIDs, model.AlertStatusResolved); err != nil {
 				return err
 			}
-			thread.Reply(ctx, fmt.Sprintf("✅ Update %d alerts to closed", len(alertIDs)))
+			thread.Reply(ctx, fmt.Sprintf("✅ Update %d alerts to resolved", len(alertIDs)))
 
 			if baseAlert != nil {
 				if err := th.UpdateAlert(ctx, *baseAlert); err != nil {
