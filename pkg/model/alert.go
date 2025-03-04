@@ -28,7 +28,7 @@ const (
 
 var alertStatusLabels = map[AlertStatus]string{
 	AlertStatusNew:          "🆕 New",
-	AlertStatusAcknowledged: "👀 Acked",
+	AlertStatusAcknowledged: "👀 Acknowledged",
 	AlertStatusBlocked:      "🚫 Blocked",
 	AlertStatusResolved:     "✅️ Resolved",
 }

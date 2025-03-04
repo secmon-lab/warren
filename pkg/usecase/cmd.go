@@ -348,7 +348,7 @@ func (x *UseCases) cmdBlock(alert *model.Alert, th interfaces.SlackThreadService
 			if err := x.repository.BatchUpdateAlertStatus(ctx, alertIDs, model.AlertStatusBlocked); err != nil {
 				return err
 			}
-			thread.Reply(ctx, fmt.Sprintf("🚫 Update %d alerts to blocked", len(alertIDs)))
+			thread.Reply(ctx, fmt.Sprintf("🚫 Blocked %d alerts", len(alertIDs)))
 
 			if baseAlert != nil {
 				if err := th.UpdateAlert(ctx, *baseAlert); err != nil {
@@ -365,7 +365,7 @@ func (x *UseCases) cmdResolve(alert *model.Alert, th interfaces.SlackThreadServi
 	var (
 		targetAlerts string
 		conclusion   model.AlertConclusion
-		comment      string
+		reason       string
 	)
 
 	return &cli.Command{
@@ -383,10 +383,10 @@ func (x *UseCases) cmdResolve(alert *model.Alert, th interfaces.SlackThreadServi
 				Required:    true,
 			},
 			&cli.StringFlag{
-				Name:        "comment",
+				Name:        "reason",
 				Aliases:     []string{"m"},
-				Usage:       "Comment of alerts",
-				Destination: &comment,
+				Usage:       "Reason of resolved alerts",
+				Destination: &reason,
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -417,7 +417,12 @@ func (x *UseCases) cmdResolve(alert *model.Alert, th interfaces.SlackThreadServi
 			if err := x.repository.BatchUpdateAlertStatus(ctx, alertIDs, model.AlertStatusResolved); err != nil {
 				return err
 			}
-			thread.Reply(ctx, fmt.Sprintf("✅ Update %d alerts to resolved", len(alertIDs)))
+
+			if err := x.repository.BatchUpdateAlertConclusion(ctx, alertIDs, conclusion, reason); err != nil {
+				return err
+			}
+
+			thread.Reply(ctx, fmt.Sprintf(`✅ Resolved %d alerts as *%s* because of "%s"`, len(alertIDs), conclusion.String(), reason))
 
 			if baseAlert != nil {
 				if err := th.UpdateAlert(ctx, *baseAlert); err != nil {
