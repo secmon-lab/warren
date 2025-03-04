@@ -628,23 +628,21 @@ func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Blo
 
 	var messageText strings.Builder
 
-	displayCount := 20
-	if len(alerts) < displayCount {
-		displayCount = len(alerts)
-	}
-
-	for i, alert := range alerts {
-		if i >= displayCount {
-			break
-		}
-
+	maxCharCount := 3000
+	msgCount := 0
+	for _, alert := range alerts {
 		assigneeText := ""
 		if alert.Assignee != nil {
 			assigneeText = fmt.Sprintf(" (👤 <@%s>)", alert.Assignee.ID)
 		}
 
 		msgURL := metadata.ToMsgURL(alert.SlackThread.ChannelID, alert.SlackThread.ThreadID)
-		messageText.WriteString(fmt.Sprintf("%s <%s|%s>%s\n", alert.Status.Label(), msgURL, alert.Title, assigneeText))
+		newString := fmt.Sprintf("%s <%s|%s>%s\n", alert.Status.Label(), msgURL, alert.Title, assigneeText)
+		if messageText.Len()+len(newString) > maxCharCount {
+			break
+		}
+		messageText.WriteString(newString)
+		msgCount++
 	}
 
 	return []slack.Block{
@@ -655,7 +653,7 @@ func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Blo
 		),
 		slack.NewDividerBlock(),
 		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("Showing %d of %d alerts", displayCount, len(alerts)), false, false),
+			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("Showing %d of %d alerts", msgCount, len(alerts)), false, false),
 			nil,
 			nil,
 		),
