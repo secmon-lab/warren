@@ -355,7 +355,7 @@ func (x *Slack) ShowResolveAlertModal(ctx context.Context, alert model.Alert, tr
 		Type: slack.VTModal,
 		Title: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
-			Text: "Close Alert",
+			Text: "Resolve Alert",
 		},
 		Blocks: slack.Blocks{
 			BlockSet: []slack.Block{
@@ -390,7 +390,7 @@ func (x *Slack) ShowResolveAlertModal(ctx context.Context, alert model.Alert, tr
 		PrivateMetadata: alert.ID.String(),
 		Submit: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
-			Text: "Close",
+			Text: "Resolve",
 		},
 		Close: &slack.TextBlockObject{
 			Type: slack.PlainTextType,

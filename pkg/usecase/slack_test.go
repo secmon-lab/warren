@@ -19,13 +19,13 @@ func TestHandleSlackInteraction(t *testing.T) {
 		checkAlert  func(t *testing.T, alert model.Alert)
 		wantErr     bool
 	}{
-		"close": {
+		"resolve": {
 			interaction: slack.InteractionCallback{
 				Type: slack.InteractionTypeBlockActions,
 				ActionCallback: slack.ActionCallbacks{
 					BlockActions: []*slack.BlockAction{
 						{
-							ActionID: "close",
+							ActionID: "resolve",
 						},
 					},
 				},
