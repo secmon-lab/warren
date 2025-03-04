@@ -170,6 +170,9 @@ func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert model.Alert
 			return nil, goerr.Wrap(err, "failed to ask chat")
 		}
 	}
+	if result == nil {
+		return nil, goerr.New("failed to generate alert metadata")
+	}
 
 	if alert.Title == "" {
 		alert.Title = result.Title
