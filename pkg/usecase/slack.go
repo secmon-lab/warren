@@ -129,7 +129,7 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 
 func (uc *UseCases) handleSlackInteractionViewSubmission(ctx context.Context, interaction slack.InteractionCallback) error {
 	switch interaction.View.CallbackID {
-	case "close_submit":
+	case "submit_resolve":
 		return uc.handleSlackInteractionViewSubmissionClose(ctx, interaction)
 	}
 
@@ -230,7 +230,7 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 			logger.Warn("slack thread not found", "alert_id", alert.ID)
 		}
 
-	case "close":
+	case "resolve":
 		alert, err := uc.repository.GetAlert(ctx, model.AlertID(action.Value))
 		if err != nil {
 			return goerr.Wrap(err, "failed to get alert")
@@ -241,8 +241,8 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 
 		triggerID := interaction.TriggerID
 
-		if err := uc.slackService.ShowCloseAlertModal(ctx, *alert, triggerID); err != nil {
-			return goerr.Wrap(err, "failed to show close alert modal")
+		if err := uc.slackService.ShowResolveAlertModal(ctx, *alert, triggerID); err != nil {
+			return goerr.Wrap(err, "failed to show resolve alert modal")
 		}
 
 	case "inspect":

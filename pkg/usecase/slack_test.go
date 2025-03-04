@@ -85,7 +85,7 @@ func TestHandleSlackInteraction(t *testing.T) {
 						},
 					}
 				},
-				ShowCloseAlertModalFunc: func(ctx context.Context, alert model.Alert, triggerID string) error {
+				ShowResolveAlertModalFunc: func(ctx context.Context, alert model.Alert, triggerID string) error {
 					return nil
 				},
 			}

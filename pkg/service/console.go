@@ -41,7 +41,7 @@ func (c *Console) VerifyRequest(_ http.Header, _ []byte) error {
 	return nil
 }
 
-func (c *Console) ShowCloseAlertModal(_ context.Context, _ model.Alert, _ string) error {
+func (c *Console) ShowResolveAlertModal(_ context.Context, _ model.Alert, _ string) error {
 	return nil
 }
 

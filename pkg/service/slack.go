@@ -264,9 +264,9 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 	if alert.Status != model.AlertStatusResolved {
 		buttons = append(buttons,
 			slack.NewButtonBlockElement(
-				"close",
+				"resolve",
 				alert.ID.String(),
-				slack.NewTextBlockObject("plain_text", "Close", false, false),
+				slack.NewTextBlockObject("plain_text", "Resolve", false, false),
 			).WithStyle(slack.StyleDanger),
 		)
 	}
@@ -311,7 +311,7 @@ func (x *Slack) PostAlert(ctx context.Context, alert model.Alert) (interfaces.Sl
 	return thread, nil
 }
 
-func (x *Slack) ShowCloseAlertModal(ctx context.Context, alert model.Alert, triggerID string) error {
+func (x *Slack) ShowResolveAlertModal(ctx context.Context, alert model.Alert, triggerID string) error {
 
 	conclusionOptions := []struct {
 		Conclusion  model.AlertConclusion
@@ -386,7 +386,7 @@ func (x *Slack) ShowCloseAlertModal(ctx context.Context, alert model.Alert, trig
 				).WithOptional(true),
 			},
 		},
-		CallbackID:      "close_submit",
+		CallbackID:      "submit_resolve",
 		PrivateMetadata: alert.ID.String(),
 		Submit: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
