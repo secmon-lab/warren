@@ -239,3 +239,13 @@ func (c *ConsoleThread) PostAlertList(_ context.Context, list *model.AlertList) 
 	}
 	return nil
 }
+
+func (c *ConsoleThread) PostAlertClusters(_ context.Context, clusters []model.AlertList) error {
+	c.printHeader("🔍 Alert Clusters")
+	for _, cluster := range clusters {
+		fmt.Fprintln(c.writer, strings.Repeat("-", 80))
+		fmt.Fprintf(c.writer, "ID: %s\n", cluster.ID)
+		fmt.Fprintf(c.writer, "Alerts: %d\n", len(cluster.Alerts))
+	}
+	return nil
+}

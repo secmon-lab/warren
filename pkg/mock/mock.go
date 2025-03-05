@@ -251,6 +251,9 @@ var _ interfaces.SlackThreadService = &SlackThreadServiceMock{}
 //			ChannelIDFunc: func() string {
 //				panic("mock out the ChannelID method")
 //			},
+//			PostAlertClustersFunc: func(ctx context.Context, clusters []model.AlertList) error {
+//				panic("mock out the PostAlertClusters method")
+//			},
 //			PostAlertListFunc: func(ctx context.Context, list *model.AlertList) error {
 //				panic("mock out the PostAlertList method")
 //			},
@@ -287,6 +290,9 @@ type SlackThreadServiceMock struct {
 
 	// ChannelIDFunc mocks the ChannelID method.
 	ChannelIDFunc func() string
+
+	// PostAlertClustersFunc mocks the PostAlertClusters method.
+	PostAlertClustersFunc func(ctx context.Context, clusters []model.AlertList) error
 
 	// PostAlertListFunc mocks the PostAlertList method.
 	PostAlertListFunc func(ctx context.Context, list *model.AlertList) error
@@ -327,6 +333,13 @@ type SlackThreadServiceMock struct {
 		}
 		// ChannelID holds details about calls to the ChannelID method.
 		ChannelID []struct {
+		}
+		// PostAlertClusters holds details about calls to the PostAlertClusters method.
+		PostAlertClusters []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Clusters is the clusters argument value.
+			Clusters []model.AlertList
 		}
 		// PostAlertList holds details about calls to the PostAlertList method.
 		PostAlertList []struct {
@@ -381,16 +394,17 @@ type SlackThreadServiceMock struct {
 			Alert model.Alert
 		}
 	}
-	lockAttachFile     sync.RWMutex
-	lockChannelID      sync.RWMutex
-	lockPostAlertList  sync.RWMutex
-	lockPostAlerts     sync.RWMutex
-	lockPostFinding    sync.RWMutex
-	lockPostNextAction sync.RWMutex
-	lockPostPolicyDiff sync.RWMutex
-	lockReply          sync.RWMutex
-	lockThreadID       sync.RWMutex
-	lockUpdateAlert    sync.RWMutex
+	lockAttachFile        sync.RWMutex
+	lockChannelID         sync.RWMutex
+	lockPostAlertClusters sync.RWMutex
+	lockPostAlertList     sync.RWMutex
+	lockPostAlerts        sync.RWMutex
+	lockPostFinding       sync.RWMutex
+	lockPostNextAction    sync.RWMutex
+	lockPostPolicyDiff    sync.RWMutex
+	lockReply             sync.RWMutex
+	lockThreadID          sync.RWMutex
+	lockUpdateAlert       sync.RWMutex
 }
 
 // AttachFile calls AttachFileFunc.
@@ -461,6 +475,42 @@ func (mock *SlackThreadServiceMock) ChannelIDCalls() []struct {
 	mock.lockChannelID.RLock()
 	calls = mock.calls.ChannelID
 	mock.lockChannelID.RUnlock()
+	return calls
+}
+
+// PostAlertClusters calls PostAlertClustersFunc.
+func (mock *SlackThreadServiceMock) PostAlertClusters(ctx context.Context, clusters []model.AlertList) error {
+	if mock.PostAlertClustersFunc == nil {
+		panic("SlackThreadServiceMock.PostAlertClustersFunc: method is nil but SlackThreadService.PostAlertClusters was just called")
+	}
+	callInfo := struct {
+		Ctx      context.Context
+		Clusters []model.AlertList
+	}{
+		Ctx:      ctx,
+		Clusters: clusters,
+	}
+	mock.lockPostAlertClusters.Lock()
+	mock.calls.PostAlertClusters = append(mock.calls.PostAlertClusters, callInfo)
+	mock.lockPostAlertClusters.Unlock()
+	return mock.PostAlertClustersFunc(ctx, clusters)
+}
+
+// PostAlertClustersCalls gets all the calls that were made to PostAlertClusters.
+// Check the length with:
+//
+//	len(mockedSlackThreadService.PostAlertClustersCalls())
+func (mock *SlackThreadServiceMock) PostAlertClustersCalls() []struct {
+	Ctx      context.Context
+	Clusters []model.AlertList
+} {
+	var calls []struct {
+		Ctx      context.Context
+		Clusters []model.AlertList
+	}
+	mock.lockPostAlertClusters.RLock()
+	calls = mock.calls.PostAlertClusters
+	mock.lockPostAlertClusters.RUnlock()
 	return calls
 }
 

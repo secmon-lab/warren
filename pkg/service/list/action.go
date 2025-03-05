@@ -200,7 +200,7 @@ func (x *Service) actionStatus(args []string) action {
 			case "resolved":
 				statusList = append(statusList, model.AlertStatusResolved)
 			default:
-				return nil, goerr.New("invalid status, status must be one of new, ack, closed", goerr.V("status", arg))
+				return nil, goerr.New("invalid status, status must be one of new, ack, blocked, resolved", goerr.V("status", arg))
 			}
 		}
 

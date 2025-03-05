@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -31,6 +33,7 @@ func (x *UseCases) RunCommand(ctx context.Context, args []string, alert *model.A
 			x.cmdShow(alert, th),
 			x.cmdBlock(alert, th),
 			x.cmdResolve(alert, th),
+			x.cmdClustering(alert, th, user),
 		},
 		Writer: &buf,
 	}
@@ -433,4 +436,146 @@ func (x *UseCases) cmdResolve(alert *model.Alert, th interfaces.SlackThreadServi
 			return nil
 		},
 	}
+}
+
+func (x *UseCases) cmdClustering(alert *model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) *cli.Command {
+	var target string
+	var topN int64
+	var similarityThreshold float64
+
+	return &cli.Command{
+		Name:        "cluster",
+		Usage:       "Create clusters",
+		UsageText:   "@warren cluster [-t last|thread|${list_id}]",
+		Description: "Create clusters",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "target",
+				Aliases:     []string{"t"},
+				Usage:       "Target list of alerts to cluster [last|thread|${list_id}]",
+				Destination: &target,
+			},
+			&cli.IntFlag{
+				Name:        "top-n",
+				Aliases:     []string{"n"},
+				Usage:       "Top N clusters to show",
+				Destination: &topN,
+				Value:       6,
+			},
+			&cli.FloatFlag{
+				Name:        "similarity-threshold",
+				Aliases:     []string{"s"},
+				Usage:       "Similarity threshold for clustering",
+				Destination: &similarityThreshold,
+				Value:       0.8,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			src := sourceFromTarget(ctx, target, th, alert)
+			if src == nil {
+				return nil
+			}
+
+			alerts, err := src(ctx, x.repository)
+			if err != nil {
+				return err
+			}
+
+			threadData := model.SlackThread{
+				ChannelID: th.ChannelID(),
+				ThreadID:  th.ThreadID(),
+			}
+			clusters, err := x.clusterAlerts(ctx, threadData, user, alerts, similarityThreshold, int(topN))
+			if err != nil {
+				return err
+			}
+
+			for _, cluster := range clusters {
+				if err := x.repository.PutAlertList(ctx, cluster); err != nil {
+					return err
+				}
+			}
+
+			// Trim alerts in clusters
+			for _, cluster := range clusters {
+				if len(cluster.Alerts) > 3 {
+					cluster.Alerts = cluster.Alerts[:3]
+				}
+			}
+
+			if err := th.PostAlertClusters(ctx, clusters); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+}
+
+func (x *UseCases) clusterAlerts(ctx context.Context, th model.SlackThread, user *model.SlackUser, alerts []model.Alert, similarityThreshold float64, topN int) ([]model.AlertList, error) {
+	clusters := newAlertCluster(ctx, th, user, alerts, similarityThreshold)
+
+	sort.Slice(clusters.clusters, func(i, j int) bool {
+		return len(clusters.clusters[i].Alerts) > len(clusters.clusters[j].Alerts)
+	})
+
+	if topN > 0 && topN < len(clusters.clusters) {
+		clusters.clusters = clusters.clusters[:topN]
+	}
+
+	return clusters.clusters, nil
+}
+
+type alertCluster struct {
+	clusters []model.AlertList
+}
+
+func newAlertCluster(ctx context.Context, th model.SlackThread, user *model.SlackUser, alerts []model.Alert, similarityThreshold float64) *alertCluster {
+	// Initialize clusters
+	clusters := make([]model.AlertList, 0)
+
+	// Process each alert
+	for _, alert := range alerts {
+		if len(alert.Embedding) == 0 {
+			continue // Skip alerts without embeddings
+		}
+
+		// Try to find matching cluster
+		matched := false
+		for j := range clusters {
+			// Compare with first alert in cluster as representative
+			if cosineSimilarity(alert.Embedding, clusters[j].Alerts[0].Embedding) >= similarityThreshold {
+				clusters[j].Alerts = append(clusters[j].Alerts, alert)
+				matched = true
+				break
+			}
+		}
+
+		// Create new cluster if no match found
+		if !matched {
+			clusters = append(clusters, model.NewAlertList(ctx, th, user, []model.Alert{alert}))
+		}
+	}
+
+	return &alertCluster{
+		clusters: clusters,
+	}
+
+}
+
+func cosineSimilarity(a, b []float32) float64 {
+	if len(a) != len(b) {
+		return 0
+	}
+
+	var dotProduct float64
+	var magnitudeA, magnitudeB float64
+
+	for i := range a {
+		dotProduct += float64(a[i]) * float64(b[i])
+		magnitudeA += float64(a[i]) * float64(a[i])
+		magnitudeB += float64(b[i]) * float64(b[i])
+	}
+
+	return dotProduct / (math.Sqrt(magnitudeA) * math.Sqrt(magnitudeB))
 }

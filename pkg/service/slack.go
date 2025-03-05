@@ -693,3 +693,42 @@ func buildAlertListBlocks(list *model.AlertList, metadata slackMetadata) []slack
 
 	return blocks
 }
+
+func (x *SlackThread) PostAlertClusters(ctx context.Context, clusters []model.AlertList) error {
+	blocks := buildAlertClustersBlocks(clusters, x.slackMetadata)
+
+	_, _, err := x.slackClient.PostMessageContext(ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post alert clusters to slack", goerr.V("blocks", blocks))
+	}
+
+	return nil
+}
+
+func buildAlertClustersBlocks(clusters []model.AlertList, metadata slackMetadata) []slack.Block {
+	blocks := []slack.Block{
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", "🗂️ Alert Clusters", false, false),
+		),
+	}
+
+	for _, cluster := range clusters {
+		lines := []string{
+			fmt.Sprintf("ID: `%s`", cluster.ID.String()),
+			fmt.Sprintf("Alerts: %d", len(cluster.Alerts)),
+		}
+		blocks = append(blocks, slack.NewDividerBlock())
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", strings.Join(lines, "\n"), false, false),
+			nil,
+			nil,
+		))
+		blocks = append(blocks, buildAlertsBlocks(cluster.Alerts, metadata)...)
+	}
+
+	return blocks
+}
