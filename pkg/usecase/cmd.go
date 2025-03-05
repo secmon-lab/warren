@@ -445,9 +445,9 @@ func (x *UseCases) cmdClustering(alert *model.Alert, th interfaces.SlackThreadSe
 
 	return &cli.Command{
 		Name:        "cluster",
-		Usage:       "Create clusters",
+		Usage:       "Create new lists of alert by clustering",
 		UsageText:   "@warren cluster [-t last|thread|${list_id}]",
-		Description: "Create clusters",
+		Description: "Create new lists of alert by clustering",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "target",
@@ -467,7 +467,7 @@ func (x *UseCases) cmdClustering(alert *model.Alert, th interfaces.SlackThreadSe
 				Aliases:     []string{"s"},
 				Usage:       "Similarity threshold for clustering",
 				Destination: &similarityThreshold,
-				Value:       0.8,
+				Value:       0.99,
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {

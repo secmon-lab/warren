@@ -651,9 +651,8 @@ func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Blo
 			nil,
 			nil,
 		),
-		slack.NewDividerBlock(),
 		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("Showing %d of %d alerts", msgCount, len(alerts)), false, false),
+			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("_Showing %d of %d alerts_", msgCount, len(alerts)), false, false),
 			nil,
 			nil,
 		),
