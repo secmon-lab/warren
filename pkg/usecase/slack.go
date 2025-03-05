@@ -129,7 +129,7 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 
 func (uc *UseCases) handleSlackInteractionViewSubmission(ctx context.Context, interaction slack.InteractionCallback) error {
 	switch interaction.View.CallbackID {
-	case "close_submit":
+	case "submit_resolve":
 		return uc.handleSlackInteractionViewSubmissionClose(ctx, interaction)
 	}
 
@@ -151,7 +151,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionClose(ctx context.Contex
 
 	var (
 		conclusion model.AlertConclusion
-		comment    string
+		reason     string
 	)
 	if conclusionBlock, ok := interaction.View.State.Values["conclusion"]; ok {
 		if conclusionAction, ok := conclusionBlock["conclusion"]; ok {
@@ -160,7 +160,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionClose(ctx context.Contex
 	}
 	if commentBlock, ok := interaction.View.State.Values["comment"]; ok {
 		if commentAction, ok := commentBlock["comment"]; ok {
-			comment = commentAction.Value
+			reason = commentAction.Value
 		}
 	}
 
@@ -169,10 +169,10 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionClose(ctx context.Contex
 	}
 
 	now := clock.Now(ctx)
-	alert.Status = model.AlertStatusClosed
-	alert.ClosedAt = &now
+	alert.Status = model.AlertStatusResolved
+	alert.ResolvedAt = &now
 	alert.Conclusion = conclusion
-	alert.Comment = comment
+	alert.Reason = reason
 	if alert.Assignee == nil {
 		alert.Assignee = &model.SlackUser{
 			ID:   interaction.User.ID,
@@ -186,7 +186,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionClose(ctx context.Contex
 
 	th := uc.slackService.NewThread(*alert.SlackThread)
 	ctx = thread.WithReplyFunc(ctx, th.Reply)
-	th.Reply(ctx, "Alert closed by <@"+interaction.User.ID+">")
+	th.Reply(ctx, "Alert resolved by <@"+interaction.User.ID+">")
 
 	if err := th.UpdateAlert(ctx, *alert); err != nil {
 		return goerr.Wrap(err, "failed to update slack thread")
@@ -230,7 +230,7 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 			logger.Warn("slack thread not found", "alert_id", alert.ID)
 		}
 
-	case "close":
+	case "resolve":
 		alert, err := uc.repository.GetAlert(ctx, model.AlertID(action.Value))
 		if err != nil {
 			return goerr.Wrap(err, "failed to get alert")
@@ -241,8 +241,8 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 
 		triggerID := interaction.TriggerID
 
-		if err := uc.slackService.ShowCloseAlertModal(ctx, *alert, triggerID); err != nil {
-			return goerr.Wrap(err, "failed to show close alert modal")
+		if err := uc.slackService.ShowResolveAlertModal(ctx, *alert, triggerID); err != nil {
+			return goerr.Wrap(err, "failed to show resolve alert modal")
 		}
 
 	case "inspect":

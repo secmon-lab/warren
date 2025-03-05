@@ -53,7 +53,7 @@ func TestSlackPostAlert(t *testing.T) {
 			"baz": 123,
 		},
 		Conclusion: model.AlertConclusionFalsePositive,
-		Comment:    "Test Comment",
+		Reason:     "Test Reason",
 		Finding: &model.AlertFinding{
 			Severity:       model.AlertSeverityHigh,
 			Summary:        "Test Summary",
@@ -223,14 +223,14 @@ func TestPostAlerts(t *testing.T) {
 	}
 	alerts[1].ParentID = alerts[0].ID
 	alerts[1].CreatedAt = alerts[0].CreatedAt.Add(time.Second)
-	alerts[1].Status = model.AlertStatusMerged
+	alerts[1].Status = model.AlertStatusAcknowledged
 	alerts[2].ParentID = alerts[0].ID
 	alerts[2].CreatedAt = alerts[0].CreatedAt.Add(time.Second * 2)
 	alerts[3].Assignee = &model.SlackUser{
 		ID:   "U0123456789",
 		Name: "John Doex",
 	}
-	alerts[3].Status = model.AlertStatusClosed
+	alerts[3].Status = model.AlertStatusResolved
 
 	thread, err := svc.PostMessage(context.Background(), "alerts test")
 	gt.NoError(t, err)

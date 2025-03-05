@@ -3,6 +3,9 @@ package usecase
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -28,6 +31,9 @@ func (x *UseCases) RunCommand(ctx context.Context, args []string, alert *model.A
 			x.cmdList(alert, th, user),
 			x.cmdIgnore(alert, th),
 			x.cmdShow(alert, th),
+			x.cmdBlock(alert, th),
+			x.cmdResolve(alert, th),
+			x.cmdClustering(alert, th, user),
 		},
 		Writer: &buf,
 	}
@@ -311,4 +317,265 @@ func (x *UseCases) cmdShow(alert *model.Alert, th interfaces.SlackThreadService)
 			return nil
 		},
 	}
+}
+
+func (x *UseCases) cmdBlock(alert *model.Alert, th interfaces.SlackThreadService) *cli.Command {
+	var targetAlerts string
+
+	return &cli.Command{
+		Name:      "block",
+		Aliases:   []string{"b"},
+		Usage:     "Change status of alerts to blocked",
+		UsageText: "@warren block [-t last|thread|${list_id}]",
+		Action: func(ctx context.Context, c *cli.Command) error {
+			src := sourceFromTarget(ctx, targetAlerts, th, alert)
+			if src == nil {
+				return nil
+			}
+
+			alerts, err := src(ctx, x.repository)
+			if err != nil {
+				return err
+			}
+
+			var baseAlert *model.Alert
+			alertIDs := make([]model.AlertID, len(alerts))
+			for i, a := range alerts {
+				alertIDs[i] = a.ID
+
+				if alert.ID == a.ID {
+					baseAlert = &a
+				}
+			}
+
+			if err := x.repository.BatchUpdateAlertStatus(ctx, alertIDs, model.AlertStatusBlocked); err != nil {
+				return err
+			}
+			thread.Reply(ctx, fmt.Sprintf("🚫 Blocked %d alerts", len(alertIDs)))
+
+			if baseAlert != nil {
+				if err := th.UpdateAlert(ctx, *baseAlert); err != nil {
+					return err
+				}
+			}
+
+			return nil
+		},
+	}
+}
+
+func (x *UseCases) cmdResolve(alert *model.Alert, th interfaces.SlackThreadService) *cli.Command {
+	var (
+		targetAlerts string
+		conclusion   model.AlertConclusion
+		reason       string
+	)
+
+	return &cli.Command{
+		Name:        "resolve",
+		Aliases:     []string{"r"},
+		Usage:       "Change status of alerts to resolved",
+		UsageText:   "@warren resolve [-t last|thread|${list_id}]",
+		Description: "Change status of alerts to resolved",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "conclusion",
+				Aliases:     []string{"c"},
+				Usage:       "Conclusion of alerts",
+				Destination: (*string)(&conclusion),
+				Required:    true,
+			},
+			&cli.StringFlag{
+				Name:        "reason",
+				Aliases:     []string{"m"},
+				Usage:       "Reason of resolved alerts",
+				Destination: &reason,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			if err := conclusion.Validate(); err != nil {
+				return err
+			}
+
+			src := sourceFromTarget(ctx, targetAlerts, th, alert)
+			if src == nil {
+				return nil
+			}
+
+			alerts, err := src(ctx, x.repository)
+			if err != nil {
+				return err
+			}
+
+			var baseAlert *model.Alert
+			alertIDs := make([]model.AlertID, len(alerts))
+			for i, a := range alerts {
+				alertIDs[i] = a.ID
+
+				if alert.ID == a.ID {
+					baseAlert = &a
+				}
+			}
+
+			if err := x.repository.BatchUpdateAlertStatus(ctx, alertIDs, model.AlertStatusResolved); err != nil {
+				return err
+			}
+
+			if err := x.repository.BatchUpdateAlertConclusion(ctx, alertIDs, conclusion, reason); err != nil {
+				return err
+			}
+
+			thread.Reply(ctx, fmt.Sprintf(`✅ Resolved %d alerts as *%s* because of "%s"`, len(alertIDs), conclusion.String(), reason))
+
+			if baseAlert != nil {
+				if err := th.UpdateAlert(ctx, *baseAlert); err != nil {
+					return err
+				}
+			}
+
+			return nil
+		},
+	}
+}
+
+func (x *UseCases) cmdClustering(alert *model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) *cli.Command {
+	var target string
+	var topN int64
+	var similarityThreshold float64
+
+	return &cli.Command{
+		Name:        "cluster",
+		Usage:       "Create new lists of alert by clustering",
+		UsageText:   "@warren cluster [-t last|thread|${list_id}]",
+		Description: "Create new lists of alert by clustering",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "target",
+				Aliases:     []string{"t"},
+				Usage:       "Target list of alerts to cluster [last|thread|${list_id}]",
+				Destination: &target,
+			},
+			&cli.IntFlag{
+				Name:        "top-n",
+				Aliases:     []string{"n"},
+				Usage:       "Top N clusters to show",
+				Destination: &topN,
+				Value:       6,
+			},
+			&cli.FloatFlag{
+				Name:        "similarity-threshold",
+				Aliases:     []string{"s"},
+				Usage:       "Similarity threshold for clustering",
+				Destination: &similarityThreshold,
+				Value:       0.99,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			src := sourceFromTarget(ctx, target, th, alert)
+			if src == nil {
+				return nil
+			}
+
+			alerts, err := src(ctx, x.repository)
+			if err != nil {
+				return err
+			}
+
+			threadData := model.SlackThread{
+				ChannelID: th.ChannelID(),
+				ThreadID:  th.ThreadID(),
+			}
+			clusters, err := x.clusterAlerts(ctx, threadData, user, alerts, similarityThreshold, int(topN))
+			if err != nil {
+				return err
+			}
+
+			for _, cluster := range clusters {
+				if err := x.repository.PutAlertList(ctx, cluster); err != nil {
+					return err
+				}
+			}
+
+			// Trim alerts in clusters
+			for _, cluster := range clusters {
+				if len(cluster.Alerts) > 3 {
+					cluster.Alerts = cluster.Alerts[:3]
+				}
+			}
+
+			if err := th.PostAlertClusters(ctx, clusters); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+}
+
+func (x *UseCases) clusterAlerts(ctx context.Context, th model.SlackThread, user *model.SlackUser, alerts []model.Alert, similarityThreshold float64, topN int) ([]model.AlertList, error) {
+	clusters := newAlertCluster(ctx, th, user, alerts, similarityThreshold)
+
+	sort.Slice(clusters.clusters, func(i, j int) bool {
+		return len(clusters.clusters[i].Alerts) > len(clusters.clusters[j].Alerts)
+	})
+
+	if topN > 0 && topN < len(clusters.clusters) {
+		clusters.clusters = clusters.clusters[:topN]
+	}
+
+	return clusters.clusters, nil
+}
+
+type alertCluster struct {
+	clusters []model.AlertList
+}
+
+func newAlertCluster(ctx context.Context, th model.SlackThread, user *model.SlackUser, alerts []model.Alert, similarityThreshold float64) *alertCluster {
+	// Initialize clusters
+	clusters := make([]model.AlertList, 0)
+
+	// Process each alert
+	for _, alert := range alerts {
+		if len(alert.Embedding) == 0 {
+			continue // Skip alerts without embeddings
+		}
+
+		// Try to find matching cluster
+		matched := false
+		for j := range clusters {
+			// Compare with first alert in cluster as representative
+			if cosineSimilarity(alert.Embedding, clusters[j].Alerts[0].Embedding) >= similarityThreshold {
+				clusters[j].Alerts = append(clusters[j].Alerts, alert)
+				matched = true
+				break
+			}
+		}
+
+		// Create new cluster if no match found
+		if !matched {
+			clusters = append(clusters, model.NewAlertList(ctx, th, user, []model.Alert{alert}))
+		}
+	}
+
+	return &alertCluster{
+		clusters: clusters,
+	}
+
+}
+
+func cosineSimilarity(a, b []float32) float64 {
+	if len(a) != len(b) {
+		return 0
+	}
+
+	var dotProduct float64
+	var magnitudeA, magnitudeB float64
+
+	for i := range a {
+		dotProduct += float64(a[i]) * float64(b[i])
+		magnitudeA += float64(a[i]) * float64(a[i])
+		magnitudeB += float64(b[i]) * float64(b[i])
+	}
+
+	return dotProduct / (math.Sqrt(magnitudeA) * math.Sqrt(magnitudeB))
 }

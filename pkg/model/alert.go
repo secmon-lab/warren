@@ -22,17 +22,28 @@ type AlertStatus string
 const (
 	AlertStatusNew          AlertStatus = "new"
 	AlertStatusAcknowledged AlertStatus = "acked"
-	AlertStatusMerged       AlertStatus = "merged"
-	AlertStatusClosed       AlertStatus = "closed"
+	AlertStatusBlocked      AlertStatus = "blocked"
+	AlertStatusResolved     AlertStatus = "resolved"
 )
+
+var alertStatusLabels = map[AlertStatus]string{
+	AlertStatusNew:          "🆕 New",
+	AlertStatusAcknowledged: "👀 Acknowledged",
+	AlertStatusBlocked:      "🚫 Blocked",
+	AlertStatusResolved:     "✅️ Resolved",
+}
 
 func (s AlertStatus) String() string {
 	return string(s)
 }
 
+func (s AlertStatus) Label() string {
+	return alertStatusLabels[s]
+}
+
 func (s AlertStatus) Validate() error {
 	switch s {
-	case AlertStatusNew, AlertStatusAcknowledged, AlertStatusMerged, AlertStatusClosed:
+	case AlertStatusNew, AlertStatusAcknowledged, AlertStatusBlocked, AlertStatusResolved:
 		return nil
 	}
 	return goerr.New("invalid alert status", goerr.V("status", s))
@@ -48,6 +59,18 @@ const (
 	AlertSeverityHigh     AlertSeverity = "high"
 	AlertSeverityCritical AlertSeverity = "critical"
 )
+
+var alertSeverityLabels = map[AlertSeverity]string{
+	AlertSeverityUnknown:  "❓️ Unknown",
+	AlertSeverityLow:      "🟢 Low",
+	AlertSeverityMedium:   "🟡 Medium",
+	AlertSeverityHigh:     "🔴 High",
+	AlertSeverityCritical: "🚨 Critical",
+}
+
+func (s AlertSeverity) Label() string {
+	return alertSeverityLabels[s]
+}
 
 func (s AlertSeverity) Validate() error {
 	switch s {
@@ -111,11 +134,11 @@ type Alert struct {
 	ParentID    AlertID         `json:"parent_id"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
-	ClosedAt    *time.Time      `json:"closed_at"`
+	ResolvedAt  *time.Time      `json:"resolved_at"`
 	Data        any             `json:"data"`
 	Attributes  []Attribute     `json:"attributes"`
 	Conclusion  AlertConclusion `json:"conclusion"`
-	Comment     string          `json:"comment"`
+	Reason      string          `json:"reason"`
 	Finding     *AlertFinding   `json:"finding"`
 
 	Assignee    *SlackUser   `json:"assignee"`

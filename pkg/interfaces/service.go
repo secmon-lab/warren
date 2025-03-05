@@ -12,7 +12,7 @@ type SlackService interface {
 	NewThread(thread model.SlackThread) SlackThreadService
 	PostAlert(ctx context.Context, alert model.Alert) (SlackThreadService, error)
 	TrimMention(message string) string
-	ShowCloseAlertModal(ctx context.Context, alert model.Alert, triggerID string) error
+	ShowResolveAlertModal(ctx context.Context, alert model.Alert, triggerID string) error
 }
 
 type SlackThreadService interface {
@@ -26,6 +26,8 @@ type SlackThreadService interface {
 	PostPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error
 	PostAlerts(ctx context.Context, alerts []model.Alert) error
 	PostAlertList(ctx context.Context, list *model.AlertList) error
+	PostAlertClusters(ctx context.Context, clusters []model.AlertList) error
+
 	// Reply replies to the thread with a message. It does not return an error because the process should not be stopped even if it fails. Instead, the error should be logged and reported to sentry in the method.
 	Reply(ctx context.Context, message string)
 }

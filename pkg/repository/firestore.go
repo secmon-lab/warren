@@ -114,10 +114,6 @@ func (r *Firestore) GetLatestAlerts(ctx context.Context, oldest time.Time, limit
 			return nil, goerr.Wrap(err, "failed to convert data to alert")
 		}
 
-		if alert.Status == model.AlertStatusMerged {
-			continue
-		}
-
 		alerts = append(alerts, alert)
 	}
 
@@ -410,4 +406,68 @@ func (r *Firestore) GetLatestAlertListInThread(ctx context.Context, thread model
 	})
 
 	return &alertLists[0], nil
+}
+
+func (r *Firestore) BatchUpdateAlertStatus(ctx context.Context, alertIDs []model.AlertID, status model.AlertStatus) error {
+	writer := r.db.BulkWriter(ctx)
+	defer writer.End()
+
+	jobs := make(map[model.AlertID]*firestore.BulkWriterJob)
+	for _, alertID := range alertIDs {
+		ref := r.db.Collection(collectionAlerts).Doc(alertID.String())
+		job, err := writer.Update(ref, []firestore.Update{
+			{
+				Path:  "Status",
+				Value: status,
+			},
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to update alert status", goerr.V("alert_id", alertID))
+		}
+		jobs[alertID] = job
+	}
+
+	writer.End()
+
+	for alertID, job := range jobs {
+		if _, err := job.Results(); err != nil {
+			return goerr.Wrap(err, "failed to update alert status", goerr.V("alert_id", alertID))
+		}
+	}
+
+	return nil
+}
+
+func (r *Firestore) BatchUpdateAlertConclusion(ctx context.Context, alertIDs []model.AlertID, conclusion model.AlertConclusion, reason string) error {
+	writer := r.db.BulkWriter(ctx)
+	defer writer.End()
+
+	jobs := make(map[model.AlertID]*firestore.BulkWriterJob)
+	for _, alertID := range alertIDs {
+		ref := r.db.Collection(collectionAlerts).Doc(alertID.String())
+		job, err := writer.Update(ref, []firestore.Update{
+			{
+				Path:  "Conclusion",
+				Value: conclusion,
+			},
+			{
+				Path:  "Reason",
+				Value: reason,
+			},
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to update alert conclusion", goerr.V("alert_id", alertID))
+		}
+		jobs[alertID] = job
+	}
+
+	writer.End()
+
+	for alertID, job := range jobs {
+		if _, err := job.Results(); err != nil {
+			return goerr.Wrap(err, "failed to update alert conclusion", goerr.V("alert_id", alertID))
+		}
+	}
+
+	return nil
 }

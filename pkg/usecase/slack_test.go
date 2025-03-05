@@ -19,13 +19,13 @@ func TestHandleSlackInteraction(t *testing.T) {
 		checkAlert  func(t *testing.T, alert model.Alert)
 		wantErr     bool
 	}{
-		"close": {
+		"resolve": {
 			interaction: slack.InteractionCallback{
 				Type: slack.InteractionTypeBlockActions,
 				ActionCallback: slack.ActionCallbacks{
 					BlockActions: []*slack.BlockAction{
 						{
-							ActionID: "close",
+							ActionID: "resolve",
 						},
 					},
 				},
@@ -33,7 +33,7 @@ func TestHandleSlackInteraction(t *testing.T) {
 			checkAlert: func(t *testing.T, alert model.Alert) {
 				gt.Equal(t, alert.Status, model.AlertStatusNew) // still new
 				gt.Equal(t, alert.Conclusion, "")               // not set yet
-				gt.Equal(t, alert.Comment, "")                  // not set yet
+				gt.Equal(t, alert.Reason, "")                   // not set yet
 			},
 			wantErr: false,
 		},
@@ -85,7 +85,7 @@ func TestHandleSlackInteraction(t *testing.T) {
 						},
 					}
 				},
-				ShowCloseAlertModalFunc: func(ctx context.Context, alert model.Alert, triggerID string) error {
+				ShowResolveAlertModalFunc: func(ctx context.Context, alert model.Alert, triggerID string) error {
 					return nil
 				},
 			}

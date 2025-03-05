@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/interfaces"
@@ -121,18 +122,7 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 	lines := []string{
 		"*ID:* `" + alert.ID.String() + "`",
 		"*Schema:* `" + alert.Schema + "`",
-		"*Status:* " + func() string {
-			switch alert.Status {
-			case model.AlertStatusNew:
-				return ":new: NEW"
-			case model.AlertStatusAcknowledged:
-				return ":eyes: ACKNOWLEDGED"
-			case model.AlertStatusClosed:
-				return ":white_check_mark: CLOSED"
-			default:
-				return string(alert.Status)
-			}
-		}(),
+		"*Status:* " + alert.Status.Label(),
 		"*Assignee:* " + func() string {
 			if alert.Assignee == nil {
 				return ":no_entry: unassigned"
@@ -141,29 +131,25 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 		}(),
 		"*Severity:* " + func() string {
 			if alert.Finding == nil {
-				return ":question: not available"
+				return model.AlertSeverityUnknown.Label()
 			}
 
-			switch alert.Finding.Severity {
-			case model.AlertSeverityCritical:
-				return ":rotating_light: *CRITICAL* :rotating_light:"
-			case model.AlertSeverityHigh:
-				return ":exclamation: *HIGH*"
-			case model.AlertSeverityMedium:
-				return ":warning: MEDIUM"
-			case model.AlertSeverityLow:
-				return ":eyes: LOW"
-			case model.AlertSeverityUnknown:
-				return ":gray_question: unknown"
-			default:
-				return string(alert.Finding.Severity)
-			}
+			return alert.Finding.Severity.Label()
 		}(),
 	}
 
 	title := alert.Title
-	if len(title) > 140 {
-		title = title[:140] + "..."
+	titleBytes := []byte(title)
+	if len(titleBytes) > 140 {
+		// Find the position to cut that doesn't break UTF-8 characters
+		pos := 0
+		count := 0
+		for pos < len(titleBytes) && count < 137 { // 137 to leave room for "..."
+			_, size := utf8.DecodeRune(titleBytes[pos:])
+			pos += size
+			count += size
+		}
+		title = string(titleBytes[:pos]) + "..."
 	}
 
 	description := "_no description_"
@@ -190,9 +176,9 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 			nil,
 		))
 
-		if alert.Comment != "" {
+		if alert.Reason != "" {
 			blocks = append(blocks, slack.NewSectionBlock(
-				slack.NewTextBlockObject("mrkdwn", alert.Comment, false, false),
+				slack.NewTextBlockObject("mrkdwn", alert.Reason, false, false),
 				nil,
 				nil,
 			))
@@ -275,12 +261,12 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 		)
 	}
 
-	if alert.Status != model.AlertStatusClosed {
+	if alert.Status != model.AlertStatusResolved {
 		buttons = append(buttons,
 			slack.NewButtonBlockElement(
-				"close",
+				"resolve",
 				alert.ID.String(),
-				slack.NewTextBlockObject("plain_text", "Close", false, false),
+				slack.NewTextBlockObject("plain_text", "Resolve", false, false),
 			).WithStyle(slack.StyleDanger),
 		)
 	}
@@ -325,7 +311,7 @@ func (x *Slack) PostAlert(ctx context.Context, alert model.Alert) (interfaces.Sl
 	return thread, nil
 }
 
-func (x *Slack) ShowCloseAlertModal(ctx context.Context, alert model.Alert, triggerID string) error {
+func (x *Slack) ShowResolveAlertModal(ctx context.Context, alert model.Alert, triggerID string) error {
 
 	conclusionOptions := []struct {
 		Conclusion  model.AlertConclusion
@@ -369,7 +355,7 @@ func (x *Slack) ShowCloseAlertModal(ctx context.Context, alert model.Alert, trig
 		Type: slack.VTModal,
 		Title: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
-			Text: "Close Alert",
+			Text: "Resolve Alert",
 		},
 		Blocks: slack.Blocks{
 			BlockSet: []slack.Block{
@@ -400,11 +386,11 @@ func (x *Slack) ShowCloseAlertModal(ctx context.Context, alert model.Alert, trig
 				).WithOptional(true),
 			},
 		},
-		CallbackID:      "close_submit",
+		CallbackID:      "submit_resolve",
 		PrivateMetadata: alert.ID.String(),
 		Submit: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
-			Text: "Close",
+			Text: "Resolve",
 		},
 		Close: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
@@ -642,37 +628,21 @@ func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Blo
 
 	var messageText strings.Builder
 
-	displayCount := 20
-	if len(alerts) < displayCount {
-		displayCount = len(alerts)
-	}
-
-	for i, alert := range alerts {
-		if i >= displayCount {
-			break
-		}
-
-		var statusEmoji string
-		switch alert.Status {
-		case model.AlertStatusNew:
-			statusEmoji = "🆕"
-		case model.AlertStatusAcknowledged:
-			statusEmoji = "👀"
-		case model.AlertStatusClosed:
-			statusEmoji = "✅"
-		case model.AlertStatusMerged:
-			statusEmoji = "🔗"
-		default:
-			statusEmoji = "❓"
-		}
-
+	maxCharCount := 3000
+	msgCount := 0
+	for _, alert := range alerts {
 		assigneeText := ""
 		if alert.Assignee != nil {
 			assigneeText = fmt.Sprintf(" (👤 <@%s>)", alert.Assignee.ID)
 		}
 
 		msgURL := metadata.ToMsgURL(alert.SlackThread.ChannelID, alert.SlackThread.ThreadID)
-		messageText.WriteString(fmt.Sprintf("%s <%s|%s>%s\n", statusEmoji, msgURL, alert.Title, assigneeText))
+		newString := fmt.Sprintf("%s <%s|%s>%s\n", alert.Status.Label(), msgURL, alert.Title, assigneeText)
+		if messageText.Len()+len(newString) > maxCharCount {
+			break
+		}
+		messageText.WriteString(newString)
+		msgCount++
 	}
 
 	return []slack.Block{
@@ -681,9 +651,8 @@ func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Blo
 			nil,
 			nil,
 		),
-		slack.NewDividerBlock(),
 		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("Showing %d of %d alerts", displayCount, len(alerts)), false, false),
+			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("_Showing %d of %d alerts_", msgCount, len(alerts)), false, false),
 			nil,
 			nil,
 		),
@@ -720,6 +689,45 @@ func buildAlertListBlocks(list *model.AlertList, metadata slackMetadata) []slack
 	}
 
 	blocks = append(blocks, buildAlertsBlocks(list.Alerts, metadata)...)
+
+	return blocks
+}
+
+func (x *SlackThread) PostAlertClusters(ctx context.Context, clusters []model.AlertList) error {
+	blocks := buildAlertClustersBlocks(clusters, x.slackMetadata)
+
+	_, _, err := x.slackClient.PostMessageContext(ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post alert clusters to slack", goerr.V("blocks", blocks))
+	}
+
+	return nil
+}
+
+func buildAlertClustersBlocks(clusters []model.AlertList, metadata slackMetadata) []slack.Block {
+	blocks := []slack.Block{
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", "🗂️ Alert Clusters", false, false),
+		),
+	}
+
+	for _, cluster := range clusters {
+		lines := []string{
+			fmt.Sprintf("ID: `%s`", cluster.ID.String()),
+			fmt.Sprintf("Alerts: %d", len(cluster.Alerts)),
+		}
+		blocks = append(blocks, slack.NewDividerBlock())
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", strings.Join(lines, "\n"), false, false),
+			nil,
+			nil,
+		))
+		blocks = append(blocks, buildAlertsBlocks(cluster.Alerts, metadata)...)
+	}
 
 	return blocks
 }

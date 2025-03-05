@@ -47,6 +47,7 @@ The `input` field is stored in the `data` field of the `alert`.
 - Set conditions that are appropriately abstracted, rather than using unique values of the alerts (such as IP addresses or alert IDs) as conditions.
 - Add new ignore conditions while retaining the current functionality of the policy.
 - Primarily focus on adding new ignore conditions, but feel free to refactor or restructure the existing policy if necessary.
+- You can refactor the existing policy to improve its readability and maintainability. Especially, the policy has redundant conditions, you should merge them.
 
 {{ if .note }}
 ## Additional Notes

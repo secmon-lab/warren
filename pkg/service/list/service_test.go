@@ -73,16 +73,15 @@ func TestService_Run(t *testing.T) {
 		},
 		{
 			name: "filter by status",
-			args: []string{"status", "new", "closed"},
+			args: []string{"status", "new", "resolved"},
 			alerts: []model.Alert{
 				{Status: model.AlertStatusNew},
 				{Status: model.AlertStatusAcknowledged},
-				{Status: model.AlertStatusClosed},
-				{Status: model.AlertStatusMerged},
+				{Status: model.AlertStatusResolved},
 			},
 			expected: []model.Alert{
 				{Status: model.AlertStatusNew},
-				{Status: model.AlertStatusClosed},
+				{Status: model.AlertStatusResolved},
 			},
 		},
 		{
@@ -92,12 +91,11 @@ func TestService_Run(t *testing.T) {
 		},
 		{
 			name: "status pipeline",
-			args: []string{"status", "new", "|", "status", "closed"},
+			args: []string{"status", "new", "|", "status", "resolved"},
 			alerts: []model.Alert{
 				{Status: model.AlertStatusNew},
 				{Status: model.AlertStatusAcknowledged},
-				{Status: model.AlertStatusClosed},
-				{Status: model.AlertStatusMerged},
+				{Status: model.AlertStatusResolved},
 			},
 			expected: nil,
 		},
