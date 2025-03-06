@@ -7,6 +7,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/errs"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -241,8 +242,12 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 
 		triggerID := interaction.TriggerID
 
-		if err := uc.slackService.ShowResolveAlertModal(ctx, *alert, triggerID); err != nil {
-			return goerr.Wrap(err, "failed to show resolve alert modal")
+		if svc, ok := uc.slackService.(*service.Slack); ok {
+			if err := svc.ShowResolveAlertModal(ctx, *alert, triggerID); err != nil {
+				return goerr.Wrap(err, "failed to show resolve alert modal")
+			}
+		} else {
+			logger.Warn("slack service is not available")
 		}
 
 	case "inspect":
@@ -260,6 +265,20 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 			}
 
 			return nil
+		})
+
+	case "ignore_list":
+		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
+			th := uc.slackService.NewThread(model.SlackThread{
+				ChannelID: interaction.Channel.ID,
+				ThreadID:  interaction.Message.ThreadTimestamp,
+			})
+			ctx = thread.WithReplyFunc(ctx, th.Reply)
+
+			return uc.RunCommand(ctx, []string{"warren", "ignore", action.Value}, nil, th, &model.SlackUser{
+				ID:   interaction.User.ID,
+				Name: interaction.User.Name,
+			})
 		})
 
 	case "create_pr":

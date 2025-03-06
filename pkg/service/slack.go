@@ -615,6 +615,32 @@ func (x *SlackThread) PostAlerts(ctx context.Context, alerts []model.Alert) erro
 	return nil
 }
 
+func buildAlertListBlocks(list *model.AlertList, metadata slackMetadata) []slack.Block {
+	blocks := buildAlertsBlocks(list.Alerts, metadata)
+
+	blocks = append(blocks, slack.NewSectionBlock(
+		slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*ID*: `%s`", list.ID.String()), false, false),
+		nil,
+		nil,
+	))
+	blocks = append(blocks, slack.NewActionBlock(
+		"alert_list_actions",
+		slack.NewButtonBlockElement(
+			"ignore_list",
+			list.ID.String(),
+			slack.NewTextBlockObject("plain_text", "Ignore", false, false),
+		).WithStyle(slack.StyleDefault),
+		slack.NewButtonBlockElement(
+			"resolve_list",
+			list.ID.String(),
+			slack.NewTextBlockObject("plain_text", "Resolve", false, false),
+		).WithStyle(slack.StyleDanger),
+	))
+	blocks = append(blocks, slack.NewDividerBlock())
+
+	return blocks
+}
+
 func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Block {
 	if len(alerts) == 0 {
 		return []slack.Block{
@@ -660,7 +686,7 @@ func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Blo
 }
 
 func (x *SlackThread) PostAlertList(ctx context.Context, list *model.AlertList) error {
-	blocks := buildAlertListBlocks(list, x.slackMetadata)
+	blocks := buildNewAlertListBlocks(list, x.slackMetadata)
 
 	_, _, err := x.slackClient.PostMessageContext(ctx,
 		x.channelID,
@@ -675,20 +701,15 @@ func (x *SlackThread) PostAlertList(ctx context.Context, list *model.AlertList) 
 	return nil
 }
 
-func buildAlertListBlocks(list *model.AlertList, metadata slackMetadata) []slack.Block {
+func buildNewAlertListBlocks(list *model.AlertList, metadata slackMetadata) []slack.Block {
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(
 			slack.NewTextBlockObject("plain_text", "📑 New list", false, false),
 		),
-		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", "ID: `"+list.ID.String()+"`", false, false),
-			nil,
-			nil,
-		),
 		slack.NewDividerBlock(),
 	}
 
-	blocks = append(blocks, buildAlertsBlocks(list.Alerts, metadata)...)
+	blocks = append(blocks, buildAlertListBlocks(list, metadata)...)
 
 	return blocks
 }
@@ -718,7 +739,7 @@ func buildAlertClustersBlocks(clusters []model.AlertList, metadata slackMetadata
 	for _, cluster := range clusters {
 		lines := []string{
 			fmt.Sprintf("ID: `%s`", cluster.ID.String()),
-			fmt.Sprintf("Alerts: %d", len(cluster.Alerts)),
+			fmt.Sprintf("Alert Total: %d", len(cluster.Alerts)),
 		}
 		blocks = append(blocks, slack.NewDividerBlock())
 		blocks = append(blocks, slack.NewSectionBlock(
@@ -726,7 +747,7 @@ func buildAlertClustersBlocks(clusters []model.AlertList, metadata slackMetadata
 			nil,
 			nil,
 		))
-		blocks = append(blocks, buildAlertsBlocks(cluster.Alerts, metadata)...)
+		blocks = append(blocks, buildAlertListBlocks(&cluster, metadata)...)
 	}
 
 	return blocks

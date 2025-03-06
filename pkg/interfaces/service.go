@@ -12,7 +12,6 @@ type SlackService interface {
 	NewThread(thread model.SlackThread) SlackThreadService
 	PostAlert(ctx context.Context, alert model.Alert) (SlackThreadService, error)
 	TrimMention(message string) string
-	ShowResolveAlertModal(ctx context.Context, alert model.Alert, triggerID string) error
 }
 
 type SlackThreadService interface {

@@ -85,9 +85,6 @@ func TestHandleSlackInteraction(t *testing.T) {
 						},
 					}
 				},
-				ShowResolveAlertModalFunc: func(ctx context.Context, alert model.Alert, triggerID string) error {
-					return nil
-				},
 			}
 
 			uc := usecase.New(usecase.WithRepository(repo), usecase.WithSlackService(slackMock))
