@@ -35,9 +35,6 @@ var _ interfaces.SlackService = &SlackServiceMock{}
 //			PostAlertFunc: func(ctx context.Context, alert model.Alert) (interfaces.SlackThreadService, error) {
 //				panic("mock out the PostAlert method")
 //			},
-//			ShowResolveAlertModalFunc: func(ctx context.Context, alert model.Alert, triggerID string) error {
-//				panic("mock out the ShowResolveAlertModal method")
-//			},
 //			TrimMentionFunc: func(message string) string {
 //				panic("mock out the TrimMention method")
 //			},
@@ -53,9 +50,6 @@ type SlackServiceMock struct {
 
 	// PostAlertFunc mocks the PostAlert method.
 	PostAlertFunc func(ctx context.Context, alert model.Alert) (interfaces.SlackThreadService, error)
-
-	// ShowResolveAlertModalFunc mocks the ShowResolveAlertModal method.
-	ShowResolveAlertModalFunc func(ctx context.Context, alert model.Alert, triggerID string) error
 
 	// TrimMentionFunc mocks the TrimMention method.
 	TrimMentionFunc func(message string) string
@@ -74,25 +68,15 @@ type SlackServiceMock struct {
 			// Alert is the alert argument value.
 			Alert model.Alert
 		}
-		// ShowResolveAlertModal holds details about calls to the ShowResolveAlertModal method.
-		ShowResolveAlertModal []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Alert is the alert argument value.
-			Alert model.Alert
-			// TriggerID is the triggerID argument value.
-			TriggerID string
-		}
 		// TrimMention holds details about calls to the TrimMention method.
 		TrimMention []struct {
 			// Message is the message argument value.
 			Message string
 		}
 	}
-	lockNewThread             sync.RWMutex
-	lockPostAlert             sync.RWMutex
-	lockShowResolveAlertModal sync.RWMutex
-	lockTrimMention           sync.RWMutex
+	lockNewThread   sync.RWMutex
+	lockPostAlert   sync.RWMutex
+	lockTrimMention sync.RWMutex
 }
 
 // NewThread calls NewThreadFunc.
@@ -160,46 +144,6 @@ func (mock *SlackServiceMock) PostAlertCalls() []struct {
 	mock.lockPostAlert.RLock()
 	calls = mock.calls.PostAlert
 	mock.lockPostAlert.RUnlock()
-	return calls
-}
-
-// ShowResolveAlertModal calls ShowResolveAlertModalFunc.
-func (mock *SlackServiceMock) ShowResolveAlertModal(ctx context.Context, alert model.Alert, triggerID string) error {
-	if mock.ShowResolveAlertModalFunc == nil {
-		panic("SlackServiceMock.ShowResolveAlertModalFunc: method is nil but SlackService.ShowResolveAlertModal was just called")
-	}
-	callInfo := struct {
-		Ctx       context.Context
-		Alert     model.Alert
-		TriggerID string
-	}{
-		Ctx:       ctx,
-		Alert:     alert,
-		TriggerID: triggerID,
-	}
-	mock.lockShowResolveAlertModal.Lock()
-	mock.calls.ShowResolveAlertModal = append(mock.calls.ShowResolveAlertModal, callInfo)
-	mock.lockShowResolveAlertModal.Unlock()
-	return mock.ShowResolveAlertModalFunc(ctx, alert, triggerID)
-}
-
-// ShowResolveAlertModalCalls gets all the calls that were made to ShowResolveAlertModal.
-// Check the length with:
-//
-//	len(mockedSlackService.ShowResolveAlertModalCalls())
-func (mock *SlackServiceMock) ShowResolveAlertModalCalls() []struct {
-	Ctx       context.Context
-	Alert     model.Alert
-	TriggerID string
-} {
-	var calls []struct {
-		Ctx       context.Context
-		Alert     model.Alert
-		TriggerID string
-	}
-	mock.lockShowResolveAlertModal.RLock()
-	calls = mock.calls.ShowResolveAlertModal
-	mock.lockShowResolveAlertModal.RUnlock()
 	return calls
 }
 
