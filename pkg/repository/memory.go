@@ -66,13 +66,14 @@ func (r *Memory) GetAlerts(ctx context.Context, duration time.Duration, limit in
 	return alerts, nil
 }
 
-func (r *Memory) GetAlertBySlackThread(ctx context.Context, thread model.SlackThread) (*model.Alert, error) {
+func (r *Memory) GetAlertsBySlackThread(ctx context.Context, thread model.SlackThread) ([]model.Alert, error) {
+	var alerts []model.Alert
 	for _, alert := range r.alerts {
 		if alert.SlackThread != nil && alert.SlackThread.ChannelID == thread.ChannelID && alert.SlackThread.ThreadID == thread.ThreadID {
-			return &alert, nil
+			alerts = append(alerts, alert)
 		}
 	}
-	return nil, nil
+	return alerts, nil
 }
 
 func (r *Memory) GetLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {

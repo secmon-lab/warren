@@ -20,7 +20,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func (x *UseCases) RunCommand(ctx context.Context, args []string, alert *model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) error {
+func (x *UseCases) RunCommand(ctx context.Context, args []string, alerts []model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) error {
 	ctx = thread.WithReplyFunc(ctx, th.Reply)
 
 	var buf bytes.Buffer
@@ -28,12 +28,12 @@ func (x *UseCases) RunCommand(ctx context.Context, args []string, alert *model.A
 		Name:  "warren",
 		Usage: "Slack bot for security monitoring",
 		Commands: []*cli.Command{
-			x.cmdList(alert, th, user),
-			x.cmdIgnore(alert, th),
-			x.cmdShow(alert, th),
-			x.cmdBlock(alert, th),
-			x.cmdResolve(alert, th),
-			x.cmdClustering(alert, th, user),
+			x.cmdList(alerts, th, user),
+			x.cmdIgnore(alerts, th),
+			x.cmdShow(alerts, th),
+			x.cmdBlock(alerts, th),
+			x.cmdResolve(alerts, th),
+			x.cmdClustering(alerts, th, user),
 		},
 		Writer: &buf,
 	}
@@ -93,7 +93,7 @@ func parseTime(s string) (time.Time, error) {
 	return time.Time{}, goerr.New("invalid time format: expected format: RFC3339, time only (15:04), date only (2/3), date+time (02-03T00:00), today, yesterday", goerr.V("time", s))
 }
 
-func (x *UseCases) cmdList(alert *model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) *cli.Command {
+func (x *UseCases) cmdList(alerts []model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) *cli.Command {
 	var (
 		duration time.Duration
 		spanFrom string
@@ -163,8 +163,8 @@ func (x *UseCases) cmdList(alert *model.Alert, th interfaces.SlackThreadService,
 			case duration != 0:
 				src = source.Span(now.Add(-duration), now)
 
-			case alert != nil:
-				src = source.Alert(alert)
+			case len(alerts) > 0:
+				src = source.Static(alerts)
 
 			default:
 				src = source.Span(now.Add(-time.Hour*24), now)
@@ -180,7 +180,7 @@ func (x *UseCases) cmdList(alert *model.Alert, th interfaces.SlackThreadService,
 	}
 }
 
-func sourceFromTarget(ctx context.Context, target string, th interfaces.SlackThreadService, alert *model.Alert) source.Source {
+func sourceFromTarget(ctx context.Context, target string, th interfaces.SlackThreadService, alerts []model.Alert) source.Source {
 	switch target {
 	case "last":
 		return source.LatestAlertList(model.SlackThread{
@@ -189,15 +189,15 @@ func sourceFromTarget(ctx context.Context, target string, th interfaces.SlackThr
 		})
 
 	case "thread":
-		if alert == nil {
+		if len(alerts) == 0 {
 			th.Reply(ctx, "💥 No alert found. Please run the command in the alert thread.")
 			return nil
 		}
-		return source.Alert(alert)
+		return source.Static(alerts)
 
 	case "":
-		if alert != nil {
-			return source.Alert(alert)
+		if len(alerts) > 0 {
+			return source.Static(alerts)
 		}
 		return source.LatestAlertList(model.SlackThread{
 			ChannelID: th.ChannelID(),
@@ -209,7 +209,7 @@ func sourceFromTarget(ctx context.Context, target string, th interfaces.SlackThr
 	}
 }
 
-func (x *UseCases) cmdIgnore(alert *model.Alert, th interfaces.SlackThreadService) *cli.Command {
+func (x *UseCases) cmdIgnore(alerts []model.Alert, th interfaces.SlackThreadService) *cli.Command {
 	var targetAlerts string
 
 	return &cli.Command{
@@ -227,7 +227,7 @@ func (x *UseCases) cmdIgnore(alert *model.Alert, th interfaces.SlackThreadServic
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			src := sourceFromTarget(ctx, targetAlerts, th, alert)
+			src := sourceFromTarget(ctx, targetAlerts, th, alerts)
 			if src == nil {
 				return nil
 			}
@@ -255,7 +255,7 @@ func (x *UseCases) cmdIgnore(alert *model.Alert, th interfaces.SlackThreadServic
 	}
 }
 
-func (x *UseCases) cmdShow(alert *model.Alert, th interfaces.SlackThreadService) *cli.Command {
+func (x *UseCases) cmdShow(alerts []model.Alert, th interfaces.SlackThreadService) *cli.Command {
 	var (
 		targetAlerts string
 		limit        int64
@@ -289,7 +289,7 @@ func (x *UseCases) cmdShow(alert *model.Alert, th interfaces.SlackThreadService)
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			src := sourceFromTarget(ctx, targetAlerts, th, alert)
+			src := sourceFromTarget(ctx, targetAlerts, th, alerts)
 			if src == nil {
 				return nil
 			}
@@ -319,7 +319,7 @@ func (x *UseCases) cmdShow(alert *model.Alert, th interfaces.SlackThreadService)
 	}
 }
 
-func (x *UseCases) cmdBlock(alert *model.Alert, th interfaces.SlackThreadService) *cli.Command {
+func (x *UseCases) cmdBlock(alerts []model.Alert, th interfaces.SlackThreadService) *cli.Command {
 	var targetAlerts string
 
 	return &cli.Command{
@@ -328,7 +328,7 @@ func (x *UseCases) cmdBlock(alert *model.Alert, th interfaces.SlackThreadService
 		Usage:     "Change status of alerts to blocked",
 		UsageText: "@warren block [-t last|thread|${list_id}]",
 		Action: func(ctx context.Context, c *cli.Command) error {
-			src := sourceFromTarget(ctx, targetAlerts, th, alert)
+			src := sourceFromTarget(ctx, targetAlerts, th, alerts)
 			if src == nil {
 				return nil
 			}
@@ -338,13 +338,13 @@ func (x *UseCases) cmdBlock(alert *model.Alert, th interfaces.SlackThreadService
 				return err
 			}
 
-			var baseAlert *model.Alert
+			var baseAlerts []*model.Alert
 			alertIDs := make([]model.AlertID, len(alerts))
 			for i, a := range alerts {
 				alertIDs[i] = a.ID
 
-				if alert.ID == a.ID {
-					baseAlert = &a
+				if a.ParentID == "" {
+					baseAlerts = append(baseAlerts, &a)
 				}
 			}
 
@@ -353,8 +353,8 @@ func (x *UseCases) cmdBlock(alert *model.Alert, th interfaces.SlackThreadService
 			}
 			thread.Reply(ctx, fmt.Sprintf("🚫 Blocked %d alerts", len(alertIDs)))
 
-			if baseAlert != nil {
-				if err := th.UpdateAlert(ctx, *baseAlert); err != nil {
+			for _, a := range baseAlerts {
+				if err := th.UpdateAlert(ctx, *a); err != nil {
 					return err
 				}
 			}
@@ -364,7 +364,7 @@ func (x *UseCases) cmdBlock(alert *model.Alert, th interfaces.SlackThreadService
 	}
 }
 
-func (x *UseCases) cmdResolve(alert *model.Alert, th interfaces.SlackThreadService) *cli.Command {
+func (x *UseCases) cmdResolve(alerts []model.Alert, th interfaces.SlackThreadService) *cli.Command {
 	var (
 		targetAlerts string
 		conclusion   model.AlertConclusion
@@ -397,7 +397,7 @@ func (x *UseCases) cmdResolve(alert *model.Alert, th interfaces.SlackThreadServi
 				return err
 			}
 
-			src := sourceFromTarget(ctx, targetAlerts, th, alert)
+			src := sourceFromTarget(ctx, targetAlerts, th, alerts)
 			if src == nil {
 				return nil
 			}
@@ -407,13 +407,13 @@ func (x *UseCases) cmdResolve(alert *model.Alert, th interfaces.SlackThreadServi
 				return err
 			}
 
-			var baseAlert *model.Alert
+			var baseAlerts []*model.Alert
 			alertIDs := make([]model.AlertID, len(alerts))
 			for i, a := range alerts {
 				alertIDs[i] = a.ID
 
-				if alert.ID == a.ID {
-					baseAlert = &a
+				if a.ParentID == "" {
+					baseAlerts = append(baseAlerts, &a)
 				}
 			}
 
@@ -427,8 +427,8 @@ func (x *UseCases) cmdResolve(alert *model.Alert, th interfaces.SlackThreadServi
 
 			thread.Reply(ctx, fmt.Sprintf(`✅ Resolved %d alerts as *%s* because of "%s"`, len(alertIDs), conclusion.String(), reason))
 
-			if baseAlert != nil {
-				if err := th.UpdateAlert(ctx, *baseAlert); err != nil {
+			for _, a := range baseAlerts {
+				if err := th.UpdateAlert(ctx, *a); err != nil {
 					return err
 				}
 			}
@@ -438,7 +438,7 @@ func (x *UseCases) cmdResolve(alert *model.Alert, th interfaces.SlackThreadServi
 	}
 }
 
-func (x *UseCases) cmdClustering(alert *model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) *cli.Command {
+func (x *UseCases) cmdClustering(alerts []model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) *cli.Command {
 	var target string
 	var topN int64
 	var similarityThreshold float64
@@ -471,7 +471,7 @@ func (x *UseCases) cmdClustering(alert *model.Alert, th interfaces.SlackThreadSe
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			src := sourceFromTarget(ctx, target, th, alert)
+			src := sourceFromTarget(ctx, target, th, alerts)
 			if src == nil {
 				return nil
 			}

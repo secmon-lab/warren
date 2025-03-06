@@ -143,7 +143,8 @@ type Alert struct {
 
 	Assignee    *SlackUser   `json:"assignee"`
 	SlackThread *SlackThread `json:"slack_thread"`
-	Embedding   []float32    `json:"-"`
+
+	Embedding []float32 `json:"-"`
 }
 
 type SlackThread struct {

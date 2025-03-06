@@ -312,7 +312,15 @@ func (x *Slack) PostAlert(ctx context.Context, alert model.Alert) (interfaces.Sl
 }
 
 func (x *Slack) ShowResolveAlertModal(ctx context.Context, alert model.Alert, triggerID string) error {
+	req := buildResolveModalViewRequest(alert)
+	if _, err := x.slackClient.OpenView(triggerID, req); err != nil {
+		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
+	}
 
+	return nil
+}
+
+func buildResolveModalViewRequest(alert model.Alert) slack.ModalViewRequest {
 	conclusionOptions := []struct {
 		Conclusion  model.AlertConclusion
 		Label       string
@@ -351,7 +359,7 @@ func (x *Slack) ShowResolveAlertModal(ctx context.Context, alert model.Alert, tr
 		)
 	}
 
-	_, err := x.slackClient.OpenView(triggerID, slack.ModalViewRequest{
+	return slack.ModalViewRequest{
 		Type: slack.VTModal,
 		Title: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
@@ -396,12 +404,7 @@ func (x *Slack) ShowResolveAlertModal(ctx context.Context, alert model.Alert, tr
 			Type: slack.PlainTextType,
 			Text: "Cancel",
 		},
-	})
-	if err != nil {
-		return goerr.Wrap(err, "failed to open view")
 	}
-
-	return nil
 }
 
 func (x *SlackThread) UpdateAlert(ctx context.Context, alert model.Alert) error {
@@ -751,4 +754,9 @@ func buildAlertClustersBlocks(clusters []model.AlertList, metadata slackMetadata
 	}
 
 	return blocks
+}
+
+func (x *Slack) ShowResolveAlertListModal(ctx context.Context, list model.AlertList, triggerID string) error {
+	return nil
+
 }

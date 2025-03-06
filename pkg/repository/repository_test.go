@@ -99,13 +99,14 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		}
 		gt.NoError(t, repo.PutAlert(ctx, alert))
 
-		got, err := repo.GetAlertBySlackThread(ctx, *alert.SlackThread)
+		got, err := repo.GetAlertsBySlackThread(ctx, *alert.SlackThread)
 		gt.NoError(t, err)
-		gt.Equal(t, alert.ID, got.ID)
+		gt.Equal(t, len(got), 1)
+		gt.Equal(t, alert.ID, got[0].ID)
 	})
 
 	t.Run("GetAlertBySlackMessageID_NotFound", func(t *testing.T) {
-		got, err := repo.GetAlertBySlackThread(ctx, model.SlackThread{
+		got, err := repo.GetAlertsBySlackThread(ctx, model.SlackThread{
 			ChannelID: "test",
 			ThreadID:  uuid.New().String(),
 		})

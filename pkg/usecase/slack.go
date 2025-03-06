@@ -30,7 +30,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 		threadData.ThreadID = event.TimeStamp
 	}
 
-	alert, err := uc.repository.GetAlertBySlackThread(ctx, threadData)
+	alerts, err := uc.repository.GetAlertsBySlackThread(ctx, threadData)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert by slack thread")
 	}
@@ -56,7 +56,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevent
 
 	arguments := append([]string{"warren"}, args...)
 	uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-		return uc.RunCommand(ctx, arguments, alert, th, &model.SlackUser{
+		return uc.RunCommand(ctx, arguments, alerts, th, &model.SlackUser{
 			ID:   event.User,
 			Name: event.User,
 		})
@@ -92,17 +92,28 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, event *slackevents.M
 		ChannelID: event.Channel,
 		ThreadID:  event.ThreadTimeStamp,
 	}
-	alert, err := uc.repository.GetAlertBySlackThread(ctx, thread)
+	alerts, err := uc.repository.GetAlertsBySlackThread(ctx, thread)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert by slack thread")
 	}
-	if alert == nil {
+	if len(alerts) == 0 {
 		logger.Info("alert not found", "thread", thread)
 		return nil
 	}
 
+	var baseAlert *model.Alert
+	for _, a := range alerts {
+		if a.ParentID == "" {
+			baseAlert = &a
+		}
+	}
+	if baseAlert == nil {
+		logger.Warn("base alert not found", "thread", thread)
+		return nil
+	}
+
 	comment := model.AlertComment{
-		AlertID:   alert.ID,
+		AlertID:   baseAlert.ID,
 		Comment:   event.Text,
 		Timestamp: event.EventTimeStamp,
 		UserID:    event.User,
