@@ -63,7 +63,8 @@ func TestHandleSlackInteraction(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
+			ctx = usecase.WithSync(ctx, true)
 			alert := model.NewAlert(ctx, "test-alert-id", model.PolicyAlert{
 				Title:       "test-alert-title",
 				Description: "test-alert-description",

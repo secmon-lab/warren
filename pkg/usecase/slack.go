@@ -129,11 +129,23 @@ func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slac
 	logger := logging.From(ctx)
 	logger.Info("slack interaction event", "event", interaction)
 
-	switch interaction.Type {
-	case slack.InteractionTypeBlockActions:
-		return uc.handleSlackInteractionBlockActions(ctx, interaction)
-	case slack.InteractionTypeViewSubmission:
-		return uc.handleSlackInteractionViewSubmission(ctx, interaction)
+	handler := func(ctx context.Context) error {
+		switch interaction.Type {
+		case slack.InteractionTypeBlockActions:
+			return uc.handleSlackInteractionBlockActions(ctx, interaction)
+		case slack.InteractionTypeViewSubmission:
+			return uc.handleSlackInteractionViewSubmission(ctx, interaction)
+		}
+
+		return nil
+	}
+
+	if IsSync(ctx) {
+		if err := handler(ctx); err != nil {
+			return goerr.Wrap(err, "failed to handle slack interaction")
+		}
+	} else {
+		uc.dispatchSlackAction(ctx, handler)
 	}
 
 	return nil
@@ -212,6 +224,12 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 
 	action := interaction.ActionCallback.BlockActions[0]
 
+	th := uc.slackService.NewThread(model.SlackThread{
+		ChannelID: interaction.Channel.ID,
+		ThreadID:  interaction.Message.ThreadTimestamp,
+	})
+	ctx = thread.WithReplyFunc(ctx, th.Reply)
+
 	switch action.ActionID {
 	case "ack":
 		alert, err := uc.repository.GetAlert(ctx, model.AlertID(action.Value))
@@ -270,63 +288,41 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 			return nil
 		}
 
-		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-			if err := uc.RunWorkflow(ctx, *alert); err != nil {
-				return err
-			}
-
-			return nil
-		})
+		if err := uc.RunWorkflow(ctx, *alert); err != nil {
+			return err
+		}
 
 	case "ignore_list":
-		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-			th := uc.slackService.NewThread(model.SlackThread{
-				ChannelID: interaction.Channel.ID,
-				ThreadID:  interaction.Message.ThreadTimestamp,
-			})
-			ctx = thread.WithReplyFunc(ctx, th.Reply)
-
-			return uc.RunCommand(ctx, []string{"warren", "ignore", action.Value}, nil, th, &model.SlackUser{
-				ID:   interaction.User.ID,
-				Name: interaction.User.Name,
-			})
+		return uc.RunCommand(ctx, []string{"warren", "ignore", action.Value}, nil, th, &model.SlackUser{
+			ID:   interaction.User.ID,
+			Name: interaction.User.Name,
 		})
 
 	case "create_pr":
-		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-			th := uc.slackService.NewThread(model.SlackThread{
-				ChannelID: interaction.Channel.ID,
-				ThreadID:  interaction.Message.ThreadTimestamp,
-			})
-			ctx = thread.WithReplyFunc(ctx, th.Reply)
+		th.Reply(ctx, "✏️ Creating pull request...")
 
-			th.Reply(ctx, "✏️ Creating pull request...")
-
-			diffID := model.PolicyDiffID(action.Value)
-			diff, err := uc.repository.GetPolicyDiff(ctx, diffID)
-			if err != nil {
-				thread.Reply(ctx, "💥 Failed to get policy diff\n> "+err.Error())
-				return goerr.Wrap(err, "failed to get policy diff")
-			} else if diff == nil {
-				thread.Reply(ctx, "💥 Policy diff not found")
-				return nil
-			}
-
-			if uc.gitHubApp == nil {
-				thread.Reply(ctx, "💥 GitHub is not enabled")
-				return nil
-			}
-
-			prURL, err := uc.gitHubApp.CreatePullRequest(ctx, diff)
-			if err != nil {
-				thread.Reply(ctx, "💥 Failed to create pull request\n> "+err.Error())
-				return err
-			}
-
-			thread.Reply(ctx, fmt.Sprintf("✅️ Created: <%s|%s>", prURL.String(), diff.Title))
-
+		diffID := model.PolicyDiffID(action.Value)
+		diff, err := uc.repository.GetPolicyDiff(ctx, diffID)
+		if err != nil {
+			thread.Reply(ctx, "💥 Failed to get policy diff\n> "+err.Error())
+			return goerr.Wrap(err, "failed to get policy diff")
+		} else if diff == nil {
+			thread.Reply(ctx, "💥 Policy diff not found")
 			return nil
-		})
+		}
+
+		if uc.gitHubApp == nil {
+			thread.Reply(ctx, "💥 GitHub is not enabled")
+			return nil
+		}
+
+		prURL, err := uc.gitHubApp.CreatePullRequest(ctx, diff)
+		if err != nil {
+			thread.Reply(ctx, "💥 Failed to create pull request\n> "+err.Error())
+			return err
+		}
+
+		thread.Reply(ctx, fmt.Sprintf("✅️ Created: <%s|%s>", prURL.String(), diff.Title))
 	}
 
 	return nil
