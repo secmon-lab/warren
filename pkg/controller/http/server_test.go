@@ -1,4 +1,4 @@
-package server_test
+package http_test
 
 import (
 	"bytes"
@@ -18,11 +18,11 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opaq"
+	server "github.com/secmon-lab/warren/pkg/controller/http"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/server"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -79,7 +79,13 @@ var slackInteractionJSON []byte
 func TestSlackInteractionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
 	uc := &mock.UseCaseMock{
-		HandleSlackInteractionFunc: func(ctx context.Context, interaction slack.InteractionCallback) error {
+		HandleSlackInteractionViewSubmissionResolveAlertFunc: func(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+			return nil
+		},
+		HandleSlackInteractionViewSubmissionResolveListFunc: func(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+			return nil
+		},
+		HandleSlackInteractionBlockActionsFunc: func(ctx context.Context, user model.SlackUser, slackThread model.SlackThread, actionID model.SlackActionID, value, triggerID string) error {
 			return nil
 		},
 	}

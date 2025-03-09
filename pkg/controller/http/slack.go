@@ -1,4 +1,4 @@
-package server
+package http
 
 import (
 	"encoding/json"
@@ -6,14 +6,14 @@ import (
 	"net/http"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/interfaces"
+	slack_ctrl "github.com/secmon-lab/warren/pkg/controller/slack"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 )
 
-func slackEventHandler(uc interfaces.UseCase) http.HandlerFunc {
+func slackEventHandler(ctrl *slack_ctrl.Controller) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -51,12 +51,12 @@ func slackEventHandler(uc interfaces.UseCase) http.HandlerFunc {
 
 			switch ev := innerEvent.Data.(type) {
 			case *slackevents.AppMentionEvent:
-				if err := uc.HandleSlackAppMention(r.Context(), ev); err != nil {
+				if err := ctrl.HandleSlackAppMention(r.Context(), ev); err != nil {
 					logging.From(r.Context()).Error("failed to handle app mention", "error", err)
 				}
 
 			case *slackevents.MessageEvent:
-				if err := uc.HandleSlackMessage(r.Context(), ev); err != nil {
+				if err := ctrl.HandleSlackMessage(r.Context(), ev); err != nil {
 					logging.From(r.Context()).Error("failed to handle message", "error", err)
 				}
 
@@ -68,7 +68,7 @@ func slackEventHandler(uc interfaces.UseCase) http.HandlerFunc {
 	}
 }
 
-func slackInteractionHandler(uc interfaces.UseCase) http.HandlerFunc {
+func slackInteractionHandler(slackCtrl *slack_ctrl.Controller) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		payload := r.FormValue("payload")
 		if payload == "" {
@@ -87,7 +87,7 @@ func slackInteractionHandler(uc interfaces.UseCase) http.HandlerFunc {
 			return
 		}
 
-		if err := uc.HandleSlackInteraction(r.Context(), interaction); err != nil {
+		if err := slackCtrl.HandleSlackInteraction(r.Context(), interaction); err != nil {
 			handleError(w, r, err)
 			return
 		}

@@ -1,3 +1,3 @@
-package server
+package http
 
 var LoggingMiddleware = loggingMiddleware

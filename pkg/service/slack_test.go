@@ -175,14 +175,11 @@ func TestAttachFile(t *testing.T) {
 	gt.NoError(t, newThread.AttachFile(context.Background(), "test", "test.txt", []byte("test")))
 }
 
-func TestTrimMention(t *testing.T) {
+func TestIsBotUser(t *testing.T) {
 	svc := service.NewDummySlackService("U0123456789")
 
-	gt.Equal(t, svc.TrimMention("<@U0123456789> test hoge"), "test hoge")
-	gt.Equal(t, svc.TrimMention("test"), "test")
-	gt.Equal(t, svc.TrimMention("test <@U0123456789>"), "")
-	gt.Equal(t, svc.TrimMention("test <@U0123456789> <@U0123456789> blue"), "blue")
-	gt.Equal(t, svc.TrimMention("<@NOT_EXIST> test"), "<@NOT_EXIST> test")
+	gt.True(t, svc.IsBotUser("U0123456789"))
+	gt.False(t, svc.IsBotUser("U0123456788"))
 }
 
 func TestPostPolicyDiff(t *testing.T) {

@@ -85,14 +85,8 @@ func NewSlack(oauthToken, signingSecret, channelID string) (*Slack, error) {
 	return s, nil
 }
 
-func (x *Slack) TrimMention(message string) string {
-	mention := "<@" + x.userID + ">"
-	idx := strings.LastIndex(message, mention)
-	if idx == -1 {
-		return message
-	}
-
-	return strings.TrimSpace(message[idx+len(mention):])
+func (x *Slack) IsBotUser(userID string) bool {
+	return x.userID == userID
 }
 
 func (x *Slack) PostMessage(ctx context.Context, message string) (*SlackThread, error) {

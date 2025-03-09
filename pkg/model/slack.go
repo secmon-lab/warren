@@ -40,3 +40,8 @@ const (
 	SlackActionIDConclusion SlackActionID = "conclusion"
 	SlackActionIDComment    SlackActionID = "comment"
 )
+
+type SlackMention struct {
+	UserID string
+	Args   []string
+}

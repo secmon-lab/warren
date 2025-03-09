@@ -11,7 +11,7 @@ import (
 type SlackService interface {
 	NewThread(thread model.SlackThread) SlackThreadService
 	PostAlert(ctx context.Context, alert model.Alert) (SlackThreadService, error)
-	TrimMention(message string) string
+	IsBotUser(userID string) bool
 }
 
 type SlackThreadService interface {

@@ -127,7 +127,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 			AlertID:   alert.ID,
 			Comment:   "test1",
 			Timestamp: time.Now().Format(time.RFC3339),
-			UserID:    "orange",
+			User:      model.SlackUser{ID: "C0123456789", Name: "orange"},
 		}
 		gt.NoError(t, repo.InsertAlertComment(ctx, comment1))
 
@@ -135,7 +135,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 			AlertID:   alert.ID,
 			Comment:   "test2",
 			Timestamp: time.Now().Add(time.Second).Format(time.RFC3339),
-			UserID:    "blue",
+			User:      model.SlackUser{ID: "C0123456788", Name: "blue"},
 		}
 		gt.NoError(t, repo.InsertAlertComment(ctx, comment2))
 
@@ -145,11 +145,11 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Equal(t, got[0].AlertID, alert.ID)
 		gt.Equal(t, got[0].Comment, comment2.Comment)
 		gt.Equal(t, got[0].Timestamp, comment2.Timestamp)
-		gt.Equal(t, got[0].UserID, comment2.UserID)
+		gt.Equal(t, got[0].User.ID, comment2.User.ID)
 		gt.Equal(t, got[1].AlertID, alert.ID)
 		gt.Equal(t, got[1].Comment, comment1.Comment)
 		gt.Equal(t, got[1].Timestamp, comment1.Timestamp)
-		gt.Equal(t, got[1].UserID, comment1.UserID)
+		gt.Equal(t, got[1].User.ID, comment1.User.ID)
 	})
 
 	t.Run("GetPolicy_and_SavePolicy", func(t *testing.T) {
