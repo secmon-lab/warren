@@ -97,6 +97,7 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackThread model.Sl
 		User:      user,
 	}
 	if err := uc.repository.InsertAlertComment(ctx, comment); err != nil {
+		thread.Reply(ctx, "💥 Failed to insert alert comment\n> "+err.Error())
 		return goerr.Wrap(err, "failed to insert alert comment", goerr.V("comment", comment))
 	}
 
@@ -121,6 +122,7 @@ func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context
 	}
 
 	if err := uc.handleSlackInteractionViewSubmissionResolve(ctx, user, values, []model.Alert{*alert}); err != nil {
+		thread.Reply(ctx, "💥 Failed to resolve alert\n> "+err.Error())
 		logger.Error("failed to resolve alert", "error", err)
 		return err
 	}
