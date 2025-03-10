@@ -496,13 +496,6 @@ func (x *UseCases) cmdClustering(alerts []model.Alert, th interfaces.SlackThread
 				}
 			}
 
-			// Trim alerts in clusters
-			for _, cluster := range clusters {
-				if len(cluster.Alerts) > 3 {
-					cluster.Alerts = cluster.Alerts[:3]
-				}
-			}
-
 			if err := th.PostAlertClusters(ctx, clusters); err != nil {
 				return err
 			}
@@ -546,6 +539,7 @@ func newAlertCluster(ctx context.Context, th model.SlackThread, user *model.Slac
 			// Compare with first alert in cluster as representative
 			if cosineSimilarity(alert.Embedding, clusters[j].Alerts[0].Embedding) >= similarityThreshold {
 				clusters[j].Alerts = append(clusters[j].Alerts, alert)
+				clusters[j].AlertIDs = append(clusters[j].AlertIDs, alert.ID)
 				matched = true
 				break
 			}
