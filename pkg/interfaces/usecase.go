@@ -8,11 +8,14 @@ import (
 )
 
 type UseCase interface {
+	// Slack event handlers
 	HandleSlackMessage(ctx context.Context, slackThread model.SlackThread, text string, user model.SlackUser, ts string) error
 	HandleSlackAppMention(ctx context.Context, user model.SlackUser, mention model.SlackMention, slackThread model.SlackThread) error
-	HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, slackThread model.SlackThread, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error
-	HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, slackThread model.SlackThread, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error
-	HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Context, slackThread model.SlackThread, metadata string, values map[string]map[string]slack.BlockAction) error
+
+	// Slack interaction handlers
+	HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error
+	HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error
+	HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Context, metadata string, values map[string]map[string]slack.BlockAction) error
 	HandleSlackInteractionBlockActions(ctx context.Context, user model.SlackUser, slackThread model.SlackThread, actionID model.SlackActionID, value, triggerID string) error
 
 	// Alert related handlers

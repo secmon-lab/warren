@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/source"
@@ -104,17 +105,13 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackThread model.Sl
 	return nil
 }
 
-func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, slackThread model.SlackThread, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
 	logger := logging.From(ctx)
 	logger.Debug("resolving alert",
-		"slack_thread", slackThread,
 		"user", user,
 		"metadata", metadata,
 		"values", values,
 	)
-
-	th := uc.slackService.NewThread(slackThread)
-	ctx = thread.WithReplyFunc(ctx, th.Reply)
 
 	alertID := model.AlertID(metadata)
 	alert, err := uc.repository.GetAlert(ctx, alertID)
@@ -127,6 +124,11 @@ func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context
 		return nil
 	}
 
+	if alert.SlackThread != nil {
+		th := uc.slackService.NewThread(*alert.SlackThread)
+		ctx = thread.WithReplyFunc(ctx, th.Reply)
+	}
+
 	if err := uc.handleSlackInteractionViewSubmissionResolve(ctx, user, values, []model.Alert{*alert}); err != nil {
 		thread.Reply(ctx, "💥 Failed to resolve alert\n> "+err.Error())
 		logger.Error("failed to resolve alert", "error", err)
@@ -136,23 +138,26 @@ func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context
 	return nil
 }
 
-func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, slackThread model.SlackThread, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
 	logger := logging.From(ctx)
 	logger.Debug("resolving alert list",
-		"slack_thread", slackThread,
 		"user", user,
 		"metadata", metadata,
 		"values", values,
 	)
 
-	th := uc.slackService.NewThread(slackThread)
-	ctx = thread.WithReplyFunc(ctx, th.Reply)
-
 	listID := model.AlertListID(metadata)
 	list, err := uc.repository.GetAlertList(ctx, listID)
 	if err != nil {
-		thread.Reply(ctx, "💥 Failed to get alert list\n> "+err.Error())
-		return goerr.Wrap(err, "failed to get alert list")
+		return goerr.Wrap(err, "failed to get alert list", goerr.V("list_id", listID))
+	}
+	if list == nil {
+		return goerr.Wrap(err, "alert list not found", goerr.V("list_id", listID))
+	}
+
+	if list.SlackThread != nil {
+		th := uc.slackService.NewThread(*list.SlackThread)
+		ctx = thread.WithReplyFunc(ctx, th.Reply)
 	}
 
 	alerts, err := uc.repository.BatchGetAlerts(ctx, list.AlertIDs)
@@ -225,7 +230,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Cont
 	return nil
 }
 
-func (x *UseCases) HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Context, slackThread model.SlackThread, metadata string, values map[string]map[string]slack.BlockAction) error {
+func (x *UseCases) HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Context, metadata string, values map[string]map[string]slack.BlockAction) error {
 	listID := model.AlertListID(metadata)
 
 	var prompt string
@@ -235,7 +240,21 @@ func (x *UseCases) HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Co
 		}
 	}
 
+	list, err := x.repository.GetAlertList(ctx, listID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alert list", goerr.V("list_id", listID))
+	}
+	if list == nil {
+		return goerr.Wrap(err, "alert list not found", goerr.V("list_id", listID))
+	}
+
+	var th interfaces.SlackThreadService
+	if list.SlackThread != nil {
+		th = x.slackService.NewThread(*list.SlackThread)
+	}
+
 	src := source.AlertListID(listID)
+
 	newPolicyDiff, err := x.GenerateIgnorePolicy(ctx, src, prompt)
 	if err != nil {
 		return err
@@ -245,9 +264,10 @@ func (x *UseCases) HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Co
 		return err
 	}
 
-	th := x.slackService.NewThread(slackThread)
-	if err := th.PostPolicyDiff(ctx, newPolicyDiff); err != nil {
-		return err
+	if th != nil {
+		if err := th.PostPolicyDiff(ctx, newPolicyDiff); err != nil {
+			return err
+		}
 	}
 
 	return nil
