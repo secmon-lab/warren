@@ -62,6 +62,8 @@ func (uc *UseCases) dispatchSlackAction(ctx context.Context, action func(ctx con
 
 func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackThread model.SlackThread, text string, user model.SlackUser, ts string) error {
 	logger := logging.From(ctx)
+	th := uc.slackService.NewThread(slackThread)
+	ctx = thread.WithReplyFunc(ctx, th.Reply)
 
 	// Skip if the message is from the bot
 	if uc.slackService.IsBotUser(user.ID) {
@@ -101,8 +103,11 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackThread model.Sl
 	return nil
 }
 
-func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, slackThread model.SlackThread, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
 	logger := logging.From(ctx)
+
+	th := uc.slackService.NewThread(slackThread)
+	ctx = thread.WithReplyFunc(ctx, th.Reply)
 
 	alertID := model.AlertID(metadata)
 	alert, err := uc.repository.GetAlert(ctx, alertID)
@@ -123,7 +128,10 @@ func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context
 	return nil
 }
 
-func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, slackThread model.SlackThread, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+	th := uc.slackService.NewThread(slackThread)
+	ctx = thread.WithReplyFunc(ctx, th.Reply)
+
 	listID := model.AlertListID(metadata)
 	list, err := uc.repository.GetAlertList(ctx, listID)
 	if err != nil {
@@ -146,6 +154,7 @@ func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.
 }
 
 func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Context, user model.SlackUser, values map[string]map[string]slack.BlockAction, alerts []model.Alert) error {
+	logger := logging.From(ctx)
 	thread.Reply(ctx, fmt.Sprintf("⏳ Resolving %d alerts...", len(alerts)))
 
 	var (
@@ -184,6 +193,8 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Cont
 		th := uc.slackService.NewThread(*alert.SlackThread)
 		ctx = thread.WithReplyFunc(ctx, th.Reply)
 		th.Reply(ctx, "Alert resolved by <@"+user.ID+">")
+
+		logger.Info("alert resolved", "alert", alert)
 
 		if alert.ParentID == "" {
 			if err := th.UpdateAlert(ctx, alert); err != nil {

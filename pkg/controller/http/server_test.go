@@ -79,10 +79,10 @@ var slackInteractionJSON []byte
 func TestSlackInteractionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
 	uc := &mock.UseCaseMock{
-		HandleSlackInteractionViewSubmissionResolveAlertFunc: func(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+		HandleSlackInteractionViewSubmissionResolveAlertFunc: func(ctx context.Context, slackThread model.SlackThread, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
 			return nil
 		},
-		HandleSlackInteractionViewSubmissionResolveListFunc: func(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+		HandleSlackInteractionViewSubmissionResolveListFunc: func(ctx context.Context, slackThread model.SlackThread, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
 			return nil
 		},
 		HandleSlackInteractionBlockActionsFunc: func(ctx context.Context, user model.SlackUser, slackThread model.SlackThread, actionID model.SlackActionID, value, triggerID string) error {

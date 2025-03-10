@@ -160,9 +160,9 @@ func (x *Controller) handleSlackInteractionViewSubmission(ctx context.Context, i
 
 	switch model.SlackCallbackID(interaction.View.CallbackID) {
 	case model.SlackCallbackSubmitResolveAlert:
-		return x.uc.HandleSlackInteractionViewSubmissionResolveAlert(ctx, user, metadata, values)
+		return x.uc.HandleSlackInteractionViewSubmissionResolveAlert(ctx, slackThread, user, metadata, values)
 	case model.SlackCallbackSubmitResolveList:
-		return x.uc.HandleSlackInteractionViewSubmissionResolveList(ctx, user, metadata, values)
+		return x.uc.HandleSlackInteractionViewSubmissionResolveList(ctx, slackThread, user, metadata, values)
 	case model.SlackCallbackSubmitIgnoreList:
 		return x.uc.HandleSlackInteractionViewSubmissionIgnoreList(ctx, slackThread, metadata, values)
 	}
