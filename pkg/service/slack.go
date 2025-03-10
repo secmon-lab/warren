@@ -541,7 +541,11 @@ func (x *SlackThread) Reply(ctx context.Context, message string) {
 	)
 
 	if err != nil {
-		errs.Handle(ctx, goerr.Wrap(err, "failed to reply to slack"))
+		errs.Handle(ctx, goerr.Wrap(err, "failed to reply to slack",
+			goerr.V("channelID", x.channelID),
+			goerr.V("threadID", x.threadID),
+			goerr.V("message", message),
+		))
 	}
 }
 

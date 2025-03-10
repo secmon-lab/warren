@@ -106,6 +106,12 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackThread model.Sl
 
 func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, slackThread model.SlackThread, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
 	logger := logging.From(ctx)
+	logger.Debug("resolving alert",
+		"slack_thread", slackThread,
+		"user", user,
+		"metadata", metadata,
+		"values", values,
+	)
 
 	th := uc.slackService.NewThread(slackThread)
 	ctx = thread.WithReplyFunc(ctx, th.Reply)
@@ -131,6 +137,14 @@ func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context
 }
 
 func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, slackThread model.SlackThread, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+	logger := logging.From(ctx)
+	logger.Debug("resolving alert list",
+		"slack_thread", slackThread,
+		"user", user,
+		"metadata", metadata,
+		"values", values,
+	)
+
 	th := uc.slackService.NewThread(slackThread)
 	ctx = thread.WithReplyFunc(ctx, th.Reply)
 
@@ -158,6 +172,7 @@ func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.
 func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Context, user model.SlackUser, values map[string]map[string]slack.BlockAction, alerts []model.Alert) error {
 	logger := logging.From(ctx)
 	thread.Reply(ctx, fmt.Sprintf("⏳ Resolving %d alerts...", len(alerts)))
+	logger.Info("resolving alerts", "alerts", alerts)
 
 	var (
 		conclusion model.AlertConclusion
