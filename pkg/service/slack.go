@@ -314,6 +314,53 @@ func (x *Slack) ShowResolveAlertModal(ctx context.Context, alert model.Alert, tr
 	return nil
 }
 
+func (x *Slack) ShowIgnoreListModal(ctx context.Context, list model.AlertList, triggerID string) error {
+	req := buildIgnoreModalViewRequest(list.ID.String())
+	if _, err := x.slackClient.OpenView(triggerID, req); err != nil {
+		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
+	}
+
+	return nil
+}
+
+func buildIgnoreModalViewRequest(listID string) slack.ModalViewRequest {
+	return slack.ModalViewRequest{
+		Type: slack.VTModal,
+		Title: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Generate Ignore Policy",
+		},
+		Blocks: slack.Blocks{
+			BlockSet: []slack.Block{
+				slack.NewSectionBlock(
+					slack.NewTextBlockObject(slack.PlainTextType, "Please input prompt for generating ignore policy.", false, false),
+					nil,
+					nil,
+				),
+				slack.NewInputBlock(
+					model.SlackBlockIDIgnorePrompt.String(),
+					slack.NewTextBlockObject(slack.PlainTextType, "Prompt", false, false),
+					slack.NewTextBlockObject(slack.PlainTextType, "Add any reason, context, or information.", false, false),
+					slack.NewPlainTextInputBlockElement(
+						slack.NewTextBlockObject(slack.PlainTextType, "prompt", false, false),
+						model.SlackActionIDIgnorePrompt.String(),
+					),
+				).WithOptional(true),
+			},
+		},
+		CallbackID:      model.SlackCallbackSubmitIgnoreList.String(),
+		PrivateMetadata: listID,
+		Submit: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Ignore",
+		},
+		Close: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Cancel",
+		},
+	}
+}
+
 func (x *Slack) ShowResolveListModal(ctx context.Context, list model.AlertList, triggerID string) error {
 	req := buildResolveModalViewRequest(model.SlackCallbackSubmitResolveList, list.ID.String())
 	if _, err := x.slackClient.OpenView(triggerID, req); err != nil {

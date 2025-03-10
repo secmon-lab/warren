@@ -21,6 +21,13 @@ func dispatch(ctx context.Context, handler func(ctx context.Context) error) {
 	newCtx = thread.WithReplyFunc(newCtx, thread.ReplyFuncFrom(ctx))
 	newCtx = lang.With(newCtx, lang.From(ctx))
 
+	if model.IsSync(ctx) {
+		if err := handler(newCtx); err != nil {
+			errs.Handle(newCtx, err)
+		}
+		return
+	}
+
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -45,8 +52,6 @@ func New(uc interfaces.UseCase) *Controller {
 func (x *Controller) HandleSlackAppMention(ctx context.Context, event *slackevents.AppMentionEvent) error {
 	logger := logging.From(ctx).With("event_ts", event.EventTimeStamp)
 	ctx = logging.With(ctx, logger)
-
-	logger.Debug("slack app mention event", "event", event)
 
 	slackThread := model.SlackThread{
 		ChannelID: event.Channel,
@@ -73,7 +78,6 @@ func (x *Controller) HandleSlackAppMention(ctx context.Context, event *slackeven
 		dispatch(ctx, func(ctx context.Context) error {
 			return x.uc.HandleSlackAppMention(ctx, user, mention, slackThread)
 		})
-		logger.Info("slack app mention event", "mention", mention)
 	}
 
 	return nil
@@ -149,11 +153,18 @@ func (x *Controller) handleSlackInteractionViewSubmission(ctx context.Context, i
 		Name: interaction.User.Name,
 	}
 
+	slackThread := model.SlackThread{
+		ChannelID: interaction.Channel.ID,
+		ThreadID:  interaction.Message.ThreadTimestamp,
+	}
+
 	switch model.SlackCallbackID(interaction.View.CallbackID) {
 	case model.SlackCallbackSubmitResolveAlert:
 		return x.uc.HandleSlackInteractionViewSubmissionResolveAlert(ctx, user, metadata, values)
 	case model.SlackCallbackSubmitResolveList:
 		return x.uc.HandleSlackInteractionViewSubmissionResolveList(ctx, user, metadata, values)
+	case model.SlackCallbackSubmitIgnoreList:
+		return x.uc.HandleSlackInteractionViewSubmissionIgnoreList(ctx, slackThread, metadata, values)
 	}
 
 	return nil

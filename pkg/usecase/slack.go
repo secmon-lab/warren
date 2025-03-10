@@ -7,6 +7,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/service"
+	"github.com/secmon-lab/warren/pkg/service/source"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/errs"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -196,6 +197,34 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Cont
 	return nil
 }
 
+func (x *UseCases) HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Context, slackThread model.SlackThread, metadata string, values map[string]map[string]slack.BlockAction) error {
+	listID := model.AlertListID(metadata)
+
+	var prompt string
+	if promptBlock, ok := values[model.SlackBlockIDIgnorePrompt.String()]; ok {
+		if promptAction, ok := promptBlock[model.SlackActionIDIgnorePrompt.String()]; ok {
+			prompt = promptAction.Value
+		}
+	}
+
+	src := source.AlertListID(listID)
+	newPolicyDiff, err := x.GenerateIgnorePolicy(ctx, src, prompt)
+	if err != nil {
+		return err
+	}
+
+	if err := x.repository.PutPolicyDiff(ctx, newPolicyDiff); err != nil {
+		return err
+	}
+
+	th := x.slackService.NewThread(slackThread)
+	if err := th.PostPolicyDiff(ctx, newPolicyDiff); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user model.SlackUser, slackThread model.SlackThread, actionID model.SlackActionID, value, triggerID string) error {
 	logger := logging.From(ctx)
 
@@ -263,7 +292,22 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user
 		return uc.RunCommand(ctx, []string{"warren", "ignore", value}, nil, th, &user)
 
 	case model.SlackActionIDResolveList:
-		return uc.RunCommand(ctx, []string{"warren", "resolve", value}, nil, th, &user)
+		listID := model.AlertListID(value)
+		list, err := uc.repository.GetAlertList(ctx, listID)
+		if err != nil {
+			return goerr.Wrap(err, "failed to get alert list")
+		} else if list == nil {
+			thread.Reply(ctx, "💥 Alert list not found")
+			return nil
+		}
+
+		if svc, ok := uc.slackService.(*service.Slack); ok {
+			if err := svc.ShowResolveListModal(ctx, *list, triggerID); err != nil {
+				return goerr.Wrap(err, "failed to show resolve list modal")
+			}
+		} else {
+			logger.Warn("slack service is not available")
+		}
 
 	case model.SlackActionIDCreatePR:
 		th.Reply(ctx, "✏️ Creating pull request...")

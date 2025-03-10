@@ -9,6 +9,7 @@ func (id SlackCallbackID) String() string {
 const (
 	SlackCallbackSubmitResolveAlert SlackCallbackID = "submit_resolve_alert"
 	SlackCallbackSubmitResolveList  SlackCallbackID = "submit_resolve_list"
+	SlackCallbackSubmitIgnoreList   SlackCallbackID = "submit_ignore_list"
 )
 
 type SlackBlockID string
@@ -18,8 +19,9 @@ func (id SlackBlockID) String() string {
 }
 
 const (
-	SlackBlockIDConclusion SlackBlockID = "conclusion"
-	SlackBlockIDComment    SlackBlockID = "comment"
+	SlackBlockIDConclusion   SlackBlockID = "conclusion"
+	SlackBlockIDComment      SlackBlockID = "comment"
+	SlackBlockIDIgnorePrompt SlackBlockID = "ignore_prompt"
 )
 
 type SlackActionID string
@@ -37,8 +39,9 @@ const (
 	SlackActionIDIgnoreList  SlackActionID = "ignore_list"
 	SlackActionIDResolveList SlackActionID = "resolve_list"
 
-	SlackActionIDConclusion SlackActionID = "conclusion"
-	SlackActionIDComment    SlackActionID = "comment"
+	SlackActionIDConclusion   SlackActionID = "conclusion"
+	SlackActionIDComment      SlackActionID = "comment"
+	SlackActionIDIgnorePrompt SlackActionID = "ignore_prompt"
 )
 
 type SlackMention struct {
