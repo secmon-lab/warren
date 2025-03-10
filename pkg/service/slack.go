@@ -677,7 +677,7 @@ func buildAlertListBlocks(list *model.AlertList, metadata slackMetadata) []slack
 		nil,
 	))
 	blocks = append(blocks, slack.NewActionBlock(
-		"alert_list_actions",
+		list.ID.String(),
 		slack.NewButtonBlockElement(
 			model.SlackActionIDIgnoreList.String(),
 			list.ID.String(),
