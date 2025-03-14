@@ -533,10 +533,17 @@ func (x *SlackThread) AttachFile(ctx context.Context, title, fileName string, da
 }
 
 func (x *SlackThread) Reply(ctx context.Context, message string) {
+	blocks := []slack.Block{
+		slack.NewContextBlock(
+			"",
+			slack.NewTextBlockObject(slack.MarkdownType, message, true, false),
+		),
+	}
+
 	_, _, err := x.slackClient.PostMessageContext(
 		ctx,
 		x.channelID,
-		slack.MsgOptionText(message, false),
+		slack.MsgOptionBlocks(blocks...),
 		slack.MsgOptionTS(x.threadID),
 	)
 
