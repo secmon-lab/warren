@@ -94,3 +94,25 @@ func TestFilterQueryPrompt(t *testing.T) {
 
 	t.Log(d)
 }
+
+func TestMetaListPrompt(t *testing.T) {
+	ctx := context.Background()
+	alerts := []model.Alert{
+		model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
+			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
+		}),
+	}
+
+	alertList := model.NewAlertList(ctx, model.SlackThread{
+		ChannelID: "C0123456789",
+		ThreadID:  "T0123456789",
+	}, &model.SlackUser{
+		ID:   "U0123456789",
+		Name: "John Doe",
+	}, alerts)
+
+	d, err := prompt.BuildMetaListPrompt(ctx, alertList)
+	gt.NoError(t, err)
+
+	t.Log(d)
+}

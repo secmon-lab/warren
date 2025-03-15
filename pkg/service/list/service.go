@@ -5,8 +5,11 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/prompt"
+	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/source"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/thread"
 )
 
 type Service struct {
@@ -53,6 +56,20 @@ func (x *Service) Run(ctx context.Context, th interfaces.SlackThreadService, use
 		ThreadID:  th.ThreadID(),
 	}
 	alertList := model.NewAlertList(ctx, slackThread, user, newAlerts)
+
+	p, err := prompt.BuildMetaListPrompt(ctx, alertList)
+	if err != nil {
+		return err
+	}
+
+	thread.Reply(ctx, "🤖 Generating meta data of alert list...")
+	resp, err := service.AskPrompt[prompt.MetaListPromptResult](ctx, x.llm, p)
+	if err != nil {
+		thread.Reply(ctx, "💥 Failed to generate meta data of alert list.")
+	} else {
+		alertList.Title = resp.Title
+		alertList.Description = resp.Description
+	}
 
 	if err := x.repo.PutAlertList(ctx, alertList); err != nil {
 		return err

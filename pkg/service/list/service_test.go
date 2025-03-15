@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/vertexai/genai"
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/model"
@@ -115,8 +117,13 @@ func TestService_Run(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
+			llmMock := &mock.LLMClientMock{
+				SendMessageFunc: func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
+					return nil, goerr.New("test")
+				},
+			}
 			repo := repository.NewMemory()
-			svc := list.New(repo)
+			svc := list.New(repo, list.WithLLM(llmMock))
 			var alertList *model.AlertList
 			th := mock.SlackThreadServiceMock{
 				ReplyFunc: func(ctx context.Context, message string) {},

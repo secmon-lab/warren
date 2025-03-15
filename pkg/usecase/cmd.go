@@ -12,6 +12,8 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/prompt"
+	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/list"
 	"github.com/secmon-lab/warren/pkg/service/source"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -491,6 +493,19 @@ func (x *UseCases) cmdClustering(alerts []model.Alert, th interfaces.SlackThread
 			}
 
 			for _, cluster := range clusters {
+				p, err := prompt.BuildMetaListPrompt(ctx, cluster)
+				if err != nil {
+					return err
+				}
+				thread.Reply(ctx, "🤖 Generating meta data of alert list... ("+cluster.ID.String()+")")
+				resp, err := service.AskPrompt[prompt.MetaListPromptResult](ctx, x.llmClient, p)
+				if err != nil {
+					thread.Reply(ctx, "💥 Failed to generate meta data of alert list: "+err.Error())
+				} else {
+					cluster.Title = resp.Title
+					cluster.Description = resp.Description
+				}
+
 				if err := x.repository.PutAlertList(ctx, cluster); err != nil {
 					return err
 				}
