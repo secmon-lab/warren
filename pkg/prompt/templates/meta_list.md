@@ -10,7 +10,7 @@ Analyze the structured data of the given security alert set and generate the cor
 
 ## Output
 
-Output the result in JSON format. Schema is described below as a JSON schema.
+Output the result in JSON format. Schema is described below as a JSON schema. It must one map object, not an array.
 
 ```json
 {{ .schema }}
