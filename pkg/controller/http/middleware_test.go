@@ -1,4 +1,4 @@
-package server_test
+package http_test
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/server"
+	server "github.com/secmon-lab/warren/pkg/controller/http"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 

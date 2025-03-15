@@ -1,4 +1,4 @@
-package server_test
+package http_test
 
 import (
 	"bytes"
@@ -18,11 +18,11 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opaq"
+	server "github.com/secmon-lab/warren/pkg/controller/http"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/server"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -79,7 +79,16 @@ var slackInteractionJSON []byte
 func TestSlackInteractionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
 	uc := &mock.UseCaseMock{
-		HandleSlackInteractionFunc: func(ctx context.Context, interaction slack.InteractionCallback) error {
+		HandleSlackInteractionViewSubmissionResolveAlertFunc: func(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+			return nil
+		},
+		HandleSlackInteractionViewSubmissionResolveListFunc: func(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+			return nil
+		},
+		HandleSlackInteractionViewSubmissionIgnoreListFunc: func(ctx context.Context, metadata string, values map[string]map[string]slack.BlockAction) error {
+			return nil
+		},
+		HandleSlackInteractionBlockActionsFunc: func(ctx context.Context, user model.SlackUser, slackThread model.SlackThread, actionID model.SlackActionID, value, triggerID string) error {
 			return nil
 		},
 	}
@@ -106,6 +115,44 @@ func TestSlackInteractionHandler(t *testing.T) {
 
 		gt.Equal(t, http.StatusOK, w.Code)
 	})
+}
+
+//go:embed testdata/slack_mention.json
+var slackMentionJSON []byte
+
+func TestSlackMentionHandler(t *testing.T) {
+	signingSecret := "test_signing_secret"
+	uc := &mock.UseCaseMock{
+		HandleSlackAppMentionFunc: func(ctx context.Context, user model.SlackUser, mention model.SlackMention, slackThread model.SlackThread) error {
+			gt.Equal(t, user.ID, "U8JLN34SV")
+			gt.Equal(t, slackThread.ChannelID, "C07AR2FPG1F")
+			gt.Equal(t, slackThread.ThreadID, "1741487414.163419")
+			gt.Equal(t, mention.UserID, "U08A3TTRENS")
+			gt.Equal(t, mention.Args, []string{"kokoro"})
+			return nil
+		},
+	}
+	srv := server.New(uc, server.WithSlackVerifier(service.NewSlackPayloadVerifier(signingSecret)))
+
+	t.Run("with valid signature", func(t *testing.T) {
+		ctx := model.WithSync(t.Context(), true)
+		ts := fmt.Sprint(time.Now().Unix())
+
+		// Calculate signature
+		signature := calculateSlackSignature(string(slackMentionJSON), ts, signingSecret)
+
+		req := httptest.NewRequest("POST", "/slack/event", strings.NewReader(string(slackMentionJSON)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Slack-Signature", signature)
+		req.Header.Set("X-Slack-Request-Timestamp", ts)
+		w := httptest.NewRecorder()
+		srv.ServeHTTP(w, req.WithContext(ctx))
+
+		gt.Equal(t, http.StatusOK, w.Code)
+
+		gt.A(t, uc.HandleSlackAppMentionCalls()).Length(1)
+	})
+
 }
 
 func calculateSlackSignature(payload string, ts string, signingSecret string) string {

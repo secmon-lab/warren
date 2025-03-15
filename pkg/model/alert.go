@@ -143,7 +143,8 @@ type Alert struct {
 
 	Assignee    *SlackUser   `json:"assignee"`
 	SlackThread *SlackThread `json:"slack_thread"`
-	Embedding   []float32    `json:"-"`
+
+	Embedding []float32 `json:"-"`
 }
 
 type SlackThread struct {
@@ -178,10 +179,10 @@ type Attribute struct {
 }
 
 type AlertComment struct {
-	AlertID   AlertID `json:"alert_id"`
-	Timestamp string  `json:"timestamp"`
-	Comment   string  `json:"comment"`
-	UserID    string  `json:"user_id"`
+	AlertID   AlertID   `json:"alert_id"`
+	Timestamp string    `json:"timestamp"`
+	Comment   string    `json:"comment"`
+	User      SlackUser `json:"user"`
 }
 
 type AlertListID string

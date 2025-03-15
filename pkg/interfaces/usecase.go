@@ -5,14 +5,18 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/slack-go/slack"
-	"github.com/slack-go/slack/slackevents"
 )
 
 type UseCase interface {
-	// Slack related handlers
-	HandleSlackAppMention(ctx context.Context, event *slackevents.AppMentionEvent) error
-	HandleSlackMessage(ctx context.Context, event *slackevents.MessageEvent) error
-	HandleSlackInteraction(ctx context.Context, interaction slack.InteractionCallback) error
+	// Slack event handlers
+	HandleSlackMessage(ctx context.Context, slackThread model.SlackThread, text string, user model.SlackUser, ts string) error
+	HandleSlackAppMention(ctx context.Context, user model.SlackUser, mention model.SlackMention, slackThread model.SlackThread) error
+
+	// Slack interaction handlers
+	HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error
+	HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error
+	HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Context, metadata string, values map[string]map[string]slack.BlockAction) error
+	HandleSlackInteractionBlockActions(ctx context.Context, user model.SlackUser, slackThread model.SlackThread, actionID model.SlackActionID, value, triggerID string) error
 
 	// Alert related handlers
 	HandleAlert(ctx context.Context, schema string, alertData any, policyClient PolicyClient) ([]*model.Alert, error)

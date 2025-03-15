@@ -3,62 +3,44 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"unicode/utf8"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/service"
+	"github.com/secmon-lab/warren/pkg/service/source"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/errs"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
 	"github.com/slack-go/slack"
-	"github.com/slack-go/slack/slackevents"
 )
 
-func (uc *UseCases) HandleSlackAppMention(ctx context.Context, event *slackevents.AppMentionEvent) error {
-	logger := logging.From(ctx).With("event_ts", event.EventTimeStamp)
-	ctx = logging.With(ctx, logger)
+func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user model.SlackUser, mention model.SlackMention, slackThread model.SlackThread) error {
+	logger := logging.From(ctx)
+	logger.Debug("slack app mention event", "mention", mention, "slack_thread", slackThread)
 
-	logger.Debug("slack app mention event", "event", event)
-
-	threadData := model.SlackThread{
-		ChannelID: event.Channel,
-		ThreadID:  event.ThreadTimeStamp,
-	}
-	if threadData.ThreadID == "" {
-		threadData.ThreadID = event.TimeStamp
+	// Nothing to do
+	if !uc.slackService.IsBotUser(mention.UserID) {
+		return nil
 	}
 
-	alert, err := uc.repository.GetAlertBySlackThread(ctx, threadData)
+	alerts, err := uc.repository.GetAlertsBySlackThread(ctx, slackThread)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert by slack thread")
 	}
 
-	mention := uc.slackService.TrimMention(event.Text)
-	if mention == "" {
-		logger.Warn("slack app mention event is empty", "event", event)
-		return nil
-	}
-
-	args := parseArgs(mention)
-
-	logger.Info("slack app mention event", "mention", mention, "thread", threadData)
-	logger.Debug("Parsed args", "args", args)
-
-	th := uc.slackService.NewThread(threadData)
+	th := uc.slackService.NewThread(slackThread)
 	ctx = thread.WithReplyFunc(ctx, th.Reply)
 
-	if len(args) == 0 {
+	if len(mention.Args) == 0 {
 		th.Reply(ctx, "⏸️ No action specified")
 		return nil
 	}
 
-	arguments := append([]string{"warren"}, args...)
+	arguments := append([]string{"warren"}, mention.Args...)
 	uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-		return uc.RunCommand(ctx, arguments, alert, th, &model.SlackUser{
-			ID:   event.User,
-			Name: event.User,
-		})
+		return uc.RunCommand(ctx, arguments, alerts, th, &user)
 	})
 
 	return nil
@@ -79,87 +61,135 @@ func (uc *UseCases) dispatchSlackAction(ctx context.Context, action func(ctx con
 	}()
 }
 
-func (uc *UseCases) HandleSlackMessage(ctx context.Context, event *slackevents.MessageEvent) error {
+func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackThread model.SlackThread, text string, user model.SlackUser, ts string) error {
 	logger := logging.From(ctx)
-	logger.Debug("slack message event", "event", event)
+	th := uc.slackService.NewThread(slackThread)
+	ctx = thread.WithReplyFunc(ctx, th.Reply)
 
-	if event.ThreadTimeStamp == "" {
+	// Skip if the message is from the bot
+	if uc.slackService.IsBotUser(user.ID) {
 		return nil
 	}
 
-	thread := model.SlackThread{
-		ChannelID: event.Channel,
-		ThreadID:  event.ThreadTimeStamp,
-	}
-	alert, err := uc.repository.GetAlertBySlackThread(ctx, thread)
+	alerts, err := uc.repository.GetAlertsBySlackThread(ctx, slackThread)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert by slack thread")
 	}
-	if alert == nil {
-		logger.Info("alert not found", "thread", thread)
+	if len(alerts) == 0 {
+		logger.Info("alert not found", "thread", slackThread)
+		return nil
+	}
+
+	var baseAlert *model.Alert
+	for _, a := range alerts {
+		if a.ParentID == "" {
+			baseAlert = &a
+		}
+	}
+	if baseAlert == nil {
+		logger.Warn("base alert not found", "thread", slackThread)
 		return nil
 	}
 
 	comment := model.AlertComment{
-		AlertID:   alert.ID,
-		Comment:   event.Text,
-		Timestamp: event.EventTimeStamp,
-		UserID:    event.User,
+		AlertID:   baseAlert.ID,
+		Comment:   text,
+		Timestamp: ts,
+		User:      user,
 	}
 	if err := uc.repository.InsertAlertComment(ctx, comment); err != nil {
+		thread.Reply(ctx, "💥 Failed to insert alert comment\n> "+err.Error())
 		return goerr.Wrap(err, "failed to insert alert comment", goerr.V("comment", comment))
 	}
 
 	return nil
 }
 
-func (uc *UseCases) HandleSlackInteraction(ctx context.Context, interaction slack.InteractionCallback) error {
+func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
 	logger := logging.From(ctx)
-	logger.Info("slack interaction event", "event", interaction)
+	logger.Debug("resolving alert",
+		"user", user,
+		"metadata", metadata,
+		"values", values,
+	)
 
-	switch interaction.Type {
-	case slack.InteractionTypeBlockActions:
-		return uc.handleSlackInteractionBlockActions(ctx, interaction)
-	case slack.InteractionTypeViewSubmission:
-		return uc.handleSlackInteractionViewSubmission(ctx, interaction)
-	}
-
-	return nil
-}
-
-func (uc *UseCases) handleSlackInteractionViewSubmission(ctx context.Context, interaction slack.InteractionCallback) error {
-	switch interaction.View.CallbackID {
-	case "submit_resolve":
-		return uc.handleSlackInteractionViewSubmissionClose(ctx, interaction)
-	}
-
-	return nil
-}
-
-func (uc *UseCases) handleSlackInteractionViewSubmissionClose(ctx context.Context, interaction slack.InteractionCallback) error {
-	logger := logging.From(ctx)
-
-	alertID := model.AlertID(interaction.View.PrivateMetadata)
+	alertID := model.AlertID(metadata)
 	alert, err := uc.repository.GetAlert(ctx, alertID)
 	if err != nil {
+		thread.Reply(ctx, "💥 Failed to get alert\n> "+err.Error())
 		return goerr.Wrap(err, "failed to get alert")
 	}
 	if alert == nil {
-		logger.Error("alert not found", "alert_id", alertID)
+		thread.Reply(ctx, "💥 Alert not found")
 		return nil
 	}
+
+	if alert.SlackThread != nil {
+		th := uc.slackService.NewThread(*alert.SlackThread)
+		ctx = thread.WithReplyFunc(ctx, th.Reply)
+	}
+
+	if err := uc.handleSlackInteractionViewSubmissionResolve(ctx, user, values, []model.Alert{*alert}); err != nil {
+		thread.Reply(ctx, "💥 Failed to resolve alert\n> "+err.Error())
+		logger.Error("failed to resolve alert", "error", err)
+		return err
+	}
+
+	return nil
+}
+
+func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+	logger := logging.From(ctx)
+	logger.Debug("resolving alert list",
+		"user", user,
+		"metadata", metadata,
+		"values", values,
+	)
+
+	listID := model.AlertListID(metadata)
+	list, err := uc.repository.GetAlertList(ctx, listID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alert list", goerr.V("list_id", listID))
+	}
+	if list == nil {
+		return goerr.Wrap(err, "alert list not found", goerr.V("list_id", listID))
+	}
+
+	if list.SlackThread != nil {
+		th := uc.slackService.NewThread(*list.SlackThread)
+		ctx = thread.WithReplyFunc(ctx, th.Reply)
+	}
+
+	alerts, err := uc.repository.BatchGetAlerts(ctx, list.AlertIDs)
+	if err != nil {
+		thread.Reply(ctx, "💥 Failed to get alerts\n> "+err.Error())
+		return goerr.Wrap(err, "failed to get alerts")
+	}
+
+	if err := uc.handleSlackInteractionViewSubmissionResolve(ctx, user, values, alerts); err != nil {
+		thread.Reply(ctx, "💥 Failed to resolve alerts of list\n> "+err.Error())
+		return goerr.Wrap(err, "failed to resolve alerts")
+	}
+
+	return nil
+}
+
+func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Context, user model.SlackUser, values map[string]map[string]slack.BlockAction, alerts []model.Alert) error {
+	logger := logging.From(ctx)
+	thread.Reply(ctx, fmt.Sprintf("⏳ Resolving %d alerts...", len(alerts)))
+	logger.Info("resolving alerts", "alerts", alerts)
 
 	var (
 		conclusion model.AlertConclusion
 		reason     string
 	)
-	if conclusionBlock, ok := interaction.View.State.Values["conclusion"]; ok {
-		if conclusionAction, ok := conclusionBlock["conclusion"]; ok {
+	if conclusionBlock, ok := values[model.SlackBlockIDConclusion.String()]; ok {
+		if conclusionAction, ok := conclusionBlock[model.SlackActionIDConclusion.String()]; ok {
 			conclusion = model.AlertConclusion(conclusionAction.SelectedOption.Value)
 		}
 	}
-	if commentBlock, ok := interaction.View.State.Values["comment"]; ok {
-		if commentAction, ok := commentBlock["comment"]; ok {
+	if commentBlock, ok := values[model.SlackBlockIDComment.String()]; ok {
+		if commentAction, ok := commentBlock[model.SlackActionIDComment.String()]; ok {
 			reason = commentAction.Value
 		}
 	}
@@ -169,51 +199,97 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionClose(ctx context.Contex
 	}
 
 	now := clock.Now(ctx)
-	alert.Status = model.AlertStatusResolved
-	alert.ResolvedAt = &now
-	alert.Conclusion = conclusion
-	alert.Reason = reason
-	if alert.Assignee == nil {
-		alert.Assignee = &model.SlackUser{
-			ID:   interaction.User.ID,
-			Name: interaction.User.Name,
+	for _, alert := range alerts {
+		alert.Status = model.AlertStatusResolved
+		alert.ResolvedAt = &now
+		alert.Conclusion = conclusion
+		alert.Reason = reason
+		if alert.Assignee == nil {
+			alert.Assignee = &user
+		}
+
+		if err := uc.repository.PutAlert(ctx, alert); err != nil {
+			return goerr.Wrap(err, "failed to put alert")
+		}
+
+		th := uc.slackService.NewThread(*alert.SlackThread)
+		newCtx := thread.WithReplyFunc(ctx, th.Reply)
+		thread.Reply(newCtx, "Alert resolved by <@"+user.ID+">")
+
+		logger.Info("alert resolved", "alert", alert)
+
+		if alert.ParentID == "" {
+			if err := th.UpdateAlert(newCtx, alert); err != nil {
+				return goerr.Wrap(err, "failed to update slack thread")
+			}
 		}
 	}
 
-	if err := uc.repository.PutAlert(ctx, *alert); err != nil {
-		return goerr.Wrap(err, "failed to put alert")
+	thread.Reply(ctx, fmt.Sprintf("✅️ Resolved %d alerts", len(alerts)))
+
+	return nil
+}
+
+func (x *UseCases) HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Context, metadata string, values map[string]map[string]slack.BlockAction) error {
+	listID := model.AlertListID(metadata)
+
+	var prompt string
+	if promptBlock, ok := values[model.SlackBlockIDIgnorePrompt.String()]; ok {
+		if promptAction, ok := promptBlock[model.SlackActionIDIgnorePrompt.String()]; ok {
+			prompt = promptAction.Value
+		}
 	}
 
-	th := uc.slackService.NewThread(*alert.SlackThread)
-	ctx = thread.WithReplyFunc(ctx, th.Reply)
-	th.Reply(ctx, "Alert resolved by <@"+interaction.User.ID+">")
+	list, err := x.repository.GetAlertList(ctx, listID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alert list", goerr.V("list_id", listID))
+	}
+	if list == nil {
+		return goerr.Wrap(err, "alert list not found", goerr.V("list_id", listID))
+	}
 
-	if err := th.UpdateAlert(ctx, *alert); err != nil {
-		return goerr.Wrap(err, "failed to update slack thread")
+	var th interfaces.SlackThreadService
+	if list.SlackThread != nil {
+		th = x.slackService.NewThread(*list.SlackThread)
+	}
+
+	src := source.AlertListID(listID)
+
+	newPolicyDiff, err := x.GenerateIgnorePolicy(ctx, src, prompt)
+	if err != nil {
+		return err
+	}
+
+	if err := x.repository.PutPolicyDiff(ctx, newPolicyDiff); err != nil {
+		return err
+	}
+
+	if th != nil {
+		if err := th.PostPolicyDiff(ctx, newPolicyDiff); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, interaction slack.InteractionCallback) error {
+func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user model.SlackUser, slackThread model.SlackThread, actionID model.SlackActionID, value, triggerID string) error {
 	logger := logging.From(ctx)
 
-	action := interaction.ActionCallback.BlockActions[0]
+	th := uc.slackService.NewThread(slackThread)
+	ctx = thread.WithReplyFunc(ctx, th.Reply)
 
-	switch action.ActionID {
-	case "ack":
-		alert, err := uc.repository.GetAlert(ctx, model.AlertID(action.Value))
+	switch actionID {
+	case model.SlackActionIDAck:
+		alert, err := uc.repository.GetAlert(ctx, model.AlertID(value))
 		if err != nil {
 			return goerr.Wrap(err, "failed to get alert")
 		} else if alert == nil {
-			logger.Error("alert not found", "alert_id", action.Value)
+			logger.Error("alert not found", "alert_id", value)
 			return nil
 		}
 
-		alert.Assignee = &model.SlackUser{
-			ID:   interaction.User.ID,
-			Name: interaction.User.Name,
-		}
+		alert.Assignee = &user
 		alert.Status = model.AlertStatusAcknowledged
 		if err := uc.repository.PutAlert(ctx, *alert); err != nil {
 			return goerr.Wrap(err, "failed to put alert")
@@ -221,7 +297,7 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 
 		if alert.SlackThread != nil {
 			thread := uc.slackService.NewThread(*alert.SlackThread)
-			thread.Reply(ctx, "Alert acknowledged by <@"+interaction.User.ID+">")
+			thread.Reply(ctx, "Alert acknowledged by <@"+user.ID+">")
 
 			if err := thread.UpdateAlert(ctx, *alert); err != nil {
 				return goerr.Wrap(err, "failed to update slack thread")
@@ -230,154 +306,83 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, inte
 			logger.Warn("slack thread not found", "alert_id", alert.ID)
 		}
 
-	case "resolve":
-		alert, err := uc.repository.GetAlert(ctx, model.AlertID(action.Value))
+	case model.SlackActionIDResolve:
+		alert, err := uc.repository.GetAlert(ctx, model.AlertID(value))
 		if err != nil {
 			return goerr.Wrap(err, "failed to get alert")
 		} else if alert == nil {
-			logger.Error("alert not found", "alert_id", action.Value)
+			logger.Error("alert not found", "alert_id", value)
 			return nil
 		}
 
-		triggerID := interaction.TriggerID
-
-		if err := uc.slackService.ShowResolveAlertModal(ctx, *alert, triggerID); err != nil {
-			return goerr.Wrap(err, "failed to show resolve alert modal")
+		if svc, ok := uc.slackService.(*service.Slack); ok {
+			if err := svc.ShowResolveAlertModal(ctx, *alert, triggerID); err != nil {
+				return goerr.Wrap(err, "failed to show resolve alert modal")
+			}
+		} else {
+			logger.Warn("slack service is not available")
 		}
 
-	case "inspect":
-		alert, err := uc.repository.GetAlert(ctx, model.AlertID(action.Value))
+	case model.SlackActionIDInspect:
+		alert, err := uc.repository.GetAlert(ctx, model.AlertID(value))
 		if err != nil {
 			return goerr.Wrap(err, "failed to get alert")
 		} else if alert == nil {
-			logger.Error("alert not found", "alert_id", action.Value)
+			logger.Error("alert not found", "alert_id", value)
 			return nil
 		}
 
-		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-			if err := uc.RunWorkflow(ctx, *alert); err != nil {
-				return err
-			}
+		if err := uc.RunWorkflow(ctx, *alert); err != nil {
+			return err
+		}
 
+	case model.SlackActionIDIgnoreList:
+		return uc.RunCommand(ctx, []string{"warren", "ignore", value}, nil, th, &user)
+
+	case model.SlackActionIDResolveList:
+		listID := model.AlertListID(value)
+		list, err := uc.repository.GetAlertList(ctx, listID)
+		if err != nil {
+			return goerr.Wrap(err, "failed to get alert list")
+		} else if list == nil {
+			thread.Reply(ctx, "💥 Alert list not found")
 			return nil
-		})
+		}
 
-	case "create_pr":
-		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-			th := uc.slackService.NewThread(model.SlackThread{
-				ChannelID: interaction.Channel.ID,
-				ThreadID:  interaction.Message.ThreadTimestamp,
-			})
-			ctx = thread.WithReplyFunc(ctx, th.Reply)
-
-			th.Reply(ctx, "✏️ Creating pull request...")
-
-			diffID := model.PolicyDiffID(action.Value)
-			diff, err := uc.repository.GetPolicyDiff(ctx, diffID)
-			if err != nil {
-				thread.Reply(ctx, "💥 Failed to get policy diff\n> "+err.Error())
-				return goerr.Wrap(err, "failed to get policy diff")
-			} else if diff == nil {
-				thread.Reply(ctx, "💥 Policy diff not found")
-				return nil
+		if svc, ok := uc.slackService.(*service.Slack); ok {
+			if err := svc.ShowResolveListModal(ctx, *list, triggerID); err != nil {
+				return goerr.Wrap(err, "failed to show resolve list modal")
 			}
+		} else {
+			logger.Warn("slack service is not available")
+		}
 
-			if uc.gitHubApp == nil {
-				thread.Reply(ctx, "💥 GitHub is not enabled")
-				return nil
-			}
+	case model.SlackActionIDCreatePR:
+		th.Reply(ctx, "✏️ Creating pull request...")
 
-			prURL, err := uc.gitHubApp.CreatePullRequest(ctx, diff)
-			if err != nil {
-				thread.Reply(ctx, "💥 Failed to create pull request\n> "+err.Error())
-				return err
-			}
-
-			thread.Reply(ctx, fmt.Sprintf("✅️ Created: <%s|%s>", prURL.String(), diff.Title))
-
+		diffID := model.PolicyDiffID(value)
+		diff, err := uc.repository.GetPolicyDiff(ctx, diffID)
+		if err != nil {
+			thread.Reply(ctx, "💥 Failed to get policy diff\n> "+err.Error())
+			return goerr.Wrap(err, "failed to get policy diff")
+		} else if diff == nil {
+			thread.Reply(ctx, "💥 Policy diff not found")
 			return nil
-		})
+		}
+
+		if uc.gitHubApp == nil {
+			thread.Reply(ctx, "💥 GitHub is not enabled")
+			return nil
+		}
+
+		prURL, err := uc.gitHubApp.CreatePullRequest(ctx, diff)
+		if err != nil {
+			thread.Reply(ctx, "💥 Failed to create pull request\n> "+err.Error())
+			return err
+		}
+
+		thread.Reply(ctx, fmt.Sprintf("✅️ Created: <%s|%s>", prURL.String(), diff.Title))
 	}
 
 	return nil
-}
-
-// parseArgs parses a string into arguments, handling various types of quotes
-func parseArgs(input string) []string {
-	var result []string
-	var current []rune
-	var inQuotes bool
-	var quoteChar rune
-
-	// Unicode code points for quotes
-	const (
-		leftDoubleQuote  = '\u201c' // "
-		rightDoubleQuote = '\u201d' // "
-		leftSingleQuote  = '\u2018' // '
-		rightSingleQuote = '\u2019' // '
-	)
-
-	// isMatchingQuote checks if two quote characters form a matching pair
-	isMatchingQuote := func(open, close rune) bool {
-		return open == close || // Same quotes
-			(open == leftDoubleQuote && close == rightDoubleQuote) || // Unicode double quotes
-			(open == leftSingleQuote && close == rightSingleQuote) // Unicode single quotes
-	}
-
-	for i := 0; i < len(input); {
-		char, size := utf8.DecodeRuneInString(input[i:])
-		i += size
-
-		switch char {
-		case '\\':
-			if i < len(input) {
-				nextChar, size := utf8.DecodeRuneInString(input[i:])
-				if nextChar == '\\' || nextChar == '"' || nextChar == '\'' ||
-					nextChar == leftDoubleQuote || nextChar == rightDoubleQuote ||
-					nextChar == leftSingleQuote || nextChar == rightSingleQuote ||
-					nextChar == '`' {
-					current = append(current, nextChar)
-					i += size
-				} else {
-					current = append(current, char)
-				}
-			} else {
-				current = append(current, char)
-			}
-		case '"', '\'', leftDoubleQuote, rightDoubleQuote, leftSingleQuote, rightSingleQuote, '`':
-			if inQuotes {
-				if isMatchingQuote(quoteChar, char) {
-					inQuotes = false
-					if len(current) > 0 {
-						result = append(result, string(current))
-						current = nil
-					}
-				} else {
-					current = append(current, char)
-				}
-			} else {
-				inQuotes = true
-				quoteChar = char
-				if len(current) > 0 {
-					result = append(result, string(current))
-					current = nil
-				}
-			}
-		case ' ':
-			if inQuotes {
-				current = append(current, char)
-			} else if len(current) > 0 {
-				result = append(result, string(current))
-				current = nil
-			}
-		default:
-			current = append(current, char)
-		}
-	}
-
-	if len(current) > 0 {
-		result = append(result, string(current))
-	}
-
-	return result
 }

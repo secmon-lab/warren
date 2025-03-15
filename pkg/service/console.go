@@ -23,11 +23,11 @@ type Console struct {
 	writer    io.Writer
 }
 
-func (c *Console) TrimMention(message string) string {
-	return message
-}
-
 var _ interfaces.SlackService = &Console{}
+
+func (c *Console) IsBotUser(userID string) bool {
+	return false
+}
 
 func (c *Console) NewThread(thread model.SlackThread) interfaces.SlackThreadService {
 	return &ConsoleThread{

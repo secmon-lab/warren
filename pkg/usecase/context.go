@@ -17,3 +17,15 @@ func newBackgroundContext(ctx context.Context) context.Context {
 
 	return newCtx
 }
+
+type ctxKeySync struct{}
+
+var syncKey = ctxKeySync{}
+
+func WithSync(ctx context.Context, sync bool) context.Context {
+	return context.WithValue(ctx, syncKey, sync)
+}
+
+func IsSync(ctx context.Context) bool {
+	return ctx.Value(syncKey).(bool)
+}

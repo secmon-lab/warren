@@ -12,7 +12,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/slack-go/slack"
-	"github.com/slack-go/slack/slackevents"
 	"github.com/urfave/cli/v3"
 	"log/slog"
 	"sync"
@@ -29,17 +28,14 @@ var _ interfaces.SlackService = &SlackServiceMock{}
 //
 //		// make and configure a mocked interfaces.SlackService
 //		mockedSlackService := &SlackServiceMock{
+//			IsBotUserFunc: func(userID string) bool {
+//				panic("mock out the IsBotUser method")
+//			},
 //			NewThreadFunc: func(thread model.SlackThread) interfaces.SlackThreadService {
 //				panic("mock out the NewThread method")
 //			},
 //			PostAlertFunc: func(ctx context.Context, alert model.Alert) (interfaces.SlackThreadService, error) {
 //				panic("mock out the PostAlert method")
-//			},
-//			ShowResolveAlertModalFunc: func(ctx context.Context, alert model.Alert, triggerID string) error {
-//				panic("mock out the ShowResolveAlertModal method")
-//			},
-//			TrimMentionFunc: func(message string) string {
-//				panic("mock out the TrimMention method")
 //			},
 //		}
 //
@@ -48,20 +44,22 @@ var _ interfaces.SlackService = &SlackServiceMock{}
 //
 //	}
 type SlackServiceMock struct {
+	// IsBotUserFunc mocks the IsBotUser method.
+	IsBotUserFunc func(userID string) bool
+
 	// NewThreadFunc mocks the NewThread method.
 	NewThreadFunc func(thread model.SlackThread) interfaces.SlackThreadService
 
 	// PostAlertFunc mocks the PostAlert method.
 	PostAlertFunc func(ctx context.Context, alert model.Alert) (interfaces.SlackThreadService, error)
 
-	// ShowResolveAlertModalFunc mocks the ShowResolveAlertModal method.
-	ShowResolveAlertModalFunc func(ctx context.Context, alert model.Alert, triggerID string) error
-
-	// TrimMentionFunc mocks the TrimMention method.
-	TrimMentionFunc func(message string) string
-
 	// calls tracks calls to the methods.
 	calls struct {
+		// IsBotUser holds details about calls to the IsBotUser method.
+		IsBotUser []struct {
+			// UserID is the userID argument value.
+			UserID string
+		}
 		// NewThread holds details about calls to the NewThread method.
 		NewThread []struct {
 			// Thread is the thread argument value.
@@ -74,25 +72,42 @@ type SlackServiceMock struct {
 			// Alert is the alert argument value.
 			Alert model.Alert
 		}
-		// ShowResolveAlertModal holds details about calls to the ShowResolveAlertModal method.
-		ShowResolveAlertModal []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Alert is the alert argument value.
-			Alert model.Alert
-			// TriggerID is the triggerID argument value.
-			TriggerID string
-		}
-		// TrimMention holds details about calls to the TrimMention method.
-		TrimMention []struct {
-			// Message is the message argument value.
-			Message string
-		}
 	}
-	lockNewThread             sync.RWMutex
-	lockPostAlert             sync.RWMutex
-	lockShowResolveAlertModal sync.RWMutex
-	lockTrimMention           sync.RWMutex
+	lockIsBotUser sync.RWMutex
+	lockNewThread sync.RWMutex
+	lockPostAlert sync.RWMutex
+}
+
+// IsBotUser calls IsBotUserFunc.
+func (mock *SlackServiceMock) IsBotUser(userID string) bool {
+	if mock.IsBotUserFunc == nil {
+		panic("SlackServiceMock.IsBotUserFunc: method is nil but SlackService.IsBotUser was just called")
+	}
+	callInfo := struct {
+		UserID string
+	}{
+		UserID: userID,
+	}
+	mock.lockIsBotUser.Lock()
+	mock.calls.IsBotUser = append(mock.calls.IsBotUser, callInfo)
+	mock.lockIsBotUser.Unlock()
+	return mock.IsBotUserFunc(userID)
+}
+
+// IsBotUserCalls gets all the calls that were made to IsBotUser.
+// Check the length with:
+//
+//	len(mockedSlackService.IsBotUserCalls())
+func (mock *SlackServiceMock) IsBotUserCalls() []struct {
+	UserID string
+} {
+	var calls []struct {
+		UserID string
+	}
+	mock.lockIsBotUser.RLock()
+	calls = mock.calls.IsBotUser
+	mock.lockIsBotUser.RUnlock()
+	return calls
 }
 
 // NewThread calls NewThreadFunc.
@@ -160,78 +175,6 @@ func (mock *SlackServiceMock) PostAlertCalls() []struct {
 	mock.lockPostAlert.RLock()
 	calls = mock.calls.PostAlert
 	mock.lockPostAlert.RUnlock()
-	return calls
-}
-
-// ShowResolveAlertModal calls ShowResolveAlertModalFunc.
-func (mock *SlackServiceMock) ShowResolveAlertModal(ctx context.Context, alert model.Alert, triggerID string) error {
-	if mock.ShowResolveAlertModalFunc == nil {
-		panic("SlackServiceMock.ShowResolveAlertModalFunc: method is nil but SlackService.ShowResolveAlertModal was just called")
-	}
-	callInfo := struct {
-		Ctx       context.Context
-		Alert     model.Alert
-		TriggerID string
-	}{
-		Ctx:       ctx,
-		Alert:     alert,
-		TriggerID: triggerID,
-	}
-	mock.lockShowResolveAlertModal.Lock()
-	mock.calls.ShowResolveAlertModal = append(mock.calls.ShowResolveAlertModal, callInfo)
-	mock.lockShowResolveAlertModal.Unlock()
-	return mock.ShowResolveAlertModalFunc(ctx, alert, triggerID)
-}
-
-// ShowResolveAlertModalCalls gets all the calls that were made to ShowResolveAlertModal.
-// Check the length with:
-//
-//	len(mockedSlackService.ShowResolveAlertModalCalls())
-func (mock *SlackServiceMock) ShowResolveAlertModalCalls() []struct {
-	Ctx       context.Context
-	Alert     model.Alert
-	TriggerID string
-} {
-	var calls []struct {
-		Ctx       context.Context
-		Alert     model.Alert
-		TriggerID string
-	}
-	mock.lockShowResolveAlertModal.RLock()
-	calls = mock.calls.ShowResolveAlertModal
-	mock.lockShowResolveAlertModal.RUnlock()
-	return calls
-}
-
-// TrimMention calls TrimMentionFunc.
-func (mock *SlackServiceMock) TrimMention(message string) string {
-	if mock.TrimMentionFunc == nil {
-		panic("SlackServiceMock.TrimMentionFunc: method is nil but SlackService.TrimMention was just called")
-	}
-	callInfo := struct {
-		Message string
-	}{
-		Message: message,
-	}
-	mock.lockTrimMention.Lock()
-	mock.calls.TrimMention = append(mock.calls.TrimMention, callInfo)
-	mock.lockTrimMention.Unlock()
-	return mock.TrimMentionFunc(message)
-}
-
-// TrimMentionCalls gets all the calls that were made to TrimMention.
-// Check the length with:
-//
-//	len(mockedSlackService.TrimMentionCalls())
-func (mock *SlackServiceMock) TrimMentionCalls() []struct {
-	Message string
-} {
-	var calls []struct {
-		Message string
-	}
-	mock.lockTrimMention.RLock()
-	calls = mock.calls.TrimMention
-	mock.lockTrimMention.RUnlock()
 	return calls
 }
 
@@ -1014,9 +957,6 @@ var _ interfaces.Repository = &RepositoryMock{}
 //			GetAlertFunc: func(ctx context.Context, alertID model.AlertID) (*model.Alert, error) {
 //				panic("mock out the GetAlert method")
 //			},
-//			GetAlertBySlackThreadFunc: func(ctx context.Context, thread model.SlackThread) (*model.Alert, error) {
-//				panic("mock out the GetAlertBySlackThread method")
-//			},
 //			GetAlertCommentsFunc: func(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error) {
 //				panic("mock out the GetAlertComments method")
 //			},
@@ -1028,6 +968,9 @@ var _ interfaces.Repository = &RepositoryMock{}
 //			},
 //			GetAlertsByParentIDFunc: func(ctx context.Context, parentID model.AlertID) ([]model.Alert, error) {
 //				panic("mock out the GetAlertsByParentID method")
+//			},
+//			GetAlertsBySlackThreadFunc: func(ctx context.Context, thread model.SlackThread) ([]model.Alert, error) {
+//				panic("mock out the GetAlertsBySlackThread method")
 //			},
 //			GetAlertsBySpanFunc: func(ctx context.Context, begin time.Time, end time.Time) ([]model.Alert, error) {
 //				panic("mock out the GetAlertsBySpan method")
@@ -1081,9 +1024,6 @@ type RepositoryMock struct {
 	// GetAlertFunc mocks the GetAlert method.
 	GetAlertFunc func(ctx context.Context, alertID model.AlertID) (*model.Alert, error)
 
-	// GetAlertBySlackThreadFunc mocks the GetAlertBySlackThread method.
-	GetAlertBySlackThreadFunc func(ctx context.Context, thread model.SlackThread) (*model.Alert, error)
-
 	// GetAlertCommentsFunc mocks the GetAlertComments method.
 	GetAlertCommentsFunc func(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error)
 
@@ -1095,6 +1035,9 @@ type RepositoryMock struct {
 
 	// GetAlertsByParentIDFunc mocks the GetAlertsByParentID method.
 	GetAlertsByParentIDFunc func(ctx context.Context, parentID model.AlertID) ([]model.Alert, error)
+
+	// GetAlertsBySlackThreadFunc mocks the GetAlertsBySlackThread method.
+	GetAlertsBySlackThreadFunc func(ctx context.Context, thread model.SlackThread) ([]model.Alert, error)
 
 	// GetAlertsBySpanFunc mocks the GetAlertsBySpan method.
 	GetAlertsBySpanFunc func(ctx context.Context, begin time.Time, end time.Time) ([]model.Alert, error)
@@ -1165,13 +1108,6 @@ type RepositoryMock struct {
 			// AlertID is the alertID argument value.
 			AlertID model.AlertID
 		}
-		// GetAlertBySlackThread holds details about calls to the GetAlertBySlackThread method.
-		GetAlertBySlackThread []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Thread is the thread argument value.
-			Thread model.SlackThread
-		}
 		// GetAlertComments holds details about calls to the GetAlertComments method.
 		GetAlertComments []struct {
 			// Ctx is the ctx argument value.
@@ -1199,6 +1135,13 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// ParentID is the parentID argument value.
 			ParentID model.AlertID
+		}
+		// GetAlertsBySlackThread holds details about calls to the GetAlertsBySlackThread method.
+		GetAlertsBySlackThread []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Thread is the thread argument value.
+			Thread model.SlackThread
 		}
 		// GetAlertsBySpan holds details about calls to the GetAlertsBySpan method.
 		GetAlertsBySpan []struct {
@@ -1286,11 +1229,11 @@ type RepositoryMock struct {
 	lockBatchUpdateAlertConclusion sync.RWMutex
 	lockBatchUpdateAlertStatus     sync.RWMutex
 	lockGetAlert                   sync.RWMutex
-	lockGetAlertBySlackThread      sync.RWMutex
 	lockGetAlertComments           sync.RWMutex
 	lockGetAlertList               sync.RWMutex
 	lockGetAlertListByThread       sync.RWMutex
 	lockGetAlertsByParentID        sync.RWMutex
+	lockGetAlertsBySlackThread     sync.RWMutex
 	lockGetAlertsBySpan            sync.RWMutex
 	lockGetAlertsByStatus          sync.RWMutex
 	lockGetLatestAlertListInThread sync.RWMutex
@@ -1460,42 +1403,6 @@ func (mock *RepositoryMock) GetAlertCalls() []struct {
 	return calls
 }
 
-// GetAlertBySlackThread calls GetAlertBySlackThreadFunc.
-func (mock *RepositoryMock) GetAlertBySlackThread(ctx context.Context, thread model.SlackThread) (*model.Alert, error) {
-	if mock.GetAlertBySlackThreadFunc == nil {
-		panic("RepositoryMock.GetAlertBySlackThreadFunc: method is nil but Repository.GetAlertBySlackThread was just called")
-	}
-	callInfo := struct {
-		Ctx    context.Context
-		Thread model.SlackThread
-	}{
-		Ctx:    ctx,
-		Thread: thread,
-	}
-	mock.lockGetAlertBySlackThread.Lock()
-	mock.calls.GetAlertBySlackThread = append(mock.calls.GetAlertBySlackThread, callInfo)
-	mock.lockGetAlertBySlackThread.Unlock()
-	return mock.GetAlertBySlackThreadFunc(ctx, thread)
-}
-
-// GetAlertBySlackThreadCalls gets all the calls that were made to GetAlertBySlackThread.
-// Check the length with:
-//
-//	len(mockedRepository.GetAlertBySlackThreadCalls())
-func (mock *RepositoryMock) GetAlertBySlackThreadCalls() []struct {
-	Ctx    context.Context
-	Thread model.SlackThread
-} {
-	var calls []struct {
-		Ctx    context.Context
-		Thread model.SlackThread
-	}
-	mock.lockGetAlertBySlackThread.RLock()
-	calls = mock.calls.GetAlertBySlackThread
-	mock.lockGetAlertBySlackThread.RUnlock()
-	return calls
-}
-
 // GetAlertComments calls GetAlertCommentsFunc.
 func (mock *RepositoryMock) GetAlertComments(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error) {
 	if mock.GetAlertCommentsFunc == nil {
@@ -1637,6 +1544,42 @@ func (mock *RepositoryMock) GetAlertsByParentIDCalls() []struct {
 	mock.lockGetAlertsByParentID.RLock()
 	calls = mock.calls.GetAlertsByParentID
 	mock.lockGetAlertsByParentID.RUnlock()
+	return calls
+}
+
+// GetAlertsBySlackThread calls GetAlertsBySlackThreadFunc.
+func (mock *RepositoryMock) GetAlertsBySlackThread(ctx context.Context, thread model.SlackThread) ([]model.Alert, error) {
+	if mock.GetAlertsBySlackThreadFunc == nil {
+		panic("RepositoryMock.GetAlertsBySlackThreadFunc: method is nil but Repository.GetAlertsBySlackThread was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		Thread model.SlackThread
+	}{
+		Ctx:    ctx,
+		Thread: thread,
+	}
+	mock.lockGetAlertsBySlackThread.Lock()
+	mock.calls.GetAlertsBySlackThread = append(mock.calls.GetAlertsBySlackThread, callInfo)
+	mock.lockGetAlertsBySlackThread.Unlock()
+	return mock.GetAlertsBySlackThreadFunc(ctx, thread)
+}
+
+// GetAlertsBySlackThreadCalls gets all the calls that were made to GetAlertsBySlackThread.
+// Check the length with:
+//
+//	len(mockedRepository.GetAlertsBySlackThreadCalls())
+func (mock *RepositoryMock) GetAlertsBySlackThreadCalls() []struct {
+	Ctx    context.Context
+	Thread model.SlackThread
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Thread model.SlackThread
+	}
+	mock.lockGetAlertsBySlackThread.RLock()
+	calls = mock.calls.GetAlertsBySlackThread
+	mock.lockGetAlertsBySlackThread.RUnlock()
 	return calls
 }
 
@@ -2299,13 +2242,22 @@ var _ interfaces.UseCase = &UseCaseMock{}
 //			HandleAlertWithAuthFunc: func(ctx context.Context, schema string, alertData any) ([]*model.Alert, error) {
 //				panic("mock out the HandleAlertWithAuth method")
 //			},
-//			HandleSlackAppMentionFunc: func(ctx context.Context, event *slackevents.AppMentionEvent) error {
+//			HandleSlackAppMentionFunc: func(ctx context.Context, user model.SlackUser, mention model.SlackMention, slackThread model.SlackThread) error {
 //				panic("mock out the HandleSlackAppMention method")
 //			},
-//			HandleSlackInteractionFunc: func(ctx context.Context, interaction slack.InteractionCallback) error {
-//				panic("mock out the HandleSlackInteraction method")
+//			HandleSlackInteractionBlockActionsFunc: func(ctx context.Context, user model.SlackUser, slackThread model.SlackThread, actionID model.SlackActionID, value string, triggerID string) error {
+//				panic("mock out the HandleSlackInteractionBlockActions method")
 //			},
-//			HandleSlackMessageFunc: func(ctx context.Context, event *slackevents.MessageEvent) error {
+//			HandleSlackInteractionViewSubmissionIgnoreListFunc: func(ctx context.Context, metadata string, values map[string]map[string]slack.BlockAction) error {
+//				panic("mock out the HandleSlackInteractionViewSubmissionIgnoreList method")
+//			},
+//			HandleSlackInteractionViewSubmissionResolveAlertFunc: func(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+//				panic("mock out the HandleSlackInteractionViewSubmissionResolveAlert method")
+//			},
+//			HandleSlackInteractionViewSubmissionResolveListFunc: func(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+//				panic("mock out the HandleSlackInteractionViewSubmissionResolveList method")
+//			},
+//			HandleSlackMessageFunc: func(ctx context.Context, slackThread model.SlackThread, text string, user model.SlackUser, ts string) error {
 //				panic("mock out the HandleSlackMessage method")
 //			},
 //			RunWorkflowFunc: func(ctx context.Context, alert model.Alert) error {
@@ -2325,13 +2277,22 @@ type UseCaseMock struct {
 	HandleAlertWithAuthFunc func(ctx context.Context, schema string, alertData any) ([]*model.Alert, error)
 
 	// HandleSlackAppMentionFunc mocks the HandleSlackAppMention method.
-	HandleSlackAppMentionFunc func(ctx context.Context, event *slackevents.AppMentionEvent) error
+	HandleSlackAppMentionFunc func(ctx context.Context, user model.SlackUser, mention model.SlackMention, slackThread model.SlackThread) error
 
-	// HandleSlackInteractionFunc mocks the HandleSlackInteraction method.
-	HandleSlackInteractionFunc func(ctx context.Context, interaction slack.InteractionCallback) error
+	// HandleSlackInteractionBlockActionsFunc mocks the HandleSlackInteractionBlockActions method.
+	HandleSlackInteractionBlockActionsFunc func(ctx context.Context, user model.SlackUser, slackThread model.SlackThread, actionID model.SlackActionID, value string, triggerID string) error
+
+	// HandleSlackInteractionViewSubmissionIgnoreListFunc mocks the HandleSlackInteractionViewSubmissionIgnoreList method.
+	HandleSlackInteractionViewSubmissionIgnoreListFunc func(ctx context.Context, metadata string, values map[string]map[string]slack.BlockAction) error
+
+	// HandleSlackInteractionViewSubmissionResolveAlertFunc mocks the HandleSlackInteractionViewSubmissionResolveAlert method.
+	HandleSlackInteractionViewSubmissionResolveAlertFunc func(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error
+
+	// HandleSlackInteractionViewSubmissionResolveListFunc mocks the HandleSlackInteractionViewSubmissionResolveList method.
+	HandleSlackInteractionViewSubmissionResolveListFunc func(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error
 
 	// HandleSlackMessageFunc mocks the HandleSlackMessage method.
-	HandleSlackMessageFunc func(ctx context.Context, event *slackevents.MessageEvent) error
+	HandleSlackMessageFunc func(ctx context.Context, slackThread model.SlackThread, text string, user model.SlackUser, ts string) error
 
 	// RunWorkflowFunc mocks the RunWorkflow method.
 	RunWorkflowFunc func(ctx context.Context, alert model.Alert) error
@@ -2362,22 +2323,71 @@ type UseCaseMock struct {
 		HandleSlackAppMention []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Event is the event argument value.
-			Event *slackevents.AppMentionEvent
+			// User is the user argument value.
+			User model.SlackUser
+			// Mention is the mention argument value.
+			Mention model.SlackMention
+			// SlackThread is the slackThread argument value.
+			SlackThread model.SlackThread
 		}
-		// HandleSlackInteraction holds details about calls to the HandleSlackInteraction method.
-		HandleSlackInteraction []struct {
+		// HandleSlackInteractionBlockActions holds details about calls to the HandleSlackInteractionBlockActions method.
+		HandleSlackInteractionBlockActions []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Interaction is the interaction argument value.
-			Interaction slack.InteractionCallback
+			// User is the user argument value.
+			User model.SlackUser
+			// SlackThread is the slackThread argument value.
+			SlackThread model.SlackThread
+			// ActionID is the actionID argument value.
+			ActionID model.SlackActionID
+			// Value is the value argument value.
+			Value string
+			// TriggerID is the triggerID argument value.
+			TriggerID string
+		}
+		// HandleSlackInteractionViewSubmissionIgnoreList holds details about calls to the HandleSlackInteractionViewSubmissionIgnoreList method.
+		HandleSlackInteractionViewSubmissionIgnoreList []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Metadata is the metadata argument value.
+			Metadata string
+			// Values is the values argument value.
+			Values map[string]map[string]slack.BlockAction
+		}
+		// HandleSlackInteractionViewSubmissionResolveAlert holds details about calls to the HandleSlackInteractionViewSubmissionResolveAlert method.
+		HandleSlackInteractionViewSubmissionResolveAlert []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// User is the user argument value.
+			User model.SlackUser
+			// Metadata is the metadata argument value.
+			Metadata string
+			// Values is the values argument value.
+			Values map[string]map[string]slack.BlockAction
+		}
+		// HandleSlackInteractionViewSubmissionResolveList holds details about calls to the HandleSlackInteractionViewSubmissionResolveList method.
+		HandleSlackInteractionViewSubmissionResolveList []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// User is the user argument value.
+			User model.SlackUser
+			// Metadata is the metadata argument value.
+			Metadata string
+			// Values is the values argument value.
+			Values map[string]map[string]slack.BlockAction
 		}
 		// HandleSlackMessage holds details about calls to the HandleSlackMessage method.
 		HandleSlackMessage []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Event is the event argument value.
-			Event *slackevents.MessageEvent
+			// SlackThread is the slackThread argument value.
+			SlackThread model.SlackThread
+			// Text is the text argument value.
+			Text string
+			// User is the user argument value.
+			User model.SlackUser
+			// Ts is the ts argument value.
+			Ts string
 		}
 		// RunWorkflow holds details about calls to the RunWorkflow method.
 		RunWorkflow []struct {
@@ -2387,12 +2397,15 @@ type UseCaseMock struct {
 			Alert model.Alert
 		}
 	}
-	lockHandleAlert            sync.RWMutex
-	lockHandleAlertWithAuth    sync.RWMutex
-	lockHandleSlackAppMention  sync.RWMutex
-	lockHandleSlackInteraction sync.RWMutex
-	lockHandleSlackMessage     sync.RWMutex
-	lockRunWorkflow            sync.RWMutex
+	lockHandleAlert                                      sync.RWMutex
+	lockHandleAlertWithAuth                              sync.RWMutex
+	lockHandleSlackAppMention                            sync.RWMutex
+	lockHandleSlackInteractionBlockActions               sync.RWMutex
+	lockHandleSlackInteractionViewSubmissionIgnoreList   sync.RWMutex
+	lockHandleSlackInteractionViewSubmissionResolveAlert sync.RWMutex
+	lockHandleSlackInteractionViewSubmissionResolveList  sync.RWMutex
+	lockHandleSlackMessage                               sync.RWMutex
+	lockRunWorkflow                                      sync.RWMutex
 }
 
 // HandleAlert calls HandleAlertFunc.
@@ -2480,21 +2493,25 @@ func (mock *UseCaseMock) HandleAlertWithAuthCalls() []struct {
 }
 
 // HandleSlackAppMention calls HandleSlackAppMentionFunc.
-func (mock *UseCaseMock) HandleSlackAppMention(ctx context.Context, event *slackevents.AppMentionEvent) error {
+func (mock *UseCaseMock) HandleSlackAppMention(ctx context.Context, user model.SlackUser, mention model.SlackMention, slackThread model.SlackThread) error {
 	if mock.HandleSlackAppMentionFunc == nil {
 		panic("UseCaseMock.HandleSlackAppMentionFunc: method is nil but UseCase.HandleSlackAppMention was just called")
 	}
 	callInfo := struct {
-		Ctx   context.Context
-		Event *slackevents.AppMentionEvent
+		Ctx         context.Context
+		User        model.SlackUser
+		Mention     model.SlackMention
+		SlackThread model.SlackThread
 	}{
-		Ctx:   ctx,
-		Event: event,
+		Ctx:         ctx,
+		User:        user,
+		Mention:     mention,
+		SlackThread: slackThread,
 	}
 	mock.lockHandleSlackAppMention.Lock()
 	mock.calls.HandleSlackAppMention = append(mock.calls.HandleSlackAppMention, callInfo)
 	mock.lockHandleSlackAppMention.Unlock()
-	return mock.HandleSlackAppMentionFunc(ctx, event)
+	return mock.HandleSlackAppMentionFunc(ctx, user, mention, slackThread)
 }
 
 // HandleSlackAppMentionCalls gets all the calls that were made to HandleSlackAppMention.
@@ -2502,12 +2519,16 @@ func (mock *UseCaseMock) HandleSlackAppMention(ctx context.Context, event *slack
 //
 //	len(mockedUseCase.HandleSlackAppMentionCalls())
 func (mock *UseCaseMock) HandleSlackAppMentionCalls() []struct {
-	Ctx   context.Context
-	Event *slackevents.AppMentionEvent
+	Ctx         context.Context
+	User        model.SlackUser
+	Mention     model.SlackMention
+	SlackThread model.SlackThread
 } {
 	var calls []struct {
-		Ctx   context.Context
-		Event *slackevents.AppMentionEvent
+		Ctx         context.Context
+		User        model.SlackUser
+		Mention     model.SlackMention
+		SlackThread model.SlackThread
 	}
 	mock.lockHandleSlackAppMention.RLock()
 	calls = mock.calls.HandleSlackAppMention
@@ -2515,58 +2536,208 @@ func (mock *UseCaseMock) HandleSlackAppMentionCalls() []struct {
 	return calls
 }
 
-// HandleSlackInteraction calls HandleSlackInteractionFunc.
-func (mock *UseCaseMock) HandleSlackInteraction(ctx context.Context, interaction slack.InteractionCallback) error {
-	if mock.HandleSlackInteractionFunc == nil {
-		panic("UseCaseMock.HandleSlackInteractionFunc: method is nil but UseCase.HandleSlackInteraction was just called")
+// HandleSlackInteractionBlockActions calls HandleSlackInteractionBlockActionsFunc.
+func (mock *UseCaseMock) HandleSlackInteractionBlockActions(ctx context.Context, user model.SlackUser, slackThread model.SlackThread, actionID model.SlackActionID, value string, triggerID string) error {
+	if mock.HandleSlackInteractionBlockActionsFunc == nil {
+		panic("UseCaseMock.HandleSlackInteractionBlockActionsFunc: method is nil but UseCase.HandleSlackInteractionBlockActions was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
-		Interaction slack.InteractionCallback
+		User        model.SlackUser
+		SlackThread model.SlackThread
+		ActionID    model.SlackActionID
+		Value       string
+		TriggerID   string
 	}{
 		Ctx:         ctx,
-		Interaction: interaction,
+		User:        user,
+		SlackThread: slackThread,
+		ActionID:    actionID,
+		Value:       value,
+		TriggerID:   triggerID,
 	}
-	mock.lockHandleSlackInteraction.Lock()
-	mock.calls.HandleSlackInteraction = append(mock.calls.HandleSlackInteraction, callInfo)
-	mock.lockHandleSlackInteraction.Unlock()
-	return mock.HandleSlackInteractionFunc(ctx, interaction)
+	mock.lockHandleSlackInteractionBlockActions.Lock()
+	mock.calls.HandleSlackInteractionBlockActions = append(mock.calls.HandleSlackInteractionBlockActions, callInfo)
+	mock.lockHandleSlackInteractionBlockActions.Unlock()
+	return mock.HandleSlackInteractionBlockActionsFunc(ctx, user, slackThread, actionID, value, triggerID)
 }
 
-// HandleSlackInteractionCalls gets all the calls that were made to HandleSlackInteraction.
+// HandleSlackInteractionBlockActionsCalls gets all the calls that were made to HandleSlackInteractionBlockActions.
 // Check the length with:
 //
-//	len(mockedUseCase.HandleSlackInteractionCalls())
-func (mock *UseCaseMock) HandleSlackInteractionCalls() []struct {
+//	len(mockedUseCase.HandleSlackInteractionBlockActionsCalls())
+func (mock *UseCaseMock) HandleSlackInteractionBlockActionsCalls() []struct {
 	Ctx         context.Context
-	Interaction slack.InteractionCallback
+	User        model.SlackUser
+	SlackThread model.SlackThread
+	ActionID    model.SlackActionID
+	Value       string
+	TriggerID   string
 } {
 	var calls []struct {
 		Ctx         context.Context
-		Interaction slack.InteractionCallback
+		User        model.SlackUser
+		SlackThread model.SlackThread
+		ActionID    model.SlackActionID
+		Value       string
+		TriggerID   string
 	}
-	mock.lockHandleSlackInteraction.RLock()
-	calls = mock.calls.HandleSlackInteraction
-	mock.lockHandleSlackInteraction.RUnlock()
+	mock.lockHandleSlackInteractionBlockActions.RLock()
+	calls = mock.calls.HandleSlackInteractionBlockActions
+	mock.lockHandleSlackInteractionBlockActions.RUnlock()
+	return calls
+}
+
+// HandleSlackInteractionViewSubmissionIgnoreList calls HandleSlackInteractionViewSubmissionIgnoreListFunc.
+func (mock *UseCaseMock) HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Context, metadata string, values map[string]map[string]slack.BlockAction) error {
+	if mock.HandleSlackInteractionViewSubmissionIgnoreListFunc == nil {
+		panic("UseCaseMock.HandleSlackInteractionViewSubmissionIgnoreListFunc: method is nil but UseCase.HandleSlackInteractionViewSubmissionIgnoreList was just called")
+	}
+	callInfo := struct {
+		Ctx      context.Context
+		Metadata string
+		Values   map[string]map[string]slack.BlockAction
+	}{
+		Ctx:      ctx,
+		Metadata: metadata,
+		Values:   values,
+	}
+	mock.lockHandleSlackInteractionViewSubmissionIgnoreList.Lock()
+	mock.calls.HandleSlackInteractionViewSubmissionIgnoreList = append(mock.calls.HandleSlackInteractionViewSubmissionIgnoreList, callInfo)
+	mock.lockHandleSlackInteractionViewSubmissionIgnoreList.Unlock()
+	return mock.HandleSlackInteractionViewSubmissionIgnoreListFunc(ctx, metadata, values)
+}
+
+// HandleSlackInteractionViewSubmissionIgnoreListCalls gets all the calls that were made to HandleSlackInteractionViewSubmissionIgnoreList.
+// Check the length with:
+//
+//	len(mockedUseCase.HandleSlackInteractionViewSubmissionIgnoreListCalls())
+func (mock *UseCaseMock) HandleSlackInteractionViewSubmissionIgnoreListCalls() []struct {
+	Ctx      context.Context
+	Metadata string
+	Values   map[string]map[string]slack.BlockAction
+} {
+	var calls []struct {
+		Ctx      context.Context
+		Metadata string
+		Values   map[string]map[string]slack.BlockAction
+	}
+	mock.lockHandleSlackInteractionViewSubmissionIgnoreList.RLock()
+	calls = mock.calls.HandleSlackInteractionViewSubmissionIgnoreList
+	mock.lockHandleSlackInteractionViewSubmissionIgnoreList.RUnlock()
+	return calls
+}
+
+// HandleSlackInteractionViewSubmissionResolveAlert calls HandleSlackInteractionViewSubmissionResolveAlertFunc.
+func (mock *UseCaseMock) HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+	if mock.HandleSlackInteractionViewSubmissionResolveAlertFunc == nil {
+		panic("UseCaseMock.HandleSlackInteractionViewSubmissionResolveAlertFunc: method is nil but UseCase.HandleSlackInteractionViewSubmissionResolveAlert was just called")
+	}
+	callInfo := struct {
+		Ctx      context.Context
+		User     model.SlackUser
+		Metadata string
+		Values   map[string]map[string]slack.BlockAction
+	}{
+		Ctx:      ctx,
+		User:     user,
+		Metadata: metadata,
+		Values:   values,
+	}
+	mock.lockHandleSlackInteractionViewSubmissionResolveAlert.Lock()
+	mock.calls.HandleSlackInteractionViewSubmissionResolveAlert = append(mock.calls.HandleSlackInteractionViewSubmissionResolveAlert, callInfo)
+	mock.lockHandleSlackInteractionViewSubmissionResolveAlert.Unlock()
+	return mock.HandleSlackInteractionViewSubmissionResolveAlertFunc(ctx, user, metadata, values)
+}
+
+// HandleSlackInteractionViewSubmissionResolveAlertCalls gets all the calls that were made to HandleSlackInteractionViewSubmissionResolveAlert.
+// Check the length with:
+//
+//	len(mockedUseCase.HandleSlackInteractionViewSubmissionResolveAlertCalls())
+func (mock *UseCaseMock) HandleSlackInteractionViewSubmissionResolveAlertCalls() []struct {
+	Ctx      context.Context
+	User     model.SlackUser
+	Metadata string
+	Values   map[string]map[string]slack.BlockAction
+} {
+	var calls []struct {
+		Ctx      context.Context
+		User     model.SlackUser
+		Metadata string
+		Values   map[string]map[string]slack.BlockAction
+	}
+	mock.lockHandleSlackInteractionViewSubmissionResolveAlert.RLock()
+	calls = mock.calls.HandleSlackInteractionViewSubmissionResolveAlert
+	mock.lockHandleSlackInteractionViewSubmissionResolveAlert.RUnlock()
+	return calls
+}
+
+// HandleSlackInteractionViewSubmissionResolveList calls HandleSlackInteractionViewSubmissionResolveListFunc.
+func (mock *UseCaseMock) HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+	if mock.HandleSlackInteractionViewSubmissionResolveListFunc == nil {
+		panic("UseCaseMock.HandleSlackInteractionViewSubmissionResolveListFunc: method is nil but UseCase.HandleSlackInteractionViewSubmissionResolveList was just called")
+	}
+	callInfo := struct {
+		Ctx      context.Context
+		User     model.SlackUser
+		Metadata string
+		Values   map[string]map[string]slack.BlockAction
+	}{
+		Ctx:      ctx,
+		User:     user,
+		Metadata: metadata,
+		Values:   values,
+	}
+	mock.lockHandleSlackInteractionViewSubmissionResolveList.Lock()
+	mock.calls.HandleSlackInteractionViewSubmissionResolveList = append(mock.calls.HandleSlackInteractionViewSubmissionResolveList, callInfo)
+	mock.lockHandleSlackInteractionViewSubmissionResolveList.Unlock()
+	return mock.HandleSlackInteractionViewSubmissionResolveListFunc(ctx, user, metadata, values)
+}
+
+// HandleSlackInteractionViewSubmissionResolveListCalls gets all the calls that were made to HandleSlackInteractionViewSubmissionResolveList.
+// Check the length with:
+//
+//	len(mockedUseCase.HandleSlackInteractionViewSubmissionResolveListCalls())
+func (mock *UseCaseMock) HandleSlackInteractionViewSubmissionResolveListCalls() []struct {
+	Ctx      context.Context
+	User     model.SlackUser
+	Metadata string
+	Values   map[string]map[string]slack.BlockAction
+} {
+	var calls []struct {
+		Ctx      context.Context
+		User     model.SlackUser
+		Metadata string
+		Values   map[string]map[string]slack.BlockAction
+	}
+	mock.lockHandleSlackInteractionViewSubmissionResolveList.RLock()
+	calls = mock.calls.HandleSlackInteractionViewSubmissionResolveList
+	mock.lockHandleSlackInteractionViewSubmissionResolveList.RUnlock()
 	return calls
 }
 
 // HandleSlackMessage calls HandleSlackMessageFunc.
-func (mock *UseCaseMock) HandleSlackMessage(ctx context.Context, event *slackevents.MessageEvent) error {
+func (mock *UseCaseMock) HandleSlackMessage(ctx context.Context, slackThread model.SlackThread, text string, user model.SlackUser, ts string) error {
 	if mock.HandleSlackMessageFunc == nil {
 		panic("UseCaseMock.HandleSlackMessageFunc: method is nil but UseCase.HandleSlackMessage was just called")
 	}
 	callInfo := struct {
-		Ctx   context.Context
-		Event *slackevents.MessageEvent
+		Ctx         context.Context
+		SlackThread model.SlackThread
+		Text        string
+		User        model.SlackUser
+		Ts          string
 	}{
-		Ctx:   ctx,
-		Event: event,
+		Ctx:         ctx,
+		SlackThread: slackThread,
+		Text:        text,
+		User:        user,
+		Ts:          ts,
 	}
 	mock.lockHandleSlackMessage.Lock()
 	mock.calls.HandleSlackMessage = append(mock.calls.HandleSlackMessage, callInfo)
 	mock.lockHandleSlackMessage.Unlock()
-	return mock.HandleSlackMessageFunc(ctx, event)
+	return mock.HandleSlackMessageFunc(ctx, slackThread, text, user, ts)
 }
 
 // HandleSlackMessageCalls gets all the calls that were made to HandleSlackMessage.
@@ -2574,12 +2745,18 @@ func (mock *UseCaseMock) HandleSlackMessage(ctx context.Context, event *slackeve
 //
 //	len(mockedUseCase.HandleSlackMessageCalls())
 func (mock *UseCaseMock) HandleSlackMessageCalls() []struct {
-	Ctx   context.Context
-	Event *slackevents.MessageEvent
+	Ctx         context.Context
+	SlackThread model.SlackThread
+	Text        string
+	User        model.SlackUser
+	Ts          string
 } {
 	var calls []struct {
-		Ctx   context.Context
-		Event *slackevents.MessageEvent
+		Ctx         context.Context
+		SlackThread model.SlackThread
+		Text        string
+		User        model.SlackUser
+		Ts          string
 	}
 	mock.lockHandleSlackMessage.RLock()
 	calls = mock.calls.HandleSlackMessage

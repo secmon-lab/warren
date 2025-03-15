@@ -85,14 +85,8 @@ func NewSlack(oauthToken, signingSecret, channelID string) (*Slack, error) {
 	return s, nil
 }
 
-func (x *Slack) TrimMention(message string) string {
-	mention := "<@" + x.userID + ">"
-	idx := strings.LastIndex(message, mention)
-	if idx == -1 {
-		return message
-	}
-
-	return strings.TrimSpace(message[idx+len(mention):])
+func (x *Slack) IsBotUser(userID string) bool {
+	return x.userID == userID
 }
 
 func (x *Slack) PostMessage(ctx context.Context, message string) (*SlackThread, error) {
@@ -244,7 +238,7 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 	if alert.Finding == nil {
 		buttons = append(buttons,
 			slack.NewButtonBlockElement(
-				"inspect",
+				model.SlackActionIDInspect.String(),
 				alert.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Inspect", false, false),
 			).WithStyle(slack.StyleDefault),
@@ -254,7 +248,7 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 	if alert.Status == model.AlertStatusNew {
 		buttons = append(buttons,
 			slack.NewButtonBlockElement(
-				"ack",
+				model.SlackActionIDAck.String(),
 				alert.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Acknowledge", false, false),
 			).WithStyle(slack.StylePrimary),
@@ -264,7 +258,7 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 	if alert.Status != model.AlertStatusResolved {
 		buttons = append(buttons,
 			slack.NewButtonBlockElement(
-				"resolve",
+				model.SlackActionIDResolve.String(),
 				alert.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Resolve", false, false),
 			).WithStyle(slack.StyleDanger),
@@ -312,7 +306,71 @@ func (x *Slack) PostAlert(ctx context.Context, alert model.Alert) (interfaces.Sl
 }
 
 func (x *Slack) ShowResolveAlertModal(ctx context.Context, alert model.Alert, triggerID string) error {
+	req := buildResolveModalViewRequest(model.SlackCallbackSubmitResolveAlert, alert.ID.String())
+	if _, err := x.slackClient.OpenView(triggerID, req); err != nil {
+		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
+	}
 
+	return nil
+}
+
+func (x *Slack) ShowIgnoreListModal(ctx context.Context, list model.AlertList, triggerID string) error {
+	req := buildIgnoreModalViewRequest(list.ID.String())
+	if _, err := x.slackClient.OpenView(triggerID, req); err != nil {
+		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
+	}
+
+	return nil
+}
+
+func buildIgnoreModalViewRequest(listID string) slack.ModalViewRequest {
+	return slack.ModalViewRequest{
+		Type: slack.VTModal,
+		Title: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Generate Ignore Policy",
+		},
+		Blocks: slack.Blocks{
+			BlockSet: []slack.Block{
+				slack.NewSectionBlock(
+					slack.NewTextBlockObject(slack.PlainTextType, "Please input prompt for generating ignore policy.", false, false),
+					nil,
+					nil,
+				),
+				slack.NewInputBlock(
+					model.SlackBlockIDIgnorePrompt.String(),
+					slack.NewTextBlockObject(slack.PlainTextType, "Prompt", false, false),
+					slack.NewTextBlockObject(slack.PlainTextType, "Add any reason, context, or information.", false, false),
+					slack.NewPlainTextInputBlockElement(
+						slack.NewTextBlockObject(slack.PlainTextType, "prompt", false, false),
+						model.SlackActionIDIgnorePrompt.String(),
+					),
+				).WithOptional(true),
+			},
+		},
+		CallbackID:      model.SlackCallbackSubmitIgnoreList.String(),
+		PrivateMetadata: listID,
+		Submit: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Ignore",
+		},
+		Close: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Cancel",
+		},
+	}
+}
+
+func (x *Slack) ShowResolveListModal(ctx context.Context, list model.AlertList, triggerID string) error {
+	req := buildResolveModalViewRequest(model.SlackCallbackSubmitResolveList, list.ID.String())
+	if _, err := x.slackClient.OpenView(triggerID, req); err != nil {
+		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
+	}
+
+	return nil
+}
+
+func buildResolveModalViewRequest(callbackID model.SlackCallbackID, metadata string) slack.ModalViewRequest {
 	conclusionOptions := []struct {
 		Conclusion  model.AlertConclusion
 		Label       string
@@ -351,7 +409,7 @@ func (x *Slack) ShowResolveAlertModal(ctx context.Context, alert model.Alert, tr
 		)
 	}
 
-	_, err := x.slackClient.OpenView(triggerID, slack.ModalViewRequest{
+	return slack.ModalViewRequest{
 		Type: slack.VTModal,
 		Title: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
@@ -365,29 +423,29 @@ func (x *Slack) ShowResolveAlertModal(ctx context.Context, alert model.Alert, tr
 					nil,
 				),
 				slack.NewInputBlock(
-					"conclusion",
+					model.SlackBlockIDConclusion.String(),
 					slack.NewTextBlockObject(slack.PlainTextType, "Conclusion", false, false),
 					slack.NewTextBlockObject(slack.PlainTextType, "Select the conclusion", false, false),
 					slack.NewOptionsSelectBlockElement(
 						slack.OptTypeStatic,
 						slack.NewTextBlockObject(slack.PlainTextType, "Select a conclusion", false, false),
-						"conclusion",
+						model.SlackActionIDConclusion.String(),
 						conclusionOptionBlocks...,
 					),
 				),
 				slack.NewInputBlock(
-					"comment",
+					model.SlackBlockIDComment.String(),
 					slack.NewTextBlockObject(slack.PlainTextType, "Comment", false, false),
 					slack.NewTextBlockObject(slack.PlainTextType, "Add any reason, context, or information.", false, false),
 					slack.NewPlainTextInputBlockElement(
 						slack.NewTextBlockObject(slack.PlainTextType, "comment", false, false),
-						"comment",
+						model.SlackActionIDComment.String(),
 					),
 				).WithOptional(true),
 			},
 		},
-		CallbackID:      "submit_resolve",
-		PrivateMetadata: alert.ID.String(),
+		CallbackID:      callbackID.String(),
+		PrivateMetadata: metadata,
 		Submit: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
 			Text: "Resolve",
@@ -396,12 +454,7 @@ func (x *Slack) ShowResolveAlertModal(ctx context.Context, alert model.Alert, tr
 			Type: slack.PlainTextType,
 			Text: "Cancel",
 		},
-	})
-	if err != nil {
-		return goerr.Wrap(err, "failed to open view")
 	}
-
-	return nil
 }
 
 func (x *SlackThread) UpdateAlert(ctx context.Context, alert model.Alert) error {
@@ -480,15 +533,27 @@ func (x *SlackThread) AttachFile(ctx context.Context, title, fileName string, da
 }
 
 func (x *SlackThread) Reply(ctx context.Context, message string) {
+	blocks := []slack.Block{
+		slack.NewContextBlock(
+			"",
+			slack.NewTextBlockObject(slack.MarkdownType, message, false, false),
+		),
+	}
+
 	_, _, err := x.slackClient.PostMessageContext(
 		ctx,
 		x.channelID,
-		slack.MsgOptionText(message, false),
+		slack.MsgOptionBlocks(blocks...),
 		slack.MsgOptionTS(x.threadID),
 	)
 
 	if err != nil {
-		errs.Handle(ctx, goerr.Wrap(err, "failed to reply to slack"))
+		errs.Handle(ctx, goerr.Wrap(err, "failed to reply to slack",
+			goerr.V("channelID", x.channelID),
+			goerr.V("threadID", x.threadID),
+			goerr.V("message", message),
+			goerr.V("blocks", blocks),
+		))
 	}
 }
 
@@ -615,6 +680,34 @@ func (x *SlackThread) PostAlerts(ctx context.Context, alerts []model.Alert) erro
 	return nil
 }
 
+func buildAlertListBlocks(list *model.AlertList, metadata slackMetadata) []slack.Block {
+	blocks := []slack.Block{
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*ID*: `%s`", list.ID.String()), false, false),
+			nil,
+			nil,
+		),
+	}
+
+	blocks = append(blocks, buildAlertsBlocks(list.Alerts, metadata)...)
+	blocks = append(blocks, slack.NewActionBlock(
+		list.ID.String(),
+		slack.NewButtonBlockElement(
+			model.SlackActionIDIgnoreList.String(),
+			list.ID.String(),
+			slack.NewTextBlockObject("plain_text", "Ignore", false, false),
+		).WithStyle(slack.StyleDefault),
+		slack.NewButtonBlockElement(
+			model.SlackActionIDResolveList.String(),
+			list.ID.String(),
+			slack.NewTextBlockObject("plain_text", "Resolve", false, false),
+		).WithStyle(slack.StyleDanger),
+	))
+	blocks = append(blocks, slack.NewDividerBlock())
+
+	return blocks
+}
+
 func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Block {
 	if len(alerts) == 0 {
 		return []slack.Block{
@@ -630,6 +723,12 @@ func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Blo
 
 	maxCharCount := 3000
 	msgCount := 0
+
+	statusCount := make(map[model.AlertStatus]int)
+	for _, alert := range alerts {
+		statusCount[alert.Status]++
+	}
+
 	for _, alert := range alerts {
 		assigneeText := ""
 		if alert.Assignee != nil {
@@ -645,7 +744,7 @@ func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Blo
 		msgCount++
 	}
 
-	return []slack.Block{
+	blocks := []slack.Block{
 		slack.NewSectionBlock(
 			slack.NewTextBlockObject("mrkdwn", messageText.String(), false, false),
 			nil,
@@ -657,10 +756,26 @@ func buildAlertsBlocks(alerts []model.Alert, metadata slackMetadata) []slack.Blo
 			nil,
 		),
 	}
+
+	var lines []string
+	for status, count := range statusCount {
+		if count == 0 {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("*%s*: %d", status.Label(), count))
+	}
+
+	blocks = append(blocks, slack.NewSectionBlock(
+		slack.NewTextBlockObject("mrkdwn", strings.Join(lines, " / "), false, false),
+		nil,
+		nil,
+	))
+
+	return blocks
 }
 
 func (x *SlackThread) PostAlertList(ctx context.Context, list *model.AlertList) error {
-	blocks := buildAlertListBlocks(list, x.slackMetadata)
+	blocks := buildNewAlertListBlocks(list, x.slackMetadata)
 
 	_, _, err := x.slackClient.PostMessageContext(ctx,
 		x.channelID,
@@ -675,20 +790,15 @@ func (x *SlackThread) PostAlertList(ctx context.Context, list *model.AlertList) 
 	return nil
 }
 
-func buildAlertListBlocks(list *model.AlertList, metadata slackMetadata) []slack.Block {
+func buildNewAlertListBlocks(list *model.AlertList, metadata slackMetadata) []slack.Block {
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(
 			slack.NewTextBlockObject("plain_text", "📑 New list", false, false),
 		),
-		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", "ID: `"+list.ID.String()+"`", false, false),
-			nil,
-			nil,
-		),
 		slack.NewDividerBlock(),
 	}
 
-	blocks = append(blocks, buildAlertsBlocks(list.Alerts, metadata)...)
+	blocks = append(blocks, buildAlertListBlocks(list, metadata)...)
 
 	return blocks
 }
@@ -713,21 +823,17 @@ func buildAlertClustersBlocks(clusters []model.AlertList, metadata slackMetadata
 		slack.NewHeaderBlock(
 			slack.NewTextBlockObject("plain_text", "🗂️ Alert Clusters", false, false),
 		),
+		slack.NewDividerBlock(),
 	}
 
 	for _, cluster := range clusters {
-		lines := []string{
-			fmt.Sprintf("ID: `%s`", cluster.ID.String()),
-			fmt.Sprintf("Alerts: %d", len(cluster.Alerts)),
-		}
-		blocks = append(blocks, slack.NewDividerBlock())
-		blocks = append(blocks, slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", strings.Join(lines, "\n"), false, false),
-			nil,
-			nil,
-		))
-		blocks = append(blocks, buildAlertsBlocks(cluster.Alerts, metadata)...)
+		blocks = append(blocks, buildAlertListBlocks(&cluster, metadata)...)
 	}
 
 	return blocks
+}
+
+func (x *Slack) ShowResolveAlertListModal(ctx context.Context, list model.AlertList, triggerID string) error {
+	return nil
+
 }

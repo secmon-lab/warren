@@ -71,26 +71,31 @@ func (r *Firestore) GetAlert(ctx context.Context, alertID model.AlertID) (*model
 	return &alert, nil
 }
 
-func (r *Firestore) GetAlertBySlackThread(ctx context.Context, thread model.SlackThread) (*model.Alert, error) {
+func (r *Firestore) GetAlertsBySlackThread(ctx context.Context, thread model.SlackThread) ([]model.Alert, error) {
 	iter := r.db.Collection(collectionAlerts).
 		Where("SlackThread.ChannelID", "==", thread.ChannelID).
 		Where("SlackThread.ThreadID", "==", thread.ThreadID).
 		Documents(ctx)
 
-	doc, err := iter.Next()
-	if err != nil {
-		if err == iterator.Done {
-			return nil, nil
+	var alerts []model.Alert
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get alert by slack thread", goerr.V("slack_thread", thread))
 		}
-		return nil, goerr.Wrap(err, "failed to get alert by slack thread", goerr.V("slack_thread", thread))
+
+		var alert model.Alert
+		if err := doc.DataTo(&alert); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("slack_message_id", thread.ThreadID))
+		}
+
+		alerts = append(alerts, alert)
 	}
 
-	var alert model.Alert
-	if err := doc.DataTo(&alert); err != nil {
-		return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("slack_message_id", thread.ThreadID))
-	}
-
-	return &alert, nil
+	return alerts, nil
 }
 
 func (r *Firestore) GetLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {

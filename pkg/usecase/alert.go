@@ -108,7 +108,6 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.
 		logger.Info("alert merged", "parent", similarAlert, "merged", alert)
 
 		alert.ParentID = similarAlert.ID
-		alert.Status = model.AlertStatusAcknowledged
 		alert.SlackThread = similarAlert.SlackThread
 		alert.Assignee = similarAlert.Assignee
 

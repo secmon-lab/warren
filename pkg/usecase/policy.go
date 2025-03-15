@@ -25,7 +25,7 @@ const (
 	maxRetryCountForIgnorePolicy = 8
 )
 
-func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, src source.Source, note string) (*model.PolicyDiff, error) {
+func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, src source.Source, query string) (*model.PolicyDiff, error) {
 	logger := logging.From(ctx)
 
 	thread.Reply(ctx, "📝 Generating ignore policy...")
@@ -46,7 +46,7 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, src source.Source,
 		CreatedAt: clock.Now(ctx),
 	}
 
-	p, err := prompt.BuildIgnorePolicyPrompt(ctx, policyData, alerts, note)
+	p, err := prompt.BuildIgnorePolicyPrompt(ctx, policyData, alerts, query)
 	if err != nil {
 		return nil, err
 	}
@@ -118,6 +118,7 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, src source.Source,
 
 		thread.Reply(ctx, "✅ Test PASSED")
 		validResult = resp
+		validResult.Policy = formattedPolicy
 	}
 
 	if validResult == nil {
@@ -179,7 +180,9 @@ func formatPolicy(policy map[string]string) (map[string]string, error) {
 
 func formatRegoPolicy(fileName string, contents []byte) ([]byte, error) {
 	var opts format.Opts
-	opts.ParserOptions = &ast.ParserOptions{RegoVersion: ast.RegoV1}
+	opts.ParserOptions = &ast.ParserOptions{
+		RegoVersion: ast.RegoV1,
+	}
 
 	formatted, err := format.SourceWithOpts(fileName, contents, opts)
 	if err != nil {

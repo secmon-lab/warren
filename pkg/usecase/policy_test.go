@@ -75,22 +75,50 @@ func TestGenerateIgnorePolicy(t *testing.T) {
 }
 
 func TestFormatRegoPolicy(t *testing.T) {
-	rawPolicy := `package example
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name: "format indentation",
+			input: `package example
 
 allow if {
 # no indent
 input.color == "red"
 }
-`
-	validPolicy := `package example
+`,
+			expected: `package example
 
 allow if {
 	# no indent
 	input.color == "red"
 }
-`
+`,
+		},
+		{
+			name: "space to indent	",
+			input: `package example
 
-	contents, err := usecase.FormatRegoPolicy("test.rego", []byte(rawPolicy))
-	gt.NoError(t, err)
-	gt.Equal(t, string(contents), validPolicy)
+allow if {
+    input.color == "red"
+}
+`,
+			expected: `package example
+
+allow if {
+	input.color == "red"
+}
+`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			contents, err := usecase.FormatRegoPolicy("test.rego", []byte(tc.input))
+			gt.NoError(t, err)
+			gt.Equal(t, string(contents), tc.expected)
+		})
+	}
 }
