@@ -213,13 +213,13 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Cont
 		}
 
 		th := uc.slackService.NewThread(*alert.SlackThread)
-		ctx = thread.WithReplyFunc(ctx, th.Reply)
-		th.Reply(ctx, "Alert resolved by <@"+user.ID+">")
+		newCtx := thread.WithReplyFunc(ctx, th.Reply)
+		thread.Reply(newCtx, "Alert resolved by <@"+user.ID+">")
 
 		logger.Info("alert resolved", "alert", alert)
 
 		if alert.ParentID == "" {
-			if err := th.UpdateAlert(ctx, alert); err != nil {
+			if err := th.UpdateAlert(newCtx, alert); err != nil {
 				return goerr.Wrap(err, "failed to update slack thread")
 			}
 		}
