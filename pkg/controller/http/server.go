@@ -42,6 +42,10 @@ func New(uc interfaces.UseCase, opts ...Options) *Server {
 			r.Use(validateGoogleIDToken)
 			r.Post("/{schema}", alertPubSubHandler(uc))
 		})
+		r.Route("/sns", func(r chi.Router) {
+			r.Use(verifySNSRequest)
+			r.Post("/{schema}", alertSNSHandler(uc))
+		})
 	})
 	r.Route("/slack", func(r chi.Router) {
 		r.Use(verifySlackRequest(s.verifier))
