@@ -197,6 +197,8 @@ func (id AlertListID) String() string {
 
 type AlertList struct {
 	ID          AlertListID  `json:"id"`
+	Title       string       `json:"title"`
+	Description string       `json:"description"`
 	AlertIDs    []AlertID    `json:"alert_ids"`
 	SlackThread *SlackThread `json:"slack_thread"`
 	CreatedAt   time.Time    `json:"created_at"`

@@ -681,14 +681,27 @@ func (x *SlackThread) PostAlerts(ctx context.Context, alerts []model.Alert) erro
 }
 
 func buildAlertListBlocks(list *model.AlertList, metadata slackMetadata) []slack.Block {
-	blocks := []slack.Block{
-		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*ID*: `%s`", list.ID.String()), false, false),
-			nil,
-			nil,
-		),
+	var blocks []slack.Block
+
+	if list.Title != "" {
+		blocks = append(blocks, slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", list.Title, false, false),
+		))
 	}
 
+	if list.Description != "" {
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", list.Description, false, false),
+			nil,
+			nil,
+		))
+	}
+
+	blocks = append(blocks, slack.NewSectionBlock(
+		slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*ID*: `%s`", list.ID.String()), false, false),
+		nil,
+		nil,
+	))
 	blocks = append(blocks, buildAlertsBlocks(list.Alerts, metadata)...)
 	blocks = append(blocks, slack.NewActionBlock(
 		list.ID.String(),

@@ -249,6 +249,8 @@ func TestPostAlertList(t *testing.T) {
 		genDummyAlertWithSlackThread(),
 		genDummyAlertWithSlackThread(),
 	})
+	alertList.Title = "Test Alert List"
+	alertList.Description = "This is a test alert list"
 
 	thread, err := svc.PostMessage(context.Background(), "alert list test")
 	gt.NoError(t, err)
