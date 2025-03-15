@@ -552,6 +552,7 @@ func (x *SlackThread) Reply(ctx context.Context, message string) {
 			goerr.V("channelID", x.channelID),
 			goerr.V("threadID", x.threadID),
 			goerr.V("message", message),
+			goerr.V("blocks", blocks),
 		))
 	}
 }
