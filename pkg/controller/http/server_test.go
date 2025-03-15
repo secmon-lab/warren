@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/m-mizutani/gt"
+	"github.com/m-mizutani/harlog"
 	"github.com/m-mizutani/opaq"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	"github.com/secmon-lab/warren/pkg/interfaces"
@@ -160,4 +162,37 @@ func calculateSlackSignature(payload string, ts string, signingSecret string) st
 	mac := hmac.New(sha256.New, []byte(signingSecret))
 	mac.Write([]byte(baseString))
 	return "v0=" + hex.EncodeToString(mac.Sum(nil))
+}
+
+//go:embed testdata/sns.pem
+var snsPem []byte
+
+func TestAlertSNS(t *testing.T) {
+	uc := &mock.UseCaseMock{
+		HandleAlertWithAuthFunc: func(ctx context.Context, schema string, alertData any) ([]*model.Alert, error) {
+			return nil, nil
+		},
+	}
+	srv := server.New(uc)
+
+	ctx := server.WithHTTPClient(t.Context(), &mockHTTPClient{
+		GetFunc: func(url string) (*http.Response, error) {
+			return &http.Response{
+				Body: io.NopCloser(bytes.NewReader(snsPem)),
+			}, nil
+		},
+	})
+
+	t.Run("with valid SNS message", func(t *testing.T) {
+		logs, err := harlog.ParseHARData(snsHar)
+		gt.NoError(t, err)
+		gt.A(t, logs).Length(1)
+
+		log := logs[0]
+		w := httptest.NewRecorder()
+		srv.ServeHTTP(w, log.Request.WithContext(ctx))
+
+		gt.Equal(t, http.StatusOK, w.Code)
+		gt.A(t, uc.HandleAlertWithAuthCalls()).Length(1)
+	})
 }

@@ -17,6 +17,7 @@ require (
 	github.com/m-mizutani/clog v0.0.8
 	github.com/m-mizutani/goerr/v2 v2.0.0-alpha.3
 	github.com/m-mizutani/gt v0.0.13
+	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.1.10
 	github.com/m-mizutani/opaq v0.2.1-0.20250222003843-b0e8fa8233e6
 	github.com/open-policy-agent/opa v1.1.0
