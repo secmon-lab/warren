@@ -492,7 +492,7 @@ func (x *UseCases) cmdClustering(alerts []model.Alert, th interfaces.SlackThread
 				return err
 			}
 
-			for _, cluster := range clusters {
+			for i, cluster := range clusters {
 				p, err := prompt.BuildMetaListPrompt(ctx, cluster)
 				if err != nil {
 					return err
@@ -502,8 +502,8 @@ func (x *UseCases) cmdClustering(alerts []model.Alert, th interfaces.SlackThread
 				if err != nil {
 					thread.Reply(ctx, "💥 Failed to generate meta data of alert list: "+err.Error())
 				} else {
-					cluster.Title = resp.Title
-					cluster.Description = resp.Description
+					clusters[i].Title = resp.Title
+					clusters[i].Description = resp.Description
 				}
 
 				if err := x.repository.PutAlertList(ctx, cluster); err != nil {
