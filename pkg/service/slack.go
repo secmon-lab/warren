@@ -536,7 +536,7 @@ func (x *SlackThread) Reply(ctx context.Context, message string) {
 	blocks := []slack.Block{
 		slack.NewContextBlock(
 			"",
-			slack.NewTextBlockObject(slack.MarkdownType, message, true, false),
+			slack.NewTextBlockObject(slack.MarkdownType, message, false, false),
 		),
 	}
 
