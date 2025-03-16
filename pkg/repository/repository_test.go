@@ -564,4 +564,45 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Equal(t, got.Conclusion, "")
 		gt.Equal(t, got.Reason, "")
 	})
+
+	t.Run("GetAlertsWithoutStatus", func(t *testing.T) {
+		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "test",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert1.Status = model.AlertStatusNew
+		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "test",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert2.Status = model.AlertStatusResolved
+		alert3 := model.NewAlert(ctx, "test", model.PolicyAlert{
+			Title: "test",
+			Attrs: []model.Attribute{
+				{Key: "test", Value: "test"},
+			},
+		})
+		alert3.Status = model.AlertStatusAcknowledged
+		gt.NoError(t, repo.PutAlert(ctx, alert1))
+		gt.NoError(t, repo.PutAlert(ctx, alert2))
+		gt.NoError(t, repo.PutAlert(ctx, alert3))
+
+		got, err := repo.GetAlertsWithoutStatus(ctx, model.AlertStatusResolved)
+		gt.NoError(t, err)
+		gt.A(t, got).
+			Longer(2).
+			Any(func(v model.Alert) bool {
+				return v.ID == alert1.ID
+			}).
+			Any(func(v model.Alert) bool {
+				return v.ID == alert3.ID
+			}).
+			All(func(v model.Alert) bool {
+				return v.Status != model.AlertStatusResolved
+			})
+	})
 }
