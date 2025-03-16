@@ -137,6 +137,16 @@ func (r *Memory) GetAlertsByStatus(ctx context.Context, status model.AlertStatus
 	return alerts, nil
 }
 
+func (r *Memory) GetAlertsWithoutStatus(ctx context.Context, status model.AlertStatus) ([]model.Alert, error) {
+	var alerts []model.Alert
+	for _, alert := range r.alerts {
+		if alert.Status != status {
+			alerts = append(alerts, alert)
+		}
+	}
+	return alerts, nil
+}
+
 func (r *Memory) BatchGetAlerts(ctx context.Context, alertIDs []model.AlertID) ([]model.Alert, error) {
 	var alerts []model.Alert
 	for _, alertID := range alertIDs {

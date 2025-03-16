@@ -97,9 +97,10 @@ func parseTime(s string) (time.Time, error) {
 
 func (x *UseCases) cmdList(alerts []model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) *cli.Command {
 	var (
-		duration time.Duration
-		spanFrom string
-		spanTo   string
+		duration   time.Duration
+		spanFrom   string
+		spanTo     string
+		unresolved bool
 	)
 	return &cli.Command{
 		Name:        "list",
@@ -125,6 +126,12 @@ func (x *UseCases) cmdList(alerts []model.Alert, th interfaces.SlackThreadServic
 				Usage:       "To time to list alerts",
 				Destination: &spanTo,
 			},
+			&cli.BoolFlag{
+				Name:        "unresolved",
+				Aliases:     []string{"u"},
+				Usage:       "Show only unresolved alerts",
+				Destination: &unresolved,
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			var src source.Source
@@ -132,6 +139,9 @@ func (x *UseCases) cmdList(alerts []model.Alert, th interfaces.SlackThreadServic
 
 			args := c.Args().Slice()
 			switch {
+			case unresolved:
+				src = source.Unresolved()
+
 			case spanFrom != "" || spanTo != "":
 				from, to := now, now
 
@@ -170,6 +180,10 @@ func (x *UseCases) cmdList(alerts []model.Alert, th interfaces.SlackThreadServic
 
 			default:
 				src = source.Span(now.Add(-time.Hour*24), now)
+			}
+
+			if unresolved {
+				args = append(args, "status", "new", "ack", "blocked")
 			}
 
 			svc := list.New(x.repository, list.WithLLM(x.llmClient))

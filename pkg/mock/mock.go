@@ -1045,6 +1045,9 @@ type RepositoryMock struct {
 	// GetAlertsByStatusFunc mocks the GetAlertsByStatus method.
 	GetAlertsByStatusFunc func(ctx context.Context, status model.AlertStatus) ([]model.Alert, error)
 
+	// GetAlertsWithoutStatusFunc mocks the GetAlertsWithoutStatus method.
+	GetAlertsWithoutStatusFunc func(ctx context.Context, status model.AlertStatus) ([]model.Alert, error)
+
 	// GetLatestAlertListInThreadFunc mocks the GetLatestAlertListInThread method.
 	GetLatestAlertListInThreadFunc func(ctx context.Context, thread model.SlackThread) (*model.AlertList, error)
 
@@ -1159,6 +1162,13 @@ type RepositoryMock struct {
 			// Status is the status argument value.
 			Status model.AlertStatus
 		}
+		// GetAlertsWithoutStatus holds details about calls to the GetAlertsWithoutStatus method.
+		GetAlertsWithoutStatus []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Status is the status argument value.
+			Status model.AlertStatus
+		}
 		// GetLatestAlertListInThread holds details about calls to the GetLatestAlertListInThread method.
 		GetLatestAlertListInThread []struct {
 			// Ctx is the ctx argument value.
@@ -1245,6 +1255,7 @@ type RepositoryMock struct {
 	lockPutAlertList               sync.RWMutex
 	lockPutPolicyDiff              sync.RWMutex
 	lockSavePolicy                 sync.RWMutex
+	lockGetAlertsWithoutStatus     sync.RWMutex
 }
 
 // BatchGetAlerts calls BatchGetAlertsFunc.
@@ -3346,5 +3357,41 @@ func (mock *GitHubAppClientMock) LookupBranchCalls() []struct {
 	mock.lockLookupBranch.RLock()
 	calls = mock.calls.LookupBranch
 	mock.lockLookupBranch.RUnlock()
+	return calls
+}
+
+// GetAlertsWithoutStatus calls GetAlertsWithoutStatusFunc.
+func (mock *RepositoryMock) GetAlertsWithoutStatus(ctx context.Context, status model.AlertStatus) ([]model.Alert, error) {
+	if mock.GetAlertsWithoutStatusFunc == nil {
+		panic("RepositoryMock.GetAlertsWithoutStatusFunc: method is nil but Repository.GetAlertsWithoutStatus was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		Status model.AlertStatus
+	}{
+		Ctx:    ctx,
+		Status: status,
+	}
+	mock.lockGetAlertsWithoutStatus.Lock()
+	mock.calls.GetAlertsWithoutStatus = append(mock.calls.GetAlertsWithoutStatus, callInfo)
+	mock.lockGetAlertsWithoutStatus.Unlock()
+	return mock.GetAlertsWithoutStatusFunc(ctx, status)
+}
+
+// GetAlertsWithoutStatusCalls gets all the calls that were made to GetAlertsWithoutStatus.
+// Check the length with:
+//
+//	len(mockedRepository.GetAlertsWithoutStatusCalls())
+func (mock *RepositoryMock) GetAlertsWithoutStatusCalls() []struct {
+	Ctx    context.Context
+	Status model.AlertStatus
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Status model.AlertStatus
+	}
+	mock.lockGetAlertsWithoutStatus.RLock()
+	calls = mock.calls.GetAlertsWithoutStatus
+	mock.lockGetAlertsWithoutStatus.RUnlock()
 	return calls
 }

@@ -102,3 +102,16 @@ func Static(alerts []model.Alert) Source {
 		return alerts, nil
 	}
 }
+
+func Unresolved() Source {
+	return func(ctx context.Context, repo interfaces.Repository) ([]model.Alert, error) {
+		thread.Reply(ctx, "🤖 Getting unresolved alerts...")
+
+		alerts, err := repo.GetAlertsWithoutStatus(ctx, model.AlertStatusResolved)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to get alerts without resolved status")
+		}
+
+		return alerts, nil
+	}
+}
