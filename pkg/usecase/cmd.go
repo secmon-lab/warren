@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"math"
 	"sort"
 	"strings"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/interfaces"
 	"github.com/secmon-lab/warren/pkg/model"
-	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/list"
 	"github.com/secmon-lab/warren/pkg/service/source"
@@ -507,17 +505,13 @@ func (x *UseCases) cmdClustering(alerts []model.Alert, th interfaces.SlackThread
 			}
 
 			for i, cluster := range clusters {
-				p, err := prompt.BuildMetaListPrompt(ctx, cluster)
+				meta, err := service.GenerateAlertListMeta(ctx, cluster, x.llmClient)
 				if err != nil {
 					return err
 				}
-				thread.Reply(ctx, "🤖 Generating meta data of alert list... ("+cluster.ID.String()+")")
-				resp, err := service.AskPrompt[prompt.MetaListPromptResult](ctx, x.llmClient, p)
-				if err != nil {
-					thread.Reply(ctx, "💥 Failed to generate meta data of alert list: "+err.Error())
-				} else {
-					clusters[i].Title = resp.Title
-					clusters[i].Description = resp.Description
+				if meta != nil {
+					clusters[i].Title = meta.Title
+					clusters[i].Description = meta.Description
 				}
 
 				if err := x.repository.PutAlertList(ctx, cluster); err != nil {
@@ -566,7 +560,7 @@ func newAlertCluster(ctx context.Context, th model.SlackThread, user *model.Slac
 		matched := false
 		for j := range clusters {
 			// Compare with first alert in cluster as representative
-			if cosineSimilarity(alert.Embedding, clusters[j].Alerts[0].Embedding) >= similarityThreshold {
+			if service.CosineSimilarity(alert.Embedding, clusters[j].Alerts[0].Embedding) >= similarityThreshold {
 				clusters[j].Alerts = append(clusters[j].Alerts, alert)
 				clusters[j].AlertIDs = append(clusters[j].AlertIDs, alert.ID)
 				matched = true
@@ -584,21 +578,4 @@ func newAlertCluster(ctx context.Context, th model.SlackThread, user *model.Slac
 		clusters: clusters,
 	}
 
-}
-
-func cosineSimilarity(a, b []float32) float64 {
-	if len(a) != len(b) {
-		return 0
-	}
-
-	var dotProduct float64
-	var magnitudeA, magnitudeB float64
-
-	for i := range a {
-		dotProduct += float64(a[i]) * float64(b[i])
-		magnitudeA += float64(a[i]) * float64(a[i])
-		magnitudeB += float64(b[i]) * float64(b[i])
-	}
-
-	return dotProduct / (math.Sqrt(magnitudeA) * math.Sqrt(magnitudeB))
 }
