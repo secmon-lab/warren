@@ -8,8 +8,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/model"
 )
 
-type ctxGoogleIDTokenClaimsKey struct{}
-
 type contextKey string
 
 const (

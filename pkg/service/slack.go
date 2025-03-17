@@ -622,7 +622,7 @@ func (x *SlackThread) PostPolicyDiff(ctx context.Context, diff *model.PolicyDiff
 			Channel:         x.channelID,
 			Reader:          bytes.NewReader([]byte(diffData)),
 			FileSize:        len(diffData),
-			Filename:        fileName,
+			Filename:        fileName + ".diff",
 			Title:           "✍️ " + diff.Title + " (" + fileName + ")",
 			ThreadTimestamp: x.threadID,
 		})
@@ -630,6 +630,28 @@ func (x *SlackThread) PostPolicyDiff(ctx context.Context, diff *model.PolicyDiff
 			return goerr.Wrap(err, "failed to upload file to slack")
 		}
 	}
+
+	blocks := []slack.Block{
+		slack.NewDividerBlock(),
+		slack.NewActionBlock(
+			"create_pr",
+			slack.NewButtonBlockElement(
+				"create_pr",
+				diff.ID.String(),
+				slack.NewTextBlockObject("plain_text", "Create Pull Request", false, false),
+			),
+		),
+	}
+
+	_, _, err := x.slackClient.PostMessageContext(ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post policy diff to slack", goerr.V("blocks", blocks))
+	}
+
 	return nil
 }
 
