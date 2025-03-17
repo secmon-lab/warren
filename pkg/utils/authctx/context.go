@@ -30,7 +30,7 @@ func WithHTTPRequest(ctx context.Context, req *model.AuthHTTPRequest) context.Co
 	return context.WithValue(ctx, httpRequestKey, req)
 }
 
-func Build(ctx context.Context) *model.AuthContext {
+func Build(ctx context.Context) model.AuthContext {
 	var authCtx model.AuthContext
 	claims, ok := ctx.Value(ctxGoogleIDTokenClaimsKey{}).(map[string]interface{})
 	if ok {
@@ -56,5 +56,5 @@ func Build(ctx context.Context) *model.AuthContext {
 		}
 	}
 
-	return &authCtx
+	return authCtx
 }

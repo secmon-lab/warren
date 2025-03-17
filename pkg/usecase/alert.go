@@ -18,9 +18,6 @@ import (
 
 func (uc *UseCases) HandleAlertWithAuth(ctx context.Context, schema string, alertData any) ([]*model.Alert, error) {
 	authCtx := authctx.Build(ctx)
-	if authCtx == nil {
-		return nil, goerr.New("failed to build auth context")
-	}
 
 	policyClient, err := uc.policyService.NewClient(ctx)
 	if err != nil {
