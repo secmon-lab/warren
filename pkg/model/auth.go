@@ -5,7 +5,7 @@ type AuthContext struct {
 	SNS    *SNSMessage            `json:"sns"`
 
 	Req *AuthHTTPRequest  `json:"req"`
-	Env map[string]string `json:"env"`
+	Env map[string]string `json:"-"`
 }
 
 type AuthHTTPRequest struct {
