@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -89,43 +88,46 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.
 	}
 
 	// Check if the alert is similar to any existing alerts
-	var similarAlert *model.Alert
-	for i := 0; i < 3 && similarAlert == nil; i++ {
-		similarAlert, err = uc.findSimilarAlert(ctx, alert)
-		if err != nil {
-			if goerr.HasTag(err, model.ErrTagInvalidLLMResponse) {
-				logger.Warn("invalid LLM response, retry to find similar alert", "error", err)
-				continue
+	// NOTE: Disable similarity merger for now
+	/*
+		var similarAlert *model.Alert
+		for i := 0; i < 3 && similarAlert == nil; i++ {
+			similarAlert, err = uc.findSimilarAlert(ctx, alert)
+			if err != nil {
+				if goerr.HasTag(err, model.ErrTagInvalidLLMResponse) {
+					logger.Warn("invalid LLM response, retry to find similar alert", "error", err)
+					continue
+				}
+				return nil, goerr.Wrap(err, "failed to find similar alert")
 			}
-			return nil, goerr.Wrap(err, "failed to find similar alert")
-		}
-	}
-
-	if similarAlert != nil {
-		logger.Info("alert merged", "parent", similarAlert, "merged", alert)
-
-		alert.ParentID = similarAlert.ID
-		alert.SlackThread = similarAlert.SlackThread
-		alert.Assignee = similarAlert.Assignee
-
-		if err := uc.repository.PutAlert(ctx, alert); err != nil {
-			return nil, goerr.Wrap(err, "failed to put alert", goerr.V("alert", alert))
 		}
 
-		thread := uc.slackService.NewThread(*alert.SlackThread)
+		if similarAlert != nil {
+			logger.Info("alert merged", "parent", similarAlert, "merged", alert)
 
-		var buf bytes.Buffer
-		enc := json.NewEncoder(&buf)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(alert.Data); err != nil {
-			return nil, goerr.Wrap(err, "failed to encode alert data")
-		}
+			alert.ParentID = similarAlert.ID
+			alert.SlackThread = similarAlert.SlackThread
+			alert.Assignee = similarAlert.Assignee
 
-		if err := thread.AttachFile(ctx, "New: "+alert.Title, "alert."+alert.ID.String()+".json", buf.Bytes()); err != nil {
-			return nil, goerr.Wrap(err, "failed to attach alert data")
+			if err := uc.repository.PutAlert(ctx, alert); err != nil {
+				return nil, goerr.Wrap(err, "failed to put alert", goerr.V("alert", alert))
+			}
+
+			thread := uc.slackService.NewThread(*alert.SlackThread)
+
+			var buf bytes.Buffer
+			enc := json.NewEncoder(&buf)
+			enc.SetIndent("", "  ")
+			if err := enc.Encode(alert.Data); err != nil {
+				return nil, goerr.Wrap(err, "failed to encode alert data")
+			}
+
+			if err := thread.AttachFile(ctx, "New: "+alert.Title, "alert."+alert.ID.String()+".json", buf.Bytes()); err != nil {
+				return nil, goerr.Wrap(err, "failed to attach alert data")
+			}
+			return nil, nil
 		}
-		return nil, nil
-	}
+	*/
 
 	// Post new alert to Slack and save the alert with Slack channel and message ID
 	thread, err := uc.slackService.PostAlert(ctx, alert)
