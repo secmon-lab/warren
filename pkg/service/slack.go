@@ -132,7 +132,7 @@ func buildAlertBlocks(alert model.Alert) []slack.Block {
 		}(),
 	}
 
-	title := alert.Title
+	title := "❗ " + alert.Title
 	titleBytes := []byte(title)
 	if len(titleBytes) > 140 {
 		// Find the position to cut that doesn't break UTF-8 characters
