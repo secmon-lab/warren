@@ -617,52 +617,20 @@ func NewSlackPayloadVerifier(signingSecret string) interfaces.SlackPayloadVerifi
 }
 
 func (x *SlackThread) PostPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error {
-	blocks := buildPolicyDiffBlocks(diff)
-
-	_, _, err := x.slackClient.PostMessageContext(ctx,
-		x.channelID,
-		slack.MsgOptionBlocks(blocks...),
-		slack.MsgOptionTS(x.threadID),
-	)
-	if err != nil {
-		return goerr.Wrap(err, "failed to post policy diff to slack", goerr.V("blocks", blocks))
+	for fileName, diffData := range diff.DiffPolicy() {
+		_, err := x.slackClient.UploadFileV2Context(ctx, slack.UploadFileV2Parameters{
+			Channel:         x.channelID,
+			Reader:          bytes.NewReader([]byte(diffData)),
+			FileSize:        len(diffData),
+			Filename:        fileName,
+			Title:           "✍️ " + diff.Title + " (" + fileName + ")",
+			ThreadTimestamp: x.threadID,
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to upload file to slack")
+		}
 	}
-
 	return nil
-}
-
-func buildPolicyDiffBlocks(diff *model.PolicyDiff) []slack.Block {
-	blocks := []slack.Block{
-		slack.NewHeaderBlock(
-			slack.NewTextBlockObject("plain_text", "📒 New Ignore Policy: "+diff.Title, false, false),
-		),
-		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", diff.Description, false, false),
-			nil,
-			nil,
-		),
-	}
-
-	for fileName, diff := range diff.DiffPolicy() {
-		blocks = append(blocks, slack.NewDividerBlock())
-		blocks = append(blocks, slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*%s*\n```\n%s\n```", fileName, diff), false, false),
-			nil,
-			nil,
-		))
-	}
-
-	blocks = append(blocks, slack.NewDividerBlock())
-	blocks = append(blocks, slack.NewActionBlock(
-		"create_pr",
-		slack.NewButtonBlockElement(
-			"create_pr",
-			diff.ID.String(),
-			slack.NewTextBlockObject("plain_text", "Create Pull Request", false, false),
-		),
-	))
-
-	return blocks
 }
 
 func (x *SlackThread) PostAlerts(ctx context.Context, alerts []model.Alert) error {
