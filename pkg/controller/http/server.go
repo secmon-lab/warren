@@ -37,6 +37,8 @@ func New(uc interfaces.UseCase, opts ...Options) *Server {
 	r.Use(panicRecoveryMiddleware)
 
 	r.Route("/alert", func(r chi.Router) {
+		r.Use(withAuthHTTPRequest)
+
 		r.Post("/raw/{schema}", alertRawHandler(uc))
 		r.Route("/pubsub", func(r chi.Router) {
 			r.Use(validateGoogleIDToken)
@@ -47,6 +49,7 @@ func New(uc interfaces.UseCase, opts ...Options) *Server {
 			r.Post("/{schema}", alertSNSHandler(uc))
 		})
 	})
+
 	r.Route("/slack", func(r chi.Router) {
 		r.Use(verifySlackRequest(s.verifier))
 		r.Post("/event", slackEventHandler(s.slackCtrl))
