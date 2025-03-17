@@ -54,11 +54,16 @@ func withAuthHTTPRequest(next http.Handler) http.Handler {
 		// Restore the body for next handlers
 		r.Body = io.NopCloser(bytes.NewBuffer(body))
 
+		copiedHeader := make(map[string][]string)
+		for k, v := range r.Header {
+			copiedHeader[k] = v[:]
+		}
+
 		authReq := &model.AuthHTTPRequest{
 			Method: r.Method,
 			Path:   r.URL.Path,
 			Body:   string(body),
-			Header: r.Header,
+			Header: copiedHeader,
 		}
 
 		ctx := authctx.WithHTTPRequest(r.Context(), authReq)
