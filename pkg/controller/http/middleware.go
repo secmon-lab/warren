@@ -44,6 +44,28 @@ type SNSMessage struct {
 	SubscribeURL     string    `json:"SubscribeURL"`
 }
 
+func withAuthHTTPRequest(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Failed to read request body", http.StatusBadRequest)
+			return
+		}
+		// Restore the body for next handlers
+		r.Body = io.NopCloser(bytes.NewBuffer(body))
+
+		authReq := &model.AuthHTTPRequest{
+			Method: r.Method,
+			Path:   r.URL.Path,
+			Body:   string(body),
+			Header: r.Header,
+		}
+
+		ctx := authctx.WithHTTPRequest(r.Context(), authReq)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 // validateGoogleIDToken validates Google ID token in Authorization header
 // and injects the claims into request context if valid
 func validateGoogleIDToken(next http.Handler) http.Handler {
