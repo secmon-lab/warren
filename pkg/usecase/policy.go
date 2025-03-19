@@ -11,7 +11,7 @@ import (
 	"github.com/m-mizutani/opaq"
 	"github.com/open-policy-agent/opa/v1/ast"
 	"github.com/open-policy-agent/opa/v1/format"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/policy"

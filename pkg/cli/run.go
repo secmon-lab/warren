@@ -8,7 +8,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/policy"

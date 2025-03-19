@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
 )
 

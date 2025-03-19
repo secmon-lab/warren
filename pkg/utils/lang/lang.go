@@ -3,7 +3,7 @@ package lang
 import (
 	"context"
 
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 )
 
 // ContextKey is a type for context keys to avoid key collisions

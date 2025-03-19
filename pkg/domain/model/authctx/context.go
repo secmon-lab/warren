@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 )
 
 type contextKey string

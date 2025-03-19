@@ -7,7 +7,7 @@ import (
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/google/go-github/v69/github"
 	"github.com/m-mizutani/opaq"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 )
 
 type LLMClient interface {

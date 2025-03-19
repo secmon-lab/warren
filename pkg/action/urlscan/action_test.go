@@ -8,7 +8,7 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/action/urlscan"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/urfave/cli/v3"
 )

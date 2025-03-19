@@ -15,7 +15,7 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/harlog"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/utils/thread"

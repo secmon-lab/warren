@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/interfaces"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/utils/errs"
 	"github.com/secmon-lab/warren/pkg/utils/lang"
 	"github.com/secmon-lab/warren/pkg/utils/logging"

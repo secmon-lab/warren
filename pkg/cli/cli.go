@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/secmon-lab/warren/pkg/cli/config"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/utils/lang"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"

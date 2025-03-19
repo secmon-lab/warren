@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/utils/test"

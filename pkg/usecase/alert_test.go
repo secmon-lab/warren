@@ -7,9 +7,9 @@ import (
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/mock"
-	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service"

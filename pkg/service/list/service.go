@@ -3,8 +3,8 @@ package list
 import (
 	"context"
 
-	"github.com/secmon-lab/warren/pkg/interfaces"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/source"
 	"github.com/secmon-lab/warren/pkg/utils/logging"

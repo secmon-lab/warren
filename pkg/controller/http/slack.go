@@ -7,7 +7,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	slack_ctrl "github.com/secmon-lab/warren/pkg/controller/slack"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"

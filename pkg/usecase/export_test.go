@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 )
 
 func (uc *UseCases) FindSimilarAlert(ctx context.Context, alert model.Alert) (*model.Alert, error) {

@@ -8,7 +8,7 @@ import (
 	"github.com/google/go-github/v69/github"
 	"github.com/jferrl/go-githubauth"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"golang.org/x/oauth2"
 )
 

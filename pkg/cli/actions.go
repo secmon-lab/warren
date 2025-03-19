@@ -9,8 +9,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/action/bigquery"
 	"github.com/secmon-lab/warren/pkg/action/otx"
 	"github.com/secmon-lab/warren/pkg/action/urlscan"
-	"github.com/secmon-lab/warren/pkg/interfaces"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/urfave/cli/v3"
 )
 

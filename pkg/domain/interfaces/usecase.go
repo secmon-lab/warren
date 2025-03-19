@@ -3,7 +3,7 @@ package interfaces
 import (
 	"context"
 
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/slack-go/slack"
 )
 

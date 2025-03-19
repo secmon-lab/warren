@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/secmon-lab/warren/pkg/controller/slack"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 )
 
 func TestParseArgs(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/utils/errs"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )

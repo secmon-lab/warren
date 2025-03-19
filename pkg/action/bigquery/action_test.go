@@ -9,8 +9,8 @@ import (
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/gt"
 	bq "github.com/secmon-lab/warren/pkg/action/bigquery"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/mock"
-	"github.com/secmon-lab/warren/pkg/model"
 	"github.com/urfave/cli/v3"
 )
 

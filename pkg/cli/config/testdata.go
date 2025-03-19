@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/urfave/cli/v3"
 )
 

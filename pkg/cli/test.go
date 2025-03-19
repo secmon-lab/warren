@@ -7,7 +7,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"

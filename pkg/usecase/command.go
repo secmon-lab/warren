@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 
-	"github.com/secmon-lab/warren/pkg/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 

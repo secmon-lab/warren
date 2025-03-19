@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/secmon-lab/warren/pkg/controller/slack"
-	"github.com/secmon-lab/warren/pkg/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 )
 
 type Server struct {
