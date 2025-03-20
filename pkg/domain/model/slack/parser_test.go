@@ -3,7 +3,7 @@ package slack_test
 import (
 	"testing"
 
-	"github.com/secmon-lab/warren/pkg/controller/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 )
 
 func TestParseArgs(t *testing.T) {

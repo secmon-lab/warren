@@ -16,7 +16,6 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/urfave/cli/v3"
@@ -90,7 +89,7 @@ func (x *Action) Spec() action.ActionSpec {
 	}
 
 	for _, table := range x.cfg.Tables {
-		tableIDSpec.Choices = append(tableIDSpec.Choices, model.ChoiceSpec{
+		tableIDSpec.Choices = append(tableIDSpec.Choices, action.ChoiceSpec{
 			Value:       table.TableID,
 			Description: table.Description,
 		})
@@ -153,7 +152,7 @@ type queryResult struct {
 	Query string `json:"query"`
 }
 
-func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.LLMSession, args action.Arguments) (*action.ActionResult, error) {
+func (x *Action) Execute(ctx context.Context, ssn interfaces.LLMSession, args action.Arguments) (*action.ActionResult, error) {
 	if err := x.Spec().Validate(args); err != nil {
 		return nil, err
 	}

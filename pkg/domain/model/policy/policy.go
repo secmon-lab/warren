@@ -110,7 +110,7 @@ func NewPolicyDiffID() PolicyDiffID {
 	return PolicyDiffID(uuid.New().String())
 }
 
-type PolicyDiff struct {
+type Diff struct {
 	ID             PolicyDiffID      `json:"id"`
 	Title          string            `json:"title"`
 	Description    string            `json:"description"`
@@ -120,8 +120,8 @@ type PolicyDiff struct {
 	NewTestDataSet *TestDataSet      `json:"new_test_data_set"`
 }
 
-func NewPolicyDiff(ctx context.Context, id PolicyDiffID, title, description string, new, old map[string]string, newTestDataSet *TestDataSet) *PolicyDiff {
-	return &PolicyDiff{
+func NewDiff(ctx context.Context, id PolicyDiffID, title, description string, new, old map[string]string, newTestDataSet *TestDataSet) *Diff {
+	return &Diff{
 		ID:             id,
 		Title:          title,
 		Description:    description,
@@ -132,7 +132,7 @@ func NewPolicyDiff(ctx context.Context, id PolicyDiffID, title, description stri
 	}
 }
 
-func (x *PolicyDiff) DiffPolicy() map[string]string {
+func (x *Diff) DiffPolicy() map[string]string {
 	return diffPolicy(x.Old, x.New)
 }
 

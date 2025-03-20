@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/chat"
+	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
@@ -35,6 +35,6 @@ type Repository interface {
 	BatchUpdateAlertStatus(ctx context.Context, alertIDs []types.AlertID, status alert.Status, reason string) error
 
 	// For policy management
-	GetPolicyDiff(ctx context.Context, id model.PolicyDiffID) (*model.PolicyDiff, error)
-	PutPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error
+	GetPolicyDiff(ctx context.Context, id types.PolicyDiffID) (*policy.Diff, error)
+	PutPolicyDiff(ctx context.Context, diff *policy.Diff) error
 }

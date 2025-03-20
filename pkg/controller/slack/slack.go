@@ -5,7 +5,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/utils/errs"
 	"github.com/secmon-lab/warren/pkg/utils/lang"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -21,7 +21,7 @@ func dispatch(ctx context.Context, handler func(ctx context.Context) error) {
 	newCtx = thread.WithReplyFunc(newCtx, thread.ReplyFuncFrom(ctx))
 	newCtx = lang.With(newCtx, lang.From(ctx))
 
-	if model.IsSync(ctx) {
+	if IsSync(ctx) {
 		if err := handler(newCtx); err != nil {
 			errs.Handle(newCtx, err)
 		}
@@ -53,7 +53,7 @@ func (x *Controller) HandleSlackAppMention(ctx context.Context, event *slackeven
 	logger := logging.From(ctx).With("event_ts", event.EventTimeStamp)
 	ctx = logging.With(ctx, logger)
 
-	slackThread := slack.SlackThread{
+	slackThread := slack_model.Thread{
 		ChannelID: event.Channel,
 		ThreadID:  event.ThreadTimeStamp,
 	}
@@ -61,8 +61,8 @@ func (x *Controller) HandleSlackAppMention(ctx context.Context, event *slackeven
 		slackThread.ThreadID = event.TimeStamp
 	}
 
-	mentions := parseMention(event.Text)
-	user := slack.SlackUser{
+	mentions := slack_model.ParseMention(event.Text)
+	user := slack_model.User{
 		ID:   event.User,
 		Name: event.User,
 	}
@@ -93,11 +93,11 @@ func (x *Controller) HandleSlackMessage(ctx context.Context, event *slackevents.
 		return nil
 	}
 
-	slackThread := slack.SlackThread{
+	slackThread := slack_model.Thread{
 		ChannelID: event.Channel,
 		ThreadID:  event.ThreadTimeStamp,
 	}
-	user := slack.SlackUser{
+	user := slack_model.User{
 		ID:   event.User,
 		Name: event.User,
 	}
@@ -129,17 +129,17 @@ func (x *Controller) HandleSlackInteraction(ctx context.Context, interaction sla
 
 func (x *Controller) handleSlackInteractionBlockActions(ctx context.Context, interaction slack.InteractionCallback) error {
 
-	user := slack.SlackUser{
+	user := slack_model.User{
 		ID:   interaction.User.ID,
 		Name: interaction.User.Name,
 	}
-	th := slack.SlackThread{
+	th := slack_model.Thread{
 		ChannelID: interaction.Channel.ID,
 		ThreadID:  interaction.Message.ThreadTimestamp,
 	}
 
 	for _, action := range interaction.ActionCallback.BlockActions {
-		return x.uc.HandleSlackInteractionBlockActions(ctx, user, th, slack.SlackActionID(action.ActionID), action.Value, interaction.TriggerID)
+		return x.uc.HandleSlackInteractionBlockActions(ctx, user, th, slack_model.ActionID(action.ActionID), action.Value, interaction.TriggerID)
 	}
 
 	return nil
@@ -148,18 +148,20 @@ func (x *Controller) handleSlackInteractionBlockActions(ctx context.Context, int
 func (x *Controller) handleSlackInteractionViewSubmission(ctx context.Context, interaction slack.InteractionCallback) error {
 	values := interaction.View.State.Values
 	metadata := interaction.View.PrivateMetadata
-	user := slack.SlackUser{
+	user := slack_model.User{
 		ID:   interaction.User.ID,
 		Name: interaction.User.Name,
 	}
 
-	switch slack.CallbackID(interaction.View.CallbackID) {
-	case slack.SlackCallbackSubmitResolveAlert:
-		return x.uc.HandleSlackInteractionViewSubmissionResolveAlert(ctx, user, metadata, values)
-	case slack.SlackCallbackSubmitResolveList:
-		return x.uc.HandleSlackInteractionViewSubmissionResolveList(ctx, user, metadata, values)
-	case slack.SlackCallbackSubmitIgnoreList:
-		return x.uc.HandleSlackInteractionViewSubmissionIgnoreList(ctx, metadata, values)
+	sv := slack_model.BlockActionFromValue(values)
+
+	switch slack_model.CallbackID(interaction.View.CallbackID) {
+	case slack_model.CallbackSubmitResolveAlert:
+		return x.uc.HandleSlackInteractionViewSubmissionResolveAlert(ctx, user, metadata, sv)
+	case slack_model.CallbackSubmitResolveList:
+		return x.uc.HandleSlackInteractionViewSubmissionResolveList(ctx, user, metadata, sv)
+	case slack_model.CallbackSubmitIgnoreList:
+		return x.uc.HandleSlackInteractionViewSubmissionIgnoreList(ctx, metadata, sv)
 	}
 
 	return nil

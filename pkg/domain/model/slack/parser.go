@@ -3,8 +3,6 @@ package slack
 import (
 	"strings"
 	"unicode/utf8"
-
-	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 )
 
 // parseArgs parses a string into arguments, handling various types of quotes
@@ -87,18 +85,18 @@ func parseArgs(input string) []string {
 	return result
 }
 
-func parseMention(input string) []slack.Mention {
+func ParseMention(input string) []Mention {
 	args := parseArgs(input)
 
-	mentions := make([]slack.Mention, 0, len(args))
-	var current *slack.Mention
+	mentions := make([]Mention, 0, len(args))
+	var current *Mention
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "<@") && strings.HasSuffix(arg, ">") {
 			if current != nil {
 				mentions = append(mentions, *current)
 				current = nil
 			}
-			current = &slack.Mention{
+			current = &Mention{
 				UserID: strings.TrimSuffix(strings.TrimPrefix(arg, "<@"), ">"),
 				Args:   make([]string, 0),
 			}

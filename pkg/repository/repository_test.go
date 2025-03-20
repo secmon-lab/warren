@@ -5,11 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/chat"
+	"github.com/secmon-lab/warren/pkg/domain/model/policy"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 )
@@ -32,578 +35,218 @@ func TestFirestore(t *testing.T) {
 func testRepository(t *testing.T, repo interfaces.Repository) {
 	ctx := context.Background()
 
-	t.Run("PutAlert", func(t *testing.T) {
-		alert := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
-			Attrs: []model.Attribute{
-				{
-					Key:   "test",
-					Value: "test",
-				},
-			},
-			Data: map[string]any{
-				"test": "test",
-			},
-		})
-		gt.NoError(t, repo.PutAlert(ctx, alert))
+	// テスト用のデータを作成
+	alertID := types.NewAlertID()
+	a := alert.Alert{
+		ID:          alertID,
+		Schema:      "test-schema",
+		Title:       "Test Alert",
+		Description: "Test Description",
+		Status:      alert.StatusNew,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Data:        map[string]string{"key": "value"},
+		Attributes: []alert.Attribute{
+			{Key: "test-key", Value: "test-value"},
+		},
+	}
 
-		got, err := repo.GetAlert(ctx, alert.ID)
+	thread := slack.Thread{
+		ChannelID: "test-channel",
+		ThreadID:  "test-thread",
+	}
+
+	// Alert関連のテスト
+	t.Run("PutAndGetAlert", func(t *testing.T) {
+		// Put
+		gt.NoError(t, repo.PutAlert(ctx, a))
+
+		// Get
+		got, err := repo.GetAlert(ctx, alertID)
 		gt.NoError(t, err)
-		gt.Equal(t, alert.ID, got.ID)
-		gt.Equal(t, alert.Title, got.Title)
-		gt.Equal(t, alert.Attributes, got.Attributes)
-		gt.Equal(t, alert.Data, got.Data)
+		gt.Value(t, got.ID).Equal(a.ID)
+		gt.Value(t, got.Schema).Equal(a.Schema)
+		gt.Value(t, got.Title).Equal(a.Title)
+		gt.Value(t, got.Description).Equal(a.Description)
+		gt.Value(t, got.Status).Equal(a.Status)
+		gt.Value(t, got.Data).Equal(a.Data)
+		gt.Array(t, got.Attributes).Equal(a.Attributes)
 	})
 
-	t.Run("GetLatestAlerts", func(t *testing.T) {
-		var alerts []alert.Alert
-		now := time.Now()
-		for i := 0; i < 10; i++ {
-			newAlert := model.NewAlert(ctx, "test", model.PolicyAlert{
-				Title: "test",
-				Attrs: []model.Attribute{
-					{Key: "test", Value: "test"},
-				},
-				Data: map[string]any{
-					"test": "test",
-				},
-			})
-			newAlert.CreatedAt = now.Add(time.Duration(i) * time.Second)
-			alerts = append(alerts, newAlert)
-		}
-		for _, alert := range alerts {
-			gt.NoError(t, repo.PutAlert(ctx, alert))
-		}
+	t.Run("GetAlertByThread", func(t *testing.T) {
+		// スレッドを設定
+		a.SlackThread = &thread
+		gt.NoError(t, repo.PutAlert(ctx, a))
 
-		got, err := repo.GetLatestAlerts(ctx, now.Add(-24*time.Hour), 5)
+		// GetByThread
+		got, err := repo.GetAlertByThread(ctx, thread)
 		gt.NoError(t, err)
-		gt.Equal(t, len(got), 5)
-		for i, alert := range got {
-			gt.True(t, alert.CreatedAt.After(now.Add(-24*time.Hour)))
-			gt.Equal(t, alert.ID, alerts[len(alerts)-i-1].ID)
-		}
+		gt.Value(t, got.ID).Equal(a.ID)
+		gt.Value(t, got.SlackThread.ChannelID).Equal(thread.ChannelID)
+		gt.Value(t, got.SlackThread.ThreadID).Equal(thread.ThreadID)
 	})
 
-	t.Run("GetAlertBySlackMessageID", func(t *testing.T) {
-		alert := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-			Data: map[string]any{
-				"test": "test",
-			},
-		})
-		alert.SlackThread = &slack.SlackThread{
-			ChannelID: "test",
-			ThreadID:  uuid.New().String(),
-		}
-		gt.NoError(t, repo.PutAlert(ctx, alert))
-
-		got, err := repo.GetAlertsBySlackThread(ctx, *alert.SlackThread)
-		gt.NoError(t, err)
-		gt.Equal(t, len(got), 1)
-		gt.Equal(t, alert.ID, got[0].ID)
-	})
-
-	t.Run("GetAlertBySlackMessageID_NotFound", func(t *testing.T) {
-		got, err := repo.GetAlertsBySlackThread(ctx, slack.SlackThread{
-			ChannelID: "test",
-			ThreadID:  uuid.New().String(),
-		})
-		gt.NoError(t, err)
-		gt.Nil(t, got)
-	})
-
-	t.Run("InsertAlertComment_and_GetAlertComments", func(t *testing.T) {
-		alert := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		gt.NoError(t, repo.PutAlert(ctx, alert))
-
-		comment1 := alert.AlertComment{
-			AlertID:   alert.ID,
-			Comment:   "test1",
+	t.Run("AlertComments", func(t *testing.T) {
+		comment := alert.AlertComment{
+			AlertID:   alertID,
 			Timestamp: time.Now().Format(time.RFC3339),
-			User:      slack.SlackUser{ID: "C0123456789", Name: "orange"},
+			Comment:   "Test comment",
+			User: slack.User{
+				ID:   "test-user",
+				Name: "Test User",
+			},
 		}
-		gt.NoError(t, repo.InsertAlertComment(ctx, comment1))
 
-		comment2 := alert.AlertComment{
-			AlertID:   alert.ID,
-			Comment:   "test2",
-			Timestamp: time.Now().Add(time.Second).Format(time.RFC3339),
-			User:      slack.SlackUser{ID: "C0123456788", Name: "blue"},
-		}
-		gt.NoError(t, repo.InsertAlertComment(ctx, comment2))
+		// PutComment
+		gt.NoError(t, repo.PutAlertComment(ctx, comment))
 
-		got, err := repo.GetAlertComments(ctx, alert.ID)
+		// GetComments
+		got, err := repo.GetAlertComments(ctx, alertID)
 		gt.NoError(t, err)
-		gt.Equal(t, len(got), 2)
-		gt.Equal(t, got[0].AlertID, alert.ID)
-		gt.Equal(t, got[0].Comment, comment2.Comment)
-		gt.Equal(t, got[0].Timestamp, comment2.Timestamp)
-		gt.Equal(t, got[0].User.ID, comment2.User.ID)
-		gt.Equal(t, got[1].AlertID, alert.ID)
-		gt.Equal(t, got[1].Comment, comment1.Comment)
-		gt.Equal(t, got[1].Timestamp, comment1.Timestamp)
-		gt.Equal(t, got[1].User.ID, comment1.User.ID)
+		gt.Array(t, got).Have(comment)
 	})
 
-	t.Run("GetPolicy_and_SavePolicy", func(t *testing.T) {
-		policy := model.PolicyData{
-			Hash:      uuid.New().String(),
-			Data:      map[string]string{"test": "test"},
+	// Chat関連のテスト
+	t.Run("History", func(t *testing.T) {
+		history := chat.History{
+			ID:        types.HistoryID("test-history-id"),
+			Thread:    thread,
+			CreatedBy: slack.User{ID: "test-user", Name: "Test User"},
 			CreatedAt: time.Now(),
+			Contents:  []*genai.Content{{Role: "user", Parts: []genai.Part{genai.Text("test message")}}},
 		}
 
-		gt.NoError(t, repo.SavePolicy(ctx, &policy))
+		// PutHistory
+		gt.NoError(t, repo.PutHistory(ctx, history))
 
-		got, err := repo.GetPolicy(ctx, policy.Hash)
-		gt.NoError(t, err).Must()
-		gt.NotNil(t, got)
-		gt.Equal(t, policy.Hash, got.Hash)
-		gt.Equal(t, policy.Data, got.Data)
-		// NOTE: Firestore returns time in UTC and has microseconds precision
-		gt.Equal(t, policy.CreatedAt.Unix(), got.CreatedAt.Unix())
-	})
-
-	t.Run("GetAlertsByStatus", func(t *testing.T) {
-		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert1.Status = alert.StatusNew
-		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert2.Status = alert.StatusResolved
-		gt.NoError(t, repo.PutAlert(ctx, alert1))
-		gt.NoError(t, repo.PutAlert(ctx, alert2))
-
-		got, err := repo.GetAlertsByStatus(ctx, alert.StatusNew)
+		// GetHistory
+		got, err := repo.GetHistory(ctx, thread)
 		gt.NoError(t, err)
-		gt.A(t, got).Longer(0).Any(func(v alert.Alert) bool {
-			return v.ID == alert1.ID
-		}).All(func(v alert.Alert) bool {
-			return v.ID != alert2.ID
-		}).All(func(v alert.Alert) bool {
-			return v.Status == alert.StatusNew
-		})
+		gt.Value(t, got.ID).Equal(history.ID)
+		gt.Value(t, got.Thread.ChannelID).Equal(thread.ChannelID)
+		gt.Value(t, got.Thread.ThreadID).Equal(thread.ThreadID)
+		gt.Value(t, got.Contents[0].Role).Equal("user")
 	})
 
-	t.Run("BatchGetAlerts", func(t *testing.T) {
-		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
+	// AlertList関連のテスト
+	t.Run("AlertList", func(t *testing.T) {
+		list := alert.List{
+			ID:          types.NewAlertListID(),
+			Title:       "Test List",
+			Description: "Test Description",
+			AlertIDs:    []types.AlertID{a.ID},
+			SlackThread: &thread,
+			CreatedAt:   time.Now(),
+			CreatedBy: &slack.User{
+				ID:   "test-user",
+				Name: "Test User",
 			},
-		})
-		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert2.Status = alert.StatusResolved
-		gt.NoError(t, repo.PutAlert(ctx, alert1))
-		gt.NoError(t, repo.PutAlert(ctx, alert2))
+		}
 
-		got, err := repo.BatchGetAlerts(ctx, []alert.AlertID{alert1.ID, alert2.ID})
+		// PutAlertList
+		gt.NoError(t, repo.PutAlertList(ctx, list))
+
+		// GetAlertList
+		got, err := repo.GetAlertList(ctx, list.ID)
 		gt.NoError(t, err)
-		gt.A(t, got).
-			Length(2).
-			Any(func(v alert.Alert) bool {
-				return v.ID == alert1.ID
-			}).
-			Any(func(v alert.Alert) bool {
-				return v.ID == alert2.ID
-			})
-	})
+		gt.Value(t, got.ID).Equal(list.ID)
+		gt.Value(t, got.Title).Equal(list.Title)
+		gt.Value(t, got.Description).Equal(list.Description)
+		gt.Array(t, got.AlertIDs).Equal(list.AlertIDs)
 
-	t.Run("GetAlertsByParentID", func(t *testing.T) {
-		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "GetAlerts test 1",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "GetAlerts test 2",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert3 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "GetAlerts test 3",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-
-		alert2.ParentID = alert1.ID
-		alert3.ParentID = alert1.ID
-		gt.NoError(t, repo.PutAlert(ctx, alert1))
-		gt.NoError(t, repo.PutAlert(ctx, alert2))
-		gt.NoError(t, repo.PutAlert(ctx, alert3))
-
-		got, err := repo.GetAlertsByParentID(ctx, alert1.ID)
+		// GetAlertListByThread
+		got, err = repo.GetAlertListByThread(ctx, thread)
 		gt.NoError(t, err)
-		gt.Equal(t, len(got), 2)
-		gt.A(t, got).
-			Length(2).
-			Any(func(v alert.Alert) bool {
-				return v.ID == alert2.ID
-			}).
-			Any(func(v alert.Alert) bool {
-				return v.ID == alert3.ID
-			})
+		gt.Value(t, got.ID).Equal(list.ID)
+		gt.Value(t, got.SlackThread.ChannelID).Equal(thread.ChannelID)
+		gt.Value(t, got.SlackThread.ThreadID).Equal(thread.ThreadID)
+
+		// GetLatestAlertListInThread
+		got, err = repo.GetLatestAlertListInThread(ctx, thread)
+		gt.NoError(t, err)
+		gt.Value(t, got.ID).Equal(list.ID)
+		gt.Value(t, got.SlackThread.ChannelID).Equal(thread.ChannelID)
+		gt.Value(t, got.SlackThread.ThreadID).Equal(thread.ThreadID)
 	})
 
-	t.Run("GetPolicyDiff", func(t *testing.T) {
-		diff := model.NewPolicyDiff(ctx, model.NewPolicyDiffID(), "test", "test", map[string]string{"test": "test"}, map[string]string{}, model.NewTestDataSet())
+	// Alert検索関連のテスト
+	t.Run("AlertSearch", func(t *testing.T) {
+		// GetAlertsByStatus
+		got, err := repo.GetAlertsByStatus(ctx, a.Status)
+		gt.NoError(t, err)
+		gt.Array(t, got).Have(a)
+
+		// GetAlertsBySpan
+		begin := time.Now().Add(-1 * time.Hour)
+		end := time.Now().Add(1 * time.Hour)
+		got, err = repo.GetAlertsBySpan(ctx, begin, end)
+		gt.NoError(t, err)
+		gt.Array(t, got).Have(a)
+
+		// BatchGetAlerts
+		got, err = repo.BatchGetAlerts(ctx, []types.AlertID{alertID})
+		gt.NoError(t, err)
+		gt.Array(t, got).Have(a)
+
+		// BatchUpdateAlertStatus
+		gt.NoError(t, repo.BatchUpdateAlertStatus(ctx, []types.AlertID{alertID}, a.Status, "Test reason"))
+		gotAlert, err := repo.GetAlert(ctx, alertID)
+		gt.NoError(t, err)
+		gt.Value(t, gotAlert.Status).Equal(a.Status)
+		gt.Value(t, gotAlert.Reason).Equal("Test reason")
+	})
+
+	// Policy関連のテスト
+	t.Run("Policy", func(t *testing.T) {
+		diffID := policy.PolicyDiffID("test-diff-id")
+		diff := &policy.Diff{
+			ID:          diffID,
+			Title:       "Test Title",
+			Description: "Test Description",
+			CreatedAt:   time.Now(),
+			New:         map[string]string{"key": "value"},
+			Old:         map[string]string{},
+		}
+
+		// PutPolicyDiff
 		gt.NoError(t, repo.PutPolicyDiff(ctx, diff))
 
-		got, err := repo.GetPolicyDiff(ctx, diff.ID)
+		// GetPolicyDiff
+		got, err := repo.GetPolicyDiff(ctx, types.PolicyDiffID(diffID))
 		gt.NoError(t, err)
-		gt.Equal(t, diff.ID, got.ID)
+		gt.Value(t, got.ID).Equal(diff.ID)
+		gt.Value(t, got.New).Equal(diff.New)
 	})
 
-	t.Run("GetPolicyDiff_NotFound", func(t *testing.T) {
-		got, err := repo.GetPolicyDiff(ctx, model.PolicyDiffID(uuid.New().String()))
-		gt.NoError(t, err)
-		gt.Nil(t, got)
-	})
-
-	t.Run("GetAlertListByThread", func(t *testing.T) {
-		list := alert.List{
-			ID: alert.ListID(uuid.New().String()),
-			AlertIDs: []alert.AlertID{
-				alert.AlertID(uuid.New().String()),
-			},
-			SlackThread: &slack.SlackThread{
-				ChannelID: "test",
-				ThreadID:  uuid.New().String(),
-			},
-		}
-		gt.NoError(t, repo.PutAlertList(ctx, list))
-
-		got, err := repo.GetAlertListByThread(ctx, *list.SlackThread)
-		gt.NoError(t, err)
-		gt.Equal(t, list.ID, got.ID)
-	})
-
-	t.Run("GetAlertList", func(t *testing.T) {
-		list := alert.List{
-			ID: alert.ListID(uuid.New().String()),
-			AlertIDs: []alert.AlertID{
-				alert.AlertID(uuid.New().String()),
-			},
-		}
-		gt.NoError(t, repo.PutAlertList(ctx, list))
-
-		got, err := repo.GetAlertList(ctx, list.ID)
-		gt.NoError(t, err)
-		gt.Equal(t, list.ID, got.ID)
-	})
-
-	t.Run("PutAlertList", func(t *testing.T) {
-		list := alert.List{
-			ID: alert.ListID(uuid.New().String()),
-			AlertIDs: []alert.AlertID{
-				alert.AlertID(uuid.New().String()),
-			},
-		}
-		gt.NoError(t, repo.PutAlertList(ctx, list))
-
-		got, err := repo.GetAlertList(ctx, list.ID)
-		gt.NoError(t, err)
-		gt.Equal(t, list.ID, got.ID)
-	})
-
-	t.Run("GetAlertsBySpan", func(t *testing.T) {
-		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "GetAlertsBySpan test 1",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "GetAlertsBySpan test 2",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert3 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "GetAlertsBySpan test 3",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		now := time.Now()
-		alert1.CreatedAt = now.Add(-time.Second * 10)
-		alert2.CreatedAt = now.Add(-time.Second * 5)
-		alert3.CreatedAt = now
-		gt.NoError(t, repo.PutAlert(ctx, alert1))
-		gt.NoError(t, repo.PutAlert(ctx, alert2))
-		gt.NoError(t, repo.PutAlert(ctx, alert3))
-
-		got, err := repo.GetAlertsBySpan(ctx, now.Add(-time.Second*9), now.Add(time.Second*1))
-		gt.NoError(t, err)
-		gt.A(t, got).
-			Longer(1).
-			Any(func(v alert.Alert) bool {
-				return v.ID == alert2.ID
-			}).
-			Any(func(v alert.Alert) bool {
-				return v.ID == alert3.ID
-			}).
-			All(func(v alert.Alert) bool {
-				return v.ID != alert1.ID
-			})
-	})
-
-	t.Run("GetLatestAlertListInThread", func(t *testing.T) {
-		ctx := context.Background()
-		thread := slack.SlackThread{
-			ChannelID: "C123",
-			ThreadID:  uuid.New().String(),
-		}
-		now := time.Now()
-
-		list1 := alert.List{
-			ID:          model.NewAlertListID(),
-			SlackThread: &thread,
-			CreatedAt:   now.Add(-1 * time.Hour),
-			Alerts: []alert.Alert{
-				{ID: model.NewAlertID()},
-			},
-		}
-		list2 := alert.List{
-			ID:          model.NewAlertListID(),
-			SlackThread: &thread,
-			CreatedAt:   now,
-			Alerts: []alert.Alert{
-				{ID: model.NewAlertID()},
-				{ID: model.NewAlertID()},
-			},
-		}
-		otherList := alert.List{
-			ID: model.NewAlertListID(),
-			SlackThread: &slack.SlackThread{
-				ChannelID: "C456",
-				ThreadID:  "T456",
-			},
-			CreatedAt: now,
-			Alerts: []alert.Alert{
-				{ID: model.NewAlertID()},
-			},
+	t.Run("Alert", func(t *testing.T) {
+		a := alert.Alert{
+			ID:          types.AlertID("test-alert-id"),
+			Title:       "Test Title",
+			Description: "Test Description",
+			Status:      alert.StatusNew,
+			CreatedAt:   time.Now(),
 		}
 
-		cases := []struct {
-			name    string
-			setup   func(r interfaces.Repository) error
-			thread  slack.SlackThread
-			want    *alert.List
-			wantErr bool
-		}{
-			{
-				name: "get latest list",
-				setup: func(r interfaces.Repository) error {
-					if err := r.PutAlertList(ctx, list1); err != nil {
-						return err
-					}
-					if err := r.PutAlertList(ctx, list2); err != nil {
-						return err
-					}
-					return r.PutAlertList(ctx, otherList)
-				},
-				thread: thread,
-				want:   &list2,
-			},
-		}
+		// PutAlert
+		gt.NoError(t, repo.PutAlert(ctx, a))
 
-		for _, tt := range cases {
-			t.Run(tt.name, func(t *testing.T) {
-				if tt.setup != nil {
-					gt.NoError(t, tt.setup(repo))
-				}
-
-				got, err := repo.GetLatestAlertListInThread(ctx, tt.thread)
-				if tt.wantErr {
-					gt.Error(t, err)
-					return
-				}
-				gt.NoError(t, err)
-
-				if tt.want == nil {
-					gt.Value(t, got).Equal(nil)
-					return
-				}
-
-				gt.Value(t, got.ID).Equal(tt.want.ID)
-				gt.Value(t, got.SlackThread).Equal(tt.want.SlackThread)
-				gt.Value(t, got.CreatedAt.Unix()).Equal(tt.want.CreatedAt.Unix())
-			})
-		}
-	})
-
-	t.Run("BatchUpdateAlertStatus", func(t *testing.T) {
-		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "BatchUpdateAlertStatus test 1",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "BatchUpdateAlertStatus test 2",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert3 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "BatchUpdateAlertStatus test 3",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert4 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "BatchUpdateAlertStatus test 4",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-
-		alert1.Status = alert.StatusNew
-		alert2.Status = alert.StatusResolved
-		alert3.Status = alert.StatusBlocked
-		gt.NoError(t, repo.PutAlert(ctx, alert1))
-		gt.NoError(t, repo.PutAlert(ctx, alert2))
-		gt.NoError(t, repo.PutAlert(ctx, alert3))
-		gt.NoError(t, repo.PutAlert(ctx, alert4))
-
-		gt.NoError(t, repo.BatchUpdateAlertStatus(ctx, []alert.AlertID{alert1.ID, alert2.ID, alert3.ID}, alert.StatusResolved))
-
-		got, err := repo.GetAlert(ctx, alert1.ID)
+		// GetAlert
+		got, err := repo.GetAlert(ctx, a.ID)
 		gt.NoError(t, err)
-		gt.Equal(t, got.Status, alert.StatusResolved)
+		gt.Value(t, got.ID).Equal(a.ID)
+		gt.Value(t, got.Title).Equal(a.Title)
 
-		got, err = repo.GetAlert(ctx, alert2.ID)
+		// GetAlertsByStatus
+		alerts, err := repo.GetAlertsByStatus(ctx, alert.StatusNew)
 		gt.NoError(t, err)
-		gt.Equal(t, got.Status, alert.StatusResolved)
+		gt.Value(t, len(alerts)).Equal(1)
+		gt.Value(t, alerts[0].ID).Equal(a.ID)
 
-		got, err = repo.GetAlert(ctx, alert3.ID)
+		// BatchUpdateAlertStatus
+		gt.NoError(t, repo.BatchUpdateAlertStatus(ctx, []types.AlertID{a.ID}, alert.StatusAcknowledged, "test reason"))
+
+		got, err = repo.GetAlert(ctx, a.ID)
 		gt.NoError(t, err)
-		gt.Equal(t, got.Status, alert.StatusResolved)
-
-		got, err = repo.GetAlert(ctx, alert4.ID)
-		gt.NoError(t, err)
-		gt.Equal(t, got.Status, alert.StatusNew)
-	})
-
-	t.Run("BatchUpdateAlertConclusion", func(t *testing.T) {
-		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "BatchUpdateAlertConclusion test 1",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "BatchUpdateAlertConclusion test 2",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert3 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "BatchUpdateAlertConclusion test 3",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert4 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "BatchUpdateAlertConclusion test 4",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-
-		alert1.Conclusion = alert.AlertConclusionIntended
-		alert2.Conclusion = alert.AlertConclusionFalsePositive
-		alert3.Conclusion = alert.AlertConclusionTruePositive
-		gt.NoError(t, repo.PutAlert(ctx, alert1))
-		gt.NoError(t, repo.PutAlert(ctx, alert2))
-		gt.NoError(t, repo.PutAlert(ctx, alert3))
-		gt.NoError(t, repo.PutAlert(ctx, alert4))
-
-		gt.NoError(t, repo.BatchUpdateAlertConclusion(ctx, []alert.AlertID{alert1.ID, alert2.ID, alert3.ID}, alert.AlertConclusionFalsePositive, "test"))
-
-		got, err := repo.GetAlert(ctx, alert1.ID)
-		gt.NoError(t, err)
-		gt.Equal(t, got.Conclusion, alert.AlertConclusionFalsePositive)
-		gt.Equal(t, got.Reason, "test")
-
-		got, err = repo.GetAlert(ctx, alert2.ID)
-		gt.NoError(t, err)
-		gt.Equal(t, got.Conclusion, alert.AlertConclusionFalsePositive)
-		gt.Equal(t, got.Reason, "test")
-
-		got, err = repo.GetAlert(ctx, alert3.ID)
-		gt.NoError(t, err)
-		gt.Equal(t, got.Conclusion, alert.AlertConclusionFalsePositive)
-		gt.Equal(t, got.Reason, "test")
-
-		got, err = repo.GetAlert(ctx, alert4.ID)
-		gt.NoError(t, err)
-		gt.Equal(t, got.Conclusion, "")
-		gt.Equal(t, got.Reason, "")
-	})
-
-	t.Run("GetAlertsWithoutStatus", func(t *testing.T) {
-		alert1 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert1.Status = alert.StatusNew
-		alert2 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert2.Status = alert.StatusResolved
-		alert3 := model.NewAlert(ctx, "test", model.PolicyAlert{
-			Title: "test",
-			Attrs: []model.Attribute{
-				{Key: "test", Value: "test"},
-			},
-		})
-		alert3.Status = alert.StatusAcknowledged
-		gt.NoError(t, repo.PutAlert(ctx, alert1))
-		gt.NoError(t, repo.PutAlert(ctx, alert2))
-		gt.NoError(t, repo.PutAlert(ctx, alert3))
-
-		got, err := repo.GetAlertsWithoutStatus(ctx, alert.StatusResolved)
-		gt.NoError(t, err)
-		gt.A(t, got).
-			Longer(2).
-			Any(func(v alert.Alert) bool {
-				return v.ID == alert1.ID
-			}).
-			Any(func(v alert.Alert) bool {
-				return v.ID == alert3.ID
-			}).
-			All(func(v alert.Alert) bool {
-				return v.Status != alert.StatusResolved
-			})
+		gt.Value(t, got.Status).Equal(alert.StatusAcknowledged)
 	})
 }

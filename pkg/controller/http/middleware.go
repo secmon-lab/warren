@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"google.golang.org/api/idtoken"
 )
@@ -113,7 +113,7 @@ func GetGoogleIDTokenClaims(ctx context.Context) (map[string]interface{}, error)
 	return claims, nil
 }
 
-func verifySlackRequest(verifier interfaces.SlackPayloadVerifier) func(http.Handler) http.Handler {
+func verifySlackRequest(verifier slack.PayloadVerifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if verifier == nil {

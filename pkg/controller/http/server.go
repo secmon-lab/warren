@@ -4,19 +4,20 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/secmon-lab/warren/pkg/controller/slack"
+	slack_controller "github.com/secmon-lab/warren/pkg/controller/slack"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 )
 
 type Server struct {
 	router    *chi.Mux
-	slackCtrl *slack.Controller
-	verifier  interfaces.SlackPayloadVerifier
+	slackCtrl *slack_controller.Controller
+	verifier  slack_model.PayloadVerifier
 }
 
 type Options func(*Server)
 
-func WithSlackVerifier(verifier interfaces.SlackPayloadVerifier) Options {
+func WithSlackVerifier(verifier slack_model.PayloadVerifier) Options {
 	return func(s *Server) {
 		s.verifier = verifier
 	}
@@ -27,7 +28,7 @@ func New(uc interfaces.UseCase, opts ...Options) *Server {
 
 	s := &Server{
 		router:    r,
-		slackCtrl: slack.New(uc),
+		slackCtrl: slack_controller.New(uc),
 	}
 	for _, opt := range opts {
 		opt(s)

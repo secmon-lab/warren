@@ -95,7 +95,7 @@ func TestSlackInteractionHandler(t *testing.T) {
 			return nil
 		},
 	}
-	server := server.New(uc, server.WithSlackVerifier(service.NewSlackPayloadVerifier(signingSecret)))
+	server := server.New(uc, server.WithSlackVerifier(slack.NewSlackPayloadVerifier(signingSecret)))
 
 	t.Run("with valid signature", func(t *testing.T) {
 		ts := fmt.Sprint(time.Now().Unix())
