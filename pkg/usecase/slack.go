@@ -7,6 +7,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/source"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -16,7 +17,7 @@ import (
 	"github.com/slack-go/slack"
 )
 
-func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user model.SlackUser, mention model.SlackMention, slackThread model.SlackThread) error {
+func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.SlackUser, mention slack.Mention, slackThread slack.SlackThread) error {
 	logger := logging.From(ctx)
 	logger.Debug("slack app mention event", "mention", mention, "slack_thread", slackThread)
 
@@ -61,7 +62,7 @@ func (uc *UseCases) dispatchSlackAction(ctx context.Context, action func(ctx con
 	}()
 }
 
-func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackThread model.SlackThread, text string, user model.SlackUser, ts string) error {
+func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackThread slack.SlackThread, text string, user slack.SlackUser, ts string) error {
 	logger := logging.From(ctx)
 	th := uc.slackService.NewThread(slackThread)
 	ctx = thread.WithReplyFunc(ctx, th.Reply)
@@ -80,7 +81,7 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackThread model.Sl
 		return nil
 	}
 
-	var baseAlert *model.Alert
+	var baseAlert *alert.Alert
 	for _, a := range alerts {
 		if a.ParentID == "" {
 			baseAlert = &a
@@ -91,7 +92,7 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackThread model.Sl
 		return nil
 	}
 
-	comment := model.AlertComment{
+	comment := alert.AlertComment{
 		AlertID:   baseAlert.ID,
 		Comment:   text,
 		Timestamp: ts,
@@ -105,7 +106,7 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackThread model.Sl
 	return nil
 }
 
-func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, user slack.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
 	logger := logging.From(ctx)
 	logger.Debug("resolving alert",
 		"user", user,
@@ -113,7 +114,7 @@ func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context
 		"values", values,
 	)
 
-	alertID := model.AlertID(metadata)
+	alertID := alert.AlertID(metadata)
 	alert, err := uc.repository.GetAlert(ctx, alertID)
 	if err != nil {
 		thread.Reply(ctx, "💥 Failed to get alert\n> "+err.Error())
@@ -129,7 +130,7 @@ func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context
 		ctx = thread.WithReplyFunc(ctx, th.Reply)
 	}
 
-	if err := uc.handleSlackInteractionViewSubmissionResolve(ctx, user, values, []model.Alert{*alert}); err != nil {
+	if err := uc.handleSlackInteractionViewSubmissionResolve(ctx, user, values, []alert.Alert{*alert}); err != nil {
 		thread.Reply(ctx, "💥 Failed to resolve alert\n> "+err.Error())
 		logger.Error("failed to resolve alert", "error", err)
 		return err
@@ -138,7 +139,7 @@ func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context
 	return nil
 }
 
-func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, user slack.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
 	logger := logging.From(ctx)
 	logger.Debug("resolving alert list",
 		"user", user,
@@ -146,7 +147,7 @@ func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.
 		"values", values,
 	)
 
-	listID := model.AlertListID(metadata)
+	listID := alert.ListID(metadata)
 	list, err := uc.repository.GetAlertList(ctx, listID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert list", goerr.V("list_id", listID))
@@ -174,22 +175,22 @@ func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.
 	return nil
 }
 
-func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Context, user model.SlackUser, values map[string]map[string]slack.BlockAction, alerts []model.Alert) error {
+func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Context, user slack.SlackUser, values map[string]map[string]slack.BlockAction, alerts []alert.Alert) error {
 	logger := logging.From(ctx)
 	thread.Reply(ctx, fmt.Sprintf("⏳ Resolving %d alerts...", len(alerts)))
 	logger.Info("resolving alerts", "alerts", alerts)
 
 	var (
-		conclusion model.AlertConclusion
+		conclusion alert.AlertConclusion
 		reason     string
 	)
-	if conclusionBlock, ok := values[model.SlackBlockIDConclusion.String()]; ok {
-		if conclusionAction, ok := conclusionBlock[model.SlackActionIDConclusion.String()]; ok {
-			conclusion = model.AlertConclusion(conclusionAction.SelectedOption.Value)
+	if conclusionBlock, ok := values[slack.SlackBlockIDConclusion.String()]; ok {
+		if conclusionAction, ok := conclusionBlock[slack.SlackActionIDConclusion.String()]; ok {
+			conclusion = alert.AlertConclusion(conclusionAction.SelectedOption.Value)
 		}
 	}
-	if commentBlock, ok := values[model.SlackBlockIDComment.String()]; ok {
-		if commentAction, ok := commentBlock[model.SlackActionIDComment.String()]; ok {
+	if commentBlock, ok := values[slack.SlackBlockIDComment.String()]; ok {
+		if commentAction, ok := commentBlock[slack.SlackActionIDComment.String()]; ok {
 			reason = commentAction.Value
 		}
 	}
@@ -200,7 +201,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Cont
 
 	now := clock.Now(ctx)
 	for _, alert := range alerts {
-		alert.Status = model.AlertStatusResolved
+		alert.Status = alert.StatusResolved
 		alert.ResolvedAt = &now
 		alert.Conclusion = conclusion
 		alert.Reason = reason
@@ -231,11 +232,11 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Cont
 }
 
 func (x *UseCases) HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Context, metadata string, values map[string]map[string]slack.BlockAction) error {
-	listID := model.AlertListID(metadata)
+	listID := alert.ListID(metadata)
 
 	var prompt string
-	if promptBlock, ok := values[model.SlackBlockIDIgnorePrompt.String()]; ok {
-		if promptAction, ok := promptBlock[model.SlackActionIDIgnorePrompt.String()]; ok {
+	if promptBlock, ok := values[slack.SlackBlockIDIgnorePrompt.String()]; ok {
+		if promptAction, ok := promptBlock[slack.SlackActionIDIgnorePrompt.String()]; ok {
 			prompt = promptAction.Value
 		}
 	}
@@ -273,15 +274,15 @@ func (x *UseCases) HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Co
 	return nil
 }
 
-func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user model.SlackUser, slackThread model.SlackThread, actionID model.SlackActionID, value, triggerID string) error {
+func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user slack.SlackUser, slackThread slack.SlackThread, actionID slack.SlackActionID, value, triggerID string) error {
 	logger := logging.From(ctx)
 
 	th := uc.slackService.NewThread(slackThread)
 	ctx = thread.WithReplyFunc(ctx, th.Reply)
 
 	switch actionID {
-	case model.SlackActionIDAck:
-		alert, err := uc.repository.GetAlert(ctx, model.AlertID(value))
+	case slack.SlackActionIDAck:
+		alert, err := uc.repository.GetAlert(ctx, alert.AlertID(value))
 		if err != nil {
 			return goerr.Wrap(err, "failed to get alert")
 		} else if alert == nil {
@@ -290,7 +291,7 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user
 		}
 
 		alert.Assignee = &user
-		alert.Status = model.AlertStatusAcknowledged
+		alert.Status = alert.StatusAcknowledged
 		if err := uc.repository.PutAlert(ctx, *alert); err != nil {
 			return goerr.Wrap(err, "failed to put alert")
 		}
@@ -306,8 +307,8 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user
 			logger.Warn("slack thread not found", "alert_id", alert.ID)
 		}
 
-	case model.SlackActionIDResolve:
-		alert, err := uc.repository.GetAlert(ctx, model.AlertID(value))
+	case slack.SlackActionIDResolve:
+		alert, err := uc.repository.GetAlert(ctx, alert.AlertID(value))
 		if err != nil {
 			return goerr.Wrap(err, "failed to get alert")
 		} else if alert == nil {
@@ -323,8 +324,8 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user
 			logger.Warn("slack service is not available")
 		}
 
-	case model.SlackActionIDInspect:
-		alert, err := uc.repository.GetAlert(ctx, model.AlertID(value))
+	case slack.SlackActionIDInspect:
+		alert, err := uc.repository.GetAlert(ctx, alert.AlertID(value))
 		if err != nil {
 			return goerr.Wrap(err, "failed to get alert")
 		} else if alert == nil {
@@ -336,11 +337,11 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user
 			return err
 		}
 
-	case model.SlackActionIDIgnoreList:
+	case slack.SlackActionIDIgnoreList:
 		return uc.RunCommand(ctx, []string{"warren", "ignore", value}, nil, th, &user)
 
-	case model.SlackActionIDResolveList:
-		listID := model.AlertListID(value)
+	case slack.SlackActionIDResolveList:
+		listID := alert.ListID(value)
 		list, err := uc.repository.GetAlertList(ctx, listID)
 		if err != nil {
 			return goerr.Wrap(err, "failed to get alert list")
@@ -357,7 +358,7 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user
 			logger.Warn("slack service is not available")
 		}
 
-	case model.SlackActionIDCreatePR:
+	case slack.SlackActionIDCreatePR:
 		th.Reply(ctx, "✏️ Creating pull request...")
 
 		diffID := model.PolicyDiffID(value)

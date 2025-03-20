@@ -23,6 +23,7 @@ import (
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service"
@@ -81,16 +82,16 @@ var slackInteractionJSON []byte
 func TestSlackInteractionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
 	uc := &mock.UseCaseMock{
-		HandleSlackInteractionViewSubmissionResolveAlertFunc: func(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+		HandleSlackInteractionViewSubmissionResolveAlertFunc: func(ctx context.Context, user slack.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
 			return nil
 		},
-		HandleSlackInteractionViewSubmissionResolveListFunc: func(ctx context.Context, user model.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+		HandleSlackInteractionViewSubmissionResolveListFunc: func(ctx context.Context, user slack.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
 			return nil
 		},
 		HandleSlackInteractionViewSubmissionIgnoreListFunc: func(ctx context.Context, metadata string, values map[string]map[string]slack.BlockAction) error {
 			return nil
 		},
-		HandleSlackInteractionBlockActionsFunc: func(ctx context.Context, user model.SlackUser, slackThread model.SlackThread, actionID model.SlackActionID, value, triggerID string) error {
+		HandleSlackInteractionBlockActionsFunc: func(ctx context.Context, user slack.SlackUser, slackThread slack.SlackThread, actionID slack.SlackActionID, value, triggerID string) error {
 			return nil
 		},
 	}
@@ -125,7 +126,7 @@ var slackMentionJSON []byte
 func TestSlackMentionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
 	uc := &mock.UseCaseMock{
-		HandleSlackAppMentionFunc: func(ctx context.Context, user model.SlackUser, mention model.SlackMention, slackThread model.SlackThread) error {
+		HandleSlackAppMentionFunc: func(ctx context.Context, user slack.SlackUser, mention slack.Mention, slackThread slack.SlackThread) error {
 			gt.Equal(t, user.ID, "U8JLN34SV")
 			gt.Equal(t, slackThread.ChannelID, "C07AR2FPG1F")
 			gt.Equal(t, slackThread.ThreadID, "1741487414.163419")
@@ -169,7 +170,7 @@ var snsPem []byte
 
 func TestAlertSNS(t *testing.T) {
 	uc := &mock.UseCaseMock{
-		HandleAlertWithAuthFunc: func(ctx context.Context, schema string, alertData any) ([]*model.Alert, error) {
+		HandleAlertWithAuthFunc: func(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error) {
 			return nil, nil
 		},
 	}

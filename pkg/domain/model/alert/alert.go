@@ -1,4 +1,4 @@
-package model
+package alert
 
 import (
 	"context"
@@ -6,44 +6,42 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
 
-type AlertID string
-
-func NewAlertID() AlertID {
-	return AlertID(uuid.New().String())
+func NewAlertID() types.AlertID {
+	return types.AlertID(uuid.New().String())
 }
 
-func (id AlertID) String() string { return string(id) }
-
-type AlertStatus string
+type Status string
 
 const (
-	AlertStatusNew          AlertStatus = "new"
-	AlertStatusAcknowledged AlertStatus = "acked"
-	AlertStatusBlocked      AlertStatus = "blocked"
-	AlertStatusResolved     AlertStatus = "resolved"
+	StatusNew          Status = "new"
+	StatusAcknowledged Status = "acked"
+	StatusBlocked      Status = "blocked"
+	StatusResolved     Status = "resolved"
 )
 
-var alertStatusLabels = map[AlertStatus]string{
-	AlertStatusNew:          "🆕 New",
-	AlertStatusAcknowledged: "👀 Acknowledged",
-	AlertStatusBlocked:      "🚫 Blocked",
-	AlertStatusResolved:     "✅️ Resolved",
+var statusLabels = map[Status]string{
+	StatusNew:          "🆕 New",
+	StatusAcknowledged: "👀 Acknowledged",
+	StatusBlocked:      "🚫 Blocked",
+	StatusResolved:     "✅️ Resolved",
 }
 
-func (s AlertStatus) String() string {
+func (s Status) String() string {
 	return string(s)
 }
 
-func (s AlertStatus) Label() string {
-	return alertStatusLabels[s]
+func (s Status) Label() string {
+	return statusLabels[s]
 }
 
-func (s AlertStatus) Validate() error {
+func (s Status) Validate() error {
 	switch s {
-	case AlertStatusNew, AlertStatusAcknowledged, AlertStatusBlocked, AlertStatusResolved:
+	case StatusNew, StatusAcknowledged, StatusBlocked, StatusResolved:
 		return nil
 	}
 	return goerr.New("invalid alert status", goerr.V("status", s))
@@ -126,12 +124,12 @@ type AlertFinding struct {
 }
 
 type Alert struct {
-	ID          AlertID         `json:"id"`
+	ID          types.AlertID   `json:"id"`
 	Schema      string          `json:"schema"`
 	Title       string          `json:"title"`
 	Description string          `json:"description"`
-	Status      AlertStatus     `json:"status"`
-	ParentID    AlertID         `json:"parent_id"`
+	Status      Status          `json:"status"`
+	ParentID    types.AlertID   `json:"parent_id"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
 	ResolvedAt  *time.Time      `json:"resolved_at"`
@@ -141,33 +139,30 @@ type Alert struct {
 	Reason      string          `json:"reason"`
 	Finding     *AlertFinding   `json:"finding"`
 
-	Assignee    *SlackUser   `json:"assignee"`
-	SlackThread *SlackThread `json:"slack_thread"`
+	Assignee    *slack.User   `json:"assignee"`
+	SlackThread *slack.Thread `json:"slack_thread"`
 
 	Embedding []float32 `json:"-"`
 }
 
-type SlackThread struct {
-	TeamID    string `json:"team_id"`
-	ChannelID string `json:"channel_id"`
-	ThreadID  string `json:"thread_id"`
+type Metadata struct {
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	Data        any         `json:"data"`
+	Attrs       []Attribute `json:"attrs"`
 }
 
-type SlackUser struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-func NewAlert(ctx context.Context, schema string, p PolicyAlert) Alert {
+func NewAlert(ctx context.Context, schema string, metadata Metadata) Alert {
 	return Alert{
-		ID:         NewAlertID(),
-		Schema:     schema,
-		Title:      p.Title,
-		Status:     AlertStatusNew,
-		CreatedAt:  clock.Now(ctx),
-		UpdatedAt:  clock.Now(ctx),
-		Data:       p.Data,
-		Attributes: p.Attrs,
+		ID:          NewAlertID(),
+		Schema:      schema,
+		Title:       metadata.Title,
+		Description: metadata.Description,
+		Status:      StatusNew,
+		CreatedAt:   clock.Now(ctx),
+		UpdatedAt:   clock.Now(ctx),
+		Data:        metadata.Data,
+		Attributes:  metadata.Attrs,
 	}
 }
 
@@ -179,45 +174,8 @@ type Attribute struct {
 }
 
 type AlertComment struct {
-	AlertID   AlertID   `json:"alert_id"`
-	Timestamp string    `json:"timestamp"`
-	Comment   string    `json:"comment"`
-	User      SlackUser `json:"user"`
-}
-
-type AlertListID string
-
-func NewAlertListID() AlertListID {
-	return AlertListID(uuid.New().String())
-}
-
-func (id AlertListID) String() string {
-	return string(id)
-}
-
-type AlertList struct {
-	ID          AlertListID  `json:"id"`
-	Title       string       `json:"title"`
-	Description string       `json:"description"`
-	AlertIDs    []AlertID    `json:"alert_ids"`
-	SlackThread *SlackThread `json:"slack_thread"`
-	CreatedAt   time.Time    `json:"created_at"`
-	CreatedBy   *SlackUser   `json:"created_by"`
-
-	Alerts []Alert `firestore:"-"`
-}
-
-func NewAlertList(ctx context.Context, thread SlackThread, createdBy *SlackUser, alerts []Alert) AlertList {
-	alertList := AlertList{
-		ID:          NewAlertListID(),
-		SlackThread: &thread,
-		CreatedAt:   clock.Now(ctx),
-		CreatedBy:   createdBy,
-	}
-	for _, alert := range alerts {
-		alertList.AlertIDs = append(alertList.AlertIDs, alert.ID)
-		alertList.Alerts = append(alertList.Alerts, alert)
-	}
-
-	return alertList
+	AlertID   types.AlertID `json:"alert_id"`
+	Timestamp string        `json:"timestamp"`
+	Comment   string        `json:"comment"`
+	User      slack.User    `json:"user"`
 }

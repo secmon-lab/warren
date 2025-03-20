@@ -1,11 +1,11 @@
-package authctx
+package auth
 
 import (
 	"context"
 	"os"
 	"strings"
 
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/message"
 )
 
 type contextKey string
@@ -20,27 +20,27 @@ func WithGoogleIDTokenClaims(ctx context.Context, claims map[string]interface{})
 	return context.WithValue(ctx, googleIDTokenClaimsKey, claims)
 }
 
-func WithSNSMessage(ctx context.Context, msg *model.SNSMessage) context.Context {
+func WithSNSMessage(ctx context.Context, msg *message.SNS) context.Context {
 	return context.WithValue(ctx, snsMessageKey, msg)
 }
 
-func WithHTTPRequest(ctx context.Context, req *model.AuthHTTPRequest) context.Context {
+func WithHTTPRequest(ctx context.Context, req *HTTPRequest) context.Context {
 	return context.WithValue(ctx, httpRequestKey, req)
 }
 
-func Build(ctx context.Context) model.AuthContext {
-	var authCtx model.AuthContext
+func BuildContext(ctx context.Context) Context {
+	var authCtx Context
 	claims, ok := ctx.Value(googleIDTokenClaimsKey).(map[string]interface{})
 	if ok {
 		authCtx.Google = claims
 	}
 
-	msg, ok := ctx.Value(snsMessageKey).(*model.SNSMessage)
+	msg, ok := ctx.Value(snsMessageKey).(*message.SNS)
 	if ok {
 		authCtx.SNS = msg
 	}
 
-	req, ok := ctx.Value(httpRequestKey).(*model.AuthHTTPRequest)
+	req, ok := ctx.Value(httpRequestKey).(*HTTPRequest)
 	if ok {
 		authCtx.Req = req
 	}

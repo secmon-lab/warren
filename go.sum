@@ -221,6 +221,8 @@ github.com/m-mizutani/masq v0.1.10 h1:vriZQHZ15volCty03OMTV8kke5fVvEQozQ5DsUf84E
 github.com/m-mizutani/masq v0.1.10/go.mod h1:H8jy743m5h+niZ1ByiZfPnLNnXzb7Khr/K59vT15f18=
 github.com/m-mizutani/opaq v0.2.1-0.20250222003843-b0e8fa8233e6 h1:a6VIFUp0Ii7gS4bRE6hZu9GupWEtnOG0C5EvaN9ek1I=
 github.com/m-mizutani/opaq v0.2.1-0.20250222003843-b0e8fa8233e6/go.mod h1:Z2HmGgy9nVqcXCYJBdaMSwVp/ZUi3VEsZmQ7fVhZuQ8=
+github.com/matryer/moq v0.5.3 h1:4femQCFmBUwFPYs8VfM5ID7AI67/DTEDRBbTtSWy7GU=
+github.com/matryer/moq v0.5.3/go.mod h1:8288Qkw7gMZhUP3cIN86GG7g5p9jRuZH8biXLW4RXvQ=
 github.com/mattn/go-colorable v0.1.14 h1:9A9LHSqF/7dyVVX6g0U9cwm9pG3kP9gSzcuIPHPsaIE=
 github.com/mattn/go-colorable v0.1.14/go.mod h1:6LmQG8QLFO4G5z1gPvYEzlUgJ2wF+stgPZH1UqBm1s8=
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=
@@ -365,6 +367,8 @@ golang.org/x/time v0.10.0/go.mod h1:3BpzKBy/shNhVucY/MWOyx10tF3SFh9QdLuxbVysPQM=
 golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.29.0 h1:Xx0h3TtM9rzQpQuR4dKLrdglAmCEN5Oi+P74JdhdzXE=
 golang.org/x/tools v0.29.0/go.mod h1:KMQVMRsVxU6nHCFXrBPhDB8XncLNLM0lIy/F14RP588=
+golang.org/x/tools v0.30.0 h1:BgcpHewrV5AUp2G9MebG4XPFI1E2W41zU1SaqVA9vJY=
+golang.org/x/tools v0.30.0/go.mod h1:c347cR/OJfw5TI+GfX7RUPNMdDRRbjvYTS0jPyvsVtY=
 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da h1:noIWHXmPHxILtqtCOPIhSt0ABwskkZKjD3bXGnZGpNY=
 golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da/go.mod h1:NDW/Ps6MPRej6fsCIbMTohpP40sJ/P/vI1MoTEGwX90=

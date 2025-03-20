@@ -10,7 +10,7 @@ import (
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -33,7 +33,7 @@ func (x *throttleSession) SendMessage(ctx context.Context, msg ...genai.Part) (*
 	return x.ssn.SendMessage(ctx, msg...)
 }
 
-func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
+func (uc *UseCases) RunWorkflow(ctx context.Context, alert alert.Alert) error {
 	logger := logging.From(ctx)
 	thread := uc.slackService.NewThread(*alert.SlackThread)
 	thread.Reply(ctx, "Starting investigation...")
@@ -96,7 +96,7 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 			continue
 		}
 
-		alert.Finding = &model.AlertFinding{
+		alert.Finding = &alert.AlertFinding{
 			Severity:       finding.Severity,
 			Summary:        finding.Summary,
 			Reason:         finding.Reason,
@@ -150,7 +150,7 @@ func planAction(ctx context.Context, ssn interfaces.LLMSession, prePrompt string
 	return &result, nil
 }
 
-func (uc *UseCases) buildFinding(ctx context.Context, ssn interfaces.LLMSession) (*model.AlertFinding, error) {
+func (uc *UseCases) buildFinding(ctx context.Context, ssn interfaces.LLMSession) (*alert.AlertFinding, error) {
 	conclusionPrompt, err := prompt.BuildFindingPrompt(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build conclusion prompt")
@@ -173,7 +173,7 @@ func (uc *UseCases) buildFinding(ctx context.Context, ssn interfaces.LLMSession)
 		return nil, eb.New("no conclusion prompt result")
 	}
 
-	var result model.AlertFinding
+	var result alert.AlertFinding
 	if err := json.Unmarshal([]byte(text), &result); err != nil {
 		return nil, eb.Wrap(err, "failed to unmarshal finding prompt result", goerr.V("text", text))
 	}

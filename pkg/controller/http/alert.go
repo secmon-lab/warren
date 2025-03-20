@@ -9,6 +9,8 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/domain/model/message"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
@@ -16,25 +18,27 @@ func alertPubSubHandler(uc interfaces.UseCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		schema := chi.URLParam(r, "schema")
 
-		var msg struct {
-			Message struct {
-				Data []byte `json:"data"`
-			} `json:"message"`
+		rawBody, err := io.ReadAll(r.Body)
+		if err != nil {
+			handleError(w, r, goerr.Wrap(err, "failed to read body"))
+			return
 		}
-		if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
+		defer r.Body.Close()
+
+		var msg message.PubSub
+		if err := json.Unmarshal(rawBody, &msg); err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to decode message",
-				goerr.T(model.ErrTagInvalidRequest),
-				goerr.V("body", r.Body),
+				goerr.T(errs.TagInvalidRequest),
+				goerr.V("body", rawBody),
 			))
 			return
 		}
-		r.Body = http.NoBody
 
 		var alertData any
-		if err := json.Unmarshal(msg.Message.Data, &alertData); err != nil {
+		if err := json.Unmarshal([]byte(msg.Data), &alertData); err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to decode message",
-				goerr.T(model.ErrTagInvalidRequest),
-				goerr.V("body", r.Body),
+				goerr.T(errs.TagInvalidRequest),
+				goerr.V("body", msg.Data),
 			))
 			return
 		}
@@ -54,7 +58,7 @@ func alertRawHandler(uc interfaces.UseCase) http.HandlerFunc {
 
 		if r.Header.Get("Content-Type") != "application/json" {
 			handleError(w, r, goerr.New("invalid content type",
-				goerr.T(model.ErrTagInvalidRequest),
+				goerr.T(errs.TagInvalidRequest),
 			))
 			return
 		}
@@ -62,7 +66,7 @@ func alertRawHandler(uc interfaces.UseCase) http.HandlerFunc {
 		var alertData any
 		if err := json.NewDecoder(r.Body).Decode(&alertData); err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to decode message",
-				goerr.T(model.ErrTagInvalidRequest),
+				goerr.T(errs.TagInvalidRequest),
 				goerr.V("body", r.Body),
 			))
 			return
@@ -91,7 +95,7 @@ func alertSNSHandler(uc interfaces.UseCase) http.HandlerFunc {
 		var msg model.SNSMessage
 		if err := json.Unmarshal(body, &msg); err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to decode message",
-				goerr.T(model.ErrTagInvalidRequest),
+				goerr.T(errs.TagInvalidRequest),
 				goerr.V("body", string(body)),
 			))
 			return
@@ -101,7 +105,7 @@ func alertSNSHandler(uc interfaces.UseCase) http.HandlerFunc {
 		var alertData any
 		if err := json.Unmarshal([]byte(msg.Message), &alertData); err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to marshal message",
-				goerr.T(model.ErrTagInvalidRequest),
+				goerr.T(errs.TagInvalidRequest),
 				goerr.V("msg", msg),
 			))
 			return

@@ -1,9 +1,9 @@
-package model_test
+package policy_test
 
 import (
 	"testing"
 
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 )
 
 func TestDiffPolicy(t *testing.T) {
@@ -71,7 +71,7 @@ func TestDiffPolicy(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := model.DiffPolicy(tc.old, tc.new)
+			result := policy.DiffPolicy(tc.old, tc.new)
 			if len(result) != len(tc.expected) {
 				t.Errorf("expected %d diffs, got %d", len(tc.expected), len(result))
 			}

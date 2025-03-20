@@ -5,8 +5,11 @@ import (
 	"testing"
 
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/domain/model"
-	"github.com/secmon-lab/warren/pkg/prompt"
+	"github.com/secmon-lab/warren/pkg/domain/model/action"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/policy"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/prompt"
 )
 
 func TestPrompt(t *testing.T) {
@@ -25,8 +28,8 @@ func TestPrompt(t *testing.T) {
 }
 
 func TestActionPrompt(t *testing.T) {
-	actions := []model.ActionSpec{
-		{Name: "action1", Description: "action1 description", Args: []model.ArgumentSpec{{Name: "arg1", Description: "arg1 description", Type: model.ArgumentTypeString, Required: true}}},
+	actions := []action.ActionSpec{
+		{Name: "action1", Description: "action1 description", Args: []action.ArgumentSpec{{Name: "arg1", Description: "arg1 description", Type: action.ArgumentTypeString, Required: true}}},
 	}
 	d, err := prompt.BuildActionPrompt(context.Background(), actions)
 	gt.NoError(t, err)
@@ -37,20 +40,20 @@ func TestActionPrompt(t *testing.T) {
 }
 
 func TestIgnorePolicyPrompt(t *testing.T) {
-	policy := map[string]string{
+	policyContent := map[string]string{
 		"test.rego": `package alert.aws.guardduty
 
 alert contains {} # Detected as an alert`,
 	}
-	alerts := []model.Alert{
+	alerts := []alert.Alert{
 		{
 			Schema: "aws.guardduty",
 			Data:   map[string]any{"Findings": map[string]any{"Severity": 7}},
 		},
 	}
 
-	policyData := model.PolicyData{
-		Data: policy,
+	policyData := policy.PolicyData{
+		Data: policyContent,
 	}
 	d, err := prompt.BuildIgnorePolicyPrompt(context.Background(), policyData, alerts, "test")
 	gt.NoError(t, err)
@@ -63,11 +66,11 @@ alert contains {} # Detected as an alert`,
 
 func TestTestDataReadmePrompt(t *testing.T) {
 	ctx := context.Background()
-	alerts := []model.Alert{
-		model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
+	alerts := []alert.Alert{
+		alert.NewAlert(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
 		}),
-		model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
+		alert.NewAlert(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
 		}),
 	}
@@ -80,11 +83,11 @@ func TestTestDataReadmePrompt(t *testing.T) {
 
 func TestFilterQueryPrompt(t *testing.T) {
 	ctx := context.Background()
-	alerts := []model.Alert{
-		model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
+	alerts := []alert.Alert{
+		alert.NewAlert(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
 		}),
-		model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
+		alert.NewAlert(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
 		}),
 	}
@@ -97,16 +100,16 @@ func TestFilterQueryPrompt(t *testing.T) {
 
 func TestMetaListPrompt(t *testing.T) {
 	ctx := context.Background()
-	alerts := []model.Alert{
-		model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
+	alerts := []alert.Alert{
+		alert.NewAlert(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
 		}),
 	}
 
-	alertList := model.NewAlertList(ctx, model.SlackThread{
+	alertList := alert.NewList(ctx, slack.Thread{
 		ChannelID: "C0123456789",
 		ThreadID:  "T0123456789",
-	}, &model.SlackUser{
+	}, &slack.User{
 		ID:   "U0123456789",
 		Name: "John Doe",
 	}, alerts)

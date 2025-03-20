@@ -9,7 +9,7 @@ import (
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/gt"
 	bq "github.com/secmon-lab/warren/pkg/action/bigquery"
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/urfave/cli/v3"
 )
@@ -104,8 +104,8 @@ func (x *ssnMock) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.Ge
 func TestActionExecute(t *testing.T) {
 	cases := map[string]struct {
 		client  *bqClientMock
-		args    model.Arguments
-		want    *model.ActionResult
+		args    action.Arguments
+		want    *action.ActionResult
 		wantErr bool
 		ssn     *ssnMock
 	}{
@@ -126,11 +126,11 @@ func TestActionExecute(t *testing.T) {
 				},
 				CloseFunc: func() error { return nil },
 			},
-			args: model.Arguments{
+			args: action.Arguments{
 				"table_id": "my-project.github.audit_logs_v1",
 			},
-			want: &model.ActionResult{
-				Type:    model.ActionResultTypeJSON,
+			want: &action.ActionResult{
+				Type:    action.ActionResultTypeJSON,
 				Data:    "{\n  \"test\": \"data\"\n}\n",
 				Message: "Retrieved data from my-project.github.audit_logs_v1",
 			},
@@ -139,13 +139,13 @@ func TestActionExecute(t *testing.T) {
 			},
 		},
 		"invalid table id": {
-			args: model.Arguments{
+			args: action.Arguments{
 				"table_id": "invalid",
 			},
 			wantErr: true,
 		},
 		"no query result": {
-			args: model.Arguments{
+			args: action.Arguments{
 				"table_id": "my-project.github.audit_logs_v1",
 			},
 			ssn: &ssnMock{
@@ -154,7 +154,7 @@ func TestActionExecute(t *testing.T) {
 			wantErr: true,
 		},
 		"no table id": {
-			args:    model.Arguments{},
+			args:    action.Arguments{},
 			wantErr: true,
 		},
 	}
@@ -215,7 +215,7 @@ func TestActionExecuteWithLimit(t *testing.T) {
 			},
 		}, nil
 	}
-	args := model.Arguments{
+	args := action.Arguments{
 		"table_id": "my-project.github.audit_logs_v1",
 	}
 	ssn := &ssnMock{
@@ -242,7 +242,7 @@ func TestActionExecuteWithLimit(t *testing.T) {
 			gt.NoError(t, action.Configure(ctx))
 			got, err := action.Execute(context.Background(), threadMock, ssn, args)
 			gt.NoError(t, err)
-			gt.Equal(t, got.Type, model.ActionResultTypeJSON)
+			gt.Equal(t, got.Type, action.ActionResultTypeJSON)
 			gt.Equal(t, got.Data, "{\n  \"test\": \"data\"\n}\n")
 			return nil
 		},

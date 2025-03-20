@@ -12,6 +12,8 @@ import (
 	"github.com/open-policy-agent/opa/v1/ast"
 	"github.com/open-policy-agent/opa/v1/format"
 	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/policy"
@@ -69,7 +71,7 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, src source.Source,
 	for i := 0; i < maxRetryCountForIgnorePolicy && validResult == nil; i++ {
 		resp, err := service.AskChat[prompt.IgnorePolicyPromptResult](ctx, ssn, p)
 		if err != nil {
-			if goerr.HasTag(err, model.ErrTagInvalidLLMResponse) {
+			if goerr.HasTag(err, errs.TagInvalidLLMResponse) {
 				thread.Reply(ctx, fmt.Sprintf("💥 Failed to generate ignore policy: \n> %v\n\nRetry...", err))
 				p = "Your response is invalid. Please try again: " + err.Error()
 				continue
@@ -97,7 +99,7 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, src source.Source,
 			var runtimeErrs []error
 			var replyLines []string
 			for _, err := range errs {
-				if goerr.HasTag(err, model.ErrTagTestFailed) {
+				if goerr.HasTag(err, errs.TagTestFailed) {
 					replyLines = append(replyLines, "❌ FAILED: "+err.Error())
 					logger.Debug("test failed", "error", err)
 					p = "Failed to test new policy: " + err.Error()
@@ -128,7 +130,7 @@ func (uc *UseCases) GenerateIgnorePolicy(ctx context.Context, src source.Source,
 
 	// Fill generated README for test data
 	thread.Reply(ctx, "📝 Generating metadata for test data...")
-	alertSchemaMap := make(map[string][]model.Alert)
+	alertSchemaMap := make(map[string][]alert.Alert)
 	for _, alert := range alerts {
 		alertSchemaMap[alert.Schema] = append(alertSchemaMap[alert.Schema], alert)
 	}

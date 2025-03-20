@@ -1,0 +1,10 @@
+# https://taskfile.dev
+
+version: "3"
+
+tasks:
+  mock:
+    aliases:
+      - m
+    cmds:
+      - go tool moq -out pkg/domain/model/message/sns_mock.go pkg/domain/model/message HTTPClient

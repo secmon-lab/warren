@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 )
 
 // parseArgs parses a string into arguments, handling various types of quotes
@@ -87,18 +87,18 @@ func parseArgs(input string) []string {
 	return result
 }
 
-func parseMention(input string) []model.SlackMention {
+func parseMention(input string) []slack.Mention {
 	args := parseArgs(input)
 
-	mentions := make([]model.SlackMention, 0, len(args))
-	var current *model.SlackMention
+	mentions := make([]slack.Mention, 0, len(args))
+	var current *slack.Mention
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "<@") && strings.HasSuffix(arg, ">") {
 			if current != nil {
 				mentions = append(mentions, *current)
 				current = nil
 			}
-			current = &model.SlackMention{
+			current = &slack.Mention{
 				UserID: strings.TrimSuffix(strings.TrimPrefix(arg, "<@"), ">"),
 				Args:   make([]string, 0),
 			}

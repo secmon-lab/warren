@@ -7,6 +7,7 @@ import (
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service"
@@ -102,7 +103,7 @@ func New(opts ...Option) *UseCases {
 
 	u := &UseCases{
 		slackService: &mock.SlackServiceMock{
-			PostAlertFunc: func(ctx context.Context, alert model.Alert) (interfaces.SlackThreadService, error) {
+			PostAlertFunc: func(ctx context.Context, alert alert.Alert) (interfaces.SlackThreadService, error) {
 				return &mock.SlackThreadServiceMock{
 					ChannelIDFunc: func() string {
 						return "test"

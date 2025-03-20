@@ -5,6 +5,7 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/source"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -33,7 +34,7 @@ func New(repo interfaces.Repository, opts ...Option) *Service {
 	return s
 }
 
-func (x *Service) Run(ctx context.Context, th interfaces.SlackThreadService, user *model.SlackUser, src source.Source, args []string) error {
+func (x *Service) Run(ctx context.Context, th interfaces.SlackThreadService, user *slack.SlackUser, src source.Source, args []string) error {
 	alerts, err := src(ctx, x.repo)
 	if err != nil {
 		return err
@@ -49,7 +50,7 @@ func (x *Service) Run(ctx context.Context, th interfaces.SlackThreadService, use
 		return err
 	}
 
-	slackThread := model.SlackThread{
+	slackThread := slack.SlackThread{
 		ChannelID: th.ChannelID(),
 		ThreadID:  th.ThreadID(),
 	}
@@ -79,7 +80,7 @@ type pipeline struct {
 	actions []action
 }
 
-func (p *pipeline) Run(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
+func (p *pipeline) Run(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
 	for _, action := range p.actions {
 		newAlerts, err := action(ctx, alerts)
 		if err != nil {

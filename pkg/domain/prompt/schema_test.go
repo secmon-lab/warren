@@ -3,7 +3,7 @@ package prompt_test
 import (
 	"testing"
 
-	"github.com/secmon-lab/warren/pkg/prompt"
+	"github.com/secmon-lab/warren/pkg/domain/prompt"
 )
 
 type TestStruct struct {

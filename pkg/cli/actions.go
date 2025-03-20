@@ -10,7 +10,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/action/otx"
 	"github.com/secmon-lab/warren/pkg/action/urlscan"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/urfave/cli/v3"
 )
 
@@ -34,7 +34,7 @@ func (x actionList) Configure(ctx context.Context) ([]interfaces.Action, error) 
 	actions := []interfaces.Action{}
 	for _, action := range x {
 		if err := action.Configure(ctx); err != nil {
-			if errors.Is(err, model.ErrActionUnavailable) {
+			if errors.Is(err, errs.ErrActionUnavailable) {
 				continue
 			}
 			return nil, goerr.Wrap(err, "failed to configure action", goerr.V("action", action.Spec().Name))

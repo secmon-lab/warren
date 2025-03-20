@@ -10,7 +10,8 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/action"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/urfave/cli/v3"
 )
 
@@ -39,11 +40,11 @@ func (x *Action) Flags() []cli.Flag {
 	}
 }
 
-func (x *Action) Spec() model.ActionSpec {
-	return model.ActionSpec{
+func (x *Action) Spec() action.ActionSpec {
+	return action.ActionSpec{
 		Name:        "otx",
 		Description: "You can search the indicator from OTX. Set indicator type and value. You can choose one of the following types: domain, ipv4, ipv6, hostname, file_hash. You need to extract actual value from the alert data. Do not set field name",
-		Args: []model.ArgumentSpec{
+		Args: []action.ArgumentSpec{
 			{
 				Name:        "domain",
 				Type:        "string",
@@ -82,7 +83,7 @@ func (x *Action) LogValue() slog.Value {
 
 func (x *Action) Configure(ctx context.Context) error {
 	if x.apiKey == "" {
-		return model.ErrActionUnavailable
+		return errs.ErrActionUnavailable
 	}
 	if _, err := url.Parse(x.baseURL); err != nil {
 		return goerr.Wrap(err, "invalid base URL", goerr.V("base_url", x.baseURL))
@@ -90,7 +91,7 @@ func (x *Action) Configure(ctx context.Context) error {
 	return nil
 }
 
-func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.LLMSession, args model.Arguments) (*model.ActionResult, error) {
+func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.LLMSession, args action.Arguments) (*action.ActionResult, error) {
 	if x.apiKey == "" {
 		return nil, goerr.New("OTX API key is required")
 	}
@@ -145,9 +146,9 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 		return nil, goerr.Wrap(err, "failed to read response body")
 	}
 
-	return &model.ActionResult{
+	return &action.ActionResult{
 		Message: fmt.Sprintf("OTX result for %s: %s", indicatorType, indicator),
-		Type:    model.ActionResultTypeJSON,
+		Type:    action.ActionResultTypeJSON,
 		Data:    string(body),
 	}, nil
 }

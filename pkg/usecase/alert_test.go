@@ -9,6 +9,7 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/repository"
@@ -94,10 +95,10 @@ func TestPlanAction(t *testing.T) {
 
 	actionSvc := service.NewActionService([]interfaces.Action{
 		&mock.ActionMock{
-			SpecFunc: func() model.ActionSpec {
-				return model.ActionSpec{
+			SpecFunc: func() action.ActionSpec {
+				return action.ActionSpec{
 					Name: "bigquery",
-					Args: []model.ArgumentSpec{
+					Args: []action.ArgumentSpec{
 						{
 							Name:        "table_id",
 							Type:        "string",
@@ -136,7 +137,7 @@ func TestPlanAction(t *testing.T) {
 	gt.NoError(t, err)
 	gt.NotEqual(t, resp, nil)
 	gt.Equal(t, resp.Action, "bigquery")
-	gt.Equal(t, resp.Args, model.Arguments{"table_id": "vpc_flow_logs"})
+	gt.Equal(t, resp.Args, action.Arguments{"table_id": "vpc_flow_logs"})
 }
 
 func TestGenerateAlertMetadata(t *testing.T) {

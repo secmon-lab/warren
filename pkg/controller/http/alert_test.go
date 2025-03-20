@@ -14,6 +14,7 @@ import (
 	"github.com/m-mizutani/harlog"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/mock"
 )
 
@@ -34,12 +35,12 @@ func TestAlertSNSHandler(t *testing.T) {
 
 	t.Run("successful alert handling", func(t *testing.T) {
 		mockUseCase := &mock.UseCaseMock{
-			HandleAlertWithAuthFunc: func(ctx context.Context, schema string, alertData any) ([]*model.Alert, error) {
+			HandleAlertWithAuthFunc: func(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error) {
 				gt.Value(t, schema).Equal("") // That's caused by calling AlertSNSHandler directly
 				data, ok := alertData.(map[string]any)
 				gt.True(t, ok)
 				gt.Value(t, data["color"]).Equal("blue")
-				return []*model.Alert{}, nil
+				return []*alert.Alert{}, nil
 			},
 		}
 

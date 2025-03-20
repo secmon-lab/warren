@@ -7,7 +7,7 @@ import (
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
@@ -19,18 +19,18 @@ func AskChat[T any](ctx context.Context, ssn interfaces.LLMSession, prompt strin
 	}
 
 	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return nil, goerr.New("no response from LLM", goerr.T(model.ErrTagInvalidLLMResponse))
+		return nil, goerr.New("no response from LLM", goerr.T(errs.TagInvalidLLMResponse))
 	}
 
 	text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
 	if !ok || text == "" {
-		return nil, goerr.New("no text data from LLM", goerr.T(model.ErrTagInvalidLLMResponse))
+		return nil, goerr.New("no text data from LLM", goerr.T(errs.TagInvalidLLMResponse))
 	}
 
 	var result T
 	if err := json.Unmarshal([]byte(text), &result); err != nil {
 		logger.Debug("failed to unmarshal text", "text", text, "error", err)
-		return nil, goerr.Wrap(err, "failed to unmarshal text", goerr.V("text", text), goerr.T(model.ErrTagInvalidLLMResponse))
+		return nil, goerr.Wrap(err, "failed to unmarshal text", goerr.V("text", text), goerr.T(errs.TagInvalidLLMResponse))
 	}
 
 	return &result, nil
@@ -45,18 +45,18 @@ func AskPrompt[T any](ctx context.Context, client interfaces.LLMClient, prompt s
 	}
 
 	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return nil, goerr.New("no response from LLM", goerr.T(model.ErrTagInvalidLLMResponse))
+		return nil, goerr.New("no response from LLM", goerr.T(errs.TagInvalidLLMResponse))
 	}
 
 	text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
 	if !ok || text == "" {
-		return nil, goerr.New("no text data from LLM", goerr.T(model.ErrTagInvalidLLMResponse))
+		return nil, goerr.New("no text data from LLM", goerr.T(errs.TagInvalidLLMResponse))
 	}
 
 	var result T
 	if err := json.Unmarshal([]byte(text), &result); err != nil {
 		logger.Debug("failed to unmarshal text", "text", text, "error", err)
-		return nil, goerr.Wrap(err, "failed to unmarshal text", goerr.V("text", text), goerr.T(model.ErrTagInvalidLLMResponse))
+		return nil, goerr.Wrap(err, "failed to unmarshal text", goerr.V("text", text), goerr.T(errs.TagInvalidLLMResponse))
 	}
 
 	return &result, nil

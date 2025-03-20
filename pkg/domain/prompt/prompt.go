@@ -9,7 +9,10 @@ import (
 	"text/template"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/action"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/policy"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/lang"
 )
 
@@ -55,11 +58,11 @@ func BuildInitPrompt(ctx context.Context, alert any, maxRetry int) (string, erro
 var actionTemplate string
 
 type ActionPromptResult struct {
-	Action string          `json:"action"`
-	Args   model.Arguments `json:"args" schema:"optional"`
+	Action string           `json:"action"`
+	Args   action.Arguments `json:"args" schema:"optional"`
 }
 
-func BuildActionPrompt(ctx context.Context, actions []model.ActionSpec) (string, error) {
+func BuildActionPrompt(ctx context.Context, actions []action.ActionSpec) (string, error) {
 	tmpl, err := template.New("action").Parse(actionTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
@@ -91,7 +94,7 @@ type AggregatePromptResult struct {
 	AlertID string `json:"alert_id"`
 }
 
-func BuildAggregatePrompt(ctx context.Context, newAlert model.Alert, candidates []model.Alert) (string, error) {
+func BuildAggregatePrompt(ctx context.Context, newAlert alert.Alert, candidates []alert.Alert) (string, error) {
 	tmpl, err := template.New("aggregate").Parse(aggregateTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
@@ -140,7 +143,7 @@ func BuildFindingPrompt(ctx context.Context) (string, error) {
 		return "", goerr.Wrap(err, "failed to parse template")
 	}
 
-	schema, err := generateSchema(model.AlertFinding{}).Stringify()
+	schema, err := generateSchema(alert.AlertFinding{}).Stringify()
 	if err != nil {
 		return "", err
 	}
@@ -164,10 +167,10 @@ var metaTemplate string
 type MetaPromptResult struct {
 	Title       string            `json:"title"`
 	Description string            `json:"description"`
-	Attrs       []model.Attribute `json:"attrs"`
+	Attrs       []alert.Attribute `json:"attrs"`
 }
 
-func BuildMetaPrompt(ctx context.Context, alert model.Alert) (string, error) {
+func BuildMetaPrompt(ctx context.Context, alert alert.Alert) (string, error) {
 	tmpl, err := template.New("meta").Parse(metaTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
@@ -206,7 +209,7 @@ type IgnorePolicyPromptResult struct {
 	Policy      map[string]string `json:"policy"`
 }
 
-func BuildIgnorePolicyPrompt(ctx context.Context, policy model.PolicyData, alerts []model.Alert, note string) (string, error) {
+func BuildIgnorePolicyPrompt(ctx context.Context, policy policy.PolicyData, alerts []alert.Alert, note string) (string, error) {
 	tmpl, err := template.New("ignore_policy").Parse(ignorePolicyTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
@@ -245,7 +248,7 @@ type TestDataReadmePromptResult struct {
 	Content string `json:"content"`
 }
 
-func BuildTestDataReadmePrompt(ctx context.Context, action string, alerts []model.Alert) (string, error) {
+func BuildTestDataReadmePrompt(ctx context.Context, action string, alerts []alert.Alert) (string, error) {
 	tmpl, err := template.New("test_data_readme").Parse(testDataReadmeTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
@@ -284,20 +287,20 @@ func BuildTestDataReadmePrompt(ctx context.Context, action string, alerts []mode
 var filterQueryTemplate string
 
 type FilterQueryPromptResult struct {
-	AlertIDs []model.AlertID `json:"alert_ids"`
+	AlertIDs []types.AlertID `json:"alert_ids"`
 }
 
-func BuildFilterQueryPrompt(ctx context.Context, query string, alerts []model.Alert) (string, error) {
+func BuildFilterQueryPrompt(ctx context.Context, query string, alerts []alert.Alert) (string, error) {
 	tmpl, err := template.New("filter_query").Parse(filterQueryTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
 	}
 
 	example := FilterQueryPromptResult{
-		AlertIDs: []model.AlertID{
-			model.NewAlertID(),
-			model.NewAlertID(),
-			model.NewAlertID(),
+		AlertIDs: []types.AlertID{
+			types.NewAlertID(),
+			types.NewAlertID(),
+			types.NewAlertID(),
 		},
 	}
 	schema, err := generateSchema(example).Stringify()
@@ -342,7 +345,7 @@ type MetaListPromptResult struct {
 	Description string `json:"description"`
 }
 
-func BuildMetaListPrompt(ctx context.Context, alertList model.AlertList) (string, error) {
+func BuildMetaListPrompt(ctx context.Context, alertList alert.List) (string, error) {
 	tmpl, err := template.New("meta_list").Parse(metaListTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")

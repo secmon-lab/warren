@@ -1,15 +1,15 @@
-package model
+package slack
 
-type SlackCallbackID string
+type CallbackID string
 
-func (id SlackCallbackID) String() string {
+func (id CallbackID) String() string {
 	return string(id)
 }
 
 const (
-	SlackCallbackSubmitResolveAlert SlackCallbackID = "submit_resolve_alert"
-	SlackCallbackSubmitResolveList  SlackCallbackID = "submit_resolve_list"
-	SlackCallbackSubmitIgnoreList   SlackCallbackID = "submit_ignore_list"
+	CallbackSubmitResolveAlert CallbackID = "submit_resolve_alert"
+	CallbackSubmitResolveList  CallbackID = "submit_resolve_list"
+	CallbackSubmitIgnoreList   CallbackID = "submit_ignore_list"
 )
 
 type SlackBlockID string
@@ -44,7 +44,7 @@ const (
 	SlackActionIDIgnorePrompt SlackActionID = "ignore_prompt"
 )
 
-type SlackMention struct {
+type Mention struct {
 	UserID string
 	Args   []string
 }

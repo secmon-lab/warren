@@ -5,25 +5,24 @@ import (
 	"testing"
 
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/usecase"
 )
 
 func TestRunCommand(t *testing.T) {
 	uc := usecase.New()
-	th := service.NewConsole(io.Discard).NewThread(model.SlackThread{
+	th := service.NewConsole(io.Discard).NewThread(slack.SlackThread{
 		ChannelID: "C07000000000000000",
 		ThreadID:  "T07000000000000000",
 	})
-	gt.NoError(t, uc.RunCommand(t.Context(), []string{"warren", "help"}, nil, th, &model.SlackUser{})).Must()
+	gt.NoError(t, uc.RunCommand(t.Context(), []string{"warren", "help"}, nil, th, &slack.SlackUser{})).Must()
 }
 
 func TestCmdList(t *testing.T) {
 	uc := usecase.New()
-	th := service.NewConsole(io.Discard).NewThread(model.SlackThread{
+	th := service.NewConsole(io.Discard).NewThread(slack.SlackThread{
 		ChannelID: "C07000000000000000",
 		ThreadID:  "T07000000000000000",
 	})
-	gt.NoError(t, uc.RunCommand(t.Context(), []string{"warren", "list", "last"}, nil, th, &model.SlackUser{})).Must()
+	gt.NoError(t, uc.RunCommand(t.Context(), []string{"warren", "list", "last"}, nil, th, &slack.SlackUser{})).Must()
 }

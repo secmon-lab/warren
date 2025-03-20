@@ -8,7 +8,8 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/action/otx"
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/action"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/urfave/cli/v3"
 )
@@ -16,7 +17,7 @@ import (
 func TestOTX(t *testing.T) {
 	testCases := []struct {
 		name       string
-		args       model.Arguments
+		args       action.Arguments
 		apiResp    string
 		statusCode int
 		wantResp   string
@@ -24,7 +25,7 @@ func TestOTX(t *testing.T) {
 	}{
 		{
 			name: "valid domain response",
-			args: model.Arguments{
+			args: action.Arguments{
 				"domain": "example.com",
 			},
 			apiResp:    `{"pulse_count": 5, "reputation": 0}`,
@@ -34,7 +35,7 @@ func TestOTX(t *testing.T) {
 		},
 		{
 			name: "valid ipv4 response",
-			args: model.Arguments{
+			args: action.Arguments{
 				"ipv4": "8.8.8.8",
 			},
 			apiResp:    `{"pulse_count": 10, "reputation": 0}`,
@@ -44,12 +45,12 @@ func TestOTX(t *testing.T) {
 		},
 		{
 			name:    "missing indicator",
-			args:    model.Arguments{},
+			args:    action.Arguments{},
 			wantErr: true,
 		},
 		{
 			name: "api error response",
-			args: model.Arguments{
+			args: action.Arguments{
 				"domain": "example.com",
 			},
 			apiResp:    `{"error": "invalid request"}`,
@@ -58,7 +59,7 @@ func TestOTX(t *testing.T) {
 		},
 		{
 			name: "api unauthorized response",
-			args: model.Arguments{
+			args: action.Arguments{
 				"domain": "example.com",
 			},
 			apiResp:    `{"error": "unauthorized"}`,
@@ -116,7 +117,7 @@ func TestOTX_Enabled(t *testing.T) {
 		Name:  "otx",
 		Flags: action.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.Equal(t, action.Configure(ctx), model.ErrActionUnavailable)
+			gt.Equal(t, action.Configure(ctx), errs.ErrActionUnavailable)
 			return nil
 		},
 	}
@@ -137,10 +138,10 @@ func TestSendRequest(t *testing.T) {
 		Name:  "otx",
 		Flags: action.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			resp, err := action.Execute(ctx, nil, nil, model.Arguments{"ipv4": vars.Get("TEST_OTX_TARGET_IPADDR")})
+			resp, err := action.Execute(ctx, nil, nil, action.Arguments{"ipv4": vars.Get("TEST_OTX_TARGET_IPADDR")})
 			gt.NoError(t, err)
 			gt.NotEqual(t, resp, nil)
-			gt.Equal(t, resp.Type, model.ActionResultTypeJSON)
+			gt.Equal(t, resp.Type, action.ActionResultTypeJSON)
 			gt.String(t, resp.Data).Contains(`"pulse_info"`)
 			return nil
 		},

@@ -1,14 +1,16 @@
-package model
+package auth
 
-type AuthContext struct {
+import "github.com/secmon-lab/warren/pkg/domain/model/message"
+
+type Context struct {
 	Google map[string]interface{} `json:"google"`
-	SNS    *SNSMessage            `json:"sns"`
+	SNS    *message.SNS           `json:"sns"`
 
-	Req *AuthHTTPRequest  `json:"req"`
+	Req *HTTPRequest      `json:"req"`
 	Env map[string]string `json:"-"`
 }
 
-type AuthHTTPRequest struct {
+type HTTPRequest struct {
 	Method string              `json:"method"`
 	Path   string              `json:"path"`
 	Body   string              `json:"body"`

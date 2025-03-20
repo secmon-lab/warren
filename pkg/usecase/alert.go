@@ -9,14 +9,16 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model"
-	"github.com/secmon-lab/warren/pkg/domain/model/authctx"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
-func (uc *UseCases) HandleAlertWithAuth(ctx context.Context, schema string, alertData any) ([]*model.Alert, error) {
-	authCtx := authctx.Build(ctx)
+func (uc *UseCases) HandleAlertWithAuth(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error) {
+	authCtx := auth.BuildContext(ctx)
 
 	policyClient, err := uc.policyService.NewClient(ctx)
 	if err != nil {
@@ -35,7 +37,7 @@ func (uc *UseCases) HandleAlertWithAuth(ctx context.Context, schema string, aler
 	return uc.HandleAlert(ctx, schema, alertData, policyClient)
 }
 
-func (uc *UseCases) HandleAlert(ctx context.Context, schema string, alertData any, policyClient interfaces.PolicyClient) ([]*model.Alert, error) {
+func (uc *UseCases) HandleAlert(ctx context.Context, schema string, alertData any, policyClient interfaces.PolicyClient) ([]*alert.Alert, error) {
 	logger := logging.From(ctx)
 
 	var result model.PolicyResult
@@ -45,7 +47,7 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema string, alertData an
 
 	logger.Info("policy query result", "input", alertData, "output", result)
 
-	var results []*model.Alert
+	var results []*alert.Alert
 	for _, a := range result.Alert {
 		alert := model.NewAlert(ctx, schema, a)
 		if alert.Data == nil {
@@ -62,7 +64,7 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema string, alertData an
 	return results, nil
 }
 
-func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.Alert, error) {
+func (uc *UseCases) handleAlert(ctx context.Context, alert alert.Alert) (*alert.Alert, error) {
 	logger := logging.From(ctx)
 
 	newAlert, err := uc.generateAlertMetadata(ctx, alert)
@@ -90,11 +92,11 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.
 	// Check if the alert is similar to any existing alerts
 	// NOTE: Disable similarity merger for now
 	/*
-		var similarAlert *model.Alert
+		var similarAlert *alert.Alert
 		for i := 0; i < 3 && similarAlert == nil; i++ {
 			similarAlert, err = uc.findSimilarAlert(ctx, alert)
 			if err != nil {
-				if goerr.HasTag(err, model.ErrTagInvalidLLMResponse) {
+				if goerr.HasTag(err, errs.TagInvalidLLMResponse) {
 					logger.Warn("invalid LLM response, retry to find similar alert", "error", err)
 					continue
 				}
@@ -134,7 +136,7 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to post alert", goerr.V("alert", alert))
 	}
-	alert.SlackThread = &model.SlackThread{
+	alert.SlackThread = &slack.SlackThread{
 		ChannelID: thread.ChannelID(),
 		ThreadID:  thread.ThreadID(),
 	}
@@ -147,7 +149,7 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert model.Alert) (*model.
 	return &alert, nil
 }
 
-func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert model.Alert) (*model.Alert, error) {
+func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert alert.Alert) (*alert.Alert, error) {
 	logger := logging.From(ctx)
 	p, err := prompt.BuildMetaPrompt(ctx, alert)
 	if err != nil {
@@ -160,7 +162,7 @@ func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert model.Alert
 	for i := 0; i < 3 && result == nil; i++ {
 		result, err = service.AskChat[prompt.MetaPromptResult](ctx, ssn, p)
 		if err != nil {
-			if goerr.HasTag(err, model.ErrTagInvalidLLMResponse) {
+			if goerr.HasTag(err, errs.TagInvalidLLMResponse) {
 				logger.Warn("invalid LLM response, retry to generate alert metadata", "error", err)
 				p = fmt.Sprintf("invalid format, please try again: %s", err.Error())
 				continue
@@ -197,15 +199,15 @@ func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert model.Alert
 	return &alert, nil
 }
 
-func (uc *UseCases) findSimilarAlert(ctx context.Context, alert model.Alert) (*model.Alert, error) {
+func (uc *UseCases) findSimilarAlert(ctx context.Context, alert alert.Alert) (*alert.Alert, error) {
 	oldest := alert.CreatedAt.Add(-24 * time.Hour)
 	alerts, err := uc.repository.GetLatestAlerts(ctx, oldest, 100)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to fetch latest alerts")
 	}
-	unresolvedAlerts := make([]model.Alert, 0, len(alerts))
+	unresolvedAlerts := make([]alert.Alert, 0, len(alerts))
 	for _, a := range alerts {
-		if a.Status != model.AlertStatusResolved {
+		if a.Status != alert.StatusResolved {
 			unresolvedAlerts = append(unresolvedAlerts, a)
 		}
 	}
@@ -225,7 +227,7 @@ func (uc *UseCases) findSimilarAlert(ctx context.Context, alert model.Alert) (*m
 		return nil, nil
 	}
 
-	alertID := model.AlertID(result.AlertID)
+	alertID := alert.AlertID(result.AlertID)
 
 	for _, candidate := range alerts {
 		if candidate.ID == alertID {

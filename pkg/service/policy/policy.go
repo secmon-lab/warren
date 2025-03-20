@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"sort"
 	"time"
 
@@ -13,6 +12,8 @@ import (
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
@@ -27,25 +28,25 @@ func Test(ctx context.Context, policy interfaces.PolicyClient, testDataSet *mode
 }
 
 func runTest(ctx context.Context, policy interfaces.PolicyClient, dataSets map[string]map[string]any, shouldDetect bool) []error {
-	var errs []error
+	var errors []error
 	for schema, dataSet := range dataSets {
 		for filename, testData := range dataSet {
-			var resp model.PolicyResult
+			var resp alert.Metadata
 			if err := policy.Query(ctx, "data.alert."+schema, testData, &resp); err != nil {
 				if errors.Is(err, opaq.ErrNoEvalResult) {
 					if shouldDetect {
-						errs = append(errs, goerr.Wrap(err, "should be detected, but not detected",
+						errors = append(errors, goerr.Wrap(err, "should be detected, but not detected",
 							goerr.V("schema", schema),
 							goerr.V("filename", filename),
-							goerr.T(model.ErrTagTestFailed)))
+							goerr.T(errs.TagTestFailed)))
 					}
 					continue
 				}
 				if len(resp.Alert) == 0 && shouldDetect {
-					errs = append(errs, goerr.Wrap(err, "should be detected, but not detected",
+					errors = append(errors, goerr.Wrap(err, "should be detected, but not detected",
 						goerr.V("schema", schema),
 						goerr.V("filename", filename),
-						goerr.T(model.ErrTagTestFailed)))
+						goerr.T(errs.TagTestFailed)))
 					continue
 				}
 
@@ -53,7 +54,7 @@ func runTest(ctx context.Context, policy interfaces.PolicyClient, dataSets map[s
 					errs = append(errs, goerr.Wrap(err, "should be ignored, but detected",
 						goerr.V("schema", schema),
 						goerr.V("filename", filename),
-						goerr.T(model.ErrTagTestFailed)))
+						goerr.T(errs.TagTestFailed)))
 				}
 			}
 
@@ -61,7 +62,7 @@ func runTest(ctx context.Context, policy interfaces.PolicyClient, dataSets map[s
 				errs = append(errs, goerr.New("should be ignored, but detected",
 					goerr.V("schema", schema),
 					goerr.V("filename", filename),
-					goerr.T(model.ErrTagTestFailed)))
+					goerr.T(errs.TagTestFailed)))
 			}
 		}
 	}

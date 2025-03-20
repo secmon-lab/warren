@@ -6,7 +6,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
@@ -29,15 +29,15 @@ func NewActionService(actions []interfaces.Action) *ActionService {
 	return &ActionService{actions: actionsMap}
 }
 
-func (x *ActionService) Spec() []model.ActionSpec {
-	specs := make([]model.ActionSpec, 0, len(x.actions))
+func (x *ActionService) Spec() []action.ActionSpec {
+	specs := make([]action.ActionSpec, 0, len(x.actions))
 	for _, a := range x.actions {
 		specs = append(specs, a.Spec())
 	}
 	return specs
 }
 
-func (x *ActionService) Execute(ctx context.Context, slack interfaces.SlackThreadService, name string, ssn interfaces.LLMSession, args model.Arguments) (*model.ActionResult, error) {
+func (x *ActionService) Execute(ctx context.Context, slack interfaces.SlackThreadService, name string, ssn interfaces.LLMSession, args action.Arguments) (*action.ActionResult, error) {
 	logger := logging.From(ctx)
 	action, ok := x.actions[name]
 	if !ok {

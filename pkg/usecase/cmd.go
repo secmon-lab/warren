@@ -11,6 +11,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/list"
 	"github.com/secmon-lab/warren/pkg/service/source"
@@ -20,7 +21,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func (x *UseCases) RunCommand(ctx context.Context, args []string, alerts []model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) error {
+func (x *UseCases) RunCommand(ctx context.Context, args []string, alerts []alert.Alert, th interfaces.SlackThreadService, user *slack.SlackUser) error {
 	ctx = thread.WithReplyFunc(ctx, th.Reply)
 
 	var buf bytes.Buffer
@@ -93,7 +94,7 @@ func parseTime(s string) (time.Time, error) {
 	return time.Time{}, goerr.New("invalid time format: expected format: RFC3339, time only (15:04), date only (2/3), date+time (02-03T00:00), today, yesterday", goerr.V("time", s))
 }
 
-func (x *UseCases) cmdList(alerts []model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) *cli.Command {
+func (x *UseCases) cmdList(alerts []alert.Alert, th interfaces.SlackThreadService, user *slack.SlackUser) *cli.Command {
 	var (
 		duration   time.Duration
 		spanFrom   string
@@ -160,14 +161,14 @@ func (x *UseCases) cmdList(alerts []model.Alert, th interfaces.SlackThreadServic
 				src = source.Span(from, to)
 
 			case len(args) > 0 && args[0] == "last":
-				src = source.LatestAlertList(model.SlackThread{
+				src = source.LatestAlertList(slack.SlackThread{
 					ChannelID: th.ChannelID(),
 					ThreadID:  th.ThreadID(),
 				})
 				args = args[1:]
 
 			case len(args) > 0:
-				src = source.AlertListID(model.AlertListID(args[0]))
+				src = source.AlertListID(alert.ListID(args[0]))
 				args = args[1:]
 
 			case duration != 0:
@@ -194,10 +195,10 @@ func (x *UseCases) cmdList(alerts []model.Alert, th interfaces.SlackThreadServic
 	}
 }
 
-func sourceFromTarget(ctx context.Context, target string, th interfaces.SlackThreadService, alerts []model.Alert) source.Source {
+func sourceFromTarget(ctx context.Context, target string, th interfaces.SlackThreadService, alerts []alert.Alert) source.Source {
 	switch target {
 	case "last":
-		return source.LatestAlertList(model.SlackThread{
+		return source.LatestAlertList(slack.SlackThread{
 			ChannelID: th.ChannelID(),
 			ThreadID:  th.ThreadID(),
 		})
@@ -213,17 +214,17 @@ func sourceFromTarget(ctx context.Context, target string, th interfaces.SlackThr
 		if len(alerts) > 0 {
 			return source.Static(alerts)
 		}
-		return source.LatestAlertList(model.SlackThread{
+		return source.LatestAlertList(slack.SlackThread{
 			ChannelID: th.ChannelID(),
 			ThreadID:  th.ThreadID(),
 		})
 
 	default:
-		return source.AlertListID(model.AlertListID(target))
+		return source.AlertListID(alert.ListID(target))
 	}
 }
 
-func (x *UseCases) cmdIgnore(alerts []model.Alert, th interfaces.SlackThreadService) *cli.Command {
+func (x *UseCases) cmdIgnore(alerts []alert.Alert, th interfaces.SlackThreadService) *cli.Command {
 	var targetAlerts string
 
 	return &cli.Command{
@@ -269,7 +270,7 @@ func (x *UseCases) cmdIgnore(alerts []model.Alert, th interfaces.SlackThreadServ
 	}
 }
 
-func (x *UseCases) cmdShow(alerts []model.Alert, th interfaces.SlackThreadService) *cli.Command {
+func (x *UseCases) cmdShow(alerts []alert.Alert, th interfaces.SlackThreadService) *cli.Command {
 	var (
 		targetAlerts string
 		limit        int64
@@ -318,7 +319,7 @@ func (x *UseCases) cmdShow(alerts []model.Alert, th interfaces.SlackThreadServic
 			}
 			if offset > 0 {
 				if offset > int64(len(alerts)) {
-					alerts = []model.Alert{}
+					alerts = []alert.Alert{}
 				} else {
 					alerts = alerts[offset:]
 				}
@@ -333,7 +334,7 @@ func (x *UseCases) cmdShow(alerts []model.Alert, th interfaces.SlackThreadServic
 	}
 }
 
-func (x *UseCases) cmdBlock(alerts []model.Alert, th interfaces.SlackThreadService) *cli.Command {
+func (x *UseCases) cmdBlock(alerts []alert.Alert, th interfaces.SlackThreadService) *cli.Command {
 	var targetAlerts string
 
 	return &cli.Command{
@@ -352,8 +353,8 @@ func (x *UseCases) cmdBlock(alerts []model.Alert, th interfaces.SlackThreadServi
 				return err
 			}
 
-			var baseAlerts []*model.Alert
-			alertIDs := make([]model.AlertID, len(alerts))
+			var baseAlerts []*alert.Alert
+			alertIDs := make([]alert.AlertID, len(alerts))
 			for i, a := range alerts {
 				alertIDs[i] = a.ID
 
@@ -362,7 +363,7 @@ func (x *UseCases) cmdBlock(alerts []model.Alert, th interfaces.SlackThreadServi
 				}
 			}
 
-			if err := x.repository.BatchUpdateAlertStatus(ctx, alertIDs, model.AlertStatusBlocked); err != nil {
+			if err := x.repository.BatchUpdateAlertStatus(ctx, alertIDs, alert.StatusBlocked); err != nil {
 				return err
 			}
 			thread.Reply(ctx, fmt.Sprintf("🚫 Blocked %d alerts", len(alertIDs)))
@@ -378,10 +379,10 @@ func (x *UseCases) cmdBlock(alerts []model.Alert, th interfaces.SlackThreadServi
 	}
 }
 
-func (x *UseCases) cmdResolve(alerts []model.Alert, th interfaces.SlackThreadService) *cli.Command {
+func (x *UseCases) cmdResolve(alerts []alert.Alert, th interfaces.SlackThreadService) *cli.Command {
 	var (
 		targetAlerts string
-		conclusion   model.AlertConclusion
+		conclusion   alert.AlertConclusion
 		reason       string
 	)
 
@@ -421,8 +422,8 @@ func (x *UseCases) cmdResolve(alerts []model.Alert, th interfaces.SlackThreadSer
 				return err
 			}
 
-			var baseAlerts []*model.Alert
-			alertIDs := make([]model.AlertID, len(alerts))
+			var baseAlerts []*alert.Alert
+			alertIDs := make([]alert.AlertID, len(alerts))
 			for i, a := range alerts {
 				alertIDs[i] = a.ID
 
@@ -431,7 +432,7 @@ func (x *UseCases) cmdResolve(alerts []model.Alert, th interfaces.SlackThreadSer
 				}
 			}
 
-			if err := x.repository.BatchUpdateAlertStatus(ctx, alertIDs, model.AlertStatusResolved); err != nil {
+			if err := x.repository.BatchUpdateAlertStatus(ctx, alertIDs, alert.StatusResolved); err != nil {
 				return err
 			}
 
@@ -452,7 +453,7 @@ func (x *UseCases) cmdResolve(alerts []model.Alert, th interfaces.SlackThreadSer
 	}
 }
 
-func (x *UseCases) cmdClustering(alerts []model.Alert, th interfaces.SlackThreadService, user *model.SlackUser) *cli.Command {
+func (x *UseCases) cmdClustering(alerts []alert.Alert, th interfaces.SlackThreadService, user *slack.SlackUser) *cli.Command {
 	var target string
 	var topN int64
 	var similarityThreshold float64
@@ -495,7 +496,7 @@ func (x *UseCases) cmdClustering(alerts []model.Alert, th interfaces.SlackThread
 				return err
 			}
 
-			threadData := model.SlackThread{
+			threadData := slack.SlackThread{
 				ChannelID: th.ChannelID(),
 				ThreadID:  th.ThreadID(),
 			}
@@ -528,7 +529,7 @@ func (x *UseCases) cmdClustering(alerts []model.Alert, th interfaces.SlackThread
 	}
 }
 
-func (x *UseCases) clusterAlerts(ctx context.Context, th model.SlackThread, user *model.SlackUser, alerts []model.Alert, similarityThreshold float64, topN int) ([]model.AlertList, error) {
+func (x *UseCases) clusterAlerts(ctx context.Context, th slack.SlackThread, user *slack.SlackUser, alerts []alert.Alert, similarityThreshold float64, topN int) ([]alert.List, error) {
 	clusters := newAlertCluster(ctx, th, user, alerts, similarityThreshold)
 
 	sort.Slice(clusters.clusters, func(i, j int) bool {
@@ -543,12 +544,12 @@ func (x *UseCases) clusterAlerts(ctx context.Context, th model.SlackThread, user
 }
 
 type alertCluster struct {
-	clusters []model.AlertList
+	clusters []alert.List
 }
 
-func newAlertCluster(ctx context.Context, th model.SlackThread, user *model.SlackUser, alerts []model.Alert, similarityThreshold float64) *alertCluster {
+func newAlertCluster(ctx context.Context, th slack.SlackThread, user *slack.SlackUser, alerts []alert.Alert, similarityThreshold float64) *alertCluster {
 	// Initialize clusters
-	clusters := make([]model.AlertList, 0)
+	clusters := make([]alert.List, 0)
 
 	// Process each alert
 	for _, alert := range alerts {
@@ -570,7 +571,7 @@ func newAlertCluster(ctx context.Context, th model.SlackThread, user *model.Slac
 
 		// Create new cluster if no match found
 		if !matched {
-			clusters = append(clusters, model.NewAlertList(ctx, th, user, []model.Alert{alert}))
+			clusters = append(clusters, model.NewAlertList(ctx, th, user, []alert.Alert{alert}))
 		}
 	}
 

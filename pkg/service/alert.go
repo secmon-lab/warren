@@ -5,12 +5,12 @@ import (
 	"math"
 
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
 )
 
-func GenerateAlertListMeta(ctx context.Context, list model.AlertList, llmClient interfaces.LLMClient) (*prompt.MetaListPromptResult, error) {
+func GenerateAlertListMeta(ctx context.Context, list alert.List, llmClient interfaces.LLMClient) (*prompt.MetaListPromptResult, error) {
 	p, err := prompt.BuildMetaListPrompt(ctx, list)
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func GenerateAlertListMeta(ctx context.Context, list model.AlertList, llmClient 
 	return result, nil
 }
 
-func CalcMaxSimilarity(alerts []model.Alert) float64 {
+func CalcMaxSimilarity(alerts []alert.Alert) float64 {
 	max := 0.0
 
 	for i, a := range alerts {

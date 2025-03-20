@@ -1,4 +1,4 @@
-package model
+package policy
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
 
+/*
 type PolicyResult struct {
 	Alert []PolicyAlert `json:"alert"`
 }
@@ -26,6 +27,7 @@ type PolicyAlert struct {
 type PolicyAuth struct {
 	Allow bool `json:"allow"`
 }
+*/
 
 type TestDataSet struct {
 	Detect *TestData `json:"detect"`
@@ -94,9 +96,8 @@ func (x TestData) LogValue() slog.Value {
 }
 
 type PolicyData struct {
-	Hash      string            `firestore:"hash"`
-	Data      map[string]string `firestore:"data"`
-	CreatedAt time.Time         `firestore:"created_at"`
+	Data      map[string]string `json:"data"`
+	CreatedAt time.Time         `json:"created_at"`
 }
 
 type PolicyDiffID string

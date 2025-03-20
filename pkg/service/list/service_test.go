@@ -8,7 +8,7 @@ import (
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/list"
@@ -19,29 +19,29 @@ func TestService_Run(t *testing.T) {
 	cases := []struct {
 		name     string
 		args     []string
-		alerts   []model.Alert
-		expected []model.Alert
+		alerts   []alert.Alert
+		expected []alert.Alert
 		wantErr  bool
 	}{
 		{
 			name: "filter by user",
 			args: []string{"user", "<@U123>"},
-			alerts: []model.Alert{
-				{Assignee: &model.SlackUser{ID: "U123"}},
-				{Assignee: &model.SlackUser{ID: "U456"}},
+			alerts: []alert.Alert{
+				{Assignee: &slack.SlackUser{ID: "U123"}},
+				{Assignee: &slack.SlackUser{ID: "U456"}},
 			},
-			expected: []model.Alert{
-				{Assignee: &model.SlackUser{ID: "U123"}},
+			expected: []alert.Alert{
+				{Assignee: &slack.SlackUser{ID: "U123"}},
 			},
 		},
 		{
 			name: "sort by created at",
 			args: []string{"sort", "created_at"},
-			alerts: []model.Alert{
+			alerts: []alert.Alert{
 				{CreatedAt: time.Date(2023, 1, 2, 0, 0, 0, 0, time.UTC)},
 				{CreatedAt: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)},
 			},
-			expected: []model.Alert{
+			expected: []alert.Alert{
 				{CreatedAt: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)},
 				{CreatedAt: time.Date(2023, 1, 2, 0, 0, 0, 0, time.UTC)},
 			},
@@ -54,36 +54,36 @@ func TestService_Run(t *testing.T) {
 		{
 			name: "limit alerts",
 			args: []string{"limit", "1"},
-			alerts: []model.Alert{
+			alerts: []alert.Alert{
 				{ID: "1"},
 				{ID: "2"},
 			},
-			expected: []model.Alert{
+			expected: []alert.Alert{
 				{ID: "1"},
 			},
 		},
 		{
 			name: "offset alerts",
 			args: []string{"offset", "1"},
-			alerts: []model.Alert{
+			alerts: []alert.Alert{
 				{ID: "1"},
 				{ID: "2"},
 			},
-			expected: []model.Alert{
+			expected: []alert.Alert{
 				{ID: "2"},
 			},
 		},
 		{
 			name: "filter by status",
 			args: []string{"status", "new", "resolved"},
-			alerts: []model.Alert{
-				{Status: model.AlertStatusNew},
-				{Status: model.AlertStatusAcknowledged},
-				{Status: model.AlertStatusResolved},
+			alerts: []alert.Alert{
+				{Status: alert.StatusNew},
+				{Status: alert.StatusAcknowledged},
+				{Status: alert.StatusResolved},
 			},
-			expected: []model.Alert{
-				{Status: model.AlertStatusNew},
-				{Status: model.AlertStatusResolved},
+			expected: []alert.Alert{
+				{Status: alert.StatusNew},
+				{Status: alert.StatusResolved},
 			},
 		},
 		{
@@ -94,22 +94,22 @@ func TestService_Run(t *testing.T) {
 		{
 			name: "status pipeline",
 			args: []string{"status", "new", "|", "status", "resolved"},
-			alerts: []model.Alert{
-				{Status: model.AlertStatusNew},
-				{Status: model.AlertStatusAcknowledged},
-				{Status: model.AlertStatusResolved},
+			alerts: []alert.Alert{
+				{Status: alert.StatusNew},
+				{Status: alert.StatusAcknowledged},
+				{Status: alert.StatusResolved},
 			},
 			expected: nil,
 		},
 		{
 			name: "limit offset pipeline",
 			args: []string{"limit", "2", "|", "offset", "1"},
-			alerts: []model.Alert{
+			alerts: []alert.Alert{
 				{ID: "1"},
 				{ID: "2"},
 				{ID: "3"},
 			},
-			expected: []model.Alert{
+			expected: []alert.Alert{
 				{ID: "2"},
 			},
 		},
@@ -124,10 +124,10 @@ func TestService_Run(t *testing.T) {
 			}
 			repo := repository.NewMemory()
 			svc := list.New(repo, list.WithLLM(llmMock))
-			var alertList *model.AlertList
+			var alertList *alert.List
 			th := mock.SlackThreadServiceMock{
 				ReplyFunc: func(ctx context.Context, message string) {},
-				PostAlertListFunc: func(ctx context.Context, list *model.AlertList) error {
+				PostAlertListFunc: func(ctx context.Context, list *alert.List) error {
 					alertList = list
 					return nil
 				},
@@ -139,7 +139,7 @@ func TestService_Run(t *testing.T) {
 				},
 			}
 			args := append([]string{"|"}, tt.args...)
-			err := svc.Run(t.Context(), &th, &model.SlackUser{}, source.Static(tt.alerts), args)
+			err := svc.Run(t.Context(), &th, &slack.SlackUser{}, source.Static(tt.alerts), args)
 			if tt.wantErr {
 				gt.Error(t, err)
 				return

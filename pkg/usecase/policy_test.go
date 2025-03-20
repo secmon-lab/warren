@@ -9,6 +9,7 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/service/source"
@@ -58,7 +59,7 @@ func TestGenerateIgnorePolicy(t *testing.T) {
 
 	uc := usecase.New(usecase.WithLLMClient(geminiClient), usecase.WithPolicyService(policyService))
 
-	alerts := []model.Alert{
+	alerts := []alert.Alert{
 		{
 			Schema: "guardduty",
 			ID:     "034f3664616c49cb85349d0511ecd306",

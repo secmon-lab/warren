@@ -8,6 +8,7 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/prompt"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/utils/test"
@@ -23,7 +24,7 @@ func newSlackService(t *testing.T) *service.Slack {
 func TestSlackPostAlert(t *testing.T) {
 	svc := newSlackService(t)
 
-	_, err := svc.PostAlert(context.Background(), model.Alert{
+	_, err := svc.PostAlert(context.Background(), alert.Alert{
 		ID:          "1234567890",
 		Title:       "Test Alert Title",
 		Schema:      "test.alert.v1",
@@ -43,19 +44,19 @@ func TestSlackPostAlert(t *testing.T) {
 				Link:  "https://example.com/alert/details",
 			},
 		},
-		Assignee: &model.SlackUser{
+		Assignee: &slack.SlackUser{
 			ID:   "U0123456789",
 			Name: "John Doe",
 		},
-		Status: model.AlertStatusAcknowledged,
+		Status: alert.StatusAcknowledged,
 		Data: map[string]interface{}{
 			"foo": "bar",
 			"baz": 123,
 		},
-		Conclusion: model.AlertConclusionFalsePositive,
+		Conclusion: alert.AlertConclusionFalsePositive,
 		Reason:     "Test Reason",
-		Finding: &model.AlertFinding{
-			Severity:       model.AlertSeverityHigh,
+		Finding: &alert.AlertFinding{
+			Severity:       alert.AlertSeverityHigh,
 			Summary:        "Test Summary",
 			Reason:         "Test Reason",
 			Recommendation: "Test Recommendation",
@@ -71,14 +72,14 @@ func TestSlackUpdateAlert(t *testing.T) {
 
 	thread, err := svc.PostAlert(context.Background(), alert)
 	gt.NoError(t, err).Must()
-	alert.SlackThread = &model.SlackThread{
+	alert.SlackThread = &slack.SlackThread{
 		ChannelID: thread.ChannelID(),
 		ThreadID:  thread.ThreadID(),
 	}
 
 	alert.Title = "Updated Alert Title"
-	alert.Finding = &model.AlertFinding{
-		Severity:       model.AlertSeverityLow,
+	alert.Finding = &alert.AlertFinding{
+		Severity:       alert.AlertSeverityLow,
 		Summary:        "Updated Summary",
 		Reason:         "Updated Reason",
 		Recommendation: "Updated Recommendation",
@@ -87,7 +88,7 @@ func TestSlackUpdateAlert(t *testing.T) {
 	gt.NoError(t, thread.UpdateAlert(context.Background(), alert))
 }
 
-func genDummyAlert() model.Alert {
+func genDummyAlert() alert.Alert {
 	return model.NewAlert(context.Background(), "test.alert.v1", model.PolicyAlert{
 		Title: "Test Alert Title",
 		Attrs: []model.Attribute{
@@ -103,9 +104,9 @@ func genDummyAlert() model.Alert {
 	})
 }
 
-func genDummyAlertWithSlackThread() model.Alert {
+func genDummyAlertWithSlackThread() alert.Alert {
 	alert := genDummyAlert()
-	alert.SlackThread = &model.SlackThread{
+	alert.SlackThread = &slack.SlackThread{
 		ChannelID: "C0123456789",
 		ThreadID:  fmt.Sprintf("%d", time.Now().Unix()),
 	}
@@ -119,7 +120,7 @@ func TestSlackPostThreadMessages(t *testing.T) {
 
 	thread, err := svc.PostAlert(context.Background(), alert)
 	gt.NoError(t, err)
-	alert.SlackThread = &model.SlackThread{
+	alert.SlackThread = &slack.SlackThread{
 		ChannelID: thread.ChannelID(),
 		ThreadID:  thread.ThreadID(),
 	}
@@ -146,13 +147,13 @@ func TestSlackPostConclusion(t *testing.T) {
 
 	thread, err := svc.PostAlert(context.Background(), alert)
 	gt.NoError(t, err)
-	alert.SlackThread = &model.SlackThread{
+	alert.SlackThread = &slack.SlackThread{
 		ChannelID: thread.ChannelID(),
 		ThreadID:  thread.ThreadID(),
 	}
 
-	gt.NoError(t, thread.PostFinding(context.Background(), model.AlertFinding{
-		Severity:       model.AlertSeverityHigh,
+	gt.NoError(t, thread.PostFinding(context.Background(), alert.AlertFinding{
+		Severity:       alert.AlertSeverityHigh,
 		Summary:        "Test Summary",
 		Reason:         "Test Reason",
 		Recommendation: "Test Recommendation",
@@ -166,7 +167,7 @@ func TestAttachFile(t *testing.T) {
 
 	thread, err := svc.PostAlert(context.Background(), alert)
 	gt.NoError(t, err)
-	alert.SlackThread = &model.SlackThread{
+	alert.SlackThread = &slack.SlackThread{
 		ChannelID: thread.ChannelID(),
 		ThreadID:  thread.ThreadID(),
 	}
@@ -212,7 +213,7 @@ allow if {
 func TestPostAlerts(t *testing.T) {
 	svc := newSlackService(t)
 
-	alerts := []model.Alert{
+	alerts := []alert.Alert{
 		genDummyAlertWithSlackThread(),
 		genDummyAlertWithSlackThread(),
 		genDummyAlertWithSlackThread(),
@@ -220,14 +221,14 @@ func TestPostAlerts(t *testing.T) {
 	}
 	alerts[1].ParentID = alerts[0].ID
 	alerts[1].CreatedAt = alerts[0].CreatedAt.Add(time.Second)
-	alerts[1].Status = model.AlertStatusAcknowledged
+	alerts[1].Status = alert.StatusAcknowledged
 	alerts[2].ParentID = alerts[0].ID
 	alerts[2].CreatedAt = alerts[0].CreatedAt.Add(time.Second * 2)
-	alerts[3].Assignee = &model.SlackUser{
+	alerts[3].Assignee = &slack.SlackUser{
 		ID:   "U0123456789",
 		Name: "John Doex",
 	}
-	alerts[3].Status = model.AlertStatusResolved
+	alerts[3].Status = alert.StatusResolved
 
 	thread, err := svc.PostMessage(context.Background(), "alerts test")
 	gt.NoError(t, err)
@@ -237,13 +238,13 @@ func TestPostAlerts(t *testing.T) {
 func TestPostAlertList(t *testing.T) {
 	svc := newSlackService(t)
 
-	alertList := model.NewAlertList(context.Background(), model.SlackThread{
+	alertList := model.NewAlertList(context.Background(), slack.SlackThread{
 		ChannelID: "C0123456789",
 		ThreadID:  "T0123456789",
-	}, &model.SlackUser{
+	}, &slack.SlackUser{
 		ID:   "U0123456789",
 		Name: "John Doe",
-	}, []model.Alert{
+	}, []alert.Alert{
 		genDummyAlertWithSlackThread(),
 		genDummyAlertWithSlackThread(),
 		genDummyAlertWithSlackThread(),

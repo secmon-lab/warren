@@ -8,7 +8,8 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/action/urlscan"
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/action"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/urfave/cli/v3"
 )
@@ -16,7 +17,7 @@ import (
 func TestURLScan(t *testing.T) {
 	testCases := []struct {
 		name            string
-		args            model.Arguments
+		args            action.Arguments
 		scanResp        string
 		resultResponses []string
 		wantResp        string
@@ -24,7 +25,7 @@ func TestURLScan(t *testing.T) {
 	}{
 		{
 			name: "valid response",
-			args: model.Arguments{
+			args: action.Arguments{
 				"url": "https://example.com",
 			},
 			scanResp: `{
@@ -40,12 +41,12 @@ func TestURLScan(t *testing.T) {
 		},
 		{
 			name:    "missing url",
-			args:    model.Arguments{},
+			args:    action.Arguments{},
 			wantErr: true,
 		},
 		{
 			name: "scan error response",
-			args: model.Arguments{
+			args: action.Arguments{
 				"url": "https://example.com",
 			},
 			scanResp: `{"error": "invalid request"}`,
@@ -53,7 +54,7 @@ func TestURLScan(t *testing.T) {
 		},
 		{
 			name: "result not ready",
-			args: model.Arguments{
+			args: action.Arguments{
 				"url": "https://example.com",
 			},
 			scanResp: `{
@@ -143,7 +144,7 @@ func TestURLScan_Enabled(t *testing.T) {
 		Name:  "urlscan",
 		Flags: action.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.Equal(t, action.Configure(ctx), model.ErrActionUnavailable)
+			gt.Equal(t, action.Configure(ctx), errs.ErrActionUnavailable)
 			return nil
 		},
 	}
@@ -164,10 +165,10 @@ func TestSendRequest(t *testing.T) {
 		Name:  "urlscan",
 		Flags: action.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			resp, err := action.Execute(ctx, nil, nil, model.Arguments{"url": "https://example.com"})
+			resp, err := action.Execute(ctx, nil, nil, action.Arguments{"url": "https://example.com"})
 			gt.NoError(t, err)
 			gt.NotEqual(t, resp, nil)
-			gt.Equal(t, resp.Type, model.ActionResultTypeJSON)
+			gt.Equal(t, resp.Type, action.ActionResultTypeJSON)
 			gt.String(t, resp.Data).Contains("https://example.com")
 			return nil
 		},

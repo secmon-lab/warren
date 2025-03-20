@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/secmon-lab/warren/pkg/controller/slack"
-	"github.com/secmon-lab/warren/pkg/domain/model"
 )
 
 func TestParseArgs(t *testing.T) {
@@ -77,11 +76,11 @@ func TestParseArgs(t *testing.T) {
 func TestParseMention(t *testing.T) {
 	testCases := map[string]struct {
 		input    string
-		expected []model.SlackMention
+		expected []slack.Mention
 	}{
 		"single mention": {
 			input: "<@U123> hello world",
-			expected: []model.SlackMention{
+			expected: []slack.Mention{
 				{
 					UserID: "U123",
 					Args:   []string{"hello", "world"},
@@ -90,7 +89,7 @@ func TestParseMention(t *testing.T) {
 		},
 		"multiple mentions": {
 			input: "<@U123> hello <@U456> world",
-			expected: []model.SlackMention{
+			expected: []slack.Mention{
 				{
 					UserID: "U123",
 					Args:   []string{"hello"},
@@ -103,7 +102,7 @@ func TestParseMention(t *testing.T) {
 		},
 		"mention with quoted args": {
 			input: `<@U123> "hello world" test`,
-			expected: []model.SlackMention{
+			expected: []slack.Mention{
 				{
 					UserID: "U123",
 					Args:   []string{"hello world", "test"},
@@ -112,7 +111,7 @@ func TestParseMention(t *testing.T) {
 		},
 		"mention without args": {
 			input: "<@U123>",
-			expected: []model.SlackMention{
+			expected: []slack.Mention{
 				{
 					UserID: "U123",
 					Args:   []string{},
@@ -129,7 +128,7 @@ func TestParseMention(t *testing.T) {
 		},
 		"mention with Japanese text": {
 			input: "<@U123> こんにちは 世界",
-			expected: []model.SlackMention{
+			expected: []slack.Mention{
 				{
 					UserID: "U123",
 					Args:   []string{"こんにちは", "世界"},
@@ -138,7 +137,7 @@ func TestParseMention(t *testing.T) {
 		},
 		"mention with mixed quotes": {
 			input: `<@U123> "hello world" 'test case' "quoted"`,
-			expected: []model.SlackMention{
+			expected: []slack.Mention{
 				{
 					UserID: "U123",
 					Args:   []string{"hello world", "test case", "quoted"},
