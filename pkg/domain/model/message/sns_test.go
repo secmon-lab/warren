@@ -40,7 +40,7 @@ func TestSNSVerify(t *testing.T) {
 		{
 			name: "valid signature",
 			msg:  msg,
-			client: &message.HTTPClientMock{
+			client: &HTTPClientMock{
 				GetFunc: func(url string) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusOK,
@@ -55,7 +55,7 @@ func TestSNSVerify(t *testing.T) {
 			msg: message.SNS{
 				Signature: "invalid",
 			},
-			client: &message.HTTPClientMock{
+			client: &HTTPClientMock{
 				GetFunc: func(url string) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusOK,
@@ -68,7 +68,7 @@ func TestSNSVerify(t *testing.T) {
 		{
 			name: "failed to get certificate",
 			msg:  msg,
-			client: &message.HTTPClientMock{
+			client: &HTTPClientMock{
 				GetFunc: func(url string) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusInternalServerError,

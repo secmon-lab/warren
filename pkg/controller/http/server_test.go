@@ -21,12 +21,15 @@ import (
 	"github.com/m-mizutani/harlog"
 	"github.com/m-mizutani/opaq"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
+	slack_ctrl "github.com/secmon-lab/warren/pkg/controller/slack"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/test"
@@ -43,7 +46,7 @@ func TestValidateGoogleIDToken(t *testing.T) {
 		QueryFunc: func(contextMoqParam context.Context, s string, v1, v2 any, queryOptions ...opaq.QueryOption) error {
 			if s == "data.auth" {
 				calledAuthQuery = true
-				m1 := v1.(*model.AuthContext)
+				m1 := v1.(*auth.Context)
 				gt.Equal(t, m1.Google["email"].(string), vars.Get("TEST_GOOGLE_ID_TOKEN_EMAIL"))
 				gt.NoError(t, json.Unmarshal([]byte(`{"allow":true}`), &v2))
 			} else {
@@ -82,20 +85,20 @@ var slackInteractionJSON []byte
 func TestSlackInteractionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
 	uc := &mock.UseCaseMock{
-		HandleSlackInteractionViewSubmissionResolveAlertFunc: func(ctx context.Context, user slack.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+		HandleSlackInteractionViewSubmissionResolveAlertFunc: func(ctx context.Context, user slack_model.User, metadata string, values map[string]map[string]slack.BlockAction) error {
 			return nil
 		},
-		HandleSlackInteractionViewSubmissionResolveListFunc: func(ctx context.Context, user slack.SlackUser, metadata string, values map[string]map[string]slack.BlockAction) error {
+		HandleSlackInteractionViewSubmissionResolveListFunc: func(ctx context.Context, user slack_model.User, metadata string, values map[string]map[string]slack.BlockAction) error {
 			return nil
 		},
 		HandleSlackInteractionViewSubmissionIgnoreListFunc: func(ctx context.Context, metadata string, values map[string]map[string]slack.BlockAction) error {
 			return nil
 		},
-		HandleSlackInteractionBlockActionsFunc: func(ctx context.Context, user slack.SlackUser, slackThread slack.SlackThread, actionID slack.SlackActionID, value, triggerID string) error {
+		HandleSlackInteractionBlockActionsFunc: func(ctx context.Context, user slack_model.User, slackThread slack_model.Thread, actionID slack_model.ActionID, value, triggerID string) error {
 			return nil
 		},
 	}
-	server := server.New(uc, server.WithSlackVerifier(slack.NewSlackPayloadVerifier(signingSecret)))
+	server := server.New(uc, server.WithSlackVerifier(slack_model.NewPayloadVerifier(signingSecret)))
 
 	t.Run("with valid signature", func(t *testing.T) {
 		ts := fmt.Sprint(time.Now().Unix())
@@ -126,7 +129,7 @@ var slackMentionJSON []byte
 func TestSlackMentionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
 	uc := &mock.UseCaseMock{
-		HandleSlackAppMentionFunc: func(ctx context.Context, user slack.SlackUser, mention slack.Mention, slackThread slack.SlackThread) error {
+		HandleSlackAppMentionFunc: func(ctx context.Context, user slack_model.User, mention slack_model.Mention, slackThread slack_model.Thread) error {
 			gt.Equal(t, user.ID, "U8JLN34SV")
 			gt.Equal(t, slackThread.ChannelID, "C07AR2FPG1F")
 			gt.Equal(t, slackThread.ThreadID, "1741487414.163419")
@@ -135,10 +138,10 @@ func TestSlackMentionHandler(t *testing.T) {
 			return nil
 		},
 	}
-	srv := server.New(uc, server.WithSlackVerifier(service.NewSlackPayloadVerifier(signingSecret)))
+	srv := server.New(uc, server.WithSlackVerifier(slack_model.NewPayloadVerifier(signingSecret)))
 
 	t.Run("with valid signature", func(t *testing.T) {
-		ctx := model.WithSync(t.Context(), true)
+		ctx := slack_ctrl.WithSync(t.Context())
 		ts := fmt.Sprint(time.Now().Unix())
 
 		// Calculate signature

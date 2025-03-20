@@ -6,5 +6,27 @@ tasks:
   mock:
     aliases:
       - m
+    desc: "Generate mock files"
+    deps:
+      - mock_http
+      - mock_model_message
+
+  mock_http:
+    desc: "Generate mock files for http"
     cmds:
-      - go tool moq -out pkg/domain/model/message/sns_mock.go pkg/domain/model/message HTTPClient
+      - go tool moq
+        -out pkg/controller/http/mock_test.go
+        -pkg http_test
+        -rm
+        -skip-ensure
+        pkg/controller/http useCase
+
+  mock_model_message:
+    desc: "Generate mock files for model/message"
+    cmds:
+      - go tool moq
+        -out pkg/domain/model/message/mock_test.go
+        -pkg message_test
+        -rm
+        -skip-ensure
+        pkg/domain/model/message HTTPClient

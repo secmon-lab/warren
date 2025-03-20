@@ -8,7 +8,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -81,7 +80,7 @@ func alertRawHandler(uc interfaces.UseCase) http.HandlerFunc {
 	}
 }
 
-func alertSNSHandler(uc interfaces.UseCase) http.HandlerFunc {
+func alertSNSHandler(uc useCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		logger := logging.From(ctx)
@@ -92,7 +91,7 @@ func alertSNSHandler(uc interfaces.UseCase) http.HandlerFunc {
 			return
 		}
 
-		var msg model.SNSMessage
+		var msg message.SNS
 		if err := json.Unmarshal(body, &msg); err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to decode message",
 				goerr.T(errs.TagInvalidRequest),
