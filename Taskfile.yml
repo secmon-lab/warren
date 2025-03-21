@@ -10,6 +10,8 @@ tasks:
     deps:
       - mock_http
       - mock_model_message
+      - mock_service_notify
+      - mock_service_githubapp
 
   mock_http:
     desc: "Generate mock files for http"
@@ -30,3 +32,21 @@ tasks:
         -rm
         -skip-ensure
         pkg/domain/model/message HTTPClient
+
+  mock_service_notify:
+    desc: "Generate mock files for service/notify"
+    cmds:
+      - go tool moq
+        -out pkg/service/notify/mock_test.go
+        -pkg notify_test
+        -rm -skip-ensure
+        pkg/service/notify slackClient
+
+  mock_service_githubapp:
+    desc: "Generate mock files for service/githubapp"
+    cmds:
+      - go tool moq
+        -out pkg/service/githubapp/mock.go
+        -pkg githubapp
+        -rm -skip-ensure
+        pkg/service/githubapp Client

@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	slack_controller "github.com/secmon-lab/warren/pkg/controller/slack"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 )
 
@@ -23,7 +22,7 @@ func WithSlackVerifier(verifier slack_model.PayloadVerifier) Options {
 	}
 }
 
-func New(uc interfaces.UseCase, opts ...Options) *Server {
+func New(uc useCase, opts ...Options) *Server {
 	r := chi.NewRouter()
 
 	s := &Server{

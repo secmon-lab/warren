@@ -1,4 +1,4 @@
-package service
+package githubapp
 
 import (
 	"context"
@@ -8,18 +8,17 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 type GitHubApp struct {
-	appClient interfaces.GitHubAppClient
-	config    GitHubAppConfig
+	client Client
+	config Config
 }
 
-type GitHubAppConfig struct {
+type Config struct {
 	Owner string
 	Repo  string
 
@@ -28,18 +27,18 @@ type GitHubAppConfig struct {
 	IgnoreTestDir string
 }
 
-func NewGitHubApp(appClient interfaces.GitHubAppClient, config GitHubAppConfig) *GitHubApp {
+func New(client Client, config Config) *GitHubApp {
 	return &GitHubApp{
-		appClient: appClient,
-		config:    config,
+		client: client,
+		config: config,
 	}
 }
 
-func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDiff) (*url.URL, error) {
+func (x *GitHubApp) CreatePolicyDiffPullRequest(ctx context.Context, diff *policy.Diff) (*url.URL, error) {
 	logger := logging.From(ctx)
 
 	eb := goerr.NewBuilder(goerr.V("config", x.config))
-	defaultBranch, err := x.appClient.GetDefaultBranch(ctx, x.config.Owner, x.config.Repo)
+	defaultBranch, err := x.client.GetDefaultBranch(ctx, x.config.Owner, x.config.Repo)
 	if err != nil {
 		return nil, eb.Wrap(err, "failed to get default branch")
 	}
@@ -48,10 +47,10 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 	newBranch := "warren/" + now.Format("2006-01-02") + "/" + diff.ID.String()
 	eb = eb.With(goerr.V("new_branch", newBranch))
 
-	if ref, err := x.appClient.LookupBranch(ctx, x.config.Owner, x.config.Repo, newBranch); err != nil {
+	if ref, err := x.client.LookupBranch(ctx, x.config.Owner, x.config.Repo, newBranch); err != nil {
 		return nil, eb.Wrap(err, "failed to lookup branch")
 	} else if ref == nil {
-		if err := x.appClient.CreateBranch(ctx, x.config.Owner, x.config.Repo, defaultBranch, newBranch); err != nil {
+		if err := x.client.CreateBranch(ctx, x.config.Owner, x.config.Repo, defaultBranch, newBranch); err != nil {
 			return nil, eb.Wrap(err, "failed to create branch")
 		}
 	}
@@ -67,10 +66,10 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 		files[fpath] = content
 	}
 
-	setTestData := func(dir string, testData *model.TestData) error {
+	setTestData := func(dir string, testData *policy.TestData) error {
 		for schema, data := range testData.Data {
 			for fname, content := range data {
-				fpath := filepath.Join(dir, schema, fname)
+				fpath := filepath.Join(dir, schema.String(), fname)
 				raw, err := json.MarshalIndent(content, "", "  ")
 				if err != nil {
 					return eb.Wrap(err, "failed to marshal test data", goerr.V("fname", fname), goerr.V("content", content))
@@ -85,7 +84,7 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 
 		for schema, metaFiles := range testData.Metafiles {
 			for fname, content := range metaFiles {
-				fpath := filepath.Join(dir, schema, fname)
+				fpath := filepath.Join(dir, schema.String(), fname)
 				files[fpath] = content
 			}
 		}
@@ -107,12 +106,12 @@ func (x *GitHubApp) CreatePullRequest(ctx context.Context, diff *model.PolicyDif
 		binData[fpath] = []byte(content)
 	}
 
-	if err := x.appClient.CommitChanges(ctx, x.config.Owner, x.config.Repo, newBranch, binData, diff.Title); err != nil {
+	if err := x.client.CommitChanges(ctx, x.config.Owner, x.config.Repo, newBranch, binData, diff.Title); err != nil {
 		return nil, eb.Wrap(err, "failed to commit changes")
 	}
 
 	// Create pull request
-	pr, err := x.appClient.CreatePullRequest(ctx,
+	pr, err := x.client.CreatePullRequest(ctx,
 		x.config.Owner,
 		x.config.Repo,
 		diff.Title,

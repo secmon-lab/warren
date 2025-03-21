@@ -5,13 +5,14 @@ import (
 	"sync"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/utils/errs"
+
 	slack_sdk "github.com/slack-go/slack"
 )
 
 type SlackThread struct {
-	client   *slack_sdk.Client
+	client   slackClient
 	msgID    string
 	thread   slack.Thread
 	messages []string
@@ -28,7 +29,12 @@ func countTextLength(messages []string) int {
 	return length
 }
 
-func NewSlackThread(client *slack_sdk.Client, thread slack.Thread) *SlackThread {
+type slackClient interface {
+	UpdateMessageContext(ctx context.Context, channelID, messageID string, options ...slack_sdk.MsgOption) (string, string, string, error)
+	PostMessageContext(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error)
+}
+
+func NewSlackThread(client slackClient, thread slack.Thread) *SlackThread {
 	return &SlackThread{
 		client: client,
 		thread: thread,

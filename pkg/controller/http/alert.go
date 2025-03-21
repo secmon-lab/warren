@@ -7,13 +7,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
-func alertPubSubHandler(uc interfaces.UseCase) http.HandlerFunc {
+func alertPubSubHandler(uc useCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		schema := chi.URLParam(r, "schema")
 
@@ -51,7 +50,7 @@ func alertPubSubHandler(uc interfaces.UseCase) http.HandlerFunc {
 	}
 }
 
-func alertRawHandler(uc interfaces.UseCase) http.HandlerFunc {
+func alertRawHandler(uc useCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		schema := chi.URLParam(r, "schema")
 

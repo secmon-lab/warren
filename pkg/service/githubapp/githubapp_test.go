@@ -1,4 +1,4 @@
-package service
+package githubapp_test
 
 import (
 	"context"
@@ -7,15 +7,17 @@ import (
 
 	"github.com/google/go-github/v69/github"
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/domain/model"
-	"github.com/secmon-lab/warren/pkg/mock"
+	"github.com/secmon-lab/warren/pkg/domain/model/policy"
+	"github.com/secmon-lab/warren/pkg/domain/types"
+
+	"github.com/secmon-lab/warren/pkg/service/githubapp"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
 
 func TestGitHubApp_CreatePullRequest(t *testing.T) {
 	ctx := t.Context()
 
-	mockClient := &mock.GitHubAppClientMock{
+	mockClient := &githubapp.ClientMock{
 		GetDefaultBranchFunc: func(ctx context.Context, owner, repo string) (string, error) {
 			return "main", nil
 		},
@@ -35,7 +37,7 @@ func TestGitHubApp_CreatePullRequest(t *testing.T) {
 		},
 	}
 
-	app := NewGitHubApp(mockClient, GitHubAppConfig{
+	app := githubapp.New(mockClient, githubapp.Config{
 		Owner:         "owner",
 		Repo:          "repo",
 		PolicyRootDir: "policies",
@@ -43,23 +45,23 @@ func TestGitHubApp_CreatePullRequest(t *testing.T) {
 		IgnoreTestDir: "test/ignore",
 	})
 
-	diff := &model.PolicyDiff{
-		ID:    model.NewPolicyDiffID(),
+	diff := &policy.Diff{
+		ID:    policy.NewPolicyDiffID(),
 		Title: "Test PR",
 		New: map[string]string{
 			"test.rego": "package color\n\nalert contains {} if {\n  input.color == \"red\"\n}",
 		},
-		NewTestDataSet: &model.TestDataSet{
-			Detect: &model.TestData{
-				Data: map[string]map[string]any{
-					"schema": {
+		NewTestDataSet: &policy.TestDataSet{
+			Detect: &policy.TestData{
+				Data: map[types.AlertSchema]map[string]any{
+					types.AlertSchema("schema"): {
 						"test.json": map[string]any{"test": "data"},
 					},
 				},
 			},
-			Ignore: &model.TestData{
-				Data: map[string]map[string]any{
-					"schema": {
+			Ignore: &policy.TestData{
+				Data: map[types.AlertSchema]map[string]any{
+					types.AlertSchema("schema"): {
 						"ignore.json": map[string]any{"ignore": "data"},
 					},
 				},
@@ -71,7 +73,7 @@ func TestGitHubApp_CreatePullRequest(t *testing.T) {
 		return time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	})
 
-	url, err := app.CreatePullRequest(ctx, diff)
+	url, err := app.CreatePolicyDiffPullRequest(ctx, diff)
 	gt.NoError(t, err)
 	gt.Equal(t, url.String(), "https://github.com/owner/repo/pull/1")
 
