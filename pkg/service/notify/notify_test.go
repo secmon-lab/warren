@@ -14,11 +14,12 @@ import (
 	"github.com/slack-go/slack"
 )
 
-func TestNotify_with_Slack(t *testing.T) {
+func newClient(t *testing.T) (*slack.Client, string) {
 	apiToken, ok := os.LookupEnv("TEST_SLACK_OAUTH_TOKEN")
 	if !ok {
 		t.Skip("TEST_SLACK_OAUTH_TOKEN is required")
 	}
+
 	testCh, ok := os.LookupEnv("TEST_SLACK_CHANNEL_ID")
 	if !ok {
 		t.Skip("TEST_SLACK_CHANNEL_ID is required")
@@ -26,7 +27,12 @@ func TestNotify_with_Slack(t *testing.T) {
 
 	client := slack.New(apiToken)
 
-	chID, ts, err := client.PostMessageContext(t.Context(), testCh, slack.MsgOptionText("notify test", false))
+	return client, testCh
+}
+
+func TestNotify(t *testing.T) {
+	client, testCh := newClient(t)
+	chID, ts, err := client.PostMessageContext(t.Context(), testCh, slack.MsgOptionText("notify thread test", false))
 	gt.NoError(t, err)
 
 	thread := model.Thread{
@@ -44,6 +50,31 @@ func TestNotify_with_Slack(t *testing.T) {
 
 	for _, msg := range testMessages {
 		notifier.Notify(t.Context(), msg)
+	}
+}
+
+func TestNotifyContext(t *testing.T) {
+	client, testCh := newClient(t)
+	chID, ts, err := client.PostMessageContext(t.Context(), testCh, slack.MsgOptionText("notify context test", false))
+	gt.NoError(t, err)
+
+	thread := model.Thread{
+		ChannelID: chID,
+		ThreadID:  ts,
+	}
+
+	notifier := notify.NewSlackThread(client, thread)
+
+	msgCtx := notifier.NewMessageContext(t.Context(), "test")
+
+	testMessages := []string{
+		"😂 test1",
+		"😁 test2",
+		"😊 test3",
+	}
+
+	for _, msg := range testMessages {
+		msgCtx.Append(t.Context(), msg)
 	}
 }
 
@@ -66,14 +97,11 @@ func TestNotifyNewPostWithManyMessages(t *testing.T) {
 		ThreadID:  "test-thread",
 	})
 
-	loopCount := 400
+	loopCount := 10
 	for range loopCount {
 		notifier.Notify(t.Context(), "Take me back to the green love")
 	}
 
-	// PostMessage need to be called multiple times because the message will be overflowed max block size.
-	gt.Array(t, mockClient.PostMessageContextCalls()).Longer(1)
-	postCallCount := len(mockClient.PostMessageContextCalls())
-	// UpdateMessage need to be called multiple times because to show the new message.
-	gt.Array(t, mockClient.UpdateMessageContextCalls()).Length(loopCount - postCallCount)
+	gt.Array(t, mockClient.PostMessageContextCalls()).Length(10)
+	gt.Array(t, mockClient.UpdateMessageContextCalls()).Length(0)
 }

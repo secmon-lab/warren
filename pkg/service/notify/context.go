@@ -4,16 +4,22 @@ import "context"
 
 type ctxKey struct{}
 
-type SendFunc func(ctx context.Context, msg string)
-
-func With(ctx context.Context, send SendFunc) context.Context {
-	return context.WithValue(ctx, ctxKey{}, send)
+func WithThread(ctx context.Context, thread *SlackThread) context.Context {
+	return context.WithValue(ctx, ctxKey{}, thread)
 }
 
-func Send(ctx context.Context, msg string) {
-	send, ok := ctx.Value(ctxKey{}).(SendFunc)
+func Notify(ctx context.Context, msg string) {
+	thread, ok := ctx.Value(ctxKey{}).(*SlackThread)
 	if !ok {
 		return
 	}
-	send(ctx, msg)
+	thread.Notify(ctx, msg)
+}
+
+func NewMessageContext(ctx context.Context, base string) *MessageContext {
+	thread, ok := ctx.Value(ctxKey{}).(*SlackThread)
+	if !ok {
+		return newDummyMessageContext()
+	}
+	return thread.NewMessageContext(ctx, base)
 }
