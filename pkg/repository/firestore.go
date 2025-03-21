@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -163,11 +164,7 @@ func (r *Firestore) GetAlertComments(ctx context.Context, alertID types.AlertID)
 	return comments, nil
 }
 
-const (
-	policyVersionCollection = "versions"
-)
-
-func (r *Firestore) GetAlertsByStatus(ctx context.Context, status alert.Status) ([]alert.Alert, error) {
+func (r *Firestore) GetAlertsByStatus(ctx context.Context, status types.AlertStatus) ([]alert.Alert, error) {
 	iter := r.db.Collection(collectionAlerts).Where("Status", "==", status).Documents(ctx)
 
 	var alerts []alert.Alert
@@ -191,7 +188,7 @@ func (r *Firestore) GetAlertsByStatus(ctx context.Context, status alert.Status) 
 	return alerts, nil
 }
 
-func (r *Firestore) GetAlertsWithoutStatus(ctx context.Context, status alert.Status) ([]alert.Alert, error) {
+func (r *Firestore) GetAlertsWithoutStatus(ctx context.Context, status types.AlertStatus) ([]alert.Alert, error) {
 	iter := r.db.Collection(collectionAlerts).Where("Status", "!=", status).Documents(ctx)
 
 	var alerts []alert.Alert
@@ -350,24 +347,36 @@ func (r *Firestore) GetLatestAlertListInThread(ctx context.Context, thread slack
 	iter := r.db.Collection(collectionAlertLists).
 		Where("SlackThread.ChannelID", "==", thread.ChannelID).
 		Where("SlackThread.ThreadID", "==", thread.ThreadID).
-		OrderBy("CreatedAt", firestore.Desc).
-		Limit(1).
 		Documents(ctx)
 
-	doc, err := iter.Next()
-	if err != nil {
-		if err == iterator.Done {
-			return nil, nil
+	var lists []alert.List
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get alert lists in thread", goerr.V("thread", thread))
 		}
-		return nil, goerr.Wrap(err, "failed to get latest alert list in thread", goerr.V("thread", thread))
+
+		var alertList alert.List
+		if err := doc.DataTo(&alertList); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert list")
+		}
+
+		lists = append(lists, alertList)
 	}
 
-	var alertList alert.List
-	if err := doc.DataTo(&alertList); err != nil {
-		return nil, goerr.Wrap(err, "failed to convert data to alert list")
+	if len(lists) == 0 {
+		return nil, nil
 	}
 
-	return &alertList, nil
+	// Sort by CreatedAt in descending order
+	sort.Slice(lists, func(i, j int) bool {
+		return lists[i].CreatedAt.After(lists[j].CreatedAt)
+	})
+
+	return &lists[0], nil
 }
 
 func (r *Firestore) GetHistory(ctx context.Context, thread slack.Thread) (*chat.History, error) {
@@ -397,7 +406,7 @@ func (r *Firestore) PutHistory(ctx context.Context, history chat.History) error 
 	return nil
 }
 
-func (r *Firestore) BatchUpdateAlertStatus(ctx context.Context, alertIDs []types.AlertID, status alert.Status, reason string) error {
+func (r *Firestore) BatchUpdateAlertStatus(ctx context.Context, alertIDs []types.AlertID, status types.AlertStatus, reason string) error {
 	writer := r.db.BulkWriter(ctx)
 	defer writer.End()
 
@@ -431,7 +440,7 @@ func (r *Firestore) BatchUpdateAlertStatus(ctx context.Context, alertIDs []types
 	return nil
 }
 
-func (r *Firestore) BatchUpdateAlertConclusion(ctx context.Context, alertIDs []types.AlertID, conclusion alert.AlertConclusion, reason string) error {
+func (r *Firestore) BatchUpdateAlertConclusion(ctx context.Context, alertIDs []types.AlertID, conclusion types.AlertConclusion, reason string) error {
 	writer := r.db.BulkWriter(ctx)
 	defer writer.End()
 

@@ -111,7 +111,7 @@ func (r *Memory) GetLatestAlertListInThread(ctx context.Context, thread slack.Th
 	return latestList, nil
 }
 
-func (r *Memory) GetAlertsByStatus(ctx context.Context, status alert.Status) ([]alert.Alert, error) {
+func (r *Memory) GetAlertsByStatus(ctx context.Context, status types.AlertStatus) ([]alert.Alert, error) {
 	var alerts []alert.Alert
 	for _, alert := range r.alerts {
 		if alert.Status == status {
@@ -141,7 +141,7 @@ func (r *Memory) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (
 	return alerts, nil
 }
 
-func (r *Memory) BatchUpdateAlertStatus(ctx context.Context, alertIDs []types.AlertID, status alert.Status, reason string) error {
+func (r *Memory) BatchUpdateAlertStatus(ctx context.Context, alertIDs []types.AlertID, status types.AlertStatus, reason string) error {
 	for _, alertID := range alertIDs {
 		if alert, ok := r.alerts[alertID]; ok {
 			alert.Status = status

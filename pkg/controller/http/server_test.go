@@ -22,18 +22,12 @@ import (
 	"github.com/m-mizutani/opaq"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	slack_ctrl "github.com/secmon-lab/warren/pkg/controller/slack"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 
-	"github.com/secmon-lab/warren/pkg/mock"
-	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/test"
-	"github.com/slack-go/slack"
 )
 
 //go:embed testdata/pubsub.json
@@ -42,28 +36,19 @@ var pubsubJSON []byte
 func TestValidateGoogleIDToken(t *testing.T) {
 	vars := test.NewEnvVars(t, "TEST_GOOGLE_ID_TOKEN", "TEST_GOOGLE_ID_TOKEN_EMAIL")
 	calledAuthQuery := false
-	policyMock := &mock.PolicyClientMock{
-		QueryFunc: func(contextMoqParam context.Context, s string, v1, v2 any, queryOptions ...opaq.QueryOption) error {
-			if s == "data.auth" {
-				calledAuthQuery = true
-				m1 := v1.(*auth.Context)
-				gt.Equal(t, m1.Google["email"].(string), vars.Get("TEST_GOOGLE_ID_TOKEN_EMAIL"))
-				gt.NoError(t, json.Unmarshal([]byte(`{"allow":true}`), &v2))
-			} else {
-				gt.NoError(t, json.Unmarshal([]byte(`{}`), &v2))
-			}
-			return nil
-		},
-		SourcesFunc: func() map[string]string {
-			return map[string]string{
-				"auth": "package auth",
-			}
-		},
+	queryFunc := func(contextMoqParam context.Context, s string, v1, v2 any, queryOptions ...opaq.QueryOption) error {
+		if s == "data.auth" {
+			calledAuthQuery = true
+			m1 := v1.(*auth.Context)
+			gt.Equal(t, m1.Google["email"].(string), vars.Get("TEST_GOOGLE_ID_TOKEN_EMAIL"))
+			gt.NoError(t, json.Unmarshal([]byte(`{"allow":true}`), &v2))
+		} else {
+			gt.NoError(t, json.Unmarshal([]byte(`{}`), &v2))
+		}
+		return nil
 	}
-	policyService := policy.New(repository.NewMemory(), policyMock, &model.TestDataSet{}, policy.WithFactory(func(data policy.PolicyData) (interfaces.PolicyClient, error) {
-		return policyMock, nil
-	}))
-	uc := usecase.New(usecase.WithPolicyService(policyService))
+
+	uc := usecase.New(usecase.WithQueryFunc(queryFunc))
 
 	server := server.New(uc)
 
@@ -84,14 +69,14 @@ var slackInteractionJSON []byte
 
 func TestSlackInteractionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
-	uc := &mock.UseCaseMock{
-		HandleSlackInteractionViewSubmissionResolveAlertFunc: func(ctx context.Context, user slack_model.User, metadata string, values map[string]map[string]slack.BlockAction) error {
+	uc := &useCaseMock{
+		HandleSlackInteractionViewSubmissionResolveAlertFunc: func(ctx context.Context, user slack_model.User, metadata string, values slack_model.StateValue) error {
 			return nil
 		},
-		HandleSlackInteractionViewSubmissionResolveListFunc: func(ctx context.Context, user slack_model.User, metadata string, values map[string]map[string]slack.BlockAction) error {
+		HandleSlackInteractionViewSubmissionResolveListFunc: func(ctx context.Context, user slack_model.User, metadata string, values slack_model.StateValue) error {
 			return nil
 		},
-		HandleSlackInteractionViewSubmissionIgnoreListFunc: func(ctx context.Context, metadata string, values map[string]map[string]slack.BlockAction) error {
+		HandleSlackInteractionViewSubmissionIgnoreListFunc: func(ctx context.Context, metadata string, values slack_model.StateValue) error {
 			return nil
 		},
 		HandleSlackInteractionBlockActionsFunc: func(ctx context.Context, user slack_model.User, slackThread slack_model.Thread, actionID slack_model.ActionID, value, triggerID string) error {
@@ -128,7 +113,7 @@ var slackMentionJSON []byte
 
 func TestSlackMentionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
-	uc := &mock.UseCaseMock{
+	uc := &useCaseMock{
 		HandleSlackAppMentionFunc: func(ctx context.Context, user slack_model.User, mention slack_model.Mention, slackThread slack_model.Thread) error {
 			gt.Equal(t, user.ID, "U8JLN34SV")
 			gt.Equal(t, slackThread.ChannelID, "C07AR2FPG1F")

@@ -8,16 +8,16 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/service/source"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
-	"github.com/secmon-lab/warren/pkg/utils/errs"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
-	"github.com/slack-go/slack"
 )
 
-func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.SlackUser, mention slack.Mention, slackThread slack.SlackThread) error {
+func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, mention slack.Mention, slackThread slack.Thread) error {
 	logger := logging.From(ctx)
 	logger.Debug("slack app mention event", "mention", mention, "slack_thread", slackThread)
 
@@ -98,7 +98,7 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackThread slack.Sl
 		Timestamp: ts,
 		User:      user,
 	}
-	if err := uc.repository.InsertAlertComment(ctx, comment); err != nil {
+	if err := uc.repository.PutAlertComment(ctx, comment); err != nil {
 		thread.Reply(ctx, "💥 Failed to insert alert comment\n> "+err.Error())
 		return goerr.Wrap(err, "failed to insert alert comment", goerr.V("comment", comment))
 	}

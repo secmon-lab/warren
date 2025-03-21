@@ -2,10 +2,10 @@ package repository_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
-	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -42,10 +42,10 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		Schema:      "test-schema",
 		Title:       "Test Alert",
 		Description: "Test Description",
-		Status:      alert.StatusNew,
+		Status:      types.AlertStatusNew,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
-		Data:        map[string]string{"key": "value"},
+		Data:        map[string]any{"key": "value"},
 		Attributes: []alert.Attribute{
 			{Key: "test-key", Value: "test-value"},
 		},
@@ -53,13 +53,14 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 
 	thread := slack.Thread{
 		ChannelID: "test-channel",
-		ThreadID:  "test-thread",
+		ThreadID:  fmt.Sprintf("%d.%d", time.Now().Unix(), time.Now().Nanosecond()),
 	}
+
+	// Put
+	gt.NoError(t, repo.PutAlert(ctx, a))
 
 	// Alert関連のテスト
 	t.Run("PutAndGetAlert", func(t *testing.T) {
-		// Put
-		gt.NoError(t, repo.PutAlert(ctx, a))
 
 		// Get
 		got, err := repo.GetAlert(ctx, alertID)
@@ -69,7 +70,9 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Value(t, got.Title).Equal(a.Title)
 		gt.Value(t, got.Description).Equal(a.Description)
 		gt.Value(t, got.Status).Equal(a.Status)
-		gt.Value(t, got.Data).Equal(a.Data)
+		gotData := gt.Cast[map[string]any](t, got.Data)
+		wantData := gt.Cast[map[string]any](t, a.Data)
+		gt.Value(t, gotData["key"]).Equal(wantData["key"])
 		gt.Array(t, got.Attributes).Equal(a.Attributes)
 	})
 
@@ -80,7 +83,8 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 
 		// GetByThread
 		got, err := repo.GetAlertByThread(ctx, thread)
-		gt.NoError(t, err)
+		gt.NoError(t, err).Must()
+		gt.NotNil(t, got)
 		gt.Value(t, got.ID).Equal(a.ID)
 		gt.Value(t, got.SlackThread.ChannelID).Equal(thread.ChannelID)
 		gt.Value(t, got.SlackThread.ThreadID).Equal(thread.ThreadID)
@@ -113,7 +117,12 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 			Thread:    thread,
 			CreatedBy: slack.User{ID: "test-user", Name: "Test User"},
 			CreatedAt: time.Now(),
-			Contents:  []*genai.Content{{Role: "user", Parts: []genai.Part{genai.Text("test message")}}},
+			Contents: []chat.Content{
+				{
+					Role: "user",
+					Text: []string{"test message"},
+				},
+			},
 		}
 
 		// PutHistory
@@ -126,6 +135,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Value(t, got.Thread.ChannelID).Equal(thread.ChannelID)
 		gt.Value(t, got.Thread.ThreadID).Equal(thread.ThreadID)
 		gt.Value(t, got.Contents[0].Role).Equal("user")
+		gt.Array(t, got.Contents[0].Text).Equal([]string{"test message"})
 	})
 
 	// AlertList関連のテスト
@@ -174,25 +184,25 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		// GetAlertsByStatus
 		got, err := repo.GetAlertsByStatus(ctx, a.Status)
 		gt.NoError(t, err)
-		gt.Array(t, got).Have(a)
+		gt.Array(t, got).Any(func(x alert.Alert) bool { return x.ID == alertID })
 
 		// GetAlertsBySpan
-		begin := time.Now().Add(-1 * time.Hour)
-		end := time.Now().Add(1 * time.Hour)
+		begin := a.CreatedAt.Add(-1 * time.Minute)
+		end := a.CreatedAt.Add(1 * time.Minute)
 		got, err = repo.GetAlertsBySpan(ctx, begin, end)
 		gt.NoError(t, err)
-		gt.Array(t, got).Have(a)
+		gt.Array(t, got).Any(func(x alert.Alert) bool { return x.ID == alertID })
 
 		// BatchGetAlerts
 		got, err = repo.BatchGetAlerts(ctx, []types.AlertID{alertID})
 		gt.NoError(t, err)
-		gt.Array(t, got).Have(a)
+		gt.Array(t, got).Any(func(x alert.Alert) bool { return x.ID == alertID })
 
 		// BatchUpdateAlertStatus
-		gt.NoError(t, repo.BatchUpdateAlertStatus(ctx, []types.AlertID{alertID}, a.Status, "Test reason"))
+		gt.NoError(t, repo.BatchUpdateAlertStatus(ctx, []types.AlertID{alertID}, types.AlertStatusResolved, "Test reason"))
 		gotAlert, err := repo.GetAlert(ctx, alertID)
 		gt.NoError(t, err)
-		gt.Value(t, gotAlert.Status).Equal(a.Status)
+		gt.Value(t, gotAlert.Status).Equal(types.AlertStatusResolved)
 		gt.Value(t, gotAlert.Reason).Equal("Test reason")
 	})
 
@@ -223,7 +233,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 			ID:          types.AlertID("test-alert-id"),
 			Title:       "Test Title",
 			Description: "Test Description",
-			Status:      alert.StatusNew,
+			Status:      types.AlertStatusNew,
 			CreatedAt:   time.Now(),
 		}
 
@@ -237,16 +247,15 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Value(t, got.Title).Equal(a.Title)
 
 		// GetAlertsByStatus
-		alerts, err := repo.GetAlertsByStatus(ctx, alert.StatusNew)
+		alerts, err := repo.GetAlertsByStatus(ctx, types.AlertStatusNew)
 		gt.NoError(t, err)
-		gt.Value(t, len(alerts)).Equal(1)
-		gt.Value(t, alerts[0].ID).Equal(a.ID)
+		gt.Array(t, alerts).Any(func(x alert.Alert) bool { return x.ID == a.ID })
 
 		// BatchUpdateAlertStatus
-		gt.NoError(t, repo.BatchUpdateAlertStatus(ctx, []types.AlertID{a.ID}, alert.StatusAcknowledged, "test reason"))
+		gt.NoError(t, repo.BatchUpdateAlertStatus(ctx, []types.AlertID{a.ID}, types.AlertStatusAcknowledged, "test reason"))
 
 		got, err = repo.GetAlert(ctx, a.ID)
 		gt.NoError(t, err)
-		gt.Value(t, got.Status).Equal(alert.StatusAcknowledged)
+		gt.Value(t, got.Status).Equal(types.AlertStatusAcknowledged)
 	})
 }

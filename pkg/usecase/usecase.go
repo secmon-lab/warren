@@ -8,6 +8,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service"
@@ -21,7 +22,7 @@ type UseCases struct {
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
 	actionService   *service.ActionService
-	policyService   *policy.Service
+	queryFunc       policy.QueryFunc
 	gitHubApp       *service.GitHubApp
 
 	// configs
@@ -52,9 +53,9 @@ func WithSlackService(slackService interfaces.SlackService) Option {
 	}
 }
 
-func WithPolicyService(policyService *policy.Service) Option {
+func WithQueryFunc(queryFunc policy.QueryFunc) Option {
 	return func(u *UseCases) {
-		u.policyService = policyService
+		u.queryFunc = queryFunc
 	}
 }
 

@@ -3,97 +3,12 @@ package policy
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
-
-/*
-type PolicyResult struct {
-	Alert []PolicyAlert `json:"alert"`
-}
-
-type PolicyAlert struct {
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
-	Attrs       []Attribute `json:"attrs"`
-	Data        any         `json:"data"`
-}
-
-type PolicyAuth struct {
-	Allow bool `json:"allow"`
-}
-*/
-
-type TestDataSet struct {
-	Detect *TestData `json:"detect"`
-	Ignore *TestData `json:"ignore"`
-}
-
-func NewTestDataSet() *TestDataSet {
-	return &TestDataSet{
-		Detect: NewTestData(),
-		Ignore: NewTestData(),
-	}
-}
-
-type TestData struct {
-	Metafiles map[string]map[string]string
-	Data      map[string]map[string]any
-}
-
-func (x *TestData) Add(schema string, filename string, data any) {
-	if x.Data[schema] == nil {
-		x.Data[schema] = make(map[string]any)
-	}
-	x.Data[schema][filename] = data
-}
-
-func (x *TestData) Clone() *TestData {
-	clone := NewTestData()
-	clone.Data = make(map[string]map[string]any)
-	for schema, dataSets := range x.Data {
-		clone.Data[schema] = make(map[string]any)
-		for filename, data := range dataSets {
-			clone.Data[schema][filename] = data
-		}
-	}
-	clone.Metafiles = make(map[string]map[string]string)
-	for schema, metafiles := range x.Metafiles {
-		clone.Metafiles[schema] = make(map[string]string)
-		for filename, content := range metafiles {
-			clone.Metafiles[schema][filename] = content
-		}
-	}
-	return clone
-}
-
-func NewTestData() *TestData {
-	return &TestData{
-		Metafiles: make(map[string]map[string]string),
-		Data:      make(map[string]map[string]any),
-	}
-}
-
-func (x TestData) LogValue() slog.Value {
-	values := make([]slog.Attr, 0, len(x.Data))
-
-	for schema, dataSets := range x.Data {
-		files := []string{}
-		for filename := range dataSets {
-			files = append(files, filename)
-		}
-		sort.Strings(files)
-
-		values = append(values, slog.Any(schema, files))
-	}
-
-	return slog.GroupValue(values...)
-}
 
 type PolicyData struct {
 	Data      map[string]string `json:"data"`
