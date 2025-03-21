@@ -251,6 +251,11 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.NoError(t, err)
 		gt.Array(t, alerts).Any(func(x alert.Alert) bool { return x.ID == a.ID })
 
+		// GetAlertsWithoutStatus
+		alerts, err = repo.GetAlertsWithoutStatus(ctx, types.AlertStatusResolved)
+		gt.NoError(t, err)
+		gt.Array(t, alerts).Any(func(x alert.Alert) bool { return x.ID == a.ID })
+
 		// BatchUpdateAlertStatus
 		gt.NoError(t, repo.BatchUpdateAlertStatus(ctx, []types.AlertID{a.ID}, types.AlertStatusAcknowledged, "test reason"))
 

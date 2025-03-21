@@ -8,20 +8,10 @@ tasks:
       - m
     desc: "Generate mock files"
     deps:
-      - mock_http
       - mock_model_message
       - mock_service_notify
       - mock_service_githubapp
-
-  mock_http:
-    desc: "Generate mock files for http"
-    cmds:
-      - go tool moq
-        -out pkg/controller/http/mock_test.go
-        -pkg http_test
-        -rm
-        -skip-ensure
-        pkg/controller/http useCase
+      - mock_usecase
 
   mock_model_message:
     desc: "Generate mock files for model/message"
@@ -50,3 +40,15 @@ tasks:
         -pkg githubapp
         -rm -skip-ensure
         pkg/service/githubapp Client
+
+  mock_usecase:
+    desc: "Generate mock files for usecase"
+    cmds:
+      - go tool moq
+        -out pkg/usecase/mock.go
+        -pkg usecase
+        -rm -skip-ensure
+        pkg/usecase
+        SlackEvent
+        SlackInteraction
+        Alert

@@ -30,6 +30,7 @@ type Repository interface {
 
 	// For list generation
 	GetAlertsByStatus(ctx context.Context, status types.AlertStatus) ([]alert.Alert, error)
+	GetAlertsWithoutStatus(ctx context.Context, status types.AlertStatus) ([]alert.Alert, error)
 	GetAlertsBySpan(ctx context.Context, begin, end time.Time) ([]alert.Alert, error)
 	BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) ([]alert.Alert, error)
 	BatchUpdateAlertStatus(ctx context.Context, alertIDs []types.AlertID, status types.AlertStatus, reason string) error

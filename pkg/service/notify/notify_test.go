@@ -67,8 +67,8 @@ func TestNotifyNewPostWithManyMessages(t *testing.T) {
 	})
 
 	loopCount := 400
-	for i := range loopCount {
-		notifier.Notify(t.Context(), fmt.Sprintf("This is a test message [%d]", i))
+	for range loopCount {
+		notifier.Notify(t.Context(), "Take me back to the green love")
 	}
 
 	// PostMessage need to be called multiple times because the message will be overflowed max block size.

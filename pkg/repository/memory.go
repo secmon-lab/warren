@@ -121,6 +121,16 @@ func (r *Memory) GetAlertsByStatus(ctx context.Context, status types.AlertStatus
 	return alerts, nil
 }
 
+func (r *Memory) GetAlertsWithoutStatus(ctx context.Context, status types.AlertStatus) ([]alert.Alert, error) {
+	var alerts []alert.Alert
+	for _, alert := range r.alerts {
+		if alert.Status != status {
+			alerts = append(alerts, alert)
+		}
+	}
+	return alerts, nil
+}
+
 func (r *Memory) GetAlertsBySpan(ctx context.Context, begin, end time.Time) ([]alert.Alert, error) {
 	var alerts []alert.Alert
 	for _, alert := range r.alerts {

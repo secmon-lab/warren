@@ -8,7 +8,6 @@ import (
 	"github.com/google/go-github/v69/github"
 	"github.com/jferrl/go-githubauth"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"golang.org/x/oauth2"
 )
 
@@ -16,8 +15,6 @@ type Client struct {
 	client     *github.Client
 	httpClient *http.Client
 }
-
-var _ interfaces.GitHubAppClient = &Client{}
 
 func New(ctx context.Context, appID int64, installationID int64, privateKey []byte) (*Client, error) {
 	appTokenSource, err := githubauth.NewApplicationTokenSource(appID, privateKey)
