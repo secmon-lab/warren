@@ -96,7 +96,7 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert alert.Alert) error {
 			continue
 		}
 
-		alert.Finding = &alert.AlertFinding{
+		alert.Finding = &alert.Finding{
 			Severity:       finding.Severity,
 			Summary:        finding.Summary,
 			Reason:         finding.Reason,
@@ -150,7 +150,7 @@ func planAction(ctx context.Context, ssn interfaces.LLMSession, prePrompt string
 	return &result, nil
 }
 
-func (uc *UseCases) buildFinding(ctx context.Context, ssn interfaces.LLMSession) (*alert.AlertFinding, error) {
+func (uc *UseCases) buildFinding(ctx context.Context, ssn interfaces.LLMSession) (*alert.Finding, error) {
 	conclusionPrompt, err := prompt.BuildFindingPrompt(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build conclusion prompt")
@@ -173,7 +173,7 @@ func (uc *UseCases) buildFinding(ctx context.Context, ssn interfaces.LLMSession)
 		return nil, eb.New("no conclusion prompt result")
 	}
 
-	var result alert.AlertFinding
+	var result alert.Finding
 	if err := json.Unmarshal([]byte(text), &result); err != nil {
 		return nil, eb.Wrap(err, "failed to unmarshal finding prompt result", goerr.V("text", text))
 	}

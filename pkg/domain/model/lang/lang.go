@@ -1,4 +1,4 @@
-package model
+package lang
 
 import "github.com/m-mizutani/goerr/v2"
 
@@ -7,6 +7,8 @@ type Lang string
 const (
 	English  Lang = "en"
 	Japanese Lang = "ja"
+
+	Default Lang = English
 )
 
 var langNames = map[Lang]string{

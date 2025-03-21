@@ -11,9 +11,9 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/utils/lang"
 )
 
 func stringify(v any) (string, error) {
@@ -143,7 +143,7 @@ func BuildFindingPrompt(ctx context.Context) (string, error) {
 		return "", goerr.Wrap(err, "failed to parse template")
 	}
 
-	schema, err := generateSchema(alert.AlertFinding{}).Stringify()
+	schema, err := generateSchema(alert.Finding{}).Stringify()
 	if err != nil {
 		return "", err
 	}

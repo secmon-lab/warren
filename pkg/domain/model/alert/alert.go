@@ -9,8 +9,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
 
-// AlertFinding is the conclusion of the alert. This is set by the AI.
-type AlertFinding struct {
+// Finding is the conclusion of the alert. This is set by the AI.
+type Finding struct {
 	Severity       types.AlertSeverity `json:"severity"`
 	Summary        string              `json:"summary"`
 	Reason         string              `json:"reason"`
@@ -31,7 +31,7 @@ type Alert struct {
 	Attributes  []Attribute           `json:"attributes"`
 	Conclusion  types.AlertConclusion `json:"conclusion"`
 	Reason      string                `json:"reason"`
-	Finding     *AlertFinding         `json:"finding"`
+	Finding     *Finding              `json:"finding"`
 
 	Assignee    *slack.User   `json:"assignee"`
 	SlackThread *slack.Thread `json:"slack_thread"`
@@ -50,7 +50,7 @@ type Metadata struct {
 	Attrs       []Attribute `json:"attrs"`
 }
 
-func NewAlert(ctx context.Context, schema string, metadata Metadata) Alert {
+func New(ctx context.Context, schema string, metadata Metadata) Alert {
 	return Alert{
 		ID:          types.NewAlertID(),
 		Schema:      schema,

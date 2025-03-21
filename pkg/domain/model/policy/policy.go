@@ -35,9 +35,9 @@ type Diff struct {
 	NewTestDataSet *TestDataSet      `json:"new_test_data_set"`
 }
 
-func NewDiff(ctx context.Context, id PolicyDiffID, title, description string, new, old map[string]string, newTestDataSet *TestDataSet) *Diff {
+func NewDiff(ctx context.Context, title, description string, new, old map[string]string, newTestDataSet *TestDataSet) *Diff {
 	return &Diff{
-		ID:             id,
+		ID:             NewPolicyDiffID(),
 		Title:          title,
 		Description:    description,
 		New:            new,

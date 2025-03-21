@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	slack_controller "github.com/secmon-lab/warren/pkg/controller/slack"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/usecase"
 )
 
 type Server struct {
@@ -22,12 +23,18 @@ func WithSlackVerifier(verifier slack_model.PayloadVerifier) Options {
 	}
 }
 
-func New(uc useCase, opts ...Options) *Server {
+type UseCase interface {
+	usecase.Alert
+	usecase.SlackEvent
+	usecase.SlackInteraction
+}
+
+func New(uc UseCase, opts ...Options) *Server {
 	r := chi.NewRouter()
 
 	s := &Server{
 		router:    r,
-		slackCtrl: slack_controller.New(uc),
+		slackCtrl: slack_controller.New(uc, uc),
 	}
 	for _, opt := range opts {
 		opt(s)

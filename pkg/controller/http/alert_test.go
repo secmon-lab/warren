@@ -33,7 +33,7 @@ func TestAlertSNSHandler(t *testing.T) {
 	gt.NoError(t, err)
 
 	t.Run("successful alert handling", func(t *testing.T) {
-		mockUseCase := &useCaseMock{
+		mockUseCase := &UseCaseMock{
 			HandleAlertWithAuthFunc: func(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error) {
 				gt.Value(t, schema).Equal("") // That's caused by calling AlertSNSHandler directly
 				data, ok := alertData.(map[string]any)
@@ -59,7 +59,7 @@ func TestAlertSNSHandler(t *testing.T) {
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
-		mockUseCase := &useCaseMock{}
+		mockUseCase := &UseCaseMock{}
 
 		req := httptest.NewRequest(http.MethodPost, "/alert/sns/test", bytes.NewReader([]byte("invalid json")))
 		rec := httptest.NewRecorder()
@@ -71,7 +71,7 @@ func TestAlertSNSHandler(t *testing.T) {
 	})
 
 	t.Run("invalid alert data", func(t *testing.T) {
-		mockUseCase := &useCaseMock{}
+		mockUseCase := &UseCaseMock{}
 
 		invalidMessage := snsMessage
 		invalidMessage.Message = "invalid json"

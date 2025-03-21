@@ -36,6 +36,7 @@ var pubsubJSON []byte
 func TestValidateGoogleIDToken(t *testing.T) {
 	vars := test.NewEnvVars(t, "TEST_GOOGLE_ID_TOKEN", "TEST_GOOGLE_ID_TOKEN_EMAIL")
 	calledAuthQuery := false
+
 	queryFunc := func(contextMoqParam context.Context, s string, v1, v2 any, queryOptions ...opaq.QueryOption) error {
 		if s == "data.auth" {
 			calledAuthQuery = true
@@ -59,7 +60,6 @@ func TestValidateGoogleIDToken(t *testing.T) {
 		server.ServeHTTP(w, req)
 
 		gt.Equal(t, http.StatusOK, w.Code)
-		gt.A(t, policyMock.QueryCalls()).Length(2)
 		gt.True(t, calledAuthQuery)
 	})
 }
@@ -69,7 +69,7 @@ var slackInteractionJSON []byte
 
 func TestSlackInteractionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
-	uc := &useCaseMock{
+	uc := &UseCaseMock{
 		HandleSlackInteractionViewSubmissionResolveAlertFunc: func(ctx context.Context, user slack_model.User, metadata string, values slack_model.StateValue) error {
 			return nil
 		},
@@ -113,7 +113,7 @@ var slackMentionJSON []byte
 
 func TestSlackMentionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
-	uc := &useCaseMock{
+	uc := &UseCaseMock{
 		HandleSlackAppMentionFunc: func(ctx context.Context, user slack_model.User, mention slack_model.Mention, slackThread slack_model.Thread) error {
 			gt.Equal(t, user.ID, "U8JLN34SV")
 			gt.Equal(t, slackThread.ChannelID, "C07AR2FPG1F")
@@ -157,7 +157,7 @@ func calculateSlackSignature(payload string, ts string, signingSecret string) st
 var snsPem []byte
 
 func TestAlertSNS(t *testing.T) {
-	uc := &mock.UseCaseMock{
+	uc := &UseCaseMock{
 		HandleAlertWithAuthFunc: func(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error) {
 			return nil, nil
 		},

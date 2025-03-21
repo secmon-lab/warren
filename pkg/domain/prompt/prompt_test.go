@@ -67,10 +67,10 @@ alert contains {} # Detected as an alert`,
 func TestTestDataReadmePrompt(t *testing.T) {
 	ctx := context.Background()
 	alerts := []alert.Alert{
-		alert.NewAlert(ctx, "aws.guardduty", alert.Metadata{
+		alert.New(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
 		}),
-		alert.NewAlert(ctx, "aws.guardduty", alert.Metadata{
+		alert.New(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
 		}),
 	}
@@ -84,10 +84,10 @@ func TestTestDataReadmePrompt(t *testing.T) {
 func TestFilterQueryPrompt(t *testing.T) {
 	ctx := context.Background()
 	alerts := []alert.Alert{
-		alert.NewAlert(ctx, "aws.guardduty", alert.Metadata{
+		alert.New(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
 		}),
-		alert.NewAlert(ctx, "aws.guardduty", alert.Metadata{
+		alert.New(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
 		}),
 	}
@@ -101,7 +101,7 @@ func TestFilterQueryPrompt(t *testing.T) {
 func TestMetaListPrompt(t *testing.T) {
 	ctx := context.Background()
 	alerts := []alert.Alert{
-		alert.NewAlert(ctx, "aws.guardduty", alert.Metadata{
+		alert.New(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
 		}),
 	}

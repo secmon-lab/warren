@@ -19,14 +19,14 @@ func TestNotify_with_Slack(t *testing.T) {
 	if !ok {
 		t.Skip("TEST_SLACK_OAUTH_TOKEN is required")
 	}
-	testCh, ok := os.LookupEnv("TEST_SLACK_CHANNEL")
+	testCh, ok := os.LookupEnv("TEST_SLACK_CHANNEL_ID")
 	if !ok {
-		t.Skip("TEST_SLACK_CHANNEL is required")
+		t.Skip("TEST_SLACK_CHANNEL_ID is required")
 	}
 
 	client := slack.New(apiToken)
 
-	chID, ts, err := client.PostMessage(testCh, slack.MsgOptionText("notify test", false))
+	chID, ts, err := client.PostMessageContext(t.Context(), testCh, slack.MsgOptionText("notify test", false))
 	gt.NoError(t, err)
 
 	thread := model.Thread{

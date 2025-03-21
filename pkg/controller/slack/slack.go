@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/lang"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/thread"
@@ -42,11 +42,15 @@ func dispatch(ctx context.Context, handler func(ctx context.Context) error) {
 }
 
 type Controller struct {
-	uc interfaces.UseCase
+	event       usecase.SlackEvent
+	interaction usecase.SlackInteraction
 }
 
-func New(uc interfaces.UseCase) *Controller {
-	return &Controller{uc: uc}
+func New(event usecase.SlackEvent, interaction usecase.SlackInteraction) *Controller {
+	return &Controller{
+		event:       event,
+		interaction: interaction,
+	}
 }
 
 func (x *Controller) HandleSlackAppMention(ctx context.Context, event *slackevents.AppMentionEvent) error {
@@ -76,7 +80,7 @@ func (x *Controller) HandleSlackAppMention(ctx context.Context, event *slackeven
 
 	for _, mention := range mentions {
 		dispatch(ctx, func(ctx context.Context) error {
-			return x.uc.HandleSlackAppMention(ctx, user, mention, slackThread)
+			return x.event.HandleSlackAppMention(ctx, user, mention, slackThread)
 		})
 	}
 
@@ -103,7 +107,7 @@ func (x *Controller) HandleSlackMessage(ctx context.Context, event *slackevents.
 	}
 
 	dispatch(ctx, func(ctx context.Context) error {
-		return x.uc.HandleSlackMessage(ctx, slackThread, event.Text, user, event.EventTimeStamp)
+		return x.event.HandleSlackMessage(ctx, slackThread, event.Text, user, event.EventTimeStamp)
 	})
 
 	return nil
@@ -139,7 +143,7 @@ func (x *Controller) handleSlackInteractionBlockActions(ctx context.Context, int
 	}
 
 	for _, action := range interaction.ActionCallback.BlockActions {
-		return x.uc.HandleSlackInteractionBlockActions(ctx, user, th, slack_model.ActionID(action.ActionID), action.Value, interaction.TriggerID)
+		return x.interaction.HandleSlackInteractionBlockActions(ctx, user, th, slack_model.ActionID(action.ActionID), action.Value, interaction.TriggerID)
 	}
 
 	return nil
@@ -157,11 +161,11 @@ func (x *Controller) handleSlackInteractionViewSubmission(ctx context.Context, i
 
 	switch slack_model.CallbackID(interaction.View.CallbackID) {
 	case slack_model.CallbackSubmitResolveAlert:
-		return x.uc.HandleSlackInteractionViewSubmissionResolveAlert(ctx, user, metadata, sv)
+		return x.interaction.HandleSlackInteractionViewSubmissionResolveAlert(ctx, user, metadata, sv)
 	case slack_model.CallbackSubmitResolveList:
-		return x.uc.HandleSlackInteractionViewSubmissionResolveList(ctx, user, metadata, sv)
+		return x.interaction.HandleSlackInteractionViewSubmissionResolveList(ctx, user, metadata, sv)
 	case slack_model.CallbackSubmitIgnoreList:
-		return x.uc.HandleSlackInteractionViewSubmissionIgnoreList(ctx, metadata, sv)
+		return x.interaction.HandleSlackInteractionViewSubmissionIgnoreList(ctx, metadata, sv)
 	}
 
 	return nil
