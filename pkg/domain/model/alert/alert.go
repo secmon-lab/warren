@@ -39,6 +39,8 @@ type Alert struct {
 	Embedding []float32 `json:"-"`
 }
 
+type Alerts []*Alert
+
 type QueryOutput struct {
 	Alert []Metadata `json:"alert"`
 }

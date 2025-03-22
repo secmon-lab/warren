@@ -38,7 +38,7 @@ type slackClient interface {
 	PostMessageContext(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error)
 }
 
-func (x *SlackThread) Notify(ctx context.Context, msg string) {
+func (x *SlackThread) Reply(ctx context.Context, msg string) {
 	_, _, err := x.client.PostMessageContext(ctx,
 		x.thread.ChannelID,
 		slack_sdk.MsgOptionBlocks(

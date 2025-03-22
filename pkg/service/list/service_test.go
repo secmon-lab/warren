@@ -1,20 +1,6 @@
 package list_test
 
-import (
-	"context"
-	"testing"
-	"time"
-
-	"cloud.google.com/go/vertexai/genai"
-	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/mock"
-	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/service/list"
-	"github.com/secmon-lab/warren/pkg/service/source"
-)
-
+/*
 func TestService_Run(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -150,3 +136,4 @@ func TestService_Run(t *testing.T) {
 		})
 	}
 }
+*/

@@ -10,7 +10,6 @@ import (
 	"github.com/m-mizutani/gt"
 	bq "github.com/secmon-lab/warren/pkg/action/bigquery"
 	"github.com/secmon-lab/warren/pkg/domain/model/action"
-	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/urfave/cli/v3"
 )
 

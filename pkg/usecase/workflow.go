@@ -1,21 +1,6 @@
 package usecase
 
-import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"sync"
-	"time"
-
-	"cloud.google.com/go/vertexai/genai"
-	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/prompt"
-	"github.com/secmon-lab/warren/pkg/service"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
-)
-
+/*
 type throttleSession struct {
 	ssn  interfaces.LLMSession
 	last time.Time
@@ -180,3 +165,4 @@ func (uc *UseCases) buildFinding(ctx context.Context, ssn interfaces.LLMSession)
 
 	return &result, nil
 }
+*/

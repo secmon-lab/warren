@@ -1,29 +1,19 @@
 package usecase
 
 import (
-	"context"
 	"time"
 
-	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
-	"github.com/secmon-lab/warren/pkg/mock"
 	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/service"
-	"github.com/secmon-lab/warren/pkg/service/policy"
 )
 
 type UseCases struct {
 	// services and adapters
-	slackService    interfaces.SlackService
 	llmClient       interfaces.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
-	actionService   *service.ActionService
 	queryFunc       policy.QueryFunc
-	gitHubApp       *service.GitHubApp
 
 	// configs
 	timeSpan     time.Duration
@@ -31,7 +21,7 @@ type UseCases struct {
 	findingLimit int
 }
 
-var _ interfaces.UseCase = &UseCases{}
+// var _ interfaces.UseCase = &UseCases{}
 
 type Option func(*UseCases)
 
@@ -47,12 +37,6 @@ func WithEmbeddingClient(embeddingClient interfaces.EmbeddingClient) Option {
 	}
 }
 
-func WithSlackService(slackService interfaces.SlackService) Option {
-	return func(u *UseCases) {
-		u.slackService = slackService
-	}
-}
-
 func WithQueryFunc(queryFunc policy.QueryFunc) Option {
 	return func(u *UseCases) {
 		u.queryFunc = queryFunc
@@ -62,18 +46,6 @@ func WithQueryFunc(queryFunc policy.QueryFunc) Option {
 func WithRepository(repository interfaces.Repository) Option {
 	return func(u *UseCases) {
 		u.repository = repository
-	}
-}
-
-func WithActionService(actionService *service.ActionService) Option {
-	return func(u *UseCases) {
-		u.actionService = actionService
-	}
-}
-
-func WithGitHubApp(githubApp *service.GitHubApp) Option {
-	return func(u *UseCases) {
-		u.gitHubApp = githubApp
 	}
 }
 
@@ -97,27 +69,8 @@ func WithFindingLimit(findingLimit int) Option {
 }
 
 func New(opts ...Option) *UseCases {
-	policyClient, err := opaq.New(opaq.Data("policy", "package alert.dummy"))
-	if err != nil {
-		panic(err)
-	}
-
 	u := &UseCases{
-		slackService: &mock.SlackServiceMock{
-			PostAlertFunc: func(ctx context.Context, alert alert.Alert) (interfaces.SlackThreadService, error) {
-				return &mock.SlackThreadServiceMock{
-					ChannelIDFunc: func() string {
-						return "test"
-					},
-					ThreadIDFunc: func() string {
-						return "test"
-					},
-				}, nil
-			},
-		},
-		policyService: policy.New(repository.NewMemory(), policyClient, &model.TestDataSet{}),
-		repository:    repository.NewMemory(),
-		actionService: service.NewActionService([]interfaces.Action{}),
+		repository: repository.NewMemory(),
 
 		timeSpan:     24 * time.Hour,
 		actionLimit:  10,

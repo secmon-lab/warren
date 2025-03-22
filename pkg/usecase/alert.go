@@ -1,22 +1,6 @@
 package usecase
 
-import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"time"
-
-	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/auth"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
-	"github.com/secmon-lab/warren/pkg/prompt"
-	"github.com/secmon-lab/warren/pkg/service"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
-)
-
+/*
 func (uc *UseCases) HandleAlertWithAuth(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error) {
 	authCtx := auth.BuildContext(ctx)
 
@@ -91,45 +75,7 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert alert.Alert) (*alert.
 
 	// Check if the alert is similar to any existing alerts
 	// NOTE: Disable similarity merger for now
-	/*
-		var similarAlert *alert.Alert
-		for i := 0; i < 3 && similarAlert == nil; i++ {
-			similarAlert, err = uc.findSimilarAlert(ctx, alert)
-			if err != nil {
-				if goerr.HasTag(err, errs.TagInvalidLLMResponse) {
-					logger.Warn("invalid LLM response, retry to find similar alert", "error", err)
-					continue
-				}
-				return nil, goerr.Wrap(err, "failed to find similar alert")
-			}
-		}
 
-		if similarAlert != nil {
-			logger.Info("alert merged", "parent", similarAlert, "merged", alert)
-
-			alert.ParentID = similarAlert.ID
-			alert.SlackThread = similarAlert.SlackThread
-			alert.Assignee = similarAlert.Assignee
-
-			if err := uc.repository.PutAlert(ctx, alert); err != nil {
-				return nil, goerr.Wrap(err, "failed to put alert", goerr.V("alert", alert))
-			}
-
-			thread := uc.slackService.NewThread(*alert.SlackThread)
-
-			var buf bytes.Buffer
-			enc := json.NewEncoder(&buf)
-			enc.SetIndent("", "  ")
-			if err := enc.Encode(alert.Data); err != nil {
-				return nil, goerr.Wrap(err, "failed to encode alert data")
-			}
-
-			if err := thread.AttachFile(ctx, "New: "+alert.Title, "alert."+alert.ID.String()+".json", buf.Bytes()); err != nil {
-				return nil, goerr.Wrap(err, "failed to attach alert data")
-			}
-			return nil, nil
-		}
-	*/
 
 	// Post new alert to Slack and save the alert with Slack channel and message ID
 	thread, err := uc.slackService.PostAlert(ctx, alert)
@@ -237,3 +183,4 @@ func (uc *UseCases) findSimilarAlert(ctx context.Context, alert alert.Alert) (*a
 
 	return nil, nil
 }
+*/

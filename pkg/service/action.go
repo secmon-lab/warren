@@ -1,15 +1,6 @@
 package service
 
-import (
-	"context"
-
-	"github.com/m-mizutani/goerr/v2"
-
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
-)
-
+/*
 type ActionService struct {
 	actions map[string]interfaces.Action
 }
@@ -47,3 +38,4 @@ func (x *ActionService) Execute(ctx context.Context, slack interfaces.SlackThrea
 	logger.Info("executing action", "name", name, "args", args)
 	return action.Execute(ctx, slack, ssn, args)
 }
+*/

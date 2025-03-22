@@ -1,21 +1,6 @@
 package list
 
-import (
-	"context"
-	"encoding/json"
-	"slices"
-	"sort"
-	"strconv"
-	"strings"
-
-	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
-	"github.com/secmon-lab/warren/pkg/prompt"
-	"github.com/secmon-lab/warren/pkg/service"
-	"github.com/secmon-lab/warren/pkg/utils/thread"
-)
-
+/*
 type actionMapping map[string]func([]string) action
 
 func newActionMapping(x *Service) actionMapping {
@@ -253,3 +238,4 @@ func (x *Service) actionQuery(args []string) action {
 		return nil, goerr.New("failed to get alerts that you specified.", goerr.V("query", query))
 	}
 }
+*/

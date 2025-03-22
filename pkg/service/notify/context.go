@@ -8,12 +8,12 @@ func WithThread(ctx context.Context, thread *SlackThread) context.Context {
 	return context.WithValue(ctx, ctxKey{}, thread)
 }
 
-func Notify(ctx context.Context, msg string) {
+func Reply(ctx context.Context, msg string) {
 	thread, ok := ctx.Value(ctxKey{}).(*SlackThread)
 	if !ok {
 		return
 	}
-	thread.Notify(ctx, msg)
+	thread.Reply(ctx, msg)
 }
 
 func NewMessageContext(ctx context.Context, base string) *MessageContext {

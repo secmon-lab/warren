@@ -1,16 +1,6 @@
 package list
 
-import (
-	"context"
-
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/service"
-	"github.com/secmon-lab/warren/pkg/service/source"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
-)
-
+/*
 type Service struct {
 	repo interfaces.Repository
 	llm  interfaces.LLMClient
@@ -54,7 +44,7 @@ func (x *Service) Run(ctx context.Context, th interfaces.SlackThreadService, use
 		ChannelID: th.ChannelID(),
 		ThreadID:  th.ThreadID(),
 	}
-	alertList := model.NewAlertList(ctx, slackThread, user, newAlerts)
+	alertList := alert.NewAlertList(ctx, slackThread, user, newAlerts)
 
 	meta, err := service.GenerateAlertListMeta(ctx, alertList, x.llm)
 	if err != nil {
@@ -142,3 +132,4 @@ func (x *Service) newPipeline(ctx context.Context, args []string) (*pipeline, er
 
 	return &pipeline{actions: actions}, nil
 }
+*/

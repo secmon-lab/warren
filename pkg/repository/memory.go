@@ -8,6 +8,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -16,18 +17,20 @@ import (
 type Memory struct {
 	alerts      map[types.AlertID]alert.Alert
 	comments    map[types.AlertID][]alert.AlertComment
-	alertLists  map[types.AlertListID]alert.List
-	policyDiffs map[types.PolicyDiffID]policy.Diff
+	lists       map[types.AlertListID]alert.List
 	histories   map[string]*chat.History
+	policyDiffs map[types.PolicyDiffID]*policy.Diff
+	sessions    map[types.SessionID]session.Session
 }
 
 func NewMemory() *Memory {
 	return &Memory{
 		alerts:      make(map[types.AlertID]alert.Alert),
 		comments:    make(map[types.AlertID][]alert.AlertComment),
-		alertLists:  make(map[types.AlertListID]alert.List),
-		policyDiffs: make(map[types.PolicyDiffID]policy.Diff),
+		lists:       make(map[types.AlertListID]alert.List),
 		histories:   make(map[string]*chat.History),
+		policyDiffs: make(map[types.PolicyDiffID]*policy.Diff),
+		sessions:    make(map[types.SessionID]session.Session),
 	}
 }
 
@@ -75,7 +78,7 @@ func (r *Memory) PutHistory(ctx context.Context, history chat.History) error {
 }
 
 func (r *Memory) GetAlertList(ctx context.Context, listID types.AlertListID) (*alert.List, error) {
-	list, ok := r.alertLists[listID]
+	list, ok := r.lists[listID]
 	if !ok {
 		return nil, nil
 	}
@@ -83,12 +86,12 @@ func (r *Memory) GetAlertList(ctx context.Context, listID types.AlertListID) (*a
 }
 
 func (r *Memory) PutAlertList(ctx context.Context, list alert.List) error {
-	r.alertLists[list.ID] = list
+	r.lists[list.ID] = list
 	return nil
 }
 
 func (r *Memory) GetAlertListByThread(ctx context.Context, thread slack.Thread) (*alert.List, error) {
-	for _, list := range r.alertLists {
+	for _, list := range r.lists {
 		if list.SlackThread.ChannelID == thread.ChannelID && list.SlackThread.ThreadID == thread.ThreadID {
 			return &list, nil
 		}
@@ -100,7 +103,7 @@ func (r *Memory) GetLatestAlertListInThread(ctx context.Context, thread slack.Th
 	var latestList *alert.List
 	var latestTime time.Time
 
-	for _, list := range r.alertLists {
+	for _, list := range r.lists {
 		if list.SlackThread.ChannelID == thread.ChannelID && list.SlackThread.ThreadID == thread.ThreadID {
 			if latestList == nil || list.CreatedAt.After(latestTime) {
 				latestList = &list
@@ -111,41 +114,41 @@ func (r *Memory) GetLatestAlertListInThread(ctx context.Context, thread slack.Th
 	return latestList, nil
 }
 
-func (r *Memory) GetAlertsByStatus(ctx context.Context, status types.AlertStatus) ([]alert.Alert, error) {
-	var alerts []alert.Alert
+func (r *Memory) GetAlertsByStatus(ctx context.Context, status types.AlertStatus) (alert.Alerts, error) {
+	var alerts alert.Alerts
 	for _, alert := range r.alerts {
 		if alert.Status == status {
-			alerts = append(alerts, alert)
+			alerts = append(alerts, &alert)
 		}
 	}
 	return alerts, nil
 }
 
-func (r *Memory) GetAlertsWithoutStatus(ctx context.Context, status types.AlertStatus) ([]alert.Alert, error) {
-	var alerts []alert.Alert
+func (r *Memory) GetAlertsWithoutStatus(ctx context.Context, status types.AlertStatus) (alert.Alerts, error) {
+	var alerts alert.Alerts
 	for _, alert := range r.alerts {
 		if alert.Status != status {
-			alerts = append(alerts, alert)
+			alerts = append(alerts, &alert)
 		}
 	}
 	return alerts, nil
 }
 
-func (r *Memory) GetAlertsBySpan(ctx context.Context, begin, end time.Time) ([]alert.Alert, error) {
-	var alerts []alert.Alert
+func (r *Memory) GetAlertsBySpan(ctx context.Context, begin, end time.Time) (alert.Alerts, error) {
+	var alerts alert.Alerts
 	for _, alert := range r.alerts {
 		if alert.CreatedAt.After(begin) && alert.CreatedAt.Before(end) {
-			alerts = append(alerts, alert)
+			alerts = append(alerts, &alert)
 		}
 	}
 	return alerts, nil
 }
 
-func (r *Memory) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) ([]alert.Alert, error) {
-	var alerts []alert.Alert
+func (r *Memory) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
+	var alerts alert.Alerts
 	for _, alertID := range alertIDs {
 		if alert, ok := r.alerts[alertID]; ok {
-			alerts = append(alerts, alert)
+			alerts = append(alerts, &alert)
 		}
 	}
 	return alerts, nil
@@ -167,10 +170,32 @@ func (r *Memory) GetPolicyDiff(ctx context.Context, id types.PolicyDiffID) (*pol
 	if !ok {
 		return nil, nil
 	}
-	return &diff, nil
+	return diff, nil
 }
 
 func (r *Memory) PutPolicyDiff(ctx context.Context, diff *policy.Diff) error {
-	r.policyDiffs[types.PolicyDiffID(diff.ID)] = *diff
+	r.policyDiffs[types.PolicyDiffID(diff.ID)] = diff
+	return nil
+}
+
+func (r *Memory) GetSession(ctx context.Context, id types.SessionID) (*session.Session, error) {
+	s, ok := r.sessions[id]
+	if !ok {
+		return nil, nil
+	}
+	return &s, nil
+}
+
+func (r *Memory) GetSessionByThread(ctx context.Context, thread slack.Thread) (*session.Session, error) {
+	for _, s := range r.sessions {
+		if s.Thread.ChannelID == thread.ChannelID && s.Thread.ThreadID == thread.ThreadID {
+			return &s, nil
+		}
+	}
+	return nil, nil
+}
+
+func (r *Memory) PutSession(ctx context.Context, s session.Session) error {
+	r.sessions[s.ID] = s
 	return nil
 }

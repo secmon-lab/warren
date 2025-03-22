@@ -24,13 +24,13 @@ func TestContext(t *testing.T) {
 		ThreadID:  "T01234567890",
 	})
 	ctx = notify.WithThread(ctx, thread)
-	notify.Notify(ctx, "test")
+	notify.Reply(ctx, "test")
 	gt.Array(t, mockClient.PostMessageContextCalls()).Length(1)
 }
 
 func TestContext_NoSend(t *testing.T) {
 	ctx := context.Background()
-	notify.Notify(ctx, "test")
+	notify.Reply(ctx, "test")
 	// no panic
 }
 

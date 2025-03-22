@@ -13,11 +13,11 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
-type Source func(ctx context.Context, repo interfaces.Repository) ([]alert.Alert, error)
+type Source func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error)
 
 func Thread(slackThread slack.Thread) Source {
-	return func(ctx context.Context, repo interfaces.Repository) ([]alert.Alert, error) {
-		notify.Send(ctx, "🤖 Getting alerts from slack thread...")
+	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
+		notify.Reply(ctx, "🤖 Getting alerts from slack thread...")
 
 		alertList, err := repo.GetAlertListByThread(ctx, slackThread)
 		if err != nil {
@@ -34,9 +34,18 @@ func Thread(slackThread slack.Thread) Source {
 	}
 }
 
+func RootAlertList(slackThread slack.Thread) Source {
+	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
+		notify.Reply(ctx, "🤖 Getting root alerts from alert list")
+		logging.From(ctx).Info("Getting root alerts from alert list")
+
+		return nil, nil
+	}
+}
+
 func LatestAlertList(slackThread slack.Thread) Source {
-	return func(ctx context.Context, repo interfaces.Repository) ([]alert.Alert, error) {
-		notify.Send(ctx, "🤖 Getting latest alerts from slack thread")
+	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
+		notify.Reply(ctx, "🤖 Getting latest alerts from slack thread")
 		logging.From(ctx).Info("Getting latest alerts from slack thread", "slack_thread", slackThread)
 
 		alertList, err := repo.GetLatestAlertListInThread(ctx, slackThread)
@@ -55,8 +64,8 @@ func LatestAlertList(slackThread slack.Thread) Source {
 }
 
 func AlertListID(alertListID types.AlertListID) Source {
-	return func(ctx context.Context, repo interfaces.Repository) ([]alert.Alert, error) {
-		notify.Send(ctx, "🤖 Getting alerts from alert list: "+alertListID.String())
+	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
+		notify.Reply(ctx, "🤖 Getting alerts from alert list: "+alertListID.String())
 
 		alertList, err := repo.GetAlertList(ctx, alertListID)
 		if err != nil {
@@ -74,8 +83,8 @@ func AlertListID(alertListID types.AlertListID) Source {
 }
 
 func Span(begin, end time.Time) Source {
-	return func(ctx context.Context, repo interfaces.Repository) ([]alert.Alert, error) {
-		notify.Send(ctx, "🤖 Getting alerts from span: "+begin.Format("2006-01-02 15:04")+" to "+end.Format("2006-01-02 15:04"))
+	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
+		notify.Reply(ctx, "🤖 Getting alerts from span: "+begin.Format("2006-01-02 15:04")+" to "+end.Format("2006-01-02 15:04"))
 
 		alerts, err := repo.GetAlertsBySpan(ctx, begin, end)
 		if err != nil {
@@ -85,15 +94,15 @@ func Span(begin, end time.Time) Source {
 	}
 }
 
-func Static(alerts []alert.Alert) Source {
-	return func(ctx context.Context, repo interfaces.Repository) ([]alert.Alert, error) {
+func Static(alerts alert.Alerts) Source {
+	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
 		return alerts, nil
 	}
 }
 
 func Unresolved() Source {
-	return func(ctx context.Context, repo interfaces.Repository) ([]alert.Alert, error) {
-		notify.Send(ctx, "🤖 Getting unresolved alerts...")
+	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
+		notify.Reply(ctx, "🤖 Getting unresolved alerts...")
 
 		alerts, err := repo.GetAlertsWithoutStatus(ctx, types.AlertStatusResolved)
 		if err != nil {

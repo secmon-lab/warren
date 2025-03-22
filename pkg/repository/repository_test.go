@@ -11,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
@@ -184,19 +185,19 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		// GetAlertsByStatus
 		got, err := repo.GetAlertsByStatus(ctx, a.Status)
 		gt.NoError(t, err)
-		gt.Array(t, got).Any(func(x alert.Alert) bool { return x.ID == alertID })
+		gt.Array(t, got).Any(func(v *alert.Alert) bool { return v.ID == alertID })
 
 		// GetAlertsBySpan
 		begin := a.CreatedAt.Add(-1 * time.Minute)
 		end := a.CreatedAt.Add(1 * time.Minute)
 		got, err = repo.GetAlertsBySpan(ctx, begin, end)
 		gt.NoError(t, err)
-		gt.Array(t, got).Any(func(x alert.Alert) bool { return x.ID == alertID })
+		gt.Array(t, got).Any(func(v *alert.Alert) bool { return v.ID == alertID })
 
 		// BatchGetAlerts
 		got, err = repo.BatchGetAlerts(ctx, []types.AlertID{alertID})
 		gt.NoError(t, err)
-		gt.Array(t, got).Any(func(x alert.Alert) bool { return x.ID == alertID })
+		gt.Array(t, got).Any(func(v *alert.Alert) bool { return v.ID == alertID })
 
 		// BatchUpdateAlertStatus
 		gt.NoError(t, repo.BatchUpdateAlertStatus(ctx, []types.AlertID{alertID}, types.AlertStatusResolved, "Test reason"))
@@ -249,12 +250,12 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		// GetAlertsByStatus
 		alerts, err := repo.GetAlertsByStatus(ctx, types.AlertStatusNew)
 		gt.NoError(t, err)
-		gt.Array(t, alerts).Any(func(x alert.Alert) bool { return x.ID == a.ID })
+		gt.Array(t, alerts).Any(func(v *alert.Alert) bool { return v.ID == a.ID })
 
 		// GetAlertsWithoutStatus
 		alerts, err = repo.GetAlertsWithoutStatus(ctx, types.AlertStatusResolved)
 		gt.NoError(t, err)
-		gt.Array(t, alerts).Any(func(x alert.Alert) bool { return x.ID == a.ID })
+		gt.Array(t, alerts).Any(func(v *alert.Alert) bool { return v.ID == a.ID })
 
 		// BatchUpdateAlertStatus
 		gt.NoError(t, repo.BatchUpdateAlertStatus(ctx, []types.AlertID{a.ID}, types.AlertStatusAcknowledged, "test reason"))
@@ -262,5 +263,35 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		got, err = repo.GetAlert(ctx, a.ID)
 		gt.NoError(t, err)
 		gt.Value(t, got.Status).Equal(types.AlertStatusAcknowledged)
+	})
+
+	// Session関連のテスト
+	t.Run("Session", func(t *testing.T) {
+		sessionID := types.NewSessionID()
+		thread := slack.Thread{
+			ChannelID: "test-channel",
+			ThreadID:  fmt.Sprintf("%d.%d", time.Now().Unix(), time.Now().Nanosecond()),
+		}
+		s := session.Session{
+			ID:     sessionID,
+			Thread: thread,
+		}
+
+		// PutSession
+		gt.NoError(t, repo.PutSession(ctx, s))
+
+		// GetSession
+		got, err := repo.GetSession(ctx, sessionID)
+		gt.NoError(t, err)
+		gt.Value(t, got.ID).Equal(sessionID)
+		gt.Value(t, got.Thread.ChannelID).Equal(thread.ChannelID)
+		gt.Value(t, got.Thread.ThreadID).Equal(thread.ThreadID)
+
+		// GetSessionByThread
+		got, err = repo.GetSessionByThread(ctx, thread)
+		gt.NoError(t, err)
+		gt.Value(t, got.ID).Equal(sessionID)
+		gt.Value(t, got.Thread.ChannelID).Equal(thread.ChannelID)
+		gt.Value(t, got.Thread.ThreadID).Equal(thread.ThreadID)
 	})
 }

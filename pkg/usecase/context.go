@@ -1,13 +1,6 @@
 package usecase
 
-import (
-	"context"
-
-	"github.com/secmon-lab/warren/pkg/utils/lang"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
-	"github.com/secmon-lab/warren/pkg/utils/thread"
-)
-
+/*
 func newBackgroundContext(ctx context.Context) context.Context {
 	newCtx := context.Background()
 
@@ -29,3 +22,4 @@ func WithSync(ctx context.Context, sync bool) context.Context {
 func IsSync(ctx context.Context) bool {
 	return ctx.Value(syncKey).(bool)
 }
+*/

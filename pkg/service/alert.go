@@ -1,15 +1,6 @@
 package service
 
-import (
-	"context"
-	"math"
-
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/prompt"
-	"github.com/secmon-lab/warren/pkg/utils/thread"
-)
-
+/*
 func GenerateAlertListMeta(ctx context.Context, list alert.List, llmClient interfaces.LLMClient) (*prompt.MetaListPromptResult, error) {
 	p, err := prompt.BuildMetaListPrompt(ctx, list)
 	if err != nil {
@@ -42,34 +33,4 @@ func GenerateAlertListMeta(ctx context.Context, list alert.List, llmClient inter
 
 	return result, nil
 }
-
-func CalcMaxSimilarity(alerts []alert.Alert) float64 {
-	max := 0.0
-
-	for i, a := range alerts {
-		for j := i + 1; j < len(alerts); j++ {
-			if CosineSimilarity(a.Embedding, alerts[j].Embedding) > max {
-				max = CosineSimilarity(a.Embedding, alerts[j].Embedding)
-			}
-		}
-	}
-
-	return max
-}
-
-func CosineSimilarity(a, b []float32) float64 {
-	if len(a) != len(b) {
-		return 0
-	}
-
-	var dotProduct float64
-	var magnitudeA, magnitudeB float64
-
-	for i := range a {
-		dotProduct += float64(a[i]) * float64(b[i])
-		magnitudeA += float64(a[i]) * float64(a[i])
-		magnitudeB += float64(b[i]) * float64(b[i])
-	}
-
-	return dotProduct / (math.Sqrt(magnitudeA) * math.Sqrt(magnitudeB))
-}
+*/

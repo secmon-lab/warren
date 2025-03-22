@@ -49,7 +49,7 @@ func TestNotify(t *testing.T) {
 	}
 
 	for _, msg := range testMessages {
-		notifier.Notify(t.Context(), msg)
+		notifier.Reply(t.Context(), msg)
 	}
 }
 
@@ -99,7 +99,7 @@ func TestNotifyNewPostWithManyMessages(t *testing.T) {
 
 	loopCount := 10
 	for range loopCount {
-		notifier.Notify(t.Context(), "Take me back to the green love")
+		notifier.Reply(t.Context(), "Take me back to the green love")
 	}
 
 	gt.Array(t, mockClient.PostMessageContextCalls()).Length(10)

@@ -1,28 +1,6 @@
 package usecase
 
-import (
-	"context"
-	"errors"
-	"fmt"
-	"path/filepath"
-	"strings"
-
-	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/opaq"
-	"github.com/open-policy-agent/opa/v1/ast"
-	"github.com/open-policy-agent/opa/v1/format"
-	"github.com/secmon-lab/warren/pkg/domain/model"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
-	"github.com/secmon-lab/warren/pkg/prompt"
-	"github.com/secmon-lab/warren/pkg/service"
-	"github.com/secmon-lab/warren/pkg/service/policy"
-	"github.com/secmon-lab/warren/pkg/service/source"
-	"github.com/secmon-lab/warren/pkg/utils/clock"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
-	"github.com/secmon-lab/warren/pkg/utils/thread"
-)
-
+/*
 const (
 	maxRetryCountForIgnorePolicy = 8
 )
@@ -193,3 +171,4 @@ func formatRegoPolicy(fileName string, contents []byte) ([]byte, error) {
 
 	return formatted, nil
 }
+*/

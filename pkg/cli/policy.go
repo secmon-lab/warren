@@ -1,24 +1,6 @@
 package cli
 
-import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
-
-	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/cli/config"
-	"github.com/secmon-lab/warren/pkg/domain/model"
-	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/service/policy"
-	"github.com/secmon-lab/warren/pkg/service/source"
-	"github.com/secmon-lab/warren/pkg/usecase"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
-	"github.com/secmon-lab/warren/pkg/utils/thread"
-	"github.com/urfave/cli/v3"
-)
-
+/*
 func cmdPolicy() *cli.Command {
 	return &cli.Command{
 		Name:    "policy",
@@ -113,9 +95,6 @@ func cmdPolicyIgnore() *cli.Command {
 				usecase.WithPolicyService(policyService),
 			)
 
-			alert := model.NewAlert(ctx, schema, model.PolicyAlert{
-				Data: alertData,
-			})
 			ctx = thread.WithReplyFunc(ctx, func(ctx context.Context, msg string) {
 				fmt.Println(msg)
 			})
@@ -126,24 +105,8 @@ func cmdPolicyIgnore() *cli.Command {
 
 			logger.Info("New policy diff", "newPolicyDiff", newPolicyDiff)
 
-			// TODO: Revise output of policy diff
-			/*
-				if outputDir == "" {
-					tmpDir, err := os.MkdirTemp("", "warren-policy")
-					if err != nil {
-						return goerr.Wrap(err, "failed to create temporary directory")
-					}
-					outputDir = tmpDir
-				}
-
-				svc := policy.New(repository.NewMemory(), policyClient, newPolicyDiff.NewTestDataSet)
-
-				if err := svc.Save(ctx, outputDir); err != nil {
-					return goerr.Wrap(err, "failed to save policy")
-				}
-			*/
-
 			return nil
 		},
 	}
 }
+*/

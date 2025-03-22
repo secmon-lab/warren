@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/urfave/cli/v3"
 )
 
@@ -52,8 +52,8 @@ func (x TestData) LogValue() slog.Value {
 	)
 }
 
-func loadTestFiles(basePath string) (*model.TestData, error) {
-	result := model.NewTestData()
+func loadTestFiles(basePath string) (*poilcy.TestData, error) {
+	result := policy.NewTestData()
 
 	if basePath == "" {
 		return result, nil

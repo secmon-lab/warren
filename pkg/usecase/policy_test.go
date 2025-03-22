@@ -1,22 +1,6 @@
 package usecase_test
 
-import (
-	"context"
-	"embed"
-	"encoding/json"
-	"testing"
-
-	"github.com/m-mizutani/gt"
-	"github.com/m-mizutani/opaq"
-	"github.com/secmon-lab/warren/pkg/domain/model"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/service/policy"
-	"github.com/secmon-lab/warren/pkg/service/source"
-	"github.com/secmon-lab/warren/pkg/usecase"
-	"github.com/secmon-lab/warren/pkg/utils/thread"
-)
-
+/*
 //go:embed testdata/ignore
 var ignoreTestData embed.FS
 
@@ -123,3 +107,4 @@ allow if {
 		})
 	}
 }
+*/
