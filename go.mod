@@ -20,6 +20,7 @@ require (
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.1.10
 	github.com/m-mizutani/opaq v0.2.1-0.20250222003843-b0e8fa8233e6
+	github.com/open-policy-agent/opa v1.1.0
 	github.com/slack-go/slack v0.15.0
 	github.com/urfave/cli/v3 v3.0.0-beta1
 	golang.org/x/oauth2 v0.26.0
@@ -91,7 +92,6 @@ require (
 	github.com/mattn/go-zglob v0.0.6 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/open-policy-agent/opa v1.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/pjbgf/sha1cd v0.3.2 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect

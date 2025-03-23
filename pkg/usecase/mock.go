@@ -7,6 +7,7 @@ import (
 	"context"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"sync"
 )
 
@@ -436,7 +437,7 @@ func (mock *SlackInteractionMock) HandleSlackInteractionViewSubmissionResolveLis
 //
 //		// make and configure a mocked Alert
 //		mockedAlert := &AlertMock{
-//			HandleAlertWithAuthFunc: func(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error) {
+//			HandleAlertWithAuthFunc: func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 //				panic("mock out the HandleAlertWithAuth method")
 //			},
 //		}
@@ -447,7 +448,7 @@ func (mock *SlackInteractionMock) HandleSlackInteractionViewSubmissionResolveLis
 //	}
 type AlertMock struct {
 	// HandleAlertWithAuthFunc mocks the HandleAlertWithAuth method.
-	HandleAlertWithAuthFunc func(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error)
+	HandleAlertWithAuthFunc func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -456,7 +457,7 @@ type AlertMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Schema is the schema argument value.
-			Schema string
+			Schema types.AlertSchema
 			// AlertData is the alertData argument value.
 			AlertData any
 		}
@@ -465,13 +466,13 @@ type AlertMock struct {
 }
 
 // HandleAlertWithAuth calls HandleAlertWithAuthFunc.
-func (mock *AlertMock) HandleAlertWithAuth(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error) {
+func (mock *AlertMock) HandleAlertWithAuth(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 	if mock.HandleAlertWithAuthFunc == nil {
 		panic("AlertMock.HandleAlertWithAuthFunc: method is nil but Alert.HandleAlertWithAuth was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
-		Schema    string
+		Schema    types.AlertSchema
 		AlertData any
 	}{
 		Ctx:       ctx,
@@ -490,12 +491,12 @@ func (mock *AlertMock) HandleAlertWithAuth(ctx context.Context, schema string, a
 //	len(mockedAlert.HandleAlertWithAuthCalls())
 func (mock *AlertMock) HandleAlertWithAuthCalls() []struct {
 	Ctx       context.Context
-	Schema    string
+	Schema    types.AlertSchema
 	AlertData any
 } {
 	var calls []struct {
 		Ctx       context.Context
-		Schema    string
+		Schema    types.AlertSchema
 		AlertData any
 	}
 	mock.lockHandleAlertWithAuth.RLock()

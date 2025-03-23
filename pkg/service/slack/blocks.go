@@ -138,7 +138,7 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 	if alert.Finding == nil {
 		buttons = append(buttons,
 			slack.NewButtonBlockElement(
-				model.SlackActionIDInspect.String(),
+				model.ActionIDInspect.String(),
 				alert.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Inspect", false, false),
 			).WithStyle(slack.StyleDefault),
@@ -148,7 +148,7 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 	if alert.Status == types.AlertStatusNew {
 		buttons = append(buttons,
 			slack.NewButtonBlockElement(
-				model.SlackActionIDAck.String(),
+				model.ActionIDAck.String(),
 				alert.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Acknowledge", false, false),
 			).WithStyle(slack.StylePrimary),
@@ -158,7 +158,7 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 	if alert.Status != types.AlertStatusResolved {
 		buttons = append(buttons,
 			slack.NewButtonBlockElement(
-				model.SlackActionIDResolve.String(),
+				model.ActionIDResolve.String(),
 				alert.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Resolve", false, false),
 			).WithStyle(slack.StyleDanger),
@@ -192,7 +192,7 @@ func buildIgnoreModalViewRequest(listID string) slack.ModalViewRequest {
 					slack.NewTextBlockObject(slack.PlainTextType, "Add any reason, context, or information.", false, false),
 					slack.NewPlainTextInputBlockElement(
 						slack.NewTextBlockObject(slack.PlainTextType, "prompt", false, false),
-						model.SlackActionIDIgnorePrompt.String(),
+						model.CallbackSubmitIgnoreList.String(),
 					),
 				).WithOptional(true),
 			},
@@ -269,7 +269,7 @@ func buildResolveModalViewRequest(callbackID model.CallbackID, metadata string) 
 					slack.NewOptionsSelectBlockElement(
 						slack.OptTypeStatic,
 						slack.NewTextBlockObject(slack.PlainTextType, "Select a conclusion", false, false),
-						model.SlackActionIDConclusion.String(),
+						model.ActionIDConclusion.String(),
 						conclusionOptionBlocks...,
 					),
 				),
@@ -279,7 +279,7 @@ func buildResolveModalViewRequest(callbackID model.CallbackID, metadata string) 
 					slack.NewTextBlockObject(slack.PlainTextType, "Add any reason, context, or information.", false, false),
 					slack.NewPlainTextInputBlockElement(
 						slack.NewTextBlockObject(slack.PlainTextType, "comment", false, false),
-						model.SlackActionIDComment.String(),
+						model.ActionIDComment.String(),
 					),
 				).WithOptional(true),
 			},
@@ -323,12 +323,12 @@ func buildAlertListBlocks(list *alert.List, metadata slackMetadata) []slack.Bloc
 	blocks = append(blocks, slack.NewActionBlock(
 		list.ID.String(),
 		slack.NewButtonBlockElement(
-			model.SlackActionIDIgnoreList.String(),
+			model.ActionIDIgnoreList.String(),
 			list.ID.String(),
 			slack.NewTextBlockObject("plain_text", "Ignore", false, false),
 		).WithStyle(slack.StyleDefault),
 		slack.NewButtonBlockElement(
-			model.SlackActionIDResolveList.String(),
+			model.ActionIDResolveList.String(),
 			list.ID.String(),
 			slack.NewTextBlockObject("plain_text", "Resolve", false, false),
 		).WithStyle(slack.StyleDanger),

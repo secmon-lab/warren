@@ -7,10 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opaq"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/adapter/gemini"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/domain/model/source"
@@ -21,34 +20,6 @@ import (
 )
 
 var ignoreTestData = "testdata/ignore"
-
-type geminiClient struct {
-	model *genai.GenerativeModel
-}
-
-func (c *geminiClient) StartChat() interfaces.LLMSession {
-	return c.model.StartChat()
-}
-
-func (c *geminiClient) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
-	return c.model.GenerateContent(ctx, msg...)
-}
-
-func genGeminiClient(t *testing.T) *geminiClient {
-	project, ok := os.LookupEnv("TEST_GEMINI_PROJECT")
-	if !ok {
-		t.Skip("TEST_GEMINI_PROJECT is not set")
-	}
-	location, ok := os.LookupEnv("TEST_GEMINI_LOCATION")
-	if !ok {
-		t.Skip("TEST_GEMINI_LOCATION is not set")
-	}
-	client, err := genai.NewClient(t.Context(), project, location)
-	gt.NoError(t, err)
-	geminiModel := client.GenerativeModel("gemini-2.0-flash-exp")
-	geminiModel.GenerationConfig.ResponseMIMEType = "application/json"
-	return &geminiClient{model: geminiModel}
-}
 
 func loadJson(t *testing.T, baseDir, path string) map[string]any {
 	t.Helper()
@@ -65,7 +36,8 @@ func loadJson(t *testing.T, baseDir, path string) map[string]any {
 func TestGenerateIgnorePolicy(t *testing.T) {
 	ctx := t.Context()
 
-	geminiClient := genGeminiClient(t)
+	geminiClient := gemini.NewTestClient(t, gemini.WithResponseMIMEType("text/plain"))
+
 	policyClient, err := opaq.New(opaq.Files("./testdata/ignore/policy"))
 	gt.NoError(t, err)
 
@@ -103,7 +75,7 @@ func TestGenerateIgnorePolicy(t *testing.T) {
 	input := svc.GenerateIgnorePolicyInput{
 		Repo:         repo,
 		Source:       source.Static(alerts),
-		LLMFunc:      ssn.SendMessage,
+		LLM:          ssn,
 		PolicyClient: policyClient,
 		TestDataSet:  testDataSet,
 	}

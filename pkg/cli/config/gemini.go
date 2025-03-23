@@ -4,9 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/adapter/gemini"
 	"github.com/urfave/cli/v3"
 )
 
@@ -52,25 +51,15 @@ func (x GeminiCfg) LogValue() slog.Value {
 	)
 }
 
-type GeminiClient struct {
-	model *genai.GenerativeModel
-}
-
-func (x *GeminiClient) StartChat() interfaces.LLMSession {
-	return x.model.StartChat()
-}
-
-func (x *GeminiClient) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
-	return x.model.GenerateContent(ctx, msg...)
-}
-
-func (x *GeminiCfg) Configure(ctx context.Context) (*GeminiClient, error) {
-	client, err := genai.NewClient(ctx, x.projectID, x.location)
+func (x *GeminiCfg) Configure(ctx context.Context) (*gemini.GeminiClient, error) {
+	client, err := gemini.New(ctx, x.projectID,
+		gemini.WithLocation(x.location),
+		gemini.WithModel(x.model),
+		gemini.WithResponseMIMEType("application/json"),
+	)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create vertex ai client")
 	}
 
-	model := client.GenerativeModel(x.model)
-	model.GenerationConfig.ResponseMIMEType = "application/json"
-	return &GeminiClient{model: model}, nil
+	return client, nil
 }

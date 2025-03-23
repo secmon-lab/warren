@@ -29,8 +29,8 @@ type GenerateIgnorePolicyInput struct {
 	// Required, Repo is the repository to get alerts from.
 	Repo interfaces.Repository
 
-	// Required, LLMFunc is the LLM function to use.
-	LLMFunc llm.SendPrompt
+	// Required, LLM is the LLM client to use.
+	LLM interfaces.LLMInquiry
 
 	// Required, PolicyClient is the policy client to use.
 	PolicyClient interfaces.PolicyClient
@@ -49,8 +49,8 @@ func (x GenerateIgnorePolicyInput) Validate() error {
 	if x.Repo == nil {
 		return goerr.New("Repo is required")
 	}
-	if x.LLMFunc == nil {
-		return goerr.New("LLMFunc is required")
+	if x.LLM == nil {
+		return goerr.New("LLM is required")
 	}
 	if x.PolicyClient == nil {
 		return goerr.New("PolicyClient is required")
@@ -97,7 +97,7 @@ func GenerateIgnorePolicy(ctx context.Context, input GenerateIgnorePolicyInput) 
 	// Generate ignore policy
 	var validResult *prompt.IgnorePolicyPromptResult
 	for i := 0; i < maxRetryCountForIgnorePolicy && validResult == nil; i++ {
-		resp, err := llm.Ask[prompt.IgnorePolicyPromptResult](ctx, input.LLMFunc, p)
+		resp, err := llm.Ask[prompt.IgnorePolicyPromptResult](ctx, input.LLM, p)
 		if err != nil {
 			if goerr.HasTag(err, errs.TagInvalidLLMResponse) {
 				ctx = msg.State(ctx, "💥 Failed to generate ignore policy: \n> %v\n\nRetry...", err)
@@ -170,7 +170,7 @@ func GenerateIgnorePolicy(ctx context.Context, input GenerateIgnorePolicyInput) 
 			return nil, err
 		}
 
-		resp, err := llm.Ask[prompt.TestDataReadmePromptResult](ctx, input.LLMFunc, p)
+		resp, err := llm.Ask[prompt.TestDataReadmePromptResult](ctx, input.LLM, p)
 		if err != nil {
 			ctx = msg.State(ctx, "💥 Failed to generate README for test data: \n> %v\n\nSkip README generation.", err)
 		} else {

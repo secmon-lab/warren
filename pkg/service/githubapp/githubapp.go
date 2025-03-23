@@ -13,7 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
-type GitHubApp struct {
+type Service struct {
 	client Client
 	config Config
 }
@@ -27,14 +27,14 @@ type Config struct {
 	IgnoreTestDir string
 }
 
-func New(client Client, config Config) *GitHubApp {
-	return &GitHubApp{
+func New(client Client, config Config) *Service {
+	return &Service{
 		client: client,
 		config: config,
 	}
 }
 
-func (x *GitHubApp) CreatePolicyDiffPullRequest(ctx context.Context, diff *policy.Diff) (*url.URL, error) {
+func (x *Service) CreatePolicyDiffPullRequest(ctx context.Context, diff *policy.Diff) (*url.URL, error) {
 	logger := logging.From(ctx)
 
 	eb := goerr.NewBuilder(goerr.V("config", x.config))

@@ -10,19 +10,17 @@ import (
 )
 
 type Session struct {
-	ID         types.SessionID   `json:"id"`
-	CreatedAt  time.Time         `json:"created_at"`
-	CreatedBy  slack.User        `json:"created_by"`
-	Thread     slack.Thread      `json:"thread"`
-	RootListID types.AlertListID `json:"root_list_id"`
+	ID        types.SessionID `json:"id"`
+	CreatedAt time.Time       `json:"created_at"`
+	CreatedBy slack.User      `json:"created_by"`
+	Thread    slack.Thread    `json:"thread"`
 }
 
-func New(ctx context.Context, createdBy slack.User, thread slack.Thread, rootListID types.AlertListID) *Session {
+func New(ctx context.Context, createdBy slack.User, thread slack.Thread) *Session {
 	return &Session{
-		ID:         types.NewSessionID(),
-		CreatedAt:  clock.Now(ctx),
-		CreatedBy:  createdBy,
-		Thread:     thread,
-		RootListID: rootListID,
+		ID:        types.NewSessionID(),
+		CreatedAt: clock.Now(ctx),
+		CreatedBy: createdBy,
+		Thread:    thread,
 	}
 }

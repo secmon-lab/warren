@@ -6,9 +6,6 @@ import (
 	"log/slog"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/action/bigquery"
-	"github.com/secmon-lab/warren/pkg/action/otx"
-	"github.com/secmon-lab/warren/pkg/action/urlscan"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/urfave/cli/v3"
@@ -17,9 +14,9 @@ import (
 type actionList []interfaces.Action
 
 var actions = actionList{
-	&urlscan.Action{},
-	&otx.Action{},
-	&bigquery.Action{},
+	// &urlscan.Action{},
+	// &otx.Action{},
+	// &bigquery.Action{},
 }
 
 func (x actionList) Flags() []cli.Flag {

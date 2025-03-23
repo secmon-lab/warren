@@ -2,8 +2,6 @@ package slack
 
 import "github.com/slack-go/slack"
 
-type ActionID string
-
 type BlockAction slack.BlockAction
 
 type StateValue map[string]map[string]BlockAction
@@ -43,24 +41,24 @@ const (
 	SlackBlockIDIgnorePrompt SlackBlockID = "ignore_prompt"
 )
 
-type SlackActionID string
+type ActionID string
 
-func (id SlackActionID) String() string {
+func (id ActionID) String() string {
 	return string(id)
 }
 
 const (
-	SlackActionIDAck         SlackActionID = "ack"
-	SlackActionIDResolve     SlackActionID = "resolve"
-	SlackActionIDInspect     SlackActionID = "inspect"
-	SlackActionIDCreatePR    SlackActionID = "create_pr"
-	SlackActionIDIgnore      SlackActionID = "ignore"
-	SlackActionIDIgnoreList  SlackActionID = "ignore_list"
-	SlackActionIDResolveList SlackActionID = "resolve_list"
+	ActionIDAck         ActionID = "ack"
+	ActionIDResolve     ActionID = "resolve"
+	ActionIDInspect     ActionID = "inspect"
+	ActionIDCreatePR    ActionID = "create_pr"
+	ActionIDIgnore      ActionID = "ignore"
+	ActionIDIgnoreList  ActionID = "ignore_list"
+	ActionIDResolveList ActionID = "resolve_list"
 
-	SlackActionIDConclusion   SlackActionID = "conclusion"
-	SlackActionIDComment      SlackActionID = "comment"
-	SlackActionIDIgnorePrompt SlackActionID = "ignore_prompt"
+	ActionIDConclusion   ActionID = "conclusion"
+	ActionIDComment      ActionID = "comment"
+	ActionIDIgnorePrompt ActionID = "ignore_prompt"
 )
 
 type Mention struct {

@@ -22,9 +22,11 @@ import (
 	"github.com/m-mizutani/opaq"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	slack_ctrl "github.com/secmon-lab/warren/pkg/controller/slack"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/test"
@@ -37,19 +39,17 @@ func TestValidateGoogleIDToken(t *testing.T) {
 	vars := test.NewEnvVars(t, "TEST_GOOGLE_ID_TOKEN", "TEST_GOOGLE_ID_TOKEN_EMAIL")
 	calledAuthQuery := false
 
-	queryFunc := func(contextMoqParam context.Context, s string, v1, v2 any, queryOptions ...opaq.QueryOption) error {
-		if s == "data.auth" {
+	policyClient := &interfaces.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, s string, v1, v2 any, queryOptions ...opaq.QueryOption) error {
 			calledAuthQuery = true
 			m1 := v1.(*auth.Context)
 			gt.Equal(t, m1.Google["email"].(string), vars.Get("TEST_GOOGLE_ID_TOKEN_EMAIL"))
 			gt.NoError(t, json.Unmarshal([]byte(`{"allow":true}`), &v2))
-		} else {
-			gt.NoError(t, json.Unmarshal([]byte(`{}`), &v2))
-		}
-		return nil
+			return nil
+		},
 	}
 
-	uc := usecase.New(usecase.WithQueryFunc(queryFunc))
+	uc := usecase.New(usecase.WithPolicyClient(policyClient))
 
 	server := server.New(uc)
 
@@ -158,7 +158,7 @@ var snsPem []byte
 
 func TestAlertSNS(t *testing.T) {
 	uc := &UseCaseMock{
-		HandleAlertWithAuthFunc: func(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error) {
+		HandleAlertWithAuthFunc: func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 			return nil, nil
 		},
 	}

@@ -219,7 +219,7 @@ func (x *Service) actionQuery(args []string) action {
 			if err != nil {
 				if goerr.HasTag(err, errs.TagInvalidLLMResponse) {
 					p = "Invalid response. Please try again: " + err.Error()
-					thread.Reply(ctx, "🔄 Invalid response. Retry...\n> "+err.Error())
+					msg.State(ctx, "🔄 Invalid response. Retry...\n> "+err.Error())
 					continue
 				}
 				return nil, err
@@ -229,7 +229,7 @@ func (x *Service) actionQuery(args []string) action {
 			alerts, err := x.repo.BatchGetAlerts(ctx, alertIDs)
 			if err != nil {
 				p = "Failed to get alerts that you specified. Please try again: " + err.Error()
-				thread.Reply(ctx, "🔄 Failed to get alerts. Retry...\n> "+err.Error())
+				msg.State(ctx, "🔄 Failed to get alerts. Retry...\n> "+err.Error())
 				continue
 			}
 			return alerts, nil

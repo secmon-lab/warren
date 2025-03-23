@@ -48,9 +48,7 @@ func Run(ctx context.Context, args []string) error {
 		},
 		Commands: []*cli.Command{
 			cmdServe(),
-			cmdRun(),
 			cmdTest(),
-			cmdPolicy(),
 		},
 	}
 

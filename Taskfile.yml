@@ -10,8 +10,8 @@ tasks:
     deps:
       - mock_controller_http
       - mock_model_message
-      - mock_service_notify
       - mock_service_githubapp
+      - mock_interfaces
       - mock_usecase
 
   mock_controller_http:
@@ -33,15 +33,6 @@ tasks:
         -skip-ensure
         pkg/domain/model/message HTTPClient
 
-  mock_service_notify:
-    desc: "Generate mock files for service/notify"
-    cmds:
-      - go tool moq
-        -out pkg/service/notify/mock_test.go
-        -pkg notify_test
-        -rm -skip-ensure
-        pkg/service/notify slackClient
-
   mock_service_githubapp:
     desc: "Generate mock files for service/githubapp"
     cmds:
@@ -50,6 +41,21 @@ tasks:
         -pkg githubapp
         -rm -skip-ensure
         pkg/service/githubapp Client
+
+  mock_interfaces:
+    desc: "Generate mock files for interfaces"
+    cmds:
+      - go tool moq
+        -out pkg/domain/interfaces/mock.go
+        -pkg interfaces
+        -rm -skip-ensure
+        pkg/domain/interfaces
+        SlackClient
+        SlackThreadService
+        LLMSession
+        Repository
+        PolicyClient
+        EmbeddingClient
 
   mock_usecase:
     desc: "Generate mock files for usecase"

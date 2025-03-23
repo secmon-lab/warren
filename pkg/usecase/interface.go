@@ -5,6 +5,7 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 type SlackEvent interface {
@@ -23,5 +24,5 @@ type SlackInteraction interface {
 
 type Alert interface {
 	// Alert related handlers
-	HandleAlertWithAuth(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error)
+	HandleAlertWithAuth(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error)
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
@@ -41,7 +42,7 @@ func alertPubSubHandler(uc useCase) http.HandlerFunc {
 			return
 		}
 
-		if _, err := uc.HandleAlertWithAuth(r.Context(), schema, alertData); err != nil {
+		if _, err := uc.HandleAlertWithAuth(r.Context(), types.AlertSchema(schema), alertData); err != nil {
 			handleError(w, r, err)
 			return
 		}
@@ -70,7 +71,7 @@ func alertRawHandler(uc useCase) http.HandlerFunc {
 			return
 		}
 
-		if _, err := uc.HandleAlertWithAuth(r.Context(), schema, alertData); err != nil {
+		if _, err := uc.HandleAlertWithAuth(r.Context(), types.AlertSchema(schema), alertData); err != nil {
 			handleError(w, r, err)
 			return
 		}
@@ -112,7 +113,7 @@ func alertSNSHandler(uc useCase) http.HandlerFunc {
 		schema := chi.URLParam(r, "schema")
 
 		// Handle alert
-		alerts, err := uc.HandleAlertWithAuth(ctx, schema, alertData)
+		alerts, err := uc.HandleAlertWithAuth(ctx, types.AlertSchema(schema), alertData)
 		if err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to handle alert"))
 			return

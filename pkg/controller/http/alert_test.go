@@ -15,6 +15,7 @@ import (
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 //go:embed testdata/sns.har
@@ -34,7 +35,7 @@ func TestAlertSNSHandler(t *testing.T) {
 
 	t.Run("successful alert handling", func(t *testing.T) {
 		mockUseCase := &UseCaseMock{
-			HandleAlertWithAuthFunc: func(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error) {
+			HandleAlertWithAuthFunc: func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 				gt.Value(t, schema).Equal("") // That's caused by calling AlertSNSHandler directly
 				data, ok := alertData.(map[string]any)
 				gt.True(t, ok)

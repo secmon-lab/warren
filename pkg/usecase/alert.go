@@ -12,7 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/service"
+	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
@@ -119,7 +119,7 @@ func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert alert.Alert
 
 	var result *prompt.MetaPromptResult
 	for i := 0; i < 3 && result == nil; i++ {
-		result, err = service.AskChat[prompt.MetaPromptResult](ctx, ssn, p)
+		result, err = llm.Ask[prompt.MetaPromptResult](ctx, ssn, p)
 		if err != nil {
 			if goerr.HasTag(err, errs.TagInvalidLLMResponse) {
 				logger.Warn("invalid LLM response, retry to generate alert metadata", "error", err)

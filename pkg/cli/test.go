@@ -7,6 +7,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
@@ -46,9 +47,9 @@ func cmdTest() *cli.Command {
 			logger.Info("Test data", "detect", testDataSet.Detect, "ignore", testDataSet.Ignore)
 
 			var runtimeErrors []error
-			errs := policy.Test(ctx, policyClient, testDataSet)
+			errors := testDataSet.Test(ctx, policyClient.Query)
 			failed := false
-			for _, err := range errs {
+			for _, err := range errors {
 				if goerr.HasTag(err, errs.TagTestFailed) {
 					values := goerr.Values(err)
 					fmt.Printf("\n❌ Test Failed!\n")

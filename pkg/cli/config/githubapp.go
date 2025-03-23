@@ -97,7 +97,7 @@ func (c GitHubAppCfg) LogValue() slog.Value {
 	)
 }
 
-func (c GitHubAppCfg) Configure(ctx context.Context) (*gha_svc.GitHubApp, error) {
+func (c GitHubAppCfg) Configure(ctx context.Context) (*gha_svc.Service, error) {
 	if c.appID == 0 {
 		return nil, nil
 	}

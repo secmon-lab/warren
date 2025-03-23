@@ -7,6 +7,7 @@ import (
 	"context"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"sync"
 )
 
@@ -16,7 +17,7 @@ import (
 //
 //		// make and configure a mocked http.UseCase
 //		mockedUseCase := &UseCaseMock{
-//			HandleAlertWithAuthFunc: func(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error) {
+//			HandleAlertWithAuthFunc: func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 //				panic("mock out the HandleAlertWithAuth method")
 //			},
 //			HandleSlackAppMentionFunc: func(ctx context.Context, user slack_model.User, mention slack_model.Mention, slackThread slack_model.Thread) error {
@@ -45,7 +46,7 @@ import (
 //	}
 type UseCaseMock struct {
 	// HandleAlertWithAuthFunc mocks the HandleAlertWithAuth method.
-	HandleAlertWithAuthFunc func(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error)
+	HandleAlertWithAuthFunc func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error)
 
 	// HandleSlackAppMentionFunc mocks the HandleSlackAppMention method.
 	HandleSlackAppMentionFunc func(ctx context.Context, user slack_model.User, mention slack_model.Mention, slackThread slack_model.Thread) error
@@ -72,7 +73,7 @@ type UseCaseMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Schema is the schema argument value.
-			Schema string
+			Schema types.AlertSchema
 			// AlertData is the alertData argument value.
 			AlertData any
 		}
@@ -157,13 +158,13 @@ type UseCaseMock struct {
 }
 
 // HandleAlertWithAuth calls HandleAlertWithAuthFunc.
-func (mock *UseCaseMock) HandleAlertWithAuth(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error) {
+func (mock *UseCaseMock) HandleAlertWithAuth(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 	if mock.HandleAlertWithAuthFunc == nil {
 		panic("UseCaseMock.HandleAlertWithAuthFunc: method is nil but UseCase.HandleAlertWithAuth was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
-		Schema    string
+		Schema    types.AlertSchema
 		AlertData any
 	}{
 		Ctx:       ctx,
@@ -182,12 +183,12 @@ func (mock *UseCaseMock) HandleAlertWithAuth(ctx context.Context, schema string,
 //	len(mockedUseCase.HandleAlertWithAuthCalls())
 func (mock *UseCaseMock) HandleAlertWithAuthCalls() []struct {
 	Ctx       context.Context
-	Schema    string
+	Schema    types.AlertSchema
 	AlertData any
 } {
 	var calls []struct {
 		Ctx       context.Context
-		Schema    string
+		Schema    types.AlertSchema
 		AlertData any
 	}
 	mock.lockHandleAlertWithAuth.RLock()

@@ -11,7 +11,6 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
-	"github.com/secmon-lab/warren/pkg/service"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -95,34 +94,34 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			githubApp, err := githubAppCfg.Configure(ctx)
-			if err != nil {
-				return err
-			}
-
 			testDataSet, err := testDataCfg.Configure()
 			if err != nil {
 				return err
 			}
 
-			enabledActions, err := actions.Configure(ctx)
+			/*
+				enabledActions, err := actions.Configure(ctx)
+				if err != nil {
+					return err
+				}
+				logging.Default().Info("enabled actions", "actions", actions)
+			*/
+			ucOptions := []usecase.Option{
+				usecase.WithLLMClient(geminiModel),
+				usecase.WithEmbeddingClient(embeddingClient),
+				usecase.WithPolicyClient(policyClient),
+				usecase.WithRepository(firestore),
+				usecase.WithSlackService(slackSvc),
+				usecase.WithTestDataSet(testDataSet),
+			}
+
+			githubApp, err := githubAppCfg.Configure(ctx)
 			if err != nil {
 				return err
 			}
-			logging.Default().Info("enabled actions", "actions", actions)
-			actionSvc := service.NewActionService(enabledActions)
+			ucOptions = append(ucOptions, usecase.WithGitHubApp(githubApp))
 
-			policyService := policy.New(firestore, policyClient, testDataSet)
-
-			uc := usecase.New(
-				usecase.WithLLMClient(geminiModel),
-				usecase.WithEmbeddingClient(embeddingClient),
-				usecase.WithPolicyService(policyService),
-				usecase.WithSlackService(slackSvc),
-				usecase.WithRepository(firestore),
-				usecase.WithActionService(actionSvc),
-				usecase.WithGitHubApp(githubApp),
-			)
+			uc := usecase.New(ucOptions...)
 
 			httpServer := http.Server{
 				Addr: addr,

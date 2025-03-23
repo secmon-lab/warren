@@ -8,16 +8,18 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/service/githubapp"
 	"github.com/secmon-lab/warren/pkg/service/slack"
 )
 
 type UseCases struct {
 	// services and adapters
-	slackService    slack.Service
+	slackService    *slack.Service
 	llmClient       interfaces.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
 	policyClient    interfaces.PolicyClient
+	githubApp       *githubapp.Service
 
 	// test data set
 	testDataSet *policy.TestDataSet
@@ -28,13 +30,21 @@ type UseCases struct {
 	findingLimit int
 }
 
-// var _ interfaces.UseCase = &UseCases{}
+var _ Alert = &UseCases{}
+var _ SlackEvent = &UseCases{}
+var _ SlackInteraction = &UseCases{}
 
 type Option func(*UseCases)
 
 func WithLLMClient(llmClient interfaces.LLMClient) Option {
 	return func(u *UseCases) {
 		u.llmClient = llmClient
+	}
+}
+
+func WithSlackService(slackService *slack.Service) Option {
+	return func(u *UseCases) {
+		u.slackService = slackService
 	}
 }
 
@@ -53,6 +63,12 @@ func WithPolicyClient(policyClient interfaces.PolicyClient) Option {
 func WithRepository(repository interfaces.Repository) Option {
 	return func(u *UseCases) {
 		u.repository = repository
+	}
+}
+
+func WithGitHubApp(githubApp *githubapp.Service) Option {
+	return func(u *UseCases) {
+		u.githubApp = githubApp
 	}
 }
 

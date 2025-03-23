@@ -7,7 +7,6 @@ import (
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 )
 
@@ -15,7 +14,7 @@ type geminiClient struct {
 	model *genai.GenerativeModel
 }
 
-func (c *geminiClient) StartChat() interfaces.LLMSession {
+func (c *geminiClient) StartChat() *genai.ChatSession {
 	return c.model.StartChat()
 }
 
@@ -52,7 +51,7 @@ func TestAsk(t *testing.T) {
 		"message": "Hello, world!"
 	}`
 
-	result, err := llm.Ask[resp](t.Context(), ssn.SendMessage, prompt)
+	result, err := llm.Ask[resp](t.Context(), ssn, prompt)
 	gt.NoError(t, err)
 	gt.NotNil(t, result)
 	gt.S(t, result.Message).NotEqual("")

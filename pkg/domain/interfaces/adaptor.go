@@ -10,15 +10,21 @@ import (
 
 type LLMClient interface {
 	StartChat() LLMSession
+	LLMInquiry
+}
+
+type LLMSession interface {
+	LLMInquiry
+	SetHistory(history ...*genai.Content)
+	GetHistory() []*genai.Content
+}
+
+type LLMInquiry interface {
 	SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
 }
 
 type EmbeddingClient interface {
 	Embeddings(ctx context.Context, texts []string, dimensionality int) ([][]float32, error)
-}
-
-type LLMSession interface {
-	SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
 }
 
 type PolicyClient interface {
@@ -32,4 +38,9 @@ type SlackClient interface {
 	AuthTest() (*slack.AuthTestResponse, error)
 	OpenView(triggerID string, view slack.ModalViewRequest) (*slack.ViewResponse, error)
 	UploadFileV2Context(ctx context.Context, params slack.UploadFileV2Parameters) (*slack.FileSummary, error)
+}
+
+type SlackThreadService interface {
+	Reply(ctx context.Context, message string)
+	NewStateFunc(ctx context.Context, message string) func(ctx context.Context, msg string)
 }
