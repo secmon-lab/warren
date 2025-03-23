@@ -386,3 +386,58 @@ func BuildMetaListPrompt(ctx context.Context, alertList alert.List) (string, err
 
 	return buf.String(), nil
 }
+
+//go:embed templates/session_start.md
+var sessionStartTemplate string
+
+func BuildSessionStartPrompt(ctx context.Context, alerts alert.Alerts) (string, error) {
+	tmpl, err := template.New("session_start").Parse(sessionStartTemplate)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to parse template")
+	}
+
+	input := map[string]any{
+		"lang": lang.From(ctx).Name(),
+	}
+
+	if len(alerts) < 10 {
+		rawAlerts := []string{}
+		for _, alert := range alerts {
+			rawAlert, err := stringify(alert.Data)
+			if err != nil {
+				return "", err
+			}
+			rawAlerts = append(rawAlerts, rawAlert)
+		}
+		input["alerts"] = rawAlerts
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "session_start", input); err != nil {
+		return "", goerr.Wrap(err, "failed to execute template")
+	}
+
+	return buf.String(), nil
+}
+
+//go:embed templates/session_next.md
+var sessionNextTemplate string
+
+func BuildSessionNextPrompt(ctx context.Context, actions []action.ActionSpec) (string, error) {
+	tmpl, err := template.New("session_next").Parse(sessionNextTemplate)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to parse template")
+	}
+
+	input := map[string]any{
+		"lang":    lang.From(ctx).Name(),
+		"actions": actions,
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "session_next", input); err != nil {
+		return "", goerr.Wrap(err, "failed to execute template")
+	}
+
+	return buf.String(), nil
+}

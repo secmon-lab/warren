@@ -117,3 +117,65 @@ func TestMetaListPrompt(t *testing.T) {
 
 	t.Log(d)
 }
+
+func TestSessionStartPrompt(t *testing.T) {
+	tests := []struct {
+		name   string
+		alerts alert.Alerts
+	}{
+		{
+			name: "single alert",
+			alerts: alert.Alerts{
+				ptr.Ref(alert.New(context.Background(), "aws.guardduty", alert.Metadata{
+					Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
+				})),
+			},
+		},
+		{
+			name:   "no alerts",
+			alerts: alert.Alerts{},
+		},
+		{
+			name: "multiple alerts",
+			alerts: alert.Alerts{
+				ptr.Ref(alert.New(context.Background(), "aws.guardduty", alert.Metadata{
+					Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
+				})),
+				ptr.Ref(alert.New(context.Background(), "aws.guardduty", alert.Metadata{
+					Data: map[string]any{"Findings": map[string]any{"Severity": 5}},
+				})),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			d, err := prompt.BuildSessionStartPrompt(ctx, tt.alerts)
+			gt.NoError(t, err)
+			t.Log(d)
+		})
+	}
+}
+
+func TestSessionNextPrompt(t *testing.T) {
+	tests := []struct {
+		name    string
+		actions []action.ActionSpec
+	}{
+		{
+			name: "single action",
+			actions: []action.ActionSpec{
+				{Name: "action1", Description: "action1 description", Args: []action.ArgumentSpec{{Name: "arg1", Description: "arg1 description", Type: action.ArgumentTypeString, Required: true}}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			d, err := prompt.BuildSessionNextPrompt(ctx, tt.actions)
+			gt.NoError(t, err)
+			t.Log(d)
+		})
+	}
+}
