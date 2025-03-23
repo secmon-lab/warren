@@ -9,6 +9,7 @@ import (
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 )
@@ -17,7 +18,7 @@ func dispatch(ctx context.Context, handler func(ctx context.Context) error) {
 	newCtx := context.Background()
 
 	newCtx = logging.With(newCtx, logging.From(ctx))
-	newCtx = thread.WithReplyFunc(newCtx, thread.ReplyFuncFrom(ctx))
+	newCtx = msg.WithContext(newCtx)
 	newCtx = lang.With(newCtx, lang.From(ctx))
 
 	if IsSync(ctx) {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
@@ -218,6 +219,71 @@ func (x *ThreadService) Reply(ctx context.Context, message string) {
 			goerr.V("channelID", x.channelID),
 			goerr.V("threadID", x.threadID),
 			goerr.V("message", message),
+			goerr.V("blocks", blocks),
+		))
+	}
+}
+
+func (x *ThreadService) NewStateFunc(ctx context.Context, message string) func(ctx context.Context, msg string) {
+	var msgID string
+	blocks := buildStateMessageBlocks(message, []string{})
+
+	if len(blocks) > 0 {
+		msgID = x.postInitialMessage(ctx, blocks)
+	}
+
+	var messages []string
+	var mutex sync.Mutex
+
+	return func(ctx context.Context, appendMsg string) {
+		mutex.Lock()
+		defer mutex.Unlock()
+		messages = append(messages, appendMsg)
+
+		blocks := buildStateMessageBlocks(message, messages)
+		if len(blocks) == 0 {
+			return
+		}
+
+		if msgID == "" {
+			msgID = x.postInitialMessage(ctx, blocks)
+			return
+		}
+
+		x.updateMessage(ctx, msgID, blocks)
+	}
+}
+
+func (x *ThreadService) postInitialMessage(ctx context.Context, blocks []slack.Block) string {
+	_, ts, err := x.client.PostMessageContext(ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+	)
+
+	if err != nil {
+		errs.Handle(ctx, goerr.Wrap(err, "failed to post message to slack",
+			goerr.V("channelID", x.channelID),
+			goerr.V("threadID", x.threadID),
+			goerr.V("blocks", blocks),
+		))
+		return ""
+	}
+
+	return ts
+}
+
+func (x *ThreadService) updateMessage(ctx context.Context, msgID string, blocks []slack.Block) {
+	_, _, _, err := x.client.UpdateMessageContext(ctx,
+		x.channelID,
+		msgID,
+		slack.MsgOptionBlocks(blocks...),
+	)
+	if err != nil {
+		errs.Handle(ctx, goerr.Wrap(err, "failed to update message to slack",
+			goerr.V("channelID", x.channelID),
+			goerr.V("threadID", x.threadID),
+			goerr.V("msgID", msgID),
 			goerr.V("blocks", blocks),
 		))
 	}

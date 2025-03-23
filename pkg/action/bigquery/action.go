@@ -18,6 +18,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 )
@@ -199,19 +200,19 @@ func (x *Action) Execute(ctx context.Context, ssn interfaces.LLMSession, args ac
 		eb = eb.With(goerr.V("query", result.Query))
 		status, err := client.DryRun(ctx, result.Query)
 		if err != nil {
-			slack.Reply(ctx, fmt.Sprintf("Failed to run query. Retry...\nQuery: %s\nError: %s", result.Query, err.Error()))
+			msg.Reply(ctx, fmt.Sprintf("Failed to run query. Retry...\nQuery: %s\nError: %s", result.Query, err.Error()))
 			prompt = fmt.Sprintf("Failed to run query. Please try again. The query is: %s\nError: %s", result.Query, err.Error())
 			continue
 		}
 
 		// #nosec: G115
 		if status.Statistics.TotalBytesProcessed > 0 && uint64(status.Statistics.TotalBytesProcessed) > x.byteLimit {
-			msg := fmt.Sprintf("The query result is too large. Retry...\nQuery: %s\nDry run result: %s\nLimit: %s",
+			message := fmt.Sprintf("The query result is too large. Retry...\nQuery: %s\nDry run result: %s\nLimit: %s",
 				result.Query,
 				humanize.Bytes(uint64(status.Statistics.TotalBytesProcessed)),
 				humanize.Bytes(uint64(x.byteLimit)),
 			)
-			slack.Reply(ctx, msg)
+			msg.Reply(ctx, message)
 
 			prompt = fmt.Sprintf("The query result is too large. Please try again with a smaller query. The your generated query result is %d bytes, but the limit is %d bytes.", status.Statistics.TotalBytesProcessed, x.byteLimit)
 			continue

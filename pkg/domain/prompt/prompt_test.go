@@ -10,6 +10,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
+	"github.com/secmon-lab/warren/pkg/utils/ptr"
 )
 
 func TestPrompt(t *testing.T) {
@@ -40,22 +41,19 @@ func TestActionPrompt(t *testing.T) {
 }
 
 func TestIgnorePolicyPrompt(t *testing.T) {
-	policyContent := map[string]string{
+	contents := policy.Contents{
 		"test.rego": `package alert.aws.guardduty
 
 alert contains {} # Detected as an alert`,
 	}
-	alerts := []alert.Alert{
+	alerts := alert.Alerts{
 		{
 			Schema: "aws.guardduty",
 			Data:   map[string]any{"Findings": map[string]any{"Severity": 7}},
 		},
 	}
 
-	policyData := policy.PolicyData{
-		Data: policyContent,
-	}
-	d, err := prompt.BuildIgnorePolicyPrompt(context.Background(), policyData, alerts, "test")
+	d, err := prompt.BuildIgnorePolicyPrompt(context.Background(), contents, alerts, "test")
 	gt.NoError(t, err)
 
 	gt.S(t, d).Contains("# Rules")
@@ -66,13 +64,13 @@ alert contains {} # Detected as an alert`,
 
 func TestTestDataReadmePrompt(t *testing.T) {
 	ctx := context.Background()
-	alerts := []alert.Alert{
-		alert.New(ctx, "aws.guardduty", alert.Metadata{
+	alerts := alert.Alerts{
+		ptr.Ref(alert.New(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
-		}),
-		alert.New(ctx, "aws.guardduty", alert.Metadata{
+		})),
+		ptr.Ref(alert.New(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
-		}),
+		})),
 	}
 
 	d, err := prompt.BuildTestDataReadmePrompt(ctx, "ignore", alerts)

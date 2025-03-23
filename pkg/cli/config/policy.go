@@ -5,6 +5,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/opaq"
+	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/urfave/cli/v3"
 )
 
@@ -31,11 +32,16 @@ func (x Policy) LogValue() slog.Value {
 	)
 }
 
-func (x *Policy) Configure() (*opaq.Client, error) {
+func (x *Policy) Configure() (*opaq.Client, policy.Contents, error) {
 	client, err := opaq.New(opaq.Files(x.filePaths...))
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create opaq client", goerr.V("file_paths", x.filePaths))
+		return nil, nil, goerr.Wrap(err, "failed to create opaq client", goerr.V("file_paths", x.filePaths))
 	}
 
-	return client, nil
+	contents, err := policy.NewContents(x.filePaths...)
+	if err != nil {
+		return nil, nil, goerr.Wrap(err, "failed to create policy contents", goerr.V("file_paths", x.filePaths))
+	}
+
+	return client, contents, nil
 }

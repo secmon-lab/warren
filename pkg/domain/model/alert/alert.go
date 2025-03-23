@@ -19,7 +19,7 @@ type Finding struct {
 
 type Alert struct {
 	ID          types.AlertID         `json:"id"`
-	Schema      string                `json:"schema"`
+	Schema      types.AlertSchema     `json:"schema"`
 	Title       string                `json:"title"`
 	Description string                `json:"description"`
 	Status      types.AlertStatus     `json:"status"`
@@ -52,7 +52,7 @@ type Metadata struct {
 	Attrs       []Attribute `json:"attrs"`
 }
 
-func New(ctx context.Context, schema string, metadata Metadata) Alert {
+func New(ctx context.Context, schema types.AlertSchema, metadata Metadata) Alert {
 	return Alert{
 		ID:          types.NewAlertID(),
 		Schema:      schema,

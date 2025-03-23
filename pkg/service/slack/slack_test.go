@@ -264,3 +264,58 @@ func TestPostAlertList(t *testing.T) {
 	gt.NoError(t, err)
 	gt.NoError(t, thread.PostAlertList(context.Background(), &alertList))
 }
+
+func TestNewStateFunc(t *testing.T) {
+	svc := newSlackService(t)
+
+	cases := []struct {
+		name     string
+		base     string
+		messages []string
+		want     int
+	}{
+		{
+			name:     "empty base and messages",
+			base:     "",
+			messages: []string{},
+			want:     0,
+		},
+		{
+			name:     "only base message",
+			base:     "base message",
+			messages: []string{},
+			want:     1,
+		},
+		{
+			name: "only state messages",
+			base: "",
+			messages: []string{
+				"message 1",
+				"message 2",
+			},
+			want: 1,
+		},
+		{
+			name: "base and state messages",
+			base: "base message",
+			messages: []string{
+				"message 1",
+				"message 2",
+			},
+			want: 2,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+			thread, err := svc.PostMessage(ctx, "State test: "+tc.name)
+			gt.NoError(t, err)
+
+			fn := thread.NewStateFunc(ctx, tc.base)
+			for _, msg := range tc.messages {
+				fn(ctx, msg)
+			}
+		})
+	}
+}

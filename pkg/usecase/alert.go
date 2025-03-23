@@ -1,16 +1,28 @@
 package usecase
 
-/*
-func (uc *UseCases) HandleAlertWithAuth(ctx context.Context, schema string, alertData any) ([]*alert.Alert, error) {
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/prompt"
+	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/service"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
+)
+
+func (uc *UseCases) HandleAlertWithAuth(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 	authCtx := auth.BuildContext(ctx)
 
-	policyClient, err := uc.policyService.NewClient(ctx)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create policy client")
+	var result struct {
+		Allow bool `json:"allow"`
 	}
-
-	var result model.PolicyAuth
-	if err := policyClient.Query(ctx, "data.auth", authCtx, &result); err != nil {
+	if err := uc.policyClient.Query(ctx, "data.auth", authCtx, &result); err != nil {
 		return nil, goerr.Wrap(err, "failed to query policy", goerr.V("auth", authCtx))
 	}
 
@@ -18,14 +30,16 @@ func (uc *UseCases) HandleAlertWithAuth(ctx context.Context, schema string, aler
 		return nil, goerr.New("unauthorized", goerr.V("auth", authCtx))
 	}
 
-	return uc.HandleAlert(ctx, schema, alertData, policyClient)
+	return uc.HandleAlert(ctx, schema, alertData)
 }
 
-func (uc *UseCases) HandleAlert(ctx context.Context, schema string, alertData any, policyClient interfaces.PolicyClient) ([]*alert.Alert, error) {
+func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 	logger := logging.From(ctx)
 
-	var result model.PolicyResult
-	if err := policyClient.Query(ctx, "data.alert."+schema, alertData, &result); err != nil {
+	var result struct {
+		Alert []alert.Metadata `json:"alert"`
+	}
+	if err := uc.policyClient.Query(ctx, "data.alert."+string(schema), alertData, &result); err != nil {
 		return nil, goerr.Wrap(err, "failed to query policy", goerr.V("schema", schema), goerr.V("alert", alertData))
 	}
 
@@ -33,7 +47,7 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema string, alertData an
 
 	var results []*alert.Alert
 	for _, a := range result.Alert {
-		alert := model.NewAlert(ctx, schema, a)
+		alert := alert.New(ctx, schema, a)
 		if alert.Data == nil {
 			alert.Data = alertData
 		}
@@ -76,13 +90,12 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert alert.Alert) (*alert.
 	// Check if the alert is similar to any existing alerts
 	// NOTE: Disable similarity merger for now
 
-
 	// Post new alert to Slack and save the alert with Slack channel and message ID
 	thread, err := uc.slackService.PostAlert(ctx, alert)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to post alert", goerr.V("alert", alert))
 	}
-	alert.SlackThread = &slack.SlackThread{
+	alert.SlackThread = &slack.Thread{
 		ChannelID: thread.ChannelID(),
 		ThreadID:  thread.ThreadID(),
 	}
@@ -144,43 +157,3 @@ func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert alert.Alert
 
 	return &alert, nil
 }
-
-func (uc *UseCases) findSimilarAlert(ctx context.Context, alert alert.Alert) (*alert.Alert, error) {
-	oldest := alert.CreatedAt.Add(-24 * time.Hour)
-	alerts, err := uc.repository.GetLatestAlerts(ctx, oldest, 100)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to fetch latest alerts")
-	}
-	unresolvedAlerts := make([]alert.Alert, 0, len(alerts))
-	for _, a := range alerts {
-		if a.Status != alert.StatusResolved {
-			unresolvedAlerts = append(unresolvedAlerts, a)
-		}
-	}
-
-	p, err := prompt.BuildAggregatePrompt(ctx, alert, unresolvedAlerts)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to build aggregate prompt")
-	}
-
-	ssn := uc.llmClient.StartChat()
-	result, err := service.AskChat[prompt.AggregatePromptResult](ctx, ssn, p)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to ask chat")
-	}
-
-	if result == nil || result.AlertID == "" {
-		return nil, nil
-	}
-
-	alertID := alert.AlertID(result.AlertID)
-
-	for _, candidate := range alerts {
-		if candidate.ID == alertID {
-			return &candidate, nil
-		}
-	}
-
-	return nil, nil
-}
-*/

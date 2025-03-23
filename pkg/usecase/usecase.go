@@ -1,19 +1,26 @@
 package usecase
 
 import (
+	"context"
 	"time"
 
+	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/service/slack"
 )
 
 type UseCases struct {
 	// services and adapters
+	slackService    slack.Service
 	llmClient       interfaces.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
-	queryFunc       policy.QueryFunc
+	policyClient    interfaces.PolicyClient
+
+	// test data set
+	testDataSet *policy.TestDataSet
 
 	// configs
 	timeSpan     time.Duration
@@ -37,9 +44,9 @@ func WithEmbeddingClient(embeddingClient interfaces.EmbeddingClient) Option {
 	}
 }
 
-func WithQueryFunc(queryFunc policy.QueryFunc) Option {
+func WithPolicyClient(policyClient interfaces.PolicyClient) Option {
 	return func(u *UseCases) {
-		u.queryFunc = queryFunc
+		u.policyClient = policyClient
 	}
 }
 
@@ -68,10 +75,26 @@ func WithFindingLimit(findingLimit int) Option {
 	}
 }
 
+func WithTestDataSet(testDataSet *policy.TestDataSet) Option {
+	return func(u *UseCases) {
+		u.testDataSet = testDataSet
+	}
+}
+
+type dummyPolicyClient struct{}
+
+func (c *dummyPolicyClient) Query(ctx context.Context, query string, data, result any, queryOptions ...opaq.QueryOption) error {
+	return nil
+}
+
+func (c *dummyPolicyClient) Sources() map[string]string {
+	return map[string]string{}
+}
+
 func New(opts ...Option) *UseCases {
 	u := &UseCases{
-		repository: repository.NewMemory(),
-
+		repository:   repository.NewMemory(),
+		policyClient: &dummyPolicyClient{},
 		timeSpan:     24 * time.Hour,
 		actionLimit:  10,
 		findingLimit: 3,

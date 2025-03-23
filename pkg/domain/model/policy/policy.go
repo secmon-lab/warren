@@ -10,11 +10,10 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
 
-type PolicyData struct {
-	Data      map[string]string `json:"data"`
-	CreatedAt time.Time         `json:"created_at"`
-}
+// Contents is a map of file paths to their policy data (Rego).
+type Contents map[string]string
 
+// PolicyDiffID is a unique identifier for a policy diff.
 type PolicyDiffID string
 
 func (x PolicyDiffID) String() string {

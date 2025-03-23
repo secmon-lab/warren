@@ -209,7 +209,7 @@ type IgnorePolicyPromptResult struct {
 	Policy      map[string]string `json:"policy"`
 }
 
-func BuildIgnorePolicyPrompt(ctx context.Context, policy policy.PolicyData, alerts []alert.Alert, note string) (string, error) {
+func BuildIgnorePolicyPrompt(ctx context.Context, contents policy.Contents, alerts alert.Alerts, note string) (string, error) {
 	tmpl, err := template.New("ignore_policy").Parse(ignorePolicyTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
@@ -220,7 +220,7 @@ func BuildIgnorePolicyPrompt(ctx context.Context, policy policy.PolicyData, aler
 		return "", err
 	}
 
-	rawPolicy, err := stringify(policy.Data)
+	rawPolicy, err := stringify(contents)
 	if err != nil {
 		return "", err
 	}
@@ -248,7 +248,7 @@ type TestDataReadmePromptResult struct {
 	Content string `json:"content"`
 }
 
-func BuildTestDataReadmePrompt(ctx context.Context, action string, alerts []alert.Alert) (string, error) {
+func BuildTestDataReadmePrompt(ctx context.Context, action string, alerts alert.Alerts) (string, error) {
 	tmpl, err := template.New("test_data_readme").Parse(testDataReadmeTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")

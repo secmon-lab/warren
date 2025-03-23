@@ -15,7 +15,7 @@ import (
 func buildAlertBlocks(alert alert.Alert) []slack.Block {
 	lines := []string{
 		"*ID:* `" + alert.ID.String() + "`",
-		"*Schema:* `" + alert.Schema + "`",
+		"*Schema:* `" + alert.Schema.String() + "`",
 		"*Status:* " + alert.Status.Label(),
 		"*Assignee:* " + func() string {
 			if alert.Assignee == nil {
@@ -433,6 +433,32 @@ func buildNextActionBlocks(action prompt.ActionPromptResult) []slack.Block {
 			fields,
 			nil,
 		),
+	}
+
+	return blocks
+}
+
+// buildStateMessageBlocks builds the blocks for the state message in the thread.
+func buildStateMessageBlocks(base string, messages []string) []slack.Block {
+	blocks := []slack.Block{}
+
+	if base != "" {
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.MarkdownType, base, false, false),
+			nil,
+			nil,
+		))
+	}
+
+	if len(messages) > 0 {
+		blocks = append(blocks, slack.NewContextBlock(
+			"context_messages",
+			slack.NewTextBlockObject(slack.MarkdownType, strings.Join(messages, "\n"), false, false),
+		))
+	}
+
+	if len(blocks) == 0 {
+		return nil
 	}
 
 	return blocks

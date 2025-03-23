@@ -1,7 +1,64 @@
 ---
-description: Rule for Go coding
+description: 
 globs: *.go
+alwaysApply: false
 ---
+# Repository Architecture
+
+This repository is structured with a clear separation of concerns following a layered, domain-driven design architecture, primarily written in Go. It appears to be designed for a CLI and HTTP-based application that integrates with multiple external services and systems (e.g., Slack, GitHub, BigQuery).
+
+## Root Directory
+
+- **`main.go`**: Entry point of the application.
+- **`Dockerfile`**: Containerization setup.
+- **`Taskfile.yml`**: Task automation (likely used for building, testing, etc.).
+- **`README.md`, `LICENSE`, `doc/`**: Documentation and licensing.
+
+---
+
+## `pkg/` - Core Application Logic
+
+This is the central directory that holds all core components of the application. It is organized into the following sub-packages:
+
+### 1. **`action/`**
+Contains implementations of specific actions or integrations with external services (e.g., BigQuery, OTX, URLScan). Each action has its own subpackage with dedicated logic, tests, and sometimes test data.
+
+### 2. **`adapter/`**
+Implements adapters for external systems (e.g., embedding APIs like Gemini, GitHub App). This is part of a clean architecture approach to abstract dependencies.
+
+### 3. **`cli/`**
+Contains the command-line interface logic, configuration parsing, and CLI-specific helpers.
+
+### 4. **`controller/`**
+Implements interface layers, such as HTTP and Slack handlers. This layer handles incoming requests and calls appropriate services or use cases.
+
+### 5. **`domain/`**
+This is the heart of the business logic:
+- `interfaces/`: Defines interfaces for actions, adapters, repositories.
+- `model/`: Domain models organized by context (e.g., alert, policy, slack).
+- `prompt/`: Handles structured prompts and schema used in LLM integrations.
+- `types/`: Shared domain-specific types.
+
+### 6. **`repository/`**
+Provides implementations of data storage mechanisms, such as Firestore or in-memory stores.
+
+### 7. **`service/`**
+Contains business logic that coordinates domain models and repositories. Divided by functionality (e.g., action, alert, session, logic for ignore policies, Slack integration).
+
+### 8. **`usecase/`**
+Implements application use cases. This layer coordinates services to fulfill specific workflows like alert handling or Slack-based interactions.
+
+### 9. **`utils/`**
+Houses utility packages for logging, pointer handling, clock abstraction, etc.
+
+---
+
+## Architectural Characteristics
+
+- **Layered Architecture**: Separation between CLI/UI (`controller`, `cli`), application logic (`usecase`, `service`), and domain logic (`domain`, `repository`).
+- **Hexagonal/Clean Architecture Elements**: Interfaces and adapters allow decoupling from infrastructure.
+- **Testability**: Strong emphasis on testability, with test data and `_test.go` files across layers.
+- **LLM/AI Integration**: Includes prompt templates and schema, suggesting integration with large language models.
 
 # Error handling
 
