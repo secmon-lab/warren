@@ -131,14 +131,14 @@ func TestOTX_Enabled(t *testing.T) {
 }
 
 func TestSendRequest(t *testing.T) {
-	var action otx.Action
+	var act otx.Action
 
 	vars := test.NewEnvVars(t, "TEST_OTX_API_KEY", "TEST_OTX_TARGET_IPADDR")
 	cmd := cli.Command{
 		Name:  "otx",
-		Flags: action.Flags(),
+		Flags: act.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			resp, err := action.Execute(ctx, nil, nil, action.Arguments{"ipv4": vars.Get("TEST_OTX_TARGET_IPADDR")})
+			resp, err := act.Execute(ctx, nil, nil, action.Arguments{"ipv4": vars.Get("TEST_OTX_TARGET_IPADDR")})
 			gt.NoError(t, err)
 			gt.NotEqual(t, resp, nil)
 			gt.Equal(t, resp.Type, action.ActionResultTypeJSON)

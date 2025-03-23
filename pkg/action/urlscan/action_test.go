@@ -158,14 +158,14 @@ func TestURLScan_Enabled(t *testing.T) {
 }
 
 func TestSendRequest(t *testing.T) {
-	var action urlscan.Action
+	var act urlscan.Action
 
 	vars := test.NewEnvVars(t, "TEST_URLSCAN_API_KEY")
 	cmd := cli.Command{
 		Name:  "urlscan",
-		Flags: action.Flags(),
+		Flags: act.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			resp, err := action.Execute(ctx, nil, nil, action.Arguments{"url": "https://example.com"})
+			resp, err := act.Execute(ctx, nil, nil, action.Arguments{"url": "https://example.com"})
 			gt.NoError(t, err)
 			gt.NotEqual(t, resp, nil)
 			gt.Equal(t, resp.Type, action.ActionResultTypeJSON)

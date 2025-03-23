@@ -304,6 +304,17 @@ func TestNewStateFunc(t *testing.T) {
 			},
 			want: 2,
 		},
+		{
+			name: "state messages with markdown",
+			base: "base message",
+			messages: []string{
+				"*message 1*",
+				"_message 2_",
+				"`message 3`",
+				"```message 4\nmessage 4\n```",
+			},
+			want: 2,
+		},
 	}
 
 	for _, tc := range cases {

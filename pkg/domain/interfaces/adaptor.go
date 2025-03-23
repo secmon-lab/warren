@@ -5,11 +5,12 @@ import (
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/opaq"
+	"github.com/secmon-lab/warren/pkg/domain/model/gemini"
 	"github.com/slack-go/slack"
 )
 
 type LLMClient interface {
-	StartChat() LLMSession
+	StartChat(options ...gemini.Option) LLMSession
 	LLMInquiry
 }
 
