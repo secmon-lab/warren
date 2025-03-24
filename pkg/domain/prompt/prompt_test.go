@@ -28,18 +28,6 @@ func TestPrompt(t *testing.T) {
 		Contains(`"message": "test"`)
 }
 
-func TestActionPrompt(t *testing.T) {
-	actions := []action.ActionSpec{
-		{Name: "action1", Description: "action1 description", Args: []action.ArgumentSpec{{Name: "arg1", Description: "arg1 description", Type: action.ArgumentTypeString, Required: true}}},
-	}
-	d, err := prompt.BuildActionPrompt(context.Background(), actions)
-	gt.NoError(t, err)
-
-	t.Log(d)
-	gt.S(t, d).Contains("## `action1`")
-	gt.S(t, d).Contains("- `arg1` (string, required): arg1 description")
-}
-
 func TestIgnorePolicyPrompt(t *testing.T) {
 	contents := policy.Contents{
 		"test.rego": `package alert.aws.guardduty
@@ -160,20 +148,22 @@ func TestSessionStartPrompt(t *testing.T) {
 
 func TestSessionNextPrompt(t *testing.T) {
 	tests := []struct {
-		name    string
-		actions []action.ActionSpec
+		name   string
+		result *action.Result
 	}{
 		{
 			name: "single action",
-			actions: []action.ActionSpec{
-				{Name: "action1", Description: "action1 description", Args: []action.ArgumentSpec{{Name: "arg1", Description: "arg1 description", Type: action.ArgumentTypeString, Required: true}}},
+			result: &action.Result{
+				Message: "test",
+				Type:    action.ResultTypeText,
+				Rows:    []string{"test"},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			d, err := prompt.BuildSessionNextPrompt(ctx, tt.actions)
+			d, err := prompt.BuildSessionNextPrompt(ctx, tt.result)
 			gt.NoError(t, err)
 			t.Log(d)
 		})

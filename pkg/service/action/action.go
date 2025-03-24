@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/action"
@@ -28,15 +29,15 @@ func New(actions []interfaces.Action) *Service {
 	return &Service{actions: actionsMap}
 }
 
-func (x *Service) Spec() []action.ActionSpec {
-	specs := make([]action.ActionSpec, 0, len(x.actions))
+func (x *Service) Specs() []*genai.FunctionDeclaration {
+	specs := make([]*genai.FunctionDeclaration, 0, len(x.actions))
 	for _, a := range x.actions {
-		specs = append(specs, a.Spec())
+		specs = append(specs, a.Specs()...)
 	}
 	return specs
 }
 
-func (x *Service) Execute(ctx context.Context, slack interfaces.SlackThreadService, name string, llm interfaces.LLMClient, args action.Arguments) (*action.ActionResult, error) {
+func (x *Service) Execute(ctx context.Context, name string, args map[string]any) (*action.Result, error) {
 	logger := logging.From(ctx)
 	action, ok := x.actions[name]
 	if !ok {

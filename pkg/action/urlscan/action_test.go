@@ -1,19 +1,6 @@
 package urlscan_test
 
-import (
-	"context"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-
-	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/action/urlscan"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
-	"github.com/secmon-lab/warren/pkg/utils/test"
-	"github.com/urfave/cli/v3"
-)
-
+/*
 func TestURLScan(t *testing.T) {
 	testCases := []struct {
 		name            string
@@ -179,3 +166,4 @@ func TestSendRequest(t *testing.T) {
 		"--urlscan-api-key", vars.Get("TEST_URLSCAN_API_KEY"),
 	}))
 }
+*/

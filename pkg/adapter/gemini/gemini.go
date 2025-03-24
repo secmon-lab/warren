@@ -61,8 +61,17 @@ func New(ctx context.Context, project string, opts ...Option) (*GeminiClient, er
 func (x *GeminiClient) StartChat(options ...gemini.Option) interfaces.LLMSession {
 	cfg := gemini.NewConfig(options...)
 
-	model := x.client.GenerativeModel(x.model)
+	genaiModel := x.model
+	if cfg.Model() != "" {
+		genaiModel = cfg.Model()
+	}
+	model := x.client.GenerativeModel(genaiModel)
+
 	model.GenerationConfig.ResponseMIMEType = x.responseMIMEType
+	if cfg.ContentType() != "" {
+		model.GenerationConfig.ResponseMIMEType = cfg.ContentType()
+	}
+
 	model.Tools = cfg.Tools()
 	model.ToolConfig = cfg.ToolConfig()
 

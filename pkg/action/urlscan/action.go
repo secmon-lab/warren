@@ -1,23 +1,6 @@
 package urlscan
 
-import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"log/slog"
-	"net/http"
-	"net/url"
-	"strings"
-	"time"
-
-	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
-	"github.com/urfave/cli/v3"
-)
-
+/*
 type Action struct {
 	apiKey  string
 	baseURL string
@@ -162,3 +145,4 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 
 	return nil, goerr.New("failed to get scan result")
 }
+*/

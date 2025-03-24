@@ -54,39 +54,6 @@ func BuildInitPrompt(ctx context.Context, alert any, maxRetry int) (string, erro
 	return result.String(), nil
 }
 
-//go:embed templates/action.md
-var actionTemplate string
-
-type ActionPromptResult struct {
-	Action string           `json:"action"`
-	Args   action.Arguments `json:"args" schema:"optional"`
-}
-
-func BuildActionPrompt(ctx context.Context, actions []action.ActionSpec) (string, error) {
-	tmpl, err := template.New("action").Parse(actionTemplate)
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to parse template")
-	}
-
-	schema, err := generateSchema(ActionPromptResult{}).Stringify()
-	if err != nil {
-		return "", err
-	}
-
-	input := map[string]any{
-		"actions": actions,
-		"schema":  schema,
-		"lang":    lang.From(ctx).Name(),
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "action", input); err != nil {
-		return "", goerr.Wrap(err, "failed to execute template")
-	}
-
-	return buf.String(), nil
-}
-
 //go:embed templates/aggregate.md
 var aggregateTemplate string
 
@@ -423,15 +390,14 @@ func BuildSessionStartPrompt(ctx context.Context, alerts alert.Alerts) (string, 
 //go:embed templates/session_next.md
 var sessionNextTemplate string
 
-func BuildSessionNextPrompt(ctx context.Context, actions []action.ActionSpec) (string, error) {
+func BuildSessionNextPrompt(ctx context.Context, result *action.Result) (string, error) {
 	tmpl, err := template.New("session_next").Parse(sessionNextTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
 	}
 
 	input := map[string]any{
-		"lang":    lang.From(ctx).Name(),
-		"actions": actions,
+		"lang": lang.From(ctx).Name(),
 	}
 
 	var buf bytes.Buffer

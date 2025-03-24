@@ -27,5 +27,6 @@ func New(repository interfaces.Repository, llmClient interfaces.LLMClient, slack
 }
 
 func (s *Service) Chat(ctx context.Context, message string) error {
+
 	return nil
 }
