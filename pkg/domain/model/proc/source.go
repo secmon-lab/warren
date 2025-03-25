@@ -6,7 +6,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
-func targetFromSource(target string, thread slack.Thread) source.Source {
+func TargetFromSource(target string, thread slack.Thread) source.Source {
 	switch target {
 	case "root":
 		return source.RootAlertList(thread)

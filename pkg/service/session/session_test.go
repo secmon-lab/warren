@@ -32,6 +32,6 @@ func TestSessionChat(t *testing.T) {
 
 	svc := session.New(repository.NewMemory(), geminiClient, slackService, ssn)
 
-	svc.Chat(ctx, "Hello, world!")
-
+	err = svc.Chat(ctx, "Hello, world!")
+	gt.NoError(t, err)
 }
