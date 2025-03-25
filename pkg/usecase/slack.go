@@ -31,6 +31,14 @@ func (uc *UseCases) dispatchSlackAction(ctx context.Context, action func(ctx con
 
 // HandleSlackAppMention handles a slack app mention event. It will dispatch a slack action to the alert.
 func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, mention slack.Mention, thread slack.Thread) error {
+	uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
+		return uc.handleSlackAppMention(ctx, user, mention, thread)
+	})
+	return nil
+}
+
+func (uc *UseCases) handleSlackAppMention(ctx context.Context, user slack.User, mention slack.Mention, thread slack.Thread) error {
+
 	logger := logging.From(ctx)
 	logger.Debug("slack app mention event", "mention", mention, "slack_thread", thread)
 
@@ -52,11 +60,8 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, 
 		return goerr.Wrap(err, "failed to get session by slack thread")
 	}
 	if ssn != nil {
-		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-			ssnSvc := session.New(uc.repository, uc.llmClient, uc.slackService, ssn)
-			return ssnSvc.Chat(ctx, mention.Message)
-		})
-		return nil
+		ssnSvc := session.New(uc.repository, uc.llmClient, uc.slackService, ssn)
+		return ssnSvc.Chat(ctx, mention.Message)
 	}
 
 	// If session is not found, starting a new session based on existing alert or list
@@ -67,15 +72,12 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, 
 	if alert != nil {
 		ssn = model.New(ctx, user, thread, []types.AlertID{alert.ID})
 
-		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-			if err := uc.repository.PutSession(ctx, *ssn); err != nil {
-				return goerr.Wrap(err, "failed to put session")
-			}
+		if err := uc.repository.PutSession(ctx, *ssn); err != nil {
+			return goerr.Wrap(err, "failed to put session")
+		}
 
-			ssnSvc := session.New(uc.repository, uc.llmClient, uc.slackService, ssn)
-			return ssnSvc.Chat(ctx, mention.Message)
-		})
-		return nil
+		ssnSvc := session.New(uc.repository, uc.llmClient, uc.slackService, ssn)
+		return ssnSvc.Chat(ctx, mention.Message)
 	}
 
 	// If alert is not found, get alert list by slack thread
@@ -86,15 +88,12 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, 
 	if alertList != nil {
 		ssn = model.New(ctx, user, thread, alertList.AlertIDs)
 
-		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-			if err := uc.repository.PutSession(ctx, *ssn); err != nil {
-				return goerr.Wrap(err, "failed to put session")
-			}
+		if err := uc.repository.PutSession(ctx, *ssn); err != nil {
+			return goerr.Wrap(err, "failed to put session")
+		}
 
-			ssnSvc := session.New(uc.repository, uc.llmClient, uc.slackService, ssn)
-			return ssnSvc.Chat(ctx, mention.Message)
-		})
-		return nil
+		ssnSvc := session.New(uc.repository, uc.llmClient, uc.slackService, ssn)
+		return ssnSvc.Chat(ctx, mention.Message)
 	}
 
 	// If session, alert and alert list are not found, nothing to do
