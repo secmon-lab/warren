@@ -37,12 +37,15 @@ var pubsubJSON []byte
 
 func TestValidateGoogleIDToken(t *testing.T) {
 	vars := test.NewEnvVars(t, "TEST_GOOGLE_ID_TOKEN", "TEST_GOOGLE_ID_TOKEN_EMAIL")
-	calledAuthQuery := false
 
 	policyClient := &interfaces.PolicyClientMock{
 		QueryFunc: func(ctx context.Context, s string, v1, v2 any, queryOptions ...opaq.QueryOption) error {
-			calledAuthQuery = true
-			m1 := v1.(*auth.Context)
+			if s == "data.alert.test" {
+				return nil
+			}
+
+			m1, ok := v1.(auth.Context)
+			gt.True(t, ok)
 			gt.Equal(t, m1.Google["email"].(string), vars.Get("TEST_GOOGLE_ID_TOKEN_EMAIL"))
 			gt.NoError(t, json.Unmarshal([]byte(`{"allow":true}`), &v2))
 			return nil
@@ -60,7 +63,25 @@ func TestValidateGoogleIDToken(t *testing.T) {
 		server.ServeHTTP(w, req)
 
 		gt.Equal(t, http.StatusOK, w.Code)
-		gt.True(t, calledAuthQuery)
+		gt.A(t, policyClient.QueryCalls()).Length(2).
+			At(0, func(t testing.TB, v struct {
+				ContextMoqParam context.Context
+				S               string
+				V1              any
+				V2              any
+				QueryOptions    []opaq.QueryOption
+			}) {
+				gt.Equal(t, v.S, "data.auth")
+			}).
+			At(1, func(t testing.TB, v struct {
+				ContextMoqParam context.Context
+				S               string
+				V1              any
+				V2              any
+				QueryOptions    []opaq.QueryOption
+			}) {
+				gt.Equal(t, v.S, "data.alert.test")
+			})
 	})
 }
 
@@ -83,7 +104,7 @@ func TestSlackInteractionHandler(t *testing.T) {
 			return nil
 		},
 	}
-	server := server.New(uc, server.WithSlackVerifier(slack_model.NewPayloadVerifier(signingSecret)))
+	srv := server.New(uc, server.WithSlackVerifier(slack_model.NewPayloadVerifier(signingSecret)))
 
 	t.Run("with valid signature", func(t *testing.T) {
 		ts := fmt.Sprint(time.Now().Unix())
@@ -102,7 +123,9 @@ func TestSlackInteractionHandler(t *testing.T) {
 		req.Header.Set("X-Slack-Signature", signature)
 		req.Header.Set("X-Slack-Request-Timestamp", ts)
 		w := httptest.NewRecorder()
-		server.ServeHTTP(w, req)
+
+		req = req.WithContext(slack_ctrl.WithSync(t.Context()))
+		srv.ServeHTTP(w, req)
 
 		gt.Equal(t, http.StatusOK, w.Code)
 	})

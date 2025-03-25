@@ -24,26 +24,27 @@ func TestWithReply(t *testing.T) {
 }
 
 func TestWithNewStateMsg(t *testing.T) {
-	var called bool
-	var gotMsg string
+	var calledReply bool
+	var calledState bool
+	var gotMsgState string
 	replyFunc := func(ctx context.Context, msg string) {
-		called = true
-		gotMsg = msg
+		calledReply = true
 	}
 	stateMsgFunc := func(ctx context.Context, msg string) {
-		called = true
-		gotMsg = msg
+		calledState = true
+		gotMsgState = msg
 	}
 	newStateFunc := func(ctx context.Context, msg string) func(ctx context.Context, msg string) {
 		return stateMsgFunc
 	}
 
 	ctx := msg.With(context.Background(), replyFunc, newStateFunc)
-	ctx = msg.NewState(ctx, "test state")
-	msg.State(ctx, "test state")
+	ctx = msg.NewState(ctx, "test new state")
+	msg.State(ctx, "test state messsage")
 
-	gt.True(t, called)
-	gt.Equal(t, "test state", gotMsg)
+	gt.False(t, calledReply)
+	gt.True(t, calledState)
+	gt.Equal(t, "test state messsage", gotMsgState)
 }
 
 func TestNewStateMsg_Nil(t *testing.T) {

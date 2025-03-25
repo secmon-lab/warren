@@ -7,7 +7,6 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/slack-go/slack"
 )
@@ -414,25 +413,6 @@ func buildAlertClustersBlocks(clusters []alert.List, metadata slackMetadata) []s
 
 	for _, cluster := range clusters {
 		blocks = append(blocks, buildAlertListBlocks(&cluster, metadata)...)
-	}
-
-	return blocks
-}
-
-// buildNextActionBlocks builds the blocks for the next action message in the thread.
-func buildNextActionBlocks(action prompt.ActionPromptResult) []slack.Block {
-	var fields []*slack.TextBlockObject
-	for key, arg := range action.Args {
-		fields = append(fields, slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*%s:* `%s`", key, arg), false, false))
-	}
-
-	nextMsg := fmt.Sprintf("⚡ Action: *%s*\n", action.Action)
-	blocks := []slack.Block{
-		slack.NewSectionBlock(
-			slack.NewTextBlockObject(slack.MarkdownType, nextMsg, false, false),
-			fields,
-			nil,
-		),
 	}
 
 	return blocks

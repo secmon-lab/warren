@@ -108,7 +108,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		// GetComments
 		got, err := repo.GetAlertComments(ctx, alertID)
 		gt.NoError(t, err)
-		gt.Array(t, got).Have(comment)
+		gt.Array(t, got).Has(comment)
 	})
 
 	// Chat関連のテスト

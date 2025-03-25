@@ -106,9 +106,9 @@ func TestGitHubApp_CreatePullRequest(t *testing.T) {
 			gt.Equal(t, v.Branch, "warren/2025-01-01/"+diff.ID.String())
 			gt.Equal(t, v.Message, diff.Title)
 			gt.M(t, v.Files).
-				HaveKey("policies/test.rego").
-				HaveKey("test/detect/schema/test.json").
-				HaveKey("test/ignore/schema/ignore.json")
+				HasKey("policies/test.rego").
+				HasKey("test/detect/schema/test.json").
+				HasKey("test/ignore/schema/ignore.json")
 		})
 	gt.A(t, mockClient.CreatePullRequestCalls()).Length(1).
 		At(0, func(t testing.TB, v struct {

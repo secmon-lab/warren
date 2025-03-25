@@ -12,11 +12,11 @@ import (
 func TestGeminiClient(t *testing.T) {
 	ctx := t.Context()
 
-	client := gemini.NewTestClient(t, gemini.WithResponseMIMEType("text/plain"))
+	client := gemini.NewTestClient(t, gemini.WithContentType("text/plain"))
 
 	ssn := client.StartChat()
 	resp, err := ssn.SendMessage(ctx, genai.Text("My color is blue. Please remember it."))
-	gt.NoError(t, err)
+	gt.NoError(t, err).Must()
 
 	t.Log("resp", resp)
 
@@ -78,7 +78,7 @@ func TestFunctionCall(t *testing.T) {
 		gt.A(t, v.Content.Parts).Longer(0).At(0, func(t testing.TB, v genai.Part) {
 			call := gt.Cast[genai.FunctionCall](t, v)
 			gt.S(t, call.Name).Equal("get_user_info")
-			gt.M(t, call.Args).HaveKey("user_name")
+			gt.M(t, call.Args).HasKey("user_name")
 		})
 	})
 

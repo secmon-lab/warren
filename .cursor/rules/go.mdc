@@ -92,7 +92,7 @@ colors := ["red", "blue"]
 // gt.Array(t, colors).Equal([]int{1, 2}) // <- Compile error
 
 gt.Array(t, colors).Equal([]string{"red", "blue"}) // <- Pass
-gt.Array(t, colors).Have("orange")                 // <- Fail
+gt.Array(t, colors).Has("orange")                 // <- Fail
 ```
 
 ## Usage
@@ -143,10 +143,10 @@ gt.Array(t, colors).
     Equal([]string{"red", "blue"})           // Fail
     // Equal([]int{1, 2})                    // Compile error
     Contain([]string{"red", "blue"})         // Pass
-    Have("yellow")                           // Pass
+    Has("yellow")                           // Pass
     Length(3)                                // Pass
 
-gt.Array(t, colors).Must().Have("orange") // Fail and stop test
+gt.Array(t, colors).Must().Has("orange") // Fail and stop test
 ```
 
 ### Map
@@ -159,12 +159,12 @@ colorMap := map[string]int{
 }
 
 gt.Map(t, colorMap)
-    .HaveKey("blue")           // Pass
-    .HaveValue(5)              // Pass
-    // .HaveValue("red")       // Compile error
-    .HaveKeyValue("yellow", 2) // Pass
+    .HasKey("blue")           // Pass
+    .HasValue(5)              // Pass
+    // .HasValue("red")       // Compile error
+    .HasKeyValue("yellow", 2) // Pass
 
-gt.Map(t, colorMap).Must().HaveKey("orange") // Fail and stop test
+gt.Map(t, colorMap).Must().HasKey("orange") // Fail and stop test
 ```
 
 ### Cast

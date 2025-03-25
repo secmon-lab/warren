@@ -13,7 +13,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/prompt"
 	"github.com/slack-go/slack"
 )
 
@@ -154,22 +153,6 @@ func (x *ThreadService) UpdateAlert(ctx context.Context, alert alert.Alert) erro
 	)
 	if err != nil {
 		return goerr.Wrap(err, "failed to update message to slack", goerr.V("channelID", x.channelID), goerr.V("threadID", x.threadID), goerr.V("blocks", blocks))
-	}
-
-	return nil
-}
-
-func (x *ThreadService) PostNextAction(ctx context.Context, action prompt.ActionPromptResult) error {
-	blocks := buildNextActionBlocks(action)
-
-	_, _, err := x.client.PostMessageContext(
-		ctx,
-		x.channelID,
-		slack.MsgOptionBlocks(blocks...),
-		slack.MsgOptionTS(x.threadID),
-	)
-	if err != nil {
-		return goerr.Wrap(err, "failed to post next action to slack")
 	}
 
 	return nil

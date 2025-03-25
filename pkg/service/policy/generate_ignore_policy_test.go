@@ -36,7 +36,7 @@ func loadJson(t *testing.T, baseDir, path string) map[string]any {
 func TestGenerateIgnorePolicy(t *testing.T) {
 	ctx := t.Context()
 
-	geminiClient := gemini.NewTestClient(t, gemini.WithResponseMIMEType("text/plain"))
+	geminiClient := gemini.NewTestClient(t, gemini.WithContentType("application/json"))
 
 	policyClient, err := opaq.New(opaq.Files("./testdata/ignore/policy"))
 	gt.NoError(t, err)
@@ -101,27 +101,27 @@ func TestFormatRegoPolicy(t *testing.T) {
 	}
 	`,
 			expected: `package example
-	
-	allow if {
-		# no indent
-		input.color == "red"
-	}
-	`,
+
+allow if {
+	# no indent
+	input.color == "red"
+}
+`,
 		},
 		{
 			name: "space to indent	",
 			input: `package example
-	
-	allow if {
-		input.color == "red"
-	}
-	`,
+
+allow if {
+    input.color == "red"
+}
+`,
 			expected: `package example
-	
-	allow if {
-		input.color == "red"
-	}
-	`,
+
+allow if {
+	input.color == "red"
+}
+`,
 		},
 	}
 

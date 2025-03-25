@@ -1,6 +1,9 @@
 package message
 
 type PubSub struct {
-	MessageID string `json:"messageId"`
-	Data      string `json:"data"`
+	Message PubSubMessage `json:"message"`
+}
+
+type PubSubMessage struct {
+	Data []byte `json:"data"`
 }

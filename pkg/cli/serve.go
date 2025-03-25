@@ -11,6 +11,7 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
+	"github.com/secmon-lab/warren/pkg/service/action"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -99,13 +100,11 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			/*
-				enabledActions, err := actions.Configure(ctx)
-				if err != nil {
-					return err
-				}
-				logging.Default().Info("enabled actions", "actions", actions)
-			*/
+			actionSvc, err := action.New(ctx, actions)
+			if err != nil {
+				return err
+			}
+
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(geminiModel),
 				usecase.WithEmbeddingClient(embeddingClient),
@@ -113,6 +112,7 @@ func cmdServe() *cli.Command {
 				usecase.WithRepository(firestore),
 				usecase.WithSlackService(slackSvc),
 				usecase.WithTestDataSet(testDataSet),
+				usecase.WithActionService(actionSvc),
 			}
 
 			githubApp, err := githubAppCfg.Configure(ctx)

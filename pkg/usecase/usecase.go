@@ -8,6 +8,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/service/action"
 	"github.com/secmon-lab/warren/pkg/service/githubapp"
 	"github.com/secmon-lab/warren/pkg/service/slack"
 )
@@ -20,6 +21,7 @@ type UseCases struct {
 	repository      interfaces.Repository
 	policyClient    interfaces.PolicyClient
 	githubApp       *githubapp.Service
+	actionSvc       *action.Service
 
 	// test data set
 	testDataSet *policy.TestDataSet
@@ -69,6 +71,12 @@ func WithRepository(repository interfaces.Repository) Option {
 func WithGitHubApp(githubApp *githubapp.Service) Option {
 	return func(u *UseCases) {
 		u.githubApp = githubApp
+	}
+}
+
+func WithActionService(actionSvc *action.Service) Option {
+	return func(u *UseCases) {
+		u.actionSvc = actionSvc
 	}
 }
 

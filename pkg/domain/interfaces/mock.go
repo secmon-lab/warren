@@ -7,6 +7,7 @@ import (
 	"cloud.google.com/go/vertexai/genai"
 	"context"
 	"github.com/m-mizutani/opaq"
+	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
@@ -14,9 +15,277 @@ import (
 	modelslack "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	slackslack "github.com/slack-go/slack"
+	"github.com/urfave/cli/v3"
+	"log/slog"
 	"sync"
 	"time"
 )
+
+// ActionMock is a mock implementation of Action.
+//
+//	func TestSomethingThatUsesAction(t *testing.T) {
+//
+//		// make and configure a mocked Action
+//		mockedAction := &ActionMock{
+//			ConfigureFunc: func(ctx context.Context) error {
+//				panic("mock out the Configure method")
+//			},
+//			ExecuteFunc: func(ctx context.Context, name string, args map[string]any) (*action.Result, error) {
+//				panic("mock out the Execute method")
+//			},
+//			FlagsFunc: func() []cli.Flag {
+//				panic("mock out the Flags method")
+//			},
+//			LogValueFunc: func() slog.Value {
+//				panic("mock out the LogValue method")
+//			},
+//			NameFunc: func() string {
+//				panic("mock out the Name method")
+//			},
+//			SpecsFunc: func() []*genai.FunctionDeclaration {
+//				panic("mock out the Specs method")
+//			},
+//		}
+//
+//		// use mockedAction in code that requires Action
+//		// and then make assertions.
+//
+//	}
+type ActionMock struct {
+	// ConfigureFunc mocks the Configure method.
+	ConfigureFunc func(ctx context.Context) error
+
+	// ExecuteFunc mocks the Execute method.
+	ExecuteFunc func(ctx context.Context, name string, args map[string]any) (*action.Result, error)
+
+	// FlagsFunc mocks the Flags method.
+	FlagsFunc func() []cli.Flag
+
+	// LogValueFunc mocks the LogValue method.
+	LogValueFunc func() slog.Value
+
+	// NameFunc mocks the Name method.
+	NameFunc func() string
+
+	// SpecsFunc mocks the Specs method.
+	SpecsFunc func() []*genai.FunctionDeclaration
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// Configure holds details about calls to the Configure method.
+		Configure []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
+		// Execute holds details about calls to the Execute method.
+		Execute []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// Args is the args argument value.
+			Args map[string]any
+		}
+		// Flags holds details about calls to the Flags method.
+		Flags []struct {
+		}
+		// LogValue holds details about calls to the LogValue method.
+		LogValue []struct {
+		}
+		// Name holds details about calls to the Name method.
+		Name []struct {
+		}
+		// Specs holds details about calls to the Specs method.
+		Specs []struct {
+		}
+	}
+	lockConfigure sync.RWMutex
+	lockExecute   sync.RWMutex
+	lockFlags     sync.RWMutex
+	lockLogValue  sync.RWMutex
+	lockName      sync.RWMutex
+	lockSpecs     sync.RWMutex
+}
+
+// Configure calls ConfigureFunc.
+func (mock *ActionMock) Configure(ctx context.Context) error {
+	if mock.ConfigureFunc == nil {
+		panic("ActionMock.ConfigureFunc: method is nil but Action.Configure was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockConfigure.Lock()
+	mock.calls.Configure = append(mock.calls.Configure, callInfo)
+	mock.lockConfigure.Unlock()
+	return mock.ConfigureFunc(ctx)
+}
+
+// ConfigureCalls gets all the calls that were made to Configure.
+// Check the length with:
+//
+//	len(mockedAction.ConfigureCalls())
+func (mock *ActionMock) ConfigureCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockConfigure.RLock()
+	calls = mock.calls.Configure
+	mock.lockConfigure.RUnlock()
+	return calls
+}
+
+// Execute calls ExecuteFunc.
+func (mock *ActionMock) Execute(ctx context.Context, name string, args map[string]any) (*action.Result, error) {
+	if mock.ExecuteFunc == nil {
+		panic("ActionMock.ExecuteFunc: method is nil but Action.Execute was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Name string
+		Args map[string]any
+	}{
+		Ctx:  ctx,
+		Name: name,
+		Args: args,
+	}
+	mock.lockExecute.Lock()
+	mock.calls.Execute = append(mock.calls.Execute, callInfo)
+	mock.lockExecute.Unlock()
+	return mock.ExecuteFunc(ctx, name, args)
+}
+
+// ExecuteCalls gets all the calls that were made to Execute.
+// Check the length with:
+//
+//	len(mockedAction.ExecuteCalls())
+func (mock *ActionMock) ExecuteCalls() []struct {
+	Ctx  context.Context
+	Name string
+	Args map[string]any
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Name string
+		Args map[string]any
+	}
+	mock.lockExecute.RLock()
+	calls = mock.calls.Execute
+	mock.lockExecute.RUnlock()
+	return calls
+}
+
+// Flags calls FlagsFunc.
+func (mock *ActionMock) Flags() []cli.Flag {
+	if mock.FlagsFunc == nil {
+		panic("ActionMock.FlagsFunc: method is nil but Action.Flags was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockFlags.Lock()
+	mock.calls.Flags = append(mock.calls.Flags, callInfo)
+	mock.lockFlags.Unlock()
+	return mock.FlagsFunc()
+}
+
+// FlagsCalls gets all the calls that were made to Flags.
+// Check the length with:
+//
+//	len(mockedAction.FlagsCalls())
+func (mock *ActionMock) FlagsCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockFlags.RLock()
+	calls = mock.calls.Flags
+	mock.lockFlags.RUnlock()
+	return calls
+}
+
+// LogValue calls LogValueFunc.
+func (mock *ActionMock) LogValue() slog.Value {
+	if mock.LogValueFunc == nil {
+		panic("ActionMock.LogValueFunc: method is nil but Action.LogValue was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockLogValue.Lock()
+	mock.calls.LogValue = append(mock.calls.LogValue, callInfo)
+	mock.lockLogValue.Unlock()
+	return mock.LogValueFunc()
+}
+
+// LogValueCalls gets all the calls that were made to LogValue.
+// Check the length with:
+//
+//	len(mockedAction.LogValueCalls())
+func (mock *ActionMock) LogValueCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockLogValue.RLock()
+	calls = mock.calls.LogValue
+	mock.lockLogValue.RUnlock()
+	return calls
+}
+
+// Name calls NameFunc.
+func (mock *ActionMock) Name() string {
+	if mock.NameFunc == nil {
+		panic("ActionMock.NameFunc: method is nil but Action.Name was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockName.Lock()
+	mock.calls.Name = append(mock.calls.Name, callInfo)
+	mock.lockName.Unlock()
+	return mock.NameFunc()
+}
+
+// NameCalls gets all the calls that were made to Name.
+// Check the length with:
+//
+//	len(mockedAction.NameCalls())
+func (mock *ActionMock) NameCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockName.RLock()
+	calls = mock.calls.Name
+	mock.lockName.RUnlock()
+	return calls
+}
+
+// Specs calls SpecsFunc.
+func (mock *ActionMock) Specs() []*genai.FunctionDeclaration {
+	if mock.SpecsFunc == nil {
+		panic("ActionMock.SpecsFunc: method is nil but Action.Specs was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockSpecs.Lock()
+	mock.calls.Specs = append(mock.calls.Specs, callInfo)
+	mock.lockSpecs.Unlock()
+	return mock.SpecsFunc()
+}
+
+// SpecsCalls gets all the calls that were made to Specs.
+// Check the length with:
+//
+//	len(mockedAction.SpecsCalls())
+func (mock *ActionMock) SpecsCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockSpecs.RLock()
+	calls = mock.calls.Specs
+	mock.lockSpecs.RUnlock()
+	return calls
+}
 
 // SlackClientMock is a mock implementation of SlackClient.
 //

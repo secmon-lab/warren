@@ -50,6 +50,7 @@ tasks:
         -pkg interfaces
         -rm -skip-ensure
         pkg/domain/interfaces
+        Action
         SlackClient
         SlackThreadService
         LLMSession

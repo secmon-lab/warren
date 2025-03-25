@@ -10,7 +10,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/utils/test"
@@ -118,33 +117,6 @@ func genDummyAlertWithSlackThread() alert.Alert {
 		ThreadID:  fmt.Sprintf("%d", time.Now().Unix()),
 	}
 	return alert
-}
-
-func TestSlackPostThreadMessages(t *testing.T) {
-	svc := newSlackService(t)
-
-	alert := genDummyAlert()
-
-	thread, err := svc.PostAlert(context.Background(), alert)
-	gt.NoError(t, err)
-	alert.SlackThread = &model.Thread{
-		ChannelID: thread.ChannelID(),
-		ThreadID:  thread.ThreadID(),
-	}
-
-	gt.NoError(t, thread.PostNextAction(context.Background(), prompt.ActionPromptResult{
-		Action: "test",
-		Args: map[string]any{
-			"foo": "bar",
-			"baz": "qux",
-		},
-	}))
-
-	gt.NoError(t, thread.AttachFile(context.Background(),
-		"this is test data",
-		"test.csv",
-		[]byte("hoge,mage,fuga\nred,blue,green"),
-	))
 }
 
 func TestSlackPostConclusion(t *testing.T) {

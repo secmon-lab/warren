@@ -34,10 +34,10 @@ func alertPubSubHandler(uc useCase) http.HandlerFunc {
 		}
 
 		var alertData any
-		if err := json.Unmarshal([]byte(msg.Data), &alertData); err != nil {
+		if err := json.Unmarshal([]byte(msg.Message.Data), &alertData); err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to decode message",
 				goerr.T(errs.TagInvalidRequest),
-				goerr.V("body", msg.Data),
+				goerr.V("body", msg.Message.Data),
 			))
 			return
 		}

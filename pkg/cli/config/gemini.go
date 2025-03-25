@@ -55,7 +55,7 @@ func (x *GeminiCfg) Configure(ctx context.Context) (*gemini.GeminiClient, error)
 	client, err := gemini.New(ctx, x.projectID,
 		gemini.WithLocation(x.location),
 		gemini.WithModel(x.model),
-		gemini.WithResponseMIMEType("application/json"),
+		gemini.WithContentType("application/json"),
 	)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create vertex ai client")

@@ -7,7 +7,6 @@ import (
 
 type ReplyFunc func(ctx context.Context, msg string)
 type NewStateFunc func(ctx context.Context, msg string) func(ctx context.Context, msg string)
-type StateFunc func(ctx context.Context, msg string)
 
 type ctxReplyFuncKey struct{}
 type ctxNewStateFuncKey struct{}
@@ -42,7 +41,7 @@ func State(ctx context.Context, base string, args ...any) context.Context {
 
 	// If there is already a state function, execute it
 	if v := ctx.Value(ctxStateFuncKey{}); v != nil {
-		if stateMsg, ok := v.(StateFunc); ok && stateMsg != nil {
+		if stateMsg, ok := v.(func(ctx context.Context, msg string)); ok && stateMsg != nil {
 			stateMsg(ctx, msg)
 			return ctx
 		}
