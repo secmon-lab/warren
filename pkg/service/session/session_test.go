@@ -8,6 +8,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	model "github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/session"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
@@ -16,7 +17,7 @@ import (
 
 func TestSessionChat(t *testing.T) {
 	ctx := t.Context()
-	ssn := model.New(ctx, slack.User{}, slack.Thread{})
+	ssn := model.New(ctx, slack.User{}, slack.Thread{}, []types.AlertID{types.NewAlertID()})
 	geminiClient := gemini.NewTestClient(t)
 	slackClient := &interfaces.SlackClientMock{
 		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {

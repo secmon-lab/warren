@@ -2,14 +2,12 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -46,6 +44,7 @@ const (
 	collectionAlertLists  = "lists"
 	commentCollection     = "comments"
 	collectionSessions    = "sessions"
+	collectionHistories   = "histories"
 )
 
 func (r *Firestore) PutAlert(ctx context.Context, alert alert.Alert) error {
@@ -378,30 +377,43 @@ func (r *Firestore) GetLatestAlertListInThread(ctx context.Context, thread slack
 	return &lists[0], nil
 }
 
-func (r *Firestore) GetHistory(ctx context.Context, thread slack.Thread) (*chat.History, error) {
-	doc := r.db.Collection("chat_histories").Doc(fmt.Sprintf("%s_%s", thread.ChannelID, thread.ThreadID))
-	docSnap, err := doc.Get(ctx)
-	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			return nil, nil
+func (r *Firestore) GetHistory(ctx context.Context, sessionID types.SessionID) (session.Histories, error) {
+	iter := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionHistories).OrderBy("CreatedAt", firestore.Asc).Documents(ctx)
+	defer iter.Stop()
+
+	var histories session.Histories
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
 		}
-		return nil, goerr.Wrap(err, "failed to get chat history")
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to get chat history")
+		}
+
+		var history session.History
+		if err := doc.DataTo(&history); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to chat history")
+		}
+		histories = append(histories, &history)
 	}
 
-	var history chat.History
-	if err := docSnap.DataTo(&history); err != nil {
-		return nil, goerr.Wrap(err, "failed to convert data to chat history")
-	}
-
-	return &history, nil
+	return histories, nil
 }
 
-func (r *Firestore) PutHistory(ctx context.Context, history chat.History) error {
-	doc := r.db.Collection("chat_histories").Doc(fmt.Sprintf("%s_%s", history.Thread.ChannelID, history.Thread.ThreadID))
-	_, err := doc.Set(ctx, history)
-	if err != nil {
-		return goerr.Wrap(err, "failed to put chat history")
+func (r *Firestore) PutHistory(ctx context.Context, sessionID types.SessionID, histories session.Histories) error {
+	writer := r.db.BulkWriter(ctx)
+	defer writer.End()
+
+	for _, history := range histories {
+		doc := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionHistories).Doc(history.ID.String())
+		_, err := writer.Set(doc, history)
+		if err != nil {
+			return goerr.Wrap(err, "failed to put chat history")
+		}
 	}
+
+	writer.End()
 	return nil
 }
 

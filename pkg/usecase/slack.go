@@ -6,7 +6,10 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	model "github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/service/session"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
@@ -38,36 +41,63 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, 
 	if !uc.slackService.IsBotUser(mention.UserID) {
 		return nil
 	}
+	if len(mention.Message) == 0 {
+		msg.Reply(ctx, "🤔 No message")
+		return nil
+	}
 
+	// If session is found, dispatch the action to the existing session
+	ssn, err := uc.repository.GetSessionByThread(ctx, thread)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get session by slack thread")
+	}
+	if ssn != nil {
+		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
+			ssnSvc := session.New(uc.repository, uc.llmClient, uc.slackService, ssn)
+			return ssnSvc.Chat(ctx, mention.Message)
+		})
+		return nil
+	}
+
+	// If session is not found, starting a new session based on existing alert or list
 	alert, err := uc.repository.GetAlertByThread(ctx, thread)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert by slack thread")
 	}
-	session, err := uc.repository.GetSessionByThread(ctx, thread)
+	if alert != nil {
+		ssn = model.New(ctx, user, thread, []types.AlertID{alert.ID})
+
+		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
+			if err := uc.repository.PutSession(ctx, *ssn); err != nil {
+				return goerr.Wrap(err, "failed to put session")
+			}
+
+			ssnSvc := session.New(uc.repository, uc.llmClient, uc.slackService, ssn)
+			return ssnSvc.Chat(ctx, mention.Message)
+		})
+		return nil
+	}
+
+	// If alert is not found, get alert list by slack thread
+	alertList, err := uc.repository.GetAlertListByThread(ctx, thread)
 	if err != nil {
-		return goerr.Wrap(err, "failed to get session by slack thread")
+		return goerr.Wrap(err, "failed to get alert list by slack thread")
 	}
+	if alertList != nil {
+		ssn = model.New(ctx, user, thread, alertList.AlertIDs)
 
-	if len(mention.Message) == 0 {
-		msg.Reply(ctx, "⏸️ No action specified")
+		uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
+			if err := uc.repository.PutSession(ctx, *ssn); err != nil {
+				return goerr.Wrap(err, "failed to put session")
+			}
+
+			ssnSvc := session.New(uc.repository, uc.llmClient, uc.slackService, ssn)
+			return ssnSvc.Chat(ctx, mention.Message)
+		})
 		return nil
 	}
 
-	uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-		// TODO: Implement
-
-		// If alert is not fo
-		if alert != nil {
-			logger.Info("alert found", "alert", alert)
-		}
-		if session != nil {
-			logger.Info("session found", "session", session)
-		}
-
-		logger.Info("dispatch slack action", "mention", mention)
-		return nil
-	})
-
+	// If session, alert and alert list are not found, nothing to do
 	return nil
 }
 

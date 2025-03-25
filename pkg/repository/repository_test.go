@@ -9,7 +9,6 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -113,30 +112,41 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 
 	// Chat関連のテスト
 	t.Run("History", func(t *testing.T) {
-		history := chat.History{
-			ID:        types.HistoryID("test-history-id"),
-			Thread:    thread,
-			CreatedBy: slack.User{ID: "test-user", Name: "Test User"},
-			CreatedAt: time.Now(),
-			Contents: []chat.Content{
-				{
-					Role: "user",
-					Text: []string{"test message"},
+		sessionID := types.NewSessionID()
+		histories := session.Histories{
+			{
+				ID:        types.NewHistoryID(),
+				CreatedAt: time.Now(),
+				Role:      "user",
+				Parts: []session.Part{
+					{
+						Text: "test message 1",
+					},
+				},
+			},
+			{
+				ID:        types.NewHistoryID(),
+				CreatedAt: time.Now(),
+				Role:      "assistant",
+				Parts: []session.Part{
+					{
+						Text: "test response 1",
+					},
 				},
 			},
 		}
 
 		// PutHistory
-		gt.NoError(t, repo.PutHistory(ctx, history))
+		gt.NoError(t, repo.PutHistory(ctx, sessionID, histories))
 
 		// GetHistory
-		got, err := repo.GetHistory(ctx, thread)
+		got, err := repo.GetHistory(ctx, sessionID)
 		gt.NoError(t, err)
-		gt.Value(t, got.ID).Equal(history.ID)
-		gt.Value(t, got.Thread.ChannelID).Equal(thread.ChannelID)
-		gt.Value(t, got.Thread.ThreadID).Equal(thread.ThreadID)
-		gt.Value(t, got.Contents[0].Role).Equal("user")
-		gt.Array(t, got.Contents[0].Text).Equal([]string{"test message"})
+		gt.Array(t, got).Length(2)
+		gt.Value(t, got[0].Role).Equal("user")
+		gt.Value(t, got[1].Role).Equal("assistant")
+		gt.Value(t, got[0].Parts[0].Text).Equal("test message 1")
+		gt.Value(t, got[1].Parts[0].Text).Equal("test response 1")
 	})
 
 	// AlertList関連のテスト

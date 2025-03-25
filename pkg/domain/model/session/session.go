@@ -14,13 +14,15 @@ type Session struct {
 	CreatedAt time.Time       `json:"created_at"`
 	CreatedBy slack.User      `json:"created_by"`
 	Thread    slack.Thread    `json:"thread"`
+	AlertIDs  []types.AlertID `json:"alert_ids"`
 }
 
-func New(ctx context.Context, createdBy slack.User, thread slack.Thread) *Session {
+func New(ctx context.Context, createdBy slack.User, thread slack.Thread, alertIDs []types.AlertID) *Session {
 	return &Session{
 		ID:        types.NewSessionID(),
 		CreatedAt: clock.Now(ctx),
 		CreatedBy: createdBy,
 		Thread:    thread,
+		AlertIDs:  alertIDs,
 	}
 }

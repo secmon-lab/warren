@@ -6,7 +6,6 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -18,7 +17,7 @@ type Memory struct {
 	alerts      map[types.AlertID]alert.Alert
 	comments    map[types.AlertID][]alert.AlertComment
 	lists       map[types.AlertListID]alert.List
-	histories   map[string]*chat.History
+	histories   map[types.SessionID]session.Histories
 	policyDiffs map[types.PolicyDiffID]*policy.Diff
 	sessions    map[types.SessionID]session.Session
 }
@@ -28,7 +27,7 @@ func NewMemory() *Memory {
 		alerts:      make(map[types.AlertID]alert.Alert),
 		comments:    make(map[types.AlertID][]alert.AlertComment),
 		lists:       make(map[types.AlertListID]alert.List),
-		histories:   make(map[string]*chat.History),
+		histories:   make(map[types.SessionID]session.Histories),
 		policyDiffs: make(map[types.PolicyDiffID]*policy.Diff),
 		sessions:    make(map[types.SessionID]session.Session),
 	}
@@ -66,14 +65,12 @@ func (r *Memory) GetAlertComments(ctx context.Context, alertID types.AlertID) ([
 	return r.comments[alertID], nil
 }
 
-func (r *Memory) GetHistory(ctx context.Context, thread slack.Thread) (*chat.History, error) {
-	key := thread.ChannelID + "_" + thread.ThreadID
-	return r.histories[key], nil
+func (r *Memory) GetHistory(ctx context.Context, sessionID types.SessionID) (session.Histories, error) {
+	return r.histories[sessionID], nil
 }
 
-func (r *Memory) PutHistory(ctx context.Context, history chat.History) error {
-	key := history.Thread.ChannelID + "_" + history.Thread.ThreadID
-	r.histories[key] = &history
+func (r *Memory) PutHistory(ctx context.Context, sessionID types.SessionID, histories session.Histories) error {
+	r.histories[sessionID] = histories
 	return nil
 }
 

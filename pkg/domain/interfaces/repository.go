@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -20,8 +19,8 @@ type Repository interface {
 	GetAlertComments(ctx context.Context, alertID types.AlertID) ([]alert.AlertComment, error)
 
 	// For chat
-	GetHistory(ctx context.Context, thread slack.Thread) (*chat.History, error)
-	PutHistory(ctx context.Context, history chat.History) error
+	GetHistory(ctx context.Context, sessionID types.SessionID) (session.Histories, error)
+	PutHistory(ctx context.Context, sessionID types.SessionID, histories session.Histories) error
 
 	// For list management
 	GetAlertList(ctx context.Context, listID types.AlertListID) (*alert.List, error)
