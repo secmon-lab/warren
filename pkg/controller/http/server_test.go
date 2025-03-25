@@ -142,7 +142,7 @@ func TestSlackMentionHandler(t *testing.T) {
 			gt.Equal(t, slackThread.ChannelID, "C07AR2FPG1F")
 			gt.Equal(t, slackThread.ThreadID, "1741487414.163419")
 			gt.Equal(t, mention.UserID, "U08A3TTRENS")
-			gt.Equal(t, mention.Args, []string{"kokoro"})
+			gt.Equal(t, mention.Message, "kokoro")
 			return nil
 		},
 	}

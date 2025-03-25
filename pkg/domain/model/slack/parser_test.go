@@ -3,9 +3,109 @@ package slack_test
 import (
 	"testing"
 
+	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 )
 
+func TestParseMention(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected []slack.Mention
+	}{
+		{
+			name:  "single mention",
+			input: "<@U123>hello",
+			expected: []slack.Mention{
+				{
+					UserID:  "U123",
+					Message: "hello",
+				},
+			},
+		},
+		{
+			name:  "multiple mentions",
+			input: "<@U123>hello<@U456>goodbye",
+			expected: []slack.Mention{
+				{
+					UserID:  "U123",
+					Message: "hello",
+				},
+				{
+					UserID:  "U456",
+					Message: "goodbye",
+				},
+			},
+		},
+		{
+			name:  "mention without message",
+			input: "<@U123>",
+			expected: []slack.Mention{
+				{
+					UserID:  "U123",
+					Message: "",
+				},
+			},
+		},
+		{
+			name:     "no mentions",
+			input:    "hello world",
+			expected: nil,
+		},
+		{
+			name:  "mention with spaces",
+			input: "<@U123> hello world ",
+			expected: []slack.Mention{
+				{
+					UserID:  "U123",
+					Message: "hello world",
+				},
+			},
+		},
+		{
+			name:  "mention with Japanese text",
+			input: "<@U123>こんにちは",
+			expected: []slack.Mention{
+				{
+					UserID:  "U123",
+					Message: "こんにちは",
+				},
+			},
+		},
+		{
+			name:  "multiple mentions with mixed content",
+			input: "start <@U123>hello world<@U456>goodbye everyone<@U789>最後",
+			expected: []slack.Mention{
+				{
+					UserID:  "U123",
+					Message: "hello world",
+				},
+				{
+					UserID:  "U456",
+					Message: "goodbye everyone",
+				},
+				{
+					UserID:  "U789",
+					Message: "最後",
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := slack.ParseMention(c.input)
+			gt.Equal(t, len(c.expected), len(got))
+
+			for i := range got {
+				gt.Equal(t, c.expected[i].UserID, got[i].UserID)
+				gt.Equal(t, c.expected[i].Message, got[i].Message)
+			}
+		})
+	}
+}
+
+/*
 func TestParseArgs(t *testing.T) {
 	testCases := map[string]struct {
 		input    string
@@ -72,7 +172,6 @@ func TestParseArgs(t *testing.T) {
 		})
 	}
 }
-
 func TestParseMention(t *testing.T) {
 	testCases := map[string]struct {
 		input    string
@@ -170,3 +269,4 @@ func TestParseMention(t *testing.T) {
 		})
 	}
 }
+*/

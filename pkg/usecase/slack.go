@@ -48,12 +48,11 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, 
 		return goerr.Wrap(err, "failed to get session by slack thread")
 	}
 
-	if len(mention.Args) == 0 {
+	if len(mention.Message) == 0 {
 		msg.Reply(ctx, "⏸️ No action specified")
 		return nil
 	}
 
-	arguments := append([]string{"warren"}, mention.Args...)
 	uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
 		// TODO: Implement
 
@@ -65,7 +64,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, 
 			logger.Info("session found", "session", session)
 		}
 
-		logger.Info("dispatch slack action", "arguments", arguments)
+		logger.Info("dispatch slack action", "mention", mention)
 		return nil
 	})
 

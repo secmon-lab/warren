@@ -2,9 +2,9 @@ package slack
 
 import (
 	"strings"
-	"unicode/utf8"
 )
 
+/*
 // parseArgs parses a string into arguments, handling various types of quotes
 func parseArgs(input string) []string {
 	var result []string
@@ -84,27 +84,39 @@ func parseArgs(input string) []string {
 
 	return result
 }
+*/
 
 func ParseMention(input string) []Mention {
-	args := parseArgs(input)
-
-	mentions := make([]Mention, 0, len(args))
+	mentions := make([]Mention, 0)
 	var current *Mention
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "<@") && strings.HasSuffix(arg, ">") {
+	var messageBuilder strings.Builder
+
+	runes := []rune(input)
+	for i := 0; i < len(runes); i++ {
+		if i+1 < len(runes) && string(runes[i:i+2]) == "<@" {
+			// Found start of mention
 			if current != nil {
+				current.Message = strings.TrimSpace(messageBuilder.String())
 				mentions = append(mentions, *current)
-				current = nil
+				messageBuilder.Reset()
 			}
-			current = &Mention{
-				UserID: strings.TrimSuffix(strings.TrimPrefix(arg, "<@"), ">"),
-				Args:   make([]string, 0),
+
+			// Extract user ID
+			start := i + 2
+			for i = start; i < len(runes) && runes[i] != '>'; i++ {
+			}
+			if i < len(runes) {
+				current = &Mention{
+					UserID: string(runes[start:i]),
+				}
 			}
 		} else if current != nil {
-			current.Args = append(current.Args, arg)
+			messageBuilder.WriteRune(runes[i])
 		}
 	}
+
 	if current != nil {
+		current.Message = strings.TrimSpace(messageBuilder.String())
 		mentions = append(mentions, *current)
 	}
 

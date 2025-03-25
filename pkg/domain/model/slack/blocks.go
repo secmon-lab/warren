@@ -62,6 +62,6 @@ const (
 )
 
 type Mention struct {
-	UserID string
-	Args   []string
+	UserID  string
+	Message string
 }
