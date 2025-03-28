@@ -20,13 +20,13 @@ type Service struct {
 	route   map[string]interfaces.Action
 }
 
-func New(ctx context.Context, actions []interfaces.Action) (*Service, error) {
+func configureActions(ctx context.Context, actions []interfaces.Action) ([]interfaces.Action, map[string]interfaces.Action, error) {
 	routeMap := make(map[string]interfaces.Action)
-
 	configuredActions := make([]interfaces.Action, 0, len(actions))
+
 	for _, a := range actions {
 		if a.Name() == "" {
-			return nil, goerr.New("action name is required", goerr.V("action", a))
+			return nil, nil, goerr.New("action name is required", goerr.V("action", a))
 		}
 
 		if err := a.Configure(ctx); err != nil {
@@ -34,16 +34,16 @@ func New(ctx context.Context, actions []interfaces.Action) (*Service, error) {
 				continue
 			}
 
-			return nil, goerr.Wrap(err, "failed to configure action", goerr.V("action", a.Name()))
+			return nil, nil, goerr.Wrap(err, "failed to configure action", goerr.V("action", a.Name()))
 		}
 
 		for _, d := range a.Specs() {
 			if d.Name == "" {
-				return nil, goerr.New("function name is required", goerr.V("action", a), goerr.V("declaration", d))
+				return nil, nil, goerr.New("function name is required", goerr.V("action", a), goerr.V("declaration", d))
 			}
 
 			if existed, ok := routeMap[d.Name]; ok {
-				return nil, goerr.New("function name is conflicted", goerr.V("action", a), goerr.V("conflicted", d), goerr.V("existed", existed))
+				return nil, nil, goerr.New("function name is conflicted", goerr.V("action", a), goerr.V("conflicted", d), goerr.V("existed", existed))
 			}
 
 			routeMap[d.Name] = a
@@ -52,8 +52,16 @@ func New(ctx context.Context, actions []interfaces.Action) (*Service, error) {
 		configuredActions = append(configuredActions, a)
 	}
 
-	logging.From(ctx).Info("configured actions", "actions", configuredActions)
+	return configuredActions, routeMap, nil
+}
 
+func New(ctx context.Context, actions []interfaces.Action) (*Service, error) {
+	configuredActions, routeMap, err := configureActions(ctx, actions)
+	if err != nil {
+		return nil, err
+	}
+
+	logging.From(ctx).Info("configured actions", "actions", configuredActions)
 	return &Service{actions: configuredActions, route: routeMap}, nil
 }
 
@@ -80,4 +88,19 @@ func (x *Service) Execute(ctx context.Context, name string, args map[string]any)
 	msg.State(ctx, "⚡ Exec: `%s` with %s", name, strings.Join(argsStr, ", "))
 	logger.Info("executing action", "name", name, "args", args)
 	return action.Execute(ctx, name, args)
+}
+
+func (x *Service) With(ctx context.Context, newActions []interfaces.Action) (*Service, error) {
+	// Create a new slice with combined actions
+	combinedActions := make([]interfaces.Action, 0, len(x.actions)+len(newActions))
+	combinedActions = append(combinedActions, x.actions...)
+	combinedActions = append(combinedActions, newActions...)
+
+	configuredActions, routeMap, err := configureActions(ctx, combinedActions)
+	if err != nil {
+		return nil, err
+	}
+
+	logging.From(ctx).Info("configured actions with new actions", "actions", configuredActions)
+	return &Service{actions: configuredActions, route: routeMap}, nil
 }

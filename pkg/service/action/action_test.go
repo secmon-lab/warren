@@ -77,3 +77,112 @@ func TestAction(t *testing.T) {
 		})
 	}
 }
+
+func TestServiceWith(t *testing.T) {
+	cases := []struct {
+		name      string
+		base      []interfaces.Action
+		new       []interfaces.Action
+		wantErr   bool
+		errCheck  func(t *testing.T, err error)
+		specCheck func(t *testing.T, specs []*genai.FunctionDeclaration)
+	}{
+		{
+			name: "success: add new action",
+			base: []interfaces.Action{
+				&interfaces.ActionMock{
+					NameFunc:      func() string { return "base" },
+					ConfigureFunc: func(ctx context.Context) error { return nil },
+					SpecsFunc: func() []*genai.FunctionDeclaration {
+						return []*genai.FunctionDeclaration{{Name: "base.func"}}
+					},
+				},
+			},
+			new: []interfaces.Action{
+				&interfaces.ActionMock{
+					NameFunc:      func() string { return "new" },
+					ConfigureFunc: func(ctx context.Context) error { return nil },
+					SpecsFunc: func() []*genai.FunctionDeclaration {
+						return []*genai.FunctionDeclaration{{Name: "new.func"}}
+					},
+				},
+			},
+			specCheck: func(t *testing.T, specs []*genai.FunctionDeclaration) {
+				gt.Equal(t, 2, len(specs))
+				gt.Equal(t, "base.func", specs[0].Name)
+				gt.Equal(t, "new.func", specs[1].Name)
+			},
+		},
+		{
+			name: "error: duplicate function name between base and new",
+			base: []interfaces.Action{
+				&interfaces.ActionMock{
+					NameFunc:      func() string { return "base" },
+					ConfigureFunc: func(ctx context.Context) error { return nil },
+					SpecsFunc: func() []*genai.FunctionDeclaration {
+						return []*genai.FunctionDeclaration{{Name: "func"}}
+					},
+				},
+			},
+			new: []interfaces.Action{
+				&interfaces.ActionMock{
+					NameFunc:      func() string { return "new" },
+					ConfigureFunc: func(ctx context.Context) error { return nil },
+					SpecsFunc: func() []*genai.FunctionDeclaration {
+						return []*genai.FunctionDeclaration{{Name: "func"}}
+					},
+				},
+			},
+			wantErr: true,
+			errCheck: func(t *testing.T, err error) {
+				gt.Error(t, err).Contains("function name is conflicted")
+			},
+		},
+		{
+			name: "error: empty action name in new actions",
+			base: []interfaces.Action{
+				&interfaces.ActionMock{
+					NameFunc:      func() string { return "base" },
+					ConfigureFunc: func(ctx context.Context) error { return nil },
+					SpecsFunc: func() []*genai.FunctionDeclaration {
+						return []*genai.FunctionDeclaration{{Name: "base.func"}}
+					},
+				},
+			},
+			new: []interfaces.Action{
+				&interfaces.ActionMock{
+					NameFunc:      func() string { return "" },
+					ConfigureFunc: func(ctx context.Context) error { return nil },
+					SpecsFunc:     func() []*genai.FunctionDeclaration { return nil },
+				},
+			},
+			wantErr: true,
+			errCheck: func(t *testing.T, err error) {
+				gt.Error(t, err).Contains("action name is required")
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			baseSvc, err := action.New(t.Context(), tt.base)
+			gt.NoError(t, err)
+
+			newSvc, err := baseSvc.With(t.Context(), tt.new)
+			if tt.wantErr {
+				gt.Error(t, err)
+				if tt.errCheck != nil {
+					tt.errCheck(t, err)
+				}
+				return
+			}
+
+			gt.NoError(t, err)
+			gt.NotNil(t, newSvc)
+
+			if tt.specCheck != nil {
+				tt.specCheck(t, newSvc.Specs())
+			}
+		})
+	}
+}
