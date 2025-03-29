@@ -3,9 +3,11 @@ package config
 import (
 	"log/slog"
 
-	"github.com/secmon-lab/warren/pkg/interfaces"
-	"github.com/secmon-lab/warren/pkg/service"
+	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/urfave/cli/v3"
+
+	sdk "github.com/slack-go/slack"
 )
 
 type Slack struct {
@@ -48,18 +50,20 @@ func (x Slack) LogValue() slog.Value {
 	)
 }
 
-func (x *Slack) Configure() (*service.Slack, error) {
+func (x *Slack) Configure() (*slack.Service, error) {
 	if x.oauthToken == "" {
 		return nil, nil
 	}
 
-	return service.NewSlack(x.oauthToken, x.signingSecret, x.channelID)
+	client := sdk.New(x.oauthToken)
+
+	return slack.New(client, x.channelID)
 }
 
-func (x *Slack) Verifier() interfaces.SlackPayloadVerifier {
+func (x *Slack) Verifier() model.PayloadVerifier {
 	if x.signingSecret == "" {
 		return nil
 	}
 
-	return service.NewSlackPayloadVerifier(x.signingSecret)
+	return model.NewPayloadVerifier(x.signingSecret)
 }

@@ -4,7 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/secmon-lab/warren/pkg/adapter/embedding"
-	"github.com/secmon-lab/warren/pkg/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/urfave/cli/v3"
 )
 

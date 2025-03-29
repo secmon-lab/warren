@@ -12,12 +12,12 @@ func TestLoadTestFiles(t *testing.T) {
 	gt.NoError(t, err)
 
 	gt.Map(t, data.Data).
-		HaveKey("schema1").
+		HasKey("schema1").
 		At("schema1", func(t testing.TB, v map[string]any) {
-			gt.Map(t, v).HaveKeyValue("nest/data.json", map[string]any{"msg": "schema1 test"})
-			gt.Map(t, v).HaveKeyValue("nest/nest2/data.json", map[string]any{"msg": "nest2 test"})
+			gt.Map(t, v).HasKeyValue("nest/data.json", map[string]any{"msg": "schema1 test"})
+			gt.Map(t, v).HasKeyValue("nest/nest2/data.json", map[string]any{"msg": "nest2 test"})
 		}).
 		At("schema2", func(t testing.TB, v map[string]any) {
-			gt.Map(t, v).HaveKeyValue("data.json", map[string]any{"msg": "schema2 test"})
+			gt.Map(t, v).HasKeyValue("data.json", map[string]any{"msg": "schema2 test"})
 		})
 }

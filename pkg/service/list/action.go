@@ -1,20 +1,6 @@
 package list
 
-import (
-	"context"
-	"encoding/json"
-	"slices"
-	"sort"
-	"strconv"
-	"strings"
-
-	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/model"
-	"github.com/secmon-lab/warren/pkg/prompt"
-	"github.com/secmon-lab/warren/pkg/service"
-	"github.com/secmon-lab/warren/pkg/utils/thread"
-)
-
+/*
 type actionMapping map[string]func([]string) action
 
 func newActionMapping(x *Service) actionMapping {
@@ -46,11 +32,11 @@ func (x actionMapping) findMatchedAction(name string) (func([]string) action, er
 	return matchedFn, nil
 }
 
-type action func(ctx context.Context, alerts []model.Alert) ([]model.Alert, error)
+type action func(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error)
 
 func (x *Service) actionGrep(args []string) action {
-	return func(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
-		filtered := []model.Alert{}
+	return func(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
+		filtered := []alert.Alert{}
 
 		for _, alert := range alerts {
 			raw, err := json.Marshal(alert)
@@ -70,10 +56,10 @@ func (x *Service) actionGrep(args []string) action {
 }
 
 func (x *Service) actionSort(args []string) action {
-	var comp func(a, b model.Alert) bool
+	var comp func(a, b alert.Alert) bool
 
 	if len(args) != 1 {
-		return func(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
+		return func(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
 			return nil, goerr.New("invalid sort key. (valid keys: created_at, updated_at)", goerr.V("key", args))
 		}
 	}
@@ -81,20 +67,20 @@ func (x *Service) actionSort(args []string) action {
 	key := args[0]
 	switch key {
 	case "created_at":
-		comp = func(a, b model.Alert) bool {
+		comp = func(a, b alert.Alert) bool {
 			return a.CreatedAt.Before(b.CreatedAt)
 		}
 	case "updated_at":
-		comp = func(a, b model.Alert) bool {
+		comp = func(a, b alert.Alert) bool {
 			return a.UpdatedAt.Before(b.UpdatedAt)
 		}
 	default:
-		return func(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
+		return func(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
 			return nil, goerr.New("invalid sort key. (valid keys: created_at, updated_at)", goerr.V("key", key))
 		}
 	}
 
-	return func(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
+	return func(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
 		sort.Slice(alerts, func(i, j int) bool {
 			return comp(alerts[i], alerts[j])
 		})
@@ -104,19 +90,19 @@ func (x *Service) actionSort(args []string) action {
 
 func (x *Service) actionLimit(args []string) action {
 	if len(args) != 1 {
-		return func(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
+		return func(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
 			return nil, goerr.New("argument required. (valid arguments: limit [number])", goerr.V("args", args))
 		}
 	}
 
 	limit, err := strconv.Atoi(args[0])
 	if err != nil {
-		return func(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
+		return func(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
 			return nil, goerr.Wrap(err, "failed to convert limit to int", goerr.V("limit", args[0]))
 		}
 	}
 
-	return func(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
+	return func(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
 		if limit > len(alerts) {
 			return alerts, nil
 		}
@@ -126,21 +112,21 @@ func (x *Service) actionLimit(args []string) action {
 
 func (x *Service) actionOffset(args []string) action {
 	if len(args) != 1 {
-		return func(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
+		return func(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
 			return nil, goerr.New("argument required. (valid arguments: offset [number])", goerr.V("args", args))
 		}
 	}
 
 	offset, err := strconv.Atoi(args[0])
 	if err != nil {
-		return func(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
+		return func(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
 			return nil, goerr.Wrap(err, "failed to convert offset to int", goerr.V("offset", args[0]))
 		}
 	}
 
-	return func(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
+	return func(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
 		if offset > len(alerts) {
-			return []model.Alert{}, nil
+			return []alert.Alert{}, nil
 		}
 		return alerts[offset:], nil
 	}
@@ -161,7 +147,7 @@ func extractUserID(arg string) (string, error) {
 }
 
 func (x *Service) actionUser(args []string) action {
-	return func(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
+	return func(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
 		if len(args) != 1 {
 			return nil, goerr.New("argument required. (valid arguments: user [user_id])")
 		}
@@ -171,7 +157,7 @@ func (x *Service) actionUser(args []string) action {
 			return nil, err
 		}
 
-		filtered := []model.Alert{}
+		filtered := []alert.Alert{}
 		for _, alert := range alerts {
 			if alert.Assignee.ID == userID {
 				filtered = append(filtered, alert)
@@ -182,29 +168,29 @@ func (x *Service) actionUser(args []string) action {
 }
 
 func (x *Service) actionStatus(args []string) action {
-	return func(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
+	return func(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
 		if len(args) == 0 {
 			return nil, goerr.New("argument required. (valid arguments: status [status])")
 		}
 
-		statusList := []model.AlertStatus{}
+		statusList := []alert.Status{}
 
 		for _, arg := range args {
 			switch arg {
 			case "new":
-				statusList = append(statusList, model.AlertStatusNew)
+				statusList = append(statusList, alert.StatusNew)
 			case "ack", "acked", "acknowledged":
-				statusList = append(statusList, model.AlertStatusAcknowledged)
+				statusList = append(statusList, alert.StatusAcknowledged)
 			case "blocked":
-				statusList = append(statusList, model.AlertStatusBlocked)
+				statusList = append(statusList, alert.StatusBlocked)
 			case "resolved":
-				statusList = append(statusList, model.AlertStatusResolved)
+				statusList = append(statusList, alert.StatusResolved)
 			default:
 				return nil, goerr.New("invalid status, status must be one of new, ack, blocked, resolved", goerr.V("status", arg))
 			}
 		}
 
-		filtered := []model.Alert{}
+		filtered := []alert.Alert{}
 		for _, alert := range alerts {
 			if slices.Contains(statusList, alert.Status) {
 				filtered = append(filtered, alert)
@@ -216,7 +202,7 @@ func (x *Service) actionStatus(args []string) action {
 }
 
 func (x *Service) actionQuery(args []string) action {
-	return func(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
+	return func(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
 		if len(args) == 0 {
 			return nil, goerr.New("argument required. (valid arguments: query [string...])")
 		}
@@ -231,9 +217,9 @@ func (x *Service) actionQuery(args []string) action {
 		for range maxRetry {
 			response, err := service.AskChat[prompt.FilterQueryPromptResult](ctx, x.llm, p)
 			if err != nil {
-				if goerr.HasTag(err, model.ErrTagInvalidLLMResponse) {
+				if goerr.HasTag(err, errs.TagInvalidLLMResponse) {
 					p = "Invalid response. Please try again: " + err.Error()
-					thread.Reply(ctx, "🔄 Invalid response. Retry...\n> "+err.Error())
+					msg.State(ctx, "🔄 Invalid response. Retry...\n> "+err.Error())
 					continue
 				}
 				return nil, err
@@ -243,7 +229,7 @@ func (x *Service) actionQuery(args []string) action {
 			alerts, err := x.repo.BatchGetAlerts(ctx, alertIDs)
 			if err != nil {
 				p = "Failed to get alerts that you specified. Please try again: " + err.Error()
-				thread.Reply(ctx, "🔄 Failed to get alerts. Retry...\n> "+err.Error())
+				msg.State(ctx, "🔄 Failed to get alerts. Retry...\n> "+err.Error())
 				continue
 			}
 			return alerts, nil
@@ -252,3 +238,4 @@ func (x *Service) actionQuery(args []string) action {
 		return nil, goerr.New("failed to get alerts that you specified.", goerr.V("query", query))
 	}
 }
+*/

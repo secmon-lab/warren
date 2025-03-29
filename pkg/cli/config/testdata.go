@@ -9,7 +9,8 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/policy"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/urfave/cli/v3"
 )
 
@@ -52,8 +53,8 @@ func (x TestData) LogValue() slog.Value {
 	)
 }
 
-func loadTestFiles(basePath string) (*model.TestData, error) {
-	result := model.NewTestData()
+func loadTestFiles(basePath string) (*policy.TestData, error) {
+	result := policy.NewTestData()
 
 	if basePath == "" {
 		return result, nil
@@ -93,21 +94,21 @@ func loadTestFiles(basePath string) (*model.TestData, error) {
 		if len(parts) == 0 || parts[0] == "." {
 			return nil
 		}
-		firstDir := parts[0]
+		schema := types.AlertSchema(parts[0])
 
 		// Get remaining path
-		remainPath := relPath[len(firstDir)+1:]
+		remainPath := relPath[len(parts[0])+1:]
 		if remainPath == "" {
 			remainPath = filepath.Base(relPath)
 		}
 
 		// Initialize map for first directory if not exists
-		if _, ok := result.Data[firstDir]; !ok {
-			result.Data[firstDir] = make(map[string]any)
+		if _, ok := result.Data[schema]; !ok {
+			result.Data[schema] = make(map[string]any)
 		}
 
 		// Store value with remaining path as key
-		result.Data[firstDir][remainPath] = v
+		result.Data[schema][remainPath] = v
 		return nil
 	})
 	if err != nil {
@@ -117,7 +118,7 @@ func loadTestFiles(basePath string) (*model.TestData, error) {
 	return result, nil
 }
 
-func (x *TestData) Configure() (*model.TestDataSet, error) {
+func (x *TestData) Configure() (*policy.TestDataSet, error) {
 	detectData, err := loadTestFiles(x.detectDataPath)
 	if err != nil {
 		return nil, err
@@ -128,7 +129,7 @@ func (x *TestData) Configure() (*model.TestDataSet, error) {
 		return nil, err
 	}
 
-	return &model.TestDataSet{
+	return &policy.TestDataSet{
 		Detect: detectData,
 		Ignore: ignoreData,
 	}, nil

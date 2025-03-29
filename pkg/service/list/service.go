@@ -1,15 +1,6 @@
 package list
 
-import (
-	"context"
-
-	"github.com/secmon-lab/warren/pkg/interfaces"
-	"github.com/secmon-lab/warren/pkg/model"
-	"github.com/secmon-lab/warren/pkg/service"
-	"github.com/secmon-lab/warren/pkg/service/source"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
-)
-
+/*
 type Service struct {
 	repo interfaces.Repository
 	llm  interfaces.LLMClient
@@ -33,7 +24,7 @@ func New(repo interfaces.Repository, opts ...Option) *Service {
 	return s
 }
 
-func (x *Service) Run(ctx context.Context, th interfaces.SlackThreadService, user *model.SlackUser, src source.Source, args []string) error {
+func (x *Service) Run(ctx context.Context, th interfaces.SlackThreadService, user *slack.SlackUser, src source.Source, args []string) error {
 	alerts, err := src(ctx, x.repo)
 	if err != nil {
 		return err
@@ -49,11 +40,11 @@ func (x *Service) Run(ctx context.Context, th interfaces.SlackThreadService, use
 		return err
 	}
 
-	slackThread := model.SlackThread{
+	slackThread := slack.SlackThread{
 		ChannelID: th.ChannelID(),
 		ThreadID:  th.ThreadID(),
 	}
-	alertList := model.NewAlertList(ctx, slackThread, user, newAlerts)
+	alertList := alert.NewAlertList(ctx, slackThread, user, newAlerts)
 
 	meta, err := service.GenerateAlertListMeta(ctx, alertList, x.llm)
 	if err != nil {
@@ -79,7 +70,7 @@ type pipeline struct {
 	actions []action
 }
 
-func (p *pipeline) Run(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
+func (p *pipeline) Run(ctx context.Context, alerts []alert.Alert) ([]alert.Alert, error) {
 	for _, action := range p.actions {
 		newAlerts, err := action(ctx, alerts)
 		if err != nil {
@@ -141,3 +132,4 @@ func (x *Service) newPipeline(ctx context.Context, args []string) (*pipeline, er
 
 	return &pipeline{actions: actions}, nil
 }
+*/
