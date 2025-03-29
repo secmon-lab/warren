@@ -73,7 +73,7 @@ func (uc *UseCases) handleSlackAppMention(ctx context.Context, user slack.User, 
 		targetAlerts = v.Alerts
 	}
 
-	if err := uc.handleSlackRootCommand(ctx, st, user, targetAlerts, mention.Message); err == nil {
+	if err := uc.handleSlackMentionCommand(ctx, st, user, targetAlerts, mention.Message); err == nil {
 		// If the command is handled, return nil
 		return nil
 	} else if err != errUnknownCommand {
@@ -114,7 +114,7 @@ var (
 	errUnknownCommand = goerr.New("unknown command")
 )
 
-func (uc *UseCases) handleSlackRootCommand(ctx context.Context, th *slack_svc.ThreadService, user slack.User, alerts alert.Alerts, message string) error {
+func (uc *UseCases) handleSlackMentionCommand(ctx context.Context, th *slack_svc.ThreadService, user slack.User, alerts alert.Alerts, message string) error {
 	args := strings.SplitN(message, " ", 2)
 	if len(args) == 0 {
 		return errUnknownCommand
@@ -134,7 +134,7 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, th *slack_svc.Th
 		return nil
 
 	case "group":
-		if err := group.Run(ctx, uc.repository, th, user, alerts, remaining); err != nil {
+		if err := group.Run(ctx, uc.repository, th, uc.llmClient, user, alerts, remaining); err != nil {
 			return goerr.Wrap(err, "failed to run group command")
 		}
 		return nil
@@ -142,11 +142,6 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, th *slack_svc.Th
 	default:
 		return errUnknownCommand
 	}
-}
-
-func (uc *UseCases) handleSlackThreadCommand(ctx context.Context, th *slack_svc.ThreadService, user slack.User, message string) error {
-
-	return nil
 }
 
 // HandleSlackMessage handles a message from a slack user. It saves the message as an alert comment if the message is in the Alert thread.
