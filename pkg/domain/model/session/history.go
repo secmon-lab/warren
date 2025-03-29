@@ -39,7 +39,7 @@ func NewHistory(ctx context.Context, contents []*genai.Content) *History {
 	}
 
 	for i, content := range contents {
-		parts := make([]Part, len(content.Parts), 0)
+		parts := make([]Part, 0, len(content.Parts))
 
 		for _, part := range content.Parts {
 			switch v := part.(type) {

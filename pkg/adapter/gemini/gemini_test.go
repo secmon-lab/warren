@@ -7,6 +7,7 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/adapter/gemini"
 	model "github.com/secmon-lab/warren/pkg/domain/model/gemini"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
 )
 
 func TestGeminiClient(t *testing.T) {
@@ -23,8 +24,10 @@ func TestGeminiClient(t *testing.T) {
 	history := ssn.GetHistory()
 	gt.A(t, history).Longer(0)
 
-	newSsn := client.StartChat()
-	newSsn.SetHistory(history...)
+	historyModel := session.NewHistory(ctx, history)
+
+	newSsn := client.StartChat(model.WithHistory(historyModel))
+
 	resp, err = newSsn.SendMessage(ctx, genai.Text("What is my color?"))
 	gt.NoError(t, err)
 

@@ -16,7 +16,6 @@ type LLMClient interface {
 
 type LLMSession interface {
 	LLMInquiry
-	SetHistory(history ...*genai.Content)
 	GetHistory() []*genai.Content
 }
 

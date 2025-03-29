@@ -77,7 +77,12 @@ func (x *GeminiClient) StartChat(options ...gemini.Option) interfaces.LLMSession
 	model.Tools = cfg.Tools()
 	model.ToolConfig = cfg.ToolConfig()
 
-	return &GeminiSession{session: model.StartChat()}
+	ssn := model.StartChat()
+	if history := cfg.History(); history != nil {
+		ssn.History = history.ToContents()
+	}
+
+	return &GeminiSession{session: ssn}
 }
 
 func (x *GeminiClient) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
