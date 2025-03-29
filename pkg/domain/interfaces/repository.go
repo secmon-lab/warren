@@ -19,8 +19,8 @@ type Repository interface {
 	GetAlertComments(ctx context.Context, alertID types.AlertID) ([]alert.AlertComment, error)
 
 	// For chat
-	GetHistory(ctx context.Context, sessionID types.SessionID) (session.Histories, error)
-	PutHistory(ctx context.Context, sessionID types.SessionID, histories session.Histories) error
+	GetLatestHistory(ctx context.Context, sessionID types.SessionID) (*session.History, error)
+	PutHistory(ctx context.Context, sessionID types.SessionID, histories []*session.History) error
 
 	// For list management
 	GetAlertList(ctx context.Context, listID types.AlertListID) (*alert.List, error)

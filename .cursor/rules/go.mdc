@@ -80,11 +80,10 @@ return goerr.Wrap(err, "failed something", goerr.V("args", args))
 
 ## Test Style
 
-Use "Function Driven Test" Style like following:
+Use "Table Driven Test" Style like following:
 
 ```go
 	type testCase struct {
-		name  string
 		args  []string
 		error string
 	}
@@ -97,12 +96,10 @@ Use "Function Driven Test" Style like following:
 	}
 
 	t.Run("invalid from command format", runTest(testCase{
-		name:  "invalid from command format",
 		args:  []string{"from", "2024-03-15"},
 		error: "unknown command",
 	}))
 	t.Run("invalid from command format", runTest(testCase{
-		name:  "invalid from command format",
 		args:  []string{"from", "2024-03-15"},
 		error: "unknown command",
 	}))

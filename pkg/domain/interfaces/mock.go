@@ -914,11 +914,11 @@ func (mock *LLMSessionMock) SetHistoryCalls() []struct {
 //			GetAlertsWithoutStatusFunc: func(ctx context.Context, status types.AlertStatus) (alert.Alerts, error) {
 //				panic("mock out the GetAlertsWithoutStatus method")
 //			},
-//			GetHistoryFunc: func(ctx context.Context, sessionID types.SessionID) (session.Histories, error) {
-//				panic("mock out the GetHistory method")
-//			},
 //			GetLatestAlertListInThreadFunc: func(ctx context.Context, thread modelslack.Thread) (*alert.List, error) {
 //				panic("mock out the GetLatestAlertListInThread method")
+//			},
+//			GetLatestHistoryFunc: func(ctx context.Context, sessionID types.SessionID) (*session.History, error) {
+//				panic("mock out the GetLatestHistory method")
 //			},
 //			GetPolicyDiffFunc: func(ctx context.Context, id types.PolicyDiffID) (*policy.Diff, error) {
 //				panic("mock out the GetPolicyDiff method")
@@ -938,7 +938,7 @@ func (mock *LLMSessionMock) SetHistoryCalls() []struct {
 //			PutAlertListFunc: func(ctx context.Context, list alert.List) error {
 //				panic("mock out the PutAlertList method")
 //			},
-//			PutHistoryFunc: func(ctx context.Context, sessionID types.SessionID, histories session.Histories) error {
+//			PutHistoryFunc: func(ctx context.Context, sessionID types.SessionID, histories []*session.History) error {
 //				panic("mock out the PutHistory method")
 //			},
 //			PutPolicyDiffFunc: func(ctx context.Context, diff *policy.Diff) error {
@@ -984,11 +984,11 @@ type RepositoryMock struct {
 	// GetAlertsWithoutStatusFunc mocks the GetAlertsWithoutStatus method.
 	GetAlertsWithoutStatusFunc func(ctx context.Context, status types.AlertStatus) (alert.Alerts, error)
 
-	// GetHistoryFunc mocks the GetHistory method.
-	GetHistoryFunc func(ctx context.Context, sessionID types.SessionID) (session.Histories, error)
-
 	// GetLatestAlertListInThreadFunc mocks the GetLatestAlertListInThread method.
 	GetLatestAlertListInThreadFunc func(ctx context.Context, thread modelslack.Thread) (*alert.List, error)
+
+	// GetLatestHistoryFunc mocks the GetLatestHistory method.
+	GetLatestHistoryFunc func(ctx context.Context, sessionID types.SessionID) (*session.History, error)
 
 	// GetPolicyDiffFunc mocks the GetPolicyDiff method.
 	GetPolicyDiffFunc func(ctx context.Context, id types.PolicyDiffID) (*policy.Diff, error)
@@ -1009,7 +1009,7 @@ type RepositoryMock struct {
 	PutAlertListFunc func(ctx context.Context, list alert.List) error
 
 	// PutHistoryFunc mocks the PutHistory method.
-	PutHistoryFunc func(ctx context.Context, sessionID types.SessionID, histories session.Histories) error
+	PutHistoryFunc func(ctx context.Context, sessionID types.SessionID, histories []*session.History) error
 
 	// PutPolicyDiffFunc mocks the PutPolicyDiff method.
 	PutPolicyDiffFunc func(ctx context.Context, diff *policy.Diff) error
@@ -1095,19 +1095,19 @@ type RepositoryMock struct {
 			// Status is the status argument value.
 			Status types.AlertStatus
 		}
-		// GetHistory holds details about calls to the GetHistory method.
-		GetHistory []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// SessionID is the sessionID argument value.
-			SessionID types.SessionID
-		}
 		// GetLatestAlertListInThread holds details about calls to the GetLatestAlertListInThread method.
 		GetLatestAlertListInThread []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Thread is the thread argument value.
 			Thread modelslack.Thread
+		}
+		// GetLatestHistory holds details about calls to the GetLatestHistory method.
+		GetLatestHistory []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SessionID is the sessionID argument value.
+			SessionID types.SessionID
 		}
 		// GetPolicyDiff holds details about calls to the GetPolicyDiff method.
 		GetPolicyDiff []struct {
@@ -1158,7 +1158,7 @@ type RepositoryMock struct {
 			// SessionID is the sessionID argument value.
 			SessionID types.SessionID
 			// Histories is the histories argument value.
-			Histories session.Histories
+			Histories []*session.History
 		}
 		// PutPolicyDiff holds details about calls to the PutPolicyDiff method.
 		PutPolicyDiff []struct {
@@ -1185,8 +1185,8 @@ type RepositoryMock struct {
 	lockGetAlertsBySpan            sync.RWMutex
 	lockGetAlertsByStatus          sync.RWMutex
 	lockGetAlertsWithoutStatus     sync.RWMutex
-	lockGetHistory                 sync.RWMutex
 	lockGetLatestAlertListInThread sync.RWMutex
+	lockGetLatestHistory           sync.RWMutex
 	lockGetPolicyDiff              sync.RWMutex
 	lockGetSession                 sync.RWMutex
 	lockGetSessionByThread         sync.RWMutex
@@ -1609,46 +1609,6 @@ func (mock *RepositoryMock) GetAlertsWithoutStatusCalls() []struct {
 	return calls
 }
 
-// GetHistory calls GetHistoryFunc.
-func (mock *RepositoryMock) GetHistory(ctx context.Context, sessionID types.SessionID) (session.Histories, error) {
-	callInfo := struct {
-		Ctx       context.Context
-		SessionID types.SessionID
-	}{
-		Ctx:       ctx,
-		SessionID: sessionID,
-	}
-	mock.lockGetHistory.Lock()
-	mock.calls.GetHistory = append(mock.calls.GetHistory, callInfo)
-	mock.lockGetHistory.Unlock()
-	if mock.GetHistoryFunc == nil {
-		var (
-			historiesOut session.Histories
-			errOut       error
-		)
-		return historiesOut, errOut
-	}
-	return mock.GetHistoryFunc(ctx, sessionID)
-}
-
-// GetHistoryCalls gets all the calls that were made to GetHistory.
-// Check the length with:
-//
-//	len(mockedRepository.GetHistoryCalls())
-func (mock *RepositoryMock) GetHistoryCalls() []struct {
-	Ctx       context.Context
-	SessionID types.SessionID
-} {
-	var calls []struct {
-		Ctx       context.Context
-		SessionID types.SessionID
-	}
-	mock.lockGetHistory.RLock()
-	calls = mock.calls.GetHistory
-	mock.lockGetHistory.RUnlock()
-	return calls
-}
-
 // GetLatestAlertListInThread calls GetLatestAlertListInThreadFunc.
 func (mock *RepositoryMock) GetLatestAlertListInThread(ctx context.Context, thread modelslack.Thread) (*alert.List, error) {
 	callInfo := struct {
@@ -1686,6 +1646,46 @@ func (mock *RepositoryMock) GetLatestAlertListInThreadCalls() []struct {
 	mock.lockGetLatestAlertListInThread.RLock()
 	calls = mock.calls.GetLatestAlertListInThread
 	mock.lockGetLatestAlertListInThread.RUnlock()
+	return calls
+}
+
+// GetLatestHistory calls GetLatestHistoryFunc.
+func (mock *RepositoryMock) GetLatestHistory(ctx context.Context, sessionID types.SessionID) (*session.History, error) {
+	callInfo := struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+	}{
+		Ctx:       ctx,
+		SessionID: sessionID,
+	}
+	mock.lockGetLatestHistory.Lock()
+	mock.calls.GetLatestHistory = append(mock.calls.GetLatestHistory, callInfo)
+	mock.lockGetLatestHistory.Unlock()
+	if mock.GetLatestHistoryFunc == nil {
+		var (
+			historyOut *session.History
+			errOut     error
+		)
+		return historyOut, errOut
+	}
+	return mock.GetLatestHistoryFunc(ctx, sessionID)
+}
+
+// GetLatestHistoryCalls gets all the calls that were made to GetLatestHistory.
+// Check the length with:
+//
+//	len(mockedRepository.GetLatestHistoryCalls())
+func (mock *RepositoryMock) GetLatestHistoryCalls() []struct {
+	Ctx       context.Context
+	SessionID types.SessionID
+} {
+	var calls []struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+	}
+	mock.lockGetLatestHistory.RLock()
+	calls = mock.calls.GetLatestHistory
+	mock.lockGetLatestHistory.RUnlock()
 	return calls
 }
 
@@ -1927,11 +1927,11 @@ func (mock *RepositoryMock) PutAlertListCalls() []struct {
 }
 
 // PutHistory calls PutHistoryFunc.
-func (mock *RepositoryMock) PutHistory(ctx context.Context, sessionID types.SessionID, histories session.Histories) error {
+func (mock *RepositoryMock) PutHistory(ctx context.Context, sessionID types.SessionID, histories []*session.History) error {
 	callInfo := struct {
 		Ctx       context.Context
 		SessionID types.SessionID
-		Histories session.Histories
+		Histories []*session.History
 	}{
 		Ctx:       ctx,
 		SessionID: sessionID,
@@ -1956,12 +1956,12 @@ func (mock *RepositoryMock) PutHistory(ctx context.Context, sessionID types.Sess
 func (mock *RepositoryMock) PutHistoryCalls() []struct {
 	Ctx       context.Context
 	SessionID types.SessionID
-	Histories session.Histories
+	Histories []*session.History
 } {
 	var calls []struct {
 		Ctx       context.Context
 		SessionID types.SessionID
-		Histories session.Histories
+		Histories []*session.History
 	}
 	mock.lockPutHistory.RLock()
 	calls = mock.calls.PutHistory

@@ -209,7 +209,7 @@ func TestService_Run(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Run test
-			listID, err := svc.Run(ctx, repo, slackThread, user, tt.input)
+			listID, err := svc.Run(ctx, slackThread, user, tt.input)
 
 			// Validate error
 			if tt.expectedError != "" {

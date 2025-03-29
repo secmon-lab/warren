@@ -3,21 +3,27 @@ package session
 import (
 	"context"
 	"log/slog"
+	"reflect"
 	"time"
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 type History struct {
 	ID        types.HistoryID `json:"id"`
 	CreatedAt time.Time       `json:"created_at"`
-	Role      string          `json:"role"`
-	Parts     []Part          `json:"parts"`
+	Contents  Contents        `json:"contents"`
 }
 
-type Histories []*History
+type Content struct {
+	Role  string
+	Parts []Part
+}
+
+type Contents []*Content
 
 type Part struct {
 	Text string              `json:"text"`
@@ -25,44 +31,50 @@ type Part struct {
 	Func *genai.FunctionCall `json:"func"`
 }
 
-func NewHistories(ctx context.Context, contents []*genai.Content) Histories {
-	histories := make(Histories, len(contents))
-	for i, content := range contents {
-		for _, part := range content.Parts {
-			h := &History{
-				ID:        types.NewHistoryID(),
-				CreatedAt: clock.Now(ctx),
-				Role:      content.Role,
-			}
+func NewHistory(ctx context.Context, contents []*genai.Content) *History {
+	history := &History{
+		ID:        types.NewHistoryID(),
+		CreatedAt: clock.Now(ctx),
+		Contents:  make(Contents, len(contents)),
+	}
 
+	for i, content := range contents {
+		parts := make([]Part, len(content.Parts), 0)
+
+		for _, part := range content.Parts {
 			switch v := part.(type) {
 			case genai.Text:
-				h.Parts = append(h.Parts, Part{
+				parts = append(parts, Part{
 					Text: string(v),
 				})
 
 			case genai.Blob:
-				h.Parts = append(h.Parts, Part{
+				parts = append(parts, Part{
 					Blob: v.Data,
 				})
 
 			case genai.FunctionCall:
-				h.Parts = append(h.Parts, Part{
+				parts = append(parts, Part{
 					Func: &v,
 				})
-			}
 
-			histories[i] = h
+			default:
+				logging.From(ctx).Warn("unknown part type", "type", reflect.TypeOf(v))
+			}
+		}
+		history.Contents[i] = &Content{
+			Role:  content.Role,
+			Parts: parts,
 		}
 	}
-	return histories
+	return history
 }
 
-func (x Histories) ToContents() []*genai.Content {
-	contents := make([]*genai.Content, len(x))
-	for i, history := range x {
-		parts := make([]genai.Part, len(history.Parts))
-		for j, part := range history.Parts {
+func (x *History) ToContents() []*genai.Content {
+	contents := make([]*genai.Content, len(x.Contents))
+	for i, content := range x.Contents {
+		parts := make([]genai.Part, len(content.Parts))
+		for j, part := range content.Parts {
 			switch {
 			case part.Text != "":
 				parts[j] = genai.Text(part.Text)
@@ -72,7 +84,7 @@ func (x Histories) ToContents() []*genai.Content {
 				parts[j] = part.Func
 			}
 		}
-		contents[i] = &genai.Content{Role: history.Role, Parts: parts}
+		contents[i] = &genai.Content{Role: content.Role, Parts: parts}
 	}
 	return contents
 }
@@ -81,7 +93,6 @@ func (x *History) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("id", x.ID.String()),
 		slog.Any("created_at", x.CreatedAt),
-		slog.Any("role", x.Role),
-		slog.Any("count_parts", len(x.Parts)),
+		slog.Any("count_contents", len(x.Contents)),
 	)
 }

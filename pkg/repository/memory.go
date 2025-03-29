@@ -20,7 +20,7 @@ type Memory struct {
 	alerts      map[types.AlertID]alert.Alert
 	comments    map[types.AlertID][]alert.AlertComment
 	lists       map[types.AlertListID]alert.List
-	histories   map[types.SessionID]session.Histories
+	histories   map[types.SessionID][]*session.History
 	policyDiffs map[types.PolicyDiffID]*policy.Diff
 	sessions    map[types.SessionID]session.Session
 }
@@ -30,7 +30,7 @@ func NewMemory() *Memory {
 		alerts:      make(map[types.AlertID]alert.Alert),
 		comments:    make(map[types.AlertID][]alert.AlertComment),
 		lists:       make(map[types.AlertListID]alert.List),
-		histories:   make(map[types.SessionID]session.Histories),
+		histories:   make(map[types.SessionID][]*session.History),
 		policyDiffs: make(map[types.PolicyDiffID]*policy.Diff),
 		sessions:    make(map[types.SessionID]session.Session),
 	}
@@ -68,11 +68,15 @@ func (r *Memory) GetAlertComments(ctx context.Context, alertID types.AlertID) ([
 	return r.comments[alertID], nil
 }
 
-func (r *Memory) GetHistory(ctx context.Context, sessionID types.SessionID) (session.Histories, error) {
-	return r.histories[sessionID], nil
+func (r *Memory) GetLatestHistory(ctx context.Context, sessionID types.SessionID) (*session.History, error) {
+	histories := r.histories[sessionID]
+	if len(histories) == 0 {
+		return nil, nil
+	}
+	return histories[len(histories)-1], nil
 }
 
-func (r *Memory) PutHistory(ctx context.Context, sessionID types.SessionID, histories session.Histories) error {
+func (r *Memory) PutHistory(ctx context.Context, sessionID types.SessionID, histories []*session.History) error {
 	r.histories[sessionID] = histories
 	return nil
 }

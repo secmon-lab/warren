@@ -377,11 +377,11 @@ func (r *Firestore) GetLatestAlertListInThread(ctx context.Context, thread slack
 	return &lists[0], nil
 }
 
-func (r *Firestore) GetHistory(ctx context.Context, sessionID types.SessionID) (session.Histories, error) {
+func (r *Firestore) GetHistory(ctx context.Context, sessionID types.SessionID) ([]*session.History, error) {
 	iter := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionHistories).OrderBy("CreatedAt", firestore.Asc).Documents(ctx)
 	defer iter.Stop()
 
-	var histories session.Histories
+	var histories []*session.History
 	for {
 		doc, err := iter.Next()
 		if err == iterator.Done {
@@ -401,7 +401,7 @@ func (r *Firestore) GetHistory(ctx context.Context, sessionID types.SessionID) (
 	return histories, nil
 }
 
-func (r *Firestore) PutHistory(ctx context.Context, sessionID types.SessionID, histories session.Histories) error {
+func (r *Firestore) PutHistory(ctx context.Context, sessionID types.SessionID, histories []*session.History) error {
 	writer := r.db.BulkWriter(ctx)
 	defer writer.End()
 
@@ -555,6 +555,25 @@ func (r *Firestore) PutSession(ctx context.Context, s session.Session) error {
 		return goerr.Wrap(err, "failed to put session", goerr.V("id", s.ID))
 	}
 	return nil
+}
+
+func (r *Firestore) GetLatestHistory(ctx context.Context, sessionID types.SessionID) (*session.History, error) {
+	iter := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionHistories).OrderBy("CreatedAt", firestore.Desc).Limit(1).Documents(ctx)
+	defer iter.Stop()
+
+	doc, err := iter.Next()
+	if err != nil {
+		if err == iterator.Done {
+			return nil, nil
+		}
+		return nil, goerr.Wrap(err, "failed to get latest chat history")
+	}
+
+	var history session.History
+	if err := doc.DataTo(&history); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert data to chat history")
+	}
+	return &history, nil
 }
 
 /*

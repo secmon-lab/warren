@@ -9,8 +9,10 @@
 
 *🔍 Filters and Modifiers*
 ━━━━━━━━━━━━━━━━━━━━━━
-• `list | grep test` _Filter by keyword_
+• `list | grep test` _Filter by keyword for original alert data_
 • `list | sort CreatedAt` _Sort by creation time_
 • `list | limit 10` _Limit number of results_
 • `list | offset 10` _Skip first N results_
-• `list | cluster` _Group similar alerts_
+• `list | user @username` _Filter by username_
+
+

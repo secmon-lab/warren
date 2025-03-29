@@ -41,7 +41,7 @@ func filterEmptyStrings(s []string) []string {
 	return result
 }
 
-func (x *Service) Run(ctx context.Context, repo interfaces.Repository, th *svc.ThreadService, user *slack.User, input string) (types.AlertListID, error) {
+func (x *Service) Run(ctx context.Context, th *svc.ThreadService, user *slack.User, input string) (types.AlertListID, error) {
 	commands := strings.Split(input, "|")
 	if len(commands) == 0 {
 		showHelp(ctx)

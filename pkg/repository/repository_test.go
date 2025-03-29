@@ -113,24 +113,32 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 	// Chat関連のテスト
 	t.Run("History", func(t *testing.T) {
 		sessionID := types.NewSessionID()
-		histories := session.Histories{
+		histories := []*session.History{
 			{
 				ID:        types.NewHistoryID(),
 				CreatedAt: time.Now(),
-				Role:      "user",
-				Parts: []session.Part{
-					{
-						Text: "test message 1",
+				Contents: session.Contents{
+					&session.Content{
+						Role: "user",
+						Parts: []session.Part{
+							{
+								Text: "test message 1",
+							},
+						},
 					},
 				},
 			},
 			{
 				ID:        types.NewHistoryID(),
 				CreatedAt: time.Now(),
-				Role:      "assistant",
-				Parts: []session.Part{
-					{
-						Text: "test response 1",
+				Contents: session.Contents{
+					&session.Content{
+						Role: "assistant",
+						Parts: []session.Part{
+							{
+								Text: "test response 1",
+							},
+						},
 					},
 				},
 			},
@@ -139,14 +147,12 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		// PutHistory
 		gt.NoError(t, repo.PutHistory(ctx, sessionID, histories))
 
-		// GetHistory
-		got, err := repo.GetHistory(ctx, sessionID)
+		// GetLatestHistory
+		got, err := repo.GetLatestHistory(ctx, sessionID)
 		gt.NoError(t, err)
-		gt.Array(t, got).Length(2)
-		gt.Value(t, got[0].Role).Equal("user")
-		gt.Value(t, got[1].Role).Equal("assistant")
-		gt.Value(t, got[0].Parts[0].Text).Equal("test message 1")
-		gt.Value(t, got[1].Parts[0].Text).Equal("test response 1")
+		gt.Value(t, got).NotNil()
+		gt.Value(t, got.Contents[0].Role).Equal("assistant")
+		gt.Value(t, got.Contents[0].Parts[0].Text).Equal("test response 1")
 	})
 
 	// AlertList関連のテスト

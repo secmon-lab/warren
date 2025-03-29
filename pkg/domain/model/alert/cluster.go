@@ -12,7 +12,7 @@ type cluster struct {
 
 type clusters []*cluster
 
-func ClusterAlerts(ctx context.Context, alerts []*Alert, similarityThreshold float64, topN int) ([][]*Alert, error) {
+func ClusterAlerts(ctx context.Context, alerts []*Alert, similarityThreshold float64, topN int) [][]*Alert {
 	clusters := newAlertCluster(alerts, similarityThreshold)
 
 	sort.Slice(clusters, func(i, j int) bool {
@@ -27,7 +27,7 @@ func ClusterAlerts(ctx context.Context, alerts []*Alert, similarityThreshold flo
 	for i, cluster := range clusters {
 		alertSets[i] = cluster.Alerts
 	}
-	return alertSets, nil
+	return alertSets
 }
 
 func newAlertCluster(alerts []*Alert, similarityThreshold float64) clusters {
