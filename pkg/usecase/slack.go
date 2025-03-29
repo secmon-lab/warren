@@ -95,7 +95,7 @@ func (uc *UseCases) handleSlackAppMention(ctx context.Context, user slack.User, 
 		for _, alert := range targetAlerts {
 			targetAlertIDs = append(targetAlertIDs, alert.ID)
 		}
-		ssn = session_model.New(ctx, user, thread, targetAlertIDs)
+		ssn = session_model.New(ctx, &user, &thread, targetAlertIDs)
 		if err := uc.repository.PutSession(ctx, *ssn); err != nil {
 			return goerr.Wrap(err, "failed to put session")
 		}

@@ -17,7 +17,7 @@ import (
 
 func TestSessionChat(t *testing.T) {
 	ctx := t.Context()
-	ssn := model.New(ctx, slack.User{}, slack.Thread{}, []types.AlertID{types.NewAlertID()})
+	ssn := model.New(ctx, &slack.User{}, &slack.Thread{}, []types.AlertID{types.NewAlertID()})
 	geminiClient := gemini.NewTestClient(t)
 	slackClient := &interfaces.SlackClientMock{
 		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {

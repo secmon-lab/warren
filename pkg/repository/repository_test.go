@@ -290,7 +290,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		}
 		s := session.Session{
 			ID:     sessionID,
-			Thread: thread,
+			Thread: &thread,
 		}
 
 		// PutSession
