@@ -158,11 +158,11 @@ func TestParseArgsToSource(t *testing.T) {
 }
 
 func TestParseArgsToSourceErrors(t *testing.T) {
-	runTest := func(tc struct {
-		name  string
+	type testCase struct {
 		args  []string
 		error string
-	}) func(*testing.T) {
+	}
+	runTest := func(tc testCase) func(*testing.T) {
 		return func(t *testing.T) {
 			result, err := list.ParseArgsToSource(t.Context(), tc.args)
 			gt.Error(t, err).Contains(tc.error)
@@ -170,52 +170,32 @@ func TestParseArgsToSourceErrors(t *testing.T) {
 		}
 	}
 
-	t.Run("invalid from command format", runTest(struct {
-		name  string
-		args  []string
-		error string
-	}{
-		name:  "invalid from command format",
+	t.Run("invalid from command format", runTest(testCase{
 		args:  []string{"from", "2024-03-15"},
 		error: "unknown command",
 	}))
 
-	t.Run("invalid between command format", runTest(struct {
-		name  string
-		args  []string
-		error string
-	}{
-		name:  "invalid between command format",
+	t.Run("invalid from command format", runTest(testCase{
+		args:  []string{"from", "2024-03-15"},
+		error: "unknown command",
+	}))
+
+	t.Run("invalid between command format", runTest(testCase{
 		args:  []string{"between", "2024-03-15"},
 		error: "invalid date range format",
 	}))
 
-	t.Run("invalid after command format", runTest(struct {
-		name  string
-		args  []string
-		error string
-	}{
-		name:  "invalid after command format",
+	t.Run("invalid after command format", runTest(testCase{
 		args:  []string{"after"},
 		error: "invalid date format",
 	}))
 
-	t.Run("invalid since command format", runTest(struct {
-		name  string
-		args  []string
-		error string
-	}{
-		name:  "invalid since command format",
+	t.Run("invalid since command format", runTest(testCase{
 		args:  []string{"since"},
 		error: "invalid duration format",
 	}))
 
-	t.Run("unknown command", runTest(struct {
-		name  string
-		args  []string
-		error string
-	}{
-		name:  "unknown command",
+	t.Run("unknown command", runTest(testCase{
 		args:  []string{"unknown"},
 		error: "unknown command",
 	}))

@@ -69,7 +69,7 @@ func GenerateIgnorePolicy(ctx context.Context, input GenerateIgnorePolicyInput) 
 
 	logger := logging.From(ctx)
 
-	ctx = msg.NewState(ctx, "📝 Generating ignore policy...")
+	ctx = msg.NewTrace(ctx, "📝 Generating ignore policy...")
 
 	alerts, err := input.Source(ctx, input.Repo)
 	if err != nil {
@@ -100,7 +100,7 @@ func GenerateIgnorePolicy(ctx context.Context, input GenerateIgnorePolicyInput) 
 		resp, err := llm.Ask[prompt.IgnorePolicyPromptResult](ctx, input.LLM, p)
 		if err != nil {
 			if goerr.HasTag(err, errs.TagInvalidLLMResponse) {
-				ctx = msg.State(ctx, "💥 Failed to generate ignore policy: \n> %v\n\nRetry...", err)
+				ctx = msg.Trace(ctx, "💥 Failed to generate ignore policy: \n> %v\n\nRetry...", err)
 				p = "Your response is invalid. Please try again: " + err.Error()
 				continue
 			}
@@ -111,14 +111,14 @@ func GenerateIgnorePolicy(ctx context.Context, input GenerateIgnorePolicyInput) 
 
 		formattedPolicy, err := formatPolicy(resp.Policy)
 		if err != nil {
-			ctx = msg.State(ctx, "💥 Invalid Rego policy format: \n> %v\n\nRetry...", err)
+			ctx = msg.Trace(ctx, "💥 Invalid Rego policy format: \n> %v\n\nRetry...", err)
 			p = "Invalid Rego policy format: " + err.Error() + "\n\nPlease retry."
 			continue
 		}
 
 		c, err := opaq.New(opaq.DataMap(formattedPolicy))
 		if err != nil {
-			ctx = msg.State(ctx, "💥 Failed to build new policy: \n> %v\n\nRetry...", err)
+			ctx = msg.Trace(ctx, "💥 Failed to build new policy: \n> %v\n\nRetry...", err)
 			p = "Failed to build new policy client: " + err.Error()
 			continue
 		}
@@ -142,23 +142,23 @@ func GenerateIgnorePolicy(ctx context.Context, input GenerateIgnorePolicyInput) 
 			if len(replyLines) > 0 {
 				lines := strings.Join(replyLines, "\n")
 				p = "Failed to test new policy:\n> " + lines
-				ctx = msg.State(ctx, "💥 Failed to test new policy: \n> %v\n\nRetry...", lines)
+				ctx = msg.Trace(ctx, "💥 Failed to test new policy: \n> %v\n\nRetry...", lines)
 				continue
 			}
 		}
 
-		ctx = msg.State(ctx, "✅ Test PASSED")
+		ctx = msg.Trace(ctx, "✅ Test PASSED")
 		validResult = resp
 		validResult.Policy = formattedPolicy
 	}
 
 	if validResult == nil {
-		_ = msg.State(ctx, "🛑 Failed to generate a new ignore policy. Stop generating.")
+		_ = msg.Trace(ctx, "🛑 Failed to generate a new ignore policy. Stop generating.")
 		return nil, goerr.New("failed to generate a new ignore policy")
 	}
 
 	// Fill generated README for test data
-	ctx = msg.State(ctx, "📝 Generating metadata for test data...")
+	ctx = msg.Trace(ctx, "📝 Generating metadata for test data...")
 	alertSchemaMap := make(map[types.AlertSchema][]*alert.Alert)
 	for _, alert := range alerts {
 		alertSchemaMap[alert.Schema] = append(alertSchemaMap[alert.Schema], alert)
@@ -172,7 +172,7 @@ func GenerateIgnorePolicy(ctx context.Context, input GenerateIgnorePolicyInput) 
 
 		resp, err := llm.Ask[prompt.TestDataReadmePromptResult](ctx, input.LLM, p)
 		if err != nil {
-			ctx = msg.State(ctx, "💥 Failed to generate README for test data: \n> %v\n\nSkip README generation.", err)
+			ctx = msg.Trace(ctx, "💥 Failed to generate README for test data: \n> %v\n\nSkip README generation.", err)
 		} else {
 			if newTestData.Ignore.Metafiles[schema] == nil {
 				newTestData.Ignore.Metafiles[schema] = make(map[string]string)
@@ -181,7 +181,7 @@ func GenerateIgnorePolicy(ctx context.Context, input GenerateIgnorePolicyInput) 
 			newTestData.Ignore.Metafiles[schema][fpath] = resp.Content
 		}
 	}
-	ctx = msg.State(ctx, "✅ Successfully generated metadata for test data")
+	ctx = msg.Trace(ctx, "✅ Successfully generated metadata for test data")
 
 	result := policy.NewDiff(ctx,
 		validResult.Title,

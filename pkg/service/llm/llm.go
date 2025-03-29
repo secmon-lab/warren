@@ -52,14 +52,14 @@ func Ask[T any](ctx context.Context, llm interfaces.LLMInquiry, prompt string, o
 		}
 
 		if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-			ctx = msg.State(ctx, "💥 failed to get valid response from LLM (no content parts), retry (%d/%d)", i+1, config.maxRetry)
+			ctx = msg.Trace(ctx, "💥 failed to get valid response from LLM (no content parts), retry (%d/%d)", i+1, config.maxRetry)
 			prompt = config.retryPrompt(ctx, err)
 			continue
 		}
 
 		text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
 		if !ok || text == "" {
-			ctx = msg.State(ctx, "💥 failed to get valid response from LLM (no text data), retry (%d/%d)", i+1, config.maxRetry)
+			ctx = msg.Trace(ctx, "💥 failed to get valid response from LLM (no text data), retry (%d/%d)", i+1, config.maxRetry)
 			prompt = config.retryPrompt(ctx, err)
 			continue
 		}
@@ -67,7 +67,7 @@ func Ask[T any](ctx context.Context, llm interfaces.LLMInquiry, prompt string, o
 		var result T
 		if err := json.Unmarshal([]byte(text), &result); err != nil {
 			logger.Debug("failed to unmarshal text", "text", text, "error", err)
-			ctx = msg.State(ctx, "💥 failed to unmarshal text. retry (%d/%d)\n> %s", i+1, config.maxRetry, err.Error())
+			ctx = msg.Trace(ctx, "💥 failed to unmarshal text. retry (%d/%d)\n> %s", i+1, config.maxRetry, err.Error())
 			prompt = config.retryPrompt(ctx, err)
 			continue
 		}

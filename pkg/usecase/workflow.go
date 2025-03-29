@@ -21,7 +21,7 @@ func (x *throttleSession) SendMessage(ctx context.Context, msg ...genai.Part) (*
 func (uc *UseCases) RunWorkflow(ctx context.Context, alert alert.Alert) error {
 	logger := logging.From(ctx)
 	thread := uc.slackService.NewThread(*alert.SlackThread)
-	msg.State(ctx, "Starting investigation...")
+	msg.Trace(ctx, "Starting investigation...")
 
 	ssn := &throttleSession{
 		ssn:  uc.llmClient.StartChat(),
@@ -36,7 +36,7 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert alert.Alert) error {
 	for i := 0; i < uc.actionLimit; i++ {
 		actionPrompt, err := planAction(ctx, ssn, prePrompt, uc.actionService)
 		if err != nil {
-			msg.State(ctx, "Failed to plan next action: "+err.Error())
+			msg.Trace(ctx, "Failed to plan next action: "+err.Error())
 			return goerr.Wrap(err, "failed to plan action")
 		}
 		logger.Info("action planned", "action", actionPrompt)
@@ -54,14 +54,14 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert alert.Alert) error {
 			logger.Error("Action failed", "error", err, "action", actionPrompt.Action, "args", actionPrompt.Args)
 
 			msg := fmt.Sprintf("Action failed: %s. Retry...", err.Error())
-			msg.State(ctx, msg)
+			msg.Trace(ctx, msg)
 			prePrompt = fmt.Sprintf("The action that you specified previously failed. Please try again. The action is: %s", actionPrompt.Action)
 			continue
 		}
 
 		logger.Info("action executed", "action", actionResult)
 		if err := thread.AttachFile(ctx, actionResult.Message, "result.json", []byte(actionResult.Data)); err != nil {
-			msg.State(ctx, "Failed to attach file: "+err.Error())
+			msg.Trace(ctx, "Failed to attach file: "+err.Error())
 			return goerr.Wrap(err, "failed to attach file")
 		}
 
@@ -71,13 +71,13 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert alert.Alert) error {
 	for i := 0; i < uc.findingLimit && alert.Finding == nil; i++ {
 		finding, err := uc.buildFinding(ctx, ssn)
 		if err != nil {
-			msg.State(ctx, "Failed to build finding: "+err.Error())
+			msg.Trace(ctx, "Failed to build finding: "+err.Error())
 			return goerr.Wrap(err, "failed to build finding")
 		}
 		logger.Info("finding built", "finding", finding)
 
 		if err := finding.Severity.Validate(); err != nil {
-			msg.State(ctx, "Failed to validate severity. Retry...")
+			msg.Trace(ctx, "Failed to validate severity. Retry...")
 			continue
 		}
 
@@ -90,7 +90,7 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert alert.Alert) error {
 	}
 
 	if alert.Finding == nil {
-		msg.State(ctx, "Failed to build finding. Exiting...")
+		msg.Trace(ctx, "Failed to build finding. Exiting...")
 		return nil
 	}
 

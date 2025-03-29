@@ -17,7 +17,7 @@ func TestWithReply(t *testing.T) {
 	}
 
 	ctx := msg.With(context.Background(), replyFunc, nil)
-	msg.Reply(ctx, "test message")
+	msg.Notify(ctx, "test message")
 
 	gt.True(t, called)
 	gt.Equal(t, "test message", gotMsg)
@@ -39,8 +39,8 @@ func TestWithNewStateMsg(t *testing.T) {
 	}
 
 	ctx := msg.With(context.Background(), replyFunc, newStateFunc)
-	ctx = msg.NewState(ctx, "test new state")
-	msg.State(ctx, "test state messsage")
+	ctx = msg.NewTrace(ctx, "test new state")
+	msg.Trace(ctx, "test state messsage")
 
 	gt.False(t, calledReply)
 	gt.True(t, calledState)
@@ -49,8 +49,8 @@ func TestWithNewStateMsg(t *testing.T) {
 
 func TestNewStateMsg_Nil(t *testing.T) {
 	ctx := context.Background()
-	ctx = msg.NewState(ctx, "test state")
+	ctx = msg.NewTrace(ctx, "test state")
 
 	// Should not panic
-	msg.State(ctx, "test message")
+	msg.Trace(ctx, "test message")
 }

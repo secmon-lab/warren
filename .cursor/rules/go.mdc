@@ -83,11 +83,12 @@ return goerr.Wrap(err, "failed something", goerr.V("args", args))
 Use "Function Driven Test" Style like following:
 
 ```go
-	runTest := func(tc struct {
+	type testCase struct {
 		name  string
 		args  []string
 		error string
-	}) func(*testing.T) {
+	}
+	runTest := func(tc testCase) func(*testing.T) {
 		return func(t *testing.T) {
 			result, err := list.ParseArgsToSource(t.Context(), tc.args)
 			gt.Error(t, err).Contains(tc.error)
@@ -95,24 +96,15 @@ Use "Function Driven Test" Style like following:
 		}
 	}
 
-	t.Run("invalid from command format", runTest(struct {
-		name  string
-		args  []string
-		error string
-	}{
+	t.Run("invalid from command format", runTest(testCase{
 		name:  "invalid from command format",
 		args:  []string{"from", "2024-03-15"},
 		error: "unknown command",
 	}))
-
-	t.Run("invalid between command format", runTest(struct {
-		name  string
-		args  []string
-		error string
-	}{
-		name:  "invalid between command format",
-		args:  []string{"between", "2024-03-15"},
-		error: "invalid date range format",
+	t.Run("invalid from command format", runTest(testCase{
+		name:  "invalid from command format",
+		args:  []string{"from", "2024-03-15"},
+		error: "unknown command",
 	}))
 ```
 

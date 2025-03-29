@@ -17,7 +17,7 @@ type Source func(ctx context.Context, repo interfaces.Repository) (alert.Alerts,
 
 func Thread(slackThread slack.Thread) Source {
 	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
-		msg.State(ctx, "🤖 Getting alerts from slack thread...")
+		msg.Trace(ctx, "🤖 Getting alerts from slack thread...")
 
 		alertList, err := repo.GetAlertListByThread(ctx, slackThread)
 		if err != nil {
@@ -36,7 +36,7 @@ func Thread(slackThread slack.Thread) Source {
 
 func RootAlertList(slackThread slack.Thread) Source {
 	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
-		msg.State(ctx, "🤖 Getting root alerts from alert list")
+		msg.Trace(ctx, "🤖 Getting root alerts from alert list")
 		logging.From(ctx).Info("Getting root alerts from alert list")
 
 		return nil, nil
@@ -45,7 +45,7 @@ func RootAlertList(slackThread slack.Thread) Source {
 
 func LatestAlertList(slackThread slack.Thread) Source {
 	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
-		msg.State(ctx, "🤖 Getting latest alerts from slack thread")
+		msg.Trace(ctx, "🤖 Getting latest alerts from slack thread")
 		logging.From(ctx).Info("Getting latest alerts from slack thread", "slack_thread", slackThread)
 
 		alertList, err := repo.GetLatestAlertListInThread(ctx, slackThread)
@@ -65,7 +65,7 @@ func LatestAlertList(slackThread slack.Thread) Source {
 
 func AlertListID(alertListID types.AlertListID) Source {
 	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
-		msg.State(ctx, "🤖 Getting alerts from alert list: %s", alertListID)
+		msg.Trace(ctx, "🤖 Getting alerts from alert list: %s", alertListID)
 
 		alertList, err := repo.GetAlertList(ctx, alertListID)
 		if err != nil {
@@ -84,7 +84,7 @@ func AlertListID(alertListID types.AlertListID) Source {
 
 func Span(begin, end time.Time) Source {
 	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
-		msg.State(ctx, "🤖 Getting alerts from span: %s to %s", begin.Format("2006-01-02 15:04"), end.Format("2006-01-02 15:04"))
+		msg.Trace(ctx, "🤖 Getting alerts from span: %s to %s", begin.Format("2006-01-02 15:04"), end.Format("2006-01-02 15:04"))
 
 		alerts, err := repo.GetAlertsBySpan(ctx, begin, end)
 		if err != nil {
@@ -102,7 +102,7 @@ func Static(alerts alert.Alerts) Source {
 
 func Status(status ...types.AlertStatus) Source {
 	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
-		msg.State(ctx, "🤖 Getting alerts with status: %s", status)
+		msg.Trace(ctx, "🤖 Getting alerts with status: %s", status)
 
 		alerts, err := repo.GetAlertsByStatus(ctx, status...)
 		if err != nil {
@@ -115,7 +115,7 @@ func Status(status ...types.AlertStatus) Source {
 
 func Unresolved() Source {
 	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
-		msg.State(ctx, "🤖 Getting unresolved alerts...")
+		msg.Trace(ctx, "🤖 Getting unresolved alerts...")
 
 		alerts, err := repo.GetAlertsWithoutStatus(ctx, types.AlertStatusResolved)
 		if err != nil {

@@ -22,13 +22,13 @@ func GenerateAlertListMeta(ctx context.Context, list alert.List, llmClient inter
 	)
 
 	if listMetaThreshold > list.Alerts.MaxSimilarity() {
-		msg.State(ctx, "🤖 Alert list is too similar to other alert lists. Skipping meta data generation (%s)", list.ID.String())
+		msg.Trace(ctx, "🤖 Alert list is too similar to other alert lists. Skipping meta data generation (%s)", list.ID.String())
 		return nil, nil
 	}
 
 	var result *prompt.MetaListPromptResult
 	for range maxRetryCount {
-		ctx = msg.State(ctx, "🤖 Generating meta data of alert list... (%s)", list.ID.String())
+		ctx = msg.Trace(ctx, "🤖 Generating meta data of alert list... (%s)", list.ID.String())
 		resp, err := llm.Ask[prompt.MetaListPromptResult](ctx, llmClient, p)
 
 		if err == nil {
@@ -36,7 +36,7 @@ func GenerateAlertListMeta(ctx context.Context, list alert.List, llmClient inter
 			break
 		}
 
-		ctx = msg.State(ctx, "💥 Failed to generate meta data of alert list: %s", err.Error())
+		ctx = msg.Trace(ctx, "💥 Failed to generate meta data of alert list: %s", err.Error())
 		p = "Invalid result. Please retry: " + err.Error()
 	}
 

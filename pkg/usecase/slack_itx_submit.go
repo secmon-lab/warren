@@ -35,11 +35,11 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveAlert(ctx context
 	alertID := types.AlertID(metadata)
 	target, err := uc.repository.GetAlert(ctx, alertID)
 	if err != nil {
-		msg.State(ctx, "💥 Failed to get alert\n> %s", err.Error())
+		msg.Trace(ctx, "💥 Failed to get alert\n> %s", err.Error())
 		return goerr.Wrap(err, "failed to get alert")
 	}
 	if target == nil {
-		msg.Reply(ctx, "💥 Alert not found")
+		msg.Notify(ctx, "💥 Alert not found")
 		return nil
 	}
 
@@ -49,7 +49,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveAlert(ctx context
 	}
 
 	if err := uc.handleSlackInteractionViewSubmissionResolve(ctx, user, values, alert.Alerts{target}); err != nil {
-		msg.State(ctx, "💥 Failed to resolve alert\n> %s", err.Error())
+		msg.Trace(ctx, "💥 Failed to resolve alert\n> %s", err.Error())
 		logger.Error("failed to resolve alert", "error", err)
 		return err
 	}
@@ -90,12 +90,12 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveList(ctx context.
 
 	alerts, err := uc.repository.BatchGetAlerts(ctx, list.AlertIDs)
 	if err != nil {
-		msg.State(ctx, "💥 Failed to get alerts\n> %s", err.Error())
+		msg.Trace(ctx, "💥 Failed to get alerts\n> %s", err.Error())
 		return goerr.Wrap(err, "failed to get alerts")
 	}
 
 	if err := uc.handleSlackInteractionViewSubmissionResolve(ctx, user, values, alerts); err != nil {
-		msg.State(ctx, "💥 Failed to resolve alerts of list\n> %s", err.Error())
+		msg.Trace(ctx, "💥 Failed to resolve alerts of list\n> %s", err.Error())
 		return goerr.Wrap(err, "failed to resolve alerts")
 	}
 
@@ -104,7 +104,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveList(ctx context.
 
 func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Context, user slack.User, values slack.StateValue, alerts alert.Alerts) error {
 	logger := logging.From(ctx)
-	ctx = msg.NewState(ctx, "⏳ Resolving %d alerts...", len(alerts))
+	ctx = msg.NewTrace(ctx, "⏳ Resolving %d alerts...", len(alerts))
 	logger.Info("resolving alerts", "alerts", alerts)
 
 	var (
@@ -129,7 +129,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Cont
 	now := clock.Now(ctx)
 	for i, alert := range alerts {
 		if i > 0 && i%10 == 0 {
-			msg.State(ctx, "🏃 Resolving %d/%d alerts...", i+1, len(alerts))
+			msg.Trace(ctx, "🏃 Resolving %d/%d alerts...", i+1, len(alerts))
 		}
 
 		alert.Status = types.AlertStatusResolved
@@ -146,7 +146,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Cont
 
 		st := uc.slackService.NewThread(*alert.SlackThread)
 		newCtx := msg.With(ctx, st.Reply, st.NewStateFunc)
-		msg.Reply(newCtx, "Alert resolved by <@%s>", user.ID)
+		msg.Notify(newCtx, "Alert resolved by <@%s>", user.ID)
 
 		logger.Info("alert resolved", "alert", alert)
 
@@ -155,7 +155,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Cont
 		}
 	}
 
-	msg.State(ctx, "✅️ Resolved %d alerts", len(alerts))
+	msg.Trace(ctx, "✅️ Resolved %d alerts", len(alerts))
 
 	return nil
 }

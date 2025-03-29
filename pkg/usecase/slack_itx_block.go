@@ -41,7 +41,7 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, user
 			return goerr.Wrap(err, "failed to put alert")
 		}
 
-		msg.State(ctx, "Alert acknowledged by <@%s>", user.ID)
+		msg.Trace(ctx, "Alert acknowledged by <@%s>", user.ID)
 
 		if err := st.UpdateAlert(ctx, *alert); err != nil {
 			return goerr.Wrap(err, "failed to update slack thread")
@@ -77,7 +77,7 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, user
 		if err != nil {
 			return goerr.Wrap(err, "failed to get alert list")
 		} else if list == nil {
-			msg.State(ctx, "💥 Alert list not found")
+			msg.Trace(ctx, "💥 Alert list not found")
 			return nil
 		}
 
@@ -86,30 +86,30 @@ func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, user
 		}
 
 	case slack.ActionIDCreatePR:
-		msg.State(ctx, "✏️ Creating pull request...")
+		msg.Trace(ctx, "✏️ Creating pull request...")
 
 		diffID := types.PolicyDiffID(value)
 		diff, err := uc.repository.GetPolicyDiff(ctx, diffID)
 		if err != nil {
-			msg.State(ctx, "💥 Failed to get policy diff\n> %s", err.Error())
+			msg.Trace(ctx, "💥 Failed to get policy diff\n> %s", err.Error())
 			return goerr.Wrap(err, "failed to get policy diff")
 		} else if diff == nil {
-			msg.State(ctx, "💥 Policy diff not found")
+			msg.Trace(ctx, "💥 Policy diff not found")
 			return nil
 		}
 
 		if uc.githubApp == nil {
-			msg.State(ctx, "💥 GitHub is not enabled")
+			msg.Trace(ctx, "💥 GitHub is not enabled")
 			return nil
 		}
 
 		prURL, err := uc.githubApp.CreatePolicyDiffPullRequest(ctx, diff)
 		if err != nil {
-			msg.State(ctx, "💥 Failed to create pull request\n> %s", err.Error())
+			msg.Trace(ctx, "💥 Failed to create pull request\n> %s", err.Error())
 			return err
 		}
 
-		msg.State(ctx, "✅️ Created: <%s|%s>", prURL.String(), diff.Title)
+		msg.Trace(ctx, "✅️ Created: <%s|%s>", prURL.String(), diff.Title)
 	}
 
 	return nil

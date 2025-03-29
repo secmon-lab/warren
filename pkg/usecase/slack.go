@@ -50,7 +50,7 @@ func (uc *UseCases) handleSlackAppMention(ctx context.Context, user slack.User, 
 		return nil
 	}
 	if len(mention.Message) == 0 {
-		msg.Reply(ctx, "🤔 No message")
+		msg.Notify(ctx, "🤔 No message")
 		return nil
 	}
 
@@ -127,7 +127,7 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, thread slack.Thread,
 		User:      user,
 	}
 	if err := uc.repository.PutAlertComment(ctx, comment); err != nil {
-		msg.State(ctx, "💥 Failed to insert alert comment\n> %s", err.Error())
+		msg.Trace(ctx, "💥 Failed to insert alert comment\n> %s", err.Error())
 		return goerr.Wrap(err, "failed to insert alert comment", goerr.V("comment", comment))
 	}
 
