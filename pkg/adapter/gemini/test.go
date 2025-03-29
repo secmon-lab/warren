@@ -16,6 +16,6 @@ func NewTestClient(t *testing.T, opts ...Option) *GeminiClient {
 	}
 
 	client, err := New(t.Context(), project, opts...)
-	gt.NoError(t, err).Must()
+	gt.NoError(t, err).Required()
 	return client
 }

@@ -838,6 +838,9 @@ func (mock *LLMSessionMock) SetHistoryCalls() []struct {
 //			BatchUpdateAlertStatusFunc: func(ctx context.Context, alertIDs []types.AlertID, status types.AlertStatus, reason string) error {
 //				panic("mock out the BatchUpdateAlertStatus method")
 //			},
+//			FindNearestAlertsFunc: func(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error) {
+//				panic("mock out the FindNearestAlerts method")
+//			},
 //			GetAlertFunc: func(ctx context.Context, alertID types.AlertID) (*alert.Alert, error) {
 //				panic("mock out the GetAlert method")
 //			},
@@ -907,6 +910,9 @@ type RepositoryMock struct {
 
 	// BatchUpdateAlertStatusFunc mocks the BatchUpdateAlertStatus method.
 	BatchUpdateAlertStatusFunc func(ctx context.Context, alertIDs []types.AlertID, status types.AlertStatus, reason string) error
+
+	// FindNearestAlertsFunc mocks the FindNearestAlerts method.
+	FindNearestAlertsFunc func(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error)
 
 	// GetAlertFunc mocks the GetAlert method.
 	GetAlertFunc func(ctx context.Context, alertID types.AlertID) (*alert.Alert, error)
@@ -984,6 +990,15 @@ type RepositoryMock struct {
 			Status types.AlertStatus
 			// Reason is the reason argument value.
 			Reason string
+		}
+		// FindNearestAlerts holds details about calls to the FindNearestAlerts method.
+		FindNearestAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Embedding is the embedding argument value.
+			Embedding []float32
+			// Limit is the limit argument value.
+			Limit int
 		}
 		// GetAlert holds details about calls to the GetAlert method.
 		GetAlert []struct {
@@ -1125,6 +1140,7 @@ type RepositoryMock struct {
 	}
 	lockBatchGetAlerts             sync.RWMutex
 	lockBatchUpdateAlertStatus     sync.RWMutex
+	lockFindNearestAlerts          sync.RWMutex
 	lockGetAlert                   sync.RWMutex
 	lockGetAlertByThread           sync.RWMutex
 	lockGetAlertComments           sync.RWMutex
@@ -1223,6 +1239,46 @@ func (mock *RepositoryMock) BatchUpdateAlertStatusCalls() []struct {
 	mock.lockBatchUpdateAlertStatus.RLock()
 	calls = mock.calls.BatchUpdateAlertStatus
 	mock.lockBatchUpdateAlertStatus.RUnlock()
+	return calls
+}
+
+// FindNearestAlerts calls FindNearestAlertsFunc.
+func (mock *RepositoryMock) FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error) {
+	if mock.FindNearestAlertsFunc == nil {
+		panic("RepositoryMock.FindNearestAlertsFunc: method is nil but Repository.FindNearestAlerts was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		Embedding []float32
+		Limit     int
+	}{
+		Ctx:       ctx,
+		Embedding: embedding,
+		Limit:     limit,
+	}
+	mock.lockFindNearestAlerts.Lock()
+	mock.calls.FindNearestAlerts = append(mock.calls.FindNearestAlerts, callInfo)
+	mock.lockFindNearestAlerts.Unlock()
+	return mock.FindNearestAlertsFunc(ctx, embedding, limit)
+}
+
+// FindNearestAlertsCalls gets all the calls that were made to FindNearestAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.FindNearestAlertsCalls())
+func (mock *RepositoryMock) FindNearestAlertsCalls() []struct {
+	Ctx       context.Context
+	Embedding []float32
+	Limit     int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		Embedding []float32
+		Limit     int
+	}
+	mock.lockFindNearestAlerts.RLock()
+	calls = mock.calls.FindNearestAlerts
+	mock.lockFindNearestAlerts.RUnlock()
 	return calls
 }
 

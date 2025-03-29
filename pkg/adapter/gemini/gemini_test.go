@@ -16,7 +16,7 @@ func TestGeminiClient(t *testing.T) {
 
 	ssn := client.StartChat()
 	resp, err := ssn.SendMessage(ctx, genai.Text("My color is blue. Please remember it."))
-	gt.NoError(t, err).Must()
+	gt.NoError(t, err).Required()
 
 	t.Log("resp", resp)
 
@@ -72,7 +72,7 @@ func TestFunctionCall(t *testing.T) {
 		model.WithContentType("text/plain"),
 	)
 	resp, err := ssn.SendMessage(ctx, genai.Text("Get the user info of the user who has the name 'John'"))
-	gt.NoError(t, err).Must()
+	gt.NoError(t, err).Required()
 	gt.NotNil(t, resp)
 	gt.A(t, resp.Candidates).Longer(0).At(0, func(t testing.TB, v *genai.Candidate) {
 		gt.A(t, v.Content.Parts).Longer(0).At(0, func(t testing.TB, v genai.Part) {
@@ -83,7 +83,7 @@ func TestFunctionCall(t *testing.T) {
 	})
 
 	resp, err = ssn.SendMessage(ctx, genai.Text("User data is following: {user_name: 'John', role: 'admin', age: 30}. Describe the user info."))
-	gt.NoError(t, err).Must()
+	gt.NoError(t, err).Required()
 	gt.NotNil(t, resp)
 	gt.A(t, resp.Candidates).Longer(0).At(0, func(t testing.TB, v *genai.Candidate) {
 		gt.A(t, v.Content.Parts).Longer(0).At(0, func(t testing.TB, v genai.Part) {

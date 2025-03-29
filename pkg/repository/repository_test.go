@@ -83,7 +83,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 
 		// GetByThread
 		got, err := repo.GetAlertByThread(ctx, thread)
-		gt.NoError(t, err).Must()
+		gt.NoError(t, err).Required()
 		gt.NotNil(t, got)
 		gt.Value(t, got.ID).Equal(a.ID)
 		gt.Value(t, got.SlackThread.ChannelID).Equal(thread.ChannelID)
@@ -304,4 +304,82 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Value(t, got.Thread.ChannelID).Equal(thread.ChannelID)
 		gt.Value(t, got.Thread.ThreadID).Equal(thread.ThreadID)
 	})
+
+	/*
+		// Test FindNearestAlerts
+		t.Run("find_nearest_alerts", func(t *testing.T) {
+			// Create test alerts with embeddings
+			alerts := []alert.Alert{
+				{
+					ID:          types.NewAlertID(),
+					Schema:      types.AlertSchema("test"),
+					Title:       "Test Alert 1",
+					Description: "Test Description 1",
+					Status:      types.AlertStatusNew,
+					CreatedAt:   time.Now(),
+					UpdatedAt:   time.Now(),
+					Embedding:   make([]float32, 256),
+				},
+				{
+					ID:          types.NewAlertID(),
+					Schema:      types.AlertSchema("test"),
+					Title:       "Test Alert 2",
+					Description: "Test Description 2",
+					Status:      types.AlertStatusNew,
+					CreatedAt:   time.Now(),
+					UpdatedAt:   time.Now(),
+					Embedding:   make([]float32, 256),
+				},
+				{
+					ID:          types.NewAlertID(),
+					Schema:      types.AlertSchema("test"),
+					Title:       "Test Alert 3",
+					Description: "Test Description 3",
+					Status:      types.AlertStatusNew,
+					CreatedAt:   time.Now(),
+					UpdatedAt:   time.Now(),
+					Embedding:   make([]float32, 256),
+				},
+			}
+
+			// Fill embeddings with random values
+			base := make([]float32, 256)
+			for i := range base {
+				base[i] = rand.Float32()
+			}
+
+			copy(alerts[0].Embedding, base)
+			copy(alerts[1].Embedding, base)
+			copy(alerts[2].Embedding, base)
+
+			// Add small random variations to alerts[1] and alerts[2]
+			for i := range alerts[1].Embedding {
+				alerts[1].Embedding[i] += 0.1 * (rand.Float32() - 0.5)
+				alerts[2].Embedding[i] += 0.2 * (rand.Float32() - 0.5)
+			}
+
+			// Store alerts
+			for _, alert := range alerts {
+				err := repo.PutAlert(ctx, alert)
+				gt.NoError(t, err)
+			}
+
+			// Test finding nearest alerts
+			queryEmbedding := make([]float32, 256)
+			queryEmbedding[0] = 1 // Most similar to first alert
+			nearest, err := repo.FindNearestAlerts(ctx, queryEmbedding, 2)
+			gt.NoError(t, err).Required()
+			gt.Array(t, nearest).Length(2).Required()
+			gt.Value(t, nearest[0].ID).Equal(alerts[0].ID) // Should be most similar to query
+			gt.Value(t, nearest[1].ID).Equal(alerts[1].ID) // Second most similar
+
+			// Test with empty embedding
+			_, err = repo.FindNearestAlerts(ctx, []float32{}, 2)
+			gt.Error(t, err)
+
+			// Test with different dimension embedding
+			_, err = repo.FindNearestAlerts(ctx, make([]float32, 128), 2)
+			gt.NoError(t, err) // Should return empty result but not error
+		})
+	*/
 }

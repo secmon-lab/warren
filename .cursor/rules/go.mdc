@@ -146,7 +146,7 @@ gt.Array(t, colors).
     Has("yellow")                           // Pass
     Length(3)                                // Pass
 
-gt.Array(t, colors).Must().Has("orange") // Fail and stop test
+gt.Array(t, colors).Required().Has("orange") // Fail and stop test
 ```
 
 ### Map
@@ -164,7 +164,7 @@ gt.Map(t, colorMap)
     // .HasValue("red")       // Compile error
     .HasKeyValue("yellow", 2) // Pass
 
-gt.Map(t, colorMap).Must().HasKey("orange") // Fail and stop test
+gt.Map(t, colorMap).Required().HasKey("orange") // Fail and stop test
 ```
 
 ### Cast

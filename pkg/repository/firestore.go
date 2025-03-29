@@ -556,3 +556,30 @@ func (r *Firestore) PutSession(ctx context.Context, s session.Session) error {
 	}
 	return nil
 }
+
+/*
+func (r *Firestore) FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error) {
+	if len(embedding) == 0 {
+		return nil, goerr.New("embedding vector is empty")
+	}
+
+	// Use FindNearest for vector search
+	docs, err := r.db.Collection(collectionAlerts).
+		FindNearest("Embedding", embedding, limit, firestore.DistanceMeasureEuclidean, nil).
+		Documents(ctx).GetAll()
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get nearest alerts")
+	}
+
+	var result alert.Alerts
+	for _, doc := range docs {
+		var alert alert.Alert
+		if err := doc.DataTo(&alert); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert")
+		}
+		result = append(result, &alert)
+	}
+
+	return result, nil
+}
+*/

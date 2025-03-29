@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"math"
+	"sort"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -195,4 +197,61 @@ func (r *Memory) GetSessionByThread(ctx context.Context, thread slack.Thread) (*
 func (r *Memory) PutSession(ctx context.Context, s session.Session) error {
 	r.sessions[s.ID] = s
 	return nil
+}
+
+func (r *Memory) FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error) {
+	if len(embedding) == 0 {
+		return nil, goerr.New("embedding vector is empty")
+	}
+
+	type alertWithDistance struct {
+		alert    alert.Alert
+		distance float32
+	}
+
+	var alertsWithDistance []alertWithDistance
+	for _, alert := range r.alerts {
+		if len(alert.Embedding) == 0 {
+			continue
+		}
+		if len(alert.Embedding) != len(embedding) {
+			continue
+		}
+
+		// Calculate cosine distance (1 - cosine similarity)
+		var dotProduct float32
+		var normA, normB float32
+		for i := 0; i < len(embedding); i++ {
+			dotProduct += embedding[i] * alert.Embedding[i]
+			normA += embedding[i] * embedding[i]
+			normB += alert.Embedding[i] * alert.Embedding[i]
+		}
+		normA = float32(math.Sqrt(float64(normA)))
+		normB = float32(math.Sqrt(float64(normB)))
+
+		if normA == 0 || normB == 0 {
+			continue
+		}
+
+		cosineSimilarity := dotProduct / (normA * normB)
+		distance := 1 - cosineSimilarity
+
+		alertsWithDistance = append(alertsWithDistance, alertWithDistance{
+			alert:    alert,
+			distance: distance,
+		})
+	}
+
+	// Sort by distance
+	sort.Slice(alertsWithDistance, func(i, j int) bool {
+		return alertsWithDistance[i].distance < alertsWithDistance[j].distance
+	})
+
+	// Take top N alerts
+	var result alert.Alerts
+	for i := 0; i < len(alertsWithDistance) && i < limit; i++ {
+		result = append(result, &alertsWithDistance[i].alert)
+	}
+
+	return result, nil
 }

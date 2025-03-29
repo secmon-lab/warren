@@ -131,7 +131,7 @@ func TestService_Run(t *testing.T) {
 				return
 			}
 
-			gt.NoError(t, err).Must()
+			gt.NoError(t, err).Required()
 			gt.Equal(t, tt.expected, alertList.Alerts)
 		})
 	}

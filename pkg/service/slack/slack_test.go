@@ -22,7 +22,7 @@ func newSlackService(t *testing.T) *slack.Service {
 	client := slack_sdk.New(envs.Get("TEST_SLACK_OAUTH_TOKEN"))
 
 	svc, err := slack.New(client, envs.Get("TEST_SLACK_CHANNEL_ID"))
-	gt.NoError(t, err).Must()
+	gt.NoError(t, err).Required()
 
 	return svc
 }
@@ -77,7 +77,7 @@ func TestSlackUpdateAlert(t *testing.T) {
 	dummy := genDummyAlert()
 
 	thread, err := svc.PostAlert(context.Background(), dummy)
-	gt.NoError(t, err).Must()
+	gt.NoError(t, err).Required()
 	dummy.SlackThread = &model.Thread{
 		ChannelID: thread.ChannelID(),
 		ThreadID:  thread.ThreadID(),
