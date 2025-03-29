@@ -20,3 +20,17 @@ func Now(ctx context.Context) time.Time {
 func With(ctx context.Context, clock Clock) context.Context {
 	return context.WithValue(ctx, ctxClockKey{}, clock)
 }
+
+type ctxTimezoneKey struct{}
+
+func WithTimezone(ctx context.Context, location *time.Location) context.Context {
+	return context.WithValue(ctx, ctxTimezoneKey{}, location)
+}
+
+func Timezone(ctx context.Context) *time.Location {
+	location, ok := ctx.Value(ctxTimezoneKey{}).(*time.Location)
+	if !ok {
+		return time.Local
+	}
+	return location
+}

@@ -61,7 +61,7 @@ type AggregatePromptResult struct {
 	AlertID string `json:"alert_id"`
 }
 
-func BuildAggregatePrompt(ctx context.Context, newAlert alert.Alert, candidates []alert.Alert) (string, error) {
+func BuildAggregatePrompt(ctx context.Context, newAlert alert.Alert, candidates alert.Alerts) (string, error) {
 	tmpl, err := template.New("aggregate").Parse(aggregateTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
@@ -257,7 +257,7 @@ type FilterQueryPromptResult struct {
 	AlertIDs []types.AlertID `json:"alert_ids"`
 }
 
-func BuildFilterQueryPrompt(ctx context.Context, query string, alerts []alert.Alert) (string, error) {
+func BuildFilterQueryPrompt(ctx context.Context, query string, alerts alert.Alerts) (string, error) {
 	tmpl, err := template.New("filter_query").Parse(filterQueryTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")

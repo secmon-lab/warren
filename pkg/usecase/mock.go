@@ -69,9 +69,6 @@ type SlackEventMock struct {
 
 // HandleSlackAppMention calls HandleSlackAppMentionFunc.
 func (mock *SlackEventMock) HandleSlackAppMention(ctx context.Context, user slack.User, mention slack.Mention, slackThread slack.Thread) error {
-	if mock.HandleSlackAppMentionFunc == nil {
-		panic("SlackEventMock.HandleSlackAppMentionFunc: method is nil but SlackEvent.HandleSlackAppMention was just called")
-	}
 	callInfo := struct {
 		Ctx         context.Context
 		User        slack.User
@@ -86,6 +83,12 @@ func (mock *SlackEventMock) HandleSlackAppMention(ctx context.Context, user slac
 	mock.lockHandleSlackAppMention.Lock()
 	mock.calls.HandleSlackAppMention = append(mock.calls.HandleSlackAppMention, callInfo)
 	mock.lockHandleSlackAppMention.Unlock()
+	if mock.HandleSlackAppMentionFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.HandleSlackAppMentionFunc(ctx, user, mention, slackThread)
 }
 
@@ -113,9 +116,6 @@ func (mock *SlackEventMock) HandleSlackAppMentionCalls() []struct {
 
 // HandleSlackMessage calls HandleSlackMessageFunc.
 func (mock *SlackEventMock) HandleSlackMessage(ctx context.Context, slackThread slack.Thread, text string, user slack.User, ts string) error {
-	if mock.HandleSlackMessageFunc == nil {
-		panic("SlackEventMock.HandleSlackMessageFunc: method is nil but SlackEvent.HandleSlackMessage was just called")
-	}
 	callInfo := struct {
 		Ctx         context.Context
 		SlackThread slack.Thread
@@ -132,6 +132,12 @@ func (mock *SlackEventMock) HandleSlackMessage(ctx context.Context, slackThread 
 	mock.lockHandleSlackMessage.Lock()
 	mock.calls.HandleSlackMessage = append(mock.calls.HandleSlackMessage, callInfo)
 	mock.lockHandleSlackMessage.Unlock()
+	if mock.HandleSlackMessageFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.HandleSlackMessageFunc(ctx, slackThread, text, user, ts)
 }
 
@@ -253,9 +259,6 @@ type SlackInteractionMock struct {
 
 // HandleSlackInteractionBlockActions calls HandleSlackInteractionBlockActionsFunc.
 func (mock *SlackInteractionMock) HandleSlackInteractionBlockActions(ctx context.Context, user slack.User, slackThread slack.Thread, actionID slack.ActionID, value string, triggerID string) error {
-	if mock.HandleSlackInteractionBlockActionsFunc == nil {
-		panic("SlackInteractionMock.HandleSlackInteractionBlockActionsFunc: method is nil but SlackInteraction.HandleSlackInteractionBlockActions was just called")
-	}
 	callInfo := struct {
 		Ctx         context.Context
 		User        slack.User
@@ -274,6 +277,12 @@ func (mock *SlackInteractionMock) HandleSlackInteractionBlockActions(ctx context
 	mock.lockHandleSlackInteractionBlockActions.Lock()
 	mock.calls.HandleSlackInteractionBlockActions = append(mock.calls.HandleSlackInteractionBlockActions, callInfo)
 	mock.lockHandleSlackInteractionBlockActions.Unlock()
+	if mock.HandleSlackInteractionBlockActionsFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.HandleSlackInteractionBlockActionsFunc(ctx, user, slackThread, actionID, value, triggerID)
 }
 
@@ -305,9 +314,6 @@ func (mock *SlackInteractionMock) HandleSlackInteractionBlockActionsCalls() []st
 
 // HandleSlackInteractionViewSubmissionIgnoreList calls HandleSlackInteractionViewSubmissionIgnoreListFunc.
 func (mock *SlackInteractionMock) HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Context, metadata string, values slack.StateValue) error {
-	if mock.HandleSlackInteractionViewSubmissionIgnoreListFunc == nil {
-		panic("SlackInteractionMock.HandleSlackInteractionViewSubmissionIgnoreListFunc: method is nil but SlackInteraction.HandleSlackInteractionViewSubmissionIgnoreList was just called")
-	}
 	callInfo := struct {
 		Ctx      context.Context
 		Metadata string
@@ -320,6 +326,12 @@ func (mock *SlackInteractionMock) HandleSlackInteractionViewSubmissionIgnoreList
 	mock.lockHandleSlackInteractionViewSubmissionIgnoreList.Lock()
 	mock.calls.HandleSlackInteractionViewSubmissionIgnoreList = append(mock.calls.HandleSlackInteractionViewSubmissionIgnoreList, callInfo)
 	mock.lockHandleSlackInteractionViewSubmissionIgnoreList.Unlock()
+	if mock.HandleSlackInteractionViewSubmissionIgnoreListFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.HandleSlackInteractionViewSubmissionIgnoreListFunc(ctx, metadata, values)
 }
 
@@ -345,9 +357,6 @@ func (mock *SlackInteractionMock) HandleSlackInteractionViewSubmissionIgnoreList
 
 // HandleSlackInteractionViewSubmissionResolveAlert calls HandleSlackInteractionViewSubmissionResolveAlertFunc.
 func (mock *SlackInteractionMock) HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
-	if mock.HandleSlackInteractionViewSubmissionResolveAlertFunc == nil {
-		panic("SlackInteractionMock.HandleSlackInteractionViewSubmissionResolveAlertFunc: method is nil but SlackInteraction.HandleSlackInteractionViewSubmissionResolveAlert was just called")
-	}
 	callInfo := struct {
 		Ctx      context.Context
 		User     slack.User
@@ -362,6 +371,12 @@ func (mock *SlackInteractionMock) HandleSlackInteractionViewSubmissionResolveAle
 	mock.lockHandleSlackInteractionViewSubmissionResolveAlert.Lock()
 	mock.calls.HandleSlackInteractionViewSubmissionResolveAlert = append(mock.calls.HandleSlackInteractionViewSubmissionResolveAlert, callInfo)
 	mock.lockHandleSlackInteractionViewSubmissionResolveAlert.Unlock()
+	if mock.HandleSlackInteractionViewSubmissionResolveAlertFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.HandleSlackInteractionViewSubmissionResolveAlertFunc(ctx, user, metadata, values)
 }
 
@@ -389,9 +404,6 @@ func (mock *SlackInteractionMock) HandleSlackInteractionViewSubmissionResolveAle
 
 // HandleSlackInteractionViewSubmissionResolveList calls HandleSlackInteractionViewSubmissionResolveListFunc.
 func (mock *SlackInteractionMock) HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
-	if mock.HandleSlackInteractionViewSubmissionResolveListFunc == nil {
-		panic("SlackInteractionMock.HandleSlackInteractionViewSubmissionResolveListFunc: method is nil but SlackInteraction.HandleSlackInteractionViewSubmissionResolveList was just called")
-	}
 	callInfo := struct {
 		Ctx      context.Context
 		User     slack.User
@@ -406,6 +418,12 @@ func (mock *SlackInteractionMock) HandleSlackInteractionViewSubmissionResolveLis
 	mock.lockHandleSlackInteractionViewSubmissionResolveList.Lock()
 	mock.calls.HandleSlackInteractionViewSubmissionResolveList = append(mock.calls.HandleSlackInteractionViewSubmissionResolveList, callInfo)
 	mock.lockHandleSlackInteractionViewSubmissionResolveList.Unlock()
+	if mock.HandleSlackInteractionViewSubmissionResolveListFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.HandleSlackInteractionViewSubmissionResolveListFunc(ctx, user, metadata, values)
 }
 
@@ -467,9 +485,6 @@ type AlertMock struct {
 
 // HandleAlertWithAuth calls HandleAlertWithAuthFunc.
 func (mock *AlertMock) HandleAlertWithAuth(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
-	if mock.HandleAlertWithAuthFunc == nil {
-		panic("AlertMock.HandleAlertWithAuthFunc: method is nil but Alert.HandleAlertWithAuth was just called")
-	}
 	callInfo := struct {
 		Ctx       context.Context
 		Schema    types.AlertSchema
@@ -482,6 +497,13 @@ func (mock *AlertMock) HandleAlertWithAuth(ctx context.Context, schema types.Ale
 	mock.lockHandleAlertWithAuth.Lock()
 	mock.calls.HandleAlertWithAuth = append(mock.calls.HandleAlertWithAuth, callInfo)
 	mock.lockHandleAlertWithAuth.Unlock()
+	if mock.HandleAlertWithAuthFunc == nil {
+		var (
+			alertsOut []*alert.Alert
+			errOut    error
+		)
+		return alertsOut, errOut
+	}
 	return mock.HandleAlertWithAuthFunc(ctx, schema, alertData)
 }
 

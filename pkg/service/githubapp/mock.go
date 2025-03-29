@@ -129,9 +129,6 @@ type ClientMock struct {
 
 // CommitChanges calls CommitChangesFunc.
 func (mock *ClientMock) CommitChanges(ctx context.Context, owner string, repo string, branch string, files map[string][]byte, message string) error {
-	if mock.CommitChangesFunc == nil {
-		panic("ClientMock.CommitChangesFunc: method is nil but Client.CommitChanges was just called")
-	}
 	callInfo := struct {
 		Ctx     context.Context
 		Owner   string
@@ -150,6 +147,12 @@ func (mock *ClientMock) CommitChanges(ctx context.Context, owner string, repo st
 	mock.lockCommitChanges.Lock()
 	mock.calls.CommitChanges = append(mock.calls.CommitChanges, callInfo)
 	mock.lockCommitChanges.Unlock()
+	if mock.CommitChangesFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.CommitChangesFunc(ctx, owner, repo, branch, files, message)
 }
 
@@ -181,9 +184,6 @@ func (mock *ClientMock) CommitChangesCalls() []struct {
 
 // CreateBranch calls CreateBranchFunc.
 func (mock *ClientMock) CreateBranch(ctx context.Context, owner string, repo string, baseBranch string, newBranch string) error {
-	if mock.CreateBranchFunc == nil {
-		panic("ClientMock.CreateBranchFunc: method is nil but Client.CreateBranch was just called")
-	}
 	callInfo := struct {
 		Ctx        context.Context
 		Owner      string
@@ -200,6 +200,12 @@ func (mock *ClientMock) CreateBranch(ctx context.Context, owner string, repo str
 	mock.lockCreateBranch.Lock()
 	mock.calls.CreateBranch = append(mock.calls.CreateBranch, callInfo)
 	mock.lockCreateBranch.Unlock()
+	if mock.CreateBranchFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.CreateBranchFunc(ctx, owner, repo, baseBranch, newBranch)
 }
 
@@ -229,9 +235,6 @@ func (mock *ClientMock) CreateBranchCalls() []struct {
 
 // CreatePullRequest calls CreatePullRequestFunc.
 func (mock *ClientMock) CreatePullRequest(ctx context.Context, owner string, repo string, title string, body string, head string, base string) (*github.PullRequest, error) {
-	if mock.CreatePullRequestFunc == nil {
-		panic("ClientMock.CreatePullRequestFunc: method is nil but Client.CreatePullRequest was just called")
-	}
 	callInfo := struct {
 		Ctx   context.Context
 		Owner string
@@ -252,6 +255,13 @@ func (mock *ClientMock) CreatePullRequest(ctx context.Context, owner string, rep
 	mock.lockCreatePullRequest.Lock()
 	mock.calls.CreatePullRequest = append(mock.calls.CreatePullRequest, callInfo)
 	mock.lockCreatePullRequest.Unlock()
+	if mock.CreatePullRequestFunc == nil {
+		var (
+			pullRequestOut *github.PullRequest
+			errOut         error
+		)
+		return pullRequestOut, errOut
+	}
 	return mock.CreatePullRequestFunc(ctx, owner, repo, title, body, head, base)
 }
 
@@ -285,9 +295,6 @@ func (mock *ClientMock) CreatePullRequestCalls() []struct {
 
 // GetDefaultBranch calls GetDefaultBranchFunc.
 func (mock *ClientMock) GetDefaultBranch(ctx context.Context, owner string, repo string) (string, error) {
-	if mock.GetDefaultBranchFunc == nil {
-		panic("ClientMock.GetDefaultBranchFunc: method is nil but Client.GetDefaultBranch was just called")
-	}
 	callInfo := struct {
 		Ctx   context.Context
 		Owner string
@@ -300,6 +307,13 @@ func (mock *ClientMock) GetDefaultBranch(ctx context.Context, owner string, repo
 	mock.lockGetDefaultBranch.Lock()
 	mock.calls.GetDefaultBranch = append(mock.calls.GetDefaultBranch, callInfo)
 	mock.lockGetDefaultBranch.Unlock()
+	if mock.GetDefaultBranchFunc == nil {
+		var (
+			sOut   string
+			errOut error
+		)
+		return sOut, errOut
+	}
 	return mock.GetDefaultBranchFunc(ctx, owner, repo)
 }
 
@@ -325,9 +339,6 @@ func (mock *ClientMock) GetDefaultBranchCalls() []struct {
 
 // LookupBranch calls LookupBranchFunc.
 func (mock *ClientMock) LookupBranch(ctx context.Context, owner string, repo string, branch string) (*github.Reference, error) {
-	if mock.LookupBranchFunc == nil {
-		panic("ClientMock.LookupBranchFunc: method is nil but Client.LookupBranch was just called")
-	}
 	callInfo := struct {
 		Ctx    context.Context
 		Owner  string
@@ -342,6 +353,13 @@ func (mock *ClientMock) LookupBranch(ctx context.Context, owner string, repo str
 	mock.lockLookupBranch.Lock()
 	mock.calls.LookupBranch = append(mock.calls.LookupBranch, callInfo)
 	mock.lockLookupBranch.Unlock()
+	if mock.LookupBranchFunc == nil {
+		var (
+			referenceOut *github.Reference
+			errOut       error
+		)
+		return referenceOut, errOut
+	}
 	return mock.LookupBranchFunc(ctx, owner, repo, branch)
 }
 

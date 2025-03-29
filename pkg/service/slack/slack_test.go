@@ -55,7 +55,7 @@ func TestSlackPostAlert(t *testing.T) {
 			Name: "John Doe",
 		},
 		Status: types.AlertStatusAcknowledged,
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"foo": "bar",
 			"baz": 123,
 		},
@@ -110,13 +110,13 @@ func genDummyAlert() alert.Alert {
 	})
 }
 
-func genDummyAlertWithSlackThread() alert.Alert {
+func genDummyAlertWithSlackThread() *alert.Alert {
 	alert := genDummyAlert()
 	alert.SlackThread = &model.Thread{
 		ChannelID: "C0123456789",
 		ThreadID:  fmt.Sprintf("%d", time.Now().Unix()),
 	}
-	return alert
+	return &alert
 }
 
 func TestSlackPostConclusion(t *testing.T) {
@@ -192,7 +192,7 @@ allow if {
 func TestPostAlerts(t *testing.T) {
 	svc := newSlackService(t)
 
-	alerts := []alert.Alert{
+	alerts := alert.Alerts{
 		genDummyAlertWithSlackThread(),
 		genDummyAlertWithSlackThread(),
 		genDummyAlertWithSlackThread(),
@@ -223,7 +223,7 @@ func TestPostAlertList(t *testing.T) {
 	}, &model.User{
 		ID:   "U0123456789",
 		Name: "John Doe",
-	}, []alert.Alert{
+	}, alert.Alerts{
 		genDummyAlertWithSlackThread(),
 		genDummyAlertWithSlackThread(),
 		genDummyAlertWithSlackThread(),

@@ -20,7 +20,7 @@ tasks:
       - go tool moq
         -out pkg/controller/http/mock_test.go
         -pkg http_test
-        -rm -skip-ensure
+        -rm -skip-ensure -stub
         pkg/controller/http UseCase
 
   mock_model_message:
@@ -29,8 +29,7 @@ tasks:
       - go tool moq
         -out pkg/domain/model/message/mock_test.go
         -pkg message_test
-        -rm
-        -skip-ensure
+        -rm -skip-ensure -stub
         pkg/domain/model/message HTTPClient
 
   mock_service_githubapp:
@@ -39,7 +38,7 @@ tasks:
       - go tool moq
         -out pkg/service/githubapp/mock.go
         -pkg githubapp
-        -rm -skip-ensure
+        -rm -skip-ensure -stub
         pkg/service/githubapp Client
 
   mock_interfaces:
@@ -48,7 +47,7 @@ tasks:
       - go tool moq
         -out pkg/domain/interfaces/mock.go
         -pkg interfaces
-        -rm -skip-ensure
+        -rm -skip-ensure -stub
         pkg/domain/interfaces
         Action
         SlackClient
@@ -64,7 +63,7 @@ tasks:
       - go tool moq
         -out pkg/usecase/mock.go
         -pkg usecase
-        -rm -skip-ensure
+        -rm -skip-ensure -stub
         pkg/usecase
         SlackEvent
         SlackInteraction

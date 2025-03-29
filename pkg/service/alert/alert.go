@@ -21,12 +21,7 @@ func GenerateAlertListMeta(ctx context.Context, list alert.List, llmClient inter
 		maxRetryCount     = 3
 	)
 
-	alerts := make(alert.Alerts, len(list.Alerts))
-	for i, a := range list.Alerts {
-		alerts[i] = &a
-	}
-
-	if listMetaThreshold > alerts.MaxSimilarity() {
+	if listMetaThreshold > list.Alerts.MaxSimilarity() {
 		msg.State(ctx, "🤖 Alert list is too similar to other alert lists. Skipping meta data generation (%s)", list.ID.String())
 		return nil, nil
 	}

@@ -19,11 +19,12 @@ func With(ctx context.Context, replyFunc ReplyFunc, newStateFunc NewStateFunc) c
 }
 
 func Reply(ctx context.Context, format string, args ...any) {
-	replyFunc := ctx.Value(ctxReplyFuncKey{}).(ReplyFunc)
-	if replyFunc == nil {
-		return
+	if v := ctx.Value(ctxReplyFuncKey{}); v != nil {
+		if replyFunc, ok := v.(ReplyFunc); ok && replyFunc != nil {
+			replyFunc(ctx, fmt.Sprintf(format, args...))
+			return
+		}
 	}
-	replyFunc(ctx, fmt.Sprintf(format, args...))
 }
 
 func NewState(ctx context.Context, format string, args ...any) context.Context {

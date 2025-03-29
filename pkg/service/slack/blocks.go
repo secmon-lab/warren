@@ -337,7 +337,7 @@ func buildAlertListBlocks(list *alert.List, metadata slackMetadata) []slack.Bloc
 	return blocks
 }
 
-func buildAlertsBlocks(alerts []alert.Alert, metadata slackMetadata) []slack.Block {
+func buildAlertsBlocks(alerts alert.Alerts, metadata slackMetadata) []slack.Block {
 	if len(alerts) == 0 {
 		return []slack.Block{
 			slack.NewSectionBlock(

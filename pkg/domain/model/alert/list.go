@@ -18,10 +18,10 @@ type List struct {
 	CreatedAt   time.Time         `json:"created_at"`
 	CreatedBy   *slack.User       `json:"created_by"`
 
-	Alerts []Alert `firestore:"-"`
+	Alerts Alerts `firestore:"-"`
 }
 
-func NewList(ctx context.Context, thread slack.Thread, createdBy *slack.User, alerts []Alert) List {
+func NewList(ctx context.Context, thread slack.Thread, createdBy *slack.User, alerts Alerts) List {
 	list := List{
 		ID:          types.NewAlertListID(),
 		SlackThread: &thread,

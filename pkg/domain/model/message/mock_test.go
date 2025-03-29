@@ -40,9 +40,6 @@ type HTTPClientMock struct {
 
 // Get calls GetFunc.
 func (mock *HTTPClientMock) Get(url string) (*http.Response, error) {
-	if mock.GetFunc == nil {
-		panic("HTTPClientMock.GetFunc: method is nil but HTTPClient.Get was just called")
-	}
 	callInfo := struct {
 		URL string
 	}{
@@ -51,6 +48,13 @@ func (mock *HTTPClientMock) Get(url string) (*http.Response, error) {
 	mock.lockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
 	mock.lockGet.Unlock()
+	if mock.GetFunc == nil {
+		var (
+			responseOut *http.Response
+			errOut      error
+		)
+		return responseOut, errOut
+	}
 	return mock.GetFunc(url)
 }
 

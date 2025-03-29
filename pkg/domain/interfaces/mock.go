@@ -108,9 +108,6 @@ type ActionMock struct {
 
 // Configure calls ConfigureFunc.
 func (mock *ActionMock) Configure(ctx context.Context) error {
-	if mock.ConfigureFunc == nil {
-		panic("ActionMock.ConfigureFunc: method is nil but Action.Configure was just called")
-	}
 	callInfo := struct {
 		Ctx context.Context
 	}{
@@ -119,6 +116,12 @@ func (mock *ActionMock) Configure(ctx context.Context) error {
 	mock.lockConfigure.Lock()
 	mock.calls.Configure = append(mock.calls.Configure, callInfo)
 	mock.lockConfigure.Unlock()
+	if mock.ConfigureFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.ConfigureFunc(ctx)
 }
 
@@ -140,9 +143,6 @@ func (mock *ActionMock) ConfigureCalls() []struct {
 
 // Execute calls ExecuteFunc.
 func (mock *ActionMock) Execute(ctx context.Context, name string, args map[string]any) (*action.Result, error) {
-	if mock.ExecuteFunc == nil {
-		panic("ActionMock.ExecuteFunc: method is nil but Action.Execute was just called")
-	}
 	callInfo := struct {
 		Ctx  context.Context
 		Name string
@@ -155,6 +155,13 @@ func (mock *ActionMock) Execute(ctx context.Context, name string, args map[strin
 	mock.lockExecute.Lock()
 	mock.calls.Execute = append(mock.calls.Execute, callInfo)
 	mock.lockExecute.Unlock()
+	if mock.ExecuteFunc == nil {
+		var (
+			resultOut *action.Result
+			errOut    error
+		)
+		return resultOut, errOut
+	}
 	return mock.ExecuteFunc(ctx, name, args)
 }
 
@@ -180,14 +187,17 @@ func (mock *ActionMock) ExecuteCalls() []struct {
 
 // Flags calls FlagsFunc.
 func (mock *ActionMock) Flags() []cli.Flag {
-	if mock.FlagsFunc == nil {
-		panic("ActionMock.FlagsFunc: method is nil but Action.Flags was just called")
-	}
 	callInfo := struct {
 	}{}
 	mock.lockFlags.Lock()
 	mock.calls.Flags = append(mock.calls.Flags, callInfo)
 	mock.lockFlags.Unlock()
+	if mock.FlagsFunc == nil {
+		var (
+			flagsOut []cli.Flag
+		)
+		return flagsOut
+	}
 	return mock.FlagsFunc()
 }
 
@@ -207,14 +217,17 @@ func (mock *ActionMock) FlagsCalls() []struct {
 
 // LogValue calls LogValueFunc.
 func (mock *ActionMock) LogValue() slog.Value {
-	if mock.LogValueFunc == nil {
-		panic("ActionMock.LogValueFunc: method is nil but Action.LogValue was just called")
-	}
 	callInfo := struct {
 	}{}
 	mock.lockLogValue.Lock()
 	mock.calls.LogValue = append(mock.calls.LogValue, callInfo)
 	mock.lockLogValue.Unlock()
+	if mock.LogValueFunc == nil {
+		var (
+			valueOut slog.Value
+		)
+		return valueOut
+	}
 	return mock.LogValueFunc()
 }
 
@@ -234,14 +247,17 @@ func (mock *ActionMock) LogValueCalls() []struct {
 
 // Name calls NameFunc.
 func (mock *ActionMock) Name() string {
-	if mock.NameFunc == nil {
-		panic("ActionMock.NameFunc: method is nil but Action.Name was just called")
-	}
 	callInfo := struct {
 	}{}
 	mock.lockName.Lock()
 	mock.calls.Name = append(mock.calls.Name, callInfo)
 	mock.lockName.Unlock()
+	if mock.NameFunc == nil {
+		var (
+			sOut string
+		)
+		return sOut
+	}
 	return mock.NameFunc()
 }
 
@@ -261,14 +277,17 @@ func (mock *ActionMock) NameCalls() []struct {
 
 // Specs calls SpecsFunc.
 func (mock *ActionMock) Specs() []*genai.FunctionDeclaration {
-	if mock.SpecsFunc == nil {
-		panic("ActionMock.SpecsFunc: method is nil but Action.Specs was just called")
-	}
 	callInfo := struct {
 	}{}
 	mock.lockSpecs.Lock()
 	mock.calls.Specs = append(mock.calls.Specs, callInfo)
 	mock.lockSpecs.Unlock()
+	if mock.SpecsFunc == nil {
+		var (
+			functionDeclarationsOut []*genai.FunctionDeclaration
+		)
+		return functionDeclarationsOut
+	}
 	return mock.SpecsFunc()
 }
 
@@ -378,14 +397,18 @@ type SlackClientMock struct {
 
 // AuthTest calls AuthTestFunc.
 func (mock *SlackClientMock) AuthTest() (*slackslack.AuthTestResponse, error) {
-	if mock.AuthTestFunc == nil {
-		panic("SlackClientMock.AuthTestFunc: method is nil but SlackClient.AuthTest was just called")
-	}
 	callInfo := struct {
 	}{}
 	mock.lockAuthTest.Lock()
 	mock.calls.AuthTest = append(mock.calls.AuthTest, callInfo)
 	mock.lockAuthTest.Unlock()
+	if mock.AuthTestFunc == nil {
+		var (
+			authTestResponseOut *slackslack.AuthTestResponse
+			errOut              error
+		)
+		return authTestResponseOut, errOut
+	}
 	return mock.AuthTestFunc()
 }
 
@@ -405,9 +428,6 @@ func (mock *SlackClientMock) AuthTestCalls() []struct {
 
 // OpenView calls OpenViewFunc.
 func (mock *SlackClientMock) OpenView(triggerID string, view slackslack.ModalViewRequest) (*slackslack.ViewResponse, error) {
-	if mock.OpenViewFunc == nil {
-		panic("SlackClientMock.OpenViewFunc: method is nil but SlackClient.OpenView was just called")
-	}
 	callInfo := struct {
 		TriggerID string
 		View      slackslack.ModalViewRequest
@@ -418,6 +438,13 @@ func (mock *SlackClientMock) OpenView(triggerID string, view slackslack.ModalVie
 	mock.lockOpenView.Lock()
 	mock.calls.OpenView = append(mock.calls.OpenView, callInfo)
 	mock.lockOpenView.Unlock()
+	if mock.OpenViewFunc == nil {
+		var (
+			viewResponseOut *slackslack.ViewResponse
+			errOut          error
+		)
+		return viewResponseOut, errOut
+	}
 	return mock.OpenViewFunc(triggerID, view)
 }
 
@@ -441,9 +468,6 @@ func (mock *SlackClientMock) OpenViewCalls() []struct {
 
 // PostMessageContext calls PostMessageContextFunc.
 func (mock *SlackClientMock) PostMessageContext(ctx context.Context, channelID string, options ...slackslack.MsgOption) (string, string, error) {
-	if mock.PostMessageContextFunc == nil {
-		panic("SlackClientMock.PostMessageContextFunc: method is nil but SlackClient.PostMessageContext was just called")
-	}
 	callInfo := struct {
 		Ctx       context.Context
 		ChannelID string
@@ -456,6 +480,14 @@ func (mock *SlackClientMock) PostMessageContext(ctx context.Context, channelID s
 	mock.lockPostMessageContext.Lock()
 	mock.calls.PostMessageContext = append(mock.calls.PostMessageContext, callInfo)
 	mock.lockPostMessageContext.Unlock()
+	if mock.PostMessageContextFunc == nil {
+		var (
+			sOut1  string
+			sOut2  string
+			errOut error
+		)
+		return sOut1, sOut2, errOut
+	}
 	return mock.PostMessageContextFunc(ctx, channelID, options...)
 }
 
@@ -481,9 +513,6 @@ func (mock *SlackClientMock) PostMessageContextCalls() []struct {
 
 // UpdateMessageContext calls UpdateMessageContextFunc.
 func (mock *SlackClientMock) UpdateMessageContext(ctx context.Context, channelID string, timestamp string, options ...slackslack.MsgOption) (string, string, string, error) {
-	if mock.UpdateMessageContextFunc == nil {
-		panic("SlackClientMock.UpdateMessageContextFunc: method is nil but SlackClient.UpdateMessageContext was just called")
-	}
 	callInfo := struct {
 		Ctx       context.Context
 		ChannelID string
@@ -498,6 +527,15 @@ func (mock *SlackClientMock) UpdateMessageContext(ctx context.Context, channelID
 	mock.lockUpdateMessageContext.Lock()
 	mock.calls.UpdateMessageContext = append(mock.calls.UpdateMessageContext, callInfo)
 	mock.lockUpdateMessageContext.Unlock()
+	if mock.UpdateMessageContextFunc == nil {
+		var (
+			sOut1  string
+			sOut2  string
+			sOut3  string
+			errOut error
+		)
+		return sOut1, sOut2, sOut3, errOut
+	}
 	return mock.UpdateMessageContextFunc(ctx, channelID, timestamp, options...)
 }
 
@@ -525,9 +563,6 @@ func (mock *SlackClientMock) UpdateMessageContextCalls() []struct {
 
 // UploadFileV2Context calls UploadFileV2ContextFunc.
 func (mock *SlackClientMock) UploadFileV2Context(ctx context.Context, params slackslack.UploadFileV2Parameters) (*slackslack.FileSummary, error) {
-	if mock.UploadFileV2ContextFunc == nil {
-		panic("SlackClientMock.UploadFileV2ContextFunc: method is nil but SlackClient.UploadFileV2Context was just called")
-	}
 	callInfo := struct {
 		Ctx    context.Context
 		Params slackslack.UploadFileV2Parameters
@@ -538,6 +573,13 @@ func (mock *SlackClientMock) UploadFileV2Context(ctx context.Context, params sla
 	mock.lockUploadFileV2Context.Lock()
 	mock.calls.UploadFileV2Context = append(mock.calls.UploadFileV2Context, callInfo)
 	mock.lockUploadFileV2Context.Unlock()
+	if mock.UploadFileV2ContextFunc == nil {
+		var (
+			fileSummaryOut *slackslack.FileSummary
+			errOut         error
+		)
+		return fileSummaryOut, errOut
+	}
 	return mock.UploadFileV2ContextFunc(ctx, params)
 }
 
@@ -607,9 +649,6 @@ type SlackThreadServiceMock struct {
 
 // NewStateFunc calls NewStateFuncFunc.
 func (mock *SlackThreadServiceMock) NewStateFunc(ctx context.Context, message string) func(ctx context.Context, msg string) {
-	if mock.NewStateFuncFunc == nil {
-		panic("SlackThreadServiceMock.NewStateFuncFunc: method is nil but SlackThreadService.NewStateFunc was just called")
-	}
 	callInfo := struct {
 		Ctx     context.Context
 		Message string
@@ -620,6 +659,12 @@ func (mock *SlackThreadServiceMock) NewStateFunc(ctx context.Context, message st
 	mock.lockNewStateFunc.Lock()
 	mock.calls.NewStateFunc = append(mock.calls.NewStateFunc, callInfo)
 	mock.lockNewStateFunc.Unlock()
+	if mock.NewStateFuncFunc == nil {
+		var (
+			fnOut func(ctx context.Context, msg string)
+		)
+		return fnOut
+	}
 	return mock.NewStateFuncFunc(ctx, message)
 }
 
@@ -643,9 +688,6 @@ func (mock *SlackThreadServiceMock) NewStateFuncCalls() []struct {
 
 // Reply calls ReplyFunc.
 func (mock *SlackThreadServiceMock) Reply(ctx context.Context, message string) {
-	if mock.ReplyFunc == nil {
-		panic("SlackThreadServiceMock.ReplyFunc: method is nil but SlackThreadService.Reply was just called")
-	}
 	callInfo := struct {
 		Ctx     context.Context
 		Message string
@@ -656,6 +698,9 @@ func (mock *SlackThreadServiceMock) Reply(ctx context.Context, message string) {
 	mock.lockReply.Lock()
 	mock.calls.Reply = append(mock.calls.Reply, callInfo)
 	mock.lockReply.Unlock()
+	if mock.ReplyFunc == nil {
+		return
+	}
 	mock.ReplyFunc(ctx, message)
 }
 
@@ -733,14 +778,17 @@ type LLMSessionMock struct {
 
 // GetHistory calls GetHistoryFunc.
 func (mock *LLMSessionMock) GetHistory() []*genai.Content {
-	if mock.GetHistoryFunc == nil {
-		panic("LLMSessionMock.GetHistoryFunc: method is nil but LLMSession.GetHistory was just called")
-	}
 	callInfo := struct {
 	}{}
 	mock.lockGetHistory.Lock()
 	mock.calls.GetHistory = append(mock.calls.GetHistory, callInfo)
 	mock.lockGetHistory.Unlock()
+	if mock.GetHistoryFunc == nil {
+		var (
+			contentsOut []*genai.Content
+		)
+		return contentsOut
+	}
 	return mock.GetHistoryFunc()
 }
 
@@ -760,9 +808,6 @@ func (mock *LLMSessionMock) GetHistoryCalls() []struct {
 
 // SendMessage calls SendMessageFunc.
 func (mock *LLMSessionMock) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
-	if mock.SendMessageFunc == nil {
-		panic("LLMSessionMock.SendMessageFunc: method is nil but LLMSession.SendMessage was just called")
-	}
 	callInfo := struct {
 		Ctx context.Context
 		Msg []genai.Part
@@ -773,6 +818,13 @@ func (mock *LLMSessionMock) SendMessage(ctx context.Context, msg ...genai.Part) 
 	mock.lockSendMessage.Lock()
 	mock.calls.SendMessage = append(mock.calls.SendMessage, callInfo)
 	mock.lockSendMessage.Unlock()
+	if mock.SendMessageFunc == nil {
+		var (
+			generateContentResponseOut *genai.GenerateContentResponse
+			errOut                     error
+		)
+		return generateContentResponseOut, errOut
+	}
 	return mock.SendMessageFunc(ctx, msg...)
 }
 
@@ -796,9 +848,6 @@ func (mock *LLMSessionMock) SendMessageCalls() []struct {
 
 // SetHistory calls SetHistoryFunc.
 func (mock *LLMSessionMock) SetHistory(history ...*genai.Content) {
-	if mock.SetHistoryFunc == nil {
-		panic("LLMSessionMock.SetHistoryFunc: method is nil but LLMSession.SetHistory was just called")
-	}
 	callInfo := struct {
 		History []*genai.Content
 	}{
@@ -807,6 +856,9 @@ func (mock *LLMSessionMock) SetHistory(history ...*genai.Content) {
 	mock.lockSetHistory.Lock()
 	mock.calls.SetHistory = append(mock.calls.SetHistory, callInfo)
 	mock.lockSetHistory.Unlock()
+	if mock.SetHistoryFunc == nil {
+		return
+	}
 	mock.SetHistoryFunc(history...)
 }
 
@@ -838,9 +890,6 @@ func (mock *LLMSessionMock) SetHistoryCalls() []struct {
 //			BatchUpdateAlertStatusFunc: func(ctx context.Context, alertIDs []types.AlertID, status types.AlertStatus, reason string) error {
 //				panic("mock out the BatchUpdateAlertStatus method")
 //			},
-//			FindNearestAlertsFunc: func(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error) {
-//				panic("mock out the FindNearestAlerts method")
-//			},
 //			GetAlertFunc: func(ctx context.Context, alertID types.AlertID) (*alert.Alert, error) {
 //				panic("mock out the GetAlert method")
 //			},
@@ -859,7 +908,7 @@ func (mock *LLMSessionMock) SetHistoryCalls() []struct {
 //			GetAlertsBySpanFunc: func(ctx context.Context, begin time.Time, end time.Time) (alert.Alerts, error) {
 //				panic("mock out the GetAlertsBySpan method")
 //			},
-//			GetAlertsByStatusFunc: func(ctx context.Context, status types.AlertStatus) (alert.Alerts, error) {
+//			GetAlertsByStatusFunc: func(ctx context.Context, status ...types.AlertStatus) (alert.Alerts, error) {
 //				panic("mock out the GetAlertsByStatus method")
 //			},
 //			GetAlertsWithoutStatusFunc: func(ctx context.Context, status types.AlertStatus) (alert.Alerts, error) {
@@ -911,9 +960,6 @@ type RepositoryMock struct {
 	// BatchUpdateAlertStatusFunc mocks the BatchUpdateAlertStatus method.
 	BatchUpdateAlertStatusFunc func(ctx context.Context, alertIDs []types.AlertID, status types.AlertStatus, reason string) error
 
-	// FindNearestAlertsFunc mocks the FindNearestAlerts method.
-	FindNearestAlertsFunc func(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error)
-
 	// GetAlertFunc mocks the GetAlert method.
 	GetAlertFunc func(ctx context.Context, alertID types.AlertID) (*alert.Alert, error)
 
@@ -933,7 +979,7 @@ type RepositoryMock struct {
 	GetAlertsBySpanFunc func(ctx context.Context, begin time.Time, end time.Time) (alert.Alerts, error)
 
 	// GetAlertsByStatusFunc mocks the GetAlertsByStatus method.
-	GetAlertsByStatusFunc func(ctx context.Context, status types.AlertStatus) (alert.Alerts, error)
+	GetAlertsByStatusFunc func(ctx context.Context, status ...types.AlertStatus) (alert.Alerts, error)
 
 	// GetAlertsWithoutStatusFunc mocks the GetAlertsWithoutStatus method.
 	GetAlertsWithoutStatusFunc func(ctx context.Context, status types.AlertStatus) (alert.Alerts, error)
@@ -991,15 +1037,6 @@ type RepositoryMock struct {
 			// Reason is the reason argument value.
 			Reason string
 		}
-		// FindNearestAlerts holds details about calls to the FindNearestAlerts method.
-		FindNearestAlerts []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Embedding is the embedding argument value.
-			Embedding []float32
-			// Limit is the limit argument value.
-			Limit int
-		}
 		// GetAlert holds details about calls to the GetAlert method.
 		GetAlert []struct {
 			// Ctx is the ctx argument value.
@@ -1049,7 +1086,7 @@ type RepositoryMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Status is the status argument value.
-			Status types.AlertStatus
+			Status []types.AlertStatus
 		}
 		// GetAlertsWithoutStatus holds details about calls to the GetAlertsWithoutStatus method.
 		GetAlertsWithoutStatus []struct {
@@ -1140,7 +1177,6 @@ type RepositoryMock struct {
 	}
 	lockBatchGetAlerts             sync.RWMutex
 	lockBatchUpdateAlertStatus     sync.RWMutex
-	lockFindNearestAlerts          sync.RWMutex
 	lockGetAlert                   sync.RWMutex
 	lockGetAlertByThread           sync.RWMutex
 	lockGetAlertComments           sync.RWMutex
@@ -1164,9 +1200,6 @@ type RepositoryMock struct {
 
 // BatchGetAlerts calls BatchGetAlertsFunc.
 func (mock *RepositoryMock) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
-	if mock.BatchGetAlertsFunc == nil {
-		panic("RepositoryMock.BatchGetAlertsFunc: method is nil but Repository.BatchGetAlerts was just called")
-	}
 	callInfo := struct {
 		Ctx      context.Context
 		AlertIDs []types.AlertID
@@ -1177,6 +1210,13 @@ func (mock *RepositoryMock) BatchGetAlerts(ctx context.Context, alertIDs []types
 	mock.lockBatchGetAlerts.Lock()
 	mock.calls.BatchGetAlerts = append(mock.calls.BatchGetAlerts, callInfo)
 	mock.lockBatchGetAlerts.Unlock()
+	if mock.BatchGetAlertsFunc == nil {
+		var (
+			alertsOut alert.Alerts
+			errOut    error
+		)
+		return alertsOut, errOut
+	}
 	return mock.BatchGetAlertsFunc(ctx, alertIDs)
 }
 
@@ -1200,9 +1240,6 @@ func (mock *RepositoryMock) BatchGetAlertsCalls() []struct {
 
 // BatchUpdateAlertStatus calls BatchUpdateAlertStatusFunc.
 func (mock *RepositoryMock) BatchUpdateAlertStatus(ctx context.Context, alertIDs []types.AlertID, status types.AlertStatus, reason string) error {
-	if mock.BatchUpdateAlertStatusFunc == nil {
-		panic("RepositoryMock.BatchUpdateAlertStatusFunc: method is nil but Repository.BatchUpdateAlertStatus was just called")
-	}
 	callInfo := struct {
 		Ctx      context.Context
 		AlertIDs []types.AlertID
@@ -1217,6 +1254,12 @@ func (mock *RepositoryMock) BatchUpdateAlertStatus(ctx context.Context, alertIDs
 	mock.lockBatchUpdateAlertStatus.Lock()
 	mock.calls.BatchUpdateAlertStatus = append(mock.calls.BatchUpdateAlertStatus, callInfo)
 	mock.lockBatchUpdateAlertStatus.Unlock()
+	if mock.BatchUpdateAlertStatusFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.BatchUpdateAlertStatusFunc(ctx, alertIDs, status, reason)
 }
 
@@ -1242,51 +1285,8 @@ func (mock *RepositoryMock) BatchUpdateAlertStatusCalls() []struct {
 	return calls
 }
 
-// FindNearestAlerts calls FindNearestAlertsFunc.
-func (mock *RepositoryMock) FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error) {
-	if mock.FindNearestAlertsFunc == nil {
-		panic("RepositoryMock.FindNearestAlertsFunc: method is nil but Repository.FindNearestAlerts was just called")
-	}
-	callInfo := struct {
-		Ctx       context.Context
-		Embedding []float32
-		Limit     int
-	}{
-		Ctx:       ctx,
-		Embedding: embedding,
-		Limit:     limit,
-	}
-	mock.lockFindNearestAlerts.Lock()
-	mock.calls.FindNearestAlerts = append(mock.calls.FindNearestAlerts, callInfo)
-	mock.lockFindNearestAlerts.Unlock()
-	return mock.FindNearestAlertsFunc(ctx, embedding, limit)
-}
-
-// FindNearestAlertsCalls gets all the calls that were made to FindNearestAlerts.
-// Check the length with:
-//
-//	len(mockedRepository.FindNearestAlertsCalls())
-func (mock *RepositoryMock) FindNearestAlertsCalls() []struct {
-	Ctx       context.Context
-	Embedding []float32
-	Limit     int
-} {
-	var calls []struct {
-		Ctx       context.Context
-		Embedding []float32
-		Limit     int
-	}
-	mock.lockFindNearestAlerts.RLock()
-	calls = mock.calls.FindNearestAlerts
-	mock.lockFindNearestAlerts.RUnlock()
-	return calls
-}
-
 // GetAlert calls GetAlertFunc.
 func (mock *RepositoryMock) GetAlert(ctx context.Context, alertID types.AlertID) (*alert.Alert, error) {
-	if mock.GetAlertFunc == nil {
-		panic("RepositoryMock.GetAlertFunc: method is nil but Repository.GetAlert was just called")
-	}
 	callInfo := struct {
 		Ctx     context.Context
 		AlertID types.AlertID
@@ -1297,6 +1297,13 @@ func (mock *RepositoryMock) GetAlert(ctx context.Context, alertID types.AlertID)
 	mock.lockGetAlert.Lock()
 	mock.calls.GetAlert = append(mock.calls.GetAlert, callInfo)
 	mock.lockGetAlert.Unlock()
+	if mock.GetAlertFunc == nil {
+		var (
+			alertOut *alert.Alert
+			errOut   error
+		)
+		return alertOut, errOut
+	}
 	return mock.GetAlertFunc(ctx, alertID)
 }
 
@@ -1320,9 +1327,6 @@ func (mock *RepositoryMock) GetAlertCalls() []struct {
 
 // GetAlertByThread calls GetAlertByThreadFunc.
 func (mock *RepositoryMock) GetAlertByThread(ctx context.Context, thread modelslack.Thread) (*alert.Alert, error) {
-	if mock.GetAlertByThreadFunc == nil {
-		panic("RepositoryMock.GetAlertByThreadFunc: method is nil but Repository.GetAlertByThread was just called")
-	}
 	callInfo := struct {
 		Ctx    context.Context
 		Thread modelslack.Thread
@@ -1333,6 +1337,13 @@ func (mock *RepositoryMock) GetAlertByThread(ctx context.Context, thread modelsl
 	mock.lockGetAlertByThread.Lock()
 	mock.calls.GetAlertByThread = append(mock.calls.GetAlertByThread, callInfo)
 	mock.lockGetAlertByThread.Unlock()
+	if mock.GetAlertByThreadFunc == nil {
+		var (
+			alertOut *alert.Alert
+			errOut   error
+		)
+		return alertOut, errOut
+	}
 	return mock.GetAlertByThreadFunc(ctx, thread)
 }
 
@@ -1356,9 +1367,6 @@ func (mock *RepositoryMock) GetAlertByThreadCalls() []struct {
 
 // GetAlertComments calls GetAlertCommentsFunc.
 func (mock *RepositoryMock) GetAlertComments(ctx context.Context, alertID types.AlertID) ([]alert.AlertComment, error) {
-	if mock.GetAlertCommentsFunc == nil {
-		panic("RepositoryMock.GetAlertCommentsFunc: method is nil but Repository.GetAlertComments was just called")
-	}
 	callInfo := struct {
 		Ctx     context.Context
 		AlertID types.AlertID
@@ -1369,6 +1377,13 @@ func (mock *RepositoryMock) GetAlertComments(ctx context.Context, alertID types.
 	mock.lockGetAlertComments.Lock()
 	mock.calls.GetAlertComments = append(mock.calls.GetAlertComments, callInfo)
 	mock.lockGetAlertComments.Unlock()
+	if mock.GetAlertCommentsFunc == nil {
+		var (
+			alertCommentsOut []alert.AlertComment
+			errOut           error
+		)
+		return alertCommentsOut, errOut
+	}
 	return mock.GetAlertCommentsFunc(ctx, alertID)
 }
 
@@ -1392,9 +1407,6 @@ func (mock *RepositoryMock) GetAlertCommentsCalls() []struct {
 
 // GetAlertList calls GetAlertListFunc.
 func (mock *RepositoryMock) GetAlertList(ctx context.Context, listID types.AlertListID) (*alert.List, error) {
-	if mock.GetAlertListFunc == nil {
-		panic("RepositoryMock.GetAlertListFunc: method is nil but Repository.GetAlertList was just called")
-	}
 	callInfo := struct {
 		Ctx    context.Context
 		ListID types.AlertListID
@@ -1405,6 +1417,13 @@ func (mock *RepositoryMock) GetAlertList(ctx context.Context, listID types.Alert
 	mock.lockGetAlertList.Lock()
 	mock.calls.GetAlertList = append(mock.calls.GetAlertList, callInfo)
 	mock.lockGetAlertList.Unlock()
+	if mock.GetAlertListFunc == nil {
+		var (
+			listOut *alert.List
+			errOut  error
+		)
+		return listOut, errOut
+	}
 	return mock.GetAlertListFunc(ctx, listID)
 }
 
@@ -1428,9 +1447,6 @@ func (mock *RepositoryMock) GetAlertListCalls() []struct {
 
 // GetAlertListByThread calls GetAlertListByThreadFunc.
 func (mock *RepositoryMock) GetAlertListByThread(ctx context.Context, thread modelslack.Thread) (*alert.List, error) {
-	if mock.GetAlertListByThreadFunc == nil {
-		panic("RepositoryMock.GetAlertListByThreadFunc: method is nil but Repository.GetAlertListByThread was just called")
-	}
 	callInfo := struct {
 		Ctx    context.Context
 		Thread modelslack.Thread
@@ -1441,6 +1457,13 @@ func (mock *RepositoryMock) GetAlertListByThread(ctx context.Context, thread mod
 	mock.lockGetAlertListByThread.Lock()
 	mock.calls.GetAlertListByThread = append(mock.calls.GetAlertListByThread, callInfo)
 	mock.lockGetAlertListByThread.Unlock()
+	if mock.GetAlertListByThreadFunc == nil {
+		var (
+			listOut *alert.List
+			errOut  error
+		)
+		return listOut, errOut
+	}
 	return mock.GetAlertListByThreadFunc(ctx, thread)
 }
 
@@ -1464,9 +1487,6 @@ func (mock *RepositoryMock) GetAlertListByThreadCalls() []struct {
 
 // GetAlertsBySpan calls GetAlertsBySpanFunc.
 func (mock *RepositoryMock) GetAlertsBySpan(ctx context.Context, begin time.Time, end time.Time) (alert.Alerts, error) {
-	if mock.GetAlertsBySpanFunc == nil {
-		panic("RepositoryMock.GetAlertsBySpanFunc: method is nil but Repository.GetAlertsBySpan was just called")
-	}
 	callInfo := struct {
 		Ctx   context.Context
 		Begin time.Time
@@ -1479,6 +1499,13 @@ func (mock *RepositoryMock) GetAlertsBySpan(ctx context.Context, begin time.Time
 	mock.lockGetAlertsBySpan.Lock()
 	mock.calls.GetAlertsBySpan = append(mock.calls.GetAlertsBySpan, callInfo)
 	mock.lockGetAlertsBySpan.Unlock()
+	if mock.GetAlertsBySpanFunc == nil {
+		var (
+			alertsOut alert.Alerts
+			errOut    error
+		)
+		return alertsOut, errOut
+	}
 	return mock.GetAlertsBySpanFunc(ctx, begin, end)
 }
 
@@ -1503,13 +1530,10 @@ func (mock *RepositoryMock) GetAlertsBySpanCalls() []struct {
 }
 
 // GetAlertsByStatus calls GetAlertsByStatusFunc.
-func (mock *RepositoryMock) GetAlertsByStatus(ctx context.Context, status types.AlertStatus) (alert.Alerts, error) {
-	if mock.GetAlertsByStatusFunc == nil {
-		panic("RepositoryMock.GetAlertsByStatusFunc: method is nil but Repository.GetAlertsByStatus was just called")
-	}
+func (mock *RepositoryMock) GetAlertsByStatus(ctx context.Context, status ...types.AlertStatus) (alert.Alerts, error) {
 	callInfo := struct {
 		Ctx    context.Context
-		Status types.AlertStatus
+		Status []types.AlertStatus
 	}{
 		Ctx:    ctx,
 		Status: status,
@@ -1517,7 +1541,14 @@ func (mock *RepositoryMock) GetAlertsByStatus(ctx context.Context, status types.
 	mock.lockGetAlertsByStatus.Lock()
 	mock.calls.GetAlertsByStatus = append(mock.calls.GetAlertsByStatus, callInfo)
 	mock.lockGetAlertsByStatus.Unlock()
-	return mock.GetAlertsByStatusFunc(ctx, status)
+	if mock.GetAlertsByStatusFunc == nil {
+		var (
+			alertsOut alert.Alerts
+			errOut    error
+		)
+		return alertsOut, errOut
+	}
+	return mock.GetAlertsByStatusFunc(ctx, status...)
 }
 
 // GetAlertsByStatusCalls gets all the calls that were made to GetAlertsByStatus.
@@ -1526,11 +1557,11 @@ func (mock *RepositoryMock) GetAlertsByStatus(ctx context.Context, status types.
 //	len(mockedRepository.GetAlertsByStatusCalls())
 func (mock *RepositoryMock) GetAlertsByStatusCalls() []struct {
 	Ctx    context.Context
-	Status types.AlertStatus
+	Status []types.AlertStatus
 } {
 	var calls []struct {
 		Ctx    context.Context
-		Status types.AlertStatus
+		Status []types.AlertStatus
 	}
 	mock.lockGetAlertsByStatus.RLock()
 	calls = mock.calls.GetAlertsByStatus
@@ -1540,9 +1571,6 @@ func (mock *RepositoryMock) GetAlertsByStatusCalls() []struct {
 
 // GetAlertsWithoutStatus calls GetAlertsWithoutStatusFunc.
 func (mock *RepositoryMock) GetAlertsWithoutStatus(ctx context.Context, status types.AlertStatus) (alert.Alerts, error) {
-	if mock.GetAlertsWithoutStatusFunc == nil {
-		panic("RepositoryMock.GetAlertsWithoutStatusFunc: method is nil but Repository.GetAlertsWithoutStatus was just called")
-	}
 	callInfo := struct {
 		Ctx    context.Context
 		Status types.AlertStatus
@@ -1553,6 +1581,13 @@ func (mock *RepositoryMock) GetAlertsWithoutStatus(ctx context.Context, status t
 	mock.lockGetAlertsWithoutStatus.Lock()
 	mock.calls.GetAlertsWithoutStatus = append(mock.calls.GetAlertsWithoutStatus, callInfo)
 	mock.lockGetAlertsWithoutStatus.Unlock()
+	if mock.GetAlertsWithoutStatusFunc == nil {
+		var (
+			alertsOut alert.Alerts
+			errOut    error
+		)
+		return alertsOut, errOut
+	}
 	return mock.GetAlertsWithoutStatusFunc(ctx, status)
 }
 
@@ -1576,9 +1611,6 @@ func (mock *RepositoryMock) GetAlertsWithoutStatusCalls() []struct {
 
 // GetHistory calls GetHistoryFunc.
 func (mock *RepositoryMock) GetHistory(ctx context.Context, sessionID types.SessionID) (session.Histories, error) {
-	if mock.GetHistoryFunc == nil {
-		panic("RepositoryMock.GetHistoryFunc: method is nil but Repository.GetHistory was just called")
-	}
 	callInfo := struct {
 		Ctx       context.Context
 		SessionID types.SessionID
@@ -1589,6 +1621,13 @@ func (mock *RepositoryMock) GetHistory(ctx context.Context, sessionID types.Sess
 	mock.lockGetHistory.Lock()
 	mock.calls.GetHistory = append(mock.calls.GetHistory, callInfo)
 	mock.lockGetHistory.Unlock()
+	if mock.GetHistoryFunc == nil {
+		var (
+			historiesOut session.Histories
+			errOut       error
+		)
+		return historiesOut, errOut
+	}
 	return mock.GetHistoryFunc(ctx, sessionID)
 }
 
@@ -1612,9 +1651,6 @@ func (mock *RepositoryMock) GetHistoryCalls() []struct {
 
 // GetLatestAlertListInThread calls GetLatestAlertListInThreadFunc.
 func (mock *RepositoryMock) GetLatestAlertListInThread(ctx context.Context, thread modelslack.Thread) (*alert.List, error) {
-	if mock.GetLatestAlertListInThreadFunc == nil {
-		panic("RepositoryMock.GetLatestAlertListInThreadFunc: method is nil but Repository.GetLatestAlertListInThread was just called")
-	}
 	callInfo := struct {
 		Ctx    context.Context
 		Thread modelslack.Thread
@@ -1625,6 +1661,13 @@ func (mock *RepositoryMock) GetLatestAlertListInThread(ctx context.Context, thre
 	mock.lockGetLatestAlertListInThread.Lock()
 	mock.calls.GetLatestAlertListInThread = append(mock.calls.GetLatestAlertListInThread, callInfo)
 	mock.lockGetLatestAlertListInThread.Unlock()
+	if mock.GetLatestAlertListInThreadFunc == nil {
+		var (
+			listOut *alert.List
+			errOut  error
+		)
+		return listOut, errOut
+	}
 	return mock.GetLatestAlertListInThreadFunc(ctx, thread)
 }
 
@@ -1648,9 +1691,6 @@ func (mock *RepositoryMock) GetLatestAlertListInThreadCalls() []struct {
 
 // GetPolicyDiff calls GetPolicyDiffFunc.
 func (mock *RepositoryMock) GetPolicyDiff(ctx context.Context, id types.PolicyDiffID) (*policy.Diff, error) {
-	if mock.GetPolicyDiffFunc == nil {
-		panic("RepositoryMock.GetPolicyDiffFunc: method is nil but Repository.GetPolicyDiff was just called")
-	}
 	callInfo := struct {
 		Ctx context.Context
 		ID  types.PolicyDiffID
@@ -1661,6 +1701,13 @@ func (mock *RepositoryMock) GetPolicyDiff(ctx context.Context, id types.PolicyDi
 	mock.lockGetPolicyDiff.Lock()
 	mock.calls.GetPolicyDiff = append(mock.calls.GetPolicyDiff, callInfo)
 	mock.lockGetPolicyDiff.Unlock()
+	if mock.GetPolicyDiffFunc == nil {
+		var (
+			diffOut *policy.Diff
+			errOut  error
+		)
+		return diffOut, errOut
+	}
 	return mock.GetPolicyDiffFunc(ctx, id)
 }
 
@@ -1684,9 +1731,6 @@ func (mock *RepositoryMock) GetPolicyDiffCalls() []struct {
 
 // GetSession calls GetSessionFunc.
 func (mock *RepositoryMock) GetSession(ctx context.Context, id types.SessionID) (*session.Session, error) {
-	if mock.GetSessionFunc == nil {
-		panic("RepositoryMock.GetSessionFunc: method is nil but Repository.GetSession was just called")
-	}
 	callInfo := struct {
 		Ctx context.Context
 		ID  types.SessionID
@@ -1697,6 +1741,13 @@ func (mock *RepositoryMock) GetSession(ctx context.Context, id types.SessionID) 
 	mock.lockGetSession.Lock()
 	mock.calls.GetSession = append(mock.calls.GetSession, callInfo)
 	mock.lockGetSession.Unlock()
+	if mock.GetSessionFunc == nil {
+		var (
+			sessionOut *session.Session
+			errOut     error
+		)
+		return sessionOut, errOut
+	}
 	return mock.GetSessionFunc(ctx, id)
 }
 
@@ -1720,9 +1771,6 @@ func (mock *RepositoryMock) GetSessionCalls() []struct {
 
 // GetSessionByThread calls GetSessionByThreadFunc.
 func (mock *RepositoryMock) GetSessionByThread(ctx context.Context, thread modelslack.Thread) (*session.Session, error) {
-	if mock.GetSessionByThreadFunc == nil {
-		panic("RepositoryMock.GetSessionByThreadFunc: method is nil but Repository.GetSessionByThread was just called")
-	}
 	callInfo := struct {
 		Ctx    context.Context
 		Thread modelslack.Thread
@@ -1733,6 +1781,13 @@ func (mock *RepositoryMock) GetSessionByThread(ctx context.Context, thread model
 	mock.lockGetSessionByThread.Lock()
 	mock.calls.GetSessionByThread = append(mock.calls.GetSessionByThread, callInfo)
 	mock.lockGetSessionByThread.Unlock()
+	if mock.GetSessionByThreadFunc == nil {
+		var (
+			sessionOut *session.Session
+			errOut     error
+		)
+		return sessionOut, errOut
+	}
 	return mock.GetSessionByThreadFunc(ctx, thread)
 }
 
@@ -1756,9 +1811,6 @@ func (mock *RepositoryMock) GetSessionByThreadCalls() []struct {
 
 // PutAlert calls PutAlertFunc.
 func (mock *RepositoryMock) PutAlert(ctx context.Context, alertMoqParam alert.Alert) error {
-	if mock.PutAlertFunc == nil {
-		panic("RepositoryMock.PutAlertFunc: method is nil but Repository.PutAlert was just called")
-	}
 	callInfo := struct {
 		Ctx           context.Context
 		AlertMoqParam alert.Alert
@@ -1769,6 +1821,12 @@ func (mock *RepositoryMock) PutAlert(ctx context.Context, alertMoqParam alert.Al
 	mock.lockPutAlert.Lock()
 	mock.calls.PutAlert = append(mock.calls.PutAlert, callInfo)
 	mock.lockPutAlert.Unlock()
+	if mock.PutAlertFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.PutAlertFunc(ctx, alertMoqParam)
 }
 
@@ -1792,9 +1850,6 @@ func (mock *RepositoryMock) PutAlertCalls() []struct {
 
 // PutAlertComment calls PutAlertCommentFunc.
 func (mock *RepositoryMock) PutAlertComment(ctx context.Context, comment alert.AlertComment) error {
-	if mock.PutAlertCommentFunc == nil {
-		panic("RepositoryMock.PutAlertCommentFunc: method is nil but Repository.PutAlertComment was just called")
-	}
 	callInfo := struct {
 		Ctx     context.Context
 		Comment alert.AlertComment
@@ -1805,6 +1860,12 @@ func (mock *RepositoryMock) PutAlertComment(ctx context.Context, comment alert.A
 	mock.lockPutAlertComment.Lock()
 	mock.calls.PutAlertComment = append(mock.calls.PutAlertComment, callInfo)
 	mock.lockPutAlertComment.Unlock()
+	if mock.PutAlertCommentFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.PutAlertCommentFunc(ctx, comment)
 }
 
@@ -1828,9 +1889,6 @@ func (mock *RepositoryMock) PutAlertCommentCalls() []struct {
 
 // PutAlertList calls PutAlertListFunc.
 func (mock *RepositoryMock) PutAlertList(ctx context.Context, list alert.List) error {
-	if mock.PutAlertListFunc == nil {
-		panic("RepositoryMock.PutAlertListFunc: method is nil but Repository.PutAlertList was just called")
-	}
 	callInfo := struct {
 		Ctx  context.Context
 		List alert.List
@@ -1841,6 +1899,12 @@ func (mock *RepositoryMock) PutAlertList(ctx context.Context, list alert.List) e
 	mock.lockPutAlertList.Lock()
 	mock.calls.PutAlertList = append(mock.calls.PutAlertList, callInfo)
 	mock.lockPutAlertList.Unlock()
+	if mock.PutAlertListFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.PutAlertListFunc(ctx, list)
 }
 
@@ -1864,9 +1928,6 @@ func (mock *RepositoryMock) PutAlertListCalls() []struct {
 
 // PutHistory calls PutHistoryFunc.
 func (mock *RepositoryMock) PutHistory(ctx context.Context, sessionID types.SessionID, histories session.Histories) error {
-	if mock.PutHistoryFunc == nil {
-		panic("RepositoryMock.PutHistoryFunc: method is nil but Repository.PutHistory was just called")
-	}
 	callInfo := struct {
 		Ctx       context.Context
 		SessionID types.SessionID
@@ -1879,6 +1940,12 @@ func (mock *RepositoryMock) PutHistory(ctx context.Context, sessionID types.Sess
 	mock.lockPutHistory.Lock()
 	mock.calls.PutHistory = append(mock.calls.PutHistory, callInfo)
 	mock.lockPutHistory.Unlock()
+	if mock.PutHistoryFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.PutHistoryFunc(ctx, sessionID, histories)
 }
 
@@ -1904,9 +1971,6 @@ func (mock *RepositoryMock) PutHistoryCalls() []struct {
 
 // PutPolicyDiff calls PutPolicyDiffFunc.
 func (mock *RepositoryMock) PutPolicyDiff(ctx context.Context, diff *policy.Diff) error {
-	if mock.PutPolicyDiffFunc == nil {
-		panic("RepositoryMock.PutPolicyDiffFunc: method is nil but Repository.PutPolicyDiff was just called")
-	}
 	callInfo := struct {
 		Ctx  context.Context
 		Diff *policy.Diff
@@ -1917,6 +1981,12 @@ func (mock *RepositoryMock) PutPolicyDiff(ctx context.Context, diff *policy.Diff
 	mock.lockPutPolicyDiff.Lock()
 	mock.calls.PutPolicyDiff = append(mock.calls.PutPolicyDiff, callInfo)
 	mock.lockPutPolicyDiff.Unlock()
+	if mock.PutPolicyDiffFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.PutPolicyDiffFunc(ctx, diff)
 }
 
@@ -1940,9 +2010,6 @@ func (mock *RepositoryMock) PutPolicyDiffCalls() []struct {
 
 // PutSession calls PutSessionFunc.
 func (mock *RepositoryMock) PutSession(ctx context.Context, sessionMoqParam session.Session) error {
-	if mock.PutSessionFunc == nil {
-		panic("RepositoryMock.PutSessionFunc: method is nil but Repository.PutSession was just called")
-	}
 	callInfo := struct {
 		Ctx             context.Context
 		SessionMoqParam session.Session
@@ -1953,6 +2020,12 @@ func (mock *RepositoryMock) PutSession(ctx context.Context, sessionMoqParam sess
 	mock.lockPutSession.Lock()
 	mock.calls.PutSession = append(mock.calls.PutSession, callInfo)
 	mock.lockPutSession.Unlock()
+	if mock.PutSessionFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.PutSessionFunc(ctx, sessionMoqParam)
 }
 
@@ -2024,9 +2097,6 @@ type PolicyClientMock struct {
 
 // Query calls QueryFunc.
 func (mock *PolicyClientMock) Query(contextMoqParam context.Context, s string, v1 any, v2 any, queryOptions ...opaq.QueryOption) error {
-	if mock.QueryFunc == nil {
-		panic("PolicyClientMock.QueryFunc: method is nil but PolicyClient.Query was just called")
-	}
 	callInfo := struct {
 		ContextMoqParam context.Context
 		S               string
@@ -2043,6 +2113,12 @@ func (mock *PolicyClientMock) Query(contextMoqParam context.Context, s string, v
 	mock.lockQuery.Lock()
 	mock.calls.Query = append(mock.calls.Query, callInfo)
 	mock.lockQuery.Unlock()
+	if mock.QueryFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
 	return mock.QueryFunc(contextMoqParam, s, v1, v2, queryOptions...)
 }
 
@@ -2072,14 +2148,17 @@ func (mock *PolicyClientMock) QueryCalls() []struct {
 
 // Sources calls SourcesFunc.
 func (mock *PolicyClientMock) Sources() map[string]string {
-	if mock.SourcesFunc == nil {
-		panic("PolicyClientMock.SourcesFunc: method is nil but PolicyClient.Sources was just called")
-	}
 	callInfo := struct {
 	}{}
 	mock.lockSources.Lock()
 	mock.calls.Sources = append(mock.calls.Sources, callInfo)
 	mock.lockSources.Unlock()
+	if mock.SourcesFunc == nil {
+		var (
+			stringToStringOut map[string]string
+		)
+		return stringToStringOut
+	}
 	return mock.SourcesFunc()
 }
 
@@ -2133,9 +2212,6 @@ type EmbeddingClientMock struct {
 
 // Embeddings calls EmbeddingsFunc.
 func (mock *EmbeddingClientMock) Embeddings(ctx context.Context, texts []string, dimensionality int) ([][]float32, error) {
-	if mock.EmbeddingsFunc == nil {
-		panic("EmbeddingClientMock.EmbeddingsFunc: method is nil but EmbeddingClient.Embeddings was just called")
-	}
 	callInfo := struct {
 		Ctx            context.Context
 		Texts          []string
@@ -2148,6 +2224,13 @@ func (mock *EmbeddingClientMock) Embeddings(ctx context.Context, texts []string,
 	mock.lockEmbeddings.Lock()
 	mock.calls.Embeddings = append(mock.calls.Embeddings, callInfo)
 	mock.lockEmbeddings.Unlock()
+	if mock.EmbeddingsFunc == nil {
+		var (
+			float32ssOut [][]float32
+			errOut       error
+		)
+		return float32ssOut, errOut
+	}
 	return mock.EmbeddingsFunc(ctx, texts, dimensionality)
 }
 

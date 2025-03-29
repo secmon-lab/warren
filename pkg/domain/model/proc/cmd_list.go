@@ -1,7 +1,7 @@
 package proc
 
 /*
-func cmdList(alerts []alert.Alert, th interfaces.SlackThreadService, user *slack.SlackUser) *cli.Command {
+func cmdList(alerts alert.Alerts, th interfaces.SlackThreadService, user *slack.SlackUser) *cli.Command {
 	var (
 		duration   time.Duration
 		spanFrom   string

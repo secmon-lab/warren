@@ -100,6 +100,19 @@ func Static(alerts alert.Alerts) Source {
 	}
 }
 
+func Status(status ...types.AlertStatus) Source {
+	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
+		msg.State(ctx, "🤖 Getting alerts with status: %s", status)
+
+		alerts, err := repo.GetAlertsByStatus(ctx, status...)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to get alerts without status")
+		}
+
+		return alerts, nil
+	}
+}
+
 func Unresolved() Source {
 	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
 		msg.State(ctx, "🤖 Getting unresolved alerts...")

@@ -6,13 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"testing"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/utils/test"
+
 	"github.com/slack-go/slack"
 )
 
@@ -59,6 +63,16 @@ func New(client interfaces.SlackClient, channelID string) (*Service, error) {
 	return s, nil
 }
 
+func NewTestService(t *testing.T) *Service {
+	envs := test.NewEnvVars(t, "TEST_SLACK_CHANNEL_ID", "TEST_SLACK_OAUTH_TOKEN")
+	client := slack.New(envs.Get("TEST_SLACK_OAUTH_TOKEN"))
+
+	svc, err := New(client, envs.Get("TEST_SLACK_CHANNEL_ID"))
+	gt.NoError(t, err).Required()
+
+	return svc
+}
+
 func (x *Service) IsBotUser(userID string) bool {
 	return x.userID == userID
 }
@@ -70,6 +84,19 @@ func (x *Service) NewThread(thread model.Thread) *ThreadService {
 		threadID:      thread.ThreadID,
 		client:        x.client,
 	}
+}
+
+// PostMessage posts a message to the channel and returns the thread. It's just for testing.
+func (x *Service) PostMessage(ctx context.Context, message string) (*ThreadService, error) {
+	ch, thread, err := x.client.PostMessageContext(ctx, x.channelID, slack.MsgOptionText(message, false))
+	if err != nil {
+		return nil, err
+	}
+
+	return x.NewThread(model.Thread{
+		ChannelID: ch,
+		ThreadID:  thread,
+	}), nil
 }
 
 func (x *Service) PostAlert(ctx context.Context, alert alert.Alert) (*ThreadService, error) {
@@ -350,7 +377,7 @@ func (x *ThreadService) PostPolicyDiff(ctx context.Context, diff *policy.Diff) e
 	return nil
 }
 
-func (x *ThreadService) PostAlerts(ctx context.Context, alerts []alert.Alert) error {
+func (x *ThreadService) PostAlerts(ctx context.Context, alerts alert.Alerts) error {
 	blocks := buildAlertsBlocks(alerts, x.slackMetadata)
 
 	_, _, err := x.client.PostMessageContext(ctx,

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"math"
+	"slices"
 	"sort"
 	"time"
 
@@ -113,10 +114,10 @@ func (r *Memory) GetLatestAlertListInThread(ctx context.Context, thread slack.Th
 	return latestList, nil
 }
 
-func (r *Memory) GetAlertsByStatus(ctx context.Context, status types.AlertStatus) (alert.Alerts, error) {
+func (r *Memory) GetAlertsByStatus(ctx context.Context, status ...types.AlertStatus) (alert.Alerts, error) {
 	var alerts alert.Alerts
 	for _, alert := range r.alerts {
-		if alert.Status == status {
+		if slices.Contains(status, alert.Status) {
 			alerts = append(alerts, &alert)
 		}
 	}

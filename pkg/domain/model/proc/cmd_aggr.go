@@ -1,7 +1,7 @@
 package proc
 
 /*
-func cmdClustering(alerts []alert.Alert, th interfaces.SlackThreadService, user *slack.SlackUser) *cli.Command {
+func cmdClustering(alerts alert.Alerts, th interfaces.SlackThreadService, user *slack.SlackUser) *cli.Command {
 	var target string
 	var topN int64
 	var similarityThreshold float64

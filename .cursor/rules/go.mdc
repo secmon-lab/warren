@@ -53,6 +53,12 @@ Houses utility packages for logging, pointer handling, clock abstraction, etc.
 
 ---
 
+## Comment
+
+All comment in code must be in English.
+
+---
+
 ## Architectural Characteristics
 
 - **Layered Architecture**: Separation between CLI/UI (`controller`, `cli`), application logic (`usecase`, `service`), and domain logic (`domain`, `repository`).
@@ -71,6 +77,46 @@ return goerr.Wrap(err, "failed something", goerr.V("args", args))
 ```
 
 # Testing
+
+## Test Style
+
+Use "Function Driven Test" Style like following:
+
+```go
+	runTest := func(tc struct {
+		name  string
+		args  []string
+		error string
+	}) func(*testing.T) {
+		return func(t *testing.T) {
+			result, err := list.ParseArgsToSource(t.Context(), tc.args)
+			gt.Error(t, err).Contains(tc.error)
+			gt.Value(t, result).Nil()
+		}
+	}
+
+	t.Run("invalid from command format", runTest(struct {
+		name  string
+		args  []string
+		error string
+	}{
+		name:  "invalid from command format",
+		args:  []string{"from", "2024-03-15"},
+		error: "unknown command",
+	}))
+
+	t.Run("invalid between command format", runTest(struct {
+		name  string
+		args  []string
+		error string
+	}{
+		name:  "invalid between command format",
+		args:  []string{"between", "2024-03-15"},
+		error: "invalid date range format",
+	}))
+```
+
+## Test Library
 
 Use `github.com/m-mizutani/gt` package.
 
@@ -94,12 +140,6 @@ colors := ["red", "blue"]
 gt.Array(t, colors).Equal([]string{"red", "blue"}) // <- Pass
 gt.Array(t, colors).Has("orange")                 // <- Fail
 ```
-
-## Usage
-
-In many cases, a developer does not care Go generics in using `gt`. However, a developer need to specify generic type (`Value`, `Array`, `Map`, `Error`, etc.) explicitly to use specific test functions for each types.
-
-See [reference](mdc:https:/pkg.go.dev/github.com/m-mizutani/gt) for more detail.
 
 ### Value
 

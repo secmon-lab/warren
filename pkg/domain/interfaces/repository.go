@@ -29,7 +29,7 @@ type Repository interface {
 	GetLatestAlertListInThread(ctx context.Context, thread slack.Thread) (*alert.List, error)
 
 	// For list generation
-	GetAlertsByStatus(ctx context.Context, status types.AlertStatus) (alert.Alerts, error)
+	GetAlertsByStatus(ctx context.Context, status ...types.AlertStatus) (alert.Alerts, error)
 	GetAlertsWithoutStatus(ctx context.Context, status types.AlertStatus) (alert.Alerts, error)
 	GetAlertsBySpan(ctx context.Context, begin, end time.Time) (alert.Alerts, error)
 	BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)

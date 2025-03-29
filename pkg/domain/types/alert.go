@@ -25,6 +25,10 @@ func NewAlertListID() AlertListID {
 	return AlertListID(uuid.New().String())
 }
 
+const (
+	EmptyAlertListID AlertListID = ""
+)
+
 type AlertSchema string
 
 func (x AlertSchema) String() string {
@@ -34,6 +38,7 @@ func (x AlertSchema) String() string {
 type AlertStatus string
 
 const (
+	AlertStatusUnknown      AlertStatus = "unknown"
 	AlertStatusNew          AlertStatus = "new"
 	AlertStatusAcknowledged AlertStatus = "acked"
 	AlertStatusBlocked      AlertStatus = "blocked"
@@ -41,6 +46,7 @@ const (
 )
 
 var alertStatusLabels = map[AlertStatus]string{
+	AlertStatusUnknown:      "❓️ Unknown",
 	AlertStatusNew:          "🆕 New",
 	AlertStatusAcknowledged: "👀 Acknowledged",
 	AlertStatusBlocked:      "🚫 Blocked",

@@ -162,8 +162,8 @@ func (r *Firestore) GetAlertComments(ctx context.Context, alertID types.AlertID)
 	return comments, nil
 }
 
-func (r *Firestore) GetAlertsByStatus(ctx context.Context, status types.AlertStatus) (alert.Alerts, error) {
-	iter := r.db.Collection(collectionAlerts).Where("Status", "==", status).Documents(ctx)
+func (r *Firestore) GetAlertsByStatus(ctx context.Context, status ...types.AlertStatus) (alert.Alerts, error) {
+	iter := r.db.Collection(collectionAlerts).Where("Status", "in", status).Documents(ctx)
 
 	var alerts alert.Alerts
 	for {

@@ -50,7 +50,7 @@ func cmdShow(c *clients) *cli.Command {
 			}
 			if offset > 0 {
 				if offset > int64(len(alerts)) {
-					alerts = []alert.Alert{}
+					alerts = alert.Alerts{}
 				} else {
 					alerts = alerts[offset:]
 				}

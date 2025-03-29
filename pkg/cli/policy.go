@@ -98,7 +98,7 @@ func cmdPolicyIgnore() *cli.Command {
 			ctx = thread.WithReplyFunc(ctx, func(ctx context.Context, msg string) {
 				fmt.Println(msg)
 			})
-			newPolicyDiff, err := uc.GenerateIgnorePolicy(ctx, source.Static([]alert.Alert{alert}), "")
+			newPolicyDiff, err := uc.GenerateIgnorePolicy(ctx, source.Static(alert.Alerts{alert}), "")
 			if err != nil {
 				return err
 			}

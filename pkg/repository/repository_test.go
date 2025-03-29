@@ -309,7 +309,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		// Test FindNearestAlerts
 		t.Run("find_nearest_alerts", func(t *testing.T) {
 			// Create test alerts with embeddings
-			alerts := []alert.Alert{
+			alerts := alert.Alerts{
 				{
 					ID:          types.NewAlertID(),
 					Schema:      types.AlertSchema("test"),

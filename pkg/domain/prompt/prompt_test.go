@@ -69,13 +69,13 @@ func TestTestDataReadmePrompt(t *testing.T) {
 
 func TestFilterQueryPrompt(t *testing.T) {
 	ctx := context.Background()
-	alerts := []alert.Alert{
-		alert.New(ctx, "aws.guardduty", alert.Metadata{
+	alerts := alert.Alerts{
+		ptr.Ref(alert.New(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
-		}),
-		alert.New(ctx, "aws.guardduty", alert.Metadata{
+		})),
+		ptr.Ref(alert.New(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
-		}),
+		})),
 	}
 
 	d, err := prompt.BuildFilterQueryPrompt(ctx, "test", alerts)
@@ -86,10 +86,10 @@ func TestFilterQueryPrompt(t *testing.T) {
 
 func TestMetaListPrompt(t *testing.T) {
 	ctx := context.Background()
-	alerts := []alert.Alert{
-		alert.New(ctx, "aws.guardduty", alert.Metadata{
+	alerts := alert.Alerts{
+		ptr.Ref(alert.New(ctx, "aws.guardduty", alert.Metadata{
 			Data: map[string]any{"Findings": map[string]any{"Severity": 7}},
-		}),
+		})),
 	}
 
 	alertList := alert.NewList(ctx, slack.Thread{
