@@ -128,7 +128,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Cont
 
 	now := clock.Now(ctx)
 	for i, alert := range alerts {
-		if i > 0 && i%10 == 0 {
+		if i > 0 && i%25 == 0 {
 			msg.Trace(ctx, "🏃 Resolving %d/%d alerts...", i+1, len(alerts))
 		}
 
