@@ -1,35 +1,37 @@
-# 次のアクションの選択
+# Instructions
 
-これまでの情報を元に問い合わせに答えるための次のアクションを選択してください。
+Choose the next action to take. You can select and execute actions repeatedly. You don't need to take actions if they're not necessary.
 
-## Selectable Actions
 
-Choose the next action from the following actions.
+{{ if .results }}
+## Input
 
-## `done`
+Here is the result of the previous action.
 
-You have already investigated the alert and no further action is needed to decide the alert severity.
-
-{{ range .actions }}
-
-## `{{ .Name }}`
-
-{{ .Description }}
-
-### Arguments
-
-Arguments are required to execute the action. Do not include any other arguments.
-{{ range .Args }}
-- `{{ .Name }}` ({{ .Type }}, {{ if .Required }}required{{ else }}optional{{ end }}): {{ .Description }} {{ if .Choices }} Choose one of the following values: {{ end }}
-{{ range .Choices }}  - `{{ .Value }}`: {{ .Description }}
-{{ end }}
-{{ end }}
-{{ end }}
-
-## Output Schema
-
-以下のスキーマに従って出力してください。必ず1つのマップ形式で出力するようにしてください。
-
-```json
-{{ .schema }}
+{{ range .results }}
+### {{ .Message }}
+{{ range .Rows }}
 ```
+{{ . }}
+```
+---
+{{ end }}
+{{ end }}
+{{ end }}
+
+## Output
+
+You can respond with the following:
+
+### Function
+
+You can call the functions from function declarations.
+
+### Exit
+
+You can end the session by calling `exit` function. When you call this function, you don't need to respond with any message.
+
+### Text
+
+You can respond with a text message. The message is stored into memory. You can retrieve the stored message by calling `base.notes` function. It's useful to analyze big data. You can put the summary of the analysis into the message.
+

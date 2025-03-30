@@ -198,10 +198,8 @@ func TestPostAlerts(t *testing.T) {
 		genDummyAlertWithSlackThread(),
 		genDummyAlertWithSlackThread(),
 	}
-	alerts[1].ParentID = alerts[0].ID
 	alerts[1].CreatedAt = alerts[0].CreatedAt.Add(time.Second)
 	alerts[1].Status = types.AlertStatusAcknowledged
-	alerts[2].ParentID = alerts[0].ID
 	alerts[2].CreatedAt = alerts[0].CreatedAt.Add(time.Second * 2)
 	alerts[3].Assignee = &model.User{
 		ID:   "U0123456789",

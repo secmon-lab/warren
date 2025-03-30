@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/action/base"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	session_model "github.com/secmon-lab/warren/pkg/domain/model/session"
@@ -102,7 +103,13 @@ func (uc *UseCases) handleSlackAppMention(ctx context.Context, user slack.User, 
 	}
 
 	// If session, alert and alert list are not found, call the command handler
-	svc := session_svc.New(uc.repository, uc.llmClient, uc.slackService, ssn)
+	baseAction := base.New(uc.repository, targetAlerts, ssn.ID)
+	actionService, err := uc.actionSvc.With(ctx, baseAction)
+	if err != nil {
+		return goerr.Wrap(err, "failed to create action service")
+	}
+
+	svc := session_svc.New(uc.repository, uc.llmClient, uc.slackService, actionService, ssn)
 	if err := svc.Chat(ctx, mention.Message); err != nil {
 		return goerr.Wrap(err, "failed to run session")
 	}

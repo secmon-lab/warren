@@ -357,14 +357,33 @@ func BuildMetaListPrompt(ctx context.Context, alertList alert.List) (string, err
 //go:embed templates/session_start.md
 var sessionStartTemplate string
 
-func BuildSessionStartPrompt(ctx context.Context, alerts alert.Alerts) (string, error) {
+func BuildSessionStartPrompt(ctx context.Context, message string, alerts alert.Alerts) (string, error) {
 	tmpl, err := template.New("session_start").Parse(sessionStartTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
 	}
 
+	const maxAlertSize = 200 * 1000
+
+	rawAlerts := []string{}
+	rawAlertsSize := 0
+	for _, alert := range alerts {
+		rawAlert, err := stringify(alert.Data)
+		if err != nil {
+			return "", err
+		}
+		if rawAlertsSize+len(rawAlert) > maxAlertSize {
+			break
+		}
+		rawAlerts = append(rawAlerts, rawAlert)
+		rawAlertsSize += len(rawAlert)
+	}
+
 	input := map[string]any{
-		"lang": lang.From(ctx).Name(),
+		"message": message,
+		"alerts":  rawAlerts,
+		"total":   len(alerts),
+		"lang":    lang.From(ctx).Name(),
 	}
 
 	if len(alerts) < 10 {
@@ -390,14 +409,15 @@ func BuildSessionStartPrompt(ctx context.Context, alerts alert.Alerts) (string, 
 //go:embed templates/session_next.md
 var sessionNextTemplate string
 
-func BuildSessionNextPrompt(ctx context.Context, result *action.Result) (string, error) {
+func BuildSessionNextPrompt(ctx context.Context, results []*action.Result) (string, error) {
 	tmpl, err := template.New("session_next").Parse(sessionNextTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
 	}
 
 	input := map[string]any{
-		"lang": lang.From(ctx).Name(),
+		"lang":    lang.From(ctx).Name(),
+		"results": results,
 	}
 
 	var buf bytes.Buffer

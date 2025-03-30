@@ -45,53 +45,39 @@ func TestBase(t *testing.T) {
 		},
 	}
 
-	baseAction := base.New(&interfaces.RepositoryMock{}, alerts)
+	sessionID := types.NewSessionID()
+	baseAction := base.New(&interfaces.RepositoryMock{}, alerts, sessionID)
 
-	t.Run("get_alerts without pagination", func(t *testing.T) {
-		result, err := baseAction.Execute(ctx, "base.get_alerts", map[string]any{})
+	t.Run("alerts without pagination", func(t *testing.T) {
+		result, err := baseAction.Execute(ctx, "base.alerts", map[string]any{})
 		gt.NoError(t, err)
 		gt.Value(t, result.Type).Equal(action.ResultTypeJSON)
 		gt.Value(t, result.Message).Equal("Retrieved alerts")
 		gt.Array(t, result.Rows).Length(3)
 	})
 
-	t.Run("get_alerts with limit", func(t *testing.T) {
-		result, err := baseAction.Execute(ctx, "base.get_alerts", map[string]any{
+	t.Run("alerts with limit", func(t *testing.T) {
+		result, err := baseAction.Execute(ctx, "base.alerts", map[string]any{
 			"limit": float64(2),
 		})
 		gt.NoError(t, err)
 		gt.Array(t, result.Rows).Length(2)
 	})
 
-	t.Run("get_alerts with offset", func(t *testing.T) {
-		result, err := baseAction.Execute(ctx, "base.get_alerts", map[string]any{
+	t.Run("alerts with offset", func(t *testing.T) {
+		result, err := baseAction.Execute(ctx, "base.alerts", map[string]any{
 			"offset": float64(1),
 		})
 		gt.NoError(t, err)
 		gt.Array(t, result.Rows).Length(2)
 	})
 
-	t.Run("get_alerts with offset beyond length", func(t *testing.T) {
-		result, err := baseAction.Execute(ctx, "base.get_alerts", map[string]any{
+	t.Run("alerts with offset beyond length", func(t *testing.T) {
+		result, err := baseAction.Execute(ctx, "base.alerts", map[string]any{
 			"offset": float64(10),
 		})
 		gt.NoError(t, err)
 		gt.Array(t, result.Rows).Length(0)
-	})
-
-	t.Run("exit with conclusion", func(t *testing.T) {
-		conclusion := "Test conclusion"
-		result, err := baseAction.Execute(ctx, "base.exit", map[string]any{
-			"conclusion": conclusion,
-		})
-		gt.NoError(t, err)
-		gt.Value(t, result.Type).Equal(action.ResultTypeText)
-		gt.Value(t, result.Message).Equal(conclusion)
-	})
-
-	t.Run("exit without conclusion", func(t *testing.T) {
-		_, err := baseAction.Execute(ctx, "base.exit", map[string]any{})
-		gt.Error(t, err)
 	})
 
 	t.Run("unknown function", func(t *testing.T) {

@@ -20,7 +20,7 @@ type Repository interface {
 
 	// For chat
 	GetLatestHistory(ctx context.Context, sessionID types.SessionID) (*session.History, error)
-	PutHistory(ctx context.Context, sessionID types.SessionID, histories []*session.History) error
+	PutHistory(ctx context.Context, sessionID types.SessionID, history *session.History) error
 
 	// For list management
 	GetAlertList(ctx context.Context, listID types.AlertListID) (*alert.List, error)
@@ -43,4 +43,8 @@ type Repository interface {
 	GetSession(ctx context.Context, id types.SessionID) (*session.Session, error)
 	GetSessionByThread(ctx context.Context, thread slack.Thread) (*session.Session, error)
 	PutSession(ctx context.Context, session session.Session) error
+
+	// For note management
+	GetNotes(ctx context.Context, sessionID types.SessionID) ([]*session.Note, error)
+	PutNote(ctx context.Context, note *session.Note) error
 }

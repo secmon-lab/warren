@@ -21,3 +21,13 @@ func (x ProcID) String() string {
 func NewProcID() ProcID {
 	return ProcID(uuid.New().String())
 }
+
+type NoteID string
+
+func NewNoteID() NoteID {
+	return NoteID(uuid.New().String())
+}
+
+func (x NoteID) String() string {
+	return string(x)
+}

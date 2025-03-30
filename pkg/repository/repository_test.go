@@ -145,7 +145,9 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		}
 
 		// PutHistory
-		gt.NoError(t, repo.PutHistory(ctx, sessionID, histories))
+		for _, h := range histories {
+			gt.NoError(t, repo.PutHistory(ctx, sessionID, h))
+		}
 
 		// GetLatestHistory
 		got, err := repo.GetLatestHistory(ctx, sessionID)
@@ -309,6 +311,27 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Value(t, got.ID).Equal(sessionID)
 		gt.Value(t, got.Thread.ChannelID).Equal(thread.ChannelID)
 		gt.Value(t, got.Thread.ThreadID).Equal(thread.ThreadID)
+	})
+
+	// Test notes
+	t.Run("notes", func(t *testing.T) {
+		sessionID := types.NewSessionID()
+		note1 := session.NewNote(sessionID, "test note 1")
+		note2 := session.NewNote(sessionID, "test note 2")
+
+		// Put notes
+		err := repo.PutNote(ctx, note1)
+		gt.NoError(t, err)
+		err = repo.PutNote(ctx, note2)
+		gt.NoError(t, err)
+
+		// Get notes
+		notes, err := repo.GetNotes(ctx, sessionID)
+		gt.NoError(t, err)
+		gt.Array(t, notes).Length(2)
+		gt.Value(t, notes[0].Note).Equal("test note 1")
+		gt.Value(t, notes[1].Note).Equal("test note 2")
+		gt.Value(t, notes[0].CreatedAt.Before(notes[1].CreatedAt)).Equal(true)
 	})
 
 	/*

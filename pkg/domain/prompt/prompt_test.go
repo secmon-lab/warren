@@ -139,8 +139,9 @@ func TestSessionStartPrompt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			d, err := prompt.BuildSessionStartPrompt(ctx, tt.alerts)
+			d, err := prompt.BuildSessionStartPrompt(ctx, "Rabbit is a cute animal", tt.alerts)
 			gt.NoError(t, err)
+			gt.S(t, d).Contains("Rabbit is a cute animal")
 			t.Log(d)
 		})
 	}
@@ -148,22 +149,28 @@ func TestSessionStartPrompt(t *testing.T) {
 
 func TestSessionNextPrompt(t *testing.T) {
 	tests := []struct {
-		name   string
-		result *action.Result
+		name    string
+		results []*action.Result
 	}{
 		{
 			name: "single action",
-			result: &action.Result{
-				Message: "test",
-				Type:    action.ResultTypeText,
-				Rows:    []string{"test"},
+			results: []*action.Result{
+				{
+					Message: "test",
+					Type:    action.ResultTypeText,
+					Rows:    []string{"test", "test2"},
+				},
 			},
+		},
+		{
+			name:    "no result",
+			results: []*action.Result{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			d, err := prompt.BuildSessionNextPrompt(ctx, tt.result)
+			d, err := prompt.BuildSessionNextPrompt(ctx, tt.results)
 			gt.NoError(t, err)
 			t.Log(d)
 		})

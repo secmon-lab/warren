@@ -45,6 +45,7 @@ const (
 	commentCollection     = "comments"
 	collectionSessions    = "sessions"
 	collectionHistories   = "histories"
+	collectionNotes       = "notes"
 )
 
 func (r *Firestore) PutAlert(ctx context.Context, alert alert.Alert) error {
@@ -401,16 +402,14 @@ func (r *Firestore) GetHistory(ctx context.Context, sessionID types.SessionID) (
 	return histories, nil
 }
 
-func (r *Firestore) PutHistory(ctx context.Context, sessionID types.SessionID, histories []*session.History) error {
+func (r *Firestore) PutHistory(ctx context.Context, sessionID types.SessionID, history *session.History) error {
 	writer := r.db.BulkWriter(ctx)
 	defer writer.End()
 
-	for _, history := range histories {
-		doc := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionHistories).Doc(history.ID.String())
-		_, err := writer.Set(doc, history)
-		if err != nil {
-			return goerr.Wrap(err, "failed to put chat history")
-		}
+	doc := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionHistories).Doc(history.ID.String())
+	_, err := writer.Set(doc, history)
+	if err != nil {
+		return goerr.Wrap(err, "failed to put chat history")
 	}
 
 	writer.End()
@@ -574,6 +573,39 @@ func (r *Firestore) GetLatestHistory(ctx context.Context, sessionID types.Sessio
 		return nil, goerr.Wrap(err, "failed to convert data to chat history")
 	}
 	return &history, nil
+}
+
+func (r *Firestore) GetNotes(ctx context.Context, sessionID types.SessionID) ([]*session.Note, error) {
+	iter := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionNotes).OrderBy("CreatedAt", firestore.Asc).Documents(ctx)
+	defer iter.Stop()
+
+	var notes []*session.Note
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to get notes")
+		}
+
+		var note session.Note
+		if err := doc.DataTo(&note); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to note")
+		}
+		notes = append(notes, &note)
+	}
+
+	return notes, nil
+}
+
+func (r *Firestore) PutNote(ctx context.Context, note *session.Note) error {
+	doc := r.db.Collection(collectionSessions).Doc(note.SessionID.String()).Collection(collectionNotes).Doc(note.ID.String())
+	_, err := doc.Set(ctx, note)
+	if err != nil {
+		return goerr.Wrap(err, "failed to put note", goerr.V("id", note.ID))
+	}
+	return nil
 }
 
 /*

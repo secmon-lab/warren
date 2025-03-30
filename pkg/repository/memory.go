@@ -23,6 +23,7 @@ type Memory struct {
 	histories   map[types.SessionID][]*session.History
 	policyDiffs map[types.PolicyDiffID]*policy.Diff
 	sessions    map[types.SessionID]session.Session
+	notes       map[types.SessionID][]*session.Note
 }
 
 func NewMemory() *Memory {
@@ -33,6 +34,7 @@ func NewMemory() *Memory {
 		histories:   make(map[types.SessionID][]*session.History),
 		policyDiffs: make(map[types.PolicyDiffID]*policy.Diff),
 		sessions:    make(map[types.SessionID]session.Session),
+		notes:       make(map[types.SessionID][]*session.Note),
 	}
 }
 
@@ -76,8 +78,8 @@ func (r *Memory) GetLatestHistory(ctx context.Context, sessionID types.SessionID
 	return histories[len(histories)-1], nil
 }
 
-func (r *Memory) PutHistory(ctx context.Context, sessionID types.SessionID, histories []*session.History) error {
-	r.histories[sessionID] = histories
+func (r *Memory) PutHistory(ctx context.Context, sessionID types.SessionID, history *session.History) error {
+	r.histories[sessionID] = append(r.histories[sessionID], history)
 	return nil
 }
 
@@ -259,4 +261,21 @@ func (r *Memory) FindNearestAlerts(ctx context.Context, embedding []float32, lim
 	}
 
 	return result, nil
+}
+
+func (r *Memory) GetNotes(ctx context.Context, sessionID types.SessionID) ([]*session.Note, error) {
+	notes, ok := r.notes[sessionID]
+	if !ok {
+		return nil, nil
+	}
+	// 時系列順にソート
+	sort.Slice(notes, func(i, j int) bool {
+		return notes[i].CreatedAt.Before(notes[j].CreatedAt)
+	})
+	return notes, nil
+}
+
+func (r *Memory) PutNote(ctx context.Context, note *session.Note) error {
+	r.notes[note.SessionID] = append(r.notes[note.SessionID], note)
+	return nil
 }

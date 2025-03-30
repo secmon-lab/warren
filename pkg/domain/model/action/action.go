@@ -15,3 +15,7 @@ type Result struct {
 	Type    ResultType
 	Rows    []string
 }
+
+type Exit struct {
+	Conclusion string
+}

@@ -90,7 +90,7 @@ func (x *Service) Execute(ctx context.Context, name string, args map[string]any)
 	return action.Execute(ctx, name, args)
 }
 
-func (x *Service) With(ctx context.Context, newActions []interfaces.Action) (*Service, error) {
+func (x *Service) With(ctx context.Context, newActions ...interfaces.Action) (*Service, error) {
 	// Create a new slice with combined actions
 	combinedActions := make([]interfaces.Action, 0, len(x.actions)+len(newActions))
 	combinedActions = append(combinedActions, x.actions...)

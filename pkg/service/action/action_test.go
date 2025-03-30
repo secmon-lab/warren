@@ -168,7 +168,7 @@ func TestServiceWith(t *testing.T) {
 			baseSvc, err := action.New(t.Context(), tt.base)
 			gt.NoError(t, err)
 
-			newSvc, err := baseSvc.With(t.Context(), tt.new)
+			newSvc, err := baseSvc.With(t.Context(), tt.new...)
 			if tt.wantErr {
 				gt.Error(t, err)
 				if tt.errCheck != nil {

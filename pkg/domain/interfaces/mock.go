@@ -734,9 +734,6 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			SendMessageFunc: func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
 //				panic("mock out the SendMessage method")
 //			},
-//			SetHistoryFunc: func(history ...*genai.Content)  {
-//				panic("mock out the SetHistory method")
-//			},
 //		}
 //
 //		// use mockedLLMSession in code that requires LLMSession
@@ -750,9 +747,6 @@ type LLMSessionMock struct {
 	// SendMessageFunc mocks the SendMessage method.
 	SendMessageFunc func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
 
-	// SetHistoryFunc mocks the SetHistory method.
-	SetHistoryFunc func(history ...*genai.Content)
-
 	// calls tracks calls to the methods.
 	calls struct {
 		// GetHistory holds details about calls to the GetHistory method.
@@ -765,15 +759,9 @@ type LLMSessionMock struct {
 			// Msg is the msg argument value.
 			Msg []genai.Part
 		}
-		// SetHistory holds details about calls to the SetHistory method.
-		SetHistory []struct {
-			// History is the history argument value.
-			History []*genai.Content
-		}
 	}
 	lockGetHistory  sync.RWMutex
 	lockSendMessage sync.RWMutex
-	lockSetHistory  sync.RWMutex
 }
 
 // GetHistory calls GetHistoryFunc.
@@ -846,38 +834,6 @@ func (mock *LLMSessionMock) SendMessageCalls() []struct {
 	return calls
 }
 
-// SetHistory calls SetHistoryFunc.
-func (mock *LLMSessionMock) SetHistory(history ...*genai.Content) {
-	callInfo := struct {
-		History []*genai.Content
-	}{
-		History: history,
-	}
-	mock.lockSetHistory.Lock()
-	mock.calls.SetHistory = append(mock.calls.SetHistory, callInfo)
-	mock.lockSetHistory.Unlock()
-	if mock.SetHistoryFunc == nil {
-		return
-	}
-	mock.SetHistoryFunc(history...)
-}
-
-// SetHistoryCalls gets all the calls that were made to SetHistory.
-// Check the length with:
-//
-//	len(mockedLLMSession.SetHistoryCalls())
-func (mock *LLMSessionMock) SetHistoryCalls() []struct {
-	History []*genai.Content
-} {
-	var calls []struct {
-		History []*genai.Content
-	}
-	mock.lockSetHistory.RLock()
-	calls = mock.calls.SetHistory
-	mock.lockSetHistory.RUnlock()
-	return calls
-}
-
 // RepositoryMock is a mock implementation of Repository.
 //
 //	func TestSomethingThatUsesRepository(t *testing.T) {
@@ -920,6 +876,9 @@ func (mock *LLMSessionMock) SetHistoryCalls() []struct {
 //			GetLatestHistoryFunc: func(ctx context.Context, sessionID types.SessionID) (*session.History, error) {
 //				panic("mock out the GetLatestHistory method")
 //			},
+//			GetNotesFunc: func(ctx context.Context, sessionID types.SessionID) ([]*session.Note, error) {
+//				panic("mock out the GetNotes method")
+//			},
 //			GetPolicyDiffFunc: func(ctx context.Context, id types.PolicyDiffID) (*policy.Diff, error) {
 //				panic("mock out the GetPolicyDiff method")
 //			},
@@ -938,8 +897,11 @@ func (mock *LLMSessionMock) SetHistoryCalls() []struct {
 //			PutAlertListFunc: func(ctx context.Context, list alert.List) error {
 //				panic("mock out the PutAlertList method")
 //			},
-//			PutHistoryFunc: func(ctx context.Context, sessionID types.SessionID, histories []*session.History) error {
+//			PutHistoryFunc: func(ctx context.Context, sessionID types.SessionID, history *session.History) error {
 //				panic("mock out the PutHistory method")
+//			},
+//			PutNoteFunc: func(ctx context.Context, note *session.Note) error {
+//				panic("mock out the PutNote method")
 //			},
 //			PutPolicyDiffFunc: func(ctx context.Context, diff *policy.Diff) error {
 //				panic("mock out the PutPolicyDiff method")
@@ -990,6 +952,9 @@ type RepositoryMock struct {
 	// GetLatestHistoryFunc mocks the GetLatestHistory method.
 	GetLatestHistoryFunc func(ctx context.Context, sessionID types.SessionID) (*session.History, error)
 
+	// GetNotesFunc mocks the GetNotes method.
+	GetNotesFunc func(ctx context.Context, sessionID types.SessionID) ([]*session.Note, error)
+
 	// GetPolicyDiffFunc mocks the GetPolicyDiff method.
 	GetPolicyDiffFunc func(ctx context.Context, id types.PolicyDiffID) (*policy.Diff, error)
 
@@ -1009,7 +974,10 @@ type RepositoryMock struct {
 	PutAlertListFunc func(ctx context.Context, list alert.List) error
 
 	// PutHistoryFunc mocks the PutHistory method.
-	PutHistoryFunc func(ctx context.Context, sessionID types.SessionID, histories []*session.History) error
+	PutHistoryFunc func(ctx context.Context, sessionID types.SessionID, history *session.History) error
+
+	// PutNoteFunc mocks the PutNote method.
+	PutNoteFunc func(ctx context.Context, note *session.Note) error
 
 	// PutPolicyDiffFunc mocks the PutPolicyDiff method.
 	PutPolicyDiffFunc func(ctx context.Context, diff *policy.Diff) error
@@ -1109,6 +1077,13 @@ type RepositoryMock struct {
 			// SessionID is the sessionID argument value.
 			SessionID types.SessionID
 		}
+		// GetNotes holds details about calls to the GetNotes method.
+		GetNotes []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SessionID is the sessionID argument value.
+			SessionID types.SessionID
+		}
 		// GetPolicyDiff holds details about calls to the GetPolicyDiff method.
 		GetPolicyDiff []struct {
 			// Ctx is the ctx argument value.
@@ -1157,8 +1132,15 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// SessionID is the sessionID argument value.
 			SessionID types.SessionID
-			// Histories is the histories argument value.
-			Histories []*session.History
+			// History is the history argument value.
+			History *session.History
+		}
+		// PutNote holds details about calls to the PutNote method.
+		PutNote []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Note is the note argument value.
+			Note *session.Note
 		}
 		// PutPolicyDiff holds details about calls to the PutPolicyDiff method.
 		PutPolicyDiff []struct {
@@ -1187,6 +1169,7 @@ type RepositoryMock struct {
 	lockGetAlertsWithoutStatus     sync.RWMutex
 	lockGetLatestAlertListInThread sync.RWMutex
 	lockGetLatestHistory           sync.RWMutex
+	lockGetNotes                   sync.RWMutex
 	lockGetPolicyDiff              sync.RWMutex
 	lockGetSession                 sync.RWMutex
 	lockGetSessionByThread         sync.RWMutex
@@ -1194,6 +1177,7 @@ type RepositoryMock struct {
 	lockPutAlertComment            sync.RWMutex
 	lockPutAlertList               sync.RWMutex
 	lockPutHistory                 sync.RWMutex
+	lockPutNote                    sync.RWMutex
 	lockPutPolicyDiff              sync.RWMutex
 	lockPutSession                 sync.RWMutex
 }
@@ -1689,6 +1673,46 @@ func (mock *RepositoryMock) GetLatestHistoryCalls() []struct {
 	return calls
 }
 
+// GetNotes calls GetNotesFunc.
+func (mock *RepositoryMock) GetNotes(ctx context.Context, sessionID types.SessionID) ([]*session.Note, error) {
+	callInfo := struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+	}{
+		Ctx:       ctx,
+		SessionID: sessionID,
+	}
+	mock.lockGetNotes.Lock()
+	mock.calls.GetNotes = append(mock.calls.GetNotes, callInfo)
+	mock.lockGetNotes.Unlock()
+	if mock.GetNotesFunc == nil {
+		var (
+			notesOut []*session.Note
+			errOut   error
+		)
+		return notesOut, errOut
+	}
+	return mock.GetNotesFunc(ctx, sessionID)
+}
+
+// GetNotesCalls gets all the calls that were made to GetNotes.
+// Check the length with:
+//
+//	len(mockedRepository.GetNotesCalls())
+func (mock *RepositoryMock) GetNotesCalls() []struct {
+	Ctx       context.Context
+	SessionID types.SessionID
+} {
+	var calls []struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+	}
+	mock.lockGetNotes.RLock()
+	calls = mock.calls.GetNotes
+	mock.lockGetNotes.RUnlock()
+	return calls
+}
+
 // GetPolicyDiff calls GetPolicyDiffFunc.
 func (mock *RepositoryMock) GetPolicyDiff(ctx context.Context, id types.PolicyDiffID) (*policy.Diff, error) {
 	callInfo := struct {
@@ -1927,15 +1951,15 @@ func (mock *RepositoryMock) PutAlertListCalls() []struct {
 }
 
 // PutHistory calls PutHistoryFunc.
-func (mock *RepositoryMock) PutHistory(ctx context.Context, sessionID types.SessionID, histories []*session.History) error {
+func (mock *RepositoryMock) PutHistory(ctx context.Context, sessionID types.SessionID, history *session.History) error {
 	callInfo := struct {
 		Ctx       context.Context
 		SessionID types.SessionID
-		Histories []*session.History
+		History   *session.History
 	}{
 		Ctx:       ctx,
 		SessionID: sessionID,
-		Histories: histories,
+		History:   history,
 	}
 	mock.lockPutHistory.Lock()
 	mock.calls.PutHistory = append(mock.calls.PutHistory, callInfo)
@@ -1946,7 +1970,7 @@ func (mock *RepositoryMock) PutHistory(ctx context.Context, sessionID types.Sess
 		)
 		return errOut
 	}
-	return mock.PutHistoryFunc(ctx, sessionID, histories)
+	return mock.PutHistoryFunc(ctx, sessionID, history)
 }
 
 // PutHistoryCalls gets all the calls that were made to PutHistory.
@@ -1956,16 +1980,55 @@ func (mock *RepositoryMock) PutHistory(ctx context.Context, sessionID types.Sess
 func (mock *RepositoryMock) PutHistoryCalls() []struct {
 	Ctx       context.Context
 	SessionID types.SessionID
-	Histories []*session.History
+	History   *session.History
 } {
 	var calls []struct {
 		Ctx       context.Context
 		SessionID types.SessionID
-		Histories []*session.History
+		History   *session.History
 	}
 	mock.lockPutHistory.RLock()
 	calls = mock.calls.PutHistory
 	mock.lockPutHistory.RUnlock()
+	return calls
+}
+
+// PutNote calls PutNoteFunc.
+func (mock *RepositoryMock) PutNote(ctx context.Context, note *session.Note) error {
+	callInfo := struct {
+		Ctx  context.Context
+		Note *session.Note
+	}{
+		Ctx:  ctx,
+		Note: note,
+	}
+	mock.lockPutNote.Lock()
+	mock.calls.PutNote = append(mock.calls.PutNote, callInfo)
+	mock.lockPutNote.Unlock()
+	if mock.PutNoteFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutNoteFunc(ctx, note)
+}
+
+// PutNoteCalls gets all the calls that were made to PutNote.
+// Check the length with:
+//
+//	len(mockedRepository.PutNoteCalls())
+func (mock *RepositoryMock) PutNoteCalls() []struct {
+	Ctx  context.Context
+	Note *session.Note
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Note *session.Note
+	}
+	mock.lockPutNote.RLock()
+	calls = mock.calls.PutNote
+	mock.lockPutNote.RUnlock()
 	return calls
 }
 
