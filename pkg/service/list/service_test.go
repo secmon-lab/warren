@@ -89,6 +89,14 @@ func TestService_Run(t *testing.T) {
 		gt.NoError(t, err)
 	}
 
+	// Create and store an alert list for testing
+	testList := alert.NewList(ctx, slack.Thread{
+		ChannelID: "C0123456789",
+		ThreadID:  "T0123456789",
+	}, user, alert.Alerts{alerts[0], alerts[1]})
+	err = repo.PutAlertList(ctx, testList)
+	gt.NoError(t, err)
+
 	tests := []struct {
 		name          string
 		input         string
@@ -171,6 +179,27 @@ func TestService_Run(t *testing.T) {
 			validate: func(t *testing.T, list *alert.List) {
 				gt.Array(t, list.Alerts).Length(1)
 				gt.Value(t, list.Alerts[0].ID).Equal(alerts[1].ID)
+			},
+		},
+		{
+			name:  "show alerts from alert list ID",
+			input: testList.ID.String(),
+			validate: func(t *testing.T, list *alert.List) {
+				gt.Array(t, list.Alerts).Length(2)
+				gt.Array(t, list.AlertIDs).Equal(testList.AlertIDs)
+				gt.Value(t, list.CreatedBy).Equal(testList.CreatedBy)
+			},
+		},
+		{
+			name:          "error on invalid alert list ID",
+			input:         "invalid-id",
+			expectedError: "unknown command",
+		},
+		{
+			name:  "empty input shows help",
+			input: "",
+			validate: func(t *testing.T, list *alert.List) {
+				gt.Array(t, list.Alerts).Length(0)
 			},
 		},
 		{

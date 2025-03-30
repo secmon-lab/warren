@@ -25,6 +25,16 @@ func NewAlertListID() AlertListID {
 	return AlertListID(uuid.New().String())
 }
 
+func (x AlertListID) Validate() error {
+	if x == EmptyAlertListID {
+		return goerr.New("empty alert list ID")
+	}
+	if _, err := uuid.Parse(string(x)); err != nil {
+		return goerr.Wrap(err, "invalid alert list ID format", goerr.V("id", x))
+	}
+	return nil
+}
+
 const (
 	EmptyAlertListID AlertListID = ""
 )

@@ -18,6 +18,7 @@ func parseArgsToSource(ctx context.Context, args []string) (source.Source, error
 		return source.Span(clock.Now(ctx).Add(-24*time.Hour), clock.Now(ctx)), nil
 	}
 
+	// Check for known commands first
 	switch args[0] {
 	case "unresolved":
 		return source.Unresolved(), nil
@@ -72,7 +73,12 @@ func parseArgsToSource(ctx context.Context, args []string) (source.Source, error
 		return source.Span(clock.Now(ctx).Add(-duration), clock.Now(ctx)), nil
 
 	default:
-		return nil, goerr.New("unknown command", goerr.V("command", args[0]))
+		// If not a known command, try to interpret as AlertListID
+		listID := types.AlertListID(args[0])
+		if err := listID.Validate(); err != nil {
+			return nil, goerr.New("unknown command", goerr.V("command", args[0]))
+		}
+		return source.AlertListID(listID), nil
 	}
 }
 
