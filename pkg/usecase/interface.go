@@ -10,8 +10,8 @@ import (
 
 type SlackEvent interface {
 	// Slack event handlers
-	HandleSlackMessage(ctx context.Context, slackThread slack.Thread, text string, user slack.User, ts string) error
-	HandleSlackAppMention(ctx context.Context, user slack.User, mention slack.Mention, slackThread slack.Thread) error
+	HandleSlackMessage(ctx context.Context, slackMsg *slack.Message, text string, user slack.User, ts string) error
+	HandleSlackAppMention(ctx context.Context, user slack.User, mention slack.Mention, slackMsg *slack.Message) error
 }
 
 type SlackInteraction interface {

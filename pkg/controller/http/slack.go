@@ -51,12 +51,12 @@ func slackEventHandler(ctrl *slack_ctrl.Controller) http.HandlerFunc {
 
 			switch ev := innerEvent.Data.(type) {
 			case *slackevents.AppMentionEvent:
-				if err := ctrl.HandleSlackAppMention(r.Context(), ev); err != nil {
+				if err := ctrl.HandleSlackAppMention(r.Context(), &eventsAPIEvent, ev); err != nil {
 					logging.From(r.Context()).Error("failed to handle app mention", "error", err)
 				}
 
 			case *slackevents.MessageEvent:
-				if err := ctrl.HandleSlackMessage(r.Context(), ev); err != nil {
+				if err := ctrl.HandleSlackMessage(r.Context(), &eventsAPIEvent, ev); err != nil {
 					logging.From(r.Context()).Error("failed to handle message", "error", err)
 				}
 

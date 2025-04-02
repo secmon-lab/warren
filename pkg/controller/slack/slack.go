@@ -53,16 +53,13 @@ func New(event usecase.SlackEvent, interaction usecase.SlackInteraction) *Contro
 	}
 }
 
-func (x *Controller) HandleSlackAppMention(ctx context.Context, event *slackevents.AppMentionEvent) error {
+func (x *Controller) HandleSlackAppMention(ctx context.Context, apiEvent *slackevents.EventsAPIEvent, event *slackevents.AppMentionEvent) error {
 	logger := logging.From(ctx).With("event_ts", event.EventTimeStamp)
 	ctx = logging.With(ctx, logger)
 
-	slackThread := slack_model.Thread{
-		ChannelID: event.Channel,
-		ThreadID:  event.ThreadTimeStamp,
-	}
-	if slackThread.ThreadID == "" {
-		slackThread.ThreadID = event.TimeStamp
+	slackMsg := slack_model.NewMessage(ctx, apiEvent)
+	if slackMsg == nil {
+		return nil
 	}
 
 	mentions := slack_model.ParseMention(event.Text)
@@ -80,14 +77,14 @@ func (x *Controller) HandleSlackAppMention(ctx context.Context, event *slackeven
 
 	for _, mention := range mentions {
 		dispatch(ctx, func(ctx context.Context) error {
-			return x.event.HandleSlackAppMention(ctx, user, mention, slackThread)
+			return x.event.HandleSlackAppMention(ctx, user, mention, slackMsg)
 		})
 	}
 
 	return nil
 }
 
-func (x *Controller) HandleSlackMessage(ctx context.Context, event *slackevents.MessageEvent) error {
+func (x *Controller) HandleSlackMessage(ctx context.Context, apiEvent *slackevents.EventsAPIEvent, event *slackevents.MessageEvent) error {
 	logger := logging.From(ctx).With("event_ts", event.EventTimeStamp)
 	ctx = logging.With(ctx, logger)
 
@@ -97,17 +94,18 @@ func (x *Controller) HandleSlackMessage(ctx context.Context, event *slackevents.
 		return nil
 	}
 
-	slackThread := slack_model.Thread{
-		ChannelID: event.Channel,
-		ThreadID:  event.ThreadTimeStamp,
+	slackMsg := slack_model.NewMessage(ctx, apiEvent)
+	if slackMsg == nil {
+		return nil
 	}
+
 	user := slack_model.User{
 		ID:   event.User,
 		Name: event.User,
 	}
 
 	dispatch(ctx, func(ctx context.Context) error {
-		return x.event.HandleSlackMessage(ctx, slackThread, event.Text, user, event.EventTimeStamp)
+		return x.event.HandleSlackMessage(ctx, slackMsg, event.Text, user, event.EventTimeStamp)
 	})
 
 	return nil

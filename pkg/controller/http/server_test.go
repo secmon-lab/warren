@@ -137,10 +137,10 @@ var slackMentionJSON []byte
 func TestSlackMentionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
 	uc := &UseCaseMock{
-		HandleSlackAppMentionFunc: func(ctx context.Context, user slack_model.User, mention slack_model.Mention, slackThread slack_model.Thread) error {
+		HandleSlackAppMentionFunc: func(ctx context.Context, user slack_model.User, mention slack_model.Mention, slackMsg *slack_model.Message) error {
 			gt.Equal(t, user.ID, "U8JLN34SV")
-			gt.Equal(t, slackThread.ChannelID, "C07AR2FPG1F")
-			gt.Equal(t, slackThread.ThreadID, "1741487414.163419")
+			gt.Equal(t, slackMsg.ChannelID(), "C07AR2FPG1F")
+			gt.Equal(t, slackMsg.ThreadID(), "1741487414.163419")
 			gt.Equal(t, mention.UserID, "U08A3TTRENS")
 			gt.Equal(t, mention.Message, "kokoro")
 			return nil

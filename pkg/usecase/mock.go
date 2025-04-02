@@ -17,10 +17,10 @@ import (
 //
 //		// make and configure a mocked SlackEvent
 //		mockedSlackEvent := &SlackEventMock{
-//			HandleSlackAppMentionFunc: func(ctx context.Context, user slack.User, mention slack.Mention, slackThread slack.Thread) error {
+//			HandleSlackAppMentionFunc: func(ctx context.Context, user slack.User, mention slack.Mention, slackMsg *slack.Message) error {
 //				panic("mock out the HandleSlackAppMention method")
 //			},
-//			HandleSlackMessageFunc: func(ctx context.Context, slackThread slack.Thread, text string, user slack.User, ts string) error {
+//			HandleSlackMessageFunc: func(ctx context.Context, slackMsg *slack.Message, text string, user slack.User, ts string) error {
 //				panic("mock out the HandleSlackMessage method")
 //			},
 //		}
@@ -31,10 +31,10 @@ import (
 //	}
 type SlackEventMock struct {
 	// HandleSlackAppMentionFunc mocks the HandleSlackAppMention method.
-	HandleSlackAppMentionFunc func(ctx context.Context, user slack.User, mention slack.Mention, slackThread slack.Thread) error
+	HandleSlackAppMentionFunc func(ctx context.Context, user slack.User, mention slack.Mention, slackMsg *slack.Message) error
 
 	// HandleSlackMessageFunc mocks the HandleSlackMessage method.
-	HandleSlackMessageFunc func(ctx context.Context, slackThread slack.Thread, text string, user slack.User, ts string) error
+	HandleSlackMessageFunc func(ctx context.Context, slackMsg *slack.Message, text string, user slack.User, ts string) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -46,15 +46,15 @@ type SlackEventMock struct {
 			User slack.User
 			// Mention is the mention argument value.
 			Mention slack.Mention
-			// SlackThread is the slackThread argument value.
-			SlackThread slack.Thread
+			// SlackMsg is the slackMsg argument value.
+			SlackMsg *slack.Message
 		}
 		// HandleSlackMessage holds details about calls to the HandleSlackMessage method.
 		HandleSlackMessage []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// SlackThread is the slackThread argument value.
-			SlackThread slack.Thread
+			// SlackMsg is the slackMsg argument value.
+			SlackMsg *slack.Message
 			// Text is the text argument value.
 			Text string
 			// User is the user argument value.
@@ -68,17 +68,17 @@ type SlackEventMock struct {
 }
 
 // HandleSlackAppMention calls HandleSlackAppMentionFunc.
-func (mock *SlackEventMock) HandleSlackAppMention(ctx context.Context, user slack.User, mention slack.Mention, slackThread slack.Thread) error {
+func (mock *SlackEventMock) HandleSlackAppMention(ctx context.Context, user slack.User, mention slack.Mention, slackMsg *slack.Message) error {
 	callInfo := struct {
-		Ctx         context.Context
-		User        slack.User
-		Mention     slack.Mention
-		SlackThread slack.Thread
+		Ctx      context.Context
+		User     slack.User
+		Mention  slack.Mention
+		SlackMsg *slack.Message
 	}{
-		Ctx:         ctx,
-		User:        user,
-		Mention:     mention,
-		SlackThread: slackThread,
+		Ctx:      ctx,
+		User:     user,
+		Mention:  mention,
+		SlackMsg: slackMsg,
 	}
 	mock.lockHandleSlackAppMention.Lock()
 	mock.calls.HandleSlackAppMention = append(mock.calls.HandleSlackAppMention, callInfo)
@@ -89,7 +89,7 @@ func (mock *SlackEventMock) HandleSlackAppMention(ctx context.Context, user slac
 		)
 		return errOut
 	}
-	return mock.HandleSlackAppMentionFunc(ctx, user, mention, slackThread)
+	return mock.HandleSlackAppMentionFunc(ctx, user, mention, slackMsg)
 }
 
 // HandleSlackAppMentionCalls gets all the calls that were made to HandleSlackAppMention.
@@ -97,16 +97,16 @@ func (mock *SlackEventMock) HandleSlackAppMention(ctx context.Context, user slac
 //
 //	len(mockedSlackEvent.HandleSlackAppMentionCalls())
 func (mock *SlackEventMock) HandleSlackAppMentionCalls() []struct {
-	Ctx         context.Context
-	User        slack.User
-	Mention     slack.Mention
-	SlackThread slack.Thread
+	Ctx      context.Context
+	User     slack.User
+	Mention  slack.Mention
+	SlackMsg *slack.Message
 } {
 	var calls []struct {
-		Ctx         context.Context
-		User        slack.User
-		Mention     slack.Mention
-		SlackThread slack.Thread
+		Ctx      context.Context
+		User     slack.User
+		Mention  slack.Mention
+		SlackMsg *slack.Message
 	}
 	mock.lockHandleSlackAppMention.RLock()
 	calls = mock.calls.HandleSlackAppMention
@@ -115,19 +115,19 @@ func (mock *SlackEventMock) HandleSlackAppMentionCalls() []struct {
 }
 
 // HandleSlackMessage calls HandleSlackMessageFunc.
-func (mock *SlackEventMock) HandleSlackMessage(ctx context.Context, slackThread slack.Thread, text string, user slack.User, ts string) error {
+func (mock *SlackEventMock) HandleSlackMessage(ctx context.Context, slackMsg *slack.Message, text string, user slack.User, ts string) error {
 	callInfo := struct {
-		Ctx         context.Context
-		SlackThread slack.Thread
-		Text        string
-		User        slack.User
-		Ts          string
+		Ctx      context.Context
+		SlackMsg *slack.Message
+		Text     string
+		User     slack.User
+		Ts       string
 	}{
-		Ctx:         ctx,
-		SlackThread: slackThread,
-		Text:        text,
-		User:        user,
-		Ts:          ts,
+		Ctx:      ctx,
+		SlackMsg: slackMsg,
+		Text:     text,
+		User:     user,
+		Ts:       ts,
 	}
 	mock.lockHandleSlackMessage.Lock()
 	mock.calls.HandleSlackMessage = append(mock.calls.HandleSlackMessage, callInfo)
@@ -138,7 +138,7 @@ func (mock *SlackEventMock) HandleSlackMessage(ctx context.Context, slackThread 
 		)
 		return errOut
 	}
-	return mock.HandleSlackMessageFunc(ctx, slackThread, text, user, ts)
+	return mock.HandleSlackMessageFunc(ctx, slackMsg, text, user, ts)
 }
 
 // HandleSlackMessageCalls gets all the calls that were made to HandleSlackMessage.
@@ -146,18 +146,18 @@ func (mock *SlackEventMock) HandleSlackMessage(ctx context.Context, slackThread 
 //
 //	len(mockedSlackEvent.HandleSlackMessageCalls())
 func (mock *SlackEventMock) HandleSlackMessageCalls() []struct {
-	Ctx         context.Context
-	SlackThread slack.Thread
-	Text        string
-	User        slack.User
-	Ts          string
+	Ctx      context.Context
+	SlackMsg *slack.Message
+	Text     string
+	User     slack.User
+	Ts       string
 } {
 	var calls []struct {
-		Ctx         context.Context
-		SlackThread slack.Thread
-		Text        string
-		User        slack.User
-		Ts          string
+		Ctx      context.Context
+		SlackMsg *slack.Message
+		Text     string
+		User     slack.User
+		Ts       string
 	}
 	mock.lockHandleSlackMessage.RLock()
 	calls = mock.calls.HandleSlackMessage
