@@ -216,11 +216,7 @@ func (r *Firestore) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID
 
 	// Process in batches of 30
 	for i := 0; i < len(alertIDs); i += 30 {
-		end := i + 30
-		if end > len(alertIDs) {
-			end = len(alertIDs)
-		}
-
+		end := min(i+30, len(alertIDs))
 		batch := alertIDs[i:end]
 		iter := r.db.Collection(collectionAlerts).Where("ID", "in", batch).Documents(ctx)
 
@@ -634,3 +630,10 @@ func (r *Firestore) FindNearestAlerts(ctx context.Context, embedding []float32, 
 	return result, nil
 }
 */
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}

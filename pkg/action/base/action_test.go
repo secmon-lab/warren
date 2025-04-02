@@ -46,7 +46,7 @@ func TestBase(t *testing.T) {
 	}
 
 	sessionID := types.NewSessionID()
-	baseAction := base.New(&interfaces.RepositoryMock{}, alerts, sessionID)
+	baseAction := base.New(&interfaces.RepositoryMock{}, alerts, map[string]string{}, sessionID)
 
 	t.Run("alerts without pagination", func(t *testing.T) {
 		result, err := baseAction.Execute(ctx, "base.alerts", map[string]any{})

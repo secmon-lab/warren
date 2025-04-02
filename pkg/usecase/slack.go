@@ -103,7 +103,7 @@ func (uc *UseCases) handleSlackAppMention(ctx context.Context, user slack.User, 
 	}
 
 	// If session, alert and alert list are not found, call the command handler
-	baseAction := base.New(uc.repository, targetAlerts, ssn.ID)
+	baseAction := base.New(uc.repository, targetAlerts, uc.policyClient.Sources(), ssn.ID)
 	actionService, err := uc.actionSvc.With(ctx, baseAction)
 	if err != nil {
 		return goerr.Wrap(err, "failed to create action service")

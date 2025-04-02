@@ -18,13 +18,15 @@ type Base struct {
 	alerts    alert.Alerts
 	repo      interfaces.Repository
 	sessionID types.SessionID
+	policies  map[string]string
 }
 
-func New(repo interfaces.Repository, alerts alert.Alerts, sessionID types.SessionID) *Base {
+func New(repo interfaces.Repository, alerts alert.Alerts, policies map[string]string, sessionID types.SessionID) *Base {
 	return &Base{
 		alerts:    alerts,
 		repo:      repo,
 		sessionID: sessionID,
+		policies:  policies,
 	}
 }
 
@@ -80,17 +82,37 @@ func (x *Base) Specs() []*genai.FunctionDeclaration {
 				},
 			},
 		},
+		{
+			Name:        "base.policy.list",
+			Description: "Get the list of policy files for the alert detection in Rego",
+		},
+		{
+			Name:        "base.policy.get",
+			Description: "Get the policy of the alert detection in Rego",
+			Parameters: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"name": {
+						Type:        genai.TypeString,
+						Description: "The name of the policy file",
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
 	}
 }
 
 func (x *Base) Execute(ctx context.Context, name string, args map[string]any) (*action.Result, error) {
 	switch name {
-	case "exit":
-		return x.exit(ctx, args)
 	case "base.alerts":
 		return x.getAlerts(ctx, args)
 	case "base.notes":
 		return x.getNotes(ctx, args)
+	case "base.policy.list":
+		return x.listPolicies(ctx, args)
+	case "base.policy.get":
+		return x.getPolicy(ctx, args)
 	default:
 		return nil, goerr.New("unknown function", goerr.V("name", name))
 	}
@@ -137,18 +159,6 @@ func (x *Base) getAlerts(_ context.Context, args map[string]any) (*action.Result
 	}, nil
 }
 
-func (x *Base) exit(_ context.Context, args map[string]any) (*action.Result, error) {
-	conclusion, ok := args["conclusion"].(string)
-	if !ok {
-		return nil, goerr.New("conclusion is required", goerr.V("args", args))
-	}
-
-	return &action.Result{
-		Message: conclusion,
-		Type:    action.ResultTypeText,
-	}, nil
-}
-
 func (x *Base) getNotes(ctx context.Context, args map[string]any) (*action.Result, error) {
 	var limit, offset int64
 
@@ -186,5 +196,48 @@ func (x *Base) getNotes(ctx context.Context, args map[string]any) (*action.Resul
 		Message: "Retrieved notes",
 		Type:    action.ResultTypeText,
 		Rows:    rows,
+	}, nil
+}
+
+func (x *Base) listPolicies(_ context.Context, _ map[string]any) (*action.Result, error) {
+	var rows []string
+	for name := range x.policies {
+		rows = append(rows, name)
+	}
+	return &action.Result{
+		Message: "Retrieved policy names",
+		Type:    action.ResultTypeText,
+		Rows:    rows,
+	}, nil
+}
+
+func (x *Base) getPolicy(_ context.Context, args map[string]any) (*action.Result, error) {
+	errResp := func(msg string) (*action.Result, error) {
+		return &action.Result{
+			Message: msg,
+			Type:    action.ResultTypeText,
+			Rows:    []string{},
+		}, nil
+	}
+
+	argName, ok := args["name"]
+	if !ok {
+		return errResp("Policy name is required")
+	}
+
+	name, ok := argName.(string)
+	if !ok {
+		return errResp("Policy name is not a string")
+	}
+
+	policy, ok := x.policies[name]
+	if !ok {
+		return errResp("Policy not found")
+	}
+
+	return &action.Result{
+		Message: "Retrieved policy: " + name,
+		Type:    action.ResultTypeText,
+		Rows:    []string{policy},
 	}, nil
 }
