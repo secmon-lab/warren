@@ -108,6 +108,9 @@ func messageToArgs(message string) (string, string) {
 	if len(args) == 0 {
 		return "", ""
 	}
+	if len(args) == 1 {
+		return strings.ToLower(strings.TrimSpace(args[0])), ""
+	}
 	return strings.ToLower(strings.TrimSpace(args[0])), strings.TrimSpace(args[1])
 }
 
