@@ -1,16 +1,6 @@
-# Main Instruction
-
-{{ .message }}
-
-# Sub Instruction
-
-First, please respond with a text message corresponding to the given instruction. If you determine that the message alone is sufficient for the answer, return `exit` simultaneously. Do not input anything into `conclusion`.
-
 # Assumptions
 
 - You are an AI supporting a security analyst.
-- Please engage in a dialogue to analyze security alerts.
-- You can take several actions.
 - Choose the necessary actions to gather information, including alert contents, to answer inquiries.
 - You can select and execute actions repeatedly.
 - You don't need to take actions if they're not necessary.
@@ -47,6 +37,6 @@ Please analyze the following alerts. The field descriptions are as follows:
 {{ end }}
 
 {{ if ne (len .alerts) .total }}
-There are {{ .total }} alerts in total, but only a portion is shown here. You can use the `base.get_alerts` command to reference other alerts.
+There are {{ .total }} alerts in total, but only a portion is shown here. You can use the `base.alerts` command to reference other alerts.
 {{ end }}
 

@@ -2,7 +2,6 @@
 
 Choose the next action to take. You can select and execute actions repeatedly. You don't need to take actions if they're not necessary.
 
-
 {{ if .results }}
 ## Input
 

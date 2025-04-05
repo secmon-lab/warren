@@ -354,11 +354,11 @@ func BuildMetaListPrompt(ctx context.Context, alertList alert.List) (string, err
 	return buf.String(), nil
 }
 
-//go:embed templates/session_start.md
-var sessionStartTemplate string
+//go:embed templates/session_init.md
+var sessionInitTemplate string
 
-func BuildSessionStartPrompt(ctx context.Context, message string, alerts alert.Alerts) (string, error) {
-	tmpl, err := template.New("session_start").Parse(sessionStartTemplate)
+func BuildSessionInitPrompt(ctx context.Context, alerts alert.Alerts) (string, error) {
+	tmpl, err := template.New("session_init").Parse(sessionInitTemplate)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
 	}
@@ -380,10 +380,9 @@ func BuildSessionStartPrompt(ctx context.Context, message string, alerts alert.A
 	}
 
 	input := map[string]any{
-		"message": message,
-		"alerts":  rawAlerts,
-		"total":   len(alerts),
-		"lang":    lang.From(ctx).Name(),
+		"alerts": rawAlerts,
+		"total":  len(alerts),
+		"lang":   lang.From(ctx).Name(),
 	}
 
 	if len(alerts) < 10 {
@@ -399,7 +398,7 @@ func BuildSessionStartPrompt(ctx context.Context, message string, alerts alert.A
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "session_start", input); err != nil {
+	if err := tmpl.ExecuteTemplate(&buf, "session_init", input); err != nil {
 		return "", goerr.Wrap(err, "failed to execute template")
 	}
 

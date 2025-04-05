@@ -2,16 +2,15 @@ package session
 
 import (
 	"context"
-	"reflect"
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	action_model "github.com/secmon-lab/warren/pkg/domain/model/action"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/gemini"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
@@ -43,7 +42,7 @@ const (
 	ctrlCommandExit = "exit"
 )
 
-func (x *Service) buildTools(ctx context.Context) []*genai.FunctionDeclaration {
+func (x *Service) buildActionTools(ctx context.Context) []*genai.FunctionDeclaration {
 	tools := x.action.Specs()
 	tools = append(tools, &genai.FunctionDeclaration{
 		Name:        ctrlCommandExit,
@@ -74,7 +73,7 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 		gemini.WithHistory(histroy),
 		gemini.WithContentType("text/plain"),
 		gemini.WithTools([]*genai.Tool{{
-			FunctionDeclarations: x.buildTools(ctx),
+			FunctionDeclarations: x.buildInitTools(ctx),
 		}}),
 	)
 
@@ -83,36 +82,40 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 		return goerr.Wrap(err, "failed to get alerts")
 	}
 
-	initPrompt, err := prompt.BuildSessionStartPrompt(ctx, message, alerts)
+	initPrompt, err := prompt.BuildSessionInitPrompt(ctx, alerts)
 	if err != nil {
 		return goerr.Wrap(err, "failed to build session start prompt")
 	}
 
-	parts := []genai.Part{
-		genai.Text(initPrompt),
-	}
-	resp, err := llmSession.SendMessage(ctx, parts...)
+	defer func() {
+		newHistory := session.NewHistory(ctx, llmSession.GetHistory())
+		if err := x.repo.PutHistory(ctx, x.ssn.ID, newHistory); err != nil {
+			errs.Handle(ctx, err)
+			msg.Notify(ctx, "⚠️ Failed to save chat history")
+		}
+	}()
+
+	initResp, err := llmSession.SendMessage(ctx, genai.Text(initPrompt), genai.Text(message))
 	if err != nil {
 		return goerr.Wrap(err, "failed to send message")
 	}
 
-	willExit := false
-	for _, candidate := range resp.Candidates {
-		for _, part := range candidate.Content.Parts {
-			switch v := part.(type) {
-			case genai.Text:
-				ctx = msg.NewTrace(ctx, "🐇 %s", string(v))
-			case genai.FunctionCall:
-				if v.Name == ctrlCommandExit {
-					willExit = true
-				}
-			}
-		}
+	ctx, contSsn, err := x.handleInit(ctx, initResp)
+	if err != nil {
+		return goerr.Wrap(err, "failed to handle init")
 	}
-
-	if willExit {
+	if !contSsn {
 		return nil
 	}
+
+	newHist := session.NewHistory(ctx, llmSession.GetHistory())
+	llmSession = x.llm.StartChat(
+		gemini.WithHistory(newHist),
+		gemini.WithContentType("text/plain"),
+		gemini.WithTools([]*genai.Tool{{
+			FunctionDeclarations: x.buildActionTools(ctx),
+		}}),
+	)
 
 	const maxLoops = 32
 	var exit *action_model.Exit
@@ -126,7 +129,7 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 
 		resp, err := llmSession.SendMessage(ctx, genai.Text(nextPrompt))
 		if err != nil {
-			return goerr.Wrap(err, "failed to send message")
+			return goerr.Wrap(err, "failed to send message", goerr.V("prompt", nextPrompt))
 		}
 
 		results = nil
@@ -143,52 +146,13 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 		}
 	}
 
-	newHistory := session.NewHistory(ctx, llmSession.GetHistory())
-	if err := x.repo.PutHistory(ctx, x.ssn.ID, newHistory); err != nil {
-		return goerr.Wrap(err, "failed to put history")
-	}
-
 	if exit == nil {
 		msg.Notify(ctx, "😫 Maximum action count exceeded")
 		return nil
 	}
-	msg.Trace(ctx, "Finished session")
+	msg.Trace(ctx, "Finished")
 
-	msg.Notify(ctx, "%s", exit.Conclusion)
+	msg.Notify(ctx, "🐇 %s", exit.Conclusion)
 
 	return nil
-}
-
-func (x *Service) handleContent(ctx context.Context, content *genai.Content) ([]*action_model.Result, *action_model.Exit, error) {
-	var results []*action_model.Result
-	var exit *action_model.Exit
-
-	for _, part := range content.Parts {
-		switch v := part.(type) {
-		case genai.Text:
-			note := session.NewNote(x.ssn.ID, string(v))
-			if err := x.repo.PutNote(ctx, note); err != nil {
-				return nil, exit, goerr.Wrap(err, "failed to put note")
-			}
-
-		case genai.FunctionCall:
-			if v.Name == ctrlCommandExit {
-				exit = &action_model.Exit{
-					Conclusion: v.Args["conclusion"].(string),
-				}
-				continue
-			}
-
-			resp, err := x.action.Execute(ctx, string(v.Name), v.Args)
-			if err != nil {
-				return nil, exit, goerr.Wrap(err, "failed to execute action", goerr.V("call", v))
-			}
-			results = append(results, resp)
-
-		default:
-			logging.From(ctx).Warn("unknown content type", "type", reflect.TypeOf(v))
-		}
-	}
-
-	return results, exit, nil
 }

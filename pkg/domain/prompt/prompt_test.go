@@ -139,9 +139,8 @@ func TestSessionStartPrompt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			d, err := prompt.BuildSessionStartPrompt(ctx, "Rabbit is a cute animal", tt.alerts)
+			d, err := prompt.BuildSessionInitPrompt(ctx, tt.alerts)
 			gt.NoError(t, err)
-			gt.S(t, d).Contains("Rabbit is a cute animal")
 			t.Log(d)
 		})
 	}

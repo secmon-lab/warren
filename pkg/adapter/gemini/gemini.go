@@ -7,6 +7,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/gemini"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 type GeminiClient struct {
@@ -86,7 +87,14 @@ func (x *GeminiClient) StartChat(options ...gemini.Option) interfaces.LLMSession
 }
 
 func (x *GeminiClient) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
-	return x.client.GenerativeModel(x.defaultModel).GenerateContent(ctx, msg...)
+	resp, err := x.client.GenerativeModel(x.defaultModel).GenerateContent(ctx, msg...)
+	logging.From(ctx).Debug("GeminiClient: sent message", "resp", resp, "parts", msg)
+
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to send message")
+	}
+
+	return resp, nil
 }
 
 type GeminiSession struct {
