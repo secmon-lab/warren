@@ -60,8 +60,11 @@ func (uc *UseCases) handleSlackAppMention(ctx context.Context, user slack.User, 
 		return nil
 	}
 
-	var targetAlerts alert.Alerts
+	if !slackMsg.InThread() {
+		return uc.handleSlackRootCommand(ctx, st, user, mention.Message)
+	}
 
+	var targetAlerts alert.Alerts
 	// If session is not found, starting a new session based on existing alert or list
 	if v, err := uc.repository.GetAlertByThread(ctx, slackMsg.SlackThread()); err != nil {
 		return goerr.Wrap(err, "failed to get alert by slack thread")
@@ -75,16 +78,18 @@ func (uc *UseCases) handleSlackAppMention(ctx context.Context, user slack.User, 
 		targetAlerts = v.Alerts
 	}
 
-	if err := uc.handleSlackMentionCommand(ctx, st, user, targetAlerts, mention.Message); err == nil {
+	if len(targetAlerts) == 0 {
+		msg.Notify(ctx, "🤔 No alerts found in the thread")
+		return nil
+	}
+
+	// If alerts are found, dispatch the action to the existing alerts
+	if err := uc.handleSlackInThreadCommand(ctx, st, user, targetAlerts, mention.Message); err == nil {
 		// If the command is handled, return nil
 		return nil
 	} else if err != errUnknownCommand {
+		// If the command is not valid, ignore the error and continue
 		return err
-	}
-
-	if len(targetAlerts) == 0 {
-		msg.Notify(ctx, "🤔 No alerts found")
-		return nil
 	}
 
 	// If session is found, dispatch the action to the existing session
@@ -122,17 +127,38 @@ var (
 	errUnknownCommand = goerr.New("unknown command")
 )
 
-func (uc *UseCases) handleSlackMentionCommand(ctx context.Context, th *slack_svc.ThreadService, user slack.User, alerts alert.Alerts, message string) error {
+func messageToArgs(message string) (string, string) {
 	args := strings.SplitN(message, " ", 2)
 	if len(args) == 0 {
+		return "", ""
+	}
+	return strings.ToLower(strings.TrimSpace(args[0])), strings.TrimSpace(args[1])
+}
+
+func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack_svc.ThreadService, user slack.User, alerts alert.Alerts, message string) error {
+	command, remaining := messageToArgs(message)
+	if command == "" {
 		return errUnknownCommand
 	}
 
-	remaining := ""
-	if len(args) == 2 {
-		remaining = strings.TrimSpace(args[1])
+	switch command {
+	case "group":
+		if err := group.Run(ctx, uc.repository, th, uc.llmClient, user, alerts, remaining); err != nil {
+			return goerr.Wrap(err, "failed to run group command")
+		}
+		return nil
+
+	default:
+		return errUnknownCommand
 	}
-	command := strings.ToLower(strings.TrimSpace(args[0]))
+}
+
+func (uc *UseCases) handleSlackRootCommand(ctx context.Context, th *slack_svc.ThreadService, user slack.User, message string) error {
+	command, remaining := messageToArgs(message)
+	if command == "" {
+		return errUnknownCommand
+	}
+
 	switch command {
 	case "list":
 		_, err := list.New(uc.repository).Run(ctx, th, &user, remaining)
@@ -141,13 +167,8 @@ func (uc *UseCases) handleSlackMentionCommand(ctx context.Context, th *slack_svc
 		}
 		return nil
 
-	case "group":
-		if err := group.Run(ctx, uc.repository, th, uc.llmClient, user, alerts, remaining); err != nil {
-			return goerr.Wrap(err, "failed to run group command")
-		}
-		return nil
-
 	default:
+		msg.Notify(ctx, "🤔 Available commands: `list`")
 		return errUnknownCommand
 	}
 }

@@ -14,10 +14,13 @@ type Thread struct {
 }
 
 type Message struct {
-	id       string
-	channel  string
+	id      string
+	channel string
+
+	// If empty, the message is the first message in the thread
 	threadID string
-	teamID   string
+
+	teamID string
 }
 
 func (x *Message) SlackThread() Thread {
@@ -77,7 +80,7 @@ func (x *Message) TeamID() string {
 }
 
 func (x *Message) InThread() bool {
-	return x.threadID != x.id
+	return x.threadID != ""
 }
 
 type User struct {
