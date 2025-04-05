@@ -4,15 +4,14 @@ import (
 	"context"
 
 	"github.com/secmon-lab/warren/pkg/cli/config"
-	"github.com/secmon-lab/warren/pkg/model"
-	"github.com/secmon-lab/warren/pkg/utils/lang"
+	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
 
 func Run(ctx context.Context, args []string) error {
 	var loggerCfg config.Logger
-	var language model.Lang
+	var language lang.Lang
 	var closer func()
 	app := &cli.Command{
 		Name:  "warren",
@@ -49,9 +48,7 @@ func Run(ctx context.Context, args []string) error {
 		},
 		Commands: []*cli.Command{
 			cmdServe(),
-			cmdRun(),
 			cmdTest(),
-			cmdPolicy(),
 		},
 	}
 

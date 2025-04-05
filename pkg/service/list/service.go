@@ -2,142 +2,114 @@ package list
 
 import (
 	"context"
+	_ "embed"
+	"strings"
 
-	"github.com/secmon-lab/warren/pkg/interfaces"
-	"github.com/secmon-lab/warren/pkg/model"
-	"github.com/secmon-lab/warren/pkg/service"
-	"github.com/secmon-lab/warren/pkg/service/source"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/types"
+	svc "github.com/secmon-lab/warren/pkg/service/slack"
+
+	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
 type Service struct {
 	repo interfaces.Repository
-	llm  interfaces.LLMClient
 }
 
-type Option func(*Service)
-
-func WithLLM(llm interfaces.LLMClient) Option {
-	return func(s *Service) {
-		s.llm = llm
-	}
-}
-
-func New(repo interfaces.Repository, opts ...Option) *Service {
-	s := &Service{
+func New(repo interfaces.Repository) *Service {
+	return &Service{
 		repo: repo,
 	}
-	for _, opt := range opts {
-		opt(s)
-	}
-	return s
 }
 
-func (x *Service) Run(ctx context.Context, th interfaces.SlackThreadService, user *model.SlackUser, src source.Source, args []string) error {
+//go:embed embed/help.md
+var helpMessage string
+
+func showHelp(ctx context.Context) {
+	msg.Notify(ctx, "%s", helpMessage)
+}
+
+func filterEmptyStrings(s []string) []string {
+	var result []string
+	for _, str := range s {
+		if str != "" {
+			result = append(result, str)
+		}
+	}
+	return result
+}
+
+func (x *Service) Run(ctx context.Context, th *svc.ThreadService, user *slack.User, input string) (types.AlertListID, error) {
+	commands := strings.Split(input, "|")
+	if len(commands) == 0 {
+		showHelp(ctx)
+		return types.EmptyAlertListID, nil
+	}
+
+	ctx = msg.NewTrace(ctx, "🤖 Creating alert list...")
+
+	args := strings.Split(commands[0], " ")
+	args = filterEmptyStrings(args)
+	src, err := parseArgsToSource(ctx, args)
+	if err != nil {
+		msg.Trace(ctx, "💥 Error: %s", err)
+		showHelp(ctx)
+		return types.EmptyAlertListID, err
+	}
+
+	nextCommands := commands[1:]
+	var pipeline *pipeline
+	if len(nextCommands) > 0 {
+		pipelineCommands := [][]string{}
+		for _, command := range nextCommands {
+			command = strings.TrimSpace(command)
+			if command == "" {
+				continue
+			}
+			pipelineCommands = append(pipelineCommands, strings.Split(command, " "))
+		}
+
+		pipeline, err = buildPipeline(pipelineCommands)
+		if err != nil {
+			msg.Trace(ctx, "💥 Building pipeline: %s", err)
+			return types.EmptyAlertListID, err
+		}
+	}
+
 	alerts, err := src(ctx, x.repo)
 	if err != nil {
-		return err
+		msg.Trace(ctx, "💥 Get alerts: %s", err)
+		return types.EmptyAlertListID, err
 	}
 
-	pipe, err := x.newPipeline(ctx, args)
-	if err != nil {
-		return err
+	if alerts == nil {
+		alerts = alert.Alerts{}
 	}
 
-	newAlerts, err := pipe.Run(ctx, alerts)
-	if err != nil {
-		return err
+	if pipeline != nil {
+		alerts, err = pipeline.Execute(ctx, alerts)
+		if err != nil {
+			msg.Trace(ctx, "💥 Execute pipeline: %s", err)
+			return types.EmptyAlertListID, err
+		}
 	}
 
-	slackThread := model.SlackThread{
+	alertList := alert.NewList(ctx, slack.Thread{
 		ChannelID: th.ChannelID(),
 		ThreadID:  th.ThreadID(),
-	}
-	alertList := model.NewAlertList(ctx, slackThread, user, newAlerts)
-
-	meta, err := service.GenerateAlertListMeta(ctx, alertList, x.llm)
-	if err != nil {
-		return err
-	}
-	if meta != nil {
-		alertList.Title = meta.Title
-		alertList.Description = meta.Description
-	}
+	}, user, alerts)
 
 	if err := x.repo.PutAlertList(ctx, alertList); err != nil {
-		return err
+		msg.Trace(ctx, "💥 Create alert list: %s", err)
+		return types.EmptyAlertListID, err
 	}
 
 	if err := th.PostAlertList(ctx, &alertList); err != nil {
-		return err
+		msg.Trace(ctx, "💥 Post alert list: %s", err)
+		return types.EmptyAlertListID, err
 	}
 
-	return nil
-}
-
-type pipeline struct {
-	actions []action
-}
-
-func (p *pipeline) Run(ctx context.Context, alerts []model.Alert) ([]model.Alert, error) {
-	for _, action := range p.actions {
-		newAlerts, err := action(ctx, alerts)
-		if err != nil {
-			return nil, err
-		}
-		alerts = newAlerts
-	}
-	return alerts, nil
-}
-
-func (x *Service) newPipeline(ctx context.Context, args []string) (*pipeline, error) {
-	logger := logging.From(ctx)
-
-	// Arguments Example:
-	// `| filter | sort CreatedAt | limit 10 | offset 10`
-
-	var actions []action
-	var currentName string
-	var currentArgs []string
-
-	actionMap := newActionMapping(x)
-
-	// Find action with prefix match and return matched function
-
-	// Process current command and append action
-	processCommand := func() error {
-		if currentName != "" {
-			matchedFn, err := actionMap.findMatchedAction(currentName)
-			if err != nil {
-				return err
-			}
-			logger.Debug("Matched action", "action", currentName, "args", currentArgs)
-			actions = append(actions, matchedFn(currentArgs))
-			currentName = ""
-			currentArgs = nil
-		}
-		return nil
-	}
-
-	for _, arg := range args {
-		if arg == "|" {
-			if err := processCommand(); err != nil {
-				return nil, err
-			}
-			continue
-		}
-
-		if currentName == "" {
-			currentName = arg
-		} else {
-			currentArgs = append(currentArgs, arg)
-		}
-	}
-
-	// Process last command
-	if err := processCommand(); err != nil {
-		return nil, err
-	}
-
-	return &pipeline{actions: actions}, nil
+	return alertList.ID, nil
 }
