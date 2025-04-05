@@ -7,7 +7,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/action/base"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	session_model "github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -20,31 +19,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/ptr"
 )
 
-func (uc *UseCases) dispatchSlackAction(ctx context.Context, action func(ctx context.Context) error) {
-	newCtx := newBackgroundContext(ctx)
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				errs.Handle(newCtx, goerr.New("panic", goerr.V("recover", r)))
-			}
-		}()
-
-		if err := action(newCtx); err != nil {
-			errs.Handle(newCtx, err)
-		}
-	}()
-}
-
 // HandleSlackAppMention handles a slack app mention event. It will dispatch a slack action to the alert.
 func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, mention slack.Mention, slackMsg *slack.Message) error {
-	uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-		return uc.handleSlackAppMention(ctx, user, mention, slackMsg)
-	})
-	return nil
-}
-
-func (uc *UseCases) handleSlackAppMention(ctx context.Context, user slack.User, mention slack.Mention, slackMsg *slack.Message) error {
-
 	logger := logging.From(ctx)
 	logger.Debug("slack app mention event", "mention", mention, "slack_thread", slackMsg.SlackThread())
 
@@ -88,7 +64,7 @@ func (uc *UseCases) handleSlackAppMention(ctx context.Context, user slack.User, 
 		// If the command is handled, return nil
 		return nil
 	} else if err != errUnknownCommand {
-		// If the command is not valid, ignore the error and continue
+		// If the command is not valid, ignore the error and continue.
 		return err
 	}
 

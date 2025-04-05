@@ -16,15 +16,6 @@ import (
 
 // HandleSlackInteractionViewSubmissionResolveAlert handles a slack interaction view submission for "resolving an alert".
 func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
-	uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-		return uc.handleSlackInteractionViewSubmissionResolveAlert(ctx, user, metadata, values)
-	})
-
-	return nil
-}
-
-func (uc *UseCases) handleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
-
 	logger := logging.From(ctx)
 	logger.Debug("resolving alert",
 		"user", user,
@@ -59,14 +50,6 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveAlert(ctx context
 
 // HandleSlackInteractionViewSubmissionResolveList handles a slack interaction view submission for "resolving an alert list".
 func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
-	uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-		return uc.handleSlackInteractionViewSubmissionResolveList(ctx, user, metadata, values)
-	})
-
-	return nil
-}
-
-func (uc *UseCases) handleSlackInteractionViewSubmissionResolveList(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
 	logger := logging.From(ctx)
 	logger.Debug("resolving alert list",
 		"user", user,

@@ -12,14 +12,6 @@ import (
 
 // HandleSlackInteractionBlockActions handles a slack interaction block action.
 func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user slack.User, slackThread slack.Thread, actionID slack.ActionID, value, triggerID string) error {
-	uc.dispatchSlackAction(ctx, func(ctx context.Context) error {
-		return uc.handleSlackInteractionBlockActions(ctx, user, slackThread, actionID, value, triggerID)
-	})
-
-	return nil
-}
-
-func (uc *UseCases) handleSlackInteractionBlockActions(ctx context.Context, user slack.User, slackThread slack.Thread, actionID slack.ActionID, value, triggerID string) error {
 	logger := logging.From(ctx)
 
 	st := uc.slackService.NewThread(slackThread)

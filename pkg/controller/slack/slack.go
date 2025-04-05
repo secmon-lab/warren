@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"runtime/debug"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
@@ -14,12 +15,16 @@ import (
 	"github.com/slack-go/slack/slackevents"
 )
 
-func dispatch(ctx context.Context, handler func(ctx context.Context) error) {
+func newBackgroundContext(ctx context.Context) context.Context {
 	newCtx := context.Background()
-
 	newCtx = logging.With(newCtx, logging.From(ctx))
 	newCtx = msg.WithContext(newCtx)
 	newCtx = lang.With(newCtx, lang.From(ctx))
+	return newCtx
+}
+
+func dispatch(ctx context.Context, handler func(ctx context.Context) error) {
+	newCtx := newBackgroundContext(ctx)
 
 	if IsSync(ctx) {
 		if err := handler(newCtx); err != nil {
@@ -31,7 +36,8 @@ func dispatch(ctx context.Context, handler func(ctx context.Context) error) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				errs.Handle(newCtx, goerr.New("panic", goerr.V("recover", r)))
+				stack := debug.Stack()
+				errs.Handle(newCtx, goerr.New("panic", goerr.V("recover", r), goerr.V("stack", string(stack))))
 			}
 		}()
 
