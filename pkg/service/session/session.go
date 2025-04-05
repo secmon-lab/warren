@@ -43,13 +43,7 @@ const (
 	ctrlCommandExit = "exit"
 )
 
-func (x *Service) Chat(ctx context.Context, message string) error {
-	// Restore history if exists
-	histroy, err := x.repo.GetLatestHistory(ctx, x.ssn.ID)
-	if err != nil {
-		return goerr.Wrap(err, "failed to get latest history")
-	}
-
+func (x *Service) buildTools(ctx context.Context) []*genai.FunctionDeclaration {
 	tools := x.action.Specs()
 	tools = append(tools, &genai.FunctionDeclaration{
 		Name:        ctrlCommandExit,
@@ -66,10 +60,22 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 		},
 	})
 
+	return tools
+}
+
+func (x *Service) Chat(ctx context.Context, message string) error {
+	// Restore history if exists
+	histroy, err := x.repo.GetLatestHistory(ctx, x.ssn.ID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get latest history")
+	}
+
 	llmSession := x.llm.StartChat(
 		gemini.WithHistory(histroy),
 		gemini.WithContentType("text/plain"),
-		gemini.WithTools([]*genai.Tool{{FunctionDeclarations: tools}}),
+		gemini.WithTools([]*genai.Tool{{
+			FunctionDeclarations: x.buildTools(ctx),
+		}}),
 	)
 
 	alerts, err := x.repo.BatchGetAlerts(ctx, x.ssn.AlertIDs)
@@ -82,25 +88,48 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 		return goerr.Wrap(err, "failed to build session start prompt")
 	}
 
-	nextPrompt, err := prompt.BuildSessionNextPrompt(ctx, nil)
-	if err != nil {
-		return goerr.Wrap(err, "failed to build session next prompt")
-	}
-
 	parts := []genai.Part{
 		genai.Text(initPrompt),
-		genai.Text(nextPrompt),
+	}
+	resp, err := llmSession.SendMessage(ctx, parts...)
+	if err != nil {
+		return goerr.Wrap(err, "failed to send message")
+	}
+
+	willExit := false
+	for _, candidate := range resp.Candidates {
+		for _, part := range candidate.Content.Parts {
+			switch v := part.(type) {
+			case genai.Text:
+				ctx = msg.NewTrace(ctx, "🐇 %s", string(v))
+			case genai.FunctionCall:
+				if v.Name == ctrlCommandExit {
+					willExit = true
+				}
+			}
+		}
+	}
+
+	if willExit {
+		return nil
 	}
 
 	const maxLoops = 32
 	var exit *action_model.Exit
+	var results []*action_model.Result
+
 	for i := 0; i < maxLoops && exit == nil; i++ {
-		resp, err := llmSession.SendMessage(ctx, parts...)
+		nextPrompt, err := prompt.BuildSessionNextPrompt(ctx, results)
+		if err != nil {
+			return goerr.Wrap(err, "failed to build session next prompt")
+		}
+
+		resp, err := llmSession.SendMessage(ctx, genai.Text(nextPrompt))
 		if err != nil {
 			return goerr.Wrap(err, "failed to send message")
 		}
 
-		var results []*action_model.Result
+		results = nil
 		for _, candidate := range resp.Candidates {
 			resultResp, exitResp, err := x.handleContent(ctx, candidate.Content)
 			if err != nil {
@@ -111,15 +140,6 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 			if exitResp != nil {
 				exit = exitResp
 			}
-		}
-
-		nextPrompt, err := prompt.BuildSessionNextPrompt(ctx, results)
-		if err != nil {
-			return goerr.Wrap(err, "failed to create netxt prompt")
-		}
-
-		parts = []genai.Part{
-			genai.Text(nextPrompt),
 		}
 	}
 
