@@ -69,23 +69,14 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 		return goerr.Wrap(err, "failed to get latest history")
 	}
 
+	// If history is empty, need to initialize the session
 	llmSession := x.llm.StartChat(
 		gemini.WithHistory(histroy),
 		gemini.WithContentType("text/plain"),
 		gemini.WithTools([]*genai.Tool{{
-			FunctionDeclarations: x.buildInitTools(ctx),
+			FunctionDeclarations: x.buildStartTools(),
 		}}),
 	)
-
-	alerts, err := x.repo.BatchGetAlerts(ctx, x.ssn.AlertIDs)
-	if err != nil {
-		return goerr.Wrap(err, "failed to get alerts")
-	}
-
-	initPrompt, err := prompt.BuildSessionInitPrompt(ctx, alerts)
-	if err != nil {
-		return goerr.Wrap(err, "failed to build session start prompt")
-	}
 
 	defer func() {
 		newHistory := session.NewHistory(ctx, llmSession.GetHistory())
@@ -95,19 +86,36 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 		}
 	}()
 
-	initResp, err := llmSession.SendMessage(ctx, genai.Text(initPrompt), genai.Text(message))
+	var parts []genai.Part
+	if histroy == nil {
+		alerts, err := x.repo.BatchGetAlerts(ctx, x.ssn.AlertIDs)
+		if err != nil {
+			return goerr.Wrap(err, "failed to get alerts")
+		}
+
+		initPrompt, err := prompt.BuildSessionInitPrompt(ctx, alerts)
+		if err != nil {
+			return goerr.Wrap(err, "failed to build session start prompt")
+		}
+
+		parts = append(parts, genai.Text(initPrompt))
+	}
+
+	parts = append(parts, genai.Text(message))
+	initResp, err := llmSession.SendMessage(ctx, parts...)
 	if err != nil {
 		return goerr.Wrap(err, "failed to send message")
 	}
 
-	ctx, contSsn, err := x.handleInit(ctx, initResp)
+	ctx, contSsn, err := x.handleStart(ctx, initResp)
 	if err != nil {
-		return goerr.Wrap(err, "failed to handle init")
+		return goerr.Wrap(err, "failed to handle start")
 	}
 	if !contSsn {
 		return nil
 	}
 
+	// Start a new chat session with the current history
 	newHist := session.NewHistory(ctx, llmSession.GetHistory())
 	llmSession = x.llm.StartChat(
 		gemini.WithHistory(newHist),
