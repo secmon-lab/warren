@@ -3,9 +3,11 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
@@ -23,11 +25,13 @@ func (uc *UseCases) HandleAlertWithAuth(ctx context.Context, schema types.AlertS
 		Allow bool `json:"allow"`
 	}
 	if err := uc.policyClient.Query(ctx, "data.auth", authCtx, &result); err != nil {
-		return nil, goerr.Wrap(err, "failed to query policy", goerr.V("auth", authCtx))
+		if !errors.Is(err, opaq.ErrNoEvalResult) {
+			return nil, goerr.Wrap(err, "failed to query policy", goerr.V("auth", authCtx))
+		}
 	}
 
 	if !result.Allow {
-		return nil, goerr.New("unauthorized", goerr.V("auth", authCtx))
+		return nil, goerr.New("unauthorized", goerr.V("auth", authCtx), goerr.V("result", result))
 	}
 
 	return uc.HandleAlert(ctx, schema, alertData)

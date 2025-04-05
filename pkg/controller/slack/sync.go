@@ -9,5 +9,9 @@ func WithSync(ctx context.Context) context.Context {
 }
 
 func IsSync(ctx context.Context) bool {
-	return ctx.Value(ctxSyncKey{}).(bool)
+	v := ctx.Value(ctxSyncKey{})
+	if v == nil {
+		return false
+	}
+	return v.(bool)
 }
