@@ -11,11 +11,6 @@ const (
 )
 
 type Result struct {
-	Message string
-	Type    ResultType
-	Rows    []string
-}
-
-type Exit struct {
-	Conclusion string
+	Name string
+	Data map[string]any
 }

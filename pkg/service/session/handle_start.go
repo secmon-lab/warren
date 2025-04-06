@@ -6,6 +6,7 @@ import (
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
@@ -38,6 +39,9 @@ func (x *Service) buildStartTools() []*genai.FunctionDeclaration {
 }
 
 func (x *Service) handleStart(ctx context.Context, resp *genai.GenerateContentResponse) (context.Context, bool, error) {
+	logger := logging.From(ctx)
+	logger.Debug("handleStart", "resp", resp)
+
 	var response string
 	var contSsn bool
 

@@ -16,9 +16,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/action"
 	"github.com/secmon-lab/warren/pkg/service/session"
-	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
-
-	slack_sdk "github.com/slack-go/slack"
 )
 
 func TestSessionChat(t *testing.T) {
@@ -37,18 +34,6 @@ func TestSessionChat(t *testing.T) {
 
 	ssn := session_model.New(ctx, &slack.User{}, &slack.Thread{}, []types.AlertID{target.ID})
 	geminiClient := gemini.NewTestClient(t)
-
-	slackClient := &interfaces.SlackClientMock{
-		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
-			return &slack_sdk.AuthTestResponse{
-				Team:   "test-team",
-				TeamID: "test-team-id",
-				BotID:  "test-bot-id",
-			}, nil
-		},
-	}
-	slackService, err := slack_svc.New(slackClient, "test-channel")
-	gt.NoError(t, err)
 
 	threatInfoMock := &interfaces.ActionMock{
 		NameFunc: func() string {
@@ -71,11 +56,14 @@ func TestSessionChat(t *testing.T) {
 		},
 		ExecuteFunc: func(ctx context.Context, name string, args map[string]any) (*action_model.Result, error) {
 			return &action_model.Result{
-				Message: "Threat info about 103.243.25.70",
-				Rows: []string{
-					"IP reputation: malicious",
-					"Country: United States",
-					"ASN: AS15169",
+				Name: "threat_info.ipv4",
+				Data: map[string]any{
+					"message": "Threat info about 103.243.25.70",
+					"rows": []string{
+						"IP reputation: malicious",
+						"Country: United States",
+						"ASN: AS15169",
+					},
 				},
 			}, nil
 		},
@@ -105,10 +93,13 @@ func TestSessionChat(t *testing.T) {
 		},
 		ExecuteFunc: func(ctx context.Context, name string, args map[string]any) (*action_model.Result, error) {
 			return &action_model.Result{
-				Message: "User logs",
-				Rows: []string{
-					"2021-01-01 12:00:00: login from 10.0.2.3",
-					"2021-01-01 12:00:01: login from 103.243.25.70",
+				Name: "log.user",
+				Data: map[string]any{
+					"message": "User logs",
+					"rows": []string{
+						"2021-01-01 12:00:00: login from 10.0.2.3",
+						"2021-01-01 12:00:01: login from 103.243.25.70",
+					},
 				},
 			}, nil
 		},
@@ -117,7 +108,7 @@ func TestSessionChat(t *testing.T) {
 	actionService, err := action.New(ctx, []interfaces.Action{threatInfoMock, logServiceMock})
 	gt.NoError(t, err)
 
-	svc := session.New(repo, geminiClient, slackService, actionService, ssn)
+	svc := session.New(repo, geminiClient, actionService, ssn)
 
 	err = svc.Chat(ctx, "How about risk of the alert?")
 	gt.NoError(t, err)

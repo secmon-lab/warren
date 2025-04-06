@@ -7,40 +7,46 @@ import (
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
 	action_model "github.com/secmon-lab/warren/pkg/domain/model/action"
-	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-func (x *Service) handleContent(ctx context.Context, content *genai.Content) ([]*action_model.Result, *action_model.Exit, error) {
+func (x *Service) handleCandidates(ctx context.Context, candidates []*genai.Candidate) ([]*action_model.Result, error) {
+	logger := logging.From(ctx)
+
 	var results []*action_model.Result
-	var exit *action_model.Exit
 
-	for _, part := range content.Parts {
-		switch v := part.(type) {
-		case genai.Text:
-			note := session.NewNote(x.ssn.ID, string(v))
-			if err := x.repo.PutNote(ctx, note); err != nil {
-				return nil, exit, goerr.Wrap(err, "failed to put note")
-			}
+	for idx, candidate := range candidates {
+		logger.Debug("candidate", "idx", idx, "contentes", candidate.Content)
 
-		case genai.FunctionCall:
-			if v.Name == ctrlCommandExit {
-				exit = &action_model.Exit{
-					Conclusion: v.Args["conclusion"].(string),
+		for _, part := range candidate.Content.Parts {
+			switch v := part.(type) {
+			case genai.Text:
+				msg.Notify(ctx, "🐰 %s", string(v))
+
+			case genai.FunctionCall:
+				if v.Name == ctrlCommandExit {
+					result := &action_model.Result{
+						Name: string(v.Name),
+						Data: v.Args,
+					}
+					results = append(results, result)
+					continue
 				}
-				continue
-			}
 
-			resp, err := x.action.Execute(ctx, string(v.Name), v.Args)
-			if err != nil {
-				return nil, exit, goerr.Wrap(err, "failed to execute action", goerr.V("call", v))
-			}
-			results = append(results, resp)
+				logger.Debug("function call", "name", v.Name, "args", v.Args)
 
-		default:
-			logging.From(ctx).Warn("unknown content type", "type", reflect.TypeOf(v))
+				resp, err := x.action.Execute(ctx, string(v.Name), v.Args)
+				if err != nil {
+					return nil, goerr.Wrap(err, "failed to execute action", goerr.V("call", v))
+				}
+				results = append(results, resp)
+
+			default:
+				logging.From(ctx).Warn("unknown content type", "type", reflect.TypeOf(v))
+			}
 		}
 	}
 
-	return results, exit, nil
+	return results, nil
 }

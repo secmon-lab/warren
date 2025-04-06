@@ -9,7 +9,6 @@ import (
 	"text/template"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
@@ -399,28 +398,6 @@ func BuildSessionInitPrompt(ctx context.Context, alerts alert.Alerts) (string, e
 
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "session_init", input); err != nil {
-		return "", goerr.Wrap(err, "failed to execute template")
-	}
-
-	return buf.String(), nil
-}
-
-//go:embed templates/session_next.md
-var sessionNextTemplate string
-
-func BuildSessionNextPrompt(ctx context.Context, results []*action.Result) (string, error) {
-	tmpl, err := template.New("session_next").Parse(sessionNextTemplate)
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to parse template")
-	}
-
-	input := map[string]any{
-		"lang":    lang.From(ctx).Name(),
-		"results": results,
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "session_next", input); err != nil {
 		return "", goerr.Wrap(err, "failed to execute template")
 	}
 

@@ -187,8 +187,9 @@ func (x *Action) Execute(ctx context.Context, name string, args map[string]any) 
 	}
 
 	return &action.Result{
-		Message: fmt.Sprintf("OTX result for %s: %s", indicatorType, indicator),
-		Type:    action.ResultTypeJSON,
-		Rows:    []string{string(body)},
+		Name: name,
+		Data: map[string]any{
+			"body": string(body),
+		},
 	}, nil
 }

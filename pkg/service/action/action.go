@@ -73,6 +73,14 @@ func (x *Service) Specs() []*genai.FunctionDeclaration {
 	return specs
 }
 
+func trimArgument(v any) string {
+	txt := fmt.Sprintf("%v", v)
+	if len(txt) > 32 {
+		return txt[:32] + "..."
+	}
+	return txt
+}
+
 func (x *Service) Execute(ctx context.Context, name string, args map[string]any) (*action.Result, error) {
 	logger := logging.From(ctx)
 	action, ok := x.route[name]
@@ -82,10 +90,10 @@ func (x *Service) Execute(ctx context.Context, name string, args map[string]any)
 
 	var argsStr []string
 	for k, v := range args {
-		argsStr = append(argsStr, fmt.Sprintf("🔸 %s: `%v`", k, v))
+		argsStr = append(argsStr, fmt.Sprintf("🔸 %s: `%s`", k, trimArgument(v)))
 	}
 
-	msg.Trace(ctx, "⚡ Exec: `%s` with %s", name, strings.Join(argsStr, ", "))
+	msg.Trace(ctx, "⚡ Exec: `%s` with %s", name, strings.Join(argsStr, " / "))
 	logger.Info("executing action", "name", name, "args", args)
 	return action.Execute(ctx, name, args)
 }

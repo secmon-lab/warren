@@ -10,6 +10,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/urfave/cli/v3"
 )
@@ -66,8 +67,8 @@ func (x *Base) Specs() []*genai.FunctionDeclaration {
 			},
 		},
 		{
-			Name:        "base.notes",
-			Description: "Get the notes of the agent session",
+			Name:        "base.memo.get",
+			Description: "Get the memos of the agent session. You can use to save summary of the analysis.",
 			Parameters: &genai.Schema{
 				Type: genai.TypeObject,
 				Properties: map[string]*genai.Schema{
@@ -78,6 +79,19 @@ func (x *Base) Specs() []*genai.FunctionDeclaration {
 					"offset": {
 						Type:        genai.TypeInteger,
 						Description: "Number of notes to skip. Default is 0.",
+					},
+				},
+			},
+		},
+		{
+			Name:        "base.memo.put",
+			Description: "Put a memo to the agent session. You can use to save summary of the analysis.",
+			Parameters: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"note": {
+						Type:        genai.TypeString,
+						Description: "The memo to put",
 					},
 				},
 			},
@@ -107,8 +121,10 @@ func (x *Base) Execute(ctx context.Context, name string, args map[string]any) (*
 	switch name {
 	case "base.alerts":
 		return x.getAlerts(ctx, args)
-	case "base.notes":
+	case "base.note.get":
 		return x.getNotes(ctx, args)
+	case "base.note.put":
+		return x.putNote(ctx, args)
 	case "base.policy.list":
 		return x.listPolicies(ctx, args)
 	case "base.policy.get":
@@ -153,9 +169,35 @@ func (x *Base) getAlerts(_ context.Context, args map[string]any) (*action.Result
 	}
 
 	return &action.Result{
-		Message: "Retrieved alerts",
-		Type:    action.ResultTypeJSON,
-		Rows:    rows,
+		Name: "base.alerts",
+		Data: map[string]any{
+			"alerts": rows,
+		},
+	}, nil
+}
+
+func (x *Base) putNote(ctx context.Context, args map[string]any) (*action.Result, error) {
+	noteRaw, ok := args["note"]
+	if !ok {
+		return nil, goerr.New("note is required")
+	}
+
+	note, ok := noteRaw.(string)
+	if !ok {
+		return nil, goerr.New("note is not a string")
+	}
+
+	data := session.NewNote(x.sessionID, note)
+
+	if err := x.repo.PutNote(ctx, data); err != nil {
+		return nil, goerr.Wrap(err, "failed to put note")
+	}
+
+	return &action.Result{
+		Name: "base.note.put",
+		Data: map[string]any{
+			"note": note,
+		},
 	}, nil
 }
 
@@ -193,9 +235,13 @@ func (x *Base) getNotes(ctx context.Context, args map[string]any) (*action.Resul
 	}
 
 	return &action.Result{
-		Message: "Retrieved notes",
-		Type:    action.ResultTypeText,
-		Rows:    rows,
+		Name: "base.note.get",
+		Data: map[string]any{
+			"notes":  rows,
+			"count":  len(notes),
+			"offset": offset,
+			"limit":  limit,
+		},
 	}, nil
 }
 
@@ -205,19 +251,21 @@ func (x *Base) listPolicies(_ context.Context, _ map[string]any) (*action.Result
 		rows = append(rows, name)
 	}
 	return &action.Result{
-		Message: "Retrieved policy names",
-		Type:    action.ResultTypeText,
-		Rows:    rows,
+		Name: "base.policy.list",
+		Data: map[string]any{
+			"policies": rows,
+		},
 	}, nil
 }
 
 func (x *Base) getPolicy(_ context.Context, args map[string]any) (*action.Result, error) {
 	errResp := func(msg string) (*action.Result, error) {
 		return &action.Result{
-			Message: msg,
-			Type:    action.ResultTypeText,
-			Rows:    []string{},
-		}, nil
+			Name: "base.policy.get",
+			Data: map[string]any{
+				"policy": "",
+			},
+		}, goerr.New(msg)
 	}
 
 	argName, ok := args["name"]
@@ -236,8 +284,9 @@ func (x *Base) getPolicy(_ context.Context, args map[string]any) (*action.Result
 	}
 
 	return &action.Result{
-		Message: "Retrieved policy: " + name,
-		Type:    action.ResultTypeText,
-		Rows:    []string{policy},
+		Name: "base.policy.get",
+		Data: map[string]any{
+			"policy": policy,
+		},
 	}, nil
 }

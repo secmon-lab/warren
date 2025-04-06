@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"fmt"
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
@@ -11,6 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/gemini"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
@@ -26,11 +28,10 @@ type Service struct {
 	ssn    *session.Session
 }
 
-func New(repository interfaces.Repository, llmClient interfaces.LLMClient, slackService *slack.Service, actionService *action.Service, ssn *session.Session) *Service {
+func New(repository interfaces.Repository, llmClient interfaces.LLMClient, actionService *action.Service, ssn *session.Session) *Service {
 	svc := &Service{
 		repo:   repository,
 		llm:    llmClient,
-		slack:  slackService,
 		action: actionService,
 		ssn:    ssn,
 	}
@@ -46,16 +47,15 @@ func (x *Service) buildActionTools(ctx context.Context) []*genai.FunctionDeclara
 	tools := x.action.Specs()
 	tools = append(tools, &genai.FunctionDeclaration{
 		Name:        ctrlCommandExit,
-		Description: "End the agent session and submit the final conclusion",
+		Description: "Finish the agent session and submit the final conclusion",
 		Parameters: &genai.Schema{
 			Type: genai.TypeObject,
 			Properties: map[string]*genai.Schema{
 				"conclusion": {
 					Type:        genai.TypeString,
-					Description: "The final conclusion in Slack markdown format and in " + lang.From(ctx).Name(),
+					Description: fmt.Sprintf("If you need, you can leave a final conclusion in Slack markdown format and in %s", lang.From(ctx).Name()),
 				},
 			},
-			Required: []string{"conclusion"},
 		},
 	})
 
@@ -63,18 +63,22 @@ func (x *Service) buildActionTools(ctx context.Context) []*genai.FunctionDeclara
 }
 
 func (x *Service) Chat(ctx context.Context, message string) error {
+	logger := logging.From(ctx)
+
 	// Restore history if exists
 	histroy, err := x.repo.GetLatestHistory(ctx, x.ssn.ID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get latest history")
 	}
 
+	logger.Debug("got history", "history", histroy)
+
 	// If history is empty, need to initialize the session
 	llmSession := x.llm.StartChat(
 		gemini.WithHistory(histroy),
 		gemini.WithContentType("text/plain"),
 		gemini.WithTools([]*genai.Tool{{
-			FunctionDeclarations: x.buildStartTools(),
+			FunctionDeclarations: x.buildActionTools(ctx),
 		}}),
 	)
 
@@ -102,54 +106,43 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 	}
 
 	parts = append(parts, genai.Text(message))
-	initResp, err := llmSession.SendMessage(ctx, parts...)
-	if err != nil {
-		return goerr.Wrap(err, "failed to send message")
-	}
-
-	ctx, contSsn, err := x.handleStart(ctx, initResp)
-	if err != nil {
-		return goerr.Wrap(err, "failed to handle start")
-	}
-	if !contSsn {
-		return nil
-	}
-
-	// Start a new chat session with the current history
-	newHist := session.NewHistory(ctx, llmSession.GetHistory())
-	llmSession = x.llm.StartChat(
-		gemini.WithHistory(newHist),
-		gemini.WithContentType("text/plain"),
-		gemini.WithTools([]*genai.Tool{{
-			FunctionDeclarations: x.buildActionTools(ctx),
-		}}),
-	)
 
 	const maxLoops = 32
-	var exit *action_model.Exit
-	var results []*action_model.Result
+	var exit *action_model.Result
 
 	for i := 0; i < maxLoops && exit == nil; i++ {
-		nextPrompt, err := prompt.BuildSessionNextPrompt(ctx, results)
+		resp, err := llmSession.SendMessage(ctx, parts...)
 		if err != nil {
-			return goerr.Wrap(err, "failed to build session next prompt")
+			return goerr.Wrap(err, "failed to send message")
 		}
 
-		resp, err := llmSession.SendMessage(ctx, genai.Text(nextPrompt))
+		actionResult, err := x.handleCandidates(ctx, resp.Candidates)
 		if err != nil {
-			return goerr.Wrap(err, "failed to send message", goerr.V("prompt", nextPrompt))
+			return goerr.Wrap(err, "failed to handle content")
+		}
+		if len(actionResult) == 0 {
+			msg.Trace(ctx, "⛔ No action executed")
+			return nil
 		}
 
-		results = nil
-		for _, candidate := range resp.Candidates {
-			resultResp, exitResp, err := x.handleContent(ctx, candidate.Content)
-			if err != nil {
-				return goerr.Wrap(err, "failed to handle content")
+		parts = nil
+		for _, result := range actionResult {
+			parts = append(parts, genai.FunctionResponse{
+				Name:     result.Name,
+				Response: result.Data,
+			})
+		}
+
+		for _, c := range resp.Candidates {
+			if c.FinishReason != genai.FinishReasonStop {
+				msg.Notify(ctx, "💥 %s", lookupFinishReasonDescription(c.FinishReason))
 			}
+		}
 
-			results = append(results, resultResp...)
-			if exitResp != nil {
-				exit = exitResp
+		for _, result := range actionResult {
+			if result.Name == ctrlCommandExit {
+				exit = result
+				break
 			}
 		}
 	}
@@ -158,9 +151,30 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 		msg.Notify(ctx, "😫 Maximum action count exceeded")
 		return nil
 	}
-	msg.Trace(ctx, "Finished")
 
-	msg.Notify(ctx, "🐇 %s", exit.Conclusion)
+	if conclusion, ok := exit.Data["conclusion"]; ok {
+		msg.Notify(ctx, "🐰 %s", conclusion)
+	}
 
 	return nil
+}
+
+var finishReasonDescriptions = map[genai.FinishReason]string{
+	genai.FinishReasonUnspecified:           "The finish reason is unspecified.",
+	genai.FinishReasonStop:                  "The model naturally stopped or reached a provided stop sequence.",
+	genai.FinishReasonMaxTokens:             "The generation stopped because the maximum number of tokens was reached.",
+	genai.FinishReasonSafety:                "The output was flagged for safety concerns and was stopped.",
+	genai.FinishReasonRecitation:            "The output was stopped due to unauthorized citations.",
+	genai.FinishReasonOther:                 "The generation was stopped for an unspecified other reason.",
+	genai.FinishReasonBlocklist:             "The response was flagged for terms included in a blocklist.",
+	genai.FinishReasonProhibitedContent:     "The response contained prohibited content and was stopped.",
+	genai.FinishReasonSpii:                  "The response was flagged for containing sensitive personal information (SPII).",
+	genai.FinishReasonMalformedFunctionCall: "The function call generated by the model was invalid or malformed.",
+}
+
+func lookupFinishReasonDescription(reason genai.FinishReason) string {
+	if desc, ok := finishReasonDescriptions[reason]; ok {
+		return desc
+	}
+	return "Unknown finish reason"
 }

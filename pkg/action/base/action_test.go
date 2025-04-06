@@ -8,7 +8,6 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/action/base"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
@@ -51,9 +50,9 @@ func TestBase(t *testing.T) {
 	t.Run("alerts without pagination", func(t *testing.T) {
 		result, err := baseAction.Execute(ctx, "base.alerts", map[string]any{})
 		gt.NoError(t, err)
-		gt.Value(t, result.Type).Equal(action.ResultTypeJSON)
-		gt.Value(t, result.Message).Equal("Retrieved alerts")
-		gt.Array(t, result.Rows).Length(3)
+		gt.Value(t, result.Name).Equal("base.alerts")
+		gt.Map(t, result.Data).HasKey("alerts")
+		gt.Array(t, result.Data["alerts"].([]string)).Length(3)
 	})
 
 	t.Run("alerts with limit", func(t *testing.T) {
@@ -61,7 +60,9 @@ func TestBase(t *testing.T) {
 			"limit": float64(2),
 		})
 		gt.NoError(t, err)
-		gt.Array(t, result.Rows).Length(2)
+		gt.Value(t, result.Name).Equal("base.alerts")
+		gt.Map(t, result.Data).HasKey("alerts")
+		gt.Array(t, result.Data["alerts"].([]string)).Length(2)
 	})
 
 	t.Run("alerts with offset", func(t *testing.T) {
@@ -69,7 +70,9 @@ func TestBase(t *testing.T) {
 			"offset": float64(1),
 		})
 		gt.NoError(t, err)
-		gt.Array(t, result.Rows).Length(2)
+		gt.Value(t, result.Name).Equal("base.alerts")
+		gt.Map(t, result.Data).HasKey("alerts")
+		gt.Array(t, result.Data["alerts"].([]string)).Length(2)
 	})
 
 	t.Run("alerts with offset beyond length", func(t *testing.T) {
@@ -77,7 +80,9 @@ func TestBase(t *testing.T) {
 			"offset": float64(10),
 		})
 		gt.NoError(t, err)
-		gt.Array(t, result.Rows).Length(0)
+		gt.Value(t, result.Name).Equal("base.alerts")
+		gt.Map(t, result.Data).HasKey("alerts")
+		gt.Array(t, result.Data["alerts"].([]string)).Length(0)
 	})
 
 	t.Run("unknown function", func(t *testing.T) {

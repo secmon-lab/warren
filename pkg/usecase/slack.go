@@ -91,7 +91,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, 
 		return goerr.Wrap(err, "failed to create action service")
 	}
 
-	svc := session_svc.New(uc.repository, uc.llmClient, uc.slackService, actionService, ssn)
+	svc := session_svc.New(uc.repository, uc.llmClient, actionService, ssn)
 	if err := svc.Chat(ctx, mention.Message); err != nil {
 		return goerr.Wrap(err, "failed to run session")
 	}

@@ -26,9 +26,10 @@ type Content struct {
 type Contents []*Content
 
 type Part struct {
-	Text string              `json:"text"`
-	Blob []byte              `json:"blob"`
-	Func *genai.FunctionCall `json:"func"`
+	Text     string                  `json:"text"`
+	Blob     []byte                  `json:"blob"`
+	FuncCall *genai.FunctionCall     `json:"func_call"`
+	FuncResp *genai.FunctionResponse `json:"func_resp"`
 }
 
 func NewHistory(ctx context.Context, contents []*genai.Content) *History {
@@ -39,7 +40,7 @@ func NewHistory(ctx context.Context, contents []*genai.Content) *History {
 	}
 
 	for i, content := range contents {
-		parts := make([]Part, 0, len(content.Parts))
+		var parts []Part
 
 		for _, part := range content.Parts {
 			switch v := part.(type) {
@@ -53,20 +54,34 @@ func NewHistory(ctx context.Context, contents []*genai.Content) *History {
 					Blob: v.Data,
 				})
 
+			case *genai.FunctionCall:
+				parts = append(parts, Part{
+					FuncCall: v,
+				})
+
 			case genai.FunctionCall:
 				parts = append(parts, Part{
-					Func: &v,
+					FuncCall: &v,
+				})
+
+			case genai.FunctionResponse:
+				parts = append(parts, Part{
+					FuncResp: &v,
 				})
 
 			default:
 				logging.From(ctx).Warn("unknown part type", "type", reflect.TypeOf(v))
 			}
 		}
-		history.Contents[i] = &Content{
-			Role:  content.Role,
-			Parts: parts,
+
+		if len(parts) > 0 {
+			history.Contents[i] = &Content{
+				Role:  content.Role,
+				Parts: parts,
+			}
 		}
 	}
+
 	return history
 }
 
@@ -80,8 +95,10 @@ func (x *History) ToContents() []*genai.Content {
 				parts[j] = genai.Text(part.Text)
 			case len(part.Blob) > 0:
 				parts[j] = genai.Blob{Data: part.Blob}
-			case part.Func != nil:
-				parts[j] = part.Func
+			case part.FuncCall != nil:
+				parts[j] = *part.FuncCall
+			case part.FuncResp != nil:
+				parts[j] = *part.FuncResp
 			}
 		}
 		contents[i] = &genai.Content{Role: content.Role, Parts: parts}
@@ -90,6 +107,10 @@ func (x *History) ToContents() []*genai.Content {
 }
 
 func (x *History) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+
 	return slog.GroupValue(
 		slog.String("id", x.ID.String()),
 		slog.Any("created_at", x.CreatedAt),

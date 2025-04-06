@@ -8,7 +8,6 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/action/otx"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/urfave/cli/v3"
@@ -96,7 +95,8 @@ func TestOTX(t *testing.T) {
 					}
 
 					gt.NoError(t, err)
-					gt.Value(t, resp.Rows[0]).Equal(tc.wantResp)
+					gt.NotEqual(t, resp, nil)
+					gt.Value(t, resp.Data["body"]).Equal(tc.wantResp)
 					return nil
 				},
 			}
@@ -148,8 +148,7 @@ func TestSendRequest(t *testing.T) {
 			})
 			gt.NoError(t, err)
 			gt.NotEqual(t, resp, nil)
-			gt.Equal(t, resp.Type, action.ResultTypeJSON)
-			gt.String(t, resp.Rows[0]).Contains(`"pulse_info"`)
+			gt.S(t, resp.Data["body"].(string)).Contains(`"pulse_info"`)
 			return nil
 		},
 	}
