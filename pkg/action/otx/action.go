@@ -8,15 +8,20 @@ import (
 	"net/http"
 	"net/url"
 
+	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/interfaces"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/action"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/urfave/cli/v3"
 )
 
 type Action struct {
 	apiKey  string
 	baseURL string
+}
+
+func (x *Action) Name() string {
+	return "otx"
 }
 
 func (x *Action) Flags() []cli.Flag {
@@ -39,35 +44,71 @@ func (x *Action) Flags() []cli.Flag {
 	}
 }
 
-func (x *Action) Spec() model.ActionSpec {
-	return model.ActionSpec{
-		Name:        "otx",
-		Description: "You can search the indicator from OTX. Set indicator type and value. You can choose one of the following types: domain, ipv4, ipv6, hostname, file_hash. You need to extract actual value from the alert data. Do not set field name",
-		Args: []model.ArgumentSpec{
-			{
-				Name:        "domain",
-				Type:        "string",
-				Description: "The domain to search",
+func (x *Action) Specs() []*genai.FunctionDeclaration {
+	return []*genai.FunctionDeclaration{
+		{
+			Name:        "otx.ipv4",
+			Description: "Search the indicator of IPv4 from OTX.",
+			Parameters: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"target": {
+						Type:        genai.TypeString,
+						Description: "The IPv4 address to search",
+					},
+				},
 			},
-			{
-				Name:        "ipv4",
-				Type:        "string",
-				Description: "The IPv4 address to search",
+		},
+		{
+			Name:        "otx.domain",
+			Description: "Search the indicator of domain from OTX.",
+			Parameters: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"target": {
+						Type:        genai.TypeString,
+						Description: "The domain to search",
+					},
+				},
 			},
-			{
-				Name:        "ipv6",
-				Type:        "string",
-				Description: "The IPv6 address to search",
+		},
+		{
+			Name:        "otx.ipv6",
+			Description: "Search the indicator of IPv6 from OTX.",
+			Parameters: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"target": {
+						Type:        genai.TypeString,
+						Description: "The IPv6 address to search",
+					},
+				},
 			},
-			{
-				Name:        "hostname",
-				Type:        "string",
-				Description: "The hostname to search",
+		},
+		{
+			Name:        "otx.hostname",
+			Description: "Search the indicator of hostname from OTX.",
+			Parameters: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"target": {
+						Type:        genai.TypeString,
+						Description: "The hostname to search",
+					},
+				},
 			},
-			{
-				Name:        "file_hash",
-				Type:        "string",
-				Description: "The file hash to search",
+		},
+		{
+			Name:        "otx.file_hash",
+			Description: "Search the indicator of file hash from OTX.",
+			Parameters: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"target": {
+						Type:        genai.TypeString,
+						Description: "The file hash to search",
+					},
+				},
 			},
 		},
 	}
@@ -82,7 +123,7 @@ func (x *Action) LogValue() slog.Value {
 
 func (x *Action) Configure(ctx context.Context) error {
 	if x.apiKey == "" {
-		return model.ErrActionUnavailable
+		return errs.ErrActionUnavailable
 	}
 	if _, err := url.Parse(x.baseURL); err != nil {
 		return goerr.Wrap(err, "invalid base URL", goerr.V("base_url", x.baseURL))
@@ -90,7 +131,7 @@ func (x *Action) Configure(ctx context.Context) error {
 	return nil
 }
 
-func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.LLMSession, args model.Arguments) (*model.ActionResult, error) {
+func (x *Action) Execute(ctx context.Context, name string, args map[string]any) (*action.Result, error) {
 	if x.apiKey == "" {
 		return nil, goerr.New("OTX API key is required")
 	}
@@ -98,25 +139,25 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 	client := &http.Client{}
 	var indicator, indicatorType string
 
-	// Determine which indicator type was provided
-	switch {
-	case args["domain"] != nil:
-		indicator = args["domain"].(string)
+	// Determine which indicator type was provided based on function name
+	switch name {
+	case "otx.domain":
+		indicator = args["target"].(string)
 		indicatorType = "domain"
-	case args["ipv4"] != nil:
-		indicator = args["ipv4"].(string)
+	case "otx.ipv4":
+		indicator = args["target"].(string)
 		indicatorType = "IPv4"
-	case args["ipv6"] != nil:
-		indicator = args["ipv6"].(string)
+	case "otx.ipv6":
+		indicator = args["target"].(string)
 		indicatorType = "IPv6"
-	case args["hostname"] != nil:
-		indicator = args["hostname"].(string)
+	case "otx.hostname":
+		indicator = args["target"].(string)
 		indicatorType = "hostname"
-	case args["file_hash"] != nil:
-		indicator = args["file_hash"].(string)
+	case "otx.file_hash":
+		indicator = args["target"].(string)
 		indicatorType = "file"
 	default:
-		return nil, goerr.New("no valid indicator provided")
+		return nil, goerr.New("invalid function name", goerr.V("name", name))
 	}
 
 	url := fmt.Sprintf("%s/indicators/%s/%s/general", x.baseURL, indicatorType, indicator)
@@ -145,9 +186,10 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 		return nil, goerr.Wrap(err, "failed to read response body")
 	}
 
-	return &model.ActionResult{
-		Message: fmt.Sprintf("OTX result for %s: %s", indicatorType, indicator),
-		Type:    model.ActionResultTypeJSON,
-		Data:    string(body),
+	return &action.Result{
+		Name: name,
+		Data: map[string]any{
+			"body": string(body),
+		},
 	}, nil
 }

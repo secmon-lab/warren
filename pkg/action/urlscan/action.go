@@ -1,22 +1,6 @@
 package urlscan
 
-import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"log/slog"
-	"net/http"
-	"net/url"
-	"strings"
-	"time"
-
-	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/interfaces"
-	"github.com/secmon-lab/warren/pkg/model"
-	"github.com/urfave/cli/v3"
-)
-
+/*
 type Action struct {
 	apiKey  string
 	baseURL string
@@ -53,7 +37,7 @@ func (x *Action) Flags() []cli.Flag {
 
 func (x *Action) Configure(ctx context.Context) error {
 	if x.apiKey == "" {
-		return model.ErrActionUnavailable
+		return errs.ErrActionUnavailable
 	}
 	if _, err := url.Parse(x.baseURL); err != nil {
 		return goerr.Wrap(err, "invalid base URL", goerr.V("base_url", x.baseURL))
@@ -70,11 +54,11 @@ func (x Action) LogValue() slog.Value {
 	)
 }
 
-func (x *Action) Spec() model.ActionSpec {
-	return model.ActionSpec{
+func (x *Action) Spec() action.ActionSpec {
+	return action.ActionSpec{
 		Name:        "urlscan",
 		Description: "Scan a URL with URLScan",
-		Args: []model.ArgumentSpec{
+		Args: []action.ArgumentSpec{
 			{
 				Name:        "url",
 				Type:        "string",
@@ -85,7 +69,7 @@ func (x *Action) Spec() model.ActionSpec {
 	}
 }
 
-func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.LLMSession, args model.Arguments) (*model.ActionResult, error) {
+func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.LLMSession, args action.Arguments) (*action.ActionResult, error) {
 	if err := x.Spec().Validate(args); err != nil {
 		return nil, err
 	}
@@ -146,9 +130,9 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 			if err != nil {
 				return nil, goerr.Wrap(err, "failed to read response body")
 			}
-			return &model.ActionResult{
+			return &action.ActionResult{
 				Message: "Scan result of " + url,
-				Type:    model.ActionResultTypeJSON,
+				Type:    action.ActionResultTypeJSON,
 				Data:    string(body),
 			}, nil
 		case http.StatusNotFound:
@@ -161,3 +145,4 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 
 	return nil, goerr.New("failed to get scan result")
 }
+*/

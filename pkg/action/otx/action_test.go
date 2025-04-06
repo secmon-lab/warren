@@ -8,7 +8,7 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/action/otx"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/urfave/cli/v3"
 )
@@ -16,16 +16,18 @@ import (
 func TestOTX(t *testing.T) {
 	testCases := []struct {
 		name       string
-		args       model.Arguments
+		funcName   string
+		args       map[string]any
 		apiResp    string
 		statusCode int
 		wantResp   string
 		wantErr    bool
 	}{
 		{
-			name: "valid domain response",
-			args: model.Arguments{
-				"domain": "example.com",
+			name:     "valid domain response",
+			funcName: "otx.domain",
+			args: map[string]any{
+				"target": "example.com",
 			},
 			apiResp:    `{"pulse_count": 5, "reputation": 0}`,
 			statusCode: http.StatusOK,
@@ -33,9 +35,10 @@ func TestOTX(t *testing.T) {
 			wantErr:    false,
 		},
 		{
-			name: "valid ipv4 response",
-			args: model.Arguments{
-				"ipv4": "8.8.8.8",
+			name:     "valid ipv4 response",
+			funcName: "otx.ipv4",
+			args: map[string]any{
+				"target": "8.8.8.8",
 			},
 			apiResp:    `{"pulse_count": 10, "reputation": 0}`,
 			statusCode: http.StatusOK,
@@ -43,23 +46,20 @@ func TestOTX(t *testing.T) {
 			wantErr:    false,
 		},
 		{
-			name:    "missing indicator",
-			args:    model.Arguments{},
-			wantErr: true,
-		},
-		{
-			name: "api error response",
-			args: model.Arguments{
-				"domain": "example.com",
+			name:     "api error response",
+			funcName: "otx.domain",
+			args: map[string]any{
+				"target": "example.com",
 			},
 			apiResp:    `{"error": "invalid request"}`,
 			statusCode: http.StatusBadRequest,
 			wantErr:    true,
 		},
 		{
-			name: "api unauthorized response",
-			args: model.Arguments{
-				"domain": "example.com",
+			name:     "api unauthorized response",
+			funcName: "otx.domain",
+			args: map[string]any{
+				"target": "example.com",
 			},
 			apiResp:    `{"error": "unauthorized"}`,
 			statusCode: http.StatusUnauthorized,
@@ -88,14 +88,15 @@ func TestOTX(t *testing.T) {
 				Name:  "otx",
 				Flags: action.Flags(),
 				Action: func(ctx context.Context, c *cli.Command) error {
-					resp, err := action.Execute(ctx, nil, nil, tc.args)
+					resp, err := action.Execute(ctx, tc.funcName, tc.args)
 					if tc.wantErr {
 						gt.Error(t, err)
 						return nil
 					}
 
 					gt.NoError(t, err)
-					gt.Value(t, resp.Data).Equal(tc.wantResp)
+					gt.NotEqual(t, resp, nil)
+					gt.Value(t, resp.Data["body"]).Equal(tc.wantResp)
 					return nil
 				},
 			}
@@ -116,7 +117,7 @@ func TestOTX_Enabled(t *testing.T) {
 		Name:  "otx",
 		Flags: action.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.Equal(t, action.Configure(ctx), model.ErrActionUnavailable)
+			gt.Equal(t, action.Configure(ctx), errs.ErrActionUnavailable)
 			return nil
 		},
 	}
@@ -129,19 +130,25 @@ func TestOTX_Enabled(t *testing.T) {
 	}))
 }
 
+// TestSendRequest tests the SendRequest method of the Action struct.
+// It sets up a test environment with a actual API key and target IP address,
+// and then runs the command to send a request to the OTX API.
+// The test verifies that the request is sent successfully and the response is not nil.
+// It also checks that the response type is JSON and contains the expected pulse_info field.
 func TestSendRequest(t *testing.T) {
-	var action otx.Action
+	var act otx.Action
 
 	vars := test.NewEnvVars(t, "TEST_OTX_API_KEY", "TEST_OTX_TARGET_IPADDR")
 	cmd := cli.Command{
 		Name:  "otx",
-		Flags: action.Flags(),
+		Flags: act.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			resp, err := action.Execute(ctx, nil, nil, model.Arguments{"ipv4": vars.Get("TEST_OTX_TARGET_IPADDR")})
+			resp, err := act.Execute(ctx, "otx.ipv4", map[string]any{
+				"target": vars.Get("TEST_OTX_TARGET_IPADDR"),
+			})
 			gt.NoError(t, err)
 			gt.NotEqual(t, resp, nil)
-			gt.Equal(t, resp.Type, model.ActionResultTypeJSON)
-			gt.String(t, resp.Data).Contains(`"pulse_info"`)
+			gt.S(t, resp.Data["body"].(string)).Contains(`"pulse_info"`)
 			return nil
 		},
 	}

@@ -6,7 +6,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/adapter/githubapp"
-	"github.com/secmon-lab/warren/pkg/service"
+	gha_svc "github.com/secmon-lab/warren/pkg/service/githubapp"
 	"github.com/urfave/cli/v3"
 )
 
@@ -97,7 +97,7 @@ func (c GitHubAppCfg) LogValue() slog.Value {
 	)
 }
 
-func (c GitHubAppCfg) Configure(ctx context.Context) (*service.GitHubApp, error) {
+func (c GitHubAppCfg) Configure(ctx context.Context) (*gha_svc.Service, error) {
 	if c.appID == 0 {
 		return nil, nil
 	}
@@ -111,7 +111,7 @@ func (c GitHubAppCfg) Configure(ctx context.Context) (*service.GitHubApp, error)
 		return nil, goerr.Wrap(err, "failed to create github app client")
 	}
 
-	svc := service.NewGitHubApp(appClient, service.GitHubAppConfig{
+	svc := gha_svc.New(appClient, gha_svc.Config{
 		Owner: c.owner,
 		Repo:  c.repo,
 
