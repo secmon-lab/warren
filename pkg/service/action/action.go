@@ -93,7 +93,7 @@ func (x *Service) Execute(ctx context.Context, name string, args map[string]any)
 		argsStr = append(argsStr, fmt.Sprintf("🔸 %s: `%s`", k, trimArgument(v)))
 	}
 
-	msg.Trace(ctx, "⚡ Exec: `%s` with %s", name, strings.Join(argsStr, " / "))
+	ctx = msg.Trace(ctx, "⚡ Exec: `%s` with %s", name, strings.Join(argsStr, " / "))
 	logger.Info("executing action", "name", name, "args", args)
 	return action.Execute(ctx, name, args)
 }

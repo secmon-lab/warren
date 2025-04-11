@@ -48,16 +48,7 @@ func Trace(ctx context.Context, base string, args ...any) context.Context {
 		}
 	}
 
-	// If there is a new Trace function, create a new Trace function
-	if v := ctx.Value(ctxNewTraceFuncKey{}); v != nil {
-		if newTrace, ok := v.(NewTraceFunc); ok && newTrace != nil {
-			TraceMsg := newTrace(ctx, msg)
-			return context.WithValue(ctx, ctxTraceFuncKey{}, TraceMsg)
-		}
-	}
-
-	// If there is no Trace function, nothing to do and return the context as is
-	return ctx
+	return NewTrace(ctx, base, args...)
 }
 
 func WithContext(original context.Context) context.Context {
