@@ -181,7 +181,7 @@ func TestServiceWith(t *testing.T) {
 			gt.NotNil(t, newSvc)
 
 			if tt.specCheck != nil {
-				tt.specCheck(t, newSvc.Specs())
+				tt.specCheck(t, newSvc.Tools())
 			}
 		})
 	}

@@ -37,7 +37,7 @@ func configureActions(ctx context.Context, actions []interfaces.Action) ([]inter
 			return nil, nil, goerr.Wrap(err, "failed to configure action", goerr.V("action", a.Name()))
 		}
 
-		for _, d := range a.Specs() {
+		for _, d := range a.Tools() {
 			if d.Name == "" {
 				return nil, nil, goerr.New("function name is required", goerr.V("action", a), goerr.V("declaration", d))
 			}
@@ -65,10 +65,10 @@ func New(ctx context.Context, actions []interfaces.Action) (*Service, error) {
 	return &Service{actions: configuredActions, route: routeMap}, nil
 }
 
-func (x *Service) Specs() []*genai.FunctionDeclaration {
+func (x *Service) Tools() []*genai.FunctionDeclaration {
 	var specs []*genai.FunctionDeclaration
 	for _, a := range x.actions {
-		specs = append(specs, a.Specs()...)
+		specs = append(specs, a.Tools()...)
 	}
 	return specs
 }

@@ -11,7 +11,7 @@ import (
 
 type Action interface {
 	Name() string
-	Specs() []*genai.FunctionDeclaration
+	Tools() []*genai.FunctionDeclaration
 	Execute(ctx context.Context, name string, args map[string]any) (*action.Result, error)
 	Flags() []cli.Flag
 	Configure(ctx context.Context) error

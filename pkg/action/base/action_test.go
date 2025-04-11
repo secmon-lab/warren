@@ -48,7 +48,7 @@ func TestBase(t *testing.T) {
 	baseAction := base.New(&interfaces.RepositoryMock{}, alerts, map[string]string{}, sessionID)
 
 	t.Run("alerts without pagination", func(t *testing.T) {
-		result, err := baseAction.Execute(ctx, "base.alerts", map[string]any{})
+		result, err := baseAction.Execute(ctx, "base.alerts.get", map[string]any{})
 		gt.NoError(t, err)
 		gt.Value(t, result.Name).Equal("base.alerts")
 		gt.Map(t, result.Data).HasKey("alerts")
@@ -56,7 +56,7 @@ func TestBase(t *testing.T) {
 	})
 
 	t.Run("alerts with limit", func(t *testing.T) {
-		result, err := baseAction.Execute(ctx, "base.alerts", map[string]any{
+		result, err := baseAction.Execute(ctx, "base.alerts.get", map[string]any{
 			"limit": float64(2),
 		})
 		gt.NoError(t, err)
@@ -66,7 +66,7 @@ func TestBase(t *testing.T) {
 	})
 
 	t.Run("alerts with offset", func(t *testing.T) {
-		result, err := baseAction.Execute(ctx, "base.alerts", map[string]any{
+		result, err := baseAction.Execute(ctx, "base.alerts.get", map[string]any{
 			"offset": float64(1),
 		})
 		gt.NoError(t, err)
@@ -76,7 +76,7 @@ func TestBase(t *testing.T) {
 	})
 
 	t.Run("alerts with offset beyond length", func(t *testing.T) {
-		result, err := baseAction.Execute(ctx, "base.alerts", map[string]any{
+		result, err := baseAction.Execute(ctx, "base.alerts.get", map[string]any{
 			"offset": float64(10),
 		})
 		gt.NoError(t, err)

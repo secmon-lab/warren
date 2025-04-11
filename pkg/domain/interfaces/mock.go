@@ -276,7 +276,7 @@ func (mock *ActionMock) NameCalls() []struct {
 }
 
 // Specs calls SpecsFunc.
-func (mock *ActionMock) Specs() []*genai.FunctionDeclaration {
+func (mock *ActionMock) Tools() []*genai.FunctionDeclaration {
 	callInfo := struct {
 	}{}
 	mock.lockSpecs.Lock()

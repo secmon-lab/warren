@@ -22,6 +22,21 @@ type Base struct {
 	policies  map[string]string
 }
 
+func getArg[T any](args map[string]any, key string) (T, error) {
+	var null T
+	val, ok := args[key]
+	if !ok {
+		return null, nil
+	}
+
+	typedVal, ok := val.(T)
+	if !ok {
+		return null, goerr.New("key is not a", goerr.V("key", key))
+	}
+
+	return typedVal, nil
+}
+
 func New(repo interfaces.Repository, alerts alert.Alerts, policies map[string]string, sessionID types.SessionID) *Base {
 	return &Base{
 		alerts:    alerts,
@@ -47,10 +62,10 @@ func (x *Base) LogValue() slog.Value {
 	return slog.GroupValue()
 }
 
-func (x *Base) Specs() []*genai.FunctionDeclaration {
+func (x *Base) Tools() []*genai.FunctionDeclaration {
 	return []*genai.FunctionDeclaration{
 		{
-			Name:        "base.alerts",
+			Name:        "base.alerts.get",
 			Description: "Get a set of alerts with pagination support",
 			Parameters: &genai.Schema{
 				Type: genai.TypeObject,
@@ -64,6 +79,34 @@ func (x *Base) Specs() []*genai.FunctionDeclaration {
 						Description: "Number of alerts to skip",
 					},
 				},
+			},
+		},
+		{
+			Name:        "base.alert.resolve",
+			Description: "Resolve the alert",
+			Parameters: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"alert_id": {
+						Type:        genai.TypeString,
+						Description: "The ID of the alert to resolve",
+					},
+					"conclusion": {
+						Type:        genai.TypeString,
+						Description: "The conclusion of the alert. Intended means the alert is intended, Unaffected means the alert is actual attack or vulnerability, but the system is not affected, FalsePositive is the alert is a false positive, TruePositive is the alert is a true positive.",
+						Enum: []string{
+							types.AlertConclusionIntended.String(),
+							types.AlertConclusionUnaffected.String(),
+							types.AlertConclusionFalsePositive.String(),
+							types.AlertConclusionTruePositive.String(),
+						},
+					},
+					"reason": {
+						Type:        genai.TypeString,
+						Description: "The reason of the conclusion",
+					},
+				},
+				Required: []string{"alert_id", "conclusion", "reason"},
 			},
 		},
 		{
@@ -118,20 +161,21 @@ func (x *Base) Specs() []*genai.FunctionDeclaration {
 }
 
 func (x *Base) Execute(ctx context.Context, name string, args map[string]any) (*action.Result, error) {
-	switch name {
-	case "base.alerts":
-		return x.getAlerts(ctx, args)
-	case "base.note.get":
-		return x.getNotes(ctx, args)
-	case "base.note.put":
-		return x.putNote(ctx, args)
-	case "base.policy.list":
-		return x.listPolicies(ctx, args)
-	case "base.policy.get":
-		return x.getPolicy(ctx, args)
-	default:
+	actionMap := map[string]func(context.Context, map[string]any) (*action.Result, error){
+		"base.alerts.get":    x.getAlerts,
+		"base.alert.resolve": x.resolveAlert,
+		"base.note.get":      x.getNotes,
+		"base.note.put":      x.putNote,
+		"base.policy.list":   x.listPolicies,
+		"base.policy.get":    x.getPolicy,
+	}
+
+	action, ok := actionMap[name]
+	if !ok {
 		return nil, goerr.New("unknown function", goerr.V("name", name))
 	}
+
+	return action(ctx, args)
 }
 
 func (x *Base) getAlerts(_ context.Context, args map[string]any) (*action.Result, error) {
@@ -174,6 +218,46 @@ func (x *Base) getAlerts(_ context.Context, args map[string]any) (*action.Result
 			"alerts": rows,
 		},
 	}, nil
+}
+
+func (x *Base) resolveAlert(ctx context.Context, args map[string]any) (*action.Result, error) {
+	strAlertID, err := getArg[string](args, "alert_id")
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get alert_id")
+	}
+	alertID := types.AlertID(strAlertID)
+
+	strConclusion, err := getArg[string](args, "conclusion")
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get conclusion")
+	}
+	conclusion := types.AlertConclusion(strConclusion)
+
+	reason, err := getArg[string](args, "reason")
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get reason")
+	}
+
+	if err := conclusion.Validate(); err != nil {
+		return nil, goerr.Wrap(err, "invalid conclusion", goerr.V("conclusion", strConclusion))
+	}
+
+	alert, err := x.repo.GetAlert(ctx, types.AlertID(alertID))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get alert")
+	}
+	if alert == nil {
+		return nil, goerr.New("alert not found", goerr.V("alert_id", alertID))
+	}
+
+	alert.Conclusion = types.AlertConclusion(conclusion)
+	alert.Reason = reason
+
+	if err := x.repo.PutAlert(ctx, *alert); err != nil {
+		return nil, goerr.Wrap(err, "failed to put alert")
+	}
+
+	return nil, nil
 }
 
 func (x *Base) putNote(ctx context.Context, args map[string]any) (*action.Result, error) {

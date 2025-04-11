@@ -136,7 +136,8 @@ func notify(ctx context.Context, msg string) {
 }
 
 func newTrace(ctx context.Context, msg string) func(ctx context.Context, msg string) {
+	fmt.Printf("<< %s >>\n", msg)
 	return func(ctx context.Context, msg string) {
-		fmt.Printf("  %s\n", msg)
+		fmt.Printf("%s\n", msg)
 	}
 }

@@ -15,7 +15,7 @@ const (
 )
 
 func (x *Service) buildStartTools() []*genai.FunctionDeclaration {
-	tools := x.action.Specs()
+	tools := x.action.Tools()
 	tools = append(tools, &genai.FunctionDeclaration{
 		Name:        ctrlActionResponse,
 		Description: "Respond to the user's message",

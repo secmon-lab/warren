@@ -44,7 +44,7 @@ const (
 )
 
 func (x *Service) buildActionTools(ctx context.Context) []*genai.FunctionDeclaration {
-	tools := x.action.Specs()
+	tools := x.action.Tools()
 	tools = append(tools, &genai.FunctionDeclaration{
 		Name:        ctrlCommandExit,
 		Description: "Finish the agent session and submit the final conclusion",
@@ -121,7 +121,6 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 			return goerr.Wrap(err, "failed to handle content")
 		}
 		if len(actionResult) == 0 {
-			msg.Trace(ctx, "⛔ No action executed")
 			return nil
 		}
 

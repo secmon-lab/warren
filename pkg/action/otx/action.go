@@ -44,7 +44,7 @@ func (x *Action) Flags() []cli.Flag {
 	}
 }
 
-func (x *Action) Specs() []*genai.FunctionDeclaration {
+func (x *Action) Tools() []*genai.FunctionDeclaration {
 	return []*genai.FunctionDeclaration{
 		{
 			Name:        "otx.ipv4",
