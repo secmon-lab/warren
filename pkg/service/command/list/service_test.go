@@ -5,7 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/gt"
+
+	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -29,7 +32,23 @@ func TestService_Run(t *testing.T) {
 	// Setup test data
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	svc := list.New(repo)
+	llm := &mock.LLMClientMock{
+		SendMessageFunc: func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
+			return &genai.GenerateContentResponse{
+				Candidates: []*genai.Candidate{
+					{
+						Content: &genai.Content{
+							Parts: []genai.Part{
+								genai.Text(`{"title": "test title", "description": "test description"}`),
+							},
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	svc := list.New(repo, llm)
 	slackService := slack_svc.NewTestService(t)
 	th, err := slackService.PostMessage(ctx, "test message")
 	gt.NoError(t, err).Required()

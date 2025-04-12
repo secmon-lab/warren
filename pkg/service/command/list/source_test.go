@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/command/list"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -84,12 +84,12 @@ func TestParseArgsToSource(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     []string
-		expected func(*interfaces.RepositoryMock)
+		expected func(*mock.RepositoryMock)
 	}{
 		{
 			name: "empty args returns last 24 hours",
 			args: []string{},
-			expected: func(m *interfaces.RepositoryMock) {
+			expected: func(m *mock.RepositoryMock) {
 				gt.Array(t, m.GetAlertsBySpanCalls()).Length(1)
 				gt.Value(t, m.GetAlertsBySpanCalls()[0].Begin).Equal(fixedTime.Add(-24 * time.Hour))
 				gt.Value(t, m.GetAlertsBySpanCalls()[0].End).Equal(fixedTime)
@@ -98,7 +98,7 @@ func TestParseArgsToSource(t *testing.T) {
 		{
 			name: "unresolved command",
 			args: []string{"unresolved"},
-			expected: func(m *interfaces.RepositoryMock) {
+			expected: func(m *mock.RepositoryMock) {
 				gt.Array(t, m.GetAlertsWithoutStatusCalls()).Length(1)
 				gt.Value(t, m.GetAlertsWithoutStatusCalls()[0].Status).Equal(types.AlertStatusResolved)
 			},
@@ -106,7 +106,7 @@ func TestParseArgsToSource(t *testing.T) {
 		{
 			name: "status command with multiple statuses",
 			args: []string{"status", "resolved", "acked"},
-			expected: func(m *interfaces.RepositoryMock) {
+			expected: func(m *mock.RepositoryMock) {
 				gt.Array(t, m.GetAlertsByStatusCalls()).Length(1)
 				gt.Value(t, m.GetAlertsByStatusCalls()[0].Status).Equal([]types.AlertStatus{types.AlertStatusResolved, types.AlertStatusAcknowledged})
 			},
@@ -114,7 +114,7 @@ func TestParseArgsToSource(t *testing.T) {
 		{
 			name: "between command with date range",
 			args: []string{"between", "2024-03-15", "2024-03-16"},
-			expected: func(m *interfaces.RepositoryMock) {
+			expected: func(m *mock.RepositoryMock) {
 				gt.Array(t, m.GetAlertsBySpanCalls()).Length(1)
 				gt.Value(t, m.GetAlertsBySpanCalls()[0].Begin).Equal(time.Date(2024, 3, 15, 0, 0, 0, 0, jst))
 				gt.Value(t, m.GetAlertsBySpanCalls()[0].End).Equal(time.Date(2024, 3, 16, 0, 0, 0, 0, jst))
@@ -123,7 +123,7 @@ func TestParseArgsToSource(t *testing.T) {
 		{
 			name: "after command with date",
 			args: []string{"after", "2024-03-15"},
-			expected: func(m *interfaces.RepositoryMock) {
+			expected: func(m *mock.RepositoryMock) {
 				gt.Array(t, m.GetAlertsBySpanCalls()).Length(1)
 				gt.Value(t, m.GetAlertsBySpanCalls()[0].Begin).Equal(time.Date(2024, 3, 15, 0, 0, 0, 0, jst))
 				gt.Value(t, m.GetAlertsBySpanCalls()[0].End).Equal(fixedTime)
@@ -132,7 +132,7 @@ func TestParseArgsToSource(t *testing.T) {
 		{
 			name: "since command with duration",
 			args: []string{"since", "1h"},
-			expected: func(m *interfaces.RepositoryMock) {
+			expected: func(m *mock.RepositoryMock) {
 				gt.Array(t, m.GetAlertsBySpanCalls()).Length(1)
 				gt.Value(t, m.GetAlertsBySpanCalls()[0].Begin).Equal(fixedTime.Add(-1 * time.Hour))
 				gt.Value(t, m.GetAlertsBySpanCalls()[0].End).Equal(fixedTime)
@@ -142,7 +142,7 @@ func TestParseArgsToSource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mock := &interfaces.RepositoryMock{}
+			mock := &mock.RepositoryMock{}
 			src, err := list.ParseArgsToSource(ctx, tt.args)
 			gt.NoError(t, err).Required()
 			gt.Value(t, src).NotNil()

@@ -16,11 +16,13 @@ import (
 
 type Service struct {
 	repo interfaces.Repository
+	llm  interfaces.LLMClient
 }
 
-func New(repo interfaces.Repository) *Service {
+func New(repo interfaces.Repository, llm interfaces.LLMClient) *Service {
 	return &Service{
 		repo: repo,
+		llm:  llm,
 	}
 }
 
@@ -96,17 +98,16 @@ func (x *Service) Run(ctx context.Context, th *svc.ThreadService, user *slack.Us
 		}
 	}
 
-	alertList := alert.NewList(ctx, slack.Thread{
+	alertList, err := CreateList(ctx, x.repo, x.llm, slack.Thread{
 		ChannelID: th.ChannelID(),
 		ThreadID:  th.ThreadID(),
 	}, user, alerts)
-
-	if err := x.repo.PutAlertList(ctx, alertList); err != nil {
+	if err != nil {
 		msg.Trace(ctx, "💥 Create alert list: %s", err)
 		return types.EmptyAlertListID, err
 	}
 
-	if err := th.PostAlertList(ctx, &alertList); err != nil {
+	if err := th.PostAlertList(ctx, alertList); err != nil {
 		msg.Trace(ctx, "💥 Post alert list: %s", err)
 		return types.EmptyAlertListID, err
 	}

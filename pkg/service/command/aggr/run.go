@@ -8,17 +8,15 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/service/llm"
+	"github.com/secmon-lab/warren/pkg/service/command/list"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-func Run(ctx context.Context, repo interfaces.Repository, slackThread *slack_svc.ThreadService, llmClient interfaces.LLMInquiry, user slack.User, alertIDs []types.AlertID, remaining string) error {
+func Run(ctx context.Context, repo interfaces.Repository, slackThread *slack_svc.ThreadService, llmClient interfaces.LLMClient, user slack.User, alertIDs []types.AlertID, remaining string) error {
 	ctx = msg.NewTrace(ctx, "🤖 Aggregating alerts...")
 
 	alerts, err := repo.BatchGetAlerts(ctx, alertIDs)
@@ -61,27 +59,12 @@ func Run(ctx context.Context, repo interfaces.Repository, slackThread *slack_svc
 
 	var lists []alert.List
 	for _, cluster := range clusters {
-		list := alert.NewList(ctx, threadModel, &user, cluster)
-
-		p, err := prompt.BuildMetaListPrompt(ctx, list)
+		newList, err := list.CreateList(ctx, repo, llmClient, threadModel, &user, cluster)
 		if err != nil {
-			return goerr.Wrap(err, "failed to build meta list prompt")
+			return goerr.Wrap(err, "failed to create alert list")
 		}
 
-		msg.Trace(ctx, "📝 Generating meta data for list: %s", list.ID)
-		resp, err := llm.Ask[prompt.MetaListPromptResult](ctx, llmClient, p)
-		if err != nil {
-			msg.Trace(ctx, "💥 failed meta data generation, skip")
-			errs.Handle(ctx, err)
-		} else {
-			list.Title = resp.Title
-			list.Description = resp.Description
-		}
-
-		if err := repo.PutAlertList(ctx, list); err != nil {
-			return goerr.Wrap(err, "failed to put alert list")
-		}
-		lists = append(lists, list)
+		lists = append(lists, *newList)
 	}
 
 	if err := slackThread.PostAlertClusters(ctx, lists); err != nil {

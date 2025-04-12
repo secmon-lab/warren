@@ -137,7 +137,7 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, th *slack_svc.Th
 
 	switch command {
 	case "list":
-		_, err := list.New(uc.repository).Run(ctx, th, &user, remaining)
+		_, err := list.New(uc.repository, uc.llmClient).Run(ctx, th, &user, remaining)
 		if err != nil {
 			return goerr.Wrap(err, "failed to run list command")
 		}

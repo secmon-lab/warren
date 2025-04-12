@@ -22,7 +22,7 @@ import (
 	"github.com/m-mizutani/opaq"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	slack_ctrl "github.com/secmon-lab/warren/pkg/controller/slack"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -38,7 +38,7 @@ var pubsubJSON []byte
 func TestValidateGoogleIDToken(t *testing.T) {
 	vars := test.NewEnvVars(t, "TEST_GOOGLE_ID_TOKEN", "TEST_GOOGLE_ID_TOKEN_EMAIL")
 
-	policyClient := &interfaces.PolicyClientMock{
+	policyClient := &mock.PolicyClientMock{
 		QueryFunc: func(ctx context.Context, s string, v1, v2 any, queryOptions ...opaq.QueryOption) error {
 			if s == "data.alert.test" {
 				return nil

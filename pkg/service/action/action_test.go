@@ -7,6 +7,7 @@ import (
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/service/action"
 )
 
@@ -20,7 +21,7 @@ func TestAction(t *testing.T) {
 		{
 			name: "success: action is configured correctly",
 			actions: []interfaces.Action{
-				&interfaces.ActionMock{
+				&mock.ActionMock{
 					NameFunc:      func() string { return "test" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
 					ToolsFunc:     func() []*genai.FunctionDeclaration { return nil },
@@ -30,7 +31,7 @@ func TestAction(t *testing.T) {
 		{
 			name: "error: empty action name",
 			actions: []interfaces.Action{
-				&interfaces.ActionMock{
+				&mock.ActionMock{
 					NameFunc:      func() string { return "" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
 					ToolsFunc:     func() []*genai.FunctionDeclaration { return nil },
@@ -44,12 +45,12 @@ func TestAction(t *testing.T) {
 		{
 			name: "error: duplicate function name",
 			actions: []interfaces.Action{
-				&interfaces.ActionMock{
+				&mock.ActionMock{
 					NameFunc:      func() string { return "test1" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
 					ToolsFunc:     func() []*genai.FunctionDeclaration { return []*genai.FunctionDeclaration{{Name: "func"}} },
 				},
-				&interfaces.ActionMock{
+				&mock.ActionMock{
 					NameFunc:      func() string { return "test2" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
 					ToolsFunc:     func() []*genai.FunctionDeclaration { return []*genai.FunctionDeclaration{{Name: "func"}} },
@@ -90,7 +91,7 @@ func TestServiceWith(t *testing.T) {
 		{
 			name: "success: add new action",
 			base: []interfaces.Action{
-				&interfaces.ActionMock{
+				&mock.ActionMock{
 					NameFunc:      func() string { return "base" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
 					ToolsFunc: func() []*genai.FunctionDeclaration {
@@ -99,7 +100,7 @@ func TestServiceWith(t *testing.T) {
 				},
 			},
 			new: []interfaces.Action{
-				&interfaces.ActionMock{
+				&mock.ActionMock{
 					NameFunc:      func() string { return "new" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
 					ToolsFunc: func() []*genai.FunctionDeclaration {
@@ -116,7 +117,7 @@ func TestServiceWith(t *testing.T) {
 		{
 			name: "error: duplicate function name between base and new",
 			base: []interfaces.Action{
-				&interfaces.ActionMock{
+				&mock.ActionMock{
 					NameFunc:      func() string { return "base" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
 					ToolsFunc: func() []*genai.FunctionDeclaration {
@@ -125,7 +126,7 @@ func TestServiceWith(t *testing.T) {
 				},
 			},
 			new: []interfaces.Action{
-				&interfaces.ActionMock{
+				&mock.ActionMock{
 					NameFunc:      func() string { return "new" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
 					ToolsFunc: func() []*genai.FunctionDeclaration {
@@ -141,7 +142,7 @@ func TestServiceWith(t *testing.T) {
 		{
 			name: "error: empty action name in new actions",
 			base: []interfaces.Action{
-				&interfaces.ActionMock{
+				&mock.ActionMock{
 					NameFunc:      func() string { return "base" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
 					ToolsFunc: func() []*genai.FunctionDeclaration {
@@ -150,7 +151,7 @@ func TestServiceWith(t *testing.T) {
 				},
 			},
 			new: []interfaces.Action{
-				&interfaces.ActionMock{
+				&mock.ActionMock{
 					NameFunc:      func() string { return "" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
 					ToolsFunc:     func() []*genai.FunctionDeclaration { return nil },

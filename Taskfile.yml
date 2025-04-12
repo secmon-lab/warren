@@ -45,14 +45,15 @@ tasks:
     desc: "Generate mock files for interfaces"
     cmds:
       - go tool moq
-        -out pkg/domain/interfaces/mock.go
-        -pkg interfaces
+        -out pkg/domain/mock/interfaces.go
+        -pkg mock
         -rm -skip-ensure -stub
         pkg/domain/interfaces
         Action
         SlackClient
         SlackThreadService
         LLMSession
+        LLMClient
         Repository
         PolicyClient
         EmbeddingClient

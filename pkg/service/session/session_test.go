@@ -8,6 +8,7 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/adapter/gemini"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/mock"
 	action_model "github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	session_model "github.com/secmon-lab/warren/pkg/domain/model/session"
@@ -35,7 +36,7 @@ func TestSessionChat(t *testing.T) {
 	ssn := session_model.New(ctx, &slack.User{}, &slack.Thread{}, []types.AlertID{target.ID})
 	geminiClient := gemini.NewTestClient(t)
 
-	threatInfoMock := &interfaces.ActionMock{
+	threatInfoMock := &mock.ActionMock{
 		NameFunc: func() string {
 			return "threat_info"
 		},
@@ -69,7 +70,7 @@ func TestSessionChat(t *testing.T) {
 		},
 	}
 
-	logServiceMock := &interfaces.ActionMock{
+	logServiceMock := &mock.ActionMock{
 		NameFunc: func() string {
 			return "log"
 		},
