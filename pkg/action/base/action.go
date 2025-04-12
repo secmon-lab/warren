@@ -9,14 +9,13 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/action"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/urfave/cli/v3"
 )
 
 type Base struct {
-	alerts    alert.Alerts
+	alertIDs  []types.AlertID
 	repo      interfaces.Repository
 	sessionID types.SessionID
 	policies  map[string]string
@@ -37,9 +36,9 @@ func getArg[T any](args map[string]any, key string) (T, error) {
 	return typedVal, nil
 }
 
-func New(repo interfaces.Repository, alerts alert.Alerts, policies map[string]string, sessionID types.SessionID) *Base {
+func New(repo interfaces.Repository, alertIDs []types.AlertID, policies map[string]string, sessionID types.SessionID) *Base {
 	return &Base{
-		alerts:    alerts,
+		alertIDs:  alertIDs,
 		repo:      repo,
 		sessionID: sessionID,
 		policies:  policies,
@@ -178,7 +177,7 @@ func (x *Base) Execute(ctx context.Context, name string, args map[string]any) (*
 	return action(ctx, args)
 }
 
-func (x *Base) getAlerts(_ context.Context, args map[string]any) (*action.Result, error) {
+func (x *Base) getAlerts(ctx context.Context, args map[string]any) (*action.Result, error) {
 	var limit, offset int64
 
 	if limitVal, ok := args["limit"].(float64); ok {
@@ -188,7 +187,10 @@ func (x *Base) getAlerts(_ context.Context, args map[string]any) (*action.Result
 		offset = int64(offsetVal)
 	}
 
-	alerts := x.alerts[:]
+	alerts, err := x.repo.BatchGetAlerts(ctx, x.alertIDs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get alerts")
+	}
 
 	// Apply pagination
 	if offset > 0 {

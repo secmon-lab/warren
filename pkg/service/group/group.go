@@ -11,13 +11,19 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-func Run(ctx context.Context, repo interfaces.Repository, th *slack_svc.ThreadService, llmClient interfaces.LLMInquiry, user slack.User, alerts alert.Alerts, remaining string) error {
+func Run(ctx context.Context, repo interfaces.Repository, slackThread *slack_svc.ThreadService, llmClient interfaces.LLMInquiry, user slack.User, alertIDs []types.AlertID, remaining string) error {
 	ctx = msg.NewTrace(ctx, "🤖 Grouping alerts...")
+
+	alerts, err := repo.BatchGetAlerts(ctx, alertIDs)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alerts")
+	}
 
 	args := strings.Fields(remaining)
 
@@ -47,8 +53,8 @@ func Run(ctx context.Context, repo interfaces.Repository, th *slack_svc.ThreadSe
 
 	var lists []alert.List
 	threadModel := slack.Thread{
-		ChannelID: th.ChannelID(),
-		ThreadID:  th.ThreadID(),
+		ChannelID: slackThread.ChannelID(),
+		ThreadID:  slackThread.ThreadID(),
 	}
 	for _, cluster := range clusters {
 		list := alert.NewList(ctx, threadModel, &user, cluster)
@@ -74,7 +80,7 @@ func Run(ctx context.Context, repo interfaces.Repository, th *slack_svc.ThreadSe
 		lists = append(lists, list)
 	}
 
-	if err := th.PostAlertClusters(ctx, lists); err != nil {
+	if err := slackThread.PostAlertClusters(ctx, lists); err != nil {
 		return goerr.Wrap(err, "failed to post alert clusters")
 	}
 

@@ -40,27 +40,28 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, 
 		return uc.handleSlackRootCommand(ctx, st, user, mention.Message)
 	}
 
-	var targetAlerts alert.Alerts
+	var targetAlertIDs []types.AlertID
+
 	// If session is not found, starting a new session based on existing alert or list
 	if v, err := uc.repository.GetAlertByThread(ctx, slackMsg.SlackThread()); err != nil {
 		return goerr.Wrap(err, "failed to get alert by slack thread")
 	} else if v != nil {
-		targetAlerts = alert.Alerts{v}
+		targetAlertIDs = []types.AlertID{v.ID}
 	}
 
 	if v, err := uc.repository.GetAlertListByThread(ctx, slackMsg.SlackThread()); err != nil {
 		return goerr.Wrap(err, "failed to get alert list by slack thread")
 	} else if v != nil {
-		targetAlerts = v.Alerts
+		targetAlertIDs = v.AlertIDs
 	}
 
-	if len(targetAlerts) == 0 {
+	if len(targetAlertIDs) == 0 {
 		msg.Notify(ctx, "🤔 No alerts found in the thread")
 		return nil
 	}
 
 	// If alerts are found, dispatch the action to the existing alerts
-	if err := uc.handleSlackInThreadCommand(ctx, st, user, targetAlerts, mention.Message); err == nil {
+	if err := uc.handleSlackInThreadCommand(ctx, st, user, targetAlertIDs, mention.Message); err == nil {
 		// If the command is handled, return nil
 		return nil
 	} else if err != errUnknownCommand {
@@ -74,10 +75,6 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, 
 		return goerr.Wrap(err, "failed to get session by slack thread")
 	}
 	if ssn == nil {
-		targetAlertIDs := []types.AlertID{}
-		for _, alert := range targetAlerts {
-			targetAlertIDs = append(targetAlertIDs, alert.ID)
-		}
 		ssn = session_model.New(ctx, &user, ptr.Ref(slackMsg.SlackThread()), targetAlertIDs)
 		if err := uc.repository.PutSession(ctx, *ssn); err != nil {
 			return goerr.Wrap(err, "failed to put session")
@@ -85,7 +82,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, 
 	}
 
 	// If session, alert and alert list are not found, call the command handler
-	baseAction := base.New(uc.repository, targetAlerts, uc.policyClient.Sources(), ssn.ID)
+	baseAction := base.New(uc.repository, targetAlertIDs, uc.policyClient.Sources(), ssn.ID)
 	actionService, err := uc.actionSvc.With(ctx, baseAction)
 	if err != nil {
 		return goerr.Wrap(err, "failed to create action service")
@@ -114,7 +111,7 @@ func messageToArgs(message string) (string, string) {
 	return strings.ToLower(strings.TrimSpace(args[0])), strings.TrimSpace(args[1])
 }
 
-func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack_svc.ThreadService, user slack.User, alerts alert.Alerts, message string) error {
+func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack_svc.ThreadService, user slack.User, alertIDs []types.AlertID, message string) error {
 	command, remaining := messageToArgs(message)
 	if command == "" {
 		return errUnknownCommand
@@ -122,7 +119,7 @@ func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack_sv
 
 	switch command {
 	case "group":
-		if err := group.Run(ctx, uc.repository, th, uc.llmClient, user, alerts, remaining); err != nil {
+		if err := group.Run(ctx, uc.repository, th, uc.llmClient, user, alertIDs, remaining); err != nil {
 			return goerr.Wrap(err, "failed to run group command")
 		}
 		return nil

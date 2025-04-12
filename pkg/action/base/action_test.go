@@ -7,9 +7,9 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/action/base"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/repository"
 )
 
 func TestBase(t *testing.T) {
@@ -44,8 +44,13 @@ func TestBase(t *testing.T) {
 		},
 	}
 
+	repo := repository.NewMemory()
+	gt.NoError(t, repo.PutAlert(ctx, *alerts[0]))
+	gt.NoError(t, repo.PutAlert(ctx, *alerts[1]))
+	gt.NoError(t, repo.PutAlert(ctx, *alerts[2]))
+
 	sessionID := types.NewSessionID()
-	baseAction := base.New(&interfaces.RepositoryMock{}, alerts, map[string]string{}, sessionID)
+	baseAction := base.New(repo, []types.AlertID{alerts[0].ID, alerts[1].ID, alerts[2].ID}, map[string]string{}, sessionID)
 
 	t.Run("alerts without pagination", func(t *testing.T) {
 		result, err := baseAction.Execute(ctx, "base.alerts.get", map[string]any{})
