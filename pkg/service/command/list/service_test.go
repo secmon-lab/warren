@@ -10,7 +10,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/service/list"
+	"github.com/secmon-lab/warren/pkg/service/command/list"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )

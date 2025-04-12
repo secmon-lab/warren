@@ -8,7 +8,7 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/service/list"
+	"github.com/secmon-lab/warren/pkg/service/command/list"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
 

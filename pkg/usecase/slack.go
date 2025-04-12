@@ -11,7 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/command/aggr"
-	"github.com/secmon-lab/warren/pkg/service/list"
+	"github.com/secmon-lab/warren/pkg/service/command/list"
 	session_svc "github.com/secmon-lab/warren/pkg/service/session"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
