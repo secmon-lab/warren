@@ -79,7 +79,10 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			embeddingClient := embeddingCfg.Configure()
+			embeddingClient, err := embeddingCfg.Configure()
+			if err != nil {
+				return err
+			}
 
 			if err := sentryCfg.Configure(); err != nil {
 				return err
