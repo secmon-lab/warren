@@ -842,6 +842,9 @@ func (mock *LLMSessionMock) SendMessageCalls() []struct {
 //
 //		// make and configure a mocked interfaces.LLMClient
 //		mockedLLMClient := &LLMClientMock{
+//			NewQueryFunc: func(options ...gemini.Option) interfaces.LLMQuery {
+//				panic("mock out the NewQuery method")
+//			},
 //			SendMessageFunc: func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
 //				panic("mock out the SendMessage method")
 //			},
@@ -855,6 +858,9 @@ func (mock *LLMSessionMock) SendMessageCalls() []struct {
 //
 //	}
 type LLMClientMock struct {
+	// NewQueryFunc mocks the NewQuery method.
+	NewQueryFunc func(options ...gemini.Option) interfaces.LLMQuery
+
 	// SendMessageFunc mocks the SendMessage method.
 	SendMessageFunc func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
 
@@ -863,6 +869,11 @@ type LLMClientMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// NewQuery holds details about calls to the NewQuery method.
+		NewQuery []struct {
+			// Options is the options argument value.
+			Options []gemini.Option
+		}
 		// SendMessage holds details about calls to the SendMessage method.
 		SendMessage []struct {
 			// Ctx is the ctx argument value.
@@ -876,8 +887,44 @@ type LLMClientMock struct {
 			Options []gemini.Option
 		}
 	}
+	lockNewQuery    sync.RWMutex
 	lockSendMessage sync.RWMutex
 	lockStartChat   sync.RWMutex
+}
+
+// NewQuery calls NewQueryFunc.
+func (mock *LLMClientMock) NewQuery(options ...gemini.Option) interfaces.LLMQuery {
+	callInfo := struct {
+		Options []gemini.Option
+	}{
+		Options: options,
+	}
+	mock.lockNewQuery.Lock()
+	mock.calls.NewQuery = append(mock.calls.NewQuery, callInfo)
+	mock.lockNewQuery.Unlock()
+	if mock.NewQueryFunc == nil {
+		var (
+			lLMQueryOut interfaces.LLMQuery
+		)
+		return lLMQueryOut
+	}
+	return mock.NewQueryFunc(options...)
+}
+
+// NewQueryCalls gets all the calls that were made to NewQuery.
+// Check the length with:
+//
+//	len(mockedLLMClient.NewQueryCalls())
+func (mock *LLMClientMock) NewQueryCalls() []struct {
+	Options []gemini.Option
+} {
+	var calls []struct {
+		Options []gemini.Option
+	}
+	mock.lockNewQuery.RLock()
+	calls = mock.calls.NewQuery
+	mock.lockNewQuery.RUnlock()
+	return calls
 }
 
 // SendMessage calls SendMessageFunc.

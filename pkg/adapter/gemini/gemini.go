@@ -61,7 +61,7 @@ func New(ctx context.Context, project string, opts ...Option) (*GeminiClient, er
 	return client, nil
 }
 
-func (x *GeminiClient) StartChat(options ...gemini.Option) interfaces.LLMSession {
+func (x *GeminiClient) newModel(options ...gemini.Option) (*genai.GenerativeModel, *gemini.Config) {
 	cfg := gemini.NewConfig(options...)
 
 	genaiModel := x.defaultModel
@@ -77,6 +77,20 @@ func (x *GeminiClient) StartChat(options ...gemini.Option) interfaces.LLMSession
 
 	model.Tools = cfg.Tools()
 	model.ToolConfig = cfg.ToolConfig()
+
+	return model, cfg
+}
+
+func (x *GeminiClient) NewQuery(options ...gemini.Option) interfaces.LLMQuery {
+	model, _ := x.newModel(options...)
+
+	return func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
+		return model.GenerateContent(ctx, msg...)
+	}
+}
+
+func (x *GeminiClient) StartChat(options ...gemini.Option) interfaces.LLMSession {
+	model, cfg := x.newModel(options...)
 
 	ssn := model.StartChat()
 	if history := cfg.History(); history != nil {

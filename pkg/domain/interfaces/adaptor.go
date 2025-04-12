@@ -11,6 +11,7 @@ import (
 
 type LLMClient interface {
 	StartChat(options ...gemini.Option) LLMSession
+	NewQuery(options ...gemini.Option) LLMQuery
 	LLMInquiry
 }
 
@@ -18,6 +19,8 @@ type LLMSession interface {
 	LLMInquiry
 	GetHistory() []*genai.Content
 }
+
+type LLMQuery func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
 
 type LLMInquiry interface {
 	SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
