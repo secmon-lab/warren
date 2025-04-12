@@ -53,12 +53,6 @@ Houses utility packages for logging, pointer handling, clock abstraction, etc.
 
 ---
 
-## Comment
-
-All comment in code must be in English.
-
----
-
 ## Architectural Characteristics
 
 - **Layered Architecture**: Separation between CLI/UI (`controller`, `cli`), application logic (`usecase`, `service`), and domain logic (`domain`, `repository`).
@@ -78,34 +72,30 @@ return goerr.Wrap(err, "failed something", goerr.V("args", args))
 
 # Testing
 
-## Test Style
+## Style for similar testing
 
-Use "Table Driven Test" Style like following:
+Use following Helper Driven Testing style instead of general Tatble Driven Test.
 
 ```go
 	type testCase struct {
-		args  []string
-		error string
+		input    string
+		expected string
 	}
-	runTest := func(tc testCase) func(*testing.T) {
+
+	runTest := func(tc testCase) func(t *testing.T) {
 		return func(t *testing.T) {
-			result, err := list.ParseArgsToSource(t.Context(), tc.args)
-			gt.Error(t, err).Contains(tc.error)
-			gt.Value(t, result).Nil()
+            actual := someFunc(tc.input)
+            gt.Equal(t, tc.expected, actual)
 		}
 	}
 
-	t.Run("invalid from command format", runTest(testCase{
-		args:  []string{"from", "2024-03-15"},
-		error: "unknown command",
-	}))
-	t.Run("invalid from command format", runTest(testCase{
-		args:  []string{"from", "2024-03-15"},
-		error: "unknown command",
-	}))
+	t.Run("success case", runTest(testCase{
+		input: "blue",
+        expected: "BLUE",
+    }))
 ```
 
-## Test Library
+## Test framework
 
 Use `github.com/m-mizutani/gt` package.
 
@@ -130,7 +120,13 @@ gt.Array(t, colors).Equal([]string{"red", "blue"}) // <- Pass
 gt.Array(t, colors).Has("orange")                 // <- Fail
 ```
 
-### Value
+### Usage
+
+In many cases, a developer does not care Go generics in using `gt`. However, a developer need to specify generic type (`Value`, `Array`, `Map`, `Error`, etc.) explicitly to use specific test functions for each types.
+
+See [reference](mdc:https:/pkg.go.dev/github.com/m-mizutani/gt) for more detail.
+
+#### Value
 
 Generic test type has a minimum set of test methods.
 
@@ -147,7 +143,7 @@ u1 := user{Name: "blue"}
 gt.Value(t, u1).Equal(user{Name:"blue"}) // Pass
 ```
 
-### Number
+#### Number
 
 Accepts only number types: `int`, `uint`, `int64`, `float64`, etc.
 
@@ -160,7 +156,7 @@ gt.Number(t, f).
     GreaterOrEqual(12.5) // Pass
 ```
 
-### Array
+#### Array
 
 Accepts array of any type not only primitive type but also struct.
 
@@ -175,10 +171,10 @@ gt.Array(t, colors).
     Has("yellow")                           // Pass
     Length(3)                                // Pass
 
-gt.Array(t, colors).Required().Has("orange") // Fail and stop test
+gt.Array(t, colors).Must().Has("orange") // Fail and stop test
 ```
 
-### Map
+#### Map
 
 ```go
 colorMap := map[string]int{
@@ -193,21 +189,5 @@ gt.Map(t, colorMap)
     // .HasValue("red")       // Compile error
     .HasKeyValue("yellow", 2) // Pass
 
-gt.Map(t, colorMap).Required().HasKey("orange") // Fail and stop test
+gt.Map(t, colorMap).Must().HasKey("orange") // Fail and stop test
 ```
-
-### Cast
-
-```go
-type user struct {
-    Name string
-}
-var v any = &user{
-    Name: "blue",
-}
-
-u1 := gt.Cast[user](mdc:t, v).NotNil()  // Fail (because v is *user, not user)
-gt.Cast[*user](mdc:t, v).Nil()          // Fail (because v is not nil)
-
-u2 := gt.Cast[*user](mdc:t, v).NotNil() // Pass
-gt.Value(t, u2.Name).Equal("blue")       // Pass
