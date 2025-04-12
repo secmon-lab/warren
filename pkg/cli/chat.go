@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/action/base"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	session_model "github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -23,6 +24,7 @@ func cmdChat() *cli.Command {
 		alertListID types.AlertListID
 		firestoreDB config.Firestore
 		geminiCfg   config.GeminiCfg
+		policyCfg   config.Policy
 	)
 
 	flags := joinFlags(
@@ -42,6 +44,7 @@ func cmdChat() *cli.Command {
 		},
 		firestoreDB.Flags(),
 		geminiCfg.Flags(),
+		policyCfg.Flags(),
 		actions.Flags(),
 	)
 
@@ -61,27 +64,53 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to configure gemini")
 			}
 
-			actionSvc, err := action.New(ctx, actions)
-			if err != nil {
-				return goerr.Wrap(err, "failed to configure action")
-			}
-
 			if (alertID == "") == (alertListID == "") {
 				return goerr.New("either alert-id or alert-list-id must be provided")
 			}
 
 			var alertIDs []types.AlertID
 			if alertID != "" {
+				alert, err := repo.GetAlert(ctx, alertID)
+				if err != nil {
+					return goerr.Wrap(err, "failed to get alert")
+				}
+
+				fmt.Printf("🔔 Alert Information:\n")
+				fmt.Printf("  📝 Title: %s\n", alert.Title)
+				fmt.Printf("  📋 Description: %s\n", alert.Description)
+				fmt.Printf("  🔍 Attributes:\n")
+				for _, attr := range alert.Attributes {
+					fmt.Printf("    - %s: %v\n", attr.Key, attr.Value)
+				}
+
 				alertIDs = []types.AlertID{alertID}
 			} else if alertListID != "" {
-				resp, err := repo.GetAlertList(ctx, alertListID)
+				list, err := repo.GetAlertList(ctx, alertListID)
 				if err != nil {
 					return goerr.Wrap(err, "failed to get alert list")
 				}
-				alertIDs = resp.AlertIDs
+
+				fmt.Printf("📋 Alert List Information:\n")
+				fmt.Printf("  📝 Title: %s\n", list.Title)
+				fmt.Printf("  📋 Description: %s\n", list.Description)
+				fmt.Printf("  🔢 Number of Alerts: %d\n", len(list.AlertIDs))
+
+				alertIDs = list.AlertIDs
+			}
+			fmt.Printf("\n")
+
+			policyClient, err := policyCfg.Configure()
+			if err != nil {
+				return goerr.Wrap(err, "failed to configure policy")
 			}
 
 			ssn := session_model.New(ctx, nil, nil, alertIDs)
+
+			actions = append(actions, base.New(repo, alertIDs, policyClient.Sources(), ssn.ID))
+			actionSvc, err := action.New(ctx, actions)
+			if err != nil {
+				return goerr.Wrap(err, "failed to configure action")
+			}
 
 			ssnSvc := session.New(repo, geminiClient, actionSvc, ssn)
 

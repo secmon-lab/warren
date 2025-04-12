@@ -59,14 +59,9 @@ func NewHistory(ctx context.Context, contents []*genai.Content) *History {
 					FuncCall: v,
 				})
 
-			case genai.FunctionCall:
+			case *genai.FunctionResponse:
 				parts = append(parts, Part{
-					FuncCall: &v,
-				})
-
-			case genai.FunctionResponse:
-				parts = append(parts, Part{
-					FuncResp: &v,
+					FuncResp: v,
 				})
 
 			default:

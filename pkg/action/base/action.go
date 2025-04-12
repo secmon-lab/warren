@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"strings"
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
@@ -11,6 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
 
@@ -331,20 +333,25 @@ func (x *Base) getNotes(ctx context.Context, args map[string]any) (*action.Resul
 	}, nil
 }
 
-func (x *Base) listPolicies(_ context.Context, _ map[string]any) (*action.Result, error) {
+func (x *Base) listPolicies(ctx context.Context, _ map[string]any) (*action.Result, error) {
 	var rows []string
 	for name := range x.policies {
 		rows = append(rows, name)
 	}
-	return &action.Result{
+
+	result := &action.Result{
 		Name: "base.policy.list",
 		Data: map[string]any{
-			"policies": rows,
+			"policies": strings.Join(rows, "\n"),
 		},
-	}, nil
+	}
+
+	logging.From(ctx).Debug("list policies", "policies", rows)
+
+	return result, nil
 }
 
-func (x *Base) getPolicy(_ context.Context, args map[string]any) (*action.Result, error) {
+func (x *Base) getPolicy(ctx context.Context, args map[string]any) (*action.Result, error) {
 	errResp := func(msg string) (*action.Result, error) {
 		return &action.Result{
 			Name: "base.policy.get",
@@ -369,10 +376,14 @@ func (x *Base) getPolicy(_ context.Context, args map[string]any) (*action.Result
 		return errResp("Policy not found")
 	}
 
-	return &action.Result{
+	result := &action.Result{
 		Name: "base.policy.get",
 		Data: map[string]any{
 			"policy": policy,
 		},
-	}, nil
+	}
+
+	logging.From(ctx).Debug("get policy", "policy", policy)
+
+	return result, nil
 }

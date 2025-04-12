@@ -59,6 +59,12 @@ func (x *Service) buildActionTools(ctx context.Context) []*genai.FunctionDeclara
 		},
 	})
 
+	var toolNames []string
+	for _, tool := range tools {
+		toolNames = append(toolNames, tool.Name)
+	}
+	logging.From(ctx).Debug("tools", "tools", toolNames)
+
 	return tools
 }
 
@@ -105,7 +111,7 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 		parts = append(parts, genai.Text(initPrompt))
 	}
 
-	parts = append(parts, genai.Text(message))
+	parts = append(parts, genai.Text("# Main instructions\n\n"+message))
 
 	const maxLoops = 32
 	var exit *action_model.Result
