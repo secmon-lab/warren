@@ -115,16 +115,20 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 		if err != nil {
 			return goerr.Wrap(err, "failed to send message")
 		}
+		parts = nil
 
 		actionResult, err := x.handleCandidates(ctx, resp.Candidates)
 		if err != nil {
-			return goerr.Wrap(err, "failed to handle content")
-		}
-		if len(actionResult) == 0 {
+			msg.Trace(ctx, "😵 failed to handle content: %s", err.Error())
+			parts = append(parts, genai.FunctionResponse{
+				Name:     ctrlCommandExit,
+				Response: map[string]any{"error_message": err.Error()},
+			})
+		} else if len(actionResult) == 0 {
+			// If no action is executed, it means the model is not able to handle the input
 			return nil
 		}
 
-		parts = nil
 		for _, result := range actionResult {
 			parts = append(parts, genai.FunctionResponse{
 				Name:     result.Name,
