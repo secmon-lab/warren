@@ -23,7 +23,7 @@ func TestAction(t *testing.T) {
 				&interfaces.ActionMock{
 					NameFunc:      func() string { return "test" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
-					SpecsFunc:     func() []*genai.FunctionDeclaration { return nil },
+					ToolsFunc:     func() []*genai.FunctionDeclaration { return nil },
 				},
 			},
 		},
@@ -33,7 +33,7 @@ func TestAction(t *testing.T) {
 				&interfaces.ActionMock{
 					NameFunc:      func() string { return "" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
-					SpecsFunc:     func() []*genai.FunctionDeclaration { return nil },
+					ToolsFunc:     func() []*genai.FunctionDeclaration { return nil },
 				},
 			},
 			wantErr: true,
@@ -47,12 +47,12 @@ func TestAction(t *testing.T) {
 				&interfaces.ActionMock{
 					NameFunc:      func() string { return "test1" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
-					SpecsFunc:     func() []*genai.FunctionDeclaration { return []*genai.FunctionDeclaration{{Name: "func"}} },
+					ToolsFunc:     func() []*genai.FunctionDeclaration { return []*genai.FunctionDeclaration{{Name: "func"}} },
 				},
 				&interfaces.ActionMock{
 					NameFunc:      func() string { return "test2" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
-					SpecsFunc:     func() []*genai.FunctionDeclaration { return []*genai.FunctionDeclaration{{Name: "func"}} },
+					ToolsFunc:     func() []*genai.FunctionDeclaration { return []*genai.FunctionDeclaration{{Name: "func"}} },
 				},
 			},
 			wantErr: true,
@@ -93,7 +93,7 @@ func TestServiceWith(t *testing.T) {
 				&interfaces.ActionMock{
 					NameFunc:      func() string { return "base" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
-					SpecsFunc: func() []*genai.FunctionDeclaration {
+					ToolsFunc: func() []*genai.FunctionDeclaration {
 						return []*genai.FunctionDeclaration{{Name: "base.func"}}
 					},
 				},
@@ -102,7 +102,7 @@ func TestServiceWith(t *testing.T) {
 				&interfaces.ActionMock{
 					NameFunc:      func() string { return "new" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
-					SpecsFunc: func() []*genai.FunctionDeclaration {
+					ToolsFunc: func() []*genai.FunctionDeclaration {
 						return []*genai.FunctionDeclaration{{Name: "new.func"}}
 					},
 				},
@@ -119,7 +119,7 @@ func TestServiceWith(t *testing.T) {
 				&interfaces.ActionMock{
 					NameFunc:      func() string { return "base" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
-					SpecsFunc: func() []*genai.FunctionDeclaration {
+					ToolsFunc: func() []*genai.FunctionDeclaration {
 						return []*genai.FunctionDeclaration{{Name: "func"}}
 					},
 				},
@@ -128,7 +128,7 @@ func TestServiceWith(t *testing.T) {
 				&interfaces.ActionMock{
 					NameFunc:      func() string { return "new" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
-					SpecsFunc: func() []*genai.FunctionDeclaration {
+					ToolsFunc: func() []*genai.FunctionDeclaration {
 						return []*genai.FunctionDeclaration{{Name: "func"}}
 					},
 				},
@@ -144,7 +144,7 @@ func TestServiceWith(t *testing.T) {
 				&interfaces.ActionMock{
 					NameFunc:      func() string { return "base" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
-					SpecsFunc: func() []*genai.FunctionDeclaration {
+					ToolsFunc: func() []*genai.FunctionDeclaration {
 						return []*genai.FunctionDeclaration{{Name: "base.func"}}
 					},
 				},
@@ -153,7 +153,7 @@ func TestServiceWith(t *testing.T) {
 				&interfaces.ActionMock{
 					NameFunc:      func() string { return "" },
 					ConfigureFunc: func(ctx context.Context) error { return nil },
-					SpecsFunc:     func() []*genai.FunctionDeclaration { return nil },
+					ToolsFunc:     func() []*genai.FunctionDeclaration { return nil },
 				},
 			},
 			wantErr: true,

@@ -637,3 +637,27 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+func (r *Firestore) SearchAlerts(ctx context.Context, path, op string, value any) (alert.Alerts, error) {
+	iter := r.db.Collection(collectionAlerts).Where(path, op, value).Documents(ctx)
+
+	var alerts alert.Alerts
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next alert")
+		}
+
+		var alert alert.Alert
+		if err := doc.DataTo(&alert); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert")
+		}
+
+		alerts = append(alerts, &alert)
+	}
+
+	return alerts, nil
+}

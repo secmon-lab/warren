@@ -17,6 +17,7 @@ type Repository interface {
 	GetAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error)
 	PutAlertComment(ctx context.Context, comment alert.AlertComment) error
 	GetAlertComments(ctx context.Context, alertID types.AlertID) ([]alert.AlertComment, error)
+	SearchAlerts(ctx context.Context, path, op string, value any) (alert.Alerts, error)
 
 	// For chat
 	GetLatestHistory(ctx context.Context, sessionID types.SessionID) (*session.History, error)

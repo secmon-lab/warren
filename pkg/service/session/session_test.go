@@ -39,7 +39,7 @@ func TestSessionChat(t *testing.T) {
 		NameFunc: func() string {
 			return "threat_info"
 		},
-		SpecsFunc: func() []*genai.FunctionDeclaration {
+		ToolsFunc: func() []*genai.FunctionDeclaration {
 			return []*genai.FunctionDeclaration{
 				{
 					Name:        "threat_info.ipv4",
@@ -73,7 +73,7 @@ func TestSessionChat(t *testing.T) {
 		NameFunc: func() string {
 			return "log"
 		},
-		SpecsFunc: func() []*genai.FunctionDeclaration {
+		ToolsFunc: func() []*genai.FunctionDeclaration {
 			return []*genai.FunctionDeclaration{
 				{
 					Name:        "log.user",

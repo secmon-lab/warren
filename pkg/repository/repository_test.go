@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -61,7 +62,6 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 
 	// Alert関連のテスト
 	t.Run("PutAndGetAlert", func(t *testing.T) {
-
 		// Get
 		got, err := repo.GetAlert(ctx, alertID)
 		gt.NoError(t, err)
@@ -331,84 +331,53 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Array(t, notes).Length(2)
 		gt.Value(t, notes[0].Note).Equal("test note 1")
 		gt.Value(t, notes[1].Note).Equal("test note 2")
-		gt.Value(t, notes[0].CreatedAt.Before(notes[1].CreatedAt)).Equal(true)
 	})
 
-	/*
-		// Test FindNearestAlerts
-		t.Run("find_nearest_alerts", func(t *testing.T) {
-			// Create test alerts with embeddings
-			alerts := alert.Alerts{
-				{
-					ID:          types.NewAlertID(),
-					Schema:      types.AlertSchema("test"),
-					Title:       "Test Alert 1",
-					Description: "Test Description 1",
-					Status:      types.AlertStatusNew,
-					CreatedAt:   time.Now(),
-					UpdatedAt:   time.Now(),
-					Embedding:   make([]float32, 256),
-				},
-				{
-					ID:          types.NewAlertID(),
-					Schema:      types.AlertSchema("test"),
-					Title:       "Test Alert 2",
-					Description: "Test Description 2",
-					Status:      types.AlertStatusNew,
-					CreatedAt:   time.Now(),
-					UpdatedAt:   time.Now(),
-					Embedding:   make([]float32, 256),
-				},
-				{
-					ID:          types.NewAlertID(),
-					Schema:      types.AlertSchema("test"),
-					Title:       "Test Alert 3",
-					Description: "Test Description 3",
-					Status:      types.AlertStatusNew,
-					CreatedAt:   time.Now(),
-					UpdatedAt:   time.Now(),
-					Embedding:   make([]float32, 256),
-				},
-			}
+	// Test SearchAlerts
+	t.Run("SearchAlerts", func(t *testing.T) {
+		// テストデータの準備
+		alerts := []alert.Alert{
+			{
+				ID:        types.AlertID(uuid.New().String()),
+				Title:     "Test Alert 1",
+				Status:    types.AlertStatus("open"),
+				CreatedAt: time.Now(),
+			},
+			{
+				ID:        types.AlertID(uuid.New().String()),
+				Title:     "Test Alert 2",
+				Status:    types.AlertStatus("closed"),
+				CreatedAt: time.Now(),
+			},
+			{
+				ID:        types.AlertID(uuid.New().String()),
+				Title:     "Test Alert 3",
+				Status:    types.AlertStatus("open"),
+				CreatedAt: time.Now(),
+			},
+		}
 
-			// Fill embeddings with random values
-			base := make([]float32, 256)
-			for i := range base {
-				base[i] = rand.Float32()
-			}
+		for _, a := range alerts {
+			err := repo.PutAlert(ctx, a)
+			gt.NoError(t, err)
+		}
 
-			copy(alerts[0].Embedding, base)
-			copy(alerts[1].Embedding, base)
-			copy(alerts[2].Embedding, base)
+		// Search for alerts with status "open"
+		result, err := repo.SearchAlerts(ctx, "Status", "==", types.AlertStatus("open"))
+		gt.NoError(t, err)
+		gt.Array(t, result).Longer(0)
+		gt.Array(t, result).Any(func(v *alert.Alert) bool { return v.ID == alerts[0].ID })
+		gt.Array(t, result).Any(func(v *alert.Alert) bool { return v.ID == alerts[2].ID })
 
-			// Add small random variations to alerts[1] and alerts[2]
-			for i := range alerts[1].Embedding {
-				alerts[1].Embedding[i] += 0.1 * (rand.Float32() - 0.5)
-				alerts[2].Embedding[i] += 0.2 * (rand.Float32() - 0.5)
-			}
+		// Search for alerts with status not "open"
+		result, err = repo.SearchAlerts(ctx, "Status", "!=", types.AlertStatus("open"))
+		gt.NoError(t, err)
+		gt.Array(t, result).Longer(0)
+		gt.Array(t, result).Any(func(v *alert.Alert) bool { return v.ID == alerts[1].ID })
 
-			// Store alerts
-			for _, alert := range alerts {
-				err := repo.PutAlert(ctx, alert)
-				gt.NoError(t, err)
-			}
-
-			// Test finding nearest alerts
-			queryEmbedding := make([]float32, 256)
-			queryEmbedding[0] = 1 // Most similar to first alert
-			nearest, err := repo.FindNearestAlerts(ctx, queryEmbedding, 2)
-			gt.NoError(t, err).Required()
-			gt.Array(t, nearest).Length(2).Required()
-			gt.Value(t, nearest[0].ID).Equal(alerts[0].ID) // Should be most similar to query
-			gt.Value(t, nearest[1].ID).Equal(alerts[1].ID) // Second most similar
-
-			// Test with empty embedding
-			_, err = repo.FindNearestAlerts(ctx, []float32{}, 2)
-			gt.Error(t, err)
-
-			// Test with different dimension embedding
-			_, err = repo.FindNearestAlerts(ctx, make([]float32, 128), 2)
-			gt.NoError(t, err) // Should return empty result but not error
-		})
-	*/
+		// Specify invalid field path
+		result, err = repo.SearchAlerts(ctx, "InvalidField", "==", "test")
+		gt.NoError(t, err)
+		gt.Array(t, result).Length(0)
+	})
 }

@@ -41,8 +41,8 @@ import (
 //			NameFunc: func() string {
 //				panic("mock out the Name method")
 //			},
-//			SpecsFunc: func() []*genai.FunctionDeclaration {
-//				panic("mock out the Specs method")
+//			ToolsFunc: func() []*genai.FunctionDeclaration {
+//				panic("mock out the Tools method")
 //			},
 //		}
 //
@@ -66,8 +66,8 @@ type ActionMock struct {
 	// NameFunc mocks the Name method.
 	NameFunc func() string
 
-	// SpecsFunc mocks the Specs method.
-	SpecsFunc func() []*genai.FunctionDeclaration
+	// ToolsFunc mocks the Tools method.
+	ToolsFunc func() []*genai.FunctionDeclaration
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -94,8 +94,8 @@ type ActionMock struct {
 		// Name holds details about calls to the Name method.
 		Name []struct {
 		}
-		// Specs holds details about calls to the Specs method.
-		Specs []struct {
+		// Tools holds details about calls to the Tools method.
+		Tools []struct {
 		}
 	}
 	lockConfigure sync.RWMutex
@@ -103,7 +103,7 @@ type ActionMock struct {
 	lockFlags     sync.RWMutex
 	lockLogValue  sync.RWMutex
 	lockName      sync.RWMutex
-	lockSpecs     sync.RWMutex
+	lockTools     sync.RWMutex
 }
 
 // Configure calls ConfigureFunc.
@@ -275,33 +275,33 @@ func (mock *ActionMock) NameCalls() []struct {
 	return calls
 }
 
-// Specs calls SpecsFunc.
+// Tools calls ToolsFunc.
 func (mock *ActionMock) Tools() []*genai.FunctionDeclaration {
 	callInfo := struct {
 	}{}
-	mock.lockSpecs.Lock()
-	mock.calls.Specs = append(mock.calls.Specs, callInfo)
-	mock.lockSpecs.Unlock()
-	if mock.SpecsFunc == nil {
+	mock.lockTools.Lock()
+	mock.calls.Tools = append(mock.calls.Tools, callInfo)
+	mock.lockTools.Unlock()
+	if mock.ToolsFunc == nil {
 		var (
 			functionDeclarationsOut []*genai.FunctionDeclaration
 		)
 		return functionDeclarationsOut
 	}
-	return mock.SpecsFunc()
+	return mock.ToolsFunc()
 }
 
-// SpecsCalls gets all the calls that were made to Specs.
+// ToolsCalls gets all the calls that were made to Tools.
 // Check the length with:
 //
-//	len(mockedAction.SpecsCalls())
-func (mock *ActionMock) SpecsCalls() []struct {
+//	len(mockedAction.ToolsCalls())
+func (mock *ActionMock) ToolsCalls() []struct {
 } {
 	var calls []struct {
 	}
-	mock.lockSpecs.RLock()
-	calls = mock.calls.Specs
-	mock.lockSpecs.RUnlock()
+	mock.lockTools.RLock()
+	calls = mock.calls.Tools
+	mock.lockTools.RUnlock()
 	return calls
 }
 
@@ -909,6 +909,9 @@ func (mock *LLMSessionMock) SendMessageCalls() []struct {
 //			PutSessionFunc: func(ctx context.Context, sessionMoqParam session.Session) error {
 //				panic("mock out the PutSession method")
 //			},
+//			SearchAlertsFunc: func(ctx context.Context, path string, op string, value any) (alert.Alerts, error) {
+//				panic("mock out the SearchAlerts method")
+//			},
 //		}
 //
 //		// use mockedRepository in code that requires Repository
@@ -984,6 +987,9 @@ type RepositoryMock struct {
 
 	// PutSessionFunc mocks the PutSession method.
 	PutSessionFunc func(ctx context.Context, sessionMoqParam session.Session) error
+
+	// SearchAlertsFunc mocks the SearchAlerts method.
+	SearchAlertsFunc func(ctx context.Context, path string, op string, value any) (alert.Alerts, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -1156,6 +1162,17 @@ type RepositoryMock struct {
 			// SessionMoqParam is the sessionMoqParam argument value.
 			SessionMoqParam session.Session
 		}
+		// SearchAlerts holds details about calls to the SearchAlerts method.
+		SearchAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Path is the path argument value.
+			Path string
+			// Op is the op argument value.
+			Op string
+			// Value is the value argument value.
+			Value any
+		}
 	}
 	lockBatchGetAlerts             sync.RWMutex
 	lockBatchUpdateAlertStatus     sync.RWMutex
@@ -1180,6 +1197,7 @@ type RepositoryMock struct {
 	lockPutNote                    sync.RWMutex
 	lockPutPolicyDiff              sync.RWMutex
 	lockPutSession                 sync.RWMutex
+	lockSearchAlerts               sync.RWMutex
 }
 
 // BatchGetAlerts calls BatchGetAlertsFunc.
@@ -2107,6 +2125,54 @@ func (mock *RepositoryMock) PutSessionCalls() []struct {
 	mock.lockPutSession.RLock()
 	calls = mock.calls.PutSession
 	mock.lockPutSession.RUnlock()
+	return calls
+}
+
+// SearchAlerts calls SearchAlertsFunc.
+func (mock *RepositoryMock) SearchAlerts(ctx context.Context, path string, op string, value any) (alert.Alerts, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		Path  string
+		Op    string
+		Value any
+	}{
+		Ctx:   ctx,
+		Path:  path,
+		Op:    op,
+		Value: value,
+	}
+	mock.lockSearchAlerts.Lock()
+	mock.calls.SearchAlerts = append(mock.calls.SearchAlerts, callInfo)
+	mock.lockSearchAlerts.Unlock()
+	if mock.SearchAlertsFunc == nil {
+		var (
+			alertsOut alert.Alerts
+			errOut    error
+		)
+		return alertsOut, errOut
+	}
+	return mock.SearchAlertsFunc(ctx, path, op, value)
+}
+
+// SearchAlertsCalls gets all the calls that were made to SearchAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.SearchAlertsCalls())
+func (mock *RepositoryMock) SearchAlertsCalls() []struct {
+	Ctx   context.Context
+	Path  string
+	Op    string
+	Value any
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Path  string
+		Op    string
+		Value any
+	}
+	mock.lockSearchAlerts.RLock()
+	calls = mock.calls.SearchAlerts
+	mock.lockSearchAlerts.RUnlock()
 	return calls
 }
 

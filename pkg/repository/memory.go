@@ -279,3 +279,73 @@ func (r *Memory) PutNote(ctx context.Context, note *session.Note) error {
 	r.notes[note.SessionID] = append(r.notes[note.SessionID], note)
 	return nil
 }
+
+func (r *Memory) SearchAlerts(ctx context.Context, path, op string, value any) (alert.Alerts, error) {
+	var alerts alert.Alerts
+
+	for _, a := range r.alerts {
+		var match bool
+
+		switch path {
+		case "Status":
+			status, ok := value.(types.AlertStatus)
+			if !ok {
+				return nil, goerr.New("invalid status type", goerr.V("value", value))
+			}
+			switch op {
+			case "==":
+				match = a.Status == status
+			case "!=":
+				match = a.Status != status
+			default:
+				return nil, goerr.New("unsupported operator for status", goerr.V("op", op))
+			}
+
+		case "Title":
+			title, ok := value.(string)
+			if !ok {
+				return nil, goerr.New("invalid title type", goerr.V("value", value))
+			}
+			switch op {
+			case "==":
+				match = a.Title == title
+			case "!=":
+				match = a.Title != title
+			default:
+				return nil, goerr.New("unsupported operator for title", goerr.V("op", op))
+			}
+
+		case "CreatedAt":
+			createdAt, ok := value.(time.Time)
+			if !ok {
+				return nil, goerr.New("invalid created_at type", goerr.V("value", value))
+			}
+			switch op {
+			case "==":
+				match = a.CreatedAt.Equal(createdAt)
+			case "!=":
+				match = !a.CreatedAt.Equal(createdAt)
+			case ">":
+				match = a.CreatedAt.After(createdAt)
+			case "<":
+				match = a.CreatedAt.Before(createdAt)
+			case ">=":
+				match = a.CreatedAt.After(createdAt) || a.CreatedAt.Equal(createdAt)
+			case "<=":
+				match = a.CreatedAt.Before(createdAt) || a.CreatedAt.Equal(createdAt)
+			default:
+				return nil, goerr.New("unsupported operator for created_at", goerr.V("op", op))
+			}
+
+		default:
+			// 未知のフィールドパスの場合は空の結果を返す
+			continue
+		}
+
+		if match {
+			alerts = append(alerts, &a)
+		}
+	}
+
+	return alerts, nil
+}
