@@ -96,9 +96,9 @@ func (x *History) ToContents() []*genai.Content {
 			case len(part.Blob) > 0:
 				parts[j] = genai.Blob{Data: part.Blob}
 			case part.FuncCall != nil:
-				parts[j] = *part.FuncCall
+				parts[j] = part.FuncCall
 			case part.FuncResp != nil:
-				parts[j] = *part.FuncResp
+				parts[j] = part.FuncResp
 			}
 		}
 		contents[i] = &genai.Content{Role: content.Role, Parts: parts}
