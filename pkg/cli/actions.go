@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/secmon-lab/warren/pkg/action/otx"
+	"github.com/secmon-lab/warren/pkg/action/urlscan"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/urfave/cli/v3"
 )
@@ -11,7 +12,7 @@ import (
 type actionList []interfaces.Action
 
 var actions = actionList{
-	// &urlscan.Action{},
+	&urlscan.Action{},
 	&otx.Action{},
 	// &bigquery.Action{},
 }
