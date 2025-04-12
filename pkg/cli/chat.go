@@ -117,7 +117,11 @@ func recvInput() (string, error) {
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to set raw mode")
 	}
-	defer term.Restore(int(os.Stdin.Fd()), oldState)
+	defer func() {
+		if err := term.Restore(int(os.Stdin.Fd()), oldState); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to restore terminal: %v\n", err)
+		}
+	}()
 
 	t := term.NewTerminal(os.Stdin, "")
 	msg, err := t.ReadLine()

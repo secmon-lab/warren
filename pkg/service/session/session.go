@@ -17,12 +17,12 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
 	"github.com/secmon-lab/warren/pkg/service/action"
-	"github.com/secmon-lab/warren/pkg/service/slack"
 )
 
 type Service struct {
-	repo   interfaces.Repository
-	slack  *slack.Service
+	repo interfaces.Repository
+	// slack is reserved for future use when Slack integration is implemented
+	// slack  *slack.Service
 	llm    interfaces.LLMClient
 	action *action.Service
 	ssn    *session.Session
