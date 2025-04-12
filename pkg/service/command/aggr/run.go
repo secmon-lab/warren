@@ -1,4 +1,4 @@
-package group
+package aggr
 
 import (
 	"context"
@@ -14,11 +14,12 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
 func Run(ctx context.Context, repo interfaces.Repository, slackThread *slack_svc.ThreadService, llmClient interfaces.LLMInquiry, user slack.User, alertIDs []types.AlertID, remaining string) error {
-	ctx = msg.NewTrace(ctx, "🤖 Grouping alerts...")
+	ctx = msg.NewTrace(ctx, "🤖 Aggregating alerts...")
 
 	alerts, err := repo.BatchGetAlerts(ctx, alertIDs)
 	if err != nil {
@@ -49,13 +50,16 @@ func Run(ctx context.Context, repo interfaces.Repository, slackThread *slack_svc
 		topN = v
 	}
 
+	logging.From(ctx).Debug("Starting group", "threshold", threshold, "topN", topN, "alerts", len(alerts))
+
 	clusters := alert.ClusterAlerts(ctx, alerts, threshold, topN)
 
-	var lists []alert.List
 	threadModel := slack.Thread{
 		ChannelID: slackThread.ChannelID(),
 		ThreadID:  slackThread.ThreadID(),
 	}
+
+	var lists []alert.List
 	for _, cluster := range clusters {
 		list := alert.NewList(ctx, threadModel, &user, cluster)
 

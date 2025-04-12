@@ -159,5 +159,22 @@ func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert alert.Alert
 		}
 	}
 
+	// Calcluating embedding for the alert
+	if uc.embeddingClient == nil {
+		panic("embedding client is not set")
+	}
+	rawData, err := json.Marshal(alert.Data)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to marshal alert data")
+	}
+	embedding, err := uc.embeddingClient.Embeddings(ctx, []string{string(rawData)}, 256)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to embed alert data")
+	}
+	if len(embedding) == 0 {
+		return nil, goerr.New("failed to embed alert data")
+	}
+	alert.Embedding = embedding[0]
+
 	return &alert, nil
 }

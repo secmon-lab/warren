@@ -10,7 +10,7 @@ import (
 	session_model "github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/service/group"
+	"github.com/secmon-lab/warren/pkg/service/command/aggr"
 	"github.com/secmon-lab/warren/pkg/service/list"
 	session_svc "github.com/secmon-lab/warren/pkg/service/session"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
@@ -118,9 +118,9 @@ func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack_sv
 	}
 
 	switch command {
-	case "group":
-		if err := group.Run(ctx, uc.repository, th, uc.llmClient, user, alertIDs, remaining); err != nil {
-			return goerr.Wrap(err, "failed to run group command")
+	case "aggr", "aggregate":
+		if err := aggr.Run(ctx, uc.repository, th, uc.llmClient, user, alertIDs, remaining); err != nil {
+			return goerr.Wrap(err, "failed to run aggregate command")
 		}
 		return nil
 
