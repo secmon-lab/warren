@@ -1,10 +1,31 @@
 package urlscan
 
-/*
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+
+	"cloud.google.com/go/vertexai/genai"
+	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/model/action"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/urfave/cli/v3"
+)
+
 type Action struct {
 	apiKey  string
 	baseURL string
 	backoff time.Duration
+}
+
+func (x *Action) Name() string {
+	return "urlscan"
 }
 
 func (x *Action) Flags() []cli.Flag {
@@ -35,18 +56,25 @@ func (x *Action) Flags() []cli.Flag {
 	}
 }
 
-func (x *Action) Configure(ctx context.Context) error {
-	if x.apiKey == "" {
-		return errs.ErrActionUnavailable
+func (x *Action) Tools() []*genai.FunctionDeclaration {
+	return []*genai.FunctionDeclaration{
+		{
+			Name:        "urlscan.scan",
+			Description: "Scan a URL with URLScan",
+			Parameters: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"url": {
+						Type:        genai.TypeString,
+						Description: "The URL to scan",
+					},
+				},
+			},
+		},
 	}
-	if _, err := url.Parse(x.baseURL); err != nil {
-		return goerr.Wrap(err, "invalid base URL", goerr.V("base_url", x.baseURL))
-	}
-
-	return nil
 }
 
-func (x Action) LogValue() slog.Value {
+func (x *Action) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.Int("api_key.len", len(x.apiKey)),
 		slog.String("base_url", x.baseURL),
@@ -54,24 +82,23 @@ func (x Action) LogValue() slog.Value {
 	)
 }
 
-func (x *Action) Spec() action.ActionSpec {
-	return action.ActionSpec{
-		Name:        "urlscan",
-		Description: "Scan a URL with URLScan",
-		Args: []action.ArgumentSpec{
-			{
-				Name:        "url",
-				Type:        "string",
-				Description: "The URL to scan",
-				Required:    true,
-			},
-		},
+func (x *Action) Configure(ctx context.Context) error {
+	if x.apiKey == "" {
+		return errs.ErrActionUnavailable
 	}
+	if _, err := url.Parse(x.baseURL); err != nil {
+		return goerr.Wrap(err, "invalid base URL", goerr.V("base_url", x.baseURL))
+	}
+	return nil
 }
 
-func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadService, ssn interfaces.LLMSession, args action.Arguments) (*action.ActionResult, error) {
-	if err := x.Spec().Validate(args); err != nil {
-		return nil, err
+func (x *Action) Execute(ctx context.Context, name string, args map[string]any) (*action.Result, error) {
+	if x.apiKey == "" {
+		return nil, goerr.New("URLScan API key is required")
+	}
+
+	if name != "urlscan.scan" {
+		return nil, goerr.New("invalid function name", goerr.V("name", name))
 	}
 
 	url, ok := args["url"].(string)
@@ -96,7 +123,9 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, goerr.New("failed to scan URL", goerr.V("status_code", resp.StatusCode), goerr.V("body", string(body)))
+		return nil, goerr.New("failed to scan URL",
+			goerr.V("status_code", resp.StatusCode),
+			goerr.V("body", string(body)))
 	}
 
 	var result struct {
@@ -130,19 +159,21 @@ func (x *Action) Execute(ctx context.Context, slack interfaces.SlackThreadServic
 			if err != nil {
 				return nil, goerr.Wrap(err, "failed to read response body")
 			}
-			return &action.ActionResult{
-				Message: "Scan result of " + url,
-				Type:    action.ActionResultTypeJSON,
-				Data:    string(body),
+			return &action.Result{
+				Name: name,
+				Data: map[string]any{
+					"body": string(body),
+				},
 			}, nil
 		case http.StatusNotFound:
 			continue
 		default:
 			body, _ := io.ReadAll(resp.Body)
-			return nil, goerr.New("failed to get scan result", goerr.V("status_code", resp.StatusCode), goerr.V("body", string(body)))
+			return nil, goerr.New("failed to get scan result",
+				goerr.V("status_code", resp.StatusCode),
+				goerr.V("body", string(body)))
 		}
 	}
 
 	return nil, goerr.New("failed to get scan result")
 }
-*/
