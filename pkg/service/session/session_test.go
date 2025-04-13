@@ -7,6 +7,7 @@ import (
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/adapter/gemini"
+	"github.com/secmon-lab/warren/pkg/adapter/storage"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	action_model "github.com/secmon-lab/warren/pkg/domain/model/action"
@@ -60,7 +61,7 @@ func TestSessionChat(t *testing.T) {
 				Name: "threat_info.ipv4",
 				Data: map[string]any{
 					"message": "Threat info about 103.243.25.70",
-					"rows": []string{
+					"rows": []any{
 						"IP reputation: malicious",
 						"Country: United States",
 						"ASN: AS15169",
@@ -97,7 +98,7 @@ func TestSessionChat(t *testing.T) {
 				Name: "log.user",
 				Data: map[string]any{
 					"message": "User logs",
-					"rows": []string{
+					"rows": []any{
 						"2021-01-01 12:00:00: login from 10.0.2.3",
 						"2021-01-01 12:00:01: login from 103.243.25.70",
 					},
@@ -109,7 +110,13 @@ func TestSessionChat(t *testing.T) {
 	actionService, err := action.New(ctx, []interfaces.Action{threatInfoMock, logServiceMock})
 	gt.NoError(t, err)
 
-	svc := session.New(repo, geminiClient, actionService, ssn)
+	clients := interfaces.NewClients(
+		interfaces.WithRepository(repo),
+		interfaces.WithLLMClient(geminiClient),
+		interfaces.WithStorageClient(storage.NewMock()),
+	)
+
+	svc := session.New(clients, actionService, ssn)
 
 	err = svc.Chat(ctx, "How about risk of the alert?")
 	gt.NoError(t, err)

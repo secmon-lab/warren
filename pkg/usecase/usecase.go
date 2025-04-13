@@ -19,6 +19,7 @@ type UseCases struct {
 	llmClient       interfaces.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
+	storageClient   interfaces.StorageClient
 	policyClient    interfaces.PolicyClient
 	githubApp       *githubapp.Service
 	actionSvc       *action.Service
@@ -59,6 +60,12 @@ func WithEmbeddingClient(embeddingClient interfaces.EmbeddingClient) Option {
 func WithPolicyClient(policyClient interfaces.PolicyClient) Option {
 	return func(u *UseCases) {
 		u.policyClient = policyClient
+	}
+}
+
+func WithStorageClient(storageClient interfaces.StorageClient) Option {
+	return func(u *UseCases) {
+		u.storageClient = storageClient
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/adapter/gemini"
 	model "github.com/secmon-lab/warren/pkg/domain/model/gemini"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 func TestGeminiClient(t *testing.T) {
@@ -24,7 +25,7 @@ func TestGeminiClient(t *testing.T) {
 	history := ssn.GetHistory()
 	gt.A(t, history).Longer(0)
 
-	historyModel := session.NewHistory(ctx, history)
+	historyModel := session.NewHistory(ctx, types.NewSessionID(), history)
 
 	newSsn := client.StartChat(model.WithHistory(historyModel))
 

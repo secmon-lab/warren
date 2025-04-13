@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -21,20 +20,22 @@ func TestClient(t *testing.T) {
 	prefix := os.Getenv("TEST_STORAGE_PREFIX") + "test-" + time.Now().Format("20060102150405")
 
 	ctx := context.Background()
-	client, err := New(ctx)
+	client, err := New(ctx, bucket, prefix)
 	gt.NoError(t, err)
 	defer client.Close(ctx)
 
-	objectName := prefix + "/test.txt"
+	objectName := "test.txt"
 	testData := []byte("test data")
 
 	t.Run("PutObject", func(t *testing.T) {
-		err := client.PutObject(ctx, bucket, objectName, bytes.NewReader(testData))
-		gt.NoError(t, err)
+		w := client.PutObject(ctx, objectName)
+		_, err := w.Write(testData)
+		gt.NoError(t, err).Required()
+		gt.NoError(t, w.Close())
 	})
 
 	t.Run("GetObject", func(t *testing.T) {
-		rc, err := client.GetObject(ctx, bucket, objectName)
+		rc, err := client.GetObject(ctx, objectName)
 		gt.NoError(t, err)
 		defer rc.Close()
 
@@ -44,8 +45,38 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("GetObject not found", func(t *testing.T) {
-		_, err := client.GetObject(ctx, bucket, "non-existent-object")
+		_, err := client.GetObject(ctx, "non-existent-object")
 		gt.Error(t, err)
 		gt.True(t, errors.Is(err, storage.ErrObjectNotExist))
+	})
+
+	t.Run("PutObject with different prefix", func(t *testing.T) {
+		// Create a client with a different prefix
+		otherPrefix := prefix + "other"
+		otherClient, err := New(ctx, bucket, otherPrefix)
+		gt.NoError(t, err)
+		defer otherClient.Close(ctx)
+
+		objectName := "prefix_test.txt"
+
+		// Save object with different prefix
+		w := otherClient.PutObject(ctx, objectName)
+		_, err = w.Write(testData)
+		gt.NoError(t, err).Required()
+		gt.NoError(t, w.Close())
+
+		// Verify object not found in original client
+		_, err = client.GetObject(ctx, objectName)
+		gt.Error(t, err)
+		gt.True(t, errors.Is(err, storage.ErrObjectNotExist))
+
+		// Verify object found in other client
+		rc, err := otherClient.GetObject(ctx, objectName)
+		gt.NoError(t, err)
+		defer rc.Close()
+
+		data, err := io.ReadAll(rc)
+		gt.NoError(t, err)
+		gt.Array(t, data).Equal(testData)
 	})
 }

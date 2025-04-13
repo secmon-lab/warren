@@ -37,8 +37,8 @@ type PolicyClient interface {
 }
 
 type StorageClient interface {
-	PutObject(ctx context.Context, bucket, object string, r io.Reader) error
-	GetObject(ctx context.Context, bucket, object string) (io.ReadCloser, error)
+	PutObject(ctx context.Context, object string) io.WriteCloser
+	GetObject(ctx context.Context, object string) (io.ReadCloser, error)
 	Close(ctx context.Context)
 }
 

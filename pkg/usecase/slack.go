@@ -6,6 +6,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/action/base"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	session_model "github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -88,7 +89,12 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, 
 		return goerr.Wrap(err, "failed to create action service")
 	}
 
-	svc := session_svc.New(uc.repository, uc.llmClient, actionService, ssn)
+	clients := interfaces.NewClients(
+		interfaces.WithRepository(uc.repository),
+		interfaces.WithLLMClient(uc.llmClient),
+		interfaces.WithStorageClient(uc.storageClient),
+	)
+	svc := session_svc.New(clients, actionService, ssn)
 	if err := svc.Chat(ctx, mention.Message); err != nil {
 		return goerr.Wrap(err, "failed to run session")
 	}

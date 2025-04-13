@@ -13,9 +13,12 @@ import (
 )
 
 type History struct {
-	ID        types.HistoryID `json:"id"`
-	CreatedAt time.Time       `json:"created_at"`
-	Contents  Contents        `json:"contents"`
+	ID        types.HistoryID `firestore:"id" json:"id"`
+	SessionID types.SessionID `firestore:"session_id" json:"session_id"`
+	CreatedAt time.Time       `firestore:"created_at" json:"created_at"`
+
+	// Contents is not stored in Firestore because it will be too large.
+	Contents Contents `firestore:"-" json:"contents"`
 }
 
 type Content struct {
@@ -32,9 +35,10 @@ type Part struct {
 	FuncResp *genai.FunctionResponse `json:"func_resp"`
 }
 
-func NewHistory(ctx context.Context, contents []*genai.Content) *History {
+func NewHistory(ctx context.Context, sessionID types.SessionID, contents []*genai.Content) *History {
 	history := &History{
 		ID:        types.NewHistoryID(),
+		SessionID: sessionID,
 		CreatedAt: clock.Now(ctx),
 		Contents:  make(Contents, 0, len(contents)),
 	}

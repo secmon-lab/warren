@@ -9,6 +9,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/action/base"
 	"github.com/secmon-lab/warren/pkg/cli/config"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	session_model "github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/action"
@@ -25,6 +26,7 @@ func cmdChat() *cli.Command {
 		firestoreDB config.Firestore
 		geminiCfg   config.GeminiCfg
 		policyCfg   config.Policy
+		storageCfg  config.Storage
 	)
 
 	flags := joinFlags(
@@ -45,6 +47,7 @@ func cmdChat() *cli.Command {
 		firestoreDB.Flags(),
 		geminiCfg.Flags(),
 		policyCfg.Flags(),
+		storageCfg.Flags(),
 		actions.Flags(),
 	)
 
@@ -62,6 +65,11 @@ func cmdChat() *cli.Command {
 			geminiClient, err := geminiCfg.Configure(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to configure gemini")
+			}
+
+			storageClient, err := storageCfg.Configure(ctx)
+			if err != nil {
+				return goerr.Wrap(err, "failed to configure storage")
 			}
 
 			if (alertID == "") == (alertListID == "") {
@@ -112,7 +120,12 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to configure action")
 			}
 
-			ssnSvc := session.New(repo, geminiClient, actionSvc, ssn)
+			clients := interfaces.NewClients(
+				interfaces.WithRepository(repo),
+				interfaces.WithLLMClient(geminiClient),
+				interfaces.WithStorageClient(storageClient),
+			)
+			ssnSvc := session.New(clients, actionSvc, ssn)
 
 			ctx = msg.With(ctx, notify, newTrace)
 

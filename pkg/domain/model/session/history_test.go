@@ -7,6 +7,7 @@ import (
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 func TestHistory(t *testing.T) {
@@ -20,11 +21,12 @@ func TestHistory(t *testing.T) {
 
 	runTest := func(tc testCase) func(t *testing.T) {
 		return func(t *testing.T) {
-			history := session.NewHistory(ctx, tc.input)
+			history := session.NewHistory(ctx, types.NewSessionID(), tc.input)
 
 			// Exclude ID and CreatedAt from comparison as they are generated at runtime
 			tc.expected.ID = history.ID
 			tc.expected.CreatedAt = history.CreatedAt
+			tc.expected.SessionID = history.SessionID
 
 			gt.Value(t, history).Equal(tc.expected)
 

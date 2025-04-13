@@ -20,20 +20,16 @@ import (
 )
 
 type Service struct {
-	repo interfaces.Repository
-	// slack is reserved for future use when Slack integration is implemented
-	// slack  *slack.Service
-	llm    interfaces.LLMClient
-	action *action.Service
-	ssn    *session.Session
+	clients *interfaces.Clients
+	action  *action.Service
+	ssn     *session.Session
 }
 
-func New(repository interfaces.Repository, llmClient interfaces.LLMClient, actionService *action.Service, ssn *session.Session) *Service {
+func New(clients *interfaces.Clients, actionService *action.Service, ssn *session.Session) *Service {
 	svc := &Service{
-		repo:   repository,
-		llm:    llmClient,
-		action: actionService,
-		ssn:    ssn,
+		clients: clients,
+		action:  actionService,
+		ssn:     ssn,
 	}
 
 	return svc
@@ -72,7 +68,7 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 	logger := logging.From(ctx)
 
 	// Restore history if exists
-	histroy, err := x.repo.GetLatestHistory(ctx, x.ssn.ID)
+	histroy, err := x.getHistory(ctx, x.ssn.ID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get latest history")
 	}
@@ -80,7 +76,7 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 	logger.Debug("got history", "history", histroy, "session", x.ssn)
 
 	// If history is empty, need to initialize the session
-	llmSession := x.llm.StartChat(
+	llmSession := x.clients.LLM().StartChat(
 		gemini.WithHistory(histroy),
 		gemini.WithContentType("text/plain"),
 		gemini.WithTools([]*genai.Tool{{
@@ -89,8 +85,8 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 	)
 
 	defer func() {
-		newHistory := session.NewHistory(ctx, llmSession.GetHistory())
-		if err := x.repo.PutHistory(ctx, x.ssn.ID, newHistory); err != nil {
+		newHistory := session.NewHistory(ctx, x.ssn.ID, llmSession.GetHistory())
+		if err := x.putHistory(ctx, newHistory); err != nil {
 			errs.Handle(ctx, err)
 			msg.Notify(ctx, "⚠️ Failed to save chat history")
 		}
@@ -98,7 +94,7 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 
 	var parts []genai.Part
 	if histroy == nil {
-		alerts, err := x.repo.BatchGetAlerts(ctx, x.ssn.AlertIDs)
+		alerts, err := x.clients.Repository().BatchGetAlerts(ctx, x.ssn.AlertIDs)
 		if err != nil {
 			return goerr.Wrap(err, "failed to get alerts")
 		}

@@ -28,6 +28,7 @@ func cmdServe() *cli.Command {
 		testDataCfg  config.TestData
 		embeddingCfg config.EmbeddingCfg
 		githubAppCfg config.GitHubAppCfg
+		storageCfg   config.Storage
 	)
 
 	flags := joinFlags(
@@ -50,6 +51,7 @@ func cmdServe() *cli.Command {
 		actions.Flags(),
 		embeddingCfg.Flags(),
 		githubAppCfg.Flags(),
+		storageCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -67,6 +69,7 @@ func cmdServe() *cli.Command {
 				"embedding", embeddingCfg,
 				"firestore", firestoreCfg,
 				"testdata", testDataCfg,
+				"storage", storageCfg,
 			)
 
 			policyClient, err := policyCfg.Configure()
