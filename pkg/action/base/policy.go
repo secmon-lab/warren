@@ -2,7 +2,6 @@ package base
 
 import (
 	"context"
-	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/action"
@@ -10,7 +9,7 @@ import (
 )
 
 func (x *Base) listPolicies(ctx context.Context, _ map[string]any) (*action.Result, error) {
-	var rows []string
+	var rows []any
 	for name := range x.policies {
 		rows = append(rows, name)
 	}
@@ -18,7 +17,7 @@ func (x *Base) listPolicies(ctx context.Context, _ map[string]any) (*action.Resu
 	result := &action.Result{
 		Name: "base.policy.list",
 		Data: map[string]any{
-			"policies": strings.Join(rows, "\n"),
+			"policies": rows,
 		},
 	}
 
