@@ -12,12 +12,15 @@ import (
 
 func genClient(t *testing.T) *embedding.Gemini {
 	vars := test.NewEnvVars(t, "TEST_GEMINI_PROJECT_ID", "TEST_GEMINI_LOCATION")
-	return embedding.NewGemini(
+	client, err := embedding.NewGemini(
 		vars.Get("TEST_GEMINI_PROJECT_ID"),
 		embedding.WithLocation(vars.Get("TEST_GEMINI_LOCATION")),
 		embedding.WithModelName("text-embedding-004"),
 	)
+	gt.NoError(t, err)
+	return client
 }
+
 func TestGemini(t *testing.T) {
 	gemini := genClient(t)
 

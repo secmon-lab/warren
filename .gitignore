@@ -24,4 +24,10 @@ go.work.sum
 # env file
 .env
 
+# metadata for github.com/go-task/task
+/.task
+
+# temp files
 /tmp
+/.vscode
+

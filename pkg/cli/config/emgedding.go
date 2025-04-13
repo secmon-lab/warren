@@ -3,8 +3,9 @@ package config
 import (
 	"log/slog"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/adapter/embedding"
-	"github.com/secmon-lab/warren/pkg/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/urfave/cli/v3"
 )
 
@@ -50,14 +51,13 @@ func (x EmbeddingCfg) LogValue() slog.Value {
 	)
 }
 
-func (x *EmbeddingCfg) Configure() interfaces.EmbeddingClient {
+func (x *EmbeddingCfg) Configure() (interfaces.EmbeddingClient, error) {
 	if x.projectID == "" {
-		return nil
+		return nil, goerr.New("projectID is required")
 	}
 
-	client := embedding.NewGemini(x.projectID,
+	return embedding.NewGemini(x.projectID,
 		embedding.WithLocation(x.location),
 		embedding.WithModelName(x.model),
 	)
-	return client
 }

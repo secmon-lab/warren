@@ -1,7 +1,64 @@
 ---
-description: Rule for Go coding
+description: 
 globs: *.go
+alwaysApply: false
 ---
+# Repository Architecture
+
+This repository is structured with a clear separation of concerns following a layered, domain-driven design architecture, primarily written in Go. It appears to be designed for a CLI and HTTP-based application that integrates with multiple external services and systems (e.g., Slack, GitHub, BigQuery).
+
+## Root Directory
+
+- **`main.go`**: Entry point of the application.
+- **`Dockerfile`**: Containerization setup.
+- **`Taskfile.yml`**: Task automation (likely used for building, testing, etc.).
+- **`README.md`, `LICENSE`, `doc/`**: Documentation and licensing.
+
+---
+
+## `pkg/` - Core Application Logic
+
+This is the central directory that holds all core components of the application. It is organized into the following sub-packages:
+
+### 1. **`action/`**
+Contains implementations of specific actions or integrations with external services (e.g., BigQuery, OTX, URLScan). Each action has its own subpackage with dedicated logic, tests, and sometimes test data.
+
+### 2. **`adapter/`**
+Implements adapters for external systems (e.g., embedding APIs like Gemini, GitHub App). This is part of a clean architecture approach to abstract dependencies.
+
+### 3. **`cli/`**
+Contains the command-line interface logic, configuration parsing, and CLI-specific helpers.
+
+### 4. **`controller/`**
+Implements interface layers, such as HTTP and Slack handlers. This layer handles incoming requests and calls appropriate services or use cases.
+
+### 5. **`domain/`**
+This is the heart of the business logic:
+- `interfaces/`: Defines interfaces for actions, adapters, repositories.
+- `model/`: Domain models organized by context (e.g., alert, policy, slack).
+- `prompt/`: Handles structured prompts and schema used in LLM integrations.
+- `types/`: Shared domain-specific types.
+
+### 6. **`repository/`**
+Provides implementations of data storage mechanisms, such as Firestore or in-memory stores.
+
+### 7. **`service/`**
+Contains business logic that coordinates domain models and repositories. Divided by functionality (e.g., action, alert, session, logic for ignore policies, Slack integration).
+
+### 8. **`usecase/`**
+Implements application use cases. This layer coordinates services to fulfill specific workflows like alert handling or Slack-based interactions.
+
+### 9. **`utils/`**
+Houses utility packages for logging, pointer handling, clock abstraction, etc.
+
+---
+
+## Architectural Characteristics
+
+- **Layered Architecture**: Separation between CLI/UI (`controller`, `cli`), application logic (`usecase`, `service`), and domain logic (`domain`, `repository`).
+- **Hexagonal/Clean Architecture Elements**: Interfaces and adapters allow decoupling from infrastructure.
+- **Testability**: Strong emphasis on testability, with test data and `_test.go` files across layers.
+- **LLM/AI Integration**: Includes prompt templates and schema, suggesting integration with large language models.
 
 # Error handling
 
@@ -14,6 +71,31 @@ return goerr.Wrap(err, "failed something", goerr.V("args", args))
 ```
 
 # Testing
+
+## Style for similar testing
+
+Use following Helper Driven Testing style instead of general Tatble Driven Test.
+
+```go
+	type testCase struct {
+		input    string
+		expected string
+	}
+
+	runTest := func(tc testCase) func(t *testing.T) {
+		return func(t *testing.T) {
+            actual := someFunc(tc.input)
+            gt.Equal(t, tc.expected, actual)
+		}
+	}
+
+	t.Run("success case", runTest(testCase{
+		input: "blue",
+        expected: "BLUE",
+    }))
+```
+
+## Test framework
 
 Use `github.com/m-mizutani/gt` package.
 
@@ -35,16 +117,16 @@ colors := ["red", "blue"]
 // gt.Array(t, colors).Equal([]int{1, 2}) // <- Compile error
 
 gt.Array(t, colors).Equal([]string{"red", "blue"}) // <- Pass
-gt.Array(t, colors).Have("orange")                 // <- Fail
+gt.Array(t, colors).Has("orange")                 // <- Fail
 ```
 
-## Usage
+### Usage
 
 In many cases, a developer does not care Go generics in using `gt`. However, a developer need to specify generic type (`Value`, `Array`, `Map`, `Error`, etc.) explicitly to use specific test functions for each types.
 
 See [reference](mdc:https:/pkg.go.dev/github.com/m-mizutani/gt) for more detail.
 
-### Value
+#### Value
 
 Generic test type has a minimum set of test methods.
 
@@ -61,7 +143,7 @@ u1 := user{Name: "blue"}
 gt.Value(t, u1).Equal(user{Name:"blue"}) // Pass
 ```
 
-### Number
+#### Number
 
 Accepts only number types: `int`, `uint`, `int64`, `float64`, etc.
 
@@ -74,7 +156,7 @@ gt.Number(t, f).
     GreaterOrEqual(12.5) // Pass
 ```
 
-### Array
+#### Array
 
 Accepts array of any type not only primitive type but also struct.
 
@@ -86,13 +168,13 @@ gt.Array(t, colors).
     Equal([]string{"red", "blue"})           // Fail
     // Equal([]int{1, 2})                    // Compile error
     Contain([]string{"red", "blue"})         // Pass
-    Have("yellow")                           // Pass
+    Has("yellow")                           // Pass
     Length(3)                                // Pass
 
-gt.Array(t, colors).Must().Have("orange") // Fail and stop test
+gt.Array(t, colors).Must().Has("orange") // Fail and stop test
 ```
 
-### Map
+#### Map
 
 ```go
 colorMap := map[string]int{
@@ -102,26 +184,10 @@ colorMap := map[string]int{
 }
 
 gt.Map(t, colorMap)
-    .HaveKey("blue")           // Pass
-    .HaveValue(5)              // Pass
-    // .HaveValue("red")       // Compile error
-    .HaveKeyValue("yellow", 2) // Pass
+    .HasKey("blue")           // Pass
+    .HasValue(5)              // Pass
+    // .HasValue("red")       // Compile error
+    .HasKeyValue("yellow", 2) // Pass
 
-gt.Map(t, colorMap).Must().HaveKey("orange") // Fail and stop test
+gt.Map(t, colorMap).Must().HasKey("orange") // Fail and stop test
 ```
-
-### Cast
-
-```go
-type user struct {
-    Name string
-}
-var v any = &user{
-    Name: "blue",
-}
-
-u1 := gt.Cast[user](mdc:t, v).NotNil()  // Fail (because v is *user, not user)
-gt.Cast[*user](mdc:t, v).Nil()          // Fail (because v is not nil)
-
-u2 := gt.Cast[*user](mdc:t, v).NotNil() // Pass
-gt.Value(t, u2.Name).Equal("blue")       // Pass

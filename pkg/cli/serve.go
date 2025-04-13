@@ -11,8 +11,7 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
-	"github.com/secmon-lab/warren/pkg/service"
-	"github.com/secmon-lab/warren/pkg/service/policy"
+	"github.com/secmon-lab/warren/pkg/service/action"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -29,6 +28,7 @@ func cmdServe() *cli.Command {
 		testDataCfg  config.TestData
 		embeddingCfg config.EmbeddingCfg
 		githubAppCfg config.GitHubAppCfg
+		storageCfg   config.Storage
 	)
 
 	flags := joinFlags(
@@ -51,6 +51,7 @@ func cmdServe() *cli.Command {
 		actions.Flags(),
 		embeddingCfg.Flags(),
 		githubAppCfg.Flags(),
+		storageCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -68,6 +69,7 @@ func cmdServe() *cli.Command {
 				"embedding", embeddingCfg,
 				"firestore", firestoreCfg,
 				"testdata", testDataCfg,
+				"storage", storageCfg,
 			)
 
 			policyClient, err := policyCfg.Configure()
@@ -80,7 +82,10 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			embeddingClient := embeddingCfg.Configure()
+			embeddingClient, err := embeddingCfg.Configure()
+			if err != nil {
+				return err
+			}
 
 			if err := sentryCfg.Configure(); err != nil {
 				return err
@@ -96,34 +101,33 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			githubApp, err := githubAppCfg.Configure(ctx)
-			if err != nil {
-				return err
-			}
-
 			testDataSet, err := testDataCfg.Configure()
 			if err != nil {
 				return err
 			}
 
-			enabledActions, err := actions.Configure(ctx)
+			actionSvc, err := action.New(ctx, actions)
 			if err != nil {
 				return err
 			}
-			logging.Default().Info("enabled actions", "actions", actions)
-			actionSvc := service.NewActionService(enabledActions)
 
-			policyService := policy.New(firestore, policyClient, testDataSet)
-
-			uc := usecase.New(
+			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(geminiModel),
 				usecase.WithEmbeddingClient(embeddingClient),
-				usecase.WithPolicyService(policyService),
-				usecase.WithSlackService(slackSvc),
+				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(firestore),
+				usecase.WithSlackService(slackSvc),
+				usecase.WithTestDataSet(testDataSet),
 				usecase.WithActionService(actionSvc),
-				usecase.WithGitHubApp(githubApp),
-			)
+			}
+
+			githubApp, err := githubAppCfg.Configure(ctx)
+			if err != nil {
+				return err
+			}
+			ucOptions = append(ucOptions, usecase.WithGitHubApp(githubApp))
+
+			uc := usecase.New(ucOptions...)
 
 			httpServer := http.Server{
 				Addr: addr,

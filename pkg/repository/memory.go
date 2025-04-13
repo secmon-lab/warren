@@ -2,40 +2,49 @@ package repository
 
 import (
 	"context"
+	"math"
+	"slices"
 	"sort"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/interfaces"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/policy"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
 
 type Memory struct {
-	alerts      map[model.AlertID]model.Alert
-	comments    map[model.AlertID][]model.AlertComment
-	policies    map[string]model.PolicyData
-	policyDiffs map[model.PolicyDiffID]model.PolicyDiff
-	alertLists  map[model.AlertListID]model.AlertList
+	alerts      map[types.AlertID]alert.Alert
+	comments    map[types.AlertID][]alert.AlertComment
+	lists       map[types.AlertListID]alert.List
+	histories   map[types.SessionID][]*session.History
+	policyDiffs map[types.PolicyDiffID]*policy.Diff
+	sessions    map[types.SessionID]session.Session
+	notes       map[types.SessionID][]*session.Note
 }
-
-var _ interfaces.Repository = &Memory{}
 
 func NewMemory() *Memory {
 	return &Memory{
-		alerts:      make(map[model.AlertID]model.Alert),
-		comments:    make(map[model.AlertID][]model.AlertComment),
-		policies:    make(map[string]model.PolicyData),
-		policyDiffs: make(map[model.PolicyDiffID]model.PolicyDiff),
-		alertLists:  make(map[model.AlertListID]model.AlertList),
+		alerts:      make(map[types.AlertID]alert.Alert),
+		comments:    make(map[types.AlertID][]alert.AlertComment),
+		lists:       make(map[types.AlertListID]alert.List),
+		histories:   make(map[types.SessionID][]*session.History),
+		policyDiffs: make(map[types.PolicyDiffID]*policy.Diff),
+		sessions:    make(map[types.SessionID]session.Session),
+		notes:       make(map[types.SessionID][]*session.Note),
 	}
 }
 
-func (r *Memory) PutAlert(ctx context.Context, alert model.Alert) error {
+func (r *Memory) PutAlert(ctx context.Context, alert alert.Alert) error {
+	alert.UpdatedAt = clock.Now(ctx)
 	r.alerts[alert.ID] = alert
 	return nil
 }
 
-func (r *Memory) GetAlert(ctx context.Context, alertID model.AlertID) (*model.Alert, error) {
+func (r *Memory) GetAlert(ctx context.Context, alertID types.AlertID) (*alert.Alert, error) {
 	alert, ok := r.alerts[alertID]
 	if !ok {
 		return nil, goerr.New("alert not found", goerr.V("alert_id", alertID))
@@ -43,147 +52,52 @@ func (r *Memory) GetAlert(ctx context.Context, alertID model.AlertID) (*model.Al
 	return &alert, nil
 }
 
-func (r *Memory) GetAlerts(ctx context.Context, duration time.Duration, limit int64, offset int64) ([]model.Alert, error) {
-	var alerts []model.Alert
+func (r *Memory) GetAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
 	for _, alert := range r.alerts {
-		if alert.CreatedAt.After(time.Now().Add(-duration)) {
-			alerts = append(alerts, alert)
+		if alert.SlackThread.ChannelID == thread.ChannelID && alert.SlackThread.ThreadID == thread.ThreadID {
+			return &alert, nil
 		}
 	}
-
-	sort.Slice(alerts, func(i, j int) bool {
-		return alerts[i].CreatedAt.After(alerts[j].CreatedAt)
-	})
-
-	if offset > 0 && int(offset) < len(alerts) {
-		alerts = alerts[int(offset):]
-	}
-
-	if len(alerts) > int(limit) {
-		alerts = alerts[:int(limit)]
-	}
-
-	return alerts, nil
+	return nil, nil
 }
 
-func (r *Memory) GetAlertsBySlackThread(ctx context.Context, thread model.SlackThread) ([]model.Alert, error) {
-	var alerts []model.Alert
-	for _, alert := range r.alerts {
-		if alert.SlackThread != nil && alert.SlackThread.ChannelID == thread.ChannelID && alert.SlackThread.ThreadID == thread.ThreadID {
-			alerts = append(alerts, alert)
-		}
-	}
-	return alerts, nil
-}
-
-func (r *Memory) GetLatestAlerts(ctx context.Context, oldest time.Time, limit int) ([]model.Alert, error) {
-	var alerts []model.Alert
-	for _, alert := range r.alerts {
-		if alert.CreatedAt.After(oldest) {
-			alerts = append(alerts, alert)
-		}
-	}
-
-	sort.Slice(alerts, func(i, j int) bool {
-		return alerts[i].CreatedAt.After(alerts[j].CreatedAt)
-	})
-
-	if len(alerts) > limit {
-		alerts = alerts[:limit]
-	}
-
-	return alerts, nil
-}
-
-func (r *Memory) InsertAlertComment(ctx context.Context, comment model.AlertComment) error {
+func (r *Memory) PutAlertComment(ctx context.Context, comment alert.AlertComment) error {
 	r.comments[comment.AlertID] = append(r.comments[comment.AlertID], comment)
 	return nil
 }
 
-func (r *Memory) GetAlertComments(ctx context.Context, alertID model.AlertID) ([]model.AlertComment, error) {
-	comments, ok := r.comments[alertID]
-	if !ok {
-		return nil, goerr.New("comments not found", goerr.V("alert_id", alertID))
-	}
-
-	// Sort by timestamp in descending order
-	sort.Slice(comments, func(i, j int) bool {
-		return comments[i].Timestamp > comments[j].Timestamp
-	})
-
-	return comments, nil
+func (r *Memory) GetAlertComments(ctx context.Context, alertID types.AlertID) ([]alert.AlertComment, error) {
+	return r.comments[alertID], nil
 }
 
-func (r *Memory) GetPolicy(ctx context.Context, hash string) (*model.PolicyData, error) {
-	policy, ok := r.policies[hash]
-	if !ok {
+func (r *Memory) GetLatestHistory(ctx context.Context, sessionID types.SessionID) (*session.History, error) {
+	histories := r.histories[sessionID]
+	if len(histories) == 0 {
 		return nil, nil
 	}
-	return &policy, nil
+	return histories[len(histories)-1], nil
 }
 
-func (r *Memory) SavePolicy(ctx context.Context, policy *model.PolicyData) error {
-	r.policies[policy.Hash] = *policy
+func (r *Memory) PutHistory(ctx context.Context, sessionID types.SessionID, history *session.History) error {
+	r.histories[sessionID] = append(r.histories[sessionID], history)
 	return nil
 }
 
-func (r *Memory) GetAlertsByStatus(ctx context.Context, status model.AlertStatus) ([]model.Alert, error) {
-	var alerts []model.Alert
-	for _, alert := range r.alerts {
-		if alert.Status == status {
-			alerts = append(alerts, alert)
-		}
-	}
-	return alerts, nil
-}
-
-func (r *Memory) GetAlertsWithoutStatus(ctx context.Context, status model.AlertStatus) ([]model.Alert, error) {
-	var alerts []model.Alert
-	for _, alert := range r.alerts {
-		if alert.Status != status {
-			alerts = append(alerts, alert)
-		}
-	}
-	return alerts, nil
-}
-
-func (r *Memory) BatchGetAlerts(ctx context.Context, alertIDs []model.AlertID) ([]model.Alert, error) {
-	var alerts []model.Alert
-	for _, alertID := range alertIDs {
-		alert, ok := r.alerts[alertID]
-		if !ok {
-			return nil, goerr.New("alert not found", goerr.V("alert_id", alertID))
-		}
-		alerts = append(alerts, alert)
-	}
-	return alerts, nil
-}
-
-func (r *Memory) GetAlertsByParentID(ctx context.Context, parentID model.AlertID) ([]model.Alert, error) {
-	var alerts []model.Alert
-	for _, alert := range r.alerts {
-		if alert.ParentID == parentID {
-			alerts = append(alerts, alert)
-		}
-	}
-	return alerts, nil
-}
-
-func (r *Memory) GetPolicyDiff(ctx context.Context, id model.PolicyDiffID) (*model.PolicyDiff, error) {
-	diff, ok := r.policyDiffs[id]
+func (r *Memory) GetAlertList(ctx context.Context, listID types.AlertListID) (*alert.List, error) {
+	list, ok := r.lists[listID]
 	if !ok {
 		return nil, nil
 	}
-	return &diff, nil
+	return &list, nil
 }
 
-func (r *Memory) PutPolicyDiff(ctx context.Context, diff *model.PolicyDiff) error {
-	r.policyDiffs[diff.ID] = *diff
+func (r *Memory) PutAlertList(ctx context.Context, list alert.List) error {
+	r.lists[list.ID] = list
 	return nil
 }
 
-func (r *Memory) GetAlertListByThread(ctx context.Context, thread model.SlackThread) (*model.AlertList, error) {
-	for _, list := range r.alertLists {
+func (r *Memory) GetAlertListByThread(ctx context.Context, thread slack.Thread) (*alert.List, error) {
+	for _, list := range r.lists {
 		if list.SlackThread.ChannelID == thread.ChannelID && list.SlackThread.ThreadID == thread.ThreadID {
 			return &list, nil
 		}
@@ -191,71 +105,247 @@ func (r *Memory) GetAlertListByThread(ctx context.Context, thread model.SlackThr
 	return nil, nil
 }
 
-func (r *Memory) GetAlertList(ctx context.Context, listID model.AlertListID) (*model.AlertList, error) {
-	list, ok := r.alertLists[listID]
-	if !ok {
-		return nil, goerr.New("alert list not found", goerr.V("list_id", listID))
-	}
-	return &list, nil
-}
-
-func (r *Memory) PutAlertList(ctx context.Context, list model.AlertList) error {
-	r.alertLists[list.ID] = list
-	return nil
-}
-
-func (r *Memory) GetAlertsBySpan(ctx context.Context, begin, end time.Time) ([]model.Alert, error) {
-	var alerts []model.Alert
-	for _, alert := range r.alerts {
-		if alert.CreatedAt.After(begin) && alert.CreatedAt.Before(end) {
-			alerts = append(alerts, alert)
-		}
-	}
-	return alerts, nil
-}
-
-func (r *Memory) GetLatestAlertListInThread(ctx context.Context, thread model.SlackThread) (*model.AlertList, error) {
-	var latestList *model.AlertList
+func (r *Memory) GetLatestAlertListInThread(ctx context.Context, thread slack.Thread) (*alert.List, error) {
+	var latestList *alert.List
 	var latestTime time.Time
 
-	for _, list := range r.alertLists {
-		if list.SlackThread != nil && list.SlackThread.ChannelID == thread.ChannelID && list.SlackThread.ThreadID == thread.ThreadID {
+	for _, list := range r.lists {
+		if list.SlackThread.ChannelID == thread.ChannelID && list.SlackThread.ThreadID == thread.ThreadID {
 			if latestList == nil || list.CreatedAt.After(latestTime) {
 				latestList = &list
 				latestTime = list.CreatedAt
 			}
 		}
 	}
-
-	if latestList == nil {
-		return nil, nil
-	}
-
-	latestList.Alerts = nil
 	return latestList, nil
 }
 
-func (r *Memory) BatchUpdateAlertStatus(ctx context.Context, alertIDs []model.AlertID, status model.AlertStatus) error {
-	for _, alertID := range alertIDs {
-		alert, ok := r.alerts[alertID]
-		if !ok {
-			return goerr.New("alert not found", goerr.V("alert_id", alertID))
+func (r *Memory) GetAlertsByStatus(ctx context.Context, status ...types.AlertStatus) (alert.Alerts, error) {
+	var alerts alert.Alerts
+	for _, alert := range r.alerts {
+		if slices.Contains(status, alert.Status) {
+			alerts = append(alerts, &alert)
 		}
-		alert.Status = status
-		r.alerts[alertID] = alert
+	}
+	return alerts, nil
+}
+
+func (r *Memory) GetAlertsWithoutStatus(ctx context.Context, status types.AlertStatus) (alert.Alerts, error) {
+	var alerts alert.Alerts
+	for _, alert := range r.alerts {
+		if alert.Status != status {
+			alerts = append(alerts, &alert)
+		}
+	}
+	return alerts, nil
+}
+
+func (r *Memory) GetAlertsBySpan(ctx context.Context, begin, end time.Time) (alert.Alerts, error) {
+	var alerts alert.Alerts
+	for _, alert := range r.alerts {
+		if alert.CreatedAt.After(begin) && alert.CreatedAt.Before(end) {
+			alerts = append(alerts, &alert)
+		}
+	}
+	return alerts, nil
+}
+
+func (r *Memory) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
+	var alerts alert.Alerts
+	for _, alertID := range alertIDs {
+		if alert, ok := r.alerts[alertID]; ok {
+			alerts = append(alerts, &alert)
+		}
+	}
+	return alerts, nil
+}
+
+func (r *Memory) BatchUpdateAlertStatus(ctx context.Context, alertIDs []types.AlertID, status types.AlertStatus, reason string) error {
+	for _, alertID := range alertIDs {
+		if alert, ok := r.alerts[alertID]; ok {
+			alert.Status = status
+			alert.Reason = reason
+			r.alerts[alertID] = alert
+		}
 	}
 	return nil
 }
 
-func (r *Memory) BatchUpdateAlertConclusion(ctx context.Context, alertIDs []model.AlertID, conclusion model.AlertConclusion, reason string) error {
-	for _, alertID := range alertIDs {
-		alert, ok := r.alerts[alertID]
-		if !ok {
-			return goerr.New("alert not found", goerr.V("alert_id", alertID))
-		}
-		alert.Conclusion = conclusion
-		alert.Reason = reason
-		r.alerts[alertID] = alert
+func (r *Memory) GetPolicyDiff(ctx context.Context, id types.PolicyDiffID) (*policy.Diff, error) {
+	diff, ok := r.policyDiffs[id]
+	if !ok {
+		return nil, nil
 	}
+	return diff, nil
+}
+
+func (r *Memory) PutPolicyDiff(ctx context.Context, diff *policy.Diff) error {
+	r.policyDiffs[types.PolicyDiffID(diff.ID)] = diff
 	return nil
+}
+
+func (r *Memory) GetSession(ctx context.Context, id types.SessionID) (*session.Session, error) {
+	s, ok := r.sessions[id]
+	if !ok {
+		return nil, nil
+	}
+	return &s, nil
+}
+
+func (r *Memory) GetSessionByThread(ctx context.Context, thread slack.Thread) (*session.Session, error) {
+	for _, s := range r.sessions {
+		if s.Thread.ChannelID == thread.ChannelID && s.Thread.ThreadID == thread.ThreadID {
+			return &s, nil
+		}
+	}
+	return nil, nil
+}
+
+func (r *Memory) PutSession(ctx context.Context, s session.Session) error {
+	r.sessions[s.ID] = s
+	return nil
+}
+
+func (r *Memory) FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error) {
+	if len(embedding) == 0 {
+		return nil, goerr.New("embedding vector is empty")
+	}
+
+	type alertWithDistance struct {
+		alert    alert.Alert
+		distance float32
+	}
+
+	var alertsWithDistance []alertWithDistance
+	for _, alert := range r.alerts {
+		if len(alert.Embedding) == 0 {
+			continue
+		}
+		if len(alert.Embedding) != len(embedding) {
+			continue
+		}
+
+		// Calculate cosine distance (1 - cosine similarity)
+		var dotProduct float32
+		var normA, normB float32
+		for i := 0; i < len(embedding); i++ {
+			dotProduct += embedding[i] * alert.Embedding[i]
+			normA += embedding[i] * embedding[i]
+			normB += alert.Embedding[i] * alert.Embedding[i]
+		}
+		normA = float32(math.Sqrt(float64(normA)))
+		normB = float32(math.Sqrt(float64(normB)))
+
+		if normA == 0 || normB == 0 {
+			continue
+		}
+
+		cosineSimilarity := dotProduct / (normA * normB)
+		distance := 1 - cosineSimilarity
+
+		alertsWithDistance = append(alertsWithDistance, alertWithDistance{
+			alert:    alert,
+			distance: distance,
+		})
+	}
+
+	// Sort by distance
+	sort.Slice(alertsWithDistance, func(i, j int) bool {
+		return alertsWithDistance[i].distance < alertsWithDistance[j].distance
+	})
+
+	// Take top N alerts
+	var result alert.Alerts
+	for i := 0; i < len(alertsWithDistance) && i < limit; i++ {
+		result = append(result, &alertsWithDistance[i].alert)
+	}
+
+	return result, nil
+}
+
+func (r *Memory) GetNotes(ctx context.Context, sessionID types.SessionID) ([]*session.Note, error) {
+	notes, ok := r.notes[sessionID]
+	if !ok {
+		return nil, nil
+	}
+	// 時系列順にソート
+	sort.Slice(notes, func(i, j int) bool {
+		return notes[i].CreatedAt.Before(notes[j].CreatedAt)
+	})
+	return notes, nil
+}
+
+func (r *Memory) PutNote(ctx context.Context, note *session.Note) error {
+	r.notes[note.SessionID] = append(r.notes[note.SessionID], note)
+	return nil
+}
+
+func (r *Memory) SearchAlerts(ctx context.Context, path, op string, value any) (alert.Alerts, error) {
+	var alerts alert.Alerts
+
+	for _, a := range r.alerts {
+		var match bool
+
+		switch path {
+		case "Status":
+			status, ok := value.(types.AlertStatus)
+			if !ok {
+				return nil, goerr.New("invalid status type", goerr.V("value", value))
+			}
+			switch op {
+			case "==":
+				match = a.Status == status
+			case "!=":
+				match = a.Status != status
+			default:
+				return nil, goerr.New("unsupported operator for status", goerr.V("op", op))
+			}
+
+		case "Title":
+			title, ok := value.(string)
+			if !ok {
+				return nil, goerr.New("invalid title type", goerr.V("value", value))
+			}
+			switch op {
+			case "==":
+				match = a.Title == title
+			case "!=":
+				match = a.Title != title
+			default:
+				return nil, goerr.New("unsupported operator for title", goerr.V("op", op))
+			}
+
+		case "CreatedAt":
+			createdAt, ok := value.(time.Time)
+			if !ok {
+				return nil, goerr.New("invalid created_at type", goerr.V("value", value))
+			}
+			switch op {
+			case "==":
+				match = a.CreatedAt.Equal(createdAt)
+			case "!=":
+				match = !a.CreatedAt.Equal(createdAt)
+			case ">":
+				match = a.CreatedAt.After(createdAt)
+			case "<":
+				match = a.CreatedAt.Before(createdAt)
+			case ">=":
+				match = a.CreatedAt.After(createdAt) || a.CreatedAt.Equal(createdAt)
+			case "<=":
+				match = a.CreatedAt.Before(createdAt) || a.CreatedAt.Equal(createdAt)
+			default:
+				return nil, goerr.New("unsupported operator for created_at", goerr.V("op", op))
+			}
+
+		default:
+			// 未知のフィールドパスの場合は空の結果を返す
+			continue
+		}
+
+		if match {
+			alerts = append(alerts, &a)
+		}
+	}
+
+	return alerts, nil
 }

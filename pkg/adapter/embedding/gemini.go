@@ -31,7 +31,11 @@ func WithModelName(modelName string) GeminiOption {
 	}
 }
 
-func NewGemini(projectID string, opts ...GeminiOption) *Gemini {
+func NewGemini(projectID string, opts ...GeminiOption) (*Gemini, error) {
+	if projectID == "" {
+		return nil, goerr.New("projectID is required")
+	}
+
 	gemini := &Gemini{
 		projectID: projectID,
 		location:  "us-central1",
@@ -40,7 +44,7 @@ func NewGemini(projectID string, opts ...GeminiOption) *Gemini {
 	for _, opt := range opts {
 		opt(gemini)
 	}
-	return gemini
+	return gemini, nil
 }
 
 func (x *Gemini) Embeddings(ctx context.Context, texts []string, dimensionality int) ([][]float32, error) {

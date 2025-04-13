@@ -5,23 +5,27 @@ import (
 	"time"
 
 	"github.com/m-mizutani/opaq"
-	"github.com/secmon-lab/warren/pkg/interfaces"
-	"github.com/secmon-lab/warren/pkg/mock"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/service"
-	"github.com/secmon-lab/warren/pkg/service/policy"
+	"github.com/secmon-lab/warren/pkg/service/action"
+	"github.com/secmon-lab/warren/pkg/service/githubapp"
+	"github.com/secmon-lab/warren/pkg/service/slack"
 )
 
 type UseCases struct {
 	// services and adapters
-	slackService    interfaces.SlackService
+	slackService    *slack.Service
 	llmClient       interfaces.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
-	actionService   *service.ActionService
-	policyService   *policy.Service
-	gitHubApp       *service.GitHubApp
+	storageClient   interfaces.StorageClient
+	policyClient    interfaces.PolicyClient
+	githubApp       *githubapp.Service
+	actionSvc       *action.Service
+
+	// test data set
+	testDataSet *policy.TestDataSet
 
 	// configs
 	timeSpan     time.Duration
@@ -29,7 +33,9 @@ type UseCases struct {
 	findingLimit int
 }
 
-var _ interfaces.UseCase = &UseCases{}
+var _ Alert = &UseCases{}
+var _ SlackEvent = &UseCases{}
+var _ SlackInteraction = &UseCases{}
 
 type Option func(*UseCases)
 
@@ -39,21 +45,27 @@ func WithLLMClient(llmClient interfaces.LLMClient) Option {
 	}
 }
 
+func WithSlackService(slackService *slack.Service) Option {
+	return func(u *UseCases) {
+		u.slackService = slackService
+	}
+}
+
 func WithEmbeddingClient(embeddingClient interfaces.EmbeddingClient) Option {
 	return func(u *UseCases) {
 		u.embeddingClient = embeddingClient
 	}
 }
 
-func WithSlackService(slackService interfaces.SlackService) Option {
+func WithPolicyClient(policyClient interfaces.PolicyClient) Option {
 	return func(u *UseCases) {
-		u.slackService = slackService
+		u.policyClient = policyClient
 	}
 }
 
-func WithPolicyService(policyService *policy.Service) Option {
+func WithStorageClient(storageClient interfaces.StorageClient) Option {
 	return func(u *UseCases) {
-		u.policyService = policyService
+		u.storageClient = storageClient
 	}
 }
 
@@ -63,15 +75,15 @@ func WithRepository(repository interfaces.Repository) Option {
 	}
 }
 
-func WithActionService(actionService *service.ActionService) Option {
+func WithGitHubApp(githubApp *githubapp.Service) Option {
 	return func(u *UseCases) {
-		u.actionService = actionService
+		u.githubApp = githubApp
 	}
 }
 
-func WithGitHubApp(githubApp *service.GitHubApp) Option {
+func WithActionService(actionSvc *action.Service) Option {
 	return func(u *UseCases) {
-		u.gitHubApp = githubApp
+		u.actionSvc = actionSvc
 	}
 }
 
@@ -94,29 +106,26 @@ func WithFindingLimit(findingLimit int) Option {
 	}
 }
 
-func New(opts ...Option) *UseCases {
-	policyClient, err := opaq.New(opaq.Data("policy", "package alert.dummy"))
-	if err != nil {
-		panic(err)
+func WithTestDataSet(testDataSet *policy.TestDataSet) Option {
+	return func(u *UseCases) {
+		u.testDataSet = testDataSet
 	}
+}
 
+type dummyPolicyClient struct{}
+
+func (c *dummyPolicyClient) Query(ctx context.Context, query string, data, result any, queryOptions ...opaq.QueryOption) error {
+	return nil
+}
+
+func (c *dummyPolicyClient) Sources() map[string]string {
+	return map[string]string{}
+}
+
+func New(opts ...Option) *UseCases {
 	u := &UseCases{
-		slackService: &mock.SlackServiceMock{
-			PostAlertFunc: func(ctx context.Context, alert model.Alert) (interfaces.SlackThreadService, error) {
-				return &mock.SlackThreadServiceMock{
-					ChannelIDFunc: func() string {
-						return "test"
-					},
-					ThreadIDFunc: func() string {
-						return "test"
-					},
-				}, nil
-			},
-		},
-		policyService: policy.New(repository.NewMemory(), policyClient, &model.TestDataSet{}),
-		repository:    repository.NewMemory(),
-		actionService: service.NewActionService([]interfaces.Action{}),
-
+		repository:   repository.NewMemory(),
+		policyClient: &dummyPolicyClient{},
 		timeSpan:     24 * time.Hour,
 		actionLimit:  10,
 		findingLimit: 3,
