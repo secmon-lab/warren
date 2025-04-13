@@ -8,6 +8,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/gemini"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/command/list"
@@ -58,8 +59,12 @@ func Run(ctx context.Context, repo interfaces.Repository, slackThread *slack_svc
 	}
 
 	var lists []alert.List
+	query := llmClient.NewQuery(
+		gemini.WithContentType("application/json"),
+	)
+
 	for _, cluster := range clusters {
-		newList, err := list.CreateList(ctx, repo, llmClient, threadModel, &user, cluster)
+		newList, err := list.CreateList(ctx, repo, query, threadModel, &user, cluster)
 		if err != nil {
 			return goerr.Wrap(err, "failed to create alert list")
 		}

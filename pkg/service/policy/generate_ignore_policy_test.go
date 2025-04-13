@@ -75,7 +75,7 @@ func TestGenerateIgnorePolicy(t *testing.T) {
 	input := svc.GenerateIgnorePolicyInput{
 		Repo:         repo,
 		Source:       source.Static(alerts),
-		LLM:          ssn,
+		LLM:          ssn.SendMessage,
 		PolicyClient: policyClient,
 		TestDataSet:  testDataSet,
 	}

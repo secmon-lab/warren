@@ -123,7 +123,7 @@ func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert alert.Alert
 
 	var result *prompt.MetaPromptResult
 	for i := 0; i < 3 && result == nil; i++ {
-		result, err = llm.Ask[prompt.MetaPromptResult](ctx, ssn, p)
+		result, err = llm.Ask[prompt.MetaPromptResult](ctx, ssn.SendMessage, p)
 		if err != nil {
 			if goerr.HasTag(err, errs.TagInvalidLLMResponse) {
 				logger.Warn("invalid LLM response, retry to generate alert metadata", "error", err)

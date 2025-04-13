@@ -31,7 +31,7 @@ func WithRetryPrompt(f func(ctx context.Context, err error) string) Option {
 	}
 }
 
-func Ask[T any](ctx context.Context, llm interfaces.LLMInquiry, prompt string, opts ...Option) (*T, error) {
+func Ask[T any](ctx context.Context, llm interfaces.LLMQuery, prompt string, opts ...Option) (*T, error) {
 	logger := logging.From(ctx)
 
 	config := &config{
@@ -46,7 +46,7 @@ func Ask[T any](ctx context.Context, llm interfaces.LLMInquiry, prompt string, o
 
 	var response *T
 	for i := 0; i < config.maxRetry && response == nil; i++ {
-		resp, err := llm.SendMessage(ctx, genai.Text(prompt))
+		resp, err := llm(ctx, genai.Text(prompt))
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to send message")
 		}

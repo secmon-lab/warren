@@ -168,7 +168,7 @@ func (x *UseCases) HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Co
 	input := policy.GenerateIgnorePolicyInput{
 		Repo:         x.repository,
 		Source:       src,
-		LLM:          ssn,
+		LLM:          ssn.SendMessage,
 		PolicyClient: x.policyClient,
 		Prompt:       prompt,
 		TestDataSet:  x.testDataSet,

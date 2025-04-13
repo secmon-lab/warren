@@ -7,6 +7,7 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/gemini"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	svc "github.com/secmon-lab/warren/pkg/service/slack"
@@ -98,7 +99,8 @@ func (x *Service) Run(ctx context.Context, th *svc.ThreadService, user *slack.Us
 		}
 	}
 
-	alertList, err := CreateList(ctx, x.repo, x.llm, slack.Thread{
+	query := x.llm.NewQuery(gemini.WithContentType("application/json"))
+	alertList, err := CreateList(ctx, x.repo, query, slack.Thread{
 		ChannelID: th.ChannelID(),
 		ThreadID:  th.ThreadID(),
 	}, user, alerts)

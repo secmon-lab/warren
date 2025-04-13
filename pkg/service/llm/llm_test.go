@@ -21,7 +21,7 @@ func TestAsk(t *testing.T) {
 		"message": "Hello, world!"
 	}`
 
-	result, err := llm.Ask[resp](t.Context(), ssn, prompt)
+	result, err := llm.Ask[resp](t.Context(), ssn.SendMessage, prompt)
 	gt.NoError(t, err)
 	gt.NotNil(t, result)
 	gt.S(t, result.Message).NotEqual("")

@@ -29,7 +29,7 @@ func GenerateAlertListMeta(ctx context.Context, list alert.List, llmClient inter
 	var result *prompt.MetaListPromptResult
 	for range maxRetryCount {
 		ctx = msg.Trace(ctx, "🤖 Generating meta data of alert list... (%s)", list.ID.String())
-		resp, err := llm.Ask[prompt.MetaListPromptResult](ctx, llmClient, p)
+		resp, err := llm.Ask[prompt.MetaListPromptResult](ctx, llmClient.SendMessage, p)
 
 		if err == nil {
 			result = resp

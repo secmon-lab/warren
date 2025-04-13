@@ -30,7 +30,7 @@ type GenerateIgnorePolicyInput struct {
 	Repo interfaces.Repository
 
 	// Required, LLM is the LLM client to use.
-	LLM interfaces.LLMInquiry
+	LLM interfaces.LLMQuery
 
 	// Required, PolicyClient is the policy client to use.
 	PolicyClient interfaces.PolicyClient
