@@ -2,6 +2,7 @@ package interfaces
 
 import (
 	"context"
+	"io"
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/opaq"
@@ -33,6 +34,12 @@ type EmbeddingClient interface {
 type PolicyClient interface {
 	Query(context.Context, string, any, any, ...opaq.QueryOption) error
 	Sources() map[string]string
+}
+
+type StorageClient interface {
+	PutObject(ctx context.Context, bucket, object string, r io.Reader) error
+	GetObject(ctx context.Context, bucket, object string) (io.ReadCloser, error)
+	Close(ctx context.Context)
 }
 
 type SlackClient interface {
