@@ -36,10 +36,10 @@ func NewHistory(ctx context.Context, contents []*genai.Content) *History {
 	history := &History{
 		ID:        types.NewHistoryID(),
 		CreatedAt: clock.Now(ctx),
-		Contents:  make(Contents, len(contents)),
+		Contents:  make(Contents, 0, len(contents)),
 	}
 
-	for i, content := range contents {
+	for _, content := range contents {
 		var parts []Part
 
 		for _, part := range content.Parts {
@@ -65,15 +65,15 @@ func NewHistory(ctx context.Context, contents []*genai.Content) *History {
 				})
 
 			default:
-				logging.From(ctx).Warn("unknown part type", "type", reflect.TypeOf(v))
+				logging.From(ctx).Warn("unknown part type", "type", reflect.TypeOf(v).String())
 			}
 		}
 
 		if len(parts) > 0 {
-			history.Contents[i] = &Content{
+			history.Contents = append(history.Contents, &Content{
 				Role:  content.Role,
 				Parts: parts,
-			}
+			})
 		}
 	}
 
@@ -81,8 +81,12 @@ func NewHistory(ctx context.Context, contents []*genai.Content) *History {
 }
 
 func (x *History) ToContents() []*genai.Content {
-	contents := make([]*genai.Content, len(x.Contents))
-	for i, content := range x.Contents {
+	contents := make([]*genai.Content, 0, len(x.Contents))
+	for _, content := range x.Contents {
+		if content == nil {
+			continue
+		}
+
 		parts := make([]genai.Part, len(content.Parts))
 		for j, part := range content.Parts {
 			switch {
@@ -96,7 +100,7 @@ func (x *History) ToContents() []*genai.Content {
 				parts[j] = part.FuncResp
 			}
 		}
-		contents[i] = &genai.Content{Role: content.Role, Parts: parts}
+		contents = append(contents, &genai.Content{Role: content.Role, Parts: parts})
 	}
 	return contents
 }

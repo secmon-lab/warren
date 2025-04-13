@@ -77,7 +77,7 @@ func (x *Service) Chat(ctx context.Context, message string) error {
 		return goerr.Wrap(err, "failed to get latest history")
 	}
 
-	logger.Debug("got history", "history", histroy)
+	logger.Debug("got history", "history", histroy, "session", x.ssn)
 
 	// If history is empty, need to initialize the session
 	llmSession := x.llm.StartChat(
