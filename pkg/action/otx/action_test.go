@@ -88,7 +88,7 @@ func TestOTX(t *testing.T) {
 				Name:  "otx",
 				Flags: action.Flags(),
 				Action: func(ctx context.Context, c *cli.Command) error {
-					resp, err := action.Execute(ctx, tc.funcName, tc.args)
+					resp, err := action.Run(ctx, tc.funcName, tc.args)
 					if tc.wantErr {
 						gt.Error(t, err)
 						return nil
@@ -96,7 +96,7 @@ func TestOTX(t *testing.T) {
 
 					gt.NoError(t, err)
 					gt.NotEqual(t, resp, nil)
-					gt.Value(t, resp.Data["body"]).Equal(tc.wantResp)
+					gt.Value(t, resp["body"]).Equal(tc.wantResp)
 					return nil
 				},
 			}
@@ -108,6 +108,30 @@ func TestOTX(t *testing.T) {
 			}))
 		})
 	}
+}
+
+func TestOTX_Specs(t *testing.T) {
+	var action otx.Action
+	specs, err := action.Specs(context.Background())
+	gt.NoError(t, err)
+	gt.A(t, specs).Length(5) // 5つのツール仕様があることを確認
+
+	// 各ツールの仕様を確認
+	for _, spec := range specs {
+		gt.Map(t, spec.Parameters).HasKey("target")
+		gt.Value(t, spec.Parameters["target"].Type).Equal("string")
+	}
+
+	// 特定のツールの仕様を確認
+	var found bool
+	for _, spec := range specs {
+		if spec.Name == "otx.ipv4" {
+			found = true
+			gt.Value(t, spec.Description).Equal("Search the indicator of IPv4 from OTX.")
+			break
+		}
+	}
+	gt.Value(t, found).Equal(true)
 }
 
 func TestOTX_Enabled(t *testing.T) {
@@ -130,7 +154,7 @@ func TestOTX_Enabled(t *testing.T) {
 	}))
 }
 
-// TestSendRequest tests the SendRequest method of the Action struct.
+// TestSendRequest tests the Run method of the Action struct.
 // It sets up a test environment with a actual API key and target IP address,
 // and then runs the command to send a request to the OTX API.
 // The test verifies that the request is sent successfully and the response is not nil.
@@ -143,12 +167,12 @@ func TestSendRequest(t *testing.T) {
 		Name:  "otx",
 		Flags: act.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			resp, err := act.Execute(ctx, "otx.ipv4", map[string]any{
+			resp, err := act.Run(ctx, "otx.ipv4", map[string]any{
 				"target": vars.Get("TEST_OTX_TARGET_IPADDR"),
 			})
 			gt.NoError(t, err)
 			gt.NotEqual(t, resp, nil)
-			gt.S(t, resp.Data["body"].(string)).Contains(`"pulse_info"`)
+			gt.S(t, resp["body"].(string)).Contains(`"pulse_info"`)
 			return nil
 		},
 	}

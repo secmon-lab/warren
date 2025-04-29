@@ -3,13 +3,13 @@ package cli
 import (
 	"log/slog"
 
+	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/action/otx"
 	"github.com/secmon-lab/warren/pkg/action/urlscan"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/urfave/cli/v3"
 )
 
-type actionList []interfaces.Action
+type actionList []gollam.ToolSet
 
 var actions = actionList{
 	&urlscan.Action{},

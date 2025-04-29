@@ -97,9 +97,6 @@ func TestSlackInteractionHandler(t *testing.T) {
 		HandleSlackInteractionViewSubmissionResolveListFunc: func(ctx context.Context, user slack_model.User, metadata string, values slack_model.StateValue) error {
 			return nil
 		},
-		HandleSlackInteractionViewSubmissionIgnoreListFunc: func(ctx context.Context, metadata string, values slack_model.StateValue) error {
-			return nil
-		},
 		HandleSlackInteractionBlockActionsFunc: func(ctx context.Context, user slack_model.User, slackThread slack_model.Thread, actionID slack_model.ActionID, value, triggerID string) error {
 			return nil
 		},

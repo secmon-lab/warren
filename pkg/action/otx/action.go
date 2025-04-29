@@ -8,9 +8,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
+	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/urfave/cli/v3"
 )
@@ -44,94 +43,62 @@ func (x *Action) Flags() []cli.Flag {
 	}
 }
 
-func (x *Action) Tools() []*genai.FunctionDeclaration {
-	return []*genai.FunctionDeclaration{
+func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
+	return []gollam.ToolSpec{
 		{
 			Name:        "otx.ipv4",
 			Description: "Search the indicator of IPv4 from OTX.",
-			Parameters: &genai.Schema{
-				Type: genai.TypeObject,
-				Properties: map[string]*genai.Schema{
-					"target": {
-						Type:        genai.TypeString,
-						Description: "The IPv4 address to search",
-					},
+			Parameters: map[string]*gollam.Parameter{
+				"target": {
+					Type:        gollam.TypeString,
+					Description: "The IPv4 address to search",
 				},
 			},
 		},
 		{
 			Name:        "otx.domain",
 			Description: "Search the indicator of domain from OTX.",
-			Parameters: &genai.Schema{
-				Type: genai.TypeObject,
-				Properties: map[string]*genai.Schema{
-					"target": {
-						Type:        genai.TypeString,
-						Description: "The domain to search",
-					},
+			Parameters: map[string]*gollam.Parameter{
+				"target": {
+					Type:        gollam.TypeString,
+					Description: "The domain to search",
 				},
 			},
 		},
 		{
 			Name:        "otx.ipv6",
 			Description: "Search the indicator of IPv6 from OTX.",
-			Parameters: &genai.Schema{
-				Type: genai.TypeObject,
-				Properties: map[string]*genai.Schema{
-					"target": {
-						Type:        genai.TypeString,
-						Description: "The IPv6 address to search",
-					},
+			Parameters: map[string]*gollam.Parameter{
+				"target": {
+					Type:        gollam.TypeString,
+					Description: "The IPv6 address to search",
 				},
 			},
 		},
 		{
 			Name:        "otx.hostname",
 			Description: "Search the indicator of hostname from OTX.",
-			Parameters: &genai.Schema{
-				Type: genai.TypeObject,
-				Properties: map[string]*genai.Schema{
-					"target": {
-						Type:        genai.TypeString,
-						Description: "The hostname to search",
-					},
+			Parameters: map[string]*gollam.Parameter{
+				"target": {
+					Type:        gollam.TypeString,
+					Description: "The hostname to search",
 				},
 			},
 		},
 		{
 			Name:        "otx.file_hash",
 			Description: "Search the indicator of file hash from OTX.",
-			Parameters: &genai.Schema{
-				Type: genai.TypeObject,
-				Properties: map[string]*genai.Schema{
-					"target": {
-						Type:        genai.TypeString,
-						Description: "The file hash to search",
-					},
+			Parameters: map[string]*gollam.Parameter{
+				"target": {
+					Type:        gollam.TypeString,
+					Description: "The file hash to search",
 				},
 			},
 		},
-	}
+	}, nil
 }
 
-func (x *Action) LogValue() slog.Value {
-	return slog.GroupValue(
-		slog.Int("api_key.len", len(x.apiKey)),
-		slog.String("base_url", x.baseURL),
-	)
-}
-
-func (x *Action) Configure(ctx context.Context) error {
-	if x.apiKey == "" {
-		return errs.ErrActionUnavailable
-	}
-	if _, err := url.Parse(x.baseURL); err != nil {
-		return goerr.Wrap(err, "invalid base URL", goerr.V("base_url", x.baseURL))
-	}
-	return nil
-}
-
-func (x *Action) Execute(ctx context.Context, name string, args map[string]any) (*action.Result, error) {
+func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
 	if x.apiKey == "" {
 		return nil, goerr.New("OTX API key is required")
 	}
@@ -186,10 +153,24 @@ func (x *Action) Execute(ctx context.Context, name string, args map[string]any) 
 		return nil, goerr.Wrap(err, "failed to read response body")
 	}
 
-	return &action.Result{
-		Name: name,
-		Data: map[string]any{
-			"body": string(body),
-		},
+	return map[string]any{
+		"body": string(body),
 	}, nil
+}
+
+func (x *Action) Configure(ctx context.Context) error {
+	if x.apiKey == "" {
+		return errs.ErrActionUnavailable
+	}
+	if _, err := url.Parse(x.baseURL); err != nil {
+		return goerr.Wrap(err, "invalid base URL", goerr.V("base_url", x.baseURL))
+	}
+	return nil
+}
+
+func (x *Action) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.Int("api_key.len", len(x.apiKey)),
+		slog.String("base_url", x.baseURL),
+	)
 }

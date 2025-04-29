@@ -168,8 +168,6 @@ func (x *Controller) handleSlackInteractionViewSubmission(ctx context.Context, i
 		return x.interaction.HandleSlackInteractionViewSubmissionResolveAlert(ctx, user, metadata, sv)
 	case slack_model.CallbackSubmitResolveList:
 		return x.interaction.HandleSlackInteractionViewSubmissionResolveList(ctx, user, metadata, sv)
-	case slack_model.CallbackSubmitIgnoreList:
-		return x.interaction.HandleSlackInteractionViewSubmissionIgnoreList(ctx, metadata, sv)
 	}
 
 	return nil

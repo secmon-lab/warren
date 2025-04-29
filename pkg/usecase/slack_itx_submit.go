@@ -6,9 +6,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/model/source"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/service/policy"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
@@ -139,55 +137,6 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Cont
 	}
 
 	msg.Trace(ctx, "✅️ Resolved %d alerts", len(alerts))
-
-	return nil
-}
-
-// HandleSlackInteractionViewSubmissionIgnoreList handles a slack interaction view submission for "ignoring an alert list".
-func (x *UseCases) HandleSlackInteractionViewSubmissionIgnoreList(ctx context.Context, metadata string, values slack.StateValue) error {
-	listID := types.AlertListID(metadata)
-
-	var prompt string
-	if promptBlock, ok := values[slack.SlackBlockIDIgnorePrompt.String()]; ok {
-		if promptAction, ok := promptBlock[slack.ActionIDIgnorePrompt.String()]; ok {
-			prompt = promptAction.Value
-		}
-	}
-
-	list, err := x.repository.GetAlertList(ctx, listID)
-	if err != nil {
-		return goerr.Wrap(err, "failed to get alert list", goerr.V("list_id", listID))
-	}
-	if list == nil {
-		return goerr.Wrap(err, "alert list not found", goerr.V("list_id", listID))
-	}
-
-	src := source.AlertListID(listID)
-
-	ssn := x.llmClient.StartChat()
-	input := policy.GenerateIgnorePolicyInput{
-		Repo:         x.repository,
-		Source:       src,
-		LLM:          ssn.SendMessage,
-		PolicyClient: x.policyClient,
-		Prompt:       prompt,
-		TestDataSet:  x.testDataSet,
-	}
-	newPolicyDiff, err := policy.GenerateIgnorePolicy(ctx, input)
-	if err != nil {
-		return err
-	}
-
-	if err := x.repository.PutPolicyDiff(ctx, newPolicyDiff); err != nil {
-		return err
-	}
-
-	if list.SlackThread != nil {
-		slackSvc := x.slackService.NewThread(*list.SlackThread)
-		if err := slackSvc.PostPolicyDiff(ctx, newPolicyDiff); err != nil {
-			return err
-		}
-	}
 
 	return nil
 }

@@ -52,8 +52,6 @@ tasks:
         Action
         SlackClient
         SlackThreadService
-        LLMSession
-        LLMClient
         Repository
         PolicyClient
         EmbeddingClient

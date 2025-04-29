@@ -119,11 +119,14 @@ func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert alert.Alert
 		return nil, goerr.Wrap(err, "failed to build meta prompt")
 	}
 
-	ssn := uc.llmClient.StartChat()
+	ssn, err := uc.llmClient.NewSession(ctx, nil)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to create LLM session")
+	}
 
 	var result *prompt.MetaPromptResult
 	for i := 0; i < 3 && result == nil; i++ {
-		result, err = llm.Ask[prompt.MetaPromptResult](ctx, ssn.SendMessage, p)
+		result, err = llm.Ask[prompt.MetaPromptResult](ctx, ssn, p)
 		if err != nil {
 			if goerr.HasTag(err, errs.TagInvalidLLMResponse) {
 				logger.Warn("invalid LLM response, retry to generate alert metadata", "error", err)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/m-mizutani/gollam"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
@@ -16,7 +17,7 @@ import (
 type UseCases struct {
 	// services and adapters
 	slackService    *slack.Service
-	llmClient       interfaces.LLMClient
+	llmClient       gollam.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
 	storageClient   interfaces.StorageClient
@@ -39,7 +40,7 @@ var _ SlackInteraction = &UseCases{}
 
 type Option func(*UseCases)
 
-func WithLLMClient(llmClient interfaces.LLMClient) Option {
+func WithLLMClient(llmClient gollam.LLMClient) Option {
 	return func(u *UseCases) {
 		u.llmClient = llmClient
 	}

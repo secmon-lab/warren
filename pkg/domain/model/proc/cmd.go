@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 
+	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/slack"
@@ -19,11 +20,11 @@ type Proc struct {
 
 type clients struct {
 	repo      interfaces.Repository
-	llmClient interfaces.LLMClient
+	llmClient gollam.LLMClient
 	slack     slack.ThreadService
 }
 
-func New(repo interfaces.Repository, llmClient interfaces.LLMClient, slackThread slack.ThreadService, args []string) *Proc {
+func New(repo interfaces.Repository, llmClient gollam.LLMClient, slackThread slack.ThreadService, args []string) *Proc {
 
 	return &Proc{
 		ID:   types.NewProcID(),

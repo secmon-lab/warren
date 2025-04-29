@@ -1,14 +1,16 @@
 package interfaces
 
+import "github.com/m-mizutani/gollam"
+
 type Clients struct {
 	repo    Repository
-	llm     LLMClient
+	llm     gollam.LLMClient
 	storage StorageClient
 }
 
 type Option func(*Clients)
 
-func WithLLMClient(llm LLMClient) Option {
+func WithLLMClient(llm gollam.LLMClient) Option {
 	return func(c *Clients) {
 		c.llm = llm
 	}
@@ -34,7 +36,7 @@ func NewClients(opts ...Option) *Clients {
 	return c
 }
 
-func (c *Clients) LLM() LLMClient {
+func (c *Clients) LLM() gollam.LLMClient {
 	return c.llm
 }
 

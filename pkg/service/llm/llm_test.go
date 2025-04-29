@@ -1,16 +1,30 @@
 package llm_test
 
 import (
+	"os"
 	"testing"
 
+	"github.com/m-mizutani/gollam/llm/gemini"
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/adapter/gemini"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 )
 
 func TestAsk(t *testing.T) {
-	geminiClient := gemini.NewTestClient(t, gemini.WithContentType("application/json"))
-	ssn := geminiClient.StartChat()
+	projectID, ok := os.LookupEnv("TEST_GEMINI_PROJECT_ID")
+	if !ok {
+		t.Skip("GEMINI_PROJECT_ID is not set")
+	}
+	location, ok := os.LookupEnv("TEST_GEMINI_LOCATION")
+	if !ok {
+		t.Skip("GEMINI_LOCATION is not set")
+	}
+
+	ctx := t.Context()
+	geminiClient, err := gemini.New(ctx, projectID, location)
+	gt.NoError(t, err).Required()
+
+	ssn, err := geminiClient.NewSession(ctx, nil)
+	gt.NoError(t, err).Required()
 
 	type resp struct {
 		Message string `json:"message"`
@@ -21,7 +35,7 @@ func TestAsk(t *testing.T) {
 		"message": "Hello, world!"
 	}`
 
-	result, err := llm.Ask[resp](t.Context(), ssn.SendMessage, prompt)
+	result, err := llm.Ask[resp](ctx, ssn, prompt)
 	gt.NoError(t, err)
 	gt.NotNil(t, result)
 	gt.S(t, result.Message).NotEqual("")

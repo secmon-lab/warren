@@ -11,9 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
+	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/urfave/cli/v3"
 )
@@ -56,30 +55,96 @@ func (x *Action) Flags() []cli.Flag {
 	}
 }
 
-func (x *Action) Tools() []*genai.FunctionDeclaration {
-	return []*genai.FunctionDeclaration{
+func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
+	return []gollam.ToolSpec{
 		{
 			Name:        "urlscan.scan",
 			Description: "Scan a URL with URLScan",
-			Parameters: &genai.Schema{
-				Type: genai.TypeObject,
-				Properties: map[string]*genai.Schema{
-					"url": {
-						Type:        genai.TypeString,
-						Description: "The URL to scan",
-					},
+			Parameters: map[string]*gollam.Parameter{
+				"url": {
+					Type:        gollam.TypeString,
+					Description: "The URL to scan",
 				},
 			},
 		},
-	}
+	}, nil
 }
 
-func (x *Action) LogValue() slog.Value {
-	return slog.GroupValue(
-		slog.Int("api_key.len", len(x.apiKey)),
-		slog.String("base_url", x.baseURL),
-		slog.Duration("backoff", x.backoff),
-	)
+func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
+	if x.apiKey == "" {
+		return nil, goerr.New("URLScan API key is required")
+	}
+
+	urlStr, ok := args["url"].(string)
+	if !ok {
+		return nil, goerr.New("url parameter is required")
+	}
+
+	if _, err := url.Parse(urlStr); err != nil {
+		return nil, goerr.Wrap(err, "invalid URL", goerr.V("url", urlStr))
+	}
+
+	client := &http.Client{}
+	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/scan/", x.baseURL), strings.NewReader(fmt.Sprintf(`{"url": "%s"}`, urlStr)))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to create request")
+	}
+
+	req.Header.Set("API-Key", x.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to send request")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, goerr.New("failed to query URLScan",
+			goerr.V("status_code", resp.StatusCode),
+			goerr.V("body", string(body)))
+	}
+
+	var result struct {
+		UUID string `json:"uuid"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, goerr.Wrap(err, "failed to decode response")
+	}
+
+	// Wait for the scan to complete
+	time.Sleep(x.backoff)
+
+	// Get the scan result
+	req, err = http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/result/%s/", x.baseURL, result.UUID), nil)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to create request")
+	}
+
+	req.Header.Set("API-Key", x.apiKey)
+
+	resp, err = client.Do(req)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to send request")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, goerr.New("failed to get scan result",
+			goerr.V("status_code", resp.StatusCode),
+			goerr.V("body", string(body)))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to read response body")
+	}
+
+	return map[string]any{
+		"body": string(body),
+	}, nil
 }
 
 func (x *Action) Configure(ctx context.Context) error {
@@ -92,88 +157,10 @@ func (x *Action) Configure(ctx context.Context) error {
 	return nil
 }
 
-func (x *Action) Execute(ctx context.Context, name string, args map[string]any) (*action.Result, error) {
-	if x.apiKey == "" {
-		return nil, goerr.New("URLScan API key is required")
-	}
-
-	if name != "urlscan.scan" {
-		return nil, goerr.New("invalid function name", goerr.V("name", name))
-	}
-
-	url, ok := args["url"].(string)
-	if !ok {
-		return nil, goerr.New("url is required")
-	}
-
-	client := &http.Client{}
-	req, err := http.NewRequestWithContext(ctx, "POST", x.baseURL+"/scan", strings.NewReader(`{"url":"`+url+`"}`))
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create request")
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("API-Key", x.apiKey)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to send request")
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, goerr.New("failed to scan URL",
-			goerr.V("status_code", resp.StatusCode),
-			goerr.V("body", string(body)))
-	}
-
-	var result struct {
-		UUID    string `json:"uuid"`
-		Message string `json:"message"`
-		Result  string `json:"result"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, goerr.Wrap(err, "failed to decode response")
-	}
-
-	// Poll the result API until scan is complete
-	resultURL := fmt.Sprintf("%s/result/%s/", x.baseURL, result.UUID)
-	for i := 0; i < 5; i++ { // Try up to 5 times with increasing delay
-		time.Sleep(time.Duration(1<<i) * x.backoff)
-
-		req, err := http.NewRequestWithContext(ctx, "GET", resultURL, nil)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to create result request")
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get result")
-		}
-		defer resp.Body.Close()
-
-		switch resp.StatusCode {
-		case http.StatusOK:
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return nil, goerr.Wrap(err, "failed to read response body")
-			}
-			return &action.Result{
-				Name: name,
-				Data: map[string]any{
-					"body": string(body),
-				},
-			}, nil
-		case http.StatusNotFound:
-			continue
-		default:
-			body, _ := io.ReadAll(resp.Body)
-			return nil, goerr.New("failed to get scan result",
-				goerr.V("status_code", resp.StatusCode),
-				goerr.V("body", string(body)))
-		}
-	}
-
-	return nil, goerr.New("failed to get scan result")
+func (x *Action) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.Int("api_key.len", len(x.apiKey)),
+		slog.String("base_url", x.baseURL),
+		slog.Duration("backoff", x.backoff),
+	)
 }
