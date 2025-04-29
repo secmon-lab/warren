@@ -15,7 +15,7 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/harlog"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
-	"github.com/secmon-lab/warren/pkg/model"
+	"github.com/secmon-lab/warren/pkg/domain/model/message"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
@@ -33,7 +33,7 @@ func TestVerifySNSRequest(t *testing.T) {
 	gt.A(t, logs).Length(1)
 
 	log := logs[0]
-	var snsMessage model.SNSMessage
+	var snsMessage message.SNS
 	bodyData, err := io.ReadAll(log.Request.Body)
 	gt.NoError(t, err)
 	err = json.Unmarshal(bodyData, &snsMessage)
@@ -195,7 +195,7 @@ func TestAlertSNSVerification(t *testing.T) {
 	gt.A(t, logs).Length(1)
 
 	log := logs[0]
-	var snsMessage model.SNSMessage
+	var snsMessage message.SNS
 	bodyData, err := io.ReadAll(log.Request.Body)
 	gt.NoError(t, err)
 	err = json.Unmarshal(bodyData, &snsMessage)

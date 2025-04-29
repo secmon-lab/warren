@@ -1,21 +1,6 @@
 package usecase
 
-import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"sync"
-	"time"
-
-	"cloud.google.com/go/vertexai/genai"
-	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/interfaces"
-	"github.com/secmon-lab/warren/pkg/model"
-	"github.com/secmon-lab/warren/pkg/prompt"
-	"github.com/secmon-lab/warren/pkg/service"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
-)
-
+/*
 type throttleSession struct {
 	ssn  interfaces.LLMSession
 	last time.Time
@@ -33,10 +18,10 @@ func (x *throttleSession) SendMessage(ctx context.Context, msg ...genai.Part) (*
 	return x.ssn.SendMessage(ctx, msg...)
 }
 
-func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
+func (uc *UseCases) RunWorkflow(ctx context.Context, alert alert.Alert) error {
 	logger := logging.From(ctx)
 	thread := uc.slackService.NewThread(*alert.SlackThread)
-	thread.Reply(ctx, "Starting investigation...")
+	msg.Trace(ctx, "Starting investigation...")
 
 	ssn := &throttleSession{
 		ssn:  uc.llmClient.StartChat(),
@@ -51,7 +36,7 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 	for i := 0; i < uc.actionLimit; i++ {
 		actionPrompt, err := planAction(ctx, ssn, prePrompt, uc.actionService)
 		if err != nil {
-			thread.Reply(ctx, "Failed to plan next action: "+err.Error())
+			msg.Trace(ctx, "Failed to plan next action: "+err.Error())
 			return goerr.Wrap(err, "failed to plan action")
 		}
 		logger.Info("action planned", "action", actionPrompt)
@@ -69,14 +54,14 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 			logger.Error("Action failed", "error", err, "action", actionPrompt.Action, "args", actionPrompt.Args)
 
 			msg := fmt.Sprintf("Action failed: %s. Retry...", err.Error())
-			thread.Reply(ctx, msg)
+			msg.Trace(ctx, msg)
 			prePrompt = fmt.Sprintf("The action that you specified previously failed. Please try again. The action is: %s", actionPrompt.Action)
 			continue
 		}
 
 		logger.Info("action executed", "action", actionResult)
 		if err := thread.AttachFile(ctx, actionResult.Message, "result.json", []byte(actionResult.Data)); err != nil {
-			thread.Reply(ctx, "Failed to attach file: "+err.Error())
+			msg.Trace(ctx, "Failed to attach file: "+err.Error())
 			return goerr.Wrap(err, "failed to attach file")
 		}
 
@@ -86,17 +71,17 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 	for i := 0; i < uc.findingLimit && alert.Finding == nil; i++ {
 		finding, err := uc.buildFinding(ctx, ssn)
 		if err != nil {
-			thread.Reply(ctx, "Failed to build finding: "+err.Error())
+			msg.Trace(ctx, "Failed to build finding: "+err.Error())
 			return goerr.Wrap(err, "failed to build finding")
 		}
 		logger.Info("finding built", "finding", finding)
 
 		if err := finding.Severity.Validate(); err != nil {
-			thread.Reply(ctx, "Failed to validate severity. Retry...")
+			msg.Trace(ctx, "Failed to validate severity. Retry...")
 			continue
 		}
 
-		alert.Finding = &model.AlertFinding{
+		alert.Finding = &alert.Finding{
 			Severity:       finding.Severity,
 			Summary:        finding.Summary,
 			Reason:         finding.Reason,
@@ -105,7 +90,7 @@ func (uc *UseCases) RunWorkflow(ctx context.Context, alert model.Alert) error {
 	}
 
 	if alert.Finding == nil {
-		thread.Reply(ctx, "Failed to build finding. Exiting...")
+		msg.Trace(ctx, "Failed to build finding. Exiting...")
 		return nil
 	}
 
@@ -150,7 +135,7 @@ func planAction(ctx context.Context, ssn interfaces.LLMSession, prePrompt string
 	return &result, nil
 }
 
-func (uc *UseCases) buildFinding(ctx context.Context, ssn interfaces.LLMSession) (*model.AlertFinding, error) {
+func (uc *UseCases) buildFinding(ctx context.Context, ssn interfaces.LLMSession) (*alert.Finding, error) {
 	conclusionPrompt, err := prompt.BuildFindingPrompt(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build conclusion prompt")
@@ -173,10 +158,11 @@ func (uc *UseCases) buildFinding(ctx context.Context, ssn interfaces.LLMSession)
 		return nil, eb.New("no conclusion prompt result")
 	}
 
-	var result model.AlertFinding
+	var result alert.Finding
 	if err := json.Unmarshal([]byte(text), &result); err != nil {
 		return nil, eb.Wrap(err, "failed to unmarshal finding prompt result", goerr.V("text", text))
 	}
 
 	return &result, nil
 }
+*/

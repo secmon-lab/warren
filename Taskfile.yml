@@ -1,0 +1,71 @@
+# https://taskfile.dev
+
+version: "3"
+
+tasks:
+  mock:
+    aliases:
+      - m
+    desc: "Generate mock files"
+    deps:
+      - mock_controller_http
+      - mock_model_message
+      - mock_service_githubapp
+      - mock_interfaces
+      - mock_usecase
+
+  mock_controller_http:
+    desc: "Generate mock files for controller/http"
+    cmds:
+      - go tool moq
+        -out pkg/controller/http/mock_test.go
+        -pkg http_test
+        -rm -skip-ensure -stub
+        pkg/controller/http UseCase
+
+  mock_model_message:
+    desc: "Generate mock files for model/message"
+    cmds:
+      - go tool moq
+        -out pkg/domain/model/message/mock_test.go
+        -pkg message_test
+        -rm -skip-ensure -stub
+        pkg/domain/model/message HTTPClient
+
+  mock_service_githubapp:
+    desc: "Generate mock files for service/githubapp"
+    cmds:
+      - go tool moq
+        -out pkg/service/githubapp/mock.go
+        -pkg githubapp
+        -rm -skip-ensure -stub
+        pkg/service/githubapp Client
+
+  mock_interfaces:
+    desc: "Generate mock files for interfaces"
+    cmds:
+      - go tool moq
+        -out pkg/domain/mock/interfaces.go
+        -pkg mock
+        -rm -skip-ensure -stub
+        pkg/domain/interfaces
+        Action
+        SlackClient
+        SlackThreadService
+        LLMSession
+        LLMClient
+        Repository
+        PolicyClient
+        EmbeddingClient
+        StorageClient
+  mock_usecase:
+    desc: "Generate mock files for usecase"
+    cmds:
+      - go tool moq
+        -out pkg/usecase/mock.go
+        -pkg usecase
+        -rm -skip-ensure -stub
+        pkg/usecase
+        SlackEvent
+        SlackInteraction
+        Alert

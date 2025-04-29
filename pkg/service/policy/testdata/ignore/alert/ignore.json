@@ -1,0 +1,192 @@
+{
+  "Findings": [
+    {
+      "SchemaVersion": "2.0",
+      "AccountId": "111111111111",
+      "Region": "region",
+      "Partition": "aws",
+      "Id": "90b971cccd774ee2570756fda343dd2a",
+      "Arn": "arn:aws:guardduty:region:111111111111:detector/42b0d9e4fcad1600d444fc52278999c2/finding/90b971cccd774ee2570756fda343dd2a",
+      "Type": "Stealth:S3/ServerAccessLoggingDisabled",
+      "Resource": {
+        "ResourceType": "AccessKey",
+        "AccessKeyDetails": {
+          "AccessKeyId": "GeneratedFindingAccessKeyId",
+          "PrincipalId": "GeneratedFindingPrincipalId",
+          "UserType": "IAMUser",
+          "UserName": "GeneratedFindingUserName"
+        },
+        "S3BucketDetails": [
+          {
+            "Arn": "arn:aws:s3:::bucketName",
+            "Name": "bucketName",
+            "Type": "Destination",
+            "CreatedAt": "1513612692",
+            "Owner": { "Id": "CanonicalId of Owner" },
+            "Tags": [{ "Key": "foo", "Value": "bar" }],
+            "DefaultServerSideEncryption": {
+              "EncryptionType": "SSEAlgorithm",
+              "KmsMasterKeyArn": "arn:aws:kms:region:123456789012:key/key-id"
+            },
+            "PublicAccess": {
+              "PermissionConfiguration": {
+                "BucketLevelPermissions": {
+                  "AccessControlList": {
+                    "AllowsPublicReadAccess": false,
+                    "AllowsPublicWriteAccess": false
+                  },
+                  "BucketPolicy": {
+                    "AllowsPublicReadAccess": false,
+                    "AllowsPublicWriteAccess": false
+                  },
+                  "BlockPublicAccess": {
+                    "IgnorePublicAcls": false,
+                    "RestrictPublicBuckets": false,
+                    "BlockPublicAcls": false,
+                    "BlockPublicPolicy": false
+                  }
+                },
+                "AccountLevelPermissions": {
+                  "BlockPublicAccess": {
+                    "IgnorePublicAcls": false,
+                    "RestrictPublicBuckets": false,
+                    "BlockPublicAcls": false,
+                    "BlockPublicPolicy": false
+                  }
+                }
+              },
+              "EffectivePermission": "NOT_PUBLIC"
+            }
+          }
+        ],
+        "InstanceDetails": {
+          "InstanceId": "i-99999999",
+          "InstanceType": "m3.xlarge",
+          "OutpostArn": "arn:aws:outposts:region-name:123456789000:outpost/op-0fbc006e9abbc73c3",
+          "LaunchTime": "2016-08-02T02:05:06Z",
+          "Platform": null,
+          "ProductCodes": [
+            {
+              "ProductCodeId": "GeneratedFindingProductCodeId",
+              "ProductCodeType": "GeneratedFindingProductCodeType"
+            }
+          ],
+          "IamInstanceProfile": {
+            "Arn": "GeneratedFindingInstanceProfileArn",
+            "Id": "GeneratedFindingInstanceProfileId"
+          },
+          "NetworkInterfaces": [
+            {
+              "Ipv6Addresses": [],
+              "NetworkInterfaceId": "test",
+              "PrivateDnsName": "GeneratedFindingPrivateDnsName",
+              "PrivateIpAddress": "10.0.0.1",
+              "PrivateIpAddresses": [
+                {
+                  "PrivateDnsName": "GeneratedFindingPrivateName",
+                  "PrivateIpAddress": "10.0.0.1"
+                }
+              ],
+              "SubnetId": "GeneratedFindingSubnetId",
+              "VpcId": "GeneratedFindingVPCId",
+              "SecurityGroups": [
+                {
+                  "GroupName": "GeneratedFindingSecurityGroupName",
+                  "GroupId": "GeneratedFindingSecurityId"
+                }
+              ],
+              "PublicDnsName": "GeneratedFindingPublicDNSName",
+              "PublicIp": "10.51.100.0"
+            }
+          ],
+          "Tags": [
+            {
+              "Key": "GeneratedFindingInstaceTag1",
+              "Value": "GeneratedFindingInstaceValue1"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag2",
+              "Value": "GeneratedFindingInstaceTagValue2"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag3",
+              "Value": "GeneratedFindingInstaceTagValue3"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag4",
+              "Value": "GeneratedFindingInstaceTagValue4"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag5",
+              "Value": "GeneratedFindingInstaceTagValue5"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag6",
+              "Value": "GeneratedFindingInstaceTagValue6"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag7",
+              "Value": "GeneratedFindingInstaceTagValue7"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag8",
+              "Value": "GeneratedFindingInstaceTagValue8"
+            },
+            {
+              "Key": "GeneratedFindingInstaceTag9",
+              "Value": "GeneratedFindingInstaceTagValue9"
+            }
+          ],
+          "InstanceState": "running",
+          "AvailabilityZone": "GeneratedFindingInstaceAvailabilityZone",
+          "ImageId": "ami-99999999",
+          "ImageDescription": "GeneratedFindingInstaceImageDescription"
+        }
+      },
+      "Service": {
+        "ServiceName": "guardduty",
+        "DetectorId": "11a1a1a1aaaa1111a111aa11111111a1",
+        "Action": {
+          "ActionType": "AWS_API_CALL",
+          "AwsApiCallAction": {
+            "Api": "GeneratedFindingAPIName",
+            "ServiceName": "GeneratedFindingAPIServiceName",
+            "CallerType": "Remote IP",
+            "RemoteIpDetails": {
+              "IpAddressV4": "10.51.100.0",
+              "Organization": {
+                "Asn": "-1",
+                "AsnOrg": "GeneratedFindingASNOrg",
+                "Isp": "GeneratedFindingISP",
+                "Org": "GeneratedFindingORG"
+              },
+              "Country": { "CountryName": "GeneratedFindingCountryName" },
+              "City": { "CityName": "GeneratedFindingCityName" },
+              "GeoLocation": { "Lat": 44.972686, "Lon": -65.860879 }
+            },
+            "AffectedResources": {
+              "AWS::S3::Bucket": "GeneratedFindingS3Bucket"
+            }
+          }
+        },
+        "ResourceRole": "TARGET",
+        "AdditionalInfo": {
+          "Unusual": {
+            "HoursOfDay": [1513609200000],
+            "UserNames": ["GeneratedFindingUserName"]
+          },
+          "Sample": true
+        },
+        "EventFirstSeen": "2020-06-23T23:53:14.222Z",
+        "EventLastSeen": "2020-06-24T00:26:33.501Z",
+        "Archived": false,
+        "Count": 2
+      },
+      "Severity": 2,
+      "CreatedAt": "2020-06-23T23:53:14.222Z",
+      "UpdatedAt": "2020-06-24T00:26:33.501Z",
+      "Title": "Amazon S3 Server Access Logging was disabled for S3 bucket GeneratedFindingS3Bucket.",
+      "Description": "Amazon S3 Server Access Logging was disabled for S3 bucket GeneratedFindingS3Bucket by GeneratedFindingUserName calling PutBucketLogging. This can lead to lack of visibility into actions taken on the affected S3 bucket and its objects if an event occurs."
+    }
+  ]
+}
