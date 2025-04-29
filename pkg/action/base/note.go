@@ -4,11 +4,10 @@ import (
 	"context"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 )
 
-func (x *Base) putNote(ctx context.Context, args map[string]any) (*action.Result, error) {
+func (x *Base) putNote(ctx context.Context, args map[string]any) (map[string]any, error) {
 	noteRaw, ok := args["note"]
 	if !ok {
 		return nil, goerr.New("note is required")
@@ -25,15 +24,12 @@ func (x *Base) putNote(ctx context.Context, args map[string]any) (*action.Result
 		return nil, goerr.Wrap(err, "failed to put note")
 	}
 
-	return &action.Result{
-		Name: "base.note.put",
-		Data: map[string]any{
-			"note": note,
-		},
+	return map[string]any{
+		"note": note,
 	}, nil
 }
 
-func (x *Base) getNotes(ctx context.Context, args map[string]any) (*action.Result, error) {
+func (x *Base) getNotes(ctx context.Context, args map[string]any) (map[string]any, error) {
 	var limit, offset int64
 
 	if limitVal, ok := args["limit"].(float64); ok {
@@ -66,13 +62,10 @@ func (x *Base) getNotes(ctx context.Context, args map[string]any) (*action.Resul
 		rows = append(rows, note.Note)
 	}
 
-	return &action.Result{
-		Name: "base.note.get",
-		Data: map[string]any{
-			"notes":  rows,
-			"count":  len(notes),
-			"offset": offset,
-			"limit":  limit,
-		},
+	return map[string]any{
+		"notes":  rows,
+		"count":  len(notes),
+		"offset": offset,
+		"limit":  limit,
 	}, nil
 }

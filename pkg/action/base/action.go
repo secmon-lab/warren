@@ -7,7 +7,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/urfave/cli/v3"
 )
@@ -113,7 +112,7 @@ func (x *Base) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 	}, nil
 }
 
-func (x *Base) Run(ctx context.Context, name string, args map[string]any) (*action.Result, error) {
+func (x *Base) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
 	switch name {
 	case "base.alerts.get":
 		return x.getAlerts(ctx, args)

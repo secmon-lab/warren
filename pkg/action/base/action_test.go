@@ -6,8 +6,6 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/action/base"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 )
@@ -17,21 +15,21 @@ func TestBase(t *testing.T) {
 		name     string
 		funcName string
 		args     map[string]any
-		wantResp *action.Result
+		wantResp map[string]any
 		wantErr  bool
 	}{
 		{
 			name:     "get alerts",
 			funcName: "base.alerts.get",
 			args: map[string]any{
-				"limit":  10,
-				"offset": 0,
+				"limit":  float64(10),
+				"offset": float64(0),
 			},
-			wantResp: &action.Result{
-				Name: "base.alerts",
-				Data: map[string]any{
-					"alerts": []alert.Alert{},
-				},
+			wantResp: map[string]any{
+				"alerts": []string{},
+				"count":  0,
+				"offset": int64(0),
+				"limit":  int64(10),
 			},
 			wantErr: false,
 		},
@@ -42,14 +40,14 @@ func TestBase(t *testing.T) {
 				"path":   "status",
 				"op":     "==",
 				"value":  "open",
-				"limit":  10,
-				"offset": 0,
+				"limit":  float64(10),
+				"offset": float64(0),
 			},
-			wantResp: &action.Result{
-				Name: "base.alerts",
-				Data: map[string]any{
-					"alerts": []alert.Alert{},
-				},
+			wantResp: map[string]any{
+				"alerts": map[string]any{},
+				"count":  0,
+				"offset": float64(0),
+				"limit":  float64(10),
 			},
 			wantErr: false,
 		},

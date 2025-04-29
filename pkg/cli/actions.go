@@ -9,7 +9,14 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-type actionList []gollam.ToolSet
+type builtinAction interface {
+	Name() string
+	Flags() []cli.Flag
+	LogValue() slog.Value
+	gollam.ToolSet
+}
+
+type actionList []builtinAction
 
 var actions = actionList{
 	&urlscan.Action{},

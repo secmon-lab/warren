@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/action/base"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
@@ -62,7 +63,7 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to configure firestore")
 			}
 
-			geminiClient, err := geminiCfg.Configure(ctx)
+			llmClient, err := geminiCfg.Configure(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to configure gemini")
 			}
@@ -115,6 +116,8 @@ func cmdChat() *cli.Command {
 			ssn := session_model.New(ctx, nil, nil, alertIDs)
 
 			actions = append(actions, base.New(repo, alertIDs, policyClient.Sources(), ssn.ID))
+
+			agent := gollam.New(llmClient)
 			actionSvc, err := action.New(ctx, actions)
 			if err != nil {
 				return goerr.Wrap(err, "failed to configure action")
@@ -122,7 +125,7 @@ func cmdChat() *cli.Command {
 
 			clients := interfaces.NewClients(
 				interfaces.WithRepository(repo),
-				interfaces.WithLLMClient(geminiClient),
+				interfaces.WithLLMClient(llmClient),
 				interfaces.WithStorageClient(storageClient),
 			)
 			ssnSvc := session.New(clients, actionSvc, ssn)

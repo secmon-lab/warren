@@ -4,21 +4,17 @@ import (
 	"context"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
-func (x *Base) listPolicies(ctx context.Context, _ map[string]any) (*action.Result, error) {
+func (x *Base) listPolicies(ctx context.Context, _ map[string]any) (map[string]any, error) {
 	var rows []any
 	for name := range x.policies {
 		rows = append(rows, name)
 	}
 
-	result := &action.Result{
-		Name: "base.policy.list",
-		Data: map[string]any{
-			"policies": rows,
-		},
+	result := map[string]any{
+		"policies": rows,
 	}
 
 	logging.From(ctx).Debug("list policies", "policies", rows)
@@ -26,13 +22,10 @@ func (x *Base) listPolicies(ctx context.Context, _ map[string]any) (*action.Resu
 	return result, nil
 }
 
-func (x *Base) getPolicy(ctx context.Context, args map[string]any) (*action.Result, error) {
-	errResp := func(msg string) (*action.Result, error) {
-		return &action.Result{
-			Name: "base.policy.get",
-			Data: map[string]any{
-				"policy": "",
-			},
+func (x *Base) getPolicy(ctx context.Context, args map[string]any) (map[string]any, error) {
+	errResp := func(msg string) (map[string]any, error) {
+		return map[string]any{
+			"policy": "",
 		}, goerr.New(msg)
 	}
 
@@ -51,11 +44,8 @@ func (x *Base) getPolicy(ctx context.Context, args map[string]any) (*action.Resu
 		return errResp("Policy not found")
 	}
 
-	result := &action.Result{
-		Name: "base.policy.get",
-		Data: map[string]any{
-			"policy": policy,
-		},
+	result := map[string]any{
+		"policy": policy,
 	}
 
 	logging.From(ctx).Debug("get policy", "policy", policy)

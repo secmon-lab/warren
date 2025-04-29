@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
-func (x *Base) getAlerts(ctx context.Context, args map[string]any) (*action.Result, error) {
+func (x *Base) getAlerts(ctx context.Context, args map[string]any) (map[string]any, error) {
 	var limit, offset int64
 
 	if limitVal, ok := args["limit"].(float64); ok {
@@ -27,7 +27,7 @@ func (x *Base) getAlerts(ctx context.Context, args map[string]any) (*action.Resu
 	// Apply pagination
 	if offset > 0 {
 		if offset >= int64(len(alerts)) {
-			alerts = nil
+			alerts = alert.Alerts{}
 		} else {
 			alerts = alerts[offset:]
 		}
@@ -37,7 +37,7 @@ func (x *Base) getAlerts(ctx context.Context, args map[string]any) (*action.Resu
 		alerts = alerts[:limit]
 	}
 
-	var rows []string
+	rows := make([]string, 0, len(alerts))
 	for _, alert := range alerts {
 		raw, err := json.Marshal(alert)
 		if err != nil {
@@ -46,15 +46,15 @@ func (x *Base) getAlerts(ctx context.Context, args map[string]any) (*action.Resu
 		rows = append(rows, string(raw))
 	}
 
-	return &action.Result{
-		Name: "base.alerts",
-		Data: map[string]any{
-			"alerts": rows,
-		},
+	return map[string]any{
+		"alerts": rows,
+		"count":  len(alerts),
+		"offset": offset,
+		"limit":  limit,
 	}, nil
 }
 
-func (x *Base) searchAlerts(ctx context.Context, args map[string]any) (*action.Result, error) {
+func (x *Base) searchAlerts(ctx context.Context, args map[string]any) (map[string]any, error) {
 	path, err := getArg[string](args, "path")
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get path")
@@ -70,14 +70,12 @@ func (x *Base) searchAlerts(ctx context.Context, args map[string]any) (*action.R
 		return nil, goerr.Wrap(err, "failed to get value")
 	}
 
-	offset, err := getArg[float64](args, "offset")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get offset")
+	var offset, limit float64
+	if offsetVal, ok := args["offset"].(float64); ok {
+		offset = offsetVal
 	}
-
-	limit, err := getArg[float64](args, "limit")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get limit")
+	if limitVal, ok := args["limit"].(float64); ok {
+		limit = limitVal
 	}
 	if limit <= 0 {
 		limit = 25
@@ -109,13 +107,15 @@ func (x *Base) searchAlerts(ctx context.Context, args map[string]any) (*action.R
 		alertMap[alert.ID.String()] = string(raw)
 	}
 
-	return &action.Result{
-		Name: "base.alerts",
-		Data: alertMap,
+	return map[string]any{
+		"alerts": alertMap,
+		"count":  len(alerts),
+		"offset": offset,
+		"limit":  limit,
 	}, nil
 }
 
-func (x *Base) resolveAlert(ctx context.Context, args map[string]any) (*action.Result, error) {
+func (x *Base) resolveAlert(ctx context.Context, args map[string]any) (map[string]any, error) {
 	strAlertID, err := getArg[string](args, "alert_id")
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get alert_id")
@@ -152,5 +152,7 @@ func (x *Base) resolveAlert(ctx context.Context, args map[string]any) (*action.R
 		return nil, goerr.Wrap(err, "failed to put alert")
 	}
 
-	return nil, nil
+	return map[string]any{
+		"status": "resolved",
+	}, nil
 }
