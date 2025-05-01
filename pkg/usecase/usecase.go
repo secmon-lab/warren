@@ -7,7 +7,6 @@ import (
 	"github.com/m-mizutani/gollam"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/slack"
 )
@@ -22,9 +21,6 @@ type UseCases struct {
 	policyClient    interfaces.PolicyClient
 
 	agent *gollam.Agent
-
-	// test data set
-	testDataSet *policy.TestDataSet
 
 	// configs
 	timeSpan      time.Duration
