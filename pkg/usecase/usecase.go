@@ -27,9 +27,10 @@ type UseCases struct {
 	testDataSet *policy.TestDataSet
 
 	// configs
-	timeSpan     time.Duration
-	actionLimit  int
-	findingLimit int
+	timeSpan      time.Duration
+	actionLimit   int
+	findingLimit  int
+	storagePrefix string
 }
 
 var _ Alert = &UseCases{}
@@ -96,6 +97,12 @@ func WithActionLimit(actionLimit int) Option {
 func WithFindingLimit(findingLimit int) Option {
 	return func(u *UseCases) {
 		u.findingLimit = findingLimit
+	}
+}
+
+func WithStoragePrefix(storagePrefix string) Option {
+	return func(u *UseCases) {
+		u.storagePrefix = storagePrefix
 	}
 }
 

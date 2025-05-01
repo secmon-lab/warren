@@ -10,10 +10,9 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/service/command/aggr"
 	"github.com/secmon-lab/warren/pkg/service/command/list"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/ptr"
@@ -24,8 +23,8 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg *slack.M
 	logger := logging.From(ctx)
 	logger.Debug("slack app mention event", "mention", slackMsg.Mention(), "slack_thread", slackMsg.Thread())
 
-	st := uc.slackService.NewThread(slackMsg.Thread())
-	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
+	threadSvc := uc.slackService.NewThread(slackMsg.Thread())
+	ctx = msg.With(ctx, threadSvc.Reply, threadSvc.NewStateFunc)
 
 	// Nothing to do
 	for _, mention := range slackMsg.Mention() {
@@ -47,6 +46,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg *slack.M
 			return goerr.Wrap(err, "failed to create or get session")
 		}
 
+		return uc.handlePrompt(ctx, threadSvc, ssn, mention.Message)
 	}
 
 	return nil
@@ -67,6 +67,7 @@ func messageToArgs(message string) (string, string) {
 	return strings.ToLower(strings.TrimSpace(args[0])), strings.TrimSpace(args[1])
 }
 
+/*
 func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack_svc.ThreadService, user slack.User, alertIDs []types.AlertID, message string) error {
 	command, remaining := messageToArgs(message)
 	if command == "" {
@@ -84,6 +85,7 @@ func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack_sv
 		return errUnknownCommand
 	}
 }
+*/
 
 func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.Message, message string) error {
 	command, remaining := messageToArgs(message)
@@ -106,7 +108,7 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.
 		if err != nil {
 			return goerr.Wrap(err, "failed to create or get session")
 		}
-		return uc.handleSlackChatCommand(ctx, threadSvc, ssn, remaining)
+		return uc.handlePrompt(ctx, threadSvc, ssn, remaining)
 
 	default:
 		msg.Notify(ctx, "🤔 Available commands: `list`")
@@ -123,21 +125,30 @@ func (uc *UseCases) handlePrompt(ctx context.Context, threadSvc *slack_svc.Threa
 		gollam.WithLogger(logging.From(ctx)),
 	)
 
-	history, err := uc.repository.GetLatestHistory(ctx, ssn.ID)
+	storageSvc := storage.New(uc.storageClient, storage.WithPrefix(uc.storagePrefix))
+
+	latest, err := uc.repository.GetLatestHistory(ctx, ssn.ID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get latest history")
 	}
-	historyData, err := uc.storageClient.GetObject(ctx, history.ID)
+
+	history, err := storageSvc.GetHistory(ctx, ssn.ID, latest.ID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get history data")
 	}
 
-	history, err = agent.Prompt(ctx, message, gollam.WithHistory(history))
+	newHistory, err := agent.Prompt(ctx, message, gollam.WithHistory(history))
 	if err != nil {
 		return goerr.Wrap(err, "failed to prompt")
 	}
 
-	if err = uc.repository.PutHistory(ctx, ssn.ID, history); err != nil {
+	newLatest := session.NewHistory(ctx, ssn.ID)
+
+	if err = storageSvc.PutHistory(ctx, ssn.ID, newLatest.ID, newHistory); err != nil {
+		return goerr.Wrap(err, "failed to put history")
+	}
+
+	if err = uc.repository.PutHistory(ctx, ssn.ID, newLatest); err != nil {
 		return goerr.Wrap(err, "failed to put history")
 	}
 

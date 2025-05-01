@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
@@ -13,6 +14,14 @@ type History struct {
 	CreatedAt time.Time       `firestore:"created_at" json:"created_at"`
 }
 
+func NewHistory(ctx context.Context, ssnID types.SessionID) *History {
+	return &History{
+		ID:        types.NewHistoryID(),
+		SessionID: ssnID,
+		CreatedAt: time.Now().UTC(),
+	}
+}
+
 func (x *History) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
@@ -20,6 +29,7 @@ func (x *History) LogValue() slog.Value {
 
 	return slog.GroupValue(
 		slog.String("id", x.ID.String()),
+		slog.String("session_id", x.SessionID.String()),
 		slog.Any("created_at", x.CreatedAt),
 	)
 }
