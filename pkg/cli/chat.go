@@ -10,11 +10,8 @@ import (
 	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/action/base"
 	"github.com/secmon-lab/warren/pkg/cli/config"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	session_model "github.com/secmon-lab/warren/pkg/domain/model/session"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/service/action"
-	"github.com/secmon-lab/warren/pkg/service/session"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/term"
@@ -68,11 +65,6 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to configure gemini")
 			}
 
-			storageClient, err := storageCfg.Configure(ctx)
-			if err != nil {
-				return goerr.Wrap(err, "failed to configure storage")
-			}
-
 			if (alertID == "") == (alertListID == "") {
 				return goerr.New("either alert-id or alert-list-id must be provided")
 			}
@@ -113,25 +105,18 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to configure policy")
 			}
 
-			ssn := session_model.New(ctx, nil, nil, alertIDs)
+			ssn := session.New(ctx, nil, alertIDs)
 
 			actions = append(actions, base.New(repo, alertIDs, policyClient.Sources(), ssn.ID))
 
-			agent := gollam.New(llmClient)
-			actionSvc, err := action.New(ctx, actions)
-			if err != nil {
-				return goerr.Wrap(err, "failed to configure action")
-			}
-
-			clients := interfaces.NewClients(
-				interfaces.WithRepository(repo),
-				interfaces.WithLLMClient(llmClient),
-				interfaces.WithStorageClient(storageClient),
+			agent := gollam.New(llmClient,
+				gollam.WithToolSets(actions.ToolSets()...),
+				gollam.WithResponseMode(gollam.ResponseModeStreaming),
 			)
-			ssnSvc := session.New(clients, actionSvc, ssn)
 
 			ctx = msg.With(ctx, notify, newTrace)
 
+			var history *gollam.History
 			for {
 				msg, err := recvInput()
 				if err != nil {
@@ -145,7 +130,8 @@ func cmdChat() *cli.Command {
 					break
 				}
 
-				if err := ssnSvc.Chat(ctx, msg); err != nil {
+				history, err = agent.Prompt(ctx, msg, gollam.WithHistory(history))
+				if err != nil {
 					return goerr.Wrap(err, "failed to chat")
 				}
 			}

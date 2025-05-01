@@ -6,6 +6,7 @@ package mock
 import (
 	"cloud.google.com/go/vertexai/genai"
 	"context"
+	"github.com/m-mizutani/gollam"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -2438,5 +2439,243 @@ func (mock *StorageClientMock) PutObjectCalls() []struct {
 	mock.lockPutObject.RLock()
 	calls = mock.calls.PutObject
 	mock.lockPutObject.RUnlock()
+	return calls
+}
+
+// LLMClientMock is a mock implementation of interfaces.LLMClient.
+//
+//	func TestSomethingThatUsesLLMClient(t *testing.T) {
+//
+//		// make and configure a mocked interfaces.LLMClient
+//		mockedLLMClient := &LLMClientMock{
+//			NewSessionFunc: func(ctx context.Context, options ...gollam.SessionOption) (gollam.Session, error) {
+//				panic("mock out the NewSession method")
+//			},
+//		}
+//
+//		// use mockedLLMClient in code that requires interfaces.LLMClient
+//		// and then make assertions.
+//
+//	}
+type LLMClientMock struct {
+	// NewSessionFunc mocks the NewSession method.
+	NewSessionFunc func(ctx context.Context, options ...gollam.SessionOption) (gollam.Session, error)
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// NewSession holds details about calls to the NewSession method.
+		NewSession []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Options is the options argument value.
+			Options []gollam.SessionOption
+		}
+	}
+	lockNewSession sync.RWMutex
+}
+
+// NewSession calls NewSessionFunc.
+func (mock *LLMClientMock) NewSession(ctx context.Context, options ...gollam.SessionOption) (gollam.Session, error) {
+	callInfo := struct {
+		Ctx     context.Context
+		Options []gollam.SessionOption
+	}{
+		Ctx:     ctx,
+		Options: options,
+	}
+	mock.lockNewSession.Lock()
+	mock.calls.NewSession = append(mock.calls.NewSession, callInfo)
+	mock.lockNewSession.Unlock()
+	if mock.NewSessionFunc == nil {
+		var (
+			sessionOut gollam.Session
+			errOut     error
+		)
+		return sessionOut, errOut
+	}
+	return mock.NewSessionFunc(ctx, options...)
+}
+
+// NewSessionCalls gets all the calls that were made to NewSession.
+// Check the length with:
+//
+//	len(mockedLLMClient.NewSessionCalls())
+func (mock *LLMClientMock) NewSessionCalls() []struct {
+	Ctx     context.Context
+	Options []gollam.SessionOption
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Options []gollam.SessionOption
+	}
+	mock.lockNewSession.RLock()
+	calls = mock.calls.NewSession
+	mock.lockNewSession.RUnlock()
+	return calls
+}
+
+// LLMSessionMock is a mock implementation of interfaces.LLMSession.
+//
+//	func TestSomethingThatUsesLLMSession(t *testing.T) {
+//
+//		// make and configure a mocked interfaces.LLMSession
+//		mockedLLMSession := &LLMSessionMock{
+//			GenerateContentFunc: func(ctx context.Context, input ...gollam.Input) (*gollam.Response, error) {
+//				panic("mock out the GenerateContent method")
+//			},
+//			GenerateStreamFunc: func(ctx context.Context, input ...gollam.Input) (<-chan *gollam.Response, error) {
+//				panic("mock out the GenerateStream method")
+//			},
+//			HistoryFunc: func() *gollam.History {
+//				panic("mock out the History method")
+//			},
+//		}
+//
+//		// use mockedLLMSession in code that requires interfaces.LLMSession
+//		// and then make assertions.
+//
+//	}
+type LLMSessionMock struct {
+	// GenerateContentFunc mocks the GenerateContent method.
+	GenerateContentFunc func(ctx context.Context, input ...gollam.Input) (*gollam.Response, error)
+
+	// GenerateStreamFunc mocks the GenerateStream method.
+	GenerateStreamFunc func(ctx context.Context, input ...gollam.Input) (<-chan *gollam.Response, error)
+
+	// HistoryFunc mocks the History method.
+	HistoryFunc func() *gollam.History
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// GenerateContent holds details about calls to the GenerateContent method.
+		GenerateContent []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Input is the input argument value.
+			Input []gollam.Input
+		}
+		// GenerateStream holds details about calls to the GenerateStream method.
+		GenerateStream []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Input is the input argument value.
+			Input []gollam.Input
+		}
+		// History holds details about calls to the History method.
+		History []struct {
+		}
+	}
+	lockGenerateContent sync.RWMutex
+	lockGenerateStream  sync.RWMutex
+	lockHistory         sync.RWMutex
+}
+
+// GenerateContent calls GenerateContentFunc.
+func (mock *LLMSessionMock) GenerateContent(ctx context.Context, input ...gollam.Input) (*gollam.Response, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		Input []gollam.Input
+	}{
+		Ctx:   ctx,
+		Input: input,
+	}
+	mock.lockGenerateContent.Lock()
+	mock.calls.GenerateContent = append(mock.calls.GenerateContent, callInfo)
+	mock.lockGenerateContent.Unlock()
+	if mock.GenerateContentFunc == nil {
+		var (
+			responseOut *gollam.Response
+			errOut      error
+		)
+		return responseOut, errOut
+	}
+	return mock.GenerateContentFunc(ctx, input...)
+}
+
+// GenerateContentCalls gets all the calls that were made to GenerateContent.
+// Check the length with:
+//
+//	len(mockedLLMSession.GenerateContentCalls())
+func (mock *LLMSessionMock) GenerateContentCalls() []struct {
+	Ctx   context.Context
+	Input []gollam.Input
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Input []gollam.Input
+	}
+	mock.lockGenerateContent.RLock()
+	calls = mock.calls.GenerateContent
+	mock.lockGenerateContent.RUnlock()
+	return calls
+}
+
+// GenerateStream calls GenerateStreamFunc.
+func (mock *LLMSessionMock) GenerateStream(ctx context.Context, input ...gollam.Input) (<-chan *gollam.Response, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		Input []gollam.Input
+	}{
+		Ctx:   ctx,
+		Input: input,
+	}
+	mock.lockGenerateStream.Lock()
+	mock.calls.GenerateStream = append(mock.calls.GenerateStream, callInfo)
+	mock.lockGenerateStream.Unlock()
+	if mock.GenerateStreamFunc == nil {
+		var (
+			responseChOut <-chan *gollam.Response
+			errOut        error
+		)
+		return responseChOut, errOut
+	}
+	return mock.GenerateStreamFunc(ctx, input...)
+}
+
+// GenerateStreamCalls gets all the calls that were made to GenerateStream.
+// Check the length with:
+//
+//	len(mockedLLMSession.GenerateStreamCalls())
+func (mock *LLMSessionMock) GenerateStreamCalls() []struct {
+	Ctx   context.Context
+	Input []gollam.Input
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Input []gollam.Input
+	}
+	mock.lockGenerateStream.RLock()
+	calls = mock.calls.GenerateStream
+	mock.lockGenerateStream.RUnlock()
+	return calls
+}
+
+// History calls HistoryFunc.
+func (mock *LLMSessionMock) History() *gollam.History {
+	callInfo := struct {
+	}{}
+	mock.lockHistory.Lock()
+	mock.calls.History = append(mock.calls.History, callInfo)
+	mock.lockHistory.Unlock()
+	if mock.HistoryFunc == nil {
+		var (
+			historyOut *gollam.History
+		)
+		return historyOut
+	}
+	return mock.HistoryFunc()
+}
+
+// HistoryCalls gets all the calls that were made to History.
+// Check the length with:
+//
+//	len(mockedLLMSession.HistoryCalls())
+func (mock *LLMSessionMock) HistoryCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockHistory.RLock()
+	calls = mock.calls.History
+	mock.lockHistory.RUnlock()
 	return calls
 }

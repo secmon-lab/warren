@@ -39,3 +39,11 @@ func (x actionList) LogValue() slog.Value {
 	}
 	return slog.GroupValue(attrs...)
 }
+
+func (x actionList) ToolSets() []gollam.ToolSet {
+	toolSets := []gollam.ToolSet{}
+	for _, action := range x {
+		toolSets = append(toolSets, action)
+	}
+	return toolSets
+}

@@ -3,14 +3,14 @@ package alert
 import (
 	"context"
 
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-func GenerateAlertListMeta(ctx context.Context, list alert.List, llmClient interfaces.LLMClient) (*prompt.MetaListPromptResult, error) {
+func GenerateAlertListMeta(ctx context.Context, list alert.List, llmClient gollam.LLMClient) (*prompt.MetaListPromptResult, error) {
 	p, err := prompt.BuildMetaListPrompt(ctx, list)
 	if err != nil {
 		return nil, err
@@ -29,7 +29,13 @@ func GenerateAlertListMeta(ctx context.Context, list alert.List, llmClient inter
 	var result *prompt.MetaListPromptResult
 	for range maxRetryCount {
 		ctx = msg.Trace(ctx, "🤖 Generating meta data of alert list... (%s)", list.ID.String())
-		resp, err := llm.Ask[prompt.MetaListPromptResult](ctx, llmClient.SendMessage, p)
+
+		llmSession, err := llmClient.NewSession(ctx, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		resp, err := llm.Ask[prompt.MetaListPromptResult](ctx, llmSession, p)
 
 		if err == nil {
 			result = resp

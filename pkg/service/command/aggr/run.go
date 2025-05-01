@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/gemini"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/command/list"
@@ -17,7 +17,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-func Run(ctx context.Context, repo interfaces.Repository, slackThread *slack_svc.ThreadService, llmClient interfaces.LLMClient, user slack.User, alertIDs []types.AlertID, remaining string) error {
+func Run(ctx context.Context, repo interfaces.Repository, slackThread *slack_svc.ThreadService, llm gollam.LLMClient, user slack.User, alertIDs []types.AlertID, remaining string) error {
 	ctx = msg.NewTrace(ctx, "🤖 Aggregating alerts...")
 
 	alerts, err := repo.BatchGetAlerts(ctx, alertIDs)
@@ -59,12 +59,8 @@ func Run(ctx context.Context, repo interfaces.Repository, slackThread *slack_svc
 	}
 
 	var lists []alert.List
-	query := llmClient.NewQuery(
-		gemini.WithContentType("application/json"),
-	)
-
 	for _, cluster := range clusters {
-		newList, err := list.CreateList(ctx, repo, query, threadModel, &user, cluster)
+		newList, err := list.CreateList(ctx, repo, llm, threadModel, &user, cluster)
 		if err != nil {
 			return goerr.Wrap(err, "failed to create alert list")
 		}

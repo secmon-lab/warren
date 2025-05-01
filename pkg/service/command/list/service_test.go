@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"cloud.google.com/go/vertexai/genai"
+	"github.com/m-mizutani/gollam"
 	"github.com/m-mizutani/gt"
 
 	"github.com/secmon-lab/warren/pkg/domain/mock"
@@ -33,16 +33,14 @@ func TestService_Run(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
 	llm := &mock.LLMClientMock{
-		SendMessageFunc: func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
-			return &genai.GenerateContentResponse{
-				Candidates: []*genai.Candidate{
-					{
-						Content: &genai.Content{
-							Parts: []genai.Part{
-								genai.Text(`{"title": "test title", "description": "test description"}`),
-							},
+		NewSessionFunc: func(ctx context.Context, opts ...gollam.SessionOption) (gollam.Session, error) {
+			return &mock.LLMSessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollam.Input) (*gollam.Response, error) {
+					return &gollam.Response{
+						Texts: []string{
+							`{"title": "test title", "description": "test description"}`,
 						},
-					},
+					}, nil
 				},
 			}, nil
 		},
@@ -50,9 +48,8 @@ func TestService_Run(t *testing.T) {
 
 	svc := list.New(repo, llm)
 	slackService := slack_svc.NewTestService(t)
-	th, err := slackService.PostMessage(ctx, "test message")
+	threadService, err := slackService.PostMessage(ctx, "test message")
 	gt.NoError(t, err).Required()
-	slackThread := th
 	user := &slack.User{
 		ID:   "U0123456789",
 		Name: "Test User",
@@ -257,7 +254,12 @@ func TestService_Run(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Run test
-			listID, err := svc.Run(ctx, slackThread, user, tt.input)
+			user := &slack.User{
+				ID:   "U0123456789",
+				Name: "Test User",
+			}
+
+			listID, err := svc.Run(ctx, threadService, user, tt.input)
 
 			// Validate error
 			if tt.expectedError != "" {

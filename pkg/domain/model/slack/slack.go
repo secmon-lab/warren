@@ -19,11 +19,15 @@ type Message struct {
 
 	// If empty, the message is the first message in the thread
 	threadID string
+	teamID   string
 
-	teamID string
+	user     User
+	msg      string
+	ts       string
+	mentions []Mention
 }
 
-func (x *Message) SlackThread() Thread {
+func (x *Message) Thread() Thread {
 	th := Thread{
 		TeamID:    x.teamID,
 		ChannelID: x.channel,
@@ -35,6 +39,22 @@ func (x *Message) SlackThread() Thread {
 	return th
 }
 
+func (x *Message) Mention() []Mention {
+	return x.mentions
+}
+
+func (x *Message) User() User {
+	return x.user
+}
+
+func (x *Message) Text() string {
+	return x.msg
+}
+
+func (x *Message) Timestamp() string {
+	return x.ts
+}
+
 func NewMessage(ctx context.Context, ev *slackevents.EventsAPIEvent) *Message {
 	switch inEv := ev.InnerEvent.Data.(type) {
 	case *slackevents.AppMentionEvent:
@@ -43,6 +63,13 @@ func NewMessage(ctx context.Context, ev *slackevents.EventsAPIEvent) *Message {
 			channel:  inEv.Channel,
 			threadID: inEv.ThreadTimeStamp,
 			teamID:   ev.TeamID,
+			user: User{
+				ID:   inEv.User,
+				Name: inEv.User,
+			},
+			msg:      inEv.Text,
+			ts:       inEv.TimeStamp,
+			mentions: ParseMention(inEv.Text),
 		}
 
 	case *slackevents.MessageEvent:
@@ -51,6 +78,12 @@ func NewMessage(ctx context.Context, ev *slackevents.EventsAPIEvent) *Message {
 			channel:  inEv.Channel,
 			threadID: inEv.ThreadTimeStamp,
 			teamID:   ev.TeamID,
+			user: User{
+				ID:   inEv.User,
+				Name: inEv.User,
+			},
+			msg: inEv.Text,
+			ts:  inEv.TimeStamp,
 		}
 
 	default:

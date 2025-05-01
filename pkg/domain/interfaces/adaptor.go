@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/m-mizutani/gollam"
 	"github.com/m-mizutani/opaq"
 	"github.com/slack-go/slack"
 )
@@ -34,4 +35,12 @@ type SlackClient interface {
 type SlackThreadService interface {
 	Reply(ctx context.Context, message string)
 	NewStateFunc(ctx context.Context, message string) func(ctx context.Context, msg string)
+}
+
+type LLMClient interface {
+	gollam.LLMClient
+}
+
+type LLMSession interface {
+	gollam.Session
 }

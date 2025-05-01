@@ -12,7 +12,25 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-// HandleSlackInteractionViewSubmissionResolveAlert handles a slack interaction view submission for "resolving an alert".
+func (uc *UseCases) HandleSlackInteractionViewSubmission(ctx context.Context, user slack.User, callbackID slack.CallbackID, metadata string, values slack.StateValue) error {
+	logger := logging.From(ctx)
+	logger.Debug("resolving alert",
+		"user", user,
+		"callback_id", callbackID,
+		"metadata", metadata,
+		"values", values,
+	)
+
+	switch callbackID {
+	case slack.CallbackSubmitResolveAlert:
+		return uc.HandleSlackInteractionViewSubmissionResolveAlert(ctx, user, metadata, values)
+	case slack.CallbackSubmitResolveList:
+		return uc.HandleSlackInteractionViewSubmissionResolveList(ctx, user, metadata, values)
+	}
+
+	return nil
+}
+
 func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
 	logger := logging.From(ctx)
 	logger.Debug("resolving alert",

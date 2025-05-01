@@ -9,8 +9,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/service/action"
-	"github.com/secmon-lab/warren/pkg/service/githubapp"
 	"github.com/secmon-lab/warren/pkg/service/slack"
 )
 
@@ -22,8 +20,8 @@ type UseCases struct {
 	repository      interfaces.Repository
 	storageClient   interfaces.StorageClient
 	policyClient    interfaces.PolicyClient
-	githubApp       *githubapp.Service
-	actionSvc       *action.Service
+
+	agent *gollam.Agent
 
 	// test data set
 	testDataSet *policy.TestDataSet
@@ -76,15 +74,9 @@ func WithRepository(repository interfaces.Repository) Option {
 	}
 }
 
-func WithGitHubApp(githubApp *githubapp.Service) Option {
+func WithAgent(agent *gollam.Agent) Option {
 	return func(u *UseCases) {
-		u.githubApp = githubApp
-	}
-}
-
-func WithActionService(actionSvc *action.Service) Option {
-	return func(u *UseCases) {
-		u.actionSvc = actionSvc
+		u.agent = agent
 	}
 }
 
@@ -104,12 +96,6 @@ func WithActionLimit(actionLimit int) Option {
 func WithFindingLimit(findingLimit int) Option {
 	return func(u *UseCases) {
 		u.findingLimit = findingLimit
-	}
-}
-
-func WithTestDataSet(testDataSet *policy.TestDataSet) Option {
-	return func(u *UseCases) {
-		u.testDataSet = testDataSet
 	}
 }
 

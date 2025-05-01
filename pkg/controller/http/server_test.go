@@ -91,10 +91,7 @@ var slackInteractionJSON []byte
 func TestSlackInteractionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
 	uc := &UseCaseMock{
-		HandleSlackInteractionViewSubmissionResolveAlertFunc: func(ctx context.Context, user slack_model.User, metadata string, values slack_model.StateValue) error {
-			return nil
-		},
-		HandleSlackInteractionViewSubmissionResolveListFunc: func(ctx context.Context, user slack_model.User, metadata string, values slack_model.StateValue) error {
+		HandleSlackInteractionViewSubmissionFunc: func(ctx context.Context, user slack_model.User, callbackID slack_model.CallbackID, metadata string, values slack_model.StateValue) error {
 			return nil
 		},
 		HandleSlackInteractionBlockActionsFunc: func(ctx context.Context, user slack_model.User, slackThread slack_model.Thread, actionID slack_model.ActionID, value, triggerID string) error {
@@ -134,12 +131,12 @@ var slackMentionJSON []byte
 func TestSlackMentionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
 	uc := &UseCaseMock{
-		HandleSlackAppMentionFunc: func(ctx context.Context, user slack_model.User, mention slack_model.Mention, slackMsg *slack_model.Message) error {
-			gt.Equal(t, user.ID, "U8JLN34SV")
+		HandleSlackAppMentionFunc: func(ctx context.Context, slackMsg *slack_model.Message) error {
+			gt.Equal(t, slackMsg.User().ID, "U8JLN34SV")
 			gt.Equal(t, slackMsg.ChannelID(), "C07AR2FPG1F")
 			gt.Equal(t, slackMsg.ThreadID(), "1741487414.163419")
-			gt.Equal(t, mention.UserID, "U08A3TTRENS")
-			gt.Equal(t, mention.Message, "kokoro")
+			gt.Equal(t, slackMsg.Mention()[0].UserID, "U08A3TTRENS")
+			gt.Equal(t, slackMsg.Mention()[0].Message, "kokoro")
 			return nil
 		},
 	}

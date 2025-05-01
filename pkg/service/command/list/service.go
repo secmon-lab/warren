@@ -5,9 +5,9 @@ import (
 	_ "embed"
 	"strings"
 
+	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/gemini"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	svc "github.com/secmon-lab/warren/pkg/service/slack"
@@ -17,10 +17,10 @@ import (
 
 type Service struct {
 	repo interfaces.Repository
-	llm  interfaces.LLMClient
+	llm  gollam.LLMClient
 }
 
-func New(repo interfaces.Repository, llm interfaces.LLMClient) *Service {
+func New(repo interfaces.Repository, llm gollam.LLMClient) *Service {
 	return &Service{
 		repo: repo,
 		llm:  llm,
@@ -99,8 +99,7 @@ func (x *Service) Run(ctx context.Context, th *svc.ThreadService, user *slack.Us
 		}
 	}
 
-	query := x.llm.NewQuery(gemini.WithContentType("application/json"))
-	alertList, err := CreateList(ctx, x.repo, query, slack.Thread{
+	alertList, err := CreateList(ctx, x.repo, x.llm, slack.Thread{
 		ChannelID: th.ChannelID(),
 		ThreadID:  th.ThreadID(),
 	}, user, alerts)

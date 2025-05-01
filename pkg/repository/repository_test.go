@@ -36,7 +36,7 @@ func TestFirestore(t *testing.T) {
 func testRepository(t *testing.T, repo interfaces.Repository) {
 	ctx := context.Background()
 
-	// テスト用のデータを作成
+	// Create test data
 	alertID := types.NewAlertID()
 	a := alert.Alert{
 		ID:          alertID,
@@ -60,7 +60,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 	// Put
 	gt.NoError(t, repo.PutAlert(ctx, a))
 
-	// Alert関連のテスト
+	// Alert related tests
 	t.Run("PutAndGetAlert", func(t *testing.T) {
 		// Get
 		got, err := repo.GetAlert(ctx, alertID)
@@ -77,7 +77,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 	})
 
 	t.Run("GetAlertByThread", func(t *testing.T) {
-		// スレッドを設定
+		// Set thread
 		a.SlackThread = &thread
 		gt.NoError(t, repo.PutAlert(ctx, a))
 
@@ -110,54 +110,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Array(t, got).Has(comment)
 	})
 
-	// Chat関連のテスト
-	t.Run("History", func(t *testing.T) {
-		sessionID := types.NewSessionID()
-		histories := []*session.History{
-			{
-				ID:        types.NewHistoryID(),
-				CreatedAt: time.Now(),
-				Contents: session.Contents{
-					&session.Content{
-						Role: "user",
-						Parts: []session.Part{
-							{
-								Text: "test message 1",
-							},
-						},
-					},
-				},
-			},
-			{
-				ID:        types.NewHistoryID(),
-				CreatedAt: time.Now(),
-				Contents: session.Contents{
-					&session.Content{
-						Role: "assistant",
-						Parts: []session.Part{
-							{
-								Text: "test response 1",
-							},
-						},
-					},
-				},
-			},
-		}
-
-		// PutHistory
-		for _, h := range histories {
-			gt.NoError(t, repo.PutHistory(ctx, sessionID, h))
-		}
-
-		// GetLatestHistory
-		got, err := repo.GetLatestHistory(ctx, sessionID)
-		gt.NoError(t, err)
-		gt.Value(t, got).NotNil()
-		gt.Value(t, got.Contents[0].Role).Equal("assistant")
-		gt.Value(t, got.Contents[0].Parts[0].Text).Equal("test response 1")
-	})
-
-	// AlertList関連のテスト
+	// AlertList related tests
 	t.Run("AlertList", func(t *testing.T) {
 		list := alert.List{
 			ID:          types.NewAlertListID(),
@@ -198,7 +151,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Value(t, got.SlackThread.ThreadID).Equal(thread.ThreadID)
 	})
 
-	// Alert検索関連のテスト
+	// Alert search related tests
 	t.Run("AlertSearch", func(t *testing.T) {
 		// GetAlertsByStatus
 		got, err := repo.GetAlertsByStatus(ctx, a.Status)
@@ -225,7 +178,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Value(t, gotAlert.Reason).Equal("Test reason")
 	})
 
-	// Policy関連のテスト
+	// Policy related tests
 	t.Run("Policy", func(t *testing.T) {
 		diffID := policy.PolicyDiffID("test-diff-id")
 		diff := &policy.Diff{
@@ -283,7 +236,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Value(t, got.Status).Equal(types.AlertStatusAcknowledged)
 	})
 
-	// Session関連のテスト
+	// Session related tests
 	t.Run("Session", func(t *testing.T) {
 		sessionID := types.NewSessionID()
 		thread := slack.Thread{
@@ -335,7 +288,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 
 	// Test SearchAlerts
 	t.Run("SearchAlerts", func(t *testing.T) {
-		// テストデータの準備
+		// Prepare test data
 		alerts := []alert.Alert{
 			{
 				ID:        types.AlertID(uuid.New().String()),

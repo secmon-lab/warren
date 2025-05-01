@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
-	"github.com/secmon-lab/warren/pkg/service/action"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -25,9 +25,7 @@ func cmdServe() *cli.Command {
 		slackCfg     config.Slack
 		geminiCfg    config.GeminiCfg
 		firestoreCfg config.Firestore
-		testDataCfg  config.TestData
 		embeddingCfg config.EmbeddingCfg
-		githubAppCfg config.GitHubAppCfg
 		storageCfg   config.Storage
 	)
 
@@ -47,10 +45,8 @@ func cmdServe() *cli.Command {
 		slackCfg.Flags(),
 		geminiCfg.Flags(),
 		firestoreCfg.Flags(),
-		testDataCfg.Flags(),
 		actions.Flags(),
 		embeddingCfg.Flags(),
-		githubAppCfg.Flags(),
 		storageCfg.Flags(),
 	)
 
@@ -68,7 +64,6 @@ func cmdServe() *cli.Command {
 				"gemini", geminiCfg,
 				"embedding", embeddingCfg,
 				"firestore", firestoreCfg,
-				"testdata", testDataCfg,
 				"storage", storageCfg,
 			)
 
@@ -101,15 +96,9 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			testDataSet, err := testDataCfg.Configure()
-			if err != nil {
-				return err
-			}
-
-			actionSvc, err := action.New(ctx, actions)
-			if err != nil {
-				return err
-			}
+			agent := gollam.New(geminiModel,
+				gollam.WithToolSets(actions.ToolSets()...),
+			)
 
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(geminiModel),
@@ -117,15 +106,8 @@ func cmdServe() *cli.Command {
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(firestore),
 				usecase.WithSlackService(slackSvc),
-				usecase.WithTestDataSet(testDataSet),
-				usecase.WithActionService(actionSvc),
+				usecase.WithAgent(agent),
 			}
-
-			githubApp, err := githubAppCfg.Configure(ctx)
-			if err != nil {
-				return err
-			}
-			ucOptions = append(ucOptions, usecase.WithGitHubApp(githubApp))
 
 			uc := usecase.New(ucOptions...)
 
