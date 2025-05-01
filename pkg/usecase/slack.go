@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/action/base"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
@@ -45,15 +46,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg *slack.M
 		if err != nil {
 			return goerr.Wrap(err, "failed to create or get session")
 		}
-		if ssn == nil {
-			return nil
-		}
 
-		// If session, alert and alert list are not found, call the command handler
-		baseAction := base.New(uc.repository, ssn.AlertIDs, uc.policyClient.Sources(), ssn.ID)
-
-		// TODO: call agent
-		logger.Info("TODO: call agent", "ssn", ssn, "baseAction", baseAction)
 	}
 
 	return nil
@@ -121,9 +114,31 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.
 	}
 }
 
-func (uc *UseCases) handleSlackChatCommand(ctx context.Context, threadSvc *slack_svc.ThreadService, ssn *session.Session, message string) error {
-	if ssn == nil {
-		return nil
+func (uc *UseCases) handlePrompt(ctx context.Context, threadSvc *slack_svc.ThreadService, ssn *session.Session, message string) error {
+	baseAction := base.New(uc.repository, ssn.AlertIDs, uc.policyClient.Sources(), ssn.ID)
+
+	agent := gollam.New(uc.llmClient,
+		gollam.WithToolSets(baseAction),
+		gollam.WithResponseMode(gollam.ResponseModeBlocking),
+		gollam.WithLogger(logging.From(ctx)),
+	)
+
+	history, err := uc.repository.GetLatestHistory(ctx, ssn.ID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get latest history")
+	}
+	historyData, err := uc.storageClient.GetObject(ctx, history.ID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get history data")
+	}
+
+	history, err = agent.Prompt(ctx, message, gollam.WithHistory(history))
+	if err != nil {
+		return goerr.Wrap(err, "failed to prompt")
+	}
+
+	if err = uc.repository.PutHistory(ctx, ssn.ID, history); err != nil {
+		return goerr.Wrap(err, "failed to put history")
 	}
 
 	return nil
