@@ -14,6 +14,8 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
 
@@ -21,6 +23,7 @@ type Action struct {
 	apiKey  string
 	baseURL string
 	backoff time.Duration
+	timeout time.Duration
 }
 
 func (x *Action) Name() string {
@@ -52,6 +55,13 @@ func (x *Action) Flags() []cli.Flag {
 			Value:       time.Duration(3) * time.Second,
 			Sources:     cli.EnvVars("WARREN_URLSCAN_BACKOFF"),
 		},
+		&cli.DurationFlag{
+			Name:        "urlscan-timeout",
+			Usage:       "URLScan API timeout duration",
+			Destination: &x.timeout,
+			Category:    "Action",
+			Value:       time.Duration(30) * time.Second,
+		},
 	}
 }
 
@@ -71,6 +81,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 }
 
 func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
+	logger := logging.From(ctx)
 	if x.apiKey == "" {
 		return nil, goerr.New("URLScan API key is required")
 	}
@@ -93,6 +104,11 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	req.Header.Set("API-Key", x.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
+	logger.Debug("sending scan request",
+		"url", urlStr,
+		"method", req.Method,
+		"headers", req.Header,
+	)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to send request")
@@ -113,9 +129,6 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 		return nil, goerr.Wrap(err, "failed to decode response")
 	}
 
-	// Wait for the scan to complete
-	time.Sleep(x.backoff)
-
 	// Get the scan result
 	req, err = http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/result/%s/", x.baseURL, result.UUID), nil)
 	if err != nil {
@@ -124,27 +137,51 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 
 	req.Header.Set("API-Key", x.apiKey)
 
-	resp, err = client.Do(req)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to send request")
-	}
-	defer resp.Body.Close()
+	deadline := clock.Now(ctx).Add(x.timeout)
+	for clock.Now(ctx).Before(deadline) {
+		time.Sleep(x.backoff)
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, goerr.New("failed to get scan result",
-			goerr.V("status_code", resp.StatusCode),
-			goerr.V("body", string(body)))
+		resp, err = client.Do(req)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to send request")
+		}
+
+		if resp.StatusCode == http.StatusNotFound {
+			resp.Body.Close()
+			logger.Debug("scan result not found, retrying",
+				"uuid", result.UUID,
+				"target", urlStr,
+				"backoff", x.backoff,
+			)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			return nil, goerr.New("failed to get scan result",
+				goerr.V("status_code", resp.StatusCode),
+				goerr.V("body", string(body)))
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to read response body")
+		}
+
+		var result map[string]any
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, goerr.Wrap(err, "failed to unmarshal response body")
+		}
+
+		return result, nil
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to read response body")
-	}
-
-	return map[string]any{
-		"body": string(body),
-	}, nil
+	return nil, goerr.New("scan result timeout",
+		goerr.V("timeout", x.timeout),
+		goerr.V("target", urlStr),
+		goerr.V("uuid", result.UUID))
 }
 
 func (x *Action) Configure(ctx context.Context) error {

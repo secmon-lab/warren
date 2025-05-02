@@ -85,7 +85,8 @@ func TestURLScan(t *testing.T) {
 
 					gt.NoError(t, err)
 					gt.NotEqual(t, resp, nil)
-					gt.Value(t, resp["body"]).Equal(tc.wantResp)
+					data := gt.Cast[string](t, resp["uuid"])
+					gt.Equal(t, data, "test-uuid")
 					return nil
 				},
 			}
@@ -151,7 +152,8 @@ func TestSendRequest(t *testing.T) {
 			})
 			gt.NoError(t, err)
 			gt.NotEqual(t, resp, nil)
-			gt.S(t, resp["body"].(string)).Contains(`"result"`)
+			data := gt.Cast[map[string]any](t, resp["data"])
+			gt.NotNil(t, data["requests"])
 			return nil
 		},
 	}
