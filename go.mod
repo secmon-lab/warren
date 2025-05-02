@@ -13,7 +13,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/m-mizutani/clog v0.0.8
 	github.com/m-mizutani/goerr/v2 v2.0.0-alpha.3
-	github.com/m-mizutani/gollam v0.0.4-0.20250502075552-8d1d91953366
+	github.com/m-mizutani/gollam v0.0.4-0.20250502232626-c349158ce856
 	github.com/m-mizutani/gt v0.0.16
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.1.10

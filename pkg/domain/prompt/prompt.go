@@ -25,34 +25,6 @@ func stringify(v any) (string, error) {
 	return buf.String(), nil
 }
 
-//go:embed templates/init.md
-var initTemplate string
-
-func BuildInitPrompt(ctx context.Context, alert any, maxRetry int) (string, error) {
-	tmpl, err := template.New("init").Parse(initTemplate)
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to parse template")
-	}
-
-	rawAlert, err := stringify(alert)
-	if err != nil {
-		return "", err
-	}
-
-	input := map[string]any{
-		"alert":     string(rawAlert),
-		"max_retry": maxRetry,
-		"lang":      lang.From(ctx).Name(),
-	}
-
-	var result bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&result, "init", input); err != nil {
-		return "", goerr.Wrap(err, "failed to execute template")
-	}
-
-	return result.String(), nil
-}
-
 //go:embed templates/aggregate.md
 var aggregateTemplate string
 

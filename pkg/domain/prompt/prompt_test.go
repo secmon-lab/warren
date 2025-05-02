@@ -12,21 +12,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/ptr"
 )
 
-func TestPrompt(t *testing.T) {
-	alert := map[string]any{
-		"id":      123,
-		"message": "test",
-	}
-	d, err := prompt.BuildInitPrompt(context.Background(), alert, 3)
-	gt.NoError(t, err)
-
-	t.Log(d)
-	gt.S(t, d).
-		Contains("# Alert").
-		Contains(`"id": 123`).
-		Contains(`"message": "test"`)
-}
-
 func TestIgnorePolicyPrompt(t *testing.T) {
 	contents := policy.Contents{
 		"test.rego": `package alert.aws.guardduty

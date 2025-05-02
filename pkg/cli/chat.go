@@ -130,7 +130,6 @@ func cmdChat() *cli.Command {
 			if err != nil {
 				return goerr.Wrap(err, "failed to build system prompt")
 			}
-			systemPrompt += "\n" + gollam.DefaultSystemPrompt
 
 			agent := gollam.New(llmClient,
 				gollam.WithToolSets(actions.ToolSets()...),
