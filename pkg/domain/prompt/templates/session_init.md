@@ -77,6 +77,5 @@ Please analyze the following alerts. The field descriptions are as follows:
 {{ end }}
 
 {{ if ne (len .alerts) .total }}
-There are {{ .total }} alerts in total, but only a portion is shown here. You can use the `base.alerts` command to reference other alerts.
+There are {{ .total }} alerts in total, but only a portion is shown here. You can use the `base.alerts.get` command to reference other alerts.
 {{ end }}
-

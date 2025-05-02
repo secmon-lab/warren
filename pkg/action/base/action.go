@@ -55,14 +55,17 @@ func (x *Base) Configure(ctx context.Context) error {
 }
 
 func (x *Base) LogValue() slog.Value {
-	return slog.GroupValue()
+	return slog.GroupValue(
+		slog.Int("alerts.length", len(x.alertIDs)),
+		slog.String("session.id", string(x.sessionID)),
+	)
 }
 
 func (x *Base) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 	return []gollam.ToolSpec{
 		{
 			Name:        "base.alerts.get",
-			Description: "Get a set of alerts with pagination support",
+			Description: "Get the alerts that you should investigate. Call the tool if you need to inspect other alert data.",
 			Parameters: map[string]*gollam.Parameter{
 				"limit": {
 					Type:        gollam.TypeInteger,
@@ -76,11 +79,11 @@ func (x *Base) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 		},
 		{
 			Name:        "base.alert.search",
-			Description: "Search the alerts by the given query. You can specify the path as Firestore path, and the operation and value to filter the alerts.",
+			Description: "Search previous alerts by the given query. Call the tool if you need to inspect old alert data. You can specify the path as Firestore path, and the operation and value to filter the alerts.",
 			Parameters: map[string]*gollam.Parameter{
 				"path": {
 					Type:        gollam.TypeString,
-					Description: "The path of the alert",
+					Description: "The path of the alert parameter to filter",
 				},
 				"op": {
 					Type:        gollam.TypeString,
@@ -118,8 +121,6 @@ func (x *Base) Run(ctx context.Context, name string, args map[string]any) (map[s
 		return x.getAlerts(ctx, args)
 	case "base.alert.search":
 		return x.searchAlerts(ctx, args)
-	case "base.alert.resolve":
-		return x.resolveAlert(ctx, args)
 	case "base.note.get":
 		return x.getNotes(ctx, args)
 	case "base.note.put":

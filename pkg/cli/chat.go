@@ -11,7 +11,9 @@ import (
 	"github.com/secmon-lab/warren/pkg/action/base"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
+	"github.com/secmon-lab/warren/pkg/domain/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/term"
@@ -25,6 +27,7 @@ func cmdChat() *cli.Command {
 		geminiCfg   config.GeminiCfg
 		policyCfg   config.Policy
 		storageCfg  config.Storage
+		query       string
 	)
 
 	flags := joinFlags(
@@ -41,6 +44,12 @@ func cmdChat() *cli.Command {
 				Usage:       "Alert List ID",
 				Destination: (*string)(&alertListID),
 			},
+			&cli.StringFlag{
+				Name:        "query",
+				Aliases:     []string{"q"},
+				Usage:       "Query",
+				Destination: (*string)(&query),
+			},
 		},
 		firestoreDB.Flags(),
 		geminiCfg.Flags(),
@@ -55,6 +64,8 @@ func cmdChat() *cli.Command {
 		Usage:   "Chat with the security analyst",
 		Flags:   flags,
 		Action: func(ctx context.Context, c *cli.Command) error {
+			logger := logging.From(ctx)
+
 			repo, err := firestoreDB.Configure(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to configure firestore")
@@ -108,13 +119,45 @@ func cmdChat() *cli.Command {
 			ssn := session.New(ctx, nil, alertIDs)
 
 			actions = append(actions, base.New(repo, alertIDs, policyClient.Sources(), ssn.ID))
+			logger.Info("actions", "actions", actions)
+
+			alerts, err := repo.BatchGetAlerts(ctx, alertIDs)
+			if err != nil {
+				return goerr.Wrap(err, "failed to get alerts")
+			}
+
+			systemPrompt, err := prompt.BuildSessionInitPrompt(ctx, alerts)
+			if err != nil {
+				return goerr.Wrap(err, "failed to build system prompt")
+			}
+			systemPrompt += "\n" + gollam.DefaultSystemPrompt
 
 			agent := gollam.New(llmClient,
 				gollam.WithToolSets(actions.ToolSets()...),
-				gollam.WithResponseMode(gollam.ResponseModeStreaming),
+				gollam.WithResponseMode(gollam.ResponseModeBlocking),
+				gollam.WithSystemPrompt(systemPrompt),
+				gollam.WithMsgCallback(func(ctx context.Context, msg string) error {
+					fmt.Print(msg)
+					return nil
+				}),
+				gollam.WithToolCallback(func(ctx context.Context, tool gollam.FunctionCall) error {
+					fmt.Printf("\n⚡ Execute Tool: %s\n", tool.Name)
+					for k, v := range tool.Arguments {
+						fmt.Printf("  ▶️ %s: %v\n", k, v)
+					}
+					fmt.Printf("\n")
+					return nil
+				}),
 			)
 
 			ctx = msg.With(ctx, notify, newTrace)
+
+			if query != "" {
+				if _, err = agent.Prompt(ctx, query); err != nil {
+					return goerr.Wrap(err, "failed to chat")
+				}
+				return nil
+			}
 
 			var history *gollam.History
 			for {
@@ -130,6 +173,7 @@ func cmdChat() *cli.Command {
 					break
 				}
 
+				msg = "# Main instruction\n\n" + msg
 				history, err = agent.Prompt(ctx, msg, gollam.WithHistory(history))
 				if err != nil {
 					return goerr.Wrap(err, "failed to chat")
