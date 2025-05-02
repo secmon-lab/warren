@@ -12,6 +12,10 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
+const (
+	StorageSchemaVersion = "v1"
+)
+
 type Service struct {
 	prefix        string
 	storageClient interfaces.StorageClient
@@ -34,7 +38,7 @@ func WithPrefix(prefix string) Option {
 }
 
 func pathToHistory(prefix string, sessionID types.SessionID, historyID types.HistoryID) string {
-	return fmt.Sprintf("%shistory/%s/%s.json", prefix, sessionID, historyID)
+	return fmt.Sprintf("%s%s/session/%s/history/%s.json", prefix, StorageSchemaVersion, sessionID, historyID)
 }
 
 func (s *Service) PutHistory(ctx context.Context, sessionID types.SessionID, historyID types.HistoryID, history *gollam.History) error {
