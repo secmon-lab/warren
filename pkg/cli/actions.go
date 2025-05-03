@@ -5,7 +5,9 @@ import (
 
 	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/action/otx"
+	"github.com/secmon-lab/warren/pkg/action/shodan"
 	"github.com/secmon-lab/warren/pkg/action/urlscan"
+	"github.com/secmon-lab/warren/pkg/action/vt"
 	"github.com/urfave/cli/v3"
 )
 
@@ -21,6 +23,8 @@ type actionList []builtinAction
 var actions = actionList{
 	&urlscan.Action{},
 	&otx.Action{},
+	&vt.Action{},
+	&shodan.Action{},
 	// &bigquery.Action{},
 }
 
