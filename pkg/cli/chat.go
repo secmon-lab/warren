@@ -8,12 +8,12 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollam"
-	"github.com/secmon-lab/warren/pkg/action/base"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/urfave/cli/v3"
@@ -56,7 +56,7 @@ func cmdChat() *cli.Command {
 		geminiCfg.Flags(),
 		policyCfg.Flags(),
 		storageCfg.Flags(),
-		actions.Flags(),
+		tools.Flags(),
 	)
 
 	return &cli.Command{
@@ -110,10 +110,10 @@ func cmdChat() *cli.Command {
 
 			ssn := session.New(ctx, nil, alertIDs)
 
-			actions = append(actions, base.New(repo, alertIDs, policyClient.Sources(), ssn.ID))
+			tools = append(tools, base.New(repo, alertIDs, policyClient.Sources(), ssn.ID))
 			var toolNames []string
-			for _, action := range actions {
-				specs, err := action.Specs(ctx)
+			for _, tool := range tools {
+				specs, err := tool.Specs(ctx)
 				if err != nil {
 					return goerr.Wrap(err, "failed to get tool specs")
 				}
@@ -122,7 +122,7 @@ func cmdChat() *cli.Command {
 				}
 			}
 			logger.Info("Enabled tools", "tools", toolNames)
-			logger.Debug("Enabled tool config", "config", actions)
+			logger.Debug("Enabled tool config", "config", tools)
 
 			fmt.Printf("\n")
 			if alertRecord != nil {
@@ -152,7 +152,7 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to build system prompt")
 			}
 
-			toolSets, err := actions.ToolSets(ctx)
+			toolSets, err := tools.ToolSets(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to get tool sets")
 			}

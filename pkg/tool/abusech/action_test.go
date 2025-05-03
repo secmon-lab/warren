@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/action/abusech"
+	"github.com/secmon-lab/warren/pkg/tool/abusech"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/urfave/cli/v3"
 )
@@ -125,7 +125,7 @@ func TestAbusech_Specs(t *testing.T) {
 	for _, spec := range specs {
 		if spec.Name == "abusech.bazaar.query" {
 			found = true
-			gt.Value(t, spec.Description).Equal("Query malware information from MalwareBazaar by hash value.")
+			gt.Value(t, spec.Description).Equal("Query malware information from MalwareBazaar by file hash value.")
 			break
 		}
 	}

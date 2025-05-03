@@ -45,7 +45,7 @@ func cmdServe() *cli.Command {
 		slackCfg.Flags(),
 		geminiCfg.Flags(),
 		firestoreCfg.Flags(),
-		actions.Flags(),
+		tools.Flags(),
 		embeddingCfg.Flags(),
 		storageCfg.Flags(),
 	)
@@ -96,7 +96,7 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			toolSets, err := actions.ToolSets(ctx)
+			toolSets, err := tools.ToolSets(ctx)
 			if err != nil {
 				return err
 			}

@@ -39,7 +39,6 @@ tasks:
         -pkg mock
         -rm -skip-ensure -stub
         pkg/domain/interfaces
-        Action
         SlackClient
         SlackThreadService
         Repository
