@@ -12,7 +12,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/m-mizutani/clog v0.0.8
-	github.com/m-mizutani/goerr/v2 v2.0.0-alpha.3
+	github.com/m-mizutani/goerr/v2 v2.0.0-beta.1.0.20250503032738-9a4f180acc1a
 	github.com/m-mizutani/gollam v0.0.4-0.20250502232626-c349158ce856
 	github.com/m-mizutani/gt v0.0.16
 	github.com/m-mizutani/harlog v0.0.3

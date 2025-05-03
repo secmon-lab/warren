@@ -131,8 +131,13 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to build system prompt")
 			}
 
+			toolSets, err := actions.ToolSets(ctx)
+			if err != nil {
+				return goerr.Wrap(err, "failed to get tool sets")
+			}
+
 			agent := gollam.New(llmClient,
-				gollam.WithToolSets(actions.ToolSets()...),
+				gollam.WithToolSets(toolSets...),
 				gollam.WithResponseMode(gollam.ResponseModeBlocking),
 				gollam.WithSystemPrompt(systemPrompt),
 				gollam.WithMsgCallback(func(ctx context.Context, msg string) error {

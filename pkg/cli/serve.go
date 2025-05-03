@@ -96,8 +96,13 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
+			toolSets, err := actions.ToolSets(ctx)
+			if err != nil {
+				return err
+			}
+
 			agent := gollam.New(geminiModel,
-				gollam.WithToolSets(actions.ToolSets()...),
+				gollam.WithToolSets(toolSets...),
 			)
 
 			ucOptions := []usecase.Option{

@@ -31,7 +31,7 @@ func (x *Action) Flags() []cli.Flag {
 			Usage:       "abuse.ch API key",
 			Destination: &x.apiKey,
 			Category:    "Action",
-			Sources:     cli.EnvVars("WARREN_ABUSECH_API_KEY"),
+			Sources:     cli.EnvVars("WARREN_ABUSECH_AUTH_KEY"),
 		},
 		&cli.StringFlag{
 			Name:        "abusech-base-url",
@@ -84,41 +84,62 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	formData.Set("hash", hash)
 
 	// Create request with form data
-	req, err := http.NewRequestWithContext(ctx, "POST", x.baseURL, strings.NewReader(formData.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, x.baseURL+"/", strings.NewReader(formData.Encode()))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create request")
 	}
 
+	// Set headers
 	req.Header.Set("Auth-Key", x.apiKey)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Accept-Encoding", "identity")
+	req.Header.Set("Connection", "Keep-Alive")
+
+	// Send request
+	eb := goerr.NewBuilder(
+		goerr.V("request_url", x.baseURL),
+		goerr.V("request_method", req.Method),
+		goerr.V("request_body", formData.Encode()),
+	)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to send request")
+		return nil, eb.Wrap(err, "failed to send request")
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
+	eb = eb.With(
+		goerr.V("response_status_code", resp.StatusCode),
+		goerr.V("response_body", string(body)),
+	)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to read response body")
+		return nil, eb.Wrap(err, "failed to read response body")
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, goerr.New("failed to query MalwareBazaar",
-			goerr.V("status_code", resp.StatusCode),
-			goerr.V("body", string(body)))
+		return nil, eb.Wrap(err, "unexpected response code from MalwareBazaar")
 	}
 
 	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, goerr.Wrap(err, "failed to unmarshal response")
+		return nil, eb.Wrap(err, "failed to unmarshal response")
 	}
 
 	// Check for API error response
 	if status, ok := result["query_status"].(string); ok && status == "error" {
-		errMsg, _ := result["error"].(string)
-		return nil, goerr.New("MalwareBazaar API returned error",
+		errMsg, _ := result["error_message"].(string)
+		if errMsg == "" {
+			errMsg, _ = result["error"].(string)
+		}
+		return nil, eb.Wrap(err, "MalwareBazaar API returned error",
 			goerr.V("error", errMsg))
+	}
+
+	// Validate response format
+	if _, ok := result["data"].([]interface{}); !ok {
+		return nil, eb.Wrap(err, "invalid response format: missing data array")
 	}
 
 	return result, nil
@@ -154,14 +175,4 @@ func New() *Action {
 	return &Action{
 		baseURL: "https://mb-api.abuse.ch/api/v1",
 	}
-}
-
-// SetAPIKey sets the API key for the action
-func (x *Action) SetAPIKey(key string) {
-	x.apiKey = key
-}
-
-// SetBaseURL sets the base URL for the action
-func (x *Action) SetBaseURL(url string) {
-	x.baseURL = url
 }

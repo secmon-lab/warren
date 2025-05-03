@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/m-mizutani/gollam"
@@ -10,12 +11,14 @@ import (
 	"github.com/secmon-lab/warren/pkg/action/shodan"
 	"github.com/secmon-lab/warren/pkg/action/urlscan"
 	"github.com/secmon-lab/warren/pkg/action/vt"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/urfave/cli/v3"
 )
 
 type builtinAction interface {
 	Name() string
 	Flags() []cli.Flag
+	Configure(ctx context.Context) error
 	LogValue() slog.Value
 	gollam.ToolSet
 }
@@ -48,10 +51,16 @@ func (x actionList) LogValue() slog.Value {
 	return slog.GroupValue(attrs...)
 }
 
-func (x actionList) ToolSets() []gollam.ToolSet {
+func (x actionList) ToolSets(ctx context.Context) ([]gollam.ToolSet, error) {
 	toolSets := []gollam.ToolSet{}
 	for _, action := range x {
+		if err := action.Configure(ctx); err != nil {
+			if err == errs.ErrActionUnavailable {
+				continue
+			}
+			return nil, err
+		}
 		toolSets = append(toolSets, action)
 	}
-	return toolSets
+	return toolSets, nil
 }
