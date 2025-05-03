@@ -1,6 +1,5 @@
 package otx_test
 
-
 import (
 	"context"
 	"net/http"
@@ -21,7 +20,7 @@ func TestOTX(t *testing.T) {
 		args       map[string]any
 		apiResp    string
 		statusCode int
-		wantResp   string
+		wantResp   map[string]any
 		wantErr    bool
 	}{
 		{
@@ -32,8 +31,11 @@ func TestOTX(t *testing.T) {
 			},
 			apiResp:    `{"pulse_count": 5, "reputation": 0}`,
 			statusCode: http.StatusOK,
-			wantResp:   `{"pulse_count": 5, "reputation": 0}`,
-			wantErr:    false,
+			wantResp: map[string]any{
+				"pulse_count": float64(5),
+				"reputation":  float64(0),
+			},
+			wantErr: false,
 		},
 		{
 			name:     "valid ipv4 response",
@@ -43,8 +45,11 @@ func TestOTX(t *testing.T) {
 			},
 			apiResp:    `{"pulse_count": 10, "reputation": 0}`,
 			statusCode: http.StatusOK,
-			wantResp:   `{"pulse_count": 10, "reputation": 0}`,
-			wantErr:    false,
+			wantResp: map[string]any{
+				"pulse_count": float64(10),
+				"reputation":  float64(0),
+			},
+			wantErr: false,
 		},
 		{
 			name:     "api error response",
@@ -97,7 +102,7 @@ func TestOTX(t *testing.T) {
 
 					gt.NoError(t, err)
 					gt.NotEqual(t, resp, nil)
-					gt.Value(t, resp["body"]).Equal(tc.wantResp)
+					gt.Value(t, resp).Equal(tc.wantResp)
 					return nil
 				},
 			}
@@ -173,7 +178,7 @@ func TestSendRequest(t *testing.T) {
 			})
 			gt.NoError(t, err)
 			gt.NotEqual(t, resp, nil)
-			gt.S(t, resp["body"].(string)).Contains(`"pulse_info"`)
+			gt.Map(t, resp).HasKey("pulse_info")
 			return nil
 		},
 	}

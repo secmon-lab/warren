@@ -2,6 +2,7 @@ package otx
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -153,9 +154,12 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 		return nil, goerr.Wrap(err, "failed to read response body")
 	}
 
-	return map[string]any{
-		"body": string(body),
-	}, nil
+	var result map[string]any
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, goerr.Wrap(err, "failed to unmarshal response")
+	}
+
+	return result, nil
 }
 
 func (x *Action) Configure(ctx context.Context) error {

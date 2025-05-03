@@ -20,7 +20,7 @@ func TestVT(t *testing.T) {
 		args       map[string]any
 		apiResp    string
 		statusCode int
-		wantResp   string
+		wantResp   map[string]any
 		wantErr    bool
 	}{
 		{
@@ -31,8 +31,17 @@ func TestVT(t *testing.T) {
 			},
 			apiResp:    `{"data": {"attributes": {"last_analysis_stats": {"harmless": 5, "malicious": 0}}}}`,
 			statusCode: http.StatusOK,
-			wantResp:   `{"data": {"attributes": {"last_analysis_stats": {"harmless": 5, "malicious": 0}}}}`,
-			wantErr:    false,
+			wantResp: map[string]any{
+				"data": map[string]any{
+					"attributes": map[string]any{
+						"last_analysis_stats": map[string]any{
+							"harmless":  float64(5),
+							"malicious": float64(0),
+						},
+					},
+				},
+			},
+			wantErr: false,
 		},
 		{
 			name:     "valid ip response",
@@ -42,8 +51,17 @@ func TestVT(t *testing.T) {
 			},
 			apiResp:    `{"data": {"attributes": {"last_analysis_stats": {"harmless": 10, "malicious": 0}}}}`,
 			statusCode: http.StatusOK,
-			wantResp:   `{"data": {"attributes": {"last_analysis_stats": {"harmless": 10, "malicious": 0}}}}`,
-			wantErr:    false,
+			wantResp: map[string]any{
+				"data": map[string]any{
+					"attributes": map[string]any{
+						"last_analysis_stats": map[string]any{
+							"harmless":  float64(10),
+							"malicious": float64(0),
+						},
+					},
+				},
+			},
+			wantErr: false,
 		},
 		{
 			name:     "valid file hash response",
@@ -53,8 +71,17 @@ func TestVT(t *testing.T) {
 			},
 			apiResp:    `{"data": {"attributes": {"last_analysis_stats": {"harmless": 15, "malicious": 0}}}}`,
 			statusCode: http.StatusOK,
-			wantResp:   `{"data": {"attributes": {"last_analysis_stats": {"harmless": 15, "malicious": 0}}}}`,
-			wantErr:    false,
+			wantResp: map[string]any{
+				"data": map[string]any{
+					"attributes": map[string]any{
+						"last_analysis_stats": map[string]any{
+							"harmless":  float64(15),
+							"malicious": float64(0),
+						},
+					},
+				},
+			},
+			wantErr: false,
 		},
 		{
 			name:     "valid url response",
@@ -64,8 +91,17 @@ func TestVT(t *testing.T) {
 			},
 			apiResp:    `{"data": {"attributes": {"last_analysis_stats": {"harmless": 20, "malicious": 0}}}}`,
 			statusCode: http.StatusOK,
-			wantResp:   `{"data": {"attributes": {"last_analysis_stats": {"harmless": 20, "malicious": 0}}}}`,
-			wantErr:    false,
+			wantResp: map[string]any{
+				"data": map[string]any{
+					"attributes": map[string]any{
+						"last_analysis_stats": map[string]any{
+							"harmless":  float64(20),
+							"malicious": float64(0),
+						},
+					},
+				},
+			},
+			wantErr: false,
 		},
 		{
 			name:     "api error response",
@@ -118,7 +154,7 @@ func TestVT(t *testing.T) {
 
 					gt.NoError(t, err)
 					gt.NotEqual(t, resp, nil)
-					gt.Value(t, resp["body"]).Equal(tc.wantResp)
+					gt.Value(t, resp).Equal(tc.wantResp)
 					return nil
 				},
 			}
@@ -194,7 +230,9 @@ func TestSendRequest(t *testing.T) {
 			})
 			gt.NoError(t, err)
 			gt.NotEqual(t, resp, nil)
-			gt.S(t, resp["body"].(string)).Contains(`"last_analysis_stats"`)
+			gt.Map(t, resp).HasKey("data")
+			gt.Map(t, resp["data"].(map[string]any)).HasKey("attributes")
+			gt.Map(t, resp["data"].(map[string]any)["attributes"].(map[string]any)).HasKey("last_analysis_stats")
 			return nil
 		},
 	}

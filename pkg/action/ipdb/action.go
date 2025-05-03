@@ -1,4 +1,4 @@
-package vt
+package ipdb
 
 import (
 	"context"
@@ -21,25 +21,25 @@ type Action struct {
 }
 
 func (x *Action) Name() string {
-	return "vt"
+	return "ipdb"
 }
 
 func (x *Action) Flags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
-			Name:        "vt-api-key",
-			Usage:       "VirusTotal API key",
+			Name:        "ipdb-api-key",
+			Usage:       "AbuseIPDB API key",
 			Destination: &x.apiKey,
 			Category:    "Action",
-			Sources:     cli.EnvVars("WARREN_VT_API_KEY"),
+			Sources:     cli.EnvVars("WARREN_IPDB_API_KEY"),
 		},
 		&cli.StringFlag{
-			Name:        "vt-base-url",
-			Usage:       "VirusTotal API base URL",
+			Name:        "ipdb-base-url",
+			Usage:       "AbuseIPDB API base URL",
 			Destination: &x.baseURL,
 			Category:    "Action",
-			Value:       "https://www.virustotal.com/api/v3",
-			Sources:     cli.EnvVars("WARREN_VT_BASE_URL"),
+			Value:       "https://api.abuseipdb.com/api/v2",
+			Sources:     cli.EnvVars("WARREN_IPDB_BASE_URL"),
 		},
 	}
 }
@@ -47,42 +47,16 @@ func (x *Action) Flags() []cli.Flag {
 func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 	return []gollam.ToolSpec{
 		{
-			Name:        "vt.ip",
-			Description: "Search the indicator of IPv4/IPv6 from VirusTotal.",
+			Name:        "ipdb.check",
+			Description: "Check IP address information from AbuseIPDB.",
 			Parameters: map[string]*gollam.Parameter{
 				"target": {
 					Type:        gollam.TypeString,
-					Description: "The IP address to search",
+					Description: "The IP address to check",
 				},
-			},
-		},
-		{
-			Name:        "vt.domain",
-			Description: "Search the indicator of domain from VirusTotal.",
-			Parameters: map[string]*gollam.Parameter{
-				"target": {
-					Type:        gollam.TypeString,
-					Description: "The domain to search",
-				},
-			},
-		},
-		{
-			Name:        "vt.file_hash",
-			Description: "Search the indicator of file hash from VirusTotal.",
-			Parameters: map[string]*gollam.Parameter{
-				"target": {
-					Type:        gollam.TypeString,
-					Description: "The file hash to search",
-				},
-			},
-		},
-		{
-			Name:        "vt.url",
-			Description: "Search the indicator of URL from VirusTotal.",
-			Parameters: map[string]*gollam.Parameter{
-				"target": {
-					Type:        gollam.TypeString,
-					Description: "The URL to search",
+				"maxAgeInDays": {
+					Type:        gollam.TypeInteger,
+					Description: "The maximum age of reports in days (1-365)",
 				},
 			},
 		},
@@ -91,37 +65,38 @@ func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 
 func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
 	if x.apiKey == "" {
-		return nil, goerr.New("VirusTotal API key is required")
+		return nil, goerr.New("AbuseIPDB API key is required")
 	}
 
 	client := &http.Client{}
-	var indicator, indicatorType string
+	var ipAddress string
 
-	// Determine which indicator type was provided based on function name
+	// Determine which function was called
 	switch name {
-	case "vt.domain":
-		indicator = args["target"].(string)
-		indicatorType = "domains"
-	case "vt.ip":
-		indicator = args["target"].(string)
-		indicatorType = "ip_addresses"
-	case "vt.file_hash":
-		indicator = args["target"].(string)
-		indicatorType = "files"
-	case "vt.url":
-		indicator = args["target"].(string)
-		indicatorType = "urls"
+	case "ipdb.check":
+		ipAddress = args["target"].(string)
 	default:
 		return nil, goerr.New("invalid function name", goerr.V("name", name))
 	}
 
-	url := fmt.Sprintf("%s/%s/%s", x.baseURL, indicatorType, indicator)
+	// Build URL with query parameters
+	url := fmt.Sprintf("%s/check", x.baseURL)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create request")
 	}
 
-	req.Header.Set("x-apikey", x.apiKey)
+	// Add query parameters
+	q := req.URL.Query()
+	q.Add("ipAddress", ipAddress)
+	if maxAge, ok := args["maxAgeInDays"].(int); ok {
+		q.Add("maxAgeInDays", fmt.Sprintf("%d", maxAge))
+	}
+	req.URL.RawQuery = q.Encode()
+
+	// Add headers
+	req.Header.Set("Key", x.apiKey)
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -131,7 +106,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, goerr.New("failed to query VirusTotal",
+		return nil, goerr.New("failed to query AbuseIPDB",
 			goerr.V("status_code", resp.StatusCode),
 			goerr.V("body", string(body)))
 	}
@@ -143,7 +118,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 
 	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, goerr.Wrap(err, "failed to unmarshal response body")
+		return nil, goerr.Wrap(err, "failed to unmarshal response")
 	}
 
 	return result, nil
