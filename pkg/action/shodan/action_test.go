@@ -20,7 +20,7 @@ func TestShodan(t *testing.T) {
 		args       map[string]any
 		apiResp    string
 		statusCode int
-		wantResp   string
+		wantResp   map[string]any
 		wantErr    bool
 	}{
 		{
@@ -29,10 +29,14 @@ func TestShodan(t *testing.T) {
 			args: map[string]any{
 				"target": "8.8.8.8",
 			},
-			apiResp:    `{"ip_str": "8.8.8.8", "os": "Linux", "ports": [53]}`,
+			apiResp:    `{"ip": "8.8.8.8", "os": "Linux", "ports": [53]}`,
 			statusCode: http.StatusOK,
-			wantResp:   `{"ip_str": "8.8.8.8", "os": "Linux", "ports": [53]}`,
-			wantErr:    false,
+			wantResp: map[string]any{
+				"ip":    "8.8.8.8",
+				"os":    "Linux",
+				"ports": []any{float64(53)},
+			},
+			wantErr: false,
 		},
 		{
 			name:     "valid domain response",
@@ -42,8 +46,12 @@ func TestShodan(t *testing.T) {
 			},
 			apiResp:    `{"domain": "example.com", "tags": ["ssl", "https"], "subdomains": ["www"]}`,
 			statusCode: http.StatusOK,
-			wantResp:   `{"domain": "example.com", "tags": ["ssl", "https"], "subdomains": ["www"]}`,
-			wantErr:    false,
+			wantResp: map[string]any{
+				"domain":     "example.com",
+				"tags":       []any{"ssl", "https"},
+				"subdomains": []any{"www"},
+			},
+			wantErr: false,
 		},
 		{
 			name:     "valid search response",
@@ -54,8 +62,19 @@ func TestShodan(t *testing.T) {
 			},
 			apiResp:    `{"matches": [{"ip_str": "1.1.1.1", "product": "Apache"}, {"ip_str": "2.2.2.2", "product": "Apache"}]}`,
 			statusCode: http.StatusOK,
-			wantResp:   `{"matches": [{"ip_str": "1.1.1.1", "product": "Apache"}, {"ip_str": "2.2.2.2", "product": "Apache"}]}`,
-			wantErr:    false,
+			wantResp: map[string]any{
+				"matches": []any{
+					map[string]any{
+						"ip_str":  "1.1.1.1",
+						"product": "Apache",
+					},
+					map[string]any{
+						"ip_str":  "2.2.2.2",
+						"product": "Apache",
+					},
+				},
+			},
+			wantErr: false,
 		},
 		{
 			name:     "api error response",
@@ -108,7 +127,7 @@ func TestShodan(t *testing.T) {
 
 					gt.NoError(t, err)
 					gt.NotEqual(t, resp, nil)
-					gt.Value(t, resp["body"]).Equal(tc.wantResp)
+					gt.Value(t, resp).Equal(tc.wantResp)
 					return nil
 				},
 			}

@@ -65,7 +65,7 @@ func (x *Base) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 	return []gollam.ToolSpec{
 		{
 			Name:        "base.alerts.get",
-			Description: "Get the alerts that you should investigate. Call the tool if you need to inspect other alert data.",
+			Description: "Get a set of alerts with pagination support",
 			Parameters: map[string]*gollam.Parameter{
 				"limit": {
 					Type:        gollam.TypeInteger,
@@ -79,7 +79,7 @@ func (x *Base) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 		},
 		{
 			Name:        "base.alert.search",
-			Description: "Search previous alerts by the given query. Call the tool if you need to inspect old alert data. You can specify the path as Firestore path, and the operation and value to filter the alerts.",
+			Description: "Search the alerts by the given query. You can specify the path as Firestore path, and the operation and value to filter the alerts.",
 			Parameters: map[string]*gollam.Parameter{
 				"path": {
 					Type:        gollam.TypeString,
