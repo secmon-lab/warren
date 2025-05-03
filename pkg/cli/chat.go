@@ -10,6 +10,7 @@ import (
 	"github.com/m-mizutani/gollam"
 	"github.com/secmon-lab/warren/pkg/action/base"
 	"github.com/secmon-lab/warren/pkg/cli/config"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -81,35 +82,25 @@ func cmdChat() *cli.Command {
 			}
 
 			var alertIDs []types.AlertID
+			var alertRecord *alert.Alert
+			var alertList *alert.List
 			if alertID != "" {
-				alert, err := repo.GetAlert(ctx, alertID)
+				alertRecord, err = repo.GetAlert(ctx, alertID)
 				if err != nil {
 					return goerr.Wrap(err, "failed to get alert")
 				}
-
-				fmt.Printf("🔔 Alert Information:\n")
-				fmt.Printf("  📝 Title: %s\n", alert.Title)
-				fmt.Printf("  📋 Description: %s\n", alert.Description)
-				fmt.Printf("  🔍 Attributes:\n")
-				for _, attr := range alert.Attributes {
-					fmt.Printf("    - %s: %v\n", attr.Key, attr.Value)
-				}
-
 				alertIDs = []types.AlertID{alertID}
-			} else if alertListID != "" {
+			}
+			if alertListID != "" {
 				list, err := repo.GetAlertList(ctx, alertListID)
 				if err != nil {
 					return goerr.Wrap(err, "failed to get alert list")
 				}
-
-				fmt.Printf("📋 Alert List Information:\n")
-				fmt.Printf("  📝 Title: %s\n", list.Title)
-				fmt.Printf("  📋 Description: %s\n", list.Description)
-				fmt.Printf("  🔢 Number of Alerts: %d\n", len(list.AlertIDs))
-
 				alertIDs = list.AlertIDs
 			}
-			fmt.Printf("\n")
+			if len(alertIDs) == 0 {
+				return goerr.New("no alert provided")
+			}
 
 			policyClient, err := policyCfg.Configure()
 			if err != nil {
@@ -119,7 +110,36 @@ func cmdChat() *cli.Command {
 			ssn := session.New(ctx, nil, alertIDs)
 
 			actions = append(actions, base.New(repo, alertIDs, policyClient.Sources(), ssn.ID))
-			logger.Info("actions", "actions", actions)
+			var toolNames []string
+			for _, action := range actions {
+				specs, err := action.Specs(ctx)
+				if err != nil {
+					return goerr.Wrap(err, "failed to get tool specs")
+				}
+				for _, spec := range specs {
+					toolNames = append(toolNames, spec.Name)
+				}
+			}
+			logger.Info("Enabled tools", "tools", toolNames)
+			logger.Debug("Enabled tool config", "config", actions)
+
+			fmt.Printf("\n")
+			if alertRecord != nil {
+				fmt.Printf("🔔 Alert Information:\n")
+				fmt.Printf("  📝 Title: %s\n", alertRecord.Title)
+				fmt.Printf("  📋 Description: %s\n", alertRecord.Description)
+				fmt.Printf("  🔍 Attributes:\n")
+				for _, attr := range alertRecord.Attributes {
+					fmt.Printf("    - %s: %v\n", attr.Key, attr.Value)
+				}
+			}
+			if alertList != nil {
+				fmt.Printf("📋 Alert List Information:\n")
+				fmt.Printf("  📝 Title: %s\n", alertList.Title)
+				fmt.Printf("  📋 Description: %s\n", alertList.Description)
+				fmt.Printf("  🔢 Number of Alerts: %d\n", len(alertList.AlertIDs))
+			}
+			fmt.Printf("\n")
 
 			alerts, err := repo.BatchGetAlerts(ctx, alertIDs)
 			if err != nil {
@@ -138,7 +158,7 @@ func cmdChat() *cli.Command {
 
 			agent := gollam.New(llmClient,
 				gollam.WithToolSets(toolSets...),
-				gollam.WithResponseMode(gollam.ResponseModeBlocking),
+				gollam.WithResponseMode(gollam.ResponseModeStreaming),
 				gollam.WithSystemPrompt(systemPrompt),
 				gollam.WithMsgCallback(func(ctx context.Context, msg string) error {
 					fmt.Print(msg)
@@ -182,6 +202,7 @@ func cmdChat() *cli.Command {
 				if err != nil {
 					return goerr.Wrap(err, "failed to chat")
 				}
+				fmt.Printf("\n")
 			}
 
 			return nil
