@@ -96,6 +96,7 @@ func cmdChat() *cli.Command {
 				if err != nil {
 					return goerr.Wrap(err, "failed to get alert list")
 				}
+				alertList = list
 				alertIDs = list.AlertIDs
 			}
 			if len(alertIDs) == 0 {
