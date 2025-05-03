@@ -48,7 +48,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 	return []gollam.ToolSpec{
 		{
 			Name:        "abusech.bazaar.query",
-			Description: "Query malware information from MalwareBazaar by hash value.",
+			Description: "Query malware information from MalwareBazaar by file hash value.",
 			Parameters: map[string]*gollam.Parameter{
 				"hash": {
 					Type:        gollam.TypeString,
