@@ -4,6 +4,8 @@ import (
 	"log/slog"
 
 	"github.com/m-mizutani/gollam"
+	"github.com/secmon-lab/warren/pkg/action/abusech"
+	"github.com/secmon-lab/warren/pkg/action/ipdb"
 	"github.com/secmon-lab/warren/pkg/action/otx"
 	"github.com/secmon-lab/warren/pkg/action/shodan"
 	"github.com/secmon-lab/warren/pkg/action/urlscan"
@@ -25,6 +27,8 @@ var actions = actionList{
 	&otx.Action{},
 	&vt.Action{},
 	&shodan.Action{},
+	&abusech.Action{},
+	&ipdb.Action{},
 	// &bigquery.Action{},
 }
 
