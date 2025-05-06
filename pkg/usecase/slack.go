@@ -6,6 +6,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -46,7 +47,8 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg *slack.M
 			return goerr.Wrap(err, "failed to create or get session")
 		}
 
-		return uc.handlePrompt(ctx, ssn, mention.Message)
+		input := uc.buildHandlePromptInput(ctx, ssn, mention.Message)
+		return handlePrompt(ctx, input)
 	}
 
 	return nil
@@ -108,7 +110,8 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.
 		if err != nil {
 			return goerr.Wrap(err, "failed to create or get session")
 		}
-		return uc.handlePrompt(ctx, ssn, remaining)
+		input := uc.buildHandlePromptInput(ctx, ssn, remaining)
+		return handlePrompt(ctx, input)
 
 	default:
 		msg.Notify(ctx, "🤔 Available commands: `list`")
@@ -116,28 +119,52 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.
 	}
 }
 
-func (uc *UseCases) handlePrompt(ctx context.Context, ssn *session.Session, p string) error {
+type handlePromptInput struct {
+	Session       *session.Session
+	Prompt        string
+	LLMClient     interfaces.LLMClient
+	Repo          interfaces.Repository
+	StorageClient interfaces.StorageClient
+	StoragePrefix string
+	Tools         []gollem.ToolSet
+	PolicyClient  interfaces.PolicyClient
+}
+
+func (uc *UseCases) buildHandlePromptInput(ctx context.Context, ssn *session.Session, p string) handlePromptInput {
+	return handlePromptInput{
+		Session:       ssn,
+		Prompt:        p,
+		LLMClient:     uc.llmClient,
+		Repo:          uc.repository,
+		StorageClient: uc.storageClient,
+		StoragePrefix: uc.storagePrefix,
+		Tools:         uc.tools,
+		PolicyClient:  uc.policyClient,
+	}
+}
+
+func handlePrompt(ctx context.Context, input handlePromptInput) error {
 	logger := logging.From(ctx)
 
-	baseAction := base.New(uc.repository, ssn.AlertIDs, uc.policyClient.Sources(), ssn.ID)
-	tools := append(uc.tools, baseAction)
+	baseAction := base.New(input.Repo, input.Session.AlertIDs, input.PolicyClient.Sources(), input.Session.ID)
+	tools := append(input.Tools, baseAction)
 
-	storageSvc := storage.New(uc.storageClient, storage.WithPrefix(uc.storagePrefix))
+	storageSvc := storage.New(input.StorageClient, storage.WithPrefix(input.StoragePrefix))
 
-	historyRecord, err := uc.repository.GetLatestHistory(ctx, ssn.ID)
+	historyRecord, err := input.Repo.GetLatestHistory(ctx, input.Session.ID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get latest history")
 	}
 
 	var history *gollem.History
 	if historyRecord != nil {
-		history, err = storageSvc.GetHistory(ctx, ssn.ID, historyRecord.ID)
+		history, err = storageSvc.GetHistory(ctx, input.Session.ID, historyRecord.ID)
 		if err != nil {
 			return goerr.Wrap(err, "failed to get history data")
 		}
 	}
 
-	alerts, err := uc.repository.BatchGetAlerts(ctx, ssn.AlertIDs)
+	alerts, err := input.Repo.BatchGetAlerts(ctx, input.Session.AlertIDs)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alerts")
 	}
@@ -147,7 +174,7 @@ func (uc *UseCases) handlePrompt(ctx context.Context, ssn *session.Session, p st
 		return goerr.Wrap(err, "failed to build system prompt")
 	}
 
-	agent := gollem.New(uc.llmClient,
+	agent := gollem.New(input.LLMClient,
 		gollem.WithHistory(history),
 		gollem.WithToolSets(tools...),
 		gollem.WithSystemPrompt(systemPrompt),
@@ -166,20 +193,20 @@ func (uc *UseCases) handlePrompt(ctx context.Context, ssn *session.Session, p st
 		}),
 	)
 
-	logger.Debug("run prompt", "system_prompt", systemPrompt, "prompt", p, "history", history, "session", ssn)
+	logger.Debug("run prompt", "prompt", input.Prompt, "history", history, "session", input.Session, "history_record", historyRecord)
 
-	newHistory, err := agent.Prompt(ctx, p)
+	newHistory, err := agent.Prompt(ctx, input.Prompt)
 	if err != nil {
 		return goerr.Wrap(err, "failed to prompt")
 	}
 
-	newRecord := session.NewHistory(ctx, ssn.ID)
+	newRecord := session.NewHistory(ctx, input.Session.ID)
 
-	if err = storageSvc.PutHistory(ctx, ssn.ID, newRecord.ID, newHistory); err != nil {
+	if err = storageSvc.PutHistory(ctx, input.Session.ID, newRecord.ID, newHistory); err != nil {
 		return goerr.Wrap(err, "failed to put history")
 	}
 
-	if err = uc.repository.PutHistory(ctx, ssn.ID, newRecord); err != nil {
+	if err = input.Repo.PutHistory(ctx, input.Session.ID, newRecord); err != nil {
 		return goerr.Wrap(err, "failed to put history")
 	}
 

@@ -65,7 +65,7 @@ func NewMessage(ctx context.Context, ev *slackevents.EventsAPIEvent) *Message {
 			teamID:   ev.TeamID,
 			user: User{
 				ID:   inEv.User,
-				Name: inEv.User,
+				Name: inEv.User, // TODO: get user name
 			},
 			msg:      inEv.Text,
 			ts:       inEv.TimeStamp,
