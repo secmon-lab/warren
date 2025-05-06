@@ -96,6 +96,11 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
+			storageClient, err := storageCfg.Configure(ctx)
+			if err != nil {
+				return err
+			}
+
 			toolSets, err := tools.ToolSets(ctx)
 			if err != nil {
 				return err
@@ -111,6 +116,7 @@ func cmdServe() *cli.Command {
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(firestore),
 				usecase.WithSlackService(slackSvc),
+				usecase.WithStorageClient(storageClient),
 				usecase.WithAgent(agent),
 			}
 
