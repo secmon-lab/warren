@@ -9,9 +9,9 @@ import (
 )
 
 type History struct {
-	ID        types.HistoryID `firestore:"id" json:"id"`
-	SessionID types.SessionID `firestore:"session_id" json:"session_id"`
-	CreatedAt time.Time       `firestore:"created_at" json:"created_at"`
+	ID        types.HistoryID `json:"id"`
+	SessionID types.SessionID `json:"session_id"`
+	CreatedAt time.Time       `json:"created_at"`
 }
 
 func NewHistory(ctx context.Context, ssnID types.SessionID) *History {

@@ -254,6 +254,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		// GetSession
 		got, err := repo.GetSession(ctx, sessionID)
 		gt.NoError(t, err)
+		gt.NotNil(t, got).Required()
 		gt.Value(t, got.ID).Equal(sessionID)
 		gt.Value(t, got.Thread.ChannelID).Equal(thread.ChannelID)
 		gt.Value(t, got.Thread.ThreadID).Equal(thread.ThreadID)
@@ -261,9 +262,57 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		// GetSessionByThread
 		got, err = repo.GetSessionByThread(ctx, thread)
 		gt.NoError(t, err)
+		gt.NotNil(t, got).Required()
 		gt.Value(t, got.ID).Equal(sessionID)
 		gt.Value(t, got.Thread.ChannelID).Equal(thread.ChannelID)
 		gt.Value(t, got.Thread.ThreadID).Equal(thread.ThreadID)
+	})
+
+	t.Run("SessionHistory", func(t *testing.T) {
+		sessionID := types.NewSessionID()
+		thread := slack.Thread{
+			ChannelID: "test-channel",
+			ThreadID:  fmt.Sprintf("%d.%d", time.Now().Unix(), time.Now().Nanosecond()),
+		}
+		s := session.Session{
+			ID:     sessionID,
+			Thread: &thread,
+		}
+
+		// PutSession
+		gt.NoError(t, repo.PutSession(ctx, s))
+
+		// Create multiple histories with different timestamps
+		histories := []*session.History{
+			{
+				ID:        types.NewHistoryID(),
+				SessionID: sessionID,
+				CreatedAt: time.Now().Add(-2 * time.Hour),
+			},
+			{
+				ID:        types.NewHistoryID(),
+				SessionID: sessionID,
+				CreatedAt: time.Now().Add(-1 * time.Hour),
+			},
+			{
+				ID:        types.NewHistoryID(),
+				SessionID: sessionID,
+				CreatedAt: time.Now(),
+			},
+		}
+
+		// Put histories
+		for _, h := range histories {
+			gt.NoError(t, repo.PutHistory(ctx, sessionID, h))
+		}
+
+		// Get latest history
+		latest, err := repo.GetLatestHistory(ctx, sessionID)
+		gt.NoError(t, err)
+		gt.NotNil(t, latest).Required()
+		gt.Value(t, latest.ID).Equal(histories[2].ID)
+		gt.Value(t, latest.SessionID).Equal(sessionID)
+		gt.Value(t, latest.CreatedAt.Unix()).Equal(histories[2].CreatedAt.Unix())
 	})
 
 	// Test notes
