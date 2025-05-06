@@ -10,7 +10,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/service/command/list"
-	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -46,7 +45,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg *slack.M
 			return goerr.Wrap(err, "failed to create or get session")
 		}
 
-		return uc.handlePrompt(ctx, threadSvc, ssn, mention.Message)
+		return uc.handlePrompt(ctx, ssn, mention.Message)
 	}
 
 	return nil
@@ -108,7 +107,7 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.
 		if err != nil {
 			return goerr.Wrap(err, "failed to create or get session")
 		}
-		return uc.handlePrompt(ctx, threadSvc, ssn, remaining)
+		return uc.handlePrompt(ctx, ssn, remaining)
 
 	default:
 		msg.Notify(ctx, "🤔 Available commands: `list`")
@@ -116,7 +115,7 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.
 	}
 }
 
-func (uc *UseCases) handlePrompt(ctx context.Context, threadSvc *slack_svc.ThreadService, ssn *session.Session, prompt string) error {
+func (uc *UseCases) handlePrompt(ctx context.Context, ssn *session.Session, prompt string) error {
 	baseAction := base.New(uc.repository, ssn.AlertIDs, uc.policyClient.Sources(), ssn.ID)
 
 	agent := gollem.New(uc.llmClient,
@@ -132,9 +131,12 @@ func (uc *UseCases) handlePrompt(ctx context.Context, threadSvc *slack_svc.Threa
 		return goerr.Wrap(err, "failed to get latest history")
 	}
 
-	history, err := storageSvc.GetHistory(ctx, ssn.ID, historyRecord.ID)
-	if err != nil {
-		return goerr.Wrap(err, "failed to get history data")
+	var history *gollem.History
+	if historyRecord != nil {
+		history, err = storageSvc.GetHistory(ctx, ssn.ID, historyRecord.ID)
+		if err != nil {
+			return goerr.Wrap(err, "failed to get history data")
+		}
 	}
 
 	newHistory, err := agent.Prompt(ctx, prompt,
