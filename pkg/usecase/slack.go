@@ -120,6 +120,7 @@ func (uc *UseCases) handlePrompt(ctx context.Context, ssn *session.Session, p st
 	logger := logging.From(ctx)
 
 	baseAction := base.New(uc.repository, ssn.AlertIDs, uc.policyClient.Sources(), ssn.ID)
+	tools := append(uc.tools, baseAction)
 
 	storageSvc := storage.New(uc.storageClient, storage.WithPrefix(uc.storagePrefix))
 
@@ -148,7 +149,7 @@ func (uc *UseCases) handlePrompt(ctx context.Context, ssn *session.Session, p st
 
 	agent := gollem.New(uc.llmClient,
 		gollem.WithHistory(history),
-		gollem.WithToolSets(baseAction),
+		gollem.WithToolSets(tools...),
 		gollem.WithSystemPrompt(systemPrompt),
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),

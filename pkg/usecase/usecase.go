@@ -20,7 +20,7 @@ type UseCases struct {
 	storageClient   interfaces.StorageClient
 	policyClient    interfaces.PolicyClient
 
-	agent *gollem.Agent
+	tools []gollem.ToolSet
 
 	// configs
 	timeSpan      time.Duration
@@ -71,9 +71,9 @@ func WithRepository(repository interfaces.Repository) Option {
 	}
 }
 
-func WithAgent(agent *gollem.Agent) Option {
+func WithTools(tools []gollem.ToolSet) Option {
 	return func(u *UseCases) {
-		u.agent = agent
+		u.tools = append(u.tools, tools...)
 	}
 }
 

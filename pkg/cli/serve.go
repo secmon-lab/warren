@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -106,10 +105,6 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			agent := gollem.New(geminiModel,
-				gollem.WithToolSets(toolSets...),
-			)
-
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(geminiModel),
 				usecase.WithEmbeddingClient(embeddingClient),
@@ -117,7 +112,7 @@ func cmdServe() *cli.Command {
 				usecase.WithRepository(firestore),
 				usecase.WithSlackService(slackSvc),
 				usecase.WithStorageClient(storageClient),
-				usecase.WithAgent(agent),
+				usecase.WithTools(toolSets),
 			}
 
 			uc := usecase.New(ucOptions...)
