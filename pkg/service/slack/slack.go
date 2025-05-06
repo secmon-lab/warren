@@ -141,15 +141,6 @@ func (x *Service) ShowResolveAlertModal(ctx context.Context, alert alert.Alert, 
 	return nil
 }
 
-func (x *Service) ShowIgnoreListModal(ctx context.Context, list alert.List, triggerID string) error {
-	req := buildIgnoreModalViewRequest(list.ID.String())
-	if _, err := x.client.OpenView(triggerID, req); err != nil {
-		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
-	}
-
-	return nil
-}
-
 func (x *Service) ShowResolveListModal(ctx context.Context, list alert.List, triggerID string) error {
 	req := buildResolveModalViewRequest(model.CallbackSubmitResolveList, list.ID.String())
 	if _, err := x.client.OpenView(triggerID, req); err != nil {

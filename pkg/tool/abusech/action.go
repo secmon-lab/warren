@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/urfave/cli/v3"
 )
@@ -44,14 +44,14 @@ func (x *Action) Flags() []cli.Flag {
 	}
 }
 
-func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
-	return []gollam.ToolSpec{
+func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
+	return []gollem.ToolSpec{
 		{
 			Name:        "abusech.bazaar.query",
 			Description: "Query malware information from MalwareBazaar by file hash value.",
-			Parameters: map[string]*gollam.Parameter{
+			Parameters: map[string]*gollem.Parameter{
 				"hash": {
-					Type:        gollam.TypeString,
+					Type:        gollem.TypeString,
 					Description: "The hash value (MD5, SHA1, or SHA256) to query",
 				},
 			},

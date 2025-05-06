@@ -5,7 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/urfave/cli/v3"
@@ -61,18 +61,18 @@ func (x *Base) LogValue() slog.Value {
 	)
 }
 
-func (x *Base) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
-	return []gollam.ToolSpec{
+func (x *Base) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
+	return []gollem.ToolSpec{
 		{
 			Name:        "base.alerts.get",
 			Description: "Get a set of alerts with pagination support",
-			Parameters: map[string]*gollam.Parameter{
+			Parameters: map[string]*gollem.Parameter{
 				"limit": {
-					Type:        gollam.TypeInteger,
+					Type:        gollem.TypeInteger,
 					Description: "Maximum number of alerts to return",
 				},
 				"offset": {
-					Type:        gollam.TypeInteger,
+					Type:        gollem.TypeInteger,
 					Description: "Number of alerts to skip",
 				},
 			},
@@ -80,13 +80,13 @@ func (x *Base) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 		{
 			Name:        "base.alert.search",
 			Description: "Search the alerts by the given query. You can specify the path as Firestore path, and the operation and value to filter the alerts.",
-			Parameters: map[string]*gollam.Parameter{
+			Parameters: map[string]*gollem.Parameter{
 				"path": {
-					Type:        gollam.TypeString,
+					Type:        gollem.TypeString,
 					Description: "The path of the alert parameter to filter",
 				},
 				"op": {
-					Type:        gollam.TypeString,
+					Type:        gollem.TypeString,
 					Description: "The operation of the alert",
 					Enum: []string{
 						"==",
@@ -98,15 +98,15 @@ func (x *Base) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 					},
 				},
 				"value": {
-					Type:        gollam.TypeString,
+					Type:        gollem.TypeString,
 					Description: "The value of the alert",
 				},
 				"limit": {
-					Type:        gollam.TypeInteger,
+					Type:        gollem.TypeInteger,
 					Description: "Maximum number of alerts to return. Default is 25.",
 				},
 				"offset": {
-					Type:        gollam.TypeInteger,
+					Type:        gollem.TypeInteger,
 					Description: "Number of alerts to skip. Default is 0.",
 				},
 			},

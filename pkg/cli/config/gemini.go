@@ -5,7 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollam/llm/gemini"
+	"github.com/m-mizutani/gollem/llm/gemini"
 	"github.com/urfave/cli/v3"
 )
 

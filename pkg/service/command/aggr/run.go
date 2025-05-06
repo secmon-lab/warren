@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -17,7 +17,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-func Run(ctx context.Context, repo interfaces.Repository, slackThread *slack_svc.ThreadService, llm gollam.LLMClient, user slack.User, alertIDs []types.AlertID, remaining string) error {
+func Run(ctx context.Context, repo interfaces.Repository, slackThread *slack_svc.ThreadService, llm gollem.LLMClient, user slack.User, alertIDs []types.AlertID, remaining string) error {
 	ctx = msg.NewTrace(ctx, "🤖 Aggregating alerts...")
 
 	alerts, err := repo.BatchGetAlerts(ctx, alertIDs)

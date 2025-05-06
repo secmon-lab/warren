@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/tool/abusech"
 	"github.com/secmon-lab/warren/pkg/tool/ipdb"
@@ -20,7 +20,7 @@ type builtinTool interface {
 	Flags() []cli.Flag
 	Configure(ctx context.Context) error
 	LogValue() slog.Value
-	gollam.ToolSet
+	gollem.ToolSet
 }
 
 type toolList []builtinTool
@@ -51,8 +51,8 @@ func (x toolList) LogValue() slog.Value {
 	return slog.GroupValue(attrs...)
 }
 
-func (x toolList) ToolSets(ctx context.Context) ([]gollam.ToolSet, error) {
-	toolSets := []gollam.ToolSet{}
+func (x toolList) ToolSets(ctx context.Context) ([]gollem.ToolSet, error) {
+	toolSets := []gollem.ToolSet{}
 	for _, tool := range x {
 		if err := tool.Configure(ctx); err != nil {
 			if err == errs.ErrActionUnavailable {

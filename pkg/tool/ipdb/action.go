@@ -10,7 +10,7 @@ import (
 	"net/url"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/urfave/cli/v3"
 )
@@ -44,18 +44,18 @@ func (x *Action) Flags() []cli.Flag {
 	}
 }
 
-func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
-	return []gollam.ToolSpec{
+func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
+	return []gollem.ToolSpec{
 		{
 			Name:        "ipdb.check",
 			Description: "Check IP address information from AbuseIPDB.",
-			Parameters: map[string]*gollam.Parameter{
+			Parameters: map[string]*gollem.Parameter{
 				"target": {
-					Type:        gollam.TypeString,
+					Type:        gollem.TypeString,
 					Description: "The IP address to check",
 				},
 				"maxAgeInDays": {
-					Type:        gollam.TypeInteger,
+					Type:        gollem.TypeInteger,
 					Description: "The maximum age of reports in days (1-365)",
 				},
 			},

@@ -10,7 +10,7 @@ import (
 	"net/url"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/urfave/cli/v3"
 )
@@ -44,14 +44,14 @@ func (x *Action) Flags() []cli.Flag {
 	}
 }
 
-func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
-	return []gollam.ToolSpec{
+func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
+	return []gollem.ToolSpec{
 		{
 			Name:        "vt.ip",
 			Description: "Search the indicator of IPv4/IPv6 from VirusTotal.",
-			Parameters: map[string]*gollam.Parameter{
+			Parameters: map[string]*gollem.Parameter{
 				"target": {
-					Type:        gollam.TypeString,
+					Type:        gollem.TypeString,
 					Description: "The IP address to search",
 				},
 			},
@@ -59,9 +59,9 @@ func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 		{
 			Name:        "vt.domain",
 			Description: "Search the indicator of domain from VirusTotal.",
-			Parameters: map[string]*gollam.Parameter{
+			Parameters: map[string]*gollem.Parameter{
 				"target": {
-					Type:        gollam.TypeString,
+					Type:        gollem.TypeString,
 					Description: "The domain to search",
 				},
 			},
@@ -69,9 +69,9 @@ func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 		{
 			Name:        "vt.file_hash",
 			Description: "Search the indicator of file hash from VirusTotal.",
-			Parameters: map[string]*gollam.Parameter{
+			Parameters: map[string]*gollem.Parameter{
 				"target": {
-					Type:        gollam.TypeString,
+					Type:        gollem.TypeString,
 					Description: "The file hash to search",
 				},
 			},
@@ -79,9 +79,9 @@ func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 		{
 			Name:        "vt.url",
 			Description: "Search the indicator of URL from VirusTotal.",
-			Parameters: map[string]*gollam.Parameter{
+			Parameters: map[string]*gollem.Parameter{
 				"target": {
-					Type:        gollam.TypeString,
+					Type:        gollem.TypeString,
 					Description: "The URL to search",
 				},
 			},

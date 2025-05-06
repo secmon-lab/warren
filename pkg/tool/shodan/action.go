@@ -10,7 +10,7 @@ import (
 	"net/url"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/urfave/cli/v3"
 )
@@ -44,14 +44,14 @@ func (x *Action) Flags() []cli.Flag {
 	}
 }
 
-func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
-	return []gollam.ToolSpec{
+func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
+	return []gollem.ToolSpec{
 		{
 			Name:        "shodan.host",
 			Description: "Search the host information from Shodan.",
-			Parameters: map[string]*gollam.Parameter{
+			Parameters: map[string]*gollem.Parameter{
 				"target": {
-					Type:        gollam.TypeString,
+					Type:        gollem.TypeString,
 					Description: "The IP address to search",
 				},
 			},
@@ -59,9 +59,9 @@ func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 		{
 			Name:        "shodan.domain",
 			Description: "Search the domain information from Shodan.",
-			Parameters: map[string]*gollam.Parameter{
+			Parameters: map[string]*gollem.Parameter{
 				"target": {
-					Type:        gollam.TypeString,
+					Type:        gollem.TypeString,
 					Description: "The domain to search",
 				},
 			},
@@ -69,13 +69,13 @@ func (x *Action) Specs(ctx context.Context) ([]gollam.ToolSpec, error) {
 		{
 			Name:        "shodan.search",
 			Description: "Search the internet using Shodan search query.",
-			Parameters: map[string]*gollam.Parameter{
+			Parameters: map[string]*gollem.Parameter{
 				"query": {
-					Type:        gollam.TypeString,
+					Type:        gollem.TypeString,
 					Description: "The search query to use",
 				},
 				"limit": {
-					Type:        gollam.TypeInteger,
+					Type:        gollem.TypeInteger,
 					Description: "Maximum number of results to return (default: 100)",
 				},
 			},

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gt"
 
 	"github.com/secmon-lab/warren/pkg/domain/mock"
@@ -33,10 +33,10 @@ func TestService_Run(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
 	llm := &mock.LLMClientMock{
-		NewSessionFunc: func(ctx context.Context, opts ...gollam.SessionOption) (gollam.Session, error) {
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollam.Input) (*gollam.Response, error) {
-					return &gollam.Response{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
 						Texts: []string{
 							`{"title": "test title", "description": "test description"}`,
 						},

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
@@ -30,7 +30,7 @@ func WithRetryPrompt(f func(ctx context.Context, err error) string) Option {
 	}
 }
 
-func Ask[T any](ctx context.Context, llm gollam.Session, prompt string, opts ...Option) (*T, error) {
+func Ask[T any](ctx context.Context, llm gollem.Session, prompt string, opts ...Option) (*T, error) {
 	logger := logging.From(ctx)
 
 	config := &config{
@@ -45,7 +45,7 @@ func Ask[T any](ctx context.Context, llm gollam.Session, prompt string, opts ...
 
 	var response *T
 	for i := 0; i < config.maxRetry && response == nil; i++ {
-		resp, err := llm.GenerateContent(ctx, gollam.Text(prompt))
+		resp, err := llm.GenerateContent(ctx, gollem.Text(prompt))
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to send message")
 		}

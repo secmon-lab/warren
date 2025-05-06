@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
@@ -41,7 +41,7 @@ func pathToHistory(prefix string, sessionID types.SessionID, historyID types.His
 	return fmt.Sprintf("%s%s/session/%s/history/%s.json", prefix, StorageSchemaVersion, sessionID, historyID)
 }
 
-func (s *Service) PutHistory(ctx context.Context, sessionID types.SessionID, historyID types.HistoryID, history *gollam.History) error {
+func (s *Service) PutHistory(ctx context.Context, sessionID types.SessionID, historyID types.HistoryID, history *gollem.History) error {
 	path := pathToHistory(s.prefix, sessionID, historyID)
 
 	w := s.storageClient.PutObject(ctx, path)
@@ -57,7 +57,7 @@ func (s *Service) PutHistory(ctx context.Context, sessionID types.SessionID, his
 	return nil
 }
 
-func (s *Service) GetHistory(ctx context.Context, sessionID types.SessionID, historyID types.HistoryID) (*gollam.History, error) {
+func (s *Service) GetHistory(ctx context.Context, sessionID types.SessionID, historyID types.HistoryID) (*gollem.History, error) {
 	path := pathToHistory(s.prefix, sessionID, historyID)
 
 	r, err := s.storageClient.GetObject(ctx, path)
@@ -66,7 +66,7 @@ func (s *Service) GetHistory(ctx context.Context, sessionID types.SessionID, his
 	}
 	defer safe.Close(ctx, r)
 
-	var history gollam.History
+	var history gollem.History
 	if err := json.NewDecoder(r).Decode(&history); err != nil {
 		return nil, goerr.Wrap(err, "failed to unmarshal history")
 	}

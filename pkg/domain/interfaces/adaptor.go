@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/opaq"
 	"github.com/slack-go/slack"
 )
@@ -38,9 +38,9 @@ type SlackThreadService interface {
 }
 
 type LLMClient interface {
-	gollam.LLMClient
+	gollem.LLMClient
 }
 
 type LLMSession interface {
-	gollam.Session
+	gollem.Session
 }

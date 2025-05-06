@@ -5,7 +5,7 @@ import (
 	_ "embed"
 	"strings"
 
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -17,10 +17,10 @@ import (
 
 type Service struct {
 	repo interfaces.Repository
-	llm  gollam.LLMClient
+	llm  gollem.LLMClient
 }
 
-func New(repo interfaces.Repository, llm gollam.LLMClient) *Service {
+func New(repo interfaces.Repository, llm gollem.LLMClient) *Service {
 	return &Service{
 		repo: repo,
 		llm:  llm,

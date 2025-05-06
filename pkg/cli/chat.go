@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
@@ -157,15 +157,15 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to get tool sets")
 			}
 
-			agent := gollam.New(llmClient,
-				gollam.WithToolSets(toolSets...),
-				gollam.WithResponseMode(gollam.ResponseModeStreaming),
-				gollam.WithSystemPrompt(systemPrompt),
-				gollam.WithMsgCallback(func(ctx context.Context, msg string) error {
+			agent := gollem.New(llmClient,
+				gollem.WithToolSets(toolSets...),
+				gollem.WithResponseMode(gollem.ResponseModeStreaming),
+				gollem.WithSystemPrompt(systemPrompt),
+				gollem.WithMessageHook(func(ctx context.Context, msg string) error {
 					fmt.Print(msg)
 					return nil
 				}),
-				gollam.WithToolCallback(func(ctx context.Context, tool gollam.FunctionCall) error {
+				gollem.WithToolRequestHook(func(ctx context.Context, tool gollem.FunctionCall) error {
 					fmt.Printf("\n⚡ Execute Tool: %s\n", tool.Name)
 					for k, v := range tool.Arguments {
 						fmt.Printf("  ▶️ %s: %v\n", k, v)
@@ -184,7 +184,7 @@ func cmdChat() *cli.Command {
 				return nil
 			}
 
-			var history *gollam.History
+			var history *gollem.History
 			for {
 				msg, err := recvInput()
 				if err != nil {
@@ -199,7 +199,7 @@ func cmdChat() *cli.Command {
 				}
 
 				msg = "# Main instruction\n\n" + msg
-				history, err = agent.Prompt(ctx, msg, gollam.WithHistory(history))
+				history, err = agent.Prompt(ctx, msg, gollem.WithHistory(history))
 				if err != nil {
 					return goerr.Wrap(err, "failed to chat")
 				}

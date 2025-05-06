@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -116,39 +116,52 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.
 	}
 }
 
-func (uc *UseCases) handlePrompt(ctx context.Context, threadSvc *slack_svc.ThreadService, ssn *session.Session, message string) error {
+func (uc *UseCases) handlePrompt(ctx context.Context, threadSvc *slack_svc.ThreadService, ssn *session.Session, prompt string) error {
 	baseAction := base.New(uc.repository, ssn.AlertIDs, uc.policyClient.Sources(), ssn.ID)
 
-	agent := gollam.New(uc.llmClient,
-		gollam.WithToolSets(baseAction),
-		gollam.WithResponseMode(gollam.ResponseModeBlocking),
-		gollam.WithLogger(logging.From(ctx)),
+	agent := gollem.New(uc.llmClient,
+		gollem.WithToolSets(baseAction),
+		gollem.WithResponseMode(gollem.ResponseModeBlocking),
+		gollem.WithLogger(logging.From(ctx)),
 	)
 
 	storageSvc := storage.New(uc.storageClient, storage.WithPrefix(uc.storagePrefix))
 
-	latest, err := uc.repository.GetLatestHistory(ctx, ssn.ID)
+	historyRecord, err := uc.repository.GetLatestHistory(ctx, ssn.ID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get latest history")
 	}
 
-	history, err := storageSvc.GetHistory(ctx, ssn.ID, latest.ID)
+	history, err := storageSvc.GetHistory(ctx, ssn.ID, historyRecord.ID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get history data")
 	}
 
-	newHistory, err := agent.Prompt(ctx, message, gollam.WithHistory(history))
+	newHistory, err := agent.Prompt(ctx, prompt,
+		gollem.WithHistory(history),
+		gollem.WithMessageHook(func(ctx context.Context, message string) error {
+			msg.Notify(ctx, "💬 %s", message)
+			return nil
+		}),
+		gollem.WithToolRequestHook(func(ctx context.Context, tool gollem.FunctionCall) error {
+			msg.Trace(ctx, "⚡ Execute Tool: `%s`", tool.Name)
+			for k, v := range tool.Arguments {
+				msg.Trace(ctx, "  ▶️ `%s`: `%v`", k, v)
+			}
+			return nil
+		}),
+	)
 	if err != nil {
 		return goerr.Wrap(err, "failed to prompt")
 	}
 
-	newLatest := session.NewHistory(ctx, ssn.ID)
+	newRecord := session.NewHistory(ctx, ssn.ID)
 
-	if err = storageSvc.PutHistory(ctx, ssn.ID, newLatest.ID, newHistory); err != nil {
+	if err = storageSvc.PutHistory(ctx, ssn.ID, newRecord.ID, newHistory); err != nil {
 		return goerr.Wrap(err, "failed to put history")
 	}
 
-	if err = uc.repository.PutHistory(ctx, ssn.ID, newLatest); err != nil {
+	if err = uc.repository.PutHistory(ctx, ssn.ID, newRecord); err != nil {
 		return goerr.Wrap(err, "failed to put history")
 	}
 

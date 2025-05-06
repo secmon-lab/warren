@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -101,8 +101,8 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			agent := gollam.New(geminiModel,
-				gollam.WithToolSets(toolSets...),
+			agent := gollem.New(geminiModel,
+				gollem.WithToolSets(toolSets...),
 			)
 
 			ucOptions := []usecase.Option{

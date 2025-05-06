@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -25,7 +25,7 @@ func CreateList(ctx context.Context, repo interfaces.Repository, llmClient inter
 		return nil, goerr.Wrap(err, "failed to build meta list prompt")
 	}
 
-	ssn, err := llmClient.NewSession(ctx, gollam.WithSessionContentType(gollam.ContentTypeJSON))
+	ssn, err := llmClient.NewSession(ctx, gollem.WithSessionContentType(gollem.ContentTypeJSON))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create session")
 	}

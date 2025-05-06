@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/m-mizutani/gollam"
-	"github.com/m-mizutani/gollam/llm/gemini"
+	"github.com/m-mizutani/gollem"
+	"github.com/m-mizutani/gollem/llm/gemini"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 )
@@ -25,7 +25,7 @@ func TestAsk(t *testing.T) {
 	gt.NoError(t, err).Required()
 
 	ssn, err := geminiClient.NewSession(ctx,
-		gollam.WithSessionContentType(gollam.ContentTypeJSON),
+		gollem.WithSessionContentType(gollem.ContentTypeJSON),
 	)
 	gt.NoError(t, err).Required()
 

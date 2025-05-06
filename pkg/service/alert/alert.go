@@ -3,14 +3,14 @@ package alert
 import (
 	"context"
 
-	"github.com/m-mizutani/gollam"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-func GenerateAlertListMeta(ctx context.Context, list alert.List, llmClient gollam.LLMClient) (*prompt.MetaListPromptResult, error) {
+func GenerateAlertListMeta(ctx context.Context, list alert.List, llmClient gollem.LLMClient) (*prompt.MetaListPromptResult, error) {
 	p, err := prompt.BuildMetaListPrompt(ctx, list)
 	if err != nil {
 		return nil, err
