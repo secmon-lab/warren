@@ -9,6 +9,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/prompt"
 	"github.com/secmon-lab/warren/pkg/service/command/list"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
@@ -115,14 +116,10 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.
 	}
 }
 
-func (uc *UseCases) handlePrompt(ctx context.Context, ssn *session.Session, prompt string) error {
-	baseAction := base.New(uc.repository, ssn.AlertIDs, uc.policyClient.Sources(), ssn.ID)
+func (uc *UseCases) handlePrompt(ctx context.Context, ssn *session.Session, p string) error {
+	logger := logging.From(ctx)
 
-	agent := gollem.New(uc.llmClient,
-		gollem.WithToolSets(baseAction),
-		gollem.WithResponseMode(gollem.ResponseModeBlocking),
-		gollem.WithLogger(logging.From(ctx)),
-	)
+	baseAction := base.New(uc.repository, ssn.AlertIDs, uc.policyClient.Sources(), ssn.ID)
 
 	storageSvc := storage.New(uc.storageClient, storage.WithPrefix(uc.storagePrefix))
 
@@ -139,8 +136,22 @@ func (uc *UseCases) handlePrompt(ctx context.Context, ssn *session.Session, prom
 		}
 	}
 
-	newHistory, err := agent.Prompt(ctx, prompt,
+	alerts, err := uc.repository.BatchGetAlerts(ctx, ssn.AlertIDs)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alerts")
+	}
+
+	systemPrompt, err := prompt.BuildSessionInitPrompt(ctx, alerts)
+	if err != nil {
+		return goerr.Wrap(err, "failed to build system prompt")
+	}
+
+	agent := gollem.New(uc.llmClient,
 		gollem.WithHistory(history),
+		gollem.WithToolSets(baseAction),
+		gollem.WithSystemPrompt(systemPrompt),
+		gollem.WithResponseMode(gollem.ResponseModeBlocking),
+		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
 			msg.Notify(ctx, "💬 %s", message)
 			return nil
@@ -153,6 +164,10 @@ func (uc *UseCases) handlePrompt(ctx context.Context, ssn *session.Session, prom
 			return nil
 		}),
 	)
+
+	logger.Debug("run prompt", "system_prompt", systemPrompt, "prompt", p, "history", history, "session", ssn)
+
+	newHistory, err := agent.Prompt(ctx, p)
 	if err != nil {
 		return goerr.Wrap(err, "failed to prompt")
 	}
