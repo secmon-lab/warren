@@ -6,64 +6,72 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
-	"time"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/storage"
 	"github.com/google/uuid"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
-	"github.com/urfave/cli/v3"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
-	"gopkg.in/yaml.v3"
 )
 
-type Action struct {
-	projectID     string
-	credentials   string
-	configFile    string
-	storageBucket string
-	storagePrefix string
-	timeout       time.Duration
-	config        *Config
-}
+func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
+	if x.projectID == "" {
+		return nil, goerr.New("BigQuery project ID is required")
+	}
 
-var _ interfaces.Tool = &Action{}
+	var opts []option.ClientOption
+	if x.credentials != "" {
+		opts = append(opts, option.WithCredentialsFile(x.credentials))
+	}
 
-func (x *Action) Helper() *cli.Command {
-	return nil
-}
+	client, err := bigquery.NewClient(ctx, x.projectID, opts...)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to create BigQuery client")
+	}
+	defer safe.Close(ctx, client)
 
-type Config struct {
-	Datasets map[string]DatasetConfig `yaml:"datasets"`
-}
+	switch name {
+	case "bigquery_list_dataset":
+		return x.listDatasets()
 
-type DatasetConfig struct {
-	Tables []TableConfig `yaml:"tables"`
-}
+	case "bigquery_query":
+		query, ok := args["query"].(string)
+		if !ok {
+			return nil, goerr.New("query parameter is required")
+		}
+		return x.executeQuery(ctx, client, query)
 
-type TableConfig struct {
-	// TableID
-	TableID string `yaml:"table_id"`
+	case "bigquery_result":
+		queryID, ok := args["query_id"].(string)
+		if !ok {
+			return nil, goerr.New("query_id parameter is required")
+		}
+		limit := 100
+		if l, ok := args["limit"].(int); ok {
+			limit = l
+		}
+		offset := 0
+		if o, ok := args["offset"].(int); ok {
+			offset = o
+		}
+		return x.getQueryResults(ctx, client, queryID, limit, offset)
 
-	// Description of the table
-	Description string `yaml:"description"`
+	case "bigquery_schema":
+		datasetID, ok := args["dataset_id"].(string)
+		if !ok {
+			return nil, goerr.New("dataset_id parameter is required")
+		}
+		tableID, ok := args["table_id"].(string)
+		if !ok {
+			return nil, goerr.New("table_id parameter is required")
+		}
+		return x.getTableSchema(datasetID, tableID)
 
-	// Columns of the table. It's not required to describe all column.
-	Columns []ColumnConfig `yaml:"columns"`
-}
-
-type ColumnConfig struct {
-	Name         string         `yaml:"name"`
-	Description  string         `yaml:"description"`
-	ValueExample string         `yaml:"value_example"`
-	Type         string         `yaml:"type"`   // STRING, INTEGER, FLOAT, BOOLEAN, TIMESTAMP, DATE, TIME, DATETIME, BYTES, RECORD
-	Fields       []ColumnConfig `yaml:"fields"` // for RECORD type
+	default:
+		return nil, goerr.New("invalid function name", goerr.V("name", name))
+	}
 }
 
 type rowProcessor interface {
@@ -206,193 +214,6 @@ func (x *Action) processBigQueryResults(ctx context.Context, it *bigquery.RowIte
 	return x.processResults(ctx, processor, limit, offset)
 }
 
-func (x *Action) Name() string {
-	return "bigquery"
-}
-
-func (x *Action) Flags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{
-			Name:        "bigquery-project-id",
-			Usage:       "Google Cloud Project ID",
-			Destination: &x.projectID,
-			Category:    "Tool",
-			Sources:     cli.EnvVars("WARREN_BIGQUERY_PROJECT_ID"),
-		},
-		&cli.StringFlag{
-			Name:        "bigquery-credentials",
-			Usage:       "Path to Google Cloud credentials JSON file (optional)",
-			Destination: &x.credentials,
-			Category:    "Tool",
-			Sources:     cli.EnvVars("WARREN_BIGQUERY_CREDENTIALS"),
-		},
-		&cli.StringFlag{
-			Name:        "bigquery-config",
-			Usage:       "Path to configuration YAML file",
-			Destination: &x.configFile,
-			Category:    "Tool",
-			Sources:     cli.EnvVars("WARREN_BIGQUERY_CONFIG"),
-		},
-		&cli.StringFlag{
-			Name:        "bigquery-storage-bucket",
-			Usage:       "GCS bucket name for storing query results",
-			Destination: &x.storageBucket,
-			Category:    "Tool",
-			Sources:     cli.EnvVars("WARREN_BIGQUERY_STORAGE_BUCKET"),
-		},
-		&cli.StringFlag{
-			Name:        "bigquery-storage-prefix",
-			Usage:       "Prefix for GCS object path for storing query results",
-			Destination: &x.storagePrefix,
-			Category:    "Tool",
-			Sources:     cli.EnvVars("WARREN_BIGQUERY_STORAGE_PREFIX"),
-		},
-		&cli.DurationFlag{
-			Name:        "bigquery-timeout",
-			Usage:       "Timeout for query execution",
-			Destination: &x.timeout,
-			Category:    "Tool",
-			Value:       5 * time.Minute,
-			Sources:     cli.EnvVars("WARREN_BIGQUERY_TIMEOUT"),
-		},
-	}
-}
-
-func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
-	return []gollem.ToolSpec{
-		{
-			Name:        "bigquery_list_dataset",
-			Description: "List available BigQuery datasets and tables",
-			Parameters:  map[string]*gollem.Parameter{},
-		},
-		{
-			Name:        "bigquery_query",
-			Description: "Execute a BigQuery query and return the query ID",
-			Parameters: map[string]*gollem.Parameter{
-				"query": {
-					Type:        gollem.TypeString,
-					Description: "The SQL query to execute",
-				},
-			},
-			Required: []string{"query"},
-		},
-		{
-			Name:        "bigquery_result",
-			Description: "Get the results of a previously executed query",
-			Parameters: map[string]*gollem.Parameter{
-				"query_id": {
-					Type:        gollem.TypeString,
-					Description: "The ID of the query to get results for",
-				},
-				"limit": {
-					Type:        gollem.TypeInteger,
-					Description: "Maximum number of rows to return (default: 100)",
-					Required:    []string{},
-				},
-				"offset": {
-					Type:        gollem.TypeInteger,
-					Description: "Number of rows to skip (default: 0)",
-					Required:    []string{},
-				},
-			},
-			Required: []string{"query_id"},
-		},
-		{
-			Name:        "bigquery_schema",
-			Description: "Get schema information for a specific table",
-			Parameters: map[string]*gollem.Parameter{
-				"dataset_id": {
-					Type:        gollem.TypeString,
-					Description: "The dataset ID containing the table",
-				},
-				"table_id": {
-					Type:        gollem.TypeString,
-					Description: "The table ID to get schema for",
-				},
-			},
-			Required: []string{"dataset_id", "table_id"},
-		},
-	}, nil
-}
-
-func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
-	if x.projectID == "" {
-		return nil, goerr.New("BigQuery project ID is required")
-	}
-
-	var opts []option.ClientOption
-	if x.credentials != "" {
-		opts = append(opts, option.WithCredentialsFile(x.credentials))
-	}
-
-	client, err := bigquery.NewClient(ctx, x.projectID, opts...)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create BigQuery client")
-	}
-	defer safe.Close(ctx, client)
-
-	switch name {
-	case "bigquery_list_dataset":
-		return x.listDatasets()
-	case "bigquery_query":
-		query, ok := args["query"].(string)
-		if !ok {
-			return nil, goerr.New("query parameter is required")
-		}
-		return x.executeQuery(ctx, client, query)
-	case "bigquery_result":
-		queryID, ok := args["query_id"].(string)
-		if !ok {
-			return nil, goerr.New("query_id parameter is required")
-		}
-		limit := 100
-		if l, ok := args["limit"].(int); ok {
-			limit = l
-		}
-		offset := 0
-		if o, ok := args["offset"].(int); ok {
-			offset = o
-		}
-		return x.getQueryResults(ctx, client, queryID, limit, offset)
-	case "bigquery_schema":
-		datasetID, ok := args["dataset_id"].(string)
-		if !ok {
-			return nil, goerr.New("dataset_id parameter is required")
-		}
-		tableID, ok := args["table_id"].(string)
-		if !ok {
-			return nil, goerr.New("table_id parameter is required")
-		}
-		return x.getTableSchema(datasetID, tableID)
-	default:
-		return nil, goerr.New("invalid function name", goerr.V("name", name))
-	}
-}
-
-func (x *Action) Configure(ctx context.Context) error {
-	if x.projectID == "" {
-		return errs.ErrActionUnavailable
-	}
-
-	if x.configFile == "" {
-		return goerr.New("configuration file is required")
-	}
-
-	// Read and parse the configuration file
-	data, err := os.ReadFile(x.configFile)
-	if err != nil {
-		return goerr.Wrap(err, "failed to read configuration file")
-	}
-
-	var config Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return goerr.Wrap(err, "failed to parse configuration file")
-	}
-
-	x.config = &config
-	return nil
-}
-
 func (x *Action) listDatasets() (map[string]any, error) {
 	if x.config == nil {
 		return nil, goerr.New("configuration is not loaded")
@@ -506,7 +327,10 @@ func (x *Action) getQueryResults(ctx context.Context, client *bigquery.Client, q
 		return nil, goerr.Wrap(err, "failed to get job")
 	}
 
-	status, err := job.Wait(ctx)
+	// Wait for the job to complete
+	waitCtx, cancel := context.WithTimeout(ctx, x.timeout)
+	defer cancel()
+	status, err := job.Wait(waitCtx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to wait for job")
 	}
