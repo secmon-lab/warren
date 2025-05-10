@@ -6,7 +6,6 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 func (x *Base) getAlerts(ctx context.Context, args map[string]any) (map[string]any, error) {
@@ -112,47 +111,5 @@ func (x *Base) searchAlerts(ctx context.Context, args map[string]any) (map[strin
 		"count":  len(alerts),
 		"offset": offset,
 		"limit":  limit,
-	}, nil
-}
-
-func (x *Base) resolveAlert(ctx context.Context, args map[string]any) (map[string]any, error) {
-	strAlertID, err := getArg[string](args, "alert_id")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get alert_id")
-	}
-	alertID := types.AlertID(strAlertID)
-
-	strConclusion, err := getArg[string](args, "conclusion")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get conclusion")
-	}
-	conclusion := types.AlertConclusion(strConclusion)
-
-	reason, err := getArg[string](args, "reason")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get reason")
-	}
-
-	if err := conclusion.Validate(); err != nil {
-		return nil, goerr.Wrap(err, "invalid conclusion", goerr.V("conclusion", strConclusion))
-	}
-
-	alert, err := x.repo.GetAlert(ctx, types.AlertID(alertID))
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get alert")
-	}
-	if alert == nil {
-		return nil, goerr.New("alert not found", goerr.V("alert_id", alertID))
-	}
-
-	alert.Conclusion = types.AlertConclusion(conclusion)
-	alert.Reason = reason
-
-	if err := x.repo.PutAlert(ctx, *alert); err != nil {
-		return nil, goerr.Wrap(err, "failed to put alert")
-	}
-
-	return map[string]any{
-		"status": "resolved",
 	}, nil
 }
