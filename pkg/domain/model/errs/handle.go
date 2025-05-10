@@ -22,5 +22,5 @@ func Handle(ctx context.Context, err error) {
 	evID := hub.CaptureException(err)
 	logAttrs = append(logAttrs, slog.Any("sentry.id", evID))
 
-	logger.Error("Error occurred", logAttrs...)
+	logger.Error("Error: "+err.Error(), logAttrs...)
 }
