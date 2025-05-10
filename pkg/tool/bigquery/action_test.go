@@ -62,7 +62,7 @@ func TestBigQuery(t *testing.T) {
 				},
 			}
 
-			gt.NoError(t, cmd.Run(context.Background(), []string{
+			gt.NoError(t, cmd.Run(t.Context(), []string{
 				"bigquery",
 			}))
 		})
