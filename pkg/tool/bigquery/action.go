@@ -127,7 +127,7 @@ func (x *Action) toMetadataStoragePath(queryID string) string {
 	return fmt.Sprintf("%sbigquery/%s/metadata.json", x.storagePrefix, queryID)
 }
 
-func (x *Action) processResults(_ context.Context, processor rowProcessor, limit, offset int, objectPath string) (map[string]any, error) {
+func (x *Action) processResults(_ context.Context, processor rowProcessor, limit, offset int) (map[string]any, error) {
 	var rows []map[string]any
 	var totalSize int64
 	var totalRows int
@@ -184,19 +184,19 @@ func (x *Action) processResults(_ context.Context, processor rowProcessor, limit
 	}, nil
 }
 
-func (x *Action) processStorageResults(ctx context.Context, reader *storage.Reader, limit, offset int, objectPath string) (map[string]any, error) {
+func (x *Action) processStorageResults(ctx context.Context, reader *storage.Reader, limit, offset int) (map[string]any, error) {
 	processor := &storageRowProcessor{
 		decoder: json.NewDecoder(reader),
 	}
-	return x.processResults(ctx, processor, limit, offset, objectPath)
+	return x.processResults(ctx, processor, limit, offset)
 }
 
-func (x *Action) processBigQueryResults(ctx context.Context, it *bigquery.RowIterator, writer *storage.Writer, limit, offset int, objectPath string) (map[string]any, error) {
+func (x *Action) processBigQueryResults(ctx context.Context, it *bigquery.RowIterator, writer *storage.Writer, limit, offset int) (map[string]any, error) {
 	processor := &bigQueryRowProcessor{
 		iterator: it,
 		writer:   writer,
 	}
-	return x.processResults(ctx, processor, limit, offset, objectPath)
+	return x.processResults(ctx, processor, limit, offset)
 }
 
 func (x *Action) Name() string {
@@ -487,7 +487,7 @@ func (x *Action) getQueryResults(ctx context.Context, client *bigquery.Client, q
 		}
 		defer safe.Close(ctx, reader)
 
-		return x.processStorageResults(ctx, reader, limit, offset, objectPath)
+		return x.processStorageResults(ctx, reader, limit, offset)
 	} else if !errors.Is(err, storage.ErrObjectNotExist) {
 		// Return error if it's not a "file not found" error
 		return nil, goerr.Wrap(err, "failed to check existing result file")
@@ -518,7 +518,7 @@ func (x *Action) getQueryResults(ctx context.Context, client *bigquery.Client, q
 	defer safe.Close(ctx, writer)
 
 	// Process results and write to storage
-	result, err := x.processBigQueryResults(ctx, it, writer, limit, offset, objectPath)
+	result, err := x.processBigQueryResults(ctx, it, writer, limit, offset)
 	if err != nil {
 		return nil, err
 	}
