@@ -11,6 +11,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/urfave/cli/v3"
@@ -19,6 +20,12 @@ import (
 type Action struct {
 	apiKey  string
 	baseURL string
+}
+
+var _ interfaces.Tool = &Action{}
+
+func (x *Action) Helper() *cli.Command {
+	return nil
 }
 
 func (x *Action) Name() string {

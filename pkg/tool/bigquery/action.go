@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/urfave/cli/v3"
@@ -30,6 +31,12 @@ type Action struct {
 	storagePrefix string
 	timeout       time.Duration
 	config        *Config
+}
+
+var _ interfaces.Tool = &Action{}
+
+func (x *Action) Helper() *cli.Command {
+	return nil
 }
 
 type Config struct {
