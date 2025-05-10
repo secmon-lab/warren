@@ -14,6 +14,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
 type SNS struct {
@@ -53,7 +54,7 @@ func (x *SNS) Verify(ctx context.Context, client HTTPClient) error {
 	if err != nil {
 		return goerr.Wrap(err, "failed to get signing cert")
 	}
-	defer resp.Body.Close()
+	defer safe.Close(ctx, resp.Body)
 
 	certPEM, err := io.ReadAll(resp.Body)
 	if err != nil {

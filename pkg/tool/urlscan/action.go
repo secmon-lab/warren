@@ -16,6 +16,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/urfave/cli/v3"
 )
 
@@ -113,7 +114,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to send request")
 	}
-	defer resp.Body.Close()
+	defer safe.Close(ctx, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

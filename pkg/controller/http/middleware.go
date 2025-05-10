@@ -16,6 +16,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"google.golang.org/api/idtoken"
 )
 
@@ -208,7 +209,7 @@ func handleSNSSubscriptionConfirmation(ctx context.Context, msg message.SNS) err
 	if err != nil {
 		return goerr.Wrap(err, "failed to access SubscribeURL")
 	}
-	defer resp.Body.Close()
+	defer safe.Close(ctx, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return goerr.New("failed to confirm subscription", goerr.V("status", resp.StatusCode))

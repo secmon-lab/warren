@@ -12,6 +12,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/urfave/cli/v3"
 )
 
@@ -107,7 +108,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	if err != nil {
 		return nil, eb.Wrap(err, "failed to send request")
 	}
-	defer resp.Body.Close()
+	defer safe.Close(ctx, resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	eb = eb.With(
