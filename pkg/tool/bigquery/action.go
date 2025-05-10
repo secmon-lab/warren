@@ -71,6 +71,9 @@ type storageRowProcessor struct {
 
 func (p *storageRowProcessor) processRow() (map[string]bigquery.Value, error) {
 	var row map[string]bigquery.Value
+	if !p.decoder.More() {
+		return nil, iterator.Done
+	}
 	if err := p.decoder.Decode(&row); err != nil {
 		return nil, goerr.Wrap(err, "failed to decode row from JSON")
 	}
@@ -125,7 +128,7 @@ func (x *Action) toMetadataStoragePath(queryID string) string {
 }
 
 func (x *Action) processResults(_ context.Context, processor rowProcessor, limit, offset int, objectPath string) (map[string]any, error) {
-	var rows []map[string]bigquery.Value
+	var rows []map[string]any
 	var totalSize int64
 	var totalRows int
 	currentRow := 0
@@ -152,11 +155,16 @@ func (x *Action) processResults(_ context.Context, processor rowProcessor, limit
 			continue
 		}
 
-		rows = append(rows, row)
 		rowJSON, err := json.Marshal(row)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to calculate row size")
 		}
+		var rowMap map[string]any
+		if err := json.Unmarshal(rowJSON, &rowMap); err != nil {
+			return nil, goerr.Wrap(err, "failed to unmarshal row")
+		}
+		rows = append(rows, rowMap)
+
 		totalSize += int64(len(rowJSON))
 
 		if err := processor.writeRow(row); err != nil {
@@ -167,8 +175,6 @@ func (x *Action) processResults(_ context.Context, processor rowProcessor, limit
 	}
 
 	return map[string]any{
-		"status":     "completed",
-		"gcs_path":   fmt.Sprintf("gs://%s/%s", x.storageBucket, objectPath),
 		"rows":       rows,
 		"total_rows": totalRows,
 		"total_size": totalSize,

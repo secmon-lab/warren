@@ -154,9 +154,40 @@ func TestBigQuery_Query(t *testing.T) {
 			gt.Map(t, runResult).HasKey("rows").Required()
 			gt.Map(t, runResult).HasKey("total_rows").Required()
 			gt.Map(t, runResult).HasKey("total_size").Required()
-			gt.Map(t, runResult).HasKey("gcs_path").Required()
 			gt.Map(t, runResult).HasKey("has_more").Required()
 
+			totalRows := gt.Cast[int](t, runResult["total_rows"])
+			if totalRows > 1 {
+				result1, err := action.Run(ctx, "bigquery_result", map[string]any{
+					"query_id": queryID,
+					"limit":    1,
+					"offset":   0,
+				})
+				gt.NoError(t, err).Required()
+				gt.NotEqual(t, result1, nil)
+				rows1 := gt.Cast[[]map[string]any](t, result1["rows"])
+
+				result2, err := action.Run(ctx, "bigquery_result", map[string]any{
+					"query_id": queryID,
+					"limit":    1,
+					"offset":   0,
+				})
+				gt.NoError(t, err)
+				gt.NotEqual(t, result2, nil)
+
+				rows2 := gt.Cast[[]map[string]any](t, result2["rows"])
+				gt.Equal(t, rows1, rows2)
+
+				result3, err := action.Run(ctx, "bigquery_result", map[string]any{
+					"query_id": queryID,
+					"limit":    1,
+					"offset":   1,
+				})
+				gt.NoError(t, err)
+				gt.NotEqual(t, result3, nil)
+				rows3 := gt.Cast[[]map[string]any](t, result3["rows"])
+				gt.NotEqual(t, rows1, rows3)
+			}
 			return nil
 		},
 	}
