@@ -11,29 +11,29 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-type config struct {
+type askConfig struct {
 	maxRetry    int
 	retryPrompt func(ctx context.Context, err error) string
 }
 
-type Option func(*config)
+type AskOption func(*askConfig)
 
-func WithMaxRetry(maxRetry int) Option {
-	return func(c *config) {
+func WithMaxRetry(maxRetry int) AskOption {
+	return func(c *askConfig) {
 		c.maxRetry = maxRetry
 	}
 }
 
-func WithRetryPrompt(f func(ctx context.Context, err error) string) Option {
-	return func(c *config) {
+func WithRetryPrompt(f func(ctx context.Context, err error) string) AskOption {
+	return func(c *askConfig) {
 		c.retryPrompt = f
 	}
 }
 
-func Ask[T any](ctx context.Context, llm gollem.Session, prompt string, opts ...Option) (*T, error) {
+func Ask[T any](ctx context.Context, llm gollem.Session, prompt string, opts ...AskOption) (*T, error) {
 	logger := logging.From(ctx)
 
-	config := &config{
+	config := &askConfig{
 		maxRetry: 3,
 		retryPrompt: func(ctx context.Context, err error) string {
 			return "Invalid response. Please try again: " + err.Error()

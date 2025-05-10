@@ -67,7 +67,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 		if !ok {
 			return nil, goerr.New("table_id parameter is required")
 		}
-		return x.getTableSchema(datasetID, tableID)
+		return x.getTableSchema(ctx, client, datasetID, tableID)
 
 	default:
 		return nil, goerr.New("invalid function name", goerr.V("name", name))
@@ -362,36 +362,25 @@ func (x *Action) getQueryResults(ctx context.Context, client *bigquery.Client, q
 	return result, nil
 }
 
-func (x *Action) getTableSchema(datasetID, tableID string) (map[string]any, error) {
-	if x.config == nil {
-		return nil, goerr.New("configuration is not loaded")
+func (x *Action) getTableSchema(ctx context.Context, client *bigquery.Client, datasetID, tableID string) (map[string]any, error) {
+	table := client.Dataset(datasetID).Table(tableID)
+	metadata, err := table.Metadata(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get table metadata", goerr.V("dataset_id", datasetID), goerr.V("table_id", tableID))
 	}
 
-	datasetConfig, ok := x.config.Datasets[datasetID]
-	if !ok {
-		return nil, goerr.New("dataset not found in configuration", goerr.V("dataset_id", datasetID))
+	// Convert schema to JSON
+	schemaJSON, err := json.Marshal(metadata.Schema)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to marshal schema to JSON")
 	}
 
-	for _, table := range datasetConfig.Tables {
-		if table.TableID == tableID {
-			// Convert table config to JSON and back to ensure all fields are included
-			jsonData, err := json.Marshal(table)
-			if err != nil {
-				return nil, goerr.Wrap(err, "failed to marshal table config to JSON")
-			}
-
-			var result map[string]any
-			if err := json.Unmarshal(jsonData, &result); err != nil {
-				return nil, goerr.Wrap(err, "failed to unmarshal table config from JSON")
-			}
-
-			return result, nil
-		}
+	var result map[string]any
+	if err := json.Unmarshal(schemaJSON, &result); err != nil {
+		return nil, goerr.Wrap(err, "failed to unmarshal schema from JSON")
 	}
 
-	return nil, goerr.New("table not found in configuration",
-		goerr.V("dataset_id", datasetID),
-		goerr.V("table_id", tableID))
+	return result, nil
 }
 
 func (x *Action) LogValue() slog.Value {

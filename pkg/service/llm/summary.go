@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
 type SummaryOption func(*summaryConfig)
@@ -34,7 +35,8 @@ func Summary(ctx context.Context, llm gollem.LLMClient, prompt string, data []an
 		opt(cfg)
 	}
 
-	for _, d := range data {
+	startIdx := 0
+	for idx, d := range data {
 		rawData, err := json.Marshal(d)
 		if err != nil {
 			return "", err
@@ -43,6 +45,9 @@ func Summary(ctx context.Context, llm gollem.LLMClient, prompt string, data []an
 
 		partSize += len(rawData)
 		if partSize > cfg.maxPartSize {
+			msg.Trace(ctx, "✍️ generate part summary (%d-%d)", startIdx, idx)
+			startIdx = idx + 1
+
 			result, err := generatePartSummary(ctx, llm, prompt, parts)
 			if err != nil {
 				return "", err
@@ -54,6 +59,7 @@ func Summary(ctx context.Context, llm gollem.LLMClient, prompt string, data []an
 	}
 
 	if len(parts) > 0 {
+		msg.Trace(ctx, "✍️ generate part summary (%d-%d)", startIdx, len(data))
 		result, err := generatePartSummary(ctx, llm, prompt, parts)
 		if err != nil {
 			return "", err
@@ -61,6 +67,7 @@ func Summary(ctx context.Context, llm gollem.LLMClient, prompt string, data []an
 		results = append(results, result)
 	}
 
+	msg.Trace(ctx, "✍️ generate final summary")
 	return generateSummary(ctx, llm, prompt, results)
 }
 
@@ -114,14 +121,6 @@ Carefully read these partial summaries and integrate them considering the follow
 3.  **Extract key insights:** Extract the most important findings or insights that emerge from the data as a whole.
 4.  **Organize and structure information:** Eliminate redundant information and organize the information in a logical flow.
 5.  **Present conclusions:** Clearly present the conclusions or main messages derived from the entire dataset based on the analysis results.
-
-Your final output should be written in a structured report format, including the following elements:
-
-*   **Introduction:** Briefly state what this summary is based on (i.e., the integration of multiple partial summaries).
-*   **Overview of Analysis Results:** Briefly summarize the main trends and patterns observed from the entire dataset.
-*   **Key Findings from Partial Summaries:** Integrate and describe notable points from each part or information that is particularly noteworthy within the whole.
-*   **Common Themes and Differences:** Discuss points that are common across the summaries and any contrasting findings.
-*   **Conclusion:** Summarize the final conclusions, implications, or key insights derived from the entire dataset.
 
 More detailed instructions regarding the report structure or specific analytical perspectives and data trends to focus on will be provided separately in the "Instruction" section.
 	`
