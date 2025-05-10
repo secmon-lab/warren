@@ -243,7 +243,25 @@ type queryMetadata struct {
 func (x *Action) executeQuery(ctx context.Context, client *bigquery.Client, query string) (map[string]any, error) {
 	q := client.Query(query)
 
+	// Perform dry run to check scan size
+	q.DryRun = true
 	job, err := q.Run(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to dry run query")
+	}
+	status, err := job.Wait(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to wait for dry run job")
+	}
+	if status.Statistics.TotalBytesProcessed > x.scanLimit {
+		return nil, goerr.New("query scan size exceeds limit",
+			goerr.V("scan_size", status.Statistics.TotalBytesProcessed),
+			goerr.V("scan_limit", x.scanLimit))
+	}
+
+	// Execute the actual query
+	q.DryRun = false
+	job, err = q.Run(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to run query")
 	}
