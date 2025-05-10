@@ -7,6 +7,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/tool/abusech"
+	"github.com/secmon-lab/warren/pkg/tool/bigquery"
 	"github.com/secmon-lab/warren/pkg/tool/ipdb"
 	"github.com/secmon-lab/warren/pkg/tool/otx"
 	"github.com/secmon-lab/warren/pkg/tool/shodan"
@@ -40,7 +41,7 @@ var tools = toolList{
 	&shodan.Action{},
 	&abusech.Action{},
 	&ipdb.Action{},
-	// &bigquery.Action{},
+	&bigquery.Action{},
 }
 
 func (x toolList) Flags() []cli.Flag {
