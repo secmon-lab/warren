@@ -11,8 +11,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
-	"github.com/secmon-lab/warren/pkg/domain/model/policy"
-	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 func stringify(v any) (string, error) {
@@ -22,53 +20,6 @@ func stringify(v any) (string, error) {
 	if err := enc.Encode(v); err != nil {
 		return "", goerr.Wrap(err, "failed to marshal", goerr.V("data", v))
 	}
-	return buf.String(), nil
-}
-
-//go:embed templates/aggregate.md
-var aggregateTemplate string
-
-type AggregatePromptResult struct {
-	AlertID string `json:"alert_id"`
-}
-
-func BuildAggregatePrompt(ctx context.Context, newAlert alert.Alert, candidates alert.Alerts) (string, error) {
-	tmpl, err := template.New("aggregate").Parse(aggregateTemplate)
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to parse template")
-	}
-
-	rawNewAlert, err := stringify(newAlert)
-	if err != nil {
-		return "", err
-	}
-
-	rawCandidates := []string{}
-	for _, candidate := range candidates {
-		rawCandidate, err := stringify(candidate)
-		if err != nil {
-			return "", err
-		}
-		rawCandidates = append(rawCandidates, rawCandidate)
-	}
-
-	schema, err := generateSchema(AggregatePromptResult{}).Stringify()
-	if err != nil {
-		return "", err
-	}
-
-	input := map[string]any{
-		"new":        rawNewAlert,
-		"candidates": rawCandidates,
-		"schema":     schema,
-		"lang":       lang.From(ctx).Name(),
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "aggregate", input); err != nil {
-		return "", goerr.Wrap(err, "failed to execute template")
-	}
-
 	return buf.String(), nil
 }
 
@@ -132,143 +83,6 @@ func BuildMetaPrompt(ctx context.Context, alert alert.Alert) (string, error) {
 
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "meta", input); err != nil {
-		return "", goerr.Wrap(err, "failed to execute template")
-	}
-
-	return buf.String(), nil
-}
-
-//go:embed templates/ignore_policy.md
-var ignorePolicyTemplate string
-
-type IgnorePolicyPromptResult struct {
-	Title       string            `json:"title"`
-	Description string            `json:"description"`
-	Policy      map[string]string `json:"policy"`
-}
-
-func BuildIgnorePolicyPrompt(ctx context.Context, contents policy.Contents, alerts alert.Alerts, note string) (string, error) {
-	tmpl, err := template.New("ignore_policy").Parse(ignorePolicyTemplate)
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to parse template")
-	}
-
-	outputSchema, err := generateSchema(IgnorePolicyPromptResult{}).Stringify()
-	if err != nil {
-		return "", err
-	}
-
-	rawPolicy, err := stringify(contents)
-	if err != nil {
-		return "", err
-	}
-
-	input := map[string]any{
-		"note":   note,
-		"policy": rawPolicy,
-		"alerts": alerts,
-		"output": outputSchema,
-		"lang":   lang.From(ctx).Name(),
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "ignore_policy", input); err != nil {
-		return "", goerr.Wrap(err, "failed to execute template")
-	}
-
-	return buf.String(), nil
-}
-
-//go:embed templates/test_data_readme.md
-var testDataReadmeTemplate string
-
-type TestDataReadmePromptResult struct {
-	Content string `json:"content"`
-}
-
-func BuildTestDataReadmePrompt(ctx context.Context, action string, alerts alert.Alerts) (string, error) {
-	tmpl, err := template.New("test_data_readme").Parse(testDataReadmeTemplate)
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to parse template")
-	}
-
-	rawAlerts := []string{}
-	for _, alert := range alerts {
-		rawAlert, err := stringify(alert)
-		if err != nil {
-			return "", err
-		}
-		rawAlerts = append(rawAlerts, rawAlert)
-	}
-
-	schema, err := generateSchema(TestDataReadmePromptResult{}).Stringify()
-	if err != nil {
-		return "", err
-	}
-
-	input := map[string]any{
-		"alerts": rawAlerts,
-		"schema": schema,
-		"action": action,
-		"lang":   lang.From(ctx).Name(),
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "test_data_readme", input); err != nil {
-		return "", goerr.Wrap(err, "failed to execute template")
-	}
-
-	return buf.String(), nil
-}
-
-//go:embed templates/filter_query.md
-var filterQueryTemplate string
-
-type FilterQueryPromptResult struct {
-	AlertIDs []types.AlertID `json:"alert_ids"`
-}
-
-func BuildFilterQueryPrompt(ctx context.Context, query string, alerts alert.Alerts) (string, error) {
-	tmpl, err := template.New("filter_query").Parse(filterQueryTemplate)
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to parse template")
-	}
-
-	example := FilterQueryPromptResult{
-		AlertIDs: []types.AlertID{
-			types.NewAlertID(),
-			types.NewAlertID(),
-			types.NewAlertID(),
-		},
-	}
-	schema, err := generateSchema(example).Stringify()
-	if err != nil {
-		return "", err
-	}
-
-	rawExample, err := stringify(example)
-	if err != nil {
-		return "", err
-	}
-
-	rawAlerts := []string{}
-	for _, alert := range alerts {
-		rawAlert, err := stringify(alert)
-		if err != nil {
-			return "", err
-		}
-		rawAlerts = append(rawAlerts, rawAlert)
-	}
-
-	input := map[string]any{
-		"query":   query,
-		"alerts":  rawAlerts,
-		"schema":  schema,
-		"example": rawExample,
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "filter_query", input); err != nil {
 		return "", goerr.Wrap(err, "failed to execute template")
 	}
 
