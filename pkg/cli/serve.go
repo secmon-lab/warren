@@ -11,7 +11,6 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
-	"github.com/secmon-lab/warren/pkg/service/action"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -25,9 +24,7 @@ func cmdServe() *cli.Command {
 		slackCfg     config.Slack
 		geminiCfg    config.GeminiCfg
 		firestoreCfg config.Firestore
-		testDataCfg  config.TestData
 		embeddingCfg config.EmbeddingCfg
-		githubAppCfg config.GitHubAppCfg
 		storageCfg   config.Storage
 	)
 
@@ -47,10 +44,8 @@ func cmdServe() *cli.Command {
 		slackCfg.Flags(),
 		geminiCfg.Flags(),
 		firestoreCfg.Flags(),
-		testDataCfg.Flags(),
-		actions.Flags(),
+		tools.Flags(),
 		embeddingCfg.Flags(),
-		githubAppCfg.Flags(),
 		storageCfg.Flags(),
 	)
 
@@ -68,7 +63,6 @@ func cmdServe() *cli.Command {
 				"gemini", geminiCfg,
 				"embedding", embeddingCfg,
 				"firestore", firestoreCfg,
-				"testdata", testDataCfg,
 				"storage", storageCfg,
 			)
 
@@ -101,12 +95,12 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			testDataSet, err := testDataCfg.Configure()
+			storageClient, err := storageCfg.Configure(ctx)
 			if err != nil {
 				return err
 			}
 
-			actionSvc, err := action.New(ctx, actions)
+			toolSets, err := tools.ToolSets(ctx)
 			if err != nil {
 				return err
 			}
@@ -117,15 +111,9 @@ func cmdServe() *cli.Command {
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(firestore),
 				usecase.WithSlackService(slackSvc),
-				usecase.WithTestDataSet(testDataSet),
-				usecase.WithActionService(actionSvc),
+				usecase.WithStorageClient(storageClient),
+				usecase.WithTools(toolSets),
 			}
-
-			githubApp, err := githubAppCfg.Configure(ctx)
-			if err != nil {
-				return err
-			}
-			ucOptions = append(ucOptions, usecase.WithGitHubApp(githubApp))
 
 			uc := usecase.New(ucOptions...)
 

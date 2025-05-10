@@ -26,7 +26,7 @@ func cmdTest() *cli.Command {
 	return &cli.Command{
 		Name:    "test",
 		Aliases: []string{"t"},
-		Usage:   "Run test",
+		Usage:   "Run test of detection policy",
 		Flags:   flags,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			logger := logging.From(ctx)

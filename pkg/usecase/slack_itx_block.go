@@ -76,32 +76,6 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user
 		if err := uc.slackService.ShowResolveListModal(ctx, *list, triggerID); err != nil {
 			return goerr.Wrap(err, "failed to show resolve list modal")
 		}
-
-	case slack.ActionIDCreatePR:
-		msg.Trace(ctx, "✏️ Creating pull request...")
-
-		diffID := types.PolicyDiffID(value)
-		diff, err := uc.repository.GetPolicyDiff(ctx, diffID)
-		if err != nil {
-			msg.Trace(ctx, "💥 Failed to get policy diff\n> %s", err.Error())
-			return goerr.Wrap(err, "failed to get policy diff")
-		} else if diff == nil {
-			msg.Trace(ctx, "💥 Policy diff not found")
-			return nil
-		}
-
-		if uc.githubApp == nil {
-			msg.Trace(ctx, "💥 GitHub is not enabled")
-			return nil
-		}
-
-		prURL, err := uc.githubApp.CreatePolicyDiffPullRequest(ctx, diff)
-		if err != nil {
-			msg.Trace(ctx, "💥 Failed to create pull request\n> %s", err.Error())
-			return err
-		}
-
-		msg.Trace(ctx, "✅️ Created: <%s|%s>", prURL.String(), diff.Title)
 	}
 
 	return nil

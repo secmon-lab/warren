@@ -4,308 +4,19 @@
 package mock
 
 import (
-	"cloud.google.com/go/vertexai/genai"
 	"context"
+	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/opaq"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/gemini"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	modelslack "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	slackslack "github.com/slack-go/slack"
-	"github.com/urfave/cli/v3"
-	"log/slog"
+	"io"
 	"sync"
 	"time"
 )
-
-// ActionMock is a mock implementation of interfaces.Action.
-//
-//	func TestSomethingThatUsesAction(t *testing.T) {
-//
-//		// make and configure a mocked interfaces.Action
-//		mockedAction := &ActionMock{
-//			ConfigureFunc: func(ctx context.Context) error {
-//				panic("mock out the Configure method")
-//			},
-//			ExecuteFunc: func(ctx context.Context, name string, args map[string]any) (*action.Result, error) {
-//				panic("mock out the Execute method")
-//			},
-//			FlagsFunc: func() []cli.Flag {
-//				panic("mock out the Flags method")
-//			},
-//			LogValueFunc: func() slog.Value {
-//				panic("mock out the LogValue method")
-//			},
-//			NameFunc: func() string {
-//				panic("mock out the Name method")
-//			},
-//			ToolsFunc: func() []*genai.FunctionDeclaration {
-//				panic("mock out the Tools method")
-//			},
-//		}
-//
-//		// use mockedAction in code that requires interfaces.Action
-//		// and then make assertions.
-//
-//	}
-type ActionMock struct {
-	// ConfigureFunc mocks the Configure method.
-	ConfigureFunc func(ctx context.Context) error
-
-	// ExecuteFunc mocks the Execute method.
-	ExecuteFunc func(ctx context.Context, name string, args map[string]any) (*action.Result, error)
-
-	// FlagsFunc mocks the Flags method.
-	FlagsFunc func() []cli.Flag
-
-	// LogValueFunc mocks the LogValue method.
-	LogValueFunc func() slog.Value
-
-	// NameFunc mocks the Name method.
-	NameFunc func() string
-
-	// ToolsFunc mocks the Tools method.
-	ToolsFunc func() []*genai.FunctionDeclaration
-
-	// calls tracks calls to the methods.
-	calls struct {
-		// Configure holds details about calls to the Configure method.
-		Configure []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-		}
-		// Execute holds details about calls to the Execute method.
-		Execute []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Name is the name argument value.
-			Name string
-			// Args is the args argument value.
-			Args map[string]any
-		}
-		// Flags holds details about calls to the Flags method.
-		Flags []struct {
-		}
-		// LogValue holds details about calls to the LogValue method.
-		LogValue []struct {
-		}
-		// Name holds details about calls to the Name method.
-		Name []struct {
-		}
-		// Tools holds details about calls to the Tools method.
-		Tools []struct {
-		}
-	}
-	lockConfigure sync.RWMutex
-	lockExecute   sync.RWMutex
-	lockFlags     sync.RWMutex
-	lockLogValue  sync.RWMutex
-	lockName      sync.RWMutex
-	lockTools     sync.RWMutex
-}
-
-// Configure calls ConfigureFunc.
-func (mock *ActionMock) Configure(ctx context.Context) error {
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	mock.lockConfigure.Lock()
-	mock.calls.Configure = append(mock.calls.Configure, callInfo)
-	mock.lockConfigure.Unlock()
-	if mock.ConfigureFunc == nil {
-		var (
-			errOut error
-		)
-		return errOut
-	}
-	return mock.ConfigureFunc(ctx)
-}
-
-// ConfigureCalls gets all the calls that were made to Configure.
-// Check the length with:
-//
-//	len(mockedAction.ConfigureCalls())
-func (mock *ActionMock) ConfigureCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	mock.lockConfigure.RLock()
-	calls = mock.calls.Configure
-	mock.lockConfigure.RUnlock()
-	return calls
-}
-
-// Execute calls ExecuteFunc.
-func (mock *ActionMock) Execute(ctx context.Context, name string, args map[string]any) (*action.Result, error) {
-	callInfo := struct {
-		Ctx  context.Context
-		Name string
-		Args map[string]any
-	}{
-		Ctx:  ctx,
-		Name: name,
-		Args: args,
-	}
-	mock.lockExecute.Lock()
-	mock.calls.Execute = append(mock.calls.Execute, callInfo)
-	mock.lockExecute.Unlock()
-	if mock.ExecuteFunc == nil {
-		var (
-			resultOut *action.Result
-			errOut    error
-		)
-		return resultOut, errOut
-	}
-	return mock.ExecuteFunc(ctx, name, args)
-}
-
-// ExecuteCalls gets all the calls that were made to Execute.
-// Check the length with:
-//
-//	len(mockedAction.ExecuteCalls())
-func (mock *ActionMock) ExecuteCalls() []struct {
-	Ctx  context.Context
-	Name string
-	Args map[string]any
-} {
-	var calls []struct {
-		Ctx  context.Context
-		Name string
-		Args map[string]any
-	}
-	mock.lockExecute.RLock()
-	calls = mock.calls.Execute
-	mock.lockExecute.RUnlock()
-	return calls
-}
-
-// Flags calls FlagsFunc.
-func (mock *ActionMock) Flags() []cli.Flag {
-	callInfo := struct {
-	}{}
-	mock.lockFlags.Lock()
-	mock.calls.Flags = append(mock.calls.Flags, callInfo)
-	mock.lockFlags.Unlock()
-	if mock.FlagsFunc == nil {
-		var (
-			flagsOut []cli.Flag
-		)
-		return flagsOut
-	}
-	return mock.FlagsFunc()
-}
-
-// FlagsCalls gets all the calls that were made to Flags.
-// Check the length with:
-//
-//	len(mockedAction.FlagsCalls())
-func (mock *ActionMock) FlagsCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockFlags.RLock()
-	calls = mock.calls.Flags
-	mock.lockFlags.RUnlock()
-	return calls
-}
-
-// LogValue calls LogValueFunc.
-func (mock *ActionMock) LogValue() slog.Value {
-	callInfo := struct {
-	}{}
-	mock.lockLogValue.Lock()
-	mock.calls.LogValue = append(mock.calls.LogValue, callInfo)
-	mock.lockLogValue.Unlock()
-	if mock.LogValueFunc == nil {
-		var (
-			valueOut slog.Value
-		)
-		return valueOut
-	}
-	return mock.LogValueFunc()
-}
-
-// LogValueCalls gets all the calls that were made to LogValue.
-// Check the length with:
-//
-//	len(mockedAction.LogValueCalls())
-func (mock *ActionMock) LogValueCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockLogValue.RLock()
-	calls = mock.calls.LogValue
-	mock.lockLogValue.RUnlock()
-	return calls
-}
-
-// Name calls NameFunc.
-func (mock *ActionMock) Name() string {
-	callInfo := struct {
-	}{}
-	mock.lockName.Lock()
-	mock.calls.Name = append(mock.calls.Name, callInfo)
-	mock.lockName.Unlock()
-	if mock.NameFunc == nil {
-		var (
-			sOut string
-		)
-		return sOut
-	}
-	return mock.NameFunc()
-}
-
-// NameCalls gets all the calls that were made to Name.
-// Check the length with:
-//
-//	len(mockedAction.NameCalls())
-func (mock *ActionMock) NameCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockName.RLock()
-	calls = mock.calls.Name
-	mock.lockName.RUnlock()
-	return calls
-}
-
-// Tools calls ToolsFunc.
-func (mock *ActionMock) Tools() []*genai.FunctionDeclaration {
-	callInfo := struct {
-	}{}
-	mock.lockTools.Lock()
-	mock.calls.Tools = append(mock.calls.Tools, callInfo)
-	mock.lockTools.Unlock()
-	if mock.ToolsFunc == nil {
-		var (
-			functionDeclarationsOut []*genai.FunctionDeclaration
-		)
-		return functionDeclarationsOut
-	}
-	return mock.ToolsFunc()
-}
-
-// ToolsCalls gets all the calls that were made to Tools.
-// Check the length with:
-//
-//	len(mockedAction.ToolsCalls())
-func (mock *ActionMock) ToolsCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockTools.RLock()
-	calls = mock.calls.Tools
-	mock.lockTools.RUnlock()
-	return calls
-}
 
 // SlackClientMock is a mock implementation of interfaces.SlackClient.
 //
@@ -721,284 +432,6 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 	mock.lockReply.RLock()
 	calls = mock.calls.Reply
 	mock.lockReply.RUnlock()
-	return calls
-}
-
-// LLMSessionMock is a mock implementation of interfaces.LLMSession.
-//
-//	func TestSomethingThatUsesLLMSession(t *testing.T) {
-//
-//		// make and configure a mocked interfaces.LLMSession
-//		mockedLLMSession := &LLMSessionMock{
-//			GetHistoryFunc: func() []*genai.Content {
-//				panic("mock out the GetHistory method")
-//			},
-//			SendMessageFunc: func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
-//				panic("mock out the SendMessage method")
-//			},
-//		}
-//
-//		// use mockedLLMSession in code that requires interfaces.LLMSession
-//		// and then make assertions.
-//
-//	}
-type LLMSessionMock struct {
-	// GetHistoryFunc mocks the GetHistory method.
-	GetHistoryFunc func() []*genai.Content
-
-	// SendMessageFunc mocks the SendMessage method.
-	SendMessageFunc func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
-
-	// calls tracks calls to the methods.
-	calls struct {
-		// GetHistory holds details about calls to the GetHistory method.
-		GetHistory []struct {
-		}
-		// SendMessage holds details about calls to the SendMessage method.
-		SendMessage []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Msg is the msg argument value.
-			Msg []genai.Part
-		}
-	}
-	lockGetHistory  sync.RWMutex
-	lockSendMessage sync.RWMutex
-}
-
-// GetHistory calls GetHistoryFunc.
-func (mock *LLMSessionMock) GetHistory() []*genai.Content {
-	callInfo := struct {
-	}{}
-	mock.lockGetHistory.Lock()
-	mock.calls.GetHistory = append(mock.calls.GetHistory, callInfo)
-	mock.lockGetHistory.Unlock()
-	if mock.GetHistoryFunc == nil {
-		var (
-			contentsOut []*genai.Content
-		)
-		return contentsOut
-	}
-	return mock.GetHistoryFunc()
-}
-
-// GetHistoryCalls gets all the calls that were made to GetHistory.
-// Check the length with:
-//
-//	len(mockedLLMSession.GetHistoryCalls())
-func (mock *LLMSessionMock) GetHistoryCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockGetHistory.RLock()
-	calls = mock.calls.GetHistory
-	mock.lockGetHistory.RUnlock()
-	return calls
-}
-
-// SendMessage calls SendMessageFunc.
-func (mock *LLMSessionMock) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
-	callInfo := struct {
-		Ctx context.Context
-		Msg []genai.Part
-	}{
-		Ctx: ctx,
-		Msg: msg,
-	}
-	mock.lockSendMessage.Lock()
-	mock.calls.SendMessage = append(mock.calls.SendMessage, callInfo)
-	mock.lockSendMessage.Unlock()
-	if mock.SendMessageFunc == nil {
-		var (
-			generateContentResponseOut *genai.GenerateContentResponse
-			errOut                     error
-		)
-		return generateContentResponseOut, errOut
-	}
-	return mock.SendMessageFunc(ctx, msg...)
-}
-
-// SendMessageCalls gets all the calls that were made to SendMessage.
-// Check the length with:
-//
-//	len(mockedLLMSession.SendMessageCalls())
-func (mock *LLMSessionMock) SendMessageCalls() []struct {
-	Ctx context.Context
-	Msg []genai.Part
-} {
-	var calls []struct {
-		Ctx context.Context
-		Msg []genai.Part
-	}
-	mock.lockSendMessage.RLock()
-	calls = mock.calls.SendMessage
-	mock.lockSendMessage.RUnlock()
-	return calls
-}
-
-// LLMClientMock is a mock implementation of interfaces.LLMClient.
-//
-//	func TestSomethingThatUsesLLMClient(t *testing.T) {
-//
-//		// make and configure a mocked interfaces.LLMClient
-//		mockedLLMClient := &LLMClientMock{
-//			NewQueryFunc: func(options ...gemini.Option) interfaces.LLMQuery {
-//				panic("mock out the NewQuery method")
-//			},
-//			SendMessageFunc: func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
-//				panic("mock out the SendMessage method")
-//			},
-//			StartChatFunc: func(options ...gemini.Option) interfaces.LLMSession {
-//				panic("mock out the StartChat method")
-//			},
-//		}
-//
-//		// use mockedLLMClient in code that requires interfaces.LLMClient
-//		// and then make assertions.
-//
-//	}
-type LLMClientMock struct {
-	// NewQueryFunc mocks the NewQuery method.
-	NewQueryFunc func(options ...gemini.Option) interfaces.LLMQuery
-
-	// SendMessageFunc mocks the SendMessage method.
-	SendMessageFunc func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
-
-	// StartChatFunc mocks the StartChat method.
-	StartChatFunc func(options ...gemini.Option) interfaces.LLMSession
-
-	// calls tracks calls to the methods.
-	calls struct {
-		// NewQuery holds details about calls to the NewQuery method.
-		NewQuery []struct {
-			// Options is the options argument value.
-			Options []gemini.Option
-		}
-		// SendMessage holds details about calls to the SendMessage method.
-		SendMessage []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Msg is the msg argument value.
-			Msg []genai.Part
-		}
-		// StartChat holds details about calls to the StartChat method.
-		StartChat []struct {
-			// Options is the options argument value.
-			Options []gemini.Option
-		}
-	}
-	lockNewQuery    sync.RWMutex
-	lockSendMessage sync.RWMutex
-	lockStartChat   sync.RWMutex
-}
-
-// NewQuery calls NewQueryFunc.
-func (mock *LLMClientMock) NewQuery(options ...gemini.Option) interfaces.LLMQuery {
-	callInfo := struct {
-		Options []gemini.Option
-	}{
-		Options: options,
-	}
-	mock.lockNewQuery.Lock()
-	mock.calls.NewQuery = append(mock.calls.NewQuery, callInfo)
-	mock.lockNewQuery.Unlock()
-	if mock.NewQueryFunc == nil {
-		var (
-			lLMQueryOut interfaces.LLMQuery
-		)
-		return lLMQueryOut
-	}
-	return mock.NewQueryFunc(options...)
-}
-
-// NewQueryCalls gets all the calls that were made to NewQuery.
-// Check the length with:
-//
-//	len(mockedLLMClient.NewQueryCalls())
-func (mock *LLMClientMock) NewQueryCalls() []struct {
-	Options []gemini.Option
-} {
-	var calls []struct {
-		Options []gemini.Option
-	}
-	mock.lockNewQuery.RLock()
-	calls = mock.calls.NewQuery
-	mock.lockNewQuery.RUnlock()
-	return calls
-}
-
-// SendMessage calls SendMessageFunc.
-func (mock *LLMClientMock) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
-	callInfo := struct {
-		Ctx context.Context
-		Msg []genai.Part
-	}{
-		Ctx: ctx,
-		Msg: msg,
-	}
-	mock.lockSendMessage.Lock()
-	mock.calls.SendMessage = append(mock.calls.SendMessage, callInfo)
-	mock.lockSendMessage.Unlock()
-	if mock.SendMessageFunc == nil {
-		var (
-			generateContentResponseOut *genai.GenerateContentResponse
-			errOut                     error
-		)
-		return generateContentResponseOut, errOut
-	}
-	return mock.SendMessageFunc(ctx, msg...)
-}
-
-// SendMessageCalls gets all the calls that were made to SendMessage.
-// Check the length with:
-//
-//	len(mockedLLMClient.SendMessageCalls())
-func (mock *LLMClientMock) SendMessageCalls() []struct {
-	Ctx context.Context
-	Msg []genai.Part
-} {
-	var calls []struct {
-		Ctx context.Context
-		Msg []genai.Part
-	}
-	mock.lockSendMessage.RLock()
-	calls = mock.calls.SendMessage
-	mock.lockSendMessage.RUnlock()
-	return calls
-}
-
-// StartChat calls StartChatFunc.
-func (mock *LLMClientMock) StartChat(options ...gemini.Option) interfaces.LLMSession {
-	callInfo := struct {
-		Options []gemini.Option
-	}{
-		Options: options,
-	}
-	mock.lockStartChat.Lock()
-	mock.calls.StartChat = append(mock.calls.StartChat, callInfo)
-	mock.lockStartChat.Unlock()
-	if mock.StartChatFunc == nil {
-		var (
-			lLMSessionOut interfaces.LLMSession
-		)
-		return lLMSessionOut
-	}
-	return mock.StartChatFunc(options...)
-}
-
-// StartChatCalls gets all the calls that were made to StartChat.
-// Check the length with:
-//
-//	len(mockedLLMClient.StartChatCalls())
-func (mock *LLMClientMock) StartChatCalls() []struct {
-	Options []gemini.Option
-} {
-	var calls []struct {
-		Options []gemini.Option
-	}
-	mock.lockStartChat.RLock()
-	calls = mock.calls.StartChat
-	mock.lockStartChat.RUnlock()
 	return calls
 }
 
@@ -2548,5 +1981,412 @@ func (mock *EmbeddingClientMock) EmbeddingsCalls() []struct {
 	mock.lockEmbeddings.RLock()
 	calls = mock.calls.Embeddings
 	mock.lockEmbeddings.RUnlock()
+	return calls
+}
+
+// StorageClientMock is a mock implementation of interfaces.StorageClient.
+//
+//	func TestSomethingThatUsesStorageClient(t *testing.T) {
+//
+//		// make and configure a mocked interfaces.StorageClient
+//		mockedStorageClient := &StorageClientMock{
+//			CloseFunc: func(ctx context.Context)  {
+//				panic("mock out the Close method")
+//			},
+//			GetObjectFunc: func(ctx context.Context, object string) (io.ReadCloser, error) {
+//				panic("mock out the GetObject method")
+//			},
+//			PutObjectFunc: func(ctx context.Context, object string) io.WriteCloser {
+//				panic("mock out the PutObject method")
+//			},
+//		}
+//
+//		// use mockedStorageClient in code that requires interfaces.StorageClient
+//		// and then make assertions.
+//
+//	}
+type StorageClientMock struct {
+	// CloseFunc mocks the Close method.
+	CloseFunc func(ctx context.Context)
+
+	// GetObjectFunc mocks the GetObject method.
+	GetObjectFunc func(ctx context.Context, object string) (io.ReadCloser, error)
+
+	// PutObjectFunc mocks the PutObject method.
+	PutObjectFunc func(ctx context.Context, object string) io.WriteCloser
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// Close holds details about calls to the Close method.
+		Close []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
+		// GetObject holds details about calls to the GetObject method.
+		GetObject []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Object is the object argument value.
+			Object string
+		}
+		// PutObject holds details about calls to the PutObject method.
+		PutObject []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Object is the object argument value.
+			Object string
+		}
+	}
+	lockClose     sync.RWMutex
+	lockGetObject sync.RWMutex
+	lockPutObject sync.RWMutex
+}
+
+// Close calls CloseFunc.
+func (mock *StorageClientMock) Close(ctx context.Context) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockClose.Lock()
+	mock.calls.Close = append(mock.calls.Close, callInfo)
+	mock.lockClose.Unlock()
+	if mock.CloseFunc == nil {
+		return
+	}
+	mock.CloseFunc(ctx)
+}
+
+// CloseCalls gets all the calls that were made to Close.
+// Check the length with:
+//
+//	len(mockedStorageClient.CloseCalls())
+func (mock *StorageClientMock) CloseCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockClose.RLock()
+	calls = mock.calls.Close
+	mock.lockClose.RUnlock()
+	return calls
+}
+
+// GetObject calls GetObjectFunc.
+func (mock *StorageClientMock) GetObject(ctx context.Context, object string) (io.ReadCloser, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Object string
+	}{
+		Ctx:    ctx,
+		Object: object,
+	}
+	mock.lockGetObject.Lock()
+	mock.calls.GetObject = append(mock.calls.GetObject, callInfo)
+	mock.lockGetObject.Unlock()
+	if mock.GetObjectFunc == nil {
+		var (
+			readCloserOut io.ReadCloser
+			errOut        error
+		)
+		return readCloserOut, errOut
+	}
+	return mock.GetObjectFunc(ctx, object)
+}
+
+// GetObjectCalls gets all the calls that were made to GetObject.
+// Check the length with:
+//
+//	len(mockedStorageClient.GetObjectCalls())
+func (mock *StorageClientMock) GetObjectCalls() []struct {
+	Ctx    context.Context
+	Object string
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Object string
+	}
+	mock.lockGetObject.RLock()
+	calls = mock.calls.GetObject
+	mock.lockGetObject.RUnlock()
+	return calls
+}
+
+// PutObject calls PutObjectFunc.
+func (mock *StorageClientMock) PutObject(ctx context.Context, object string) io.WriteCloser {
+	callInfo := struct {
+		Ctx    context.Context
+		Object string
+	}{
+		Ctx:    ctx,
+		Object: object,
+	}
+	mock.lockPutObject.Lock()
+	mock.calls.PutObject = append(mock.calls.PutObject, callInfo)
+	mock.lockPutObject.Unlock()
+	if mock.PutObjectFunc == nil {
+		var (
+			writeCloserOut io.WriteCloser
+		)
+		return writeCloserOut
+	}
+	return mock.PutObjectFunc(ctx, object)
+}
+
+// PutObjectCalls gets all the calls that were made to PutObject.
+// Check the length with:
+//
+//	len(mockedStorageClient.PutObjectCalls())
+func (mock *StorageClientMock) PutObjectCalls() []struct {
+	Ctx    context.Context
+	Object string
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Object string
+	}
+	mock.lockPutObject.RLock()
+	calls = mock.calls.PutObject
+	mock.lockPutObject.RUnlock()
+	return calls
+}
+
+// LLMClientMock is a mock implementation of interfaces.LLMClient.
+//
+//	func TestSomethingThatUsesLLMClient(t *testing.T) {
+//
+//		// make and configure a mocked interfaces.LLMClient
+//		mockedLLMClient := &LLMClientMock{
+//			NewSessionFunc: func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
+//				panic("mock out the NewSession method")
+//			},
+//		}
+//
+//		// use mockedLLMClient in code that requires interfaces.LLMClient
+//		// and then make assertions.
+//
+//	}
+type LLMClientMock struct {
+	// NewSessionFunc mocks the NewSession method.
+	NewSessionFunc func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error)
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// NewSession holds details about calls to the NewSession method.
+		NewSession []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Options is the options argument value.
+			Options []gollem.SessionOption
+		}
+	}
+	lockNewSession sync.RWMutex
+}
+
+// NewSession calls NewSessionFunc.
+func (mock *LLMClientMock) NewSession(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
+	callInfo := struct {
+		Ctx     context.Context
+		Options []gollem.SessionOption
+	}{
+		Ctx:     ctx,
+		Options: options,
+	}
+	mock.lockNewSession.Lock()
+	mock.calls.NewSession = append(mock.calls.NewSession, callInfo)
+	mock.lockNewSession.Unlock()
+	if mock.NewSessionFunc == nil {
+		var (
+			sessionOut gollem.Session
+			errOut     error
+		)
+		return sessionOut, errOut
+	}
+	return mock.NewSessionFunc(ctx, options...)
+}
+
+// NewSessionCalls gets all the calls that were made to NewSession.
+// Check the length with:
+//
+//	len(mockedLLMClient.NewSessionCalls())
+func (mock *LLMClientMock) NewSessionCalls() []struct {
+	Ctx     context.Context
+	Options []gollem.SessionOption
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Options []gollem.SessionOption
+	}
+	mock.lockNewSession.RLock()
+	calls = mock.calls.NewSession
+	mock.lockNewSession.RUnlock()
+	return calls
+}
+
+// LLMSessionMock is a mock implementation of interfaces.LLMSession.
+//
+//	func TestSomethingThatUsesLLMSession(t *testing.T) {
+//
+//		// make and configure a mocked interfaces.LLMSession
+//		mockedLLMSession := &LLMSessionMock{
+//			GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+//				panic("mock out the GenerateContent method")
+//			},
+//			GenerateStreamFunc: func(ctx context.Context, input ...gollem.Input) (<-chan *gollem.Response, error) {
+//				panic("mock out the GenerateStream method")
+//			},
+//			HistoryFunc: func() *gollem.History {
+//				panic("mock out the History method")
+//			},
+//		}
+//
+//		// use mockedLLMSession in code that requires interfaces.LLMSession
+//		// and then make assertions.
+//
+//	}
+type LLMSessionMock struct {
+	// GenerateContentFunc mocks the GenerateContent method.
+	GenerateContentFunc func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error)
+
+	// GenerateStreamFunc mocks the GenerateStream method.
+	GenerateStreamFunc func(ctx context.Context, input ...gollem.Input) (<-chan *gollem.Response, error)
+
+	// HistoryFunc mocks the History method.
+	HistoryFunc func() *gollem.History
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// GenerateContent holds details about calls to the GenerateContent method.
+		GenerateContent []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Input is the input argument value.
+			Input []gollem.Input
+		}
+		// GenerateStream holds details about calls to the GenerateStream method.
+		GenerateStream []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Input is the input argument value.
+			Input []gollem.Input
+		}
+		// History holds details about calls to the History method.
+		History []struct {
+		}
+	}
+	lockGenerateContent sync.RWMutex
+	lockGenerateStream  sync.RWMutex
+	lockHistory         sync.RWMutex
+}
+
+// GenerateContent calls GenerateContentFunc.
+func (mock *LLMSessionMock) GenerateContent(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		Input []gollem.Input
+	}{
+		Ctx:   ctx,
+		Input: input,
+	}
+	mock.lockGenerateContent.Lock()
+	mock.calls.GenerateContent = append(mock.calls.GenerateContent, callInfo)
+	mock.lockGenerateContent.Unlock()
+	if mock.GenerateContentFunc == nil {
+		var (
+			responseOut *gollem.Response
+			errOut      error
+		)
+		return responseOut, errOut
+	}
+	return mock.GenerateContentFunc(ctx, input...)
+}
+
+// GenerateContentCalls gets all the calls that were made to GenerateContent.
+// Check the length with:
+//
+//	len(mockedLLMSession.GenerateContentCalls())
+func (mock *LLMSessionMock) GenerateContentCalls() []struct {
+	Ctx   context.Context
+	Input []gollem.Input
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Input []gollem.Input
+	}
+	mock.lockGenerateContent.RLock()
+	calls = mock.calls.GenerateContent
+	mock.lockGenerateContent.RUnlock()
+	return calls
+}
+
+// GenerateStream calls GenerateStreamFunc.
+func (mock *LLMSessionMock) GenerateStream(ctx context.Context, input ...gollem.Input) (<-chan *gollem.Response, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		Input []gollem.Input
+	}{
+		Ctx:   ctx,
+		Input: input,
+	}
+	mock.lockGenerateStream.Lock()
+	mock.calls.GenerateStream = append(mock.calls.GenerateStream, callInfo)
+	mock.lockGenerateStream.Unlock()
+	if mock.GenerateStreamFunc == nil {
+		var (
+			responseChOut <-chan *gollem.Response
+			errOut        error
+		)
+		return responseChOut, errOut
+	}
+	return mock.GenerateStreamFunc(ctx, input...)
+}
+
+// GenerateStreamCalls gets all the calls that were made to GenerateStream.
+// Check the length with:
+//
+//	len(mockedLLMSession.GenerateStreamCalls())
+func (mock *LLMSessionMock) GenerateStreamCalls() []struct {
+	Ctx   context.Context
+	Input []gollem.Input
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Input []gollem.Input
+	}
+	mock.lockGenerateStream.RLock()
+	calls = mock.calls.GenerateStream
+	mock.lockGenerateStream.RUnlock()
+	return calls
+}
+
+// History calls HistoryFunc.
+func (mock *LLMSessionMock) History() *gollem.History {
+	callInfo := struct {
+	}{}
+	mock.lockHistory.Lock()
+	mock.calls.History = append(mock.calls.History, callInfo)
+	mock.lockHistory.Unlock()
+	if mock.HistoryFunc == nil {
+		var (
+			historyOut *gollem.History
+		)
+		return historyOut
+	}
+	return mock.HistoryFunc()
+}
+
+// HistoryCalls gets all the calls that were made to History.
+// Check the length with:
+//
+//	len(mockedLLMSession.HistoryCalls())
+func (mock *LLMSessionMock) HistoryCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockHistory.RLock()
+	calls = mock.calls.History
+	mock.lockHistory.RUnlock()
 	return calls
 }

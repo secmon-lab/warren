@@ -5,7 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/adapter/gemini"
+	"github.com/m-mizutani/gollem/llm/gemini"
 	"github.com/urfave/cli/v3"
 )
 
@@ -51,12 +51,8 @@ func (x GeminiCfg) LogValue() slog.Value {
 	)
 }
 
-func (x *GeminiCfg) Configure(ctx context.Context) (*gemini.GeminiClient, error) {
-	client, err := gemini.New(ctx, x.projectID,
-		gemini.WithLocation(x.location),
-		gemini.WithModel(x.model),
-		gemini.WithContentType("application/json"),
-	)
+func (x *GeminiCfg) Configure(ctx context.Context) (*gemini.Client, error) {
+	client, err := gemini.New(ctx, x.projectID, x.location, gemini.WithModel(x.model))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create vertex ai client")
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/ptr"
 )
 
 type Session struct {
@@ -17,12 +18,17 @@ type Session struct {
 	AlertIDs  []types.AlertID `json:"alert_ids"`
 }
 
-func New(ctx context.Context, createdBy *slack.User, thread *slack.Thread, alertIDs []types.AlertID) *Session {
-	return &Session{
+func New(ctx context.Context, msg *slack.Message, alertIDs []types.AlertID) *Session {
+	ssn := &Session{
 		ID:        types.NewSessionID(),
 		CreatedAt: clock.Now(ctx),
-		CreatedBy: createdBy,
-		Thread:    thread,
 		AlertIDs:  alertIDs,
 	}
+
+	if msg != nil {
+		ssn.CreatedBy = ptr.Ref(msg.User())
+		ssn.Thread = ptr.Ref(msg.Thread())
+	}
+
+	return ssn
 }

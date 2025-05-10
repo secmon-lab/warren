@@ -31,6 +31,7 @@ func (x *TestData) Flags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
 			Name:        "test-detect-data",
+			Aliases:     []string{"td"},
 			Usage:       "Path to the alert data JSON file should be detected. File path under the path will be used as [schema]/[filename].json",
 			Category:    "Test",
 			Destination: &x.detectDataPath,
@@ -38,6 +39,7 @@ func (x *TestData) Flags() []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name:        "test-ignore-data",
+			Aliases:     []string{"ti"},
 			Usage:       "Path to the alert data JSON file should be ignored. File path under the path will be used as [schema]/[filename].json",
 			Category:    "Test",
 			Destination: &x.ignoreDataPath,

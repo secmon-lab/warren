@@ -4,33 +4,29 @@ import (
 	"context"
 	"time"
 
+	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/service/action"
-	"github.com/secmon-lab/warren/pkg/service/githubapp"
 	"github.com/secmon-lab/warren/pkg/service/slack"
 )
 
 type UseCases struct {
 	// services and adapters
 	slackService    *slack.Service
-	llmClient       interfaces.LLMClient
+	llmClient       gollem.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
 	storageClient   interfaces.StorageClient
 	policyClient    interfaces.PolicyClient
-	githubApp       *githubapp.Service
-	actionSvc       *action.Service
 
-	// test data set
-	testDataSet *policy.TestDataSet
+	tools []gollem.ToolSet
 
 	// configs
-	timeSpan     time.Duration
-	actionLimit  int
-	findingLimit int
+	timeSpan      time.Duration
+	actionLimit   int
+	findingLimit  int
+	storagePrefix string
 }
 
 var _ Alert = &UseCases{}
@@ -39,7 +35,7 @@ var _ SlackInteraction = &UseCases{}
 
 type Option func(*UseCases)
 
-func WithLLMClient(llmClient interfaces.LLMClient) Option {
+func WithLLMClient(llmClient gollem.LLMClient) Option {
 	return func(u *UseCases) {
 		u.llmClient = llmClient
 	}
@@ -75,15 +71,9 @@ func WithRepository(repository interfaces.Repository) Option {
 	}
 }
 
-func WithGitHubApp(githubApp *githubapp.Service) Option {
+func WithTools(tools []gollem.ToolSet) Option {
 	return func(u *UseCases) {
-		u.githubApp = githubApp
-	}
-}
-
-func WithActionService(actionSvc *action.Service) Option {
-	return func(u *UseCases) {
-		u.actionSvc = actionSvc
+		u.tools = append(u.tools, tools...)
 	}
 }
 
@@ -106,9 +96,9 @@ func WithFindingLimit(findingLimit int) Option {
 	}
 }
 
-func WithTestDataSet(testDataSet *policy.TestDataSet) Option {
+func WithStoragePrefix(storagePrefix string) Option {
 	return func(u *UseCases) {
-		u.testDataSet = testDataSet
+		u.storagePrefix = storagePrefix
 	}
 }
 

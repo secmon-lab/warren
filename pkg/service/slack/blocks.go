@@ -171,44 +171,6 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 	return blocks
 }
 
-func buildIgnoreModalViewRequest(listID string) slack.ModalViewRequest {
-	return slack.ModalViewRequest{
-		Type: slack.VTModal,
-		Title: &slack.TextBlockObject{
-			Type: slack.PlainTextType,
-			Text: "Generate Ignore Policy",
-		},
-		Blocks: slack.Blocks{
-			BlockSet: []slack.Block{
-				slack.NewSectionBlock(
-					slack.NewTextBlockObject(slack.PlainTextType, "Please input prompt for generating ignore policy.", false, false),
-					nil,
-					nil,
-				),
-				slack.NewInputBlock(
-					model.SlackBlockIDIgnorePrompt.String(),
-					slack.NewTextBlockObject(slack.PlainTextType, "Prompt", false, false),
-					slack.NewTextBlockObject(slack.PlainTextType, "Add any reason, context, or information.", false, false),
-					slack.NewPlainTextInputBlockElement(
-						slack.NewTextBlockObject(slack.PlainTextType, "prompt", false, false),
-						model.CallbackSubmitIgnoreList.String(),
-					),
-				).WithOptional(true),
-			},
-		},
-		CallbackID:      model.CallbackSubmitIgnoreList.String(),
-		PrivateMetadata: listID,
-		Submit: &slack.TextBlockObject{
-			Type: slack.PlainTextType,
-			Text: "Ignore",
-		},
-		Close: &slack.TextBlockObject{
-			Type: slack.PlainTextType,
-			Text: "Cancel",
-		},
-	}
-}
-
 func buildResolveModalViewRequest(callbackID model.CallbackID, metadata string) slack.ModalViewRequest {
 	conclusionOptions := []struct {
 		Conclusion  types.AlertConclusion

@@ -5,98 +5,50 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/action/base"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	session_model "github.com/secmon-lab/warren/pkg/domain/model/session"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/service/command/aggr"
+	"github.com/secmon-lab/warren/pkg/domain/prompt"
 	"github.com/secmon-lab/warren/pkg/service/command/list"
-	session_svc "github.com/secmon-lab/warren/pkg/service/session"
-	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/service/storage"
+	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/ptr"
 )
 
 // HandleSlackAppMention handles a slack app mention event. It will dispatch a slack action to the alert.
-func (uc *UseCases) HandleSlackAppMention(ctx context.Context, user slack.User, mention slack.Mention, slackMsg *slack.Message) error {
+func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg *slack.Message) error {
 	logger := logging.From(ctx)
-	logger.Debug("slack app mention event", "mention", mention, "slack_thread", slackMsg.SlackThread())
+	logger.Debug("slack app mention event", "mention", slackMsg.Mention(), "slack_thread", slackMsg.Thread())
 
-	st := uc.slackService.NewThread(slackMsg.SlackThread())
-	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
+	threadSvc := uc.slackService.NewThread(slackMsg.Thread())
+	ctx = msg.With(ctx, threadSvc.Reply, threadSvc.NewStateFunc)
 
 	// Nothing to do
-	if !uc.slackService.IsBotUser(mention.UserID) {
-		return nil
-	}
-	if len(mention.Message) == 0 {
-		msg.Notify(ctx, "🤔 No message")
-		return nil
-	}
-
-	if !slackMsg.InThread() {
-		return uc.handleSlackRootCommand(ctx, st, user, mention.Message)
-	}
-
-	var targetAlertIDs []types.AlertID
-
-	// If session is not found, starting a new session based on existing alert or list
-	if v, err := uc.repository.GetAlertByThread(ctx, slackMsg.SlackThread()); err != nil {
-		return goerr.Wrap(err, "failed to get alert by slack thread")
-	} else if v != nil {
-		targetAlertIDs = []types.AlertID{v.ID}
-	}
-
-	if v, err := uc.repository.GetAlertListByThread(ctx, slackMsg.SlackThread()); err != nil {
-		return goerr.Wrap(err, "failed to get alert list by slack thread")
-	} else if v != nil {
-		targetAlertIDs = v.AlertIDs
-	}
-
-	if len(targetAlertIDs) == 0 {
-		msg.Notify(ctx, "🤔 No alerts found in the thread")
-		return nil
-	}
-
-	// If alerts are found, dispatch the action to the existing alerts
-	if err := uc.handleSlackInThreadCommand(ctx, st, user, targetAlertIDs, mention.Message); err == nil {
-		// If the command is handled, return nil
-		return nil
-	} else if err != errUnknownCommand {
-		// If the command is not valid, ignore the error and continue.
-		return err
-	}
-
-	// If session is found, dispatch the action to the existing session
-	ssn, err := uc.repository.GetSessionByThread(ctx, slackMsg.SlackThread())
-	if err != nil {
-		return goerr.Wrap(err, "failed to get session by slack thread")
-	}
-	if ssn == nil {
-		ssn = session_model.New(ctx, &user, ptr.Ref(slackMsg.SlackThread()), targetAlertIDs)
-		if err := uc.repository.PutSession(ctx, *ssn); err != nil {
-			return goerr.Wrap(err, "failed to put session")
+	for _, mention := range slackMsg.Mention() {
+		if !uc.slackService.IsBotUser(mention.UserID) {
+			continue
 		}
-	}
 
-	// If session, alert and alert list are not found, call the command handler
-	baseAction := base.New(uc.repository, targetAlertIDs, uc.policyClient.Sources(), ssn.ID)
-	actionService, err := uc.actionSvc.With(ctx, baseAction)
-	if err != nil {
-		return goerr.Wrap(err, "failed to create action service")
-	}
+		if len(mention.Message) == 0 {
+			msg.Notify(ctx, "🤔 No message")
+			return nil
+		}
 
-	clients := interfaces.NewClients(
-		interfaces.WithRepository(uc.repository),
-		interfaces.WithLLMClient(uc.llmClient),
-		interfaces.WithStorageClient(uc.storageClient),
-	)
-	svc := session_svc.New(clients, actionService, ssn)
-	if err := svc.Chat(ctx, mention.Message); err != nil {
-		return goerr.Wrap(err, "failed to run session")
+		if !slackMsg.InThread() {
+			return uc.handleSlackRootCommand(ctx, slackMsg, mention.Message)
+		}
+
+		ssn, err := createOrGetSession(ctx, uc.repository, slackMsg)
+		if err != nil {
+			return goerr.Wrap(err, "failed to create or get session")
+		}
+
+		input := uc.buildHandlePromptInput(ctx, ssn, mention.Message)
+		return handlePrompt(ctx, input)
 	}
 
 	return nil
@@ -117,6 +69,7 @@ func messageToArgs(message string) (string, string) {
 	return strings.ToLower(strings.TrimSpace(args[0])), strings.TrimSpace(args[1])
 }
 
+/*
 func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack_svc.ThreadService, user slack.User, alertIDs []types.AlertID, message string) error {
 	command, remaining := messageToArgs(message)
 	if command == "" {
@@ -134,20 +87,31 @@ func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack_sv
 		return errUnknownCommand
 	}
 }
+*/
 
-func (uc *UseCases) handleSlackRootCommand(ctx context.Context, th *slack_svc.ThreadService, user slack.User, message string) error {
+func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.Message, message string) error {
 	command, remaining := messageToArgs(message)
 	if command == "" {
 		return errUnknownCommand
 	}
 
+	threadSvc := uc.slackService.NewThread(slackMsg.Thread())
+
 	switch command {
 	case "list":
-		_, err := list.New(uc.repository, uc.llmClient).Run(ctx, th, &user, remaining)
+		_, err := list.New(uc.repository, uc.llmClient).Run(ctx, threadSvc, ptr.Ref(slackMsg.User()), remaining)
 		if err != nil {
 			return goerr.Wrap(err, "failed to run list command")
 		}
 		return nil
+
+	case "chat":
+		ssn, err := createSession(ctx, uc.repository, slackMsg)
+		if err != nil {
+			return goerr.Wrap(err, "failed to create or get session")
+		}
+		input := uc.buildHandlePromptInput(ctx, ssn, remaining)
+		return handlePrompt(ctx, input)
 
 	default:
 		msg.Notify(ctx, "🤔 Available commands: `list`")
@@ -155,31 +119,125 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, th *slack_svc.Th
 	}
 }
 
-// HandleSlackMessage handles a message from a slack user. It saves the message as an alert comment if the message is in the Alert thread.
-func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg *slack.Message, text string, user slack.User, ts string) error {
+type handlePromptInput struct {
+	Session       *session.Session
+	Prompt        string
+	LLMClient     interfaces.LLMClient
+	Repo          interfaces.Repository
+	StorageClient interfaces.StorageClient
+	StoragePrefix string
+	Tools         []gollem.ToolSet
+	PolicyClient  interfaces.PolicyClient
+}
+
+func (uc *UseCases) buildHandlePromptInput(ctx context.Context, ssn *session.Session, p string) handlePromptInput {
+	return handlePromptInput{
+		Session:       ssn,
+		Prompt:        p,
+		LLMClient:     uc.llmClient,
+		Repo:          uc.repository,
+		StorageClient: uc.storageClient,
+		StoragePrefix: uc.storagePrefix,
+		Tools:         uc.tools,
+		PolicyClient:  uc.policyClient,
+	}
+}
+
+func handlePrompt(ctx context.Context, input handlePromptInput) error {
 	logger := logging.From(ctx)
-	th := uc.slackService.NewThread(slackMsg.SlackThread())
+
+	baseAction := base.New(input.Repo, input.Session.AlertIDs, input.PolicyClient.Sources(), input.Session.ID)
+	tools := append(input.Tools, baseAction)
+
+	storageSvc := storage.New(input.StorageClient, storage.WithPrefix(input.StoragePrefix))
+
+	historyRecord, err := input.Repo.GetLatestHistory(ctx, input.Session.ID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get latest history")
+	}
+
+	var history *gollem.History
+	if historyRecord != nil {
+		history, err = storageSvc.GetHistory(ctx, input.Session.ID, historyRecord.ID)
+		if err != nil {
+			return goerr.Wrap(err, "failed to get history data")
+		}
+	}
+
+	alerts, err := input.Repo.BatchGetAlerts(ctx, input.Session.AlertIDs)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alerts")
+	}
+
+	systemPrompt, err := prompt.BuildSessionInitPrompt(ctx, alerts)
+	if err != nil {
+		return goerr.Wrap(err, "failed to build system prompt")
+	}
+
+	agent := gollem.New(input.LLMClient,
+		gollem.WithHistory(history),
+		gollem.WithToolSets(tools...),
+		gollem.WithSystemPrompt(systemPrompt),
+		gollem.WithResponseMode(gollem.ResponseModeBlocking),
+		gollem.WithLogger(logging.From(ctx)),
+		gollem.WithMessageHook(func(ctx context.Context, message string) error {
+			msg.Notify(ctx, "💬 %s", message)
+			return nil
+		}),
+		gollem.WithToolRequestHook(func(ctx context.Context, tool gollem.FunctionCall) error {
+			msg.Trace(ctx, "⚡ Execute Tool: `%s`", tool.Name)
+			for k, v := range tool.Arguments {
+				msg.Trace(ctx, "  ▶️ `%s`: `%v`", k, v)
+			}
+			return nil
+		}),
+	)
+
+	logger.Debug("run prompt", "prompt", input.Prompt, "history", history, "session", input.Session, "history_record", historyRecord)
+
+	newHistory, err := agent.Prompt(ctx, input.Prompt)
+	if err != nil {
+		return goerr.Wrap(err, "failed to prompt")
+	}
+
+	newRecord := session.NewHistory(ctx, input.Session.ID)
+
+	if err = storageSvc.PutHistory(ctx, input.Session.ID, newRecord.ID, newHistory); err != nil {
+		return goerr.Wrap(err, "failed to put history")
+	}
+
+	if err = input.Repo.PutHistory(ctx, input.Session.ID, newRecord); err != nil {
+		return goerr.Wrap(err, "failed to put history")
+	}
+
+	return nil
+}
+
+// HandleSlackMessage handles a message from a slack user. It saves the message as an alert comment if the message is in the Alert thread.
+func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg *slack.Message) error {
+	logger := logging.From(ctx)
+	th := uc.slackService.NewThread(slackMsg.Thread())
 	ctx = msg.With(ctx, th.Reply, th.NewStateFunc)
 
 	// Skip if the message is from the bot
-	if uc.slackService.IsBotUser(user.ID) {
+	if uc.slackService.IsBotUser(slackMsg.User().ID) {
 		return nil
 	}
 
-	baseAlert, err := uc.repository.GetAlertByThread(ctx, slackMsg.SlackThread())
+	baseAlert, err := uc.repository.GetAlertByThread(ctx, slackMsg.Thread())
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert by slack thread")
 	}
 	if baseAlert == nil {
-		logger.Info("alert not found", "slack_thread", slackMsg.SlackThread())
+		logger.Info("alert not found", "slack_thread", slackMsg.Thread())
 		return nil
 	}
 
 	comment := alert.AlertComment{
 		AlertID:   baseAlert.ID,
-		Comment:   text,
-		Timestamp: ts,
-		User:      user,
+		Comment:   slackMsg.Text(),
+		Timestamp: slackMsg.Timestamp(),
+		User:      slackMsg.User(),
 	}
 	if err := uc.repository.PutAlertComment(ctx, comment); err != nil {
 		msg.Trace(ctx, "💥 Failed to insert alert comment\n> %s", err.Error())

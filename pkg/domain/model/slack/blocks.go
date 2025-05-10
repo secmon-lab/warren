@@ -26,7 +26,6 @@ func (id CallbackID) String() string {
 const (
 	CallbackSubmitResolveAlert CallbackID = "submit_resolve_alert"
 	CallbackSubmitResolveList  CallbackID = "submit_resolve_list"
-	CallbackSubmitIgnoreList   CallbackID = "submit_ignore_list"
 )
 
 type SlackBlockID string
@@ -36,9 +35,8 @@ func (id SlackBlockID) String() string {
 }
 
 const (
-	SlackBlockIDConclusion   SlackBlockID = "conclusion"
-	SlackBlockIDComment      SlackBlockID = "comment"
-	SlackBlockIDIgnorePrompt SlackBlockID = "ignore_prompt"
+	SlackBlockIDConclusion SlackBlockID = "conclusion"
+	SlackBlockIDComment    SlackBlockID = "comment"
 )
 
 type ActionID string

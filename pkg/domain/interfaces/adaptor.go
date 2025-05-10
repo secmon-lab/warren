@@ -4,28 +4,10 @@ import (
 	"context"
 	"io"
 
-	"cloud.google.com/go/vertexai/genai"
+	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/opaq"
-	"github.com/secmon-lab/warren/pkg/domain/model/gemini"
 	"github.com/slack-go/slack"
 )
-
-type LLMClient interface {
-	StartChat(options ...gemini.Option) LLMSession
-	NewQuery(options ...gemini.Option) LLMQuery
-	LLMInquiry
-}
-
-type LLMSession interface {
-	LLMInquiry
-	GetHistory() []*genai.Content
-}
-
-type LLMQuery func(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
-
-type LLMInquiry interface {
-	SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error)
-}
 
 type EmbeddingClient interface {
 	Embeddings(ctx context.Context, texts []string, dimensionality int) ([][]float32, error)
@@ -53,4 +35,12 @@ type SlackClient interface {
 type SlackThreadService interface {
 	Reply(ctx context.Context, message string)
 	NewStateFunc(ctx context.Context, message string) func(ctx context.Context, msg string)
+}
+
+type LLMClient interface {
+	gollem.LLMClient
+}
+
+type LLMSession interface {
+	gollem.Session
 }

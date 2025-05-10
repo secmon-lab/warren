@@ -4,9 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
@@ -31,7 +30,7 @@ func WithRetryPrompt(f func(ctx context.Context, err error) string) Option {
 	}
 }
 
-func Ask[T any](ctx context.Context, llm interfaces.LLMQuery, prompt string, opts ...Option) (*T, error) {
+func Ask[T any](ctx context.Context, llm gollem.Session, prompt string, opts ...Option) (*T, error) {
 	logger := logging.From(ctx)
 
 	config := &config{
@@ -46,19 +45,19 @@ func Ask[T any](ctx context.Context, llm interfaces.LLMQuery, prompt string, opt
 
 	var response *T
 	for i := 0; i < config.maxRetry && response == nil; i++ {
-		resp, err := llm(ctx, genai.Text(prompt))
+		resp, err := llm.GenerateContent(ctx, gollem.Text(prompt))
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to send message")
 		}
 
-		if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+		if len(resp.Texts) == 0 {
 			ctx = msg.Trace(ctx, "💥 failed to get valid response from LLM (no content parts), retry (%d/%d)", i+1, config.maxRetry)
 			prompt = config.retryPrompt(ctx, err)
 			continue
 		}
 
-		text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
-		if !ok || text == "" {
+		text := resp.Texts[0]
+		if text == "" {
 			ctx = msg.Trace(ctx, "💥 failed to get valid response from LLM (no text data), retry (%d/%d)", i+1, config.maxRetry)
 			prompt = config.retryPrompt(ctx, err)
 			continue

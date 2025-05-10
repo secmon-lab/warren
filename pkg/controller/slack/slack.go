@@ -68,24 +68,9 @@ func (x *Controller) HandleSlackAppMention(ctx context.Context, apiEvent *slacke
 		return nil
 	}
 
-	mentions := slack_model.ParseMention(event.Text)
-	user := slack_model.User{
-		ID:   event.User,
-		Name: event.User,
-	}
-
-	logger.Info("slack app mention event", "mentions", mentions, "user", user)
-
-	if len(mentions) == 0 {
-		// nothing to do
-		return nil
-	}
-
-	for _, mention := range mentions {
-		dispatch(ctx, func(ctx context.Context) error {
-			return x.event.HandleSlackAppMention(ctx, user, mention, slackMsg)
-		})
-	}
+	dispatch(ctx, func(ctx context.Context) error {
+		return x.event.HandleSlackAppMention(ctx, slackMsg)
+	})
 
 	return nil
 }
@@ -105,13 +90,8 @@ func (x *Controller) HandleSlackMessage(ctx context.Context, apiEvent *slackeven
 		return nil
 	}
 
-	user := slack_model.User{
-		ID:   event.User,
-		Name: event.User,
-	}
-
 	dispatch(ctx, func(ctx context.Context) error {
-		return x.event.HandleSlackMessage(ctx, slackMsg, event.Text, user, event.EventTimeStamp)
+		return x.event.HandleSlackMessage(ctx, slackMsg)
 	})
 
 	return nil
@@ -163,14 +143,7 @@ func (x *Controller) handleSlackInteractionViewSubmission(ctx context.Context, i
 
 	sv := slack_model.BlockActionFromValue(values)
 
-	switch slack_model.CallbackID(interaction.View.CallbackID) {
-	case slack_model.CallbackSubmitResolveAlert:
-		return x.interaction.HandleSlackInteractionViewSubmissionResolveAlert(ctx, user, metadata, sv)
-	case slack_model.CallbackSubmitResolveList:
-		return x.interaction.HandleSlackInteractionViewSubmissionResolveList(ctx, user, metadata, sv)
-	case slack_model.CallbackSubmitIgnoreList:
-		return x.interaction.HandleSlackInteractionViewSubmissionIgnoreList(ctx, metadata, sv)
-	}
+	callbackID := slack_model.CallbackID(interaction.View.CallbackID)
 
-	return nil
+	return x.interaction.HandleSlackInteractionViewSubmission(ctx, user, callbackID, metadata, sv)
 }

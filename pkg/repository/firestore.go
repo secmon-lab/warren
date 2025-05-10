@@ -398,20 +398,6 @@ func (r *Firestore) GetHistory(ctx context.Context, sessionID types.SessionID) (
 	return histories, nil
 }
 
-func (r *Firestore) PutHistory(ctx context.Context, sessionID types.SessionID, history *session.History) error {
-	writer := r.db.BulkWriter(ctx)
-	defer writer.End()
-
-	doc := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionHistories).Doc(history.ID.String())
-	_, err := writer.Set(doc, history)
-	if err != nil {
-		return goerr.Wrap(err, "failed to put chat history")
-	}
-
-	writer.End()
-	return nil
-}
-
 func (r *Firestore) BatchUpdateAlertStatus(ctx context.Context, alertIDs []types.AlertID, status types.AlertStatus, reason string) error {
 	writer := r.db.BulkWriter(ctx)
 	defer writer.End()
@@ -549,6 +535,15 @@ func (r *Firestore) PutSession(ctx context.Context, s session.Session) error {
 	if err != nil {
 		return goerr.Wrap(err, "failed to put session", goerr.V("id", s.ID))
 	}
+	return nil
+}
+
+func (r *Firestore) PutHistory(ctx context.Context, sessionID types.SessionID, history *session.History) error {
+	doc := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionHistories).Doc(history.ID.String())
+	if _, err := doc.Set(ctx, history); err != nil {
+		return goerr.Wrap(err, "failed to put chat history")
+	}
+
 	return nil
 }
 
