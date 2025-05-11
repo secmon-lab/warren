@@ -3,6 +3,8 @@ package bigquery
 import (
 	"context"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -17,26 +19,21 @@ import (
 type Action struct {
 	projectID     string
 	credentials   string
-	configFile    string
+	configFiles   []string
 	storageBucket string
 	storagePrefix string
 	timeout       time.Duration
 	scanLimitStr  string
 	scanLimit     int64
-	config        *Config
+	configs       []*Config
 }
 
 var _ interfaces.Tool = &Action{}
 
 type Config struct {
-	Datasets map[string]DatasetConfig `yaml:"datasets" json:"datasets"`
-}
+	// DatasetID
+	DatasetID string `yaml:"dataset_id" json:"dataset_id"`
 
-type DatasetConfig struct {
-	Tables []TableConfig `yaml:"tables" json:"tables"`
-}
-
-type TableConfig struct {
 	// TableID
 	TableID string `yaml:"table_id" json:"table_id"`
 
@@ -75,10 +72,10 @@ func (x *Action) Flags() []cli.Flag {
 			Category:    "Tool",
 			Sources:     cli.EnvVars("WARREN_BIGQUERY_CREDENTIALS"),
 		},
-		&cli.StringFlag{
+		&cli.StringSliceFlag{
 			Name:        "bigquery-config",
 			Usage:       "Path to configuration YAML file",
-			Destination: &x.configFile,
+			Destination: &x.configFiles,
 			Category:    "Tool",
 			Sources:     cli.EnvVars("WARREN_BIGQUERY_CONFIG"),
 		},
@@ -120,19 +117,34 @@ func (x *Action) Configure(ctx context.Context) error {
 		return errs.ErrActionUnavailable
 	}
 
-	if x.configFile == "" {
+	if len(x.configFiles) == 0 {
 		return goerr.New("configuration file is required")
 	}
 
-	// Read and parse the configuration file
-	data, err := os.ReadFile(x.configFile)
-	if err != nil {
-		return goerr.Wrap(err, "failed to read configuration file")
+	var configs []*Config
+	for _, configPath := range x.configFiles {
+		fileInfo, err := os.Stat(configPath)
+		if err != nil {
+			return goerr.Wrap(err, "failed to stat config path", goerr.V("path", configPath))
+		}
+
+		if fileInfo.IsDir() {
+			dirConfigs, err := loadConfigsFromDir(configPath)
+			if err != nil {
+				return err
+			}
+			configs = append(configs, dirConfigs...)
+		} else {
+			config, err := loadConfigFromFile(configPath)
+			if err != nil {
+				return err
+			}
+			configs = append(configs, config)
+		}
 	}
 
-	var config Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return goerr.Wrap(err, "failed to parse configuration file")
+	if len(configs) == 0 {
+		return goerr.New("no valid configuration files found")
 	}
 
 	scanLimit, err := humanize.ParseBytes(x.scanLimitStr)
@@ -141,8 +153,55 @@ func (x *Action) Configure(ctx context.Context) error {
 	}
 	x.scanLimit = int64(scanLimit)
 
-	x.config = &config
+	x.configs = configs
 	return nil
+}
+
+func loadConfigFromFile(filePath string) (*Config, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to read configuration file", goerr.V("path", filePath))
+	}
+
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, goerr.Wrap(err, "failed to parse configuration file", goerr.V("path", filePath))
+	}
+
+	return &config, nil
+}
+
+func loadConfigsFromDir(dirPath string) ([]*Config, error) {
+	var configs []*Config
+
+	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return goerr.Wrap(err, "failed to walk directory", goerr.V("path", path))
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		ext := strings.ToLower(filepath.Ext(path))
+		if ext != ".yaml" && ext != ".yml" {
+			return nil
+		}
+
+		config, err := loadConfigFromFile(path)
+		if err != nil {
+			return err
+		}
+
+		configs = append(configs, config)
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return configs, nil
 }
 
 func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {

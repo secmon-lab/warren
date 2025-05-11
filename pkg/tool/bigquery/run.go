@@ -215,12 +215,12 @@ func (x *Action) processBigQueryResults(ctx context.Context, it *bigquery.RowIte
 }
 
 func (x *Action) listDatasets() (map[string]any, error) {
-	if x.config == nil {
+	if len(x.configs) == 0 {
 		return nil, goerr.New("configuration is not loaded")
 	}
 
 	// Convert config to JSON and back to ensure all fields are included
-	jsonData, err := json.Marshal(x.config)
+	jsonData, err := json.Marshal(x.configs)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to marshal config to JSON")
 	}
@@ -405,7 +405,7 @@ func (x *Action) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("project_id", x.projectID),
 		slog.String("credentials", x.credentials),
-		slog.String("config_file", x.configFile),
+		slog.Any("config_files", x.configFiles),
 		slog.String("storage_bucket", x.storageBucket),
 		slog.Duration("timeout", x.timeout),
 	)
