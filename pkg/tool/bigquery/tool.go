@@ -24,7 +24,7 @@ type Action struct {
 	storagePrefix string
 	timeout       time.Duration
 	scanLimitStr  string
-	scanLimit     int64
+	scanLimit     uint64
 	configs       []*Config
 }
 
@@ -152,14 +152,14 @@ func (x *Action) Configure(ctx context.Context) error {
 	if err != nil {
 		return goerr.Wrap(err, "failed to parse scan limit")
 	}
-	x.scanLimit = int64(scanLimit)
+	x.scanLimit = scanLimit
 
 	x.configs = configs
 	return nil
 }
 
 func loadConfigFromFile(filePath string) (*Config, error) {
-	data, err := os.ReadFile(filePath)
+	data, err := os.ReadFile(filepath.Clean(filePath))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to read configuration file", goerr.V("path", filePath))
 	}

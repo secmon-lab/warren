@@ -257,7 +257,7 @@ func (x *Action) executeQuery(ctx context.Context, client *bigquery.Client, quer
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to wait for dry run job")
 	}
-	if status.Statistics.TotalBytesProcessed > x.scanLimit {
+	if uint64(status.Statistics.TotalBytesProcessed) > x.scanLimit {
 		return nil, goerr.New("query scan size exceeds limit",
 			goerr.V("scan_size", status.Statistics.TotalBytesProcessed),
 			goerr.V("scan_limit", x.scanLimit))
