@@ -94,7 +94,7 @@ func TestBigQuery_Specs(t *testing.T) {
 	gt.NoError(t, err)
 	gt.A(t, specs).Length(4)
 
-	// 各ツールの仕様を確認
+	// Check specifications of each tool
 	for _, spec := range specs {
 		switch spec.Name {
 		case "bigquery_list_dataset":

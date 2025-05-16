@@ -59,6 +59,10 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 		return x.getQueryResults(ctx, client, queryID, limit, offset)
 
 	case "bigquery_schema":
+		projectID, ok := args["project_id"].(string)
+		if !ok {
+			return nil, goerr.New("project_id parameter is required")
+		}
 		datasetID, ok := args["dataset_id"].(string)
 		if !ok {
 			return nil, goerr.New("dataset_id parameter is required")
@@ -67,7 +71,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 		if !ok {
 			return nil, goerr.New("table_id parameter is required")
 		}
-		return x.getTableSchema(ctx, client, datasetID, tableID)
+		return x.getTableSchema(ctx, projectID, datasetID, tableID)
 
 	default:
 		return nil, goerr.New("invalid function name", goerr.V("name", name))
@@ -380,7 +384,13 @@ func (x *Action) getQueryResults(ctx context.Context, client *bigquery.Client, q
 	return result, nil
 }
 
-func (x *Action) getTableSchema(ctx context.Context, client *bigquery.Client, datasetID, tableID string) (map[string]any, error) {
+func (x *Action) getTableSchema(ctx context.Context, projectID, datasetID, tableID string) (map[string]any, error) {
+	client, err := bigquery.NewClient(ctx, projectID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to create BigQuery client")
+	}
+	defer safe.Close(ctx, client)
+
 	table := client.Dataset(datasetID).Table(tableID)
 	metadata, err := table.Metadata(ctx)
 	if err != nil {

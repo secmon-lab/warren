@@ -31,6 +31,7 @@ type Action struct {
 var _ interfaces.Tool = &Action{}
 
 type Config struct {
+	// ProjectID
 	// DatasetID
 	DatasetID string `yaml:"dataset_id" json:"dataset_id"`
 
@@ -247,6 +248,10 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			Name:        "bigquery_schema",
 			Description: "Get schema information for a specific table",
 			Parameters: map[string]*gollem.Parameter{
+				"project_id": {
+					Type:        gollem.TypeString,
+					Description: "The project ID",
+				},
 				"dataset_id": {
 					Type:        gollem.TypeString,
 					Description: "The dataset ID containing the table",
@@ -256,7 +261,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The table ID to get schema for",
 				},
 			},
-			Required: []string{"dataset_id", "table_id"},
+			Required: []string{"project_id", "dataset_id", "table_id"},
 		},
 	}, nil
 }
