@@ -194,7 +194,9 @@ func generateConfig(ctx context.Context, cfg generateConfigConfig) error {
 		}),
 	)
 
-	agent.Prompt(ctx, "Generate config")
+	if _, err := agent.Prompt(ctx, "Generate config"); err != nil {
+		return err
+	}
 
 	return nil
 }
