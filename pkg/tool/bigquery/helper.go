@@ -190,7 +190,7 @@ func generateConfig(ctx context.Context, cfg generateConfigConfig) error {
 		gollem.WithToolSets(&generateConfigTool{
 			bigqueryClient: bqClient,
 			scanLimitStr:   cfg.scanLimit,
-			scanLimit:      int64(scanLimit),
+			scanLimit:      scanLimit,
 		}),
 	)
 
@@ -203,7 +203,7 @@ func generateConfig(ctx context.Context, cfg generateConfigConfig) error {
 
 type generateConfigTool struct {
 	scanLimitStr   string
-	scanLimit      int64
+	scanLimit      uint64
 	bigqueryClient *bigquery.Client
 }
 
@@ -264,7 +264,7 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to wait for dry run job")
 		}
-		if status.Statistics.TotalBytesProcessed > x.scanLimit {
+		if uint64(status.Statistics.TotalBytesProcessed) > x.scanLimit {
 			return nil, goerr.New("query scan size exceeds limit",
 				goerr.V("scan_size", status.Statistics.TotalBytesProcessed),
 				goerr.V("scan_limit", x.scanLimit))
