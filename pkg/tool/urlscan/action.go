@@ -13,6 +13,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -25,6 +26,12 @@ type Action struct {
 	baseURL string
 	backoff time.Duration
 	timeout time.Duration
+}
+
+var _ interfaces.Tool = &Action{}
+
+func (x *Action) Helper() *cli.Command {
+	return nil
 }
 
 func (x *Action) Name() string {

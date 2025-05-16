@@ -50,6 +50,7 @@ func Run(ctx context.Context, args []string) error {
 			cmdServe(),
 			cmdTest(),
 			cmdChat(),
+			cmdTool(),
 		},
 	}
 

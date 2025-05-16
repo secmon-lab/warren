@@ -18,6 +18,12 @@ type Base struct {
 	policies  map[string]string
 }
 
+var _ interfaces.Tool = &Base{}
+
+func (x *Base) Helper() *cli.Command {
+	return nil
+}
+
 func getArg[T any](args map[string]any, key string) (T, error) {
 	var null T
 	val, ok := args[key]

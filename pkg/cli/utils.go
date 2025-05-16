@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/tool/abusech"
 	"github.com/secmon-lab/warren/pkg/tool/bigquery"
@@ -24,15 +25,7 @@ func joinFlags(flags ...[]cli.Flag) []cli.Flag {
 	return result
 }
 
-type builtinTool interface {
-	Name() string
-	Flags() []cli.Flag
-	Configure(ctx context.Context) error
-	LogValue() slog.Value
-	gollem.ToolSet
-}
-
-type toolList []builtinTool
+type toolList []interfaces.Tool
 
 var tools = toolList{
 	&urlscan.Action{},
