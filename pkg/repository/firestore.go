@@ -360,8 +360,8 @@ func (r *Firestore) GetLatestHistory(ctx context.Context, sessionID types.Sessio
 	return &history, nil
 }
 
-func (r *Firestore) SearchAlerts(ctx context.Context, path, op string, value any) (alert.Alerts, error) {
-	iter := r.db.Collection(collectionAlerts).Where(path, op, value).Documents(ctx)
+func (r *Firestore) SearchAlerts(ctx context.Context, path, op string, value any, limit int) (alert.Alerts, error) {
+	iter := r.db.Collection(collectionAlerts).Where(path, op, value).Limit(limit).Documents(ctx)
 
 	var alerts alert.Alerts
 	for {
@@ -519,7 +519,7 @@ func (r *Firestore) FindSimilarAlerts(ctx context.Context, target alert.Alert, l
 		FindNearest("Embedding",
 			target.Embedding,
 			limit+1, // Add 1 to exclude target itself
-			firestore.DistanceMeasureCosine,
+			firestore.DistanceMeasureEuclidean,
 			&firestore.FindNearestOptions{
 				DistanceResultField: "vector_distance",
 			})
@@ -557,4 +557,26 @@ func (r *Firestore) FindSimilarAlerts(ctx context.Context, target alert.Alert, l
 	}
 
 	return alerts, nil
+}
+
+func (r *Firestore) GetTicketByThread(ctx context.Context, thread slack.Thread) (*ticket.Ticket, error) {
+	iter := r.db.Collection(collectionTickets).
+		Where("SlackThread.ChannelID", "==", thread.ChannelID).
+		Where("SlackThread.ThreadID", "==", thread.ThreadID).
+		Documents(ctx)
+
+	doc, err := iter.Next()
+	if err != nil {
+		if err == iterator.Done {
+			return nil, nil
+		}
+		return nil, goerr.Wrap(err, "failed to get ticket by thread", goerr.V("slack_thread", thread))
+	}
+
+	var t ticket.Ticket
+	if err := doc.DataTo(&t); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert data to ticket")
+	}
+
+	return &t, nil
 }

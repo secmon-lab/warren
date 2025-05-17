@@ -71,7 +71,15 @@ func (x *List) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) err
 		return err
 	}
 
-	resp, err := llm.Ask[Metadata](ctx, llmClient, p)
+	resp, err := llm.Ask[Metadata](ctx, llmClient, p, llm.WithValidate(func(v Metadata) error {
+		if v.Title == "" {
+			return goerr.New("title is required")
+		}
+		if v.Description == "" {
+			return goerr.New("description is required")
+		}
+		return nil
+	}))
 	if err != nil {
 		return err
 	}

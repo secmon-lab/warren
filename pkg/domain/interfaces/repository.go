@@ -14,6 +14,7 @@ import (
 type Repository interface {
 	GetTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error)
 	PutTicket(ctx context.Context, ticket ticket.Ticket) error
+	GetTicketByThread(ctx context.Context, thread slack.Thread) (*ticket.Ticket, error)
 	PutTicketComment(ctx context.Context, comment ticket.Comment) error
 	GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
 
@@ -23,7 +24,7 @@ type Repository interface {
 	PutAlert(ctx context.Context, alert alert.Alert) error
 	GetAlert(ctx context.Context, alertID types.AlertID) (*alert.Alert, error)
 	GetAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error)
-	SearchAlerts(ctx context.Context, path, op string, value any) (alert.Alerts, error)
+	SearchAlerts(ctx context.Context, path, op string, value any, limit int) (alert.Alerts, error)
 	GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, error)
 	GetAlertsBySpan(ctx context.Context, begin, end time.Time) (alert.Alerts, error)
 	BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)

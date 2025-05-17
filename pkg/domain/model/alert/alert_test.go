@@ -1,22 +1,24 @@
-package alert
+package alert_test
 
 import (
 	"testing"
 
 	"github.com/m-mizutani/gt"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 )
 
 func TestAlert_FillMetadata(t *testing.T) {
 	client := test.NewGeminiClient(t)
 
-	alert := New(t.Context(), "test.alert.v1", map[string]any{
+	a := alert.New(t.Context(), "test.alert.v1", map[string]any{
 		"foo": "bar",
 		"baz": 123,
-	}, Metadata{})
+	}, alert.Metadata{})
 
-	gt.NoError(t, alert.FillMetadata(t.Context(), client))
-	gt.NotEqual(t, alert.Metadata.Title, "")
-	gt.NotEqual(t, alert.Metadata.Description, "")
-	t.Logf("metadata: %+v", alert.Metadata)
+	gt.NoError(t, a.FillMetadata(t.Context(), client))
+	gt.NotEqual(t, a.Metadata.Title, "")
+	gt.NotEqual(t, a.Metadata.Description, "")
+	gt.Equal(t, len(a.Embedding), alert.EmbeddingSize)
+	t.Logf("metadata: %+v", a.Metadata)
 }

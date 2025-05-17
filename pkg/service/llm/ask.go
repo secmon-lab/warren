@@ -11,29 +11,36 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-type askConfig struct {
+type askConfig[T any] struct {
 	maxRetry    int
 	retryPrompt func(ctx context.Context, err error) string
+	validate    func(v T) error
 }
 
-type AskOption func(*askConfig)
+type AskOption[T any] func(*askConfig[T])
 
-func WithMaxRetry(maxRetry int) AskOption {
-	return func(c *askConfig) {
+func WithMaxRetry[T any](maxRetry int) AskOption[T] {
+	return func(c *askConfig[T]) {
 		c.maxRetry = maxRetry
 	}
 }
 
-func WithRetryPrompt(f func(ctx context.Context, err error) string) AskOption {
-	return func(c *askConfig) {
+func WithRetryPrompt[T any](f func(ctx context.Context, err error) string) AskOption[T] {
+	return func(c *askConfig[T]) {
 		c.retryPrompt = f
 	}
 }
 
-func Ask[T any](ctx context.Context, llm gollem.LLMClient, prompt string, opts ...AskOption) (*T, error) {
+func WithValidate[T any](f func(v T) error) AskOption[T] {
+	return func(c *askConfig[T]) {
+		c.validate = f
+	}
+}
+
+func Ask[T any](ctx context.Context, llm gollem.LLMClient, prompt string, opts ...AskOption[T]) (*T, error) {
 	logger := logging.From(ctx)
 
-	config := &askConfig{
+	config := &askConfig[T]{
 		maxRetry: 3,
 		retryPrompt: func(ctx context.Context, err error) string {
 			return "Invalid response. Please try again: " + err.Error()
@@ -74,6 +81,14 @@ func Ask[T any](ctx context.Context, llm gollem.LLMClient, prompt string, opts .
 			ctx = msg.Trace(ctx, "💥 failed to unmarshal text. retry (%d/%d)\n> %s", i+1, config.maxRetry, err.Error())
 			prompt = config.retryPrompt(ctx, err)
 			continue
+		}
+
+		if config.validate != nil {
+			if err := config.validate(result); err != nil {
+				ctx = msg.Trace(ctx, "💥 failed to validate response from LLM, retry (%d/%d)", i+1, config.maxRetry)
+				prompt = config.retryPrompt(ctx, err)
+				continue
+			}
 		}
 
 		response = &result

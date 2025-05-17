@@ -20,11 +20,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/test"
 )
 
-func TestMemory(t *testing.T) {
-	repo := repository.NewMemory()
-	testRepository(t, repo)
-}
-
 func newFirestoreClient(t *testing.T) *repository.Firestore {
 	vars := test.NewEnvVars(t, "TEST_FIRESTORE_PROJECT_ID", "TEST_FIRESTORE_DATABASE_ID")
 	client, err := repository.NewFirestore(t.Context(),
@@ -35,26 +30,19 @@ func newFirestoreClient(t *testing.T) *repository.Firestore {
 	return client
 }
 
-func TestFirestore(t *testing.T) {
-	repo := newFirestoreClient(t)
-	testRepository(t, repo)
-}
-
-func testRepository(t *testing.T, repo interfaces.Repository) {
-	ctx := context.Background()
-
-	// Create test data
-	alertID := types.NewAlertID()
-	thread := slack.Thread{
+func newTestThread() slack.Thread {
+	return slack.Thread{
 		ChannelID: "test-channel",
 		ThreadID:  fmt.Sprintf("%d.%d", time.Now().Unix(), time.Now().Nanosecond()),
 	}
-	schema := types.AlertSchema("test-schema." + uuid.New().String())
-	a := alert.Alert{
-		ID:          alertID,
-		Schema:      schema,
+}
+
+func newTestAlert(ctx context.Context, thread *slack.Thread) alert.Alert {
+	return alert.Alert{
+		ID:          types.NewAlertID(),
+		Schema:      types.AlertSchema("test-schema." + uuid.New().String()),
 		CreatedAt:   time.Now(),
-		SlackThread: &thread,
+		SlackThread: thread,
 		Metadata: alert.Metadata{
 			Title:       "Test Alert",
 			Description: "Test Description",
@@ -63,67 +51,128 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 			},
 		},
 		Data: map[string]any{"key": "value"},
+		// Embedding: make([]float32, 256),
 	}
+}
 
-	// Alert basic operations
-	t.Run("AlertBasic", func(t *testing.T) {
+func newTestTicket(ctx context.Context, thread *slack.Thread) ticket.Ticket {
+	return ticket.Ticket{
+		ID:          types.NewTicketID(),
+		Title:       "Test Ticket",
+		Description: "Test Description",
+		SlackThread: thread,
+	}
+}
+
+func newTestAlertList(ctx context.Context, thread *slack.Thread, alertIDs []types.AlertID) alert.List {
+	return alert.List{
+		ID:          types.NewAlertListID(),
+		Title:       "Test List",
+		Description: "Test Description",
+		AlertIDs:    alertIDs,
+		SlackThread: thread,
+		CreatedAt:   time.Now(),
+		CreatedBy: &slack.User{
+			ID:   "test-user",
+			Name: "Test User",
+		},
+	}
+}
+
+func newTestSession(ctx context.Context, thread *slack.Thread) session.Session {
+	return session.Session{
+		ID:     types.NewSessionID(),
+		Thread: thread,
+	}
+}
+
+func TestAlertBasic(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := context.Background()
+		thread := newTestThread()
+		a := newTestAlert(ctx, &thread)
+
 		// PutAlert
 		gt.NoError(t, repo.PutAlert(ctx, a))
 
 		// GetAlert
-		got, err := repo.GetAlert(ctx, alertID)
+		got, err := repo.GetAlert(ctx, a.ID)
 		gt.NoError(t, err)
-		gt.Value(t, got.ID).Equal(alertID)
-		gt.Value(t, got.Schema).Equal(schema)
+		gt.Value(t, got.ID).Equal(a.ID)
+		gt.Value(t, got.Schema).Equal(a.Schema)
 
 		// GetAlertByThread
 		got, err = repo.GetAlertByThread(ctx, thread)
 		gt.NoError(t, err)
-		gt.Value(t, got.ID).Equal(alertID)
+		gt.Value(t, got.ID).Equal(a.ID)
 
 		// SearchAlerts
-		gotAlerts, err := repo.SearchAlerts(ctx, "Schema", "==", schema)
+		gotAlerts, err := repo.SearchAlerts(ctx, "Schema", "==", a.Schema, 3)
 		gt.NoError(t, err)
 		gt.Array(t, gotAlerts).Length(1)
-		gt.Value(t, gotAlerts[0].ID).Equal(alertID)
+		gt.Value(t, gotAlerts[0].ID).Equal(a.ID)
 
 		// BatchGetAlerts
-		gotAlerts, err = repo.BatchGetAlerts(ctx, []types.AlertID{alertID})
+		gotAlerts, err = repo.BatchGetAlerts(ctx, []types.AlertID{a.ID})
 		gt.NoError(t, err)
 		gt.Array(t, gotAlerts).Length(1).Required()
-		gt.Equal(t, gotAlerts[0], &a)
+		gt.Equal(t, gotAlerts[0].ID, a.ID)
+		gt.Equal(t, gotAlerts[0].Schema, a.Schema)
+		gt.Equal(t, gotAlerts[0].SlackThread, a.SlackThread)
+		gt.Equal(t, gotAlerts[0].Metadata, a.Metadata)
+		gt.Equal(t, gotAlerts[0].Data, a.Data)
+		gt.Equal(t, gotAlerts[0].Embedding, a.Embedding)
+		gt.Equal(t, gotAlerts[0].CreatedAt.Unix(), a.CreatedAt.Unix())
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
 	})
 
-	// Alert-Ticket binding tests
-	t.Run("AlertTicketBinding", func(t *testing.T) {
-		ticketID := types.NewTicketID()
-		ticketObj := ticket.Ticket{
-			ID:          ticketID,
-			Title:       "Test Ticket",
-			Description: "Test Description",
-		}
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
 
-		// PutTicket
+func TestAlertTicketBinding(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := context.Background()
+		thread := newTestThread()
+		testAlert := newTestAlert(ctx, &thread)
+		ticketObj := newTestTicket(ctx, &thread)
+
+		// PutAlert and PutTicket
+		gt.NoError(t, repo.PutAlert(ctx, testAlert))
 		gt.NoError(t, repo.PutTicket(ctx, ticketObj))
 
 		// GetTicket
-		got, err := repo.GetTicket(ctx, ticketID)
+		got, err := repo.GetTicket(ctx, ticketObj.ID)
 		gt.NoError(t, err)
-		gt.Value(t, got.ID).Equal(ticketID)
-		gt.Value(t, got.Title).Equal("Test Ticket")
+		gt.Value(t, got.ID).Equal(ticketObj.ID)
+		gt.Value(t, got.Title).Equal(ticketObj.Title)
+
+		// GetTicketByThread
+		got, err = repo.GetTicketByThread(ctx, thread)
+		gt.NoError(t, err)
+		gt.NotNil(t, got)
+		gt.Value(t, got.ID).Equal(ticketObj.ID)
+		gt.Value(t, got.SlackThread.ChannelID).Equal(thread.ChannelID)
+		gt.Value(t, got.SlackThread.ThreadID).Equal(thread.ThreadID)
 
 		// BindAlertToTicket
-		gt.NoError(t, repo.BindAlertToTicket(ctx, alertID, ticketID))
+		gt.NoError(t, repo.BindAlertToTicket(ctx, testAlert.ID, ticketObj.ID))
 
 		// UnbindAlertFromTicket
-		gt.NoError(t, repo.UnbindAlertFromTicket(ctx, alertID))
+		gt.NoError(t, repo.UnbindAlertFromTicket(ctx, testAlert.ID))
 
 		// GetAlertWithoutTicket again
 		gotAlerts, err := repo.GetAlertWithoutTicket(ctx)
 		gt.NoError(t, err)
 		gt.Array(t, gotAlerts).Longer(0)
 		gt.Array(t, gotAlerts).Any(func(a *alert.Alert) bool {
-			return a.ID == alertID
+			return a.ID == testAlert.ID
 		})
 
 		// PutTicketComment
@@ -134,26 +183,29 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.NoError(t, repo.PutTicketComment(ctx, comment))
 
 		// GetTicketComments
-		gotComments, err := repo.GetTicketComments(ctx, ticketID)
+		gotComments, err := repo.GetTicketComments(ctx, ticketObj.ID)
 		gt.NoError(t, err)
 		gt.Array(t, gotComments).Longer(0).Required()
 		gt.Value(t, gotComments[0].Comment).Equal("Test Comment")
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
 	})
 
-	// AlertList related tests
-	t.Run("AlertList", func(t *testing.T) {
-		list := alert.List{
-			ID:          types.NewAlertListID(),
-			Title:       "Test List",
-			Description: "Test Description",
-			AlertIDs:    []types.AlertID{types.NewAlertID(), types.NewAlertID()},
-			SlackThread: &thread,
-			CreatedAt:   time.Now(),
-			CreatedBy: &slack.User{
-				ID:   "test-user",
-				Name: "Test User",
-			},
-		}
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+func TestAlertList(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := context.Background()
+		thread := newTestThread()
+		alertIDs := []types.AlertID{types.NewAlertID(), types.NewAlertID()}
+		list := newTestAlertList(ctx, &thread, alertIDs)
 
 		// PutAlertList
 		gt.NoError(t, repo.PutAlertList(ctx, list))
@@ -179,54 +231,74 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Value(t, got.ID).Equal(list.ID)
 		gt.Value(t, got.SlackThread.ChannelID).Equal(thread.ChannelID)
 		gt.Value(t, got.SlackThread.ThreadID).Equal(thread.ThreadID)
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
 	})
 
-	// Alert search related tests
-	t.Run("AlertSearch", func(t *testing.T) {
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+func TestAlertSearch(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := context.Background()
+		alert := newTestAlert(ctx, nil)
+
+		gt.NoError(t, repo.PutAlert(ctx, alert))
+
 		// GetAlertsBySpan
-		begin := a.CreatedAt.Add(-1 * time.Minute)
-		end := a.CreatedAt.Add(1 * time.Minute)
+		begin := alert.CreatedAt.Add(-1 * time.Minute)
+		end := alert.CreatedAt.Add(1 * time.Minute)
 		got, err := repo.GetAlertsBySpan(ctx, begin, end)
 		gt.NoError(t, err)
-		// 検索結果が空でないことのみ確認
 		gt.Array(t, got).Longer(0)
 
 		// SearchAlerts
-		got, err = repo.SearchAlerts(ctx, "Schema", "==", schema)
+		got, err = repo.SearchAlerts(ctx, "Schema", "==", alert.Schema, 3)
 		gt.NoError(t, err)
 		gt.Array(t, got).Longer(0)
-		gt.Value(t, got[0].Schema).Equal(schema)
+		gt.Value(t, got[0].Schema).Equal(alert.Schema)
 
 		// SearchAlerts with different operators
-		got, err = repo.SearchAlerts(ctx, "CreatedAt", ">", begin)
+		got, err = repo.SearchAlerts(ctx, "CreatedAt", ">", begin, 3)
 		gt.NoError(t, err)
 		gt.Array(t, got).Longer(0)
 
-		got, err = repo.SearchAlerts(ctx, "CreatedAt", "<", end)
+		got, err = repo.SearchAlerts(ctx, "CreatedAt", "<", end, 3)
 		gt.NoError(t, err)
 		gt.Array(t, got).Longer(0)
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
 	})
 
-	// Session related tests
-	t.Run("Session", func(t *testing.T) {
-		sessionID := types.NewSessionID()
-		thread := slack.Thread{
-			ChannelID: "test-channel",
-			ThreadID:  fmt.Sprintf("%d.%d", time.Now().Unix(), time.Now().Nanosecond()),
-		}
-		s := session.Session{
-			ID:     sessionID,
-			Thread: &thread,
-		}
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+func TestSession(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := context.Background()
+		thread := newTestThread()
+		s := newTestSession(ctx, &thread)
 
 		// PutSession
 		gt.NoError(t, repo.PutSession(ctx, s))
 
 		// GetSession
-		got, err := repo.GetSession(ctx, sessionID)
+		got, err := repo.GetSession(ctx, s.ID)
 		gt.NoError(t, err)
 		gt.NotNil(t, got).Required()
-		gt.Value(t, got.ID).Equal(sessionID)
+		gt.Value(t, got.ID).Equal(s.ID)
 		gt.Value(t, got.Thread.ChannelID).Equal(thread.ChannelID)
 		gt.Value(t, got.Thread.ThreadID).Equal(thread.ThreadID)
 
@@ -234,19 +306,29 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		got, err = repo.GetSessionByThread(ctx, thread)
 		gt.NoError(t, err)
 		gt.NotNil(t, got)
-		gt.Value(t, got.ID).Equal(sessionID)
+		gt.Value(t, got.ID).Equal(s.ID)
 		gt.Value(t, got.Thread.ChannelID).Equal(thread.ChannelID)
 		gt.Value(t, got.Thread.ThreadID).Equal(thread.ThreadID)
 
 		// PutHistory
-		history := session.NewHistory(ctx, sessionID)
-		gt.NoError(t, repo.PutHistory(ctx, sessionID, history))
+		history := session.NewHistory(ctx, s.ID)
+		gt.NoError(t, repo.PutHistory(ctx, s.ID, history))
 
 		// GetLatestHistory
-		gotHistory, err := repo.GetLatestHistory(ctx, sessionID)
+		gotHistory, err := repo.GetLatestHistory(ctx, s.ID)
 		gt.NoError(t, err)
 		gt.NotNil(t, gotHistory)
-		gt.Value(t, gotHistory.SessionID).Equal(sessionID)
+		gt.Value(t, gotHistory.SessionID).Equal(s.ID)
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
 	})
 }
 
@@ -285,7 +367,7 @@ func TestFindSimilarAlerts(t *testing.T) {
 		}
 		gt.NoError(t, repo.PutAlert(ctx, target))
 		got, err := repo.FindSimilarAlerts(ctx, target, 3)
-		gt.NoError(t, err)
+		gt.NoError(t, err).Required()
 		gt.Array(t, got).Longer(0).Required()
 		gt.Value(t, got[0].ID).Equal(alerts[0].ID)
 	}

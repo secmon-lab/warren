@@ -264,12 +264,16 @@ func (r *Memory) GetAlertsBySpan(ctx context.Context, begin, end time.Time) (ale
 	return alerts, nil
 }
 
-func (r *Memory) SearchAlerts(ctx context.Context, path, op string, value any) (alert.Alerts, error) {
+func (r *Memory) SearchAlerts(ctx context.Context, path, op string, value any, limit int) (alert.Alerts, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	var alerts alert.Alerts
 	for _, alert := range r.alerts {
+		if limit > 0 && len(alerts) >= limit {
+			break
+		}
+
 		// リフレクションを使用して動的にフィールドにアクセス
 		alertValue := reflect.ValueOf(alert).Elem()
 		fieldValue := alertValue.FieldByName(path)
@@ -367,4 +371,16 @@ func (r *Memory) FindSimilarAlerts(ctx context.Context, target alert.Alert, limi
 	}
 
 	return alerts, nil
+}
+
+func (r *Memory) GetTicketByThread(ctx context.Context, thread slack.Thread) (*ticket.Ticket, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, t := range r.tickets {
+		if t.SlackThread != nil && t.SlackThread.ChannelID == thread.ChannelID && t.SlackThread.ThreadID == thread.ThreadID {
+			return t, nil
+		}
+	}
+	return nil, nil
 }

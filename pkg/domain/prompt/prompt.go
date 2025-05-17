@@ -22,45 +22,6 @@ func stringify(v any) (string, error) {
 	return buf.String(), nil
 }
 
-//go:embed templates/meta.md
-var metaTemplate string
-
-type MetaPromptResult struct {
-	Title       string            `json:"title"`
-	Description string            `json:"description"`
-	Attributes  []alert.Attribute `json:"attributes"`
-}
-
-func BuildMetaPrompt(ctx context.Context, alert alert.Alert) (string, error) {
-	tmpl, err := template.New("meta").Parse(metaTemplate)
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to parse template")
-	}
-
-	schema, err := generateSchema(MetaPromptResult{}).Stringify()
-	if err != nil {
-		return "", err
-	}
-
-	rawAlert, err := stringify(alert)
-	if err != nil {
-		return "", err
-	}
-
-	input := map[string]any{
-		"alert":  rawAlert,
-		"schema": schema,
-		"lang":   lang.From(ctx).Name(),
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "meta", input); err != nil {
-		return "", goerr.Wrap(err, "failed to execute template")
-	}
-
-	return buf.String(), nil
-}
-
 //go:embed templates/session_init.md
 var sessionInitTemplate string
 
