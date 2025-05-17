@@ -30,7 +30,7 @@ func WithRetryPrompt(f func(ctx context.Context, err error) string) AskOption {
 	}
 }
 
-func Ask[T any](ctx context.Context, llm gollem.Session, prompt string, opts ...AskOption) (*T, error) {
+func Ask[T any](ctx context.Context, llm gollem.LLMClient, prompt string, opts ...AskOption) (*T, error) {
 	logger := logging.From(ctx)
 
 	config := &askConfig{
@@ -43,9 +43,14 @@ func Ask[T any](ctx context.Context, llm gollem.Session, prompt string, opts ...
 		opt(config)
 	}
 
+	ssn, err := llm.NewSession(ctx, gollem.WithSessionContentType(gollem.ContentTypeJSON))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to create session")
+	}
+
 	var response *T
 	for i := 0; i < config.maxRetry && response == nil; i++ {
-		resp, err := llm.GenerateContent(ctx, gollem.Text(prompt))
+		resp, err := ssn.GenerateContent(ctx, gollem.Text(prompt))
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to send message")
 		}

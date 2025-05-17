@@ -5,7 +5,6 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"math/rand/v2"
 	"text/template"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -29,7 +28,7 @@ var metaTemplate string
 type MetaPromptResult struct {
 	Title       string            `json:"title"`
 	Description string            `json:"description"`
-	Attrs       []alert.Attribute `json:"attrs"`
+	Attributes  []alert.Attribute `json:"attributes"`
 }
 
 func BuildMetaPrompt(ctx context.Context, alert alert.Alert) (string, error) {
@@ -56,56 +55,6 @@ func BuildMetaPrompt(ctx context.Context, alert alert.Alert) (string, error) {
 
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "meta", input); err != nil {
-		return "", goerr.Wrap(err, "failed to execute template")
-	}
-
-	return buf.String(), nil
-}
-
-//go:embed templates/meta_list.md
-var metaListTemplate string
-
-type MetaListPromptResult struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-}
-
-func BuildMetaListPrompt(ctx context.Context, alertList alert.List) (string, error) {
-	tmpl, err := template.New("meta_list").Parse(metaListTemplate)
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to parse template")
-	}
-	rawAlerts := []string{}
-	alerts := alertList.Alerts
-	if len(alerts) > 10 {
-		// Create a random permutation and take first 10
-		rand.Shuffle(len(alerts), func(i, j int) {
-			alerts[i], alerts[j] = alerts[j], alerts[i]
-		})
-		alerts = alerts[:10]
-	}
-
-	for _, alert := range alerts {
-		rawAlert, err := stringify(alert.Data)
-		if err != nil {
-			return "", err
-		}
-		rawAlerts = append(rawAlerts, rawAlert)
-	}
-
-	schema, err := generateSchema(MetaListPromptResult{}).Stringify()
-	if err != nil {
-		return "", err
-	}
-
-	input := map[string]any{
-		"alerts": rawAlerts,
-		"schema": schema,
-		"lang":   lang.From(ctx).Name(),
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "meta_list", input); err != nil {
 		return "", goerr.Wrap(err, "failed to execute template")
 	}
 

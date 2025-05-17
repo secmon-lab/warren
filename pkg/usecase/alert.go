@@ -51,7 +51,7 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, a
 
 	var results []*alert.Alert
 	for _, a := range result.Alert {
-		alert := alert.New(ctx, schema, a)
+		alert := alert.New(ctx, schema, alertData, a)
 		if alert.Data == nil {
 			alert.Data = alertData
 		}
@@ -119,14 +119,9 @@ func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert alert.Alert
 		return nil, goerr.Wrap(err, "failed to build meta prompt")
 	}
 
-	ssn, err := uc.llmClient.NewSession(ctx, nil)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create LLM session")
-	}
-
 	var result *prompt.MetaPromptResult
 	for i := 0; i < 3 && result == nil; i++ {
-		result, err = llm.Ask[prompt.MetaPromptResult](ctx, ssn, p)
+		result, err = llm.Ask[prompt.MetaPromptResult](ctx, uc.llmClient, p)
 		if err != nil {
 			if goerr.HasTag(err, errs.TagInvalidLLMResponse) {
 				logger.Warn("invalid LLM response, retry to generate alert metadata", "error", err)
@@ -148,7 +143,7 @@ func (uc *UseCases) generateAlertMetadata(ctx context.Context, alert alert.Alert
 		alert.Description = result.Description
 	}
 
-	for _, resAttr := range result.Attrs {
+	for _, resAttr := range result.Attributes {
 		found := false
 		for _, aAttr := range alert.Attributes {
 			if aAttr.Value == resAttr.Value {

@@ -63,8 +63,8 @@ func TestService_Run(t *testing.T) {
 			Metadata: alert.Metadata{
 				Title:       "Alert 1",
 				Description: "Test alert 1",
-				Data:        map[string]interface{}{"color": "blue"},
 			},
+			Data:      map[string]interface{}{"color": "blue"},
 			CreatedAt: fixedTime.Add(-1 * time.Hour),
 			SlackThread: &slack.Thread{
 				ChannelID: "C0123456789",
@@ -76,8 +76,8 @@ func TestService_Run(t *testing.T) {
 			Metadata: alert.Metadata{
 				Title:       "Alert 2",
 				Description: "Test alert 2 with grep match",
-				Data:        map[string]interface{}{"color": "orange"},
 			},
+			Data:      map[string]interface{}{"color": "orange"},
 			CreatedAt: fixedTime.Add(-2 * time.Hour),
 			SlackThread: &slack.Thread{
 				ChannelID: "C0123456789",
@@ -89,8 +89,8 @@ func TestService_Run(t *testing.T) {
 			Metadata: alert.Metadata{
 				Title:       "Alert 3",
 				Description: "Test alert 3",
-				Data:        map[string]interface{}{"color": "red"},
 			},
+			Data:      map[string]interface{}{"color": "red"},
 			CreatedAt: fixedTime.Add(-3 * time.Hour),
 			SlackThread: &slack.Thread{
 				ChannelID: "C0123456789",

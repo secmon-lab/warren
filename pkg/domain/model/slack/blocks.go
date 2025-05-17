@@ -56,6 +56,7 @@ const (
 
 	// For ticket
 	ActionIDConclusion ActionID = "conclusion"
+	ActionIDComment    ActionID = "comment"
 )
 
 type Mention struct {

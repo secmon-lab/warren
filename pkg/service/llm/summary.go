@@ -23,7 +23,7 @@ func WithMaxPartSize(maxPartSize int) SummaryOption {
 }
 
 // Summary generates a summary of the large data by using the LLM.
-func Summary(ctx context.Context, llm gollem.LLMClient, prompt string, data []any, opts ...SummaryOption) (string, error) {
+func Summary[T any](ctx context.Context, llm gollem.LLMClient, prompt string, data []T, opts ...SummaryOption) (string, error) {
 	var results []string
 	var parts []string
 	var partSize = 0

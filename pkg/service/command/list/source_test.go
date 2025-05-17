@@ -7,7 +7,6 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
-	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/command/list"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
@@ -99,8 +98,7 @@ func TestParseArgsToSource(t *testing.T) {
 			name: "unbound command",
 			args: []string{"unbound"},
 			expected: func(m *mock.RepositoryMock) {
-				gt.Array(t, m.GetAlertsWithoutTicketCalls()).Length(1)
-				gt.Value(t, m.GetAlertsWithoutTicketCalls()[0].TicketID).Equal(types.EmptyTicketID)
+				gt.Array(t, m.GetAlertWithoutTicketCalls()).Length(1)
 			},
 		},
 		{

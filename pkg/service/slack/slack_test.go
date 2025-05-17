@@ -35,7 +35,7 @@ func TestSlackPostAlert(t *testing.T) {
 		Metadata: alert.Metadata{
 			Title:       "Test Alert Title",
 			Description: "Test Alert Description",
-			Attrs: []alert.Attribute{
+			Attributes: []alert.Attribute{
 				{
 					Key:   "severity",
 					Value: "high",
@@ -74,17 +74,16 @@ func TestSlackUpdateAlert(t *testing.T) {
 }
 
 func genDummyAlert() alert.Alert {
-	return alert.New(context.Background(), "test.alert.v1", alert.Metadata{
+	return alert.New(context.Background(), "test.alert.v1", map[string]any{
+		"foo": "bar",
+		"baz": 123,
+	}, alert.Metadata{
 		Title: "Test Alert Title",
-		Attrs: []alert.Attribute{
+		Attributes: []alert.Attribute{
 			{
 				Key:   "color",
 				Value: "red",
 			},
-		},
-		Data: map[string]any{
-			"foo": "bar",
-			"baz": 123,
 		},
 	})
 }

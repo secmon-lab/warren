@@ -58,11 +58,11 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		Metadata: alert.Metadata{
 			Title:       "Test Alert",
 			Description: "Test Description",
-			Data:        map[string]any{"key": "value"},
-			Attrs: []alert.Attribute{
+			Attributes: []alert.Attribute{
 				{Key: "test-key", Value: "test-value"},
 			},
 		},
+		Data: map[string]any{"key": "value"},
 	}
 
 	// Alert basic operations

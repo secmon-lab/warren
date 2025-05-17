@@ -63,9 +63,9 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 		slack.NewDividerBlock(),
 	}...)
 
-	if len(alert.Metadata.Attrs) > 0 {
-		fields := make([]*slack.TextBlockObject, 0, len(alert.Metadata.Attrs)*2)
-		for _, attr := range alert.Metadata.Attrs {
+	if len(alert.Metadata.Attributes) > 0 {
+		fields := make([]*slack.TextBlockObject, 0, len(alert.Metadata.Attributes)*2)
+		for _, attr := range alert.Metadata.Attributes {
 			var value string
 			if attr.Link != "" {
 				value = "<" + attr.Link + "|" + attr.Value + ">"
@@ -149,7 +149,7 @@ func buildResolveModalViewRequest(callbackID model.CallbackID, metadata string) 
 		Type: slack.VTModal,
 		Title: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
-			Text: "Resolve Alert",
+			Text: "Resolve Ticket",
 		},
 		Blocks: slack.Blocks{
 			BlockSet: []slack.Block{
@@ -219,14 +219,14 @@ func buildAlertListBlocks(list *alert.List, metadata slackMetadata) []slack.Bloc
 	blocks = append(blocks, slack.NewActionBlock(
 		list.ID.String(),
 		slack.NewButtonBlockElement(
-			model.ActionIDIgnoreList.String(),
+			model.ActionIDAckList.String(),
 			list.ID.String(),
-			slack.NewTextBlockObject("plain_text", "Ignore", false, false),
+			slack.NewTextBlockObject("plain_text", "Acknowledge", false, false),
 		).WithStyle(slack.StyleDefault),
 		slack.NewButtonBlockElement(
-			model.ActionIDResolveList.String(),
+			model.ActionIDBindList.String(),
 			list.ID.String(),
-			slack.NewTextBlockObject("plain_text", "Resolve", false, false),
+			slack.NewTextBlockObject("plain_text", "Bind to ticket", false, false),
 		).WithStyle(slack.StyleDanger),
 	))
 	blocks = append(blocks, slack.NewDividerBlock())
@@ -250,19 +250,9 @@ func buildAlertsBlocks(alerts alert.Alerts, metadata slackMetadata) []slack.Bloc
 	maxCharCount := 3000
 	msgCount := 0
 
-	statusCount := make(map[types.AlertStatus]int)
 	for _, alert := range alerts {
-		statusCount[alert.Status]++
-	}
-
-	for _, alert := range alerts {
-		assigneeText := ""
-		if alert.Assignee != nil {
-			assigneeText = fmt.Sprintf(" (👤 <@%s>)", alert.Assignee.ID)
-		}
-
 		msgURL := metadata.ToMsgURL(alert.SlackThread.ChannelID, alert.SlackThread.ThreadID)
-		newString := fmt.Sprintf("%s <%s|%s>%s\n", alert.Status.Label(), msgURL, alert.Title, assigneeText)
+		newString := fmt.Sprintf("<%s|%s>\n", msgURL, alert.Title)
 		if messageText.Len()+len(newString) > maxCharCount {
 			break
 		}
@@ -282,20 +272,6 @@ func buildAlertsBlocks(alerts alert.Alerts, metadata slackMetadata) []slack.Bloc
 			nil,
 		),
 	}
-
-	var lines []string
-	for status, count := range statusCount {
-		if count == 0 {
-			continue
-		}
-		lines = append(lines, fmt.Sprintf("*%s*: %d", status.Label(), count))
-	}
-
-	blocks = append(blocks, slack.NewSectionBlock(
-		slack.NewTextBlockObject("mrkdwn", strings.Join(lines, " / "), false, false),
-		nil,
-		nil,
-	))
 
 	return blocks
 }
