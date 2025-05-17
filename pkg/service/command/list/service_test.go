@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/m-mizutani/gollem"
+	"github.com/m-mizutani/gollem/mock"
 	"github.com/m-mizutani/gt"
 
-	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -34,7 +34,7 @@ func TestService_Run(t *testing.T) {
 	repo := repository.NewMemory()
 	llm := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
-			return &mock.LLMSessionMock{
+			return &mock.SessionMock{
 				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{
@@ -59,39 +59,39 @@ func TestService_Run(t *testing.T) {
 	// Create test alerts
 	alerts := []*alert.Alert{
 		{
-			ID:          types.NewAlertID(),
-			Title:       "Alert 1",
-			Description: "Test alert 1",
-			Status:      types.AlertStatusNew,
-			CreatedAt:   fixedTime.Add(-1 * time.Hour),
-			UpdatedAt:   fixedTime.Add(-1 * time.Hour),
-			Data:        map[string]interface{}{"color": "blue"},
+			ID: types.NewAlertID(),
+			Metadata: alert.Metadata{
+				Title:       "Alert 1",
+				Description: "Test alert 1",
+			},
+			Data:      map[string]interface{}{"color": "blue"},
+			CreatedAt: fixedTime.Add(-1 * time.Hour),
 			SlackThread: &slack.Thread{
 				ChannelID: "C0123456789",
 				ThreadID:  "T0123456789",
 			},
 		},
 		{
-			ID:          types.NewAlertID(),
-			Title:       "Alert 2",
-			Description: "Test alert 2 with grep match",
-			Status:      types.AlertStatusNew,
-			CreatedAt:   fixedTime.Add(-2 * time.Hour),
-			UpdatedAt:   fixedTime.Add(-2 * time.Hour),
-			Data:        map[string]interface{}{"color": "orange"},
+			ID: types.NewAlertID(),
+			Metadata: alert.Metadata{
+				Title:       "Alert 2",
+				Description: "Test alert 2 with grep match",
+			},
+			Data:      map[string]interface{}{"color": "orange"},
+			CreatedAt: fixedTime.Add(-2 * time.Hour),
 			SlackThread: &slack.Thread{
 				ChannelID: "C0123456789",
 				ThreadID:  "T0123456789",
 			},
 		},
 		{
-			ID:          types.NewAlertID(),
-			Title:       "Alert 3",
-			Description: "Test alert 3",
-			Status:      types.AlertStatusResolved,
-			CreatedAt:   fixedTime.Add(-3 * time.Hour),
-			UpdatedAt:   fixedTime.Add(-3 * time.Hour),
-			Data:        map[string]interface{}{"color": "red"},
+			ID: types.NewAlertID(),
+			Metadata: alert.Metadata{
+				Title:       "Alert 3",
+				Description: "Test alert 3",
+			},
+			Data:      map[string]interface{}{"color": "red"},
+			CreatedAt: fixedTime.Add(-3 * time.Hour),
 			SlackThread: &slack.Thread{
 				ChannelID: "C0123456789",
 				ThreadID:  "T0123456789",
@@ -120,24 +120,15 @@ func TestService_Run(t *testing.T) {
 		validate      func(*testing.T, *alert.List)
 	}{
 		{
-			name:  "show unresolved alerts",
-			input: "unresolved",
+			name:  "show unbound alerts",
+			input: "unbound",
 			validate: func(t *testing.T, list *alert.List) {
 				gt.Array(t, list.Alerts).Length(2).Required()
 				for _, a := range list.Alerts {
-					gt.Value(t, a.Status).Equal(types.AlertStatusNew)
+					gt.Value(t, a.TicketID).Equal(types.EmptyTicketID)
 				}
 				gt.Array(t, list.AlertIDs).Has(alerts[0].ID)
 				gt.Array(t, list.AlertIDs).Has(alerts[1].ID)
-			},
-		},
-		{
-			name:  "show alerts with status filter",
-			input: "status resolved",
-			validate: func(t *testing.T, list *alert.List) {
-				gt.Array(t, list.Alerts).Length(1)
-				gt.Value(t, list.Alerts[0].Status).Equal(types.AlertStatusResolved)
-				gt.Value(t, list.Alerts[0].ID).Equal(alerts[2].ID)
 			},
 		},
 		{

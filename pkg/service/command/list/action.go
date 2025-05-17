@@ -10,7 +10,6 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 type pipeline struct {
@@ -60,8 +59,6 @@ type initFunc func(args []string) (actionFunc, error)
 var actionMapping = map[string]initFunc{
 	"limit":  actionLimit,
 	"offset": actionOffset,
-	"user":   actionUser,
-	"status": actionStatus,
 	"grep":   actionGrep,
 	"sort":   actionSort,
 }
@@ -131,48 +128,6 @@ func parseSlackID(user string) string {
 	return ""
 }
 
-func actionUser(args []string) (actionFunc, error) {
-	if len(args) != 1 {
-		return nil, goerr.New("user: requires one argument")
-	}
-
-	slackID := parseSlackID(args[0])
-	if slackID == "" {
-		return nil, goerr.New("user: invalid user", goerr.V("user", args[0]))
-	}
-
-	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
-		var filtered alert.Alerts
-		for _, a := range alerts {
-			if a.Assignee != nil && a.Assignee.ID == slackID {
-				filtered = append(filtered, a)
-			}
-		}
-		return filtered, nil
-	}, nil
-}
-
-func actionStatus(args []string) (actionFunc, error) {
-	if len(args) != 1 {
-		return nil, goerr.New("status: requires one argument")
-	}
-
-	status := types.AlertStatus(args[0])
-	if err := status.Validate(); err != nil {
-		return nil, goerr.Wrap(err, "status: invalid status")
-	}
-
-	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
-		var filtered alert.Alerts
-		for _, a := range alerts {
-			if a.Status == status {
-				filtered = append(filtered, a)
-			}
-		}
-		return filtered, nil
-	}, nil
-}
-
 func actionGrep(args []string) (actionFunc, error) {
 	if len(args) != 1 {
 		return nil, goerr.New("grep: requires one argument")
@@ -208,10 +163,6 @@ func actionSort(args []string) (actionFunc, error) {
 		case "CreatedAt":
 			sort.Slice(sorted, func(i, j int) bool {
 				return sorted[i].CreatedAt.Before(sorted[j].CreatedAt)
-			})
-		case "UpdatedAt":
-			sort.Slice(sorted, func(i, j int) bool {
-				return sorted[i].UpdatedAt.Before(sorted[j].UpdatedAt)
 			})
 		default:
 			return nil, goerr.New("sort: invalid field", goerr.V("field", field))

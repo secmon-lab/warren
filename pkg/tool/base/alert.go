@@ -80,7 +80,7 @@ func (x *Base) searchAlerts(ctx context.Context, args map[string]any) (map[strin
 		limit = 25
 	}
 
-	alerts, err := x.repo.SearchAlerts(ctx, path, op, value)
+	alerts, err := x.repo.SearchAlerts(ctx, path, op, value, int(limit))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to search alerts")
 	}

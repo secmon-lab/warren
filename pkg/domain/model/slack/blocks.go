@@ -46,17 +46,17 @@ func (id ActionID) String() string {
 }
 
 const (
-	ActionIDAck         ActionID = "ack"
-	ActionIDResolve     ActionID = "resolve"
-	ActionIDInspect     ActionID = "inspect"
-	ActionIDCreatePR    ActionID = "create_pr"
-	ActionIDIgnore      ActionID = "ignore"
-	ActionIDIgnoreList  ActionID = "ignore_list"
-	ActionIDResolveList ActionID = "resolve_list"
+	// For alert
+	ActionIDAckAlert  ActionID = "ack_alert"
+	ActionIDBindAlert ActionID = "bind_alert"
 
-	ActionIDConclusion   ActionID = "conclusion"
-	ActionIDComment      ActionID = "comment"
-	ActionIDIgnorePrompt ActionID = "ignore_prompt"
+	// For list
+	ActionIDAckList  ActionID = "ack_list"
+	ActionIDBindList ActionID = "bind_list"
+
+	// For ticket
+	ActionIDConclusion ActionID = "conclusion"
+	ActionIDComment    ActionID = "comment"
 )
 
 type Mention struct {

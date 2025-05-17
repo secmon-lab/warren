@@ -24,7 +24,6 @@ func cmdServe() *cli.Command {
 		slackCfg     config.Slack
 		geminiCfg    config.GeminiCfg
 		firestoreCfg config.Firestore
-		embeddingCfg config.EmbeddingCfg
 		storageCfg   config.Storage
 	)
 
@@ -45,7 +44,6 @@ func cmdServe() *cli.Command {
 		geminiCfg.Flags(),
 		firestoreCfg.Flags(),
 		tools.Flags(),
-		embeddingCfg.Flags(),
 		storageCfg.Flags(),
 	)
 
@@ -61,7 +59,6 @@ func cmdServe() *cli.Command {
 				"sentry", sentryCfg,
 				"slack", slackCfg,
 				"gemini", geminiCfg,
-				"embedding", embeddingCfg,
 				"firestore", firestoreCfg,
 				"storage", storageCfg,
 			)
@@ -72,11 +69,6 @@ func cmdServe() *cli.Command {
 			}
 
 			geminiModel, err := geminiCfg.Configure(ctx)
-			if err != nil {
-				return err
-			}
-
-			embeddingClient, err := embeddingCfg.Configure()
 			if err != nil {
 				return err
 			}
@@ -107,7 +99,6 @@ func cmdServe() *cli.Command {
 
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(geminiModel),
-				usecase.WithEmbeddingClient(embeddingClient),
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(firestore),
 				usecase.WithSlackService(slackSvc),

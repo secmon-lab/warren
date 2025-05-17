@@ -20,23 +20,8 @@ func parseArgsToSource(ctx context.Context, args []string) (source.Source, error
 
 	// Check for known commands first
 	switch args[0] {
-	case "unresolved":
-		return source.Unresolved(), nil
-
-	case "status":
-		if len(args) < 2 || args[1] == "" {
-			return nil, goerr.New("invalid status format", goerr.V("args", args))
-		}
-
-		statuses := []types.AlertStatus{}
-		for _, arg := range args[1:] {
-			status := types.AlertStatus(arg)
-			if err := status.Validate(); err != nil {
-				return nil, goerr.Wrap(err, "failed to parse status")
-			}
-			statuses = append(statuses, status)
-		}
-		return source.Status(statuses...), nil
+	case "unbound":
+		return source.Unbound(), nil
 
 	case "between":
 		if len(args) != 3 || args[1] == "" || args[2] == "" {

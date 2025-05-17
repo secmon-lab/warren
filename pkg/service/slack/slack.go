@@ -15,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 
 	"github.com/slack-go/slack"
@@ -113,9 +114,10 @@ func (x *Service) PostAlert(ctx context.Context, alert alert.Alert) (*ThreadServ
 	}
 
 	thread := &ThreadService{
-		channelID: channelID,
-		threadID:  timestamp,
-		client:    x.client,
+		channelID:     channelID,
+		threadID:      timestamp,
+		client:        x.client,
+		slackMetadata: x.slackMetadata,
 	}
 
 	var buf bytes.Buffer
@@ -174,6 +176,36 @@ func (x *ThreadService) UpdateAlert(ctx context.Context, alert alert.Alert) erro
 	}
 
 	return nil
+}
+
+func (x *ThreadService) PostTicket(ctx context.Context, ticket ticket.Ticket, alerts alert.Alerts) (string, error) {
+	blocks := buildTicketBlocks(ticket, alerts, x.slackMetadata)
+
+	if ticket.SlackMessageID == "" {
+		_, ts, err := x.client.PostMessageContext(
+			ctx,
+			x.channelID,
+			slack.MsgOptionBlocks(blocks...),
+			slack.MsgOptionBroadcast(),
+			slack.MsgOptionTS(ticket.SlackThread.ThreadID),
+		)
+		if err != nil {
+			return "", goerr.Wrap(err, "failed to post message to slack", goerr.V("channelID", x.channelID), goerr.V("blocks", blocks))
+		}
+		return ts, nil
+	}
+
+	_, _, _, err := x.client.UpdateMessageContext(
+		ctx,
+		ticket.SlackThread.ChannelID,
+		ticket.SlackMessageID,
+		slack.MsgOptionBlocks(blocks...),
+	)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to update message to slack", goerr.V("channelID", x.channelID), goerr.V("threadID", x.threadID), goerr.V("blocks", blocks))
+	}
+
+	return ticket.SlackMessageID, nil
 }
 
 func (x *ThreadService) AttachFile(ctx context.Context, title, fileName string, data []byte) error {
@@ -290,7 +322,7 @@ func (x *ThreadService) updateMessage(ctx context.Context, msgID string, blocks 
 	}
 }
 
-func (x *ThreadService) PostFinding(ctx context.Context, finding alert.Finding) error {
+func (x *ThreadService) PostFinding(ctx context.Context, finding ticket.Finding) error {
 	blocks := buildFindingBlocks(finding)
 
 	_, _, err := x.client.PostMessageContext(
@@ -306,7 +338,7 @@ func (x *ThreadService) PostFinding(ctx context.Context, finding alert.Finding) 
 	return nil
 }
 
-func buildFindingBlocks(finding alert.Finding) []slack.Block {
+func buildFindingBlocks(finding ticket.Finding) []slack.Block {
 	return []slack.Block{
 		slack.NewHeaderBlock(
 			slack.NewTextBlockObject("plain_text", "Severity: "+string(finding.Severity), false, false),
