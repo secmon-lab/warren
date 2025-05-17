@@ -2,28 +2,57 @@ package ticket
 
 import (
 	"context"
+	_ "embed"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/lang"
+	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
 
 type Ticket struct {
-	ID          types.TicketID  `json:"id"`
-	AlertIDs    []types.AlertID `json:"alert_ids"`
-	SlackThread *slack.Thread   `json:"slack_thread"`
+	ID             types.TicketID  `json:"id"`
+	AlertIDs       []types.AlertID `json:"alert_ids"`
+	SlackThread    *slack.Thread   `json:"slack_thread"`
+	SlackMessageID string          `json:"slack_message_id"`
 
-	Title       string                `json:"title"`
-	Description string                `json:"description"`
-	Status      types.TicketStatus    `json:"status"`
-	Severity    types.AlertSeverity   `json:"severity"`
-	Conclusion  types.AlertConclusion `json:"conclusion"`
-	Reason      string                `json:"reason"`
+	Metadata
+
+	Status     types.TicketStatus    `json:"status"`
+	Severity   types.AlertSeverity   `json:"severity"`
+	Conclusion types.AlertConclusion `json:"conclusion"`
+	Reason     string                `json:"reason"`
 
 	Finding  *Finding    `json:"finding"`
 	Assignee *slack.User `json:"assignee"`
+}
+
+type Metadata struct {
+	// Title is the title of the ticket for human readability.
+	Title string `json:"title"`
+	// Description is the description of the ticket for human readability.
+	Description string `json:"description"`
+	// Summary is the summary of the ticket for AI analysis.
+	Summary string `json:"summary"`
+}
+
+func (x *Metadata) Validate() error {
+	if x.Title == "" {
+		return goerr.New("title is required")
+	}
+	if x.Description == "" {
+		return goerr.New("description is required")
+	}
+	if x.Summary == "" {
+		return goerr.New("summary is required")
+	}
+	return nil
 }
 
 func New(ctx context.Context, alertIDs []types.AlertID, slackThread *slack.Thread) Ticket {
@@ -31,6 +60,7 @@ func New(ctx context.Context, alertIDs []types.AlertID, slackThread *slack.Threa
 		ID:          types.NewTicketID(),
 		AlertIDs:    alertIDs,
 		SlackThread: slackThread,
+		Status:      types.TicketStatusNew,
 	}
 }
 
@@ -71,5 +101,52 @@ func (x *Finding) Validate() error {
 	if err := x.Severity.Validate(); err != nil {
 		return goerr.Wrap(err, "invalid severity")
 	}
+	return nil
+}
+
+type AlertRepository interface {
+	BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
+}
+
+//go:embed prompt/ticket_meta.md
+var ticketMetaPrompt string
+
+func (x *Ticket) FillMetadata(ctx context.Context, llmClient gollem.LLMClient, alertRepo AlertRepository) error {
+	alerts, err := alertRepo.BatchGetAlerts(ctx, x.AlertIDs)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alerts")
+	}
+
+	summaryPrompt, err := prompt.Generate(ctx, ticketMetaPrompt, map[string]any{})
+	if err != nil {
+		return goerr.Wrap(err, "failed to generate summary prompt")
+	}
+
+	summary, err := llm.Summary(ctx, llmClient, summaryPrompt, alerts)
+	if err != nil {
+		return goerr.Wrap(err, "failed to generate summary")
+	}
+
+	metaPrompt, err := prompt.Generate(ctx, ticketMetaPrompt, map[string]any{
+		"summary": summary,
+		"schema":  prompt.ToSchema(Metadata{}),
+		"lang":    lang.From(ctx),
+	})
+	if err != nil {
+		return goerr.Wrap(err, "failed to generate meta prompt")
+	}
+
+	meta, err := llm.Ask(ctx, llmClient, metaPrompt, llm.WithValidate(func(meta Metadata) error {
+		return meta.Validate()
+	}))
+	if err != nil {
+		return goerr.Wrap(err, "failed to generate meta")
+	}
+	if meta == nil {
+		return goerr.New("failed to generate meta")
+	}
+
+	x.Metadata = *meta
+
 	return nil
 }

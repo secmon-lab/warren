@@ -37,7 +37,7 @@ func newTestThread() slack.Thread {
 	}
 }
 
-func newTestAlert(ctx context.Context, thread *slack.Thread) alert.Alert {
+func newTestAlert(thread *slack.Thread) alert.Alert {
 	return alert.Alert{
 		ID:          types.NewAlertID(),
 		Schema:      types.AlertSchema("test-schema." + uuid.New().String()),
@@ -55,16 +55,18 @@ func newTestAlert(ctx context.Context, thread *slack.Thread) alert.Alert {
 	}
 }
 
-func newTestTicket(ctx context.Context, thread *slack.Thread) ticket.Ticket {
+func newTestTicket(thread *slack.Thread) ticket.Ticket {
 	return ticket.Ticket{
-		ID:          types.NewTicketID(),
-		Title:       "Test Ticket",
-		Description: "Test Description",
+		ID: types.NewTicketID(),
+		Metadata: ticket.Metadata{
+			Title:       "Test Ticket",
+			Description: "Test Description",
+		},
 		SlackThread: thread,
 	}
 }
 
-func newTestAlertList(ctx context.Context, thread *slack.Thread, alertIDs []types.AlertID) alert.List {
+func newTestAlertList(thread *slack.Thread, alertIDs []types.AlertID) alert.List {
 	return alert.List{
 		ID:          types.NewAlertListID(),
 		Title:       "Test List",
@@ -79,7 +81,7 @@ func newTestAlertList(ctx context.Context, thread *slack.Thread, alertIDs []type
 	}
 }
 
-func newTestSession(ctx context.Context, thread *slack.Thread) session.Session {
+func newTestSession(thread *slack.Thread) session.Session {
 	return session.Session{
 		ID:     types.NewSessionID(),
 		Thread: thread,
@@ -90,7 +92,7 @@ func TestAlertBasic(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := context.Background()
 		thread := newTestThread()
-		a := newTestAlert(ctx, &thread)
+		a := newTestAlert(&thread)
 
 		// PutAlert
 		gt.NoError(t, repo.PutAlert(ctx, a))
@@ -140,8 +142,8 @@ func TestAlertTicketBinding(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := context.Background()
 		thread := newTestThread()
-		testAlert := newTestAlert(ctx, &thread)
-		ticketObj := newTestTicket(ctx, &thread)
+		testAlert := newTestAlert(&thread)
+		ticketObj := newTestTicket(&thread)
 
 		// PutAlert and PutTicket
 		gt.NoError(t, repo.PutAlert(ctx, testAlert))
@@ -205,7 +207,7 @@ func TestAlertList(t *testing.T) {
 		ctx := context.Background()
 		thread := newTestThread()
 		alertIDs := []types.AlertID{types.NewAlertID(), types.NewAlertID()}
-		list := newTestAlertList(ctx, &thread, alertIDs)
+		list := newTestAlertList(&thread, alertIDs)
 
 		// PutAlertList
 		gt.NoError(t, repo.PutAlertList(ctx, list))
@@ -247,7 +249,7 @@ func TestAlertList(t *testing.T) {
 func TestAlertSearch(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := context.Background()
-		alert := newTestAlert(ctx, nil)
+		alert := newTestAlert(nil)
 
 		gt.NoError(t, repo.PutAlert(ctx, alert))
 
@@ -289,7 +291,7 @@ func TestSession(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := context.Background()
 		thread := newTestThread()
-		s := newTestSession(ctx, &thread)
+		s := newTestSession(&thread)
 
 		// PutSession
 		gt.NoError(t, repo.PutSession(ctx, s))

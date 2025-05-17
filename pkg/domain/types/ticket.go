@@ -52,7 +52,7 @@ type TicketStatus string
 const (
 	TicketStatusUnknown      TicketStatus = "unknown"
 	TicketStatusNew          TicketStatus = "new"
-	TicketStatusAcknowledged TicketStatus = "acked"
+	TicketStatusAcknowledged TicketStatus = "acknowledged"
 	TicketStatusBlocked      TicketStatus = "blocked"
 	TicketStatusResolved     TicketStatus = "resolved"
 )

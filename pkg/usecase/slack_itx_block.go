@@ -5,6 +5,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
@@ -18,13 +19,25 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user
 	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
 
 	switch actionID {
-	case slack.ActionIDAck:
+	case slack.ActionIDAckAlert:
 		alert, err := uc.repository.GetAlert(ctx, types.AlertID(value))
 		if err != nil {
 			return goerr.Wrap(err, "failed to get alert")
 		} else if alert == nil {
 			logger.Error("alert not found", "alert_id", value)
 			return nil
+		}
+
+		newTicket := ticket.New(ctx, []types.AlertID{alert.ID}, &slackThread)
+		newTicket.Assignee = &user
+		newTicket.Status = types.TicketStatusAcknowledged
+
+		if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
+			return goerr.Wrap(err, "failed to fill ticket metadata")
+		}
+
+		if err := uc.repository.PutTicket(ctx, newTicket); err != nil {
+			return goerr.Wrap(err, "failed to put ticket")
 		}
 
 		alert.Assignee = &user

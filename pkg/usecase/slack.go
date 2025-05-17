@@ -7,7 +7,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
@@ -224,22 +223,17 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg *slack.Mess
 		return nil
 	}
 
-	baseAlert, err := uc.repository.GetAlertByThread(ctx, slackMsg.Thread())
+	ticket, err := uc.repository.GetTicketByThread(ctx, slackMsg.Thread())
 	if err != nil {
-		return goerr.Wrap(err, "failed to get alert by slack thread")
+		return goerr.Wrap(err, "failed to get ticket by slack thread")
 	}
-	if baseAlert == nil {
-		logger.Info("alert not found", "slack_thread", slackMsg.Thread())
+	if ticket == nil {
+		logger.Info("ticket not found", "slack_thread", slackMsg.Thread())
 		return nil
 	}
 
-	comment := alert.AlertComment{
-		AlertID:   baseAlert.ID,
-		Comment:   slackMsg.Text(),
-		Timestamp: slackMsg.Timestamp(),
-		User:      slackMsg.User(),
-	}
-	if err := uc.repository.PutAlertComment(ctx, comment); err != nil {
+	comment := ticket.NewComment(ctx, slackMsg.Text(), slackMsg.User())
+	if err := uc.repository.PutTicketComment(ctx, comment); err != nil {
 		msg.Trace(ctx, "💥 Failed to insert alert comment\n> %s", err.Error())
 		return goerr.Wrap(err, "failed to insert alert comment", goerr.V("comment", comment))
 	}

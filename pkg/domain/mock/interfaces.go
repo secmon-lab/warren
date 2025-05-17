@@ -483,6 +483,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			GetTicketFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
 //				panic("mock out the GetTicket method")
 //			},
+//			GetTicketByThreadFunc: func(ctx context.Context, thread modelslack.Thread) (*ticket.Ticket, error) {
+//				panic("mock out the GetTicketByThread method")
+//			},
 //			GetTicketCommentsFunc: func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
 //				panic("mock out the GetTicketComments method")
 //			},
@@ -504,7 +507,7 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			PutTicketCommentFunc: func(ctx context.Context, comment ticket.Comment) error {
 //				panic("mock out the PutTicketComment method")
 //			},
-//			SearchAlertsFunc: func(ctx context.Context, path string, op string, value any) (alert.Alerts, error) {
+//			SearchAlertsFunc: func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
 //				panic("mock out the SearchAlerts method")
 //			},
 //			UnbindAlertFromTicketFunc: func(ctx context.Context, alertID types.AlertID) error {
@@ -559,6 +562,9 @@ type RepositoryMock struct {
 	// GetTicketFunc mocks the GetTicket method.
 	GetTicketFunc func(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error)
 
+	// GetTicketByThreadFunc mocks the GetTicketByThread method.
+	GetTicketByThreadFunc func(ctx context.Context, thread modelslack.Thread) (*ticket.Ticket, error)
+
 	// GetTicketCommentsFunc mocks the GetTicketComments method.
 	GetTicketCommentsFunc func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
 
@@ -581,7 +587,7 @@ type RepositoryMock struct {
 	PutTicketCommentFunc func(ctx context.Context, comment ticket.Comment) error
 
 	// SearchAlertsFunc mocks the SearchAlerts method.
-	SearchAlertsFunc func(ctx context.Context, path string, op string, value any) (alert.Alerts, error)
+	SearchAlertsFunc func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error)
 
 	// UnbindAlertFromTicketFunc mocks the UnbindAlertFromTicket method.
 	UnbindAlertFromTicketFunc func(ctx context.Context, alertID types.AlertID) error
@@ -690,6 +696,13 @@ type RepositoryMock struct {
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
 		}
+		// GetTicketByThread holds details about calls to the GetTicketByThread method.
+		GetTicketByThread []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Thread is the thread argument value.
+			Thread modelslack.Thread
+		}
 		// GetTicketComments holds details about calls to the GetTicketComments method.
 		GetTicketComments []struct {
 			// Ctx is the ctx argument value.
@@ -751,6 +764,8 @@ type RepositoryMock struct {
 			Op string
 			// Value is the value argument value.
 			Value any
+			// Limit is the limit argument value.
+			Limit int
 		}
 		// UnbindAlertFromTicket holds details about calls to the UnbindAlertFromTicket method.
 		UnbindAlertFromTicket []struct {
@@ -774,6 +789,7 @@ type RepositoryMock struct {
 	lockGetSession                 sync.RWMutex
 	lockGetSessionByThread         sync.RWMutex
 	lockGetTicket                  sync.RWMutex
+	lockGetTicketByThread          sync.RWMutex
 	lockGetTicketComments          sync.RWMutex
 	lockPutAlert                   sync.RWMutex
 	lockPutAlertList               sync.RWMutex
@@ -1352,6 +1368,46 @@ func (mock *RepositoryMock) GetTicketCalls() []struct {
 	return calls
 }
 
+// GetTicketByThread calls GetTicketByThreadFunc.
+func (mock *RepositoryMock) GetTicketByThread(ctx context.Context, thread modelslack.Thread) (*ticket.Ticket, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Thread modelslack.Thread
+	}{
+		Ctx:    ctx,
+		Thread: thread,
+	}
+	mock.lockGetTicketByThread.Lock()
+	mock.calls.GetTicketByThread = append(mock.calls.GetTicketByThread, callInfo)
+	mock.lockGetTicketByThread.Unlock()
+	if mock.GetTicketByThreadFunc == nil {
+		var (
+			ticketOut *ticket.Ticket
+			errOut    error
+		)
+		return ticketOut, errOut
+	}
+	return mock.GetTicketByThreadFunc(ctx, thread)
+}
+
+// GetTicketByThreadCalls gets all the calls that were made to GetTicketByThread.
+// Check the length with:
+//
+//	len(mockedRepository.GetTicketByThreadCalls())
+func (mock *RepositoryMock) GetTicketByThreadCalls() []struct {
+	Ctx    context.Context
+	Thread modelslack.Thread
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Thread modelslack.Thread
+	}
+	mock.lockGetTicketByThread.RLock()
+	calls = mock.calls.GetTicketByThread
+	mock.lockGetTicketByThread.RUnlock()
+	return calls
+}
+
 // GetTicketComments calls GetTicketCommentsFunc.
 func (mock *RepositoryMock) GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
 	callInfo := struct {
@@ -1631,17 +1687,19 @@ func (mock *RepositoryMock) PutTicketCommentCalls() []struct {
 }
 
 // SearchAlerts calls SearchAlertsFunc.
-func (mock *RepositoryMock) SearchAlerts(ctx context.Context, path string, op string, value any) (alert.Alerts, error) {
+func (mock *RepositoryMock) SearchAlerts(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
 	callInfo := struct {
 		Ctx   context.Context
 		Path  string
 		Op    string
 		Value any
+		Limit int
 	}{
 		Ctx:   ctx,
 		Path:  path,
 		Op:    op,
 		Value: value,
+		Limit: limit,
 	}
 	mock.lockSearchAlerts.Lock()
 	mock.calls.SearchAlerts = append(mock.calls.SearchAlerts, callInfo)
@@ -1653,7 +1711,7 @@ func (mock *RepositoryMock) SearchAlerts(ctx context.Context, path string, op st
 		)
 		return alertsOut, errOut
 	}
-	return mock.SearchAlertsFunc(ctx, path, op, value)
+	return mock.SearchAlertsFunc(ctx, path, op, value, limit)
 }
 
 // SearchAlertsCalls gets all the calls that were made to SearchAlerts.
@@ -1665,12 +1723,14 @@ func (mock *RepositoryMock) SearchAlertsCalls() []struct {
 	Path  string
 	Op    string
 	Value any
+	Limit int
 } {
 	var calls []struct {
 		Ctx   context.Context
 		Path  string
 		Op    string
 		Value any
+		Limit int
 	}
 	mock.lockSearchAlerts.RLock()
 	calls = mock.calls.SearchAlerts
