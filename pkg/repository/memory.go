@@ -384,3 +384,17 @@ func (r *Memory) GetTicketByThread(ctx context.Context, thread slack.Thread) (*t
 	}
 	return nil, nil
 }
+
+func (r *Memory) BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, alertID := range alertIDs {
+		alert, ok := r.alerts[alertID]
+		if !ok {
+			return goerr.New("alert not found", goerr.V("alert_id", alertID))
+		}
+		alert.TicketID = ticketID
+	}
+	return nil
+}

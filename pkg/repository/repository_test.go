@@ -166,6 +166,22 @@ func TestAlertTicketBinding(t *testing.T) {
 		// BindAlertToTicket
 		gt.NoError(t, repo.BindAlertToTicket(ctx, testAlert.ID, ticketObj.ID))
 
+		// BatchBindAlertsToTicket
+		alert2 := newTestAlert(&thread)
+		alert3 := newTestAlert(&thread)
+		gt.NoError(t, repo.PutAlert(ctx, alert2))
+		gt.NoError(t, repo.PutAlert(ctx, alert3))
+		gt.NoError(t, repo.BatchBindAlertsToTicket(ctx, []types.AlertID{alert2.ID, alert3.ID}, ticketObj.ID))
+
+		// Verify alerts are bound
+		gotAlert2, err := repo.GetAlert(ctx, alert2.ID)
+		gt.NoError(t, err)
+		gt.Value(t, gotAlert2.TicketID).Equal(ticketObj.ID)
+
+		gotAlert3, err := repo.GetAlert(ctx, alert3.ID)
+		gt.NoError(t, err)
+		gt.Value(t, gotAlert3.TicketID).Equal(ticketObj.ID)
+
 		// UnbindAlertFromTicket
 		gt.NoError(t, repo.UnbindAlertFromTicket(ctx, testAlert.ID))
 

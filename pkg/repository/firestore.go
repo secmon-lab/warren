@@ -580,3 +580,30 @@ func (r *Firestore) GetTicketByThread(ctx context.Context, thread slack.Thread) 
 
 	return &t, nil
 }
+
+func (r *Firestore) BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
+	bw := r.db.BulkWriter(ctx)
+	var jobs []*firestore.BulkWriterJob
+	for _, alertID := range alertIDs {
+		alertDoc := r.db.Collection(collectionAlerts).Doc(alertID.String())
+		job, err := bw.Update(alertDoc, []firestore.Update{
+			{
+				Path:  "TicketID",
+				Value: ticketID,
+			},
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to bind alert to ticket", goerr.V("alert_id", alertID), goerr.V("ticket_id", ticketID))
+		}
+		jobs = append(jobs, job)
+	}
+	bw.End()
+
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil {
+			return goerr.Wrap(err, "failed to commit bulk writer job")
+		}
+	}
+
+	return nil
+}

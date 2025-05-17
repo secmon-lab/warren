@@ -18,6 +18,7 @@ type Repository interface {
 	PutTicketComment(ctx context.Context, comment ticket.Comment) error
 	GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
 
+	BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error
 	BindAlertToTicket(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error
 	UnbindAlertFromTicket(ctx context.Context, alertID types.AlertID) error
 

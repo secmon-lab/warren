@@ -10,6 +10,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/utils/test"
@@ -71,6 +72,37 @@ func TestSlackUpdateAlert(t *testing.T) {
 	dummy.Title = "Updated Alert Title"
 
 	gt.NoError(t, thread.UpdateAlert(context.Background(), dummy))
+}
+
+func TestSlackUpdateTicket(t *testing.T) {
+	svc := newSlackService(t)
+	ctx := t.Context()
+	dummy := genDummyAlert()
+
+	thread, err := svc.PostAlert(context.Background(), dummy)
+	gt.NoError(t, err).Required()
+	dummy.SlackThread = &model.Thread{
+		ChannelID: thread.ChannelID(),
+		ThreadID:  thread.ThreadID(),
+	}
+
+	ticketData := ticket.New(context.Background(), []types.AlertID{dummy.ID}, &model.Thread{
+		ChannelID: thread.ChannelID(),
+		ThreadID:  thread.ThreadID(),
+	})
+	ticketData.Metadata.Title = "Test Ticket Title"
+	ticketData.Metadata.Description = "Test Ticket Description"
+	ticketData.Metadata.Summary = "Test Ticket Summary"
+	ticketData.Status = types.TicketStatusAcknowledged
+	ticketData.Reason = "Test Ticket Reason"
+
+	ts, err := thread.PostTicket(ctx, ticketData, alert.Alerts{&dummy})
+	gt.NoError(t, err)
+	ticketData.SlackMessageID = ts
+	ticketData.Reason = "Updated reason"
+
+	_, err = thread.PostTicket(ctx, ticketData, alert.Alerts{&dummy})
+	gt.NoError(t, err)
 }
 
 func genDummyAlert() alert.Alert {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/slack-go/slack"
 )
@@ -101,6 +102,102 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 
 	if len(buttons) > 0 {
 		blocks = append(blocks, slack.NewActionBlock("alert_actions", buttons...))
+	}
+
+	return blocks
+}
+
+func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slackMetadata) []slack.Block {
+	var blocks []slack.Block
+
+	// Header with Title and emoji
+	blocks = append(blocks, slack.NewHeaderBlock(
+		slack.NewTextBlockObject(slack.PlainTextType, fmt.Sprintf("🎫 %s", ticket.Metadata.Title), false, false),
+	))
+
+	// ID and Description
+	blocks = append(blocks, slack.NewSectionBlock(
+		slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*ID:* `%s`\n%s", ticket.ID.String(), ticket.Metadata.Description), false, false),
+		nil,
+		nil,
+	))
+
+	// Status, Assignee, Conclusion fields with emojis
+	fields := []*slack.TextBlockObject{
+		slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*Status:*\n%s", ticket.Status.Label()), false, false),
+	}
+	if ticket.Assignee != nil {
+		fields = append(fields, slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*Assignee:*\n👤 <@%s>", ticket.Assignee.ID), false, false))
+	}
+	if ticket.Conclusion != "" {
+		fields = append(fields, slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*Conclusion:*\n%s", ticket.Conclusion.Label()), false, false))
+	}
+	if ticket.Reason != "" {
+		fields = append(fields, slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*Reason:*\n💭 %s", ticket.Reason), false, false))
+	}
+	if len(fields) > 0 {
+		blocks = append(blocks, slack.NewSectionBlock(nil, fields, nil))
+	}
+
+	// Alert list section
+	if len(alerts) > 0 {
+		blocks = append(blocks, slack.NewDividerBlock())
+		blocks = append(blocks, slack.NewHeaderBlock(
+			slack.NewTextBlockObject(slack.PlainTextType, "🔔 Related Alerts", false, false),
+		))
+
+		var alertList string
+		displayCount := len(alerts)
+		if displayCount > 5 {
+			displayCount = 5
+		}
+
+		for i := 0; i < displayCount; i++ {
+			alert := alerts[i]
+			alertList += fmt.Sprintf("• <%s|%s>\n",
+				metadata.ToMsgURL(alert.SlackThread.ChannelID, alert.SlackThread.ThreadID),
+				alert.Metadata.Title)
+		}
+		if displayCount < len(alerts) {
+			alertList += fmt.Sprintf("\n_Showing %d of %d alerts_", displayCount, len(alerts))
+		}
+
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.MarkdownType, alertList, false, false),
+			nil,
+			nil,
+		))
+	}
+
+	// Finding section if exists
+	if ticket.Finding != nil {
+		blocks = append(blocks,
+			slack.NewDividerBlock(),
+			slack.NewHeaderBlock(
+				slack.NewTextBlockObject(slack.PlainTextType, "🔍 Finding", false, false),
+			),
+			slack.NewSectionBlock(
+				slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*Severity:* %s\n*Summary:* %s",
+					ticket.Finding.Severity.Label(),
+					ticket.Finding.Summary), false, false),
+				nil,
+				nil,
+			),
+		)
+		if ticket.Finding.Reason != "" {
+			blocks = append(blocks, slack.NewSectionBlock(
+				slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*Reason:*\n💭 %s", ticket.Finding.Reason), false, false),
+				nil,
+				nil,
+			))
+		}
+		if ticket.Finding.Recommendation != "" {
+			blocks = append(blocks, slack.NewSectionBlock(
+				slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*Recommendation:*\n💡 %s", ticket.Finding.Recommendation), false, false),
+				nil,
+				nil,
+			))
+		}
 	}
 
 	return blocks

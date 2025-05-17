@@ -25,7 +25,6 @@ type Ticket struct {
 	Metadata
 
 	Status     types.TicketStatus    `json:"status"`
-	Severity   types.AlertSeverity   `json:"severity"`
 	Conclusion types.AlertConclusion `json:"conclusion"`
 	Reason     string                `json:"reason"`
 
