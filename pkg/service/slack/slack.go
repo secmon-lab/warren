@@ -13,7 +13,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
-	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/utils/test"
@@ -132,24 +131,6 @@ func (x *Service) PostAlert(ctx context.Context, alert alert.Alert) (*ThreadServ
 	}
 
 	return thread, nil
-}
-
-func (x *Service) ShowResolveAlertModal(ctx context.Context, alert alert.Alert, triggerID string) error {
-	req := buildResolveModalViewRequest(model.CallbackSubmitResolveAlert, alert.ID.String())
-	if _, err := x.client.OpenView(triggerID, req); err != nil {
-		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
-	}
-
-	return nil
-}
-
-func (x *Service) ShowResolveListModal(ctx context.Context, list alert.List, triggerID string) error {
-	req := buildResolveModalViewRequest(model.CallbackSubmitResolveList, list.ID.String())
-	if _, err := x.client.OpenView(triggerID, req); err != nil {
-		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
-	}
-
-	return nil
 }
 
 type ThreadService struct {
@@ -361,45 +342,6 @@ func buildFindingBlocks(finding ticket.Finding) []slack.Block {
 	}
 }
 
-func (x *ThreadService) PostPolicyDiff(ctx context.Context, diff *policy.Diff) error {
-	for fileName, diffData := range diff.DiffPolicy() {
-		_, err := x.client.UploadFileV2Context(ctx, slack.UploadFileV2Parameters{
-			Channel:         x.channelID,
-			Reader:          bytes.NewReader([]byte(diffData)),
-			FileSize:        len(diffData),
-			Filename:        fileName + ".diff",
-			Title:           "✍️ " + diff.Title + " (" + fileName + ")",
-			ThreadTimestamp: x.threadID,
-		})
-		if err != nil {
-			return goerr.Wrap(err, "failed to upload file to slack")
-		}
-	}
-
-	blocks := []slack.Block{
-		slack.NewDividerBlock(),
-		slack.NewActionBlock(
-			"create_pr",
-			slack.NewButtonBlockElement(
-				"create_pr",
-				diff.ID.String(),
-				slack.NewTextBlockObject("plain_text", "Create Pull Request", false, false),
-			),
-		),
-	}
-
-	_, _, err := x.client.PostMessageContext(ctx,
-		x.channelID,
-		slack.MsgOptionBlocks(blocks...),
-		slack.MsgOptionTS(x.threadID),
-	)
-	if err != nil {
-		return goerr.Wrap(err, "failed to post policy diff to slack", goerr.V("blocks", blocks))
-	}
-
-	return nil
-}
-
 func (x *ThreadService) PostAlerts(ctx context.Context, alerts alert.Alerts) error {
 	blocks := buildAlertsBlocks(alerts, x.slackMetadata)
 
@@ -460,5 +402,23 @@ func (x *ThreadService) PostAlertClusters(ctx context.Context, clusters []alert.
 }
 
 func (x *Service) ShowResolveAlertListModal(ctx context.Context, list alert.List, triggerID string) error {
+	return nil
+}
+
+func (x *Service) ShowBindAlertModal(ctx context.Context, tickets []*ticket.Ticket, triggerID string, target string) error {
+	req := buildBindAlertModalViewRequest(ctx, model.CallbackSubmitBindAlert, tickets, target)
+	if _, err := x.client.OpenView(triggerID, req); err != nil {
+		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
+	}
+
+	return nil
+}
+
+func (x *Service) ShowResolveTicketModal(ctx context.Context, ticket *ticket.Ticket, triggerID string) error {
+	req := buildResolveTicketModalViewRequest(ctx, model.CallbackSubmitResolveTicket, ticket)
+	if _, err := x.client.OpenView(triggerID, req); err != nil {
+		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
+	}
+
 	return nil
 }

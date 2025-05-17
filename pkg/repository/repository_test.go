@@ -413,3 +413,48 @@ func cosineSimilarity(a, b []float32) float32 {
 	}
 	return dot / (float32(math.Sqrt(float64(normA))) * float32(math.Sqrt(float64(normB))))
 }
+
+func TestBatchGetTickets(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := context.Background()
+		thread := newTestThread()
+
+		// Create test tickets
+		tickets := make([]*ticket.Ticket, 3)
+		ticketIDs := make([]types.TicketID, 3)
+		for i := 0; i < 3; i++ {
+			ticket := newTestTicket(&thread)
+			ticket.Metadata.Title = fmt.Sprintf("Test Ticket %d", i)
+			gt.NoError(t, repo.PutTicket(ctx, ticket)).Required()
+			tickets[i] = &ticket
+			ticketIDs[i] = ticket.ID
+		}
+
+		// Test BatchGetTickets
+		got, err := repo.BatchGetTickets(ctx, ticketIDs)
+		gt.NoError(t, err).Required()
+		gt.Array(t, got).Length(3)
+
+		// Verify each ticket
+		for i, ticket := range got {
+			gt.Value(t, ticket.ID).Equal(tickets[i].ID)
+			gt.Value(t, ticket.Metadata.Title).Equal(tickets[i].Metadata.Title)
+		}
+
+		// Test with non-existent ticket ID
+		nonExistentID := types.NewTicketID()
+		got, err = repo.BatchGetTickets(ctx, []types.TicketID{nonExistentID})
+		gt.NoError(t, err)
+		gt.Array(t, got).Length(0)
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}

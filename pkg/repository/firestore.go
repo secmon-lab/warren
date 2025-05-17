@@ -494,18 +494,25 @@ func (r *Firestore) GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, er
 
 func (r *Firestore) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
 	var alerts alert.Alerts
+	var docRefs []*firestore.DocumentRef
 	for _, id := range alertIDs {
-		doc, err := r.db.Collection(collectionAlerts).Doc(id.String()).Get(ctx)
-		if err != nil {
-			if status.Code(err) == codes.NotFound {
-				continue
-			}
-			return nil, goerr.Wrap(err, "failed to get alert", goerr.V("alert_id", id))
+		docRef := r.db.Collection(collectionAlerts).Doc(id.String())
+		docRefs = append(docRefs, docRef)
+	}
+
+	docs, err := r.db.GetAll(ctx, docRefs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get alerts")
+	}
+
+	for _, doc := range docs {
+		if !doc.Exists() {
+			continue
 		}
 
 		var alert alert.Alert
 		if err := doc.DataTo(&alert); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("alert_id", id))
+			return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("doc.ref.id", doc.Ref.ID))
 		}
 
 		alerts = append(alerts, &alert)
@@ -606,4 +613,34 @@ func (r *Firestore) BatchBindAlertsToTicket(ctx context.Context, alertIDs []type
 	}
 
 	return nil
+}
+
+// BatchGetTickets gets tickets by their IDs. If some tickets are not found, it will be ignored.
+func (r *Firestore) BatchGetTickets(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error) {
+	var tickets []*ticket.Ticket
+	var docRefs []*firestore.DocumentRef
+	for _, id := range ticketIDs {
+		docRef := r.db.Collection(collectionTickets).Doc(id.String())
+		docRefs = append(docRefs, docRef)
+	}
+
+	docs, err := r.db.GetAll(ctx, docRefs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get tickets")
+	}
+
+	for _, doc := range docs {
+		if !doc.Exists() {
+			continue
+		}
+
+		var t ticket.Ticket
+		if err := doc.DataTo(&t); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket", goerr.V("doc.ref.id", doc.Ref.ID))
+		}
+
+		tickets = append(tickets, &t)
+	}
+
+	return tickets, nil
 }

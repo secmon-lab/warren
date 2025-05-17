@@ -21,6 +21,7 @@ type Ticket struct {
 	AlertIDs       []types.AlertID `json:"alert_ids"`
 	SlackThread    *slack.Thread   `json:"slack_thread"`
 	SlackMessageID string          `json:"slack_message_id"`
+	CreatedAt      time.Time       `json:"created_at"`
 
 	Metadata
 
@@ -60,6 +61,7 @@ func New(ctx context.Context, alertIDs []types.AlertID, slackThread *slack.Threa
 		AlertIDs:    alertIDs,
 		SlackThread: slackThread,
 		Status:      types.TicketStatusNew,
+		CreatedAt:   clock.Now(ctx),
 	}
 }
 

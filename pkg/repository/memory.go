@@ -398,3 +398,16 @@ func (r *Memory) BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.A
 	}
 	return nil
 }
+
+func (r *Memory) BatchGetTickets(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var tickets []*ticket.Ticket
+	for _, id := range ticketIDs {
+		if ticket, ok := r.tickets[id]; ok {
+			tickets = append(tickets, ticket)
+		}
+	}
+	return tickets, nil
+}

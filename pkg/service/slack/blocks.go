@@ -1,14 +1,17 @@
 package slack
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/slack-go/slack"
 )
 
@@ -147,12 +150,9 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 		))
 
 		var alertList string
-		displayCount := len(alerts)
-		if displayCount > 5 {
-			displayCount = 5
-		}
+		displayCount := min(len(alerts), 5)
 
-		for i := 0; i < displayCount; i++ {
+		for i := range displayCount {
 			alert := alerts[i]
 			alertList += fmt.Sprintf("• <%s|%s>\n",
 				metadata.ToMsgURL(alert.SlackThread.ChannelID, alert.SlackThread.ThreadID),
@@ -203,7 +203,88 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 	return blocks
 }
 
-func buildResolveModalViewRequest(callbackID model.CallbackID, metadata string) slack.ModalViewRequest {
+func buildBindAlertModalViewRequest(ctx context.Context, callbackID model.CallbackID, tickets []*ticket.Ticket, metadata string) slack.ModalViewRequest {
+	// Create ticket options for dropdown
+	ticketOptions := make([]*slack.OptionBlockObject, 0, len(tickets))
+	now := clock.Now(ctx)
+	for _, t := range tickets {
+		elapsed := now.Sub(t.CreatedAt)
+		var timeStr string
+		switch {
+		case elapsed < time.Minute:
+			timeStr = "just now"
+		case elapsed < time.Hour:
+			minutes := int(elapsed.Minutes())
+			timeStr = fmt.Sprintf("%dm ago", minutes)
+		case elapsed < 24*time.Hour:
+			hours := int(elapsed.Hours())
+			timeStr = fmt.Sprintf("%dh ago", hours)
+		case elapsed < 30*24*time.Hour:
+			days := int(elapsed.Hours() / 24)
+			timeStr = fmt.Sprintf("%dd ago", days)
+		default:
+			timeStr = t.CreatedAt.Format("2006-01-02")
+		}
+
+		label := fmt.Sprintf("%s (%s)", t.Metadata.Title, timeStr)
+		ticketOptions = append(ticketOptions,
+			slack.NewOptionBlockObject(
+				t.ID.String(),
+				slack.NewTextBlockObject(slack.PlainTextType, label, false, false),
+				slack.NewTextBlockObject(slack.PlainTextType, t.Metadata.Description, false, false),
+			),
+		)
+	}
+
+	return slack.ModalViewRequest{
+		Type: slack.VTModal,
+		Title: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Bind Alert to Ticket",
+		},
+		Blocks: slack.Blocks{
+			BlockSet: []slack.Block{
+				slack.NewSectionBlock(
+					slack.NewTextBlockObject(slack.PlainTextType, "Please select a ticket or enter a ticket ID.", false, false),
+					nil,
+					nil,
+				),
+				slack.NewInputBlock(
+					model.BlockIDTicketSelect.String(),
+					slack.NewTextBlockObject(slack.PlainTextType, "Select Ticket", false, false),
+					slack.NewTextBlockObject(slack.PlainTextType, "Choose a ticket from the list", false, false),
+					slack.NewOptionsSelectBlockElement(
+						slack.OptTypeStatic,
+						slack.NewTextBlockObject(slack.PlainTextType, "Select a ticket", false, false),
+						model.BlockActionIDTicketSelect.String(),
+						ticketOptions...,
+					),
+				).WithOptional(true),
+				slack.NewInputBlock(
+					model.BlockIDTicketID.String(),
+					slack.NewTextBlockObject(slack.PlainTextType, "Or Enter Ticket ID", false, false),
+					slack.NewTextBlockObject(slack.PlainTextType, "Enter the ticket ID directly", false, false),
+					slack.NewPlainTextInputBlockElement(
+						slack.NewTextBlockObject(slack.PlainTextType, "Enter ticket ID", false, false),
+						model.BlockActionIDTicketID.String(),
+					),
+				).WithOptional(true),
+			},
+		},
+		CallbackID:      callbackID.String(),
+		PrivateMetadata: metadata,
+		Submit: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Bind",
+		},
+		Close: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Cancel",
+		},
+	}
+}
+
+func buildResolveTicketModalViewRequest(ctx context.Context, callbackID model.CallbackID, ticket *ticket.Ticket) slack.ModalViewRequest {
 	conclusionOptions := []struct {
 		Conclusion  types.AlertConclusion
 		Label       string
@@ -256,7 +337,7 @@ func buildResolveModalViewRequest(callbackID model.CallbackID, metadata string) 
 					nil,
 				),
 				slack.NewInputBlock(
-					model.SlackBlockIDConclusion.String(),
+					model.BlockIDConclusion.String(),
 					slack.NewTextBlockObject(slack.PlainTextType, "Conclusion", false, false),
 					slack.NewTextBlockObject(slack.PlainTextType, "Select the conclusion", false, false),
 					slack.NewOptionsSelectBlockElement(

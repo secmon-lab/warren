@@ -8,7 +8,6 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -150,33 +149,6 @@ func TestIsBotUser(t *testing.T) {
 
 	botID := svc.BotUserID()
 	gt.S(t, botID).Match(`^[A-Z][A-Z0-9]{6,12}$`)
-}
-
-func TestPostPolicyDiff(t *testing.T) {
-	svc := newSlackService(t)
-
-	diff := policy.NewDiff(context.Background(), "Policy Diff", "This is a test policy diff", map[string]string{
-		"test.rego": `package test
-
-allow if {
-  input.color == "red"
-}
-`,
-	},
-		map[string]string{
-			"test.rego": `package test
-
-allow if {
-  input.color == "blue"
-}
-`,
-		},
-		policy.NewTestDataSet(),
-	)
-
-	thread, err := svc.PostMessage(context.Background(), "policy diff test")
-	gt.NoError(t, err)
-	gt.NoError(t, thread.PostPolicyDiff(context.Background(), diff))
 }
 
 func TestPostAlerts(t *testing.T) {

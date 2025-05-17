@@ -13,6 +13,7 @@ import (
 
 type Repository interface {
 	GetTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error)
+	BatchGetTickets(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error)
 	PutTicket(ctx context.Context, ticket ticket.Ticket) error
 	GetTicketByThread(ctx context.Context, thread slack.Thread) (*ticket.Ticket, error)
 	PutTicketComment(ctx context.Context, comment ticket.Comment) error

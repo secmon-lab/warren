@@ -24,19 +24,32 @@ func (id CallbackID) String() string {
 }
 
 const (
-	CallbackSubmitResolveAlert CallbackID = "submit_resolve_alert"
-	CallbackSubmitResolveList  CallbackID = "submit_resolve_list"
+	CallbackSubmitResolveTicket CallbackID = "submit_resolve_ticket"
+	CallbackSubmitBindAlert     CallbackID = "submit_bind_alert"
+	CallbackSubmitBindList      CallbackID = "submit_bind_list"
 )
 
-type SlackBlockID string
+type BlockID string
 
-func (id SlackBlockID) String() string {
+func (id BlockID) String() string {
 	return string(id)
 }
 
 const (
-	SlackBlockIDConclusion SlackBlockID = "conclusion"
-	SlackBlockIDComment    SlackBlockID = "comment"
+	BlockIDTicketSelect BlockID = "ticket_select_block"
+	BlockIDTicketID     BlockID = "ticket_id_block"
+)
+
+// ActionID in block
+type BlockActionID string
+
+func (id BlockActionID) String() string {
+	return string(id)
+}
+
+const (
+	BlockActionIDTicketSelect BlockActionID = "ticket_select_input"
+	BlockActionIDTicketID     BlockActionID = "ticket_id_input"
 )
 
 type ActionID string
@@ -55,8 +68,7 @@ const (
 	ActionIDBindList ActionID = "bind_list"
 
 	// For ticket
-	ActionIDConclusion ActionID = "conclusion"
-	ActionIDComment    ActionID = "comment"
+	ActionIDResolveTicket ActionID = "resolve_ticket"
 )
 
 type Mention struct {
