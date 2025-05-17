@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"reflect"
+	"sort"
 	"sync"
 	"time"
 
@@ -334,5 +335,36 @@ func (r *Memory) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (
 			alerts = append(alerts, alert)
 		}
 	}
+	return alerts, nil
+}
+func (r *Memory) FindSimilarAlerts(ctx context.Context, target alert.Alert, limit int) (alert.Alerts, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var alerts alert.Alerts
+	for _, a := range r.alerts {
+		// Skip the same alert
+		if a.ID == target.ID {
+			continue
+		}
+
+		// Only add alerts that have embeddings
+		if len(a.Embedding) > 0 {
+			alerts = append(alerts, a)
+		}
+	}
+
+	// Sort by similarity
+	sort.Slice(alerts, func(i, j int) bool {
+		simI := alert.CosineSimilarity(alerts[i].Embedding, target.Embedding)
+		simJ := alert.CosineSimilarity(alerts[j].Embedding, target.Embedding)
+		return simI > simJ
+	})
+
+	// Apply limit
+	if limit > 0 && limit < len(alerts) {
+		alerts = alerts[:limit]
+	}
+
 	return alerts, nil
 }

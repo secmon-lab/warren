@@ -2,8 +2,10 @@ package alert
 
 import (
 	"context"
+	"math"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -18,7 +20,7 @@ type Alert struct {
 
 	SlackThread *slack.Thread `json:"slack_thread"`
 
-	Embedding []float32 `json:"-"`
+	Embedding firestore.Vector32 `json:"-"`
 
 	Metadata
 }
@@ -50,4 +52,21 @@ type Attribute struct {
 	Value string `json:"value"`
 	Link  string `json:"link"`
 	Auto  bool   `json:"auto"`
+}
+
+func (x *Alert) CosineSimilarity(other []float32) float64 {
+	if len(x.Embedding) == 0 || len(other) == 0 {
+		return 0
+	}
+
+	var dotProduct float64
+	var magnitudeA, magnitudeB float64
+
+	for i := range x.Embedding {
+		dotProduct += float64(x.Embedding[i]) * float64(other[i])
+		magnitudeA += float64(x.Embedding[i]) * float64(x.Embedding[i])
+		magnitudeB += float64(other[i]) * float64(other[i])
+	}
+
+	return dotProduct / (math.Sqrt(magnitudeA) * math.Sqrt(magnitudeB))
 }

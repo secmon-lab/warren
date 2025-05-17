@@ -15,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 
 	"github.com/slack-go/slack"
@@ -290,7 +291,7 @@ func (x *ThreadService) updateMessage(ctx context.Context, msgID string, blocks 
 	}
 }
 
-func (x *ThreadService) PostFinding(ctx context.Context, finding alert.Finding) error {
+func (x *ThreadService) PostFinding(ctx context.Context, finding ticket.Finding) error {
 	blocks := buildFindingBlocks(finding)
 
 	_, _, err := x.client.PostMessageContext(
@@ -306,7 +307,7 @@ func (x *ThreadService) PostFinding(ctx context.Context, finding alert.Finding) 
 	return nil
 }
 
-func buildFindingBlocks(finding alert.Finding) []slack.Block {
+func buildFindingBlocks(finding ticket.Finding) []slack.Block {
 	return []slack.Block{
 		slack.NewHeaderBlock(
 			slack.NewTextBlockObject("plain_text", "Severity: "+string(finding.Severity), false, false),

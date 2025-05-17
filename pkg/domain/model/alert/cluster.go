@@ -44,7 +44,7 @@ func newAlertCluster(alerts []*Alert, similarityThreshold float64) clusters {
 		matched := false
 		for j := range clusters {
 			// Compare with first alert in cluster as representative
-			if cosineSimilarity(alert.Embedding, clusters[j].Alerts[0].Embedding) >= similarityThreshold {
+			if CosineSimilarity(alert.Embedding, clusters[j].Alerts[0].Embedding) >= similarityThreshold {
 				clusters[j].Alerts = append(clusters[j].Alerts, alert)
 				matched = true
 				break
@@ -65,8 +65,8 @@ func (x Alerts) MaxSimilarity() float64 {
 
 	for i, a := range x {
 		for j := i + 1; j < len(x); j++ {
-			if cosineSimilarity(a.Embedding, x[j].Embedding) > max {
-				max = cosineSimilarity(a.Embedding, x[j].Embedding)
+			if CosineSimilarity(a.Embedding, x[j].Embedding) > max {
+				max = CosineSimilarity(a.Embedding, x[j].Embedding)
 			}
 		}
 	}
@@ -74,7 +74,7 @@ func (x Alerts) MaxSimilarity() float64 {
 	return max
 }
 
-func cosineSimilarity(a, b []float32) float64 {
+func CosineSimilarity(a, b []float32) float64 {
 	if len(a) != len(b) {
 		return 0
 	}

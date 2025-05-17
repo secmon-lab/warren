@@ -96,19 +96,11 @@ func TestParseArgsToSource(t *testing.T) {
 			},
 		},
 		{
-			name: "unresolved command",
-			args: []string{"unresolved"},
+			name: "unbound command",
+			args: []string{"unbound"},
 			expected: func(m *mock.RepositoryMock) {
-				gt.Array(t, m.GetAlertsWithoutStatusCalls()).Length(1)
-				gt.Value(t, m.GetAlertsWithoutStatusCalls()[0].Status).Equal(types.AlertStatusResolved)
-			},
-		},
-		{
-			name: "status command with multiple statuses",
-			args: []string{"status", "resolved", "acked"},
-			expected: func(m *mock.RepositoryMock) {
-				gt.Array(t, m.GetAlertsByStatusCalls()).Length(1)
-				gt.Value(t, m.GetAlertsByStatusCalls()[0].Status).Equal([]types.AlertStatus{types.AlertStatusResolved, types.AlertStatusAcknowledged})
+				gt.Array(t, m.GetAlertsWithoutTicketCalls()).Length(1)
+				gt.Value(t, m.GetAlertsWithoutTicketCalls()[0].TicketID).Equal(types.EmptyTicketID)
 			},
 		},
 		{

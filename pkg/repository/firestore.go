@@ -512,3 +512,49 @@ func (r *Firestore) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID
 	}
 	return alerts, nil
 }
+
+func (r *Firestore) FindSimilarAlerts(ctx context.Context, target alert.Alert, limit int) (alert.Alerts, error) {
+	// Build vector search query
+	query := r.db.Collection(collectionAlerts).
+		FindNearest("Embedding",
+			target.Embedding,
+			limit+1, // Add 1 to exclude target itself
+			firestore.DistanceMeasureCosine,
+			&firestore.FindNearestOptions{
+				DistanceResultField: "vector_distance",
+			})
+
+	iter := query.Documents(ctx)
+	var alerts alert.Alerts
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next alert")
+		}
+
+		var a alert.Alert
+		if err := doc.DataTo(&a); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert")
+		}
+
+		// Exclude the same alert
+		if a.ID == target.ID {
+			continue
+		}
+
+		// Only add alerts that have embeddings
+		if len(a.Embedding) > 0 {
+			alerts = append(alerts, &a)
+		}
+	}
+
+	// Apply limit
+	if limit > 0 && limit < len(alerts) {
+		alerts = alerts[:limit]
+	}
+
+	return alerts, nil
+}

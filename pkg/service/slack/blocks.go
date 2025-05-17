@@ -12,23 +12,15 @@ import (
 )
 
 func buildAlertBlocks(alert alert.Alert) []slack.Block {
+	ack := "⏳"
+	if alert.TicketID != types.EmptyTicketID {
+		ack = "✅"
+	}
+
 	lines := []string{
 		"*ID:* `" + alert.ID.String() + "`",
 		"*Schema:* `" + alert.Schema.String() + "`",
-		"*Status:* " + alert.Status.Label(),
-		"*Assignee:* " + func() string {
-			if alert.Assignee == nil {
-				return ":no_entry: unassigned"
-			}
-			return ":bust_in_silhouette: <@" + alert.Assignee.ID + ">"
-		}(),
-		"*Severity:* " + func() string {
-			if alert.Finding == nil {
-				return types.AlertSeverityUnknown.Label()
-			}
-
-			return alert.Finding.Severity.Label()
-		}(),
+		"*Ack:* " + ack,
 	}
 
 	title := "❗ " + alert.Title
@@ -61,23 +53,6 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 		),
 	}
 
-	if alert.Conclusion != "" {
-		blocks = append(blocks, slack.NewDividerBlock())
-		blocks = append(blocks, slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", "*Conclusion:* "+alert.Conclusion.Label(), false, false),
-			nil,
-			nil,
-		))
-
-		if alert.Reason != "" {
-			blocks = append(blocks, slack.NewSectionBlock(
-				slack.NewTextBlockObject("mrkdwn", alert.Reason, false, false),
-				nil,
-				nil,
-			))
-		}
-	}
-
 	blocks = append(blocks, []slack.Block{
 		slack.NewDividerBlock(),
 		slack.NewSectionBlock(
@@ -88,9 +63,9 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 		slack.NewDividerBlock(),
 	}...)
 
-	if len(alert.Attributes) > 0 {
-		fields := make([]*slack.TextBlockObject, 0, len(alert.Attributes)*2)
-		for _, attr := range alert.Attributes {
+	if len(alert.Metadata.Attrs) > 0 {
+		fields := make([]*slack.TextBlockObject, 0, len(alert.Metadata.Attrs)*2)
+		for _, attr := range alert.Metadata.Attrs {
 			var value string
 			if attr.Link != "" {
 				value = "<" + attr.Link + "|" + attr.Value + ">"
@@ -103,63 +78,23 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 		}
 		blocks = append(blocks, slack.NewSectionBlock(nil, fields, nil))
 	}
-	if alert.Finding != nil {
-		blocks = append(blocks,
-			slack.NewDividerBlock(),
-			slack.NewHeaderBlock(
-				slack.NewTextBlockObject(slack.PlainTextType, "🤖 AI Analysis Result", false, false),
-			),
-			slack.NewSectionBlock(
-				slack.NewTextBlockObject("mrkdwn", "Severity ➡️ *"+alert.Finding.Severity.String()+"*", false, false),
-				nil,
-				nil,
-			),
-			slack.NewSectionBlock(
-				slack.NewTextBlockObject("mrkdwn", "📝 *Summary:*\n"+alert.Finding.Summary, false, false),
-				nil,
-				nil,
-			),
-			slack.NewSectionBlock(
-				slack.NewTextBlockObject("mrkdwn", "🔍 *Reason:*\n"+alert.Finding.Reason, false, false),
-				nil,
-				nil,
-			),
-			slack.NewSectionBlock(
-				slack.NewTextBlockObject("mrkdwn", "💡 *Recommendation:*\n"+alert.Finding.Recommendation, false, false),
-				nil,
-				nil,
-			),
-		)
-	}
-
 	// Add action buttons
 	buttons := []slack.BlockElement{}
-	if alert.Finding == nil {
-		buttons = append(buttons,
-			slack.NewButtonBlockElement(
-				model.ActionIDInspect.String(),
-				alert.ID.String(),
-				slack.NewTextBlockObject("plain_text", "Inspect", false, false),
-			).WithStyle(slack.StyleDefault),
-		)
-	}
 
-	if alert.Status == types.AlertStatusNew {
+	if alert.TicketID == types.EmptyTicketID {
 		buttons = append(buttons,
 			slack.NewButtonBlockElement(
-				model.ActionIDAck.String(),
+				model.ActionIDAckAlert.String(),
 				alert.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Acknowledge", false, false),
 			).WithStyle(slack.StylePrimary),
 		)
-	}
 
-	if alert.Status != types.AlertStatusResolved {
 		buttons = append(buttons,
 			slack.NewButtonBlockElement(
-				model.ActionIDResolve.String(),
+				model.ActionIDBindAlert.String(),
 				alert.ID.String(),
-				slack.NewTextBlockObject("plain_text", "Resolve", false, false),
+				slack.NewTextBlockObject("plain_text", "Bind to ticket", false, false),
 			).WithStyle(slack.StyleDanger),
 		)
 	}

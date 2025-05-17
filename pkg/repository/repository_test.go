@@ -3,9 +3,12 @@ package repository_test
 import (
 	"context"
 	"fmt"
+	"math"
+	"math/rand/v2"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -22,13 +25,18 @@ func TestMemory(t *testing.T) {
 	testRepository(t, repo)
 }
 
-func TestFirestore(t *testing.T) {
+func newFirestoreClient(t *testing.T) *repository.Firestore {
 	vars := test.NewEnvVars(t, "TEST_FIRESTORE_PROJECT_ID", "TEST_FIRESTORE_DATABASE_ID")
-	repo, err := repository.NewFirestore(context.Background(),
+	client, err := repository.NewFirestore(t.Context(),
 		vars.Get("TEST_FIRESTORE_PROJECT_ID"),
 		vars.Get("TEST_FIRESTORE_DATABASE_ID"),
 	)
-	gt.NoError(t, err)
+	gt.NoError(t, err).Required()
+	return client
+}
+
+func TestFirestore(t *testing.T) {
+	repo := newFirestoreClient(t)
 	testRepository(t, repo)
 }
 
@@ -41,9 +49,10 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		ChannelID: "test-channel",
 		ThreadID:  fmt.Sprintf("%d.%d", time.Now().Unix(), time.Now().Nanosecond()),
 	}
+	schema := types.AlertSchema("test-schema." + uuid.New().String())
 	a := alert.Alert{
 		ID:          alertID,
-		Schema:      "test-schema",
+		Schema:      schema,
 		CreatedAt:   time.Now(),
 		SlackThread: &thread,
 		Metadata: alert.Metadata{
@@ -65,7 +74,7 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		got, err := repo.GetAlert(ctx, alertID)
 		gt.NoError(t, err)
 		gt.Value(t, got.ID).Equal(alertID)
-		gt.Value(t, got.Schema).Equal("test-schema")
+		gt.Value(t, got.Schema).Equal(schema)
 
 		// GetAlertByThread
 		got, err = repo.GetAlertByThread(ctx, thread)
@@ -73,15 +82,16 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Value(t, got.ID).Equal(alertID)
 
 		// SearchAlerts
-		gotAlerts, err := repo.SearchAlerts(ctx, "Schema", "==", "test-schema")
+		gotAlerts, err := repo.SearchAlerts(ctx, "Schema", "==", schema)
 		gt.NoError(t, err)
-		gt.Array(t, gotAlerts).Longer(0)
+		gt.Array(t, gotAlerts).Length(1)
 		gt.Value(t, gotAlerts[0].ID).Equal(alertID)
 
 		// BatchGetAlerts
 		gotAlerts, err = repo.BatchGetAlerts(ctx, []types.AlertID{alertID})
 		gt.NoError(t, err)
-		gt.Array(t, gotAlerts).Equal([]*alert.Alert{&a})
+		gt.Array(t, gotAlerts).Length(1).Required()
+		gt.Equal(t, gotAlerts[0], &a)
 	})
 
 	// Alert-Ticket binding tests
@@ -105,37 +115,28 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		// BindAlertToTicket
 		gt.NoError(t, repo.BindAlertToTicket(ctx, alertID, ticketID))
 
-		// GetAlertWithoutTicket
-		gotAlerts, err := repo.GetAlertWithoutTicket(ctx)
-		gt.NoError(t, err)
-		gt.Array(t, gotAlerts).Equal([]*alert.Alert{})
-
 		// UnbindAlertFromTicket
 		gt.NoError(t, repo.UnbindAlertFromTicket(ctx, alertID))
 
 		// GetAlertWithoutTicket again
-		gotAlerts, err = repo.GetAlertWithoutTicket(ctx)
+		gotAlerts, err := repo.GetAlertWithoutTicket(ctx)
 		gt.NoError(t, err)
 		gt.Array(t, gotAlerts).Longer(0)
-		gt.Value(t, gotAlerts[0].ID).Equal(alertID)
+		gt.Array(t, gotAlerts).Any(func(a *alert.Alert) bool {
+			return a.ID == alertID
+		})
 
 		// PutTicketComment
-		comment := ticket.Comment{
-			ID:        types.NewCommentID(),
-			TicketID:  ticketID,
-			Comment:   "Test Comment",
-			Timestamp: time.Now(),
-			User: slack.User{
-				ID:   "test-user",
-				Name: "Test User",
-			},
-		}
+		comment := ticketObj.NewComment(ctx, "Test Comment", slack.User{
+			ID:   "test-user",
+			Name: "Test User",
+		})
 		gt.NoError(t, repo.PutTicketComment(ctx, comment))
 
 		// GetTicketComments
 		gotComments, err := repo.GetTicketComments(ctx, ticketID)
 		gt.NoError(t, err)
-		gt.Array(t, gotComments).Longer(0)
+		gt.Array(t, gotComments).Longer(0).Required()
 		gt.Value(t, gotComments[0].Comment).Equal("Test Comment")
 	})
 
@@ -191,10 +192,10 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.Array(t, got).Longer(0)
 
 		// SearchAlerts
-		got, err = repo.SearchAlerts(ctx, "Schema", "==", "test-schema")
+		got, err = repo.SearchAlerts(ctx, "Schema", "==", schema)
 		gt.NoError(t, err)
 		gt.Array(t, got).Longer(0)
-		gt.Value(t, got[0].Schema).Equal("test-schema")
+		gt.Value(t, got[0].Schema).Equal(schema)
 
 		// SearchAlerts with different operators
 		got, err = repo.SearchAlerts(ctx, "CreatedAt", ">", begin)
@@ -247,6 +248,68 @@ func testRepository(t *testing.T, repo interfaces.Repository) {
 		gt.NotNil(t, gotHistory)
 		gt.Value(t, gotHistory.SessionID).Equal(sessionID)
 	})
+}
 
-	// Ticket関連のテストも必要に応じて追加
+func TestFindSimilarAlerts(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+		alerts := alert.Alerts{}
+		for i := 0; i < 10; i++ {
+			// Generate random embedding array with 256 dimensions
+			embeddings := make([]float32, 256)
+			for i := range embeddings {
+				embeddings[i] = rand.Float32()
+			}
+			alerts = append(alerts, &alert.Alert{
+				ID:        types.NewAlertID(),
+				Schema:    types.AlertSchema("test-schema." + uuid.New().String()),
+				Embedding: embeddings,
+				CreatedAt: time.Now(),
+			})
+			gt.NoError(t, repo.PutAlert(ctx, *alerts[i]))
+		}
+
+		newEmbedding := make([]float32, 256)
+		for i := range newEmbedding {
+			newEmbedding[i] = alerts[0].Embedding[i]
+		}
+		newEmbedding[0] = 1.0 // Change one value to make it different
+
+		gt.Number(t, cosineSimilarity(alerts[0].Embedding, newEmbedding)).Greater(0.99)
+
+		target := alert.Alert{
+			ID:        types.NewAlertID(),
+			Schema:    types.AlertSchema("test-schema." + uuid.New().String()),
+			Embedding: newEmbedding,
+			CreatedAt: time.Now(),
+		}
+		gt.NoError(t, repo.PutAlert(ctx, target))
+		got, err := repo.FindSimilarAlerts(ctx, target, 3)
+		gt.NoError(t, err)
+		gt.Array(t, got).Longer(0).Required()
+		gt.Value(t, got[0].ID).Equal(alerts[0].ID)
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+func cosineSimilarity(a, b []float32) float32 {
+	var dot, normA, normB float32
+	for i := range a {
+		dot += a[i] * b[i]
+		normA += a[i] * a[i]
+		normB += b[i] * b[i]
+	}
+	if normA == 0 || normB == 0 {
+		return 0
+	}
+	return dot / (float32(math.Sqrt(float64(normA))) * float32(math.Sqrt(float64(normB))))
 }

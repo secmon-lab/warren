@@ -27,6 +27,7 @@ type Repository interface {
 	GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, error)
 	GetAlertsBySpan(ctx context.Context, begin, end time.Time) (alert.Alerts, error)
 	BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
+	FindSimilarAlerts(ctx context.Context, alert alert.Alert, limit int) (alert.Alerts, error)
 
 	// For list management
 	GetAlertList(ctx context.Context, listID types.AlertListID) (*alert.List, error)

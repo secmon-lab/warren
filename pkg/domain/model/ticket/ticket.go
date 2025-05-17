@@ -37,7 +37,7 @@ func New(ctx context.Context, alertIDs []types.AlertID, slackThread *slack.Threa
 type Comment struct {
 	ID        types.CommentID `json:"id"`
 	TicketID  types.TicketID  `json:"ticket_id"`
-	Timestamp time.Time       `json:"timestamp"`
+	CreatedAt time.Time       `json:"created_at"`
 	Comment   string          `json:"comment"`
 	User      slack.User      `json:"user"`
 }
@@ -53,7 +53,7 @@ func (x *Ticket) NewComment(ctx context.Context, comment string, user slack.User
 	return Comment{
 		ID:        types.NewCommentID(),
 		TicketID:  x.ID,
-		Timestamp: clock.Now(ctx),
+		CreatedAt: clock.Now(ctx),
 		Comment:   comment,
 		User:      user,
 	}
