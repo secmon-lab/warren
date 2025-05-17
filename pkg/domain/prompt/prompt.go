@@ -23,33 +23,6 @@ func stringify(v any) (string, error) {
 	return buf.String(), nil
 }
 
-//go:embed templates/finding.md
-var findingTemplate string
-
-func BuildFindingPrompt(ctx context.Context) (string, error) {
-	tmpl, err := template.New("finding").Parse(findingTemplate)
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to parse template")
-	}
-
-	schema, err := generateSchema(alert.Finding{}).Stringify()
-	if err != nil {
-		return "", err
-	}
-
-	input := map[string]any{
-		"schema": schema,
-		"lang":   lang.From(ctx).Name(),
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "finding", input); err != nil {
-		return "", goerr.Wrap(err, "failed to execute template")
-	}
-
-	return buf.String(), nil
-}
-
 //go:embed templates/meta.md
 var metaTemplate string
 

@@ -100,26 +100,13 @@ func Static(alerts alert.Alerts) Source {
 	}
 }
 
-func Status(status ...types.AlertStatus) Source {
+func Unbound() Source {
 	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
-		msg.Trace(ctx, "🤖 Getting alerts with status: %s", status)
+		msg.Trace(ctx, "🤖 Getting unbound alerts with ticket...")
 
-		alerts, err := repo.GetAlertsByStatus(ctx, status...)
+		alerts, err := repo.GetAlertWithoutTicket(ctx)
 		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get alerts without status")
-		}
-
-		return alerts, nil
-	}
-}
-
-func Unresolved() Source {
-	return func(ctx context.Context, repo interfaces.Repository) (alert.Alerts, error) {
-		msg.Trace(ctx, "🤖 Getting unresolved alerts...")
-
-		alerts, err := repo.GetAlertsWithoutStatus(ctx, types.AlertStatusResolved)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get alerts without resolved status")
+			return nil, goerr.Wrap(err, "failed to get unbound alerts")
 		}
 
 		return alerts, nil

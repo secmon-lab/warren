@@ -8,11 +8,10 @@ import (
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -42,14 +41,14 @@ const (
 	collectionPolicies    = "policies"
 	collectionPolicyDiffs = "diffs"
 	collectionAlertLists  = "lists"
-	commentCollection     = "comments"
 	collectionSessions    = "sessions"
 	collectionHistories   = "histories"
 	collectionNotes       = "notes"
+	collectionTickets     = "tickets"
+	collectionComments    = "comments"
 )
 
 func (r *Firestore) PutAlert(ctx context.Context, alert alert.Alert) error {
-	alert.UpdatedAt = clock.Now(ctx)
 	alertDoc := r.db.Collection(collectionAlerts).Doc(alert.ID.String())
 	_, err := alertDoc.Set(ctx, alert)
 	if err != nil {
@@ -128,143 +127,6 @@ func (r *Firestore) GetLatestAlerts(ctx context.Context, oldest time.Time, limit
 	}
 
 	return alerts, nil
-}
-
-func (r *Firestore) PutAlertComment(ctx context.Context, comment alert.AlertComment) error {
-	commentDoc := r.db.Collection(collectionAlerts).Doc(comment.AlertID.String()).Collection(commentCollection).Doc(comment.Timestamp)
-	_, err := commentDoc.Set(ctx, comment)
-	if err != nil {
-		return goerr.Wrap(err, "failed to insert alert comment")
-	}
-	return nil
-}
-
-func (r *Firestore) GetAlertComments(ctx context.Context, alertID types.AlertID) ([]alert.AlertComment, error) {
-	iter := r.db.Collection(collectionAlerts).Doc(alertID.String()).Collection(commentCollection).OrderBy("Timestamp", firestore.Desc).Documents(ctx)
-
-	var comments []alert.AlertComment
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			return nil, goerr.Wrap(err, "failed to get next alert comment")
-		}
-
-		var comment alert.AlertComment
-		if err := doc.DataTo(&comment); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to alert comment")
-		}
-
-		comments = append(comments, comment)
-	}
-
-	return comments, nil
-}
-
-func (r *Firestore) GetAlertsByStatus(ctx context.Context, status ...types.AlertStatus) (alert.Alerts, error) {
-	iter := r.db.Collection(collectionAlerts).Where("Status", "in", status).Documents(ctx)
-
-	var alerts alert.Alerts
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			return nil, goerr.Wrap(err, "failed to get next alert")
-		}
-
-		var alert alert.Alert
-		if err := doc.DataTo(&alert); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to alert")
-		}
-
-		alerts = append(alerts, &alert)
-	}
-
-	return alerts, nil
-}
-
-func (r *Firestore) GetAlertsWithoutStatus(ctx context.Context, status types.AlertStatus) (alert.Alerts, error) {
-	iter := r.db.Collection(collectionAlerts).Where("Status", "!=", status).Documents(ctx)
-
-	var alerts alert.Alerts
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			return nil, goerr.Wrap(err, "failed to get next alert")
-		}
-
-		var alert alert.Alert
-		if err := doc.DataTo(&alert); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to alert")
-		}
-
-		alerts = append(alerts, &alert)
-	}
-
-	return alerts, nil
-}
-
-func (r *Firestore) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
-	var alerts alert.Alerts
-
-	// Process in batches of 30
-	for i := 0; i < len(alertIDs); i += 30 {
-		end := min(i+30, len(alertIDs))
-		batch := alertIDs[i:end]
-		iter := r.db.Collection(collectionAlerts).Where("ID", "in", batch).Documents(ctx)
-
-		for {
-			doc, err := iter.Next()
-			if err != nil {
-				if err == iterator.Done {
-					break
-				}
-				return nil, goerr.Wrap(err, "failed to get next alert")
-			}
-
-			var alert alert.Alert
-			if err := doc.DataTo(&alert); err != nil {
-				return nil, goerr.Wrap(err, "failed to convert data to alert")
-			}
-
-			alerts = append(alerts, &alert)
-		}
-	}
-
-	return alerts, nil
-}
-
-func (r *Firestore) GetPolicyDiff(ctx context.Context, id types.PolicyDiffID) (*policy.Diff, error) {
-	doc, err := r.db.Collection(collectionPolicyDiffs).Doc(string(id)).Get(ctx)
-	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			return nil, nil
-		}
-		return nil, goerr.Wrap(err, "failed to get policy diff", goerr.V("id", id))
-	}
-
-	var policyDiff policy.Diff
-	if err := doc.DataTo(&policyDiff); err != nil {
-		return nil, goerr.Wrap(err, "failed to convert data to policy diff")
-	}
-
-	return &policyDiff, nil
-}
-
-func (r *Firestore) PutPolicyDiff(ctx context.Context, diff *policy.Diff) error {
-	doc := r.db.Collection(collectionPolicyDiffs).Doc(string(diff.ID))
-	_, err := doc.Set(ctx, diff)
-	if err != nil {
-		return goerr.Wrap(err, "failed to put policy diff", goerr.V("id", diff.ID))
-	}
-	return nil
 }
 
 func (r *Firestore) GetAlertListByThread(ctx context.Context, thread slack.Thread) (*alert.List, error) {
@@ -398,74 +260,6 @@ func (r *Firestore) GetHistory(ctx context.Context, sessionID types.SessionID) (
 	return histories, nil
 }
 
-func (r *Firestore) BatchUpdateAlertStatus(ctx context.Context, alertIDs []types.AlertID, status types.AlertStatus, reason string) error {
-	writer := r.db.BulkWriter(ctx)
-	defer writer.End()
-
-	jobs := make(map[types.AlertID]*firestore.BulkWriterJob)
-	for _, alertID := range alertIDs {
-		ref := r.db.Collection(collectionAlerts).Doc(alertID.String())
-		job, err := writer.Update(ref, []firestore.Update{
-			{
-				Path:  "Status",
-				Value: status,
-			},
-			{
-				Path:  "Reason",
-				Value: reason,
-			},
-		})
-		if err != nil {
-			return goerr.Wrap(err, "failed to update alert status", goerr.V("alert_id", alertID))
-		}
-		jobs[alertID] = job
-	}
-
-	writer.End()
-
-	for alertID, job := range jobs {
-		if _, err := job.Results(); err != nil {
-			return goerr.Wrap(err, "failed to update alert status", goerr.V("alert_id", alertID))
-		}
-	}
-
-	return nil
-}
-
-func (r *Firestore) BatchUpdateAlertConclusion(ctx context.Context, alertIDs []types.AlertID, conclusion types.AlertConclusion, reason string) error {
-	writer := r.db.BulkWriter(ctx)
-	defer writer.End()
-
-	jobs := make(map[types.AlertID]*firestore.BulkWriterJob)
-	for _, alertID := range alertIDs {
-		ref := r.db.Collection(collectionAlerts).Doc(alertID.String())
-		job, err := writer.Update(ref, []firestore.Update{
-			{
-				Path:  "Conclusion",
-				Value: conclusion,
-			},
-			{
-				Path:  "Reason",
-				Value: reason,
-			},
-		})
-		if err != nil {
-			return goerr.Wrap(err, "failed to update alert conclusion", goerr.V("alert_id", alertID))
-		}
-		jobs[alertID] = job
-	}
-
-	writer.End()
-
-	for alertID, job := range jobs {
-		if _, err := job.Results(); err != nil {
-			return goerr.Wrap(err, "failed to update alert conclusion", goerr.V("alert_id", alertID))
-		}
-	}
-
-	return nil
-}
-
 func (r *Firestore) GetAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
 	iter := r.db.Collection(collectionAlerts).
 		Where("SlackThread.ChannelID", "==", thread.ChannelID).
@@ -566,73 +360,6 @@ func (r *Firestore) GetLatestHistory(ctx context.Context, sessionID types.Sessio
 	return &history, nil
 }
 
-func (r *Firestore) GetNotes(ctx context.Context, sessionID types.SessionID) ([]*session.Note, error) {
-	iter := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionNotes).OrderBy("CreatedAt", firestore.Asc).Documents(ctx)
-	defer iter.Stop()
-
-	var notes []*session.Note
-	for {
-		doc, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get notes")
-		}
-
-		var note session.Note
-		if err := doc.DataTo(&note); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to note")
-		}
-		notes = append(notes, &note)
-	}
-
-	return notes, nil
-}
-
-func (r *Firestore) PutNote(ctx context.Context, note *session.Note) error {
-	doc := r.db.Collection(collectionSessions).Doc(note.SessionID.String()).Collection(collectionNotes).Doc(note.ID.String())
-	_, err := doc.Set(ctx, note)
-	if err != nil {
-		return goerr.Wrap(err, "failed to put note", goerr.V("id", note.ID))
-	}
-	return nil
-}
-
-/*
-func (r *Firestore) FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error) {
-	if len(embedding) == 0 {
-		return nil, goerr.New("embedding vector is empty")
-	}
-
-	// Use FindNearest for vector search
-	docs, err := r.db.Collection(collectionAlerts).
-		FindNearest("Embedding", embedding, limit, firestore.DistanceMeasureEuclidean, nil).
-		Documents(ctx).GetAll()
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get nearest alerts")
-	}
-
-	var result alert.Alerts
-	for _, doc := range docs {
-		var alert alert.Alert
-		if err := doc.DataTo(&alert); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to alert")
-		}
-		result = append(result, &alert)
-	}
-
-	return result, nil
-}
-*/
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func (r *Firestore) SearchAlerts(ctx context.Context, path, op string, value any) (alert.Alerts, error) {
 	iter := r.db.Collection(collectionAlerts).Where(path, op, value).Documents(ctx)
 
@@ -654,5 +381,134 @@ func (r *Firestore) SearchAlerts(ctx context.Context, path, op string, value any
 		alerts = append(alerts, &alert)
 	}
 
+	return alerts, nil
+}
+
+// Ticket related methods
+func (r *Firestore) GetTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
+	doc, err := r.db.Collection(collectionTickets).Doc(ticketID.String()).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+		}
+		return nil, goerr.Wrap(err, "failed to get ticket", goerr.V("ticket_id", ticketID))
+	}
+
+	var t ticket.Ticket
+	if err := doc.DataTo(&t); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert data to ticket", goerr.V("ticket_id", ticketID))
+	}
+
+	return &t, nil
+}
+
+func (r *Firestore) PutTicket(ctx context.Context, t ticket.Ticket) error {
+	_, err := r.db.Collection(collectionTickets).Doc(t.ID.String()).Set(ctx, t)
+	if err != nil {
+		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", t.ID))
+	}
+	return nil
+}
+
+func (r *Firestore) PutTicketComment(ctx context.Context, comment ticket.Comment) error {
+	_, err := r.db.Collection(collectionTickets).Doc(comment.TicketID.String()).Collection(collectionComments).Doc(comment.ID.String()).Set(ctx, comment)
+	if err != nil {
+		return goerr.Wrap(err, "failed to put ticket comment", goerr.V("ticket_id", comment.TicketID))
+	}
+	return nil
+}
+
+func (r *Firestore) GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
+	iter := r.db.Collection(collectionTickets).Doc(ticketID.String()).Collection(collectionComments).OrderBy("CreatedAt", firestore.Desc).Documents(ctx)
+	var comments []ticket.Comment
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get ticket comments", goerr.V("ticket_id", ticketID))
+		}
+
+		var comment ticket.Comment
+		if err := doc.DataTo(&comment); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket comment", goerr.V("ticket_id", ticketID))
+		}
+		comments = append(comments, comment)
+	}
+	return comments, nil
+}
+
+// Alert-Ticket binding methods
+func (r *Firestore) BindAlertToTicket(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
+	alertDoc := r.db.Collection(collectionAlerts).Doc(alertID.String())
+	_, err := alertDoc.Update(ctx, []firestore.Update{
+		{
+			Path:  "TicketID",
+			Value: ticketID,
+		},
+	})
+	if err != nil {
+		return goerr.Wrap(err, "failed to bind alert to ticket", goerr.V("alert_id", alertID), goerr.V("ticket_id", ticketID))
+	}
+	return nil
+}
+
+func (r *Firestore) UnbindAlertFromTicket(ctx context.Context, alertID types.AlertID) error {
+	alertDoc := r.db.Collection(collectionAlerts).Doc(alertID.String())
+	_, err := alertDoc.Update(ctx, []firestore.Update{
+		{
+			Path:  "TicketID",
+			Value: nil,
+		},
+	})
+	if err != nil {
+		return goerr.Wrap(err, "failed to unbind alert from ticket", goerr.V("alert_id", alertID))
+	}
+	return nil
+}
+
+func (r *Firestore) GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, error) {
+	iter := r.db.Collection(collectionAlerts).Where("TicketID", "==", nil).Documents(ctx)
+
+	var alerts alert.Alerts
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next alert")
+		}
+
+		var alert alert.Alert
+		if err := doc.DataTo(&alert); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert")
+		}
+
+		alerts = append(alerts, &alert)
+	}
+
+	return alerts, nil
+}
+
+func (r *Firestore) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
+	var alerts alert.Alerts
+	for _, id := range alertIDs {
+		doc, err := r.db.Collection(collectionAlerts).Doc(id.String()).Get(ctx)
+		if err != nil {
+			if status.Code(err) == codes.NotFound {
+				continue
+			}
+			return nil, goerr.Wrap(err, "failed to get alert", goerr.V("alert_id", id))
+		}
+
+		var alert alert.Alert
+		if err := doc.DataTo(&alert); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("alert_id", id))
+		}
+
+		alerts = append(alerts, &alert)
+	}
 	return alerts, nil
 }

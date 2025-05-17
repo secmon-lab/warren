@@ -45,40 +45,6 @@ func (x AlertSchema) String() string {
 	return string(x)
 }
 
-type AlertStatus string
-
-const (
-	AlertStatusUnknown      AlertStatus = "unknown"
-	AlertStatusNew          AlertStatus = "new"
-	AlertStatusAcknowledged AlertStatus = "acked"
-	AlertStatusBlocked      AlertStatus = "blocked"
-	AlertStatusResolved     AlertStatus = "resolved"
-)
-
-var alertStatusLabels = map[AlertStatus]string{
-	AlertStatusUnknown:      "❓️ Unknown",
-	AlertStatusNew:          "🆕 New",
-	AlertStatusAcknowledged: "👀 Acknowledged",
-	AlertStatusBlocked:      "🚫 Blocked",
-	AlertStatusResolved:     "✅️ Resolved",
-}
-
-func (s AlertStatus) String() string {
-	return string(s)
-}
-
-func (s AlertStatus) Label() string {
-	return alertStatusLabels[s]
-}
-
-func (s AlertStatus) Validate() error {
-	switch s {
-	case AlertStatusNew, AlertStatusAcknowledged, AlertStatusBlocked, AlertStatusResolved:
-		return nil
-	}
-	return goerr.New("invalid alert status", goerr.V("status", s))
-}
-
 // AlertSeverity is the severity of the alert. This is set by the AI.
 type AlertSeverity string
 
