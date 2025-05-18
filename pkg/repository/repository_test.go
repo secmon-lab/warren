@@ -498,3 +498,94 @@ func TestFindSimilarTickets(t *testing.T) {
 		testFn(t, repo)
 	})
 }
+
+func TestFindNearestTickets(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+		tickets := make([]*ticket.Ticket, 10)
+		for i := 0; i < 10; i++ {
+			// Generate random embedding array with 256 dimensions
+			embeddings := make([]float32, 256)
+			for i := range embeddings {
+				embeddings[i] = rand.Float32()
+			}
+			tickets[i] = &ticket.Ticket{
+				ID:        types.NewTicketID(),
+				Embedding: embeddings,
+				CreatedAt: time.Now(),
+			}
+			gt.NoError(t, repo.PutTicket(ctx, *tickets[i]))
+		}
+
+		// Create a target embedding that is similar to the first ticket
+		targetEmbedding := make([]float32, 256)
+		for i := range targetEmbedding {
+			targetEmbedding[i] = tickets[0].Embedding[i]
+		}
+		targetEmbedding[0] = 1.0 // Change one value to make it different
+
+		gt.Number(t, cosineSimilarity(tickets[0].Embedding, targetEmbedding)).Greater(0.99)
+
+		// Test FindNearestTickets
+		got, err := repo.FindNearestTickets(ctx, targetEmbedding, 3)
+		gt.NoError(t, err).Required()
+		gt.Array(t, got).Longer(0).Required()
+		gt.Value(t, got[0].ID).Equal(tickets[0].ID)
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+func TestFindNearestAlerts(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+		alerts := alert.Alerts{}
+		for i := 0; i < 10; i++ {
+			// Generate random embedding array with 256 dimensions
+			embeddings := make([]float32, 256)
+			for i := range embeddings {
+				embeddings[i] = rand.Float32()
+			}
+			alerts = append(alerts, &alert.Alert{
+				ID:        types.NewAlertID(),
+				Schema:    types.AlertSchema("test-schema." + uuid.New().String()),
+				Embedding: embeddings,
+				CreatedAt: time.Now(),
+			})
+			gt.NoError(t, repo.PutAlert(ctx, *alerts[i]))
+		}
+
+		// Create a target embedding that is similar to the first alert
+		targetEmbedding := make([]float32, 256)
+		for i := range targetEmbedding {
+			targetEmbedding[i] = alerts[0].Embedding[i]
+		}
+		targetEmbedding[0] = 1.0 // Change one value to make it different
+
+		gt.Number(t, cosineSimilarity(alerts[0].Embedding, targetEmbedding)).Greater(0.99)
+
+		// Test FindNearestAlerts
+		got, err := repo.FindNearestAlerts(ctx, targetEmbedding, 3)
+		gt.NoError(t, err).Required()
+		gt.Array(t, got).Longer(0).Required()
+		gt.Value(t, got[0].ID).Equal(alerts[0].ID)
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}

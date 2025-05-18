@@ -7,6 +7,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -20,6 +21,8 @@ import (
 type Firestore struct {
 	db *firestore.Client
 }
+
+var _ interfaces.Repository = &Firestore{}
 
 func NewFirestore(ctx context.Context, projectID, databaseID string) (*Firestore, error) {
 	db, err := firestore.NewClientWithDatabase(ctx, projectID, databaseID)
@@ -704,4 +707,88 @@ func (r *Firestore) FindSimilarTickets(ctx context.Context, ticketID types.Ticke
 	}
 
 	return tickets, nil
+}
+
+func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32, limit int) ([]*ticket.Ticket, error) {
+	// Convert []float32 to firestore.Vector32
+	vector32 := make(firestore.Vector32, len(embedding))
+	for i, v := range embedding {
+		vector32[i] = v
+	}
+
+	// Build vector search query
+	query := r.db.Collection(collectionTickets).
+		FindNearest("Embedding",
+			vector32,
+			limit,
+			firestore.DistanceMeasureEuclidean,
+			&firestore.FindNearestOptions{
+				DistanceResultField: "vector_distance",
+			})
+
+	iter := query.Documents(ctx)
+	var tickets []*ticket.Ticket
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next ticket")
+		}
+
+		var t ticket.Ticket
+		if err := doc.DataTo(&t); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		// Only add tickets that have embeddings
+		if len(t.Embedding) > 0 {
+			tickets = append(tickets, &t)
+		}
+	}
+
+	return tickets, nil
+}
+
+func (r *Firestore) FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error) {
+	// Convert []float32 to firestore.Vector32
+	vector32 := make(firestore.Vector32, len(embedding))
+	for i, v := range embedding {
+		vector32[i] = v
+	}
+
+	// Build vector search query
+	query := r.db.Collection(collectionAlerts).
+		FindNearest("Embedding",
+			vector32,
+			limit,
+			firestore.DistanceMeasureEuclidean,
+			&firestore.FindNearestOptions{
+				DistanceResultField: "vector_distance",
+			})
+
+	iter := query.Documents(ctx)
+	var alerts alert.Alerts
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next alert")
+		}
+
+		var a alert.Alert
+		if err := doc.DataTo(&a); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert")
+		}
+
+		// Only add alerts that have embeddings
+		if len(a.Embedding) > 0 {
+			alerts = append(alerts, &a)
+		}
+	}
+
+	return alerts, nil
 }

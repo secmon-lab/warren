@@ -453,6 +453,12 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			BindAlertToTicketFunc: func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
 //				panic("mock out the BindAlertToTicket method")
 //			},
+//			FindNearestAlertsFunc: func(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error) {
+//				panic("mock out the FindNearestAlerts method")
+//			},
+//			FindNearestTicketsFunc: func(ctx context.Context, embedding []float32, limit int) ([]*ticket.Ticket, error) {
+//				panic("mock out the FindNearestTickets method")
+//			},
 //			FindSimilarAlertsFunc: func(ctx context.Context, alertMoqParam alert.Alert, limit int) (alert.Alerts, error) {
 //				panic("mock out the FindSimilarAlerts method")
 //			},
@@ -540,6 +546,12 @@ type RepositoryMock struct {
 
 	// BindAlertToTicketFunc mocks the BindAlertToTicket method.
 	BindAlertToTicketFunc func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error
+
+	// FindNearestAlertsFunc mocks the FindNearestAlerts method.
+	FindNearestAlertsFunc func(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error)
+
+	// FindNearestTicketsFunc mocks the FindNearestTickets method.
+	FindNearestTicketsFunc func(ctx context.Context, embedding []float32, limit int) ([]*ticket.Ticket, error)
 
 	// FindSimilarAlertsFunc mocks the FindSimilarAlerts method.
 	FindSimilarAlertsFunc func(ctx context.Context, alertMoqParam alert.Alert, limit int) (alert.Alerts, error)
@@ -643,6 +655,24 @@ type RepositoryMock struct {
 			AlertID types.AlertID
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
+		}
+		// FindNearestAlerts holds details about calls to the FindNearestAlerts method.
+		FindNearestAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Embedding is the embedding argument value.
+			Embedding []float32
+			// Limit is the limit argument value.
+			Limit int
+		}
+		// FindNearestTickets holds details about calls to the FindNearestTickets method.
+		FindNearestTickets []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Embedding is the embedding argument value.
+			Embedding []float32
+			// Limit is the limit argument value.
+			Limit int
 		}
 		// FindSimilarAlerts holds details about calls to the FindSimilarAlerts method.
 		FindSimilarAlerts []struct {
@@ -822,6 +852,8 @@ type RepositoryMock struct {
 	lockBatchGetAlerts             sync.RWMutex
 	lockBatchGetTickets            sync.RWMutex
 	lockBindAlertToTicket          sync.RWMutex
+	lockFindNearestAlerts          sync.RWMutex
+	lockFindNearestTickets         sync.RWMutex
 	lockFindSimilarAlerts          sync.RWMutex
 	lockFindSimilarTickets         sync.RWMutex
 	lockGetAlert                   sync.RWMutex
@@ -1010,6 +1042,94 @@ func (mock *RepositoryMock) BindAlertToTicketCalls() []struct {
 	mock.lockBindAlertToTicket.RLock()
 	calls = mock.calls.BindAlertToTicket
 	mock.lockBindAlertToTicket.RUnlock()
+	return calls
+}
+
+// FindNearestAlerts calls FindNearestAlertsFunc.
+func (mock *RepositoryMock) FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error) {
+	callInfo := struct {
+		Ctx       context.Context
+		Embedding []float32
+		Limit     int
+	}{
+		Ctx:       ctx,
+		Embedding: embedding,
+		Limit:     limit,
+	}
+	mock.lockFindNearestAlerts.Lock()
+	mock.calls.FindNearestAlerts = append(mock.calls.FindNearestAlerts, callInfo)
+	mock.lockFindNearestAlerts.Unlock()
+	if mock.FindNearestAlertsFunc == nil {
+		var (
+			alertsOut alert.Alerts
+			errOut    error
+		)
+		return alertsOut, errOut
+	}
+	return mock.FindNearestAlertsFunc(ctx, embedding, limit)
+}
+
+// FindNearestAlertsCalls gets all the calls that were made to FindNearestAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.FindNearestAlertsCalls())
+func (mock *RepositoryMock) FindNearestAlertsCalls() []struct {
+	Ctx       context.Context
+	Embedding []float32
+	Limit     int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		Embedding []float32
+		Limit     int
+	}
+	mock.lockFindNearestAlerts.RLock()
+	calls = mock.calls.FindNearestAlerts
+	mock.lockFindNearestAlerts.RUnlock()
+	return calls
+}
+
+// FindNearestTickets calls FindNearestTicketsFunc.
+func (mock *RepositoryMock) FindNearestTickets(ctx context.Context, embedding []float32, limit int) ([]*ticket.Ticket, error) {
+	callInfo := struct {
+		Ctx       context.Context
+		Embedding []float32
+		Limit     int
+	}{
+		Ctx:       ctx,
+		Embedding: embedding,
+		Limit:     limit,
+	}
+	mock.lockFindNearestTickets.Lock()
+	mock.calls.FindNearestTickets = append(mock.calls.FindNearestTickets, callInfo)
+	mock.lockFindNearestTickets.Unlock()
+	if mock.FindNearestTicketsFunc == nil {
+		var (
+			ticketsOut []*ticket.Ticket
+			errOut     error
+		)
+		return ticketsOut, errOut
+	}
+	return mock.FindNearestTicketsFunc(ctx, embedding, limit)
+}
+
+// FindNearestTicketsCalls gets all the calls that were made to FindNearestTickets.
+// Check the length with:
+//
+//	len(mockedRepository.FindNearestTicketsCalls())
+func (mock *RepositoryMock) FindNearestTicketsCalls() []struct {
+	Ctx       context.Context
+	Embedding []float32
+	Limit     int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		Embedding []float32
+		Limit     int
+	}
+	mock.lockFindNearestTickets.RLock()
+	calls = mock.calls.FindNearestTickets
+	mock.lockFindNearestTickets.RUnlock()
 	return calls
 }
 

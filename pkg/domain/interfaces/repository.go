@@ -19,6 +19,7 @@ type Repository interface {
 	PutTicketComment(ctx context.Context, comment ticket.Comment) error
 	GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
 	FindSimilarTickets(ctx context.Context, ticketID types.TicketID, limit int) ([]*ticket.Ticket, error)
+	FindNearestTickets(ctx context.Context, embedding []float32, limit int) ([]*ticket.Ticket, error)
 
 	BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error
 	BindAlertToTicket(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error
@@ -32,6 +33,7 @@ type Repository interface {
 	GetAlertsBySpan(ctx context.Context, begin, end time.Time) (alert.Alerts, error)
 	BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
 	FindSimilarAlerts(ctx context.Context, alert alert.Alert, limit int) (alert.Alerts, error)
+	FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error)
 
 	// For list management
 	GetAlertList(ctx context.Context, listID types.AlertListID) (*alert.List, error)

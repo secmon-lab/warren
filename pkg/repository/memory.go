@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -26,6 +27,8 @@ type Memory struct {
 	tickets        map[types.TicketID]*ticket.Ticket
 	ticketComments map[types.TicketID][]ticket.Comment
 }
+
+var _ interfaces.Repository = &Memory{}
 
 func NewMemory() *Memory {
 	return &Memory{
@@ -462,4 +465,58 @@ func cosineSimilarity(a, b []float32) float32 {
 		return 0
 	}
 	return dot / (float32(math.Sqrt(float64(normA))) * float32(math.Sqrt(float64(normB))))
+}
+
+func (r *Memory) FindNearestTickets(ctx context.Context, embedding []float32, limit int) ([]*ticket.Ticket, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var tickets []*ticket.Ticket
+	for _, t := range r.tickets {
+		// Only add tickets that have embeddings
+		if len(t.Embedding) > 0 {
+			tickets = append(tickets, t)
+		}
+	}
+
+	// Sort by similarity
+	sort.Slice(tickets, func(i, j int) bool {
+		simI := cosineSimilarity(tickets[i].Embedding, embedding)
+		simJ := cosineSimilarity(tickets[j].Embedding, embedding)
+		return simI > simJ
+	})
+
+	// Apply limit
+	if limit > 0 && limit < len(tickets) {
+		tickets = tickets[:limit]
+	}
+
+	return tickets, nil
+}
+
+func (r *Memory) FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var alerts alert.Alerts
+	for _, a := range r.alerts {
+		// Only add alerts that have embeddings
+		if len(a.Embedding) > 0 {
+			alerts = append(alerts, a)
+		}
+	}
+
+	// Sort by similarity
+	sort.Slice(alerts, func(i, j int) bool {
+		simI := cosineSimilarity(alerts[i].Embedding, embedding)
+		simJ := cosineSimilarity(alerts[j].Embedding, embedding)
+		return simI > simJ
+	})
+
+	// Apply limit
+	if limit > 0 && limit < len(alerts) {
+		alerts = alerts[:limit]
+	}
+
+	return alerts, nil
 }
