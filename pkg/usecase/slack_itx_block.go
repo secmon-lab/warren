@@ -83,7 +83,7 @@ func (uc *UseCases) bindAlert(ctx context.Context, user slack.User, slackThread 
 	}
 
 	target := fmt.Sprintf("alert:%s", targetAlertID)
-	if err := uc.slackService.ShowBindAlertModal(ctx, tickets, triggerID, target); err != nil {
+	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindAlert, tickets, triggerID, target); err != nil {
 		return goerr.Wrap(err, "failed to show bind alert modal")
 	}
 
@@ -91,9 +91,7 @@ func (uc *UseCases) bindAlert(ctx context.Context, user slack.User, slackThread 
 }
 
 func (uc *UseCases) bindList(ctx context.Context, user slack.User, slackThread slack.Thread, targetListID types.AlertListID, triggerID string) error {
-	target := fmt.Sprintf("list:%s", targetListID)
-
-	if err := uc.slackService.ShowBindAlertModal(ctx, []*ticket.Ticket{}, triggerID, target); err != nil {
+	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindList, []*ticket.Ticket{}, triggerID, targetListID.String()); err != nil {
 		return goerr.Wrap(err, "failed to show bind list modal")
 	}
 
@@ -113,6 +111,7 @@ func (uc *UseCases) ackAlert(ctx context.Context, user slack.User, slackThread s
 	newTicket := ticket.New(ctx, []types.AlertID{targetAlert.ID}, &slackThread)
 	newTicket.Assignee = &user
 	newTicket.Status = types.TicketStatusAcknowledged
+	newTicket.Embedding = targetAlert.Embedding
 
 	if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
 		return goerr.Wrap(err, "failed to fill ticket metadata")

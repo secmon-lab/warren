@@ -441,14 +441,23 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //
 //		// make and configure a mocked interfaces.Repository
 //		mockedRepository := &RepositoryMock{
+//			BatchBindAlertsToTicketFunc: func(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
+//				panic("mock out the BatchBindAlertsToTicket method")
+//			},
 //			BatchGetAlertsFunc: func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
 //				panic("mock out the BatchGetAlerts method")
+//			},
+//			BatchGetTicketsFunc: func(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error) {
+//				panic("mock out the BatchGetTickets method")
 //			},
 //			BindAlertToTicketFunc: func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
 //				panic("mock out the BindAlertToTicket method")
 //			},
 //			FindSimilarAlertsFunc: func(ctx context.Context, alertMoqParam alert.Alert, limit int) (alert.Alerts, error) {
 //				panic("mock out the FindSimilarAlerts method")
+//			},
+//			FindSimilarTicketsFunc: func(ctx context.Context, ticketID types.TicketID, limit int) ([]*ticket.Ticket, error) {
+//				panic("mock out the FindSimilarTickets method")
 //			},
 //			GetAlertFunc: func(ctx context.Context, alertID types.AlertID) (*alert.Alert, error) {
 //				panic("mock out the GetAlert method")
@@ -520,14 +529,23 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //
 //	}
 type RepositoryMock struct {
+	// BatchBindAlertsToTicketFunc mocks the BatchBindAlertsToTicket method.
+	BatchBindAlertsToTicketFunc func(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error
+
 	// BatchGetAlertsFunc mocks the BatchGetAlerts method.
 	BatchGetAlertsFunc func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
+
+	// BatchGetTicketsFunc mocks the BatchGetTickets method.
+	BatchGetTicketsFunc func(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error)
 
 	// BindAlertToTicketFunc mocks the BindAlertToTicket method.
 	BindAlertToTicketFunc func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error
 
 	// FindSimilarAlertsFunc mocks the FindSimilarAlerts method.
 	FindSimilarAlertsFunc func(ctx context.Context, alertMoqParam alert.Alert, limit int) (alert.Alerts, error)
+
+	// FindSimilarTicketsFunc mocks the FindSimilarTickets method.
+	FindSimilarTicketsFunc func(ctx context.Context, ticketID types.TicketID, limit int) ([]*ticket.Ticket, error)
 
 	// GetAlertFunc mocks the GetAlert method.
 	GetAlertFunc func(ctx context.Context, alertID types.AlertID) (*alert.Alert, error)
@@ -594,12 +612,28 @@ type RepositoryMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// BatchBindAlertsToTicket holds details about calls to the BatchBindAlertsToTicket method.
+		BatchBindAlertsToTicket []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// AlertIDs is the alertIDs argument value.
+			AlertIDs []types.AlertID
+			// TicketID is the ticketID argument value.
+			TicketID types.TicketID
+		}
 		// BatchGetAlerts holds details about calls to the BatchGetAlerts method.
 		BatchGetAlerts []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// AlertIDs is the alertIDs argument value.
 			AlertIDs []types.AlertID
+		}
+		// BatchGetTickets holds details about calls to the BatchGetTickets method.
+		BatchGetTickets []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TicketIDs is the ticketIDs argument value.
+			TicketIDs []types.TicketID
 		}
 		// BindAlertToTicket holds details about calls to the BindAlertToTicket method.
 		BindAlertToTicket []struct {
@@ -616,6 +650,15 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// AlertMoqParam is the alertMoqParam argument value.
 			AlertMoqParam alert.Alert
+			// Limit is the limit argument value.
+			Limit int
+		}
+		// FindSimilarTickets holds details about calls to the FindSimilarTickets method.
+		FindSimilarTickets []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TicketID is the ticketID argument value.
+			TicketID types.TicketID
 			// Limit is the limit argument value.
 			Limit int
 		}
@@ -775,9 +818,12 @@ type RepositoryMock struct {
 			AlertID types.AlertID
 		}
 	}
+	lockBatchBindAlertsToTicket    sync.RWMutex
 	lockBatchGetAlerts             sync.RWMutex
+	lockBatchGetTickets            sync.RWMutex
 	lockBindAlertToTicket          sync.RWMutex
 	lockFindSimilarAlerts          sync.RWMutex
+	lockFindSimilarTickets         sync.RWMutex
 	lockGetAlert                   sync.RWMutex
 	lockGetAlertByThread           sync.RWMutex
 	lockGetAlertList               sync.RWMutex
@@ -799,6 +845,49 @@ type RepositoryMock struct {
 	lockPutTicketComment           sync.RWMutex
 	lockSearchAlerts               sync.RWMutex
 	lockUnbindAlertFromTicket      sync.RWMutex
+}
+
+// BatchBindAlertsToTicket calls BatchBindAlertsToTicketFunc.
+func (mock *RepositoryMock) BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
+	callInfo := struct {
+		Ctx      context.Context
+		AlertIDs []types.AlertID
+		TicketID types.TicketID
+	}{
+		Ctx:      ctx,
+		AlertIDs: alertIDs,
+		TicketID: ticketID,
+	}
+	mock.lockBatchBindAlertsToTicket.Lock()
+	mock.calls.BatchBindAlertsToTicket = append(mock.calls.BatchBindAlertsToTicket, callInfo)
+	mock.lockBatchBindAlertsToTicket.Unlock()
+	if mock.BatchBindAlertsToTicketFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.BatchBindAlertsToTicketFunc(ctx, alertIDs, ticketID)
+}
+
+// BatchBindAlertsToTicketCalls gets all the calls that were made to BatchBindAlertsToTicket.
+// Check the length with:
+//
+//	len(mockedRepository.BatchBindAlertsToTicketCalls())
+func (mock *RepositoryMock) BatchBindAlertsToTicketCalls() []struct {
+	Ctx      context.Context
+	AlertIDs []types.AlertID
+	TicketID types.TicketID
+} {
+	var calls []struct {
+		Ctx      context.Context
+		AlertIDs []types.AlertID
+		TicketID types.TicketID
+	}
+	mock.lockBatchBindAlertsToTicket.RLock()
+	calls = mock.calls.BatchBindAlertsToTicket
+	mock.lockBatchBindAlertsToTicket.RUnlock()
+	return calls
 }
 
 // BatchGetAlerts calls BatchGetAlertsFunc.
@@ -838,6 +927,46 @@ func (mock *RepositoryMock) BatchGetAlertsCalls() []struct {
 	mock.lockBatchGetAlerts.RLock()
 	calls = mock.calls.BatchGetAlerts
 	mock.lockBatchGetAlerts.RUnlock()
+	return calls
+}
+
+// BatchGetTickets calls BatchGetTicketsFunc.
+func (mock *RepositoryMock) BatchGetTickets(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error) {
+	callInfo := struct {
+		Ctx       context.Context
+		TicketIDs []types.TicketID
+	}{
+		Ctx:       ctx,
+		TicketIDs: ticketIDs,
+	}
+	mock.lockBatchGetTickets.Lock()
+	mock.calls.BatchGetTickets = append(mock.calls.BatchGetTickets, callInfo)
+	mock.lockBatchGetTickets.Unlock()
+	if mock.BatchGetTicketsFunc == nil {
+		var (
+			ticketsOut []*ticket.Ticket
+			errOut     error
+		)
+		return ticketsOut, errOut
+	}
+	return mock.BatchGetTicketsFunc(ctx, ticketIDs)
+}
+
+// BatchGetTicketsCalls gets all the calls that were made to BatchGetTickets.
+// Check the length with:
+//
+//	len(mockedRepository.BatchGetTicketsCalls())
+func (mock *RepositoryMock) BatchGetTicketsCalls() []struct {
+	Ctx       context.Context
+	TicketIDs []types.TicketID
+} {
+	var calls []struct {
+		Ctx       context.Context
+		TicketIDs []types.TicketID
+	}
+	mock.lockBatchGetTickets.RLock()
+	calls = mock.calls.BatchGetTickets
+	mock.lockBatchGetTickets.RUnlock()
 	return calls
 }
 
@@ -925,6 +1054,50 @@ func (mock *RepositoryMock) FindSimilarAlertsCalls() []struct {
 	mock.lockFindSimilarAlerts.RLock()
 	calls = mock.calls.FindSimilarAlerts
 	mock.lockFindSimilarAlerts.RUnlock()
+	return calls
+}
+
+// FindSimilarTickets calls FindSimilarTicketsFunc.
+func (mock *RepositoryMock) FindSimilarTickets(ctx context.Context, ticketID types.TicketID, limit int) ([]*ticket.Ticket, error) {
+	callInfo := struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+		Limit    int
+	}{
+		Ctx:      ctx,
+		TicketID: ticketID,
+		Limit:    limit,
+	}
+	mock.lockFindSimilarTickets.Lock()
+	mock.calls.FindSimilarTickets = append(mock.calls.FindSimilarTickets, callInfo)
+	mock.lockFindSimilarTickets.Unlock()
+	if mock.FindSimilarTicketsFunc == nil {
+		var (
+			ticketsOut []*ticket.Ticket
+			errOut     error
+		)
+		return ticketsOut, errOut
+	}
+	return mock.FindSimilarTicketsFunc(ctx, ticketID, limit)
+}
+
+// FindSimilarTicketsCalls gets all the calls that were made to FindSimilarTickets.
+// Check the length with:
+//
+//	len(mockedRepository.FindSimilarTicketsCalls())
+func (mock *RepositoryMock) FindSimilarTicketsCalls() []struct {
+	Ctx      context.Context
+	TicketID types.TicketID
+	Limit    int
+} {
+	var calls []struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+		Limit    int
+	}
+	mock.lockFindSimilarTickets.RLock()
+	calls = mock.calls.FindSimilarTickets
+	mock.lockFindSimilarTickets.RUnlock()
 	return calls
 }
 

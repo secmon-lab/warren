@@ -405,8 +405,8 @@ func (x *Service) ShowResolveAlertListModal(ctx context.Context, list alert.List
 	return nil
 }
 
-func (x *Service) ShowBindAlertModal(ctx context.Context, tickets []*ticket.Ticket, triggerID string, target string) error {
-	req := buildBindAlertModalViewRequest(ctx, model.CallbackSubmitBindAlert, tickets, target)
+func (x *Service) ShowBindToTicketModal(ctx context.Context, callbackID model.CallbackID, tickets []*ticket.Ticket, triggerID string, metadata string) error {
+	req := buildBindToTicketModalViewRequest(ctx, callbackID, tickets, metadata)
 	if _, err := x.client.OpenView(triggerID, req); err != nil {
 		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
 	}
@@ -415,7 +415,7 @@ func (x *Service) ShowBindAlertModal(ctx context.Context, tickets []*ticket.Tick
 }
 
 func (x *Service) ShowResolveTicketModal(ctx context.Context, ticket *ticket.Ticket, triggerID string) error {
-	req := buildResolveTicketModalViewRequest(ctx, model.CallbackSubmitResolveTicket, ticket)
+	req := buildResolveTicketModalViewRequest(model.CallbackSubmitResolveTicket, ticket)
 	if _, err := x.client.OpenView(triggerID, req); err != nil {
 		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
 	}

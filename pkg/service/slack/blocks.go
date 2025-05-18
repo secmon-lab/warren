@@ -203,7 +203,7 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 	return blocks
 }
 
-func buildBindAlertModalViewRequest(ctx context.Context, callbackID model.CallbackID, tickets []*ticket.Ticket, metadata string) slack.ModalViewRequest {
+func buildBindToTicketModalViewRequest(ctx context.Context, callbackID model.CallbackID, tickets []*ticket.Ticket, metadata string) slack.ModalViewRequest {
 	// Create ticket options for dropdown
 	ticketOptions := make([]*slack.OptionBlockObject, 0, len(tickets))
 	now := clock.Now(ctx)
@@ -236,6 +236,43 @@ func buildBindAlertModalViewRequest(ctx context.Context, callbackID model.Callba
 		)
 	}
 
+	msg := "Please enter a ticket ID."
+	if len(ticketOptions) > 0 {
+		msg = "Please select an existing ticket or enter a ticket ID."
+	}
+
+	blockSet := []slack.Block{
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.PlainTextType, msg, false, false),
+			nil,
+			nil,
+		),
+	}
+
+	if len(ticketOptions) > 0 {
+		blockSet = append(blockSet, slack.NewInputBlock(
+			model.BlockIDTicketSelect.String(),
+			slack.NewTextBlockObject(slack.PlainTextType, "Select Ticket", false, false),
+			slack.NewTextBlockObject(slack.PlainTextType, "Choose a ticket from the list", false, false),
+			slack.NewOptionsSelectBlockElement(
+				slack.OptTypeStatic,
+				slack.NewTextBlockObject(slack.PlainTextType, "Select a ticket", false, false),
+				model.BlockActionIDTicketSelect.String(),
+				ticketOptions...,
+			)).WithOptional(true),
+		)
+	}
+
+	blockSet = append(blockSet, slack.NewInputBlock(
+		model.BlockIDTicketID.String(),
+		slack.NewTextBlockObject(slack.PlainTextType, "Or Enter Ticket ID", false, false),
+		slack.NewTextBlockObject(slack.PlainTextType, "Enter the ticket ID directly", false, false),
+		slack.NewPlainTextInputBlockElement(
+			slack.NewTextBlockObject(slack.PlainTextType, "Enter ticket ID", false, false),
+			model.BlockActionIDTicketID.String(),
+		)).WithOptional(true),
+	)
+
 	return slack.ModalViewRequest{
 		Type: slack.VTModal,
 		Title: &slack.TextBlockObject{
@@ -243,33 +280,7 @@ func buildBindAlertModalViewRequest(ctx context.Context, callbackID model.Callba
 			Text: "Bind Alert to Ticket",
 		},
 		Blocks: slack.Blocks{
-			BlockSet: []slack.Block{
-				slack.NewSectionBlock(
-					slack.NewTextBlockObject(slack.PlainTextType, "Please select a ticket or enter a ticket ID.", false, false),
-					nil,
-					nil,
-				),
-				slack.NewInputBlock(
-					model.BlockIDTicketSelect.String(),
-					slack.NewTextBlockObject(slack.PlainTextType, "Select Ticket", false, false),
-					slack.NewTextBlockObject(slack.PlainTextType, "Choose a ticket from the list", false, false),
-					slack.NewOptionsSelectBlockElement(
-						slack.OptTypeStatic,
-						slack.NewTextBlockObject(slack.PlainTextType, "Select a ticket", false, false),
-						model.BlockActionIDTicketSelect.String(),
-						ticketOptions...,
-					),
-				).WithOptional(true),
-				slack.NewInputBlock(
-					model.BlockIDTicketID.String(),
-					slack.NewTextBlockObject(slack.PlainTextType, "Or Enter Ticket ID", false, false),
-					slack.NewTextBlockObject(slack.PlainTextType, "Enter the ticket ID directly", false, false),
-					slack.NewPlainTextInputBlockElement(
-						slack.NewTextBlockObject(slack.PlainTextType, "Enter ticket ID", false, false),
-						model.BlockActionIDTicketID.String(),
-					),
-				).WithOptional(true),
-			},
+			BlockSet: blockSet,
 		},
 		CallbackID:      callbackID.String(),
 		PrivateMetadata: metadata,
@@ -284,7 +295,7 @@ func buildBindAlertModalViewRequest(ctx context.Context, callbackID model.Callba
 	}
 }
 
-func buildResolveTicketModalViewRequest(ctx context.Context, callbackID model.CallbackID, ticket *ticket.Ticket) slack.ModalViewRequest {
+func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *ticket.Ticket) slack.ModalViewRequest {
 	conclusionOptions := []struct {
 		Conclusion  types.AlertConclusion
 		Label       string
@@ -337,29 +348,29 @@ func buildResolveTicketModalViewRequest(ctx context.Context, callbackID model.Ca
 					nil,
 				),
 				slack.NewInputBlock(
-					model.BlockIDConclusion.String(),
+					model.BlockIDTicketConclusion.String(),
 					slack.NewTextBlockObject(slack.PlainTextType, "Conclusion", false, false),
 					slack.NewTextBlockObject(slack.PlainTextType, "Select the conclusion", false, false),
 					slack.NewOptionsSelectBlockElement(
 						slack.OptTypeStatic,
 						slack.NewTextBlockObject(slack.PlainTextType, "Select a conclusion", false, false),
-						model.ActionIDConclusion.String(),
+						model.BlockActionIDTicketConclusion.String(),
 						conclusionOptionBlocks...,
 					),
 				),
 				slack.NewInputBlock(
-					model.SlackBlockIDComment.String(),
+					model.BlockIDTicketComment.String(),
 					slack.NewTextBlockObject(slack.PlainTextType, "Comment", false, false),
 					slack.NewTextBlockObject(slack.PlainTextType, "Add any reason, context, or information.", false, false),
 					slack.NewPlainTextInputBlockElement(
 						slack.NewTextBlockObject(slack.PlainTextType, "comment", false, false),
-						model.ActionIDComment.String(),
+						model.BlockActionIDTicketComment.String(),
 					),
 				).WithOptional(true),
 			},
 		},
 		CallbackID:      callbackID.String(),
-		PrivateMetadata: metadata,
+		PrivateMetadata: ticket.ID.String(),
 		Submit: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
 			Text: "Resolve",

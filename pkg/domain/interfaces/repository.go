@@ -18,6 +18,7 @@ type Repository interface {
 	GetTicketByThread(ctx context.Context, thread slack.Thread) (*ticket.Ticket, error)
 	PutTicketComment(ctx context.Context, comment ticket.Comment) error
 	GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
+	FindSimilarTickets(ctx context.Context, ticketID types.TicketID, limit int) ([]*ticket.Ticket, error)
 
 	BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error
 	BindAlertToTicket(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error

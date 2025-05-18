@@ -458,3 +458,52 @@ func TestBatchGetTickets(t *testing.T) {
 		testFn(t, repo)
 	})
 }
+
+func TestFindSimilarTickets(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+		tickets := make([]*ticket.Ticket, 10)
+		for i := 0; i < 10; i++ {
+			// Generate random embedding array with 256 dimensions
+			embeddings := make([]float32, 256)
+			for i := range embeddings {
+				embeddings[i] = rand.Float32()
+			}
+			tickets[i] = &ticket.Ticket{
+				ID:        types.NewTicketID(),
+				Embedding: embeddings,
+				CreatedAt: time.Now(),
+			}
+			gt.NoError(t, repo.PutTicket(ctx, *tickets[i]))
+		}
+
+		newEmbedding := make([]float32, 256)
+		for i := range newEmbedding {
+			newEmbedding[i] = tickets[0].Embedding[i]
+		}
+		newEmbedding[0] = 1.0 // Change one value to make it different
+
+		gt.Number(t, cosineSimilarity(tickets[0].Embedding, newEmbedding)).Greater(0.99)
+
+		target := ticket.Ticket{
+			ID:        types.NewTicketID(),
+			Embedding: newEmbedding,
+			CreatedAt: time.Now(),
+		}
+		gt.NoError(t, repo.PutTicket(ctx, target))
+		got, err := repo.FindSimilarTickets(ctx, target.ID, 3)
+		gt.NoError(t, err).Required()
+		gt.Array(t, got).Longer(0).Required()
+		gt.Value(t, got[0].ID).Equal(tickets[0].ID)
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}

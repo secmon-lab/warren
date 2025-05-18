@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -31,6 +32,8 @@ type Ticket struct {
 
 	Finding  *Finding    `json:"finding"`
 	Assignee *slack.User `json:"assignee"`
+
+	Embedding firestore.Vector32 `json:"-"`
 }
 
 type Metadata struct {

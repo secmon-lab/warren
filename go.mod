@@ -3,7 +3,6 @@ module github.com/secmon-lab/warren
 go 1.24.0
 
 require (
-	cloud.google.com/go/aiplatform v1.85.0
 	cloud.google.com/go/bigquery v1.67.0
 	cloud.google.com/go/firestore v1.18.0
 	cloud.google.com/go/storage v1.53.0
@@ -25,13 +24,13 @@ require (
 	golang.org/x/term v0.31.0
 	google.golang.org/api v0.231.0
 	google.golang.org/grpc v1.72.0
-	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
 	cel.dev/expr v0.23.1 // indirect
 	cloud.google.com/go v0.121.0 // indirect
+	cloud.google.com/go/aiplatform v1.85.0 // indirect
 	cloud.google.com/go/auth v0.16.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
@@ -148,6 +147,7 @@ require (
 	google.golang.org/genproto v0.0.0-20250428153025-10db94c68c34 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250428153025-10db94c68c34 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250428153025-10db94c68c34 // indirect
+	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	mvdan.cc/sh/v3 v3.11.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect

@@ -36,8 +36,10 @@ func (id BlockID) String() string {
 }
 
 const (
-	BlockIDTicketSelect BlockID = "ticket_select_block"
-	BlockIDTicketID     BlockID = "ticket_id_block"
+	BlockIDTicketSelect     BlockID = "ticket_select_block"
+	BlockIDTicketID         BlockID = "ticket_id_block"
+	BlockIDTicketConclusion BlockID = "ticket_conclusion_block"
+	BlockIDTicketComment    BlockID = "ticket_comment_block"
 )
 
 // ActionID in block
@@ -48,8 +50,10 @@ func (id BlockActionID) String() string {
 }
 
 const (
-	BlockActionIDTicketSelect BlockActionID = "ticket_select_input"
-	BlockActionIDTicketID     BlockActionID = "ticket_id_input"
+	BlockActionIDTicketSelect     BlockActionID = "ticket_select_input"
+	BlockActionIDTicketID         BlockActionID = "ticket_id_input"
+	BlockActionIDTicketComment    BlockActionID = "ticket_comment_input"
+	BlockActionIDTicketConclusion BlockActionID = "ticket_conclusion_input"
 )
 
 type ActionID string

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"math"
 	"reflect"
 	"sort"
 	"sync"
@@ -341,6 +342,7 @@ func (r *Memory) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (
 	}
 	return alerts, nil
 }
+
 func (r *Memory) FindSimilarAlerts(ctx context.Context, target alert.Alert, limit int) (alert.Alerts, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -410,4 +412,54 @@ func (r *Memory) BatchGetTickets(ctx context.Context, ticketIDs []types.TicketID
 		}
 	}
 	return tickets, nil
+}
+
+func (r *Memory) FindSimilarTickets(ctx context.Context, ticketID types.TicketID, limit int) ([]*ticket.Ticket, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	target, ok := r.tickets[ticketID]
+	if !ok {
+		return nil, goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+	}
+
+	var tickets []*ticket.Ticket
+	for _, t := range r.tickets {
+		// Skip the same ticket
+		if t.ID == target.ID {
+			continue
+		}
+
+		// Only add tickets that have embeddings
+		if len(t.Embedding) > 0 {
+			tickets = append(tickets, t)
+		}
+	}
+
+	// Sort by similarity
+	sort.Slice(tickets, func(i, j int) bool {
+		simI := cosineSimilarity(tickets[i].Embedding, target.Embedding)
+		simJ := cosineSimilarity(tickets[j].Embedding, target.Embedding)
+		return simI > simJ
+	})
+
+	// Apply limit
+	if limit > 0 && limit < len(tickets) {
+		tickets = tickets[:limit]
+	}
+
+	return tickets, nil
+}
+
+func cosineSimilarity(a, b []float32) float32 {
+	var dot, normA, normB float32
+	for i := range a {
+		dot += a[i] * b[i]
+		normA += a[i] * a[i]
+		normB += b[i] * b[i]
+	}
+	if normA == 0 || normB == 0 {
+		return 0
+	}
+	return dot / (float32(math.Sqrt(float64(normA))) * float32(math.Sqrt(float64(normB))))
 }

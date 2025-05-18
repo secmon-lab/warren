@@ -3,11 +3,10 @@ package usecase
 import (
 	"context"
 
+	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
@@ -22,52 +21,45 @@ func (uc *UseCases) HandleSlackInteractionViewSubmission(ctx context.Context, us
 	)
 
 	switch callbackID {
-	case slack.CallbackSubmitResolveAlert:
-		return uc.HandleSlackInteractionViewSubmissionResolveAlert(ctx, user, metadata, values)
-	case slack.CallbackSubmitResolveList:
-		return uc.HandleSlackInteractionViewSubmissionResolveList(ctx, user, metadata, values)
+	case slack.CallbackSubmitResolveTicket:
+		return uc.handleSlackInteractionViewSubmissionResolveTicket(ctx, user, metadata, values)
+	case slack.CallbackSubmitBindAlert:
+		return uc.handleSlackInteractionViewSubmissionBindAlert(ctx, user, metadata, values)
+	case slack.CallbackSubmitBindList:
+		return uc.handleSlackInteractionViewSubmissionBindList(ctx, user, metadata, values)
 	}
 
 	return nil
 }
 
-func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveAlert(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
+func getSlackValue[T ~string](values slack.StateValue, blockID slack.BlockID, actionID slack.BlockActionID) (T, bool) {
+	if block, ok := values[blockID.String()]; ok {
+		if action, ok := block[actionID.String()]; ok {
+			return T(action.Value), true
+		}
+	}
+	return T(""), false
+}
+
+func (uc *UseCases) handleSlackInteractionViewSubmissionBindAlert(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
 	logger := logging.From(ctx)
-	logger.Debug("resolving alert",
+	logger.Debug("binding alert",
 		"user", user,
 		"metadata", metadata,
 		"values", values,
 	)
 
-	alertID := types.AlertID(metadata)
-	target, err := uc.repository.GetAlert(ctx, alertID)
-	if err != nil {
-		msg.Trace(ctx, "💥 Failed to get alert\n> %s", err.Error())
-		return goerr.Wrap(err, "failed to get alert")
-	}
-	if target == nil {
-		msg.Notify(ctx, "💥 Alert not found")
-		return nil
+	ticketID, ok := getSlackValue[types.TicketID](values, slack.BlockIDTicketID, slack.BlockActionIDTicketID)
+	if !ok {
+		return goerr.New("ticket ID not found")
 	}
 
-	if target.SlackThread != nil {
-		st := uc.slackService.NewThread(*target.SlackThread)
-		ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
-	}
-
-	if err := uc.handleSlackInteractionViewSubmissionResolve(ctx, user, values, alert.Alerts{target}); err != nil {
-		msg.Trace(ctx, "💥 Failed to resolve alert\n> %s", err.Error())
-		logger.Error("failed to resolve alert", "error", err)
-		return err
-	}
-
-	return nil
+	return uc.handleBindAlerts(ctx, user, types.TicketID(ticketID), []types.AlertID{types.AlertID(metadata)})
 }
 
-// HandleSlackInteractionViewSubmissionResolveList handles a slack interaction view submission for "resolving an alert list".
-func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
+func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
 	logger := logging.From(ctx)
-	logger.Debug("resolving alert list",
+	logger.Debug("binding list",
 		"user", user,
 		"metadata", metadata,
 		"values", values,
@@ -82,79 +74,175 @@ func (uc *UseCases) HandleSlackInteractionViewSubmissionResolveList(ctx context.
 		return goerr.Wrap(err, "alert list not found", goerr.V("list_id", listID))
 	}
 
-	if list.SlackThread != nil {
-		st := uc.slackService.NewThread(*list.SlackThread)
-		ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
+	ticketID, ok := getSlackValue[types.TicketID](values, slack.BlockIDTicketID, slack.BlockActionIDTicketID)
+	if !ok {
+		return goerr.New("ticket ID not found")
 	}
 
-	alerts, err := uc.repository.BatchGetAlerts(ctx, list.AlertIDs)
+	return uc.handleBindAlerts(ctx, user, ticketID, list.AlertIDs)
+}
+
+func (uc *UseCases) handleBindAlerts(ctx context.Context, user slack.User, ticketID types.TicketID, alertIDs []types.AlertID) error {
+	logger := logging.From(ctx)
+	logger.Debug("binding alerts",
+		"user", user,
+		"ticket_id", ticketID,
+		"alert_ids", alertIDs,
+	)
+
+	ticket, err := uc.repository.GetTicket(ctx, ticketID)
 	if err != nil {
-		msg.Trace(ctx, "💥 Failed to get alerts\n> %s", err.Error())
-		return goerr.Wrap(err, "failed to get alerts")
+		return goerr.Wrap(err, "failed to get ticket", goerr.V("ticket_id", ticketID))
+	}
+	if ticket == nil {
+		return goerr.Wrap(err, "ticket not found", goerr.V("ticket_id", ticketID))
 	}
 
-	if err := uc.handleSlackInteractionViewSubmissionResolve(ctx, user, values, alerts); err != nil {
-		msg.Trace(ctx, "💥 Failed to resolve alerts of list\n> %s", err.Error())
-		return goerr.Wrap(err, "failed to resolve alerts")
+	alerts, err := uc.repository.BatchGetAlerts(ctx, alertIDs)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alerts", goerr.V("alert_ids", alertIDs))
 	}
+
+	ticket.AlertIDs = unifyAlertIDs(ticket.AlertIDs, alertIDs)
+	for _, alert := range alerts {
+		ticket.AlertIDs = append(ticket.AlertIDs, alert.ID)
+	}
+
+	embeddings := make([]firestore.Vector32, len(alerts))
+	for i, alert := range alerts {
+		embeddings[i] = alert.Embedding
+	}
+	ticket.Embedding = averageEmbeddings(embeddings)
+
+	// Update database
+	if err := uc.repository.BatchBindAlertsToTicket(ctx, ticket.AlertIDs, ticketID); err != nil {
+		return goerr.Wrap(err, "failed to bind alerts to ticket", goerr.V("ticket_id", ticketID), goerr.V("new_alert_ids", ticket.AlertIDs))
+	}
+
+	if err := uc.repository.PutTicket(ctx, *ticket); err != nil {
+		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID))
+	}
+
+	// Update slack view
+	st := uc.slackService.NewThread(*ticket.SlackThread)
+
+	if _, err := st.PostTicket(ctx, *ticket, alerts); err != nil {
+		return goerr.Wrap(err, "failed to update slack thread")
+	}
+
+	for _, alert := range alerts {
+		if alert.SlackThread != nil {
+			st := uc.slackService.NewThread(*alert.SlackThread)
+			if err := st.UpdateAlert(ctx, *alert); err != nil {
+				return goerr.Wrap(err, "failed to update slack thread")
+			}
+		}
+	}
+
+	msg.Notify(ctx, "🎉 Alert bound to ticket")
 
 	return nil
 }
 
-func (uc *UseCases) handleSlackInteractionViewSubmissionResolve(ctx context.Context, user slack.User, values slack.StateValue, alerts alert.Alerts) error {
+func unifyAlertIDs(oldAlertIDs, newAlertIDs []types.AlertID) []types.AlertID {
+	// Create a map to eliminate duplicates
+	idMap := make(map[types.AlertID]struct{})
+
+	// Add old IDs to the map
+	for _, id := range oldAlertIDs {
+		idMap[id] = struct{}{}
+	}
+
+	// Add new IDs to the map
+	for _, id := range newAlertIDs {
+		idMap[id] = struct{}{}
+	}
+
+	// Create a slice from the map
+	unified := make([]types.AlertID, 0, len(idMap))
+	for id := range idMap {
+		unified = append(unified, id)
+	}
+
+	return unified
+}
+
+func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
 	logger := logging.From(ctx)
-	ctx = msg.NewTrace(ctx, "⏳ Resolving %d alerts...", len(alerts))
-	logger.Info("resolving alerts", "alerts", alerts)
-
-	var (
-		conclusion types.AlertConclusion
-		reason     string
+	logger.Debug("resolving alert",
+		"user", user,
+		"metadata", metadata,
+		"values", values,
 	)
-	if conclusionBlock, ok := values[slack.SlackBlockIDConclusion.String()]; ok {
-		if conclusionAction, ok := conclusionBlock[slack.ActionIDConclusion.String()]; ok {
-			conclusion = types.AlertConclusion(conclusionAction.SelectedOption.Value)
-		}
-	}
-	if commentBlock, ok := values[slack.SlackBlockIDComment.String()]; ok {
-		if commentAction, ok := commentBlock[slack.ActionIDComment.String()]; ok {
-			reason = commentAction.Value
-		}
-	}
 
-	if err := conclusion.Validate(); err != nil {
-		return goerr.Wrap(err, "invalid conclusion", goerr.V("conclusion", conclusion))
+	ticketID := types.TicketID(metadata)
+	target, err := uc.repository.GetTicket(ctx, ticketID)
+	if err != nil {
+		msg.Trace(ctx, "💥 Failed to get ticket\n> %s", err.Error())
+		return goerr.Wrap(err, "failed to get ticket")
+	}
+	if target == nil {
+		msg.Notify(ctx, "💥 Ticket not found")
+		return nil
 	}
 
-	now := clock.Now(ctx)
-	for i, alert := range alerts {
-		if i > 0 && i%25 == 0 {
-			msg.Trace(ctx, "🏃 Resolving %d/%d alerts...", i+1, len(alerts))
-		}
+	st := uc.slackService.NewThread(*target.SlackThread)
+	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
 
-		alert.Status = types.AlertStatusResolved
-		alert.ResolvedAt = &now
-		alert.Conclusion = conclusion
-		alert.Reason = reason
-		if alert.Assignee == nil {
-			alert.Assignee = &user
-		}
-
-		if err := uc.repository.PutAlert(ctx, *alert); err != nil {
-			return goerr.Wrap(err, "failed to put alert")
-		}
-
-		st := uc.slackService.NewThread(*alert.SlackThread)
-		newCtx := msg.With(ctx, st.Reply, st.NewStateFunc)
-		msg.Notify(newCtx, "Alert resolved by <@%s>", user.ID)
-
-		logger.Info("alert resolved", "alert", alert)
-
-		if err := st.UpdateAlert(newCtx, *alert); err != nil {
-			return goerr.Wrap(err, "failed to update slack thread")
-		}
+	conclusion, ok := getSlackValue[types.AlertConclusion](values,
+		slack.BlockIDTicketConclusion,
+		slack.BlockActionIDTicketConclusion,
+	)
+	if !ok {
+		return goerr.New("conclusion not found")
 	}
 
-	msg.Trace(ctx, "✅️ Resolved %d alerts", len(alerts))
+	reason, ok := getSlackValue[string](values,
+		slack.BlockIDTicketComment,
+		slack.BlockActionIDTicketComment,
+	)
+	if !ok {
+		return goerr.New("reason not found")
+	}
+
+	target.Conclusion = conclusion
+	target.Reason = reason
+
+	if err := uc.repository.PutTicket(ctx, *target); err != nil {
+		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID))
+	}
+
+	if _, err := st.PostTicket(ctx, *target, nil); err != nil {
+		return goerr.Wrap(err, "failed to update slack thread")
+	}
+
+	msg.Notify(ctx, "🎉 Ticket resolved")
 
 	return nil
+}
+
+func averageEmbeddings(embeddings []firestore.Vector32) firestore.Vector32 {
+	if len(embeddings) == 0 {
+		return firestore.Vector32{}
+	}
+
+	// Get dimension from first embedding
+	dim := len(embeddings[0])
+	sum := make([]float32, dim)
+
+	// Sum up all embeddings
+	for _, embedding := range embeddings {
+		for i := 0; i < dim; i++ {
+			sum[i] += embedding[i]
+		}
+	}
+
+	// Calculate average
+	avg := make([]float32, dim)
+	n := float32(len(embeddings))
+	for i := 0; i < dim; i++ {
+		avg[i] = sum[i] / n
+	}
+
+	return avg
 }

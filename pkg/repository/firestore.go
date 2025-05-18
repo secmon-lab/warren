@@ -644,3 +644,64 @@ func (r *Firestore) BatchGetTickets(ctx context.Context, ticketIDs []types.Ticke
 
 	return tickets, nil
 }
+
+func (r *Firestore) FindSimilarTickets(ctx context.Context, ticketID types.TicketID, limit int) ([]*ticket.Ticket, error) {
+	// Get target ticket
+	targetDoc := r.db.Collection(collectionTickets).Doc(ticketID.String())
+	targetSnapshot, err := targetDoc.Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+		}
+		return nil, goerr.Wrap(err, "failed to get ticket", goerr.V("ticket_id", ticketID))
+	}
+
+	var target ticket.Ticket
+	if err := targetSnapshot.DataTo(&target); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert data to ticket", goerr.V("ticket_id", ticketID))
+	}
+
+	// Build vector search query
+	query := r.db.Collection(collectionTickets).
+		FindNearest("Embedding",
+			target.Embedding,
+			limit+1, // Add 1 to exclude target itself
+			firestore.DistanceMeasureEuclidean,
+			&firestore.FindNearestOptions{
+				DistanceResultField: "vector_distance",
+			})
+
+	iter := query.Documents(ctx)
+	var tickets []*ticket.Ticket
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next ticket")
+		}
+
+		var t ticket.Ticket
+		if err := doc.DataTo(&t); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		// Exclude the same ticket
+		if t.ID == target.ID {
+			continue
+		}
+
+		// Only add tickets that have embeddings
+		if len(t.Embedding) > 0 {
+			tickets = append(tickets, &t)
+		}
+	}
+
+	// Apply limit
+	if limit > 0 && limit < len(tickets) {
+		tickets = tickets[:limit]
+	}
+
+	return tickets, nil
+}
