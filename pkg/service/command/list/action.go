@@ -3,7 +3,6 @@ package list
 import (
 	"context"
 	"encoding/json"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -117,15 +116,6 @@ func actionOffset(args []string) (actionFunc, error) {
 		}
 		return alerts[offset:], nil
 	}, nil
-}
-
-func parseSlackID(user string) string {
-	re := regexp.MustCompile(`<@U[A-Z0-9]+>`)
-	matches := re.FindStringSubmatch(user)
-	if len(matches) > 0 {
-		return matches[0]
-	}
-	return ""
 }
 
 func actionGrep(args []string) (actionFunc, error) {
