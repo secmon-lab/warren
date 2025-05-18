@@ -142,6 +142,10 @@ func (x *Base) Run(ctx context.Context, name string, args map[string]any) (map[s
 		return x.getAlerts(ctx, args)
 	case "base.alert.search":
 		return x.searchAlerts(ctx, args)
+		/* TODO:
+		case "base.alert.similar":
+			return x.getSimilarAlerts(ctx, args)
+		*/
 	case "base.policy.list":
 		return x.listPolicies(ctx, args)
 	case "base.policy.get":

@@ -83,9 +83,8 @@ func TestBase_Specs(t *testing.T) {
 
 	specs, err := base.Specs(context.Background())
 	gt.NoError(t, err)
-	gt.A(t, specs).Length(2) // 2つのツール仕様があることを確認
+	gt.A(t, specs).Length(4)
 
-	// 各ツールの仕様を確認
 	for _, spec := range specs {
 		switch spec.Name {
 		case "base.alerts.get":

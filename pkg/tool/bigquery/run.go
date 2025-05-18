@@ -229,13 +229,13 @@ func (x *Action) listDatasets() (map[string]any, error) {
 		return nil, goerr.Wrap(err, "failed to marshal config to JSON")
 	}
 
-	var result map[string]any
+	var result []map[string]any
 	if err := json.Unmarshal(jsonData, &result); err != nil {
 		return nil, goerr.Wrap(err, "failed to unmarshal config from JSON")
 	}
 
 	return map[string]any{
-		"datasets": result["datasets"],
+		"config": result,
 	}, nil
 }
 
@@ -249,13 +249,18 @@ func (x *Action) executeQuery(ctx context.Context, client *bigquery.Client, quer
 
 	// Perform dry run to check scan size
 	q.DryRun = true
+
 	job, err := q.Run(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to dry run query")
 	}
+
 	status, err := job.Wait(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to wait for dry run job")
+	}
+	if err := status.Err(); err != nil {
+		return nil, goerr.Wrap(err, "dry run job failed")
 	}
 	if uint64(status.Statistics.TotalBytesProcessed) > x.scanLimit {
 		return nil, goerr.New("query scan size exceeds limit",
@@ -403,12 +408,14 @@ func (x *Action) getTableSchema(ctx context.Context, projectID, datasetID, table
 		return nil, goerr.Wrap(err, "failed to marshal schema to JSON")
 	}
 
-	var result map[string]any
+	var result []map[string]any
 	if err := json.Unmarshal(schemaJSON, &result); err != nil {
 		return nil, goerr.Wrap(err, "failed to unmarshal schema from JSON")
 	}
 
-	return result, nil
+	return map[string]any{
+		"schema": result,
+	}, nil
 }
 
 func (x *Action) LogValue() slog.Value {

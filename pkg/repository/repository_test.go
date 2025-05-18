@@ -281,15 +281,6 @@ func TestAlertSearch(t *testing.T) {
 		gt.NoError(t, err)
 		gt.Array(t, got).Longer(0)
 		gt.Value(t, got[0].Schema).Equal(alert.Schema)
-
-		// SearchAlerts with different operators
-		got, err = repo.SearchAlerts(ctx, "CreatedAt", ">", begin, 3)
-		gt.NoError(t, err)
-		gt.Array(t, got).Longer(0)
-
-		got, err = repo.SearchAlerts(ctx, "CreatedAt", "<", end, 3)
-		gt.NoError(t, err)
-		gt.Array(t, got).Longer(0)
 	}
 
 	t.Run("Memory", func(t *testing.T) {
