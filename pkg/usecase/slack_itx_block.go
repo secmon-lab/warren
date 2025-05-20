@@ -2,9 +2,9 @@ package usecase
 
 import (
 	"context"
-	"fmt"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -28,71 +28,13 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user
 		return uc.ackList(ctx, user, slackThread, types.AlertListID(value))
 
 	case slack.ActionIDBindAlert:
-		return uc.bindAlert(ctx, user, slackThread, types.AlertID(value), triggerID)
+		return uc.bindAlert(ctx, types.AlertID(value), triggerID)
 
 	case slack.ActionIDBindList:
 		return uc.bindList(ctx, user, slackThread, types.AlertListID(value), triggerID)
 
 	case slack.ActionIDResolveTicket:
 		return uc.resolveTicket(ctx, user, slackThread, types.TicketID(value), triggerID)
-	}
-
-	return nil
-}
-
-func (uc *UseCases) resolveTicket(ctx context.Context, user slack.User, slackThread slack.Thread, targetTicketID types.TicketID, triggerID string) error {
-	ticket, err := uc.repository.GetTicket(ctx, targetTicketID)
-	if err != nil {
-		return goerr.Wrap(err, "failed to get ticket")
-	} else if ticket == nil {
-		return goerr.New("ticket not found", goerr.V("ticket_id", targetTicketID))
-	}
-
-	if err := uc.slackService.ShowResolveTicketModal(ctx, ticket, triggerID); err != nil {
-		return goerr.Wrap(err, "failed to show resolve ticket modal")
-	}
-
-	return nil
-}
-
-func (uc *UseCases) bindAlert(ctx context.Context, user slack.User, slackThread slack.Thread, targetAlertID types.AlertID, triggerID string) error {
-	targetAlert, err := uc.repository.GetAlert(ctx, targetAlertID)
-	if err != nil {
-		return goerr.Wrap(err, "failed to get alert")
-	} else if targetAlert == nil {
-		return goerr.New("alert not found")
-	}
-
-	alerts, err := uc.repository.FindSimilarAlerts(ctx, *targetAlert, 10)
-	if err != nil {
-		return goerr.Wrap(err, "failed to find similar alerts")
-	}
-
-	var similarAlertTicketIDs []types.TicketID
-	now := clock.Now(ctx)
-	for _, alert := range alerts {
-		if alert.CreatedAt.Before(now.Add(-72 * time.Hour)) {
-			continue
-		}
-		similarAlertTicketIDs = append(similarAlertTicketIDs, alert.TicketID)
-	}
-
-	tickets, err := uc.repository.BatchGetTickets(ctx, similarAlertTicketIDs)
-	if err != nil {
-		return goerr.Wrap(err, "failed to get tickets by alert")
-	}
-
-	target := fmt.Sprintf("alert:%s", targetAlertID)
-	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindAlert, tickets, triggerID, target); err != nil {
-		return goerr.Wrap(err, "failed to show bind alert modal")
-	}
-
-	return nil
-}
-
-func (uc *UseCases) bindList(ctx context.Context, user slack.User, slackThread slack.Thread, targetListID types.AlertListID, triggerID string) error {
-	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindList, []*ticket.Ticket{}, triggerID, targetListID.String()); err != nil {
-		return goerr.Wrap(err, "failed to show bind list modal")
 	}
 
 	return nil
@@ -157,9 +99,20 @@ func (uc *UseCases) ackList(ctx context.Context, user slack.User, slackThread sl
 		alertIDs[i] = alert.ID
 	}
 
+	alerts, err := uc.repository.BatchGetAlerts(ctx, alertIDs)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alerts")
+	}
+
 	newTicket := ticket.New(ctx, alertIDs, &slackThread)
 	newTicket.Assignee = &user
 	newTicket.Status = types.TicketStatusAcknowledged
+
+	var alertEmbeddings []firestore.Vector32
+	for _, alert := range alerts {
+		alertEmbeddings = append(alertEmbeddings, alert.Embedding)
+	}
+	newTicket.Embedding = averageEmbeddings(alertEmbeddings)
 
 	if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
 		return goerr.Wrap(err, "failed to fill ticket metadata")
@@ -182,5 +135,57 @@ func (uc *UseCases) ackList(ctx context.Context, user slack.User, slackThread sl
 	}
 
 	msg.Trace(ctx, "🎫 Alert list acknowledged by <@%s>", user.ID)
+	return nil
+}
+
+func (uc *UseCases) bindAlert(ctx context.Context, targetAlertID types.AlertID, triggerID string) error {
+	targetAlert, err := uc.repository.GetAlert(ctx, targetAlertID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alert")
+	} else if targetAlert == nil {
+		return goerr.New("alert not found")
+	}
+
+	nearestTickets, err := uc.repository.FindNearestTickets(ctx, targetAlert.Embedding, 10)
+	if err != nil {
+		return goerr.Wrap(err, "failed to find similar tickets")
+	}
+
+	var tickets []*ticket.Ticket
+	now := clock.Now(ctx)
+	for _, ticket := range nearestTickets {
+		if ticket.CreatedAt.Before(now.Add(-72 * time.Hour)) {
+			continue
+		}
+		tickets = append(tickets, ticket)
+	}
+
+	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindAlert, tickets, triggerID, targetAlertID.String()); err != nil {
+		return goerr.Wrap(err, "failed to show bind alert modal")
+	}
+
+	return nil
+}
+
+func (uc *UseCases) bindList(ctx context.Context, user slack.User, slackThread slack.Thread, targetListID types.AlertListID, triggerID string) error {
+	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindList, []*ticket.Ticket{}, triggerID, targetListID.String()); err != nil {
+		return goerr.Wrap(err, "failed to show bind list modal")
+	}
+
+	return nil
+}
+
+func (uc *UseCases) resolveTicket(ctx context.Context, user slack.User, slackThread slack.Thread, targetTicketID types.TicketID, triggerID string) error {
+	ticket, err := uc.repository.GetTicket(ctx, targetTicketID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get ticket")
+	} else if ticket == nil {
+		return goerr.New("ticket not found", goerr.V("ticket_id", targetTicketID))
+	}
+
+	if err := uc.slackService.ShowResolveTicketModal(ctx, ticket, triggerID); err != nil {
+		return goerr.Wrap(err, "failed to show resolve ticket modal")
+	}
+
 	return nil
 }

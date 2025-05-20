@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
+	"google.golang.org/api/impersonate"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -24,6 +25,19 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	var opts []option.ClientOption
 	if x.credentials != "" {
 		opts = append(opts, option.WithCredentialsFile(x.credentials))
+	}
+	if x.impersonateServiceAccount != "" {
+		ts, err := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
+			TargetPrincipal: x.impersonateServiceAccount,
+			Scopes: []string{
+				"https://www.googleapis.com/auth/bigquery",
+				"https://www.googleapis.com/auth/cloud-platform",
+			},
+		})
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to create impersonated credentials")
+		}
+		opts = append(opts, option.WithTokenSource(ts))
 	}
 
 	client, err := bigquery.NewClient(ctx, x.projectID, opts...)

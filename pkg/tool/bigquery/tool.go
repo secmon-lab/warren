@@ -17,15 +17,16 @@ import (
 )
 
 type Action struct {
-	projectID     string
-	credentials   string
-	configFiles   []string
-	storageBucket string
-	storagePrefix string
-	timeout       time.Duration
-	scanLimitStr  string
-	scanLimit     uint64
-	configs       []*Config
+	projectID                 string
+	impersonateServiceAccount string
+	credentials               string
+	configFiles               []string
+	storageBucket             string
+	storagePrefix             string
+	timeout                   time.Duration
+	scanLimitStr              string
+	scanLimit                 uint64
+	configs                   []*Config
 }
 
 var _ interfaces.Tool = &Action{}
@@ -72,6 +73,13 @@ func (x *Action) Flags() []cli.Flag {
 			Destination: &x.credentials,
 			Category:    "Tool",
 			Sources:     cli.EnvVars("WARREN_BIGQUERY_CREDENTIALS"),
+		},
+		&cli.StringFlag{
+			Name:        "bigquery-impersonate-service-account",
+			Usage:       "Service account email for impersonation",
+			Destination: &x.impersonateServiceAccount,
+			Category:    "Tool",
+			Sources:     cli.EnvVars("WARREN_BIGQUERY_IMPERSONATE_SERVICE_ACCOUNT"),
 		},
 		&cli.StringSliceFlag{
 			Name:        "bigquery-config",
