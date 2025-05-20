@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"html/template"
+	"text/template"
 
 	"github.com/m-mizutani/goerr/v2"
 )

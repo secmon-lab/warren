@@ -16,6 +16,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 const (
@@ -86,6 +87,8 @@ func (x *Alert) CosineSimilarity(other []float32) float64 {
 var alertMetaPrompt string
 
 func (x *Alert) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) error {
+	logger := logging.From(ctx)
+	logger.Info("fill metadata", "alert", x.Data)
 	prompt, err := prompt.Generate(ctx, alertMetaPrompt, map[string]any{
 		"alert":  x.Data,
 		"schema": prompt.ToSchema(Metadata{}),
