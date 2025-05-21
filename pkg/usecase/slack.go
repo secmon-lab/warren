@@ -46,7 +46,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg *slack.M
 			return goerr.Wrap(err, "failed to create or get session")
 		}
 
-		input := uc.buildHandlePromptInput(ctx, ssn, mention.Message)
+		input := uc.buildHandlePromptInput(ssn, mention.Message)
 		return handlePrompt(ctx, input)
 	}
 
@@ -69,16 +69,16 @@ func messageToArgs(message string) (string, string) {
 }
 
 /*
-func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack_svc.ThreadService, user slack.User, alertIDs []types.AlertID, message string) error {
+func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack.Thread, user slack.User, alertIDs []types.AlertID, message string) error {
 	command, remaining := messageToArgs(message)
 	if command == "" {
 		return errUnknownCommand
 	}
 
 	switch command {
-	case "aggr", "aggregate":
-		if err := aggr.Run(ctx, uc.repository, th, uc.llmClient, user, alertIDs, remaining); err != nil {
-			return goerr.Wrap(err, "failed to run aggregate command")
+	case "resolve":
+		if err := uc.resolveTicket(ctx, user, th, remaining); err != nil {
+			return goerr.Wrap(err, "failed to run resolve command")
 		}
 		return nil
 
@@ -109,7 +109,7 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.
 		if err != nil {
 			return goerr.Wrap(err, "failed to create or get session")
 		}
-		input := uc.buildHandlePromptInput(ctx, ssn, remaining)
+		input := uc.buildHandlePromptInput(ssn, remaining)
 		return handlePrompt(ctx, input)
 
 	default:
@@ -129,7 +129,7 @@ type handlePromptInput struct {
 	PolicyClient  interfaces.PolicyClient
 }
 
-func (uc *UseCases) buildHandlePromptInput(ctx context.Context, ssn *session.Session, p string) handlePromptInput {
+func (uc *UseCases) buildHandlePromptInput(ssn *session.Session, p string) handlePromptInput {
 	return handlePromptInput{
 		Session:       ssn,
 		Prompt:        p,

@@ -34,7 +34,7 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user
 		return uc.bindList(ctx, user, slackThread, types.AlertListID(value), triggerID)
 
 	case slack.ActionIDResolveTicket:
-		return uc.resolveTicket(ctx, user, slackThread, types.TicketID(value), triggerID)
+		return uc.showResolveTicketModal(ctx, user, slackThread, types.TicketID(value), triggerID)
 	}
 
 	return nil
@@ -175,7 +175,7 @@ func (uc *UseCases) bindList(ctx context.Context, user slack.User, slackThread s
 	return nil
 }
 
-func (uc *UseCases) resolveTicket(ctx context.Context, user slack.User, slackThread slack.Thread, targetTicketID types.TicketID, triggerID string) error {
+func (uc *UseCases) showResolveTicketModal(ctx context.Context, user slack.User, slackThread slack.Thread, targetTicketID types.TicketID, triggerID string) error {
 	ticket, err := uc.repository.GetTicket(ctx, targetTicketID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get ticket")
