@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
@@ -189,6 +191,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 	st := uc.slackService.NewThread(*target.SlackThread)
 	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
 
+	json.NewEncoder(os.Stdout).Encode(values)
 	conclusion, ok := getSlackValue[types.AlertConclusion](values,
 		slack.BlockIDTicketConclusion,
 		slack.BlockActionIDTicketConclusion,
@@ -207,6 +210,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 
 	target.Conclusion = conclusion
 	target.Reason = reason
+	target.Status = types.TicketStatusResolved
 
 	if err := uc.repository.PutTicket(ctx, *target); err != nil {
 		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID))

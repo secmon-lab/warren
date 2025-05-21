@@ -9,6 +9,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/source"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	svc "github.com/secmon-lab/warren/pkg/service/slack"
 
@@ -38,7 +39,7 @@ func filterEmptyStrings(s []string) []string {
 	var result []string
 	for _, str := range s {
 		if str != "" {
-			result = append(result, str)
+			result = append(result, strings.TrimSpace(str))
 		}
 	}
 	return result
@@ -53,17 +54,9 @@ func (x *Service) Run(ctx context.Context, th *svc.ThreadService, user *slack.Us
 
 	ctx = msg.NewTrace(ctx, "🤖 Creating alert list...")
 
-	args := strings.Split(commands[0], " ")
-	args = filterEmptyStrings(args)
-	src, err := parseArgsToSource(ctx, args)
-	if err != nil {
-		msg.Trace(ctx, "💥 Error: %s", err)
-		showHelp(ctx)
-		return types.EmptyAlertListID, err
-	}
-
 	nextCommands := commands[1:]
 	var pipeline *pipeline
+	var err error
 	if len(nextCommands) > 0 {
 		pipelineCommands := [][]string{}
 		for _, command := range nextCommands {
@@ -81,9 +74,9 @@ func (x *Service) Run(ctx context.Context, th *svc.ThreadService, user *slack.Us
 		}
 	}
 
-	alerts, err := src(ctx, x.repo)
+	alerts, err := source.Unbound()(ctx, x.repo)
 	if err != nil {
-		msg.Trace(ctx, "💥 Get alerts: %s", err)
+		msg.Trace(ctx, "💥 Get alerts without ticket: %s", err)
 		return types.EmptyAlertListID, err
 	}
 
