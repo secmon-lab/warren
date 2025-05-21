@@ -57,6 +57,14 @@ func (x *List) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) err
 		)
 	}
 
+	if len(x.Alerts) == 0 {
+		x.Metadata = Metadata{
+			Title:       "(no alerts)",
+			Description: "",
+		}
+		return nil
+	}
+
 	summary, err := llm.Summary(ctx, llmClient, listSummaryPrompt, x.Alerts)
 	if err != nil {
 		return err

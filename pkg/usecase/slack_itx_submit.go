@@ -2,8 +2,6 @@ package usecase
 
 import (
 	"context"
-	"encoding/json"
-	"os"
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
@@ -191,7 +189,6 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 	st := uc.slackService.NewThread(*target.SlackThread)
 	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
 
-	json.NewEncoder(os.Stdout).Encode(values)
 	conclusion, ok := getSlackValue[types.AlertConclusion](values,
 		slack.BlockIDTicketConclusion,
 		slack.BlockActionIDTicketConclusion,
