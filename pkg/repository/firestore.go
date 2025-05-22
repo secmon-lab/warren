@@ -472,7 +472,7 @@ func (r *Firestore) UnbindAlertFromTicket(ctx context.Context, alertID types.Ale
 }
 
 func (r *Firestore) GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, error) {
-	iter := r.db.Collection(collectionAlerts).Where("TicketID", "==", nil).Documents(ctx)
+	iter := r.db.Collection(collectionAlerts).Where("TicketID", "==", "").Documents(ctx)
 
 	var alerts alert.Alerts
 	for {

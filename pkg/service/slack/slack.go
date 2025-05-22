@@ -143,6 +143,14 @@ type ThreadService struct {
 func (x *ThreadService) ChannelID() string { return x.channelID }
 func (x *ThreadService) ThreadID() string  { return x.threadID }
 
+func (x *ThreadService) Entity() *model.Thread {
+	return &model.Thread{
+		ChannelID: x.channelID,
+		ThreadID:  x.threadID,
+		TeamID:    x.teamID,
+	}
+}
+
 func (x *ThreadService) UpdateAlert(ctx context.Context, alert alert.Alert) error {
 	blocks := buildAlertBlocks(alert)
 
