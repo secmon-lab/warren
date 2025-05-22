@@ -2,8 +2,6 @@ package usecase
 
 import (
 	"context"
-	"encoding/json"
-	"os"
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
@@ -53,8 +51,6 @@ func getSlackSelectValue[T ~string](values slack.StateValue, blockID slack.Block
 }
 
 func getTicketID(values slack.StateValue) (types.TicketID, error) {
-	json.NewEncoder(os.Stdout).Encode(values)
-
 	inputTicketID, ok := getSlackValue[types.TicketID](values, slack.BlockIDTicketID, slack.BlockActionIDTicketID)
 	if !ok {
 		return "", goerr.New("ticket ID not found (invalid schema)", goerr.V("values", values))

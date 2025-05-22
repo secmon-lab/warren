@@ -35,16 +35,6 @@ func showHelp(ctx context.Context) {
 	msg.Notify(ctx, "%s", helpMessage)
 }
 
-func filterEmptyStrings(s []string) []string {
-	var result []string
-	for _, str := range s {
-		if str != "" {
-			result = append(result, strings.TrimSpace(str))
-		}
-	}
-	return result
-}
-
 func (x *Service) Run(ctx context.Context, th *svc.ThreadService, user *slack.User, input string) (types.AlertListID, error) {
 	commands := strings.Split(input, "|")
 	pipelineCommands := [][]string{}

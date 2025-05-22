@@ -2,9 +2,7 @@ package slack
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -297,8 +295,6 @@ func buildBindToTicketModalViewRequest(ctx context.Context, callbackID model.Cal
 			model.BlockActionIDTicketID.String(),
 		)).WithOptional(true),
 	)
-
-	json.NewEncoder(os.Stdout).Encode(blockSet)
 
 	return slack.ModalViewRequest{
 		Type: slack.VTModal,
