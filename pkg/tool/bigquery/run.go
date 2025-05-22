@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
+	"google.golang.org/api/impersonate"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -24,6 +25,19 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	var opts []option.ClientOption
 	if x.credentials != "" {
 		opts = append(opts, option.WithCredentialsFile(x.credentials))
+	}
+	if x.impersonateServiceAccount != "" {
+		ts, err := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
+			TargetPrincipal: x.impersonateServiceAccount,
+			Scopes: []string{
+				"https://www.googleapis.com/auth/bigquery",
+				"https://www.googleapis.com/auth/cloud-platform",
+			},
+		})
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to create impersonated credentials")
+		}
+		opts = append(opts, option.WithTokenSource(ts))
 	}
 
 	client, err := bigquery.NewClient(ctx, x.projectID, opts...)
@@ -229,13 +243,13 @@ func (x *Action) listDatasets() (map[string]any, error) {
 		return nil, goerr.Wrap(err, "failed to marshal config to JSON")
 	}
 
-	var result map[string]any
+	var result []map[string]any
 	if err := json.Unmarshal(jsonData, &result); err != nil {
 		return nil, goerr.Wrap(err, "failed to unmarshal config from JSON")
 	}
 
 	return map[string]any{
-		"datasets": result["datasets"],
+		"config": result,
 	}, nil
 }
 
@@ -249,17 +263,15 @@ func (x *Action) executeQuery(ctx context.Context, client *bigquery.Client, quer
 
 	// Perform dry run to check scan size
 	q.DryRun = true
+
 	job, err := q.Run(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to dry run query")
 	}
-	status, err := job.Wait(ctx)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to wait for dry run job")
-	}
-	if uint64(status.Statistics.TotalBytesProcessed) > x.scanLimit {
+
+	if uint64(job.LastStatus().Statistics.TotalBytesProcessed) > x.scanLimit {
 		return nil, goerr.New("query scan size exceeds limit",
-			goerr.V("scan_size", status.Statistics.TotalBytesProcessed),
+			goerr.V("scan_size", job.LastStatus().Statistics.TotalBytesProcessed),
 			goerr.V("scan_limit", x.scanLimit))
 	}
 
@@ -403,12 +415,14 @@ func (x *Action) getTableSchema(ctx context.Context, projectID, datasetID, table
 		return nil, goerr.Wrap(err, "failed to marshal schema to JSON")
 	}
 
-	var result map[string]any
+	var result []map[string]any
 	if err := json.Unmarshal(schemaJSON, &result); err != nil {
 		return nil, goerr.Wrap(err, "failed to unmarshal schema from JSON")
 	}
 
-	return result, nil
+	return map[string]any{
+		"schema": result,
+	}, nil
 }
 
 func (x *Action) LogValue() slog.Value {

@@ -23,7 +23,15 @@ func createOrGetSession(ctx context.Context, repo interfaces.Repository, slackMs
 }
 
 func createSession(ctx context.Context, repo interfaces.Repository, slackMsg *slack.Message) (*session.Session, error) {
+	// @TODO: Handle ticket also
 	var alertIDs []types.AlertID
+	ticket, err := repo.GetTicketByThread(ctx, slackMsg.Thread())
+	if err != nil {
+		return nil, err
+	}
+	if ticket != nil {
+		alertIDs = ticket.AlertIDs
+	}
 
 	alert, err := repo.GetAlertByThread(ctx, slackMsg.Thread())
 	if err != nil {

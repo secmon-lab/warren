@@ -234,6 +234,7 @@ func TestBigQuery_WithEnvVars(t *testing.T) {
 			name:     "get schema with config",
 			funcName: "bigquery_schema",
 			args: map[string]any{
+				"project_id": projectID,
 				"dataset_id": datasetID,
 				"table_id":   tableID,
 			},

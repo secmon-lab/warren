@@ -3,6 +3,7 @@ package config
 import (
 	"log/slog"
 
+	"github.com/m-mizutani/goerr/v2"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/urfave/cli/v3"
@@ -52,7 +53,7 @@ func (x Slack) LogValue() slog.Value {
 
 func (x *Slack) Configure() (*slack.Service, error) {
 	if x.oauthToken == "" {
-		return nil, nil
+		return nil, goerr.New("slack oauth token is not set")
 	}
 
 	client := sdk.New(x.oauthToken)

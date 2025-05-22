@@ -7,7 +7,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
@@ -47,7 +46,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg *slack.M
 			return goerr.Wrap(err, "failed to create or get session")
 		}
 
-		input := uc.buildHandlePromptInput(ctx, ssn, mention.Message)
+		input := uc.buildHandlePromptInput(ssn, mention.Message)
 		return handlePrompt(ctx, input)
 	}
 
@@ -70,16 +69,16 @@ func messageToArgs(message string) (string, string) {
 }
 
 /*
-func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack_svc.ThreadService, user slack.User, alertIDs []types.AlertID, message string) error {
+func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack.Thread, user slack.User, alertIDs []types.AlertID, message string) error {
 	command, remaining := messageToArgs(message)
 	if command == "" {
 		return errUnknownCommand
 	}
 
 	switch command {
-	case "aggr", "aggregate":
-		if err := aggr.Run(ctx, uc.repository, th, uc.llmClient, user, alertIDs, remaining); err != nil {
-			return goerr.Wrap(err, "failed to run aggregate command")
+	case "resolve":
+		if err := uc.resolveTicket(ctx, user, th, remaining); err != nil {
+			return goerr.Wrap(err, "failed to run resolve command")
 		}
 		return nil
 
@@ -110,7 +109,7 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.
 		if err != nil {
 			return goerr.Wrap(err, "failed to create or get session")
 		}
-		input := uc.buildHandlePromptInput(ctx, ssn, remaining)
+		input := uc.buildHandlePromptInput(ssn, remaining)
 		return handlePrompt(ctx, input)
 
 	default:
@@ -130,7 +129,7 @@ type handlePromptInput struct {
 	PolicyClient  interfaces.PolicyClient
 }
 
-func (uc *UseCases) buildHandlePromptInput(ctx context.Context, ssn *session.Session, p string) handlePromptInput {
+func (uc *UseCases) buildHandlePromptInput(ssn *session.Session, p string) handlePromptInput {
 	return handlePromptInput{
 		Session:       ssn,
 		Prompt:        p,
@@ -224,22 +223,17 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg *slack.Mess
 		return nil
 	}
 
-	baseAlert, err := uc.repository.GetAlertByThread(ctx, slackMsg.Thread())
+	ticket, err := uc.repository.GetTicketByThread(ctx, slackMsg.Thread())
 	if err != nil {
-		return goerr.Wrap(err, "failed to get alert by slack thread")
+		return goerr.Wrap(err, "failed to get ticket by slack thread")
 	}
-	if baseAlert == nil {
-		logger.Info("alert not found", "slack_thread", slackMsg.Thread())
+	if ticket == nil {
+		logger.Info("ticket not found", "slack_thread", slackMsg.Thread())
 		return nil
 	}
 
-	comment := alert.AlertComment{
-		AlertID:   baseAlert.ID,
-		Comment:   slackMsg.Text(),
-		Timestamp: slackMsg.Timestamp(),
-		User:      slackMsg.User(),
-	}
-	if err := uc.repository.PutAlertComment(ctx, comment); err != nil {
+	comment := ticket.NewComment(ctx, slackMsg.Text(), slackMsg.User())
+	if err := uc.repository.PutTicketComment(ctx, comment); err != nil {
 		msg.Trace(ctx, "💥 Failed to insert alert comment\n> %s", err.Error())
 		return goerr.Wrap(err, "failed to insert alert comment", goerr.V("comment", comment))
 	}

@@ -10,9 +10,10 @@ import (
 )
 
 type GeminiCfg struct {
-	model     string
-	projectID string
-	location  string
+	model          string
+	embeddingModel string
+	projectID      string
+	location       string
 }
 
 func (x *GeminiCfg) Flags() []cli.Flag {
@@ -40,6 +41,13 @@ func (x *GeminiCfg) Flags() []cli.Flag {
 			Category:    "Gemini",
 			Sources:     cli.EnvVars("WARREN_GEMINI_LOCATION"),
 		},
+		&cli.StringFlag{
+			Name:        "gemini-embedding-model",
+			Usage:       "Gemini embedding model",
+			Destination: &x.embeddingModel,
+			Category:    "Embedding model",
+			Sources:     cli.EnvVars("WARREN_GEMINI_EMBEDDING_MODEL"),
+		},
 	}
 }
 
@@ -52,7 +60,13 @@ func (x GeminiCfg) LogValue() slog.Value {
 }
 
 func (x *GeminiCfg) Configure(ctx context.Context) (*gemini.Client, error) {
-	client, err := gemini.New(ctx, x.projectID, x.location, gemini.WithModel(x.model))
+	options := []gemini.Option{
+		gemini.WithModel(x.model),
+	}
+	if x.embeddingModel != "" {
+		options = append(options, gemini.WithEmbeddingModel(x.embeddingModel))
+	}
+	client, err := gemini.New(ctx, x.projectID, x.location, options...)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create vertex ai client")
 	}

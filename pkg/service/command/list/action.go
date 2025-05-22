@@ -3,14 +3,12 @@ package list
 import (
 	"context"
 	"encoding/json"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 type pipeline struct {
@@ -60,8 +58,6 @@ type initFunc func(args []string) (actionFunc, error)
 var actionMapping = map[string]initFunc{
 	"limit":  actionLimit,
 	"offset": actionOffset,
-	"user":   actionUser,
-	"status": actionStatus,
 	"grep":   actionGrep,
 	"sort":   actionSort,
 }
@@ -98,6 +94,9 @@ func actionLimit(args []string) (actionFunc, error) {
 		return nil, goerr.Wrap(err, "limit: failed to convert limit to int")
 	}
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		if limit <= 0 {
+			return alerts, nil
+		}
 		if limit > len(alerts) {
 			return alerts, nil
 		}
@@ -115,61 +114,13 @@ func actionOffset(args []string) (actionFunc, error) {
 		return nil, goerr.Wrap(err, "offset: failed to convert offset to int")
 	}
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		if offset <= 0 {
+			return alerts, nil
+		}
 		if offset >= len(alerts) {
 			return alert.Alerts{}, nil
 		}
 		return alerts[offset:], nil
-	}, nil
-}
-
-func parseSlackID(user string) string {
-	re := regexp.MustCompile(`<@U[A-Z0-9]+>`)
-	matches := re.FindStringSubmatch(user)
-	if len(matches) > 0 {
-		return matches[0]
-	}
-	return ""
-}
-
-func actionUser(args []string) (actionFunc, error) {
-	if len(args) != 1 {
-		return nil, goerr.New("user: requires one argument")
-	}
-
-	slackID := parseSlackID(args[0])
-	if slackID == "" {
-		return nil, goerr.New("user: invalid user", goerr.V("user", args[0]))
-	}
-
-	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
-		var filtered alert.Alerts
-		for _, a := range alerts {
-			if a.Assignee != nil && a.Assignee.ID == slackID {
-				filtered = append(filtered, a)
-			}
-		}
-		return filtered, nil
-	}, nil
-}
-
-func actionStatus(args []string) (actionFunc, error) {
-	if len(args) != 1 {
-		return nil, goerr.New("status: requires one argument")
-	}
-
-	status := types.AlertStatus(args[0])
-	if err := status.Validate(); err != nil {
-		return nil, goerr.Wrap(err, "status: invalid status")
-	}
-
-	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
-		var filtered alert.Alerts
-		for _, a := range alerts {
-			if a.Status == status {
-				filtered = append(filtered, a)
-			}
-		}
-		return filtered, nil
 	}, nil
 }
 
@@ -180,14 +131,21 @@ func actionGrep(args []string) (actionFunc, error) {
 
 	pattern := args[0]
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		if pattern == "" {
+			return alerts, nil
+		}
 		var filtered alert.Alerts
 		for _, a := range alerts {
-			raw, err := json.Marshal(a.Data)
-			if err != nil {
-				return nil, goerr.Wrap(err, "grep: failed to marshal alert data")
-			}
-			if strings.Contains(string(raw), pattern) {
+			if strings.Contains(strings.ToLower(a.Metadata.Title), strings.ToLower(pattern)) ||
+				strings.Contains(strings.ToLower(a.Metadata.Description), strings.ToLower(pattern)) {
 				filtered = append(filtered, a)
+				continue
+			}
+			if a.Data != nil {
+				jsonData, err := json.Marshal(a.Data)
+				if err == nil && strings.Contains(strings.ToLower(string(jsonData)), strings.ToLower(pattern)) {
+					filtered = append(filtered, a)
+				}
 			}
 		}
 		return filtered, nil
@@ -201,6 +159,10 @@ func actionSort(args []string) (actionFunc, error) {
 
 	field := args[0]
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		if field == "" {
+			return alerts, nil
+		}
+
 		sorted := make(alert.Alerts, len(alerts))
 		copy(sorted, alerts)
 
@@ -208,10 +170,6 @@ func actionSort(args []string) (actionFunc, error) {
 		case "CreatedAt":
 			sort.Slice(sorted, func(i, j int) bool {
 				return sorted[i].CreatedAt.Before(sorted[j].CreatedAt)
-			})
-		case "UpdatedAt":
-			sort.Slice(sorted, func(i, j int) bool {
-				return sorted[i].UpdatedAt.Before(sorted[j].UpdatedAt)
 			})
 		default:
 			return nil, goerr.New("sort: invalid field", goerr.V("field", field))

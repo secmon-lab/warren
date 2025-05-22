@@ -7,7 +7,6 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
-	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/command/list"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
@@ -96,19 +95,10 @@ func TestParseArgsToSource(t *testing.T) {
 			},
 		},
 		{
-			name: "unresolved command",
-			args: []string{"unresolved"},
+			name: "unbound command",
+			args: []string{"unbound"},
 			expected: func(m *mock.RepositoryMock) {
-				gt.Array(t, m.GetAlertsWithoutStatusCalls()).Length(1)
-				gt.Value(t, m.GetAlertsWithoutStatusCalls()[0].Status).Equal(types.AlertStatusResolved)
-			},
-		},
-		{
-			name: "status command with multiple statuses",
-			args: []string{"status", "resolved", "acked"},
-			expected: func(m *mock.RepositoryMock) {
-				gt.Array(t, m.GetAlertsByStatusCalls()).Length(1)
-				gt.Value(t, m.GetAlertsByStatusCalls()[0].Status).Equal([]types.AlertStatus{types.AlertStatusResolved, types.AlertStatusAcknowledged})
+				gt.Array(t, m.GetAlertWithoutTicketCalls()).Length(1)
 			},
 		},
 		{

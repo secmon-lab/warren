@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/llm/gemini"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/service/llm"
@@ -24,11 +23,6 @@ func TestAsk(t *testing.T) {
 	geminiClient, err := gemini.New(ctx, projectID, location)
 	gt.NoError(t, err).Required()
 
-	ssn, err := geminiClient.NewSession(ctx,
-		gollem.WithSessionContentType(gollem.ContentTypeJSON),
-	)
-	gt.NoError(t, err).Required()
-
 	type resp struct {
 		Message string `json:"message"`
 	}
@@ -38,7 +32,7 @@ func TestAsk(t *testing.T) {
 		"message": "Hello, world!"
 	}`
 
-	result, err := llm.Ask[resp](ctx, ssn, prompt)
+	result, err := llm.Ask[resp](ctx, geminiClient, prompt)
 	gt.NoError(t, err)
 	gt.NotNil(t, result)
 	gt.S(t, result.Message).NotEqual("")

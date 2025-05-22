@@ -24,19 +24,36 @@ func (id CallbackID) String() string {
 }
 
 const (
-	CallbackSubmitResolveAlert CallbackID = "submit_resolve_alert"
-	CallbackSubmitResolveList  CallbackID = "submit_resolve_list"
+	CallbackSubmitResolveTicket CallbackID = "submit_resolve_ticket"
+	CallbackSubmitBindAlert     CallbackID = "submit_bind_alert"
+	CallbackSubmitBindList      CallbackID = "submit_bind_list"
 )
 
-type SlackBlockID string
+type BlockID string
 
-func (id SlackBlockID) String() string {
+func (id BlockID) String() string {
 	return string(id)
 }
 
 const (
-	SlackBlockIDConclusion SlackBlockID = "conclusion"
-	SlackBlockIDComment    SlackBlockID = "comment"
+	BlockIDTicketSelect     BlockID = "ticket_select_block"
+	BlockIDTicketID         BlockID = "ticket_id_block"
+	BlockIDTicketConclusion BlockID = "ticket_conclusion_block"
+	BlockIDTicketComment    BlockID = "ticket_comment_block"
+)
+
+// ActionID in block
+type BlockActionID string
+
+func (id BlockActionID) String() string {
+	return string(id)
+}
+
+const (
+	BlockActionIDTicketSelect     BlockActionID = "ticket_select_input"
+	BlockActionIDTicketID         BlockActionID = "ticket_id_input"
+	BlockActionIDTicketComment    BlockActionID = "ticket_comment_input"
+	BlockActionIDTicketConclusion BlockActionID = "ticket_conclusion_input"
 )
 
 type ActionID string
@@ -46,17 +63,16 @@ func (id ActionID) String() string {
 }
 
 const (
-	ActionIDAck         ActionID = "ack"
-	ActionIDResolve     ActionID = "resolve"
-	ActionIDInspect     ActionID = "inspect"
-	ActionIDCreatePR    ActionID = "create_pr"
-	ActionIDIgnore      ActionID = "ignore"
-	ActionIDIgnoreList  ActionID = "ignore_list"
-	ActionIDResolveList ActionID = "resolve_list"
+	// For alert
+	ActionIDAckAlert  ActionID = "ack_alert"
+	ActionIDBindAlert ActionID = "bind_alert"
 
-	ActionIDConclusion   ActionID = "conclusion"
-	ActionIDComment      ActionID = "comment"
-	ActionIDIgnorePrompt ActionID = "ignore_prompt"
+	// For list
+	ActionIDAckList  ActionID = "ack_list"
+	ActionIDBindList ActionID = "bind_list"
+
+	// For ticket
+	ActionIDResolveTicket ActionID = "resolve_ticket"
 )
 
 type Mention struct {

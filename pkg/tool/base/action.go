@@ -118,6 +118,21 @@ func (x *Base) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			},
 			Required: []string{"path", "op", "value"},
 		},
+		{
+			Name:        "base.policy.list",
+			Description: "List all policies",
+		},
+		{
+			Name:        "base.policy.get",
+			Description: "Get a policy by name",
+			Parameters: map[string]*gollem.Parameter{
+				"name": {
+					Type:        gollem.TypeString,
+					Description: "The name of the policy",
+				},
+			},
+			Required: []string{"name"},
+		},
 	}, nil
 }
 
@@ -127,10 +142,10 @@ func (x *Base) Run(ctx context.Context, name string, args map[string]any) (map[s
 		return x.getAlerts(ctx, args)
 	case "base.alert.search":
 		return x.searchAlerts(ctx, args)
-	case "base.note.get":
-		return x.getNotes(ctx, args)
-	case "base.note.put":
-		return x.putNote(ctx, args)
+		/* TODO:
+		case "base.alert.similar":
+			return x.getSimilarAlerts(ctx, args)
+		*/
 	case "base.policy.list":
 		return x.listPolicies(ctx, args)
 	case "base.policy.get":

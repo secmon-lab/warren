@@ -66,6 +66,7 @@ func (x *Logger) Flags() []cli.Flag {
 			Usage:       "Show stacktrace (only for console format)",
 			Sources:     cli.EnvVars("WARREN_LOG_STACKTRACE"),
 			Destination: &x.stacktrace,
+			Value:       true,
 		},
 	}
 }
