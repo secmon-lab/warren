@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
@@ -19,7 +21,6 @@ func (uc *UseCases) HandleSlackInteractionViewSubmission(ctx context.Context, us
 		"metadata", metadata,
 		"values", values,
 	)
-
 	switch callbackID {
 	case slack.CallbackSubmitResolveTicket:
 		return uc.handleSlackInteractionViewSubmissionResolveTicket(ctx, user, metadata, values)
@@ -41,6 +42,40 @@ func getSlackValue[T ~string](values slack.StateValue, blockID slack.BlockID, ac
 	return T(""), false
 }
 
+func getSlackSelectValue[T ~string](values slack.StateValue, blockID slack.BlockID, actionID slack.BlockActionID) (T, bool) {
+	if block, ok := values[blockID.String()]; ok {
+		if action, ok := block[actionID.String()]; ok {
+			return T(action.SelectedOption.Value), true
+		}
+	}
+	return T(""), false
+}
+
+func getTicketID(values slack.StateValue) (types.TicketID, error) {
+	json.NewEncoder(os.Stdout).Encode(values)
+
+	inputTicketID, ok := getSlackValue[types.TicketID](values, slack.BlockIDTicketID, slack.BlockActionIDTicketID)
+	if !ok {
+		return "", goerr.New("ticket ID not found (invalid schema)", goerr.V("values", values))
+	}
+
+	selectedTicketID, ok := getSlackSelectValue[types.TicketID](values, slack.BlockIDTicketSelect, slack.BlockActionIDTicketSelect)
+	if !ok {
+		return "", goerr.New("ticket ID not found (invalid schema)", goerr.V("values", values))
+	}
+
+	var ticketID types.TicketID
+	if inputTicketID != "" {
+		ticketID = types.TicketID(inputTicketID)
+	} else if selectedTicketID != "" {
+		ticketID = types.TicketID(selectedTicketID)
+	} else {
+		return "", goerr.New("ticket ID not found (invalid schema)", goerr.V("values", values))
+	}
+
+	return ticketID, nil
+}
+
 func (uc *UseCases) handleSlackInteractionViewSubmissionBindAlert(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
 	logger := logging.From(ctx)
 	logger.Debug("binding alert",
@@ -48,13 +83,27 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindAlert(ctx context.Co
 		"metadata", metadata,
 		"values", values,
 	)
+	msg.Trace(ctx, "💥 binding alert\n> %s", metadata)
 
-	ticketID, ok := getSlackValue[types.TicketID](values, slack.BlockIDTicketID, slack.BlockActionIDTicketID)
-	if !ok {
-		return goerr.New("ticket ID not found")
+	alertID := types.AlertID(metadata)
+	alert, err := uc.repository.GetAlert(ctx, alertID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alert", goerr.V("alert_id", alertID))
+	}
+	if alert == nil {
+		return goerr.Wrap(err, "alert not found", goerr.V("alert_id", alertID))
 	}
 
-	return uc.handleBindAlerts(ctx, user, types.TicketID(ticketID), []types.AlertID{types.AlertID(metadata)})
+	st := uc.slackService.NewThread(*alert.SlackThread)
+	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
+
+	ticketID, err := getTicketID(values)
+	if err != nil {
+		msg.Trace(ctx, "💥 Failed to get ticket ID\n> %s", err.Error())
+		return err
+	}
+
+	return uc.handleBindAlerts(ctx, user, ticketID, []types.AlertID{alertID})
 }
 
 func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
@@ -74,9 +123,13 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Con
 		return goerr.Wrap(err, "alert list not found", goerr.V("list_id", listID))
 	}
 
-	ticketID, ok := getSlackValue[types.TicketID](values, slack.BlockIDTicketID, slack.BlockActionIDTicketID)
-	if !ok {
-		return goerr.New("ticket ID not found")
+	st := uc.slackService.NewThread(*list.SlackThread)
+	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
+
+	ticketID, err := getTicketID(values)
+	if err != nil {
+		msg.Trace(ctx, "💥 Failed to get ticket ID\n> %s", err.Error())
+		return err
 	}
 
 	return uc.handleBindAlerts(ctx, user, ticketID, list.AlertIDs)
@@ -104,9 +157,6 @@ func (uc *UseCases) handleBindAlerts(ctx context.Context, user slack.User, ticke
 	}
 
 	ticket.AlertIDs = unifyAlertIDs(ticket.AlertIDs, alertIDs)
-	for _, alert := range alerts {
-		ticket.AlertIDs = append(ticket.AlertIDs, alert.ID)
-	}
 
 	embeddings := make([]firestore.Vector32, len(alerts))
 	for i, alert := range alerts {
@@ -139,7 +189,7 @@ func (uc *UseCases) handleBindAlerts(ctx context.Context, user slack.User, ticke
 		}
 	}
 
-	msg.Notify(ctx, "🎉 Alert bound to ticket")
+	msg.Notify(ctx, "🎉 Alert bound to ticket to %s (%s)", ticketID, ticket.Metadata.Title)
 
 	return nil
 }

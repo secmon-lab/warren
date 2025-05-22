@@ -2,7 +2,9 @@ package slack
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -215,6 +217,13 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 	return blocks
 }
 
+func shortenString(s string, maxLen int) string {
+	if len([]rune(s)) <= maxLen {
+		return s
+	}
+	return string([]rune(s)[:maxLen-3]) + "..."
+}
+
 func buildBindToTicketModalViewRequest(ctx context.Context, callbackID model.CallbackID, tickets []*ticket.Ticket, metadata string) slack.ModalViewRequest {
 	// Create ticket options for dropdown
 	ticketOptions := make([]*slack.OptionBlockObject, 0, len(tickets))
@@ -238,12 +247,16 @@ func buildBindToTicketModalViewRequest(ctx context.Context, callbackID model.Cal
 			timeStr = t.CreatedAt.Format("2006-01-02")
 		}
 
-		label := fmt.Sprintf("%s (%s)", t.Metadata.Title, timeStr)
+		title := shortenString(t.Metadata.Title, 32)
+		description := shortenString(t.Metadata.Description, 64)
+		status := t.Status.Icon()
+
+		label := fmt.Sprintf("%s %s (%s)", status, title, timeStr)
 		ticketOptions = append(ticketOptions,
 			slack.NewOptionBlockObject(
 				t.ID.String(),
 				slack.NewTextBlockObject(slack.PlainTextType, label, false, false),
-				slack.NewTextBlockObject(slack.PlainTextType, t.Metadata.Description, false, false),
+				slack.NewTextBlockObject(slack.PlainTextType, description, false, false),
 			),
 		)
 	}
@@ -277,13 +290,15 @@ func buildBindToTicketModalViewRequest(ctx context.Context, callbackID model.Cal
 
 	blockSet = append(blockSet, slack.NewInputBlock(
 		model.BlockIDTicketID.String(),
-		slack.NewTextBlockObject(slack.PlainTextType, "Or Enter Ticket ID", false, false),
+		slack.NewTextBlockObject(slack.PlainTextType, "Enter Ticket ID", false, false),
 		slack.NewTextBlockObject(slack.PlainTextType, "Enter the ticket ID directly", false, false),
 		slack.NewPlainTextInputBlockElement(
 			slack.NewTextBlockObject(slack.PlainTextType, "Enter ticket ID", false, false),
 			model.BlockActionIDTicketID.String(),
 		)).WithOptional(true),
 	)
+
+	json.NewEncoder(os.Stdout).Encode(blockSet)
 
 	return slack.ModalViewRequest{
 		Type: slack.VTModal,

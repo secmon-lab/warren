@@ -52,7 +52,6 @@ func (uc *UseCases) ackAlert(ctx context.Context, user slack.User, slackThread s
 
 	newTicket := ticket.New(ctx, []types.AlertID{targetAlert.ID}, &slackThread)
 	newTicket.Assignee = &user
-	newTicket.Status = types.TicketStatusAcknowledged
 	newTicket.Embedding = targetAlert.Embedding
 
 	if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
@@ -104,14 +103,13 @@ func (uc *UseCases) ackList(ctx context.Context, user slack.User, slackThread sl
 		return goerr.Wrap(err, "failed to get alerts")
 	}
 
-	newTicket := ticket.New(ctx, alertIDs, &slackThread)
-	newTicket.Assignee = &user
-	newTicket.Status = types.TicketStatusAcknowledged
-
 	var alertEmbeddings []firestore.Vector32
 	for _, alert := range alerts {
 		alertEmbeddings = append(alertEmbeddings, alert.Embedding)
 	}
+
+	newTicket := ticket.New(ctx, alertIDs, &slackThread)
+	newTicket.Assignee = &user
 	newTicket.Embedding = averageEmbeddings(alertEmbeddings)
 
 	if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {

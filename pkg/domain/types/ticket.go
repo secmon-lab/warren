@@ -50,19 +50,21 @@ func NewCommentID() CommentID {
 type TicketStatus string
 
 const (
-	TicketStatusUnknown      TicketStatus = "unknown"
-	TicketStatusNew          TicketStatus = "new"
-	TicketStatusAcknowledged TicketStatus = "acknowledged"
-	TicketStatusBlocked      TicketStatus = "blocked"
-	TicketStatusResolved     TicketStatus = "resolved"
+	TicketStatusInvestigating TicketStatus = "investigating"
+	TicketStatusPending       TicketStatus = "pending"
+	TicketStatusResolved      TicketStatus = "resolved"
 )
 
 var ticketstatusLabels = map[TicketStatus]string{
-	TicketStatusUnknown:      "❓️ Unknown",
-	TicketStatusNew:          "🆕 New",
-	TicketStatusAcknowledged: "👀 Acknowledged",
-	TicketStatusBlocked:      "🚫 Blocked",
-	TicketStatusResolved:     "✅️ Resolved",
+	TicketStatusInvestigating: "🔍 Investigating",
+	TicketStatusPending:       "🕒 Pending",
+	TicketStatusResolved:      "✅️ Resolved",
+}
+
+var ticketStatusIcons = map[TicketStatus]string{
+	TicketStatusInvestigating: "🔍",
+	TicketStatusPending:       "🕒",
+	TicketStatusResolved:      "✅️",
 }
 
 func (s TicketStatus) String() string {
@@ -73,9 +75,13 @@ func (s TicketStatus) Label() string {
 	return ticketstatusLabels[s]
 }
 
+func (s TicketStatus) Icon() string {
+	return ticketStatusIcons[s]
+}
+
 func (s TicketStatus) Validate() error {
 	switch s {
-	case TicketStatusUnknown, TicketStatusNew, TicketStatusAcknowledged, TicketStatusBlocked, TicketStatusResolved:
+	case TicketStatusInvestigating, TicketStatusPending, TicketStatusResolved:
 		return nil
 	}
 	return goerr.New("invalid ticket Ticketstatus", goerr.V("Ticketstatus", s))

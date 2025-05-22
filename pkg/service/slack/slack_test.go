@@ -92,7 +92,7 @@ func TestSlackUpdateTicket(t *testing.T) {
 	ticketData.Metadata.Title = "Test Ticket Title"
 	ticketData.Metadata.Description = "Test Ticket Description"
 	ticketData.Metadata.Summary = "Test Ticket Summary"
-	ticketData.Status = types.TicketStatusAcknowledged
+	ticketData.Status = types.TicketStatusInvestigating
 	ticketData.Reason = "Test Ticket Reason"
 
 	ts, err := thread.PostTicket(ctx, ticketData, alert.Alerts{&dummy})
