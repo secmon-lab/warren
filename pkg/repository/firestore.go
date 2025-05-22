@@ -711,10 +711,7 @@ func (r *Firestore) FindSimilarTickets(ctx context.Context, ticketID types.Ticke
 
 func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32, limit int) ([]*ticket.Ticket, error) {
 	// Convert []float32 to firestore.Vector32
-	vector32 := make(firestore.Vector32, len(embedding))
-	for i, v := range embedding {
-		vector32[i] = v
-	}
+	vector32 := firestore.Vector32(embedding[:])
 
 	// Build vector search query
 	query := r.db.Collection(collectionTickets).
@@ -753,10 +750,7 @@ func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32,
 
 func (r *Firestore) FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error) {
 	// Convert []float32 to firestore.Vector32
-	vector32 := make(firestore.Vector32, len(embedding))
-	for i, v := range embedding {
-		vector32[i] = v
-	}
+	vector32 := firestore.Vector32(embedding[:])
 
 	// Build vector search query
 	query := r.db.Collection(collectionAlerts).
