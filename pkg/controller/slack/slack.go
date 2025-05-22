@@ -69,7 +69,7 @@ func (x *Controller) HandleSlackAppMention(ctx context.Context, apiEvent *slacke
 	}
 
 	dispatch(ctx, func(ctx context.Context) error {
-		return x.event.HandleSlackAppMention(ctx, slackMsg)
+		return x.event.HandleSlackAppMention(ctx, *slackMsg)
 	})
 
 	return nil
@@ -91,7 +91,7 @@ func (x *Controller) HandleSlackMessage(ctx context.Context, apiEvent *slackeven
 	}
 
 	dispatch(ctx, func(ctx context.Context) error {
-		return x.event.HandleSlackMessage(ctx, slackMsg)
+		return x.event.HandleSlackMessage(ctx, *slackMsg)
 	})
 
 	return nil

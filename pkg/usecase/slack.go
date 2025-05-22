@@ -19,7 +19,7 @@ import (
 )
 
 // HandleSlackAppMention handles a slack app mention event. It will dispatch a slack action to the alert.
-func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg *slack.Message) error {
+func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Message) error {
 	logger := logging.From(ctx)
 	logger.Debug("slack app mention event", "mention", slackMsg.Mention(), "slack_thread", slackMsg.Thread())
 
@@ -92,7 +92,7 @@ func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack.Th
 }
 */
 
-func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.Message, message string) error {
+func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg slack.Message, message string) error {
 	command, remaining := messageToArgs(message)
 	if command == "" {
 		return errUnknownCommand
@@ -209,7 +209,7 @@ func handlePrompt(ctx context.Context, input handlePromptInput) error {
 }
 
 // HandleSlackMessage handles a message from a slack user. It saves the message as an alert comment if the message is in the Alert thread.
-func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg *slack.Message) error {
+func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg slack.Message) error {
 	logger := logging.From(ctx)
 	th := uc.slackService.NewThread(slackMsg.Thread())
 	ctx = msg.With(ctx, th.Reply, th.NewStateFunc)
@@ -228,7 +228,7 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg *slack.Mess
 		return nil
 	}
 
-	comment := ticket.NewComment(ctx, slackMsg.Text(), slackMsg.User())
+	comment := ticket.NewComment(ctx, slackMsg)
 	if err := uc.repository.PutTicketComment(ctx, comment); err != nil {
 		msg.Trace(ctx, "💥 Failed to insert alert comment\n> %s", err.Error())
 		return goerr.Wrap(err, "failed to insert alert comment", goerr.V("comment", comment))

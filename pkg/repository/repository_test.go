@@ -17,6 +17,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/utils/test"
+	"github.com/slack-go/slack/slackevents"
 )
 
 func newFirestoreClient(t *testing.T) *repository.Firestore {
@@ -183,10 +184,16 @@ func TestAlertTicketBinding(t *testing.T) {
 		gt.Value(t, gotAlert3.TicketID).Equal(ticketObj.ID)
 
 		// PutTicketComment
-		comment := ticketObj.NewComment(ctx, "Test Comment", slack.User{
-			ID:   "test-user",
-			Name: "Test User",
-		})
+		comment := ticketObj.NewComment(ctx, *slack.NewMessage(ctx, &slackevents.EventsAPIEvent{
+			InnerEvent: slackevents.EventsAPIInnerEvent{
+				Data: &slackevents.AppMentionEvent{
+					TimeStamp: "test-message-id",
+					Text:      "Test Comment",
+					User:      "test-user",
+					Channel:   "test-channel",
+				},
+			},
+		}))
 		gt.NoError(t, repo.PutTicketComment(ctx, comment))
 
 		// GetTicketComments
@@ -194,6 +201,7 @@ func TestAlertTicketBinding(t *testing.T) {
 		gt.NoError(t, err)
 		gt.Array(t, gotComments).Longer(0).Required()
 		gt.Value(t, gotComments[0].Comment).Equal("Test Comment")
+		gt.Value(t, gotComments[0].SlackMessageID).Equal("test-message-id")
 	}
 
 	t.Run("Memory", func(t *testing.T) {

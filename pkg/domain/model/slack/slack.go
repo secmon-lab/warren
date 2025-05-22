@@ -39,6 +39,10 @@ func (x *Message) Thread() Thread {
 	return th
 }
 
+func (x *Message) ID() string {
+	return x.id
+}
+
 func (x *Message) Mention() []Mention {
 	return x.mentions
 }
@@ -53,6 +57,25 @@ func (x *Message) Text() string {
 
 func (x *Message) Timestamp() string {
 	return x.ts
+}
+
+func (x *Message) ChannelID() string {
+	return x.channel
+}
+
+func (x *Message) ThreadID() string {
+	if x.threadID == "" {
+		return x.id
+	}
+	return x.threadID
+}
+
+func (x *Message) TeamID() string {
+	return x.teamID
+}
+
+func (x *Message) InThread() bool {
+	return x.threadID != ""
 }
 
 func NewMessage(ctx context.Context, ev *slackevents.EventsAPIEvent) *Message {
@@ -91,29 +114,6 @@ func NewMessage(ctx context.Context, ev *slackevents.EventsAPIEvent) *Message {
 	}
 
 	return nil
-}
-
-func (x *Message) ID() string {
-	return x.id
-}
-
-func (x *Message) ChannelID() string {
-	return x.channel
-}
-
-func (x *Message) ThreadID() string {
-	if x.threadID == "" {
-		return x.id
-	}
-	return x.threadID
-}
-
-func (x *Message) TeamID() string {
-	return x.teamID
-}
-
-func (x *Message) InThread() bool {
-	return x.threadID != ""
 }
 
 type User struct {

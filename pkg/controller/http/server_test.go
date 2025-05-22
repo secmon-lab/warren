@@ -131,7 +131,7 @@ var slackMentionJSON []byte
 func TestSlackMentionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
 	uc := &UseCaseMock{
-		HandleSlackAppMentionFunc: func(ctx context.Context, slackMsg *slack_model.Message) error {
+		HandleSlackAppMentionFunc: func(ctx context.Context, slackMsg slack_model.Message) error {
 			gt.Equal(t, slackMsg.User().ID, "U8JLN34SV")
 			gt.Equal(t, slackMsg.ChannelID(), "C07AR2FPG1F")
 			gt.Equal(t, slackMsg.ThreadID(), "1741487414.163419")
