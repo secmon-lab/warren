@@ -12,10 +12,10 @@ import (
 )
 
 type Base struct {
-	alertIDs  []types.AlertID
-	repo      interfaces.Repository
-	sessionID types.SessionID
-	policies  map[string]string
+	alertIDs []types.AlertID
+	repo     interfaces.Repository
+	ticketID types.TicketID
+	policies map[string]string
 }
 
 var _ interfaces.Tool = &Base{}
@@ -39,12 +39,12 @@ func getArg[T any](args map[string]any, key string) (T, error) {
 	return typedVal, nil
 }
 
-func New(repo interfaces.Repository, alertIDs []types.AlertID, policies map[string]string, sessionID types.SessionID) *Base {
+func New(repo interfaces.Repository, alertIDs []types.AlertID, policies map[string]string, ticketID types.TicketID) *Base {
 	return &Base{
-		alertIDs:  alertIDs,
-		repo:      repo,
-		sessionID: sessionID,
-		policies:  policies,
+		alertIDs: alertIDs,
+		repo:     repo,
+		ticketID: ticketID,
+		policies: policies,
 	}
 }
 
@@ -63,7 +63,7 @@ func (x *Base) Configure(ctx context.Context) error {
 func (x *Base) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.Int("alerts.length", len(x.alertIDs)),
-		slog.String("session.id", string(x.sessionID)),
+		slog.String("ticket.id", string(x.ticketID)),
 	)
 }
 

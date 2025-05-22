@@ -10,7 +10,7 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
-	"github.com/secmon-lab/warren/pkg/domain/model/session"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -67,12 +67,8 @@ func TestHandlePrompt(t *testing.T) {
 		},
 	}
 
-	// Create test session
-	ssn := session.New(ctx, nil, []types.AlertID{})
-
-	// First HandlePrompt call
 	input := usecase.HandlePromptInput{
-		Session:       ssn,
+		Ticket:        &ticket.Ticket{ID: types.NewTicketID()},
 		Prompt:        "prompt:1",
 		LLMClient:     mockLLM,
 		Repo:          mockRepo,
@@ -83,12 +79,12 @@ func TestHandlePrompt(t *testing.T) {
 	err := usecase.HandlePrompt(ctx, input)
 	gt.NoError(t, err)
 
-	latestHistory, err := mockRepo.GetLatestHistory(ctx, ssn.ID)
+	latestHistory, err := mockRepo.GetLatestHistory(ctx, input.Ticket.ID)
 	gt.NoError(t, err)
 	gt.NotNil(t, latestHistory)
 
 	storageSvc := storage_svc.New(mockStorage)
-	history, err := storageSvc.GetHistory(ctx, ssn.ID, latestHistory.ID)
+	history, err := storageSvc.GetHistory(ctx, input.Ticket.ID, latestHistory.ID)
 	gt.NoError(t, err)
 	geminiHistory, err := history.ToGemini()
 	gt.NoError(t, err)
@@ -102,7 +98,7 @@ func TestHandlePrompt(t *testing.T) {
 	err = usecase.HandlePrompt(ctx, input)
 	gt.NoError(t, err)
 
-	latestHistory, err = mockRepo.GetLatestHistory(ctx, ssn.ID)
+	latestHistory, err = mockRepo.GetLatestHistory(ctx, input.Ticket.ID)
 	gt.NoError(t, err)
 	gt.NotNil(t, latestHistory)
 

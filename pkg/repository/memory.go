@@ -11,7 +11,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -22,8 +21,7 @@ type Memory struct {
 
 	alerts         map[types.AlertID]*alert.Alert
 	lists          map[types.AlertListID]*alert.List
-	histories      map[types.SessionID][]*session.History
-	sessions       map[types.SessionID]*session.Session
+	histories      map[types.TicketID][]*ticket.History
 	tickets        map[types.TicketID]*ticket.Ticket
 	ticketComments map[types.TicketID][]ticket.Comment
 }
@@ -34,8 +32,7 @@ func NewMemory() *Memory {
 	return &Memory{
 		alerts:         make(map[types.AlertID]*alert.Alert),
 		lists:          make(map[types.AlertListID]*alert.List),
-		histories:      make(map[types.SessionID][]*session.History),
-		sessions:       make(map[types.SessionID]*session.Session),
+		histories:      make(map[types.TicketID][]*ticket.History),
 		tickets:        make(map[types.TicketID]*ticket.Ticket),
 		ticketComments: make(map[types.TicketID][]ticket.Comment),
 	}
@@ -72,11 +69,11 @@ func (r *Memory) GetAlertByThread(ctx context.Context, thread slack.Thread) (*al
 	return nil, nil
 }
 
-func (r *Memory) GetLatestHistory(ctx context.Context, sessionID types.SessionID) (*session.History, error) {
+func (r *Memory) GetLatestHistory(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	histories, ok := r.histories[sessionID]
+	histories, ok := r.histories[ticketID]
 	if !ok || len(histories) == 0 {
 		return nil, nil
 	}
@@ -90,11 +87,11 @@ func (r *Memory) GetLatestHistory(ctx context.Context, sessionID types.SessionID
 	return latest, nil
 }
 
-func (r *Memory) PutHistory(ctx context.Context, sessionID types.SessionID, history *session.History) error {
+func (r *Memory) PutHistory(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.histories[sessionID] = append(r.histories[sessionID], history)
+	r.histories[ticketID] = append(r.histories[ticketID], history)
 	return nil
 }
 
@@ -142,37 +139,6 @@ func (r *Memory) GetLatestAlertListInThread(ctx context.Context, thread slack.Th
 		}
 	}
 	return latestList, nil
-}
-
-func (r *Memory) GetSession(ctx context.Context, id types.SessionID) (*session.Session, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	s, ok := r.sessions[id]
-	if !ok {
-		return nil, nil
-	}
-	return s, nil
-}
-
-func (r *Memory) GetSessionByThread(ctx context.Context, thread slack.Thread) (*session.Session, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	for _, s := range r.sessions {
-		if s.Thread.ChannelID == thread.ChannelID && s.Thread.ThreadID == thread.ThreadID {
-			return s, nil
-		}
-	}
-	return nil, nil
-}
-
-func (r *Memory) PutSession(ctx context.Context, s session.Session) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.sessions[s.ID] = &s
-	return nil
 }
 
 func (r *Memory) GetTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {

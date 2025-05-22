@@ -37,12 +37,12 @@ func WithPrefix(prefix string) Option {
 	}
 }
 
-func pathToHistory(prefix string, sessionID types.SessionID, historyID types.HistoryID) string {
-	return fmt.Sprintf("%s%s/session/%s/history/%s.json", prefix, StorageSchemaVersion, sessionID, historyID)
+func pathToHistory(prefix string, ticketID types.TicketID, historyID types.HistoryID) string {
+	return fmt.Sprintf("%s%s/ticket/%s/history/%s.json", prefix, StorageSchemaVersion, ticketID, historyID)
 }
 
-func (s *Service) PutHistory(ctx context.Context, sessionID types.SessionID, historyID types.HistoryID, history *gollem.History) error {
-	path := pathToHistory(s.prefix, sessionID, historyID)
+func (s *Service) PutHistory(ctx context.Context, ticketID types.TicketID, historyID types.HistoryID, history *gollem.History) error {
+	path := pathToHistory(s.prefix, ticketID, historyID)
 
 	w := s.storageClient.PutObject(ctx, path)
 
@@ -57,8 +57,8 @@ func (s *Service) PutHistory(ctx context.Context, sessionID types.SessionID, his
 	return nil
 }
 
-func (s *Service) GetHistory(ctx context.Context, sessionID types.SessionID, historyID types.HistoryID) (*gollem.History, error) {
-	path := pathToHistory(s.prefix, sessionID, historyID)
+func (s *Service) GetHistory(ctx context.Context, ticketID types.TicketID, historyID types.HistoryID) (*gollem.History, error) {
+	path := pathToHistory(s.prefix, ticketID, historyID)
 
 	r, err := s.storageClient.GetObject(ctx, path)
 	if err != nil {

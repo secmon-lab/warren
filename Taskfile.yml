@@ -3,9 +3,9 @@
 version: "3"
 
 tasks:
-  default:  
-    deps:
-    - mock
+  default:
+    cmds:
+      - task mock
 
   mock:
     aliases:

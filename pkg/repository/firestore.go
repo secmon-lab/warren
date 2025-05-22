@@ -9,7 +9,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -76,60 +75,6 @@ func (r *Firestore) GetAlert(ctx context.Context, alertID types.AlertID) (*alert
 	}
 
 	return &alert, nil
-}
-
-func (r *Firestore) GetAlertsBySlackThread(ctx context.Context, thread slack.Thread) (alert.Alerts, error) {
-	iter := r.db.Collection(collectionAlerts).
-		Where("SlackThread.ChannelID", "==", thread.ChannelID).
-		Where("SlackThread.ThreadID", "==", thread.ThreadID).
-		Documents(ctx)
-
-	var alerts alert.Alerts
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			return nil, goerr.Wrap(err, "failed to get alert by slack thread", goerr.V("slack_thread", thread))
-		}
-
-		var alert alert.Alert
-		if err := doc.DataTo(&alert); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("slack_message_id", thread.ThreadID))
-		}
-
-		alerts = append(alerts, &alert)
-	}
-
-	return alerts, nil
-}
-
-func (r *Firestore) GetLatestAlerts(ctx context.Context, oldest time.Time, limit int) (alert.Alerts, error) {
-	iter := r.db.Collection(collectionAlerts).
-		Where("CreatedAt", ">=", oldest).
-		OrderBy("CreatedAt", firestore.Desc).
-		Documents(ctx)
-
-	var alerts alert.Alerts
-	for len(alerts) < limit {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			return nil, goerr.Wrap(err, "failed to get next alert")
-		}
-
-		var alert alert.Alert
-		if err := doc.DataTo(&alert); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to alert")
-		}
-
-		alerts = append(alerts, &alert)
-	}
-
-	return alerts, nil
 }
 
 func (r *Firestore) GetAlertListByThread(ctx context.Context, thread slack.Thread) (*alert.List, error) {
@@ -239,30 +184,6 @@ func (r *Firestore) GetLatestAlertListInThread(ctx context.Context, thread slack
 	return &lists[0], nil
 }
 
-func (r *Firestore) GetHistory(ctx context.Context, sessionID types.SessionID) ([]*session.History, error) {
-	iter := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionHistories).OrderBy("CreatedAt", firestore.Asc).Documents(ctx)
-	defer iter.Stop()
-
-	var histories []*session.History
-	for {
-		doc, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get chat history")
-		}
-
-		var history session.History
-		if err := doc.DataTo(&history); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to chat history")
-		}
-		histories = append(histories, &history)
-	}
-
-	return histories, nil
-}
-
 func (r *Firestore) GetAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
 	iter := r.db.Collection(collectionAlerts).
 		Where("SlackThread.ChannelID", "==", thread.ChannelID).
@@ -286,66 +207,16 @@ func (r *Firestore) GetAlertByThread(ctx context.Context, thread slack.Thread) (
 	return &alert, nil
 }
 
-func (r *Firestore) GetSession(ctx context.Context, id types.SessionID) (*session.Session, error) {
-	doc, err := r.db.Collection(collectionSessions).Doc(id.String()).Get(ctx)
+func (r *Firestore) PutHistory(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
+	_, err := r.db.Collection(collectionTickets).Doc(ticketID.String()).Collection(collectionHistories).Doc(history.ID.String()).Set(ctx, history)
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			return nil, nil
-		}
-		return nil, goerr.Wrap(err, "failed to get session", goerr.V("id", id))
-	}
-
-	var s session.Session
-	if err := doc.DataTo(&s); err != nil {
-		return nil, goerr.Wrap(err, "failed to convert data to session")
-	}
-
-	return &s, nil
-}
-
-func (r *Firestore) GetSessionByThread(ctx context.Context, thread slack.Thread) (*session.Session, error) {
-	iter := r.db.Collection(collectionSessions).
-		Where("Thread.ChannelID", "==", thread.ChannelID).
-		Where("Thread.ThreadID", "==", thread.ThreadID).
-		Limit(1).
-		Documents(ctx)
-
-	doc, err := iter.Next()
-	if err != nil {
-		if err == iterator.Done {
-			return nil, nil
-		}
-		return nil, goerr.Wrap(err, "failed to get session by thread", goerr.V("thread", thread))
-	}
-
-	var s session.Session
-	if err := doc.DataTo(&s); err != nil {
-		return nil, goerr.Wrap(err, "failed to convert data to session")
-	}
-
-	return &s, nil
-}
-
-func (r *Firestore) PutSession(ctx context.Context, s session.Session) error {
-	doc := r.db.Collection(collectionSessions).Doc(s.ID.String())
-	_, err := doc.Set(ctx, s)
-	if err != nil {
-		return goerr.Wrap(err, "failed to put session", goerr.V("id", s.ID))
+		return goerr.Wrap(err, "failed to put history", goerr.V("ticket_id", ticketID), goerr.V("history_id", history.ID))
 	}
 	return nil
 }
 
-func (r *Firestore) PutHistory(ctx context.Context, sessionID types.SessionID, history *session.History) error {
-	doc := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionHistories).Doc(history.ID.String())
-	if _, err := doc.Set(ctx, history); err != nil {
-		return goerr.Wrap(err, "failed to put chat history")
-	}
-
-	return nil
-}
-
-func (r *Firestore) GetLatestHistory(ctx context.Context, sessionID types.SessionID) (*session.History, error) {
-	iter := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionHistories).OrderBy("CreatedAt", firestore.Desc).Limit(1).Documents(ctx)
+func (r *Firestore) GetLatestHistory(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
+	iter := r.db.Collection(collectionTickets).Doc(ticketID.String()).Collection(collectionHistories).OrderBy("CreatedAt", firestore.Desc).Limit(1).Documents(ctx)
 	defer iter.Stop()
 
 	doc, err := iter.Next()
@@ -356,7 +227,7 @@ func (r *Firestore) GetLatestHistory(ctx context.Context, sessionID types.Sessio
 		return nil, goerr.Wrap(err, "failed to get latest chat history")
 	}
 
-	var history session.History
+	var history ticket.History
 	if err := doc.DataTo(&history); err != nil {
 		return nil, goerr.Wrap(err, "failed to convert data to chat history")
 	}

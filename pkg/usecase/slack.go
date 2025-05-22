@@ -7,8 +7,8 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
 	"github.com/secmon-lab/warren/pkg/service/command/list"
 	"github.com/secmon-lab/warren/pkg/service/storage"
@@ -41,12 +41,16 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg *slack.M
 			return uc.handleSlackRootCommand(ctx, slackMsg, mention.Message)
 		}
 
-		ssn, err := createOrGetSession(ctx, uc.repository, slackMsg)
+		ticket, err := uc.repository.GetTicketByThread(ctx, slackMsg.Thread())
 		if err != nil {
-			return goerr.Wrap(err, "failed to create or get session")
+			return goerr.Wrap(err, "failed to get ticket by slack thread")
+		}
+		if ticket == nil {
+			msg.Notify(ctx, "😣 Please create a ticket first. I will not work without a ticket.")
+			return nil
 		}
 
-		input := uc.buildHandlePromptInput(ssn, mention.Message)
+		input := uc.buildHandlePromptInput(ticket, mention.Message)
 		return handlePrompt(ctx, input)
 	}
 
@@ -104,14 +108,6 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.
 		}
 		return nil
 
-	case "chat":
-		ssn, err := createSession(ctx, uc.repository, slackMsg)
-		if err != nil {
-			return goerr.Wrap(err, "failed to create or get session")
-		}
-		input := uc.buildHandlePromptInput(ssn, remaining)
-		return handlePrompt(ctx, input)
-
 	default:
 		msg.Notify(ctx, "🤔 Available commands: `list`")
 		return errUnknownCommand
@@ -119,7 +115,7 @@ func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg *slack.
 }
 
 type handlePromptInput struct {
-	Session       *session.Session
+	Ticket        *ticket.Ticket
 	Prompt        string
 	LLMClient     interfaces.LLMClient
 	Repo          interfaces.Repository
@@ -129,9 +125,9 @@ type handlePromptInput struct {
 	PolicyClient  interfaces.PolicyClient
 }
 
-func (uc *UseCases) buildHandlePromptInput(ssn *session.Session, p string) handlePromptInput {
+func (uc *UseCases) buildHandlePromptInput(ticket *ticket.Ticket, p string) handlePromptInput {
 	return handlePromptInput{
-		Session:       ssn,
+		Ticket:        ticket,
 		Prompt:        p,
 		LLMClient:     uc.llmClient,
 		Repo:          uc.repository,
@@ -145,25 +141,25 @@ func (uc *UseCases) buildHandlePromptInput(ssn *session.Session, p string) handl
 func handlePrompt(ctx context.Context, input handlePromptInput) error {
 	logger := logging.From(ctx)
 
-	baseAction := base.New(input.Repo, input.Session.AlertIDs, input.PolicyClient.Sources(), input.Session.ID)
+	baseAction := base.New(input.Repo, input.Ticket.AlertIDs, input.PolicyClient.Sources(), input.Ticket.ID)
 	tools := append(input.Tools, baseAction)
 
 	storageSvc := storage.New(input.StorageClient, storage.WithPrefix(input.StoragePrefix))
 
-	historyRecord, err := input.Repo.GetLatestHistory(ctx, input.Session.ID)
+	historyRecord, err := input.Repo.GetLatestHistory(ctx, input.Ticket.ID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get latest history")
 	}
 
 	var history *gollem.History
 	if historyRecord != nil {
-		history, err = storageSvc.GetHistory(ctx, input.Session.ID, historyRecord.ID)
+		history, err = storageSvc.GetHistory(ctx, input.Ticket.ID, historyRecord.ID)
 		if err != nil {
 			return goerr.Wrap(err, "failed to get history data")
 		}
 	}
 
-	alerts, err := input.Repo.BatchGetAlerts(ctx, input.Session.AlertIDs)
+	alerts, err := input.Repo.BatchGetAlerts(ctx, input.Ticket.AlertIDs)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alerts")
 	}
@@ -192,20 +188,20 @@ func handlePrompt(ctx context.Context, input handlePromptInput) error {
 		}),
 	)
 
-	logger.Debug("run prompt", "prompt", input.Prompt, "history", history, "session", input.Session, "history_record", historyRecord)
+	logger.Debug("run prompt", "prompt", input.Prompt, "history", history, "ticket", input.Ticket, "history_record", historyRecord)
 
 	newHistory, err := agent.Prompt(ctx, input.Prompt)
 	if err != nil {
 		return goerr.Wrap(err, "failed to prompt")
 	}
 
-	newRecord := session.NewHistory(ctx, input.Session.ID)
+	newRecord := ticket.NewHistory(ctx, input.Ticket.ID)
 
-	if err = storageSvc.PutHistory(ctx, input.Session.ID, newRecord.ID, newHistory); err != nil {
+	if err = storageSvc.PutHistory(ctx, input.Ticket.ID, newRecord.ID, newHistory); err != nil {
 		return goerr.Wrap(err, "failed to put history")
 	}
 
-	if err = input.Repo.PutHistory(ctx, input.Session.ID, newRecord); err != nil {
+	if err = input.Repo.PutHistory(ctx, input.Ticket.ID, &newRecord); err != nil {
 		return goerr.Wrap(err, "failed to put history")
 	}
 

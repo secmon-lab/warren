@@ -68,31 +68,6 @@ func New(ctx context.Context, alertIDs []types.AlertID, slackThread *slack.Threa
 	}
 }
 
-type Comment struct {
-	ID        types.CommentID `json:"id"`
-	TicketID  types.TicketID  `json:"ticket_id"`
-	CreatedAt time.Time       `json:"created_at"`
-	Comment   string          `json:"comment"`
-	User      slack.User      `json:"user"`
-}
-
-func (x *Ticket) Validate() error {
-	if err := x.Status.Validate(); err != nil {
-		return goerr.Wrap(err, "invalid status")
-	}
-	return nil
-}
-
-func (x *Ticket) NewComment(ctx context.Context, comment string, user slack.User) Comment {
-	return Comment{
-		ID:        types.NewCommentID(),
-		TicketID:  x.ID,
-		CreatedAt: clock.Now(ctx),
-		Comment:   comment,
-		User:      user,
-	}
-}
-
 // Finding is the conclusion of the alert. This is set by the AI.
 type Finding struct {
 	Severity       types.AlertSeverity `json:"severity"`
