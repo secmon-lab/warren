@@ -94,6 +94,9 @@ func actionLimit(args []string) (actionFunc, error) {
 		return nil, goerr.Wrap(err, "limit: failed to convert limit to int")
 	}
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		if limit <= 0 {
+			return alerts, nil
+		}
 		if limit > len(alerts) {
 			return alerts, nil
 		}
@@ -111,6 +114,9 @@ func actionOffset(args []string) (actionFunc, error) {
 		return nil, goerr.Wrap(err, "offset: failed to convert offset to int")
 	}
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		if offset <= 0 {
+			return alerts, nil
+		}
 		if offset >= len(alerts) {
 			return alert.Alerts{}, nil
 		}
@@ -125,14 +131,21 @@ func actionGrep(args []string) (actionFunc, error) {
 
 	pattern := args[0]
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		if pattern == "" {
+			return alerts, nil
+		}
 		var filtered alert.Alerts
 		for _, a := range alerts {
-			raw, err := json.Marshal(a.Data)
-			if err != nil {
-				return nil, goerr.Wrap(err, "grep: failed to marshal alert data")
-			}
-			if strings.Contains(string(raw), pattern) {
+			if strings.Contains(strings.ToLower(a.Metadata.Title), strings.ToLower(pattern)) ||
+				strings.Contains(strings.ToLower(a.Metadata.Description), strings.ToLower(pattern)) {
 				filtered = append(filtered, a)
+				continue
+			}
+			if a.Data != nil {
+				jsonData, err := json.Marshal(a.Data)
+				if err == nil && strings.Contains(strings.ToLower(string(jsonData)), strings.ToLower(pattern)) {
+					filtered = append(filtered, a)
+				}
 			}
 		}
 		return filtered, nil
@@ -146,6 +159,10 @@ func actionSort(args []string) (actionFunc, error) {
 
 	field := args[0]
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		if field == "" {
+			return alerts, nil
+		}
+
 		sorted := make(alert.Alerts, len(alerts))
 		copy(sorted, alerts)
 

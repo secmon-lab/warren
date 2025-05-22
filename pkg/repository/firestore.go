@@ -462,7 +462,7 @@ func (r *Firestore) UnbindAlertFromTicket(ctx context.Context, alertID types.Ale
 	_, err := alertDoc.Update(ctx, []firestore.Update{
 		{
 			Path:  "TicketID",
-			Value: nil,
+			Value: "",
 		},
 	})
 	if err != nil {
@@ -484,12 +484,12 @@ func (r *Firestore) GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, er
 			return nil, goerr.Wrap(err, "failed to get next alert")
 		}
 
-		var alert alert.Alert
-		if err := doc.DataTo(&alert); err != nil {
+		var v alert.Alert
+		if err := doc.DataTo(&v); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to alert")
 		}
 
-		alerts = append(alerts, &alert)
+		alerts = append(alerts, &v)
 	}
 
 	return alerts, nil

@@ -11,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/embedding"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
@@ -110,7 +111,7 @@ func (uc *UseCases) ackList(ctx context.Context, user slack.User, slackThread sl
 
 	newTicket := ticket.New(ctx, alertIDs, &slackThread)
 	newTicket.Assignee = &user
-	newTicket.Embedding = averageEmbeddings(alertEmbeddings)
+	newTicket.Embedding = embedding.Averate(alertEmbeddings)
 
 	if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
 		return goerr.Wrap(err, "failed to fill ticket metadata")

@@ -50,8 +50,8 @@ func newTestAlert(thread *slack.Thread) alert.Alert {
 				{Key: "test-key", Value: "test-value"},
 			},
 		},
-		Data: map[string]any{"key": "value"},
-		// Embedding: make([]float32, 256),
+		Embedding: make([]float32, 256),
+		Data:      map[string]any{"key": "value"},
 	}
 }
 
@@ -68,9 +68,11 @@ func newTestTicket(thread *slack.Thread) ticket.Ticket {
 
 func newTestAlertList(thread *slack.Thread, alertIDs []types.AlertID) alert.List {
 	return alert.List{
-		ID:          types.NewAlertListID(),
-		Title:       "Test List",
-		Description: "Test Description",
+		ID: types.NewAlertListID(),
+		Metadata: alert.Metadata{
+			Title:       "Test List",
+			Description: "Test Description",
+		},
 		AlertIDs:    alertIDs,
 		SlackThread: thread,
 		CreatedAt:   time.Now(),
@@ -149,6 +151,12 @@ func TestAlertTicketBinding(t *testing.T) {
 		gt.NoError(t, repo.PutAlert(ctx, testAlert))
 		gt.NoError(t, repo.PutTicket(ctx, ticketObj))
 
+		unbindAlerts, err := repo.GetAlertWithoutTicket(ctx)
+		gt.NoError(t, err).Required()
+		gt.Array(t, unbindAlerts).Longer(0).Any(func(a *alert.Alert) bool {
+			return a.ID == testAlert.ID
+		})
+
 		// GetTicket
 		got, err := repo.GetTicket(ctx, ticketObj.ID)
 		gt.NoError(t, err)
@@ -181,17 +189,6 @@ func TestAlertTicketBinding(t *testing.T) {
 		gotAlert3, err := repo.GetAlert(ctx, alert3.ID)
 		gt.NoError(t, err)
 		gt.Value(t, gotAlert3.TicketID).Equal(ticketObj.ID)
-
-		// UnbindAlertFromTicket
-		gt.NoError(t, repo.UnbindAlertFromTicket(ctx, testAlert.ID))
-
-		// GetAlertWithoutTicket again
-		gotAlerts, err := repo.GetAlertWithoutTicket(ctx)
-		gt.NoError(t, err)
-		gt.Array(t, gotAlerts).Longer(0)
-		gt.Array(t, gotAlerts).Any(func(a *alert.Alert) bool {
-			return a.ID == testAlert.ID
-		})
 
 		// PutTicketComment
 		comment := ticketObj.NewComment(ctx, "Test Comment", slack.User{

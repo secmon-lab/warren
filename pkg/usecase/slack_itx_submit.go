@@ -9,6 +9,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/embedding"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
@@ -162,7 +163,7 @@ func (uc *UseCases) handleBindAlerts(ctx context.Context, user slack.User, ticke
 	for i, alert := range alerts {
 		embeddings[i] = alert.Embedding
 	}
-	ticket.Embedding = averageEmbeddings(embeddings)
+	ticket.Embedding = embedding.Averate(embeddings)
 
 	// Update database
 	if err := uc.repository.BatchBindAlertsToTicket(ctx, ticket.AlertIDs, ticketID); err != nil {
@@ -270,30 +271,4 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 	msg.Notify(ctx, "🎉 Ticket resolved")
 
 	return nil
-}
-
-func averageEmbeddings(embeddings []firestore.Vector32) firestore.Vector32 {
-	if len(embeddings) == 0 {
-		return firestore.Vector32{}
-	}
-
-	// Get dimension from first embedding
-	dim := len(embeddings[0])
-	sum := make([]float32, dim)
-
-	// Sum up all embeddings
-	for _, embedding := range embeddings {
-		for i := 0; i < dim; i++ {
-			sum[i] += embedding[i]
-		}
-	}
-
-	// Calculate average
-	avg := make([]float32, dim)
-	n := float32(len(embeddings))
-	for i := 0; i < dim; i++ {
-		avg[i] = sum[i] / n
-	}
-
-	return avg
 }

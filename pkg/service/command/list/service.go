@@ -47,31 +47,30 @@ func filterEmptyStrings(s []string) []string {
 
 func (x *Service) Run(ctx context.Context, th *svc.ThreadService, user *slack.User, input string) (types.AlertListID, error) {
 	commands := strings.Split(input, "|")
-	if len(commands) == 0 {
-		showHelp(ctx)
-		return types.EmptyAlertListID, nil
+	pipelineCommands := [][]string{}
+	for _, command := range commands {
+		command = strings.TrimSpace(command)
+		if command == "" {
+			continue
+		}
+		parts := strings.Split(command, " ")
+		if len(parts) == 0 {
+			continue
+		}
+		pipelineCommands = append(pipelineCommands, parts)
 	}
 
-	ctx = msg.NewTrace(ctx, "🤖 Creating alert list...")
-
-	nextCommands := commands[1:]
 	var pipeline *pipeline
 	var err error
-	if len(nextCommands) > 0 {
-		pipelineCommands := [][]string{}
-		for _, command := range nextCommands {
-			command = strings.TrimSpace(command)
-			if command == "" {
-				continue
-			}
-			pipelineCommands = append(pipelineCommands, strings.Split(command, " "))
-		}
-
+	if len(pipelineCommands) > 0 {
 		pipeline, err = buildPipeline(pipelineCommands)
 		if err != nil {
 			msg.Trace(ctx, "💥 Building pipeline: %s", err)
 			return types.EmptyAlertListID, err
 		}
+	} else {
+		showHelp(ctx)
+		return types.EmptyAlertListID, nil
 	}
 
 	alerts, err := source.Unbound()(ctx, x.repo)

@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
@@ -13,17 +14,18 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/embedding"
 )
 
 type List struct {
 	ID          types.AlertListID `json:"id"`
-	Metadata    Metadata          `json:"metadata"`
-	Title       string            `json:"title"`
-	Description string            `json:"description"`
 	AlertIDs    []types.AlertID   `json:"alert_ids"`
 	SlackThread *slack.Thread     `json:"slack_thread"`
 	CreatedAt   time.Time         `json:"created_at"`
 	CreatedBy   *slack.User       `json:"created_by"`
+
+	Metadata
+	Embedding firestore.Vector32 `json:"-"`
 
 	Alerts Alerts `firestore:"-"`
 }
@@ -65,6 +67,12 @@ func (x *List) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) err
 		return nil
 	}
 
+	embeddings := make([]firestore.Vector32, len(x.Alerts))
+	for i, alert := range x.Alerts {
+		embeddings[i] = alert.Embedding
+	}
+	x.Embedding = embedding.Averate(embeddings)
+
 	summary, err := llm.Summary(ctx, llmClient, listSummaryPrompt, x.Alerts)
 	if err != nil {
 		return err
@@ -79,7 +87,7 @@ func (x *List) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) err
 		return err
 	}
 
-	resp, err := llm.Ask[Metadata](ctx, llmClient, p, llm.WithValidate(func(v Metadata) error {
+	resp, err := llm.Ask(ctx, llmClient, p, llm.WithValidate(func(v Metadata) error {
 		if v.Title == "" {
 			return goerr.New("title is required")
 		}
