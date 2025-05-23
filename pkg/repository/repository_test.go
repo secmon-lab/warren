@@ -589,3 +589,65 @@ func TestHistory(t *testing.T) {
 		testFn(t, repo)
 	})
 }
+
+func TestTicketComments(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := context.Background()
+		thread := newTestThread()
+		ticket := newTestTicket(&thread)
+
+		// PutTicket
+		gt.NoError(t, repo.PutTicket(ctx, ticket))
+
+		// Create and put multiple comments
+		comments := make([]ticketmodel.Comment, 3)
+		for i := 0; i < 3; i++ {
+			comment := ticket.NewComment(ctx, *slack.NewMessage(ctx, &slackevents.EventsAPIEvent{
+				InnerEvent: slackevents.EventsAPIInnerEvent{
+					Data: &slackevents.AppMentionEvent{
+						TimeStamp: fmt.Sprintf("test-message-id-%d", i),
+						Text:      fmt.Sprintf("Test Comment %d", i),
+						User:      "test-user",
+						Channel:   "test-channel",
+					},
+				},
+			}))
+			gt.NoError(t, repo.PutTicketComment(ctx, comment))
+			comments[i] = comment
+		}
+
+		// Test GetTicketUnpromptedComments
+		unpromptedComments, err := repo.GetTicketUnpromptedComments(ctx, ticket.ID)
+		gt.NoError(t, err).Required()
+		gt.Array(t, unpromptedComments).Length(3).Required()
+
+		// Test PutTicketCommentsPrompted
+		commentIDs := []types.CommentID{comments[0].ID, comments[1].ID}
+		gt.NoError(t, repo.PutTicketCommentsPrompted(ctx, ticket.ID, commentIDs))
+
+		// Verify prompted status
+		unpromptedComments, err = repo.GetTicketUnpromptedComments(ctx, ticket.ID)
+		gt.NoError(t, err).Required()
+		gt.Array(t, unpromptedComments).Length(1).Required()
+		gt.Value(t, unpromptedComments[0].ID).Equal(comments[2].ID)
+
+		// Test with non-existent ticket ID
+		nonExistentID := types.NewTicketID()
+		unpromptedComments, err = repo.GetTicketUnpromptedComments(ctx, nonExistentID)
+		gt.NoError(t, err)
+		gt.Array(t, unpromptedComments).Length(0)
+
+		err = repo.PutTicketCommentsPrompted(ctx, nonExistentID, commentIDs)
+		gt.Error(t, err).Required()
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}

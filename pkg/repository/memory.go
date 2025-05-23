@@ -179,6 +179,50 @@ func (r *Memory) GetTicketComments(ctx context.Context, ticketID types.TicketID)
 	return comments, nil
 }
 
+func (r *Memory) GetTicketUnpromptedComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	comments, ok := r.ticketComments[ticketID]
+	if !ok {
+		return []ticket.Comment{}, nil
+	}
+
+	var unpromptedComments []ticket.Comment
+	for _, comment := range comments {
+		if !comment.Prompted {
+			unpromptedComments = append(unpromptedComments, comment)
+		}
+	}
+	return unpromptedComments, nil
+}
+
+func (r *Memory) PutTicketCommentsPrompted(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	comments, ok := r.ticketComments[ticketID]
+	if !ok {
+		return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+	}
+
+	// Create a map for faster lookup
+	commentIDMap := make(map[types.CommentID]bool)
+	for _, id := range commentIDs {
+		commentIDMap[id] = true
+	}
+
+	// Update prompted status for matching comments
+	for i := range comments {
+		if commentIDMap[comments[i].ID] {
+			comments[i].Prompted = true
+		}
+	}
+
+	r.ticketComments[ticketID] = comments
+	return nil
+}
+
 func (r *Memory) BindAlertToTicket(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

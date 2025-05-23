@@ -15,9 +15,13 @@ type Repository interface {
 	BatchGetTickets(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error)
 	PutTicket(ctx context.Context, ticket ticket.Ticket) error
 	GetTicketByThread(ctx context.Context, thread slack.Thread) (*ticket.Ticket, error)
+	FindNearestTickets(ctx context.Context, embedding []float32, limit int) ([]*ticket.Ticket, error)
+
+	// For comment management
 	PutTicketComment(ctx context.Context, comment ticket.Comment) error
 	GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
-	FindNearestTickets(ctx context.Context, embedding []float32, limit int) ([]*ticket.Ticket, error)
+	GetTicketUnpromptedComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
+	PutTicketCommentsPrompted(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error
 
 	BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error
 	BindAlertToTicket(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error

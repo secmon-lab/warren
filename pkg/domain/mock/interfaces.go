@@ -491,6 +491,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			GetTicketCommentsFunc: func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
 //				panic("mock out the GetTicketComments method")
 //			},
+//			GetTicketUnpromptedCommentsFunc: func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
+//				panic("mock out the GetTicketUnpromptedComments method")
+//			},
 //			PutAlertFunc: func(ctx context.Context, alertMoqParam alert.Alert) error {
 //				panic("mock out the PutAlert method")
 //			},
@@ -505,6 +508,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			},
 //			PutTicketCommentFunc: func(ctx context.Context, comment ticket.Comment) error {
 //				panic("mock out the PutTicketComment method")
+//			},
+//			PutTicketCommentsPromptedFunc: func(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error {
+//				panic("mock out the PutTicketCommentsPrompted method")
 //			},
 //			SearchAlertsFunc: func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
 //				panic("mock out the SearchAlerts method")
@@ -570,6 +576,9 @@ type RepositoryMock struct {
 	// GetTicketCommentsFunc mocks the GetTicketComments method.
 	GetTicketCommentsFunc func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
 
+	// GetTicketUnpromptedCommentsFunc mocks the GetTicketUnpromptedComments method.
+	GetTicketUnpromptedCommentsFunc func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
+
 	// PutAlertFunc mocks the PutAlert method.
 	PutAlertFunc func(ctx context.Context, alertMoqParam alert.Alert) error
 
@@ -584,6 +593,9 @@ type RepositoryMock struct {
 
 	// PutTicketCommentFunc mocks the PutTicketComment method.
 	PutTicketCommentFunc func(ctx context.Context, comment ticket.Comment) error
+
+	// PutTicketCommentsPromptedFunc mocks the PutTicketCommentsPrompted method.
+	PutTicketCommentsPromptedFunc func(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error
 
 	// SearchAlertsFunc mocks the SearchAlerts method.
 	SearchAlertsFunc func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error)
@@ -720,6 +732,13 @@ type RepositoryMock struct {
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
 		}
+		// GetTicketUnpromptedComments holds details about calls to the GetTicketUnpromptedComments method.
+		GetTicketUnpromptedComments []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TicketID is the ticketID argument value.
+			TicketID types.TicketID
+		}
 		// PutAlert holds details about calls to the PutAlert method.
 		PutAlert []struct {
 			// Ctx is the ctx argument value.
@@ -757,6 +776,15 @@ type RepositoryMock struct {
 			// Comment is the comment argument value.
 			Comment ticket.Comment
 		}
+		// PutTicketCommentsPrompted holds details about calls to the PutTicketCommentsPrompted method.
+		PutTicketCommentsPrompted []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TicketID is the ticketID argument value.
+			TicketID types.TicketID
+			// CommentIDs is the commentIDs argument value.
+			CommentIDs []types.CommentID
+		}
 		// SearchAlerts holds details about calls to the SearchAlerts method.
 		SearchAlerts []struct {
 			// Ctx is the ctx argument value.
@@ -778,30 +806,32 @@ type RepositoryMock struct {
 			AlertID types.AlertID
 		}
 	}
-	lockBatchBindAlertsToTicket    sync.RWMutex
-	lockBatchGetAlerts             sync.RWMutex
-	lockBatchGetTickets            sync.RWMutex
-	lockBindAlertToTicket          sync.RWMutex
-	lockFindNearestAlerts          sync.RWMutex
-	lockFindNearestTickets         sync.RWMutex
-	lockGetAlert                   sync.RWMutex
-	lockGetAlertByThread           sync.RWMutex
-	lockGetAlertList               sync.RWMutex
-	lockGetAlertListByThread       sync.RWMutex
-	lockGetAlertWithoutTicket      sync.RWMutex
-	lockGetAlertsBySpan            sync.RWMutex
-	lockGetLatestAlertListInThread sync.RWMutex
-	lockGetLatestHistory           sync.RWMutex
-	lockGetTicket                  sync.RWMutex
-	lockGetTicketByThread          sync.RWMutex
-	lockGetTicketComments          sync.RWMutex
-	lockPutAlert                   sync.RWMutex
-	lockPutAlertList               sync.RWMutex
-	lockPutHistory                 sync.RWMutex
-	lockPutTicket                  sync.RWMutex
-	lockPutTicketComment           sync.RWMutex
-	lockSearchAlerts               sync.RWMutex
-	lockUnbindAlertFromTicket      sync.RWMutex
+	lockBatchBindAlertsToTicket     sync.RWMutex
+	lockBatchGetAlerts              sync.RWMutex
+	lockBatchGetTickets             sync.RWMutex
+	lockBindAlertToTicket           sync.RWMutex
+	lockFindNearestAlerts           sync.RWMutex
+	lockFindNearestTickets          sync.RWMutex
+	lockGetAlert                    sync.RWMutex
+	lockGetAlertByThread            sync.RWMutex
+	lockGetAlertList                sync.RWMutex
+	lockGetAlertListByThread        sync.RWMutex
+	lockGetAlertWithoutTicket       sync.RWMutex
+	lockGetAlertsBySpan             sync.RWMutex
+	lockGetLatestAlertListInThread  sync.RWMutex
+	lockGetLatestHistory            sync.RWMutex
+	lockGetTicket                   sync.RWMutex
+	lockGetTicketByThread           sync.RWMutex
+	lockGetTicketComments           sync.RWMutex
+	lockGetTicketUnpromptedComments sync.RWMutex
+	lockPutAlert                    sync.RWMutex
+	lockPutAlertList                sync.RWMutex
+	lockPutHistory                  sync.RWMutex
+	lockPutTicket                   sync.RWMutex
+	lockPutTicketComment            sync.RWMutex
+	lockPutTicketCommentsPrompted   sync.RWMutex
+	lockSearchAlerts                sync.RWMutex
+	lockUnbindAlertFromTicket       sync.RWMutex
 }
 
 // BatchBindAlertsToTicket calls BatchBindAlertsToTicketFunc.
@@ -1498,6 +1528,46 @@ func (mock *RepositoryMock) GetTicketCommentsCalls() []struct {
 	return calls
 }
 
+// GetTicketUnpromptedComments calls GetTicketUnpromptedCommentsFunc.
+func (mock *RepositoryMock) GetTicketUnpromptedComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
+	callInfo := struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+	}{
+		Ctx:      ctx,
+		TicketID: ticketID,
+	}
+	mock.lockGetTicketUnpromptedComments.Lock()
+	mock.calls.GetTicketUnpromptedComments = append(mock.calls.GetTicketUnpromptedComments, callInfo)
+	mock.lockGetTicketUnpromptedComments.Unlock()
+	if mock.GetTicketUnpromptedCommentsFunc == nil {
+		var (
+			commentsOut []ticket.Comment
+			errOut      error
+		)
+		return commentsOut, errOut
+	}
+	return mock.GetTicketUnpromptedCommentsFunc(ctx, ticketID)
+}
+
+// GetTicketUnpromptedCommentsCalls gets all the calls that were made to GetTicketUnpromptedComments.
+// Check the length with:
+//
+//	len(mockedRepository.GetTicketUnpromptedCommentsCalls())
+func (mock *RepositoryMock) GetTicketUnpromptedCommentsCalls() []struct {
+	Ctx      context.Context
+	TicketID types.TicketID
+} {
+	var calls []struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+	}
+	mock.lockGetTicketUnpromptedComments.RLock()
+	calls = mock.calls.GetTicketUnpromptedComments
+	mock.lockGetTicketUnpromptedComments.RUnlock()
+	return calls
+}
+
 // PutAlert calls PutAlertFunc.
 func (mock *RepositoryMock) PutAlert(ctx context.Context, alertMoqParam alert.Alert) error {
 	callInfo := struct {
@@ -1694,6 +1764,49 @@ func (mock *RepositoryMock) PutTicketCommentCalls() []struct {
 	mock.lockPutTicketComment.RLock()
 	calls = mock.calls.PutTicketComment
 	mock.lockPutTicketComment.RUnlock()
+	return calls
+}
+
+// PutTicketCommentsPrompted calls PutTicketCommentsPromptedFunc.
+func (mock *RepositoryMock) PutTicketCommentsPrompted(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error {
+	callInfo := struct {
+		Ctx        context.Context
+		TicketID   types.TicketID
+		CommentIDs []types.CommentID
+	}{
+		Ctx:        ctx,
+		TicketID:   ticketID,
+		CommentIDs: commentIDs,
+	}
+	mock.lockPutTicketCommentsPrompted.Lock()
+	mock.calls.PutTicketCommentsPrompted = append(mock.calls.PutTicketCommentsPrompted, callInfo)
+	mock.lockPutTicketCommentsPrompted.Unlock()
+	if mock.PutTicketCommentsPromptedFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutTicketCommentsPromptedFunc(ctx, ticketID, commentIDs)
+}
+
+// PutTicketCommentsPromptedCalls gets all the calls that were made to PutTicketCommentsPrompted.
+// Check the length with:
+//
+//	len(mockedRepository.PutTicketCommentsPromptedCalls())
+func (mock *RepositoryMock) PutTicketCommentsPromptedCalls() []struct {
+	Ctx        context.Context
+	TicketID   types.TicketID
+	CommentIDs []types.CommentID
+} {
+	var calls []struct {
+		Ctx        context.Context
+		TicketID   types.TicketID
+		CommentIDs []types.CommentID
+	}
+	mock.lockPutTicketCommentsPrompted.RLock()
+	calls = mock.calls.PutTicketCommentsPrompted
+	mock.lockPutTicketCommentsPrompted.RUnlock()
 	return calls
 }
 

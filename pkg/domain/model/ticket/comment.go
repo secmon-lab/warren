@@ -16,6 +16,7 @@ type Comment struct {
 	Comment        string          `json:"comment"`
 	User           slack.User      `json:"user"`
 	SlackMessageID string          `json:"slack_message_id"`
+	Prompted       bool            `json:"prompted"`
 }
 
 func (x *Ticket) NewComment(ctx context.Context, msg slack.Message) Comment {
@@ -26,5 +27,6 @@ func (x *Ticket) NewComment(ctx context.Context, msg slack.Message) Comment {
 		Comment:        msg.Text(),
 		User:           msg.User(),
 		SlackMessageID: msg.ID(),
+		Prompted:       false,
 	}
 }

@@ -313,6 +313,65 @@ func (r *Firestore) GetTicketComments(ctx context.Context, ticketID types.Ticket
 	return comments, nil
 }
 
+func (r *Firestore) GetTicketUnpromptedComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
+	iter := r.db.Collection(collectionTickets).
+		Doc(ticketID.String()).
+		Collection(collectionComments).
+		Where("Prompted", "==", false).
+		Documents(ctx)
+
+	var comments []ticket.Comment
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get ticket unprompted comments", goerr.V("ticket_id", ticketID))
+		}
+
+		var comment ticket.Comment
+		if err := doc.DataTo(&comment); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket comment", goerr.V("ticket_id", ticketID))
+		}
+		comments = append(comments, comment)
+	}
+	return comments, nil
+}
+
+func (r *Firestore) PutTicketCommentsPrompted(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error {
+	bw := r.db.BulkWriter(ctx)
+	var jobs []*firestore.BulkWriterJob
+
+	for _, commentID := range commentIDs {
+		commentDoc := r.db.Collection(collectionTickets).
+			Doc(ticketID.String()).
+			Collection(collectionComments).
+			Doc(commentID.String())
+
+		job, err := bw.Update(commentDoc, []firestore.Update{
+			{
+				Path:  "Prompted",
+				Value: true,
+			},
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to update comment prompted status", goerr.V("ticket_id", ticketID), goerr.V("comment_id", commentID))
+		}
+		jobs = append(jobs, job)
+	}
+
+	bw.End()
+
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil {
+			return goerr.Wrap(err, "failed to commit bulk writer job")
+		}
+	}
+
+	return nil
+}
+
 // Alert-Ticket binding methods
 func (r *Firestore) BindAlertToTicket(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
 	alertDoc := r.db.Collection(collectionAlerts).Doc(alertID.String())
