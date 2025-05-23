@@ -2,15 +2,11 @@ package cli
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"os"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/urfave/cli/v3"
-	"golang.org/x/term"
 )
 
 func cmdChat() *cli.Command {
@@ -206,6 +202,7 @@ func cmdChat() *cli.Command {
 	}
 }
 
+/*
 func recvInput() (string, error) {
 	fmt.Printf("\033[2K> ")
 
@@ -241,3 +238,4 @@ func newTrace(ctx context.Context, msg string) func(ctx context.Context, msg str
 		fmt.Printf("%s\n", msg)
 	}
 }
+*/
