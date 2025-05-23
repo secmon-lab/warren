@@ -5,11 +5,11 @@ import (
 	_ "embed"
 	"strings"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/model/source"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	svc "github.com/secmon-lab/warren/pkg/service/slack"
 
@@ -63,10 +63,12 @@ func (x *Service) Run(ctx context.Context, th *svc.ThreadService, user *slack.Us
 		return types.EmptyAlertListID, nil
 	}
 
-	alerts, err := source.Unbound()(ctx, x.repo)
+	msg.Trace(ctx, "🤖 Getting unbound alerts with ticket...")
+
+	alerts, err := x.repo.GetAlertWithoutTicket(ctx)
 	if err != nil {
 		msg.Trace(ctx, "💥 Get alerts without ticket: %s", err)
-		return types.EmptyAlertListID, err
+		return types.EmptyAlertListID, goerr.Wrap(err, "failed to get unbound alerts")
 	}
 
 	if alerts == nil {

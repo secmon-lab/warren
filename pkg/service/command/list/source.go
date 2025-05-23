@@ -1,18 +1,6 @@
 package list
 
-import (
-	"context"
-	"fmt"
-	"regexp"
-	"strings"
-	"time"
-
-	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/source"
-	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/utils/clock"
-)
-
+/*
 func parseArgsToSource(ctx context.Context, args []string) (source.Source, error) {
 	if len(args) == 0 {
 		return source.Span(clock.Now(ctx).Add(-24*time.Hour), clock.Now(ctx)), nil
@@ -183,3 +171,4 @@ func parseDuration(s string) (time.Duration, error) {
 		return 0, goerr.New("unsupported duration unit", goerr.V("unit", unit))
 	}
 }
+*/
