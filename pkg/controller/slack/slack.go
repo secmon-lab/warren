@@ -5,10 +5,10 @@ import (
 	"runtime/debug"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/slack-go/slack"
@@ -48,11 +48,11 @@ func dispatch(ctx context.Context, handler func(ctx context.Context) error) {
 }
 
 type Controller struct {
-	event       usecase.SlackEvent
-	interaction usecase.SlackInteraction
+	event       interfaces.SlackEventUsecases
+	interaction interfaces.SlackInteractionUsecases
 }
 
-func New(event usecase.SlackEvent, interaction usecase.SlackInteraction) *Controller {
+func New(event interfaces.SlackEventUsecases, interaction interfaces.SlackInteractionUsecases) *Controller {
 	return &Controller{
 		event:       event,
 		interaction: interaction,

@@ -15,7 +15,6 @@ tasks:
       - mock_controller_http
       - mock_model_message
       - mock_interfaces
-      - mock_usecase
 
   mock_controller_http:
     desc: "Generate mock files for controller/http"
@@ -51,14 +50,6 @@ tasks:
         StorageClient
         LLMClient
         LLMSession
-  mock_usecase:
-    desc: "Generate mock files for usecase"
-    cmds:
-      - go tool moq
-        -out pkg/usecase/mock.go
-        -pkg usecase
-        -rm -skip-ensure -stub
-        pkg/usecase
-        SlackEvent
-        SlackInteraction
-        Alert
+        SlackEventUsecases
+        SlackInteractionUsecases
+        AlertUsecases

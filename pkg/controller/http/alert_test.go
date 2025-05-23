@@ -13,6 +13,7 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/harlog"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
+	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -34,7 +35,7 @@ func TestAlertSNSHandler(t *testing.T) {
 	gt.NoError(t, err)
 
 	t.Run("successful alert handling", func(t *testing.T) {
-		mockUseCase := &UseCaseMock{
+		alertMock := &mock.AlertUsecasesMock{
 			HandleAlertWithAuthFunc: func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 				gt.Value(t, schema).Equal("") // That's caused by calling AlertSNSHandler directly
 				data, ok := alertData.(map[string]any)
@@ -42,6 +43,9 @@ func TestAlertSNSHandler(t *testing.T) {
 				gt.Value(t, data["color"]).Equal("blue")
 				return []*alert.Alert{}, nil
 			},
+		}
+		mockUseCase := &useCaseInterface{
+			AlertUsecases: alertMock,
 		}
 
 		// Create request with SNS message
@@ -56,11 +60,11 @@ func TestAlertSNSHandler(t *testing.T) {
 
 		// Check response
 		gt.Value(t, rec.Code).Equal(http.StatusOK)
-		gt.Value(t, len(mockUseCase.HandleAlertWithAuthCalls())).Equal(1)
+		gt.Value(t, len(alertMock.HandleAlertWithAuthCalls())).Equal(1)
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
-		mockUseCase := &UseCaseMock{}
+		mockUseCase := &useCaseInterface{}
 
 		req := httptest.NewRequest(http.MethodPost, "/alert/sns/test", bytes.NewReader([]byte("invalid json")))
 		rec := httptest.NewRecorder()
@@ -68,11 +72,14 @@ func TestAlertSNSHandler(t *testing.T) {
 		server.AlertSNSHandler(mockUseCase)(rec, req)
 
 		gt.Value(t, rec.Code).Equal(http.StatusBadRequest)
-		gt.Value(t, len(mockUseCase.HandleAlertWithAuthCalls())).Equal(0)
 	})
 
 	t.Run("invalid alert data", func(t *testing.T) {
-		mockUseCase := &UseCaseMock{}
+		alertMock := &mock.AlertUsecasesMock{
+			HandleAlertWithAuthFunc: func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
+				return []*alert.Alert{}, nil
+			},
+		}
 
 		invalidMessage := snsMessage
 		invalidMessage.Message = "invalid json"
@@ -83,9 +90,11 @@ func TestAlertSNSHandler(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/alert/sns/test", bytes.NewReader(body))
 		rec := httptest.NewRecorder()
 
-		server.AlertSNSHandler(mockUseCase)(rec, req)
+		server.AlertSNSHandler(&useCaseInterface{
+			AlertUsecases: alertMock,
+		})(rec, req)
 
 		gt.Value(t, rec.Code).Equal(http.StatusBadRequest)
-		gt.Value(t, len(mockUseCase.HandleAlertWithAuthCalls())).Equal(0)
+		gt.Value(t, len(alertMock.HandleAlertWithAuthCalls())).Equal(0)
 	})
 }
