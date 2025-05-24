@@ -402,7 +402,7 @@ func buildNewAlertListBlocks(list *alert.List, alerts alert.Alerts, metadata sla
 	return blocks
 }
 
-func (x *ThreadService) PostAlertClusters(ctx context.Context, clusters []*alert.List) error {
+func (x *ThreadService) PostAlertLists(ctx context.Context, clusters []*alert.List) error {
 	blocks, err := buildAlertClustersBlocks(clusters, x.slackMetadata)
 	if err != nil {
 		return goerr.Wrap(err, "failed to build alert clusters blocks")

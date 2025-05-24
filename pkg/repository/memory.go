@@ -57,16 +57,19 @@ func (r *Memory) GetAlert(ctx context.Context, alertID types.AlertID) (*alert.Al
 	return alert, nil
 }
 
-func (r *Memory) GetAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
+func (r *Memory) GetLatestAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
+	var latest *alert.Alert
 	for _, alert := range r.alerts {
 		if alert.SlackThread.ChannelID == thread.ChannelID && alert.SlackThread.ThreadID == thread.ThreadID {
-			return alert, nil
+			if latest == nil || alert.CreatedAt.After(latest.CreatedAt) {
+				latest = alert
+			}
 		}
 	}
-	return nil, nil
+	return latest, nil
 }
 
 func (r *Memory) GetLatestHistory(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {

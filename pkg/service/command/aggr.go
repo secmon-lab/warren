@@ -1,4 +1,4 @@
-package aggr
+package command
 
 import (
 	"context"
@@ -6,16 +6,14 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/service/command/list"
-	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
+	svc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-func Run(ctx context.Context, repo interfaces.Repository, llm gollem.LLMClient, st *slack_svc.ThreadService, user slack.User, alertList *alert.List, remaining string) error {
+// RunAggr runs the aggregate command with the given input.
+func (x *Service) RunAggr(ctx context.Context, st *svc.ThreadService, user slack.User, alertList *alert.List, remaining string) error {
 	args := strings.Fields(remaining)
 
 	threshold := 0.99
@@ -39,7 +37,7 @@ func Run(ctx context.Context, repo interfaces.Repository, llm gollem.LLMClient, 
 		topN = v
 	}
 
-	alerts, err := alertList.GetAlerts(ctx, repo)
+	alerts, err := alertList.GetAlerts(ctx, x.repo)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alerts")
 	}
@@ -50,7 +48,7 @@ func Run(ctx context.Context, repo interfaces.Repository, llm gollem.LLMClient, 
 
 	var lists []*alert.List
 	for _, cluster := range clusters {
-		newList, err := list.CreateList(ctx, repo, llm, *alertList.SlackThread, &user, cluster)
+		newList, err := x.CreateList(ctx, *alertList.SlackThread, &user, cluster)
 		if err != nil {
 			return goerr.Wrap(err, "failed to create alert list")
 		}

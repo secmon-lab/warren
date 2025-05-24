@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -10,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
+	"github.com/secmon-lab/warren/pkg/service/command/aggr"
 	"github.com/secmon-lab/warren/pkg/service/command/list"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
@@ -27,18 +29,27 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 	ctx = msg.With(ctx, threadSvc.Reply, threadSvc.NewStateFunc)
 
 	// Nothing to do
-	for _, mention := range slackMsg.Mention() {
+	for i, mention := range slackMsg.Mention() {
 		if !uc.slackService.IsBotUser(mention.UserID) {
 			continue
 		}
 
-		if len(mention.Message) == 0 {
-			msg.Notify(ctx, "🤔 No message")
-			return nil
+		// Try to parse message as command when it's first mention.
+		if i == 0 && len(mention.Message) > 0 {
+			if err := uc.handleSlackCommand(ctx, slackMsg, mention.Message); err != nil {
+				// If errUnknownCommand, it will be falled thorugh.
+				if !errors.Is(err, errUnknownCommand) {
+					return goerr.Wrap(err, "failed to handle slack root command")
+				}
+			} else {
+				// If no error in command processor, the mention has been proceeded.
+				continue
+			}
 		}
 
-		if !slackMsg.InThread() {
-			return uc.handleSlackRootCommand(ctx, slackMsg, mention.Message)
+		if len(mention.Message) == 0 {
+			msg.Notify(ctx, "Tell me what you want to do. 🙂")
+			return nil
 		}
 
 		ticket, err := uc.repository.GetTicketByThread(ctx, slackMsg.Thread())
@@ -59,6 +70,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 
 var (
 	errUnknownCommand = goerr.New("unknown command")
+	errNoRequiredData = goerr.New("no required data")
 )
 
 func messageToArgs(message string) (string, string) {
@@ -70,6 +82,73 @@ func messageToArgs(message string) (string, string) {
 		return strings.ToLower(strings.TrimSpace(args[0])), ""
 	}
 	return strings.ToLower(strings.TrimSpace(args[0])), strings.TrimSpace(args[1])
+}
+
+// handleSlackCommand not only routes command but also get input data in the thread.
+func (uc *UseCases) handleSlackCommand(ctx context.Context, slackMsg slack.Message, command string) error {
+	threadSvc := uc.slackService.NewThread(slackMsg.Thread())
+	cmd, remaining := messageToArgs(command)
+	if cmd == "" {
+		return errUnknownCommand
+	}
+
+	eb := goerr.NewBuilder(goerr.V("thread", slackMsg.Thread()))
+
+	latestAlert, err := uc.repository.GetLatestAlertByThread(ctx, slackMsg.Thread())
+	if err != nil {
+		return eb.Wrap(err, "failed to get latest alert by thread")
+	}
+	latestList, err := uc.repository.GetLatestAlertListInThread(ctx, slackMsg.Thread())
+	if err != nil {
+		return eb.Wrap(err, "failed to get latest alert list in thread")
+	}
+	ticket, err := uc.repository.GetTicketByThread(ctx, slackMsg.Thread())
+	if err != nil {
+		return eb.Wrap(err, "failed to get ticket by thread")
+	}
+
+	switch cmd {
+	case "l", "ls", "list":
+		_, err := list.
+			New(uc.repository, uc.llmClient).
+			Run(ctx, threadSvc, ptr.Ref(slackMsg.User()), remaining)
+		if err != nil {
+			return eb.Wrap(err, "failed to run list command")
+		}
+		return nil
+
+	case "a", "aggr", "aggregate":
+		if latestList == nil {
+			msg.Notify(ctx, "🤔 No alert list found in this thread. Please create one first.")
+			return eb.Wrap(errNoRequiredData, "no alert list found in thread", goerr.V("thread", slackMsg.Thread()))
+		}
+
+		if err := aggr.Run(ctx, uc.repository, uc.llmClient, threadSvc, slackMsg.User(), latestList, remaining); err != nil {
+			return eb.Wrap(err, "failed to run aggregate command")
+		}
+		return nil
+
+	case "t", "ticket":
+		// @TODO: Fix it
+		if ticket == nil {
+			msg.Notify(ctx, "🤔 No ticket found in this thread. Please create one first.")
+			return eb.Wrap(errNoRequiredData, "no ticket found in thread", goerr.V("thread", slackMsg.Thread()))
+		}
+		msg.Notify(ctx, "🤔 Ticket found in this thread. Please use `ticket` command to manage the ticket.")
+		return nil
+
+	case "alert":
+		// @TODO: Fix it
+		if latestAlert == nil {
+			msg.Notify(ctx, "🤔 No alert found in this thread. Please create one first.")
+			return eb.Wrap(errNoRequiredData, "no alert found in thread", goerr.V("thread", slackMsg.Thread()))
+		}
+		msg.Notify(ctx, "🤔 Alert found in this thread. Please use `alert` command to manage the alert.")
+		return nil
+
+	default:
+		return errUnknownCommand
+	}
 }
 
 /*

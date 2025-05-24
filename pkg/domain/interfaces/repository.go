@@ -30,7 +30,7 @@ type Repository interface {
 	PutAlert(ctx context.Context, alert alert.Alert) error
 	BatchPutAlerts(ctx context.Context, alerts alert.Alerts) error
 	GetAlert(ctx context.Context, alertID types.AlertID) (*alert.Alert, error)
-	GetAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error)
+	GetLatestAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error)
 	SearchAlerts(ctx context.Context, path, op string, value any, limit int) (alert.Alerts, error)
 	GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, error)
 	GetAlertsBySpan(ctx context.Context, begin, end time.Time) (alert.Alerts, error)

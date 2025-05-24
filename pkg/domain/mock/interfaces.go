@@ -1182,7 +1182,7 @@ func (mock *RepositoryMock) GetAlertCalls() []struct {
 }
 
 // GetAlertByThread calls GetAlertByThreadFunc.
-func (mock *RepositoryMock) GetAlertByThread(ctx context.Context, thread modelslack.Thread) (*alert.Alert, error) {
+func (mock *RepositoryMock) GetLatestAlertByThread(ctx context.Context, thread modelslack.Thread) (*alert.Alert, error) {
 	callInfo := struct {
 		Ctx    context.Context
 		Thread modelslack.Thread

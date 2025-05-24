@@ -83,7 +83,7 @@ func newTestAlertList(thread *slack.Thread, alertIDs []types.AlertID) alert.List
 	}
 }
 
-func TestAlertBasic(t *testing.T) {
+func TestGetLatestAlertByThread(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := context.Background()
 		thread := newTestThread()
@@ -98,8 +98,8 @@ func TestAlertBasic(t *testing.T) {
 		gt.Value(t, got.ID).Equal(a.ID)
 		gt.Value(t, got.Schema).Equal(a.Schema)
 
-		// GetAlertByThread
-		got, err = repo.GetAlertByThread(ctx, thread)
+		// GetLatestAlertByThread
+		got, err = repo.GetLatestAlertByThread(ctx, thread)
 		gt.NoError(t, err)
 		gt.Value(t, got.ID).Equal(a.ID)
 
