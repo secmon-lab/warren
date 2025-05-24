@@ -24,5 +24,5 @@ func CreateList(ctx context.Context, repo interfaces.Repository, llmClient inter
 		return nil, goerr.Wrap(err, "failed to put alert list")
 	}
 
-	return &list, nil
+	return list, nil
 }

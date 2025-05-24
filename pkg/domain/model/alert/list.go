@@ -3,6 +3,7 @@ package alert
 import (
 	"context"
 	_ "embed"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -27,10 +28,11 @@ type List struct {
 	Metadata
 	Embedding firestore.Vector32 `json:"-"`
 
-	Alerts Alerts `firestore:"-"`
+	alertsMutex sync.RWMutex
+	alerts      Alerts `firestore:"-"`
 }
 
-func NewList(ctx context.Context, thread slack.Thread, createdBy *slack.User, alerts Alerts) List {
+func NewList(ctx context.Context, thread slack.Thread, createdBy *slack.User, alerts Alerts) *List {
 	list := List{
 		ID:          types.NewAlertListID(),
 		SlackThread: &thread,
@@ -39,10 +41,10 @@ func NewList(ctx context.Context, thread slack.Thread, createdBy *slack.User, al
 	}
 	for _, alert := range alerts {
 		list.AlertIDs = append(list.AlertIDs, alert.ID)
-		list.Alerts = append(list.Alerts, alert)
+		list.alerts = append(list.alerts, alert)
 	}
 
-	return list
+	return &list
 }
 
 //go:embed prompt/list_summary.md
@@ -51,15 +53,72 @@ var listSummaryPrompt string
 //go:embed prompt/list_meta.md
 var listMetaPrompt string
 
+type AlertListRepository interface {
+	BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (Alerts, error)
+}
+
+func matchIDs(ids []types.AlertID, alerts Alerts) bool {
+	if len(ids) != len(alerts) {
+		return false
+	}
+
+	idSet := make(map[types.AlertID]struct{})
+	for _, id := range ids {
+		idSet[id] = struct{}{}
+	}
+
+	for _, alert := range alerts {
+		if _, ok := idSet[alert.ID]; !ok {
+			return false
+		}
+		delete(idSet, alert.ID)
+	}
+
+	return len(idSet) == 0
+}
+
+func (x *List) Alerts() (Alerts, error) {
+	x.alertsMutex.RLock()
+	defer x.alertsMutex.RUnlock()
+
+	if matchIDs(x.AlertIDs, x.alerts) {
+		return x.alerts, nil
+	}
+
+	return nil, goerr.New("alerts are not matched, need to call GetAlerts first")
+}
+
+func (x *List) GetAlerts(ctx context.Context, repo AlertListRepository) (Alerts, error) {
+	x.alertsMutex.Lock()
+	defer x.alertsMutex.Unlock()
+
+	if matchIDs(x.AlertIDs, x.alerts) {
+		return x.alerts, nil
+	}
+
+	alerts, err := repo.BatchGetAlerts(ctx, x.AlertIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	x.alerts = alerts
+	x.AlertIDs = make([]types.AlertID, len(alerts))
+	for i, alert := range alerts {
+		x.AlertIDs[i] = alert.ID
+	}
+
+	return alerts, nil
+}
+
 func (x *List) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) error {
-	if len(x.Alerts) != len(x.AlertIDs) {
+	if len(x.alerts) != len(x.AlertIDs) {
 		return goerr.New("alert IDs and alerts are not matched",
 			goerr.V("alert_ids", len(x.AlertIDs)),
-			goerr.V("alerts", len(x.Alerts)),
+			goerr.V("alerts", len(x.alerts)),
 		)
 	}
 
-	if len(x.Alerts) == 0 {
+	if len(x.alerts) == 0 {
 		x.Metadata = Metadata{
 			Title:       "(no alerts)",
 			Description: "",
@@ -67,13 +126,13 @@ func (x *List) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) err
 		return nil
 	}
 
-	embeddings := make([]firestore.Vector32, len(x.Alerts))
-	for i, alert := range x.Alerts {
+	embeddings := make([]firestore.Vector32, len(x.alerts))
+	for i, alert := range x.alerts {
 		embeddings[i] = alert.Embedding
 	}
 	x.Embedding = embedding.Averate(embeddings)
 
-	summary, err := llm.Summary(ctx, llmClient, listSummaryPrompt, x.Alerts)
+	summary, err := llm.Summary(ctx, llmClient, listSummaryPrompt, x.alerts)
 	if err != nil {
 		return err
 	}

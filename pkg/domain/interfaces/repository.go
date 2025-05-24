@@ -28,6 +28,7 @@ type Repository interface {
 	UnbindAlertFromTicket(ctx context.Context, alertID types.AlertID) error
 
 	PutAlert(ctx context.Context, alert alert.Alert) error
+	BatchPutAlerts(ctx context.Context, alerts alert.Alerts) error
 	GetAlert(ctx context.Context, alertID types.AlertID) (*alert.Alert, error)
 	GetAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error)
 	SearchAlerts(ctx context.Context, path, op string, value any, limit int) (alert.Alerts, error)
@@ -41,7 +42,7 @@ type Repository interface {
 
 	// For list management
 	GetAlertList(ctx context.Context, listID types.AlertListID) (*alert.List, error)
-	PutAlertList(ctx context.Context, list alert.List) error
+	PutAlertList(ctx context.Context, list *alert.List) error
 	GetAlertListByThread(ctx context.Context, thread slack.Thread) (*alert.List, error)
 	GetLatestAlertListInThread(ctx context.Context, thread slack.Thread) (*alert.List, error)
 }

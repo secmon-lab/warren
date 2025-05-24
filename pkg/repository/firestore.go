@@ -112,7 +112,7 @@ func (r *Firestore) GetAlertList(ctx context.Context, listID types.AlertListID) 
 	return &alertList, nil
 }
 
-func (r *Firestore) PutAlertList(ctx context.Context, list alert.List) error {
+func (r *Firestore) PutAlertList(ctx context.Context, list *alert.List) error {
 	doc := r.db.Collection(collectionAlertLists).Doc(list.ID.String())
 	_, err := doc.Set(ctx, list)
 	if err != nil {
@@ -154,7 +154,7 @@ func (r *Firestore) GetLatestAlertListInThread(ctx context.Context, thread slack
 		Where("SlackThread.ThreadID", "==", thread.ThreadID).
 		Documents(ctx)
 
-	var lists []alert.List
+	var lists []*alert.List
 	for {
 		doc, err := iter.Next()
 		if err != nil {
@@ -169,7 +169,7 @@ func (r *Firestore) GetLatestAlertListInThread(ctx context.Context, thread slack
 			return nil, goerr.Wrap(err, "failed to convert data to alert list")
 		}
 
-		lists = append(lists, alertList)
+		lists = append(lists, &alertList)
 	}
 
 	if len(lists) == 0 {
@@ -181,7 +181,7 @@ func (r *Firestore) GetLatestAlertListInThread(ctx context.Context, thread slack
 		return lists[i].CreatedAt.After(lists[j].CreatedAt)
 	})
 
-	return &lists[0], nil
+	return lists[0], nil
 }
 
 func (r *Firestore) GetAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
@@ -715,4 +715,28 @@ func (r *Firestore) FindNearestAlerts(ctx context.Context, embedding []float32, 
 	}
 
 	return alerts, nil
+}
+
+func (r *Firestore) BatchPutAlerts(ctx context.Context, alerts alert.Alerts) error {
+	bw := r.db.BulkWriter(ctx)
+	var jobs []*firestore.BulkWriterJob
+
+	for _, alert := range alerts {
+		alertDoc := r.db.Collection(collectionAlerts).Doc(alert.ID.String())
+		job, err := bw.Set(alertDoc, alert)
+		if err != nil {
+			return goerr.Wrap(err, "failed to put alert", goerr.V("alert_id", alert.ID))
+		}
+		jobs = append(jobs, job)
+	}
+
+	bw.End()
+
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil {
+			return goerr.Wrap(err, "failed to commit bulk writer job")
+		}
+	}
+
+	return nil
 }

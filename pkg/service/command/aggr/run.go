@@ -58,14 +58,14 @@ func Run(ctx context.Context, repo interfaces.Repository, slackThread *slack_svc
 		ThreadID:  slackThread.ThreadID(),
 	}
 
-	var lists []alert.List
+	var lists []*alert.List
 	for _, cluster := range clusters {
 		newList, err := list.CreateList(ctx, repo, llm, threadModel, &user, cluster)
 		if err != nil {
 			return goerr.Wrap(err, "failed to create alert list")
 		}
 
-		lists = append(lists, *newList)
+		lists = append(lists, newList)
 	}
 
 	if err := slackThread.PostAlertClusters(ctx, lists); err != nil {

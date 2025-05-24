@@ -7,6 +7,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -405,7 +406,7 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 	}
 }
 
-func buildAlertListBlocks(list *alert.List, metadata slackMetadata) []slack.Block {
+func buildAlertListBlocks(list *alert.List, alerts alert.Alerts, metadata slackMetadata) []slack.Block {
 	var blocks []slack.Block
 
 	if list.Title != "" {
@@ -427,7 +428,7 @@ func buildAlertListBlocks(list *alert.List, metadata slackMetadata) []slack.Bloc
 		nil,
 		nil,
 	))
-	blocks = append(blocks, buildAlertsBlocks(list.Alerts, metadata)...)
+	blocks = append(blocks, buildAlertsBlocks(alerts, metadata)...)
 	blocks = append(blocks, slack.NewActionBlock(
 		list.ID.String(),
 		slack.NewButtonBlockElement(
@@ -488,7 +489,7 @@ func buildAlertsBlocks(alerts alert.Alerts, metadata slackMetadata) []slack.Bloc
 	return blocks
 }
 
-func buildAlertClustersBlocks(clusters []alert.List, metadata slackMetadata) []slack.Block {
+func buildAlertClustersBlocks(clusters []*alert.List, metadata slackMetadata) ([]slack.Block, error) {
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(
 			slack.NewTextBlockObject("plain_text", "🗂️ Alert Clusters", false, false),
@@ -497,10 +498,14 @@ func buildAlertClustersBlocks(clusters []alert.List, metadata slackMetadata) []s
 	}
 
 	for _, cluster := range clusters {
-		blocks = append(blocks, buildAlertListBlocks(&cluster, metadata)...)
+		alerts, err := cluster.Alerts()
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to get alerts")
+		}
+		blocks = append(blocks, buildAlertListBlocks(cluster, alerts, metadata)...)
 	}
 
-	return blocks
+	return blocks, nil
 }
 
 // buildStateMessageBlocks builds the blocks for the state message in the thread.

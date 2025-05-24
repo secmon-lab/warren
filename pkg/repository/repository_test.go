@@ -223,7 +223,7 @@ func TestAlertList(t *testing.T) {
 		list := newTestAlertList(&thread, alertIDs)
 
 		// PutAlertList
-		gt.NoError(t, repo.PutAlertList(ctx, list))
+		gt.NoError(t, repo.PutAlertList(ctx, &list))
 
 		// GetAlertList
 		got, err := repo.GetAlertList(ctx, list.ID)
@@ -639,6 +639,49 @@ func TestTicketComments(t *testing.T) {
 
 		err = repo.PutTicketCommentsPrompted(ctx, nonExistentID, commentIDs)
 		gt.Error(t, err).Required()
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+func TestBatchPutAlerts(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := context.Background()
+		alerts := alert.Alerts{
+			&alert.Alert{
+				ID:        types.NewAlertID(),
+				CreatedAt: time.Now(),
+				Metadata: alert.Metadata{
+					Title: "Test Alert 1",
+				},
+			},
+			&alert.Alert{
+				ID:        types.NewAlertID(),
+				CreatedAt: time.Now(),
+				Metadata: alert.Metadata{
+					Title: "Test Alert 2",
+				},
+			},
+		}
+
+		err := repo.BatchPutAlerts(ctx, alerts)
+		gt.NoError(t, err)
+
+		// Verify alerts were stored
+		for _, alert := range alerts {
+			stored, err := repo.GetAlert(ctx, alert.ID)
+			gt.NoError(t, err)
+			gt.Value(t, stored.ID).Equal(alert.ID)
+			gt.Value(t, stored.Title).Equal(alert.Title)
+		}
 	}
 
 	t.Run("Memory", func(t *testing.T) {

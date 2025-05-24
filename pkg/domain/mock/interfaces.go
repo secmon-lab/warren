@@ -449,6 +449,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			BatchGetTicketsFunc: func(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error) {
 //				panic("mock out the BatchGetTickets method")
 //			},
+//			BatchPutAlertsFunc: func(ctx context.Context, alerts alert.Alerts) error {
+//				panic("mock out the BatchPutAlerts method")
+//			},
 //			BindAlertToTicketFunc: func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
 //				panic("mock out the BindAlertToTicket method")
 //			},
@@ -497,7 +500,7 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			PutAlertFunc: func(ctx context.Context, alertMoqParam alert.Alert) error {
 //				panic("mock out the PutAlert method")
 //			},
-//			PutAlertListFunc: func(ctx context.Context, list alert.List) error {
+//			PutAlertListFunc: func(ctx context.Context, list *alert.List) error {
 //				panic("mock out the PutAlertList method")
 //			},
 //			PutHistoryFunc: func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
@@ -533,6 +536,9 @@ type RepositoryMock struct {
 
 	// BatchGetTicketsFunc mocks the BatchGetTickets method.
 	BatchGetTicketsFunc func(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error)
+
+	// BatchPutAlertsFunc mocks the BatchPutAlerts method.
+	BatchPutAlertsFunc func(ctx context.Context, alerts alert.Alerts) error
 
 	// BindAlertToTicketFunc mocks the BindAlertToTicket method.
 	BindAlertToTicketFunc func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error
@@ -583,7 +589,7 @@ type RepositoryMock struct {
 	PutAlertFunc func(ctx context.Context, alertMoqParam alert.Alert) error
 
 	// PutAlertListFunc mocks the PutAlertList method.
-	PutAlertListFunc func(ctx context.Context, list alert.List) error
+	PutAlertListFunc func(ctx context.Context, list *alert.List) error
 
 	// PutHistoryFunc mocks the PutHistory method.
 	PutHistoryFunc func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error
@@ -627,6 +633,13 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// TicketIDs is the ticketIDs argument value.
 			TicketIDs []types.TicketID
+		}
+		// BatchPutAlerts holds details about calls to the BatchPutAlerts method.
+		BatchPutAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Alerts is the alerts argument value.
+			Alerts alert.Alerts
 		}
 		// BindAlertToTicket holds details about calls to the BindAlertToTicket method.
 		BindAlertToTicket []struct {
@@ -751,7 +764,7 @@ type RepositoryMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// List is the list argument value.
-			List alert.List
+			List *alert.List
 		}
 		// PutHistory holds details about calls to the PutHistory method.
 		PutHistory []struct {
@@ -809,6 +822,7 @@ type RepositoryMock struct {
 	lockBatchBindAlertsToTicket     sync.RWMutex
 	lockBatchGetAlerts              sync.RWMutex
 	lockBatchGetTickets             sync.RWMutex
+	lockBatchPutAlerts              sync.RWMutex
 	lockBindAlertToTicket           sync.RWMutex
 	lockFindNearestAlerts           sync.RWMutex
 	lockFindNearestTickets          sync.RWMutex
@@ -954,6 +968,45 @@ func (mock *RepositoryMock) BatchGetTicketsCalls() []struct {
 	mock.lockBatchGetTickets.RLock()
 	calls = mock.calls.BatchGetTickets
 	mock.lockBatchGetTickets.RUnlock()
+	return calls
+}
+
+// BatchPutAlerts calls BatchPutAlertsFunc.
+func (mock *RepositoryMock) BatchPutAlerts(ctx context.Context, alerts alert.Alerts) error {
+	callInfo := struct {
+		Ctx    context.Context
+		Alerts alert.Alerts
+	}{
+		Ctx:    ctx,
+		Alerts: alerts,
+	}
+	mock.lockBatchPutAlerts.Lock()
+	mock.calls.BatchPutAlerts = append(mock.calls.BatchPutAlerts, callInfo)
+	mock.lockBatchPutAlerts.Unlock()
+	if mock.BatchPutAlertsFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.BatchPutAlertsFunc(ctx, alerts)
+}
+
+// BatchPutAlertsCalls gets all the calls that were made to BatchPutAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.BatchPutAlertsCalls())
+func (mock *RepositoryMock) BatchPutAlertsCalls() []struct {
+	Ctx    context.Context
+	Alerts alert.Alerts
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Alerts alert.Alerts
+	}
+	mock.lockBatchPutAlerts.RLock()
+	calls = mock.calls.BatchPutAlerts
+	mock.lockBatchPutAlerts.RUnlock()
 	return calls
 }
 
@@ -1608,10 +1661,10 @@ func (mock *RepositoryMock) PutAlertCalls() []struct {
 }
 
 // PutAlertList calls PutAlertListFunc.
-func (mock *RepositoryMock) PutAlertList(ctx context.Context, list alert.List) error {
+func (mock *RepositoryMock) PutAlertList(ctx context.Context, list *alert.List) error {
 	callInfo := struct {
 		Ctx  context.Context
-		List alert.List
+		List *alert.List
 	}{
 		Ctx:  ctx,
 		List: list,
@@ -1634,11 +1687,11 @@ func (mock *RepositoryMock) PutAlertList(ctx context.Context, list alert.List) e
 //	len(mockedRepository.PutAlertListCalls())
 func (mock *RepositoryMock) PutAlertListCalls() []struct {
 	Ctx  context.Context
-	List alert.List
+	List *alert.List
 } {
 	var calls []struct {
 		Ctx  context.Context
-		List alert.List
+		List *alert.List
 	}
 	mock.lockPutAlertList.RLock()
 	calls = mock.calls.PutAlertList

@@ -106,11 +106,11 @@ func (r *Memory) GetAlertList(ctx context.Context, listID types.AlertListID) (*a
 	return list, nil
 }
 
-func (r *Memory) PutAlertList(ctx context.Context, list alert.List) error {
+func (r *Memory) PutAlertList(ctx context.Context, list *alert.List) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.lists[list.ID] = &list
+	r.lists[list.ID] = list
 	return nil
 }
 
@@ -529,4 +529,14 @@ func (r *Memory) FindNearestAlerts(ctx context.Context, embedding []float32, lim
 	}
 
 	return alerts, nil
+}
+
+func (r *Memory) BatchPutAlerts(ctx context.Context, alerts alert.Alerts) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, alert := range alerts {
+		r.alerts[alert.ID] = alert
+	}
+	return nil
 }

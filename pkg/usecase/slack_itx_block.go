@@ -23,16 +23,16 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user
 
 	switch actionID {
 	case slack.ActionIDAckAlert:
-		return uc.ackAlert(ctx, user, slackThread, types.AlertID(value))
+		return uc.slackActionAckAlert(ctx, user, slackThread, types.AlertID(value))
 
 	case slack.ActionIDAckList:
-		return uc.ackList(ctx, user, slackThread, types.AlertListID(value))
+		return uc.slackActionAckList(ctx, user, slackThread, types.AlertListID(value))
 
 	case slack.ActionIDBindAlert:
-		return uc.bindAlert(ctx, types.AlertID(value), triggerID)
+		return uc.slackActionBindAlert(ctx, types.AlertID(value), triggerID)
 
 	case slack.ActionIDBindList:
-		return uc.bindList(ctx, user, slackThread, types.AlertListID(value), triggerID)
+		return uc.slackActionBindList(ctx, user, slackThread, types.AlertListID(value), triggerID)
 
 	case slack.ActionIDResolveTicket:
 		return uc.showResolveTicketModal(ctx, user, slackThread, types.TicketID(value), triggerID)
@@ -41,9 +41,53 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user
 	return nil
 }
 
-func (uc *UseCases) ackAlert(ctx context.Context, user slack.User, slackThread slack.Thread, targetAlertID types.AlertID) error {
+func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread slack.Thread, alerts alert.Alerts) error {
 	st := uc.slackService.NewThread(slackThread)
+	alertIDs := make([]types.AlertID, len(alerts))
+	for i, alert := range alerts {
+		alertIDs[i] = alert.ID
+	}
 
+	embeddings := make([]firestore.Vector32, len(alerts))
+	for i, alert := range alerts {
+		embeddings[i] = alert.Embedding
+	}
+
+	newTicket := ticket.New(ctx, alertIDs, &slackThread)
+	newTicket.Assignee = &user
+	newTicket.Embedding = embedding.Averate(embeddings)
+
+	if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
+		return goerr.Wrap(err, "failed to fill ticket metadata")
+	}
+
+	ts, err := st.PostTicket(ctx, newTicket, alerts)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post ticket")
+	}
+	newTicket.SlackMessageID = ts
+	for _, alert := range alerts {
+		alert.TicketID = newTicket.ID
+	}
+
+	if err := uc.repository.PutTicket(ctx, newTicket); err != nil {
+		return goerr.Wrap(err, "failed to put ticket")
+	}
+	if err := uc.repository.BatchPutAlerts(ctx, alerts); err != nil {
+		return goerr.Wrap(err, "failed to put alert")
+	}
+
+	for _, alert := range alerts {
+		if err := st.UpdateAlert(ctx, *alert); err != nil {
+			return goerr.Wrap(err, "failed to update slack thread")
+		}
+	}
+
+	msg.Trace(ctx, "🎫 Ticket created. Why don't you ask <@%s> about it?", uc.slackService.BotID())
+	return nil
+}
+
+func (uc *UseCases) slackActionAckAlert(ctx context.Context, user slack.User, slackThread slack.Thread, targetAlertID types.AlertID) error {
 	targetAlert, err := uc.repository.GetAlert(ctx, targetAlertID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert")
@@ -51,39 +95,11 @@ func (uc *UseCases) ackAlert(ctx context.Context, user slack.User, slackThread s
 		return goerr.New("alert not found")
 	}
 
-	newTicket := ticket.New(ctx, []types.AlertID{targetAlert.ID}, &slackThread)
-	newTicket.Assignee = &user
-	newTicket.Embedding = targetAlert.Embedding
-
-	if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
-		return goerr.Wrap(err, "failed to fill ticket metadata")
-	}
-
-	ts, err := st.PostTicket(ctx, newTicket, alert.Alerts{targetAlert})
-	if err != nil {
-		return goerr.Wrap(err, "failed to post ticket")
-	}
-	newTicket.SlackMessageID = ts
-	targetAlert.TicketID = newTicket.ID
-
-	if err := uc.repository.PutTicket(ctx, newTicket); err != nil {
-		return goerr.Wrap(err, "failed to put ticket")
-	}
-	if err := uc.repository.PutAlert(ctx, *targetAlert); err != nil {
-		return goerr.Wrap(err, "failed to put alert")
-	}
-
-	if err := st.UpdateAlert(ctx, *targetAlert); err != nil {
-		return goerr.Wrap(err, "failed to update slack thread")
-	}
-
-	msg.Trace(ctx, "🎫 Alert acknowledged by <@%s>", user.ID)
-	return nil
+	return uc.ackAlerts(ctx, user, slackThread, alert.Alerts{targetAlert})
 }
 
-func (uc *UseCases) ackList(ctx context.Context, user slack.User, slackThread slack.Thread, targetListID types.AlertListID) error {
+func (uc *UseCases) slackActionAckList(ctx context.Context, user slack.User, slackThread slack.Thread, targetListID types.AlertListID) error {
 	logger := logging.From(ctx)
-	st := uc.slackService.NewThread(slackThread)
 
 	list, err := uc.repository.GetAlertList(ctx, targetListID)
 	if err != nil {
@@ -94,50 +110,15 @@ func (uc *UseCases) ackList(ctx context.Context, user slack.User, slackThread sl
 		return nil
 	}
 
-	alertIDs := make([]types.AlertID, len(list.Alerts))
-	for i, alert := range list.Alerts {
-		alertIDs[i] = alert.ID
-	}
-
-	alerts, err := uc.repository.BatchGetAlerts(ctx, alertIDs)
+	alerts, err := list.GetAlerts(ctx, uc.repository)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alerts")
 	}
 
-	var alertEmbeddings []firestore.Vector32
-	for _, alert := range alerts {
-		alertEmbeddings = append(alertEmbeddings, alert.Embedding)
-	}
-
-	newTicket := ticket.New(ctx, alertIDs, &slackThread)
-	newTicket.Assignee = &user
-	newTicket.Embedding = embedding.Averate(alertEmbeddings)
-
-	if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
-		return goerr.Wrap(err, "failed to fill ticket metadata")
-	}
-
-	ts, err := st.PostTicket(ctx, newTicket, list.Alerts)
-	if err != nil {
-		return goerr.Wrap(err, "failed to post ticket")
-	}
-	newTicket.SlackMessageID = ts
-
-	if err := uc.repository.BatchBindAlertsToTicket(ctx, alertIDs, newTicket.ID); err != nil {
-		return goerr.Wrap(err, "failed to bind alerts to ticket")
-	}
-
-	for _, alert := range list.Alerts {
-		if err := st.UpdateAlert(ctx, *alert); err != nil {
-			return goerr.Wrap(err, "failed to update alert")
-		}
-	}
-
-	msg.Trace(ctx, "🎫 Alert list acknowledged by <@%s>", user.ID)
-	return nil
+	return uc.ackAlerts(ctx, user, slackThread, alerts)
 }
 
-func (uc *UseCases) bindAlert(ctx context.Context, targetAlertID types.AlertID, triggerID string) error {
+func (uc *UseCases) slackActionBindAlert(ctx context.Context, targetAlertID types.AlertID, triggerID string) error {
 	targetAlert, err := uc.repository.GetAlert(ctx, targetAlertID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert")
@@ -166,7 +147,7 @@ func (uc *UseCases) bindAlert(ctx context.Context, targetAlertID types.AlertID, 
 	return nil
 }
 
-func (uc *UseCases) bindList(ctx context.Context, user slack.User, slackThread slack.Thread, targetListID types.AlertListID, triggerID string) error {
+func (uc *UseCases) slackActionBindList(ctx context.Context, user slack.User, slackThread slack.Thread, targetListID types.AlertListID, triggerID string) error {
 	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindList, []*ticket.Ticket{}, triggerID, targetListID.String()); err != nil {
 		return goerr.Wrap(err, "failed to show bind list modal")
 	}

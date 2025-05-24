@@ -111,9 +111,8 @@ func setupTestService(t *testing.T) (*list.Service, *domain_mock.RepositoryMock,
 		return nil, nil
 	}
 
-	repo.PutAlertListFunc = func(ctx context.Context, l alert.List) error {
-		copyList := l
-		alertListMap[l.ID] = &copyList
+	repo.PutAlertListFunc = func(ctx context.Context, list *alert.List) error {
+		alertListMap[list.ID] = list
 		return nil
 	}
 
@@ -121,7 +120,7 @@ func setupTestService(t *testing.T) (*list.Service, *domain_mock.RepositoryMock,
 }
 
 func TestService_Run(t *testing.T) {
-	svc, repo, threadService, user, alerts := setupTestService(t)
+	svc, repo, threadService, user, baseAlerts := setupTestService(t)
 	ctx := context.Background()
 
 	t.Run("show alerts with limit", func(t *testing.T) {
@@ -131,8 +130,10 @@ func TestService_Run(t *testing.T) {
 
 		list, err := repo.GetAlertList(ctx, listID)
 		gt.NoError(t, err).Required()
-		gt.Array(t, list.Alerts).Length(1)
-		gt.Array(t, []types.AlertID{alerts[0].ID, alerts[1].ID, alerts[2].ID}).Has(list.AlertIDs[0])
+		alerts, err := list.GetAlerts(ctx, repo)
+		gt.NoError(t, err).Required()
+		gt.Array(t, alerts).Length(1)
+		gt.Array(t, alerts).Has(baseAlerts[0])
 	})
 
 	t.Run("show alerts with offset", func(t *testing.T) {
@@ -142,9 +143,11 @@ func TestService_Run(t *testing.T) {
 
 		list, err := repo.GetAlertList(ctx, listID)
 		gt.NoError(t, err).Required()
-		gt.Array(t, list.Alerts).Length(2)
-		gt.Array(t, []types.AlertID{alerts[0].ID, alerts[1].ID, alerts[2].ID}).Has(list.AlertIDs[0])
-		gt.Array(t, []types.AlertID{alerts[0].ID, alerts[1].ID, alerts[2].ID}).Has(list.AlertIDs[1])
+		alerts, err := list.GetAlerts(ctx, repo)
+		gt.NoError(t, err).Required()
+		gt.Array(t, alerts).Length(2)
+		gt.Value(t, alerts[0].ID).Equal(baseAlerts[1].ID)
+		gt.Value(t, alerts[1].ID).Equal(baseAlerts[2].ID)
 	})
 
 	t.Run("show alerts with grep filter", func(t *testing.T) {
@@ -154,8 +157,10 @@ func TestService_Run(t *testing.T) {
 
 		list, err := repo.GetAlertList(ctx, listID)
 		gt.NoError(t, err).Required()
-		gt.Array(t, list.Alerts).Length(1)
-		gt.Value(t, list.Alerts[0].ID).Equal(alerts[1].ID)
+		alerts, err := list.GetAlerts(ctx, repo)
+		gt.NoError(t, err).Required()
+		gt.Array(t, alerts).Length(1)
+		gt.Value(t, alerts[0].ID).Equal(baseAlerts[1].ID)
 	})
 
 	t.Run("show alerts with sort by CreatedAt", func(t *testing.T) {
@@ -165,9 +170,11 @@ func TestService_Run(t *testing.T) {
 
 		list, err := repo.GetAlertList(ctx, listID)
 		gt.NoError(t, err).Required()
-		gt.Array(t, list.Alerts).Length(3)
-		gt.Value(t, list.Alerts[0].CreatedAt.Before(list.Alerts[1].CreatedAt)).Equal(true)
-		gt.Value(t, list.Alerts[1].CreatedAt.Before(list.Alerts[2].CreatedAt)).Equal(true)
+		alerts, err := list.GetAlerts(ctx, repo)
+		gt.NoError(t, err).Required()
+		gt.Array(t, alerts).Length(3)
+		gt.Value(t, alerts[0].CreatedAt.Before(alerts[1].CreatedAt)).Equal(true)
+		gt.Value(t, alerts[1].CreatedAt.Before(alerts[2].CreatedAt)).Equal(true)
 	})
 
 	t.Run("show alerts with multiple pipeline actions", func(t *testing.T) {
@@ -177,8 +184,10 @@ func TestService_Run(t *testing.T) {
 
 		list, err := repo.GetAlertList(ctx, listID)
 		gt.NoError(t, err).Required()
-		gt.Array(t, list.Alerts).Length(1)
-		gt.Value(t, list.Alerts[0].ID).Equal(alerts[1].ID)
+		alerts, err := list.GetAlerts(ctx, repo)
+		gt.NoError(t, err).Required()
+		gt.Array(t, alerts).Length(1)
+		gt.Value(t, alerts[0].ID).Equal(baseAlerts[1].ID)
 	})
 
 	t.Run("error on invalid command", func(t *testing.T) {
