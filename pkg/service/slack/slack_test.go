@@ -191,6 +191,50 @@ func TestPostAlertList(t *testing.T) {
 	gt.NoError(t, thread.PostAlertList(context.Background(), alertList))
 }
 
+func TestPostTicketList(t *testing.T) {
+	svc := newSlackService(t)
+	ctx := t.Context()
+
+	// Create test tickets
+	tickets := []*ticket.Ticket{
+		{
+			ID: types.NewTicketID(),
+			Metadata: ticket.Metadata{
+				Title:       "Test Ticket 1",
+				Description: "Description for ticket 1",
+			},
+			Status: types.TicketStatusInvestigating,
+			Assignee: &model.User{
+				ID:   "U0123456789",
+				Name: "John Doe",
+			},
+			SlackThread: &model.Thread{
+				ChannelID: "C0123456789",
+				ThreadID:  "T0123456789",
+			},
+			CreatedAt: time.Now().Add(-time.Hour),
+		},
+		{
+			ID: types.NewTicketID(),
+			Metadata: ticket.Metadata{
+				Title:       "Test Ticket 2",
+				Description: "Description for ticket 2",
+			},
+			Status: types.TicketStatusResolved,
+			SlackThread: &model.Thread{
+				ChannelID: "C0123456789",
+				ThreadID:  "T0123456789",
+			},
+			CreatedAt: time.Now().Add(-time.Hour * 2),
+		},
+	}
+
+	// Post ticket list
+	thread, err := svc.PostMessage(ctx, "Ticket list test")
+	gt.NoError(t, err)
+	gt.NoError(t, thread.PostTicketList(ctx, tickets))
+}
+
 func TestNewStateFunc(t *testing.T) {
 	svc := newSlackService(t)
 

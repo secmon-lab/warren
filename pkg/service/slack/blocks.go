@@ -533,3 +533,63 @@ func buildStateMessageBlocks(base string, messages []string) []slack.Block {
 
 	return blocks
 }
+
+func buildTicketListBlocks(ctx context.Context, tickets []*ticket.Ticket, metadata slackMetadata) []slack.Block {
+	blocks := []slack.Block{
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", "🎫 Ticket List", false, false),
+		),
+		slack.NewDividerBlock(),
+	}
+
+	if len(tickets) == 0 {
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", "📭 No tickets found", false, false),
+			nil,
+			nil,
+		))
+		return blocks
+	}
+
+	var messageText strings.Builder
+	now := clock.Now(ctx)
+	for _, t := range tickets {
+		// Create a link to the ticket
+		ticketLink := fmt.Sprintf("<%s|%s>", metadata.ToMsgURL(t.SlackThread.ChannelID, t.SlackThread.ThreadID), t.Metadata.Title)
+
+		// Calculate relative time
+		elapsed := now.Sub(t.CreatedAt)
+		var timeStr string
+		switch {
+		case elapsed < time.Minute:
+			timeStr = "just now"
+		case elapsed < time.Hour:
+			minutes := int(elapsed.Minutes())
+			timeStr = fmt.Sprintf("%dm ago", minutes)
+		case elapsed < 24*time.Hour:
+			hours := int(elapsed.Hours())
+			timeStr = fmt.Sprintf("%dh ago", hours)
+		case elapsed < 30*24*time.Hour:
+			days := int(elapsed.Hours() / 24)
+			timeStr = fmt.Sprintf("%dd ago", days)
+		default:
+			timeStr = t.CreatedAt.Format("2006-01-02")
+		}
+
+		// Create a line with status, time and assignee information
+		statusInfo := fmt.Sprintf("%s %s (%s)", t.Status.Icon(), ticketLink, timeStr)
+		if t.Assignee != nil {
+			statusInfo += fmt.Sprintf(" 👤 <@%s>", t.Assignee.ID)
+		}
+
+		messageText.WriteString(statusInfo + "\n")
+	}
+
+	blocks = append(blocks, slack.NewSectionBlock(
+		slack.NewTextBlockObject("mrkdwn", messageText.String(), false, false),
+		nil,
+		nil,
+	))
+
+	return blocks
+}

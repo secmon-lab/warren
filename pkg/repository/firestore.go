@@ -748,3 +748,57 @@ func (r *Firestore) BatchPutAlerts(ctx context.Context, alerts alert.Alerts) err
 
 	return nil
 }
+
+func (r *Firestore) GetTicketsByStatus(ctx context.Context, status types.TicketStatus) ([]*ticket.Ticket, error) {
+	iter := r.db.Collection(collectionTickets).
+		Where("Status", "==", status).
+		Documents(ctx)
+
+	var tickets []*ticket.Ticket
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next ticket")
+		}
+
+		var t ticket.Ticket
+		if err := doc.DataTo(&t); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		tickets = append(tickets, &t)
+	}
+
+	return tickets, nil
+}
+
+func (r *Firestore) GetTicketsBySpan(ctx context.Context, begin, end time.Time) ([]*ticket.Ticket, error) {
+	iter := r.db.Collection(collectionTickets).
+		Where("CreatedAt", ">=", begin).
+		Where("CreatedAt", "<=", end).
+		OrderBy("CreatedAt", firestore.Asc).
+		Documents(ctx)
+
+	var tickets []*ticket.Ticket
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next ticket")
+		}
+
+		var t ticket.Ticket
+		if err := doc.DataTo(&t); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		tickets = append(tickets, &t)
+	}
+
+	return tickets, nil
+}

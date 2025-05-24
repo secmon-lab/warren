@@ -543,3 +543,29 @@ func (r *Memory) BatchPutAlerts(ctx context.Context, alerts alert.Alerts) error 
 	}
 	return nil
 }
+
+func (r *Memory) GetTicketsByStatus(ctx context.Context, status types.TicketStatus) ([]*ticket.Ticket, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var tickets []*ticket.Ticket
+	for _, t := range r.tickets {
+		if t.Status == status {
+			tickets = append(tickets, t)
+		}
+	}
+	return tickets, nil
+}
+
+func (r *Memory) GetTicketsBySpan(ctx context.Context, start, end time.Time) ([]*ticket.Ticket, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var tickets []*ticket.Ticket
+	for _, t := range r.tickets {
+		if t.CreatedAt.After(start) && t.CreatedAt.Before(end) {
+			tickets = append(tickets, t)
+		}
+	}
+	return tickets, nil
+}

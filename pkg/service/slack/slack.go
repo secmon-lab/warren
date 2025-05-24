@@ -420,6 +420,22 @@ func (x *ThreadService) PostAlertLists(ctx context.Context, clusters []*alert.Li
 	return nil
 }
 
+func (x *ThreadService) PostTicketList(ctx context.Context, tickets []*ticket.Ticket) error {
+	blocks := buildTicketListBlocks(ctx, tickets, x.slackMetadata)
+
+	_, _, err := x.client.PostMessageContext(ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+		slack.MsgOptionBroadcast(),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post ticket list to slack", goerr.V("blocks", blocks))
+	}
+
+	return nil
+}
+
 func (x *Service) ShowResolveAlertListModal(ctx context.Context, list *alert.List, triggerID string) error {
 	return nil
 }

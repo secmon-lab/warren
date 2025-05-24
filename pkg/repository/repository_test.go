@@ -694,3 +694,178 @@ func TestBatchPutAlerts(t *testing.T) {
 		testFn(t, repo)
 	})
 }
+
+func TestGetTicketsByStatus(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := context.Background()
+		thread := newTestThread()
+
+		// テスト用のチケットを作成
+		tickets := []*ticketmodel.Ticket{
+			{
+				ID:        types.NewTicketID(),
+				Status:    types.TicketStatusInvestigating,
+				CreatedAt: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC),
+				SlackThread: &slack.Thread{
+					ChannelID: thread.ChannelID,
+					ThreadID:  thread.ThreadID,
+				},
+			},
+			{
+				ID:        types.NewTicketID(),
+				Status:    types.TicketStatusPending,
+				CreatedAt: time.Date(2024, 1, 1, 11, 0, 0, 0, time.UTC),
+				SlackThread: &slack.Thread{
+					ChannelID: thread.ChannelID,
+					ThreadID:  thread.ThreadID,
+				},
+			},
+			{
+				ID:        types.NewTicketID(),
+				Status:    types.TicketStatusResolved,
+				CreatedAt: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+				SlackThread: &slack.Thread{
+					ChannelID: thread.ChannelID,
+					ThreadID:  thread.ThreadID,
+				},
+			},
+		}
+
+		// チケットをリポジトリに保存
+		for _, ticket := range tickets {
+			gt.NoError(t, repo.PutTicket(ctx, *ticket))
+		}
+
+		t.Run("investigating tickets", func(t *testing.T) {
+			result, err := repo.GetTicketsByStatus(ctx, types.TicketStatusInvestigating)
+			gt.NoError(t, err)
+			filtered := filterByIDs(result, []types.TicketID{tickets[0].ID})
+			gt.Array(t, filtered).Length(1)
+			gt.Value(t, filtered[0].ID).Equal(tickets[0].ID)
+		})
+
+		t.Run("pending tickets", func(t *testing.T) {
+			result, err := repo.GetTicketsByStatus(ctx, types.TicketStatusPending)
+			gt.NoError(t, err)
+			filtered := filterByIDs(result, []types.TicketID{tickets[1].ID})
+			gt.Array(t, filtered).Length(1)
+			gt.Value(t, filtered[0].ID).Equal(tickets[1].ID)
+		})
+
+		t.Run("resolved tickets", func(t *testing.T) {
+			result, err := repo.GetTicketsByStatus(ctx, types.TicketStatusResolved)
+			gt.NoError(t, err)
+			filtered := filterByIDs(result, []types.TicketID{tickets[2].ID})
+			gt.Array(t, filtered).Length(1)
+			gt.Value(t, filtered[0].ID).Equal(tickets[2].ID)
+		})
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+func TestGetTicketsBySpan(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := context.Background()
+		thread := newTestThread()
+
+		// テスト用のチケットを作成
+		tickets := []*ticketmodel.Ticket{
+			{
+				ID:        types.NewTicketID(),
+				Status:    types.TicketStatusInvestigating,
+				CreatedAt: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC),
+				SlackThread: &slack.Thread{
+					ChannelID: thread.ChannelID,
+					ThreadID:  thread.ThreadID,
+				},
+			},
+			{
+				ID:        types.NewTicketID(),
+				Status:    types.TicketStatusPending,
+				CreatedAt: time.Date(2024, 1, 1, 11, 0, 0, 0, time.UTC),
+				SlackThread: &slack.Thread{
+					ChannelID: thread.ChannelID,
+					ThreadID:  thread.ThreadID,
+				},
+			},
+			{
+				ID:        types.NewTicketID(),
+				Status:    types.TicketStatusResolved,
+				CreatedAt: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+				SlackThread: &slack.Thread{
+					ChannelID: thread.ChannelID,
+					ThreadID:  thread.ThreadID,
+				},
+			},
+		}
+
+		// チケットをリポジトリに保存
+		for _, ticket := range tickets {
+			gt.NoError(t, repo.PutTicket(ctx, *ticket))
+		}
+
+		t.Run("tickets in time range", func(t *testing.T) {
+			start := time.Date(2024, 1, 1, 10, 30, 0, 0, time.UTC)
+			end := time.Date(2024, 1, 1, 11, 30, 0, 0, time.UTC)
+
+			result, err := repo.GetTicketsBySpan(ctx, start, end)
+			gt.NoError(t, err)
+			filtered := filterByIDs(result, []types.TicketID{tickets[1].ID})
+			gt.Array(t, filtered).Length(1)
+			gt.Value(t, filtered[0].ID).Equal(tickets[1].ID)
+		})
+
+		t.Run("tickets outside time range", func(t *testing.T) {
+			start := time.Date(2024, 1, 1, 13, 0, 0, 0, time.UTC)
+			end := time.Date(2024, 1, 1, 14, 0, 0, 0, time.UTC)
+
+			result, err := repo.GetTicketsBySpan(ctx, start, end)
+			gt.NoError(t, err)
+			gt.Array(t, result).Length(0)
+		})
+
+		t.Run("all tickets in range", func(t *testing.T) {
+			start := time.Date(2024, 1, 1, 9, 0, 0, 0, time.UTC)
+			end := time.Date(2024, 1, 1, 13, 0, 0, 0, time.UTC)
+
+			result, err := repo.GetTicketsBySpan(ctx, start, end)
+			gt.NoError(t, err)
+			filtered := filterByIDs(result, []types.TicketID{tickets[0].ID, tickets[1].ID, tickets[2].ID})
+			gt.Array(t, filtered).Length(3)
+		})
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+// Firestore用: 取得結果からテスト投入分のみ抽出してアサート
+func filterByIDs(result []*ticketmodel.Ticket, ids []types.TicketID) []*ticketmodel.Ticket {
+	idMap := make(map[types.TicketID]struct{})
+	for _, id := range ids {
+		idMap[id] = struct{}{}
+	}
+	var filtered []*ticketmodel.Ticket
+	for _, t := range result {
+		if _, ok := idMap[t.ID]; ok {
+			filtered = append(filtered, t)
+		}
+	}
+	return filtered
+}
