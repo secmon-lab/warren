@@ -11,7 +11,6 @@ import (
 	slack_sdk "github.com/slack-go/slack"
 
 	"github.com/secmon-lab/warren/pkg/domain/mock"
-	domain_mock "github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -19,9 +18,9 @@ import (
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
 )
 
-func setupTestAggrService(t *testing.T) (*command.Service, *domain_mock.RepositoryMock, *slack_svc.ThreadService, slack.User, *alert.List) {
+func setupTestAggrService(t *testing.T) (*command.Service, *mock.RepositoryMock, *slack_svc.ThreadService, slack.User, *alert.List) {
 	ctx := context.Background()
-	repo := &domain_mock.RepositoryMock{}
+	repo := &mock.RepositoryMock{}
 	llm := &gollem_mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &gollem_mock.SessionMock{
