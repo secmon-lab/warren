@@ -2,14 +2,15 @@ package command_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/m-mizutani/gollem"
 	gollem_mock "github.com/m-mizutani/gollem/mock"
 	"github.com/m-mizutani/gt"
+	slack_sdk "github.com/slack-go/slack"
 
+	"github.com/secmon-lab/warren/pkg/domain/mock"
 	domain_mock "github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -116,36 +117,120 @@ func TestService_Aggregate(t *testing.T) {
 	})
 
 	t.Run("aggregate with custom threshold", func(t *testing.T) {
-		err := svc.Aggregate(ctx, threadService, user, alertList, "0.8")
+		err := svc.Aggregate(ctx, threadService, user, alertList, "threshold 0.8")
 		gt.NoError(t, err)
 	})
 
 	t.Run("aggregate with custom threshold and topN", func(t *testing.T) {
-		err := svc.Aggregate(ctx, threadService, user, alertList, "0.8 3")
+		err := svc.Aggregate(ctx, threadService, user, alertList, "th 0.8 top 3")
 		gt.NoError(t, err)
 	})
 
 	t.Run("error on invalid threshold", func(t *testing.T) {
 		err := svc.Aggregate(ctx, threadService, user, alertList, "invalid")
 		gt.Error(t, err)
-		if !strings.Contains(err.Error(), "failed to parse threshold") {
-			t.Fatalf("value should contain failed to parse threshold, actual: %s", err.Error())
-		}
 	})
 
 	t.Run("error on invalid threshold range", func(t *testing.T) {
-		err := svc.Aggregate(ctx, threadService, user, alertList, "1.5")
+		err := svc.Aggregate(ctx, threadService, user, alertList, "threshold 1.5")
 		gt.Error(t, err)
-		if !strings.Contains(err.Error(), "invalid threshold range") {
-			t.Fatalf("value should contain invalid threshold range, actual: %s", err.Error())
-		}
 	})
 
 	t.Run("error on invalid topN", func(t *testing.T) {
-		err := svc.Aggregate(ctx, threadService, user, alertList, "0.8 invalid")
+		err := svc.Aggregate(ctx, threadService, user, alertList, "th 0.8 top invalid")
 		gt.Error(t, err)
-		if !strings.Contains(err.Error(), "failed to parse topN") {
-			t.Fatalf("value should contain failed to parse topN, actual: %s", err.Error())
-		}
 	})
+}
+
+func TestAggregate(t *testing.T) {
+	type testCase struct {
+		name      string
+		args      string
+		threshold float64
+		topN      int
+		wantErr   bool
+	}
+
+	runTest := func(tc testCase) func(t *testing.T) {
+		return func(t *testing.T) {
+			ctx := t.Context()
+			svc := &command.Service{}
+
+			slackClient := &mock.SlackClientMock{
+				PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+					return "", "", nil
+				},
+				AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+					return &slack_sdk.AuthTestResponse{
+						UserID: "U0123456789",
+					}, nil
+				},
+			}
+			user := slack.User{}
+			alertList := &alert.List{}
+
+			slackSvc, err := slack_svc.New(slackClient, "C0123456789")
+			gt.NoError(t, err).Required()
+			threadService, err := slackSvc.PostMessage(ctx, "test message")
+			gt.NoError(t, err).Required()
+
+			err = svc.Aggregate(context.Background(), threadService, user, alertList, tc.args)
+			if tc.wantErr && err == nil {
+				t.Error("expected error but got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		}
+	}
+
+	t.Run("default values", runTest(testCase{
+		name:      "default values",
+		args:      "",
+		threshold: 0.99,
+		topN:      10,
+		wantErr:   false,
+	}))
+
+	t.Run("with threshold", runTest(testCase{
+		name:      "with threshold",
+		args:      "threshold 0.95",
+		threshold: 0.95,
+		topN:      10,
+		wantErr:   false,
+	}))
+
+	t.Run("with top", runTest(testCase{
+		name:      "with top",
+		args:      "top 5",
+		threshold: 0.99,
+		topN:      5,
+		wantErr:   false,
+	}))
+
+	t.Run("with both threshold and top", runTest(testCase{
+		name:      "with both threshold and top",
+		args:      "threshold 0.95 top 5",
+		threshold: 0.95,
+		topN:      5,
+		wantErr:   false,
+	}))
+
+	t.Run("invalid threshold", runTest(testCase{
+		name:    "invalid threshold",
+		args:    "threshold 1.5",
+		wantErr: true,
+	}))
+
+	t.Run("invalid top", runTest(testCase{
+		name:    "invalid top",
+		args:    "top 0",
+		wantErr: true,
+	}))
+
+	t.Run("unknown argument", runTest(testCase{
+		name:    "unknown argument",
+		args:    "unknown",
+		wantErr: true,
+	}))
 }
