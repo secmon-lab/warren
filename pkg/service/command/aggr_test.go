@@ -106,27 +106,27 @@ func setupTestAggrService(t *testing.T) (*command.Service, *domain_mock.Reposito
 	return svc, repo, threadService, user, alertList
 }
 
-func TestService_RunAggr(t *testing.T) {
+func TestService_Aggregate(t *testing.T) {
 	svc, _, threadService, user, alertList := setupTestAggrService(t)
 	ctx := context.Background()
 
 	t.Run("aggregate with default parameters", func(t *testing.T) {
-		err := svc.RunAggr(ctx, threadService, user, alertList, "")
+		err := svc.Aggregate(ctx, threadService, user, alertList, "")
 		gt.NoError(t, err)
 	})
 
 	t.Run("aggregate with custom threshold", func(t *testing.T) {
-		err := svc.RunAggr(ctx, threadService, user, alertList, "0.8")
+		err := svc.Aggregate(ctx, threadService, user, alertList, "0.8")
 		gt.NoError(t, err)
 	})
 
 	t.Run("aggregate with custom threshold and topN", func(t *testing.T) {
-		err := svc.RunAggr(ctx, threadService, user, alertList, "0.8 3")
+		err := svc.Aggregate(ctx, threadService, user, alertList, "0.8 3")
 		gt.NoError(t, err)
 	})
 
 	t.Run("error on invalid threshold", func(t *testing.T) {
-		err := svc.RunAggr(ctx, threadService, user, alertList, "invalid")
+		err := svc.Aggregate(ctx, threadService, user, alertList, "invalid")
 		gt.Error(t, err)
 		if !strings.Contains(err.Error(), "failed to parse threshold") {
 			t.Fatalf("value should contain failed to parse threshold, actual: %s", err.Error())
@@ -134,7 +134,7 @@ func TestService_RunAggr(t *testing.T) {
 	})
 
 	t.Run("error on invalid threshold range", func(t *testing.T) {
-		err := svc.RunAggr(ctx, threadService, user, alertList, "1.5")
+		err := svc.Aggregate(ctx, threadService, user, alertList, "1.5")
 		gt.Error(t, err)
 		if !strings.Contains(err.Error(), "invalid threshold range") {
 			t.Fatalf("value should contain invalid threshold range, actual: %s", err.Error())
@@ -142,7 +142,7 @@ func TestService_RunAggr(t *testing.T) {
 	})
 
 	t.Run("error on invalid topN", func(t *testing.T) {
-		err := svc.RunAggr(ctx, threadService, user, alertList, "0.8 invalid")
+		err := svc.Aggregate(ctx, threadService, user, alertList, "0.8 invalid")
 		gt.Error(t, err)
 		if !strings.Contains(err.Error(), "failed to parse topN") {
 			t.Fatalf("value should contain failed to parse topN, actual: %s", err.Error())

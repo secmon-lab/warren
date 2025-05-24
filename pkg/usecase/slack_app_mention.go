@@ -11,8 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
-	"github.com/secmon-lab/warren/pkg/service/command/aggr"
-	"github.com/secmon-lab/warren/pkg/service/command/list"
+	"github.com/secmon-lab/warren/pkg/service/command"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -85,9 +84,9 @@ func messageToArgs(message string) (string, string) {
 }
 
 // handleSlackCommand not only routes command but also get input data in the thread.
-func (uc *UseCases) handleSlackCommand(ctx context.Context, slackMsg slack.Message, command string) error {
+func (uc *UseCases) handleSlackCommand(ctx context.Context, slackMsg slack.Message, cmd string) error {
 	threadSvc := uc.slackService.NewThread(slackMsg.Thread())
-	cmd, remaining := messageToArgs(command)
+	cmd, remaining := messageToArgs(cmd)
 	if cmd == "" {
 		return errUnknownCommand
 	}
@@ -107,11 +106,10 @@ func (uc *UseCases) handleSlackCommand(ctx context.Context, slackMsg slack.Messa
 		return eb.Wrap(err, "failed to get ticket by thread")
 	}
 
+	svc := command.New(uc.repository, uc.llmClient)
 	switch cmd {
 	case "l", "ls", "list":
-		_, err := list.
-			New(uc.repository, uc.llmClient).
-			Run(ctx, threadSvc, ptr.Ref(slackMsg.User()), remaining)
+		_, err := svc.List(ctx, threadSvc, ptr.Ref(slackMsg.User()), remaining)
 		if err != nil {
 			return eb.Wrap(err, "failed to run list command")
 		}
@@ -123,7 +121,7 @@ func (uc *UseCases) handleSlackCommand(ctx context.Context, slackMsg slack.Messa
 			return eb.Wrap(errNoRequiredData, "no alert list found in thread", goerr.V("thread", slackMsg.Thread()))
 		}
 
-		if err := aggr.Run(ctx, uc.repository, uc.llmClient, threadSvc, slackMsg.User(), latestList, remaining); err != nil {
+		if err := svc.Aggregate(ctx, threadSvc, slackMsg.User(), latestList, remaining); err != nil {
 			return eb.Wrap(err, "failed to run aggregate command")
 		}
 		return nil
@@ -170,28 +168,6 @@ func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack.Th
 	}
 }
 */
-
-func (uc *UseCases) handleSlackRootCommand(ctx context.Context, slackMsg slack.Message, message string) error {
-	command, remaining := messageToArgs(message)
-	if command == "" {
-		return errUnknownCommand
-	}
-
-	threadSvc := uc.slackService.NewThread(slackMsg.Thread())
-
-	switch command {
-	case "list":
-		_, err := list.New(uc.repository, uc.llmClient).Run(ctx, threadSvc, ptr.Ref(slackMsg.User()), remaining)
-		if err != nil {
-			return goerr.Wrap(err, "failed to run list command")
-		}
-		return nil
-
-	default:
-		msg.Notify(ctx, "🤔 Available commands: `list`")
-		return errUnknownCommand
-	}
-}
 
 type handlePromptInput struct {
 	Ticket        *ticket.Ticket

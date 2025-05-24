@@ -108,12 +108,12 @@ func setupTestService(t *testing.T) (*command.Service, *domain_mock.RepositoryMo
 	return svc, repo, threadService, user, alerts
 }
 
-func TestService_RunList(t *testing.T) {
+func TestService_List(t *testing.T) {
 	svc, repo, threadService, user, baseAlerts := setupTestService(t)
 	ctx := context.Background()
 
 	t.Run("show alerts with limit", func(t *testing.T) {
-		listID, err := svc.RunList(ctx, threadService, user, "limit 1")
+		listID, err := svc.List(ctx, threadService, user, "limit 1")
 		gt.NoError(t, err)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
 
@@ -126,7 +126,7 @@ func TestService_RunList(t *testing.T) {
 	})
 
 	t.Run("show alerts with offset", func(t *testing.T) {
-		listID, err := svc.RunList(ctx, threadService, user, "offset 1")
+		listID, err := svc.List(ctx, threadService, user, "offset 1")
 		gt.NoError(t, err)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
 
@@ -140,7 +140,7 @@ func TestService_RunList(t *testing.T) {
 	})
 
 	t.Run("show alerts with grep filter", func(t *testing.T) {
-		listID, err := svc.RunList(ctx, threadService, user, "grep orange")
+		listID, err := svc.List(ctx, threadService, user, "grep orange")
 		gt.NoError(t, err)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
 
@@ -153,7 +153,7 @@ func TestService_RunList(t *testing.T) {
 	})
 
 	t.Run("show alerts with sort by CreatedAt", func(t *testing.T) {
-		listID, err := svc.RunList(ctx, threadService, user, "sort CreatedAt")
+		listID, err := svc.List(ctx, threadService, user, "sort CreatedAt")
 		gt.NoError(t, err)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
 
@@ -167,7 +167,7 @@ func TestService_RunList(t *testing.T) {
 	})
 
 	t.Run("show alerts with multiple pipeline actions", func(t *testing.T) {
-		listID, err := svc.RunList(ctx, threadService, user, "grep orange | sort CreatedAt | limit 1")
+		listID, err := svc.List(ctx, threadService, user, "grep orange | sort CreatedAt | limit 1")
 		gt.NoError(t, err)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
 
@@ -180,7 +180,7 @@ func TestService_RunList(t *testing.T) {
 	})
 
 	t.Run("error on invalid command", func(t *testing.T) {
-		_, err := svc.RunList(ctx, threadService, user, "invalid_command")
+		_, err := svc.List(ctx, threadService, user, "invalid_command")
 		gt.Error(t, err)
 		if !strings.Contains(err.Error(), "unknown command") && !strings.Contains(err.Error(), "unknown action") {
 			t.Fatalf("value should contain unknown command or unknown action, actual: %s", err.Error())
@@ -188,7 +188,7 @@ func TestService_RunList(t *testing.T) {
 	})
 
 	t.Run("error on invalid pipeline action", func(t *testing.T) {
-		_, err := svc.RunList(ctx, threadService, user, "invalid_action")
+		_, err := svc.List(ctx, threadService, user, "invalid_action")
 		gt.Error(t, err)
 		if !strings.Contains(err.Error(), "unknown action") {
 			t.Fatalf("value should contain unknown action, actual: %s", err.Error())
@@ -196,7 +196,7 @@ func TestService_RunList(t *testing.T) {
 	})
 
 	t.Run("error on invalid action argument", func(t *testing.T) {
-		_, err := svc.RunList(ctx, threadService, user, "limit invalid")
+		_, err := svc.List(ctx, threadService, user, "limit invalid")
 		gt.Error(t, err)
 		if !strings.Contains(err.Error(), "limit: failed to convert limit to int") {
 			t.Fatalf("value should contain limit: failed to convert limit to int, actual: %s", err.Error())

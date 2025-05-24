@@ -204,8 +204,8 @@ func (x *Service) CreateList(ctx context.Context, thread slack.Thread, user *sla
 	return list, nil
 }
 
-// RunList runs the list command with the given input.
-func (x *Service) RunList(ctx context.Context, th *svc.ThreadService, user *slack.User, input string) (types.AlertListID, error) {
+// List runs the list command with the given input.
+func (x *Service) List(ctx context.Context, th *svc.ThreadService, user *slack.User, input string) (types.AlertListID, error) {
 	commands := strings.Split(input, "|")
 	pipelineCommands := [][]string{}
 	for _, command := range commands {

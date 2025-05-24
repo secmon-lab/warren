@@ -12,8 +12,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-// RunAggr runs the aggregate command with the given input.
-func (x *Service) RunAggr(ctx context.Context, st *svc.ThreadService, user slack.User, alertList *alert.List, remaining string) error {
+// Aggregate runs the aggregate command with the given input.
+func (x *Service) Aggregate(ctx context.Context, st *svc.ThreadService, user slack.User, alertList *alert.List, remaining string) error {
 	args := strings.Fields(remaining)
 
 	threshold := 0.99
