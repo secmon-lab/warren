@@ -53,7 +53,7 @@ func setupTestAggrService(t *testing.T) (*command.Service, *domain_mock.Reposito
 				Title:       "Alert 1",
 				Description: "Test alert 1",
 			},
-			Data:      map[string]interface{}{"color": "blue"},
+			Data:      map[string]any{"color": "blue"},
 			CreatedAt: fixedTime.Add(-1 * time.Hour),
 			SlackThread: &slack.Thread{
 				ChannelID: "C0123456789",
@@ -66,7 +66,7 @@ func setupTestAggrService(t *testing.T) (*command.Service, *domain_mock.Reposito
 				Title:       "Alert 2",
 				Description: "Test alert 2 with grep match",
 			},
-			Data:      map[string]interface{}{"color": "orange"},
+			Data:      map[string]any{"color": "orange"},
 			CreatedAt: fixedTime.Add(-2 * time.Hour),
 			SlackThread: &slack.Thread{
 				ChannelID: "C0123456789",
@@ -79,7 +79,7 @@ func setupTestAggrService(t *testing.T) (*command.Service, *domain_mock.Reposito
 				Title:       "Alert 3",
 				Description: "Test alert 3",
 			},
-			Data:      map[string]interface{}{"color": "red"},
+			Data:      map[string]any{"color": "red"},
 			CreatedAt: fixedTime.Add(-3 * time.Hour),
 			SlackThread: &slack.Thread{
 				ChannelID: "C0123456789",
