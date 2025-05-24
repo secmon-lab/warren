@@ -203,3 +203,118 @@ func TestService_List(t *testing.T) {
 		}
 	})
 }
+
+func TestTimeFilters(t *testing.T) {
+	now := time.Now()
+	alerts := alert.Alerts{
+		{
+			CreatedAt: now.Add(-2 * time.Hour),
+		},
+		{
+			CreatedAt: now.Add(-1 * time.Hour),
+		},
+		{
+			CreatedAt: now,
+		},
+	}
+
+	type testCase struct {
+		name     string
+		command  []string
+		expected int
+	}
+
+	runTest := func(tc testCase) func(t *testing.T) {
+		return func(t *testing.T) {
+			init, err := command.FindMatchedInitFunc(tc.command[0])
+			gt.NoError(t, err)
+
+			action, err := init(tc.command[1:])
+			gt.NoError(t, err)
+
+			result, err := action(context.Background(), alerts)
+			gt.NoError(t, err)
+			gt.Number(t, len(result)).Equal(tc.expected)
+		}
+	}
+
+	t.Run("all", runTest(testCase{
+		name:     "all",
+		command:  []string{"all"},
+		expected: 3,
+	}))
+
+	t.Run("from to", runTest(testCase{
+		name:     "from to",
+		command:  []string{"from", now.Add(-2 * time.Hour).Format("15:04"), "to", now.Add(-90 * time.Minute).Format("15:04")},
+		expected: 1,
+	}))
+
+	t.Run("after", runTest(testCase{
+		name:     "after",
+		command:  []string{"after", now.Add(-90 * time.Minute).Format("15:04")},
+		expected: 2,
+	}))
+
+	t.Run("since", runTest(testCase{
+		name:     "since",
+		command:  []string{"since", "90m"},
+		expected: 2,
+	}))
+}
+
+func TestParseTime(t *testing.T) {
+	type testCase struct {
+		input    string
+		expected time.Time
+	}
+
+	runTest := func(tc testCase) func(t *testing.T) {
+		return func(t *testing.T) {
+			result, err := command.ParseTime(tc.input)
+			gt.NoError(t, err)
+			gt.Value(t, result.Format("15:04")).Equal(tc.expected.Format("15:04"))
+		}
+	}
+
+	now := time.Now()
+	t.Run("time format", runTest(testCase{
+		input:    "14:30",
+		expected: time.Date(now.Year(), now.Month(), now.Day(), 14, 30, 0, 0, now.Location()),
+	}))
+
+	t.Run("date format", runTest(testCase{
+		input:    "2024-01-01",
+		expected: time.Date(2024, 1, 1, 0, 0, 0, 0, time.Local),
+	}))
+}
+
+func TestParseDuration(t *testing.T) {
+	type testCase struct {
+		input    string
+		expected time.Duration
+	}
+
+	runTest := func(tc testCase) func(t *testing.T) {
+		return func(t *testing.T) {
+			result, err := command.ParseDuration(tc.input)
+			gt.NoError(t, err)
+			gt.Value(t, result).Equal(tc.expected)
+		}
+	}
+
+	t.Run("minutes", runTest(testCase{
+		input:    "30m",
+		expected: 30 * time.Minute,
+	}))
+
+	t.Run("hours", runTest(testCase{
+		input:    "2h",
+		expected: 2 * time.Hour,
+	}))
+
+	t.Run("days", runTest(testCase{
+		input:    "1d",
+		expected: 24 * time.Hour,
+	}))
+}

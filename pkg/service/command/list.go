@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -42,7 +43,7 @@ func buildPipeline(commands [][]string) (*pipeline, error) {
 			continue
 		}
 
-		init, err := findMatchedInitFunc(command[0])
+		init, err := FindMatchedInitFunc(command[0])
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to find matched action")
 		}
@@ -68,9 +69,15 @@ var actionMapping = map[string]initFunc{
 	"offset": actionOffset,
 	"grep":   actionGrep,
 	"sort":   actionSort,
+	"from":   actionFrom,
+	"to":     actionTo,
+	"after":  actionAfter,
+	"since":  actionSince,
+	"all":    actionAll,
 }
 
-func findMatchedInitFunc(command string) (initFunc, error) {
+// FindMatchedInitFunc finds the matched init function for the given command
+func FindMatchedInitFunc(command string) (initFunc, error) {
 	var longestMatch string
 	var matchedAction initFunc
 	command = strings.ToLower(command)
@@ -185,6 +192,144 @@ func actionSort(args []string) (actionFunc, error) {
 
 		return sorted, nil
 	}, nil
+}
+
+func actionFrom(args []string) (actionFunc, error) {
+	if len(args) != 3 || args[1] != "to" {
+		return nil, goerr.New("from: requires 'from <time> to <time>' format")
+	}
+
+	fromTime, err := ParseTime(args[0])
+	if err != nil {
+		return nil, goerr.Wrap(err, "from: failed to parse from time")
+	}
+
+	toTime, err := ParseTime(args[2])
+	if err != nil {
+		return nil, goerr.Wrap(err, "from: failed to parse to time")
+	}
+
+	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		var filtered alert.Alerts
+		for _, a := range alerts {
+			if (a.CreatedAt.After(fromTime) || a.CreatedAt.Equal(fromTime)) &&
+				(a.CreatedAt.Before(toTime) || a.CreatedAt.Equal(toTime)) {
+				filtered = append(filtered, a)
+			}
+		}
+		return filtered, nil
+	}, nil
+}
+
+func actionTo(args []string) (actionFunc, error) {
+	if len(args) != 1 {
+		return nil, goerr.New("to: requires one argument")
+	}
+
+	toTime, err := ParseTime(args[0])
+	if err != nil {
+		return nil, goerr.Wrap(err, "to: failed to parse time")
+	}
+
+	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		var filtered alert.Alerts
+		for _, a := range alerts {
+			if a.CreatedAt.Before(toTime) || a.CreatedAt.Equal(toTime) {
+				filtered = append(filtered, a)
+			}
+		}
+		return filtered, nil
+	}, nil
+}
+
+func actionAfter(args []string) (actionFunc, error) {
+	if len(args) != 1 {
+		return nil, goerr.New("after: requires one argument")
+	}
+
+	afterTime, err := ParseTime(args[0])
+	if err != nil {
+		return nil, goerr.Wrap(err, "after: failed to parse time")
+	}
+
+	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		var filtered alert.Alerts
+		for _, a := range alerts {
+			if a.CreatedAt.After(afterTime) {
+				filtered = append(filtered, a)
+			}
+		}
+		return filtered, nil
+	}, nil
+}
+
+func actionSince(args []string) (actionFunc, error) {
+	if len(args) != 1 {
+		return nil, goerr.New("since: requires one argument")
+	}
+
+	duration, err := ParseDuration(args[0])
+	if err != nil {
+		return nil, goerr.Wrap(err, "since: failed to parse duration")
+	}
+
+	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		sinceTime := time.Now().Add(-duration)
+		var filtered alert.Alerts
+		for _, a := range alerts {
+			if a.CreatedAt.After(sinceTime) || a.CreatedAt.Equal(sinceTime) {
+				filtered = append(filtered, a)
+			}
+		}
+		return filtered, nil
+	}, nil
+}
+
+func actionAll(args []string) (actionFunc, error) {
+	if len(args) != 0 {
+		return nil, goerr.New("all: takes no arguments")
+	}
+
+	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		return alerts, nil
+	}, nil
+}
+
+// ParseTime parses a time string in either HH:MM or YYYY-MM-DD format
+func ParseTime(timeStr string) (time.Time, error) {
+	// Try parsing as time format (HH:MM)
+	if t, err := time.Parse("15:04", timeStr); err == nil {
+		now := time.Now()
+		return time.Date(now.Year(), now.Month(), now.Day(), t.Hour(), t.Minute(), 0, 0, now.Location()), nil
+	}
+
+	// Try parsing as date format (YYYY-MM-DD)
+	if t, err := time.Parse("2006-01-02", timeStr); err == nil {
+		return t, nil
+	}
+
+	return time.Time{}, goerr.New("invalid time format", goerr.V("time", timeStr))
+}
+
+// ParseDuration parses a duration string in the format of "10m", "1h", "1d"
+func ParseDuration(durationStr string) (time.Duration, error) {
+	// Parse duration like "10m", "1h", "1d"
+	unit := durationStr[len(durationStr)-1:]
+	value, err := strconv.Atoi(durationStr[:len(durationStr)-1])
+	if err != nil {
+		return 0, goerr.Wrap(err, "failed to parse duration value")
+	}
+
+	switch unit {
+	case "m":
+		return time.Duration(value) * time.Minute, nil
+	case "h":
+		return time.Duration(value) * time.Hour, nil
+	case "d":
+		return time.Duration(value) * 24 * time.Hour, nil
+	default:
+		return 0, goerr.New("invalid duration unit", goerr.V("unit", unit))
+	}
 }
 
 // CreateList creates a new AlertList from the given alerts and registers it to the repository.
