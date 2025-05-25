@@ -35,7 +35,7 @@ func Generate(ctx context.Context, client gollem.LLMClient, data any) (firestore
 	return vector32, nil
 }
 
-func Averate(embeddings []firestore.Vector32) firestore.Vector32 {
+func Average(embeddings []firestore.Vector32) firestore.Vector32 {
 	if len(embeddings) == 0 {
 		return firestore.Vector32{}
 	}

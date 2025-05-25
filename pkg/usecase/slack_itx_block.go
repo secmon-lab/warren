@@ -55,7 +55,7 @@ func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread 
 
 	newTicket := ticket.New(ctx, alertIDs, &slackThread)
 	newTicket.Assignee = &user
-	newTicket.Embedding = embedding.Averate(embeddings)
+	newTicket.Embedding = embedding.Average(embeddings)
 
 	if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
 		return goerr.Wrap(err, "failed to fill ticket metadata")
