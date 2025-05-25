@@ -1,4 +1,4 @@
-package command_test
+package list_test
 
 import (
 	"context"
@@ -15,10 +15,12 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/command"
+	"github.com/secmon-lab/warren/pkg/service/command/core"
+	list "github.com/secmon-lab/warren/pkg/service/command/list"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
 )
 
-func setupTestService(t *testing.T) (*command.Service, *mock.RepositoryMock, *slack_svc.ThreadService, *slack.User, []*alert.Alert) {
+func setupTestService(t *testing.T) (*command.Service, *mock.RepositoryMock, *slack_svc.ThreadService, *slack.User, []*alert.Alert, gollem.LLMClient) {
 	ctx := context.Background()
 	repo := &mock.RepositoryMock{}
 	llm := &gollem_mock.LLMClientMock{
@@ -105,16 +107,27 @@ func setupTestService(t *testing.T) (*command.Service, *mock.RepositoryMock, *sl
 		return nil
 	}
 
-	return svc, repo, threadService, user, alerts
+	return svc, repo, threadService, user, alerts, llm
 }
 
 func TestService_List(t *testing.T) {
-	svc, repo, threadService, user, baseAlerts := setupTestService(t)
+	_, repo, threadService, user, baseAlerts, llm := setupTestService(t)
 	ctx := context.Background()
 
+	// Create core.Clients directly
+	clients := core.NewClients(repo, llm, threadService)
+
+	// Create a mock slack message
+	createSlackMessage := func(user *slack.User) *slack.Message {
+		// Since slack.Message has unexported fields, we'll pass nil for now
+		// The list.Create function should handle this gracefully in tests
+		return nil
+	}
+
 	t.Run("show alerts with limit", func(t *testing.T) {
-		listID, err := svc.List(ctx, threadService, user, "limit 1")
+		resp, err := list.Create(ctx, clients, createSlackMessage(user), "limit 1")
 		gt.NoError(t, err)
+		listID := gt.Cast[types.AlertListID](t, resp)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
 
 		list, err := repo.GetAlertList(ctx, listID)
@@ -126,8 +139,9 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("show alerts with offset", func(t *testing.T) {
-		listID, err := svc.List(ctx, threadService, user, "offset 1")
+		resp, err := list.Create(ctx, clients, createSlackMessage(user), "offset 1")
 		gt.NoError(t, err)
+		listID := gt.Cast[types.AlertListID](t, resp)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
 
 		list, err := repo.GetAlertList(ctx, listID)
@@ -140,7 +154,8 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("show alerts with grep filter", func(t *testing.T) {
-		listID, err := svc.List(ctx, threadService, user, "grep orange")
+		resp, err := list.Create(ctx, clients, createSlackMessage(user), "grep orange")
+		listID := gt.Cast[types.AlertListID](t, resp)
 		gt.NoError(t, err)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
 
@@ -153,11 +168,12 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("show alerts with sort by CreatedAt", func(t *testing.T) {
-		listID, err := svc.List(ctx, threadService, user, "sort CreatedAt")
+		resp, err := list.Create(ctx, clients, createSlackMessage(user), "sort CreatedAt")
 		gt.NoError(t, err)
+		listID := gt.Cast[types.AlertListID](t, resp)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
 
-		list, err := repo.GetAlertList(ctx, listID)
+		list, err := repo.GetAlertList(ctx, gt.Cast[types.AlertListID](t, resp))
 		gt.NoError(t, err).Required()
 		alerts, err := list.GetAlerts(ctx, repo)
 		gt.NoError(t, err).Required()
@@ -167,7 +183,8 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("show alerts with multiple pipeline actions", func(t *testing.T) {
-		listID, err := svc.List(ctx, threadService, user, "grep orange | sort CreatedAt | limit 1")
+		resp, err := list.Create(ctx, clients, createSlackMessage(user), "grep orange | sort CreatedAt | limit 1")
+		listID := gt.Cast[types.AlertListID](t, resp)
 		gt.NoError(t, err)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
 
@@ -180,7 +197,7 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("error on invalid command", func(t *testing.T) {
-		_, err := svc.List(ctx, threadService, user, "invalid_command")
+		_, err := list.Create(ctx, clients, createSlackMessage(user), "invalid_command")
 		gt.Error(t, err)
 		if !strings.Contains(err.Error(), "unknown command") && !strings.Contains(err.Error(), "unknown action") {
 			t.Fatalf("value should contain unknown command or unknown action, actual: %s", err.Error())
@@ -188,7 +205,7 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("error on invalid pipeline action", func(t *testing.T) {
-		_, err := svc.List(ctx, threadService, user, "invalid_action")
+		_, err := list.Create(ctx, clients, createSlackMessage(user), "invalid_action")
 		gt.Error(t, err)
 		if !strings.Contains(err.Error(), "unknown action") {
 			t.Fatalf("value should contain unknown action, actual: %s", err.Error())
@@ -196,7 +213,7 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("error on invalid action argument", func(t *testing.T) {
-		_, err := svc.List(ctx, threadService, user, "limit invalid")
+		_, err := list.Create(ctx, clients, createSlackMessage(user), "limit invalid")
 		gt.Error(t, err)
 		if !strings.Contains(err.Error(), "limit: failed to convert limit to int") {
 			t.Fatalf("value should contain limit: failed to convert limit to int, actual: %s", err.Error())
@@ -226,7 +243,7 @@ func TestTimeFilters(t *testing.T) {
 
 	runTest := func(tc testCase) func(t *testing.T) {
 		return func(t *testing.T) {
-			init, err := command.FindMatchedInitFunc(tc.command[0])
+			init, err := list.FindMatchedInitFunc(tc.command[0])
 			gt.NoError(t, err)
 
 			action, err := init(tc.command[1:])
@@ -271,7 +288,7 @@ func TestParseTime(t *testing.T) {
 
 	runTest := func(tc testCase) func(t *testing.T) {
 		return func(t *testing.T) {
-			result, err := command.ParseTime(tc.input)
+			result, err := list.ParseTime(tc.input)
 			gt.NoError(t, err)
 			gt.Value(t, result.Format("15:04")).Equal(tc.expected.Format("15:04"))
 		}
@@ -297,7 +314,7 @@ func TestParseDuration(t *testing.T) {
 
 	runTest := func(tc testCase) func(t *testing.T) {
 		return func(t *testing.T) {
-			result, err := command.ParseDuration(tc.input)
+			result, err := list.ParseDuration(tc.input)
 			gt.NoError(t, err)
 			gt.Value(t, result).Equal(tc.expected)
 		}

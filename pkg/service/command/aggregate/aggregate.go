@@ -1,4 +1,4 @@
-package command
+package aggregate
 
 import (
 	"context"
@@ -76,28 +76,28 @@ func parseArgs(ctx context.Context, args []string) (threshold float64, topN int,
 }
 
 // Aggregate runs the aggregate command with the given input.
-func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message, remaining string) error {
+func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message, remaining string) (any, error) {
 	alertList, err := clients.Repo().GetLatestAlertListInThread(ctx, slackMsg.Thread())
 	if err != nil {
 		msg.Notify(ctx, "🤔 No alert list found in this thread. Please create one first.")
-		return goerr.Wrap(err, "failed to get latest alert list in thread")
+		return nil, goerr.Wrap(err, "failed to get latest alert list in thread")
 	}
 
 	if remaining == "help" || remaining == "h" {
 		showAggregateHelp(ctx)
-		return nil
+		return nil, nil
 	}
 
 	args := strings.Fields(remaining)
 
 	threshold, topN, err := parseArgs(ctx, args)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	alerts, err := alertList.GetAlerts(ctx, clients.Repo())
 	if err != nil {
-		return goerr.Wrap(err, "failed to get alerts")
+		return nil, goerr.Wrap(err, "failed to get alerts")
 	}
 
 	msg.Trace(ctx, "Aggregating %d alerts (threshold: %f, topN: %d)", len(alerts), threshold, topN)
@@ -108,15 +108,15 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 	for _, cluster := range clusters {
 		newList, err := clients.CreateList(ctx, *alertList.SlackThread, slackMsg.User(), cluster)
 		if err != nil {
-			return goerr.Wrap(err, "failed to create alert list")
+			return nil, goerr.Wrap(err, "failed to create alert list")
 		}
 
 		lists = append(lists, newList)
 	}
 
 	if err := clients.Thread().PostAlertLists(ctx, lists); err != nil {
-		return goerr.Wrap(err, "failed to post alert clusters")
+		return nil, goerr.Wrap(err, "failed to post alert clusters")
 	}
 
-	return nil
+	return nil, nil
 }

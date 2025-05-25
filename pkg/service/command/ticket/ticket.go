@@ -1,4 +1,4 @@
-package command
+package ticket
 
 import (
 	"context"
@@ -38,75 +38,75 @@ func parseTicketCommand(input string) (*ticketCommand, error) {
 	}, nil
 }
 
-func Create(ctx context.Context, clients *core.Clients, msg *slack.Message, input string) error {
+func Create(ctx context.Context, clients *core.Clients, msg *slack.Message, input string) (any, error) {
 	th := clients.Thread()
 
 	cmd, err := parseTicketCommand(input)
 	if err != nil {
 		th.Reply(ctx, ticketHelp)
-		return goerr.Wrap(err, "failed to parse ticket command")
+		return nil, goerr.Wrap(err, "failed to parse ticket command")
 	}
 
 	switch cmd.command {
 	case "help":
 		th.Reply(ctx, ticketHelp)
-		return nil
+		return nil, nil
 
 	case "unresolved", "u":
-		return handleUnresolvedTickets(ctx, clients, th)
+		return nil, handleUnresolvedTickets(ctx, clients, th)
 
 	case "from":
 		if len(cmd.args) < 3 || cmd.args[1] != "to" {
 			th.Reply(ctx, ticketHelp)
-			return goerr.New("invalid time range format. expected: from <time> to <time>")
+			return nil, goerr.New("invalid time range format. expected: from <time> to <time>")
 		}
 
 		from, err := core.ParseTime(cmd.args[0])
 		if err != nil {
 			th.Reply(ctx, ticketHelp)
-			return goerr.Wrap(err, "failed to parse from time")
+			return nil, goerr.Wrap(err, "failed to parse from time")
 		}
 
 		to, err := core.ParseTime(cmd.args[2])
 		if err != nil {
 			th.Reply(ctx, ticketHelp)
-			return goerr.Wrap(err, "failed to parse to time")
+			return nil, goerr.Wrap(err, "failed to parse to time")
 		}
 
-		return handleTicketsBySpan(ctx, clients, th, from, to)
+		return nil, handleTicketsBySpan(ctx, clients, th, from, to)
 
 	case "after":
 		if len(cmd.args) < 1 {
 			th.Reply(ctx, ticketHelp)
-			return goerr.New("invalid date format. expected: after <date>")
+			return nil, goerr.New("invalid date format. expected: after <date>")
 		}
 
 		date, err := core.ParseTime(cmd.args[0])
 		if err != nil {
 			th.Reply(ctx, ticketHelp)
-			return goerr.Wrap(err, "failed to parse date")
+			return nil, goerr.Wrap(err, "failed to parse date")
 		}
 
-		return handleTicketsBySpan(ctx, clients, th, date, time.Now())
+		return nil, handleTicketsBySpan(ctx, clients, th, date, time.Now())
 
 	case "since":
 		if len(cmd.args) < 1 {
 			th.Reply(ctx, ticketHelp)
-			return goerr.New("invalid duration format. expected: since <duration>")
+			return nil, goerr.New("invalid duration format. expected: since <duration>")
 		}
 
 		duration, err := core.ParseDuration(cmd.args[0])
 		if err != nil {
 			th.Reply(ctx, ticketHelp)
-			return goerr.Wrap(err, "failed to parse duration")
+			return nil, goerr.Wrap(err, "failed to parse duration")
 		}
 
 		since := time.Now().Add(-duration)
-		return handleTicketsBySpan(ctx, clients, th, since, time.Now())
+		return nil, handleTicketsBySpan(ctx, clients, th, since, time.Now())
 
 	default:
 		th.Reply(ctx, ticketHelp)
-		return goerr.New(fmt.Sprintf("unknown command: %s", cmd.command))
+		return nil, goerr.New(fmt.Sprintf("unknown command: %s", cmd.command))
 	}
 }
 

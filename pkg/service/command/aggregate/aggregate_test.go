@@ -1,4 +1,4 @@
-package command_test
+package aggregate_test
 
 import (
 	"context"
@@ -15,10 +15,12 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/command"
+	aggregate "github.com/secmon-lab/warren/pkg/service/command/aggregate"
+	"github.com/secmon-lab/warren/pkg/service/command/core"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
 )
 
-func setupTestAggrService(t *testing.T) (*command.Service, *mock.RepositoryMock, *slack_svc.ThreadService, slack.User, *alert.List) {
+func setupTestAggrService(t *testing.T) (*command.Service, *mock.RepositoryMock, *slack_svc.ThreadService, slack.User, *alert.List, gollem.LLMClient) {
 	ctx := context.Background()
 	repo := &mock.RepositoryMock{}
 	llm := &gollem_mock.LLMClientMock{
@@ -99,44 +101,56 @@ func setupTestAggrService(t *testing.T) (*command.Service, *mock.RepositoryMock,
 		return nil, nil
 	}
 
+	repo.GetLatestAlertListInThreadFunc = func(ctx context.Context, thread slack.Thread) (*alert.List, error) {
+		return alertList, nil
+	}
+
 	repo.PutAlertListFunc = func(ctx context.Context, list *alert.List) error {
 		return nil
 	}
 
-	return svc, repo, threadService, user, alertList
+	return svc, repo, threadService, user, alertList, llm
 }
 
 func TestService_Aggregate(t *testing.T) {
-	svc, _, threadService, user, alertList := setupTestAggrService(t)
+	_, repo, threadService, user, _, llm := setupTestAggrService(t)
 	ctx := context.Background()
 
+	// Create core.Clients directly
+	clients := core.NewClients(repo, llm, threadService)
+
+	// Create a mock slack message
+	createSlackMessage := func(user *slack.User) *slack.Message {
+		return nil
+	}
+
 	t.Run("aggregate with default parameters", func(t *testing.T) {
-		err := svc.Aggregate(ctx, threadService, user, alertList, "")
+		_, err := aggregate.Create(ctx, clients, createSlackMessage(&user), "")
 		gt.NoError(t, err)
 	})
 
 	t.Run("aggregate with custom threshold", func(t *testing.T) {
-		err := svc.Aggregate(ctx, threadService, user, alertList, "threshold 0.8")
+		_, err := aggregate.Create(ctx, clients, createSlackMessage(&user), "threshold 0.8")
 		gt.NoError(t, err)
 	})
 
 	t.Run("aggregate with custom threshold and topN", func(t *testing.T) {
-		err := svc.Aggregate(ctx, threadService, user, alertList, "th 0.8 top 3")
+		_, err := aggregate.Create(ctx, clients, createSlackMessage(&user), "th 0.8 top 3")
 		gt.NoError(t, err)
 	})
 
 	t.Run("error on invalid threshold", func(t *testing.T) {
-		err := svc.Aggregate(ctx, threadService, user, alertList, "invalid")
+		_, err := aggregate.Create(ctx, clients, createSlackMessage(&user), "invalid")
 		gt.Error(t, err)
 	})
 
 	t.Run("error on invalid threshold range", func(t *testing.T) {
-		err := svc.Aggregate(ctx, threadService, user, alertList, "threshold 1.5")
+		_, err := aggregate.Create(ctx, clients, createSlackMessage(&user), "threshold 1.5")
 		gt.Error(t, err)
 	})
 
 	t.Run("error on invalid topN", func(t *testing.T) {
-		err := svc.Aggregate(ctx, threadService, user, alertList, "th 0.8 top invalid")
+		_, err := aggregate.Create(ctx, clients, createSlackMessage(&user), "th 0.8 top invalid")
 		gt.Error(t, err)
 	})
 }
@@ -152,8 +166,8 @@ func TestAggregate(t *testing.T) {
 
 	runTest := func(tc testCase) func(t *testing.T) {
 		return func(t *testing.T) {
-			ctx := t.Context()
-			svc := &command.Service{}
+			ctx := context.Background()
+			repo := &mock.RepositoryMock{}
 
 			slackClient := &mock.SlackClientMock{
 				PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
@@ -168,12 +182,26 @@ func TestAggregate(t *testing.T) {
 			user := slack.User{}
 			alertList := &alert.List{}
 
+			// Mock GetLatestAlertListInThread to return the alertList
+			repo.GetLatestAlertListInThreadFunc = func(ctx context.Context, thread slack.Thread) (*alert.List, error) {
+				return alertList, nil
+			}
+
+			llm := &gollem_mock.LLMClientMock{}
+
 			slackSvc, err := slack_svc.New(slackClient, "C0123456789")
 			gt.NoError(t, err).Required()
 			threadService, err := slackSvc.PostMessage(ctx, "test message")
 			gt.NoError(t, err).Required()
 
-			err = svc.Aggregate(context.Background(), threadService, user, alertList, tc.args)
+			clients := core.NewClients(repo, llm, threadService)
+
+			// Create a mock slack message
+			createSlackMessage := func(user *slack.User) *slack.Message {
+				return nil
+			}
+
+			_, err = aggregate.Create(ctx, clients, createSlackMessage(&user), tc.args)
 			if tc.wantErr && err == nil {
 				t.Error("expected error but got nil")
 			}

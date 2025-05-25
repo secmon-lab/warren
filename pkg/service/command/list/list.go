@@ -1,4 +1,4 @@
-package command
+package list
 
 import (
 	"context"
@@ -332,7 +332,7 @@ func ParseDuration(durationStr string) (time.Duration, error) {
 	}
 }
 
-func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message, input string) (types.AlertListID, error) {
+func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message, input string) (any, error) {
 	th := clients.Thread()
 
 	commands := strings.Split(input, "|")
