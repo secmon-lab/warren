@@ -14,7 +14,7 @@ type Comment struct {
 	TicketID       types.TicketID  `json:"ticket_id"`
 	CreatedAt      time.Time       `json:"created_at"`
 	Comment        string          `json:"comment"`
-	User           slack.User      `json:"user"`
+	User           *slack.User     `json:"user"`
 	SlackMessageID string          `json:"slack_message_id"`
 	Prompted       bool            `json:"prompted"`
 }

@@ -47,8 +47,11 @@ func (x *Message) Mention() []Mention {
 	return x.mentions
 }
 
-func (x *Message) User() User {
-	return x.user
+func (x *Message) User() *User {
+	if x.user.ID == "" {
+		return nil
+	}
+	return &x.user
 }
 
 func (x *Message) Text() string {
