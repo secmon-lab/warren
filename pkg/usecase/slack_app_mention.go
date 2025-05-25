@@ -101,10 +101,12 @@ func (uc *UseCases) handleSlackCommand(ctx context.Context, slackMsg slack.Messa
 	if err != nil {
 		return eb.Wrap(err, "failed to get latest alert list in thread")
 	}
-	ticket, err := uc.repository.GetTicketByThread(ctx, slackMsg.Thread())
-	if err != nil {
-		return eb.Wrap(err, "failed to get ticket by thread")
-	}
+	/*
+		ticket, err := uc.repository.GetTicketByThread(ctx, slackMsg.Thread())
+		if err != nil {
+			return eb.Wrap(err, "failed to get ticket by thread")
+		}
+	*/
 
 	svc := command.New(uc.repository, uc.llmClient)
 	switch cmd {
@@ -127,12 +129,10 @@ func (uc *UseCases) handleSlackCommand(ctx context.Context, slackMsg slack.Messa
 		return nil
 
 	case "t", "ticket":
-		// @TODO: Fix it
-		if ticket == nil {
-			msg.Notify(ctx, "🤔 No ticket found in this thread. Please create one first.")
-			return eb.Wrap(errNoRequiredData, "no ticket found in thread", goerr.V("thread", slackMsg.Thread()))
+		err := svc.Ticket(ctx, threadSvc, ptr.Ref(slackMsg.User()), remaining)
+		if err != nil {
+			return eb.Wrap(err, "failed to run ticket command")
 		}
-		msg.Notify(ctx, "🤔 Ticket found in this thread. Please use `ticket` command to manage the ticket.")
 		return nil
 
 	case "alert":

@@ -35,10 +35,10 @@ func setupTestAggrService(t *testing.T) (*command.Service, *mock.RepositoryMock,
 		},
 	}
 
-	svc := command.New(repo, llm)
 	slackService := slack_svc.NewTestService(t)
 	threadService, err := slackService.PostMessage(ctx, "test message")
 	gt.NoError(t, err).Required()
+	svc := command.New(repo, llm, threadService)
 	user := slack.User{
 		ID:   "U0123456789",
 		Name: "Test User",

@@ -18,10 +18,10 @@ import (
 func setupTicketTestService(t *testing.T) (*command.Service, *mock.RepositoryMock, *slacksvc.ThreadService, *slack.User, []*ticket.Ticket) {
 	ctx := context.Background()
 	repo := &mock.RepositoryMock{}
-	cmdSvc := command.New(repo, nil)
 	slackService := slacksvc.NewTestService(t)
 	threadService, err := slackService.PostMessage(ctx, "test message")
 	gt.NoError(t, err).Required()
+	cmdSvc := command.New(repo, nil, threadService)
 	user := &slack.User{
 		ID:   "U0123456789",
 		Name: "Test User",
