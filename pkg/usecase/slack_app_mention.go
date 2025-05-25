@@ -108,7 +108,7 @@ func (uc *UseCases) handleSlackCommand(ctx context.Context, slackMsg slack.Messa
 		}
 	*/
 
-	svc := command.New(uc.repository, uc.llmClient)
+	svc := command.New(uc.repository, uc.llmClient, threadSvc)
 	switch cmd {
 	case "l", "ls", "list":
 		_, err := svc.List(ctx, threadSvc, ptr.Ref(slackMsg.User()), remaining)
