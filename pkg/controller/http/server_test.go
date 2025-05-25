@@ -90,12 +90,14 @@ var slackInteractionJSON []byte
 
 func TestSlackInteractionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
-	uc := &UseCaseMock{
-		HandleSlackInteractionViewSubmissionFunc: func(ctx context.Context, user slack_model.User, callbackID slack_model.CallbackID, metadata string, values slack_model.StateValue) error {
-			return nil
-		},
-		HandleSlackInteractionBlockActionsFunc: func(ctx context.Context, user slack_model.User, slackThread slack_model.Thread, actionID slack_model.ActionID, value, triggerID string) error {
-			return nil
+	uc := &useCaseInterface{
+		SlackInteractionUsecases: &mock.SlackInteractionUsecasesMock{
+			HandleSlackInteractionViewSubmissionFunc: func(ctx context.Context, user slack_model.User, callbackID slack_model.CallbackID, metadata string, values slack_model.StateValue) error {
+				return nil
+			},
+			HandleSlackInteractionBlockActionsFunc: func(ctx context.Context, user slack_model.User, slackThread slack_model.Thread, actionID slack_model.ActionID, value, triggerID string) error {
+				return nil
+			},
 		},
 	}
 	srv := server.New(uc, server.WithSlackVerifier(slack_model.NewPayloadVerifier(signingSecret)))
@@ -130,8 +132,8 @@ var slackMentionJSON []byte
 
 func TestSlackMentionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
-	uc := &UseCaseMock{
-		HandleSlackAppMentionFunc: func(ctx context.Context, slackMsg *slack_model.Message) error {
+	slackEventMock := &mock.SlackEventUsecasesMock{
+		HandleSlackAppMentionFunc: func(ctx context.Context, slackMsg slack_model.Message) error {
 			gt.Equal(t, slackMsg.User().ID, "U8JLN34SV")
 			gt.Equal(t, slackMsg.ChannelID(), "C07AR2FPG1F")
 			gt.Equal(t, slackMsg.ThreadID(), "1741487414.163419")
@@ -139,6 +141,10 @@ func TestSlackMentionHandler(t *testing.T) {
 			gt.Equal(t, slackMsg.Mention()[0].Message, "kokoro")
 			return nil
 		},
+	}
+
+	uc := &useCaseInterface{
+		SlackEventUsecases: slackEventMock,
 	}
 	srv := server.New(uc, server.WithSlackVerifier(slack_model.NewPayloadVerifier(signingSecret)))
 
@@ -158,7 +164,7 @@ func TestSlackMentionHandler(t *testing.T) {
 
 		gt.Equal(t, http.StatusOK, w.Code)
 
-		gt.A(t, uc.HandleSlackAppMentionCalls()).Length(1)
+		gt.A(t, slackEventMock.HandleSlackAppMentionCalls()).Length(1)
 	})
 
 }
@@ -174,10 +180,13 @@ func calculateSlackSignature(payload string, ts string, signingSecret string) st
 var snsPem []byte
 
 func TestAlertSNS(t *testing.T) {
-	uc := &UseCaseMock{
+	alertUsecasesMock := &mock.AlertUsecasesMock{
 		HandleAlertWithAuthFunc: func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 			return nil, nil
 		},
+	}
+	uc := &useCaseInterface{
+		AlertUsecases: alertUsecasesMock,
 	}
 	srv := server.New(uc)
 
@@ -199,6 +208,6 @@ func TestAlertSNS(t *testing.T) {
 		srv.ServeHTTP(w, log.Request.WithContext(ctx))
 
 		gt.Equal(t, http.StatusOK, w.Code)
-		gt.A(t, uc.HandleAlertWithAuthCalls()).Length(1)
+		gt.A(t, alertUsecasesMock.HandleAlertWithAuthCalls()).Length(1)
 	})
 }

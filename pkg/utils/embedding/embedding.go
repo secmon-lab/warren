@@ -54,7 +54,7 @@ func Averate(embeddings []firestore.Vector32) firestore.Vector32 {
 	// Calculate average
 	avg := make([]float32, dim)
 	n := float32(len(embeddings))
-	for i := 0; i < dim; i++ {
+	for i := range avg {
 		avg[i] = sum[i] / n
 	}
 

@@ -21,7 +21,6 @@ require (
 	github.com/m-mizutani/opaq v0.2.1-0.20250222003843-b0e8fa8233e6
 	github.com/slack-go/slack v0.16.0
 	github.com/urfave/cli/v3 v3.3.2
-	golang.org/x/term v0.32.0
 	google.golang.org/api v0.233.0
 	google.golang.org/grpc v1.72.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -140,6 +139,7 @@ require (
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/term v0.32.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	golang.org/x/tools v0.33.0 // indirect

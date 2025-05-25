@@ -62,7 +62,7 @@ func TestBase(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := repository.NewMemory()
-			base := base.New(repo, []types.AlertID{}, map[string]string{}, types.NewSessionID())
+			base := base.New(repo, []types.AlertID{}, map[string]string{}, types.NewTicketID())
 
 			resp, err := base.Run(context.Background(), tc.funcName, tc.args)
 			if tc.wantErr {
@@ -79,7 +79,7 @@ func TestBase(t *testing.T) {
 
 func TestBase_Specs(t *testing.T) {
 	repo := repository.NewMemory()
-	base := base.New(repo, []types.AlertID{}, map[string]string{}, types.NewSessionID())
+	base := base.New(repo, []types.AlertID{}, map[string]string{}, types.NewTicketID())
 
 	specs, err := base.Specs(context.Background())
 	gt.NoError(t, err)

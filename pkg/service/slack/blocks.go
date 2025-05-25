@@ -7,6 +7,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -405,7 +406,7 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 	}
 }
 
-func buildAlertListBlocks(list *alert.List, metadata slackMetadata) []slack.Block {
+func buildAlertListBlocks(list *alert.List, alerts alert.Alerts, metadata slackMetadata) []slack.Block {
 	var blocks []slack.Block
 
 	if list.Title != "" {
@@ -427,7 +428,7 @@ func buildAlertListBlocks(list *alert.List, metadata slackMetadata) []slack.Bloc
 		nil,
 		nil,
 	))
-	blocks = append(blocks, buildAlertsBlocks(list.Alerts, metadata)...)
+	blocks = append(blocks, buildAlertsBlocks(alerts, metadata)...)
 	blocks = append(blocks, slack.NewActionBlock(
 		list.ID.String(),
 		slack.NewButtonBlockElement(
@@ -488,7 +489,7 @@ func buildAlertsBlocks(alerts alert.Alerts, metadata slackMetadata) []slack.Bloc
 	return blocks
 }
 
-func buildAlertClustersBlocks(clusters []alert.List, metadata slackMetadata) []slack.Block {
+func buildAlertClustersBlocks(clusters []*alert.List, metadata slackMetadata) ([]slack.Block, error) {
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(
 			slack.NewTextBlockObject("plain_text", "🗂️ Alert Clusters", false, false),
@@ -497,10 +498,14 @@ func buildAlertClustersBlocks(clusters []alert.List, metadata slackMetadata) []s
 	}
 
 	for _, cluster := range clusters {
-		blocks = append(blocks, buildAlertListBlocks(&cluster, metadata)...)
+		alerts, err := cluster.Alerts()
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to get alerts")
+		}
+		blocks = append(blocks, buildAlertListBlocks(cluster, alerts, metadata)...)
 	}
 
-	return blocks
+	return blocks, nil
 }
 
 // buildStateMessageBlocks builds the blocks for the state message in the thread.
@@ -525,6 +530,66 @@ func buildStateMessageBlocks(base string, messages []string) []slack.Block {
 	if len(blocks) == 0 {
 		return nil
 	}
+
+	return blocks
+}
+
+func buildTicketListBlocks(ctx context.Context, tickets []*ticket.Ticket, metadata slackMetadata) []slack.Block {
+	blocks := []slack.Block{
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", "🎫 Ticket List", false, false),
+		),
+		slack.NewDividerBlock(),
+	}
+
+	if len(tickets) == 0 {
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", "📭 No tickets found", false, false),
+			nil,
+			nil,
+		))
+		return blocks
+	}
+
+	var messageText strings.Builder
+	now := clock.Now(ctx)
+	for _, t := range tickets {
+		// Create a link to the ticket
+		ticketLink := fmt.Sprintf("<%s|%s>", metadata.ToMsgURL(t.SlackThread.ChannelID, t.SlackThread.ThreadID), t.Metadata.Title)
+
+		// Calculate relative time
+		elapsed := now.Sub(t.CreatedAt)
+		var timeStr string
+		switch {
+		case elapsed < time.Minute:
+			timeStr = "just now"
+		case elapsed < time.Hour:
+			minutes := int(elapsed.Minutes())
+			timeStr = fmt.Sprintf("%dm ago", minutes)
+		case elapsed < 24*time.Hour:
+			hours := int(elapsed.Hours())
+			timeStr = fmt.Sprintf("%dh ago", hours)
+		case elapsed < 30*24*time.Hour:
+			days := int(elapsed.Hours() / 24)
+			timeStr = fmt.Sprintf("%dd ago", days)
+		default:
+			timeStr = t.CreatedAt.Format("2006-01-02")
+		}
+
+		// Create a line with status, time and assignee information
+		statusInfo := fmt.Sprintf("%s %s (%s)", t.Status.Icon(), ticketLink, timeStr)
+		if t.Assignee != nil {
+			statusInfo += fmt.Sprintf(" 👤 <@%s>", t.Assignee.ID)
+		}
+
+		messageText.WriteString(statusInfo + "\n")
+	}
+
+	blocks = append(blocks, slack.NewSectionBlock(
+		slack.NewTextBlockObject("mrkdwn", messageText.String(), false, false),
+		nil,
+		nil,
+	))
 
 	return blocks
 }

@@ -77,6 +77,10 @@ func (x *Service) IsBotUser(userID string) bool {
 	return x.userID == userID
 }
 
+func (x *Service) BotID() string {
+	return x.botID
+}
+
 func (x *Service) NewThread(thread model.Thread) *ThreadService {
 	return &ThreadService{
 		slackMetadata: x.slackMetadata,
@@ -366,9 +370,13 @@ func (x *ThreadService) PostAlerts(ctx context.Context, alerts alert.Alerts) err
 }
 
 func (x *ThreadService) PostAlertList(ctx context.Context, list *alert.List) error {
-	blocks := buildNewAlertListBlocks(list, x.slackMetadata)
+	alerts, err := list.Alerts()
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alerts")
+	}
+	blocks := buildNewAlertListBlocks(list, alerts, x.slackMetadata)
 
-	_, _, err := x.client.PostMessageContext(ctx,
+	_, _, err = x.client.PostMessageContext(ctx,
 		x.channelID,
 		slack.MsgOptionBlocks(blocks...),
 		slack.MsgOptionTS(x.threadID),
@@ -381,23 +389,26 @@ func (x *ThreadService) PostAlertList(ctx context.Context, list *alert.List) err
 	return nil
 }
 
-func buildNewAlertListBlocks(list *alert.List, metadata slackMetadata) []slack.Block {
+func buildNewAlertListBlocks(list *alert.List, alerts alert.Alerts, metadata slackMetadata) []slack.Block {
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(
-			slack.NewTextBlockObject("plain_text", "📑 New list", false, false),
+			slack.NewTextBlockObject("plain_text", fmt.Sprintf("📑 New list with %d alerts", len(alerts)), false, false),
 		),
 		slack.NewDividerBlock(),
 	}
 
-	blocks = append(blocks, buildAlertListBlocks(list, metadata)...)
+	blocks = append(blocks, buildAlertListBlocks(list, alerts, metadata)...)
 
 	return blocks
 }
 
-func (x *ThreadService) PostAlertClusters(ctx context.Context, clusters []alert.List) error {
-	blocks := buildAlertClustersBlocks(clusters, x.slackMetadata)
+func (x *ThreadService) PostAlertLists(ctx context.Context, clusters []*alert.List) error {
+	blocks, err := buildAlertClustersBlocks(clusters, x.slackMetadata)
+	if err != nil {
+		return goerr.Wrap(err, "failed to build alert clusters blocks")
+	}
 
-	_, _, err := x.client.PostMessageContext(ctx,
+	_, _, err = x.client.PostMessageContext(ctx,
 		x.channelID,
 		slack.MsgOptionBlocks(blocks...),
 		slack.MsgOptionTS(x.threadID),
@@ -409,7 +420,23 @@ func (x *ThreadService) PostAlertClusters(ctx context.Context, clusters []alert.
 	return nil
 }
 
-func (x *Service) ShowResolveAlertListModal(ctx context.Context, list alert.List, triggerID string) error {
+func (x *ThreadService) PostTicketList(ctx context.Context, tickets []*ticket.Ticket) error {
+	blocks := buildTicketListBlocks(ctx, tickets, x.slackMetadata)
+
+	_, _, err := x.client.PostMessageContext(ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+		slack.MsgOptionBroadcast(),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post ticket list to slack", goerr.V("blocks", blocks))
+	}
+
+	return nil
+}
+
+func (x *Service) ShowResolveAlertListModal(ctx context.Context, list *alert.List, triggerID string) error {
 	return nil
 }
 

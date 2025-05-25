@@ -29,9 +29,9 @@ type UseCases struct {
 	storagePrefix string
 }
 
-var _ Alert = &UseCases{}
-var _ SlackEvent = &UseCases{}
-var _ SlackInteraction = &UseCases{}
+var _ interfaces.AlertUsecases = &UseCases{}
+var _ interfaces.SlackEventUsecases = &UseCases{}
+var _ interfaces.SlackInteractionUsecases = &UseCases{}
 
 type Option func(*UseCases)
 

@@ -11,7 +11,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -22,8 +21,7 @@ type Memory struct {
 
 	alerts         map[types.AlertID]*alert.Alert
 	lists          map[types.AlertListID]*alert.List
-	histories      map[types.SessionID][]*session.History
-	sessions       map[types.SessionID]*session.Session
+	histories      map[types.TicketID][]*ticket.History
 	tickets        map[types.TicketID]*ticket.Ticket
 	ticketComments map[types.TicketID][]ticket.Comment
 }
@@ -34,8 +32,7 @@ func NewMemory() *Memory {
 	return &Memory{
 		alerts:         make(map[types.AlertID]*alert.Alert),
 		lists:          make(map[types.AlertListID]*alert.List),
-		histories:      make(map[types.SessionID][]*session.History),
-		sessions:       make(map[types.SessionID]*session.Session),
+		histories:      make(map[types.TicketID][]*ticket.History),
 		tickets:        make(map[types.TicketID]*ticket.Ticket),
 		ticketComments: make(map[types.TicketID][]ticket.Comment),
 	}
@@ -60,23 +57,26 @@ func (r *Memory) GetAlert(ctx context.Context, alertID types.AlertID) (*alert.Al
 	return alert, nil
 }
 
-func (r *Memory) GetAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
+func (r *Memory) GetLatestAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
+	var latest *alert.Alert
 	for _, alert := range r.alerts {
 		if alert.SlackThread.ChannelID == thread.ChannelID && alert.SlackThread.ThreadID == thread.ThreadID {
-			return alert, nil
+			if latest == nil || alert.CreatedAt.After(latest.CreatedAt) {
+				latest = alert
+			}
 		}
 	}
-	return nil, nil
+	return latest, nil
 }
 
-func (r *Memory) GetLatestHistory(ctx context.Context, sessionID types.SessionID) (*session.History, error) {
+func (r *Memory) GetLatestHistory(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	histories, ok := r.histories[sessionID]
+	histories, ok := r.histories[ticketID]
 	if !ok || len(histories) == 0 {
 		return nil, nil
 	}
@@ -90,11 +90,11 @@ func (r *Memory) GetLatestHistory(ctx context.Context, sessionID types.SessionID
 	return latest, nil
 }
 
-func (r *Memory) PutHistory(ctx context.Context, sessionID types.SessionID, history *session.History) error {
+func (r *Memory) PutHistory(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.histories[sessionID] = append(r.histories[sessionID], history)
+	r.histories[ticketID] = append(r.histories[ticketID], history)
 	return nil
 }
 
@@ -109,11 +109,11 @@ func (r *Memory) GetAlertList(ctx context.Context, listID types.AlertListID) (*a
 	return list, nil
 }
 
-func (r *Memory) PutAlertList(ctx context.Context, list alert.List) error {
+func (r *Memory) PutAlertList(ctx context.Context, list *alert.List) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.lists[list.ID] = &list
+	r.lists[list.ID] = list
 	return nil
 }
 
@@ -142,37 +142,6 @@ func (r *Memory) GetLatestAlertListInThread(ctx context.Context, thread slack.Th
 		}
 	}
 	return latestList, nil
-}
-
-func (r *Memory) GetSession(ctx context.Context, id types.SessionID) (*session.Session, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	s, ok := r.sessions[id]
-	if !ok {
-		return nil, nil
-	}
-	return s, nil
-}
-
-func (r *Memory) GetSessionByThread(ctx context.Context, thread slack.Thread) (*session.Session, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	for _, s := range r.sessions {
-		if s.Thread.ChannelID == thread.ChannelID && s.Thread.ThreadID == thread.ThreadID {
-			return s, nil
-		}
-	}
-	return nil, nil
-}
-
-func (r *Memory) PutSession(ctx context.Context, s session.Session) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.sessions[s.ID] = &s
-	return nil
 }
 
 func (r *Memory) GetTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
@@ -211,6 +180,50 @@ func (r *Memory) GetTicketComments(ctx context.Context, ticketID types.TicketID)
 		return []ticket.Comment{}, nil
 	}
 	return comments, nil
+}
+
+func (r *Memory) GetTicketUnpromptedComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	comments, ok := r.ticketComments[ticketID]
+	if !ok {
+		return []ticket.Comment{}, nil
+	}
+
+	var unpromptedComments []ticket.Comment
+	for _, comment := range comments {
+		if !comment.Prompted {
+			unpromptedComments = append(unpromptedComments, comment)
+		}
+	}
+	return unpromptedComments, nil
+}
+
+func (r *Memory) PutTicketCommentsPrompted(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	comments, ok := r.ticketComments[ticketID]
+	if !ok {
+		return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+	}
+
+	// Create a map for faster lookup
+	commentIDMap := make(map[types.CommentID]bool)
+	for _, id := range commentIDs {
+		commentIDMap[id] = true
+	}
+
+	// Update prompted status for matching comments
+	for i := range comments {
+		if commentIDMap[comments[i].ID] {
+			comments[i].Prompted = true
+		}
+	}
+
+	r.ticketComments[ticketID] = comments
+	return nil
 }
 
 func (r *Memory) BindAlertToTicket(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
@@ -519,4 +532,40 @@ func (r *Memory) FindNearestAlerts(ctx context.Context, embedding []float32, lim
 	}
 
 	return alerts, nil
+}
+
+func (r *Memory) BatchPutAlerts(ctx context.Context, alerts alert.Alerts) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, alert := range alerts {
+		r.alerts[alert.ID] = alert
+	}
+	return nil
+}
+
+func (r *Memory) GetTicketsByStatus(ctx context.Context, status types.TicketStatus) ([]*ticket.Ticket, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var tickets []*ticket.Ticket
+	for _, t := range r.tickets {
+		if t.Status == status {
+			tickets = append(tickets, t)
+		}
+	}
+	return tickets, nil
+}
+
+func (r *Memory) GetTicketsBySpan(ctx context.Context, start, end time.Time) ([]*ticket.Ticket, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var tickets []*ticket.Ticket
+	for _, t := range r.tickets {
+		if t.CreatedAt.After(start) && t.CreatedAt.Before(end) {
+			tickets = append(tickets, t)
+		}
+	}
+	return tickets, nil
 }

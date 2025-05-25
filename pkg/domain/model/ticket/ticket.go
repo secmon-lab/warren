@@ -36,6 +36,22 @@ type Ticket struct {
 	Embedding firestore.Vector32 `json:"-"`
 }
 
+func (x *Ticket) Validate() error {
+	if err := x.ID.Validate(); err != nil {
+		return goerr.Wrap(err, "invalid ticket ID")
+	}
+	if err := x.Status.Validate(); err != nil {
+		return goerr.Wrap(err, "invalid status")
+	}
+	if err := x.Metadata.Validate(); err != nil {
+		return goerr.Wrap(err, "invalid metadata")
+	}
+	if err := x.Finding.Validate(); err != nil {
+		return goerr.Wrap(err, "invalid finding")
+	}
+	return nil
+}
+
 type Metadata struct {
 	// Title is the title of the ticket for human readability.
 	Title string `json:"title"`
@@ -65,31 +81,6 @@ func New(ctx context.Context, alertIDs []types.AlertID, slackThread *slack.Threa
 		SlackThread: slackThread,
 		Status:      types.TicketStatusInvestigating,
 		CreatedAt:   clock.Now(ctx),
-	}
-}
-
-type Comment struct {
-	ID        types.CommentID `json:"id"`
-	TicketID  types.TicketID  `json:"ticket_id"`
-	CreatedAt time.Time       `json:"created_at"`
-	Comment   string          `json:"comment"`
-	User      slack.User      `json:"user"`
-}
-
-func (x *Ticket) Validate() error {
-	if err := x.Status.Validate(); err != nil {
-		return goerr.Wrap(err, "invalid status")
-	}
-	return nil
-}
-
-func (x *Ticket) NewComment(ctx context.Context, comment string, user slack.User) Comment {
-	return Comment{
-		ID:        types.NewCommentID(),
-		TicketID:  x.ID,
-		CreatedAt: clock.Now(ctx),
-		Comment:   comment,
-		User:      user,
 	}
 }
 

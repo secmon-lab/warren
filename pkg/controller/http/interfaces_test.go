@@ -1,8 +1,8 @@
-package http
+package http_test
 
 import "github.com/secmon-lab/warren/pkg/domain/interfaces"
 
-type useCase interface {
+type useCaseInterface struct {
 	interfaces.AlertUsecases
 	interfaces.SlackEventUsecases
 	interfaces.SlackInteractionUsecases

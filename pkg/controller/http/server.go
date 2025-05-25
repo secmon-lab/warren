@@ -5,8 +5,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	slack_controller "github.com/secmon-lab/warren/pkg/controller/slack"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/usecase"
 )
 
 type Server struct {
@@ -24,9 +24,9 @@ func WithSlackVerifier(verifier slack_model.PayloadVerifier) Options {
 }
 
 type UseCase interface {
-	usecase.Alert
-	usecase.SlackEvent
-	usecase.SlackInteraction
+	interfaces.AlertUsecases
+	interfaces.SlackEventUsecases
+	interfaces.SlackInteractionUsecases
 }
 
 func New(uc UseCase, opts ...Options) *Server {

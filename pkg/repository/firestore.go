@@ -9,7 +9,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -78,60 +77,6 @@ func (r *Firestore) GetAlert(ctx context.Context, alertID types.AlertID) (*alert
 	return &alert, nil
 }
 
-func (r *Firestore) GetAlertsBySlackThread(ctx context.Context, thread slack.Thread) (alert.Alerts, error) {
-	iter := r.db.Collection(collectionAlerts).
-		Where("SlackThread.ChannelID", "==", thread.ChannelID).
-		Where("SlackThread.ThreadID", "==", thread.ThreadID).
-		Documents(ctx)
-
-	var alerts alert.Alerts
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			return nil, goerr.Wrap(err, "failed to get alert by slack thread", goerr.V("slack_thread", thread))
-		}
-
-		var alert alert.Alert
-		if err := doc.DataTo(&alert); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("slack_message_id", thread.ThreadID))
-		}
-
-		alerts = append(alerts, &alert)
-	}
-
-	return alerts, nil
-}
-
-func (r *Firestore) GetLatestAlerts(ctx context.Context, oldest time.Time, limit int) (alert.Alerts, error) {
-	iter := r.db.Collection(collectionAlerts).
-		Where("CreatedAt", ">=", oldest).
-		OrderBy("CreatedAt", firestore.Desc).
-		Documents(ctx)
-
-	var alerts alert.Alerts
-	for len(alerts) < limit {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			return nil, goerr.Wrap(err, "failed to get next alert")
-		}
-
-		var alert alert.Alert
-		if err := doc.DataTo(&alert); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to alert")
-		}
-
-		alerts = append(alerts, &alert)
-	}
-
-	return alerts, nil
-}
-
 func (r *Firestore) GetAlertListByThread(ctx context.Context, thread slack.Thread) (*alert.List, error) {
 	iter := r.db.Collection(collectionAlertLists).Where("SlackThread.ChannelID", "==", thread.ChannelID).Where("SlackThread.ThreadID", "==", thread.ThreadID).Documents(ctx)
 
@@ -167,7 +112,7 @@ func (r *Firestore) GetAlertList(ctx context.Context, listID types.AlertListID) 
 	return &alertList, nil
 }
 
-func (r *Firestore) PutAlertList(ctx context.Context, list alert.List) error {
+func (r *Firestore) PutAlertList(ctx context.Context, list *alert.List) error {
 	doc := r.db.Collection(collectionAlertLists).Doc(list.ID.String())
 	_, err := doc.Set(ctx, list)
 	if err != nil {
@@ -209,7 +154,7 @@ func (r *Firestore) GetLatestAlertListInThread(ctx context.Context, thread slack
 		Where("SlackThread.ThreadID", "==", thread.ThreadID).
 		Documents(ctx)
 
-	var lists []alert.List
+	var lists []*alert.List
 	for {
 		doc, err := iter.Next()
 		if err != nil {
@@ -224,7 +169,7 @@ func (r *Firestore) GetLatestAlertListInThread(ctx context.Context, thread slack
 			return nil, goerr.Wrap(err, "failed to convert data to alert list")
 		}
 
-		lists = append(lists, alertList)
+		lists = append(lists, &alertList)
 	}
 
 	if len(lists) == 0 {
@@ -236,116 +181,50 @@ func (r *Firestore) GetLatestAlertListInThread(ctx context.Context, thread slack
 		return lists[i].CreatedAt.After(lists[j].CreatedAt)
 	})
 
-	return &lists[0], nil
+	return lists[0], nil
 }
 
-func (r *Firestore) GetHistory(ctx context.Context, sessionID types.SessionID) ([]*session.History, error) {
-	iter := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionHistories).OrderBy("CreatedAt", firestore.Asc).Documents(ctx)
-	defer iter.Stop()
-
-	var histories []*session.History
-	for {
-		doc, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get chat history")
-		}
-
-		var history session.History
-		if err := doc.DataTo(&history); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to chat history")
-		}
-		histories = append(histories, &history)
-	}
-
-	return histories, nil
-}
-
-func (r *Firestore) GetAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
+func (r *Firestore) GetLatestAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
 	iter := r.db.Collection(collectionAlerts).
 		Where("SlackThread.ChannelID", "==", thread.ChannelID).
 		Where("SlackThread.ThreadID", "==", thread.ThreadID).
 		Limit(1).
 		Documents(ctx)
 
-	doc, err := iter.Next()
-	if err != nil {
-		if err == iterator.Done {
-			return nil, nil
+	var resp *alert.Alert
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get alert by thread", goerr.V("thread", thread))
 		}
-		return nil, goerr.Wrap(err, "failed to get alert by thread", goerr.V("thread", thread))
+
+		var v alert.Alert
+		if err := doc.DataTo(&v); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert")
+		}
+		if resp == nil {
+			resp = &v
+		} else if v.CreatedAt.After(resp.CreatedAt) {
+			resp = &v
+		}
 	}
 
-	var alert alert.Alert
-	if err := doc.DataTo(&alert); err != nil {
-		return nil, goerr.Wrap(err, "failed to convert data to alert")
-	}
-
-	return &alert, nil
+	return resp, nil
 }
 
-func (r *Firestore) GetSession(ctx context.Context, id types.SessionID) (*session.Session, error) {
-	doc, err := r.db.Collection(collectionSessions).Doc(id.String()).Get(ctx)
+func (r *Firestore) PutHistory(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
+	_, err := r.db.Collection(collectionTickets).Doc(ticketID.String()).Collection(collectionHistories).Doc(history.ID.String()).Set(ctx, history)
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			return nil, nil
-		}
-		return nil, goerr.Wrap(err, "failed to get session", goerr.V("id", id))
-	}
-
-	var s session.Session
-	if err := doc.DataTo(&s); err != nil {
-		return nil, goerr.Wrap(err, "failed to convert data to session")
-	}
-
-	return &s, nil
-}
-
-func (r *Firestore) GetSessionByThread(ctx context.Context, thread slack.Thread) (*session.Session, error) {
-	iter := r.db.Collection(collectionSessions).
-		Where("Thread.ChannelID", "==", thread.ChannelID).
-		Where("Thread.ThreadID", "==", thread.ThreadID).
-		Limit(1).
-		Documents(ctx)
-
-	doc, err := iter.Next()
-	if err != nil {
-		if err == iterator.Done {
-			return nil, nil
-		}
-		return nil, goerr.Wrap(err, "failed to get session by thread", goerr.V("thread", thread))
-	}
-
-	var s session.Session
-	if err := doc.DataTo(&s); err != nil {
-		return nil, goerr.Wrap(err, "failed to convert data to session")
-	}
-
-	return &s, nil
-}
-
-func (r *Firestore) PutSession(ctx context.Context, s session.Session) error {
-	doc := r.db.Collection(collectionSessions).Doc(s.ID.String())
-	_, err := doc.Set(ctx, s)
-	if err != nil {
-		return goerr.Wrap(err, "failed to put session", goerr.V("id", s.ID))
+		return goerr.Wrap(err, "failed to put history", goerr.V("ticket_id", ticketID), goerr.V("history_id", history.ID))
 	}
 	return nil
 }
 
-func (r *Firestore) PutHistory(ctx context.Context, sessionID types.SessionID, history *session.History) error {
-	doc := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionHistories).Doc(history.ID.String())
-	if _, err := doc.Set(ctx, history); err != nil {
-		return goerr.Wrap(err, "failed to put chat history")
-	}
-
-	return nil
-}
-
-func (r *Firestore) GetLatestHistory(ctx context.Context, sessionID types.SessionID) (*session.History, error) {
-	iter := r.db.Collection(collectionSessions).Doc(sessionID.String()).Collection(collectionHistories).OrderBy("CreatedAt", firestore.Desc).Limit(1).Documents(ctx)
+func (r *Firestore) GetLatestHistory(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
+	iter := r.db.Collection(collectionTickets).Doc(ticketID.String()).Collection(collectionHistories).OrderBy("CreatedAt", firestore.Desc).Limit(1).Documents(ctx)
 	defer iter.Stop()
 
 	doc, err := iter.Next()
@@ -356,7 +235,7 @@ func (r *Firestore) GetLatestHistory(ctx context.Context, sessionID types.Sessio
 		return nil, goerr.Wrap(err, "failed to get latest chat history")
 	}
 
-	var history session.History
+	var history ticket.History
 	if err := doc.DataTo(&history); err != nil {
 		return nil, goerr.Wrap(err, "failed to convert data to chat history")
 	}
@@ -440,6 +319,65 @@ func (r *Firestore) GetTicketComments(ctx context.Context, ticketID types.Ticket
 		comments = append(comments, comment)
 	}
 	return comments, nil
+}
+
+func (r *Firestore) GetTicketUnpromptedComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
+	iter := r.db.Collection(collectionTickets).
+		Doc(ticketID.String()).
+		Collection(collectionComments).
+		Where("Prompted", "==", false).
+		Documents(ctx)
+
+	var comments []ticket.Comment
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get ticket unprompted comments", goerr.V("ticket_id", ticketID))
+		}
+
+		var comment ticket.Comment
+		if err := doc.DataTo(&comment); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket comment", goerr.V("ticket_id", ticketID))
+		}
+		comments = append(comments, comment)
+	}
+	return comments, nil
+}
+
+func (r *Firestore) PutTicketCommentsPrompted(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error {
+	bw := r.db.BulkWriter(ctx)
+	var jobs []*firestore.BulkWriterJob
+
+	for _, commentID := range commentIDs {
+		commentDoc := r.db.Collection(collectionTickets).
+			Doc(ticketID.String()).
+			Collection(collectionComments).
+			Doc(commentID.String())
+
+		job, err := bw.Update(commentDoc, []firestore.Update{
+			{
+				Path:  "Prompted",
+				Value: true,
+			},
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to update comment prompted status", goerr.V("ticket_id", ticketID), goerr.V("comment_id", commentID))
+		}
+		jobs = append(jobs, job)
+	}
+
+	bw.End()
+
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil {
+			return goerr.Wrap(err, "failed to commit bulk writer job")
+		}
+	}
+
+	return nil
 }
 
 // Alert-Ticket binding methods
@@ -785,4 +723,82 @@ func (r *Firestore) FindNearestAlerts(ctx context.Context, embedding []float32, 
 	}
 
 	return alerts, nil
+}
+
+func (r *Firestore) BatchPutAlerts(ctx context.Context, alerts alert.Alerts) error {
+	bw := r.db.BulkWriter(ctx)
+	var jobs []*firestore.BulkWriterJob
+
+	for _, alert := range alerts {
+		alertDoc := r.db.Collection(collectionAlerts).Doc(alert.ID.String())
+		job, err := bw.Set(alertDoc, alert)
+		if err != nil {
+			return goerr.Wrap(err, "failed to put alert", goerr.V("alert_id", alert.ID))
+		}
+		jobs = append(jobs, job)
+	}
+
+	bw.End()
+
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil {
+			return goerr.Wrap(err, "failed to commit bulk writer job")
+		}
+	}
+
+	return nil
+}
+
+func (r *Firestore) GetTicketsByStatus(ctx context.Context, status types.TicketStatus) ([]*ticket.Ticket, error) {
+	iter := r.db.Collection(collectionTickets).
+		Where("Status", "==", status).
+		Documents(ctx)
+
+	var tickets []*ticket.Ticket
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next ticket")
+		}
+
+		var t ticket.Ticket
+		if err := doc.DataTo(&t); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		tickets = append(tickets, &t)
+	}
+
+	return tickets, nil
+}
+
+func (r *Firestore) GetTicketsBySpan(ctx context.Context, begin, end time.Time) ([]*ticket.Ticket, error) {
+	iter := r.db.Collection(collectionTickets).
+		Where("CreatedAt", ">=", begin).
+		Where("CreatedAt", "<=", end).
+		OrderBy("CreatedAt", firestore.Asc).
+		Documents(ctx)
+
+	var tickets []*ticket.Ticket
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next ticket")
+		}
+
+		var t ticket.Ticket
+		if err := doc.DataTo(&t); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		tickets = append(tickets, &t)
+	}
+
+	return tickets, nil
 }

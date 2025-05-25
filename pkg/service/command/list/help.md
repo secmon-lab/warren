@@ -1,10 +1,11 @@
+`list` command shows alerts that are *not bound to any ticket*.
+
 *📋 Basic Usage*
 ━━━━━━━━━━━━━━━━━━━━━━
 • `list from 10:00 to 11:00` _Show alerts within time range_
-• `list between 2025-01-01 2025-01-02`
-• `list unresolved` _Show unresolved alerts_
 • `list after 2025-01-01` _Show alerts after date_
 • `list since 10m` _Show alerts from last 10 minutes_
+• `list all` _Show all unbound alerts_
   _(Default: `list since 1d`)_
 
 *🔍 Filters and Modifiers*
@@ -14,5 +15,3 @@
 • `list | limit 10` _Limit number of results_
 • `list | offset 10` _Skip first N results_
 • `list | user @username` _Filter by username_
-
-
