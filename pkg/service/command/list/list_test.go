@@ -9,6 +9,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	gollem_mock "github.com/m-mizutani/gollem/mock"
 	"github.com/m-mizutani/gt"
+	"github.com/slack-go/slack/slackevents"
 
 	mock "github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -110,6 +111,27 @@ func setupTestService(t *testing.T) (*command.Service, *mock.RepositoryMock, *sl
 	return svc, repo, threadService, user, alerts, llm
 }
 
+// createTestSlackMessage creates a test slack.Message for testing purposes
+func createTestSlackMessage(user *slack.User) *slack.Message {
+	ctx := context.Background()
+
+	// Create a mock event to use with NewMessage
+	event := &slackevents.EventsAPIEvent{
+		TeamID: "T0123456789",
+		InnerEvent: slackevents.EventsAPIInnerEvent{
+			Data: &slackevents.MessageEvent{
+				TimeStamp:       "1234567890.123456",
+				Channel:         "C0123456789",
+				ThreadTimeStamp: "1234567890.123456",
+				User:            user.ID,
+				Text:            "test message",
+			},
+		},
+	}
+
+	return slack.NewMessage(ctx, event)
+}
+
 func TestService_List(t *testing.T) {
 	_, repo, threadService, user, baseAlerts, llm := setupTestService(t)
 	ctx := context.Background()
@@ -117,15 +139,8 @@ func TestService_List(t *testing.T) {
 	// Create core.Clients directly
 	clients := core.NewClients(repo, llm, threadService)
 
-	// Create a mock slack message
-	createSlackMessage := func(user *slack.User) *slack.Message {
-		// Since slack.Message has unexported fields, we'll pass nil for now
-		// The list.Create function should handle this gracefully in tests
-		return nil
-	}
-
 	t.Run("show alerts with limit", func(t *testing.T) {
-		resp, err := list.Create(ctx, clients, createSlackMessage(user), "limit 1")
+		resp, err := list.Create(ctx, clients, createTestSlackMessage(user), "limit 1")
 		gt.NoError(t, err)
 		listID := gt.Cast[types.AlertListID](t, resp)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
@@ -139,7 +154,7 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("show alerts with offset", func(t *testing.T) {
-		resp, err := list.Create(ctx, clients, createSlackMessage(user), "offset 1")
+		resp, err := list.Create(ctx, clients, createTestSlackMessage(user), "offset 1")
 		gt.NoError(t, err)
 		listID := gt.Cast[types.AlertListID](t, resp)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
@@ -154,12 +169,12 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("show alerts with grep filter", func(t *testing.T) {
-		resp, err := list.Create(ctx, clients, createSlackMessage(user), "grep orange")
+		resp, err := list.Create(ctx, clients, createTestSlackMessage(user), "grep orange")
 		listID := gt.Cast[types.AlertListID](t, resp)
 		gt.NoError(t, err)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
 
-		list, err := repo.GetAlertList(ctx, listID)
+		list, err := repo.GetAlertList(ctx, gt.Cast[types.AlertListID](t, resp))
 		gt.NoError(t, err).Required()
 		alerts, err := list.GetAlerts(ctx, repo)
 		gt.NoError(t, err).Required()
@@ -168,7 +183,7 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("show alerts with sort by CreatedAt", func(t *testing.T) {
-		resp, err := list.Create(ctx, clients, createSlackMessage(user), "sort CreatedAt")
+		resp, err := list.Create(ctx, clients, createTestSlackMessage(user), "sort CreatedAt")
 		gt.NoError(t, err)
 		listID := gt.Cast[types.AlertListID](t, resp)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
@@ -183,7 +198,7 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("show alerts with multiple pipeline actions", func(t *testing.T) {
-		resp, err := list.Create(ctx, clients, createSlackMessage(user), "grep orange | sort CreatedAt | limit 1")
+		resp, err := list.Create(ctx, clients, createTestSlackMessage(user), "grep orange | sort CreatedAt | limit 1")
 		listID := gt.Cast[types.AlertListID](t, resp)
 		gt.NoError(t, err)
 		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
@@ -197,7 +212,7 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("error on invalid command", func(t *testing.T) {
-		_, err := list.Create(ctx, clients, createSlackMessage(user), "invalid_command")
+		_, err := list.Create(ctx, clients, createTestSlackMessage(user), "invalid_command")
 		gt.Error(t, err)
 		if !strings.Contains(err.Error(), "unknown command") && !strings.Contains(err.Error(), "unknown action") {
 			t.Fatalf("value should contain unknown command or unknown action, actual: %s", err.Error())
@@ -205,7 +220,7 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("error on invalid pipeline action", func(t *testing.T) {
-		_, err := list.Create(ctx, clients, createSlackMessage(user), "invalid_action")
+		_, err := list.Create(ctx, clients, createTestSlackMessage(user), "invalid_action")
 		gt.Error(t, err)
 		if !strings.Contains(err.Error(), "unknown action") {
 			t.Fatalf("value should contain unknown action, actual: %s", err.Error())
@@ -213,7 +228,7 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("error on invalid action argument", func(t *testing.T) {
-		_, err := list.Create(ctx, clients, createSlackMessage(user), "limit invalid")
+		_, err := list.Create(ctx, clients, createTestSlackMessage(user), "limit invalid")
 		gt.Error(t, err)
 		if !strings.Contains(err.Error(), "limit: failed to convert limit to int") {
 			t.Fatalf("value should contain limit: failed to convert limit to int, actual: %s", err.Error())

@@ -392,7 +392,7 @@ func (x *ThreadService) PostAlertList(ctx context.Context, list *alert.List) err
 func buildNewAlertListBlocks(list *alert.List, alerts alert.Alerts, metadata slackMetadata) []slack.Block {
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(
-			slack.NewTextBlockObject("plain_text", "📑 New list", false, false),
+			slack.NewTextBlockObject("plain_text", fmt.Sprintf("📑 New list with %d alerts", len(alerts)), false, false),
 		),
 		slack.NewDividerBlock(),
 	}

@@ -14,7 +14,7 @@ import (
 	slacksvc "github.com/secmon-lab/warren/pkg/service/slack"
 )
 
-//go:embed help.md
+//go:embed ticket.help.md
 var ticketHelp string
 
 type ticketCommand struct {

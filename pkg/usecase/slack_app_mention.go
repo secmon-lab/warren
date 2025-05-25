@@ -10,6 +10,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/prompt"
+	"github.com/secmon-lab/warren/pkg/service/command"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -34,7 +35,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 		if i == 0 && len(mention.Message) > 0 {
 			if err := uc.handleSlackCommand(ctx, slackMsg, mention.Message); err != nil {
 				// If errUnknownCommand, it will be falled thorugh.
-				if !errors.Is(err, errUnknownCommand) {
+				if !errors.Is(err, command.ErrUnknownCommand) {
 					return goerr.Wrap(err, "failed to handle slack root command")
 				}
 			} else {
@@ -64,14 +65,16 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 	return nil
 }
 
-var (
-	errUnknownCommand = goerr.New("unknown command")
-	errNoRequiredData = goerr.New("no required data")
-)
-
 // handleSlackCommand not only routes command but also get input data in the thread.
 func (uc *UseCases) handleSlackCommand(ctx context.Context, slackMsg slack.Message, cmd string) error {
 	threadSvc := uc.slackService.NewThread(slackMsg.Thread())
+
+	cmdSvc := command.New(uc.repository, uc.llmClient, threadSvc)
+	if err := cmdSvc.Execute(ctx, &slackMsg, cmd); err != nil {
+		return goerr.Wrap(err, "failed to execute command")
+	}
+
+	return nil
 }
 
 /*
