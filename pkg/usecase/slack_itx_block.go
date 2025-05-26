@@ -55,7 +55,7 @@ func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread 
 
 	newTicket := ticket.New(ctx, alertIDs, &slackThread)
 	newTicket.Assignee = &user
-	newTicket.Embedding = embedding.Averate(embeddings)
+	newTicket.Embedding = embedding.Average(embeddings)
 
 	if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
 		return goerr.Wrap(err, "failed to fill ticket metadata")
@@ -148,7 +148,20 @@ func (uc *UseCases) slackActionBindAlert(ctx context.Context, targetAlertID type
 }
 
 func (uc *UseCases) slackActionBindList(ctx context.Context, user slack.User, slackThread slack.Thread, targetListID types.AlertListID, triggerID string) error {
-	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindList, []*ticket.Ticket{}, triggerID, targetListID.String()); err != nil {
+	list, err := uc.repository.GetAlertList(ctx, targetListID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alert list")
+	}
+	if list == nil {
+		return goerr.New("alert list not found")
+	}
+
+	tickets, err := uc.repository.FindNearestTickets(ctx, list.Embedding, 10)
+	if err != nil {
+		return goerr.Wrap(err, "failed to find similar tickets")
+	}
+
+	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindList, tickets, triggerID, targetListID.String()); err != nil {
 		return goerr.Wrap(err, "failed to show bind list modal")
 	}
 

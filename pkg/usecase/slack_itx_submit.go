@@ -159,7 +159,7 @@ func (uc *UseCases) handleBindAlerts(ctx context.Context, user slack.User, ticke
 	for i, alert := range alerts {
 		embeddings[i] = alert.Embedding
 	}
-	ticket.Embedding = embedding.Averate(embeddings)
+	ticket.Embedding = embedding.Average(embeddings)
 
 	// Update database
 	if err := uc.repository.BatchBindAlertsToTicket(ctx, ticket.AlertIDs, ticketID); err != nil {

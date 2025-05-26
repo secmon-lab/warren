@@ -130,7 +130,7 @@ func (x *List) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) err
 	for i, alert := range x.alerts {
 		embeddings[i] = alert.Embedding
 	}
-	x.Embedding = embedding.Averate(embeddings)
+	x.Embedding = embedding.Average(embeddings)
 
 	summary, err := llm.Summary(ctx, llmClient, listSummaryPrompt, x.alerts)
 	if err != nil {
