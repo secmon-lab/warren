@@ -9,6 +9,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	gollem_mock "github.com/m-mizutani/gollem/mock"
 	"github.com/m-mizutani/gt"
+	"github.com/newmo-oss/go-caller"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -21,6 +22,15 @@ import (
 
 	slack_sdk "github.com/slack-go/slack"
 )
+
+func checkMockCaller(t testing.TB, skip int, pkgPath string, funcName string) {
+	t.Helper()
+	gt.A(t, caller.New(3+skip)).Longer(0).At(0, func(t testing.TB, v caller.Frame) {
+		t.Helper()
+		gt.Equal(t, v.PkgPath(), pkgPath)
+		gt.Equal(t, v.FuncName(), funcName)
+	})
+}
 
 func TestSlackActionAckAlert(t *testing.T) {
 	ctx := context.Background()
@@ -51,12 +61,23 @@ func TestSlackActionAckAlert(t *testing.T) {
 					llmCallCount++
 					switch llmCallCount {
 					case 1:
+						// creating summary
+						checkMockCaller(t, 2,
+							"github.com/secmon-lab/warren/pkg/domain/model/ticket",
+							"(*Ticket).FillMetadata",
+						)
 						return &gollem.Response{
 							Texts: []string{
 								`{"title": "test title", "description": "test description"}`,
 							},
 						}, nil
+
 					case 2:
+						// summarize ticket
+						checkMockCaller(t, 2,
+							"github.com/secmon-lab/warren/pkg/domain/model/ticket",
+							"(*Ticket).FillMetadata",
+						)
 						return &gollem.Response{
 							Texts: []string{
 								`{"title": "test title", "description": "test description", "summary": "test summary"}`,
@@ -64,11 +85,17 @@ func TestSlackActionAckAlert(t *testing.T) {
 						}, nil
 
 					case 3:
+						// ack alerts
+						checkMockCaller(t, 2,
+							"github.com/secmon-lab/warren/pkg/usecase",
+							"(*UseCases).ackAlerts",
+						)
 						return &gollem.Response{
 							Texts: []string{
 								`{"title": "test title", "description": "test description", "summary": "test summary"}`,
 							},
 						}, nil
+
 					default:
 						return nil, goerr.New("unexpected call")
 					}
@@ -301,6 +328,11 @@ func TestSlackActionBindAlert(t *testing.T) {
 
 	slackMock := &mock.SlackClientMock{
 		OpenViewFunc: func(triggerID string, view slack_sdk.ModalViewRequest) (*slack_sdk.ViewResponse, error) {
+			checkMockCaller(t, 0,
+				"github.com/secmon-lab/warren/pkg/service/slack",
+				"(*Service).ShowBindToTicketModal",
+			)
+
 			return &slack_sdk.ViewResponse{}, nil
 		},
 		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
