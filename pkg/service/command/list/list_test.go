@@ -19,6 +19,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/command/core"
 	list "github.com/secmon-lab/warren/pkg/service/command/list"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
 
 func setupTestService(t *testing.T) (*command.Service, *mock.RepositoryMock, *slack_svc.ThreadService, *slack.User, []*alert.Alert, gollem.LLMClient) {
@@ -237,16 +238,17 @@ func TestService_List(t *testing.T) {
 }
 
 func TestTimeFilters(t *testing.T) {
-	now := time.Now()
+	fixedTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx := clock.With(context.Background(), func() time.Time { return fixedTime })
 	alerts := alert.Alerts{
 		{
-			CreatedAt: now.Add(-2 * time.Hour),
+			CreatedAt: fixedTime.Add(-2 * time.Hour),
 		},
 		{
-			CreatedAt: now.Add(-1 * time.Hour),
+			CreatedAt: fixedTime.Add(-1 * time.Hour),
 		},
 		{
-			CreatedAt: now,
+			CreatedAt: fixedTime,
 		},
 	}
 
@@ -264,7 +266,7 @@ func TestTimeFilters(t *testing.T) {
 			action, err := init(tc.command[1:])
 			gt.NoError(t, err)
 
-			result, err := action(context.Background(), alerts)
+			result, err := action(ctx, alerts)
 			gt.NoError(t, err)
 			gt.Number(t, len(result)).Equal(tc.expected)
 		}
@@ -278,13 +280,13 @@ func TestTimeFilters(t *testing.T) {
 
 	t.Run("from to", runTest(testCase{
 		name:     "from to",
-		command:  []string{"from", now.Add(-2 * time.Hour).Format("15:04"), "to", now.Add(-90 * time.Minute).Format("15:04")},
+		command:  []string{"from", fixedTime.Add(-2 * time.Hour).Format("15:04"), "to", fixedTime.Add(-90 * time.Minute).Format("15:04")},
 		expected: 1,
 	}))
 
 	t.Run("after", runTest(testCase{
 		name:     "after",
-		command:  []string{"after", now.Add(-90 * time.Minute).Format("15:04")},
+		command:  []string{"after", fixedTime.Add(-90 * time.Minute).Format("15:04")},
 		expected: 2,
 	}))
 
@@ -303,13 +305,14 @@ func TestParseTime(t *testing.T) {
 
 	runTest := func(tc testCase) func(t *testing.T) {
 		return func(t *testing.T) {
-			result, err := list.ParseTime(tc.input)
+			ctx := clock.With(context.Background(), func() time.Time { return tc.expected })
+			result, err := list.ParseTime(ctx, tc.input)
 			gt.NoError(t, err)
 			gt.Value(t, result.Format("15:04")).Equal(tc.expected.Format("15:04"))
 		}
 	}
 
-	now := time.Now()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	t.Run("time format", runTest(testCase{
 		input:    "14:30",
 		expected: time.Date(now.Year(), now.Month(), now.Day(), 14, 30, 0, 0, now.Location()),

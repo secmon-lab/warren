@@ -14,6 +14,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/command/core"
+	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
@@ -199,17 +200,17 @@ func actionFrom(args []string) (actionFunc, error) {
 		return nil, goerr.New("from: requires 'from <time> to <time>' format")
 	}
 
-	fromTime, err := ParseTime(args[0])
-	if err != nil {
-		return nil, goerr.Wrap(err, "from: failed to parse from time")
-	}
-
-	toTime, err := ParseTime(args[2])
-	if err != nil {
-		return nil, goerr.Wrap(err, "from: failed to parse to time")
-	}
-
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		fromTime, err := ParseTime(ctx, args[0])
+		if err != nil {
+			return nil, goerr.Wrap(err, "from: failed to parse from time")
+		}
+
+		toTime, err := ParseTime(ctx, args[2])
+		if err != nil {
+			return nil, goerr.Wrap(err, "from: failed to parse to time")
+		}
+
 		var filtered alert.Alerts
 		for _, a := range alerts {
 			if (a.CreatedAt.After(fromTime) || a.CreatedAt.Equal(fromTime)) &&
@@ -226,12 +227,12 @@ func actionTo(args []string) (actionFunc, error) {
 		return nil, goerr.New("to: requires one argument")
 	}
 
-	toTime, err := ParseTime(args[0])
-	if err != nil {
-		return nil, goerr.Wrap(err, "to: failed to parse time")
-	}
-
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		toTime, err := ParseTime(ctx, args[0])
+		if err != nil {
+			return nil, goerr.Wrap(err, "to: failed to parse time")
+		}
+
 		var filtered alert.Alerts
 		for _, a := range alerts {
 			if a.CreatedAt.Before(toTime) || a.CreatedAt.Equal(toTime) {
@@ -247,12 +248,12 @@ func actionAfter(args []string) (actionFunc, error) {
 		return nil, goerr.New("after: requires one argument")
 	}
 
-	afterTime, err := ParseTime(args[0])
-	if err != nil {
-		return nil, goerr.Wrap(err, "after: failed to parse time")
-	}
-
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		afterTime, err := ParseTime(ctx, args[0])
+		if err != nil {
+			return nil, goerr.Wrap(err, "after: failed to parse time")
+		}
+
 		var filtered alert.Alerts
 		for _, a := range alerts {
 			if a.CreatedAt.After(afterTime) {
@@ -274,7 +275,7 @@ func actionSince(args []string) (actionFunc, error) {
 	}
 
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
-		sinceTime := time.Now().Add(-duration)
+		sinceTime := clock.Now(ctx).Add(-duration)
 		var filtered alert.Alerts
 		for _, a := range alerts {
 			if a.CreatedAt.After(sinceTime) || a.CreatedAt.Equal(sinceTime) {
@@ -296,10 +297,10 @@ func actionAll(args []string) (actionFunc, error) {
 }
 
 // ParseTime parses a time string in either HH:MM or YYYY-MM-DD format
-func ParseTime(timeStr string) (time.Time, error) {
+func ParseTime(ctx context.Context, timeStr string) (time.Time, error) {
 	// Try parsing as time format (HH:MM)
 	if t, err := time.Parse("15:04", timeStr); err == nil {
-		now := time.Now()
+		now := clock.Now(ctx)
 		return time.Date(now.Year(), now.Month(), now.Day(), t.Hour(), t.Minute(), 0, 0, now.Location()), nil
 	}
 
