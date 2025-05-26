@@ -303,6 +303,11 @@ func TestSlackActionBindAlert(t *testing.T) {
 		OpenViewFunc: func(triggerID string, view slack_sdk.ModalViewRequest) (*slack_sdk.ViewResponse, error) {
 			return &slack_sdk.ViewResponse{}, nil
 		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
 	}
 
 	// Create test alert
@@ -311,6 +316,10 @@ func TestSlackActionBindAlert(t *testing.T) {
 		CreatedAt: now,
 		Metadata:  alert.Metadata{Title: "Test Alert"},
 		Embedding: []float32{0.1, 0.2, 0.3},
+		SlackThread: &slack.Thread{
+			ChannelID: "test-channel",
+			ThreadID:  "test-thread",
+		},
 	}
 
 	// Create test ticket
@@ -319,6 +328,10 @@ func TestSlackActionBindAlert(t *testing.T) {
 		CreatedAt: now,
 		Status:    types.TicketStatusInvestigating,
 		Embedding: []float32{0.15, 0.25, 0.35},
+		SlackThread: &slack.Thread{
+			ChannelID: "test-channel",
+			ThreadID:  "test-thread",
+		},
 	}
 
 	// Store test alert and ticket
@@ -365,6 +378,11 @@ func TestSlackActionBindList(t *testing.T) {
 		OpenViewFunc: func(triggerID string, view slack_sdk.ModalViewRequest) (*slack_sdk.ViewResponse, error) {
 			return &slack_sdk.ViewResponse{}, nil
 		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
 	}
 
 	// Create test alerts
@@ -374,12 +392,20 @@ func TestSlackActionBindList(t *testing.T) {
 			CreatedAt: now,
 			Metadata:  alert.Metadata{Title: "Test Alert 1"},
 			Embedding: []float32{0.1, 0.2, 0.3},
+			SlackThread: &slack.Thread{
+				ChannelID: "test-channel",
+				ThreadID:  "test-thread",
+			},
 		},
 		&alert.Alert{
 			ID:        types.AlertID("test-alert-2"),
 			CreatedAt: now,
 			Metadata:  alert.Metadata{Title: "Test Alert 2"},
 			Embedding: []float32{0.2, 0.3, 0.4},
+			SlackThread: &slack.Thread{
+				ChannelID: "test-channel",
+				ThreadID:  "test-thread",
+			},
 		},
 	}
 
@@ -448,6 +474,11 @@ func TestSlackActionResolveTicket(t *testing.T) {
 		OpenViewFunc: func(triggerID string, view slack_sdk.ModalViewRequest) (*slack_sdk.ViewResponse, error) {
 			return &slack_sdk.ViewResponse{}, nil
 		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
 	}
 
 	// Create test ticket
@@ -456,6 +487,10 @@ func TestSlackActionResolveTicket(t *testing.T) {
 		CreatedAt: now,
 		Status:    types.TicketStatusInvestigating,
 		Embedding: []float32{0.15, 0.25, 0.35},
+		SlackThread: &slack.Thread{
+			ChannelID: "test-channel",
+			ThreadID:  "test-thread",
+		},
 	}
 
 	// Store test ticket
