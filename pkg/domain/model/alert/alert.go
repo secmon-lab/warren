@@ -16,11 +16,13 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/embedding"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 const (
-	EmbeddingSize = 256
+	DefaultAlertTitle       = "(no title)"
+	DefaultAlertDescription = "(no description)"
 )
 
 // Alert represents an event of a potential security incident. This model is designed to be immutable. An Alert can be linked to at most one ticket.
@@ -50,13 +52,23 @@ type Metadata struct {
 }
 
 func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metadata) Alert {
-	return Alert{
+	newAlert := Alert{
 		ID:        types.NewAlertID(),
+		TicketID:  types.EmptyTicketID,
 		Schema:    schema,
 		CreatedAt: clock.Now(ctx),
 		Metadata:  metadata,
 		Data:      data,
 	}
+
+	if newAlert.Metadata.Title == "" {
+		newAlert.Metadata.Title = DefaultAlertTitle
+	}
+	if newAlert.Metadata.Description == "" {
+		newAlert.Metadata.Description = DefaultAlertDescription
+	}
+
+	return newAlert
 }
 
 type Attribute struct {
@@ -137,7 +149,7 @@ func (x *Alert) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) er
 	if err != nil {
 		return goerr.Wrap(err, "failed to marshal alert data")
 	}
-	embedding, err := llmClient.GenerateEmbedding(ctx, EmbeddingSize, []string{string(rawData)})
+	embedding, err := embedding.Generate(ctx, llmClient, []string{string(rawData)})
 	if err != nil {
 		return err
 	}
@@ -145,10 +157,7 @@ func (x *Alert) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) er
 		return goerr.New("failed to generate embedding", goerr.V("embedding.length", len(embedding)))
 	}
 
-	x.Embedding = make([]float32, len(embedding[0]))
-	for idx, emb := range embedding[0] {
-		x.Embedding[idx] = float32(emb)
-	}
+	x.Embedding = embedding
 
 	return nil
 }

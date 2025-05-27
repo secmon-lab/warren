@@ -5,6 +5,7 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/utils/embedding"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 )
 
@@ -19,6 +20,6 @@ func TestAlert_FillMetadata(t *testing.T) {
 	gt.NoError(t, a.FillMetadata(t.Context(), client))
 	gt.NotEqual(t, a.Metadata.Title, "")
 	gt.NotEqual(t, a.Metadata.Description, "")
-	gt.Equal(t, len(a.Embedding), alert.EmbeddingSize)
+	gt.Equal(t, len(a.Embedding), embedding.EmbeddingDimension)
 	t.Logf("metadata: %+v", a.Metadata)
 }
