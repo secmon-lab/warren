@@ -20,6 +20,11 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
+const (
+	DefaultAlertTitle       = "(no title)"
+	DefaultAlertDescription = "(no description)"
+)
+
 // Alert represents an event of a potential security incident. This model is designed to be immutable. An Alert can be linked to at most one ticket.
 type Alert struct {
 	ID       types.AlertID     `json:"id"`
@@ -57,10 +62,10 @@ func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metad
 	}
 
 	if newAlert.Metadata.Title == "" {
-		newAlert.Metadata.Title = "(no title)"
+		newAlert.Metadata.Title = DefaultAlertTitle
 	}
 	if newAlert.Metadata.Description == "" {
-		newAlert.Metadata.Description = "(no description)"
+		newAlert.Metadata.Description = DefaultAlertDescription
 	}
 
 	return newAlert
