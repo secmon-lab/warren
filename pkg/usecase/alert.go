@@ -80,7 +80,7 @@ func (uc *UseCases) handleAlert(ctx context.Context, alert alert.Alert) (*alert.
 	}
 
 	// Update posted alert in Slack.
-	if _, err := uc.slackService.PostAlert(ctx, alert); err != nil {
+	if err := thread.UpdateAlert(ctx, alert); err != nil {
 		return nil, goerr.Wrap(err, "failed to post alert", goerr.V("alert", alert))
 	}
 

@@ -50,13 +50,23 @@ type Metadata struct {
 }
 
 func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metadata) Alert {
-	return Alert{
+	newAlert := Alert{
 		ID:        types.NewAlertID(),
+		TicketID:  types.TicketID(""),
 		Schema:    schema,
 		CreatedAt: clock.Now(ctx),
 		Metadata:  metadata,
 		Data:      data,
 	}
+
+	if newAlert.Metadata.Title == "" {
+		newAlert.Metadata.Title = "(no title)"
+	}
+	if newAlert.Metadata.Description == "" {
+		newAlert.Metadata.Description = "(no description)"
+	}
+
+	return newAlert
 }
 
 type Attribute struct {
