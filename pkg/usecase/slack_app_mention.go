@@ -77,26 +77,6 @@ func (uc *UseCases) handleSlackCommand(ctx context.Context, slackMsg slack.Messa
 	return nil
 }
 
-/*
-func (uc *UseCases) handleSlackInThreadCommand(ctx context.Context, th *slack.Thread, user slack.User, alertIDs []types.AlertID, message string) error {
-	command, remaining := messageToArgs(message)
-	if command == "" {
-		return errUnknownCommand
-	}
-
-	switch command {
-	case "resolve":
-		if err := uc.resolveTicket(ctx, user, th, remaining); err != nil {
-			return goerr.Wrap(err, "failed to run resolve command")
-		}
-		return nil
-
-	default:
-		return errUnknownCommand
-	}
-}
-*/
-
 type handlePromptInput struct {
 	Ticket        *ticket.Ticket
 	Prompt        string
