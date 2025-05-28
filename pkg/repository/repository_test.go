@@ -1,11 +1,9 @@
 package repository_test
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"math/rand/v2"
-	"os"
 	"testing"
 	"time"
 
@@ -904,22 +902,6 @@ func TestGetAlertWithoutEmbedding(t *testing.T) {
 		repo := newFirestoreClient(t)
 		testFn(t, repo)
 	})
-}
-
-func setupTestFirestore(t *testing.T, ctx context.Context) *repository.Firestore {
-	projectID := os.Getenv("FIRESTORE_PROJECT_ID")
-	if projectID == "" {
-		t.Skip("FIRESTORE_PROJECT_ID is not set")
-	}
-
-	databaseID := os.Getenv("FIRESTORE_DATABASE_ID")
-	if databaseID == "" {
-		t.Skip("FIRESTORE_DATABASE_ID is not set")
-	}
-
-	repo, err := repository.NewFirestore(ctx, projectID, databaseID)
-	gt.NoError(t, err)
-	return repo
 }
 
 func TestFindNearestTicketsWithSpan(t *testing.T) {
