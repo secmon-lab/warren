@@ -5,7 +5,6 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/service/command/core"
-	"github.com/secmon-lab/warren/pkg/utils/embedding"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
@@ -38,12 +37,6 @@ func fixAlertsWithoutMetadata(ctx context.Context, clients *core.Clients, slackM
 			return err
 		}
 
-		embedding, err := embedding.Generate(ctx, clients.LLM(), alert.Data)
-		if err != nil {
-			return err
-		}
-
-		alert.Embedding = embedding
 		if err := clients.Repo().PutAlert(ctx, *alert); err != nil {
 			return err
 		}
