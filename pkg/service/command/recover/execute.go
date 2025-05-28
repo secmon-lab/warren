@@ -2,9 +2,11 @@ package recover
 
 import (
 	"context"
+	"time"
 
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/service/command/core"
+	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
@@ -26,11 +28,14 @@ func fixAlertsWithoutMetadata(ctx context.Context, clients *core.Clients, slackM
 		return nil
 	}
 
-	msg.Trace(ctx, "🔨Fixing alerts missing metadata: %d", len(alerts))
+	msg.Notify(ctx, "🔨Fixing alerts missing metadata: %d", len(alerts))
 
+	ts := clock.Now(ctx)
+	notifyPeriod := time.Minute * 2
 	for i, alert := range alerts {
-		if i%32 == 0 {
-			msg.Trace(ctx, "Fixing alert metadata %d/%d: %s", i+1, len(alerts), alert.ID)
+		if clock.Since(ctx, ts) > notifyPeriod {
+			msg.Trace(ctx, "⌛ Fixing alert metadata %d/%d", i+1, len(alerts))
+			ts = clock.Now(ctx)
 		}
 
 		if err := alert.FillMetadata(ctx, clients.LLM()); err != nil {
