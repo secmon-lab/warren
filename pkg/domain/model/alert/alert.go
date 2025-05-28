@@ -32,7 +32,6 @@ type Alert struct {
 	Data     any               `json:"data"`
 
 	Metadata
-	Finding *Finding
 
 	CreatedAt   time.Time          `json:"created_at"`
 	SlackThread *slack.Thread      `json:"slack_thread"`

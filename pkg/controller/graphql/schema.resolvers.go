@@ -19,14 +19,6 @@ func (r *alertResolver) ID(ctx context.Context, obj *alert.Alert) (string, error
 	return string(obj.ID), nil
 }
 
-// Severity is the resolver for the severity field.
-func (r *alertResolver) Severity(ctx context.Context, obj *alert.Alert) (string, error) {
-	if obj.Finding == nil {
-		return "", nil
-	}
-	return string(obj.Finding.Severity), nil
-}
-
 // CreatedAt is the resolver for the createdAt field.
 func (r *alertResolver) CreatedAt(ctx context.Context, obj *alert.Alert) (string, error) {
 	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
@@ -38,6 +30,26 @@ func (r *alertResolver) Ticket(ctx context.Context, obj *alert.Alert) (*ticket.T
 		return nil, nil
 	}
 	return r.repo.GetTicket(ctx, obj.TicketID)
+}
+
+// ID is the resolver for the id field.
+func (r *commentResolver) ID(ctx context.Context, obj *ticket.Comment) (string, error) {
+	return string(obj.ID), nil
+}
+
+// Content is the resolver for the content field.
+func (r *commentResolver) Content(ctx context.Context, obj *ticket.Comment) (string, error) {
+	return obj.Comment, nil
+}
+
+// CreatedAt is the resolver for the createdAt field.
+func (r *commentResolver) CreatedAt(ctx context.Context, obj *ticket.Comment) (string, error) {
+	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
+}
+
+// UpdatedAt is the resolver for the updatedAt field.
+func (r *commentResolver) UpdatedAt(ctx context.Context, obj *ticket.Comment) (string, error) {
+	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
 }
 
 // UpdateTicketStatus is the resolver for the updateTicketStatus field.
@@ -65,8 +77,12 @@ func (r *queryResolver) Ticket(ctx context.Context, id string) (*ticket.Ticket, 
 }
 
 // Tickets is the resolver for the tickets field.
-func (r *queryResolver) Tickets(ctx context.Context) ([]*ticket.Ticket, error) {
-	tickets, err := r.repo.GetTicketsByStatus(ctx, types.TicketStatus(""))
+func (r *queryResolver) Tickets(ctx context.Context, status *string) ([]*ticket.Ticket, error) {
+	var ticketStatus types.TicketStatus
+	if status != nil {
+		ticketStatus = types.TicketStatus(*status)
+	}
+	tickets, err := r.repo.GetTicketsByStatus(ctx, ticketStatus)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list tickets")
 	}
@@ -110,6 +126,21 @@ func (r *ticketResolver) Alerts(ctx context.Context, obj *ticket.Ticket) ([]*ale
 	return alerts, nil
 }
 
+// Comments is the resolver for the comments field.
+func (r *ticketResolver) Comments(ctx context.Context, obj *ticket.Ticket) ([]*ticket.Comment, error) {
+	comments, err := r.repo.GetTicketComments(ctx, obj.ID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get ticket comments")
+	}
+
+	// Convert []ticket.Comment to []*ticket.Comment
+	commentPtrs := make([]*ticket.Comment, len(comments))
+	for i := range comments {
+		commentPtrs[i] = &comments[i]
+	}
+	return commentPtrs, nil
+}
+
 // CreatedAt is the resolver for the createdAt field.
 func (r *ticketResolver) CreatedAt(ctx context.Context, obj *ticket.Ticket) (string, error) {
 	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
@@ -123,6 +154,9 @@ func (r *ticketResolver) UpdatedAt(ctx context.Context, obj *ticket.Ticket) (str
 // Alert returns AlertResolver implementation.
 func (r *Resolver) Alert() AlertResolver { return &alertResolver{r} }
 
+// Comment returns CommentResolver implementation.
+func (r *Resolver) Comment() CommentResolver { return &commentResolver{r} }
+
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
@@ -133,33 +167,7 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 func (r *Resolver) Ticket() TicketResolver { return &ticketResolver{r} }
 
 type alertResolver struct{ *Resolver }
+type commentResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-/*
-	func (r *alertResolver) Title(ctx context.Context, obj *alert.Alert) (string, error) {
-	return obj.Metadata.Title, nil
-}
-func (r *alertResolver) Description(ctx context.Context, obj *alert.Alert) (*string, error) {
-	if obj.Metadata.Description == "" {
-		return nil, nil
-	}
-	return &obj.Metadata.Description, nil
-}
-func (r *ticketResolver) Title(ctx context.Context, obj *ticket.Ticket) (string, error) {
-	return obj.Metadata.Title, nil
-}
-func (r *ticketResolver) Description(ctx context.Context, obj *ticket.Ticket) (*string, error) {
-	if obj.Metadata.Description == "" {
-		return nil, nil
-	}
-	return &obj.Metadata.Description, nil
-}
-*/

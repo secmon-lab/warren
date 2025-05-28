@@ -50,7 +50,6 @@ func TestAlertResolver(t *testing.T) {
 		ID:        types.AlertID("alert-1"),
 		Metadata:  alert.Metadata{Title: "Test Alert", Description: "desc"},
 		CreatedAt: time.Now(),
-		Finding:   &alert.Finding{Severity: types.AlertSeverity("high")},
 	}
 	_ = repo.PutAlert(ctx, *testAlert)
 
@@ -59,7 +58,6 @@ func TestAlertResolver(t *testing.T) {
 		gt.NoError(t, err)
 		gt.Value(t, got.ID).Equal(testAlert.ID)
 		gt.Value(t, got.Metadata.Title).Equal(testAlert.Metadata.Title)
-		gt.Value(t, got.Finding.Severity).Equal(types.AlertSeverity("high"))
 	})
 }
 
@@ -83,7 +81,6 @@ func TestCrossReference(t *testing.T) {
 		Metadata:  alert.Metadata{Title: "Test Alert"},
 		CreatedAt: time.Now(),
 		TicketID:  ticketID,
-		Finding:   &alert.Finding{Severity: types.AlertSeverity("high")},
 	}
 	_ = repo.PutTicket(ctx, *testTicket)
 	_ = repo.PutAlert(ctx, *testAlert)

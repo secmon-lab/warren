@@ -2,6 +2,14 @@ type Ticket {
   id: ID!
   status: String!
   alerts: [Alert!]!
+  comments: [Comment!]!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Comment {
+  id: ID!
+  content: String!
   createdAt: String!
   updatedAt: String!
 }
@@ -10,14 +18,13 @@ type Alert {
   id: ID!
   title: String!
   description: String
-  severity: String!
   createdAt: String!
   ticket: Ticket
 }
 
 type Query {
   ticket(id: ID!): Ticket
-  tickets: [Ticket!]!
+  tickets(status: String): [Ticket!]!
   alert(id: ID!): Alert
   alerts: [Alert!]!
 }

@@ -95,6 +95,11 @@ Use following Helper Driven Testing style instead of general Tatble Driven Test.
     }))
 ```
 
+## Mocking for test
+
+- Use mock implementation from pkg/domain/mock instead of createing own mock structure.
+- For repository, use Memory repository in pkg/repository instead of mock.
+
 ## Test framework
 
 Use `github.com/m-mizutani/gt` package.

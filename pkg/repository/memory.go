@@ -512,6 +512,12 @@ func (r *Memory) GetTicketsByStatus(ctx context.Context, status types.TicketStat
 	defer r.mu.RUnlock()
 
 	var tickets []*ticket.Ticket
+	if status == "" {
+		for _, t := range r.tickets {
+			tickets = append(tickets, t)
+		}
+		return tickets, nil
+	}
 	for _, t := range r.tickets {
 		if t.Status == status {
 			tickets = append(tickets, t)
