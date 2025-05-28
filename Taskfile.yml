@@ -6,6 +6,7 @@ tasks:
   default:
     cmds:
       - task mock
+      - task graphql
 
   mock:
     aliases:
@@ -53,3 +54,8 @@ tasks:
         SlackEventUsecases
         SlackInteractionUsecases
         AlertUsecases
+
+  graphql:
+    desc: "Generate GraphQL code"
+    cmds:
+      - go tool gqlgen generate

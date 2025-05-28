@@ -33,6 +33,7 @@ type Alert struct {
 	Data     any               `json:"data"`
 
 	Metadata
+	Finding *Finding
 
 	CreatedAt   time.Time          `json:"created_at"`
 	SlackThread *slack.Thread      `json:"slack_thread"`
@@ -76,6 +77,21 @@ type Attribute struct {
 	Value string `json:"value"`
 	Link  string `json:"link"`
 	Auto  bool   `json:"auto"`
+}
+
+// Finding is the conclusion of the alert. This is set by the AI.
+type Finding struct {
+	Severity       types.AlertSeverity `json:"severity"`
+	Summary        string              `json:"summary"`
+	Reason         string              `json:"reason"`
+	Recommendation string              `json:"recommendation"`
+}
+
+func (x *Finding) Validate() error {
+	if err := x.Severity.Validate(); err != nil {
+		return goerr.Wrap(err, "invalid severity")
+	}
+	return nil
 }
 
 func (x *Alert) CosineSimilarity(other []float32) float64 {

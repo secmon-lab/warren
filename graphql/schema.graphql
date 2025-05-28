@@ -1,0 +1,32 @@
+type Ticket {
+  id: ID!
+  status: String!
+  alerts: [Alert!]!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Alert {
+  id: ID!
+  title: String!
+  description: String
+  severity: String!
+  createdAt: String!
+  ticket: Ticket
+}
+
+type Query {
+  ticket(id: ID!): Ticket
+  tickets: [Ticket!]!
+  alert(id: ID!): Alert
+  alerts: [Alert!]!
+}
+
+type Mutation {
+  updateTicketStatus(id: ID!, status: String!): Ticket!
+}
+
+schema {
+  query: Query
+  mutation: Mutation
+}
