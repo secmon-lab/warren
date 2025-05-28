@@ -802,3 +802,29 @@ func (r *Firestore) GetTicketsBySpan(ctx context.Context, begin, end time.Time) 
 
 	return tickets, nil
 }
+
+func (r *Firestore) GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts, error) {
+	iter := r.db.Collection(collectionAlerts).Where("Embedding", "==", nil).Documents(ctx)
+
+	var alerts alert.Alerts
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next alert")
+		}
+
+		var v alert.Alert
+		if err := doc.DataTo(&v); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert")
+		}
+
+		if len(v.Embedding) == 0 {
+			alerts = append(alerts, &v)
+		}
+	}
+
+	return alerts, nil
+}
