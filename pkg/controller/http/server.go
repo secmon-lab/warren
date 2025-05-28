@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/go-chi/chi/v5"
 	"github.com/secmon-lab/warren/pkg/controller/graphql"
 	slack_controller "github.com/secmon-lab/warren/pkg/controller/slack"
@@ -87,7 +88,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // GraphQL handler
 func graphqlHandler(repo interfaces.Repository) http.Handler {
 	resolver := graphql.NewResolver(repo)
-	return handler.New(
+	srv := handler.New(
 		graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}),
 	)
+	srv.AddTransport(transport.POST{})
+	return srv
 }

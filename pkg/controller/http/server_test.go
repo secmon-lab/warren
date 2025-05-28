@@ -26,8 +26,10 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 
+	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 )
@@ -209,5 +211,87 @@ func TestAlertSNS(t *testing.T) {
 
 		gt.Equal(t, http.StatusOK, w.Code)
 		gt.A(t, alertUsecasesMock.HandleAlertWithAuthCalls()).Length(1)
+	})
+}
+
+func TestGraphQLHandler(t *testing.T) {
+	repo := repository.NewMemory()
+	server := server.New(nil, server.WithGraphQLRepo(repo))
+
+	// Add test data
+	ticketID := types.TicketID("test-ticket-1")
+	alertID := types.AlertID("test-alert-1")
+	gt.NoError(t, repo.PutTicket(context.Background(), ticket.Ticket{
+		ID:     ticketID,
+		Status: types.TicketStatusInvestigating,
+		Metadata: ticket.Metadata{
+			Title: "Test Ticket",
+		},
+	}))
+	gt.NoError(t, repo.PutAlert(context.Background(), alert.Alert{
+		ID: alertID,
+		Metadata: alert.Metadata{
+			Title: "Test Alert",
+		},
+	}))
+
+	t.Run("query ticket", func(t *testing.T) {
+		body := map[string]interface{}{
+			"query":     "query { ticket(id: \"test-ticket-1\") { id status createdAt } }",
+			"variables": nil,
+		}
+		b, err := json.Marshal(body)
+		gt.NoError(t, err)
+
+		req := httptest.NewRequest("POST", "/graphql", bytes.NewBuffer(b))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		server.ServeHTTP(w, req)
+
+		gt.Value(t, w.Code).Equal(http.StatusOK)
+
+		var response map[string]interface{}
+		err = json.NewDecoder(w.Body).Decode(&response)
+		gt.NoError(t, err)
+
+		if errs, ok := response["errors"]; ok {
+			t.Logf("GraphQL errors: %v", errs)
+		}
+
+		data := response["data"].(map[string]interface{})
+		ticket := data["ticket"].(map[string]interface{})
+		gt.Value(t, ticket["id"]).Equal("test-ticket-1")
+		gt.Value(t, ticket["status"]).Equal("investigating")
+	})
+
+	t.Run("query alert", func(t *testing.T) {
+		body := map[string]interface{}{
+			"query":     "query { alert(id: \"test-alert-1\") { id title } }",
+			"variables": nil,
+		}
+		b, err := json.Marshal(body)
+		gt.NoError(t, err)
+
+		req := httptest.NewRequest("POST", "/graphql", bytes.NewBuffer(b))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		server.ServeHTTP(w, req)
+
+		gt.Value(t, w.Code).Equal(http.StatusOK)
+
+		var response map[string]interface{}
+		err = json.NewDecoder(w.Body).Decode(&response)
+		gt.NoError(t, err)
+
+		if errs, ok := response["errors"]; ok {
+			t.Logf("GraphQL errors: %v", errs)
+		}
+
+		data := response["data"].(map[string]interface{})
+		alert := data["alert"].(map[string]interface{})
+		gt.Value(t, alert["id"]).Equal("test-alert-1")
+		gt.Value(t, alert["title"]).Equal("Test Alert")
 	})
 }
