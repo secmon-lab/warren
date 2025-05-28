@@ -430,43 +430,6 @@ func (r *Memory) BatchGetTickets(ctx context.Context, ticketIDs []types.TicketID
 	return tickets, nil
 }
 
-func (r *Memory) FindSimilarTickets(ctx context.Context, ticketID types.TicketID, limit int) ([]*ticket.Ticket, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	target, ok := r.tickets[ticketID]
-	if !ok {
-		return nil, goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
-	}
-
-	var tickets []*ticket.Ticket
-	for _, t := range r.tickets {
-		// Skip the same ticket
-		if t.ID == target.ID {
-			continue
-		}
-
-		// Only add tickets that have embeddings
-		if len(t.Embedding) > 0 {
-			tickets = append(tickets, t)
-		}
-	}
-
-	// Sort by similarity
-	sort.Slice(tickets, func(i, j int) bool {
-		simI := cosineSimilarity(tickets[i].Embedding, target.Embedding)
-		simJ := cosineSimilarity(tickets[j].Embedding, target.Embedding)
-		return simI > simJ
-	})
-
-	// Apply limit
-	if limit > 0 && limit < len(tickets) {
-		tickets = tickets[:limit]
-	}
-
-	return tickets, nil
-}
-
 func cosineSimilarity(a, b []float32) float32 {
 	var dot, normA, normB float32
 	for i := range a {
@@ -584,4 +547,43 @@ func (r *Memory) GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts, er
 		return alert.Alerts{}, nil
 	}
 	return alerts, nil
+}
+
+func (r *Memory) FindNearestTicketsWithSpan(ctx context.Context, embedding []float32, begin, end time.Time, limit int) ([]*ticket.Ticket, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var tickets []*ticket.Ticket
+	for _, t := range r.tickets {
+		if t.CreatedAt.After(begin) && t.CreatedAt.Before(end) {
+			tickets = append(tickets, t)
+		}
+	}
+
+	// Sort by cosine similarity
+	sort.Slice(tickets, func(i, j int) bool {
+		simI := cosineSimilarity(embedding, tickets[i].Embedding)
+		simJ := cosineSimilarity(embedding, tickets[j].Embedding)
+		return simI > simJ
+	})
+
+	if len(tickets) > limit {
+		tickets = tickets[:limit]
+	}
+
+	return tickets, nil
+}
+
+func (r *Memory) GetTicketsByStatusAndSpan(ctx context.Context, status types.TicketStatus, begin, end time.Time) ([]*ticket.Ticket, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var tickets []*ticket.Ticket
+	for _, t := range r.tickets {
+		if t.Status == status && t.CreatedAt.After(begin) && t.CreatedAt.Before(end) {
+			tickets = append(tickets, t)
+		}
+	}
+
+	return tickets, nil
 }

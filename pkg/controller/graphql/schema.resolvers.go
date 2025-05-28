@@ -8,7 +8,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/m-mizutani/goerr/v2"
+	goerr "github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -17,19 +17,6 @@ import (
 // ID is the resolver for the id field.
 func (r *alertResolver) ID(ctx context.Context, obj *alert.Alert) (string, error) {
 	return string(obj.ID), nil
-}
-
-// Title is the resolver for the title field.
-func (r *alertResolver) Title(ctx context.Context, obj *alert.Alert) (string, error) {
-	return obj.Metadata.Title, nil
-}
-
-// Description is the resolver for the description field.
-func (r *alertResolver) Description(ctx context.Context, obj *alert.Alert) (*string, error) {
-	if obj.Metadata.Description == "" {
-		return nil, nil
-	}
-	return &obj.Metadata.Description, nil
 }
 
 // Severity is the resolver for the severity field.
@@ -109,19 +96,6 @@ func (r *ticketResolver) ID(ctx context.Context, obj *ticket.Ticket) (string, er
 	return string(obj.ID), nil
 }
 
-// Title is the resolver for the title field.
-func (r *ticketResolver) Title(ctx context.Context, obj *ticket.Ticket) (string, error) {
-	return obj.Metadata.Title, nil
-}
-
-// Description is the resolver for the description field.
-func (r *ticketResolver) Description(ctx context.Context, obj *ticket.Ticket) (*string, error) {
-	if obj.Metadata.Description == "" {
-		return nil, nil
-	}
-	return &obj.Metadata.Description, nil
-}
-
 // Status is the resolver for the status field.
 func (r *ticketResolver) Status(ctx context.Context, obj *ticket.Ticket) (string, error) {
 	return string(obj.Status), nil
@@ -162,3 +136,30 @@ type alertResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
+	func (r *alertResolver) Title(ctx context.Context, obj *alert.Alert) (string, error) {
+	return obj.Metadata.Title, nil
+}
+func (r *alertResolver) Description(ctx context.Context, obj *alert.Alert) (*string, error) {
+	if obj.Metadata.Description == "" {
+		return nil, nil
+	}
+	return &obj.Metadata.Description, nil
+}
+func (r *ticketResolver) Title(ctx context.Context, obj *ticket.Ticket) (string, error) {
+	return obj.Metadata.Title, nil
+}
+func (r *ticketResolver) Description(ctx context.Context, obj *ticket.Ticket) (*string, error) {
+	if obj.Metadata.Description == "" {
+		return nil, nil
+	}
+	return &obj.Metadata.Description, nil
+}
+*/
