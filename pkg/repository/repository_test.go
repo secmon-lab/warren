@@ -869,3 +869,38 @@ func filterByIDs(result []*ticketmodel.Ticket, ids []types.TicketID) []*ticketmo
 	}
 	return filtered
 }
+
+func TestGetAlertWithoutEmbedding(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := context.Background()
+		thread := newTestThread()
+		// Alert with embedding
+		alertWithEmbedding := newTestAlert(&thread)
+		alertWithEmbedding.Embedding = make([]float32, 256)
+		// Alert without embedding
+		alertWithoutEmbedding := newTestAlert(&thread)
+		alertWithoutEmbedding.Embedding = nil
+		// Put both alerts
+		gt.NoError(t, repo.PutAlert(ctx, alertWithEmbedding))
+		gt.NoError(t, repo.PutAlert(ctx, alertWithoutEmbedding))
+
+		alerts, err := repo.GetAlertWithoutEmbedding(ctx)
+		gt.NoError(t, err).Required()
+		gt.Array(t, alerts).Any(func(a *alert.Alert) bool {
+			return a.ID == alertWithoutEmbedding.ID
+		})
+		gt.Array(t, alerts).All(func(a *alert.Alert) bool {
+			return len(a.Embedding) == 0
+		})
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}

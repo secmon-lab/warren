@@ -569,3 +569,19 @@ func (r *Memory) GetTicketsBySpan(ctx context.Context, start, end time.Time) ([]
 	}
 	return tickets, nil
 }
+
+func (r *Memory) GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var alerts alert.Alerts
+	for _, alert := range r.alerts {
+		if len(alert.Embedding) == 0 {
+			alerts = append(alerts, alert)
+		}
+	}
+	if alerts == nil {
+		return alert.Alerts{}, nil
+	}
+	return alerts, nil
+}

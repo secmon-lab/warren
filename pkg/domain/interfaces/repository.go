@@ -47,4 +47,6 @@ type Repository interface {
 	PutAlertList(ctx context.Context, list *alert.List) error
 	GetAlertListByThread(ctx context.Context, thread slack.Thread) (*alert.List, error)
 	GetLatestAlertListInThread(ctx context.Context, thread slack.Thread) (*alert.List, error)
+
+	GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts, error)
 }

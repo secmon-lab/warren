@@ -13,6 +13,7 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/service/command/aggregate"
 	"github.com/secmon-lab/warren/pkg/service/command/list"
+	"github.com/secmon-lab/warren/pkg/service/command/recover"
 	"github.com/secmon-lab/warren/pkg/service/command/ticket"
 )
 
@@ -42,6 +43,7 @@ func (x *Service) Execute(ctx context.Context, msg *slack.Message, input string)
 		"aggregate": aggregate.Create,
 		"t":         ticket.Create,
 		"ticket":    ticket.Create,
+		"recover":   recover.Run,
 	}
 
 	cmd, remaining := messageToArgs(input)

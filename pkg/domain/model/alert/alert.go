@@ -98,49 +98,51 @@ func (x *Alert) CosineSimilarity(other []float32) float64 {
 var alertMetaPrompt string
 
 func (x *Alert) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) error {
-	logger := logging.From(ctx)
-	logger.Info("fill metadata", "alert", x.Data)
-	prompt, err := prompt.Generate(ctx, alertMetaPrompt, map[string]any{
-		"alert":  x.Data,
-		"schema": prompt.ToSchema(Metadata{}),
-		"lang":   lang.From(ctx).Name(),
-	})
-	if err != nil {
-		return err
-	}
-
-	resp, err := llm.Ask(ctx, llmClient, prompt, llm.WithValidate(func(v Metadata) error {
-		if v.Title == "" {
-			return goerr.New("title is required")
+	if x.Metadata.Title == DefaultAlertTitle || x.Metadata.Title == "" {
+		logger := logging.From(ctx)
+		logger.Info("fill metadata", "alert", x.Data)
+		prompt, err := prompt.Generate(ctx, alertMetaPrompt, map[string]any{
+			"alert":  x.Data,
+			"schema": prompt.ToSchema(Metadata{}),
+			"lang":   lang.From(ctx).Name(),
+		})
+		if err != nil {
+			return err
 		}
-		if v.Description == "" {
-			return goerr.New("description is required")
-		}
-		return nil
-	}))
-	if err != nil {
-		return err
-	}
 
-	if x.Metadata.Title == "" {
-		x.Metadata.Title = resp.Title
-	}
-
-	if x.Metadata.Description == "" {
-		x.Metadata.Description = resp.Description
-	}
-
-	for _, resAttr := range resp.Attributes {
-		found := false
-		for _, aAttr := range x.Metadata.Attributes {
-			if aAttr.Value == resAttr.Value {
-				found = true
-				break
+		resp, err := llm.Ask(ctx, llmClient, prompt, llm.WithValidate(func(v Metadata) error {
+			if v.Title == "" {
+				return goerr.New("title is required")
 			}
+			if v.Description == "" {
+				return goerr.New("description is required")
+			}
+			return nil
+		}))
+		if err != nil {
+			return err
 		}
-		if !found {
-			resAttr.Auto = true
-			x.Metadata.Attributes = append(x.Metadata.Attributes, resAttr)
+
+		if x.Metadata.Title == "" {
+			x.Metadata.Title = resp.Title
+		}
+
+		if x.Metadata.Description == "" {
+			x.Metadata.Description = resp.Description
+		}
+
+		for _, resAttr := range resp.Attributes {
+			found := false
+			for _, aAttr := range x.Metadata.Attributes {
+				if aAttr.Value == resAttr.Value {
+					found = true
+					break
+				}
+			}
+			if !found {
+				resAttr.Auto = true
+				x.Metadata.Attributes = append(x.Metadata.Attributes, resAttr)
+			}
 		}
 	}
 
