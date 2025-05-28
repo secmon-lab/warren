@@ -44,6 +44,12 @@ func NewList(ctx context.Context, thread slack.Thread, createdBy *slack.User, al
 		list.alerts = append(list.alerts, alert)
 	}
 
+	embeddings := make([]firestore.Vector32, len(alerts))
+	for i, alert := range alerts {
+		embeddings[i] = alert.Embedding
+	}
+	list.Embedding = embedding.Average(embeddings)
+
 	return &list
 }
 
