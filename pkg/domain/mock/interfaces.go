@@ -470,6 +470,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			GetAlertListByThreadFunc: func(ctx context.Context, thread modelslack.Thread) (*alert.List, error) {
 //				panic("mock out the GetAlertListByThread method")
 //			},
+//			GetAlertWithoutEmbeddingFunc: func(ctx context.Context) (alert.Alerts, error) {
+//				panic("mock out the GetAlertWithoutEmbedding method")
+//			},
 //			GetAlertWithoutTicketFunc: func(ctx context.Context) (alert.Alerts, error) {
 //				panic("mock out the GetAlertWithoutTicket method")
 //			},
@@ -563,6 +566,9 @@ type RepositoryMock struct {
 
 	// GetAlertListByThreadFunc mocks the GetAlertListByThread method.
 	GetAlertListByThreadFunc func(ctx context.Context, thread modelslack.Thread) (*alert.List, error)
+
+	// GetAlertWithoutEmbeddingFunc mocks the GetAlertWithoutEmbedding method.
+	GetAlertWithoutEmbeddingFunc func(ctx context.Context) (alert.Alerts, error)
 
 	// GetAlertWithoutTicketFunc mocks the GetAlertWithoutTicket method.
 	GetAlertWithoutTicketFunc func(ctx context.Context) (alert.Alerts, error)
@@ -700,6 +706,11 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Thread is the thread argument value.
 			Thread modelslack.Thread
+		}
+		// GetAlertWithoutEmbedding holds details about calls to the GetAlertWithoutEmbedding method.
+		GetAlertWithoutEmbedding []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
 		}
 		// GetAlertWithoutTicket holds details about calls to the GetAlertWithoutTicket method.
 		GetAlertWithoutTicket []struct {
@@ -857,6 +868,7 @@ type RepositoryMock struct {
 	lockGetAlert                    sync.RWMutex
 	lockGetAlertList                sync.RWMutex
 	lockGetAlertListByThread        sync.RWMutex
+	lockGetAlertWithoutEmbedding    sync.RWMutex
 	lockGetAlertWithoutTicket       sync.RWMutex
 	lockGetAlertsBySpan             sync.RWMutex
 	lockGetLatestAlertByThread      sync.RWMutex
@@ -1288,6 +1300,42 @@ func (mock *RepositoryMock) GetAlertListByThreadCalls() []struct {
 	mock.lockGetAlertListByThread.RLock()
 	calls = mock.calls.GetAlertListByThread
 	mock.lockGetAlertListByThread.RUnlock()
+	return calls
+}
+
+// GetAlertWithoutEmbedding calls GetAlertWithoutEmbeddingFunc.
+func (mock *RepositoryMock) GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockGetAlertWithoutEmbedding.Lock()
+	mock.calls.GetAlertWithoutEmbedding = append(mock.calls.GetAlertWithoutEmbedding, callInfo)
+	mock.lockGetAlertWithoutEmbedding.Unlock()
+	if mock.GetAlertWithoutEmbeddingFunc == nil {
+		var (
+			alertsOut alert.Alerts
+			errOut    error
+		)
+		return alertsOut, errOut
+	}
+	return mock.GetAlertWithoutEmbeddingFunc(ctx)
+}
+
+// GetAlertWithoutEmbeddingCalls gets all the calls that were made to GetAlertWithoutEmbedding.
+// Check the length with:
+//
+//	len(mockedRepository.GetAlertWithoutEmbeddingCalls())
+func (mock *RepositoryMock) GetAlertWithoutEmbeddingCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockGetAlertWithoutEmbedding.RLock()
+	calls = mock.calls.GetAlertWithoutEmbedding
+	mock.lockGetAlertWithoutEmbedding.RUnlock()
 	return calls
 }
 
