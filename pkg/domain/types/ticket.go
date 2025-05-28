@@ -53,18 +53,21 @@ const (
 	TicketStatusInvestigating TicketStatus = "investigating"
 	TicketStatusPending       TicketStatus = "pending"
 	TicketStatusResolved      TicketStatus = "resolved"
+	TicketStatusArchived      TicketStatus = "archived"
 )
 
-var ticketstatusLabels = map[TicketStatus]string{
+var ticketStatusLabels = map[TicketStatus]string{
 	TicketStatusInvestigating: "🔍 Investigating",
 	TicketStatusPending:       "🕒 Pending",
 	TicketStatusResolved:      "✅️ Resolved",
+	TicketStatusArchived:      "📦 Archived",
 }
 
 var ticketStatusIcons = map[TicketStatus]string{
 	TicketStatusInvestigating: "🔍",
 	TicketStatusPending:       "🕒",
 	TicketStatusResolved:      "✅️",
+	TicketStatusArchived:      "📦",
 }
 
 func (s TicketStatus) String() string {
@@ -72,7 +75,7 @@ func (s TicketStatus) String() string {
 }
 
 func (s TicketStatus) Label() string {
-	return ticketstatusLabels[s]
+	return ticketStatusLabels[s]
 }
 
 func (s TicketStatus) Icon() string {
