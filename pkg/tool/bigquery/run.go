@@ -48,9 +48,15 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 
 	switch name {
 	case "bigquery_list_dataset":
+		if len(x.configs) == 0 {
+			return nil, goerr.New("configuration is not loaded")
+		}
 		return x.listDatasets()
 
 	case "bigquery_query":
+		if len(x.configs) == 0 {
+			return nil, goerr.New("configuration is not loaded")
+		}
 		query, ok := args["query"].(string)
 		if !ok {
 			return nil, goerr.New("query parameter is required")
@@ -58,6 +64,9 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 		return x.executeQuery(ctx, client, query)
 
 	case "bigquery_result":
+		if len(x.configs) == 0 {
+			return nil, goerr.New("configuration is not loaded")
+		}
 		queryID, ok := args["query_id"].(string)
 		if !ok {
 			return nil, goerr.New("query_id parameter is required")
