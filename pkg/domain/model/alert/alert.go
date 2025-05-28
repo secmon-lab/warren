@@ -3,7 +3,6 @@ package alert
 import (
 	"context"
 	_ "embed"
-	"encoding/json"
 	"math"
 	"time"
 
@@ -145,18 +144,10 @@ func (x *Alert) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) er
 		}
 	}
 
-	rawData, err := json.Marshal(x.Data)
-	if err != nil {
-		return goerr.Wrap(err, "failed to marshal alert data")
-	}
-	embedding, err := embedding.Generate(ctx, llmClient, []string{string(rawData)})
+	embedding, err := embedding.Generate(ctx, llmClient, x.Data)
 	if err != nil {
 		return err
 	}
-	if len(embedding) != 1 {
-		return goerr.New("failed to generate embedding", goerr.V("embedding.length", len(embedding)))
-	}
-
 	x.Embedding = embedding
 
 	return nil
