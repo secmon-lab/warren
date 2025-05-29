@@ -383,6 +383,11 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 		}
 	}
 
+	if len(alerts) == 0 {
+		msg.Trace(ctx, "No alerts found")
+		return types.EmptyAlertListID, nil
+	}
+
 	alertList, err := clients.CreateList(ctx, slack.Thread{
 		ChannelID: th.ChannelID(),
 		ThreadID:  th.ThreadID(),
