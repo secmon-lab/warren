@@ -264,6 +264,10 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to wait for dry run job")
 		}
+		if status.Statistics.TotalBytesProcessed < 0 {
+			return nil, goerr.New("invalid negative bytes processed",
+				goerr.V("bytes_processed", status.Statistics.TotalBytesProcessed))
+		}
 		if uint64(status.Statistics.TotalBytesProcessed) > x.scanLimit {
 			return nil, goerr.New("query scan size exceeds limit",
 				goerr.V("scan_size", status.Statistics.TotalBytesProcessed),

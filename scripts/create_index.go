@@ -214,6 +214,7 @@ func createMissingIndexes(projectID, databaseID string, existingIndexes []index,
 }
 
 func getExistingIndexes(projectID, databaseID string) ([]index, error) {
+	// #nosec G204
 	cmd := exec.Command("gcloud", "firestore", "indexes", "composite", "list",
 		"--project="+projectID,
 		"--database="+databaseID,
@@ -267,6 +268,7 @@ func createIndex(projectID, databaseID string, config indexConfig) error {
 		args = append(args, "--field-config="+fieldConfig)
 	}
 
+	// #nosec G204
 	cmd := exec.Command("gcloud", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

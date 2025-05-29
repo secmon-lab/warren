@@ -84,7 +84,7 @@ func (s TicketStatus) Icon() string {
 
 func (s TicketStatus) Validate() error {
 	switch s {
-	case TicketStatusOpen, TicketStatusPending, TicketStatusResolved:
+	case TicketStatusOpen, TicketStatusPending, TicketStatusResolved, TicketStatusArchived:
 		return nil
 	}
 	return goerr.New("invalid ticket Ticketstatus", goerr.V("Ticketstatus", s))
