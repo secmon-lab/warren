@@ -98,10 +98,6 @@ func TestTicketResolver(t *testing.T) {
 	})
 }
 
-func ptr(s string) *string {
-	return &s
-}
-
 func TestAlertResolver(t *testing.T) {
 	repo := repository.NewMemory()
 	resolver := NewResolver(repo)
