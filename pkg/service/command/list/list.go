@@ -363,7 +363,7 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 		return types.EmptyAlertListID, nil
 	}
 
-	msg.Trace(ctx, "🤖 Getting unbound alerts with ticket...")
+	msg.Notify(ctx, "🤖 Getting and filtering alerts without ticket...")
 
 	alerts, err := clients.Repo().GetAlertWithoutTicket(ctx)
 	if err != nil {

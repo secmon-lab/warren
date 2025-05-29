@@ -59,7 +59,7 @@ func Summary[T any](ctx context.Context, llm gollem.LLMClient, prompt string, da
 	}
 
 	if len(parts) > 0 {
-		msg.Trace(ctx, "✍️ generate part summary (%d-%d)", startIdx, len(data))
+		msg.Trace(ctx, "✍️ reading data (%d-%d)", startIdx, len(data))
 		result, err := generatePartSummary(ctx, llm, prompt, parts)
 		if err != nil {
 			return "", err
@@ -67,7 +67,7 @@ func Summary[T any](ctx context.Context, llm gollem.LLMClient, prompt string, da
 		results = append(results, result)
 	}
 
-	msg.Trace(ctx, "✍️ generate final summary")
+	msg.Trace(ctx, "✍️ generating summary")
 	return generateSummary(ctx, llm, prompt, results)
 }
 

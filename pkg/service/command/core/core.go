@@ -11,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
 type Clients struct {
@@ -40,6 +41,7 @@ func (s *Clients) Thread() *slack_svc.ThreadService {
 }
 
 func (x *Clients) CreateList(ctx context.Context, thread slack.Thread, user *slack.User, alerts alert.Alerts) (*alert.List, error) {
+	msg.Trace(ctx, "🤖 Creating alert list...")
 	list := alert.NewList(ctx, thread, user, alerts)
 
 	if err := list.FillMetadata(ctx, x.llm); err != nil {
