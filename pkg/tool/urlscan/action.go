@@ -155,7 +155,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 		}
 
 		if resp.StatusCode == http.StatusNotFound {
-			resp.Body.Close()
+			safe.Close(ctx, resp.Body)
 			logger.Debug("scan result not found, retrying",
 				"uuid", result.UUID,
 				"target", urlStr,
@@ -166,14 +166,14 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
+			safe.Close(ctx, resp.Body)
 			return nil, goerr.New("failed to get scan result",
 				goerr.V("status_code", resp.StatusCode),
 				goerr.V("body", string(body)))
 		}
 
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		safe.Close(ctx, resp.Body)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to read response body")
 		}
