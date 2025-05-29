@@ -132,9 +132,9 @@ func handlePrompt(ctx context.Context, input handlePromptInput) error {
 			return nil
 		}),
 		gollem.WithToolRequestHook(func(ctx context.Context, tool gollem.FunctionCall) error {
-			msg.Trace(ctx, "⚡ Execute Tool: `%s`", tool.Name)
+			ctx = msg.Trace(ctx, "⚡ Execute Tool: `%s`", tool.Name)
 			for k, v := range tool.Arguments {
-				msg.Trace(ctx, "  ▶️ `%s`: `%v`", k, v)
+				ctx = msg.Trace(ctx, "  ▶️ `%s`: `%v`", k, v)
 			}
 			return nil
 		}),

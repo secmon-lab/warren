@@ -80,7 +80,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindAlert(ctx context.Co
 		"metadata", metadata,
 		"values", values,
 	)
-	msg.Trace(ctx, "💥 binding alert\n> %s", metadata)
+	ctx = msg.Trace(ctx, "💥 binding alert\n> %s", metadata)
 
 	alertID := types.AlertID(metadata)
 	alert, err := uc.repository.GetAlert(ctx, alertID)
@@ -96,7 +96,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindAlert(ctx context.Co
 
 	ticketID, err := getTicketID(values)
 	if err != nil {
-		msg.Trace(ctx, "💥 Failed to get ticket ID\n> %s", err.Error())
+		_ = msg.Trace(ctx, "💥 Failed to get ticket ID\n> %s", err.Error())
 		return err
 	}
 
@@ -125,7 +125,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Con
 
 	ticketID, err := getTicketID(values)
 	if err != nil {
-		msg.Trace(ctx, "💥 Failed to get ticket ID\n> %s", err.Error())
+		_ = msg.Trace(ctx, "💥 Failed to get ticket ID\n> %s", err.Error())
 		return err
 	}
 
@@ -225,7 +225,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 	ticketID := types.TicketID(metadata)
 	target, err := uc.repository.GetTicket(ctx, ticketID)
 	if err != nil {
-		msg.Trace(ctx, "💥 Failed to get ticket\n> %s", err.Error())
+		_ = msg.Trace(ctx, "💥 Failed to get ticket\n> %s", err.Error())
 		return goerr.Wrap(err, "failed to get ticket")
 	}
 	if target == nil {

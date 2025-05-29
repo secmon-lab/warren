@@ -41,7 +41,7 @@ func (s *Clients) Thread() *slack_svc.ThreadService {
 }
 
 func (x *Clients) CreateList(ctx context.Context, thread slack.Thread, user *slack.User, alerts alert.Alerts) (*alert.List, error) {
-	msg.Trace(ctx, "🤖 Creating alert list...")
+	ctx = msg.Trace(ctx, "🤖 Creating alert list...")
 	list := alert.NewList(ctx, thread, user, alerts)
 
 	if err := list.FillMetadata(ctx, x.llm); err != nil {

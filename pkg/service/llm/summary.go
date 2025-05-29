@@ -45,7 +45,7 @@ func Summary[T any](ctx context.Context, llm gollem.LLMClient, prompt string, da
 
 		partSize += len(rawData)
 		if partSize > cfg.maxPartSize {
-			msg.Trace(ctx, "✍️ generate part summary (%d-%d)", startIdx, idx)
+			ctx = msg.Trace(ctx, "✍️ generate part summary (%d-%d)", startIdx, idx)
 			startIdx = idx + 1
 
 			result, err := generatePartSummary(ctx, llm, prompt, parts)
@@ -59,7 +59,7 @@ func Summary[T any](ctx context.Context, llm gollem.LLMClient, prompt string, da
 	}
 
 	if len(parts) > 0 {
-		msg.Trace(ctx, "✍️ reading data (%d-%d)", startIdx, len(data))
+		ctx = msg.Trace(ctx, "✍️ reading data (%d-%d)", startIdx, len(data))
 		result, err := generatePartSummary(ctx, llm, prompt, parts)
 		if err != nil {
 			return "", err
@@ -67,7 +67,7 @@ func Summary[T any](ctx context.Context, llm gollem.LLMClient, prompt string, da
 		results = append(results, result)
 	}
 
-	msg.Trace(ctx, "✍️ generating summary")
+	ctx = msg.Trace(ctx, "✍️ generating summary")
 	return generateSummary(ctx, llm, prompt, results)
 }
 

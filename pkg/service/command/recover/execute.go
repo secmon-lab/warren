@@ -24,7 +24,7 @@ func fixAlertsWithoutMetadata(ctx context.Context, clients *core.Clients, slackM
 		return err
 	}
 	if len(alerts) == 0 {
-		msg.Trace(ctx, "✅ No alerts missing metadata")
+		_ = msg.Trace(ctx, "✅ No alerts missing metadata")
 		return nil
 	}
 
@@ -34,7 +34,7 @@ func fixAlertsWithoutMetadata(ctx context.Context, clients *core.Clients, slackM
 	notifyPeriod := time.Minute * 2
 	for i, alert := range alerts {
 		if clock.Since(ctx, ts) > notifyPeriod {
-			msg.Trace(ctx, "⌛ Fixing alert metadata %d/%d", i+1, len(alerts))
+			ctx = msg.Trace(ctx, "⌛ Fixing alert metadata %d/%d", i+1, len(alerts))
 			ts = clock.Now(ctx)
 		}
 
@@ -47,6 +47,6 @@ func fixAlertsWithoutMetadata(ctx context.Context, clients *core.Clients, slackM
 		}
 	}
 
-	msg.Trace(ctx, "✅ Fixed %d alerts missing metadata", len(alerts))
+	_ = msg.Trace(ctx, "✅ Fixed %d alerts missing metadata", len(alerts))
 	return nil
 }

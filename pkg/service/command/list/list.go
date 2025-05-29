@@ -355,7 +355,7 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 	if len(pipelineCommands) > 0 {
 		pipeline, err = buildPipeline(pipelineCommands)
 		if err != nil {
-			msg.Trace(ctx, "💥 Building pipeline: %s", err)
+			_ = msg.Trace(ctx, "💥 Building pipeline: %s", err)
 			return types.EmptyAlertListID, err
 		}
 	} else {

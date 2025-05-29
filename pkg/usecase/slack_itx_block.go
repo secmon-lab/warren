@@ -83,7 +83,7 @@ func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread 
 		}
 	}
 
-	msg.Trace(ctx, "🎫 Ticket created. Why don't you ask <@%s> about it?", uc.slackService.BotID())
+	_ = msg.Trace(ctx, "🎫 Ticket created. Why don't you ask <@%s> about it?", uc.slackService.BotID())
 	return nil
 }
 
@@ -147,7 +147,7 @@ func (uc *UseCases) slackActionBindAlert(ctx context.Context, targetAlertID type
 	return nil
 }
 
-func (uc *UseCases) slackActionBindList(ctx context.Context, user slack.User, slackThread slack.Thread, targetListID types.AlertListID, triggerID string) error {
+func (uc *UseCases) slackActionBindList(ctx context.Context, _ slack.User, _ slack.Thread, targetListID types.AlertListID, triggerID string) error {
 	list, err := uc.repository.GetAlertList(ctx, targetListID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert list")
@@ -168,7 +168,7 @@ func (uc *UseCases) slackActionBindList(ctx context.Context, user slack.User, sl
 	return nil
 }
 
-func (uc *UseCases) showResolveTicketModal(ctx context.Context, user slack.User, slackThread slack.Thread, targetTicketID types.TicketID, triggerID string) error {
+func (uc *UseCases) showResolveTicketModal(ctx context.Context, _ slack.User, _ slack.Thread, targetTicketID types.TicketID, triggerID string) error {
 	ticket, err := uc.repository.GetTicket(ctx, targetTicketID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get ticket")

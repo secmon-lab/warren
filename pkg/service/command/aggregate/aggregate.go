@@ -100,7 +100,7 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 		return nil, goerr.Wrap(err, "failed to get alerts")
 	}
 
-	msg.Trace(ctx, "Aggregating %d alerts (threshold: %f, topN: %d)", len(alerts), threshold, topN)
+	ctx = msg.Trace(ctx, "Aggregating %d alerts (threshold: %f, topN: %d)", len(alerts), threshold, topN)
 
 	clusters := alert.ClusterAlerts(ctx, alerts, threshold, topN)
 
