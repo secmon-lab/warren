@@ -699,11 +699,11 @@ func TestGetTicketsByStatus(t *testing.T) {
 		ctx := t.Context()
 		thread := newTestThread()
 
-		// テスト用のチケットを作成
+		// Create tickets
 		tickets := []*ticketmodel.Ticket{
 			{
 				ID:        types.NewTicketID(),
-				Status:    types.TicketStatusInvestigating,
+				Status:    types.TicketStatusOpen,
 				CreatedAt: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC),
 				SlackThread: &slack.Thread{
 					ChannelID: thread.ChannelID,
@@ -730,13 +730,13 @@ func TestGetTicketsByStatus(t *testing.T) {
 			},
 		}
 
-		// チケットをリポジトリに保存
+		// Put tickets
 		for _, ticket := range tickets {
 			gt.NoError(t, repo.PutTicket(ctx, *ticket))
 		}
 
 		t.Run("investigating tickets", func(t *testing.T) {
-			result, err := repo.GetTicketsByStatus(ctx, types.TicketStatusInvestigating)
+			result, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 0)
 			gt.NoError(t, err)
 			filtered := filterByIDs(result, []types.TicketID{tickets[0].ID})
 			gt.Array(t, filtered).Length(1)
@@ -744,7 +744,7 @@ func TestGetTicketsByStatus(t *testing.T) {
 		})
 
 		t.Run("pending tickets", func(t *testing.T) {
-			result, err := repo.GetTicketsByStatus(ctx, types.TicketStatusPending)
+			result, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusPending}, 0, 0)
 			gt.NoError(t, err)
 			filtered := filterByIDs(result, []types.TicketID{tickets[1].ID})
 			gt.Array(t, filtered).Length(1)
@@ -752,11 +752,52 @@ func TestGetTicketsByStatus(t *testing.T) {
 		})
 
 		t.Run("resolved tickets", func(t *testing.T) {
-			result, err := repo.GetTicketsByStatus(ctx, types.TicketStatusResolved)
+			result, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusResolved}, 0, 0)
 			gt.NoError(t, err)
 			filtered := filterByIDs(result, []types.TicketID{tickets[2].ID})
 			gt.Array(t, filtered).Length(1)
 			gt.Value(t, filtered[0].ID).Equal(tickets[2].ID)
+		})
+
+		t.Run("multiple statuses", func(t *testing.T) {
+			result, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{
+				types.TicketStatusOpen,
+				types.TicketStatusPending,
+			}, 0, 0)
+			gt.NoError(t, err)
+			filtered := filterByIDs(result, []types.TicketID{tickets[0].ID, tickets[1].ID})
+			gt.Array(t, filtered).Length(2)
+		})
+
+		t.Run("all tickets", func(t *testing.T) {
+			result, err := repo.GetTicketsByStatus(ctx, nil, 0, 0)
+			gt.NoError(t, err)
+			filtered := filterByIDs(result, []types.TicketID{tickets[0].ID, tickets[1].ID, tickets[2].ID})
+			gt.Array(t, filtered).Length(3)
+		})
+
+		t.Run("with limit", func(t *testing.T) {
+			result, err := repo.GetTicketsByStatus(ctx, nil, 0, 2)
+			gt.NoError(t, err)
+			gt.Array(t, result).Length(2)
+		})
+
+		t.Run("with offset", func(t *testing.T) {
+			result1, err := repo.GetTicketsByStatus(ctx, nil, 1, 0)
+			gt.NoError(t, err)
+			gt.Array(t, result1).Longer(0)
+			result2, err := repo.GetTicketsByStatus(ctx, nil, 2, 0)
+			gt.NoError(t, err)
+			gt.Array(t, result2).Longer(0)
+			gt.Array(t, result2).All(func(v *ticketmodel.Ticket) bool {
+				return v.ID != result1[0].ID
+			})
+		})
+
+		t.Run("with offset and limit", func(t *testing.T) {
+			result, err := repo.GetTicketsByStatus(ctx, nil, 1, 1)
+			gt.NoError(t, err)
+			gt.Array(t, result).Length(1)
 		})
 	}
 
@@ -776,11 +817,11 @@ func TestGetTicketsBySpan(t *testing.T) {
 		ctx := t.Context()
 		thread := newTestThread()
 
-		// テスト用のチケットを作成
+		// Create tickets
 		tickets := []*ticketmodel.Ticket{
 			{
 				ID:        types.NewTicketID(),
-				Status:    types.TicketStatusInvestigating,
+				Status:    types.TicketStatusOpen,
 				CreatedAt: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC),
 				SlackThread: &slack.Thread{
 					ChannelID: thread.ChannelID,
@@ -807,7 +848,7 @@ func TestGetTicketsBySpan(t *testing.T) {
 			},
 		}
 
-		// チケットをリポジトリに保存
+		// Put tickets
 		for _, ticket := range tickets {
 			gt.NoError(t, repo.PutTicket(ctx, *ticket))
 		}
@@ -982,12 +1023,12 @@ func TestGetTicketsByStatusAndSpan(t *testing.T) {
 		tickets := []ticketmodel.Ticket{
 			{
 				ID:        types.NewTicketID(),
-				Status:    types.TicketStatusInvestigating,
+				Status:    types.TicketStatusOpen,
 				CreatedAt: now.Add(-2 * time.Hour),
 			},
 			{
 				ID:        types.NewTicketID(),
-				Status:    types.TicketStatusInvestigating,
+				Status:    types.TicketStatusOpen,
 				CreatedAt: now.Add(-1 * time.Hour),
 			},
 			{
@@ -997,7 +1038,7 @@ func TestGetTicketsByStatusAndSpan(t *testing.T) {
 			},
 			{
 				ID:        types.NewTicketID(),
-				Status:    types.TicketStatusInvestigating,
+				Status:    types.TicketStatusOpen,
 				CreatedAt: now.Add(1 * time.Hour),
 			},
 		}
@@ -1010,7 +1051,7 @@ func TestGetTicketsByStatusAndSpan(t *testing.T) {
 		begin := now.Add(-3 * time.Hour)
 		end := now
 
-		results, err := repo.GetTicketsByStatusAndSpan(ctx, types.TicketStatusInvestigating, begin, end)
+		results, err := repo.GetTicketsByStatusAndSpan(ctx, types.TicketStatusOpen, begin, end)
 		gt.NoError(t, err)
 		gt.Array(t, results).Longer(1)
 

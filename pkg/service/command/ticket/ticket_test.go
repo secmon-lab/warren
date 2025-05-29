@@ -2,6 +2,7 @@ package ticket_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -37,7 +38,7 @@ func setupTicketTestService(t *testing.T) (*command.Service, *mock.RepositoryMoc
 				Title:       "Ticket 1",
 				Description: "Test ticket 1",
 			},
-			Status:    types.TicketStatusInvestigating,
+			Status:    types.TicketStatusOpen,
 			CreatedAt: fixedTime.Add(-1 * time.Hour),
 			SlackThread: &slack.Thread{
 				ChannelID: "C0123456789",
@@ -50,7 +51,7 @@ func setupTicketTestService(t *testing.T) (*command.Service, *mock.RepositoryMoc
 				Title:       "Ticket 2",
 				Description: "Test ticket 2",
 			},
-			Status:    types.TicketStatusInvestigating,
+			Status:    types.TicketStatusOpen,
 			CreatedAt: fixedTime.Add(-2 * time.Hour),
 			SlackThread: &slack.Thread{
 				ChannelID: "C0123456789",
@@ -72,10 +73,10 @@ func setupTicketTestService(t *testing.T) (*command.Service, *mock.RepositoryMoc
 		},
 	}
 
-	repo.GetTicketsByStatusFunc = func(ctx context.Context, status types.TicketStatus) ([]*ticket.Ticket, error) {
+	repo.GetTicketsByStatusFunc = func(ctx context.Context, statuses []types.TicketStatus, offset, limit int) ([]*ticket.Ticket, error) {
 		var result []*ticket.Ticket
 		for _, t := range tickets {
-			if t.Status == status {
+			if slices.Contains(statuses, t.Status) {
 				result = append(result, t)
 			}
 		}

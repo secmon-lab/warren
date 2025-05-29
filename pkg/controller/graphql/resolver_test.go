@@ -33,12 +33,73 @@ func TestTicketResolver(t *testing.T) {
 		gt.Value(t, got.Metadata.Title).Equal(testTicket.Metadata.Title)
 	})
 
+	t.Run("GetTickets", func(t *testing.T) {
+		status := "open"
+		got, err := resolver.Query().Tickets(ctx, []string{status}, nil, nil)
+		gt.NoError(t, err)
+		gt.Array(t, got).Length(1)
+		gt.Value(t, got[0].ID).Equal(testTicket.ID)
+	})
+
+	t.Run("GetTicketsWithPagination", func(t *testing.T) {
+		// Create additional tickets
+		tickets := []*ticket.Ticket{
+			{
+				ID:        types.TicketID("ticket-2"),
+				Metadata:  ticket.Metadata{Title: "Test Ticket 2", Description: "desc"},
+				Status:    types.TicketStatus("open"),
+				CreatedAt: time.Now().Add(time.Hour),
+			},
+			{
+				ID:        types.TicketID("ticket-3"),
+				Metadata:  ticket.Metadata{Title: "Test Ticket 3", Description: "desc"},
+				Status:    types.TicketStatus("closed"),
+				CreatedAt: time.Now().Add(2 * time.Hour),
+			},
+		}
+		for _, t := range tickets {
+			_ = repo.PutTicket(ctx, *t)
+		}
+
+		t.Run("with limit", func(t *testing.T) {
+			limit := 2
+			got, err := resolver.Query().Tickets(ctx, nil, nil, &limit)
+			gt.NoError(t, err)
+			gt.Array(t, got).Length(2)
+		})
+
+		t.Run("with offset", func(t *testing.T) {
+			offset := 1
+			got, err := resolver.Query().Tickets(ctx, nil, &offset, nil)
+			gt.NoError(t, err)
+			gt.Array(t, got).Length(2)
+		})
+
+		t.Run("with offset and limit", func(t *testing.T) {
+			offset := 1
+			limit := 1
+			got, err := resolver.Query().Tickets(ctx, nil, &offset, &limit)
+			gt.NoError(t, err)
+			gt.Array(t, got).Length(1)
+		})
+
+		t.Run("with multiple statuses", func(t *testing.T) {
+			got, err := resolver.Query().Tickets(ctx, []string{"open", "pending"}, nil, nil)
+			gt.NoError(t, err)
+			gt.Array(t, got).Length(2)
+		})
+	})
+
 	t.Run("UpdateTicketStatus", func(t *testing.T) {
 		newStatus := types.TicketStatus("closed")
 		got, err := resolver.Mutation().UpdateTicketStatus(ctx, string(testTicket.ID), string(newStatus))
 		gt.NoError(t, err)
 		gt.Value(t, got.Status).Equal(newStatus)
 	})
+}
+
+func ptr(s string) *string {
+	return &s
 }
 
 func TestAlertResolver(t *testing.T) {

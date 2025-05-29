@@ -69,6 +69,11 @@ Houses utility packages for logging, pointer handling, clock abstraction, etc.
 ```go
 return goerr.Wrap(err, "failed something", goerr.V("args", args))
 ```
+# Code generation
+
+You can generate code by `go tool task`
+- Generating mock code (pkg/domain/mock)
+- Generating graphql code (pkg/controller/graphql)
 
 # Testing
 

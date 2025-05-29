@@ -73,7 +73,7 @@ type ComplexityRoot struct {
 		Alert   func(childComplexity int, id string) int
 		Alerts  func(childComplexity int) int
 		Ticket  func(childComplexity int, id string) int
-		Tickets func(childComplexity int, status *string) int
+		Tickets func(childComplexity int, statuses []string, offset *int, limit *int) int
 	}
 
 	Ticket struct {
@@ -103,7 +103,7 @@ type MutationResolver interface {
 }
 type QueryResolver interface {
 	Ticket(ctx context.Context, id string) (*ticket.Ticket, error)
-	Tickets(ctx context.Context, status *string) ([]*ticket.Ticket, error)
+	Tickets(ctx context.Context, statuses []string, offset *int, limit *int) ([]*ticket.Ticket, error)
 	Alert(ctx context.Context, id string) (*alert.Alert, error)
 	Alerts(ctx context.Context) ([]*alert.Alert, error)
 }
@@ -251,7 +251,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.Tickets(childComplexity, args["status"].(*string)), true
+		return e.complexity.Query.Tickets(childComplexity, args["statuses"].([]string), args["offset"].(*int), args["limit"].(*int)), true
 
 	case "Ticket.alerts":
 		if e.complexity.Ticket.Alerts == nil {
@@ -425,7 +425,7 @@ type Alert {
 
 type Query {
   ticket(id: ID!): Ticket
-  tickets(status: String): [Ticket!]!
+  tickets(statuses: [String!], offset: Int, limit: Int): [Ticket!]!
   alert(id: ID!): Alert
   alerts: [Alert!]!
 }
@@ -584,28 +584,74 @@ func (ec *executionContext) field_Query_ticket_argsID(
 func (ec *executionContext) field_Query_tickets_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Query_tickets_argsStatus(ctx, rawArgs)
+	arg0, err := ec.field_Query_tickets_argsStatuses(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
-	args["status"] = arg0
+	args["statuses"] = arg0
+	arg1, err := ec.field_Query_tickets_argsOffset(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg1
+	arg2, err := ec.field_Query_tickets_argsLimit(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg2
 	return args, nil
 }
-func (ec *executionContext) field_Query_tickets_argsStatus(
+func (ec *executionContext) field_Query_tickets_argsStatuses(
 	ctx context.Context,
 	rawArgs map[string]any,
-) (*string, error) {
-	if _, ok := rawArgs["status"]; !ok {
-		var zeroVal *string
+) ([]string, error) {
+	if _, ok := rawArgs["statuses"]; !ok {
+		var zeroVal []string
 		return zeroVal, nil
 	}
 
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("status"))
-	if tmp, ok := rawArgs["status"]; ok {
-		return ec.unmarshalOString2ᚖstring(ctx, tmp)
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("statuses"))
+	if tmp, ok := rawArgs["statuses"]; ok {
+		return ec.unmarshalOString2ᚕstringᚄ(ctx, tmp)
 	}
 
-	var zeroVal *string
+	var zeroVal []string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_tickets_argsOffset(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["offset"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
+	if tmp, ok := rawArgs["offset"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_tickets_argsLimit(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["limit"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+	if tmp, ok := rawArgs["limit"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
 	return zeroVal, nil
 }
 
@@ -1282,7 +1328,7 @@ func (ec *executionContext) _Query_tickets(ctx context.Context, field graphql.Co
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Tickets(rctx, fc.Args["status"].(*string))
+		return ec.resolvers.Query().Tickets(rctx, fc.Args["statuses"].([]string), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5427,6 +5473,24 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
+func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalInt(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.SelectionSet, v *int) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalInt(*v)
+	return res
+}
+
 func (ec *executionContext) unmarshalOString2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -5437,6 +5501,42 @@ func (ec *executionContext) marshalOString2string(ctx context.Context, sel ast.S
 	_ = ctx
 	res := graphql.MarshalString(v)
 	return res
+}
+
+func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]string, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNString2string(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v any) (*string, error) {

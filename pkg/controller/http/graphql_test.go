@@ -36,7 +36,7 @@ func TestGraphQLQueries(t *testing.T) {
 		alertID := types.NewAlertID()
 		ticketObj := &ticket.Ticket{
 			ID:        ticketID,
-			Status:    types.TicketStatusInvestigating,
+			Status:    types.TicketStatusOpen,
 			AlertIDs:  []types.AlertID{alertID},
 			CreatedAt: time.Now(),
 		}
@@ -79,7 +79,7 @@ func TestGraphQLQueries(t *testing.T) {
 		ticket, ok := tickets[0].(map[string]interface{})
 		gt.True(t, ok)
 		gt.Value(t, ticket["id"]).Equal(ticketID.String())
-		gt.Value(t, ticket["status"]).Equal(types.TicketStatusInvestigating.String())
+		gt.Value(t, ticket["status"]).Equal(types.TicketStatusOpen.String())
 	})
 
 	t.Run("query ticket by id", func(t *testing.T) {
@@ -88,7 +88,7 @@ func TestGraphQLQueries(t *testing.T) {
 		alertID := types.NewAlertID()
 		ticketObj := &ticket.Ticket{
 			ID:        ticketID,
-			Status:    types.TicketStatusInvestigating,
+			Status:    types.TicketStatusOpen,
 			AlertIDs:  []types.AlertID{alertID},
 			CreatedAt: time.Now(),
 		}
@@ -133,7 +133,7 @@ func TestGraphQLQueries(t *testing.T) {
 		ticket, ok := data["ticket"].(map[string]interface{})
 		gt.True(t, ok)
 		gt.Value(t, ticket["id"]).Equal(ticketID.String())
-		gt.Value(t, ticket["status"]).Equal(types.TicketStatusInvestigating.String())
+		gt.Value(t, ticket["status"]).Equal(types.TicketStatusOpen.String())
 
 		alerts, ok := ticket["alerts"].([]interface{})
 		gt.True(t, ok)
@@ -213,7 +213,7 @@ func TestGraphQLQueries(t *testing.T) {
 		}
 		ticket1 := &ticket.Ticket{
 			ID:         types.NewTicketID(),
-			Status:     types.TicketStatusInvestigating,
+			Status:     types.TicketStatusOpen,
 			AlertIDs:   []types.AlertID{alert1.ID, alert2.ID},
 			Conclusion: types.AlertConclusionTruePositive,
 			Metadata: ticket.Metadata{
@@ -244,7 +244,7 @@ func TestGraphQLQueries(t *testing.T) {
 		req := graphqlRequest{
 			Query: `
 				query {
-					tickets(status: "investigating") {
+					tickets(statuses: ["open"]) {
 						id
 						status
 						alerts {
@@ -270,7 +270,7 @@ func TestGraphQLQueries(t *testing.T) {
 		ticket, ok := tickets[0].(map[string]interface{})
 		gt.True(t, ok)
 		gt.Value(t, ticket["id"]).Equal(ticket1.ID.String())
-		gt.Value(t, ticket["status"]).Equal(types.TicketStatusInvestigating.String())
+		gt.Value(t, ticket["status"]).Equal(types.TicketStatusOpen.String())
 
 		alerts, ok := ticket["alerts"].([]interface{})
 		gt.True(t, ok)

@@ -77,12 +77,27 @@ func (r *queryResolver) Ticket(ctx context.Context, id string) (*ticket.Ticket, 
 }
 
 // Tickets is the resolver for the tickets field.
-func (r *queryResolver) Tickets(ctx context.Context, status *string) ([]*ticket.Ticket, error) {
-	var ticketStatus types.TicketStatus
-	if status != nil {
-		ticketStatus = types.TicketStatus(*status)
+func (r *queryResolver) Tickets(ctx context.Context, statuses []string, offset *int, limit *int) ([]*ticket.Ticket, error) {
+	var ticketStatuses []types.TicketStatus
+	if statuses != nil {
+		for _, s := range statuses {
+			status := types.TicketStatus(s)
+			if err := status.Validate(); err != nil {
+				return nil, goerr.Wrap(err, "invalid ticket status", goerr.V("status", s))
+			}
+			ticketStatuses = append(ticketStatuses, status)
+		}
 	}
-	tickets, err := r.repo.GetTicketsByStatus(ctx, ticketStatus)
+
+	var offsetVal, limitVal int
+	if offset != nil {
+		offsetVal = *offset
+	}
+	if limit != nil {
+		limitVal = *limit
+	}
+
+	tickets, err := r.repo.GetTicketsByStatus(ctx, ticketStatuses, offsetVal, limitVal)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list tickets")
 	}

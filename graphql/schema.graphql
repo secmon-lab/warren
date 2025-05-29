@@ -24,7 +24,7 @@ type Alert {
 
 type Query {
   ticket(id: ID!): Ticket
-  tickets(status: String): [Ticket!]!
+  tickets(statuses: [String!], offset: Int, limit: Int): [Ticket!]!
   alert(id: ID!): Alert
   alerts: [Alert!]!
 }

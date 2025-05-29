@@ -223,7 +223,7 @@ func TestGraphQLHandler(t *testing.T) {
 	alertID := types.AlertID("test-alert-1")
 	gt.NoError(t, repo.PutTicket(context.Background(), ticket.Ticket{
 		ID:     ticketID,
-		Status: types.TicketStatusInvestigating,
+		Status: types.TicketStatusOpen,
 		Metadata: ticket.Metadata{
 			Title: "Test Ticket",
 		},
@@ -262,7 +262,7 @@ func TestGraphQLHandler(t *testing.T) {
 		data := response["data"].(map[string]interface{})
 		ticket := data["ticket"].(map[string]interface{})
 		gt.Value(t, ticket["id"]).Equal("test-ticket-1")
-		gt.Value(t, ticket["status"]).Equal("investigating")
+		gt.Value(t, ticket["status"]).Equal("open")
 	})
 
 	t.Run("query alert", func(t *testing.T) {

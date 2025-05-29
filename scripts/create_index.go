@@ -94,7 +94,7 @@ func defineRequiredIndexes() []indexConfig {
 			fields: []indexField{
 				{
 					FieldPath: "CreatedAt",
-					Order:     "ASCENDING",
+					Order:     "DESCENDING",
 				},
 				{
 					FieldPath:    "Embedding",
@@ -114,7 +114,7 @@ func defineRequiredIndexes() []indexConfig {
 					},
 					{
 						FieldPath: "CreatedAt",
-						Order:     "ASCENDING",
+						Order:     "DESCENDING",
 					},
 				},
 			})
@@ -284,6 +284,7 @@ func indexExists(existingIndexes []index, required indexConfig) bool {
 
 		newFields := append(required.fields, indexField{
 			FieldPath: "__name__",
+			Order:     "*",
 		})
 		if fieldsMatch(existing.Fields, newFields) {
 			return true
@@ -298,14 +299,26 @@ func fieldsMatch(existing, new []indexField) bool {
 	}
 
 	// Create maps of field paths for comparison
-	existingPaths := make(map[string]bool)
+	existingPaths := make(map[string]string)
 	for _, f := range existing {
-		existingPaths[f.FieldPath] = true
+		if f.FieldPath == "__name__" {
+			existingPaths[f.FieldPath] = "*"
+		} else {
+			existingPaths[f.FieldPath] = f.Order
+		}
 	}
 
 	// Check if all new fields exist in existing index
+	matchedPaths := make(map[string]bool)
 	for _, f := range new {
-		if !existingPaths[f.FieldPath] {
+		if existingPaths[f.FieldPath] != f.Order {
+			return false
+		}
+		matchedPaths[f.FieldPath] = true
+	}
+
+	for _, f := range existing {
+		if !matchedPaths[f.FieldPath] {
 			return false
 		}
 	}
