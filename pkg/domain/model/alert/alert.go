@@ -138,11 +138,11 @@ func (x *Alert) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) er
 			return err
 		}
 
-		if x.Metadata.Title == "" {
+		if x.Metadata.Title == "" || x.Metadata.Title == DefaultAlertTitle {
 			x.Metadata.Title = resp.Title
 		}
 
-		if x.Metadata.Description == "" {
+		if x.Metadata.Description == "" || x.Metadata.Description == DefaultAlertDescription {
 			x.Metadata.Description = resp.Description
 		}
 

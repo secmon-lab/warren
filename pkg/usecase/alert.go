@@ -63,26 +63,16 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, a
 func (uc *UseCases) handleAlert(ctx context.Context, alert alert.Alert) (*alert.Alert, error) {
 	logger := logging.From(ctx)
 
+	if err := alert.FillMetadata(ctx, uc.llmClient); err != nil {
+		return nil, goerr.Wrap(err, "failed to fill alert metadata")
+	}
+
 	// Post new alert to Slack and save the alert with Slack channel and message ID. It should be done before querying LLM.
 	thread, err := uc.slackService.PostAlert(ctx, alert)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to post alert", goerr.V("alert", alert))
 	}
 	alert.SlackThread = thread.Entity()
-
-	if err := uc.repository.PutAlert(ctx, alert); err != nil {
-		return nil, goerr.Wrap(err, "failed to put alert", goerr.V("alert", alert))
-	}
-	logger.Info("alert created", "alert", alert)
-
-	if err := alert.FillMetadata(ctx, uc.llmClient); err != nil {
-		return nil, goerr.Wrap(err, "failed to fill alert metadata")
-	}
-
-	// Update posted alert in Slack.
-	if err := thread.UpdateAlert(ctx, alert); err != nil {
-		return nil, goerr.Wrap(err, "failed to post alert", goerr.V("alert", alert))
-	}
 
 	if err := uc.repository.PutAlert(ctx, alert); err != nil {
 		return nil, goerr.Wrap(err, "failed to put alert", goerr.V("alert", alert))
