@@ -92,7 +92,7 @@ func TestSlackUpdateTicket(t *testing.T) {
 	ticketData.Metadata.Title = "Test Ticket Title"
 	ticketData.Metadata.Description = "Test Ticket Description"
 	ticketData.Metadata.Summary = "Test Ticket Summary"
-	ticketData.Status = types.TicketStatusInvestigating
+	ticketData.Status = types.TicketStatusOpen
 	ticketData.Reason = "Test Ticket Reason"
 
 	ts, err := thread.PostTicket(ctx, ticketData, alert.Alerts{&dummy})
@@ -203,7 +203,7 @@ func TestPostTicketList(t *testing.T) {
 				Title:       "Test Ticket 1",
 				Description: "Description for ticket 1",
 			},
-			Status: types.TicketStatusInvestigating,
+			Status: types.TicketStatusOpen,
 			Assignee: &model.User{
 				ID:   "U0123456789",
 				Name: "John Doe",

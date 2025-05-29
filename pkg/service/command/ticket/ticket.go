@@ -111,7 +111,7 @@ func Create(ctx context.Context, clients *core.Clients, msg *slack.Message, inpu
 }
 
 func handleUnresolvedTickets(ctx context.Context, clients *core.Clients, th *slacksvc.ThreadService) error {
-	tickets, err := clients.Repo().GetTicketsByStatus(ctx, types.TicketStatusInvestigating)
+	tickets, err := clients.Repo().GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 0)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get tickets by status")
 	}

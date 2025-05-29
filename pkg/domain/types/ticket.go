@@ -50,21 +50,24 @@ func NewCommentID() CommentID {
 type TicketStatus string
 
 const (
-	TicketStatusInvestigating TicketStatus = "investigating"
-	TicketStatusPending       TicketStatus = "pending"
-	TicketStatusResolved      TicketStatus = "resolved"
+	TicketStatusOpen     TicketStatus = "open"
+	TicketStatusPending  TicketStatus = "pending"
+	TicketStatusResolved TicketStatus = "resolved"
+	TicketStatusArchived TicketStatus = "archived"
 )
 
-var ticketstatusLabels = map[TicketStatus]string{
-	TicketStatusInvestigating: "🔍 Investigating",
-	TicketStatusPending:       "🕒 Pending",
-	TicketStatusResolved:      "✅️ Resolved",
+var ticketStatusLabels = map[TicketStatus]string{
+	TicketStatusOpen:     "🔍 Open",
+	TicketStatusPending:  "🕒 Pending",
+	TicketStatusResolved: "✅️ Resolved",
+	TicketStatusArchived: "📦 Archived",
 }
 
 var ticketStatusIcons = map[TicketStatus]string{
-	TicketStatusInvestigating: "🔍",
-	TicketStatusPending:       "🕒",
-	TicketStatusResolved:      "✅️",
+	TicketStatusOpen:     "🔍",
+	TicketStatusPending:  "🕒",
+	TicketStatusResolved: "✅️",
+	TicketStatusArchived: "📦",
 }
 
 func (s TicketStatus) String() string {
@@ -72,7 +75,7 @@ func (s TicketStatus) String() string {
 }
 
 func (s TicketStatus) Label() string {
-	return ticketstatusLabels[s]
+	return ticketStatusLabels[s]
 }
 
 func (s TicketStatus) Icon() string {
@@ -81,7 +84,7 @@ func (s TicketStatus) Icon() string {
 
 func (s TicketStatus) Validate() error {
 	switch s {
-	case TicketStatusInvestigating, TicketStatusPending, TicketStatusResolved:
+	case TicketStatusOpen, TicketStatusPending, TicketStatusResolved, TicketStatusArchived:
 		return nil
 	}
 	return goerr.New("invalid ticket Ticketstatus", goerr.V("Ticketstatus", s))

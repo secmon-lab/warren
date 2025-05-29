@@ -461,6 +461,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			FindNearestTicketsFunc: func(ctx context.Context, embedding []float32, limit int) ([]*ticket.Ticket, error) {
 //				panic("mock out the FindNearestTickets method")
 //			},
+//			FindNearestTicketsWithSpanFunc: func(ctx context.Context, embedding []float32, begin time.Time, end time.Time, limit int) ([]*ticket.Ticket, error) {
+//				panic("mock out the FindNearestTicketsWithSpan method")
+//			},
 //			GetAlertFunc: func(ctx context.Context, alertID types.AlertID) (*alert.Alert, error) {
 //				panic("mock out the GetAlert method")
 //			},
@@ -503,8 +506,11 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			GetTicketsBySpanFunc: func(ctx context.Context, begin time.Time, end time.Time) ([]*ticket.Ticket, error) {
 //				panic("mock out the GetTicketsBySpan method")
 //			},
-//			GetTicketsByStatusFunc: func(ctx context.Context, status types.TicketStatus) ([]*ticket.Ticket, error) {
+//			GetTicketsByStatusFunc: func(ctx context.Context, statuses []types.TicketStatus, offset int, limit int) ([]*ticket.Ticket, error) {
 //				panic("mock out the GetTicketsByStatus method")
+//			},
+//			GetTicketsByStatusAndSpanFunc: func(ctx context.Context, status types.TicketStatus, begin time.Time, end time.Time) ([]*ticket.Ticket, error) {
+//				panic("mock out the GetTicketsByStatusAndSpan method")
 //			},
 //			PutAlertFunc: func(ctx context.Context, alertMoqParam alert.Alert) error {
 //				panic("mock out the PutAlert method")
@@ -558,6 +564,9 @@ type RepositoryMock struct {
 	// FindNearestTicketsFunc mocks the FindNearestTickets method.
 	FindNearestTicketsFunc func(ctx context.Context, embedding []float32, limit int) ([]*ticket.Ticket, error)
 
+	// FindNearestTicketsWithSpanFunc mocks the FindNearestTicketsWithSpan method.
+	FindNearestTicketsWithSpanFunc func(ctx context.Context, embedding []float32, begin time.Time, end time.Time, limit int) ([]*ticket.Ticket, error)
+
 	// GetAlertFunc mocks the GetAlert method.
 	GetAlertFunc func(ctx context.Context, alertID types.AlertID) (*alert.Alert, error)
 
@@ -601,7 +610,10 @@ type RepositoryMock struct {
 	GetTicketsBySpanFunc func(ctx context.Context, begin time.Time, end time.Time) ([]*ticket.Ticket, error)
 
 	// GetTicketsByStatusFunc mocks the GetTicketsByStatus method.
-	GetTicketsByStatusFunc func(ctx context.Context, status types.TicketStatus) ([]*ticket.Ticket, error)
+	GetTicketsByStatusFunc func(ctx context.Context, statuses []types.TicketStatus, offset int, limit int) ([]*ticket.Ticket, error)
+
+	// GetTicketsByStatusAndSpanFunc mocks the GetTicketsByStatusAndSpan method.
+	GetTicketsByStatusAndSpanFunc func(ctx context.Context, status types.TicketStatus, begin time.Time, end time.Time) ([]*ticket.Ticket, error)
 
 	// PutAlertFunc mocks the PutAlert method.
 	PutAlertFunc func(ctx context.Context, alertMoqParam alert.Alert) error
@@ -683,6 +695,19 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Embedding is the embedding argument value.
 			Embedding []float32
+			// Limit is the limit argument value.
+			Limit int
+		}
+		// FindNearestTicketsWithSpan holds details about calls to the FindNearestTicketsWithSpan method.
+		FindNearestTicketsWithSpan []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Embedding is the embedding argument value.
+			Embedding []float32
+			// Begin is the begin argument value.
+			Begin time.Time
+			// End is the end argument value.
+			End time.Time
 			// Limit is the limit argument value.
 			Limit int
 		}
@@ -788,8 +813,23 @@ type RepositoryMock struct {
 		GetTicketsByStatus []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// Statuses is the statuses argument value.
+			Statuses []types.TicketStatus
+			// Offset is the offset argument value.
+			Offset int
+			// Limit is the limit argument value.
+			Limit int
+		}
+		// GetTicketsByStatusAndSpan holds details about calls to the GetTicketsByStatusAndSpan method.
+		GetTicketsByStatusAndSpan []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
 			// Status is the status argument value.
 			Status types.TicketStatus
+			// Begin is the begin argument value.
+			Begin time.Time
+			// End is the end argument value.
+			End time.Time
 		}
 		// PutAlert holds details about calls to the PutAlert method.
 		PutAlert []struct {
@@ -865,6 +905,7 @@ type RepositoryMock struct {
 	lockBindAlertToTicket           sync.RWMutex
 	lockFindNearestAlerts           sync.RWMutex
 	lockFindNearestTickets          sync.RWMutex
+	lockFindNearestTicketsWithSpan  sync.RWMutex
 	lockGetAlert                    sync.RWMutex
 	lockGetAlertList                sync.RWMutex
 	lockGetAlertListByThread        sync.RWMutex
@@ -880,6 +921,7 @@ type RepositoryMock struct {
 	lockGetTicketUnpromptedComments sync.RWMutex
 	lockGetTicketsBySpan            sync.RWMutex
 	lockGetTicketsByStatus          sync.RWMutex
+	lockGetTicketsByStatusAndSpan   sync.RWMutex
 	lockPutAlert                    sync.RWMutex
 	lockPutAlertList                sync.RWMutex
 	lockPutHistory                  sync.RWMutex
@@ -1180,6 +1222,58 @@ func (mock *RepositoryMock) FindNearestTicketsCalls() []struct {
 	mock.lockFindNearestTickets.RLock()
 	calls = mock.calls.FindNearestTickets
 	mock.lockFindNearestTickets.RUnlock()
+	return calls
+}
+
+// FindNearestTicketsWithSpan calls FindNearestTicketsWithSpanFunc.
+func (mock *RepositoryMock) FindNearestTicketsWithSpan(ctx context.Context, embedding []float32, begin time.Time, end time.Time, limit int) ([]*ticket.Ticket, error) {
+	callInfo := struct {
+		Ctx       context.Context
+		Embedding []float32
+		Begin     time.Time
+		End       time.Time
+		Limit     int
+	}{
+		Ctx:       ctx,
+		Embedding: embedding,
+		Begin:     begin,
+		End:       end,
+		Limit:     limit,
+	}
+	mock.lockFindNearestTicketsWithSpan.Lock()
+	mock.calls.FindNearestTicketsWithSpan = append(mock.calls.FindNearestTicketsWithSpan, callInfo)
+	mock.lockFindNearestTicketsWithSpan.Unlock()
+	if mock.FindNearestTicketsWithSpanFunc == nil {
+		var (
+			ticketsOut []*ticket.Ticket
+			errOut     error
+		)
+		return ticketsOut, errOut
+	}
+	return mock.FindNearestTicketsWithSpanFunc(ctx, embedding, begin, end, limit)
+}
+
+// FindNearestTicketsWithSpanCalls gets all the calls that were made to FindNearestTicketsWithSpan.
+// Check the length with:
+//
+//	len(mockedRepository.FindNearestTicketsWithSpanCalls())
+func (mock *RepositoryMock) FindNearestTicketsWithSpanCalls() []struct {
+	Ctx       context.Context
+	Embedding []float32
+	Begin     time.Time
+	End       time.Time
+	Limit     int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		Embedding []float32
+		Begin     time.Time
+		End       time.Time
+		Limit     int
+	}
+	mock.lockFindNearestTicketsWithSpan.RLock()
+	calls = mock.calls.FindNearestTicketsWithSpan
+	mock.lockFindNearestTicketsWithSpan.RUnlock()
 	return calls
 }
 
@@ -1744,13 +1838,17 @@ func (mock *RepositoryMock) GetTicketsBySpanCalls() []struct {
 }
 
 // GetTicketsByStatus calls GetTicketsByStatusFunc.
-func (mock *RepositoryMock) GetTicketsByStatus(ctx context.Context, status types.TicketStatus) ([]*ticket.Ticket, error) {
+func (mock *RepositoryMock) GetTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, offset int, limit int) ([]*ticket.Ticket, error) {
 	callInfo := struct {
-		Ctx    context.Context
-		Status types.TicketStatus
+		Ctx      context.Context
+		Statuses []types.TicketStatus
+		Offset   int
+		Limit    int
 	}{
-		Ctx:    ctx,
-		Status: status,
+		Ctx:      ctx,
+		Statuses: statuses,
+		Offset:   offset,
+		Limit:    limit,
 	}
 	mock.lockGetTicketsByStatus.Lock()
 	mock.calls.GetTicketsByStatus = append(mock.calls.GetTicketsByStatus, callInfo)
@@ -1762,7 +1860,7 @@ func (mock *RepositoryMock) GetTicketsByStatus(ctx context.Context, status types
 		)
 		return ticketsOut, errOut
 	}
-	return mock.GetTicketsByStatusFunc(ctx, status)
+	return mock.GetTicketsByStatusFunc(ctx, statuses, offset, limit)
 }
 
 // GetTicketsByStatusCalls gets all the calls that were made to GetTicketsByStatus.
@@ -1770,16 +1868,68 @@ func (mock *RepositoryMock) GetTicketsByStatus(ctx context.Context, status types
 //
 //	len(mockedRepository.GetTicketsByStatusCalls())
 func (mock *RepositoryMock) GetTicketsByStatusCalls() []struct {
-	Ctx    context.Context
-	Status types.TicketStatus
+	Ctx      context.Context
+	Statuses []types.TicketStatus
+	Offset   int
+	Limit    int
 } {
 	var calls []struct {
-		Ctx    context.Context
-		Status types.TicketStatus
+		Ctx      context.Context
+		Statuses []types.TicketStatus
+		Offset   int
+		Limit    int
 	}
 	mock.lockGetTicketsByStatus.RLock()
 	calls = mock.calls.GetTicketsByStatus
 	mock.lockGetTicketsByStatus.RUnlock()
+	return calls
+}
+
+// GetTicketsByStatusAndSpan calls GetTicketsByStatusAndSpanFunc.
+func (mock *RepositoryMock) GetTicketsByStatusAndSpan(ctx context.Context, status types.TicketStatus, begin time.Time, end time.Time) ([]*ticket.Ticket, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Status types.TicketStatus
+		Begin  time.Time
+		End    time.Time
+	}{
+		Ctx:    ctx,
+		Status: status,
+		Begin:  begin,
+		End:    end,
+	}
+	mock.lockGetTicketsByStatusAndSpan.Lock()
+	mock.calls.GetTicketsByStatusAndSpan = append(mock.calls.GetTicketsByStatusAndSpan, callInfo)
+	mock.lockGetTicketsByStatusAndSpan.Unlock()
+	if mock.GetTicketsByStatusAndSpanFunc == nil {
+		var (
+			ticketsOut []*ticket.Ticket
+			errOut     error
+		)
+		return ticketsOut, errOut
+	}
+	return mock.GetTicketsByStatusAndSpanFunc(ctx, status, begin, end)
+}
+
+// GetTicketsByStatusAndSpanCalls gets all the calls that were made to GetTicketsByStatusAndSpan.
+// Check the length with:
+//
+//	len(mockedRepository.GetTicketsByStatusAndSpanCalls())
+func (mock *RepositoryMock) GetTicketsByStatusAndSpanCalls() []struct {
+	Ctx    context.Context
+	Status types.TicketStatus
+	Begin  time.Time
+	End    time.Time
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Status types.TicketStatus
+		Begin  time.Time
+		End    time.Time
+	}
+	mock.lockGetTicketsByStatusAndSpan.RLock()
+	calls = mock.calls.GetTicketsByStatusAndSpan
+	mock.lockGetTicketsByStatusAndSpan.RUnlock()
 	return calls
 }
 

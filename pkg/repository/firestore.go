@@ -749,19 +749,35 @@ func (r *Firestore) BatchPutAlerts(ctx context.Context, alerts alert.Alerts) err
 	return nil
 }
 
-func (r *Firestore) GetTicketsByStatus(ctx context.Context, status types.TicketStatus) ([]*ticket.Ticket, error) {
-	iter := r.db.Collection(collectionTickets).
-		Where("Status", "==", status).
-		Documents(ctx)
+func (r *Firestore) GetTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, offset, limit int) ([]*ticket.Ticket, error) {
+	// If no statuses specified, query all tickets
+	var query firestore.Query
+	if len(statuses) > 0 {
+		// Use "in" operator to match any of the specified statuses
+		query = r.db.Collection(collectionTickets).Where("Status", "in", statuses)
+	} else {
+		query = r.db.Collection(collectionTickets).Query
+	}
+
+	// Order by CreatedAt in descending order (newest first)
+	query = query.OrderBy("CreatedAt", firestore.Desc)
+
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
 
 	var tickets []*ticket.Ticket
+	iter := query.Documents(ctx)
 	for {
 		doc, err := iter.Next()
 		if err != nil {
 			if err == iterator.Done {
 				break
 			}
-			return nil, goerr.Wrap(err, "failed to get next ticket")
+			return nil, goerr.Wrap(err, "failed to get offset documents")
 		}
 
 		var t ticket.Ticket
@@ -779,7 +795,7 @@ func (r *Firestore) GetTicketsBySpan(ctx context.Context, begin, end time.Time) 
 	iter := r.db.Collection(collectionTickets).
 		Where("CreatedAt", ">=", begin).
 		Where("CreatedAt", "<=", end).
-		OrderBy("CreatedAt", firestore.Asc).
+		OrderBy("CreatedAt", firestore.Desc).
 		Documents(ctx)
 
 	var tickets []*ticket.Ticket
@@ -827,4 +843,74 @@ func (r *Firestore) GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts,
 	}
 
 	return alerts, nil
+}
+
+func (r *Firestore) FindNearestTicketsWithSpan(ctx context.Context, embedding []float32, begin, end time.Time, limit int) ([]*ticket.Ticket, error) {
+	iter := r.db.Collection(collectionTickets).
+		Where("CreatedAt", ">=", begin).
+		Where("CreatedAt", "<=", end).
+		FindNearest("Embedding",
+			firestore.Vector32(embedding[:]),
+			limit,
+			firestore.DistanceMeasureEuclidean,
+			&firestore.FindNearestOptions{
+				DistanceResultField: "vector_distance",
+			}).Documents(ctx)
+
+	var tickets []*ticket.Ticket
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next ticket")
+		}
+
+		var t ticket.Ticket
+		if err := doc.DataTo(&t); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		tickets = append(tickets, &t)
+	}
+
+	if len(tickets) == 0 {
+		return []*ticket.Ticket{}, nil
+	}
+
+	if len(tickets) > limit {
+		tickets = tickets[:limit]
+	}
+
+	return tickets, nil
+}
+
+func (r *Firestore) GetTicketsByStatusAndSpan(ctx context.Context, status types.TicketStatus, begin, end time.Time) ([]*ticket.Ticket, error) {
+	iter := r.db.Collection(collectionTickets).
+		Where("Status", "==", status).
+		Where("CreatedAt", ">=", begin).
+		Where("CreatedAt", "<=", end).
+		OrderBy("CreatedAt", firestore.Desc).
+		Documents(ctx)
+
+	var tickets []*ticket.Ticket
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next ticket")
+		}
+
+		var t ticket.Ticket
+		if err := doc.DataTo(&t); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		tickets = append(tickets, &t)
+	}
+
+	return tickets, nil
 }

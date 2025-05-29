@@ -3,7 +3,10 @@ package http
 import (
 	"net/http"
 
+	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/go-chi/chi/v5"
+	"github.com/secmon-lab/warren/pkg/controller/graphql"
 	slack_controller "github.com/secmon-lab/warren/pkg/controller/slack"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -13,6 +16,7 @@ type Server struct {
 	router    *chi.Mux
 	slackCtrl *slack_controller.Controller
 	verifier  slack_model.PayloadVerifier
+	repo      interfaces.Repository // GraphQL用
 }
 
 type Options func(*Server)
@@ -20,6 +24,12 @@ type Options func(*Server)
 func WithSlackVerifier(verifier slack_model.PayloadVerifier) Options {
 	return func(s *Server) {
 		s.verifier = verifier
+	}
+}
+
+func WithGraphQLRepo(repo interfaces.Repository) Options {
+	return func(s *Server) {
+		s.repo = repo
 	}
 }
 
@@ -63,9 +73,24 @@ func New(uc UseCase, opts ...Options) *Server {
 		r.Post("/interaction", slackInteractionHandler(s.slackCtrl))
 	})
 
+	// GraphQL endpoint
+	if s.repo != nil {
+		r.Handle("/graphql", graphqlHandler(s.repo))
+	}
+
 	return s
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
+}
+
+// GraphQL handler
+func graphqlHandler(repo interfaces.Repository) http.Handler {
+	resolver := graphql.NewResolver(repo)
+	srv := handler.New(
+		graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}),
+	)
+	srv.AddTransport(transport.POST{})
+	return srv
 }

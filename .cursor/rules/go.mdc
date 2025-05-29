@@ -69,6 +69,11 @@ Houses utility packages for logging, pointer handling, clock abstraction, etc.
 ```go
 return goerr.Wrap(err, "failed something", goerr.V("args", args))
 ```
+# Code generation
+
+You can generate code by `go tool task`
+- Generating mock code (pkg/domain/mock)
+- Generating graphql code (pkg/controller/graphql)
 
 # Testing
 
@@ -94,6 +99,11 @@ Use following Helper Driven Testing style instead of general Tatble Driven Test.
         expected: "BLUE",
     }))
 ```
+
+## Mocking for test
+
+- Use mock implementation from pkg/domain/mock instead of createing own mock structure.
+- For repository, use Memory repository in pkg/repository instead of mock.
 
 ## Test framework
 

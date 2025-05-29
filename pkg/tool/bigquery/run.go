@@ -48,9 +48,15 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 
 	switch name {
 	case "bigquery_list_dataset":
+		if len(x.configs) == 0 {
+			return nil, goerr.New("configuration is not loaded")
+		}
 		return x.listDatasets()
 
 	case "bigquery_query":
+		if len(x.configs) == 0 {
+			return nil, goerr.New("configuration is not loaded")
+		}
 		query, ok := args["query"].(string)
 		if !ok {
 			return nil, goerr.New("query parameter is required")
@@ -58,6 +64,9 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 		return x.executeQuery(ctx, client, query)
 
 	case "bigquery_result":
+		if len(x.configs) == 0 {
+			return nil, goerr.New("configuration is not loaded")
+		}
 		queryID, ok := args["query_id"].(string)
 		if !ok {
 			return nil, goerr.New("query_id parameter is required")
@@ -269,6 +278,10 @@ func (x *Action) executeQuery(ctx context.Context, client *bigquery.Client, quer
 		return nil, goerr.Wrap(err, "failed to dry run query")
 	}
 
+	if job.LastStatus().Statistics.TotalBytesProcessed < 0 {
+		return nil, goerr.New("invalid negative bytes processed",
+			goerr.V("bytes_processed", job.LastStatus().Statistics.TotalBytesProcessed))
+	}
 	if uint64(job.LastStatus().Statistics.TotalBytesProcessed) > x.scanLimit {
 		return nil, goerr.New("query scan size exceeds limit",
 			goerr.V("scan_size", job.LastStatus().Statistics.TotalBytesProcessed),

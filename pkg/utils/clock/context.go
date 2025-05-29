@@ -17,6 +17,10 @@ func Now(ctx context.Context) time.Time {
 	return clock()
 }
 
+func Since(ctx context.Context, t time.Time) time.Duration {
+	return Now(ctx).Sub(t)
+}
+
 func With(ctx context.Context, clock Clock) context.Context {
 	return context.WithValue(ctx, ctxClockKey{}, clock)
 }

@@ -16,8 +16,10 @@ type Repository interface {
 	PutTicket(ctx context.Context, ticket ticket.Ticket) error
 	GetTicketByThread(ctx context.Context, thread slack.Thread) (*ticket.Ticket, error)
 	FindNearestTickets(ctx context.Context, embedding []float32, limit int) ([]*ticket.Ticket, error)
-	GetTicketsByStatus(ctx context.Context, status types.TicketStatus) ([]*ticket.Ticket, error)
+	FindNearestTicketsWithSpan(ctx context.Context, embedding []float32, begin, end time.Time, limit int) ([]*ticket.Ticket, error)
+	GetTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, offset, limit int) ([]*ticket.Ticket, error)
 	GetTicketsBySpan(ctx context.Context, begin, end time.Time) ([]*ticket.Ticket, error)
+	GetTicketsByStatusAndSpan(ctx context.Context, status types.TicketStatus, begin, end time.Time) ([]*ticket.Ticket, error)
 
 	// For comment management
 	PutTicketComment(ctx context.Context, comment ticket.Comment) error

@@ -31,3 +31,5 @@ go.work.sum
 /tmp
 /.vscode
 
+# for AI instruction
+todo.md

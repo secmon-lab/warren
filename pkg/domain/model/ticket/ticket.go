@@ -79,7 +79,7 @@ func New(ctx context.Context, alertIDs []types.AlertID, slackThread *slack.Threa
 		ID:          types.NewTicketID(),
 		AlertIDs:    alertIDs,
 		SlackThread: slackThread,
-		Status:      types.TicketStatusInvestigating,
+		Status:      types.TicketStatusOpen,
 		CreatedAt:   clock.Now(ctx),
 	}
 }

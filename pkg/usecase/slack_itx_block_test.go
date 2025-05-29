@@ -152,7 +152,7 @@ func TestSlackActionAckAlert(t *testing.T) {
 	gt.NoError(t, err)
 
 	// Verify ticket was created
-	tickets, err := repo.GetTicketsByStatus(ctx, types.TicketStatusInvestigating)
+	tickets, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 0)
 	gt.NoError(t, err)
 	gt.Array(t, tickets).Length(1)
 
@@ -297,7 +297,7 @@ func TestSlackActionAckList(t *testing.T) {
 	gt.NoError(t, err)
 
 	// Verify ticket was created
-	tickets, err := repo.GetTicketsByStatus(ctx, types.TicketStatusInvestigating)
+	tickets, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 0)
 	gt.NoError(t, err)
 	gt.Array(t, tickets).Length(1)
 
@@ -358,7 +358,7 @@ func TestSlackActionBindAlert(t *testing.T) {
 	testTicket := ticket.Ticket{
 		ID:        types.TicketID("test-ticket-1"),
 		CreatedAt: now,
-		Status:    types.TicketStatusInvestigating,
+		Status:    types.TicketStatusOpen,
 		Embedding: []float32{0.15, 0.25, 0.35},
 		SlackThread: &slack.Thread{
 			ChannelID: "test-channel",
@@ -453,7 +453,7 @@ func TestSlackActionBindList(t *testing.T) {
 	testTicket := ticket.Ticket{
 		ID:        types.TicketID("test-ticket-1"),
 		CreatedAt: now,
-		Status:    types.TicketStatusInvestigating,
+		Status:    types.TicketStatusOpen,
 		Embedding: []float32{0.15, 0.25, 0.35},
 	}
 
@@ -517,7 +517,7 @@ func TestSlackActionResolveTicket(t *testing.T) {
 	testTicket := ticket.Ticket{
 		ID:        types.TicketID("test-ticket-1"),
 		CreatedAt: now,
-		Status:    types.TicketStatusInvestigating,
+		Status:    types.TicketStatusOpen,
 		Embedding: []float32{0.15, 0.25, 0.35},
 		SlackThread: &slack.Thread{
 			ChannelID: "test-channel",
