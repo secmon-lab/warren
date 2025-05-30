@@ -359,8 +359,12 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 			return types.EmptyAlertListID, err
 		}
 	} else {
-		msg.Notify(ctx, "%s", helpListMessage)
-		return types.EmptyAlertListID, nil
+		// Default to showing all alerts
+		pipeline, err = buildPipeline([][]string{{"all"}})
+		if err != nil {
+			_ = msg.Trace(ctx, "💥 Building default pipeline: %s", err)
+			return types.EmptyAlertListID, err
+		}
 	}
 
 	msg.Notify(ctx, "🤖 Getting and filtering alerts without ticket...")

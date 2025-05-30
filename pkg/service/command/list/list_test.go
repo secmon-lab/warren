@@ -235,6 +235,22 @@ func TestService_List(t *testing.T) {
 			t.Fatalf("value should contain limit: failed to convert limit to int, actual: %s", err.Error())
 		}
 	})
+
+	t.Run("default behavior shows all alerts when no input", func(t *testing.T) {
+		resp, err := list.Create(ctx, clients, createTestSlackMessage(user), "")
+		gt.NoError(t, err)
+		listID := gt.Cast[types.AlertListID](t, resp)
+		gt.Value(t, listID).NotEqual(types.EmptyAlertListID)
+
+		list, err := repo.GetAlertList(ctx, listID)
+		gt.NoError(t, err).Required()
+		alerts, err := list.GetAlerts(ctx, repo)
+		gt.NoError(t, err).Required()
+		gt.Array(t, alerts).Length(3)
+		gt.Value(t, alerts[0].ID).Equal(baseAlerts[0].ID)
+		gt.Value(t, alerts[1].ID).Equal(baseAlerts[1].ID)
+		gt.Value(t, alerts[2].ID).Equal(baseAlerts[2].ID)
+	})
 }
 
 func TestTimeFilters(t *testing.T) {
