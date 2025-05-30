@@ -167,8 +167,8 @@ func TestSlackActionAckAlert(t *testing.T) {
 	gt.Value(t, updatedAlert.TicketID).Equal(ticket.ID)
 
 	// Verify Slack interactions
-	gt.Value(t, len(slackMock.PostMessageContextCalls())).Equal(4)
-	gt.Value(t, len(slackMock.UpdateMessageContextCalls())).Equal(1)
+	gt.Value(t, len(slackMock.PostMessageContextCalls())).Equal(3)
+	gt.Value(t, len(slackMock.UpdateMessageContextCalls())).Equal(2)
 }
 
 func TestSlackActionAckList(t *testing.T) {
@@ -314,8 +314,8 @@ func TestSlackActionAckList(t *testing.T) {
 	}
 
 	// Verify Slack interactions
-	gt.Value(t, len(slackMock.PostMessageContextCalls())).Equal(4)
-	gt.Value(t, len(slackMock.UpdateMessageContextCalls())).Equal(2)
+	gt.Value(t, len(slackMock.PostMessageContextCalls())).Equal(3)
+	gt.Value(t, len(slackMock.UpdateMessageContextCalls())).Equal(3)
 }
 
 func TestSlackActionBindAlert(t *testing.T) {

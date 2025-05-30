@@ -75,6 +75,8 @@ var actionMapping = map[string]initFunc{
 	"after":  actionAfter,
 	"since":  actionSince,
 	"all":    actionAll,
+	"help":   actionHelp,
+	"h":      actionHelp,
 }
 
 // FindMatchedInitFunc finds the matched init function for the given command
@@ -296,6 +298,16 @@ func actionAll(args []string) (actionFunc, error) {
 	}, nil
 }
 
+func actionHelp(args []string) (actionFunc, error) {
+	if len(args) != 0 {
+		return nil, goerr.New("help: takes no arguments")
+	}
+
+	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
+		return alert.Alerts{}, nil
+	}, nil
+}
+
 // ParseTime parses a time string in either HH:MM or YYYY-MM-DD format
 func ParseTime(ctx context.Context, timeStr string) (time.Time, error) {
 	// Try parsing as time format (HH:MM)
@@ -350,6 +362,13 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 		pipelineCommands = append(pipelineCommands, parts)
 	}
 
+	for _, cmd := range pipelineCommands {
+		if len(cmd) > 0 && strings.ToLower(cmd[0]) == "help" {
+			th.Reply(ctx, helpListMessage)
+			return types.EmptyAlertListID, nil
+		}
+	}
+
 	var pipeline *pipeline
 	var err error
 	if len(pipelineCommands) > 0 {
@@ -359,8 +378,12 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 			return types.EmptyAlertListID, err
 		}
 	} else {
-		msg.Notify(ctx, "%s", helpListMessage)
-		return types.EmptyAlertListID, nil
+		// Default to showing all alerts
+		pipeline, err = buildPipeline([][]string{{"all"}})
+		if err != nil {
+			_ = msg.Trace(ctx, "💥 Building default pipeline: %s", err)
+			return types.EmptyAlertListID, err
+		}
 	}
 
 	msg.Notify(ctx, "🤖 Getting and filtering alerts without ticket...")
