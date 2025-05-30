@@ -6,7 +6,7 @@
 • `list after 2025-01-01` _Show alerts after date_
 • `list since 10m` _Show alerts from last 10 minutes_
 • `list all` _Show all unbound alerts_
-  _(Default: `list since 1d`)_
+  _(Default: `list all`)_
 
 *🔍 Filters and Modifiers*
 ━━━━━━━━━━━━━━━━━━━━━━
