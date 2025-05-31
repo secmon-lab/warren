@@ -10,6 +10,8 @@ import (
 
 type TokenID string
 
+const TokenExpireDuration = 7 * 24 * time.Hour
+
 func (x TokenID) String() string {
 	return string(x)
 }
@@ -93,7 +95,7 @@ func NewToken(sub, email, name string) *Token {
 		Sub:       sub,
 		Email:     email,
 		Name:      name,
-		ExpiresAt: now.Add(7 * 24 * time.Hour), // 1週間後
+		ExpiresAt: now.Add(TokenExpireDuration),
 		CreatedAt: now,
 	}
 }
