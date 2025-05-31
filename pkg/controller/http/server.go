@@ -1,8 +1,10 @@
 package http
 
 import (
+	"io"
 	"io/fs"
 	"net/http"
+	"strings"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
@@ -93,10 +95,11 @@ func New(uc UseCase, opts ...Options) *Server {
 		}
 	}
 
-	// Static file serving
+	// Static file serving for SPA
 	staticFS, err := fs.Sub(frontend.StaticFiles, "dist")
 	if err == nil {
-		r.Handle("/*", http.FileServer(http.FS(staticFS)))
+		// Serve static files and handle SPA routing
+		r.HandleFunc("/*", spaHandler(staticFS))
 	}
 
 	return s
@@ -114,4 +117,47 @@ func graphqlHandler(repo interfaces.Repository) http.Handler {
 	)
 	srv.AddTransport(transport.POST{})
 	return srv
+}
+
+// spaHandler handles SPA routing by serving static files and falling back to index.html
+func spaHandler(staticFS fs.FS) http.HandlerFunc {
+	fileServer := http.FileServer(http.FS(staticFS))
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		urlPath := strings.TrimPrefix(r.URL.Path, "/")
+
+		// If the path is empty, serve index.html
+		if urlPath == "" {
+			urlPath = "index.html"
+		}
+
+		// Try to open the file
+		if _, err := staticFS.Open(urlPath); err != nil {
+			// For SPA routes (not assets), serve index.html for client-side routing
+			// Assets like _next/, api/, static/, etc. should return 404
+			if strings.HasPrefix(urlPath, "_next/") ||
+				strings.HasPrefix(urlPath, "api/") ||
+				strings.HasPrefix(urlPath, "static/") ||
+				strings.Contains(urlPath, ".") { // Files with extensions
+				// File not found, return 404
+				http.NotFound(w, r)
+				return
+			}
+
+			// For SPA routes, serve index.html
+			if indexFile, err := staticFS.Open("index.html"); err == nil {
+				defer indexFile.Close()
+				w.Header().Set("Content-Type", "text/html")
+				io.Copy(w, indexFile)
+				return
+			}
+
+			// If index.html is also not found, return 404
+			http.NotFound(w, r)
+			return
+		}
+
+		// Serve the requested file
+		fileServer.ServeHTTP(w, r)
+	}
 }

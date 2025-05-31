@@ -1,37 +1,56 @@
 'use client';
 
 import { useQuery } from '@apollo/client';
-import { useState } from 'react';
-import Link from 'next/link';
+import { useState, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
-import { GET_TICKETS } from '@/lib/graphql/queries';
-import { Ticket, TicketStatus, TICKET_STATUS_LABELS, TICKET_STATUS_COLORS } from '@/lib/types';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { GET_TICKETS, GET_TICKET } from '@/lib/graphql/queries';
+import { Ticket, TicketStatus, TICKET_STATUS_LABELS, TICKET_STATUS_COLORS, Alert } from '@/lib/types';
 import { formatRelativeTime } from '@/lib/utils-extended';
-import { AlertCircle, MessageSquare, User, Ticket as TicketIcon } from 'lucide-react';
+import { AlertCircle, MessageSquare, User, Ticket as TicketIcon, Calendar, Clock, FileText, Eye, Code, Database, Hash, ExternalLink, ChevronDown, ChevronUp, ArrowLeft } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 10;
+const ALERTS_PER_PAGE = 5;
 const ALL_STATUSES: TicketStatus[] = ['open', 'pending', 'resolved', 'archived'];
 
-export default function TicketsPage() {
+function TicketsPageContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedStatuses, setSelectedStatuses] = useState<TicketStatus[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | TicketStatus>('all');
+  const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const [alertsCurrentPage, setAlertsCurrentPage] = useState(1);
+  
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const ticketId = searchParams.get('id');
 
-  const { data, loading, error } = useQuery(GET_TICKETS, {
+  const { data: ticketsData, loading: ticketsLoading, error: ticketsError } = useQuery(GET_TICKETS, {
     variables: {
       statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
       offset: (currentPage - 1) * ITEMS_PER_PAGE,
       limit: ITEMS_PER_PAGE,
     },
+    skip: !!ticketId,
   });
 
+  const { data: ticketData, loading: ticketLoading, error: ticketError } = useQuery(GET_TICKET, {
+    variables: { id: ticketId },
+    skip: !ticketId,
+  });
+
+  const ticket: Ticket = ticketData?.ticket;
+
   // Sort tickets by createdAt in descending order (newest first)
-  const tickets: Ticket[] = [...(data?.tickets || [])].sort((a: Ticket, b: Ticket) => 
+  const tickets: Ticket[] = [...(ticketsData?.tickets || [])].sort((a: Ticket, b: Ticket) => 
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
@@ -46,7 +65,423 @@ export default function TicketsPage() {
     setCurrentPage(1);
   };
 
-  if (loading) {
+  const handleTicketClick = (ticketId: string) => {
+    const params = new URLSearchParams();
+    params.set('id', ticketId);
+    router.push(`/tickets?${params.toString()}`);
+  };
+
+  const handleBackToList = () => {
+    router.push('/tickets');
+  };
+
+  const handleAlertClick = (alert: Alert) => {
+    setSelectedAlert(alert);
+  };
+
+  const formatJsonData = (jsonString: string) => {
+    try {
+      const parsed = JSON.parse(jsonString);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return jsonString;
+    }
+  };
+
+  // If viewing a specific ticket
+  if (ticketId) {
+    if (ticketLoading) {
+      return (
+        <MainLayout>
+          <div className="flex items-center justify-center h-64">
+            <div className="text-lg">Loading ticket...</div>
+          </div>
+        </MainLayout>
+      );
+    }
+
+    if (ticketError || !ticket) {
+      return (
+        <MainLayout>
+          <div className="flex items-center justify-center h-64">
+            <div className="text-lg text-red-600">
+              {ticketError ? `Error loading ticket: ${ticketError.message}` : 'Ticket not found'}
+            </div>
+          </div>
+        </MainLayout>
+      );
+    }
+
+    // Paginate alerts
+    const paginatedAlerts = ticket?.alerts ? ticket.alerts.slice(
+      (alertsCurrentPage - 1) * ALERTS_PER_PAGE,
+      alertsCurrentPage * ALERTS_PER_PAGE
+    ) : [];
+
+    const totalAlertsPages = ticket?.alerts ? Math.ceil(ticket.alerts.length / ALERTS_PER_PAGE) : 0;
+
+    return (
+      <MainLayout>
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={handleBackToList} className="mr-2">
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Back to tickets
+                </Button>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
+                </h1>
+                <Badge 
+                  className={TICKET_STATUS_COLORS[ticket.status as TicketStatus]}
+                  variant="secondary"
+                >
+                  {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
+                </Badge>
+              </div>
+              <p className="text-muted-foreground">
+                #{ticket.id} • Created {formatRelativeTime(ticket.createdAt)} • 
+                Updated {formatRelativeTime(ticket.updatedAt)}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Content */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Description Section */}
+              {ticket.description && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Description
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {ticket.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Summary Section - Collapsible */}
+              {ticket.summary && (
+                <Card>
+                  <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen}>
+                    <CollapsibleTrigger asChild>
+                      <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                        <CardTitle className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Eye className="h-5 w-5" />
+                            Summary
+                          </div>
+                          {isSummaryOpen ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </CardTitle>
+                      </CardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <CardContent>
+                        <p className="text-sm leading-relaxed">
+                          {ticket.summary}
+                        </p>
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </Card>
+              )}
+
+              {/* Comments Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    Comments ({ticket.comments.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y">
+                    {ticket.comments.length === 0 ? (
+                      <div className="p-4 text-center text-muted-foreground">
+                        No comments yet
+                      </div>
+                    ) : (
+                      ticket.comments.map((comment) => (
+                        <div key={comment.id} className="p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                              <User className="h-4 w-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium">System</span>
+                                <span className="text-sm text-muted-foreground">
+                                  {formatRelativeTime(comment.createdAt)}
+                                </span>
+                              </div>
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                                {comment.content}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Alerts Section with Pagination */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5" />
+                    Related Alerts ({ticket.alerts.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y">
+                    {paginatedAlerts.map((alert) => (
+                      <div 
+                        key={alert.id} 
+                        className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleAlertClick(alert)}
+                      >
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="h-5 w-5 text-orange-500 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-foreground hover:text-primary">
+                              {alert.title}
+                            </h4>
+                            {alert.description && (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {alert.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                              <span>#{alert.id.slice(0, 8)}</span>
+                              <span>created {formatRelativeTime(alert.createdAt)}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {alert.schema}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Alerts Pagination */}
+                  {totalAlertsPages > 1 && (
+                    <div className="p-4 border-t">
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious 
+                              href="#" 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (alertsCurrentPage > 1) setAlertsCurrentPage(alertsCurrentPage - 1);
+                              }}
+                            />
+                          </PaginationItem>
+                          
+                          {/* Show page numbers */}
+                          {Array.from({ length: totalAlertsPages }, (_, i) => i + 1).map((page) => (
+                            <PaginationItem key={page}>
+                              <PaginationLink 
+                                href="#" 
+                                isActive={page === alertsCurrentPage}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setAlertsCurrentPage(page);
+                                }}
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          ))}
+                          
+                          <PaginationItem>
+                            <PaginationNext 
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (alertsCurrentPage < totalAlertsPages) setAlertsCurrentPage(alertsCurrentPage + 1);
+                              }}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Metadata */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Assignee:</span>
+                    <span>{ticket.assignee ? ticket.assignee.name : 'Unassigned'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Created:</span>
+                    <span>{formatRelativeTime(ticket.createdAt)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Updated:</span>
+                    <span>{formatRelativeTime(ticket.updatedAt)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Alerts:</span>
+                    <span>{ticket.alerts.length}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Comments:</span>
+                    <span>{ticket.comments.length}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Alert Detail Dialog */}
+          <Dialog open={!!selectedAlert} onOpenChange={() => setSelectedAlert(null)}>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              {selectedAlert && (
+                <>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-orange-500" />
+                      Alert Details
+                    </DialogTitle>
+                  </DialogHeader>
+                  
+                  <div className="space-y-6">
+                    {/* Basic Information */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <Hash className="h-4 w-4" />
+                          ID
+                        </label>
+                        <p className="text-sm text-muted-foreground font-mono">{selectedAlert.id}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Created At
+                        </label>
+                        <p className="text-sm text-muted-foreground">
+                          {formatRelativeTime(selectedAlert.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Title</label>
+                      <p className="text-sm">{selectedAlert.title}</p>
+                    </div>
+
+                    {selectedAlert.description && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Description</label>
+                        <p className="text-sm text-muted-foreground">{selectedAlert.description}</p>
+                      </div>
+                    )}
+
+                    <Separator />
+
+                    {/* Schema Information */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium flex items-center gap-2">
+                        <Code className="h-4 w-4" />
+                        Schema
+                      </label>
+                      <Badge variant="outline" className="font-mono">
+                        {selectedAlert.schema}
+                      </Badge>
+                    </div>
+
+                    {/* Attributes */}
+                    {selectedAlert.attributes && selectedAlert.attributes.length > 0 && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Attributes</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {selectedAlert.attributes.map((attr, index) => (
+                            <div key={index} className="p-3 border rounded-md">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-sm font-medium">{attr.key}</span>
+                                {attr.auto && (
+                                  <Badge variant="secondary" className="text-xs">Auto</Badge>
+                                )}
+                              </div>
+                              {attr.link ? (
+                                <a 
+                                  href={attr.link} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                >
+                                  {attr.value}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ) : (
+                                <span className="text-sm text-muted-foreground font-mono">
+                                  {attr.value}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <Separator />
+
+                    {/* Raw Data */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium flex items-center gap-2">
+                        <Database className="h-4 w-4" />
+                        Raw Data
+                      </label>
+                      <div className="bg-muted p-4 rounded-md">
+                        <pre className="text-xs overflow-x-auto whitespace-pre-wrap">
+                          {formatJsonData(selectedAlert.data)}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </DialogContent>
+          </Dialog>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // Normal tickets list view
+  if (ticketsLoading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-64">
@@ -56,11 +491,11 @@ export default function TicketsPage() {
     );
   }
 
-  if (error) {
+  if (ticketsError) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-64">
-          <div className="text-lg text-red-600">Error loading tickets: {error.message}</div>
+          <div className="text-lg text-red-600">Error loading tickets: {ticketsError.message}</div>
         </div>
       </MainLayout>
     );
@@ -96,41 +531,43 @@ export default function TicketsPage() {
               <CardContent className="p-0">
                 <div className="divide-y">
                   {tickets.map((ticket) => (
-                    <Link key={ticket.id} href={`/tickets/${ticket.id}`}>
-                      <div className="p-3 hover:bg-muted/50 transition-colors">
-                        <div className="flex items-start gap-3">
-                          <TicketIcon className="h-4 w-4 text-muted-foreground mt-0.5" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge 
-                                className={TICKET_STATUS_COLORS[ticket.status as TicketStatus]}
-                                variant="secondary"
-                              >
-                                {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
-                              </Badge>
+                    <div 
+                      key={ticket.id} 
+                      className="p-3 hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => handleTicketClick(ticket.id)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <TicketIcon className="h-4 w-4 text-muted-foreground mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge 
+                              className={TICKET_STATUS_COLORS[ticket.status as TicketStatus]}
+                              variant="secondary"
+                            >
+                              {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
+                            </Badge>
+                          </div>
+                          <h3 className="font-medium text-foreground hover:text-primary mb-1">
+                            {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
+                          </h3>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <span>opened {formatRelativeTime(ticket.createdAt)}</span>
+                            <div className="flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              <span>{ticket.assignee ? ticket.assignee.name : 'Unassigned'}</span>
                             </div>
-                            <h3 className="font-medium text-foreground hover:text-primary mb-1">
-                              {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
-                            </h3>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <span>opened {formatRelativeTime(ticket.createdAt)}</span>
-                              <div className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                <span>{ticket.assignee ? ticket.assignee.name : 'Unassigned'}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <MessageSquare className="h-3 w-3" />
-                                <span>{ticket.comments.length}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <AlertCircle className="h-3 w-3" />
-                                <span>{ticket.alerts.length}</span>
-                              </div>
+                            <div className="flex items-center gap-1">
+                              <MessageSquare className="h-3 w-3" />
+                              <span>{ticket.comments.length}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              <span>{ticket.alerts.length}</span>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </Link>
+                    </div>
                   ))}
                 </div>
               </CardContent>
@@ -167,5 +604,19 @@ export default function TicketsPage() {
         </Pagination>
       </div>
     </MainLayout>
+  );
+}
+
+export default function TicketsPage() {
+  return (
+    <Suspense fallback={
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg">Loading...</div>
+        </div>
+      </MainLayout>
+    }>
+      <TicketsPageContent />
+    </Suspense>
   );
 } 

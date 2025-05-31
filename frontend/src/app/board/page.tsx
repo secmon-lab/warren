@@ -1,9 +1,9 @@
 'use client';
 
 import { useQuery } from '@apollo/client';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { GET_TICKETS } from '@/lib/graphql/queries';
 import { Ticket, TicketStatus, TICKET_STATUS_LABELS, TICKET_STATUS_COLORS } from '@/lib/types';
@@ -13,6 +13,8 @@ import { AlertCircle, MessageSquare, User } from 'lucide-react';
 const BOARD_STATUSES: TicketStatus[] = ['open', 'pending', 'resolved'];
 
 export default function BoardPage() {
+  const router = useRouter();
+
   const { data, loading, error } = useQuery(GET_TICKETS, {
     variables: {
       statuses: BOARD_STATUSES,
@@ -25,6 +27,12 @@ export default function BoardPage() {
     acc[status] = tickets.filter(ticket => ticket.status === status);
     return acc;
   }, {} as Record<TicketStatus, Ticket[]>);
+
+  const handleTicketClick = (ticketId: string) => {
+    const params = new URLSearchParams();
+    params.set('id', ticketId);
+    router.push(`/tickets?${params.toString()}`);
+  };
 
   if (loading) {
     return (
@@ -72,36 +80,38 @@ export default function BoardPage() {
 
               <div className="space-y-2 min-h-[400px]">
                 {ticketsByStatus[status].map((ticket) => (
-                  <Link key={ticket.id} href={`/tickets/${ticket.id}`}>
-                    <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                      <CardContent className="p-3">
-                        <h3 className="font-medium text-sm mb-2 line-clamp-2">
-                          {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
-                        </h3>
-                        
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              <span>{ticket.assignee ? ticket.assignee.name : 'Unassigned'}</span>
-                            </div>
-                            <span>{formatRelativeTime(ticket.createdAt)}</span>
+                  <Card 
+                    key={ticket.id} 
+                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => handleTicketClick(ticket.id)}
+                  >
+                    <CardContent className="p-3">
+                      <h3 className="font-medium text-sm mb-2 line-clamp-2">
+                        {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
+                      </h3>
+                      
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            <span>{ticket.assignee ? ticket.assignee.name : 'Unassigned'}</span>
                           </div>
-                          
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <MessageSquare className="h-3 w-3" />
-                              <span>{ticket.comments.length}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <AlertCircle className="h-3 w-3" />
-                              <span>{ticket.alerts.length}</span>
-                            </div>
+                          <span>{formatRelativeTime(ticket.createdAt)}</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <MessageSquare className="h-3 w-3" />
+                            <span>{ticket.comments.length}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            <span>{ticket.alerts.length}</span>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
                 
                 {ticketsByStatus[status].length === 0 && (

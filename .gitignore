@@ -40,3 +40,4 @@ CLAUDE.md
 # Generated contents
 frontend/dist/*
 !frontend/dist/.gitkeep
+/warren
