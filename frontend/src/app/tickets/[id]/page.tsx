@@ -6,19 +6,24 @@ import { useState } from 'react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { GET_TICKET } from '@/lib/graphql/queries';
 import { Ticket, TicketStatus, TICKET_STATUS_LABELS, TICKET_STATUS_COLORS, Alert } from '@/lib/types';
 import { formatRelativeTime } from '@/lib/utils-extended';
 import { AlertCircle, MessageSquare, Calendar, User, Clock, FileText, Eye, Code, Database, Hash, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 
+const ALERTS_PER_PAGE = 5;
+
 export default function TicketDetailPage() {
   const params = useParams();
   const ticketId = params.id as string;
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const [alertsCurrentPage, setAlertsCurrentPage] = useState(1);
 
   const { data, loading, error } = useQuery(GET_TICKET, {
     variables: { id: ticketId },
@@ -38,6 +43,14 @@ export default function TicketDetailPage() {
       return jsonString;
     }
   };
+
+  // Paginate alerts
+  const paginatedAlerts = ticket?.alerts ? ticket.alerts.slice(
+    (alertsCurrentPage - 1) * ALERTS_PER_PAGE,
+    alertsCurrentPage * ALERTS_PER_PAGE
+  ) : [];
+
+  const totalAlertsPages = ticket?.alerts ? Math.ceil(ticket.alerts.length / ALERTS_PER_PAGE) : 0;
 
   if (loading) {
     return (
@@ -175,7 +188,7 @@ export default function TicketDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Alerts Section */}
+            {/* Alerts Section with Pagination */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -185,7 +198,7 @@ export default function TicketDetailPage() {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="divide-y">
-                  {ticket.alerts.map((alert) => (
+                  {paginatedAlerts.map((alert) => (
                     <div 
                       key={alert.id} 
                       className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
@@ -214,6 +227,51 @@ export default function TicketDetailPage() {
                     </div>
                   ))}
                 </div>
+                
+                {/* Alerts Pagination */}
+                {totalAlertsPages > 1 && (
+                  <div className="p-4 border-t">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            href="#" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (alertsCurrentPage > 1) setAlertsCurrentPage(alertsCurrentPage - 1);
+                            }}
+                          />
+                        </PaginationItem>
+                        
+                        {/* Show page numbers */}
+                        {Array.from({ length: totalAlertsPages }, (_, i) => i + 1).map((page) => (
+                          <PaginationItem key={page}>
+                            <PaginationLink 
+                              href="#" 
+                              isActive={page === alertsCurrentPage}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setAlertsCurrentPage(page);
+                              }}
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+                        
+                        <PaginationItem>
+                          <PaginationNext 
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (alertsCurrentPage < totalAlertsPages) setAlertsCurrentPage(alertsCurrentPage + 1);
+                            }}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

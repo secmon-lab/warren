@@ -30,7 +30,10 @@ export default function TicketsPage() {
     },
   });
 
-  const tickets: Ticket[] = data?.tickets || [];
+  // Sort tickets by createdAt in descending order (newest first)
+  const tickets: Ticket[] = [...(data?.tickets || [])].sort((a: Ticket, b: Ticket) => 
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 
   const handleStatusFilter = (status: TicketStatus | 'all') => {
     if (status === 'all') {
