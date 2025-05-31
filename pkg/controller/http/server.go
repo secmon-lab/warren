@@ -96,16 +96,23 @@ func New(uc UseCase, opts ...Options) *Server {
 	if s.repo != nil {
 		graphqlHandler := graphqlHandler(s.repo)
 
-		// Apply authentication middleware to GraphQL
-		if s.authUC != nil {
-			graphqlHandler = authMiddleware(s.authUC)(graphqlHandler)
-		}
+		r.Route("/graphql", func(r chi.Router) {
+			// Apply authentication middleware to GraphQL
+			if s.authUC != nil {
+				r.Use(authMiddleware(s.authUC))
+			}
 
-		r.Handle("/graphql", graphqlHandler)
+			r.Handle("/", graphqlHandler)
+		})
 
 		// Add playground endpoint when GraphiQL is enabled
 		if s.enableGraphiQL {
-			r.Handle("/graphiql", playground.Handler("GraphQL playground", "/graphql"))
+			r.Route("/graphiql", func(r chi.Router) {
+				if s.authUC != nil {
+					r.Use(authMiddleware(s.authUC))
+				}
+				r.Handle("/", playground.Handler("GraphQL playground", "/graphql"))
+			})
 		}
 	}
 
