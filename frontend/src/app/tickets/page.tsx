@@ -12,7 +12,7 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { GET_TICKETS } from '@/lib/graphql/queries';
 import { Ticket, TicketStatus, TICKET_STATUS_LABELS, TICKET_STATUS_COLORS } from '@/lib/types';
 import { formatRelativeTime } from '@/lib/utils-extended';
-import { AlertCircle, MessageSquare, User } from 'lucide-react';
+import { AlertCircle, MessageSquare, User, Ticket as TicketIcon } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 10;
 const ALL_STATUSES: TicketStatus[] = ['open', 'pending', 'resolved', 'archived'];
@@ -97,9 +97,9 @@ export default function TicketsPage() {
                 <div className="divide-y">
                   {tickets.map((ticket) => (
                     <Link key={ticket.id} href={`/tickets/${ticket.id}`}>
-                      <div className="p-4 hover:bg-muted/50 transition-colors">
+                      <div className="p-3 hover:bg-muted/50 transition-colors">
                         <div className="flex items-start gap-3">
-                          <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
+                          <TicketIcon className="h-4 w-4 text-muted-foreground mt-0.5" />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <Badge 
@@ -108,31 +108,23 @@ export default function TicketsPage() {
                               >
                                 {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
                               </Badge>
-                              <span className="text-sm text-muted-foreground">
-                                #{ticket.id.slice(0, 8)}
-                              </span>
                             </div>
-                            <h3 className="font-medium text-foreground hover:text-primary">
+                            <h3 className="font-medium text-foreground hover:text-primary mb-1">
                               {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
                             </h3>
-                            {ticket.description && (
-                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                                {ticket.description}
-                              </p>
-                            )}
-                            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
                               <span>opened {formatRelativeTime(ticket.createdAt)}</span>
                               <div className="flex items-center gap-1">
-                                <User className="h-4 w-4" />
+                                <User className="h-3 w-3" />
                                 <span>{ticket.assignee ? ticket.assignee.name : 'Unassigned'}</span>
                               </div>
                               <div className="flex items-center gap-1">
-                                <MessageSquare className="h-4 w-4" />
+                                <MessageSquare className="h-3 w-3" />
                                 <span>{ticket.comments.length}</span>
                               </div>
                               <div className="flex items-center gap-1">
-                                <AlertCircle className="h-4 w-4" />
-                                <span>{ticket.alerts.length} alerts</span>
+                                <AlertCircle className="h-3 w-3" />
+                                <span>{ticket.alerts.length}</span>
                               </div>
                             </div>
                           </div>
