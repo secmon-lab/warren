@@ -70,32 +70,16 @@ export default function BoardPage() {
                 </h2>
               </div>
 
-              <div className="space-y-3 min-h-[400px]">
+              <div className="space-y-2 min-h-[400px]">
                 {ticketsByStatus[status].map((ticket) => (
                   <Link key={ticket.id} href={`/tickets/${ticket.id}`}>
                     <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                      <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground font-mono">
-                              #{ticket.id.slice(0, 8)}
-                            </span>
-                          </div>
-                          <Badge 
-                            className={TICKET_STATUS_COLORS[ticket.status as TicketStatus]}
-                            variant="secondary"
-                          >
-                            {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        <h3 className="font-medium text-sm mb-3 line-clamp-2">
-                          Ticket {ticket.id.slice(0, 8)}
+                      <CardContent className="p-3">
+                        <h3 className="font-medium text-sm mb-2 line-clamp-2">
+                          {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
                         </h3>
                         
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <User className="h-3 w-3" />
@@ -107,11 +91,11 @@ export default function BoardPage() {
                           <div className="flex items-center gap-3 text-xs text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <MessageSquare className="h-3 w-3" />
-                              <span>{ticket.comments.length} comments</span>
+                              <span>{ticket.comments.length}</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <AlertCircle className="h-3 w-3" />
-                              <span>{ticket.alerts.length} alerts</span>
+                              <span>{ticket.alerts.length}</span>
                             </div>
                           </div>
                         </div>
