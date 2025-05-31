@@ -126,21 +126,12 @@ func (uc *UseCases) slackActionBindAlert(ctx context.Context, targetAlertID type
 		return goerr.New("alert not found")
 	}
 
-	nearestTickets, err := uc.repository.FindNearestTickets(ctx, targetAlert.Embedding, 10)
+	nearestTickets, err := uc.repository.FindNearestTicketsWithSpan(ctx, targetAlert.Embedding, clock.Now(ctx).Add(-72*time.Hour), clock.Now(ctx), 10)
 	if err != nil {
 		return goerr.Wrap(err, "failed to find similar tickets")
 	}
 
-	var tickets []*ticket.Ticket
-	now := clock.Now(ctx)
-	for _, ticket := range nearestTickets {
-		if ticket.CreatedAt.Before(now.Add(-72 * time.Hour)) {
-			continue
-		}
-		tickets = append(tickets, ticket)
-	}
-
-	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindAlert, tickets, triggerID, targetAlertID.String()); err != nil {
+	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindAlert, nearestTickets, triggerID, targetAlertID.String()); err != nil {
 		return goerr.Wrap(err, "failed to show bind alert modal")
 	}
 
@@ -156,12 +147,12 @@ func (uc *UseCases) slackActionBindList(ctx context.Context, _ slack.User, _ sla
 		return goerr.New("alert list not found")
 	}
 
-	tickets, err := uc.repository.FindNearestTickets(ctx, list.Embedding, 10)
+	nearestTickets, err := uc.repository.FindNearestTicketsWithSpan(ctx, list.Embedding, clock.Now(ctx).Add(-72*time.Hour), clock.Now(ctx), 10)
 	if err != nil {
 		return goerr.Wrap(err, "failed to find similar tickets")
 	}
 
-	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindList, tickets, triggerID, targetListID.String()); err != nil {
+	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindList, nearestTickets, triggerID, targetListID.String()); err != nil {
 		return goerr.Wrap(err, "failed to show bind list modal")
 	}
 
