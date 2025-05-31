@@ -3,6 +3,10 @@ description:
 globs: *.go
 alwaysApply: false
 ---
+# Implementation Plan
+
+If there are markdown files in `.todo/` directory, refer to the markdown files and implement code to fill checklists. When you completing the task, fill checkbox in the markdown file.
+
 # Repository Architecture
 
 This repository is structured with a clear separation of concerns following a layered, domain-driven design architecture, primarily written in Go. It appears to be designed for a CLI and HTTP-based application that integrates with multiple external services and systems (e.g., Slack, GitHub, BigQuery).
@@ -20,7 +24,7 @@ This repository is structured with a clear separation of concerns following a la
 
 This is the central directory that holds all core components of the application. It is organized into the following sub-packages:
 
-### 1. **`action/`**
+### 1. **`tools/`**
 Contains implementations of specific actions or integrations with external services (e.g., BigQuery, OTX, URLScan). Each action has its own subpackage with dedicated logic, tests, and sometimes test data.
 
 ### 2. **`adapter/`**
@@ -60,85 +64,140 @@ Houses utility packages for logging, pointer handling, clock abstraction, etc.
 - **Testability**: Strong emphasis on testability, with test data and `_test.go` files across layers.
 - **LLM/AI Integration**: Includes prompt templates and schema, suggesting integration with large language models.
 
-# Error handling
+# Coding Standards and Best Practices
 
-- Use `github.com/m-mizutani/goerr/v2`
-- Must wrap error by `goerr.Wrap`
-- Add helpful variables with `goerr.V` like following
+## Error Handling
 
-```go
-return goerr.Wrap(err, "failed something", goerr.V("args", args))
-```
-# Code generation
-
-You can generate code by `go tool task`
-- Generating mock code (pkg/domain/mock)
-- Generating graphql code (pkg/controller/graphql)
-
-# Testing
-
-## Style for similar testing
-
-Use following Helper Driven Testing style instead of general Tatble Driven Test.
+- Use `github.com/m-mizutani/goerr/v2` for error handling
+- Must wrap errors with `goerr.Wrap` to maintain error context
+- Add helpful variables with `goerr.V` for debugging
+- Always provide meaningful error messages
 
 ```go
-	type testCase struct {
-		input    string
-		expected string
-	}
-
-	runTest := func(tc testCase) func(t *testing.T) {
-		return func(t *testing.T) {
-            actual := someFunc(tc.input)
-            gt.Equal(t, tc.expected, actual)
-		}
-	}
-
-	t.Run("success case", runTest(testCase{
-		input: "blue",
-        expected: "BLUE",
-    }))
+return goerr.Wrap(err, "failed to process user data", 
+    goerr.V("userID", userID),
+    goerr.V("operation", "update"),
+)
 ```
 
-## Mocking for test
+### Error Handling Guidelines
+- **Error Categorization**: Distinguish between business logic errors (validation, policy violations) and system errors (network, database failures)
+  - Business errors should be wrapped with context using `goerr.V("validation", "reason")`
+  - System errors should include retry information and external service details
+- **Error Logging Strategy**: 
+  - Use structured logging with consistent error fields
+  - Include request ID, user context, and service identifiers
+  - Log errors at appropriate levels (ERROR for system failures, WARN for business logic issues)
+- **Error Response Format**: For HTTP APIs, return structured JSON errors with:
+  ```json
+  {
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": "Human readable message",
+      "details": {...}
+    }
+  }
+  ```
+- **Panic Recovery**: Implement middleware for HTTP handlers and background workers to gracefully handle panics and convert them to appropriate error responses
 
-- Use mock implementation from pkg/domain/mock instead of createing own mock structure.
-- For repository, use Memory repository in pkg/repository instead of mock.
+## Code Generation
 
-## Test framework
+You can generate code by `go tool task`:
+- Generating mock code (`pkg/domain/mock`)
+- Generating GraphQL code (`pkg/controller/graphql`)
 
-Use `github.com/m-mizutani/gt` package.
+### Code Generation Guidelines
+- **When to Use**: Use code generation for:
+  - Mock implementations for testing (`pkg/domain/mock`)
+  - GraphQL schema and resolvers (`pkg/controller/graphql`)
+  - Repository interfaces with common CRUD patterns
+- **Custom Templates**: Maintain templates in `templates/` directo- Domain model boilerplate
+  - Repository implementations
+  - API handler scaffolding
+- **Maintenance Practices**:
+  - Generated code should not be manually edited
+  - Include `//go:generate` directives in source files
+  - Run `go generate ./...` before commits
+  - Review generated code changes in pull requests
 
-`gt` is test library leveraging Go generics to check variable type in IDE and compiler.
+# Testing Guidelines
+
+## Testing Style - Helper Driven Testing
+
+Use Helper Driven Testing style instead of general Table Driven Test for better readability and maintainability:
+
+```go
+type testCase struct {
+    input    string
+    expected string
+}
+
+runTest := func(tc testCase) func(t *testing.T) {
+    return func(t *testing.T) {
+        actual := someFunc(tc.input)
+        gt.Equal(t, tc.expected, actual)
+    }
+}
+
+t.Run("success case", runTest(testCase{
+    input:    "blue",
+    expected: "BLUE",
+}))
+
+t.Run("empty input case", runTest(testCase{
+    input:    "",
+    expected: "",
+}))
+```
+
+## Mocking Strategy
+
+- Use mock implementations from `pkg/domain/mock` instead of creating custom mock structures
+- For repository testing, use Memory repository in `pkg/repository` instead of mocks
+- **Mock Data Setup**: Create test fixtures in `testdata/` directory organized by domain:
+  ```
+  testdata/
+  ├── alerts/
+  │   ├── valid_alert.json
+  │   └── malformed_alert.json
+  ├── policies/
+  │   └── sample_policy.rego
+  └── slack/
+      └── sample_events.json
+  ```
+- **Integration Testing**: Use docker-compose for external service dependencies:
+  - Firestore emulator for database testing
+  - Mock Slack API server for webhook testing
+  - BigQuery emulator for data pipeline testing
+
+## Test Framework - gt Package
+
+Use `github.com/m-mizutani/gt` package for type-safe testing.
+
+`gt` is a test library leveraging Go generics to check variable types in IDE and compiler:
 
 ```go
 color := "blue"
 
 // gt.Value(t, color).Equal(5) // <- Compile error
-
 gt.Value(t, color).Equal("orange") // <- Fail
 gt.Value(t, color).Equal("blue")   // <- Pass
 ```
 
 ```go
-colors := ["red", "blue"]
+colors := []string{"red", "blue"}
 
 // gt.Array(t, colors).Equal("red")       // <- Compile error
 // gt.Array(t, colors).Equal([]int{1, 2}) // <- Compile error
 
 gt.Array(t, colors).Equal([]string{"red", "blue"}) // <- Pass
-gt.Array(t, colors).Has("orange")                 // <- Fail
+gt.Array(t, colors).Has("orange")                  // <- Fail
 ```
 
-### Usage
+### gt Usage Patterns
 
-In many cases, a developer does not care Go generics in using `gt`. However, a developer need to specify generic type (`Value`, `Array`, `Map`, `Error`, etc.) explicitly to use specific test functions for each types.
-
-See [reference](mdc:https:/pkg.go.dev/github.com/m-mizutani/gt) for more detail.
-
-#### Value
-
-Generic test type has a minimum set of test methods.
+#### Value Testing
+Generic test type with minimum set of test methods:
 
 ```go
 type user struct {
@@ -150,12 +209,11 @@ u1 := user{Name: "blue"}
 // gt.Value(t, u1).Equal("blue")             // Compile error
 // gt.Value(t, u1).Equal(&user{Name:"blue"}) // Compile error
 
-gt.Value(t, u1).Equal(user{Name:"blue"}) // Pass
+gt.Value(t, u1).Equal(user{Name: "blue"}) // Pass
 ```
 
-#### Number
-
-Accepts only number types: `int`, `uint`, `int64`, `float64`, etc.
+#### Number Testing
+Accepts only number types: `int`, `uint`, `int64`, `float64`, etc:
 
 ```go
 var f float64 = 12.5
@@ -166,38 +224,155 @@ gt.Number(t, f).
     GreaterOrEqual(12.5) // Pass
 ```
 
-#### Array
-
-Accepts array of any type not only primitive type but also struct.
+#### Array Testing
+Accepts arrays of any type including structs:
 
 ```go
 colors := []string{"red", "blue", "yellow"}
 
 gt.Array(t, colors).
-    Equal([]string{"red", "blue", "yellow"}) // Pass
-    Equal([]string{"red", "blue"})           // Fail
+    Equal([]string{"red", "blue", "yellow"}). // Pass
+    Equal([]string{"red", "blue"}).           // Fail
     // Equal([]int{1, 2})                    // Compile error
-    Contain([]string{"red", "blue"})         // Pass
-    Has("yellow")                           // Pass
-    Length(3)                                // Pass
+    Contain([]string{"red", "blue"}).         // Pass
+    Has("yellow").                            // Pass
+    Length(3)                                 // Pass
 
 gt.Array(t, colors).Must().Has("orange") // Fail and stop test
 ```
 
-#### Map
+#### Map Testing
 
 ```go
 colorMap := map[string]int{
-    "red": 1,
+    "red":    1,
     "yellow": 2,
-    "blue": 5,
+    "blue":   5,
 }
 
-gt.Map(t, colorMap)
-    .HasKey("blue")           // Pass
-    .HasValue(5)              // Pass
-    // .HasValue("red")       // Compile error
-    .HasKeyValue("yellow", 2) // Pass
+gt.Map(t, colorMap).
+    HasKey("blue").           // Pass
+    HasValue(5).              // Pass
+    // HasValue("red")        // Compile error
+    HasKeyValue("yellow", 2)  // Pass
 
 gt.Map(t, colorMap).Must().HasKey("orange") // Fail and stop test
 ```
+
+## Test Organization and Structure
+
+- **Test File Naming**: Follow Go conventions:
+  - `*_test.go` for unit tests in same package
+  - `*_integration_test.go` for integration tests
+  - `testdata/` directory for test fixtures and sample data
+- **Test Data Management**: 
+  - Use JSON files in `testdata/` for complex test scenarios
+  - Create builder patterns for domain objects in tests
+  - Use table-driven tests sparingly, prefer helper-driven tests
+- **Performance Testing**: 
+  - Benchmark critical paths like alert processing and LLM integration
+  - Use `testing.B` for benchmark tests with meaningful names
+  - Set performance baselines for CI/CD pipelines
+- **Integration Test Setup**:
+  - Use `docker-compose.test.yml` for external dependencies
+  - Implement `TestMain` for setup/teardown of integration tests
+  - Use build tags to separate unit and integration tests: `//go:build integration`
+
+# Development Workflow
+
+## Code Style and Formatting
+- **TO_BE_WRITTEN**: Go formatting rules (gofmt, goimports)
+- **TO_BE_WRITTEN**: Linting configuration (golangci-lint)
+- **TO_BE_WRITTEN**: Code review checklist
+
+## Documentation Standards
+- **TO_BE_WRITTEN**: Function and package documentation requirements
+- **TO_BE_WRITTEN**: API documentation generation
+- **TO_BE_WRITTEN**: Architecture decision records (ADR)
+
+## Dependency Management
+- **TO_BE_WRITTEN**: Go module management practices
+- **TO_BE_WRITTEN**: Dependency update and security scanning
+- **TO_BE_WRITTEN**: Vendor directory usage guidelines
+
+## Configuration Management
+- **Environment-Specific Configuration**: Use CLI flags with environment variable fallbacks:
+  ```go
+  --slack-oauth-token (WARREN_SLACK_OAUTH_TOKEN)
+  --gemini-project-id (WARREN_GEMINI_PROJECT_ID)
+  --firestore-project-id (WARREN_FIRESTORE_PROJECT_ID)
+  ```
+- **Secret Management**: 
+  - Use Google Secret Manager for production secrets
+  - Environment variables for local development
+  - Never commit secrets to version control
+  - Use `.env.example` files to document required variables
+- **Configuration Validation**: 
+  - Implement `Validate()` methods on config structs
+  - Fail fast on startup with clear error messages
+  - Use struct tags for validation rules: `validate:"required,url"`
+
+## Logging and Observability
+- **Structured Logging**: Use `slog` package with consistent field names:
+  ```go
+  slog.Info("processing alert", 
+      slog.String("alert_id", alertID),
+      slog.String("source", "slack"),
+      slog.Duration("duration", time.Since(start)),
+  )
+  ```
+- **Metrics and Monitoring**: 
+  - Integrate with Sentry for error tracking (WARREN_SENTRY_DSN)
+  - Use Prometheus metrics for key performance indicators
+  - Track alert processing times, API response times, and error rates
+- **Distributed Tracing**: 
+  - Use OpenTelemetry for request tracing across services
+  - Include trace IDs in log messages for correlation
+  - Trace external API calls (Slack, BigQuery, Gemini AI)
+
+## Security Practices
+- **Input Validation**: 
+  - Validate all Slack webhook payloads using signing secrets
+  - Sanitize user inputs before processing with LLM
+  - Use struct validation tags and custom validators for complex rules
+- **Authentication and Authorization**: 
+  - Use Slack OAuth tokens for API authentication
+  - Implement middleware for request authentication
+  - Validate user permissions before executing sensitive actions
+- **Secure Coding**: 
+  - Never log sensitive data (tokens, API keys, user messages)
+  - Use secure defaults for all configurations
+  - Implement rate limiting for external API calls
+  - Sanitize data before BigQuery insertion to prevent injection attacks
+
+## Performance Guidelines
+- **Memory Management**: 
+  - Use object pooling for frequently allocated objects (alert processing, HTTP requests)
+  - Implement proper cleanup in defer statements
+  - Monitor memory usage with pprof in production
+- **Concurrency Patterns**: 
+  - Use worker pools for alert processing to control resource usage
+  - Implement graceful shutdown with context cancellation
+  - Use channels for inter-goroutine communication, avoid shared state
+  - Set reasonable timeouts for external API calls (URLScan backoff: 3s)
+- **Database Query Optimization**: 
+  - Use indexed queries in Firestore for alert retrieval
+  - Implement query result caching for frequently accessed data
+  - Use batch operations for BigQuery insertions
+  - Monitor query performance and set up alerts for slow queries
+
+## Deployment and Operations
+- **Docker Best Practices**: 
+  - Use multi-stage builds to minimize image size
+  - Run as non-root user in container
+  - Use distroless base images for security
+  - Set proper resource limits and health checks
+- **Health Check Endpoints**: 
+  - Implement `/health` endpoint for liveness probes
+  - Implement `/ready` endpoint for readiness probes
+  - Include dependency health checks (Firestore, BigQuery connectivity)
+- **Graceful Shutdown**: 
+  - Listen for SIGTERM and SIGINT signals
+  - Complete in-flight requests before shutting down
+  - Close database connections and external service clients cleanly
+  - Set reasonable shutdown timeout (30s default)
