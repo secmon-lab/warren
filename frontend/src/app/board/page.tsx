@@ -99,7 +99,7 @@ export default function BoardPage() {
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <User className="h-3 w-3" />
-                              <span>Unassigned</span>
+                              <span>{ticket.assignee ? ticket.assignee.name : 'Unassigned'}</span>
                             </div>
                             <span>{formatRelativeTime(ticket.createdAt)}</span>
                           </div>

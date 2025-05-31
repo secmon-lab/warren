@@ -7,6 +7,10 @@ export const GET_TICKETS = gql`
       status
       title
       description
+      assignee {
+        id
+        name
+      }
       createdAt
       updatedAt
       alerts {
@@ -31,6 +35,10 @@ export const GET_TICKET = gql`
       title
       description
       summary
+      assignee {
+        id
+        name
+      }
       createdAt
       updatedAt
       alerts {

@@ -124,7 +124,7 @@ export default function TicketsPage() {
                               <span>opened {formatRelativeTime(ticket.createdAt)}</span>
                               <div className="flex items-center gap-1">
                                 <User className="h-4 w-4" />
-                                <span>Unassigned</span>
+                                <span>{ticket.assignee ? ticket.assignee.name : 'Unassigned'}</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <MessageSquare className="h-4 w-4" />

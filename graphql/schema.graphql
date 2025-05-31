@@ -4,10 +4,16 @@ type Ticket {
   title: String!
   description: String!
   summary: String!
+  assignee: User
   alerts: [Alert!]!
   comments: [Comment!]!
   createdAt: String!
   updatedAt: String!
+}
+
+type User {
+  id: ID!
+  name: String!
 }
 
 type Comment {

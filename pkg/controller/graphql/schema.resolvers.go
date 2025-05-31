@@ -164,6 +164,17 @@ func (r *ticketResolver) Status(ctx context.Context, obj *ticket.Ticket) (string
 	return string(obj.Status), nil
 }
 
+// Assignee is the resolver for the assignee field.
+func (r *ticketResolver) Assignee(ctx context.Context, obj *ticket.Ticket) (*graphql1.User, error) {
+	if obj.Assignee == nil {
+		return nil, nil
+	}
+	return &graphql1.User{
+		ID:   obj.Assignee.ID,
+		Name: obj.Assignee.Name,
+	}, nil
+}
+
 // Alerts is the resolver for the alerts field.
 func (r *ticketResolver) Alerts(ctx context.Context, obj *ticket.Ticket) ([]*alert.Alert, error) {
 	alerts, err := r.repo.BatchGetAlerts(ctx, obj.AlertIDs)
@@ -218,23 +229,3 @@ type commentResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-/*
-	func (r *alertResolver) SlackLink(ctx context.Context, obj *alert.Alert) (*string, error) {
-	if obj.SlackThread == nil {
-		return nil, nil
-	}
-
-	// TODO: This requires slack metadata to generate the proper URL
-	// For now, we'll return a placeholder URL format
-	// The proper implementation would need access to SlackService metadata
-	slackURL := fmt.Sprintf("https://slack.com/archives/%s/p%s", obj.SlackThread.ChannelID, obj.SlackThread.ThreadID)
-	return &slackURL, nil
-}
-*/

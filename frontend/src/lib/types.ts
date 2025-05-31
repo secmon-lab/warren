@@ -4,6 +4,7 @@ export interface Ticket {
   title: string;
   description: string;
   summary: string;
+  assignee?: User;
   alerts: Alert[];
   comments: Comment[];
   createdAt: string;
@@ -33,6 +34,11 @@ export interface AlertAttribute {
   value: string;
   link?: string;
   auto: boolean;
+}
+
+export interface User {
+  id: string;
+  name: string;
 }
 
 export type TicketStatus = 'open' | 'pending' | 'resolved' | 'archived';
