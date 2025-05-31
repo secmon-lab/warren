@@ -34,4 +34,5 @@ go.work.sum
 # for AI instruction
 todo.md
 CLAUDE.md
+.claude
 

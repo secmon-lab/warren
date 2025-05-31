@@ -5,6 +5,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
+	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/go-chi/chi/v5"
 	"github.com/secmon-lab/warren/pkg/controller/graphql"
 	slack_controller "github.com/secmon-lab/warren/pkg/controller/slack"
@@ -13,10 +14,11 @@ import (
 )
 
 type Server struct {
-	router    *chi.Mux
-	slackCtrl *slack_controller.Controller
-	verifier  slack_model.PayloadVerifier
-	repo      interfaces.Repository // GraphQL用
+	router         *chi.Mux
+	slackCtrl      *slack_controller.Controller
+	verifier       slack_model.PayloadVerifier
+	repo           interfaces.Repository // for GraphQL
+	enableGraphiQL bool                  // GraphiQL enable flag
 }
 
 type Options func(*Server)
@@ -30,6 +32,12 @@ func WithSlackVerifier(verifier slack_model.PayloadVerifier) Options {
 func WithGraphQLRepo(repo interfaces.Repository) Options {
 	return func(s *Server) {
 		s.repo = repo
+	}
+}
+
+func WithGraphiQL(enabled bool) Options {
+	return func(s *Server) {
+		s.enableGraphiQL = enabled
 	}
 }
 
@@ -76,6 +84,11 @@ func New(uc UseCase, opts ...Options) *Server {
 	// GraphQL endpoint
 	if s.repo != nil {
 		r.Handle("/graphql", graphqlHandler(s.repo))
+
+		// Add playground endpoint when GraphiQL is enabled
+		if s.enableGraphiQL {
+			r.Handle("/graphiql", playground.Handler("GraphQL playground", "/graphql"))
+		}
 	}
 
 	return s

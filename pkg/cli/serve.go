@@ -18,13 +18,15 @@ import (
 
 func cmdServe() *cli.Command {
 	var (
-		addr         string
-		policyCfg    config.Policy
-		sentryCfg    config.Sentry
-		slackCfg     config.Slack
-		geminiCfg    config.GeminiCfg
-		firestoreCfg config.Firestore
-		storageCfg   config.Storage
+		addr           string
+		enableGraphQL  bool
+		enableGraphiQL bool
+		policyCfg      config.Policy
+		sentryCfg      config.Sentry
+		slackCfg       config.Slack
+		geminiCfg      config.GeminiCfg
+		firestoreCfg   config.Firestore
+		storageCfg     config.Storage
 	)
 
 	flags := joinFlags(
@@ -36,6 +38,20 @@ func cmdServe() *cli.Command {
 				Usage:       "Listen address (default: 127.0.0.1:8080)",
 				Value:       "127.0.0.1:8080",
 				Destination: &addr,
+			},
+			&cli.BoolFlag{
+				Name:        "enable-graphql",
+				Usage:       "Enable GraphQL endpoint",
+				Category:    "GraphQL",
+				Sources:     cli.EnvVars("WARREN_ENABLE_GRAPHQL"),
+				Destination: &enableGraphQL,
+			},
+			&cli.BoolFlag{
+				Name:        "enable-graphiql",
+				Usage:       "Enable GraphiQL playground (requires --enable-graphql)",
+				Category:    "GraphQL",
+				Sources:     cli.EnvVars("WARREN_ENABLE_GRAPHIQL"),
+				Destination: &enableGraphiQL,
 			},
 		},
 		policyCfg.Flags(),
@@ -55,6 +71,8 @@ func cmdServe() *cli.Command {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			logging.Default().Info("starting server",
 				"addr", addr,
+				"enableGraphQL", enableGraphQL,
+				"enableGraphiQL", enableGraphiQL,
 				"policy", policyCfg,
 				"sentry", sentryCfg,
 				"slack", slackCfg,
@@ -108,11 +126,27 @@ func cmdServe() *cli.Command {
 
 			uc := usecase.New(ucOptions...)
 
+			// Build HTTP server options
+			serverOptions := []server.Options{
+				server.WithSlackVerifier(slackCfg.Verifier()),
+			}
+
+			// Add repository when GraphQL is enabled
+			if enableGraphQL {
+				serverOptions = append(serverOptions, server.WithGraphQLRepo(firestore))
+			}
+
+			// Add GraphiQL option when GraphiQL is enabled
+			if enableGraphiQL {
+				serverOptions = append(serverOptions, server.WithGraphiQL(true))
+				if !enableGraphQL {
+					logging.From(ctx).Warn("GraphiQL is enabled but GraphQL is not enabled. GraphiQL will not work.")
+				}
+			}
+
 			httpServer := http.Server{
-				Addr: addr,
-				Handler: server.New(uc,
-					server.WithSlackVerifier(slackCfg.Verifier()),
-				),
+				Addr:              addr,
+				Handler:           server.New(uc, serverOptions...),
 				ReadTimeout:       30 * time.Second,
 				ReadHeaderTimeout: 10 * time.Second,
 				BaseContext: func(l net.Listener) context.Context {
