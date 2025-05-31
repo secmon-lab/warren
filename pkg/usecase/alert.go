@@ -3,12 +3,14 @@ package usecase
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
@@ -60,24 +62,67 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, a
 	return results, nil
 }
 
-func (uc *UseCases) handleAlert(ctx context.Context, alert alert.Alert) (*alert.Alert, error) {
+func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*alert.Alert, error) {
 	logger := logging.From(ctx)
 
-	if err := alert.FillMetadata(ctx, uc.llmClient); err != nil {
+	if err := newAlert.FillMetadata(ctx, uc.llmClient); err != nil {
 		return nil, goerr.Wrap(err, "failed to fill alert metadata")
 	}
 
-	// Post new alert to Slack and save the alert with Slack channel and message ID. It should be done before querying LLM.
-	thread, err := uc.slackService.PostAlert(ctx, alert)
+	// Get alerts from the last 24 hours and search for those not bound to tickets
+	now := clock.Now(ctx)
+	begin := now.Add(-24 * time.Hour)
+	end := now
+
+	recentAlerts, err := uc.repository.GetAlertsBySpan(ctx, begin, end)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to post alert", goerr.V("alert", alert))
+		return nil, goerr.Wrap(err, "failed to get recent alerts")
 	}
-	alert.SlackThread = thread.Entity()
 
-	if err := uc.repository.PutAlert(ctx, alert); err != nil {
-		return nil, goerr.Wrap(err, "failed to put alert", goerr.V("alert", alert))
+	// Filter alerts that are not bound to tickets
+	var unboundAlerts []*alert.Alert
+	for _, recentAlert := range recentAlerts {
+		if recentAlert.TicketID == types.EmptyTicketID && len(recentAlert.Embedding) > 0 {
+			unboundAlerts = append(unboundAlerts, recentAlert)
+		}
 	}
-	logger.Info("alert created", "alert", alert)
 
-	return &alert, nil
+	var existingAlert *alert.Alert
+	var bestSimilarity float64
+
+	// Search for the alert with the closest embedding (similarity >= 0.99)
+	if len(unboundAlerts) > 0 {
+		for _, unboundAlert := range unboundAlerts {
+			similarity := newAlert.CosineSimilarity(unboundAlert.Embedding)
+			if similarity >= 0.99 && similarity > bestSimilarity {
+				bestSimilarity = similarity
+				existingAlert = unboundAlert
+			}
+		}
+	}
+
+	if existingAlert != nil && existingAlert.SlackThread != nil {
+		// Post to existing thread
+		thread := uc.slackService.NewThread(*existingAlert.SlackThread)
+		if err := thread.PostAlert(ctx, newAlert); err != nil {
+			return nil, goerr.Wrap(err, "failed to post alert to existing thread", goerr.V("alert", newAlert), goerr.V("existing_alert", existingAlert))
+		}
+		newAlert.SlackThread = existingAlert.SlackThread
+		logger.Info("alert posted to existing thread", "alert", newAlert, "existing_alert", existingAlert, "similarity", bestSimilarity)
+	} else {
+		// Post to new thread (normal posting)
+		newThread, err := uc.slackService.PostAlert(ctx, newAlert)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to post alert", goerr.V("alert", newAlert))
+		}
+		newAlert.SlackThread = newThread.Entity()
+		logger.Info("alert posted to new thread", "alert", newAlert)
+	}
+
+	if err := uc.repository.PutAlert(ctx, newAlert); err != nil {
+		return nil, goerr.Wrap(err, "failed to put alert", goerr.V("alert", newAlert))
+	}
+	logger.Info("alert created", "alert", newAlert)
+
+	return &newAlert, nil
 }

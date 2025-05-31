@@ -457,3 +457,30 @@ func (x *Service) ShowResolveTicketModal(ctx context.Context, ticket *ticket.Tic
 
 	return nil
 }
+
+func (x *ThreadService) PostAlert(ctx context.Context, alert alert.Alert) error {
+	blocks := buildAlertBlocks(alert)
+
+	_, _, err := x.client.PostMessageContext(
+		ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post alert to thread", goerr.V("channelID", x.channelID), goerr.V("threadID", x.threadID), goerr.V("blocks", blocks))
+	}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(alert.Data); err != nil {
+		return goerr.Wrap(err, "failed to encode alert data")
+	}
+
+	if err := x.AttachFile(ctx, "Original Alert", "alert."+alert.ID.String()+".json", buf.Bytes()); err != nil {
+		return goerr.Wrap(err, "failed to attach file to slack")
+	}
+
+	return nil
+}

@@ -1,150 +1,408 @@
 package usecase_test
 
 import (
-	_ "embed"
+	"context"
+	"testing"
+	"time"
+
+	"cloud.google.com/go/firestore"
+	"github.com/m-mizutani/gollem"
+	gollem_mock "github.com/m-mizutani/gollem/mock"
+	"github.com/m-mizutani/gt"
+	"github.com/m-mizutani/opaq"
+	"github.com/secmon-lab/warren/pkg/domain/mock"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/repository"
+	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/usecase"
+	"github.com/secmon-lab/warren/pkg/utils/clock"
+
+	slack_sdk "github.com/slack-go/slack"
 )
 
-/*
-type geminiClient struct {
-	model *genai.GenerativeModel
-}
-
-func (c *geminiClient) StartChat() interfaces.LLMSession {
-	return c.model.StartChat()
-}
-
-func (c *geminiClient) SendMessage(ctx context.Context, msg ...genai.Part) (*genai.GenerateContentResponse, error) {
-	return c.model.GenerateContent(ctx, msg...)
-}
-
-func genGeminiClient(t *testing.T) *geminiClient {
-	vars := test.NewEnvVars(t, "TEST_GEMINI_PROJECT_ID", "TEST_GEMINI_LOCATION")
-	client, err := genai.NewClient(t.Context(), vars.Get("TEST_GEMINI_PROJECT_ID"), vars.Get("TEST_GEMINI_LOCATION"))
-	gt.NoError(t, err)
-	geminiModel := client.GenerativeModel("gemini-2.0-flash-exp")
-	geminiModel.GenerationConfig.ResponseMIMEType = "application/json"
-	return &geminiClient{model: geminiModel}
-}
-
-func TestFindSimilarAlert(t *testing.T) {
+func TestHandleAlert_NoSimilarAlert(t *testing.T) {
+	// Test case: No similar alert found, should post to new thread
 	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
 	repo := repository.NewMemory()
-	uc := usecase.New(usecase.WithLLMClient(genGeminiClient(t)), usecase.WithRepository(repo))
 
-	newAlert := alert.NewAlert(ctx, "my_schema", model.PolicyAlert{
-		Title: "test alert 1",
-		Attrs: []model.Attribute{{Key: "test", Value: "test"}},
-		Data:  map[string]any{"test": "test"},
-	})
-
-	alert1 := alert.NewAlert(ctx, "my_schema", model.PolicyAlert{
-		Title: "test alert 0",
-		Attrs: []model.Attribute{{Key: "test", Value: "test"}},
-		Data:  map[string]any{"test": "test"},
-	})
-	alert2 := model.NewAlert(ctx, "some_other_schema", model.PolicyAlert{
-		Title: "this is different alert",
-		Attrs: []model.Attribute{{Key: "color", Value: "red"}},
-		Data:  map[string]any{"test": "test"},
-	})
-	alert3 := model.NewAlert(ctx, "some_big_schema", model.PolicyAlert{
-		Title: "more different alert",
-		Attrs: []model.Attribute{{Key: "taste", Value: "sweet"}},
-		Data:  map[string]any{"test": "test"},
-	})
-	if err := repo.PutAlert(ctx, alert1); err != nil {
-		t.Fatal("failed to put alert1:", err)
-	}
-	if err := repo.PutAlert(ctx, alert2); err != nil {
-		t.Fatal("failed to put alert2:", err)
-	}
-	if err := repo.PutAlert(ctx, alert3); err != nil {
-		t.Fatal("failed to put alert3:", err)
+	var postAlertCalled bool
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			postAlertCalled = true
+			return "test-channel", "test-thread", nil
+		},
+		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			return &slack_sdk.FileSummary{}, nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
 	}
 
-	alert, err := uc.FindSimilarAlert(ctx, newAlert)
-	gt.NoError(t, err)
-	gt.NotEqual(t, alert, nil)
-	gt.Equal(t, alert.ID, alert1.ID)
-}
-
-//go:embed testdata/guardduty.json
-var guarddutyJSON []byte
-
-func TestPlanAction(t *testing.T) {
-	ctx := context.Background()
-	vars := test.NewEnvVars(t, "TEST_GEMINI_PROJECT_ID", "TEST_GEMINI_LOCATION")
-	client, err := genai.NewClient(ctx, vars.Get("TEST_GEMINI_PROJECT_ID"), vars.Get("TEST_GEMINI_LOCATION"))
-	gt.NoError(t, err)
-	geminiModel := client.GenerativeModel("gemini-2.0-flash-exp")
-	geminiModel.GenerationConfig.ResponseMIMEType = "application/json"
-	ssn := geminiModel.StartChat()
-
-	actionSvc := service.NewActionService([]interfaces.Action{
-		&mock.ActionMock{
-			SpecFunc: func() action.ActionSpec {
-				return action.ActionSpec{
-					Name: "bigquery",
-					Args: []action.ArgumentSpec{
-						{
-							Name:        "table_id",
-							Type:        "string",
-							Description: "The name of the BigQuery table to query",
-							Required:    true,
-							Choices: []model.ChoiceSpec{
-								{
-									Value:       "cloudtrail_logs",
-									Description: "stored CloudTrail logs",
-								},
-								{
-									Value:       "vpc_flow_logs",
-									Description: "stored VPC flow logs",
-								},
-								{
-									Value:       "s3_access_logs",
-									Description: "stored S3 access logs",
-								},
-							},
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{
+							`{"title": "test title", "description": "test description"}`,
 						},
+					}, nil
+				},
+			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
+			return [][]float64{{0.1, 0.2, 0.3}}, nil
+		},
+	}
+
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			if queryResult, ok := result.(*struct {
+				Alert []alert.Metadata `json:"alert"`
+			}); ok {
+				queryResult.Alert = []alert.Metadata{
+					{
+						Title:       "Test Alert",
+						Description: "Test Description",
 					},
 				}
-			},
+			}
+			return nil
 		},
-	})
+	}
 
-	alert := model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
-		Title: "Amazon GuardDuty finding",
-		Data:  guarddutyJSON,
-	})
-
-	prePrompt, err := prompt.BuildInitPrompt(ctx, alert, 3)
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
 	gt.NoError(t, err)
 
-	resp, err := usecase.PlanAction(ctx, ssn, prePrompt, actionSvc)
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackService(slackSvc),
+		usecase.WithLLMClient(llmMock),
+		usecase.WithPolicyClient(policyMock),
+	)
+
+	// Execute
+	result, err := uc.HandleAlert(ctx, types.AlertSchema("test"), map[string]interface{}{"key": "value"})
+
+	// Verify
 	gt.NoError(t, err)
-	gt.NotEqual(t, resp, nil)
-	gt.Equal(t, resp.Action, "bigquery")
-	gt.Equal(t, resp.Args, action.Arguments{"table_id": "vpc_flow_logs"})
+	gt.Array(t, result).Length(1)
+	gt.Value(t, postAlertCalled).Equal(true)
+	gt.NotNil(t, result[0].SlackThread)
 }
 
-func TestGenerateAlertMetadata(t *testing.T) {
+func TestHandleAlert_SimilarAlertFound(t *testing.T) {
+	// Test case: Similar alert found, should post to existing thread
 	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
 	repo := repository.NewMemory()
-	uc := usecase.New(usecase.WithLLMClient(genGeminiClient(t)), usecase.WithRepository(repo))
 
-	alert := model.NewAlert(ctx, "aws.guardduty", model.PolicyAlert{
-		Title: "Amazon GuardDuty finding",
-		Data:  guarddutyJSON,
-		Attrs: []model.Attribute{{Key: "test", Value: "test"}},
-	})
+	// Create existing alert (within 24 hours, not bound to ticket)
+	existingAlert := alert.Alert{
+		ID:        types.NewAlertID(),
+		TicketID:  types.EmptyTicketID,
+		Schema:    "test",
+		CreatedAt: now.Add(-1 * time.Hour),
+		Metadata: alert.Metadata{
+			Title:       "Existing Alert",
+			Description: "Existing Description",
+		},
+		SlackThread: &slack.Thread{
+			ChannelID: "existing-channel",
+			ThreadID:  "existing-thread",
+		},
+		Embedding: firestore.Vector32{0.1, 0.2, 0.3}, // Same embedding for high similarity
+		Data:      map[string]interface{}{"key": "existing"},
+	}
 
-	newAlert, err := uc.GenerateAlertMetadata(ctx, alert)
+	gt.NoError(t, repo.PutAlert(ctx, existingAlert))
+
+	var postAlertCalled bool
+	var usedChannelID string
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			// Check if this is posting to existing channel
+			if channelID == "existing-channel" {
+				usedChannelID = channelID
+			} else {
+				postAlertCalled = true
+			}
+
+			return channelID, "test-thread", nil
+		},
+		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			if usedChannelID == "" {
+				usedChannelID = params.Channel
+			}
+			return &slack_sdk.FileSummary{}, nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
+	}
+
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{
+							`{"title": "test title", "description": "test description"}`,
+						},
+					}, nil
+				},
+			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
+			return [][]float64{{0.1, 0.2, 0.3}}, nil
+		},
+	}
+
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			if queryResult, ok := result.(*struct {
+				Alert []alert.Metadata `json:"alert"`
+			}); ok {
+				queryResult.Alert = []alert.Metadata{
+					{
+						Title:       "Test Alert",
+						Description: "Test Description",
+					},
+				}
+			}
+			return nil
+		},
+	}
+
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
 	gt.NoError(t, err)
-	// Title is not changed
-	gt.Equal(t, newAlert.Title, alert.Title)
-	// Description is not empty
-	gt.NotEqual(t, newAlert.Description, "")
-	// Attributes are not empty
-	gt.A(t, newAlert.Attributes).Longer(2)
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackService(slackSvc),
+		usecase.WithLLMClient(llmMock),
+		usecase.WithPolicyClient(policyMock),
+	)
+
+	// Execute
+	result, err := uc.HandleAlert(ctx, types.AlertSchema("test"), map[string]interface{}{"key": "new"})
+
+	// Verify
+	gt.NoError(t, err)
+	gt.Array(t, result).Length(1)
+
+	// Should post to existing thread, not create new thread
+	gt.Value(t, postAlertCalled).Equal(false)
+	gt.Value(t, usedChannelID).Equal("existing-channel")
+	gt.Value(t, result[0].SlackThread.ChannelID).Equal("existing-channel")
+	gt.Value(t, result[0].SlackThread.ThreadID).Equal("existing-thread")
 }
-*/
+
+func TestHandleAlert_SimilarAlertBoundToTicket(t *testing.T) {
+	// Test case: Similar alert found but bound to ticket, should post to new thread
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	// Create existing alert bound to ticket
+	existingAlert := alert.Alert{
+		ID:        types.NewAlertID(),
+		TicketID:  types.NewTicketID(), // Bound to ticket
+		Schema:    "test",
+		CreatedAt: now.Add(-1 * time.Hour),
+		Metadata: alert.Metadata{
+			Title:       "Existing Alert",
+			Description: "Existing Description",
+		},
+		SlackThread: &slack.Thread{
+			ChannelID: "existing-channel",
+			ThreadID:  "existing-thread",
+		},
+		Embedding: firestore.Vector32{0.1, 0.2, 0.3},
+		Data:      map[string]interface{}{"key": "existing"},
+	}
+
+	gt.NoError(t, repo.PutAlert(ctx, existingAlert))
+
+	var postAlertCalled bool
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			postAlertCalled = true
+			return "test-channel", "test-thread", nil
+		},
+		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			return &slack_sdk.FileSummary{}, nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
+	}
+
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{
+							`{"title": "test title", "description": "test description"}`,
+						},
+					}, nil
+				},
+			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
+			return [][]float64{{0.1, 0.2, 0.3}}, nil
+		},
+	}
+
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			if queryResult, ok := result.(*struct {
+				Alert []alert.Metadata `json:"alert"`
+			}); ok {
+				queryResult.Alert = []alert.Metadata{
+					{
+						Title:       "Test Alert",
+						Description: "Test Description",
+					},
+				}
+			}
+			return nil
+		},
+	}
+
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+	gt.NoError(t, err)
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackService(slackSvc),
+		usecase.WithLLMClient(llmMock),
+		usecase.WithPolicyClient(policyMock),
+	)
+
+	// Execute
+	result, err := uc.HandleAlert(ctx, types.AlertSchema("test"), map[string]interface{}{"key": "new"})
+
+	// Verify - should post to new thread because existing alert is bound to ticket
+	gt.NoError(t, err)
+	gt.Array(t, result).Length(1)
+	gt.Value(t, postAlertCalled).Equal(true)
+	gt.Value(t, result[0].SlackThread.ChannelID).Equal("test-channel")
+}
+
+func TestHandleAlert_LowSimilarity(t *testing.T) {
+	// Test case: Similar alert found but similarity < 0.99, should post to new thread
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	// Create existing alert with different embedding
+	existingAlert := alert.Alert{
+		ID:        types.NewAlertID(),
+		TicketID:  types.EmptyTicketID,
+		Schema:    "test",
+		CreatedAt: now.Add(-1 * time.Hour),
+		Metadata: alert.Metadata{
+			Title:       "Existing Alert",
+			Description: "Existing Description",
+		},
+		SlackThread: &slack.Thread{
+			ChannelID: "existing-channel",
+			ThreadID:  "existing-thread",
+		},
+		Embedding: firestore.Vector32{0.9, 0.1, 0.1}, // Different embedding for low similarity
+		Data:      map[string]interface{}{"key": "existing"},
+	}
+
+	gt.NoError(t, repo.PutAlert(ctx, existingAlert))
+
+	var postAlertCalled bool
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			postAlertCalled = true
+			return "test-channel", "test-thread", nil
+		},
+		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			return &slack_sdk.FileSummary{}, nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
+	}
+
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{
+							`{"title": "test title", "description": "test description"}`,
+						},
+					}, nil
+				},
+			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
+			return [][]float64{{0.1, 0.2, 0.3}}, nil
+		},
+	}
+
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			if queryResult, ok := result.(*struct {
+				Alert []alert.Metadata `json:"alert"`
+			}); ok {
+				queryResult.Alert = []alert.Metadata{
+					{
+						Title:       "Test Alert",
+						Description: "Test Description",
+					},
+				}
+			}
+			return nil
+		},
+	}
+
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+	gt.NoError(t, err)
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackService(slackSvc),
+		usecase.WithLLMClient(llmMock),
+		usecase.WithPolicyClient(policyMock),
+	)
+
+	// Execute
+	result, err := uc.HandleAlert(ctx, types.AlertSchema("test"), map[string]interface{}{"key": "new"})
+
+	// Verify - should post to new thread because similarity is too low
+	gt.NoError(t, err)
+	gt.Array(t, result).Length(1)
+	gt.Value(t, postAlertCalled).Equal(true)
+	gt.Value(t, result[0].SlackThread.ChannelID).Equal("test-channel")
+}
