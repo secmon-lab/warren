@@ -10,6 +10,13 @@ import (
 
 // runCreateIndexes executes the main logic for creating Firestore indexes
 func runCreateIndexes(ctx context.Context, projectID, databaseID string, dryrun bool) error {
+	fmt.Println("Creating Firestore indexes...")
+	fmt.Println("----------------------------------------")
+	fmt.Printf("Project ID: %s\n", projectID)
+	fmt.Printf("Database ID: %s\n", databaseID)
+	fmt.Printf("Dry run: %t\n", dryrun)
+	fmt.Println("----------------------------------------")
+
 	// Define all required indexes
 	requiredIndexes := DefineRequiredIndexes()
 

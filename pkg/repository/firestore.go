@@ -847,8 +847,9 @@ func (r *Firestore) GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts,
 
 func (r *Firestore) FindNearestTicketsWithSpan(ctx context.Context, embedding []float32, begin, end time.Time, limit int) ([]*ticket.Ticket, error) {
 	iter := r.db.Collection(collectionTickets).
-		Where("CreatedAt", ">=", begin).
+		OrderBy("CreatedAt", firestore.Desc).
 		Where("CreatedAt", "<=", end).
+		Where("CreatedAt", ">=", begin).
 		FindNearest("Embedding",
 			firestore.Vector32(embedding[:]),
 			limit,
