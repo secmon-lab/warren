@@ -32,6 +32,7 @@ import (
 func cmdDev() *cli.Command {
 	var (
 		addr      string
+		authCfg   config.Auth
 		geminiCfg config.GeminiCfg
 	)
 
@@ -46,6 +47,7 @@ func cmdDev() *cli.Command {
 				Destination: &addr,
 			},
 		},
+		authCfg.Flags(),
 		geminiCfg.Flags(),
 	)
 
@@ -57,6 +59,7 @@ func cmdDev() *cli.Command {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			logging.Default().Info("starting development server",
 				"addr", addr,
+				"auth", authCfg,
 				"gemini", geminiCfg,
 			)
 
@@ -111,6 +114,15 @@ func cmdDev() *cli.Command {
 				server.WithSlackVerifier(nil), // No verifier needed for dev mode
 				server.WithGraphQLRepo(repo),
 				server.WithGraphiQL(true),
+			}
+
+			// Add AuthUseCase if authentication options are provided
+			authUC, err := authCfg.Configure(repo)
+			if err != nil {
+				return err
+			}
+			if authUC != nil {
+				serverOptions = append(serverOptions, server.WithAuthUseCase(authUC))
 			}
 
 			httpServer := http.Server{

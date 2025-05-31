@@ -18,6 +18,10 @@ const nextConfig: NextConfig = {
           source: '/graphql',
           destination: 'http://localhost:8080/graphql',
         },
+        {
+          source: '/api/auth/:path*',
+          destination: 'http://localhost:8080/api/auth/:path*',
+        },
       ];
     },
   } : {}),

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -51,4 +52,9 @@ type Repository interface {
 	GetLatestAlertListInThread(ctx context.Context, thread slack.Thread) (*alert.List, error)
 
 	GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts, error)
+
+	// For authentication management
+	PutToken(ctx context.Context, token *auth.Token) error
+	GetToken(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error)
+	DeleteToken(ctx context.Context, tokenID auth.TokenID) error
 }

@@ -7,6 +7,7 @@ const getGraphQLUri = () => {
 
 const httpLink = createHttpLink({
   uri: getGraphQLUri(),
+  credentials: 'include',
 });
 
 export const apolloClient = new ApolloClient({

@@ -8,6 +8,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	modelslack "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -455,6 +456,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			BindAlertToTicketFunc: func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
 //				panic("mock out the BindAlertToTicket method")
 //			},
+//			DeleteTokenFunc: func(ctx context.Context, tokenID auth.TokenID) error {
+//				panic("mock out the DeleteToken method")
+//			},
 //			FindNearestAlertsFunc: func(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error) {
 //				panic("mock out the FindNearestAlerts method")
 //			},
@@ -512,6 +516,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			GetTicketsByStatusAndSpanFunc: func(ctx context.Context, status types.TicketStatus, begin time.Time, end time.Time) ([]*ticket.Ticket, error) {
 //				panic("mock out the GetTicketsByStatusAndSpan method")
 //			},
+//			GetTokenFunc: func(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error) {
+//				panic("mock out the GetToken method")
+//			},
 //			PutAlertFunc: func(ctx context.Context, alertMoqParam alert.Alert) error {
 //				panic("mock out the PutAlert method")
 //			},
@@ -529,6 +536,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			},
 //			PutTicketCommentsPromptedFunc: func(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error {
 //				panic("mock out the PutTicketCommentsPrompted method")
+//			},
+//			PutTokenFunc: func(ctx context.Context, token *auth.Token) error {
+//				panic("mock out the PutToken method")
 //			},
 //			SearchAlertsFunc: func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
 //				panic("mock out the SearchAlerts method")
@@ -557,6 +567,9 @@ type RepositoryMock struct {
 
 	// BindAlertToTicketFunc mocks the BindAlertToTicket method.
 	BindAlertToTicketFunc func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error
+
+	// DeleteTokenFunc mocks the DeleteToken method.
+	DeleteTokenFunc func(ctx context.Context, tokenID auth.TokenID) error
 
 	// FindNearestAlertsFunc mocks the FindNearestAlerts method.
 	FindNearestAlertsFunc func(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error)
@@ -615,6 +628,9 @@ type RepositoryMock struct {
 	// GetTicketsByStatusAndSpanFunc mocks the GetTicketsByStatusAndSpan method.
 	GetTicketsByStatusAndSpanFunc func(ctx context.Context, status types.TicketStatus, begin time.Time, end time.Time) ([]*ticket.Ticket, error)
 
+	// GetTokenFunc mocks the GetToken method.
+	GetTokenFunc func(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error)
+
 	// PutAlertFunc mocks the PutAlert method.
 	PutAlertFunc func(ctx context.Context, alertMoqParam alert.Alert) error
 
@@ -632,6 +648,9 @@ type RepositoryMock struct {
 
 	// PutTicketCommentsPromptedFunc mocks the PutTicketCommentsPrompted method.
 	PutTicketCommentsPromptedFunc func(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error
+
+	// PutTokenFunc mocks the PutToken method.
+	PutTokenFunc func(ctx context.Context, token *auth.Token) error
 
 	// SearchAlertsFunc mocks the SearchAlerts method.
 	SearchAlertsFunc func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error)
@@ -679,6 +698,13 @@ type RepositoryMock struct {
 			AlertID types.AlertID
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
+		}
+		// DeleteToken holds details about calls to the DeleteToken method.
+		DeleteToken []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TokenID is the tokenID argument value.
+			TokenID auth.TokenID
 		}
 		// FindNearestAlerts holds details about calls to the FindNearestAlerts method.
 		FindNearestAlerts []struct {
@@ -831,6 +857,13 @@ type RepositoryMock struct {
 			// End is the end argument value.
 			End time.Time
 		}
+		// GetToken holds details about calls to the GetToken method.
+		GetToken []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TokenID is the tokenID argument value.
+			TokenID auth.TokenID
+		}
 		// PutAlert holds details about calls to the PutAlert method.
 		PutAlert []struct {
 			// Ctx is the ctx argument value.
@@ -877,6 +910,13 @@ type RepositoryMock struct {
 			// CommentIDs is the commentIDs argument value.
 			CommentIDs []types.CommentID
 		}
+		// PutToken holds details about calls to the PutToken method.
+		PutToken []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Token is the token argument value.
+			Token *auth.Token
+		}
 		// SearchAlerts holds details about calls to the SearchAlerts method.
 		SearchAlerts []struct {
 			// Ctx is the ctx argument value.
@@ -903,6 +943,7 @@ type RepositoryMock struct {
 	lockBatchGetTickets             sync.RWMutex
 	lockBatchPutAlerts              sync.RWMutex
 	lockBindAlertToTicket           sync.RWMutex
+	lockDeleteToken                 sync.RWMutex
 	lockFindNearestAlerts           sync.RWMutex
 	lockFindNearestTickets          sync.RWMutex
 	lockFindNearestTicketsWithSpan  sync.RWMutex
@@ -922,12 +963,14 @@ type RepositoryMock struct {
 	lockGetTicketsBySpan            sync.RWMutex
 	lockGetTicketsByStatus          sync.RWMutex
 	lockGetTicketsByStatusAndSpan   sync.RWMutex
+	lockGetToken                    sync.RWMutex
 	lockPutAlert                    sync.RWMutex
 	lockPutAlertList                sync.RWMutex
 	lockPutHistory                  sync.RWMutex
 	lockPutTicket                   sync.RWMutex
 	lockPutTicketComment            sync.RWMutex
 	lockPutTicketCommentsPrompted   sync.RWMutex
+	lockPutToken                    sync.RWMutex
 	lockSearchAlerts                sync.RWMutex
 	lockUnbindAlertFromTicket       sync.RWMutex
 }
@@ -1134,6 +1177,45 @@ func (mock *RepositoryMock) BindAlertToTicketCalls() []struct {
 	mock.lockBindAlertToTicket.RLock()
 	calls = mock.calls.BindAlertToTicket
 	mock.lockBindAlertToTicket.RUnlock()
+	return calls
+}
+
+// DeleteToken calls DeleteTokenFunc.
+func (mock *RepositoryMock) DeleteToken(ctx context.Context, tokenID auth.TokenID) error {
+	callInfo := struct {
+		Ctx     context.Context
+		TokenID auth.TokenID
+	}{
+		Ctx:     ctx,
+		TokenID: tokenID,
+	}
+	mock.lockDeleteToken.Lock()
+	mock.calls.DeleteToken = append(mock.calls.DeleteToken, callInfo)
+	mock.lockDeleteToken.Unlock()
+	if mock.DeleteTokenFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.DeleteTokenFunc(ctx, tokenID)
+}
+
+// DeleteTokenCalls gets all the calls that were made to DeleteToken.
+// Check the length with:
+//
+//	len(mockedRepository.DeleteTokenCalls())
+func (mock *RepositoryMock) DeleteTokenCalls() []struct {
+	Ctx     context.Context
+	TokenID auth.TokenID
+} {
+	var calls []struct {
+		Ctx     context.Context
+		TokenID auth.TokenID
+	}
+	mock.lockDeleteToken.RLock()
+	calls = mock.calls.DeleteToken
+	mock.lockDeleteToken.RUnlock()
 	return calls
 }
 
@@ -1933,6 +2015,46 @@ func (mock *RepositoryMock) GetTicketsByStatusAndSpanCalls() []struct {
 	return calls
 }
 
+// GetToken calls GetTokenFunc.
+func (mock *RepositoryMock) GetToken(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error) {
+	callInfo := struct {
+		Ctx     context.Context
+		TokenID auth.TokenID
+	}{
+		Ctx:     ctx,
+		TokenID: tokenID,
+	}
+	mock.lockGetToken.Lock()
+	mock.calls.GetToken = append(mock.calls.GetToken, callInfo)
+	mock.lockGetToken.Unlock()
+	if mock.GetTokenFunc == nil {
+		var (
+			tokenOut *auth.Token
+			errOut   error
+		)
+		return tokenOut, errOut
+	}
+	return mock.GetTokenFunc(ctx, tokenID)
+}
+
+// GetTokenCalls gets all the calls that were made to GetToken.
+// Check the length with:
+//
+//	len(mockedRepository.GetTokenCalls())
+func (mock *RepositoryMock) GetTokenCalls() []struct {
+	Ctx     context.Context
+	TokenID auth.TokenID
+} {
+	var calls []struct {
+		Ctx     context.Context
+		TokenID auth.TokenID
+	}
+	mock.lockGetToken.RLock()
+	calls = mock.calls.GetToken
+	mock.lockGetToken.RUnlock()
+	return calls
+}
+
 // PutAlert calls PutAlertFunc.
 func (mock *RepositoryMock) PutAlert(ctx context.Context, alertMoqParam alert.Alert) error {
 	callInfo := struct {
@@ -2172,6 +2294,45 @@ func (mock *RepositoryMock) PutTicketCommentsPromptedCalls() []struct {
 	mock.lockPutTicketCommentsPrompted.RLock()
 	calls = mock.calls.PutTicketCommentsPrompted
 	mock.lockPutTicketCommentsPrompted.RUnlock()
+	return calls
+}
+
+// PutToken calls PutTokenFunc.
+func (mock *RepositoryMock) PutToken(ctx context.Context, token *auth.Token) error {
+	callInfo := struct {
+		Ctx   context.Context
+		Token *auth.Token
+	}{
+		Ctx:   ctx,
+		Token: token,
+	}
+	mock.lockPutToken.Lock()
+	mock.calls.PutToken = append(mock.calls.PutToken, callInfo)
+	mock.lockPutToken.Unlock()
+	if mock.PutTokenFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutTokenFunc(ctx, token)
+}
+
+// PutTokenCalls gets all the calls that were made to PutToken.
+// Check the length with:
+//
+//	len(mockedRepository.PutTokenCalls())
+func (mock *RepositoryMock) PutTokenCalls() []struct {
+	Ctx   context.Context
+	Token *auth.Token
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Token *auth.Token
+	}
+	mock.lockPutToken.RLock()
+	calls = mock.calls.PutToken
+	mock.lockPutToken.RUnlock()
 	return calls
 }
 

@@ -22,6 +22,7 @@ type Server struct {
 	slackCtrl      *slack_controller.Controller
 	verifier       slack_model.PayloadVerifier
 	repo           interfaces.Repository // for GraphQL
+	authUC         AuthUseCase           // for authentication
 	enableGraphiQL bool                  // GraphiQL enable flag
 }
 
@@ -42,6 +43,12 @@ func WithGraphQLRepo(repo interfaces.Repository) Options {
 func WithGraphiQL(enabled bool) Options {
 	return func(s *Server) {
 		s.enableGraphiQL = enabled
+	}
+}
+
+func WithAuthUseCase(authUC AuthUseCase) Options {
+	return func(s *Server) {
+		s.authUC = authUC
 	}
 }
 
@@ -87,12 +94,29 @@ func New(uc UseCase, opts ...Options) *Server {
 
 	// GraphQL endpoint
 	if s.repo != nil {
-		r.Handle("/graphql", graphqlHandler(s.repo))
+		graphqlHandler := graphqlHandler(s.repo)
+
+		// Apply authentication middleware to GraphQL
+		if s.authUC != nil {
+			graphqlHandler = authMiddleware(s.authUC)(graphqlHandler)
+		}
+
+		r.Handle("/graphql", graphqlHandler)
 
 		// Add playground endpoint when GraphiQL is enabled
 		if s.enableGraphiQL {
 			r.Handle("/graphiql", playground.Handler("GraphQL playground", "/graphql"))
 		}
+	}
+
+	// Authentication endpoints
+	if s.authUC != nil {
+		r.Route("/api/auth", func(r chi.Router) {
+			r.Get("/login", authLoginHandler(s.authUC))
+			r.Get("/callback", authCallbackHandler(s.authUC))
+			r.Post("/logout", authLogoutHandler(s.authUC))
+			r.Get("/me", authMeHandler(s.authUC))
+		})
 	}
 
 	// Static file serving for SPA

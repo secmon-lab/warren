@@ -1,3 +1,7 @@
+'use client';
+
+import { AuthProvider } from '@/contexts/auth-context';
+import { AuthGuard } from '@/components/auth/auth-guard';
 import { Header } from './header';
 import { Sidebar } from './sidebar';
 
@@ -5,7 +9,7 @@ interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-export function MainLayout({ children }: MainLayoutProps) {
+function AuthenticatedLayout({ children }: MainLayoutProps) {
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
@@ -16,5 +20,17 @@ export function MainLayout({ children }: MainLayoutProps) {
         </main>
       </div>
     </div>
+  );
+}
+
+export function MainLayout({ children }: MainLayoutProps) {
+  return (
+    <AuthProvider>
+      <AuthGuard>
+        <AuthenticatedLayout>
+          {children}
+        </AuthenticatedLayout>
+      </AuthGuard>
+    </AuthProvider>
   );
 } 

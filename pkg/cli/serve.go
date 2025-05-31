@@ -21,6 +21,7 @@ func cmdServe() *cli.Command {
 		addr           string
 		enableGraphQL  bool
 		enableGraphiQL bool
+		authCfg        config.Auth
 		policyCfg      config.Policy
 		sentryCfg      config.Sentry
 		slackCfg       config.Slack
@@ -54,6 +55,7 @@ func cmdServe() *cli.Command {
 				Destination: &enableGraphiQL,
 			},
 		},
+		authCfg.Flags(),
 		policyCfg.Flags(),
 		sentryCfg.Flags(),
 		slackCfg.Flags(),
@@ -73,6 +75,7 @@ func cmdServe() *cli.Command {
 				"addr", addr,
 				"enableGraphQL", enableGraphQL,
 				"enableGraphiQL", enableGraphiQL,
+				"auth", authCfg,
 				"policy", policyCfg,
 				"sentry", sentryCfg,
 				"slack", slackCfg,
@@ -142,6 +145,15 @@ func cmdServe() *cli.Command {
 				if !enableGraphQL {
 					logging.From(ctx).Warn("GraphiQL is enabled but GraphQL is not enabled. GraphiQL will not work.")
 				}
+			}
+
+			// Add AuthUseCase if authentication options are provided
+			authUC, err := authCfg.Configure(firestore)
+			if err != nil {
+				return err
+			}
+			if authUC != nil {
+				serverOptions = append(serverOptions, server.WithAuthUseCase(authUC))
 			}
 
 			httpServer := http.Server{

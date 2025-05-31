@@ -11,6 +11,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -24,6 +25,7 @@ type Memory struct {
 	histories      map[types.TicketID][]*ticket.History
 	tickets        map[types.TicketID]*ticket.Ticket
 	ticketComments map[types.TicketID][]ticket.Comment
+	tokens         map[auth.TokenID]*auth.Token
 }
 
 var _ interfaces.Repository = &Memory{}
@@ -35,6 +37,7 @@ func NewMemory() *Memory {
 		histories:      make(map[types.TicketID][]*ticket.History),
 		tickets:        make(map[types.TicketID]*ticket.Ticket),
 		ticketComments: make(map[types.TicketID][]ticket.Comment),
+		tokens:         make(map[auth.TokenID]*auth.Token),
 	}
 }
 
@@ -612,4 +615,32 @@ func (r *Memory) GetTicketsByStatusAndSpan(ctx context.Context, status types.Tic
 	}
 
 	return tickets, nil
+}
+
+// Token related methods
+func (r *Memory) PutToken(ctx context.Context, token *auth.Token) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.tokens[token.ID] = token
+	return nil
+}
+
+func (r *Memory) GetToken(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	token, ok := r.tokens[tokenID]
+	if !ok {
+		return nil, goerr.New("token not found", goerr.V("token_id", tokenID))
+	}
+	return token, nil
+}
+
+func (r *Memory) DeleteToken(ctx context.Context, tokenID auth.TokenID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	delete(r.tokens, tokenID)
+	return nil
 }
