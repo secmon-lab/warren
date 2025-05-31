@@ -37,6 +37,14 @@ export const GET_TICKET = gql`
         id
         title
         description
+        schema
+        data
+        attributes {
+          key
+          value
+          link
+          auto
+        }
         createdAt
       }
       comments {
@@ -55,6 +63,14 @@ export const GET_ALERT = gql`
       id
       title
       description
+      schema
+      data
+      attributes {
+        key
+        value
+        link
+        auto
+      }
       createdAt
       ticket {
         id
@@ -71,6 +87,14 @@ export const GET_ALERTS = gql`
       id
       title
       description
+      schema
+      data
+      attributes {
+        key
+        value
+        link
+        auto
+      }
       createdAt
       ticket {
         id

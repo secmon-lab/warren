@@ -6,9 +6,11 @@ package graphql
 
 import (
 	"context"
+	"encoding/json"
 
 	goerr "github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
@@ -16,6 +18,39 @@ import (
 // ID is the resolver for the id field.
 func (r *alertResolver) ID(ctx context.Context, obj *alert.Alert) (string, error) {
 	return string(obj.ID), nil
+}
+
+// Schema is the resolver for the schema field.
+func (r *alertResolver) Schema(ctx context.Context, obj *alert.Alert) (string, error) {
+	return string(obj.Schema), nil
+}
+
+// Data is the resolver for the data field.
+func (r *alertResolver) Data(ctx context.Context, obj *alert.Alert) (string, error) {
+	// Convert obj.Data to JSON string
+	jsonBytes, err := json.Marshal(obj.Data)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to marshal alert data to JSON")
+	}
+	return string(jsonBytes), nil
+}
+
+// Attributes is the resolver for the attributes field.
+func (r *alertResolver) Attributes(ctx context.Context, obj *alert.Alert) ([]*graphql1.AlertAttribute, error) {
+	attributes := make([]*graphql1.AlertAttribute, len(obj.Metadata.Attributes))
+	for i, attr := range obj.Metadata.Attributes {
+		var link *string
+		if attr.Link != "" {
+			link = &attr.Link
+		}
+		attributes[i] = &graphql1.AlertAttribute{
+			Key:   attr.Key,
+			Value: attr.Value,
+			Link:  link,
+			Auto:  attr.Auto,
+		}
+	}
+	return attributes, nil
 }
 
 // CreatedAt is the resolver for the createdAt field.
@@ -183,3 +218,23 @@ type commentResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
+	func (r *alertResolver) SlackLink(ctx context.Context, obj *alert.Alert) (*string, error) {
+	if obj.SlackThread == nil {
+		return nil, nil
+	}
+
+	// TODO: This requires slack metadata to generate the proper URL
+	// For now, we'll return a placeholder URL format
+	// The proper implementation would need access to SlackService metadata
+	slackURL := fmt.Sprintf("https://slack.com/archives/%s/p%s", obj.SlackThread.ChannelID, obj.SlackThread.ThreadID)
+	return &slackURL, nil
+}
+*/

@@ -21,8 +21,18 @@ export interface Alert {
   id: string;
   title: string;
   description?: string;
+  schema: string;
+  data: string;
+  attributes: AlertAttribute[];
   createdAt: string;
   ticket?: Ticket;
+}
+
+export interface AlertAttribute {
+  key: string;
+  value: string;
+  link?: string;
+  auto: boolean;
 }
 
 export type TicketStatus = 'open' | 'pending' | 'resolved' | 'archived';

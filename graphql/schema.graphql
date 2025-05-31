@@ -21,8 +21,18 @@ type Alert {
   id: ID!
   title: String!
   description: String
+  schema: String!
+  data: String!
+  attributes: [AlertAttribute!]!
   createdAt: String!
   ticket: Ticket
+}
+
+type AlertAttribute {
+  key: String!
+  value: String!
+  link: String
+  auto: Boolean!
 }
 
 type Query {
