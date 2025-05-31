@@ -86,7 +86,7 @@ export default function BoardPage() {
                     onClick={() => handleTicketClick(ticket.id)}
                   >
                     <CardContent className="p-3">
-                      <h3 className="font-medium text-sm mb-2 line-clamp-2">
+                      <h3 className="font-medium text-sm mb-2 line-clamp-2" title={ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}>
                         {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
                       </h3>
                       

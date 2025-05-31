@@ -125,15 +125,12 @@ function TicketsPageContent() {
         <div className="space-y-6">
           {/* Header */}
           <div className="flex items-start justify-between">
-            <div className="space-y-1">
+            <div className="space-y-3 flex-1">
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={handleBackToList} className="mr-2">
+                <Button variant="ghost" size="sm" onClick={handleBackToList}>
                   <ArrowLeft className="h-4 w-4 mr-1" />
                   Back to tickets
                 </Button>
-                <h1 className="text-3xl font-bold tracking-tight">
-                  {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
-                </h1>
                 <Badge 
                   className={TICKET_STATUS_COLORS[ticket.status as TicketStatus]}
                   variant="secondary"
@@ -141,6 +138,9 @@ function TicketsPageContent() {
                   {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
                 </Badge>
               </div>
+              <h1 className="text-3xl font-bold tracking-tight break-words" title={ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}>
+                {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
+              </h1>
               <p className="text-muted-foreground">
                 #{ticket.id} • Created {formatRelativeTime(ticket.createdAt)} • 
                 Updated {formatRelativeTime(ticket.updatedAt)}
@@ -547,7 +547,7 @@ function TicketsPageContent() {
                               {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
                             </Badge>
                           </div>
-                          <h3 className="font-medium text-foreground hover:text-primary mb-1">
+                          <h3 className="font-medium text-foreground hover:text-primary mb-1 truncate" title={ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}>
                             {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
                           </h3>
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">

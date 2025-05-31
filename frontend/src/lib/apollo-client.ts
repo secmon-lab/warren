@@ -14,7 +14,7 @@ export const apolloClient = new ApolloClient({
   cache: new InMemoryCache(),
   defaultOptions: {
     watchQuery: {
-      errorPolicy: 'ignore',
+      errorPolicy: 'all',
     },
     query: {
       errorPolicy: 'all',
