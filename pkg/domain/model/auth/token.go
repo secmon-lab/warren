@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,11 +43,15 @@ func (x TokenSecret) String() string {
 }
 
 func NewTokenSecret() TokenSecret {
-	id, err := uuid.NewV7()
-	if err != nil {
-		panic(err)
+	// Generate 32 bytes (256 bits) of cryptographically secure random data
+	randomBytes := make([]byte, 32)
+	if _, err := rand.Read(randomBytes); err != nil {
+		panic(goerr.Wrap(err, "failed to generate random token secret"))
 	}
-	return TokenSecret(id.String())
+
+	// Encode to base64 URL-safe string (no padding)
+	tokenString := base64.RawURLEncoding.EncodeToString(randomBytes)
+	return TokenSecret(tokenString)
 }
 
 type Token struct {
