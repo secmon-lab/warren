@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 # Implementation Plan
 
-If there are markdown files in `.todo/` directory, refer to the markdown files and implement code to fill checklists. When you completing the task, fill checkbox in the markdown file.
+If there are markdown files in `.todo/` directory, refer to the markdown files and implement code to fill checklists. When you completing the task, fill checkbox in the markdown file. DO NOT remove and brake already implemented features in the checked items.
 
 # Repository Architecture
 
