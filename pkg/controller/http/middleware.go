@@ -256,7 +256,7 @@ func authMiddleware(authUC AuthUseCase) func(http.Handler) http.Handler {
 			}
 
 			// Add user context to request
-			ctx := context.WithValue(r.Context(), "user", token)
+			ctx := auth.ContextWithToken(r.Context(), token)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

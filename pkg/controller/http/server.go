@@ -1,7 +1,6 @@
 package http
 
 import (
-	"io"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	slack_controller "github.com/secmon-lab/warren/pkg/controller/slack"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
 type Server struct {
@@ -179,7 +179,7 @@ func spaHandler(staticFS fs.FS) http.HandlerFunc {
 			if indexFile, err := staticFS.Open("index.html"); err == nil {
 				defer indexFile.Close()
 				w.Header().Set("Content-Type", "text/html")
-				io.Copy(w, indexFile)
+				safe.Copy(r.Context(), w, indexFile)
 				return
 			}
 

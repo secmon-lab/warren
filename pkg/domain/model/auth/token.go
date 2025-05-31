@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -46,8 +47,8 @@ func NewTokenSecret() TokenSecret {
 }
 
 type Token struct {
-	ID        TokenID     `json:"id" firestore:"-"`
-	Secret    TokenSecret `json:"secret"`
+	ID        TokenID     `json:"id"`
+	Secret    TokenSecret `json:"secret" masq:"secret"`
 	Sub       string      `json:"sub"`
 	Email     string      `json:"email"`
 	Name      string      `json:"name"`
@@ -95,4 +96,18 @@ func NewToken(sub, email, name string) *Token {
 		ExpiresAt: now.Add(7 * 24 * time.Hour), // 1週間後
 		CreatedAt: now,
 	}
+}
+
+type ctxTokenKey struct{}
+
+func TokenFromContext(ctx context.Context) (*Token, error) {
+	token, ok := ctx.Value(ctxTokenKey{}).(*Token)
+	if !ok {
+		return nil, goerr.New("token not found in context")
+	}
+	return token, nil
+}
+
+func ContextWithToken(ctx context.Context, token *Token) context.Context {
+	return context.WithValue(ctx, ctxTokenKey{}, token)
 }

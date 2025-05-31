@@ -8,6 +8,8 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
 type AuthUseCase interface {
@@ -132,7 +134,9 @@ func authLogoutHandler(authUC AuthUseCase) http.HandlerFunc {
 		tokenIDCookie, err := r.Cookie("token_id")
 		if err == nil {
 			tokenID := auth.TokenID(tokenIDCookie.Value)
-			authUC.Logout(r.Context(), tokenID)
+			if err := authUC.Logout(r.Context(), tokenID); err != nil {
+				logging.From(r.Context()).Error("Failed to logout, but ignored", logging.ErrAttr(err))
+			}
 		}
 
 		// Clear authentication cookies
@@ -160,7 +164,7 @@ func authLogoutHandler(authUC AuthUseCase) http.HandlerFunc {
 		http.SetCookie(w, clearTokenSecret)
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"success": true}`))
+		safe.Write(r.Context(), w, []byte(`{"success": true}`))
 	}
 }
 
@@ -194,6 +198,6 @@ func authMeHandler(authUC AuthUseCase) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		userInfo := `{"sub": "` + token.Sub + `", "email": "` + token.Email + `", "name": "` + token.Name + `"}`
-		w.Write([]byte(userInfo))
+		safe.Write(r.Context(), w, []byte(userInfo))
 	}
 }
