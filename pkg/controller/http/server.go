@@ -1,12 +1,14 @@
 package http
 
 import (
+	"io/fs"
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/go-chi/chi/v5"
+	"github.com/secmon-lab/warren/frontend"
 	"github.com/secmon-lab/warren/pkg/controller/graphql"
 	slack_controller "github.com/secmon-lab/warren/pkg/controller/slack"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
@@ -89,6 +91,12 @@ func New(uc UseCase, opts ...Options) *Server {
 		if s.enableGraphiQL {
 			r.Handle("/graphiql", playground.Handler("GraphQL playground", "/graphql"))
 		}
+	}
+
+	// Static file serving
+	staticFS, err := fs.Sub(frontend.StaticFiles, "dist")
+	if err == nil {
+		r.Handle("/*", http.FileServer(http.FS(staticFS)))
 	}
 
 	return s

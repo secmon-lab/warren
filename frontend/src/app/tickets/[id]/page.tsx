@@ -1,30 +1,51 @@
 'use client';
 
-import { useQuery } from '@apollo/client';
-import { useState, use } from 'react';
+import { useQuery, useMutation } from '@apollo/client';
+import { useParams } from 'next/navigation';
+import { useState } from 'react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { GET_TICKET } from '@/lib/graphql/queries';
-import { Ticket, Alert, TICKET_STATUS_LABELS, TICKET_STATUS_COLORS } from '@/lib/types';
-import { formatDateTime, formatRelativeTime, generateSlackLink, generateAlertSlackLink } from '@/lib/utils-extended';
-import { AlertCircle, MessageSquare, User, ExternalLink } from 'lucide-react';
+import { GET_TICKET, UPDATE_TICKET_STATUS } from '@/lib/graphql/queries';
+import { Ticket, TicketStatus, TICKET_STATUS_LABELS, TICKET_STATUS_COLORS } from '@/lib/types';
+import { formatRelativeTime } from '@/lib/utils-extended';
+import { AlertCircle, MessageSquare, Calendar, User, Clock, FileText, Eye } from 'lucide-react';
 
-interface TicketDetailPageProps {
-  params: Promise<{ id: string }>;
-}
+export default function TicketDetailPage() {
+  const params = useParams();
+  const ticketId = params.id as string;
+  const [isUpdating, setIsUpdating] = useState(false);
 
-export default function TicketDetailPage({ params }: TicketDetailPageProps) {
-  const resolvedParams = use(params);
-  const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
-  
-  const { data, loading, error } = useQuery(GET_TICKET, {
-    variables: { id: resolvedParams.id },
+  const { data, loading, error, refetch } = useQuery(GET_TICKET, {
+    variables: { id: ticketId },
+  });
+
+  const [updateTicketStatus] = useMutation(UPDATE_TICKET_STATUS, {
+    onCompleted: () => {
+      console.log('Ticket status updated successfully');
+      refetch();
+    },
+    onError: (error) => {
+      console.error('Failed to update ticket status:', error.message);
+    },
   });
 
   const ticket: Ticket = data?.ticket;
+
+  const handleStatusUpdate = async (newStatus: TicketStatus) => {
+    setIsUpdating(true);
+    try {
+      await updateTicketStatus({
+        variables: {
+          id: ticketId,
+          status: newStatus,
+        },
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -48,114 +69,88 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
     );
   }
 
-  const slackLink = generateSlackLink(ticket.id);
-
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
               <h1 className="text-3xl font-bold tracking-tight">
-                Ticket #{ticket.id.slice(0, 8)}
+                {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
               </h1>
-              <Badge className={TICKET_STATUS_COLORS[ticket.status as keyof typeof TICKET_STATUS_COLORS]}>
-                {TICKET_STATUS_LABELS[ticket.status as keyof typeof TICKET_STATUS_LABELS]}
+              <Badge 
+                className={TICKET_STATUS_COLORS[ticket.status as TicketStatus]}
+                variant="secondary"
+              >
+                {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
               </Badge>
             </div>
             <p className="text-muted-foreground">
-              Created {formatRelativeTime(ticket.createdAt)}
+              #{ticket.id} • Created {formatRelativeTime(ticket.createdAt)} • 
+              Updated {formatRelativeTime(ticket.updatedAt)}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <a href={slackLink} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="mr-2 h-4 w-4" />
-                View in Slack
-              </a>
-            </Button>
-            <Button>Edit Ticket</Button>
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant={ticket.status === 'open' ? 'default' : 'outline'}
+                onClick={() => handleStatusUpdate('open')}
+                disabled={isUpdating || ticket.status === 'open'}
+              >
+                🔍 Open
+              </Button>
+              <Button
+                size="sm"
+                variant={ticket.status === 'resolved' ? 'default' : 'outline'}
+                onClick={() => handleStatusUpdate('resolved')}
+                disabled={isUpdating || ticket.status === 'resolved'}
+              >
+                ✅ Resolve
+              </Button>
+            </div>
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Ticket Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5" />
-                  Ticket Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">ID</label>
-                    <p className="text-sm text-muted-foreground font-mono">{ticket.id}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Status</label>
-                    <p className="text-sm">
-                      <Badge className={TICKET_STATUS_COLORS[ticket.status as keyof typeof TICKET_STATUS_COLORS]}>
-                        {TICKET_STATUS_LABELS[ticket.status as keyof typeof TICKET_STATUS_LABELS]}
-                      </Badge>
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Created</label>
-                    <p className="text-sm text-muted-foreground">{formatDateTime(ticket.createdAt)}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Last Updated</label>
-                    <p className="text-sm text-muted-foreground">{formatDateTime(ticket.updatedAt)}</p>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Assignee</label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Unassigned</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Summary Section */}
+            {ticket.summary && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Eye className="h-5 w-5" />
+                    Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm leading-relaxed">
+                    {ticket.summary}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
-            {/* Comments */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5" />
-                  Comments ({ticket.comments.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {ticket.comments.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No comments yet.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {ticket.comments.map((comment) => (
-                      <div key={comment.id} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4" />
-                            <span className="font-medium">System</span>
-                          </div>
-                          <span className="text-sm text-muted-foreground">
-                            {formatRelativeTime(comment.createdAt)}
-                          </span>
-                        </div>
-                        <p className="text-sm">{comment.content}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+            {/* Description Section */}
+            {ticket.description && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Description
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                    {ticket.description}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
-          <div className="space-y-6">
-            {/* Related Alerts */}
+            {/* Alerts Section */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -163,86 +158,127 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
                   Related Alerts ({ticket.alerts.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                {ticket.alerts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No related alerts.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {ticket.alerts.slice(0, 5).map((alert) => (
-                      <div
-                        key={alert.id}
-                        className="p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => setSelectedAlert(alert)}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-sm truncate">{alert.title}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              {formatRelativeTime(alert.createdAt)}
+              <CardContent className="p-0">
+                <div className="divide-y">
+                  {ticket.alerts.map((alert) => (
+                    <div key={alert.id} className="p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-orange-500 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-foreground">
+                            {alert.title}
+                          </h4>
+                          {alert.description && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {alert.description}
                             </p>
+                          )}
+                          <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                            <span>#{alert.id.slice(0, 8)}</span>
+                            <span>created {formatRelativeTime(alert.createdAt)}</span>
                           </div>
-                          <ExternalLink className="h-3 w-3 text-muted-foreground ml-2" />
                         </div>
                       </div>
-                    ))}
-                    {ticket.alerts.length > 5 && (
-                      <Button variant="ghost" size="sm" className="w-full">
-                        View all {ticket.alerts.length} alerts
-                      </Button>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
-            {/* Alert Detail Modal/Panel */}
-            {selectedAlert && (
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg">Alert Details</CardTitle>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setSelectedAlert(null)}
-                  >
-                    ✕
-                  </Button>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium">ID</label>
-                    <p className="text-sm text-muted-foreground font-mono">{selectedAlert.id}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Title</label>
-                    <p className="text-sm">{selectedAlert.title}</p>
-                  </div>
-                  {selectedAlert.description && (
-                    <div>
-                      <label className="text-sm font-medium">Description</label>
-                      <p className="text-sm text-muted-foreground">{selectedAlert.description}</p>
+            {/* Comments Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  Comments ({ticket.comments.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y">
+                  {ticket.comments.length === 0 ? (
+                    <div className="p-4 text-center text-muted-foreground">
+                      No comments yet
                     </div>
+                  ) : (
+                    ticket.comments.map((comment) => (
+                      <div key={comment.id} className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                            <User className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium">System</span>
+                              <span className="text-sm text-muted-foreground">
+                                {formatRelativeTime(comment.createdAt)}
+                              </span>
+                            </div>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                              {comment.content}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
                   )}
-                  <div>
-                    <label className="text-sm font-medium">Created</label>
-                    <p className="text-sm text-muted-foreground">
-                      {formatDateTime(selectedAlert.createdAt)}
-                    </p>
-                  </div>
-                  <Separator />
-                  <Button variant="outline" size="sm" className="w-full" asChild>
-                    <a 
-                      href={generateAlertSlackLink(selectedAlert.id)} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                    >
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      View Alert in Slack
-                    </a>
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Metadata */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Assignee:</span>
+                  <span>Unassigned</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Created:</span>
+                  <span>{formatRelativeTime(ticket.createdAt)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Updated:</span>
+                  <span>{formatRelativeTime(ticket.updatedAt)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Alerts:</span>
+                  <span>{ticket.alerts.length}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Comments:</span>
+                  <span>{ticket.comments.length}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button className="w-full" variant="outline">
+                  Add Comment
+                </Button>
+                <Button className="w-full" variant="outline">
+                  Edit Ticket
+                </Button>
+                <Button className="w-full" variant="destructive">
+                  Delete Ticket
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

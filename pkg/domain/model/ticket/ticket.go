@@ -23,6 +23,7 @@ type Ticket struct {
 	SlackThread    *slack.Thread   `json:"slack_thread"`
 	SlackMessageID string          `json:"slack_message_id"`
 	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
 
 	Metadata
 
@@ -81,6 +82,7 @@ func New(ctx context.Context, alertIDs []types.AlertID, slackThread *slack.Threa
 		SlackThread: slackThread,
 		Status:      types.TicketStatusOpen,
 		CreatedAt:   clock.Now(ctx),
+		UpdatedAt:   clock.Now(ctx),
 	}
 }
 

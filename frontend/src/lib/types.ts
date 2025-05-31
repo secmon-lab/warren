@@ -1,6 +1,9 @@
 export interface Ticket {
   id: string;
   status: string;
+  title: string;
+  description: string;
+  summary: string;
   alerts: Alert[];
   comments: Comment[];
   createdAt: string;

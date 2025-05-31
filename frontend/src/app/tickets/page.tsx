@@ -20,6 +20,7 @@ const ALL_STATUSES: TicketStatus[] = ['open', 'pending', 'resolved', 'archived']
 export default function TicketsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedStatuses, setSelectedStatuses] = useState<TicketStatus[]>([]);
+  const [activeTab, setActiveTab] = useState<'all' | TicketStatus>('all');
 
   const { data, loading, error } = useQuery(GET_TICKETS, {
     variables: {
@@ -34,8 +35,10 @@ export default function TicketsPage() {
   const handleStatusFilter = (status: TicketStatus | 'all') => {
     if (status === 'all') {
       setSelectedStatuses([]);
+      setActiveTab('all');
     } else {
       setSelectedStatuses([status]);
+      setActiveTab(status);
     }
     setCurrentPage(1);
   };
@@ -70,28 +73,21 @@ export default function TicketsPage() {
           </p>
         </div>
 
-        <Tabs defaultValue="all" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(value) => handleStatusFilter(value as TicketStatus | 'all')} className="space-y-6">
           <TabsList>
-            <TabsTrigger value="all" onClick={() => handleStatusFilter('all')}>
-              All
-            </TabsTrigger>
+            <TabsTrigger value="all">All</TabsTrigger>
             {ALL_STATUSES.map((status) => (
-              <TabsTrigger 
-                key={status} 
-                value={status}
-                onClick={() => handleStatusFilter(status)}
-              >
+              <TabsTrigger key={status} value={status}>
                 {TICKET_STATUS_LABELS[status]}
               </TabsTrigger>
             ))}
           </TabsList>
 
-          <TabsContent value="all" className="space-y-4">
+          <TabsContent value={activeTab} className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>{tickets.length} tickets</span>
-                  <Button size="sm">New Ticket</Button>
+                <CardTitle>
+                  {tickets.length} {activeTab === 'all' ? '' : activeTab} tickets
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
@@ -114,8 +110,13 @@ export default function TicketsPage() {
                               </span>
                             </div>
                             <h3 className="font-medium text-foreground hover:text-primary">
-                              Ticket {ticket.id.slice(0, 8)}
+                              {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
                             </h3>
+                            {ticket.description && (
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                {ticket.description}
+                              </p>
+                            )}
                             <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                               <span>opened {formatRelativeTime(ticket.createdAt)}</span>
                               <div className="flex items-center gap-1">
@@ -140,63 +141,6 @@ export default function TicketsPage() {
               </CardContent>
             </Card>
           </TabsContent>
-
-          {ALL_STATUSES.map((status) => (
-            <TabsContent key={status} value={status} className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>{tickets.length} {status} tickets</span>
-                    <Button size="sm">New Ticket</Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="divide-y">
-                    {tickets.map((ticket) => (
-                      <Link key={ticket.id} href={`/tickets/${ticket.id}`}>
-                        <div className="p-4 hover:bg-muted/50 transition-colors">
-                          <div className="flex items-start gap-3">
-                            <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Badge 
-                                  className={TICKET_STATUS_COLORS[ticket.status as TicketStatus]}
-                                  variant="secondary"
-                                >
-                                  {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
-                                </Badge>
-                                <span className="text-sm text-muted-foreground">
-                                  #{ticket.id.slice(0, 8)}
-                                </span>
-                              </div>
-                              <h3 className="font-medium text-foreground hover:text-primary">
-                                Ticket {ticket.id.slice(0, 8)}
-                              </h3>
-                              <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                                <span>opened {formatRelativeTime(ticket.createdAt)}</span>
-                                <div className="flex items-center gap-1">
-                                  <User className="h-4 w-4" />
-                                  <span>Unassigned</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <MessageSquare className="h-4 w-4" />
-                                  <span>{ticket.comments.length}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <AlertCircle className="h-4 w-4" />
-                                  <span>{ticket.alerts.length} alerts</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          ))}
         </Tabs>
 
         <Pagination>

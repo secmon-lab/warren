@@ -17,12 +17,14 @@ func TestTicketResolver(t *testing.T) {
 	resolver := NewResolver(repo)
 	ctx := context.Background()
 
+	now := time.Now()
 	testTicket := &ticket.Ticket{
 		ID:        types.TicketID("ticket-1"),
 		Metadata:  ticket.Metadata{Title: "Test Ticket", Description: "desc"},
 		Status:    types.TicketStatus("open"),
 		AlertIDs:  []types.AlertID{"alert-1"},
-		CreatedAt: time.Now(),
+		CreatedAt: now.Add(-time.Hour), // 1時間前に作成
+		UpdatedAt: now,                 // 現在時刻で更新
 	}
 	_ = repo.PutTicket(ctx, *testTicket)
 
@@ -31,6 +33,26 @@ func TestTicketResolver(t *testing.T) {
 		gt.NoError(t, err)
 		gt.Value(t, got.ID).Equal(testTicket.ID)
 		gt.Value(t, got.Metadata.Title).Equal(testTicket.Metadata.Title)
+	})
+
+	t.Run("TicketTimestampResolvers", func(t *testing.T) {
+		got, err := resolver.Query().Ticket(ctx, string(testTicket.ID))
+		gt.NoError(t, err)
+
+		// CreatedAtリゾルバーのテスト
+		createdAtStr, err := resolver.Ticket().CreatedAt(ctx, got)
+		gt.NoError(t, err)
+		expectedCreatedAt := testTicket.CreatedAt.Format("2006-01-02T15:04:05Z07:00")
+		gt.Value(t, createdAtStr).Equal(expectedCreatedAt)
+
+		// UpdatedAtリゾルバーのテスト
+		updatedAtStr, err := resolver.Ticket().UpdatedAt(ctx, got)
+		gt.NoError(t, err)
+		expectedUpdatedAt := testTicket.UpdatedAt.Format("2006-01-02T15:04:05Z07:00")
+		gt.Value(t, updatedAtStr).Equal(expectedUpdatedAt)
+
+		// UpdatedAtがCreatedAtより新しいことを確認
+		gt.Value(t, testTicket.UpdatedAt.After(testTicket.CreatedAt)).Equal(true)
 	})
 
 	t.Run("GetTickets", func(t *testing.T) {
@@ -49,12 +71,14 @@ func TestTicketResolver(t *testing.T) {
 				Metadata:  ticket.Metadata{Title: "Test Ticket 2", Description: "desc"},
 				Status:    types.TicketStatus("open"),
 				CreatedAt: time.Now().Add(time.Hour),
+				UpdatedAt: time.Now().Add(time.Hour + time.Minute),
 			},
 			{
 				ID:        types.TicketID("ticket-3"),
 				Metadata:  ticket.Metadata{Title: "Test Ticket 3", Description: "desc"},
 				Status:    types.TicketStatus("closed"),
 				CreatedAt: time.Now().Add(2 * time.Hour),
+				UpdatedAt: time.Now().Add(2*time.Hour + time.Minute),
 			},
 		}
 		for _, t := range tickets {
@@ -126,12 +150,14 @@ func TestCrossReference(t *testing.T) {
 	ticketID := types.TicketID("ticket-1")
 	alertID := types.AlertID("alert-1")
 
+	now := time.Now()
 	testTicket := &ticket.Ticket{
 		ID:        ticketID,
 		Metadata:  ticket.Metadata{Title: "Test Ticket"},
 		Status:    types.TicketStatus("open"),
 		AlertIDs:  []types.AlertID{alertID},
-		CreatedAt: time.Now(),
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 	testAlert := &alert.Alert{
 		ID:        alertID,

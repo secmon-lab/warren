@@ -1,6 +1,9 @@
 type Ticket {
   id: ID!
   status: String!
+  title: String!
+  description: String!
+  summary: String!
   alerts: [Alert!]!
   comments: [Comment!]!
   createdAt: String!

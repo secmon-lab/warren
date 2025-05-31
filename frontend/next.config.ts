@@ -5,7 +5,15 @@ const nextConfig: NextConfig = {
   trailingSlash: true,
   images: {
     unoptimized: true
-  }
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/graphql',
+        destination: 'http://localhost:8080/graphql',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

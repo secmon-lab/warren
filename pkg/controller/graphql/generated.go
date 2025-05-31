@@ -77,12 +77,15 @@ type ComplexityRoot struct {
 	}
 
 	Ticket struct {
-		Alerts    func(childComplexity int) int
-		Comments  func(childComplexity int) int
-		CreatedAt func(childComplexity int) int
-		ID        func(childComplexity int) int
-		Status    func(childComplexity int) int
-		UpdatedAt func(childComplexity int) int
+		Alerts      func(childComplexity int) int
+		Comments    func(childComplexity int) int
+		CreatedAt   func(childComplexity int) int
+		Description func(childComplexity int) int
+		ID          func(childComplexity int) int
+		Status      func(childComplexity int) int
+		Summary     func(childComplexity int) int
+		Title       func(childComplexity int) int
+		UpdatedAt   func(childComplexity int) int
 	}
 }
 
@@ -110,6 +113,7 @@ type QueryResolver interface {
 type TicketResolver interface {
 	ID(ctx context.Context, obj *ticket.Ticket) (string, error)
 	Status(ctx context.Context, obj *ticket.Ticket) (string, error)
+
 	Alerts(ctx context.Context, obj *ticket.Ticket) ([]*alert.Alert, error)
 	Comments(ctx context.Context, obj *ticket.Ticket) ([]*ticket.Comment, error)
 	CreatedAt(ctx context.Context, obj *ticket.Ticket) (string, error)
@@ -274,6 +278,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Ticket.CreatedAt(childComplexity), true
 
+	case "Ticket.description":
+		if e.complexity.Ticket.Description == nil {
+			break
+		}
+
+		return e.complexity.Ticket.Description(childComplexity), true
+
 	case "Ticket.id":
 		if e.complexity.Ticket.ID == nil {
 			break
@@ -287,6 +298,20 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Ticket.Status(childComplexity), true
+
+	case "Ticket.summary":
+		if e.complexity.Ticket.Summary == nil {
+			break
+		}
+
+		return e.complexity.Ticket.Summary(childComplexity), true
+
+	case "Ticket.title":
+		if e.complexity.Ticket.Title == nil {
+			break
+		}
+
+		return e.complexity.Ticket.Title(childComplexity), true
 
 	case "Ticket.updatedAt":
 		if e.complexity.Ticket.UpdatedAt == nil {
@@ -402,6 +427,9 @@ var sources = []*ast.Source{
 	{Name: "../../../graphql/schema.graphql", Input: `type Ticket {
   id: ID!
   status: String!
+  title: String!
+  description: String!
+  summary: String!
   alerts: [Alert!]!
   comments: [Comment!]!
   createdAt: String!
@@ -988,6 +1016,12 @@ func (ec *executionContext) fieldContext_Alert_ticket(_ context.Context, field g
 				return ec.fieldContext_Ticket_id(ctx, field)
 			case "status":
 				return ec.fieldContext_Ticket_status(ctx, field)
+			case "title":
+				return ec.fieldContext_Ticket_title(ctx, field)
+			case "description":
+				return ec.fieldContext_Ticket_description(ctx, field)
+			case "summary":
+				return ec.fieldContext_Ticket_summary(ctx, field)
 			case "alerts":
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "comments":
@@ -1222,6 +1256,12 @@ func (ec *executionContext) fieldContext_Mutation_updateTicketStatus(ctx context
 				return ec.fieldContext_Ticket_id(ctx, field)
 			case "status":
 				return ec.fieldContext_Ticket_status(ctx, field)
+			case "title":
+				return ec.fieldContext_Ticket_title(ctx, field)
+			case "description":
+				return ec.fieldContext_Ticket_description(ctx, field)
+			case "summary":
+				return ec.fieldContext_Ticket_summary(ctx, field)
 			case "alerts":
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "comments":
@@ -1288,6 +1328,12 @@ func (ec *executionContext) fieldContext_Query_ticket(ctx context.Context, field
 				return ec.fieldContext_Ticket_id(ctx, field)
 			case "status":
 				return ec.fieldContext_Ticket_status(ctx, field)
+			case "title":
+				return ec.fieldContext_Ticket_title(ctx, field)
+			case "description":
+				return ec.fieldContext_Ticket_description(ctx, field)
+			case "summary":
+				return ec.fieldContext_Ticket_summary(ctx, field)
 			case "alerts":
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "comments":
@@ -1357,6 +1403,12 @@ func (ec *executionContext) fieldContext_Query_tickets(ctx context.Context, fiel
 				return ec.fieldContext_Ticket_id(ctx, field)
 			case "status":
 				return ec.fieldContext_Ticket_status(ctx, field)
+			case "title":
+				return ec.fieldContext_Ticket_title(ctx, field)
+			case "description":
+				return ec.fieldContext_Ticket_description(ctx, field)
+			case "summary":
+				return ec.fieldContext_Ticket_summary(ctx, field)
 			case "alerts":
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "comments":
@@ -1715,6 +1767,138 @@ func (ec *executionContext) fieldContext_Ticket_status(_ context.Context, field 
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Ticket_title(ctx context.Context, field graphql.CollectedField, obj *ticket.Ticket) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Ticket_title(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Title, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Ticket_title(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Ticket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Ticket_description(ctx context.Context, field graphql.CollectedField, obj *ticket.Ticket) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Ticket_description(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Description, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Ticket_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Ticket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Ticket_summary(ctx context.Context, field graphql.CollectedField, obj *ticket.Ticket) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Ticket_summary(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Summary, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Ticket_summary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Ticket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -4467,6 +4651,21 @@ func (ec *executionContext) _Ticket(ctx context.Context, sel ast.SelectionSet, o
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "title":
+			out.Values[i] = ec._Ticket_title(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "description":
+			out.Values[i] = ec._Ticket_description(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "summary":
+			out.Values[i] = ec._Ticket_summary(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "alerts":
 			field := field
 

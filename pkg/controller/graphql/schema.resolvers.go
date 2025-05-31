@@ -6,7 +6,6 @@ package graphql
 
 import (
 	"context"
-	"fmt"
 
 	goerr "github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -161,7 +160,7 @@ func (r *ticketResolver) CreatedAt(ctx context.Context, obj *ticket.Ticket) (str
 
 // UpdatedAt is the resolver for the updatedAt field.
 func (r *ticketResolver) UpdatedAt(ctx context.Context, obj *ticket.Ticket) (string, error) {
-	panic(fmt.Errorf("not implemented: UpdatedAt - updatedAt"))
+	return obj.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
 }
 
 // Alert returns AlertResolver implementation.

@@ -5,6 +5,8 @@ export const GET_TICKETS = gql`
     tickets(statuses: $statuses, offset: $offset, limit: $limit) {
       id
       status
+      title
+      description
       createdAt
       updatedAt
       alerts {
@@ -26,6 +28,9 @@ export const GET_TICKET = gql`
     ticket(id: $id) {
       id
       status
+      title
+      description
+      summary
       createdAt
       updatedAt
       alerts {
@@ -54,6 +59,7 @@ export const GET_ALERT = gql`
       ticket {
         id
         status
+        title
       }
     }
   }
