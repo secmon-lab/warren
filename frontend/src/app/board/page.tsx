@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { GET_TICKETS } from '@/lib/graphql/queries';
 import { Ticket, TicketStatus, TICKET_STATUS_LABELS, TICKET_STATUS_COLORS } from '@/lib/types';
 import { formatRelativeTime } from '@/lib/utils-extended';
@@ -94,7 +95,22 @@ export default function BoardPage() {
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <User className="h-3 w-3" />
-                            <span>{ticket.assignee ? ticket.assignee.name : 'Unassigned'}</span>
+                            {ticket.assignee ? (
+                              <div className="flex items-center gap-1">
+                                <Avatar className="h-3 w-3">
+                                  <AvatarImage 
+                                    src={`/api/user/${ticket.assignee.id}/icon`} 
+                                    alt={ticket.assignee.name} 
+                                  />
+                                  <AvatarFallback className="text-xs leading-none">
+                                    {ticket.assignee.name.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span>{ticket.assignee.name}</span>
+                              </div>
+                            ) : (
+                              <span>Unassigned</span>
+                            )}
                           </div>
                           <span>{formatRelativeTime(ticket.createdAt)}</span>
                         </div>

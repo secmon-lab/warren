@@ -27,6 +27,9 @@ import (
 //			AuthTestFunc: func() (*slackslack.AuthTestResponse, error) {
 //				panic("mock out the AuthTest method")
 //			},
+//			GetUserInfoFunc: func(userID string) (*slackslack.User, error) {
+//				panic("mock out the GetUserInfo method")
+//			},
 //			OpenViewFunc: func(triggerID string, view slackslack.ModalViewRequest) (*slackslack.ViewResponse, error) {
 //				panic("mock out the OpenView method")
 //			},
@@ -49,6 +52,9 @@ type SlackClientMock struct {
 	// AuthTestFunc mocks the AuthTest method.
 	AuthTestFunc func() (*slackslack.AuthTestResponse, error)
 
+	// GetUserInfoFunc mocks the GetUserInfo method.
+	GetUserInfoFunc func(userID string) (*slackslack.User, error)
+
 	// OpenViewFunc mocks the OpenView method.
 	OpenViewFunc func(triggerID string, view slackslack.ModalViewRequest) (*slackslack.ViewResponse, error)
 
@@ -65,6 +71,11 @@ type SlackClientMock struct {
 	calls struct {
 		// AuthTest holds details about calls to the AuthTest method.
 		AuthTest []struct {
+		}
+		// GetUserInfo holds details about calls to the GetUserInfo method.
+		GetUserInfo []struct {
+			// UserID is the userID argument value.
+			UserID string
 		}
 		// OpenView holds details about calls to the OpenView method.
 		OpenView []struct {
@@ -102,6 +113,7 @@ type SlackClientMock struct {
 		}
 	}
 	lockAuthTest             sync.RWMutex
+	lockGetUserInfo          sync.RWMutex
 	lockOpenView             sync.RWMutex
 	lockPostMessageContext   sync.RWMutex
 	lockUpdateMessageContext sync.RWMutex
@@ -136,6 +148,42 @@ func (mock *SlackClientMock) AuthTestCalls() []struct {
 	mock.lockAuthTest.RLock()
 	calls = mock.calls.AuthTest
 	mock.lockAuthTest.RUnlock()
+	return calls
+}
+
+// GetUserInfo calls GetUserInfoFunc.
+func (mock *SlackClientMock) GetUserInfo(userID string) (*slackslack.User, error) {
+	callInfo := struct {
+		UserID string
+	}{
+		UserID: userID,
+	}
+	mock.lockGetUserInfo.Lock()
+	mock.calls.GetUserInfo = append(mock.calls.GetUserInfo, callInfo)
+	mock.lockGetUserInfo.Unlock()
+	if mock.GetUserInfoFunc == nil {
+		var (
+			userOut *slackslack.User
+			errOut  error
+		)
+		return userOut, errOut
+	}
+	return mock.GetUserInfoFunc(userID)
+}
+
+// GetUserInfoCalls gets all the calls that were made to GetUserInfo.
+// Check the length with:
+//
+//	len(mockedSlackClient.GetUserInfoCalls())
+func (mock *SlackClientMock) GetUserInfoCalls() []struct {
+	UserID string
+} {
+	var calls []struct {
+		UserID string
+	}
+	mock.lockGetUserInfo.RLock()
+	calls = mock.calls.GetUserInfo
+	mock.lockGetUserInfo.RUnlock()
 	return calls
 }
 

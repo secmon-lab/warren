@@ -3,10 +3,12 @@ package slack_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/m-mizutani/gt"
+	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -299,4 +301,148 @@ func TestNewStateFunc(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestService_GetUserIcon(t *testing.T) {
+	ctx := context.Background()
+
+	// Setup Slack client mock
+	slackMock := &mock.SlackClientMock{
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "U123456",
+				TeamID: "T123456",
+				Team:   "test-team",
+				BotID:  "B123456",
+			}, nil
+		},
+		GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
+			return &slack_sdk.User{
+				ID: userID,
+				Profile: slack_sdk.UserProfile{
+					Image192: "https://example.com/avatar.jpg",
+				},
+			}, nil
+		},
+	}
+
+	// Create service
+	service, err := slack.New(slackMock, "C123456")
+	gt.NoError(t, err)
+
+	// Note: This test would fail in real usage because it tries to download from example.com
+	// But it verifies that the Slack GetUserInfo method is called correctly
+	_, _, err = service.GetUserIcon(ctx, "U123456")
+	// We expect an error because example.com won't have the image
+	gt.Error(t, err)
+
+	// Verify Slack was called
+	gt.Array(t, slackMock.GetUserInfoCalls()).Length(1)
+	gt.Value(t, slackMock.GetUserInfoCalls()[0].UserID).Equal("U123456")
+}
+
+func TestService_ClearExpiredIconCache(t *testing.T) {
+	// Setup Slack client mock
+	slackMock := &mock.SlackClientMock{
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "U123456",
+				TeamID: "T123456",
+				Team:   "test-team",
+				BotID:  "B123456",
+			}, nil
+		},
+	}
+
+	service, err := slack.New(slackMock, "C123456")
+	gt.NoError(t, err)
+
+	// Add expired cache entry
+	cache := service.GetIconCache()
+	cache["U123456"] = &slack.UserIconCache{
+		ImageData: []byte("old data"),
+		ExpiresAt: time.Now().Add(-time.Hour), // Expired 1 hour ago
+	}
+
+	// Add non-expired cache entry
+	cache["U789012"] = &slack.UserIconCache{
+		ImageData: []byte("new data"),
+		ExpiresAt: time.Now().Add(time.Hour), // Expires in 1 hour
+	}
+
+	// Clear expired cache
+	service.ClearExpiredIconCache()
+
+	// Verify expired entry was removed
+	_, exists := cache["U123456"]
+	gt.Value(t, exists).Equal(false)
+
+	// Verify non-expired entry remains
+	_, exists2 := cache["U789012"]
+	gt.Value(t, exists2).Equal(true)
+}
+
+func TestService_GetUserIcon_RealSlack(t *testing.T) {
+	// Skip test if TEST_SLACK_USER_ID is not set
+	userID := os.Getenv("TEST_SLACK_USER_ID")
+	if userID == "" {
+		t.Skip("TEST_SLACK_USER_ID not set, skipping real Slack API test")
+	}
+
+	svc := newSlackService(t)
+	ctx := context.Background()
+
+	type testCase struct {
+		userID     string
+		shouldFail bool
+	}
+
+	runTest := func(tc testCase) func(t *testing.T) {
+		return func(t *testing.T) {
+			imageData, mimeType, err := svc.GetUserIcon(ctx, tc.userID)
+
+			if tc.shouldFail {
+				gt.Error(t, err)
+				return
+			}
+
+			gt.NoError(t, err)
+			gt.Number(t, len(imageData)).Greater(0)
+			gt.Value(t, mimeType).NotEqual("")
+
+			// Verify MIME type is a valid image type
+			validMimeTypes := []string{
+				"image/jpeg",
+				"image/png",
+				"image/gif",
+				"image/webp",
+			}
+			gt.Array(t, validMimeTypes).Has(mimeType)
+		}
+	}
+
+	t.Run("valid user ID", runTest(testCase{
+		userID:     userID,
+		shouldFail: false,
+	}))
+
+	t.Run("invalid user ID", runTest(testCase{
+		userID:     "INVALID_USER_ID",
+		shouldFail: true,
+	}))
+
+	// Test caching behavior
+	t.Run("cached response", func(t *testing.T) {
+		// First call
+		imageData1, mimeType1, err := svc.GetUserIcon(ctx, userID)
+		gt.NoError(t, err)
+
+		// Second call (should use cache)
+		imageData2, mimeType2, err := svc.GetUserIcon(ctx, userID)
+		gt.NoError(t, err)
+
+		// Results should be identical
+		gt.Array(t, imageData1).Equal(imageData2)
+		gt.Value(t, mimeType1).Equal(mimeType2)
+	})
 }

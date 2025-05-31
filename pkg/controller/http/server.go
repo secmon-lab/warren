@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -56,6 +57,7 @@ type UseCase interface {
 	interfaces.AlertUsecases
 	interfaces.SlackEventUsecases
 	interfaces.SlackInteractionUsecases
+	GetUserIcon(ctx context.Context, userID string) ([]byte, string, error)
 }
 
 func New(uc UseCase, opts ...Options) *Server {
@@ -125,6 +127,15 @@ func New(uc UseCase, opts ...Options) *Server {
 			r.Get("/me", authMeHandler(s.authUC))
 		})
 	}
+
+	// User API endpoints
+	r.Route("/api/user", func(r chi.Router) {
+		// Apply authentication middleware to user API
+		if s.authUC != nil {
+			r.Use(authMiddleware(s.authUC))
+		}
+		r.Get("/{userID}/icon", userIconHandler(uc))
+	})
 
 	// Static file serving for SPA
 	staticFS, err := fs.Sub(frontend.StaticFiles, "dist")

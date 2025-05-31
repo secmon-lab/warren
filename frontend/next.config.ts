@@ -22,6 +22,10 @@ const nextConfig: NextConfig = {
           source: '/api/auth/:path*',
           destination: 'http://localhost:8080/api/auth/:path*',
         },
+        {
+          source: '/api/user/:path*',
+          destination: 'http://localhost:8080/api/user/:path*',
+        },
       ];
     },
   } : {}),

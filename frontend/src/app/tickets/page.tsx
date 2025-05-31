@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Separator } from '@/components/ui/separator';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { GET_TICKETS, GET_TICKET } from '@/lib/graphql/queries';
 import { Ticket, TicketStatus, TICKET_STATUS_LABELS, TICKET_STATUS_COLORS, Alert } from '@/lib/types';
 import { formatRelativeTime } from '@/lib/utils-extended';
@@ -337,7 +338,22 @@ function TicketsPageContent() {
                   <div className="flex items-center gap-2 text-sm">
                     <User className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Assignee:</span>
-                    <span>{ticket.assignee ? ticket.assignee.name : 'Unassigned'}</span>
+                    {ticket.assignee ? (
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-5 w-5">
+                          <AvatarImage 
+                            src={`/api/user/${ticket.assignee.id}/icon`} 
+                            alt={ticket.assignee.name} 
+                          />
+                          <AvatarFallback className="text-xs">
+                            {ticket.assignee.name.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>{ticket.assignee.name}</span>
+                      </div>
+                    ) : (
+                      <span>Unassigned</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -554,7 +570,22 @@ function TicketsPageContent() {
                             <span>opened {formatRelativeTime(ticket.createdAt)}</span>
                             <div className="flex items-center gap-1">
                               <User className="h-3 w-3" />
-                              <span>{ticket.assignee ? ticket.assignee.name : 'Unassigned'}</span>
+                              {ticket.assignee ? (
+                                <div className="flex items-center gap-1">
+                                  <Avatar className="h-3 w-3">
+                                    <AvatarImage 
+                                      src={`/api/user/${ticket.assignee.id}/icon`} 
+                                      alt={ticket.assignee.name} 
+                                    />
+                                    <AvatarFallback className="text-xs leading-none">
+                                      {ticket.assignee.name.charAt(0).toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span>{ticket.assignee.name}</span>
+                                </div>
+                              ) : (
+                                <span>Unassigned</span>
+                              )}
                             </div>
                             <div className="flex items-center gap-1">
                               <MessageSquare className="h-3 w-3" />

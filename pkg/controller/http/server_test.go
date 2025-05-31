@@ -37,6 +37,15 @@ import (
 //go:embed testdata/pubsub.json
 var pubsubJSON []byte
 
+//go:embed testdata/slack_interaction.json
+var slackInteractionJSON []byte
+
+//go:embed testdata/slack_mention.json
+var slackMentionJSON []byte
+
+//go:embed testdata/sns.pem
+var snsPem []byte
+
 func TestValidateGoogleIDToken(t *testing.T) {
 	vars := test.NewEnvVars(t, "TEST_GOOGLE_ID_TOKEN", "TEST_GOOGLE_ID_TOKEN_EMAIL")
 
@@ -87,9 +96,6 @@ func TestValidateGoogleIDToken(t *testing.T) {
 	})
 }
 
-//go:embed testdata/slack_interaction.json
-var slackInteractionJSON []byte
-
 func TestSlackInteractionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
 	uc := &useCaseInterface{
@@ -128,9 +134,6 @@ func TestSlackInteractionHandler(t *testing.T) {
 		gt.Equal(t, http.StatusOK, w.Code)
 	})
 }
-
-//go:embed testdata/slack_mention.json
-var slackMentionJSON []byte
 
 func TestSlackMentionHandler(t *testing.T) {
 	signingSecret := "test_signing_secret"
@@ -177,9 +180,6 @@ func calculateSlackSignature(payload string, ts string, signingSecret string) st
 	mac.Write([]byte(baseString))
 	return "v0=" + hex.EncodeToString(mac.Sum(nil))
 }
-
-//go:embed testdata/sns.pem
-var snsPem []byte
 
 func TestAlertSNS(t *testing.T) {
 	alertUsecasesMock := &mock.AlertUsecasesMock{

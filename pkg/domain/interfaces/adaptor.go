@@ -30,6 +30,7 @@ type SlackClient interface {
 	AuthTest() (*slack.AuthTestResponse, error)
 	OpenView(triggerID string, view slack.ModalViewRequest) (*slack.ViewResponse, error)
 	UploadFileV2Context(ctx context.Context, params slack.UploadFileV2Parameters) (*slack.FileSummary, error)
+	GetUserInfo(userID string) (*slack.User, error)
 }
 
 type SlackThreadService interface {
