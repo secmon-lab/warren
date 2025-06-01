@@ -5,8 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gt"
@@ -15,15 +18,35 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 
 	"github.com/slack-go/slack"
 )
 
+type userIconCache struct {
+	ImageData []byte
+	ExpiresAt time.Time
+}
+
+type userProfileCache struct {
+	Name      string
+	ExpiresAt time.Time
+}
+
+const UserProfileCacheExpiry = 10 * time.Minute
+
 type Service struct {
 	channelID string
 	client    interfaces.SlackClient
 	slackMetadata
+	// User icon cache
+	iconCache       map[string]*userIconCache
+	iconCacheMutex  sync.RWMutex
+	iconCacheExpiry time.Duration
+	// User profile cache
+	profileCache      map[string]*userProfileCache
+	profileCacheMutex sync.RWMutex
 }
 
 type slackMetadata struct {
@@ -44,8 +67,11 @@ func (x slackMetadata) ToMsgURL(channelID, threadID string) string {
 
 func New(client interfaces.SlackClient, channelID string) (*Service, error) {
 	s := &Service{
-		channelID: channelID,
-		client:    client,
+		channelID:       channelID,
+		client:          client,
+		iconCache:       make(map[string]*userIconCache),
+		iconCacheExpiry: time.Hour, // 1時間でキャッシュ更新
+		profileCache:    make(map[string]*userProfileCache),
 	}
 
 	authTest, err := s.client.AuthTest()
@@ -460,7 +486,6 @@ func (x *Service) ShowResolveTicketModal(ctx context.Context, ticket *ticket.Tic
 
 func (x *ThreadService) PostAlert(ctx context.Context, alert alert.Alert) error {
 	blocks := buildAlertBlocks(alert)
-
 	_, _, err := x.client.PostMessageContext(
 		ctx,
 		x.channelID,
@@ -468,19 +493,151 @@ func (x *ThreadService) PostAlert(ctx context.Context, alert alert.Alert) error 
 		slack.MsgOptionTS(x.threadID),
 	)
 	if err != nil {
-		return goerr.Wrap(err, "failed to post alert to thread", goerr.V("channelID", x.channelID), goerr.V("threadID", x.threadID), goerr.V("blocks", blocks))
-	}
-
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(alert.Data); err != nil {
-		return goerr.Wrap(err, "failed to encode alert data")
-	}
-
-	if err := x.AttachFile(ctx, "Original Alert", "alert."+alert.ID.String()+".json", buf.Bytes()); err != nil {
-		return goerr.Wrap(err, "failed to attach file to slack")
+		return goerr.Wrap(err, "failed to post message to slack", goerr.V("channelID", x.channelID), goerr.V("threadID", x.threadID), goerr.V("blocks", blocks))
 	}
 
 	return nil
+}
+
+// GetUserIcon returns the user's icon image data
+func (x *Service) GetUserIcon(ctx context.Context, userID string) ([]byte, string, error) {
+	logger := logging.From(ctx)
+
+	// Check cache first
+	x.iconCacheMutex.RLock()
+	if cached, exists := x.iconCache[userID]; exists && time.Now().Before(cached.ExpiresAt) {
+		x.iconCacheMutex.RUnlock()
+		logger.Debug("returning cached user icon", "user_id", userID)
+		return cached.ImageData, "image/jpeg", nil
+	}
+	x.iconCacheMutex.RUnlock()
+
+	// Fetch user info from Slack
+	user, err := x.client.GetUserInfo(userID)
+	if err != nil {
+		return nil, "", goerr.Wrap(err, "failed to get user info from slack", goerr.V("user_id", userID))
+	}
+
+	// Get profile image URL (use image_192 for good quality)
+	imageURL := user.Profile.Image192
+	if imageURL == "" {
+		// Fallback to other sizes if image_192 is not available
+		imageURL = user.Profile.Image512
+		if imageURL == "" {
+			imageURL = user.Profile.Image72
+			if imageURL == "" {
+				return nil, "", goerr.New("no profile image available", goerr.V("user_id", userID))
+			}
+		}
+	}
+
+	// Download the image
+	imageData, contentType, err := x.downloadUserImage(ctx, imageURL)
+	if err != nil {
+		return nil, "", goerr.Wrap(err, "failed to download user icon", goerr.V("user_id", userID), goerr.V("image_url", imageURL))
+	}
+
+	// Cache the image
+	x.iconCacheMutex.Lock()
+	x.iconCache[userID] = &userIconCache{
+		ImageData: imageData,
+		ExpiresAt: time.Now().Add(x.iconCacheExpiry),
+	}
+	x.iconCacheMutex.Unlock()
+
+	logger.Debug("cached user icon", "user_id", userID, "image_size", len(imageData))
+	return imageData, contentType, nil
+}
+
+// downloadUserImage downloads an image from the given URL
+func (x *Service) downloadUserImage(ctx context.Context, url string) ([]byte, string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, "", goerr.Wrap(err, "failed to create request")
+	}
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, "", goerr.Wrap(err, "failed to download image")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", goerr.New("failed to download image",
+			goerr.V("status_code", resp.StatusCode),
+			goerr.V("status", resp.Status))
+	}
+
+	imageData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", goerr.Wrap(err, "failed to read image data")
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "image/jpeg" // default fallback
+	}
+
+	return imageData, contentType, nil
+}
+
+// ClearExpiredIconCache removes expired cache entries
+func (x *Service) ClearExpiredIconCache() {
+	x.iconCacheMutex.Lock()
+	defer x.iconCacheMutex.Unlock()
+
+	now := time.Now()
+	for userID, cached := range x.iconCache {
+		if now.After(cached.ExpiresAt) {
+			delete(x.iconCache, userID)
+		}
+	}
+}
+
+// GetUserProfile returns the user's profile name
+func (x *Service) GetUserProfile(ctx context.Context, userID string) (string, error) {
+	logger := logging.From(ctx)
+
+	// Check cache first
+	x.profileCacheMutex.RLock()
+	if cached, exists := x.profileCache[userID]; exists && time.Now().Before(cached.ExpiresAt) {
+		x.profileCacheMutex.RUnlock()
+		logger.Debug("returning cached user profile", "user_id", userID)
+		return cached.Name, nil
+	}
+	x.profileCacheMutex.RUnlock()
+
+	// Fetch user info from Slack
+	user, err := x.client.GetUserInfo(userID)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to get user info from slack", goerr.V("user_id", userID))
+	}
+
+	// Cache the profile
+	x.profileCacheMutex.Lock()
+	x.profileCache[userID] = &userProfileCache{
+		Name:      user.Profile.DisplayName,
+		ExpiresAt: time.Now().Add(UserProfileCacheExpiry),
+	}
+	x.profileCacheMutex.Unlock()
+
+	logger.Debug("cached user profile", "user_id", userID, "name", user.Profile.DisplayName)
+	return user.Profile.DisplayName, nil
+}
+
+// ClearExpiredProfileCache removes expired profile cache entries
+func (x *Service) ClearExpiredProfileCache() {
+	x.profileCacheMutex.Lock()
+	defer x.profileCacheMutex.Unlock()
+
+	now := time.Now()
+	for userID, cached := range x.profileCache {
+		if now.After(cached.ExpiresAt) {
+			delete(x.profileCache, userID)
+		}
+	}
 }

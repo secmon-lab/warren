@@ -9,6 +9,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -48,6 +49,7 @@ const (
 	collectionNotes       = "notes"
 	collectionTickets     = "tickets"
 	collectionComments    = "comments"
+	collectionTokens      = "tokens"
 )
 
 func (r *Firestore) PutAlert(ctx context.Context, alert alert.Alert) error {
@@ -914,4 +916,76 @@ func (r *Firestore) GetTicketsByStatusAndSpan(ctx context.Context, status types.
 	}
 
 	return tickets, nil
+}
+
+// Token related methods
+func (r *Firestore) PutToken(ctx context.Context, token *auth.Token) error {
+	doc := r.db.Collection(collectionTokens).Doc(token.ID.String())
+	_, err := doc.Set(ctx, token)
+	if err != nil {
+		return goerr.Wrap(err, "failed to put token", goerr.V("token_id", token.ID))
+	}
+	return nil
+}
+
+func (r *Firestore) GetToken(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error) {
+	doc, err := r.db.Collection(collectionTokens).Doc(tokenID.String()).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, goerr.New("token not found", goerr.V("token_id", tokenID))
+		}
+		return nil, goerr.Wrap(err, "failed to get token", goerr.V("token_id", tokenID))
+	}
+
+	var token auth.Token
+	if err := doc.DataTo(&token); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert data to token", goerr.V("token_id", tokenID))
+	}
+
+	token.ID = tokenID // Set the ID manually since it's not stored in the document
+	return &token, nil
+}
+
+func (r *Firestore) DeleteToken(ctx context.Context, tokenID auth.TokenID) error {
+	doc := r.db.Collection(collectionTokens).Doc(tokenID.String())
+	_, err := doc.Delete(ctx)
+	if err != nil {
+		return goerr.Wrap(err, "failed to delete token", goerr.V("token_id", tokenID))
+	}
+	return nil
+}
+
+func (r *Firestore) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error {
+	bw := r.db.BulkWriter(ctx)
+	var jobs []*firestore.BulkWriterJob
+
+	now := time.Now()
+	for _, ticketID := range ticketIDs {
+		ticketDoc := r.db.Collection(collectionTickets).Doc(ticketID.String())
+
+		job, err := bw.Update(ticketDoc, []firestore.Update{
+			{
+				Path:  "Status",
+				Value: status,
+			},
+			{
+				Path:  "UpdatedAt",
+				Value: now,
+			},
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to update ticket status", goerr.V("ticket_id", ticketID), goerr.V("status", status))
+		}
+		jobs = append(jobs, job)
+	}
+
+	bw.End()
+
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil {
+			return goerr.Wrap(err, "failed to commit bulk writer job")
+		}
+	}
+
+	return nil
 }

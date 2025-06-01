@@ -6,10 +6,11 @@ package graphql
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 
 	goerr "github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
@@ -17,6 +18,39 @@ import (
 // ID is the resolver for the id field.
 func (r *alertResolver) ID(ctx context.Context, obj *alert.Alert) (string, error) {
 	return string(obj.ID), nil
+}
+
+// Schema is the resolver for the schema field.
+func (r *alertResolver) Schema(ctx context.Context, obj *alert.Alert) (string, error) {
+	return string(obj.Schema), nil
+}
+
+// Data is the resolver for the data field.
+func (r *alertResolver) Data(ctx context.Context, obj *alert.Alert) (string, error) {
+	// Convert obj.Data to JSON string
+	jsonBytes, err := json.Marshal(obj.Data)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to marshal alert data to JSON")
+	}
+	return string(jsonBytes), nil
+}
+
+// Attributes is the resolver for the attributes field.
+func (r *alertResolver) Attributes(ctx context.Context, obj *alert.Alert) ([]*graphql1.AlertAttribute, error) {
+	attributes := make([]*graphql1.AlertAttribute, len(obj.Metadata.Attributes))
+	for i, attr := range obj.Metadata.Attributes {
+		var link *string
+		if attr.Link != "" {
+			link = &attr.Link
+		}
+		attributes[i] = &graphql1.AlertAttribute{
+			Key:   attr.Key,
+			Value: attr.Value,
+			Link:  link,
+			Auto:  attr.Auto,
+		}
+	}
+	return attributes, nil
 }
 
 // CreatedAt is the resolver for the createdAt field.
@@ -52,6 +86,11 @@ func (r *commentResolver) UpdatedAt(ctx context.Context, obj *ticket.Comment) (s
 	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
 }
 
+// Severity is the resolver for the severity field.
+func (r *findingResolver) Severity(ctx context.Context, obj *ticket.Finding) (string, error) {
+	return string(obj.Severity), nil
+}
+
 // UpdateTicketStatus is the resolver for the updateTicketStatus field.
 func (r *mutationResolver) UpdateTicketStatus(ctx context.Context, id string, status string) (*ticket.Ticket, error) {
 	t, err := r.repo.GetTicket(ctx, types.TicketID(id))
@@ -65,6 +104,38 @@ func (r *mutationResolver) UpdateTicketStatus(ctx context.Context, id string, st
 	}
 
 	return t, nil
+}
+
+// UpdateMultipleTicketsStatus is the resolver for the updateMultipleTicketsStatus field.
+func (r *mutationResolver) UpdateMultipleTicketsStatus(ctx context.Context, ids []string, status string) ([]*ticket.Ticket, error) {
+	// ステータスのバリデーション
+	ticketStatus := types.TicketStatus(status)
+	if err := ticketStatus.Validate(); err != nil {
+		return nil, goerr.Wrap(err, "invalid ticket status", goerr.V("status", status))
+	}
+
+	// チケットIDの変換とバリデーション
+	ticketIDs := make([]types.TicketID, len(ids))
+	for i, id := range ids {
+		ticketID := types.TicketID(id)
+		if err := ticketID.Validate(); err != nil {
+			return nil, goerr.Wrap(err, "invalid ticket ID", goerr.V("id", id))
+		}
+		ticketIDs[i] = ticketID
+	}
+
+	// バッチでステータス更新
+	if err := r.repo.BatchUpdateTicketsStatus(ctx, ticketIDs, ticketStatus); err != nil {
+		return nil, goerr.Wrap(err, "failed to batch update tickets status")
+	}
+
+	// 更新されたチケットを取得
+	tickets, err := r.repo.BatchGetTickets(ctx, ticketIDs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get updated tickets")
+	}
+
+	return tickets, nil
 }
 
 // Ticket is the resolver for the ticket field.
@@ -130,6 +201,17 @@ func (r *ticketResolver) Status(ctx context.Context, obj *ticket.Ticket) (string
 	return string(obj.Status), nil
 }
 
+// Assignee is the resolver for the assignee field.
+func (r *ticketResolver) Assignee(ctx context.Context, obj *ticket.Ticket) (*graphql1.User, error) {
+	if obj.Assignee == nil {
+		return nil, nil
+	}
+	return &graphql1.User{
+		ID:   obj.Assignee.ID,
+		Name: obj.Assignee.Name,
+	}, nil
+}
+
 // Alerts is the resolver for the alerts field.
 func (r *ticketResolver) Alerts(ctx context.Context, obj *ticket.Ticket) ([]*alert.Alert, error) {
 	alerts, err := r.repo.BatchGetAlerts(ctx, obj.AlertIDs)
@@ -154,6 +236,15 @@ func (r *ticketResolver) Comments(ctx context.Context, obj *ticket.Ticket) ([]*t
 	return commentPtrs, nil
 }
 
+// Conclusion is the resolver for the conclusion field.
+func (r *ticketResolver) Conclusion(ctx context.Context, obj *ticket.Ticket) (*string, error) {
+	if obj.Conclusion == "" {
+		return nil, nil
+	}
+	conclusion := string(obj.Conclusion)
+	return &conclusion, nil
+}
+
 // CreatedAt is the resolver for the createdAt field.
 func (r *ticketResolver) CreatedAt(ctx context.Context, obj *ticket.Ticket) (string, error) {
 	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
@@ -161,7 +252,7 @@ func (r *ticketResolver) CreatedAt(ctx context.Context, obj *ticket.Ticket) (str
 
 // UpdatedAt is the resolver for the updatedAt field.
 func (r *ticketResolver) UpdatedAt(ctx context.Context, obj *ticket.Ticket) (string, error) {
-	panic(fmt.Errorf("not implemented: UpdatedAt - updatedAt"))
+	return obj.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
 }
 
 // Alert returns AlertResolver implementation.
@@ -169,6 +260,9 @@ func (r *Resolver) Alert() AlertResolver { return &alertResolver{r} }
 
 // Comment returns CommentResolver implementation.
 func (r *Resolver) Comment() CommentResolver { return &commentResolver{r} }
+
+// Finding returns FindingResolver implementation.
+func (r *Resolver) Finding() FindingResolver { return &findingResolver{r} }
 
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
@@ -181,6 +275,7 @@ func (r *Resolver) Ticket() TicketResolver { return &ticketResolver{r} }
 
 type alertResolver struct{ *Resolver }
 type commentResolver struct{ *Resolver }
+type findingResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }

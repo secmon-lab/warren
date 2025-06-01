@@ -2,8 +2,20 @@
 
 package graphql
 
+type AlertAttribute struct {
+	Key   string  `json:"key"`
+	Value string  `json:"value"`
+	Link  *string `json:"link,omitempty"`
+	Auto  bool    `json:"auto"`
+}
+
 type Mutation struct {
 }
 
 type Query struct {
+}
+
+type User struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }

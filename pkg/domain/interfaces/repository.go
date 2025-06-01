@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -14,6 +15,7 @@ type Repository interface {
 	GetTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error)
 	BatchGetTickets(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error)
 	PutTicket(ctx context.Context, ticket ticket.Ticket) error
+	BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error
 	GetTicketByThread(ctx context.Context, thread slack.Thread) (*ticket.Ticket, error)
 	FindNearestTickets(ctx context.Context, embedding []float32, limit int) ([]*ticket.Ticket, error)
 	FindNearestTicketsWithSpan(ctx context.Context, embedding []float32, begin, end time.Time, limit int) ([]*ticket.Ticket, error)
@@ -51,4 +53,9 @@ type Repository interface {
 	GetLatestAlertListInThread(ctx context.Context, thread slack.Thread) (*alert.List, error)
 
 	GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts, error)
+
+	// For authentication management
+	PutToken(ctx context.Context, token *auth.Token) error
+	GetToken(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error)
+	DeleteToken(ctx context.Context, tokenID auth.TokenID) error
 }

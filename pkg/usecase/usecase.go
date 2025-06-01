@@ -4,11 +4,16 @@ import (
 	"context"
 	"time"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/slack"
+)
+
+var (
+	ErrSlackServiceNotConfigured = goerr.New("slack service not configured")
 )
 
 type UseCases struct {
@@ -32,6 +37,7 @@ type UseCases struct {
 var _ interfaces.AlertUsecases = &UseCases{}
 var _ interfaces.SlackEventUsecases = &UseCases{}
 var _ interfaces.SlackInteractionUsecases = &UseCases{}
+var _ interfaces.UserUsecases = &UseCases{}
 
 type Option func(*UseCases)
 
@@ -126,4 +132,22 @@ func New(opts ...Option) *UseCases {
 	}
 
 	return u
+}
+
+// GetUserIcon returns the user's icon image data via Slack service
+func (u *UseCases) GetUserIcon(ctx context.Context, userID string) ([]byte, string, error) {
+	if u.slackService == nil {
+		return nil, "", ErrSlackServiceNotConfigured
+	}
+
+	return u.slackService.GetUserIcon(ctx, userID)
+}
+
+// GetUserProfile returns the user's profile name via Slack service
+func (u *UseCases) GetUserProfile(ctx context.Context, userID string) (string, error) {
+	if u.slackService == nil {
+		return "", ErrSlackServiceNotConfigured
+	}
+
+	return u.slackService.GetUserProfile(ctx, userID)
 }

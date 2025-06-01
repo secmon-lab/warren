@@ -1,10 +1,22 @@
 type Ticket {
   id: ID!
   status: String!
+  title: String!
+  description: String!
+  summary: String!
+  assignee: User
   alerts: [Alert!]!
   comments: [Comment!]!
+  conclusion: String
+  reason: String
+  finding: Finding
   createdAt: String!
   updatedAt: String!
+}
+
+type User {
+  id: ID!
+  name: String!
 }
 
 type Comment {
@@ -18,8 +30,25 @@ type Alert {
   id: ID!
   title: String!
   description: String
+  schema: String!
+  data: String!
+  attributes: [AlertAttribute!]!
   createdAt: String!
   ticket: Ticket
+}
+
+type AlertAttribute {
+  key: String!
+  value: String!
+  link: String
+  auto: Boolean!
+}
+
+type Finding {
+  severity: String!
+  summary: String!
+  reason: String!
+  recommendation: String!
 }
 
 type Query {
@@ -31,6 +60,7 @@ type Query {
 
 type Mutation {
   updateTicketStatus(id: ID!, status: String!): Ticket!
+  updateMultipleTicketsStatus(ids: [ID!]!, status: String!): [Ticket!]!
 }
 
 schema {
