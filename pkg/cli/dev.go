@@ -32,7 +32,7 @@ import (
 func cmdDev() *cli.Command {
 	var (
 		addr      string
-		authCfg   config.Auth
+		webUICfg  config.WebUI
 		geminiCfg config.GeminiCfg
 	)
 
@@ -47,7 +47,7 @@ func cmdDev() *cli.Command {
 				Destination: &addr,
 			},
 		},
-		authCfg.Flags(),
+		webUICfg.Flags(),
 		geminiCfg.Flags(),
 	)
 
@@ -59,7 +59,7 @@ func cmdDev() *cli.Command {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			logging.Default().Info("starting development server",
 				"addr", addr,
-				"auth", authCfg,
+				"web-ui", webUICfg,
 				"gemini", geminiCfg,
 			)
 
@@ -117,7 +117,7 @@ func cmdDev() *cli.Command {
 			}
 
 			// Add AuthUseCase if authentication options are provided
-			authUC, err := authCfg.Configure(repo)
+			authUC, err := webUICfg.Configure(repo)
 			if err != nil {
 				return err
 			}

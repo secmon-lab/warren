@@ -119,23 +119,20 @@ func New(uc UseCase, opts ...Options) *Server {
 
 	// Authentication endpoints
 	if s.authUC != nil {
-		r.Route("/api/auth", func(r chi.Router) {
-			r.Get("/login", authLoginHandler(s.authUC))
-			r.Get("/callback", authCallbackHandler(s.authUC))
-			r.Post("/logout", authLogoutHandler(s.authUC))
-			r.Get("/me", authMeHandler(s.authUC))
+		r.Route("/api", func(r chi.Router) {
+			r.Route("/auth", func(r chi.Router) {
+				r.Get("/login", authLoginHandler(s.authUC))
+				r.Get("/callback", authCallbackHandler(s.authUC))
+				r.Post("/logout", authLogoutHandler(s.authUC))
+				r.Get("/me", authMeHandler(s.authUC))
+			})
+			r.Route("/user", func(r chi.Router) {
+				r.Use(authMiddleware(s.authUC))
+				r.Get("/{userID}/icon", userIconHandler(uc))
+				r.Get("/{userID}/profile", userProfileHandler(uc))
+			})
 		})
 	}
-
-	// User API endpoints
-	r.Route("/api/user", func(r chi.Router) {
-		// Apply authentication middleware to user API
-		if s.authUC != nil {
-			r.Use(authMiddleware(s.authUC))
-		}
-		r.Get("/{userID}/icon", userIconHandler(uc))
-		r.Get("/{userID}/profile", userProfileHandler(uc))
-	})
 
 	// Static file serving for SPA
 	staticFS, err := fs.Sub(frontend.StaticFiles, "dist")

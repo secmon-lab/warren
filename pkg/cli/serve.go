@@ -21,7 +21,7 @@ func cmdServe() *cli.Command {
 		addr           string
 		enableGraphQL  bool
 		enableGraphiQL bool
-		authCfg        config.Auth
+		webUICfg       config.WebUI
 		policyCfg      config.Policy
 		sentryCfg      config.Sentry
 		slackCfg       config.Slack
@@ -55,7 +55,7 @@ func cmdServe() *cli.Command {
 				Destination: &enableGraphiQL,
 			},
 		},
-		authCfg.Flags(),
+		webUICfg.Flags(),
 		policyCfg.Flags(),
 		sentryCfg.Flags(),
 		slackCfg.Flags(),
@@ -75,7 +75,7 @@ func cmdServe() *cli.Command {
 				"addr", addr,
 				"enableGraphQL", enableGraphQL,
 				"enableGraphiQL", enableGraphiQL,
-				"auth", authCfg,
+				"web-ui", webUICfg,
 				"policy", policyCfg,
 				"sentry", sentryCfg,
 				"slack", slackCfg,
@@ -148,12 +148,14 @@ func cmdServe() *cli.Command {
 			}
 
 			// Add AuthUseCase if authentication options are provided
-			authUC, err := authCfg.Configure(firestore)
+			authUC, err := webUICfg.Configure(firestore)
 			if err != nil {
 				return err
 			}
 			if authUC != nil {
 				serverOptions = append(serverOptions, server.WithAuthUseCase(authUC))
+			} else {
+				logging.From(ctx).Warn("Authentication is not configured, Web UI will not work.")
 			}
 
 			httpServer := http.Server{
