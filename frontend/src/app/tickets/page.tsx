@@ -534,7 +534,7 @@ function TicketsPageContent() {
 
           {/* Alert Detail Dialog */}
           <Dialog open={!!selectedAlert} onOpenChange={() => setSelectedAlert(null)}>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[95vw] md:max-w-[90vw] lg:max-w-[1200px] max-h-[80vh] overflow-y-auto">
               {selectedAlert && (
                 <>
                   <DialogHeader>
