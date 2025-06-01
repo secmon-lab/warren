@@ -7,6 +7,9 @@ type Ticket {
   assignee: User
   alerts: [Alert!]!
   comments: [Comment!]!
+  conclusion: String
+  reason: String
+  finding: Finding
   createdAt: String!
   updatedAt: String!
 }
@@ -39,6 +42,13 @@ type AlertAttribute {
   value: String!
   link: String
   auto: Boolean!
+}
+
+type Finding {
+  severity: String!
+  summary: String!
+  reason: String!
+  recommendation: String!
 }
 
 type Query {

@@ -42,6 +42,7 @@ type Config struct {
 type ResolverRoot interface {
 	Alert() AlertResolver
 	Comment() CommentResolver
+	Finding() FindingResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
 	Ticket() TicketResolver
@@ -76,6 +77,13 @@ type ComplexityRoot struct {
 		UpdatedAt func(childComplexity int) int
 	}
 
+	Finding struct {
+		Reason         func(childComplexity int) int
+		Recommendation func(childComplexity int) int
+		Severity       func(childComplexity int) int
+		Summary        func(childComplexity int) int
+	}
+
 	Mutation struct {
 		UpdateTicketStatus func(childComplexity int, id string, status string) int
 	}
@@ -91,9 +99,12 @@ type ComplexityRoot struct {
 		Alerts      func(childComplexity int) int
 		Assignee    func(childComplexity int) int
 		Comments    func(childComplexity int) int
+		Conclusion  func(childComplexity int) int
 		CreatedAt   func(childComplexity int) int
 		Description func(childComplexity int) int
+		Finding     func(childComplexity int) int
 		ID          func(childComplexity int) int
+		Reason      func(childComplexity int) int
 		Status      func(childComplexity int) int
 		Summary     func(childComplexity int) int
 		Title       func(childComplexity int) int
@@ -121,6 +132,9 @@ type CommentResolver interface {
 	CreatedAt(ctx context.Context, obj *ticket.Comment) (string, error)
 	UpdatedAt(ctx context.Context, obj *ticket.Comment) (string, error)
 }
+type FindingResolver interface {
+	Severity(ctx context.Context, obj *ticket.Finding) (string, error)
+}
 type MutationResolver interface {
 	UpdateTicketStatus(ctx context.Context, id string, status string) (*ticket.Ticket, error)
 }
@@ -137,6 +151,8 @@ type TicketResolver interface {
 	Assignee(ctx context.Context, obj *ticket.Ticket) (*graphql1.User, error)
 	Alerts(ctx context.Context, obj *ticket.Ticket) ([]*alert.Alert, error)
 	Comments(ctx context.Context, obj *ticket.Ticket) ([]*ticket.Comment, error)
+	Conclusion(ctx context.Context, obj *ticket.Ticket) (*string, error)
+
 	CreatedAt(ctx context.Context, obj *ticket.Ticket) (string, error)
 	UpdatedAt(ctx context.Context, obj *ticket.Ticket) (string, error)
 }
@@ -272,6 +288,34 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Comment.UpdatedAt(childComplexity), true
 
+	case "Finding.reason":
+		if e.complexity.Finding.Reason == nil {
+			break
+		}
+
+		return e.complexity.Finding.Reason(childComplexity), true
+
+	case "Finding.recommendation":
+		if e.complexity.Finding.Recommendation == nil {
+			break
+		}
+
+		return e.complexity.Finding.Recommendation(childComplexity), true
+
+	case "Finding.severity":
+		if e.complexity.Finding.Severity == nil {
+			break
+		}
+
+		return e.complexity.Finding.Severity(childComplexity), true
+
+	case "Finding.summary":
+		if e.complexity.Finding.Summary == nil {
+			break
+		}
+
+		return e.complexity.Finding.Summary(childComplexity), true
+
 	case "Mutation.updateTicketStatus":
 		if e.complexity.Mutation.UpdateTicketStatus == nil {
 			break
@@ -348,6 +392,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Ticket.Comments(childComplexity), true
 
+	case "Ticket.conclusion":
+		if e.complexity.Ticket.Conclusion == nil {
+			break
+		}
+
+		return e.complexity.Ticket.Conclusion(childComplexity), true
+
 	case "Ticket.createdAt":
 		if e.complexity.Ticket.CreatedAt == nil {
 			break
@@ -362,12 +413,26 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Ticket.Description(childComplexity), true
 
+	case "Ticket.finding":
+		if e.complexity.Ticket.Finding == nil {
+			break
+		}
+
+		return e.complexity.Ticket.Finding(childComplexity), true
+
 	case "Ticket.id":
 		if e.complexity.Ticket.ID == nil {
 			break
 		}
 
 		return e.complexity.Ticket.ID(childComplexity), true
+
+	case "Ticket.reason":
+		if e.complexity.Ticket.Reason == nil {
+			break
+		}
+
+		return e.complexity.Ticket.Reason(childComplexity), true
 
 	case "Ticket.status":
 		if e.complexity.Ticket.Status == nil {
@@ -524,6 +589,9 @@ var sources = []*ast.Source{
   assignee: User
   alerts: [Alert!]!
   comments: [Comment!]!
+  conclusion: String
+  reason: String
+  finding: Finding
   createdAt: String!
   updatedAt: String!
 }
@@ -556,6 +624,13 @@ type AlertAttribute {
   value: String!
   link: String
   auto: Boolean!
+}
+
+type Finding {
+  severity: String!
+  summary: String!
+  reason: String!
+  recommendation: String!
 }
 
 type Query {
@@ -1277,6 +1352,12 @@ func (ec *executionContext) fieldContext_Alert_ticket(_ context.Context, field g
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "comments":
 				return ec.fieldContext_Ticket_comments(ctx, field)
+			case "conclusion":
+				return ec.fieldContext_Ticket_conclusion(ctx, field)
+			case "reason":
+				return ec.fieldContext_Ticket_reason(ctx, field)
+			case "finding":
+				return ec.fieldContext_Ticket_finding(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
@@ -1637,6 +1718,182 @@ func (ec *executionContext) fieldContext_Comment_updatedAt(_ context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _Finding_severity(ctx context.Context, field graphql.CollectedField, obj *ticket.Finding) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Finding_severity(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Finding().Severity(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Finding_severity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Finding",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Finding_summary(ctx context.Context, field graphql.CollectedField, obj *ticket.Finding) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Finding_summary(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Summary, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Finding_summary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Finding",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Finding_reason(ctx context.Context, field graphql.CollectedField, obj *ticket.Finding) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Finding_reason(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Reason, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Finding_reason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Finding",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Finding_recommendation(ctx context.Context, field graphql.CollectedField, obj *ticket.Finding) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Finding_recommendation(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Recommendation, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Finding_recommendation(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Finding",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_updateTicketStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_updateTicketStatus(ctx, field)
 	if err != nil {
@@ -1692,6 +1949,12 @@ func (ec *executionContext) fieldContext_Mutation_updateTicketStatus(ctx context
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "comments":
 				return ec.fieldContext_Ticket_comments(ctx, field)
+			case "conclusion":
+				return ec.fieldContext_Ticket_conclusion(ctx, field)
+			case "reason":
+				return ec.fieldContext_Ticket_reason(ctx, field)
+			case "finding":
+				return ec.fieldContext_Ticket_finding(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
@@ -1766,6 +2029,12 @@ func (ec *executionContext) fieldContext_Query_ticket(ctx context.Context, field
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "comments":
 				return ec.fieldContext_Ticket_comments(ctx, field)
+			case "conclusion":
+				return ec.fieldContext_Ticket_conclusion(ctx, field)
+			case "reason":
+				return ec.fieldContext_Ticket_reason(ctx, field)
+			case "finding":
+				return ec.fieldContext_Ticket_finding(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
@@ -1843,6 +2112,12 @@ func (ec *executionContext) fieldContext_Query_tickets(ctx context.Context, fiel
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "comments":
 				return ec.fieldContext_Ticket_comments(ctx, field)
+			case "conclusion":
+				return ec.fieldContext_Ticket_conclusion(ctx, field)
+			case "reason":
+				return ec.fieldContext_Ticket_reason(ctx, field)
+			case "finding":
+				return ec.fieldContext_Ticket_finding(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
@@ -2506,6 +2781,139 @@ func (ec *executionContext) fieldContext_Ticket_comments(_ context.Context, fiel
 				return ec.fieldContext_Comment_updatedAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Ticket_conclusion(ctx context.Context, field graphql.CollectedField, obj *ticket.Ticket) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Ticket_conclusion(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Ticket().Conclusion(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Ticket_conclusion(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Ticket",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Ticket_reason(ctx context.Context, field graphql.CollectedField, obj *ticket.Ticket) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Ticket_reason(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Reason, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalOString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Ticket_reason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Ticket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Ticket_finding(ctx context.Context, field graphql.CollectedField, obj *ticket.Ticket) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Ticket_finding(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Finding, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*ticket.Finding)
+	fc.Result = res
+	return ec.marshalOFinding2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐFinding(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Ticket_finding(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Ticket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "severity":
+				return ec.fieldContext_Finding_severity(ctx, field)
+			case "summary":
+				return ec.fieldContext_Finding_summary(ctx, field)
+			case "reason":
+				return ec.fieldContext_Finding_reason(ctx, field)
+			case "recommendation":
+				return ec.fieldContext_Finding_recommendation(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Finding", field.Name)
 		},
 	}
 	return fc, nil
@@ -5129,6 +5537,91 @@ func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, 
 	return out
 }
 
+var findingImplementors = []string{"Finding"}
+
+func (ec *executionContext) _Finding(ctx context.Context, sel ast.SelectionSet, obj *ticket.Finding) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, findingImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Finding")
+		case "severity":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Finding_severity(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "summary":
+			out.Values[i] = ec._Finding_summary(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "reason":
+			out.Values[i] = ec._Finding_reason(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "recommendation":
+			out.Values[i] = ec._Finding_recommendation(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -5513,6 +6006,43 @@ func (ec *executionContext) _Ticket(ctx context.Context, sel ast.SelectionSet, o
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "conclusion":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Ticket_conclusion(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "reason":
+			out.Values[i] = ec._Ticket_reason(ctx, field, obj)
+		case "finding":
+			out.Values[i] = ec._Ticket_finding(ctx, field, obj)
 		case "createdAt":
 			field := field
 
@@ -6543,6 +7073,13 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	_ = ctx
 	res := graphql.MarshalBoolean(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOFinding2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐFinding(ctx context.Context, sel ast.SelectionSet, v *ticket.Finding) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Finding(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {

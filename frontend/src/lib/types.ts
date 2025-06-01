@@ -7,6 +7,9 @@ export interface Ticket {
   assignee?: User;
   alerts: Alert[];
   comments: Comment[];
+  conclusion?: string;
+  reason?: string;
+  finding?: Finding;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,6 +42,13 @@ export interface AlertAttribute {
 export interface User {
   id: string;
   name: string;
+}
+
+export interface Finding {
+  severity: string;
+  summary: string;
+  reason: string;
+  recommendation: string;
 }
 
 export type TicketStatus = 'open' | 'pending' | 'resolved' | 'archived';

@@ -86,6 +86,11 @@ func (r *commentResolver) UpdatedAt(ctx context.Context, obj *ticket.Comment) (s
 	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
 }
 
+// Severity is the resolver for the severity field.
+func (r *findingResolver) Severity(ctx context.Context, obj *ticket.Finding) (string, error) {
+	return string(obj.Severity), nil
+}
+
 // UpdateTicketStatus is the resolver for the updateTicketStatus field.
 func (r *mutationResolver) UpdateTicketStatus(ctx context.Context, id string, status string) (*ticket.Ticket, error) {
 	t, err := r.repo.GetTicket(ctx, types.TicketID(id))
@@ -199,6 +204,15 @@ func (r *ticketResolver) Comments(ctx context.Context, obj *ticket.Ticket) ([]*t
 	return commentPtrs, nil
 }
 
+// Conclusion is the resolver for the conclusion field.
+func (r *ticketResolver) Conclusion(ctx context.Context, obj *ticket.Ticket) (*string, error) {
+	if obj.Conclusion == "" {
+		return nil, nil
+	}
+	conclusion := string(obj.Conclusion)
+	return &conclusion, nil
+}
+
 // CreatedAt is the resolver for the createdAt field.
 func (r *ticketResolver) CreatedAt(ctx context.Context, obj *ticket.Ticket) (string, error) {
 	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
@@ -215,6 +229,9 @@ func (r *Resolver) Alert() AlertResolver { return &alertResolver{r} }
 // Comment returns CommentResolver implementation.
 func (r *Resolver) Comment() CommentResolver { return &commentResolver{r} }
 
+// Finding returns FindingResolver implementation.
+func (r *Resolver) Finding() FindingResolver { return &findingResolver{r} }
+
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
@@ -226,6 +243,7 @@ func (r *Resolver) Ticket() TicketResolver { return &ticketResolver{r} }
 
 type alertResolver struct{ *Resolver }
 type commentResolver struct{ *Resolver }
+type findingResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }

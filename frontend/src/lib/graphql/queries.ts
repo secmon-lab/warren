@@ -35,6 +35,14 @@ export const GET_TICKET = gql`
       title
       description
       summary
+      conclusion
+      reason
+      finding {
+        severity
+        summary
+        reason
+        recommendation
+      }
       assignee {
         id
         name

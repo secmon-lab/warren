@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { UserWithAvatar } from '@/components/ui/user-name';
+import { ResolveInfo } from '@/components/ui/resolve-info';
 import { GET_TICKETS, GET_TICKET } from '@/lib/graphql/queries';
 import { Ticket, TicketStatus, TICKET_STATUS_LABELS, TICKET_STATUS_COLORS, Alert } from '@/lib/types';
 import { formatRelativeTime } from '@/lib/utils-extended';
@@ -198,6 +199,9 @@ function TicketsPageContent() {
                   </Collapsible>
                 </Card>
               )}
+
+              {/* Resolve Information Section */}
+              <ResolveInfo ticket={ticket} />
 
               {/* Comments Section */}
               <Card>
