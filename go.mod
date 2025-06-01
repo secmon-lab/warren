@@ -23,6 +23,7 @@ require (
 	github.com/m-mizutani/opaq v0.2.1-0.20250222003843-b0e8fa8233e6
 	github.com/newmo-oss/go-caller v0.1.0
 	github.com/slack-go/slack v0.16.0
+	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli/v3 v3.3.2
 	github.com/vektah/gqlparser/v2 v2.5.26
 	google.golang.org/api v0.233.0

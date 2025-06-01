@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -20,6 +19,7 @@ type AuthUseCase struct {
 	clientID     string
 	clientSecret string
 	callbackURL  string
+	cache        *authCache
 }
 
 func NewAuthUseCase(repo interfaces.Repository, clientID, clientSecret, callbackURL string) *AuthUseCase {
@@ -28,6 +28,7 @@ func NewAuthUseCase(repo interfaces.Repository, clientID, clientSecret, callback
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		callbackURL:  callbackURL,
+		cache:        newAuthCache(),
 	}
 }
 
@@ -238,24 +239,14 @@ func (uc *AuthUseCase) decodeIDToken(ctx context.Context, idToken string) (*Slac
 
 // ValidateToken validates the token and returns user info
 func (uc *AuthUseCase) ValidateToken(ctx context.Context, tokenID auth.TokenID, tokenSecret auth.TokenSecret) (*auth.Token, error) {
-	token, err := uc.repo.GetToken(ctx, tokenID)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get token")
-	}
-
-	// Constant-time comparison to prevent timing attacks
-	if subtle.ConstantTimeCompare([]byte(token.Secret), []byte(tokenSecret)) != 1 {
-		return nil, goerr.New("invalid token secret")
-	}
-
-	if token.IsExpired() {
-		return nil, goerr.New("token expired")
-	}
-
-	return token, nil
+	return uc.validateTokenWithCache(ctx, tokenID, tokenSecret)
 }
 
 // Logout deletes the token
 func (uc *AuthUseCase) Logout(ctx context.Context, tokenID auth.TokenID) error {
+	// Remove from cache first
+	uc.cache.remove(tokenID)
+
+	// Then remove from repository
 	return uc.repo.DeleteToken(ctx, tokenID)
 }
