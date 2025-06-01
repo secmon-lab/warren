@@ -33,6 +33,25 @@ function TicketsPageContent() {
   const [alertsCurrentPage, setAlertsCurrentPage] = useState(1);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   
+  const formatAbsoluteTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    
+    // Get timezone offset and format it as +09:00 style
+    const timezoneOffset = -date.getTimezoneOffset();
+    const offsetHours = Math.floor(Math.abs(timezoneOffset) / 60);
+    const offsetMinutes = Math.round(Math.abs(timezoneOffset) % 60);
+    const offsetSign = timezoneOffset >= 0 ? '+' : '-';
+    const timezone = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+    
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${timezone}`;
+  };
+
   const searchParams = useSearchParams();
   const router = useRouter();
   const ticketId = searchParams.get('id');
@@ -426,15 +445,19 @@ function TicketsPageContent() {
                       <span>Unassigned</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Created:</span>
-                    <span>{formatRelativeTime(ticket.createdAt)}</span>
+                  <div className="flex items-start gap-2 text-sm">
+                    <Calendar className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-muted-foreground">Created:</span>
+                      <div className="font-mono text-xs break-all">{formatAbsoluteTime(ticket.createdAt)}</div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Updated:</span>
-                    <span>{formatRelativeTime(ticket.updatedAt)}</span>
+                  <div className="flex items-start gap-2 text-sm">
+                    <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-muted-foreground">Updated:</span>
+                      <div className="font-mono text-xs break-all">{formatAbsoluteTime(ticket.updatedAt)}</div>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <AlertCircle className="h-4 w-4 text-muted-foreground" />
