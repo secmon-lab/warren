@@ -85,7 +85,8 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		UpdateTicketStatus func(childComplexity int, id string, status string) int
+		UpdateMultipleTicketsStatus func(childComplexity int, ids []string, status string) int
+		UpdateTicketStatus          func(childComplexity int, id string, status string) int
 	}
 
 	Query struct {
@@ -137,6 +138,7 @@ type FindingResolver interface {
 }
 type MutationResolver interface {
 	UpdateTicketStatus(ctx context.Context, id string, status string) (*ticket.Ticket, error)
+	UpdateMultipleTicketsStatus(ctx context.Context, ids []string, status string) ([]*ticket.Ticket, error)
 }
 type QueryResolver interface {
 	Ticket(ctx context.Context, id string) (*ticket.Ticket, error)
@@ -315,6 +317,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Finding.Summary(childComplexity), true
+
+	case "Mutation.updateMultipleTicketsStatus":
+		if e.complexity.Mutation.UpdateMultipleTicketsStatus == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateMultipleTicketsStatus_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateMultipleTicketsStatus(childComplexity, args["ids"].([]string), args["status"].(string)), true
 
 	case "Mutation.updateTicketStatus":
 		if e.complexity.Mutation.UpdateTicketStatus == nil {
@@ -642,6 +656,7 @@ type Query {
 
 type Mutation {
   updateTicketStatus(id: ID!, status: String!): Ticket!
+  updateMultipleTicketsStatus(ids: [ID!]!, status: String!): [Ticket!]!
 }
 
 schema {
@@ -655,6 +670,57 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_Mutation_updateMultipleTicketsStatus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_updateMultipleTicketsStatus_argsIds(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["ids"] = arg0
+	arg1, err := ec.field_Mutation_updateMultipleTicketsStatus_argsStatus(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["status"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_updateMultipleTicketsStatus_argsIds(
+	ctx context.Context,
+	rawArgs map[string]any,
+) ([]string, error) {
+	if _, ok := rawArgs["ids"]; !ok {
+		var zeroVal []string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("ids"))
+	if tmp, ok := rawArgs["ids"]; ok {
+		return ec.unmarshalNID2ᚕstringᚄ(ctx, tmp)
+	}
+
+	var zeroVal []string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_updateMultipleTicketsStatus_argsStatus(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["status"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("status"))
+	if tmp, ok := rawArgs["status"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
 
 func (ec *executionContext) field_Mutation_updateTicketStatus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
@@ -1971,6 +2037,89 @@ func (ec *executionContext) fieldContext_Mutation_updateTicketStatus(ctx context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateTicketStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateMultipleTicketsStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_updateMultipleTicketsStatus(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().UpdateMultipleTicketsStatus(rctx, fc.Args["ids"].([]string), fc.Args["status"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*ticket.Ticket)
+	fc.Result = res
+	return ec.marshalNTicket2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐTicketᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateMultipleTicketsStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Ticket_id(ctx, field)
+			case "status":
+				return ec.fieldContext_Ticket_status(ctx, field)
+			case "title":
+				return ec.fieldContext_Ticket_title(ctx, field)
+			case "description":
+				return ec.fieldContext_Ticket_description(ctx, field)
+			case "summary":
+				return ec.fieldContext_Ticket_summary(ctx, field)
+			case "assignee":
+				return ec.fieldContext_Ticket_assignee(ctx, field)
+			case "alerts":
+				return ec.fieldContext_Ticket_alerts(ctx, field)
+			case "comments":
+				return ec.fieldContext_Ticket_comments(ctx, field)
+			case "conclusion":
+				return ec.fieldContext_Ticket_conclusion(ctx, field)
+			case "reason":
+				return ec.fieldContext_Ticket_reason(ctx, field)
+			case "finding":
+				return ec.fieldContext_Ticket_finding(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Ticket_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateMultipleTicketsStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -5648,6 +5797,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "updateMultipleTicketsStatus":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateMultipleTicketsStatus(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -6709,6 +6865,36 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNID2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]string, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNID2string(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNID2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNID2string(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {

@@ -128,4 +128,14 @@ export const UPDATE_TICKET_STATUS = gql`
       updatedAt
     }
   }
+`;
+
+export const UPDATE_MULTIPLE_TICKETS_STATUS = gql`
+  mutation UpdateMultipleTicketsStatus($ids: [ID!]!, $status: String!) {
+    updateMultipleTicketsStatus(ids: $ids, status: $status) {
+      id
+      status
+      updatedAt
+    }
+  }
 `; 

@@ -954,3 +954,38 @@ func (r *Firestore) DeleteToken(ctx context.Context, tokenID auth.TokenID) error
 	}
 	return nil
 }
+
+func (r *Firestore) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error {
+	bw := r.db.BulkWriter(ctx)
+	var jobs []*firestore.BulkWriterJob
+
+	now := time.Now()
+	for _, ticketID := range ticketIDs {
+		ticketDoc := r.db.Collection(collectionTickets).Doc(ticketID.String())
+
+		job, err := bw.Update(ticketDoc, []firestore.Update{
+			{
+				Path:  "Status",
+				Value: status,
+			},
+			{
+				Path:  "UpdatedAt",
+				Value: now,
+			},
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to update ticket status", goerr.V("ticket_id", ticketID), goerr.V("status", status))
+		}
+		jobs = append(jobs, job)
+	}
+
+	bw.End()
+
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil {
+			return goerr.Wrap(err, "failed to commit bulk writer job")
+		}
+	}
+
+	return nil
+}

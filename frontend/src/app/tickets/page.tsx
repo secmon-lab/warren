@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
 import { useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
@@ -14,10 +14,11 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { UserWithAvatar } from '@/components/ui/user-name';
 import { ResolveInfo } from '@/components/ui/resolve-info';
-import { GET_TICKETS, GET_TICKET } from '@/lib/graphql/queries';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { GET_TICKETS, GET_TICKET, UPDATE_TICKET_STATUS } from '@/lib/graphql/queries';
 import { Ticket, TicketStatus, TICKET_STATUS_LABELS, TICKET_STATUS_COLORS, Alert } from '@/lib/types';
 import { formatRelativeTime } from '@/lib/utils-extended';
-import { AlertCircle, MessageSquare, User, Ticket as TicketIcon, Calendar, Clock, FileText, Eye, Code, Database, Hash, ExternalLink, ChevronDown, ChevronUp, ArrowLeft } from 'lucide-react';
+import { AlertCircle, MessageSquare, User, Ticket as TicketIcon, Calendar, Clock, FileText, Eye, Code, Database, Hash, ExternalLink, ChevronDown, ChevronUp, ArrowLeft, Archive, ArchiveRestore } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 10;
 const ALERTS_PER_PAGE = 5;
@@ -30,10 +31,18 @@ function TicketsPageContent() {
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [alertsCurrentPage, setAlertsCurrentPage] = useState(1);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   
   const searchParams = useSearchParams();
   const router = useRouter();
   const ticketId = searchParams.get('id');
+
+  const [updateTicketStatus] = useMutation(UPDATE_TICKET_STATUS, {
+    refetchQueries: [
+      { query: GET_TICKET, variables: { id: ticketId } },
+      { query: GET_TICKETS }
+    ],
+  });
 
   const { data: ticketsData, loading: ticketsLoading, error: ticketsError } = useQuery(GET_TICKETS, {
     variables: {
@@ -79,6 +88,71 @@ function TicketsPageContent() {
 
   const handleAlertClick = (alert: Alert) => {
     setSelectedAlert(alert);
+  };
+
+  const handleStatusChange = async (newStatus: TicketStatus) => {
+    if (!ticket || isUpdatingStatus) return;
+    
+    setIsUpdatingStatus(true);
+    try {
+      await updateTicketStatus({
+        variables: {
+          id: ticket.id,
+          status: newStatus,
+        },
+      });
+    } catch (error) {
+      console.error('Failed to update ticket status:', error);
+      alert('Failed to update ticket status');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleArchive = async () => {
+    if (!ticket || isUpdatingStatus) return;
+    
+    if (!confirm('Are you sure you want to archive this ticket? Archived tickets will be excluded from inspection and adaptation.')) {
+      return;
+    }
+    
+    setIsUpdatingStatus(true);
+    try {
+      await updateTicketStatus({
+        variables: {
+          id: ticket.id,
+          status: 'archived',
+        },
+      });
+    } catch (error) {
+      console.error('Failed to archive ticket:', error);
+      alert('Failed to archive ticket');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleUnarchive = async () => {
+    if (!ticket || isUpdatingStatus) return;
+    
+    if (!confirm('Are you sure you want to unarchive this ticket? It will be set to Open status.')) {
+      return;
+    }
+    
+    setIsUpdatingStatus(true);
+    try {
+      await updateTicketStatus({
+        variables: {
+          id: ticket.id,
+          status: 'open',
+        },
+      });
+    } catch (error) {
+      console.error('Failed to unarchive ticket:', error);
+      alert('Failed to unarchive ticket');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
   };
 
   const formatJsonData = (jsonString: string) => {
@@ -333,7 +407,7 @@ function TicketsPageContent() {
 
             {/* Sidebar */}
             <div className="space-y-6">
-              {/* Metadata */}
+              {/* Details & Status Management */}
               <Card>
                 <CardHeader>
                   <CardTitle>Details</CardTitle>
@@ -372,6 +446,87 @@ function TicketsPageContent() {
                     <span className="text-muted-foreground">Comments:</span>
                     <span>{ticket.comments.length}</span>
                   </div>
+
+                  <Separator />
+
+                  {ticket.status === 'archived' ? (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Status</label>
+                      <div className="w-full p-2">
+                        <Badge 
+                          className={TICKET_STATUS_COLORS[ticket.status as TicketStatus]}
+                          variant="secondary"
+                        >
+                          {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
+                        </Badge>
+                      </div>
+                      <Button 
+                        variant="secondary" 
+                        size="sm"
+                        className="w-full text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors cursor-pointer"
+                        onClick={handleUnarchive}
+                        disabled={isUpdatingStatus}
+                      >
+                        <ArchiveRestore className="h-4 w-4 mr-2" />
+                        Unarchive
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Status</label>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              className="w-full justify-between"
+                              disabled={isUpdatingStatus}
+                            >
+                              <Badge 
+                                className={TICKET_STATUS_COLORS[ticket.status as TicketStatus]}
+                                variant="secondary"
+                              >
+                                {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
+                              </Badge>
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-full">
+                            {(['open', 'pending', 'resolved'] as TicketStatus[]).map((status) => (
+                              <DropdownMenuItem
+                                key={status}
+                                onClick={() => handleStatusChange(status)}
+                                disabled={ticket.status === status || isUpdatingStatus}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <Badge 
+                                    className={TICKET_STATUS_COLORS[status]}
+                                    variant="secondary"
+                                  >
+                                    {TICKET_STATUS_LABELS[status]}
+                                  </Badge>
+                                  {ticket.status === status && <span className="text-xs text-muted-foreground">(current)</span>}
+                                </span>
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Button 
+                          variant="secondary" 
+                          size="sm"
+                          className="w-full text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors cursor-pointer"
+                          onClick={handleArchive}
+                          disabled={isUpdatingStatus}
+                        >
+                          <Archive className="h-4 w-4 mr-2" />
+                          Mark as Archived
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>

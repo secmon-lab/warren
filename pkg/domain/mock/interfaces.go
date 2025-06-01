@@ -501,6 +501,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			BatchPutAlertsFunc: func(ctx context.Context, alerts alert.Alerts) error {
 //				panic("mock out the BatchPutAlerts method")
 //			},
+//			BatchUpdateTicketsStatusFunc: func(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error {
+//				panic("mock out the BatchUpdateTicketsStatus method")
+//			},
 //			BindAlertToTicketFunc: func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
 //				panic("mock out the BindAlertToTicket method")
 //			},
@@ -612,6 +615,9 @@ type RepositoryMock struct {
 
 	// BatchPutAlertsFunc mocks the BatchPutAlerts method.
 	BatchPutAlertsFunc func(ctx context.Context, alerts alert.Alerts) error
+
+	// BatchUpdateTicketsStatusFunc mocks the BatchUpdateTicketsStatus method.
+	BatchUpdateTicketsStatusFunc func(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error
 
 	// BindAlertToTicketFunc mocks the BindAlertToTicket method.
 	BindAlertToTicketFunc func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error
@@ -737,6 +743,15 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Alerts is the alerts argument value.
 			Alerts alert.Alerts
+		}
+		// BatchUpdateTicketsStatus holds details about calls to the BatchUpdateTicketsStatus method.
+		BatchUpdateTicketsStatus []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TicketIDs is the ticketIDs argument value.
+			TicketIDs []types.TicketID
+			// Status is the status argument value.
+			Status types.TicketStatus
 		}
 		// BindAlertToTicket holds details about calls to the BindAlertToTicket method.
 		BindAlertToTicket []struct {
@@ -990,6 +1005,7 @@ type RepositoryMock struct {
 	lockBatchGetAlerts              sync.RWMutex
 	lockBatchGetTickets             sync.RWMutex
 	lockBatchPutAlerts              sync.RWMutex
+	lockBatchUpdateTicketsStatus    sync.RWMutex
 	lockBindAlertToTicket           sync.RWMutex
 	lockDeleteToken                 sync.RWMutex
 	lockFindNearestAlerts           sync.RWMutex
@@ -1182,6 +1198,49 @@ func (mock *RepositoryMock) BatchPutAlertsCalls() []struct {
 	mock.lockBatchPutAlerts.RLock()
 	calls = mock.calls.BatchPutAlerts
 	mock.lockBatchPutAlerts.RUnlock()
+	return calls
+}
+
+// BatchUpdateTicketsStatus calls BatchUpdateTicketsStatusFunc.
+func (mock *RepositoryMock) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error {
+	callInfo := struct {
+		Ctx       context.Context
+		TicketIDs []types.TicketID
+		Status    types.TicketStatus
+	}{
+		Ctx:       ctx,
+		TicketIDs: ticketIDs,
+		Status:    status,
+	}
+	mock.lockBatchUpdateTicketsStatus.Lock()
+	mock.calls.BatchUpdateTicketsStatus = append(mock.calls.BatchUpdateTicketsStatus, callInfo)
+	mock.lockBatchUpdateTicketsStatus.Unlock()
+	if mock.BatchUpdateTicketsStatusFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.BatchUpdateTicketsStatusFunc(ctx, ticketIDs, status)
+}
+
+// BatchUpdateTicketsStatusCalls gets all the calls that were made to BatchUpdateTicketsStatus.
+// Check the length with:
+//
+//	len(mockedRepository.BatchUpdateTicketsStatusCalls())
+func (mock *RepositoryMock) BatchUpdateTicketsStatusCalls() []struct {
+	Ctx       context.Context
+	TicketIDs []types.TicketID
+	Status    types.TicketStatus
+} {
+	var calls []struct {
+		Ctx       context.Context
+		TicketIDs []types.TicketID
+		Status    types.TicketStatus
+	}
+	mock.lockBatchUpdateTicketsStatus.RLock()
+	calls = mock.calls.BatchUpdateTicketsStatus
+	mock.lockBatchUpdateTicketsStatus.RUnlock()
 	return calls
 }
 

@@ -644,3 +644,24 @@ func (r *Memory) DeleteToken(ctx context.Context, tokenID auth.TokenID) error {
 	delete(r.tokens, tokenID)
 	return nil
 }
+
+func (r *Memory) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	now := time.Now()
+	for _, ticketID := range ticketIDs {
+		t, ok := r.tickets[ticketID]
+		if !ok {
+			return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+		}
+
+		// Create a copy and update status
+		updatedTicket := *t
+		updatedTicket.Status = status
+		updatedTicket.UpdatedAt = now
+		r.tickets[ticketID] = &updatedTicket
+	}
+
+	return nil
+}

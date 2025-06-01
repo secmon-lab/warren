@@ -15,6 +15,7 @@ type Repository interface {
 	GetTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error)
 	BatchGetTickets(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error)
 	PutTicket(ctx context.Context, ticket ticket.Ticket) error
+	BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error
 	GetTicketByThread(ctx context.Context, thread slack.Thread) (*ticket.Ticket, error)
 	FindNearestTickets(ctx context.Context, embedding []float32, limit int) ([]*ticket.Ticket, error)
 	FindNearestTicketsWithSpan(ctx context.Context, embedding []float32, begin, end time.Time, limit int) ([]*ticket.Ticket, error)

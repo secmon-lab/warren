@@ -1,20 +1,33 @@
 'use client';
 
-import { useQuery } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { UserWithAvatar } from '@/components/ui/user-name';
-import { GET_TICKETS } from '@/lib/graphql/queries';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { GET_TICKETS, UPDATE_TICKET_STATUS, UPDATE_MULTIPLE_TICKETS_STATUS } from '@/lib/graphql/queries';
 import { Ticket, TicketStatus, TICKET_STATUS_LABELS, TICKET_STATUS_COLORS } from '@/lib/types';
 import { formatRelativeTime } from '@/lib/utils-extended';
-import { AlertCircle, MessageSquare, User } from 'lucide-react';
+import { AlertCircle, MessageSquare, User, MoreHorizontal, Archive } from 'lucide-react';
 
 const BOARD_STATUSES: TicketStatus[] = ['open', 'pending', 'resolved'];
 
 export default function BoardPage() {
   const router = useRouter();
+  const [draggedTicket, setDraggedTicket] = useState<Ticket | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  const [updateTicketStatus] = useMutation(UPDATE_TICKET_STATUS, {
+    refetchQueries: [{ query: GET_TICKETS, variables: { statuses: BOARD_STATUSES } }],
+  });
+
+  const [updateMultipleTicketsStatus] = useMutation(UPDATE_MULTIPLE_TICKETS_STATUS, {
+    refetchQueries: [{ query: GET_TICKETS, variables: { statuses: BOARD_STATUSES } }],
+  });
 
   const { data, loading, error } = useQuery(GET_TICKETS, {
     variables: {
@@ -33,6 +46,65 @@ export default function BoardPage() {
     const params = new URLSearchParams();
     params.set('id', ticketId);
     router.push(`/tickets?${params.toString()}`);
+  };
+
+  const handleDragStart = (e: React.DragEvent, ticket: Ticket) => {
+    setDraggedTicket(ticket);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetStatus: TicketStatus) => {
+    e.preventDefault();
+    
+    if (!draggedTicket || draggedTicket.status === targetStatus || isUpdatingStatus) {
+      setDraggedTicket(null);
+      return;
+    }
+
+    setIsUpdatingStatus(true);
+    try {
+      await updateTicketStatus({
+        variables: {
+          id: draggedTicket.id,
+          status: targetStatus,
+        },
+      });
+    } catch (error) {
+      console.error('Failed to update ticket status:', error);
+      alert('Failed to update ticket status');
+    } finally {
+      setIsUpdatingStatus(false);
+      setDraggedTicket(null);
+    }
+  };
+
+  const handleArchiveResolved = async () => {
+    const resolvedTickets = ticketsByStatus['resolved'];
+    if (resolvedTickets.length === 0) return;
+
+    if (!confirm(`Are you sure you want to archive ${resolvedTickets.length} resolved tickets?`)) {
+      return;
+    }
+
+    setIsUpdatingStatus(true);
+    try {
+      await updateMultipleTicketsStatus({
+        variables: {
+          ids: resolvedTickets.map(ticket => ticket.id),
+          status: 'archived',
+        },
+      });
+    } catch (error) {
+      console.error('Failed to archive tickets:', error);
+      alert('Failed to archive tickets');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
   };
 
   if (loading) {
@@ -77,13 +149,38 @@ export default function BoardPage() {
                     ({ticketsByStatus[status].length})
                   </span>
                 </h2>
+                
+                {status === 'resolved' && ticketsByStatus[status].length > 0 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" disabled={isUpdatingStatus}>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={handleArchiveResolved}>
+                        <Archive className="h-4 w-4 mr-2" />
+                        Archive All Resolved
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
 
-              <div className="space-y-2 min-h-[400px]">
+              <div 
+                className="space-y-2 min-h-[400px] p-2 border-2 border-dashed border-transparent rounded-lg transition-colors"
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, status)}
+                style={{
+                  borderColor: draggedTicket && draggedTicket.status !== status ? '#e2e8f0' : 'transparent'
+                }}
+              >
                 {ticketsByStatus[status].map((ticket) => (
                   <Card 
                     key={ticket.id} 
-                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    className="hover:shadow-md transition-shadow cursor-move"
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, ticket)}
                     onClick={() => handleTicketClick(ticket.id)}
                   >
                     <CardContent className="p-3">
