@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -57,7 +56,7 @@ type UseCase interface {
 	interfaces.AlertUsecases
 	interfaces.SlackEventUsecases
 	interfaces.SlackInteractionUsecases
-	GetUserIcon(ctx context.Context, userID string) ([]byte, string, error)
+	interfaces.UserUsecases
 }
 
 func New(uc UseCase, opts ...Options) *Server {
@@ -135,6 +134,7 @@ func New(uc UseCase, opts ...Options) *Server {
 			r.Use(authMiddleware(s.authUC))
 		}
 		r.Get("/{userID}/icon", userIconHandler(uc))
+		r.Get("/{userID}/profile", userProfileHandler(uc))
 	})
 
 	// Static file serving for SPA
@@ -180,6 +180,9 @@ func spaHandler(staticFS fs.FS) http.HandlerFunc {
 			if strings.HasPrefix(urlPath, "_next/") ||
 				strings.HasPrefix(urlPath, "api/") ||
 				strings.HasPrefix(urlPath, "static/") ||
+				strings.HasPrefix(urlPath, "graphql") ||
+				strings.HasPrefix(urlPath, "alert/") ||
+				strings.HasPrefix(urlPath, "slack/") ||
 				strings.Contains(urlPath, ".") { // Files with extensions
 				// File not found, return 404
 				http.NotFound(w, r)

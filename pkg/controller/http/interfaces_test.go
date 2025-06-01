@@ -10,6 +10,7 @@ type useCaseInterface struct {
 	interfaces.AlertUsecases
 	interfaces.SlackEventUsecases
 	interfaces.SlackInteractionUsecases
+	interfaces.UserUsecases
 }
 
 // GetUserIcon implements the UseCase interface

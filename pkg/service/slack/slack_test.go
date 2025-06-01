@@ -446,3 +446,121 @@ func TestService_GetUserIcon_RealSlack(t *testing.T) {
 		gt.Value(t, mimeType1).Equal(mimeType2)
 	})
 }
+
+func TestService_GetUserProfile(t *testing.T) {
+	ctx := context.Background()
+
+	// Setup Slack client mock
+	slackMock := &mock.SlackClientMock{
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "U123456",
+				TeamID: "T123456",
+				Team:   "test-team",
+				BotID:  "B123456",
+			}, nil
+		},
+		GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
+			return &slack_sdk.User{
+				ID: userID,
+				Profile: slack_sdk.UserProfile{
+					DisplayName: "Test User",
+				},
+			}, nil
+		},
+	}
+
+	// Create service
+	service, err := slack.New(slackMock, "C123456")
+	gt.NoError(t, err)
+
+	// Test GetUserProfile
+	name, err := service.GetUserProfile(ctx, "U123456")
+	gt.NoError(t, err)
+	gt.Value(t, name).Equal("Test User")
+
+	// Verify Slack was called
+	gt.Array(t, slackMock.GetUserInfoCalls()).Length(1)
+	gt.Value(t, slackMock.GetUserInfoCalls()[0].UserID).Equal("U123456")
+}
+
+func TestService_GetUserProfile_Cache(t *testing.T) {
+	ctx := context.Background()
+
+	// Setup Slack client mock
+	slackMock := &mock.SlackClientMock{
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "U123456",
+				TeamID: "T123456",
+				Team:   "test-team",
+				BotID:  "B123456",
+			}, nil
+		},
+		GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
+			return &slack_sdk.User{
+				ID: userID,
+				Profile: slack_sdk.UserProfile{
+					DisplayName: "Test User",
+				},
+			}, nil
+		},
+	}
+
+	service, err := slack.New(slackMock, "C123456")
+	gt.NoError(t, err)
+
+	// First call - should call Slack API
+	name1, err := service.GetUserProfile(ctx, "U123456")
+	gt.NoError(t, err)
+	gt.Value(t, name1).Equal("Test User")
+
+	// Second call - should use cache
+	name2, err := service.GetUserProfile(ctx, "U123456")
+	gt.NoError(t, err)
+	gt.Value(t, name2).Equal("Test User")
+
+	// Should have called Slack API only once
+	gt.Array(t, slackMock.GetUserInfoCalls()).Length(1)
+}
+
+func TestService_ClearExpiredProfileCache(t *testing.T) {
+	// Setup Slack client mock
+	slackMock := &mock.SlackClientMock{
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "U123456",
+				TeamID: "T123456",
+				Team:   "test-team",
+				BotID:  "B123456",
+			}, nil
+		},
+	}
+
+	service, err := slack.New(slackMock, "C123456")
+	gt.NoError(t, err)
+
+	// Add expired cache entry
+	profileCache := service.GetProfileCache()
+	profileCache["U123456"] = &slack.UserProfileCache{
+		Name:      "Old User",
+		ExpiresAt: time.Now().Add(-time.Hour), // Expired 1 hour ago
+	}
+
+	// Add non-expired cache entry
+	profileCache["U789012"] = &slack.UserProfileCache{
+		Name:      "Current User",
+		ExpiresAt: time.Now().Add(time.Hour), // Expires in 1 hour
+	}
+
+	// Clear expired cache
+	service.ClearExpiredProfileCache()
+
+	// Verify expired entry was removed
+	_, exists := profileCache["U123456"]
+	gt.Value(t, exists).Equal(false)
+
+	// Verify non-expired entry remains
+	_, exists2 := profileCache["U789012"]
+	gt.Value(t, exists2).Equal(true)
+}

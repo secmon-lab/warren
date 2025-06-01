@@ -24,3 +24,9 @@ type AlertUsecases interface {
 	// Alert related handlers
 	HandleAlertWithAuth(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error)
 }
+
+type UserUsecases interface {
+	// User related handlers
+	GetUserIcon(ctx context.Context, userID string) ([]byte, string, error)
+	GetUserProfile(ctx context.Context, userID string) (string, error)
+}

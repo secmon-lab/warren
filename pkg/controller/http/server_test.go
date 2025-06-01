@@ -209,7 +209,7 @@ func TestAlertSNS(t *testing.T) {
 		w := httptest.NewRecorder()
 		srv.ServeHTTP(w, log.Request.WithContext(ctx))
 
-		gt.Equal(t, http.StatusOK, w.Code)
+		gt.Value(t, w.Code).Equal(http.StatusOK)
 		gt.A(t, alertUsecasesMock.HandleAlertWithAuthCalls()).Length(1)
 	})
 }

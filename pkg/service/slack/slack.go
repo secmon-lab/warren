@@ -24,19 +24,29 @@ import (
 	"github.com/slack-go/slack"
 )
 
-type UserIconCache struct {
+type userIconCache struct {
 	ImageData []byte
 	ExpiresAt time.Time
 }
+
+type userProfileCache struct {
+	Name      string
+	ExpiresAt time.Time
+}
+
+const UserProfileCacheExpiry = 10 * time.Minute
 
 type Service struct {
 	channelID string
 	client    interfaces.SlackClient
 	slackMetadata
 	// User icon cache
-	iconCache       map[string]*UserIconCache
+	iconCache       map[string]*userIconCache
 	iconCacheMutex  sync.RWMutex
 	iconCacheExpiry time.Duration
+	// User profile cache
+	profileCache      map[string]*userProfileCache
+	profileCacheMutex sync.RWMutex
 }
 
 type slackMetadata struct {
@@ -59,8 +69,9 @@ func New(client interfaces.SlackClient, channelID string) (*Service, error) {
 	s := &Service{
 		channelID:       channelID,
 		client:          client,
-		iconCache:       make(map[string]*UserIconCache),
+		iconCache:       make(map[string]*userIconCache),
 		iconCacheExpiry: time.Hour, // 1時間でキャッシュ更新
+		profileCache:    make(map[string]*userProfileCache),
 	}
 
 	authTest, err := s.client.AuthTest()
@@ -528,7 +539,7 @@ func (x *Service) GetUserIcon(ctx context.Context, userID string) ([]byte, strin
 
 	// Cache the image
 	x.iconCacheMutex.Lock()
-	x.iconCache[userID] = &UserIconCache{
+	x.iconCache[userID] = &userIconCache{
 		ImageData: imageData,
 		ExpiresAt: time.Now().Add(x.iconCacheExpiry),
 	}
@@ -583,6 +594,50 @@ func (x *Service) ClearExpiredIconCache() {
 	for userID, cached := range x.iconCache {
 		if now.After(cached.ExpiresAt) {
 			delete(x.iconCache, userID)
+		}
+	}
+}
+
+// GetUserProfile returns the user's profile name
+func (x *Service) GetUserProfile(ctx context.Context, userID string) (string, error) {
+	logger := logging.From(ctx)
+
+	// Check cache first
+	x.profileCacheMutex.RLock()
+	if cached, exists := x.profileCache[userID]; exists && time.Now().Before(cached.ExpiresAt) {
+		x.profileCacheMutex.RUnlock()
+		logger.Debug("returning cached user profile", "user_id", userID)
+		return cached.Name, nil
+	}
+	x.profileCacheMutex.RUnlock()
+
+	// Fetch user info from Slack
+	user, err := x.client.GetUserInfo(userID)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to get user info from slack", goerr.V("user_id", userID))
+	}
+
+	// Cache the profile
+	x.profileCacheMutex.Lock()
+	x.profileCache[userID] = &userProfileCache{
+		Name:      user.Profile.DisplayName,
+		ExpiresAt: time.Now().Add(UserProfileCacheExpiry),
+	}
+	x.profileCacheMutex.Unlock()
+
+	logger.Debug("cached user profile", "user_id", userID, "name", user.Profile.DisplayName)
+	return user.Profile.DisplayName, nil
+}
+
+// ClearExpiredProfileCache removes expired profile cache entries
+func (x *Service) ClearExpiredProfileCache() {
+	x.profileCacheMutex.Lock()
+	defer x.profileCacheMutex.Unlock()
+
+	now := time.Now()
+	for userID, cached := range x.profileCache {
+		if now.After(cached.ExpiresAt) {
+			delete(x.profileCache, userID)
 		}
 	}
 }

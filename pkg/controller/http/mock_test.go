@@ -17,6 +17,12 @@ import (
 //
 //		// make and configure a mocked http.UseCase
 //		mockedUseCase := &UseCaseMock{
+//			GetUserIconFunc: func(ctx context.Context, userID string) ([]byte, string, error) {
+//				panic("mock out the GetUserIcon method")
+//			},
+//			GetUserProfileFunc: func(ctx context.Context, userID string) (string, error) {
+//				panic("mock out the GetUserProfile method")
+//			},
 //			HandleAlertWithAuthFunc: func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 //				panic("mock out the HandleAlertWithAuth method")
 //			},
@@ -39,6 +45,12 @@ import (
 //
 //	}
 type UseCaseMock struct {
+	// GetUserIconFunc mocks the GetUserIcon method.
+	GetUserIconFunc func(ctx context.Context, userID string) ([]byte, string, error)
+
+	// GetUserProfileFunc mocks the GetUserProfile method.
+	GetUserProfileFunc func(ctx context.Context, userID string) (string, error)
+
 	// HandleAlertWithAuthFunc mocks the HandleAlertWithAuth method.
 	HandleAlertWithAuthFunc func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error)
 
@@ -56,6 +68,20 @@ type UseCaseMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// GetUserIcon holds details about calls to the GetUserIcon method.
+		GetUserIcon []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID string
+		}
+		// GetUserProfile holds details about calls to the GetUserProfile method.
+		GetUserProfile []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID string
+		}
 		// HandleAlertWithAuth holds details about calls to the HandleAlertWithAuth method.
 		HandleAlertWithAuth []struct {
 			// Ctx is the ctx argument value.
@@ -108,11 +134,94 @@ type UseCaseMock struct {
 			SlackMsg slack_model.Message
 		}
 	}
+	lockGetUserIcon                          sync.RWMutex
+	lockGetUserProfile                       sync.RWMutex
 	lockHandleAlertWithAuth                  sync.RWMutex
 	lockHandleSlackAppMention                sync.RWMutex
 	lockHandleSlackInteractionBlockActions   sync.RWMutex
 	lockHandleSlackInteractionViewSubmission sync.RWMutex
 	lockHandleSlackMessage                   sync.RWMutex
+}
+
+// GetUserIcon calls GetUserIconFunc.
+func (mock *UseCaseMock) GetUserIcon(ctx context.Context, userID string) ([]byte, string, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		UserID string
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+	}
+	mock.lockGetUserIcon.Lock()
+	mock.calls.GetUserIcon = append(mock.calls.GetUserIcon, callInfo)
+	mock.lockGetUserIcon.Unlock()
+	if mock.GetUserIconFunc == nil {
+		var (
+			bytesOut []byte
+			sOut     string
+			errOut   error
+		)
+		return bytesOut, sOut, errOut
+	}
+	return mock.GetUserIconFunc(ctx, userID)
+}
+
+// GetUserIconCalls gets all the calls that were made to GetUserIcon.
+// Check the length with:
+//
+//	len(mockedUseCase.GetUserIconCalls())
+func (mock *UseCaseMock) GetUserIconCalls() []struct {
+	Ctx    context.Context
+	UserID string
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID string
+	}
+	mock.lockGetUserIcon.RLock()
+	calls = mock.calls.GetUserIcon
+	mock.lockGetUserIcon.RUnlock()
+	return calls
+}
+
+// GetUserProfile calls GetUserProfileFunc.
+func (mock *UseCaseMock) GetUserProfile(ctx context.Context, userID string) (string, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		UserID string
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+	}
+	mock.lockGetUserProfile.Lock()
+	mock.calls.GetUserProfile = append(mock.calls.GetUserProfile, callInfo)
+	mock.lockGetUserProfile.Unlock()
+	if mock.GetUserProfileFunc == nil {
+		var (
+			sOut   string
+			errOut error
+		)
+		return sOut, errOut
+	}
+	return mock.GetUserProfileFunc(ctx, userID)
+}
+
+// GetUserProfileCalls gets all the calls that were made to GetUserProfile.
+// Check the length with:
+//
+//	len(mockedUseCase.GetUserProfileCalls())
+func (mock *UseCaseMock) GetUserProfileCalls() []struct {
+	Ctx    context.Context
+	UserID string
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID string
+	}
+	mock.lockGetUserProfile.RLock()
+	calls = mock.calls.GetUserProfile
+	mock.lockGetUserProfile.RUnlock()
+	return calls
 }
 
 // HandleAlertWithAuth calls HandleAlertWithAuthFunc.

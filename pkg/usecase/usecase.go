@@ -37,6 +37,7 @@ type UseCases struct {
 var _ interfaces.AlertUsecases = &UseCases{}
 var _ interfaces.SlackEventUsecases = &UseCases{}
 var _ interfaces.SlackInteractionUsecases = &UseCases{}
+var _ interfaces.UserUsecases = &UseCases{}
 
 type Option func(*UseCases)
 
@@ -140,4 +141,13 @@ func (u *UseCases) GetUserIcon(ctx context.Context, userID string) ([]byte, stri
 	}
 
 	return u.slackService.GetUserIcon(ctx, userID)
+}
+
+// GetUserProfile returns the user's profile name via Slack service
+func (u *UseCases) GetUserProfile(ctx context.Context, userID string) (string, error) {
+	if u.slackService == nil {
+		return "", ErrSlackServiceNotConfigured
+	}
+
+	return u.slackService.GetUserProfile(ctx, userID)
 }
