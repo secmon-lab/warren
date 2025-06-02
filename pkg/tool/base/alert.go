@@ -8,17 +8,18 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 )
 
-func (x *Base) getAlerts(ctx context.Context, args map[string]any) (map[string]any, error) {
-	var limit, offset int64
-
-	if limitVal, ok := args["limit"].(float64); ok {
-		limit = int64(limitVal)
-	}
-	if offsetVal, ok := args["offset"].(float64); ok {
-		offset = int64(offsetVal)
+func (x *Warren) getAlerts(ctx context.Context, args map[string]any) (map[string]any, error) {
+	limit, err := getArg[int64](args, "limit")
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get limit")
 	}
 
-	alerts, err := x.repo.BatchGetAlerts(ctx, x.alertIDs)
+	offset, err := getArg[int64](args, "offset")
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get offset")
+	}
+
+	alerts, err := x.repo.BatchGetAlerts(ctx, x.ticket.AlertIDs)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get alerts")
 	}
@@ -47,67 +48,6 @@ func (x *Base) getAlerts(ctx context.Context, args map[string]any) (map[string]a
 
 	return map[string]any{
 		"alerts": rows,
-		"count":  len(alerts),
-		"offset": offset,
-		"limit":  limit,
-	}, nil
-}
-
-func (x *Base) searchAlerts(ctx context.Context, args map[string]any) (map[string]any, error) {
-	path, err := getArg[string](args, "path")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get path")
-	}
-
-	op, err := getArg[string](args, "op")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get op")
-	}
-
-	value, err := getArg[string](args, "value")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get value")
-	}
-
-	var offset, limit float64
-	if offsetVal, ok := args["offset"].(float64); ok {
-		offset = offsetVal
-	}
-	if limitVal, ok := args["limit"].(float64); ok {
-		limit = limitVal
-	}
-	if limit <= 0 {
-		limit = 25
-	}
-
-	alerts, err := x.repo.SearchAlerts(ctx, path, op, value, int(limit))
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to search alerts")
-	}
-
-	if offset > 0 {
-		if int(offset) >= len(alerts) {
-			alerts = nil
-		} else {
-			alerts = alerts[int(offset):]
-		}
-	}
-
-	if limit < float64(len(alerts)) {
-		alerts = alerts[:int(limit)]
-	}
-
-	alertMap := make(map[string]any)
-	for _, alert := range alerts {
-		raw, err := json.Marshal(alert)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to marshal alert")
-		}
-		alertMap[alert.ID.String()] = string(raw)
-	}
-
-	return map[string]any{
-		"alerts": alertMap,
 		"count":  len(alerts),
 		"offset": offset,
 		"limit":  limit,

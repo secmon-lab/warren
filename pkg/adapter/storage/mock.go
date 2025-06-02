@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 )
 
@@ -42,7 +43,11 @@ func (m *Mock) PutObject(ctx context.Context, object string) io.WriteCloser {
 }
 
 func (m *Mock) GetObject(ctx context.Context, object string) (io.ReadCloser, error) {
-	return io.NopCloser(strings.NewReader(m.data[object])), nil
+	v, ok := m.data[object]
+	if !ok {
+		return nil, goerr.New("object not found", goerr.V("object", object))
+	}
+	return io.NopCloser(strings.NewReader(v)), nil
 }
 
 func (m *Mock) Close(_ context.Context) {}
