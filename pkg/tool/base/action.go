@@ -13,10 +13,10 @@ import (
 )
 
 type Warren struct {
-	repo     interfaces.Repository
-	ticketID types.TicketID
-	policies map[string]string
-	ticket   *ticket.Ticket
+	repo         interfaces.Repository
+	ticketID     types.TicketID
+	policyClient interfaces.PolicyClient
+	ticket       *ticket.Ticket
 }
 
 var _ interfaces.Tool = &Warren{}
@@ -40,11 +40,11 @@ func getArg[T any](args map[string]any, key string) (T, error) {
 	return typedVal, nil
 }
 
-func New(repo interfaces.Repository, policies map[string]string, ticketID types.TicketID) *Warren {
+func New(repo interfaces.Repository, policy interfaces.PolicyClient, ticketID types.TicketID) *Warren {
 	return &Warren{
-		repo:     repo,
-		ticketID: ticketID,
-		policies: policies,
+		repo:         repo,
+		ticketID:     ticketID,
+		policyClient: policy,
 	}
 }
 
@@ -72,6 +72,7 @@ const (
 	cmdFindNearestTicket = "warren.find_nearest_ticket"
 	cmdListPolicies      = "warren.list_policies"
 	cmdGetPolicy         = "warren.get_policy"
+	cmdExecPolicy        = "warren.exec_policy"
 )
 
 func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
@@ -98,6 +99,10 @@ func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Type:        gollem.TypeInteger,
 					Description: "Maximum number of tickets to return",
 				},
+				"duration": {
+					Type:        gollem.TypeInteger,
+					Description: "Duration of the ticket in days",
+				},
 			},
 		},
 		{
@@ -115,6 +120,21 @@ func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			},
 			Required: []string{"name"},
 		},
+		{
+			Name:        cmdExecPolicy,
+			Description: "Execute a policy in Rego to detect an alert by schema and input data. It returns detected alert data.",
+			Parameters: map[string]*gollem.Parameter{
+				"schema": {
+					Type:        gollem.TypeString,
+					Description: "The schema of the alert. It must be in 'package line' in the policy.",
+				},
+				"input": {
+					Type:        gollem.TypeString,
+					Description: "The input data to the policy. It must be a JSON string.",
+				},
+			},
+			Required: []string{"schema", "input"},
+		},
 	}, nil
 }
 
@@ -128,6 +148,8 @@ func (x *Warren) Run(ctx context.Context, name string, args map[string]any) (map
 		return x.listPolicies(ctx, args)
 	case cmdGetPolicy:
 		return x.getPolicy(ctx, args)
+	case cmdExecPolicy:
+		return x.execPolicy(ctx, args)
 	default:
 		return nil, goerr.New("invalid function name", goerr.V("name", name))
 	}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 )
 
 // Export private types and functions for testing
@@ -67,9 +68,6 @@ func (uc *AuthUseCase) TestGetCache() *TestAuthCache {
 	return uc.cache
 }
 
-// Export for existing HandlePrompt tests
-type HandlePromptInput = handlePromptInput
-
-func HandlePrompt(ctx context.Context, input HandlePromptInput) error {
-	return handlePrompt(ctx, input)
+func (uc *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message string) error {
+	return uc.chat(ctx, target, message)
 }
