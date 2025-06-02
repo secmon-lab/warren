@@ -232,3 +232,72 @@ func TestAlertSNSVerification(t *testing.T) {
 		gt.Value(t, rec.Code).Equal(http.StatusOK)
 	})
 }
+
+func TestValidateGoogleIAPToken(t *testing.T) {
+	t.Run("no IAP header - should pass through", func(t *testing.T) {
+		called := false
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			called = true
+			// Verify no IAP claims in context
+			claims, err := server.GetGoogleIAPJWTClaims(r.Context())
+			gt.Error(t, err) // Should error since no IAP header was provided
+			gt.Value(t, claims).Equal(nil)
+			w.WriteHeader(http.StatusOK)
+		})
+
+		middleware := server.ValidateGoogleIAPToken(handler)
+		req := httptest.NewRequest("GET", "/", nil)
+		w := httptest.NewRecorder()
+
+		middleware.ServeHTTP(w, req)
+
+		gt.Value(t, called).Equal(true)
+		gt.Value(t, w.Code).Equal(http.StatusOK)
+	})
+
+	t.Run("invalid IAP token - should log warning and continue", func(t *testing.T) {
+		called := false
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			called = true
+			// Verify no IAP claims in context since validation failed
+			claims, err := server.GetGoogleIAPJWTClaims(r.Context())
+			gt.Error(t, err) // Should error since validation failed
+			gt.Value(t, claims).Equal(nil)
+			w.WriteHeader(http.StatusOK)
+		})
+
+		middleware := server.ValidateGoogleIAPToken(handler)
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("x-goog-iap-jwt-assertion", "invalid.jwt.token")
+		w := httptest.NewRecorder()
+
+		middleware.ServeHTTP(w, req)
+
+		// Handler should be called even with invalid token (now logs warning and continues)
+		gt.Value(t, called).Equal(true)
+		gt.Value(t, w.Code).Equal(http.StatusOK)
+	})
+
+	t.Run("malformed IAP token - should log warning and continue", func(t *testing.T) {
+		called := false
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			called = true
+			// Verify no IAP claims in context since validation failed
+			claims, err := server.GetGoogleIAPJWTClaims(r.Context())
+			gt.Error(t, err) // Should error since validation failed
+			gt.Value(t, claims).Equal(nil)
+			w.WriteHeader(http.StatusOK)
+		})
+
+		middleware := server.ValidateGoogleIAPToken(handler)
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("x-goog-iap-jwt-assertion", "not-a-jwt-token")
+		w := httptest.NewRecorder()
+
+		middleware.ServeHTTP(w, req)
+
+		// Handler should be called even with malformed token (now logs warning and continues)
+		gt.Value(t, called).Equal(true)
+		gt.Value(t, w.Code).Equal(http.StatusOK)
+	})
+}

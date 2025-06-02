@@ -12,12 +12,17 @@ type contextKey string
 
 const (
 	googleIDTokenClaimsKey contextKey = "google_id_token_claims"
+	googleIAPJWTClaimsKey  contextKey = "google_iap_jwt_claims"
 	snsMessageKey          contextKey = "sns_message"
 	httpRequestKey         contextKey = "http_request"
 )
 
 func WithGoogleIDTokenClaims(ctx context.Context, claims map[string]interface{}) context.Context {
 	return context.WithValue(ctx, googleIDTokenClaimsKey, claims)
+}
+
+func WithGoogleIAPJWTClaims(ctx context.Context, claims map[string]interface{}) context.Context {
+	return context.WithValue(ctx, googleIAPJWTClaimsKey, claims)
 }
 
 func WithSNSMessage(ctx context.Context, msg *message.SNS) context.Context {
@@ -33,6 +38,11 @@ func BuildContext(ctx context.Context) Context {
 	claims, ok := ctx.Value(googleIDTokenClaimsKey).(map[string]interface{})
 	if ok {
 		authCtx.Google = claims
+	}
+
+	iapClaims, ok := ctx.Value(googleIAPJWTClaimsKey).(map[string]interface{})
+	if ok {
+		authCtx.IAP = iapClaims
 	}
 
 	msg, ok := ctx.Value(snsMessageKey).(*message.SNS)

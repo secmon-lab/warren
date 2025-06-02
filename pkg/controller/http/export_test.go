@@ -6,6 +6,7 @@ var (
 	HandleSNSSubscriptionConfirmation = handleSNSSubscriptionConfirmation
 	AlertSNSHandler                   = alertSNSHandler
 	WithHTTPClient                    = withHTTPClient
+	ValidateGoogleIAPToken            = validateGoogleIAPToken
 )
 
 var LoggingMiddleware = loggingMiddleware

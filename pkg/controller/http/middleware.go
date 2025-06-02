@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
@@ -24,6 +26,7 @@ type contextKey string
 
 const (
 	GoogleIDTokenClaimsKey contextKey = "google_id_token_claims"
+	GoogleIAPJWTClaimsKey  contextKey = "google_iap_jwt_claims"
 	httpClientKey          contextKey = "http_client"
 )
 
@@ -63,6 +66,98 @@ func withAuthHTTPRequest(next http.Handler) http.Handler {
 		}
 
 		ctx := auth.WithHTTPRequest(r.Context(), authReq)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// validateGoogleIAPToken validates Google IAP JWT from x-goog-iap-jwt-assertion header
+// and injects the verified claims into request context if valid
+// If validation fails, it logs a warning and continues processing
+func validateGoogleIAPToken(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		iapJWTHeader := r.Header.Get("x-goog-iap-jwt-assertion")
+		if iapJWTHeader == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Fetch IAP public keys
+		keySet, err := jwk.Fetch(r.Context(), "https://www.gstatic.com/iap/verify/public_key-jwk")
+		if err != nil {
+			logging.From(r.Context()).Warn("failed to fetch IAP public keys, continuing without validation", "error", err)
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Parse and verify the JWT token
+		token, err := jwt.Parse([]byte(iapJWTHeader), jwt.WithKeySet(keySet), jwt.WithValidate(true))
+		if err != nil {
+			logging.From(r.Context()).Warn("invalid IAP JWT token, continuing without validation", "error", err)
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Verify algorithm is ES256 (this is checked in header)
+		// The jwx library should already validate this, but we can double-check
+		if token.PrivateClaims()["alg"] != nil {
+			alg := token.PrivateClaims()["alg"]
+			if alg != "ES256" {
+				logging.From(r.Context()).Warn("invalid JWT algorithm, continuing without validation", "algorithm", alg)
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		// Verify issuer
+		if token.Issuer() != "https://cloud.google.com/iap" {
+			logging.From(r.Context()).Warn("invalid JWT issuer, continuing without validation", "issuer", token.Issuer())
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Verify expiration and issued-at time
+		now := time.Now()
+		if token.Expiration().Before(now) {
+			logging.From(r.Context()).Warn("JWT token expired, continuing without validation", "expiration", token.Expiration(), "now", now)
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if token.IssuedAt().After(now) {
+			logging.From(r.Context()).Warn("JWT token used before issued, continuing without validation", "issued_at", token.IssuedAt(), "now", now)
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Verify audience format (should be /projects/{project_number}/apps/{project_id})
+		aud := token.Audience()
+		if len(aud) == 0 {
+			logging.From(r.Context()).Warn("JWT missing audience, continuing without validation")
+			next.ServeHTTP(w, r)
+			return
+		}
+		// Basic format check for audience
+		if !strings.HasPrefix(aud[0], "/projects/") || !strings.Contains(aud[0], "/apps/") {
+			logging.From(r.Context()).Warn("invalid JWT audience format, continuing without validation", "audience", aud[0])
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Extract claims as map for context
+		claimsMap := make(map[string]interface{})
+		for iter := token.Iterate(r.Context()); iter.Next(r.Context()); {
+			pair := iter.Pair()
+			claimsMap[pair.Key.(string)] = pair.Value
+		}
+
+		// Log successful validation for debugging
+		logging.From(r.Context()).Info("IAP JWT validated successfully",
+			"sub", token.Subject(),
+			"email", claimsMap["email"],
+			"aud", aud[0])
+
+		// Inject validated claims into request context
+		ctx := auth.WithGoogleIAPJWTClaims(r.Context(), claimsMap)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -110,6 +205,15 @@ func GetGoogleIDTokenClaims(ctx context.Context) (map[string]interface{}, error)
 	claims, ok := ctx.Value(GoogleIDTokenClaimsKey).(map[string]interface{})
 	if !ok {
 		return nil, goerr.New("Google ID token claims not found in context")
+	}
+	return claims, nil
+}
+
+// GetGoogleIAPJWTClaims retrieves Google IAP JWT claims from context
+func GetGoogleIAPJWTClaims(ctx context.Context) (map[string]interface{}, error) {
+	claims, ok := ctx.Value(GoogleIAPJWTClaimsKey).(map[string]interface{})
+	if !ok {
+		return nil, goerr.New("Google IAP JWT claims not found in context")
 	}
 	return claims, nil
 }
