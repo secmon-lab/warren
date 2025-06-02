@@ -68,10 +68,10 @@ func (x *Warren) LogValue() slog.Value {
 }
 
 const (
-	cmdGetAlerts           = "warren.get.alerts"
-	cmdSearchNearestTicket = "warren.search.nearest_ticket"
-	cmdListPolicies        = "warren.list.policies"
-	cmdGetPolicy           = "warren.get.policy"
+	cmdGetAlerts         = "warren.get_alerts"
+	cmdFindNearestTicket = "warren.find_nearest_ticket"
+	cmdListPolicies      = "warren.list_policies"
+	cmdGetPolicy         = "warren.get_policy"
 )
 
 func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
@@ -91,7 +91,7 @@ func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			},
 		},
 		{
-			Name:        cmdSearchNearestTicket,
+			Name:        cmdFindNearestTicket,
 			Description: "Search the previous tickets that are similar to the current ticket",
 			Parameters: map[string]*gollem.Parameter{
 				"limit": {
@@ -102,15 +102,15 @@ func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 		},
 		{
 			Name:        cmdListPolicies,
-			Description: "List all policies",
+			Description: "List all policies in Rego to detect an alert",
 		},
 		{
 			Name:        cmdGetPolicy,
-			Description: "Get a policy by name",
+			Description: "Get a policy in Rego to detect an alert by name",
 			Parameters: map[string]*gollem.Parameter{
 				"name": {
 					Type:        gollem.TypeString,
-					Description: "The name of the policy",
+					Description: "The name of the policy. It must be in the list of policies returned by `warren.list_policies`",
 				},
 			},
 			Required: []string{"name"},
@@ -122,10 +122,8 @@ func (x *Warren) Run(ctx context.Context, name string, args map[string]any) (map
 	switch name {
 	case cmdGetAlerts:
 		return x.getAlerts(ctx, args)
-		/* TODO:
-		case "base.alert.similar":
-			return x.getSimilarAlerts(ctx, args)
-		*/
+	case cmdFindNearestTicket:
+		return x.findNearestTicket(ctx, args)
 	case cmdListPolicies:
 		return x.listPolicies(ctx, args)
 	case cmdGetPolicy:

@@ -93,7 +93,7 @@ func (uc *UseCases) buildHandlePromptInput(ticket *ticket.Ticket, p string) hand
 func handlePrompt(ctx context.Context, input handlePromptInput) error {
 	logger := logging.From(ctx)
 
-	baseAction := base.New(input.Repo, input.Ticket.AlertIDs, input.PolicyClient.Sources(), input.Ticket.ID)
+	baseAction := base.New(input.Repo, input.PolicyClient.Sources(), input.Ticket.ID)
 	tools := append(input.Tools, baseAction)
 
 	storageSvc := storage.New(input.StorageClient, storage.WithPrefix(input.StoragePrefix))
