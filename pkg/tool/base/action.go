@@ -7,20 +7,21 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/urfave/cli/v3"
 )
 
-type Base struct {
-	alertIDs []types.AlertID
+type Warren struct {
 	repo     interfaces.Repository
 	ticketID types.TicketID
 	policies map[string]string
+	ticket   *ticket.Ticket
 }
 
-var _ interfaces.Tool = &Base{}
+var _ interfaces.Tool = &Warren{}
 
-func (x *Base) Helper() *cli.Command {
+func (x *Warren) Helper() *cli.Command {
 	return nil
 }
 
@@ -39,39 +40,45 @@ func getArg[T any](args map[string]any, key string) (T, error) {
 	return typedVal, nil
 }
 
-func New(repo interfaces.Repository, alertIDs []types.AlertID, policies map[string]string, ticketID types.TicketID) *Base {
-	return &Base{
-		alertIDs: alertIDs,
+func New(repo interfaces.Repository, policies map[string]string, ticketID types.TicketID) *Warren {
+	return &Warren{
 		repo:     repo,
 		ticketID: ticketID,
 		policies: policies,
 	}
 }
 
-func (x *Base) Name() string {
-	return "base"
+func (x *Warren) Name() string {
+	return "warren"
 }
 
-func (x *Base) Flags() []cli.Flag {
+func (x *Warren) Flags() []cli.Flag {
 	return nil
 }
 
-func (x *Base) Configure(ctx context.Context) error {
+func (x *Warren) Configure(ctx context.Context) error {
 	return nil
 }
 
-func (x *Base) LogValue() slog.Value {
+func (x *Warren) LogValue() slog.Value {
 	return slog.GroupValue(
-		slog.Int("alerts.length", len(x.alertIDs)),
+		slog.Int("alerts.number", len(x.ticket.AlertIDs)),
 		slog.String("ticket.id", string(x.ticketID)),
 	)
 }
 
-func (x *Base) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
+const (
+	cmdGetAlerts           = "warren.get.alerts"
+	cmdSearchNearestTicket = "warren.search.nearest_ticket"
+	cmdListPolicies        = "warren.list.policies"
+	cmdGetPolicy           = "warren.get.policy"
+)
+
+func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return []gollem.ToolSpec{
 		{
-			Name:        "base.alerts.get",
-			Description: "Get a set of alerts with pagination support",
+			Name:        cmdGetAlerts,
+			Description: "Get a set of alerts that is bound to the ticket with pagination support",
 			Parameters: map[string]*gollem.Parameter{
 				"limit": {
 					Type:        gollem.TypeInteger,
@@ -84,46 +91,21 @@ func (x *Base) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			},
 		},
 		{
-			Name:        "base.alert.search",
-			Description: "Search the alerts by the given query. You can specify the path as Firestore path, and the operation and value to filter the alerts.",
+			Name:        cmdSearchNearestTicket,
+			Description: "Search the previous tickets that are similar to the current ticket",
 			Parameters: map[string]*gollem.Parameter{
-				"path": {
-					Type:        gollem.TypeString,
-					Description: "The path of the alert parameter to filter",
-				},
-				"op": {
-					Type:        gollem.TypeString,
-					Description: "The operation of the alert",
-					Enum: []string{
-						"==",
-						"!=",
-						">",
-						">=",
-						"<",
-						"<=",
-					},
-				},
-				"value": {
-					Type:        gollem.TypeString,
-					Description: "The value of the alert",
-				},
 				"limit": {
 					Type:        gollem.TypeInteger,
-					Description: "Maximum number of alerts to return. Default is 25.",
-				},
-				"offset": {
-					Type:        gollem.TypeInteger,
-					Description: "Number of alerts to skip. Default is 0.",
+					Description: "Maximum number of tickets to return",
 				},
 			},
-			Required: []string{"path", "op", "value"},
 		},
 		{
-			Name:        "base.policy.list",
+			Name:        cmdListPolicies,
 			Description: "List all policies",
 		},
 		{
-			Name:        "base.policy.get",
+			Name:        cmdGetPolicy,
 			Description: "Get a policy by name",
 			Parameters: map[string]*gollem.Parameter{
 				"name": {
@@ -136,19 +118,17 @@ func (x *Base) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	}, nil
 }
 
-func (x *Base) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
+func (x *Warren) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
 	switch name {
-	case "base.alerts.get":
+	case cmdGetAlerts:
 		return x.getAlerts(ctx, args)
-	case "base.alert.search":
-		return x.searchAlerts(ctx, args)
 		/* TODO:
 		case "base.alert.similar":
 			return x.getSimilarAlerts(ctx, args)
 		*/
-	case "base.policy.list":
+	case cmdListPolicies:
 		return x.listPolicies(ctx, args)
-	case "base.policy.get":
+	case cmdGetPolicy:
 		return x.getPolicy(ctx, args)
 	default:
 		return nil, goerr.New("invalid function name", goerr.V("name", name))

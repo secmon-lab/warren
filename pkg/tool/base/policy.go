@@ -7,7 +7,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
-func (x *Base) listPolicies(ctx context.Context, _ map[string]any) (map[string]any, error) {
+func (x *Warren) listPolicies(ctx context.Context, _ map[string]any) (map[string]any, error) {
 	var rows []any
 	for name := range x.policies {
 		rows = append(rows, name)
@@ -22,7 +22,7 @@ func (x *Base) listPolicies(ctx context.Context, _ map[string]any) (map[string]a
 	return result, nil
 }
 
-func (x *Base) getPolicy(ctx context.Context, args map[string]any) (map[string]any, error) {
+func (x *Warren) getPolicy(ctx context.Context, args map[string]any) (map[string]any, error) {
 	errResp := func(msg string) (map[string]any, error) {
 		return map[string]any{
 			"policy": "",
