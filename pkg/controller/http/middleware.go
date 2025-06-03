@@ -101,17 +101,6 @@ func validateGoogleIAPTokenWithJWKURL(next http.Handler, jwkURL string) http.Han
 			return
 		}
 
-		// Verify algorithm is ES256 (this is checked in header)
-		// The jwx library should already validate this, but we can double-check
-		if token.PrivateClaims()["alg"] != nil {
-			alg := token.PrivateClaims()["alg"]
-			if alg != "ES256" {
-				logging.From(r.Context()).Warn("invalid JWT algorithm, continuing without validation", "algorithm", alg)
-				next.ServeHTTP(w, r)
-				return
-			}
-		}
-
 		// Verify issuer
 		if token.Issuer() != "https://cloud.google.com/iap" {
 			logging.From(r.Context()).Warn("invalid JWT issuer, continuing without validation", "issuer", token.Issuer())
