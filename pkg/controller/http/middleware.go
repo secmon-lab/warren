@@ -26,9 +26,7 @@ import (
 type contextKey string
 
 const (
-	GoogleIDTokenClaimsKey contextKey = "google_id_token_claims"
-	GoogleIAPJWTClaimsKey  contextKey = "google_iap_jwt_claims"
-	httpClientKey          contextKey = "http_client"
+	httpClientKey contextKey = "http_client"
 )
 
 type SNSMessage struct {
@@ -75,6 +73,11 @@ func withAuthHTTPRequest(next http.Handler) http.Handler {
 // and injects the verified claims into request context if valid
 // If validation fails, it logs a warning and continues processing
 func validateGoogleIAPToken(next http.Handler) http.Handler {
+	return validateGoogleIAPTokenWithJWKURL(next, "https://www.gstatic.com/iap/verify/public_key-jwk")
+}
+
+// validateGoogleIAPTokenWithJWKURL validates Google IAP JWT with a configurable JWK URL
+func validateGoogleIAPTokenWithJWKURL(next http.Handler, jwkURL string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		iapJWTHeader := r.Header.Get("x-goog-iap-jwt-assertion")
 		if iapJWTHeader == "" {
@@ -83,7 +86,7 @@ func validateGoogleIAPToken(next http.Handler) http.Handler {
 		}
 
 		// Fetch IAP public keys
-		keySet, err := jwk.Fetch(r.Context(), "https://www.gstatic.com/iap/verify/public_key-jwk")
+		keySet, err := jwk.Fetch(r.Context(), jwkURL)
 		if err != nil {
 			logging.From(r.Context()).Warn("failed to fetch IAP public keys, continuing without validation", "error", err)
 			next.ServeHTTP(w, r)
@@ -193,24 +196,6 @@ func validateGoogleIDToken(next http.Handler) http.Handler {
 		ctx := auth.WithGoogleIDTokenClaims(r.Context(), payload.Claims)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
-}
-
-// GetGoogleIDTokenClaims retrieves Google ID token claims from context
-func GetGoogleIDTokenClaims(ctx context.Context) (map[string]interface{}, error) {
-	claims, ok := ctx.Value(GoogleIDTokenClaimsKey).(map[string]interface{})
-	if !ok {
-		return nil, goerr.New("Google ID token claims not found in context")
-	}
-	return claims, nil
-}
-
-// GetGoogleIAPJWTClaims retrieves Google IAP JWT claims from context
-func GetGoogleIAPJWTClaims(ctx context.Context) (map[string]interface{}, error) {
-	claims, ok := ctx.Value(GoogleIAPJWTClaimsKey).(map[string]interface{})
-	if !ok {
-		return nil, goerr.New("Google IAP JWT claims not found in context")
-	}
-	return claims, nil
 }
 
 func verifySlackRequest(verifier slack.PayloadVerifier) func(http.Handler) http.Handler {

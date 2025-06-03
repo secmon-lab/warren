@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
 )
 
@@ -31,6 +32,24 @@ func WithSNSMessage(ctx context.Context, msg *message.SNS) context.Context {
 
 func WithHTTPRequest(ctx context.Context, req *HTTPRequest) context.Context {
 	return context.WithValue(ctx, httpRequestKey, req)
+}
+
+// GetGoogleIDTokenClaims retrieves Google ID token claims from context
+func GetGoogleIDTokenClaims(ctx context.Context) (map[string]interface{}, error) {
+	claims, ok := ctx.Value(googleIDTokenClaimsKey).(map[string]interface{})
+	if !ok {
+		return nil, goerr.New("Google ID token claims not found in context")
+	}
+	return claims, nil
+}
+
+// GetGoogleIAPJWTClaims retrieves Google IAP JWT claims from context
+func GetGoogleIAPJWTClaims(ctx context.Context) (map[string]interface{}, error) {
+	claims, ok := ctx.Value(googleIAPJWTClaimsKey).(map[string]interface{})
+	if !ok {
+		return nil, goerr.New("Google IAP JWT claims not found in context")
+	}
+	return claims, nil
 }
 
 func BuildContext(ctx context.Context) Context {
