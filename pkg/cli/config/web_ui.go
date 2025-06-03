@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/urfave/cli/v3"
 )
@@ -59,11 +60,11 @@ func (x *WebUI) GetCallbackURL() string {
 	return x.frontendURL + "/api/auth/callback"
 }
 
-func (x *WebUI) Configure(repo interfaces.Repository) (*usecase.AuthUseCase, error) {
+func (x *WebUI) Configure(repo interfaces.Repository, slackSvc *slack.Service) (*usecase.AuthUseCase, error) {
 	if !x.IsConfigured() {
 		return nil, nil // Return nil if not configured (authentication is optional)
 	}
 
 	callbackURL := x.GetCallbackURL()
-	return usecase.NewAuthUseCase(repo, x.clientID, x.clientSecret, callbackURL), nil
+	return usecase.NewAuthUseCase(repo, slackSvc, x.clientID, x.clientSecret, callbackURL), nil
 }

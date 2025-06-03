@@ -6,14 +6,35 @@ import (
 	"testing"
 
 	"github.com/m-mizutani/gt"
+	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/usecase"
+	slack_sdk "github.com/slack-go/slack"
 )
+
+func mockSlackService(t *testing.T) *slack.Service {
+	slackSvc, err := slack.New(&mock.SlackClientMock{
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				User:   "U0000000000",
+				Team:   "T0000000000",
+				URL:    "https://slack.com",
+				TeamID: "T0000000000",
+				UserID: "U0000000000",
+				BotID:  "B0000000000",
+			}, nil
+		},
+	}, "test-channel-id")
+	gt.NoError(t, err)
+	return slackSvc
+}
 
 func TestAuthUseCase_GetAuthURL(t *testing.T) {
 	repo := repository.NewMemory()
-	authUC := usecase.NewAuthUseCase(repo, "test-client-id", "test-client-secret", "http://localhost:3000/api/auth/callback")
+	slackSvc := mockSlackService(t)
+	authUC := usecase.NewAuthUseCase(repo, slackSvc, "test-client-id", "test-client-secret", "http://localhost:3000/api/auth/callback")
 
 	authURL := authUC.GetAuthURL("test-state")
 
@@ -28,7 +49,8 @@ func TestAuthUseCase_GetAuthURL(t *testing.T) {
 func TestAuthUseCase_ValidateToken(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	authUC := usecase.NewAuthUseCase(repo, "test-client-id", "test-client-secret", "http://localhost:3000/api/auth/callback")
+	slackSvc := mockSlackService(t)
+	authUC := usecase.NewAuthUseCase(repo, slackSvc, "test-client-id", "test-client-secret", "http://localhost:3000/api/auth/callback")
 
 	// Create and store a test token
 	token := auth.NewToken("test-sub", "test@example.com", "Test User")
@@ -57,7 +79,8 @@ func TestAuthUseCase_ValidateToken(t *testing.T) {
 func TestAuthUseCase_Logout(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	authUC := usecase.NewAuthUseCase(repo, "test-client-id", "test-client-secret", "http://localhost:3000/api/auth/callback")
+	slackSvc := mockSlackService(t)
+	authUC := usecase.NewAuthUseCase(repo, slackSvc, "test-client-id", "test-client-secret", "http://localhost:3000/api/auth/callback")
 
 	// Create and store a test token
 	token := auth.NewToken("test-sub", "test@example.com", "Test User")
@@ -78,7 +101,8 @@ func TestAuthUseCase_Logout(t *testing.T) {
 func TestAuthUseCase_TokenExpiration(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	authUC := usecase.NewAuthUseCase(repo, "test-client-id", "test-client-secret", "http://localhost:3000/api/auth/callback")
+	slackSvc := mockSlackService(t)
+	authUC := usecase.NewAuthUseCase(repo, slackSvc, "test-client-id", "test-client-secret", "http://localhost:3000/api/auth/callback")
 
 	// Create an expired token
 	token := auth.NewToken("test-sub", "test@example.com", "Test User")
