@@ -117,7 +117,7 @@ func cmdDev() *cli.Command {
 			}
 
 			// Add AuthUseCase if authentication options are provided
-			authUC, err := webUICfg.Configure(repo)
+			authUC, err := webUICfg.Configure(repo, slackSvc)
 			if err != nil {
 				return err
 			}

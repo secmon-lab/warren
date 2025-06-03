@@ -107,6 +107,10 @@ func (x *Service) BotID() string {
 	return x.botID
 }
 
+func (x *Service) TeamID() string {
+	return x.teamID
+}
+
 func (x *Service) NewThread(thread model.Thread) *ThreadService {
 	return &ThreadService{
 		slackMetadata: x.slackMetadata,

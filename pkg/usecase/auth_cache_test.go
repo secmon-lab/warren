@@ -81,7 +81,8 @@ func TestAuthCache_Clear(t *testing.T) {
 
 func TestAuthUseCase_ValidateTokenWithCache(t *testing.T) {
 	repo := repository.NewMemory()
-	authUC := usecase.NewAuthUseCase(repo, "client-id", "client-secret", "callback-url")
+	slackSvc := mockSlackService(t)
+	authUC := usecase.NewAuthUseCase(repo, slackSvc, "client-id", "client-secret", "callback-url")
 	ctx := context.Background()
 
 	// Create and store a token
@@ -108,7 +109,8 @@ func TestAuthUseCase_ValidateTokenWithCache(t *testing.T) {
 
 func TestAuthUseCase_ValidateTokenWithCache_InvalidSecret(t *testing.T) {
 	repo := repository.NewMemory()
-	authUC := usecase.NewAuthUseCase(repo, "client-id", "client-secret", "callback-url")
+	slackSvc := mockSlackService(t)
+	authUC := usecase.NewAuthUseCase(repo, slackSvc, "client-id", "client-secret", "callback-url")
 	ctx := context.Background()
 
 	// Create and store a token
@@ -133,7 +135,8 @@ func TestAuthUseCase_ValidateTokenWithCache_InvalidSecret(t *testing.T) {
 
 func TestAuthUseCase_Logout_RemovesFromCache(t *testing.T) {
 	repo := repository.NewMemory()
-	authUC := usecase.NewAuthUseCase(repo, "client-id", "client-secret", "callback-url")
+	slackSvc := mockSlackService(t)
+	authUC := usecase.NewAuthUseCase(repo, slackSvc, "client-id", "client-secret", "callback-url")
 	ctx := context.Background()
 
 	// Create and store a token

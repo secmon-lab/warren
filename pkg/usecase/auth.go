@@ -12,19 +12,22 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/service/slack"
 )
 
 type AuthUseCase struct {
 	repo         interfaces.Repository
+	slackSvc     *slack.Service
 	clientID     string
 	clientSecret string
 	callbackURL  string
 	cache        *authCache
 }
 
-func NewAuthUseCase(repo interfaces.Repository, clientID, clientSecret, callbackURL string) *AuthUseCase {
+func NewAuthUseCase(repo interfaces.Repository, slackSvc *slack.Service, clientID, clientSecret, callbackURL string) *AuthUseCase {
 	return &AuthUseCase{
 		repo:         repo,
+		slackSvc:     slackSvc,
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		callbackURL:  callbackURL,
@@ -60,6 +63,7 @@ func (uc *AuthUseCase) GetAuthURL(state string) string {
 	params.Set("redirect_uri", uc.callbackURL)
 	params.Set("response_type", "code")
 	params.Set("state", state)
+	params.Set("team", uc.slackSvc.TeamID())
 
 	return "https://slack.com/openid/connect/authorize?" + params.Encode()
 }
