@@ -11,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 type TestDataSet struct {
@@ -123,6 +124,7 @@ func test(ctx context.Context, queryFunc QueryFunc, testData *TestData, shouldDe
 						goerr.V("filename", filename),
 						goerr.T(errs.TagTestFailed)))
 				}
+				continue
 			}
 
 			if !shouldDetect && len(resp.Alert) > 0 {
@@ -130,7 +132,10 @@ func test(ctx context.Context, queryFunc QueryFunc, testData *TestData, shouldDe
 					goerr.V("schema", schema),
 					goerr.V("filename", filename),
 					goerr.T(errs.TagTestFailed)))
+				continue
 			}
+
+			logging.From(ctx).Debug("✅ PASS", "schema", schema, "filename", filename, "should_detect", shouldDetect)
 		}
 	}
 

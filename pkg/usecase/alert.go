@@ -17,11 +17,12 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, a
 	var result struct {
 		Alert []alert.Metadata `json:"alert"`
 	}
-	if err := uc.policyClient.Query(ctx, "data.alert."+string(schema), alertData, &result); err != nil {
+	query := "data.alert." + string(schema)
+	if err := uc.policyClient.Query(ctx, query, alertData, &result); err != nil {
 		return nil, goerr.Wrap(err, "failed to query policy", goerr.V("schema", schema), goerr.V("alert", alertData))
 	}
 
-	logger.Info("policy query result", "input", alertData, "output", result)
+	logger.Info("policy query result", "input", alertData, "output", result, "query", query)
 
 	var results []*alert.Alert
 	for _, a := range result.Alert {

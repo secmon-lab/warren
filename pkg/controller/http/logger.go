@@ -42,7 +42,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		}
 
 		sw := &statusResponseWriter{ResponseWriter: w}
-		next.ServeHTTP(sw, r)
+		next.ServeHTTP(sw, r.WithContext(logging.With(r.Context(), logger)))
 		attrs = append(attrs, slog.Int("status", sw.status))
 
 		logger.Info("Access Log", attrs...)
