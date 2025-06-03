@@ -65,7 +65,7 @@ func TestValidateGoogleIDToken(t *testing.T) {
 
 	uc := usecase.New(usecase.WithPolicyClient(policyClient))
 
-	server := server.New(uc)
+	server := server.New(uc, server.WithPolicy(policyClient))
 
 	t.Run("with valid token", func(t *testing.T) {
 		req := httptest.NewRequest("POST", "/alert/pubsub/test", bytes.NewReader(pubsubJSON))

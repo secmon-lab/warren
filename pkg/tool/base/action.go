@@ -12,11 +12,15 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+// SlackUpdateFunc is a callback function to update Slack messages when ticket is updated
+type SlackUpdateFunc func(ctx context.Context, ticket *ticket.Ticket) error
+
 type Warren struct {
 	repo         interfaces.Repository
 	ticketID     types.TicketID
 	policyClient interfaces.PolicyClient
 	ticket       *ticket.Ticket
+	slackUpdate  SlackUpdateFunc
 }
 
 var _ interfaces.Tool = &Warren{}
@@ -40,11 +44,23 @@ func getArg[T any](args map[string]any, key string) (T, error) {
 	return typedVal, nil
 }
 
-func New(repo interfaces.Repository, policy interfaces.PolicyClient, ticketID types.TicketID) *Warren {
-	return &Warren{
+func New(repo interfaces.Repository, policy interfaces.PolicyClient, ticketID types.TicketID, opts ...func(*Warren)) *Warren {
+	w := &Warren{
 		repo:         repo,
 		ticketID:     ticketID,
 		policyClient: policy,
+	}
+
+	for _, opt := range opts {
+		opt(w)
+	}
+
+	return w
+}
+
+func WithSlackUpdate(updateFunc SlackUpdateFunc) func(*Warren) {
+	return func(w *Warren) {
+		w.slackUpdate = updateFunc
 	}
 }
 
@@ -73,6 +89,7 @@ const (
 	cmdListPolicies      = "warren.list_policies"
 	cmdGetPolicy         = "warren.get_policy"
 	cmdExecPolicy        = "warren.exec_policy"
+	cmdUpdateFinding     = "warren.update_finding"
 )
 
 func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
@@ -135,6 +152,29 @@ func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			},
 			Required: []string{"schema", "input"},
 		},
+		{
+			Name:        cmdUpdateFinding,
+			Description: "Update the finding information of the current ticket with analysis results",
+			Parameters: map[string]*gollem.Parameter{
+				"summary": {
+					Type:        gollem.TypeString,
+					Description: "Summary of the investigation results analyzed by the agent",
+				},
+				"severity": {
+					Type:        gollem.TypeString,
+					Description: "Severity level of the finding. Must be one of: 'low', 'medium', 'high', 'critical'",
+				},
+				"reason": {
+					Type:        gollem.TypeString,
+					Description: "Detailed reasoning and justification for the severity assessment",
+				},
+				"recommendation": {
+					Type:        gollem.TypeString,
+					Description: "Recommended actions based on the analysis results",
+				},
+			},
+			Required: []string{"summary", "severity", "reason", "recommendation"},
+		},
 	}, nil
 }
 
@@ -150,6 +190,8 @@ func (x *Warren) Run(ctx context.Context, name string, args map[string]any) (map
 		return x.getPolicy(ctx, args)
 	case cmdExecPolicy:
 		return x.execPolicy(ctx, args)
+	case cmdUpdateFinding:
+		return x.updateFinding(ctx, args)
 	default:
 		return nil, goerr.New("invalid function name", goerr.V("name", name))
 	}
