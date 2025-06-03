@@ -20,7 +20,7 @@ require (
 	github.com/m-mizutani/gt v0.0.16
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.1.11
-	github.com/m-mizutani/opaq v0.2.1-0.20250222003843-b0e8fa8233e6
+	github.com/m-mizutani/opaq v0.3.0
 	github.com/newmo-oss/go-caller v0.1.0
 	github.com/slack-go/slack v0.16.0
 	github.com/stretchr/testify v1.10.0

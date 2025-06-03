@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -14,11 +15,13 @@ import (
 func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 	logger := logging.From(ctx)
 
-	var result struct {
-		Alert []alert.Metadata `json:"alert"`
-	}
+	var result alert.QueryOutput
 	query := "data.alert." + string(schema)
-	if err := uc.policyClient.Query(ctx, query, alertData, &result); err != nil {
+	hook := func(ctx context.Context, loc opaq.PrintLocation, msg string) error {
+		logging.From(ctx).Debug("[rego.print] "+msg, "location", loc)
+		return nil
+	}
+	if err := uc.policyClient.Query(ctx, query, alertData, &result, opaq.WithPrintHook(hook)); err != nil {
 		return nil, goerr.Wrap(err, "failed to query policy", goerr.V("schema", schema), goerr.V("alert", alertData))
 	}
 

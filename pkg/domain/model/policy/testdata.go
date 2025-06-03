@@ -99,35 +99,36 @@ func test(ctx context.Context, queryFunc QueryFunc, testData *TestData, shouldDe
 		for filename, testData := range dataSet {
 			var resp alert.QueryOutput
 
-			if err := queryFunc(ctx, "data.alert."+schema.String(), testData, &resp); err != nil {
+			hook := func(ctx context.Context, loc opaq.PrintLocation, msg string) error {
+				logging.From(ctx).Debug("[print] "+msg, "loc", loc)
+				return nil
+			}
+
+			err := queryFunc(ctx, "data.alert."+schema.String(), testData, &resp, opaq.WithPrintHook(hook))
+			if err != nil {
 				if errors.Is(err, opaq.ErrNoEvalResult) {
 					if shouldDetect {
-						results = append(results, goerr.Wrap(err, "should be detected, but not detected",
+						logging.From(ctx).Debug("❌ FAIL (should be detected, but not detected by NoEvalResult)", "schema", schema, "filename", filename)
+						results = append(results, goerr.New("should be detected, but not detected",
 							goerr.V("schema", schema),
 							goerr.V("filename", filename),
 							goerr.T(errs.TagTestFailed)))
 					}
 					continue
 				}
+			}
 
-				if len(resp.Alert) == 0 && shouldDetect {
-					results = append(results, goerr.Wrap(err, "should be detected, but not detected",
-						goerr.V("schema", schema),
-						goerr.V("filename", filename),
-						goerr.T(errs.TagTestFailed)))
-					continue
-				}
-
-				if len(resp.Alert) > 0 && !shouldDetect {
-					results = append(results, goerr.Wrap(err, "should be ignored, but detected",
-						goerr.V("schema", schema),
-						goerr.V("filename", filename),
-						goerr.T(errs.TagTestFailed)))
-				}
+			if len(resp.Alert) == 0 && shouldDetect {
+				logging.From(ctx).Debug("❌ FAIL (should be detected, but not detected)", "schema", schema, "filename", filename)
+				results = append(results, goerr.New("should be detected, but not detected",
+					goerr.V("schema", schema),
+					goerr.V("filename", filename),
+					goerr.T(errs.TagTestFailed)))
 				continue
 			}
 
-			if !shouldDetect && len(resp.Alert) > 0 {
+			if len(resp.Alert) > 0 && !shouldDetect {
+				logging.From(ctx).Debug("❌ FAIL (should be ignored, but detected)", "schema", schema, "filename", filename)
 				results = append(results, goerr.New("should be ignored, but detected",
 					goerr.V("schema", schema),
 					goerr.V("filename", filename),
@@ -135,7 +136,7 @@ func test(ctx context.Context, queryFunc QueryFunc, testData *TestData, shouldDe
 				continue
 			}
 
-			logging.From(ctx).Debug("✅ PASS", "schema", schema, "filename", filename, "should_detect", shouldDetect)
+			logging.From(ctx).Debug("✅ PASS", "schema", schema, "filename", filename, "should_detect", shouldDetect, "count", len(resp.Alert))
 		}
 	}
 

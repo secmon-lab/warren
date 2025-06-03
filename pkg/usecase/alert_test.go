@@ -65,9 +65,7 @@ func TestHandleAlert_NoSimilarAlert(t *testing.T) {
 
 	policyMock := &mock.PolicyClientMock{
 		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
-			if queryResult, ok := result.(*struct {
-				Alert []alert.Metadata `json:"alert"`
-			}); ok {
+			if queryResult, ok := result.(*alert.QueryOutput); ok {
 				queryResult.Alert = []alert.Metadata{
 					{
 						Title:       "Test Alert",
@@ -94,7 +92,7 @@ func TestHandleAlert_NoSimilarAlert(t *testing.T) {
 
 	// Verify
 	gt.NoError(t, err)
-	gt.Array(t, result).Length(1)
+	gt.Array(t, result).Length(1).Required()
 	gt.Value(t, postAlertCalled).Equal(true)
 	gt.NotNil(t, result[0].SlackThread)
 }
@@ -173,9 +171,7 @@ func TestHandleAlert_SimilarAlertFound(t *testing.T) {
 
 	policyMock := &mock.PolicyClientMock{
 		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
-			if queryResult, ok := result.(*struct {
-				Alert []alert.Metadata `json:"alert"`
-			}); ok {
+			if queryResult, ok := result.(*alert.QueryOutput); ok {
 				queryResult.Alert = []alert.Metadata{
 					{
 						Title:       "Test Alert",
@@ -275,9 +271,7 @@ func TestHandleAlert_SimilarAlertBoundToTicket(t *testing.T) {
 
 	policyMock := &mock.PolicyClientMock{
 		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
-			if queryResult, ok := result.(*struct {
-				Alert []alert.Metadata `json:"alert"`
-			}); ok {
+			if queryResult, ok := result.(*alert.QueryOutput); ok {
 				queryResult.Alert = []alert.Metadata{
 					{
 						Title:       "Test Alert",
@@ -373,9 +367,7 @@ func TestHandleAlert_LowSimilarity(t *testing.T) {
 
 	policyMock := &mock.PolicyClientMock{
 		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
-			if queryResult, ok := result.(*struct {
-				Alert []alert.Metadata `json:"alert"`
-			}); ok {
+			if queryResult, ok := result.(*alert.QueryOutput); ok {
 				queryResult.Alert = []alert.Metadata{
 					{
 						Title:       "Test Alert",

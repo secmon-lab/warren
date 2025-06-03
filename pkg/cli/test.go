@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
@@ -52,9 +51,10 @@ func cmdTest() *cli.Command {
 			for _, err := range errors {
 				if goerr.HasTag(err, errs.TagTestFailed) {
 					values := goerr.Values(err)
-					fmt.Printf("\n❌ Test Failed!\n")
+					fmt.Printf("\n❌ FAIL!\n")
 					fmt.Printf("  Reason:   %s\n", err.Error())
-					fmt.Printf("  File:     %s\n", filepath.Join(values["schema"].(string), values["filename"].(string)))
+					fmt.Printf("  Schema:   %v\n", values["schema"])
+					fmt.Printf("  File:     %v\n", values["filename"])
 					fmt.Println("  ----------------------------------------")
 					failed = true
 				} else {

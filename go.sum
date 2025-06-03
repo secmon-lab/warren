@@ -250,8 +250,8 @@ github.com/m-mizutani/harlog v0.0.3 h1:bL3i/xM3wWPsvoOOsuu/a4eaz+1yj1UyO7OPUzkWP
 github.com/m-mizutani/harlog v0.0.3/go.mod h1:TH6btPQXEJ0Jk0QPju9zMLDr2uslqTryszY5bjmYLVQ=
 github.com/m-mizutani/masq v0.1.11 h1:NgOcn+22jpkFA8RQxQDaiQCRsuIymOFGn927jsbTuak=
 github.com/m-mizutani/masq v0.1.11/go.mod h1:H8jy743m5h+niZ1ByiZfPnLNnXzb7Khr/K59vT15f18=
-github.com/m-mizutani/opaq v0.2.1-0.20250222003843-b0e8fa8233e6 h1:a6VIFUp0Ii7gS4bRE6hZu9GupWEtnOG0C5EvaN9ek1I=
-github.com/m-mizutani/opaq v0.2.1-0.20250222003843-b0e8fa8233e6/go.mod h1:Z2HmGgy9nVqcXCYJBdaMSwVp/ZUi3VEsZmQ7fVhZuQ8=
+github.com/m-mizutani/opaq v0.3.0 h1:YXn+liGP29PPA35lv9kZH+wkbTPis3ikjyPHHSe+2jM=
+github.com/m-mizutani/opaq v0.3.0/go.mod h1:2iRHIIKXXlWeHVUDhQ/szJ5DwFo1TxvJ61zXZsC2MUw=
 github.com/matryer/moq v0.5.3 h1:4femQCFmBUwFPYs8VfM5ID7AI67/DTEDRBbTtSWy7GU=
 github.com/matryer/moq v0.5.3/go.mod h1:8288Qkw7gMZhUP3cIN86GG7g5p9jRuZH8biXLW4RXvQ=
 github.com/mattn/go-colorable v0.1.14 h1:9A9LHSqF/7dyVVX6g0U9cwm9pG3kP9gSzcuIPHPsaIE=
