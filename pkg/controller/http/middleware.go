@@ -13,6 +13,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
@@ -133,12 +134,6 @@ func validateGoogleIAPToken(next http.Handler) http.Handler {
 		aud := token.Audience()
 		if len(aud) == 0 {
 			logging.From(r.Context()).Warn("JWT missing audience, continuing without validation")
-			next.ServeHTTP(w, r)
-			return
-		}
-		// Basic format check for audience
-		if !strings.HasPrefix(aud[0], "/projects/") || !strings.Contains(aud[0], "/apps/") {
-			logging.From(r.Context()).Warn("invalid JWT audience format, continuing without validation", "audience", aud[0])
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -362,6 +357,36 @@ func authMiddleware(authUC AuthUseCase) func(http.Handler) http.Handler {
 			// Add user context to request
 			ctx := auth.ContextWithToken(r.Context(), token)
 			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func authorizeWithPolicy(policy interfaces.PolicyClient) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if policy == nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			var result struct {
+				Allow bool `json:"allow"`
+			}
+
+			ctx := r.Context()
+			authCtx := auth.BuildContext(ctx)
+			if err := policy.Query(ctx, "data.auth", authCtx, &result); err != nil {
+				handleError(w, r, goerr.Wrap(err, "failed to authorize request"))
+				return
+			}
+
+			if !result.Allow {
+				logging.From(ctx).Warn("authorization failed", "auth", authCtx)
+				http.Error(w, `Authorization failed. Check your policy.`, http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
 		})
 	}
 }

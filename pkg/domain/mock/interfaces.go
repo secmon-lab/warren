@@ -3504,8 +3504,8 @@ func (mock *SlackInteractionUsecasesMock) HandleSlackInteractionViewSubmissionCa
 //
 //		// make and configure a mocked interfaces.AlertUsecases
 //		mockedAlertUsecases := &AlertUsecasesMock{
-//			HandleAlertWithAuthFunc: func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
-//				panic("mock out the HandleAlertWithAuth method")
+//			HandleAlertFunc: func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
+//				panic("mock out the HandleAlert method")
 //			},
 //		}
 //
@@ -3514,13 +3514,13 @@ func (mock *SlackInteractionUsecasesMock) HandleSlackInteractionViewSubmissionCa
 //
 //	}
 type AlertUsecasesMock struct {
-	// HandleAlertWithAuthFunc mocks the HandleAlertWithAuth method.
-	HandleAlertWithAuthFunc func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error)
+	// HandleAlertFunc mocks the HandleAlert method.
+	HandleAlertFunc func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
-		// HandleAlertWithAuth holds details about calls to the HandleAlertWithAuth method.
-		HandleAlertWithAuth []struct {
+		// HandleAlert holds details about calls to the HandleAlert method.
+		HandleAlert []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Schema is the schema argument value.
@@ -3529,11 +3529,11 @@ type AlertUsecasesMock struct {
 			AlertData any
 		}
 	}
-	lockHandleAlertWithAuth sync.RWMutex
+	lockHandleAlert sync.RWMutex
 }
 
-// HandleAlertWithAuth calls HandleAlertWithAuthFunc.
-func (mock *AlertUsecasesMock) HandleAlertWithAuth(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
+// HandleAlert calls HandleAlertFunc.
+func (mock *AlertUsecasesMock) HandleAlert(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 	callInfo := struct {
 		Ctx       context.Context
 		Schema    types.AlertSchema
@@ -3543,24 +3543,24 @@ func (mock *AlertUsecasesMock) HandleAlertWithAuth(ctx context.Context, schema t
 		Schema:    schema,
 		AlertData: alertData,
 	}
-	mock.lockHandleAlertWithAuth.Lock()
-	mock.calls.HandleAlertWithAuth = append(mock.calls.HandleAlertWithAuth, callInfo)
-	mock.lockHandleAlertWithAuth.Unlock()
-	if mock.HandleAlertWithAuthFunc == nil {
+	mock.lockHandleAlert.Lock()
+	mock.calls.HandleAlert = append(mock.calls.HandleAlert, callInfo)
+	mock.lockHandleAlert.Unlock()
+	if mock.HandleAlertFunc == nil {
 		var (
 			alertsOut []*alert.Alert
 			errOut    error
 		)
 		return alertsOut, errOut
 	}
-	return mock.HandleAlertWithAuthFunc(ctx, schema, alertData)
+	return mock.HandleAlertFunc(ctx, schema, alertData)
 }
 
-// HandleAlertWithAuthCalls gets all the calls that were made to HandleAlertWithAuth.
+// HandleAlertCalls gets all the calls that were made to HandleAlert.
 // Check the length with:
 //
-//	len(mockedAlertUsecases.HandleAlertWithAuthCalls())
-func (mock *AlertUsecasesMock) HandleAlertWithAuthCalls() []struct {
+//	len(mockedAlertUsecases.HandleAlertCalls())
+func (mock *AlertUsecasesMock) HandleAlertCalls() []struct {
 	Ctx       context.Context
 	Schema    types.AlertSchema
 	AlertData any
@@ -3570,8 +3570,8 @@ func (mock *AlertUsecasesMock) HandleAlertWithAuthCalls() []struct {
 		Schema    types.AlertSchema
 		AlertData any
 	}
-	mock.lockHandleAlertWithAuth.RLock()
-	calls = mock.calls.HandleAlertWithAuth
-	mock.lockHandleAlertWithAuth.RUnlock()
+	mock.lockHandleAlert.RLock()
+	calls = mock.calls.HandleAlert
+	mock.lockHandleAlert.RUnlock()
 	return calls
 }

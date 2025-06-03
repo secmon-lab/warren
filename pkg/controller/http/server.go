@@ -20,6 +20,7 @@ import (
 type Server struct {
 	router         *chi.Mux
 	slackCtrl      *slack_controller.Controller
+	policy         interfaces.PolicyClient
 	verifier       slack_model.PayloadVerifier
 	repo           interfaces.Repository // for GraphQL
 	authUC         AuthUseCase           // for authentication
@@ -52,6 +53,12 @@ func WithAuthUseCase(authUC AuthUseCase) Options {
 	}
 }
 
+func WithPolicy(policy interfaces.PolicyClient) Options {
+	return func(s *Server) {
+		s.policy = policy
+	}
+}
+
 type UseCase interface {
 	interfaces.AlertUsecases
 	interfaces.SlackEventUsecases
@@ -72,17 +79,22 @@ func New(uc UseCase, opts ...Options) *Server {
 
 	r.Use(loggingMiddleware)
 	r.Use(panicRecoveryMiddleware)
+	r.Use(withAuthHTTPRequest)
+	r.Use(validateGoogleIAPToken)
 
 	r.Route("/alert", func(r chi.Router) {
-		r.Use(withAuthHTTPRequest)
-
-		r.Post("/raw/{schema}", alertRawHandler(uc))
+		r.Route("/raw", func(r chi.Router) {
+			r.Use(authorizeWithPolicy(s.policy))
+			r.Post("/{schema}", alertRawHandler(uc))
+		})
 		r.Route("/pubsub", func(r chi.Router) {
 			r.Use(validateGoogleIDToken)
+			r.Use(authorizeWithPolicy(s.policy))
 			r.Post("/{schema}", alertPubSubHandler(uc))
 		})
 		r.Route("/sns", func(r chi.Router) {
 			r.Use(verifySNSRequest)
+			r.Use(authorizeWithPolicy(s.policy))
 			r.Post("/{schema}", alertSNSHandler(uc))
 		})
 	})
@@ -103,6 +115,7 @@ func New(uc UseCase, opts ...Options) *Server {
 				r.Use(authMiddleware(s.authUC))
 			}
 
+			r.Use(authorizeWithPolicy(s.policy))
 			r.Handle("/", graphqlHandler)
 		})
 
@@ -112,6 +125,7 @@ func New(uc UseCase, opts ...Options) *Server {
 				if s.authUC != nil {
 					r.Use(authMiddleware(s.authUC))
 				}
+				r.Use(authorizeWithPolicy(s.policy))
 				r.Handle("/", playground.Handler("GraphQL playground", "/graphql"))
 			})
 		}
@@ -120,6 +134,7 @@ func New(uc UseCase, opts ...Options) *Server {
 	// Authentication endpoints
 	if s.authUC != nil {
 		r.Route("/api", func(r chi.Router) {
+			r.Use(authorizeWithPolicy(s.policy))
 			r.Route("/auth", func(r chi.Router) {
 				r.Get("/login", authLoginHandler(s.authUC))
 				r.Get("/callback", authCallbackHandler(s.authUC))

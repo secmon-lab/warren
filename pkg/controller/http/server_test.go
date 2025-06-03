@@ -183,7 +183,7 @@ func calculateSlackSignature(payload string, ts string, signingSecret string) st
 
 func TestAlertSNS(t *testing.T) {
 	alertUsecasesMock := &mock.AlertUsecasesMock{
-		HandleAlertWithAuthFunc: func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
+		HandleAlertFunc: func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 			return nil, nil
 		},
 	}
@@ -210,7 +210,7 @@ func TestAlertSNS(t *testing.T) {
 		srv.ServeHTTP(w, log.Request.WithContext(ctx))
 
 		gt.Value(t, w.Code).Equal(http.StatusOK)
-		gt.A(t, alertUsecasesMock.HandleAlertWithAuthCalls()).Length(1)
+		gt.A(t, alertUsecasesMock.HandleAlertCalls()).Length(1)
 	})
 }
 

@@ -2,36 +2,14 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
-
-func (uc *UseCases) HandleAlertWithAuth(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
-	authCtx := auth.BuildContext(ctx)
-
-	var result struct {
-		Allow bool `json:"allow"`
-	}
-	if err := uc.policyClient.Query(ctx, "data.auth", authCtx, &result); err != nil {
-		if !errors.Is(err, opaq.ErrNoEvalResult) {
-			return nil, goerr.Wrap(err, "failed to query policy", goerr.V("auth", authCtx))
-		}
-	}
-
-	if !result.Allow {
-		return nil, goerr.New("unauthorized", goerr.V("auth", authCtx), goerr.V("result", result))
-	}
-
-	return uc.HandleAlert(ctx, schema, alertData)
-}
 
 func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 	logger := logging.From(ctx)
