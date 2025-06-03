@@ -20,6 +20,7 @@ export function SlackText({ children, className, options }: SlackTextProps) {
     <span
       className={cn("slack-text", className)}
       dangerouslySetInnerHTML={{ __html: html }}
+      key={children}
     />
   );
 }
@@ -46,6 +47,7 @@ export function SlackTextBlock({
     <div
       className={cn("slack-text-block", className)}
       dangerouslySetInnerHTML={{ __html: html }}
+      key={children}
     />
   );
 }
