@@ -20,7 +20,25 @@ var chatSystemPromptTemplate string
 func (x *UseCases) chat(ctx context.Context, target *ticket.Ticket, message string) error {
 	logger := logging.From(ctx)
 
-	baseAction := base.New(x.repository, x.policyClient, target.ID)
+	// Create Slack update callback function
+	slackUpdateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
+		if x.slackService == nil {
+			return nil // Skip if Slack service is not configured
+		}
+
+		if ticket.SlackThread == nil {
+			return nil // Skip if ticket has no Slack thread
+		}
+
+		if ticket.Finding == nil {
+			return nil // Skip if ticket has no finding
+		}
+
+		threadSvc := x.slackService.NewThread(*ticket.SlackThread)
+		return threadSvc.PostFinding(ctx, *ticket.Finding)
+	}
+
+	baseAction := base.New(x.repository, x.policyClient, target.ID, base.WithSlackUpdate(slackUpdateFunc))
 	tools := append(x.tools, baseAction)
 
 	storageSvc := storage.New(x.storageClient, storage.WithPrefix(x.storagePrefix))
