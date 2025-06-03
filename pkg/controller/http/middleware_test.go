@@ -372,7 +372,7 @@ func TestValidateGoogleIAPToken(t *testing.T) {
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			w.Write(keySetJSON)
+			_, _ = w.Write(keySetJSON)
 		}))
 		defer testServer.Close()
 
