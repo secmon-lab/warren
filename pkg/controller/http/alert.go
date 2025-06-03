@@ -42,7 +42,7 @@ func alertPubSubHandler(uc useCase) http.HandlerFunc {
 			return
 		}
 
-		if _, err := uc.HandleAlertWithAuth(r.Context(), types.AlertSchema(schema), alertData); err != nil {
+		if _, err := uc.HandleAlert(r.Context(), types.AlertSchema(schema), alertData); err != nil {
 			handleError(w, r, err)
 			return
 		}
@@ -71,7 +71,7 @@ func alertRawHandler(uc useCase) http.HandlerFunc {
 			return
 		}
 
-		if _, err := uc.HandleAlertWithAuth(r.Context(), types.AlertSchema(schema), alertData); err != nil {
+		if _, err := uc.HandleAlert(r.Context(), types.AlertSchema(schema), alertData); err != nil {
 			handleError(w, r, err)
 			return
 		}
@@ -113,7 +113,7 @@ func alertSNSHandler(uc useCase) http.HandlerFunc {
 		schema := chi.URLParam(r, "schema")
 
 		// Handle alert
-		alerts, err := uc.HandleAlertWithAuth(ctx, types.AlertSchema(schema), alertData)
+		alerts, err := uc.HandleAlert(ctx, types.AlertSchema(schema), alertData)
 		if err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to handle alert"))
 			return

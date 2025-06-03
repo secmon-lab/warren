@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
 )
 
@@ -12,12 +13,17 @@ type contextKey string
 
 const (
 	googleIDTokenClaimsKey contextKey = "google_id_token_claims"
+	googleIAPJWTClaimsKey  contextKey = "google_iap_jwt_claims"
 	snsMessageKey          contextKey = "sns_message"
 	httpRequestKey         contextKey = "http_request"
 )
 
 func WithGoogleIDTokenClaims(ctx context.Context, claims map[string]interface{}) context.Context {
 	return context.WithValue(ctx, googleIDTokenClaimsKey, claims)
+}
+
+func WithGoogleIAPJWTClaims(ctx context.Context, claims map[string]interface{}) context.Context {
+	return context.WithValue(ctx, googleIAPJWTClaimsKey, claims)
 }
 
 func WithSNSMessage(ctx context.Context, msg *message.SNS) context.Context {
@@ -28,11 +34,34 @@ func WithHTTPRequest(ctx context.Context, req *HTTPRequest) context.Context {
 	return context.WithValue(ctx, httpRequestKey, req)
 }
 
+// GetGoogleIDTokenClaims retrieves Google ID token claims from context
+func GetGoogleIDTokenClaims(ctx context.Context) (map[string]interface{}, error) {
+	claims, ok := ctx.Value(googleIDTokenClaimsKey).(map[string]interface{})
+	if !ok {
+		return nil, goerr.New("Google ID token claims not found in context")
+	}
+	return claims, nil
+}
+
+// GetGoogleIAPJWTClaims retrieves Google IAP JWT claims from context
+func GetGoogleIAPJWTClaims(ctx context.Context) (map[string]interface{}, error) {
+	claims, ok := ctx.Value(googleIAPJWTClaimsKey).(map[string]interface{})
+	if !ok {
+		return nil, goerr.New("Google IAP JWT claims not found in context")
+	}
+	return claims, nil
+}
+
 func BuildContext(ctx context.Context) Context {
 	var authCtx Context
 	claims, ok := ctx.Value(googleIDTokenClaimsKey).(map[string]interface{})
 	if ok {
 		authCtx.Google = claims
+	}
+
+	iapClaims, ok := ctx.Value(googleIAPJWTClaimsKey).(map[string]interface{})
+	if ok {
+		authCtx.IAP = iapClaims
 	}
 
 	msg, ok := ctx.Value(snsMessageKey).(*message.SNS)
