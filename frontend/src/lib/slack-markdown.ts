@@ -34,18 +34,30 @@ export function slackToHtml(
   if (!text) return "";
 
   const opts = { ...defaultOptions, ...options };
+  let result = text;
 
-  // Escape HTML to prevent XSS unless explicitly allowed
-  let result = opts.allowHtml ? text : escapeHtml(text);
+  // If HTML is not allowed, escape everything first but preserve placeholders for later replacement
+  if (!opts.allowHtml) {
+    result = escapeHtml(result);
+  }
 
-  // Convert Slack-specific markdown to HTML
-  result = convertSlackLinks(result, opts.className?.link || "");
-  result = convertUserMentions(result);
-  result = convertChannelMentions(result);
+  // Convert Slack-specific patterns that contain angle brackets
+  // Use escaped angle brackets if HTML was escaped
+  if (!opts.allowHtml) {
+    result = convertSlackLinksEscaped(result, opts.className?.link || "");
+    result = convertUserMentionsEscaped(result);
+    result = convertChannelMentionsEscaped(result);
+  } else {
+    result = convertSlackLinks(result, opts.className?.link || "");
+    result = convertUserMentions(result);
+    result = convertChannelMentions(result);
+  }
+
+  // Convert standard markdown patterns
   result = convertBold(result, opts.className?.bold || "");
   result = convertItalic(result, opts.className?.italic || "");
-  result = convertCode(result, opts.className?.code || "");
   result = convertCodeBlocks(result, opts.className?.codeBlock || "");
+  result = convertCode(result, opts.className?.code || "");
   result = convertStrikethrough(result, opts.className?.strikethrough || "");
   result = convertLineBreaks(result);
 
@@ -71,15 +83,34 @@ function escapeHtml(text: string): string {
 
 // Convert Slack link format <url|text> to HTML <a href="url">text</a>
 function convertSlackLinks(text: string, className: string): string {
-  // Pattern for <url|text> format
-  const linkPattern = /<([^|>]+)\|([^>]+)>/g;
+  // Pattern for <url|text> format (but not user/channel mentions)
+  const linkPattern = /<(https?:\/\/[^|>]+)\|([^>]+)>/g;
   text = text.replace(
     linkPattern,
     `<a href="$1" target="_blank" rel="noopener noreferrer" class="${className}">$2</a>`
   );
 
-  // Pattern for plain URLs <url>
+  // Pattern for plain URLs <url> (but not user/channel mentions)
   const plainUrlPattern = /<(https?:\/\/[^>]+)>/g;
+  text = text.replace(
+    plainUrlPattern,
+    `<a href="$1" target="_blank" rel="noopener noreferrer" class="${className}">$1</a>`
+  );
+
+  return text;
+}
+
+// Convert Slack link format for escaped HTML
+function convertSlackLinksEscaped(text: string, className: string): string {
+  // Pattern for &lt;url|text&gt; format
+  const linkPattern = /&lt;(https?:\/\/[^|&]+)\|([^&]+)&gt;/g;
+  text = text.replace(
+    linkPattern,
+    `<a href="$1" target="_blank" rel="noopener noreferrer" class="${className}">$2</a>`
+  );
+
+  // Pattern for plain URLs &lt;url&gt;
+  const plainUrlPattern = /&lt;(https?:\/\/[^&]+)&gt;/g;
   text = text.replace(
     plainUrlPattern,
     `<a href="$1" target="_blank" rel="noopener noreferrer" class="${className}">$1</a>`
@@ -97,9 +128,27 @@ function convertUserMentions(text: string): string {
   });
 }
 
+// Convert user mentions for escaped HTML
+function convertUserMentionsEscaped(text: string): string {
+  const userPattern = /&lt;@([UW][A-Z0-9]+)(\|([^&]+))?&gt;/g;
+  return text.replace(userPattern, (match, userId, _, displayName) => {
+    const name = displayName || userId;
+    return `<span class="bg-blue-100 text-blue-800 px-1 py-0.5 rounded text-sm font-medium">@${name}</span>`;
+  });
+}
+
 // Convert channel mentions <#C123456|general> to styled mentions
 function convertChannelMentions(text: string): string {
   const channelPattern = /<#([C][A-Z0-9]+)(\|([^>]+))?>/g;
+  return text.replace(channelPattern, (match, channelId, _, channelName) => {
+    const name = channelName || channelId;
+    return `<span class="bg-green-100 text-green-800 px-1 py-0.5 rounded text-sm font-medium">#${name}</span>`;
+  });
+}
+
+// Convert channel mentions for escaped HTML
+function convertChannelMentionsEscaped(text: string): string {
+  const channelPattern = /&lt;#([C][A-Z0-9]+)(\|([^&]+))?&gt;/g;
   return text.replace(channelPattern, (match, channelId, _, channelName) => {
     const name = channelName || channelId;
     return `<span class="bg-green-100 text-green-800 px-1 py-0.5 rounded text-sm font-medium">#${name}</span>`;
@@ -153,7 +202,7 @@ export function slackToPlainText(text: string): string {
   let result = text;
 
   // Remove Slack link formatting but keep the text
-  result = result.replace(/<([^|>]+)\|([^>]+)>/g, "$2"); // <url|text> -> text
+  result = result.replace(/<(https?:\/\/[^|>]+)\|([^>]+)>/g, "$2"); // <url|text> -> text
   result = result.replace(/<(https?:\/\/[^>]+)>/g, "$1"); // <url> -> url
 
   // Remove user/channel mentions formatting but keep names
@@ -173,8 +222,8 @@ export function slackToPlainText(text: string): string {
   // Remove markdown formatting
   result = result.replace(/\*([^*]+)\*/g, "$1"); // *bold* -> bold
   result = result.replace(/_([^_]+)_/g, "$1"); // _italic_ -> italic
+  result = result.replace(/```/g, ""); // Remove code block markers first
   result = result.replace(/`([^`]+)`/g, "$1"); // `code` -> code
-  result = result.replace(/```([^`]+)```/g, "$1"); // ```code``` -> code
   result = result.replace(/~([^~]+)~/g, "$1"); // ~strike~ -> strike
 
   return result;
