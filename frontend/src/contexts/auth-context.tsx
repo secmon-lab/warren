@@ -1,6 +1,10 @@
-'use client';
-
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 
 interface User {
   sub: string;
@@ -25,10 +29,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('/api/auth/me', {
-        credentials: 'include',
+      const response = await fetch("/api/auth/me", {
+        credentials: "include",
       });
-      
+
       if (response.ok) {
         const userData = await response.json();
         setUser(userData);
@@ -36,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
       }
     } catch (error) {
-      console.error('Auth check failed:', error);
+      console.error("Auth check failed:", error);
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -44,20 +48,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login = () => {
-    window.location.href = '/api/auth/login';
+    window.location.href = "/api/auth/login";
   };
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
       });
       setUser(null);
       // Optionally redirect to login page or refresh
       window.location.reload();
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error("Logout failed:", error);
     }
   };
 
@@ -74,17 +78,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
-} 
+}

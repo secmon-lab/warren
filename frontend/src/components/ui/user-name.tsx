@@ -1,8 +1,6 @@
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import { userProfileCache } from '@/lib/user-profile-cache';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useState, useEffect } from "react";
+import { userProfileCache } from "@/lib/user-profile-cache";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface UserNameProps {
   userID: string;
@@ -10,7 +8,7 @@ interface UserNameProps {
   fallback?: string;
 }
 
-export function UserName({ userID, className = '', fallback }: UserNameProps) {
+export function UserName({ userID, className = "", fallback }: UserNameProps) {
   const [name, setName] = useState<string>(fallback || userID);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,14 +22,14 @@ export function UserName({ userID, className = '', fallback }: UserNameProps) {
         setError(null);
 
         const profile = await userProfileCache.getUserProfile(userID);
-        
+
         if (mounted) {
           setName(profile.name || fallback || userID);
         }
       } catch (err) {
-        console.error('Failed to fetch user name:', err);
+        console.error("Failed to fetch user name:", err);
         if (mounted) {
-          setError('Failed to load user name');
+          setError("Failed to load user name");
           setName(fallback || userID);
         }
       } finally {
@@ -50,7 +48,8 @@ export function UserName({ userID, className = '', fallback }: UserNameProps) {
 
   if (isLoading) {
     return (
-      <span className={`animate-pulse bg-muted rounded text-transparent ${className}`}>
+      <span
+        className={`animate-pulse bg-muted rounded text-transparent ${className}`}>
         {fallback || userID}
       </span>
     );
@@ -90,14 +89,14 @@ export function useUserName(userID: string): {
         setError(null);
 
         const profile = await userProfileCache.getUserProfile(userID);
-        
+
         if (mounted) {
           setName(profile.name || userID);
         }
       } catch (err) {
-        console.error('Failed to fetch user name:', err);
+        console.error("Failed to fetch user name:", err);
         if (mounted) {
-          setError('Failed to load user name');
+          setError("Failed to load user name");
           setName(userID);
         }
       } finally {
@@ -122,23 +121,23 @@ interface UserWithAvatarProps {
   userID: string;
   className?: string;
   fallback?: string;
-  avatarSize?: 'sm' | 'md' | 'lg';
+  avatarSize?: "sm" | "md" | "lg";
   showAvatar?: boolean;
 }
 
-export function UserWithAvatar({ 
-  userID, 
-  className = '', 
-  fallback, 
-  avatarSize = 'sm',
-  showAvatar = true 
+export function UserWithAvatar({
+  userID,
+  className = "",
+  fallback,
+  avatarSize = "sm",
+  showAvatar = true,
 }: UserWithAvatarProps) {
   const { name, isLoading, error } = useUserName(userID);
 
   const avatarSizeClasses = {
-    sm: 'h-3 w-3',
-    md: 'h-5 w-5', 
-    lg: 'h-8 w-8'
+    sm: "h-3 w-3",
+    md: "h-5 w-5",
+    lg: "h-8 w-8",
   };
 
   const displayName = name || fallback || userID;
@@ -147,7 +146,9 @@ export function UserWithAvatar({
     return (
       <div className={`flex items-center gap-1 ${className}`}>
         {showAvatar && (
-          <div className={`${avatarSizeClasses[avatarSize]} bg-muted rounded-full animate-pulse`} />
+          <div
+            className={`${avatarSizeClasses[avatarSize]} bg-muted rounded-full animate-pulse`}
+          />
         )}
         <span className="animate-pulse bg-muted rounded text-transparent">
           {fallback || userID}
@@ -161,10 +162,7 @@ export function UserWithAvatar({
       <div className={`flex items-center gap-1 ${className}`} title={error}>
         {showAvatar && (
           <Avatar className={avatarSizeClasses[avatarSize]}>
-            <AvatarImage 
-              src={`/api/user/${userID}/icon`} 
-              alt={displayName} 
-            />
+            <AvatarImage src={`/api/user/${userID}/icon`} alt={displayName} />
             <AvatarFallback className="text-xs leading-none">
               {displayName.charAt(0).toUpperCase()}
             </AvatarFallback>
@@ -176,13 +174,12 @@ export function UserWithAvatar({
   }
 
   return (
-    <div className={`flex items-center gap-1 ${className}`} title={`User: ${userID}`}>
+    <div
+      className={`flex items-center gap-1 ${className}`}
+      title={`User: ${userID}`}>
       {showAvatar && (
         <Avatar className={avatarSizeClasses[avatarSize]}>
-          <AvatarImage 
-            src={`/api/user/${userID}/icon`} 
-            alt={displayName} 
-          />
+          <AvatarImage src={`/api/user/${userID}/icon`} alt={displayName} />
           <AvatarFallback className="text-xs leading-none">
             {displayName.charAt(0).toUpperCase()}
           </AvatarFallback>
@@ -191,4 +188,4 @@ export function UserWithAvatar({
       <span>{displayName}</span>
     </div>
   );
-} 
+}

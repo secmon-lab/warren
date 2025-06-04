@@ -1,9 +1,6 @@
-'use client';
-
-import { AuthProvider } from '@/contexts/auth-context';
-import { AuthGuard } from '@/components/auth/auth-guard';
-import { Header } from './header';
-import { Sidebar } from './sidebar';
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { Header } from "./header";
+import { Sidebar } from "./sidebar";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -15,9 +12,7 @@ function AuthenticatedLayout({ children }: MainLayoutProps) {
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden ml-52">
         <Header />
-        <main className="flex-1 overflow-auto p-6">
-          {children}
-        </main>
+        <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
     </div>
   );
@@ -25,12 +20,8 @@ function AuthenticatedLayout({ children }: MainLayoutProps) {
 
 export function MainLayout({ children }: MainLayoutProps) {
   return (
-    <AuthProvider>
-      <AuthGuard>
-        <AuthenticatedLayout>
-          {children}
-        </AuthenticatedLayout>
-      </AuthGuard>
-    </AuthProvider>
+    <AuthGuard>
+      <AuthenticatedLayout>{children}</AuthenticatedLayout>
+    </AuthGuard>
   );
-} 
+}

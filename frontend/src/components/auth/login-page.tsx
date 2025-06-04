@@ -1,8 +1,12 @@
-'use client';
-
-import { useAuth } from '@/contexts/auth-context';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from "@/contexts/auth-context";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -20,15 +24,11 @@ export function LoginPage() {
           <div className="text-center text-sm text-gray-600 mb-4">
             Please sign in with your Slack account to continue.
           </div>
-          <Button 
-            onClick={login} 
-            className="w-full"
-            size="lg"
-          >
+          <Button onClick={login} className="w-full" size="lg">
             Sign in with Slack
           </Button>
         </CardContent>
       </Card>
     </div>
   );
-} 
+}
