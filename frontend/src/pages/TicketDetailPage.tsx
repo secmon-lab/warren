@@ -32,6 +32,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useErrorToast, useSuccessToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/hooks/use-confirm";
 import { GET_TICKET, UPDATE_TICKET_STATUS } from "@/lib/graphql/queries";
 import {
   Ticket,
@@ -66,6 +68,10 @@ export default function TicketDetailPage() {
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [alertsCurrentPage, setAlertsCurrentPage] = useState(1);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  const errorToast = useErrorToast();
+  const successToast = useSuccessToast();
+  const confirm = useConfirm();
 
   const formatAbsoluteTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -132,9 +138,12 @@ export default function TicketDetailPage() {
           status: newStatus,
         },
       });
+      successToast(
+        `Ticket status updated to ${TICKET_STATUS_LABELS[newStatus]}`
+      );
     } catch (error) {
       console.error("Failed to update ticket status:", error);
-      alert("Failed to update ticket status");
+      errorToast("Failed to update ticket status");
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -143,9 +152,14 @@ export default function TicketDetailPage() {
   const handleArchive = async () => {
     if (!ticket || isUpdatingStatus) return;
 
-    if (!confirm("Are you sure you want to archive this ticket?")) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: "Archive Ticket",
+      description: "Are you sure you want to archive this ticket?",
+      confirmText: "Archive",
+      variant: "destructive",
+    });
+
+    if (!confirmed) return;
 
     setIsUpdatingStatus(true);
     try {
@@ -155,9 +169,10 @@ export default function TicketDetailPage() {
           status: "archived",
         },
       });
+      successToast("Ticket archived successfully");
     } catch (error) {
       console.error("Failed to archive ticket:", error);
-      alert("Failed to archive ticket");
+      errorToast("Failed to archive ticket");
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -166,9 +181,13 @@ export default function TicketDetailPage() {
   const handleUnarchive = async () => {
     if (!ticket || isUpdatingStatus) return;
 
-    if (!confirm("Are you sure you want to unarchive this ticket?")) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: "Unarchive Ticket",
+      description: "Are you sure you want to unarchive this ticket?",
+      confirmText: "Unarchive",
+    });
+
+    if (!confirmed) return;
 
     setIsUpdatingStatus(true);
     try {
@@ -178,9 +197,10 @@ export default function TicketDetailPage() {
           status: "open",
         },
       });
+      successToast("Ticket unarchived successfully");
     } catch (error) {
       console.error("Failed to unarchive ticket:", error);
-      alert("Failed to unarchive ticket");
+      errorToast("Failed to unarchive ticket");
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -572,7 +592,7 @@ export default function TicketDetailPage() {
       <Dialog
         open={!!selectedAlert}
         onOpenChange={() => setSelectedAlert(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
@@ -632,27 +652,16 @@ export default function TicketDetailPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <Hash className="h-4 w-4" />
-                      <span className="font-medium">Attributes:</span>
+                      <span className="font-medium">Data:</span>
                     </div>
-                    <div className="bg-muted p-3 rounded-md">
-                      <div className="grid gap-2">
-                        {Object.entries(
-                          JSON.parse(selectedAlert.data || "{}")
-                        ).map(([key, value]) => (
-                          <div
-                            key={key}
-                            className="flex items-start gap-2 text-sm">
-                            <span className="font-mono text-muted-foreground min-w-0 flex-shrink-0">
-                              {key}:
-                            </span>
-                            <span className="font-mono break-all">
-                              {typeof value === "string"
-                                ? value
-                                : JSON.stringify(value)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                    <div className="bg-muted p-4 rounded-md">
+                      <pre className="text-sm font-mono whitespace-pre-wrap overflow-x-auto text-foreground">
+                        {JSON.stringify(
+                          JSON.parse(selectedAlert.data || "{}"),
+                          null,
+                          2
+                        )}
+                      </pre>
                     </div>
                   </div>
                 )}

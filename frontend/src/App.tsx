@@ -4,6 +4,9 @@ import { apolloClient } from "@/lib/apollo-client";
 import { AuthProvider } from "@/contexts/auth-context";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { MainLayout } from "@/components/layout/main-layout";
+import { ToastProvider } from "@/hooks/use-toast";
+import { ConfirmProvider } from "@/hooks/use-confirm";
+import { Toaster } from "@/components/ui/toaster";
 import Dashboard from "@/pages/Dashboard";
 import TicketsPage from "@/pages/TicketsPage";
 import TicketDetailPage from "@/pages/TicketDetailPage";
@@ -28,11 +31,16 @@ function App() {
   return (
     <ApolloProvider client={apolloClient}>
       <AuthProvider>
-        <Router>
-          <AuthGuard>
-            <AuthenticatedApp />
-          </AuthGuard>
-        </Router>
+        <ToastProvider>
+          <ConfirmProvider>
+            <Router>
+              <AuthGuard>
+                <AuthenticatedApp />
+              </AuthGuard>
+              <Toaster />
+            </Router>
+          </ConfirmProvider>
+        </ToastProvider>
       </AuthProvider>
     </ApolloProvider>
   );

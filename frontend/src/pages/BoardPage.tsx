@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@apollo/client";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,8 @@ import {
   MoreHorizontal,
   Archive,
 } from "lucide-react";
+import { useErrorToast, useSuccessToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/hooks/use-confirm";
 
 const BOARD_STATUSES: TicketStatus[] = ["open", "pending", "resolved"];
 
@@ -37,6 +39,10 @@ export default function BoardPage() {
   const navigate = useNavigate();
   const [draggedTicket, setDraggedTicket] = useState<Ticket | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  const errorToast = useErrorToast();
+  const successToast = useSuccessToast();
+  const confirm = useConfirm();
 
   const [updateTicketStatus] = useMutation(UPDATE_TICKET_STATUS, {
     refetchQueries: [
@@ -59,12 +65,14 @@ export default function BoardPage() {
     },
   });
 
-  const tickets: Ticket[] = data?.tickets || [];
+  const tickets: Ticket[] = useMemo(() => data?.tickets || [], [data?.tickets]);
 
-  const ticketsByStatus = BOARD_STATUSES.reduce((acc, status) => {
-    acc[status] = tickets.filter((ticket) => ticket.status === status);
-    return acc;
-  }, {} as Record<TicketStatus, Ticket[]>);
+  const ticketsByStatus = useMemo(() => {
+    return BOARD_STATUSES.reduce((acc, status) => {
+      acc[status] = tickets.filter((ticket) => ticket.status === status);
+      return acc;
+    }, {} as Record<TicketStatus, Ticket[]>);
+  }, [tickets]);
 
   const handleTicketClick = (ticketId: string) => {
     navigate(`/tickets/${ticketId}`);
@@ -100,9 +108,10 @@ export default function BoardPage() {
           status: targetStatus,
         },
       });
+      successToast(`Ticket moved to ${targetStatus}`);
     } catch (error) {
       console.error("Failed to update ticket status:", error);
-      alert("Failed to update ticket status");
+      errorToast("Failed to update ticket status");
     } finally {
       setIsUpdatingStatus(false);
       setDraggedTicket(null);
@@ -113,13 +122,14 @@ export default function BoardPage() {
     const resolvedTickets = ticketsByStatus["resolved"];
     if (resolvedTickets.length === 0) return;
 
-    if (
-      !confirm(
-        `Are you sure you want to archive ${resolvedTickets.length} resolved tickets?`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: "Archive Resolved Tickets",
+      description: `Are you sure you want to archive ${resolvedTickets.length} resolved tickets?`,
+      confirmText: "Archive",
+      variant: "destructive",
+    });
+
+    if (!confirmed) return;
 
     setIsUpdatingStatus(true);
     try {
@@ -129,9 +139,10 @@ export default function BoardPage() {
           status: "archived",
         },
       });
+      successToast(`Successfully archived ${resolvedTickets.length} tickets`);
     } catch (error) {
       console.error("Failed to archive tickets:", error);
-      alert("Failed to archive tickets");
+      errorToast("Failed to archive tickets");
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -222,6 +233,14 @@ export default function BoardPage() {
                       title={ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}>
                       {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
                     </h3>
+
+                    {/* Show conclusion for resolved tickets */}
+                    {ticket.status === "resolved" && ticket.conclusion && (
+                      <p className="text-xs text-muted-foreground mb-2 line-clamp-1">
+                        <span className="font-medium">Resolution:</span>{" "}
+                        {ticket.conclusion}
+                      </p>
+                    )}
 
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">

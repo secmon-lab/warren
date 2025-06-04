@@ -123,19 +123,16 @@ export default function TicketsPage() {
             </Card>
           ) : (
             <>
-              <div className="grid gap-4">
+              <div className="space-y-3">
                 {tickets.map((ticket) => (
                   <Card
                     key={ticket.id}
-                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    className="hover:shadow-md hover:border-primary/20 transition-all duration-200 cursor-pointer"
                     onClick={() => handleTicketClick(ticket.id)}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <CardTitle className="text-lg">
-                            {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
-                          </CardTitle>
-                          <div className="flex items-center gap-2">
+                    <CardHeader className="pb-0">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
                             <Badge
                               className={
                                 TICKET_STATUS_COLORS[
@@ -149,23 +146,44 @@ export default function TicketsPage() {
                                 ]
                               }
                             </Badge>
-                            <span className="text-sm text-muted-foreground">
-                              #{ticket.id.slice(0, 8)}
-                            </span>
+                            <CardTitle
+                              className="text-lg leading-tight truncate"
+                              title={
+                                ticket.title ||
+                                `Ticket ${ticket.id.slice(0, 8)}`
+                              }>
+                              {ticket.title ||
+                                `Ticket ${ticket.id.slice(0, 8)}`}
+                            </CardTitle>
                           </div>
+
+                          {/* Show conclusion for resolved tickets */}
+                          {ticket.status === "resolved" &&
+                            ticket.conclusion && (
+                              <div className="mt-2">
+                                <p className="text-sm text-muted-foreground line-clamp-2">
+                                  <span className="font-medium text-foreground">
+                                    Conclusion:
+                                  </span>{" "}
+                                  {ticket.conclusion}
+                                </p>
+                              </div>
+                            )}
                         </div>
-                        <div className="text-right text-sm text-muted-foreground">
+
+                        <div className="text-right text-sm text-muted-foreground shrink-0">
                           <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
+                            <Clock className="h-4 w-4" />
                             {formatRelativeTime(ticket.createdAt)}
                           </div>
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="pt-0">
+
+                    <CardContent className="pt-0 -mt-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2">
                             <User className="h-4 w-4" />
                             {ticket.assignee ? (
                               <UserWithAvatar
@@ -177,14 +195,26 @@ export default function TicketsPage() {
                               <span>Unassigned</span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+
+                          <div className="flex items-center gap-2">
                             <MessageSquare className="h-4 w-4" />
-                            <span>{ticket.comments.length} comments</span>
+                            <span>
+                              {ticket.comments.length} comment
+                              {ticket.comments.length !== 1 ? "s" : ""}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+
+                          <div className="flex items-center gap-2">
                             <AlertCircle className="h-4 w-4" />
-                            <span>{ticket.alerts.length} alerts</span>
+                            <span>
+                              {ticket.alerts.length} alert
+                              {ticket.alerts.length !== 1 ? "s" : ""}
+                            </span>
                           </div>
+                        </div>
+
+                        <div className="text-xs text-muted-foreground">
+                          #{ticket.id.slice(0, 8)}
                         </div>
                       </div>
                     </CardContent>
