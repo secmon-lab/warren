@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation } from "@apollo/client";
 import { useState, Suspense, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -78,7 +78,11 @@ const ALL_STATUSES: TicketStatus[] = [
   "archived",
 ];
 
-function TicketsPageContent() {
+interface TicketsPageProps {
+  searchParams: { id?: string };
+}
+
+function TicketsPageContent({ searchParams }: TicketsPageProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedStatuses, setSelectedStatuses] = useState<TicketStatus[]>([]);
   const [activeTab, setActiveTab] = useState<"all" | TicketStatus>("all");
@@ -86,7 +90,16 @@ function TicketsPageContent() {
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [alertsCurrentPage, setAlertsCurrentPage] = useState(1);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [ticketId, setTicketId] = useState<string | null>(null);
+
+  const ticketId = searchParams?.id || null;
+
+  // Debug logging
+  useEffect(() => {
+    console.log("TicketsPageContent rendered with:", {
+      searchParams,
+      ticketId,
+    });
+  }, [searchParams, ticketId]);
 
   const formatAbsoluteTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -110,20 +123,16 @@ function TicketsPageContent() {
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${timezone}`;
   };
 
-  const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Initialize ticketId from searchParams when component mounts
+  // Reset other state when ticket changes
   useEffect(() => {
-    const id = searchParams.get("id");
-    setTicketId(id);
-    // Also reset other state when ticket changes
-    if (id) {
+    if (ticketId) {
       setAlertsCurrentPage(1);
       setSelectedAlert(null);
       setIsSummaryOpen(false);
     }
-  }, [searchParams]);
+  }, [ticketId]);
 
   const [updateTicketStatus] = useMutation(UPDATE_TICKET_STATUS, {
     refetchQueries: [
@@ -174,14 +183,10 @@ function TicketsPageContent() {
   };
 
   const handleTicketClick = (newTicketId: string) => {
-    setTicketId(newTicketId);
-    const params = new URLSearchParams();
-    params.set("id", newTicketId);
-    router.push(`/tickets?${params.toString()}`);
+    router.push(`/tickets?id=${newTicketId}`);
   };
 
   const handleBackToList = () => {
-    setTicketId(null);
     router.push("/tickets");
   };
 
@@ -967,7 +972,17 @@ function TicketsPageContent() {
   );
 }
 
-export default function TicketsPage() {
+export default function TicketsPage({ searchParams }: TicketsPageProps) {
+  // Add error boundary for searchParams handling
+  let resolvedSearchParams: { id?: string } = {};
+
+  try {
+    resolvedSearchParams = searchParams || {};
+  } catch (error) {
+    console.error("Error resolving searchParams:", error);
+    resolvedSearchParams = {};
+  }
+
   return (
     <Suspense
       fallback={
@@ -977,7 +992,7 @@ export default function TicketsPage() {
           </div>
         </MainLayout>
       }>
-      <TicketsPageContent />
+      <TicketsPageContent searchParams={resolvedSearchParams} />
     </Suspense>
   );
 }
