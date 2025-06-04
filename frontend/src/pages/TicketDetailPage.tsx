@@ -57,6 +57,9 @@ import {
   ArrowLeft,
   Archive,
   ArchiveRestore,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 
 const ALERTS_PER_PAGE = 5;
@@ -592,7 +595,9 @@ export default function TicketDetailPage() {
       <Dialog
         open={!!selectedAlert}
         onOpenChange={() => setSelectedAlert(null)}>
-        <DialogContent className="max-w-6xl max-h-[85vh] overflow-y-auto">
+        <DialogContent
+          className="!max-w-[90vw] w-full max-h-[85vh] overflow-y-auto p-6"
+          style={{ maxWidth: "90vw" }}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
@@ -600,7 +605,7 @@ export default function TicketDetailPage() {
             </DialogTitle>
           </DialogHeader>
           {selectedAlert && (
-            <div className="space-y-4">
+            <div className="space-y-4 w-full min-w-0">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="font-medium">ID:</span>
@@ -629,7 +634,7 @@ export default function TicketDetailPage() {
               </div>
 
               {selectedAlert.title && (
-                <div>
+                <div className="w-full">
                   <span className="font-medium">Title:</span>
                   <p className="text-muted-foreground mt-1">
                     {selectedAlert.title}
@@ -638,7 +643,7 @@ export default function TicketDetailPage() {
               )}
 
               {selectedAlert.description && (
-                <div>
+                <div className="w-full">
                   <span className="font-medium">Description:</span>
                   <p className="text-muted-foreground mt-1 whitespace-pre-wrap">
                     {selectedAlert.description}
@@ -646,16 +651,62 @@ export default function TicketDetailPage() {
                 </div>
               )}
 
+              {selectedAlert.attributes &&
+                selectedAlert.attributes.length > 0 && (
+                  <div className="w-full">
+                    <div className="flex items-center gap-2 mb-2">
+                      <ExternalLink className="h-4 w-4" />
+                      <span className="font-medium">Attributes:</span>
+                    </div>
+                    <div className="space-y-2">
+                      {selectedAlert.attributes.map((attr, index) => (
+                        <div
+                          key={index}
+                          className="flex items-start gap-2 p-2 bg-muted rounded-md w-full">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-sm">
+                                {attr.key}:
+                              </span>
+                              {attr.auto && (
+                                <Badge variant="outline" className="text-xs">
+                                  auto
+                                </Badge>
+                              )}
+                            </div>
+                            {attr.link ? (
+                              <a
+                                href={attr.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 underline text-sm break-all">
+                                {attr.value}
+                              </a>
+                            ) : (
+                              <span className="text-sm font-mono break-all text-muted-foreground">
+                                {attr.value}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
               {selectedAlert.data &&
                 Object.keys(JSON.parse(selectedAlert.data || "{}")).length >
                   0 && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Hash className="h-4 w-4" />
-                      <span className="font-medium">Data:</span>
+                  <div className="w-full">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Hash className="h-4 w-4" />
+                        <span className="font-medium">Data:</span>
+                      </div>
+                      <CopyButton data={selectedAlert.data} />
                     </div>
-                    <div className="bg-muted p-4 rounded-md">
-                      <pre className="text-sm font-mono whitespace-pre-wrap overflow-x-auto text-foreground">
+                    <div className="bg-muted p-4 rounded-md w-full min-w-0 overflow-auto">
+                      <pre className="text-sm font-mono whitespace-pre-wrap text-foreground min-w-0 w-full break-words overflow-wrap-anywhere">
                         {JSON.stringify(
                           JSON.parse(selectedAlert.data || "{}"),
                           null,
@@ -670,5 +721,36 @@ export default function TicketDetailPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// Copy Button Component
+function CopyButton({ data }: { data: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      const formatted = JSON.stringify(JSON.parse(data), null, 2);
+      await navigator.clipboard.writeText(formatted);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy data:", error);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleCopy}
+      className="h-8 px-2">
+      {copied ? (
+        <Check className="h-3 w-3 text-green-600" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+      <span className="ml-1 text-xs">{copied ? "Copied!" : "Copy"}</span>
+    </Button>
   );
 }
