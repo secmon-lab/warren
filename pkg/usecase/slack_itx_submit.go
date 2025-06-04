@@ -236,11 +236,11 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 	st := uc.slackService.NewThread(*target.SlackThread)
 	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
 
-	conclusion, ok := getSlackValue[types.AlertConclusion](values,
+	conclusion, ok := getSlackSelectValue[types.AlertConclusion](values,
 		slack.BlockIDTicketConclusion,
 		slack.BlockActionIDTicketConclusion,
 	)
-	if !ok {
+	if !ok || conclusion == "" {
 		return goerr.New("conclusion not found")
 	}
 
