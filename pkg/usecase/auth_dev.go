@@ -61,11 +61,6 @@ func (uc *AuthUseCaseForDev) Logout(ctx context.Context, tokenID auth.TokenID) e
 	return nil
 }
 
-// IsDevMode always returns true for dev auth use case
-func (uc *AuthUseCaseForDev) IsDevMode() bool {
-	return true
-}
-
 // DevModeAuth creates a dev token (same as HandleCallback for dev mode)
 func (uc *AuthUseCaseForDev) DevModeAuth(ctx context.Context) (*auth.Token, error) {
 	return uc.HandleCallback(ctx, "dev")

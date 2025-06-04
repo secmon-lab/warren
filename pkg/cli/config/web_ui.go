@@ -62,10 +62,6 @@ func (x *WebUI) IsDevMode() bool {
 	return x.devUser != ""
 }
 
-func (x *WebUI) GetDevUser() string {
-	return x.devUser
-}
-
 func (x *WebUI) IsConfigured() bool {
 	// In dev mode, we don't need OAuth configuration
 	if x.IsDevMode() {
