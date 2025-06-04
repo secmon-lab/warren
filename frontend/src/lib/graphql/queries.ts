@@ -1,4 +1,4 @@
-import { gql } from '@apollo/client';
+import { gql } from "@apollo/client";
 
 export const GET_TICKETS = gql`
   query GetTickets($statuses: [String!], $offset: Int, $limit: Int) {
@@ -7,6 +7,7 @@ export const GET_TICKETS = gql`
       status
       title
       description
+      conclusion
       assignee {
         id
         name
@@ -138,4 +139,4 @@ export const UPDATE_MULTIPLE_TICKETS_STATUS = gql`
       updatedAt
     }
   }
-`; 
+`;
