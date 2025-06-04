@@ -4,7 +4,7 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
-RUN npm run export
+RUN npm run build
 
 # Go build stage
 FROM golang:1.24 AS build-go
