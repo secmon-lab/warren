@@ -71,6 +71,13 @@ func cmdServe() *cli.Command {
 		Usage:   "Run server",
 		Flags:   flags,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
+			// Display dev mode warning if enabled
+			if webUICfg.IsDevMode() {
+				logging.Default().Warn("🔧 DEVELOPMENT MODE ENABLED 🔧",
+					"dev-user", webUICfg.GetDevUser(),
+					"warning", "Authentication is bypassed! Do not use in production!")
+			}
+
 			logging.Default().Info("starting server",
 				"addr", addr,
 				"enableGraphQL", enableGraphQL,
