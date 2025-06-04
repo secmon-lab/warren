@@ -1,23 +1,18 @@
 package http
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
-type AuthUseCase interface {
-	GetAuthURL(state string) string
-	HandleCallback(ctx context.Context, code string) (*auth.Token, error)
-	ValidateToken(ctx context.Context, tokenID auth.TokenID, tokenSecret auth.TokenSecret) (*auth.Token, error)
-	Logout(ctx context.Context, tokenID auth.TokenID) error
-}
+type AuthUseCase = usecase.AuthUseCaseInterface
 
 // generateState generates a random state parameter for OAuth
 func generateState() (string, error) {
@@ -31,6 +26,7 @@ func generateState() (string, error) {
 // authLoginHandler handles the OAuth login initiation
 func authLoginHandler(authUC AuthUseCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Normal OAuth flow for production
 		// Generate state parameter to prevent CSRF
 		state, err := generateState()
 		if err != nil {
