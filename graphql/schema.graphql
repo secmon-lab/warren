@@ -22,6 +22,7 @@ type User {
 type Comment {
   id: ID!
   content: String!
+  user: User
   createdAt: String!
   updatedAt: String!
 }

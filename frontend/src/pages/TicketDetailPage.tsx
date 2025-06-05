@@ -25,6 +25,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { UserWithAvatar } from "@/components/ui/user-name";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ResolveInfo } from "@/components/ui/resolve-info";
 import {
   DropdownMenu,
@@ -352,19 +353,42 @@ export default function TicketDetailPage() {
                   ticket.comments.map((comment) => (
                     <div key={comment.id} className="p-4">
                       <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                          <User className="h-4 w-4" />
-                        </div>
+                        {comment.user ? (
+                          <Avatar className="w-8 h-8 flex-shrink-0">
+                            <AvatarImage
+                              src={`/api/user/${comment.user.id}/icon`}
+                              alt={comment.user.name}
+                            />
+                            <AvatarFallback className="text-xs">
+                              {comment.user.name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        ) : (
+                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                            <User className="h-4 w-4" />
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium">System</span>
-                            <span className="text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="font-medium text-sm">
+                              {comment.user ? (
+                                <UserWithAvatar
+                                  userID={comment.user.id}
+                                  fallback={comment.user.name}
+                                  showAvatar={false}
+                                  className="inline"
+                                />
+                              ) : (
+                                "System"
+                              )}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
                               {formatRelativeTime(comment.createdAt)}
                             </span>
                           </div>
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                          <div className="text-sm leading-relaxed whitespace-pre-wrap bg-muted/50 rounded-lg p-3">
                             {comment.content}
-                          </p>
+                          </div>
                         </div>
                       </div>
                     </div>

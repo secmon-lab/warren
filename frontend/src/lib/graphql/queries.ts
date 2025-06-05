@@ -22,6 +22,10 @@ export const GET_TICKETS = gql`
       comments {
         id
         content
+        user {
+          id
+          name
+        }
         createdAt
       }
     }
@@ -67,6 +71,10 @@ export const GET_TICKET = gql`
       comments {
         id
         content
+        user {
+          id
+          name
+        }
         createdAt
         updatedAt
       }
