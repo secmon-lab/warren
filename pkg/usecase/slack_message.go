@@ -28,9 +28,14 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg slack.Messa
 	if slackMsg.User() != nil && uc.slackService.IsBotUser(slackMsg.User().ID) {
 		// Bot messages should only be recorded if they are NOT Trace messages
 		// Trace messages are identified by having ContextBlock in their structure
-		if slackMsg.IsTraceMessage() {
-			return nil
-		}
+
+		logger.Debug("bot message", "slack_msg", slackMsg.LogValue())
+		/*
+			if slackMsg.IsTraceMessage() {
+				return nil
+			}
+		*/
+		return nil
 	}
 
 	comment := ticket.NewComment(ctx, slackMsg)

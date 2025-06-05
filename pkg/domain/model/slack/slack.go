@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/slack-go/slack"
@@ -27,6 +28,18 @@ type Message struct {
 	ts             string
 	mentions       []Mention
 	isTraceMessage bool
+}
+
+func (x Message) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("id", x.id),
+		slog.String("channel", x.channel),
+		slog.String("thread_id", x.threadID),
+		slog.String("user", x.user.ID),
+		slog.String("msg", x.msg),
+		slog.String("ts", x.ts),
+		slog.Bool("is_trace_message", x.isTraceMessage),
+	)
 }
 
 func (x *Message) Thread() Thread {
