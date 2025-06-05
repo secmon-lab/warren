@@ -15,11 +15,6 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg slack.Messa
 	th := uc.slackService.NewThread(slackMsg.Thread())
 	ctx = msg.With(ctx, th.Reply, th.NewStateFunc)
 
-	// Skip if the message is from the bot
-	if uc.slackService.IsBotUser(slackMsg.User().ID) {
-		return nil
-	}
-
 	ticket, err := uc.repository.GetTicketByThread(ctx, slackMsg.Thread())
 	if err != nil {
 		return goerr.Wrap(err, "failed to get ticket by slack thread")
@@ -27,6 +22,15 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg slack.Messa
 	if ticket == nil {
 		logger.Info("ticket not found", "slack_thread", slackMsg.Thread())
 		return nil
+	}
+
+	// For bot messages, only record if it's a Notify message (not Trace message)
+	if slackMsg.User() != nil && uc.slackService.IsBotUser(slackMsg.User().ID) {
+		// Bot messages should only be recorded if they are NOT Trace messages
+		// Trace messages are identified by having ContextBlock in their structure
+		if slackMsg.IsTraceMessage() {
+			return nil
+		}
 	}
 
 	comment := ticket.NewComment(ctx, slackMsg)

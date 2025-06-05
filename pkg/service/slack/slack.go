@@ -257,9 +257,10 @@ func (x *ThreadService) AttachFile(ctx context.Context, title, fileName string, 
 
 func (x *ThreadService) Reply(ctx context.Context, message string) {
 	blocks := []slack.Block{
-		slack.NewContextBlock(
-			"",
+		slack.NewSectionBlock(
 			slack.NewTextBlockObject(slack.MarkdownType, message, false, false),
+			nil,
+			nil,
 		),
 	}
 
