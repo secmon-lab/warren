@@ -386,7 +386,7 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 		}
 	}
 
-	msg.Notify(ctx, "🤖 Getting and filtering alerts without ticket...")
+	ctx = msg.Trace(ctx, "🤖 Getting and filtering alerts without ticket...")
 
 	alerts, err := clients.Repo().GetAlertWithoutTicket(ctx)
 	if err != nil {

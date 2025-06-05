@@ -80,7 +80,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindAlert(ctx context.Co
 		"metadata", metadata,
 		"values", values,
 	)
-	ctx = msg.Trace(ctx, "💥 binding alert\n> %s", metadata)
+	ctx = msg.Trace(ctx, "🔗 binding alert\n> %s", metadata)
 
 	alertID := types.AlertID(metadata)
 	alert, err := uc.repository.GetAlert(ctx, alertID)
