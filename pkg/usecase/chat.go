@@ -81,6 +81,7 @@ func (x *UseCases) chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithSystemPrompt(systemPrompt),
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
+		gollem.WithExitTool(&gollem.DefaultExitTool{}),
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
 			msg.Notify(ctx, "💬 %s", message)
 			return nil
