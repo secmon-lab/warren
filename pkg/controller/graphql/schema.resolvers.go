@@ -76,6 +76,17 @@ func (r *commentResolver) Content(ctx context.Context, obj *ticket.Comment) (str
 	return obj.Comment, nil
 }
 
+// User is the resolver for the user field.
+func (r *commentResolver) User(ctx context.Context, obj *ticket.Comment) (*graphql1.User, error) {
+	if obj.User == nil {
+		return nil, nil
+	}
+	return &graphql1.User{
+		ID:   obj.User.ID,
+		Name: obj.User.Name,
+	}, nil
+}
+
 // CreatedAt is the resolver for the createdAt field.
 func (r *commentResolver) CreatedAt(ctx context.Context, obj *ticket.Comment) (string, error) {
 	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil

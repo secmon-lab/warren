@@ -140,7 +140,7 @@ export function UserWithAvatar({
     lg: "h-8 w-8",
   };
 
-  const displayName = name || fallback || userID;
+  const displayName = name || fallback || "Unknown User";
 
   if (isLoading) {
     return (
@@ -151,7 +151,7 @@ export function UserWithAvatar({
           />
         )}
         <span className="animate-pulse bg-muted rounded text-transparent">
-          {fallback || userID}
+          {fallback || "Loading..."}
         </span>
       </div>
     );
@@ -174,9 +174,7 @@ export function UserWithAvatar({
   }
 
   return (
-    <div
-      className={`flex items-center gap-1 ${className}`}
-      title={`User: ${userID}`}>
+    <div className={`flex items-center gap-1 ${className}`}>
       {showAvatar && (
         <Avatar className={avatarSizeClasses[avatarSize]}>
           <AvatarImage src={`/api/user/${userID}/icon`} alt={displayName} />

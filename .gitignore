@@ -38,6 +38,6 @@ CLAUDE.md
 /.todo
 
 # Generated contents
-!frontend/dist/.gitkeep
 frontend/dist/*
+!frontend/dist/.gitkeep
 /warren
