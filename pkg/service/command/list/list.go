@@ -37,19 +37,27 @@ func (p *pipeline) Execute(ctx context.Context, alerts alert.Alerts) (alert.Aler
 	return alerts, nil
 }
 
-func buildPipeline(commands [][]string) (*pipeline, error) {
+func buildPipeline(commands []string) (*pipeline, error) {
 	actions := []actionFunc{}
 	for _, command := range commands {
-		if len(command) == 0 {
+		command = strings.TrimSpace(command)
+		if command == "" {
 			continue
 		}
 
-		init, err := FindMatchedInitFunc(command[0])
+		parts := strings.SplitN(command, " ", 2)
+		cmdName := parts[0]
+		var args string
+		if len(parts) > 1 {
+			args = parts[1]
+		}
+
+		init, err := FindMatchedInitFunc(cmdName)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to find matched action")
 		}
 
-		actionFunc, err := init(command[1:])
+		actionFunc, err := init(args)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to initialize action")
 		}
@@ -63,7 +71,7 @@ func buildPipeline(commands [][]string) (*pipeline, error) {
 }
 
 type actionFunc func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error)
-type initFunc func(args []string) (actionFunc, error)
+type initFunc func(args string) (actionFunc, error)
 
 var actionMapping = map[string]initFunc{
 	"limit":  actionLimit,
@@ -102,12 +110,13 @@ func FindMatchedInitFunc(command string) (initFunc, error) {
 	return matchedAction, nil
 }
 
-func actionLimit(args []string) (actionFunc, error) {
-	if len(args) != 1 {
+func actionLimit(args string) (actionFunc, error) {
+	args = strings.TrimSpace(args)
+	if args == "" {
 		return nil, goerr.New("limit: requires one argument")
 	}
 
-	limit, err := strconv.Atoi(args[0])
+	limit, err := strconv.Atoi(args)
 	if err != nil {
 		return nil, goerr.Wrap(err, "limit: failed to convert limit to int")
 	}
@@ -122,12 +131,13 @@ func actionLimit(args []string) (actionFunc, error) {
 	}, nil
 }
 
-func actionOffset(args []string) (actionFunc, error) {
-	if len(args) != 1 {
+func actionOffset(args string) (actionFunc, error) {
+	args = strings.TrimSpace(args)
+	if args == "" {
 		return nil, goerr.New("offset: requires one argument")
 	}
 
-	offset, err := strconv.Atoi(args[0])
+	offset, err := strconv.Atoi(args)
 	if err != nil {
 		return nil, goerr.Wrap(err, "offset: failed to convert offset to int")
 	}
@@ -142,16 +152,13 @@ func actionOffset(args []string) (actionFunc, error) {
 	}, nil
 }
 
-func actionGrep(args []string) (actionFunc, error) {
-	if len(args) != 1 {
+func actionGrep(args string) (actionFunc, error) {
+	pattern := strings.TrimSpace(args)
+	if pattern == "" {
 		return nil, goerr.New("grep: requires one argument")
 	}
 
-	pattern := args[0]
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
-		if pattern == "" {
-			return alerts, nil
-		}
 		var filtered alert.Alerts
 		for _, a := range alerts {
 			if strings.Contains(strings.ToLower(a.Metadata.Title), strings.ToLower(pattern)) ||
@@ -170,17 +177,13 @@ func actionGrep(args []string) (actionFunc, error) {
 	}, nil
 }
 
-func actionSort(args []string) (actionFunc, error) {
-	if len(args) != 1 {
+func actionSort(args string) (actionFunc, error) {
+	field := strings.TrimSpace(args)
+	if field == "" {
 		return nil, goerr.New("sort: requires one argument")
 	}
 
-	field := args[0]
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
-		if field == "" {
-			return alerts, nil
-		}
-
 		sorted := make(alert.Alerts, len(alerts))
 		copy(sorted, alerts)
 
@@ -197,18 +200,19 @@ func actionSort(args []string) (actionFunc, error) {
 	}, nil
 }
 
-func actionFrom(args []string) (actionFunc, error) {
-	if len(args) != 3 || args[1] != "to" {
+func actionFrom(args string) (actionFunc, error) {
+	parts := strings.Fields(args)
+	if len(parts) != 3 || parts[1] != "to" {
 		return nil, goerr.New("from: requires 'from <time> to <time>' format")
 	}
 
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
-		fromTime, err := ParseTime(ctx, args[0])
+		fromTime, err := ParseTime(ctx, parts[0])
 		if err != nil {
 			return nil, goerr.Wrap(err, "from: failed to parse from time")
 		}
 
-		toTime, err := ParseTime(ctx, args[2])
+		toTime, err := ParseTime(ctx, parts[2])
 		if err != nil {
 			return nil, goerr.Wrap(err, "from: failed to parse to time")
 		}
@@ -224,13 +228,14 @@ func actionFrom(args []string) (actionFunc, error) {
 	}, nil
 }
 
-func actionTo(args []string) (actionFunc, error) {
-	if len(args) != 1 {
+func actionTo(args string) (actionFunc, error) {
+	args = strings.TrimSpace(args)
+	if args == "" {
 		return nil, goerr.New("to: requires one argument")
 	}
 
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
-		toTime, err := ParseTime(ctx, args[0])
+		toTime, err := ParseTime(ctx, args)
 		if err != nil {
 			return nil, goerr.Wrap(err, "to: failed to parse time")
 		}
@@ -245,13 +250,14 @@ func actionTo(args []string) (actionFunc, error) {
 	}, nil
 }
 
-func actionAfter(args []string) (actionFunc, error) {
-	if len(args) != 1 {
+func actionAfter(args string) (actionFunc, error) {
+	args = strings.TrimSpace(args)
+	if args == "" {
 		return nil, goerr.New("after: requires one argument")
 	}
 
 	return func(ctx context.Context, alerts alert.Alerts) (alert.Alerts, error) {
-		afterTime, err := ParseTime(ctx, args[0])
+		afterTime, err := ParseTime(ctx, args)
 		if err != nil {
 			return nil, goerr.Wrap(err, "after: failed to parse time")
 		}
@@ -266,12 +272,13 @@ func actionAfter(args []string) (actionFunc, error) {
 	}, nil
 }
 
-func actionSince(args []string) (actionFunc, error) {
-	if len(args) != 1 {
+func actionSince(args string) (actionFunc, error) {
+	args = strings.TrimSpace(args)
+	if args == "" {
 		return nil, goerr.New("since: requires one argument")
 	}
 
-	duration, err := ParseDuration(args[0])
+	duration, err := ParseDuration(args)
 	if err != nil {
 		return nil, goerr.Wrap(err, "since: failed to parse duration")
 	}
@@ -288,8 +295,9 @@ func actionSince(args []string) (actionFunc, error) {
 	}, nil
 }
 
-func actionAll(args []string) (actionFunc, error) {
-	if len(args) != 0 {
+func actionAll(args string) (actionFunc, error) {
+	args = strings.TrimSpace(args)
+	if args != "" {
 		return nil, goerr.New("all: takes no arguments")
 	}
 
@@ -298,8 +306,9 @@ func actionAll(args []string) (actionFunc, error) {
 	}, nil
 }
 
-func actionHelp(args []string) (actionFunc, error) {
-	if len(args) != 0 {
+func actionHelp(args string) (actionFunc, error) {
+	args = strings.TrimSpace(args)
+	if args != "" {
 		return nil, goerr.New("help: takes no arguments")
 	}
 
@@ -349,23 +358,22 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 	th := clients.Thread()
 
 	commands := strings.Split(input, "|")
-	pipelineCommands := [][]string{}
+	pipelineCommands := []string{}
 	for _, command := range commands {
 		command = strings.TrimSpace(command)
 		if command == "" {
 			continue
 		}
-		parts := strings.Split(command, " ")
-		if len(parts) == 0 {
-			continue
-		}
-		pipelineCommands = append(pipelineCommands, parts)
+		pipelineCommands = append(pipelineCommands, command)
 	}
 
 	for _, cmd := range pipelineCommands {
-		if len(cmd) > 0 && strings.ToLower(cmd[0]) == "help" {
-			th.Reply(ctx, helpListMessage)
-			return types.EmptyAlertListID, nil
+		if cmd != "" {
+			parts := strings.SplitN(cmd, " ", 2)
+			if len(parts) > 0 && strings.ToLower(parts[0]) == "help" {
+				th.Reply(ctx, helpListMessage)
+				return types.EmptyAlertListID, nil
+			}
 		}
 	}
 
@@ -379,7 +387,7 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 		}
 	} else {
 		// Default to showing all alerts
-		pipeline, err = buildPipeline([][]string{{"all"}})
+		pipeline, err = buildPipeline([]string{"all"})
 		if err != nil {
 			_ = msg.Trace(ctx, "💥 Building default pipeline: %s", err)
 			return types.EmptyAlertListID, err

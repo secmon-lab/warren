@@ -270,16 +270,17 @@ func TestTimeFilters(t *testing.T) {
 
 	type testCase struct {
 		name     string
-		command  []string
+		cmdName  string
+		args     string
 		expected int
 	}
 
 	runTest := func(tc testCase) func(t *testing.T) {
 		return func(t *testing.T) {
-			init, err := list.FindMatchedInitFunc(tc.command[0])
+			init, err := list.FindMatchedInitFunc(tc.cmdName)
 			gt.NoError(t, err)
 
-			action, err := init(tc.command[1:])
+			action, err := init(tc.args)
 			gt.NoError(t, err)
 
 			result, err := action(ctx, alerts)
@@ -290,25 +291,29 @@ func TestTimeFilters(t *testing.T) {
 
 	t.Run("all", runTest(testCase{
 		name:     "all",
-		command:  []string{"all"},
+		cmdName:  "all",
+		args:     "",
 		expected: 3,
 	}))
 
 	t.Run("from to", runTest(testCase{
 		name:     "from to",
-		command:  []string{"from", fixedTime.Add(-2 * time.Hour).Format("15:04"), "to", fixedTime.Add(-90 * time.Minute).Format("15:04")},
+		cmdName:  "from",
+		args:     fixedTime.Add(-2*time.Hour).Format("15:04") + " to " + fixedTime.Add(-90*time.Minute).Format("15:04"),
 		expected: 1,
 	}))
 
 	t.Run("after", runTest(testCase{
 		name:     "after",
-		command:  []string{"after", fixedTime.Add(-90 * time.Minute).Format("15:04")},
+		cmdName:  "after",
+		args:     fixedTime.Add(-90 * time.Minute).Format("15:04"),
 		expected: 2,
 	}))
 
 	t.Run("since", runTest(testCase{
 		name:     "since",
-		command:  []string{"since", "90m"},
+		cmdName:  "since",
+		args:     "90m",
 		expected: 2,
 	}))
 }
