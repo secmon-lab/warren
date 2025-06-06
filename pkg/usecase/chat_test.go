@@ -48,6 +48,17 @@ func TestHandlePrompt(t *testing.T) {
 			return &mock.LLMSessionMock{
 				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
 					genContentCount++
+					if genContentCount > 2 {
+						return &gollem.Response{
+							FunctionCalls: []*gollem.FunctionCall{
+								{
+									Name:      "respond_to_user",
+									Arguments: map[string]any{},
+								},
+							},
+						}, nil
+					}
+
 					contents = append(contents, &genai.Content{
 						Role:  "user",
 						Parts: []genai.Part{genai.Text(fmt.Sprintf("prompt:%d", genContentCount))},
@@ -96,7 +107,7 @@ func TestHandlePrompt(t *testing.T) {
 	gt.NoError(t, err)
 	geminiHistory, err := history.ToGemini()
 	gt.NoError(t, err)
-	gt.A(t, geminiHistory).Length(2).At(0, func(t testing.TB, v *genai.Content) {
+	gt.A(t, geminiHistory).Length(4).At(0, func(t testing.TB, v *genai.Content) {
 		gt.Equal(t, v.Role, "user")
 		p := gt.Cast[genai.Text](t, v.Parts[0])
 		gt.Equal(t, p, "prompt:1")

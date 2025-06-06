@@ -509,26 +509,12 @@ func buildAlertClustersBlocks(clusters []*alert.List, metadata slackMetadata) ([
 }
 
 // buildStateMessageBlocks builds the blocks for the state message in the thread.
-func buildStateMessageBlocks(base string, messages []string) []slack.Block {
-	blocks := []slack.Block{}
-
-	if base != "" {
-		blocks = append(blocks, slack.NewSectionBlock(
-			slack.NewTextBlockObject(slack.MarkdownType, base, false, false),
-			nil,
-			nil,
-		))
-	}
-
-	if len(messages) > 0 {
-		blocks = append(blocks, slack.NewContextBlock(
+func buildStateMessageBlocks(messages []string) []slack.Block {
+	blocks := []slack.Block{
+		slack.NewContextBlock(
 			"context_messages",
 			slack.NewTextBlockObject(slack.MarkdownType, strings.Join(messages, "\n"), false, false),
-		))
-	}
-
-	if len(blocks) == 0 {
-		return nil
+		),
 	}
 
 	return blocks

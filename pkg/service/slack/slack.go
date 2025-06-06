@@ -282,21 +282,21 @@ func (x *ThreadService) Reply(ctx context.Context, message string) {
 
 func (x *ThreadService) NewStateFunc(ctx context.Context, message string) func(ctx context.Context, msg string) {
 	var msgID string
-	blocks := buildStateMessageBlocks(message, []string{})
+	blocks := buildStateMessageBlocks([]string{message})
 
 	if len(blocks) > 0 {
 		msgID = x.postInitialMessage(ctx, blocks)
 	}
 
-	var messages []string
+	messages := []string{message}
 	var mutex sync.Mutex
 
 	return func(ctx context.Context, appendMsg string) {
 		mutex.Lock()
 		defer mutex.Unlock()
-		messages = append(messages, appendMsg)
 
-		blocks := buildStateMessageBlocks(message, messages)
+		messages = append(messages, appendMsg)
+		blocks := buildStateMessageBlocks(messages)
 		if len(blocks) == 0 {
 			return
 		}
