@@ -502,30 +502,48 @@ export default function TicketDetailPage() {
               <CardTitle>Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-2 text-sm">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Assignee:</span>
-                {ticket.assignee ? (
-                  <UserWithAvatar
-                    userID={ticket.assignee.id}
-                    fallback={ticket.assignee.name}
-                    avatarSize="sm"
-                  />
-                ) : (
-                  <span>Unassigned</span>
-                )}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <User className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
+                    Assignee
+                  </span>
+                </div>
+                <div className="ml-5">
+                  {ticket.assignee ? (
+                    <UserWithAvatar
+                      userID={ticket.assignee.id}
+                      fallback={ticket.assignee.name}
+                      avatarSize="sm"
+                    />
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Unassigned</span>
+                  )}
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Created:</span>
-                <span>{formatAbsoluteTime(ticket.createdAt)}</span>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
+                    Created
+                  </span>
+                </div>
+                <div className="ml-5">
+                  <span className="text-sm font-mono">{formatAbsoluteTime(ticket.createdAt)}</span>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Updated:</span>
-                <span>{formatAbsoluteTime(ticket.updatedAt)}</span>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
+                    Updated
+                  </span>
+                </div>
+                <div className="ml-5">
+                  <span className="text-sm font-mono">{formatAbsoluteTime(ticket.updatedAt)}</span>
+                </div>
               </div>
 
               <Separator />
