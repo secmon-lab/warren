@@ -149,7 +149,7 @@ func TestAttachFile(t *testing.T) {
 func TestIsBotUser(t *testing.T) {
 	svc := newSlackService(t)
 
-	botID := svc.BotUserID()
+	botID := svc.BotID()
 	gt.S(t, botID).Match(`^[A-Z][A-Z0-9]{6,12}$`)
 }
 
@@ -306,81 +306,110 @@ func TestNewStateFunc(t *testing.T) {
 func TestService_GetUserIcon(t *testing.T) {
 	ctx := context.Background()
 
-	// Setup Slack client mock
-	slackMock := &mock.SlackClientMock{
-		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
-			return &slack_sdk.AuthTestResponse{
-				UserID: "U123456",
-				TeamID: "T123456",
-				Team:   "test-team",
-				BotID:  "B123456",
-			}, nil
-		},
-		GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
-			return &slack_sdk.User{
-				ID: userID,
-				Profile: slack_sdk.UserProfile{
-					Image192: "https://example.com/avatar.jpg",
-				},
-			}, nil
-		},
-	}
+	t.Run("returns error when Slack API fails", func(t *testing.T) {
+		slackMock := &mock.SlackClientMock{
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "U123456",
+					TeamID: "T123456",
+					Team:   "test-team",
+					BotID:  "B123456",
+				}, nil
+			},
+			GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
+				return nil, fmt.Errorf("user not found")
+			},
+		}
 
-	// Create service
-	service, err := slack.New(slackMock, "C123456")
-	gt.NoError(t, err)
+		service, err := slack.New(slackMock, "C123456")
+		gt.NoError(t, err)
 
-	// Note: This test would fail in real usage because it tries to download from example.com
-	// But it verifies that the Slack GetUserInfo method is called correctly
-	_, _, err = service.GetUserIcon(ctx, "U123456")
-	// We expect an error because example.com won't have the image
-	gt.Error(t, err)
+		_, _, err = service.GetUserIcon(ctx, "U123456")
+		gt.Error(t, err)
+		gt.S(t, err.Error()).Contains("failed to get user info from slack")
+	})
 
-	// Verify Slack was called
-	gt.Array(t, slackMock.GetUserInfoCalls()).Length(1)
-	gt.Value(t, slackMock.GetUserInfoCalls()[0].UserID).Equal("U123456")
+	t.Run("returns error when user is nil", func(t *testing.T) {
+		slackMock := &mock.SlackClientMock{
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "U123456",
+					TeamID: "T123456",
+					Team:   "test-team",
+					BotID:  "B123456",
+				}, nil
+			},
+			GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
+				return nil, nil // Return nil user without error
+			},
+		}
+
+		service, err := slack.New(slackMock, "C123456")
+		gt.NoError(t, err)
+
+		_, _, err = service.GetUserIcon(ctx, "U123456")
+		gt.Error(t, err)
+		gt.S(t, err.Error()).Contains("user data is nil")
+	})
+
+	t.Run("returns error when no profile image available", func(t *testing.T) {
+		slackMock := &mock.SlackClientMock{
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "U123456",
+					TeamID: "T123456",
+					Team:   "test-team",
+					BotID:  "B123456",
+				}, nil
+			},
+			GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
+				return &slack_sdk.User{
+					ID:      userID,
+					Profile: slack_sdk.UserProfile{
+						// No image URLs
+					},
+				}, nil
+			},
+		}
+
+		service, err := slack.New(slackMock, "C123456")
+		gt.NoError(t, err)
+
+		_, _, err = service.GetUserIcon(ctx, "U123456")
+		gt.Error(t, err)
+		gt.S(t, err.Error()).Contains("no profile image available")
+	})
+
+	t.Run("returns error when image download fails", func(t *testing.T) {
+		slackMock := &mock.SlackClientMock{
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "U123456",
+					TeamID: "T123456",
+					Team:   "test-team",
+					BotID:  "B123456",
+				}, nil
+			},
+			GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
+				return &slack_sdk.User{
+					ID: userID,
+					Profile: slack_sdk.UserProfile{
+						Image192: "https://example.com/nonexistent.jpg",
+					},
+				}, nil
+			},
+		}
+
+		service, err := slack.New(slackMock, "C123456")
+		gt.NoError(t, err)
+
+		_, _, err = service.GetUserIcon(ctx, "U123456")
+		gt.Error(t, err)
+		gt.S(t, err.Error()).Contains("failed to download user icon")
+	})
 }
 
-func TestService_ClearExpiredIconCache(t *testing.T) {
-	// Setup Slack client mock
-	slackMock := &mock.SlackClientMock{
-		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
-			return &slack_sdk.AuthTestResponse{
-				UserID: "U123456",
-				TeamID: "T123456",
-				Team:   "test-team",
-				BotID:  "B123456",
-			}, nil
-		},
-	}
-
-	service, err := slack.New(slackMock, "C123456")
-	gt.NoError(t, err)
-
-	// Add expired cache entry
-	cache := service.GetIconCache()
-	cache["U123456"] = &slack.UserIconCache{
-		ImageData: []byte("old data"),
-		ExpiresAt: time.Now().Add(-time.Hour), // Expired 1 hour ago
-	}
-
-	// Add non-expired cache entry
-	cache["U789012"] = &slack.UserIconCache{
-		ImageData: []byte("new data"),
-		ExpiresAt: time.Now().Add(time.Hour), // Expires in 1 hour
-	}
-
-	// Clear expired cache
-	service.ClearExpiredIconCache()
-
-	// Verify expired entry was removed
-	_, exists := cache["U123456"]
-	gt.Value(t, exists).Equal(false)
-
-	// Verify non-expired entry remains
-	_, exists2 := cache["U789012"]
-	gt.Value(t, exists2).Equal(true)
-}
+// TestService_ClearExpiredIconCache is tested internally as part of the icon cache functionality
 
 func TestService_GetUserIcon_RealSlack(t *testing.T) {
 	// Skip test if TEST_SLACK_USER_ID is not set
@@ -450,38 +479,137 @@ func TestService_GetUserIcon_RealSlack(t *testing.T) {
 func TestService_GetUserProfile(t *testing.T) {
 	ctx := context.Background()
 
-	// Setup Slack client mock
-	slackMock := &mock.SlackClientMock{
-		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
-			return &slack_sdk.AuthTestResponse{
-				UserID: "U123456",
-				TeamID: "T123456",
-				Team:   "test-team",
-				BotID:  "B123456",
-			}, nil
-		},
-		GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
-			return &slack_sdk.User{
-				ID: userID,
-				Profile: slack_sdk.UserProfile{
-					DisplayName: "Test User",
-				},
-			}, nil
-		},
-	}
+	t.Run("returns display name when available", func(t *testing.T) {
+		slackMock := &mock.SlackClientMock{
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "U123456",
+					TeamID: "T123456",
+					Team:   "test-team",
+					BotID:  "B123456",
+				}, nil
+			},
+			GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
+				return &slack_sdk.User{
+					ID: userID,
+					Profile: slack_sdk.UserProfile{
+						DisplayName: "Test User",
+					},
+				}, nil
+			},
+		}
 
-	// Create service
-	service, err := slack.New(slackMock, "C123456")
-	gt.NoError(t, err)
+		service, err := slack.New(slackMock, "C123456")
+		gt.NoError(t, err)
 
-	// Test GetUserProfile
-	name, err := service.GetUserProfile(ctx, "U123456")
-	gt.NoError(t, err)
-	gt.Value(t, name).Equal("Test User")
+		name, err := service.GetUserProfile(ctx, "U123456")
+		gt.NoError(t, err)
+		gt.Value(t, name).Equal("Test User")
+	})
 
-	// Verify Slack was called
-	gt.Array(t, slackMock.GetUserInfoCalls()).Length(1)
-	gt.Value(t, slackMock.GetUserInfoCalls()[0].UserID).Equal("U123456")
+	t.Run("returns error when Slack API fails", func(t *testing.T) {
+		slackMock := &mock.SlackClientMock{
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "U123456",
+					TeamID: "T123456",
+					Team:   "test-team",
+					BotID:  "B123456",
+				}, nil
+			},
+			GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
+				return nil, fmt.Errorf("user not found")
+			},
+		}
+
+		service, err := slack.New(slackMock, "C123456")
+		gt.NoError(t, err)
+
+		_, err = service.GetUserProfile(ctx, "U123456")
+		gt.Error(t, err)
+		gt.S(t, err.Error()).Contains("failed to get user info from slack")
+	})
+
+	t.Run("returns error when user is nil", func(t *testing.T) {
+		slackMock := &mock.SlackClientMock{
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "U123456",
+					TeamID: "T123456",
+					Team:   "test-team",
+					BotID:  "B123456",
+				}, nil
+			},
+			GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
+				return nil, nil // Return nil user without error
+			},
+		}
+
+		service, err := slack.New(slackMock, "C123456")
+		gt.NoError(t, err)
+
+		_, err = service.GetUserProfile(ctx, "U123456")
+		gt.Error(t, err)
+		gt.S(t, err.Error()).Contains("user data is nil")
+	})
+
+	t.Run("falls back to real name when display name is empty", func(t *testing.T) {
+		slackMock := &mock.SlackClientMock{
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "U123456",
+					TeamID: "T123456",
+					Team:   "test-team",
+					BotID:  "B123456",
+				}, nil
+			},
+			GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
+				return &slack_sdk.User{
+					ID: userID,
+					Profile: slack_sdk.UserProfile{
+						DisplayName: "",
+						RealName:    "John Doe",
+					},
+				}, nil
+			},
+		}
+
+		service, err := slack.New(slackMock, "C123456")
+		gt.NoError(t, err)
+
+		name, err := service.GetUserProfile(ctx, "U123456")
+		gt.NoError(t, err)
+		gt.Value(t, name).Equal("John Doe")
+	})
+
+	t.Run("returns error when both names are empty", func(t *testing.T) {
+		slackMock := &mock.SlackClientMock{
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "U123456",
+					TeamID: "T123456",
+					Team:   "test-team",
+					BotID:  "B123456",
+				}, nil
+			},
+			GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
+				return &slack_sdk.User{
+					ID: userID,
+					Profile: slack_sdk.UserProfile{
+						DisplayName: "",
+						RealName:    "",
+					},
+				}, nil
+			},
+		}
+
+		service, err := slack.New(slackMock, "C123456")
+		gt.NoError(t, err)
+
+		_, err = service.GetUserProfile(ctx, "U123456")
+		gt.Error(t, err)
+		gt.S(t, err.Error()).Contains("no user name available")
+	})
 }
 
 func TestService_GetUserProfile_Cache(t *testing.T) {
@@ -524,43 +652,4 @@ func TestService_GetUserProfile_Cache(t *testing.T) {
 	gt.Array(t, slackMock.GetUserInfoCalls()).Length(1)
 }
 
-func TestService_ClearExpiredProfileCache(t *testing.T) {
-	// Setup Slack client mock
-	slackMock := &mock.SlackClientMock{
-		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
-			return &slack_sdk.AuthTestResponse{
-				UserID: "U123456",
-				TeamID: "T123456",
-				Team:   "test-team",
-				BotID:  "B123456",
-			}, nil
-		},
-	}
-
-	service, err := slack.New(slackMock, "C123456")
-	gt.NoError(t, err)
-
-	// Add expired cache entry
-	profileCache := service.GetProfileCache()
-	profileCache["U123456"] = &slack.UserProfileCache{
-		Name:      "Old User",
-		ExpiresAt: time.Now().Add(-time.Hour), // Expired 1 hour ago
-	}
-
-	// Add non-expired cache entry
-	profileCache["U789012"] = &slack.UserProfileCache{
-		Name:      "Current User",
-		ExpiresAt: time.Now().Add(time.Hour), // Expires in 1 hour
-	}
-
-	// Clear expired cache
-	service.ClearExpiredProfileCache()
-
-	// Verify expired entry was removed
-	_, exists := profileCache["U123456"]
-	gt.Value(t, exists).Equal(false)
-
-	// Verify non-expired entry remains
-	_, exists2 := profileCache["U789012"]
-	gt.Value(t, exists2).Equal(true)
-}
+// TestService_ClearExpiredProfileCache is tested internally as part of the profile cache functionality

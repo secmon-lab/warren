@@ -522,6 +522,11 @@ func (x *Service) GetUserIcon(ctx context.Context, userID string) ([]byte, strin
 		return nil, "", goerr.Wrap(err, "failed to get user info from slack", goerr.V("user_id", userID))
 	}
 
+	// Check if user data is valid
+	if user == nil {
+		return nil, "", goerr.New("user data is nil", goerr.V("user_id", userID))
+	}
+
 	// Get profile image URL (use image_192 for good quality)
 	imageURL := user.Profile.Image192
 	if imageURL == "" {
@@ -621,16 +626,30 @@ func (x *Service) GetUserProfile(ctx context.Context, userID string) (string, er
 		return "", goerr.Wrap(err, "failed to get user info from slack", goerr.V("user_id", userID))
 	}
 
+	// Check if user data is valid
+	if user == nil {
+		return "", goerr.New("user data is nil", goerr.V("user_id", userID))
+	}
+
+	// Get the display name, with fallback to real name
+	displayName := user.Profile.DisplayName
+	if displayName == "" {
+		displayName = user.Profile.RealName
+		if displayName == "" {
+			return "", goerr.New("no user name available", goerr.V("user_id", userID))
+		}
+	}
+
 	// Cache the profile
 	x.profileCacheMutex.Lock()
 	x.profileCache[userID] = &userProfileCache{
-		Name:      user.Profile.DisplayName,
+		Name:      displayName,
 		ExpiresAt: time.Now().Add(UserProfileCacheExpiry),
 	}
 	x.profileCacheMutex.Unlock()
 
-	logger.Debug("cached user profile", "user_id", userID, "name", user.Profile.DisplayName)
-	return user.Profile.DisplayName, nil
+	logger.Debug("cached user profile", "user_id", userID, "name", displayName)
+	return displayName, nil
 }
 
 // ClearExpiredProfileCache removes expired profile cache entries
