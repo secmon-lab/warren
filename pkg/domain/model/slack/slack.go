@@ -2,10 +2,8 @@ package slack
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/secmon-lab/warren/pkg/utils/logging"
-	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 )
 
@@ -23,23 +21,10 @@ type Message struct {
 	threadID string
 	teamID   string
 
-	user           User
-	msg            string
-	ts             string
-	mentions       []Mention
-	isTraceMessage bool
-}
-
-func (x Message) LogValue() slog.Value {
-	return slog.GroupValue(
-		slog.String("id", x.id),
-		slog.String("channel", x.channel),
-		slog.String("thread_id", x.threadID),
-		slog.String("user", x.user.ID),
-		slog.String("msg", x.msg),
-		slog.String("ts", x.ts),
-		slog.Bool("is_trace_message", x.isTraceMessage),
-	)
+	user     User
+	msg      string
+	ts       string
+	mentions []Mention
 }
 
 func (x *Message) Thread() Thread {
@@ -96,10 +81,6 @@ func (x *Message) InThread() bool {
 	return x.threadID != ""
 }
 
-func (x *Message) IsTraceMessage() bool {
-	return x.isTraceMessage
-}
-
 func NewMessage(ctx context.Context, ev *slackevents.EventsAPIEvent) *Message {
 	switch inEv := ev.InnerEvent.Data.(type) {
 	case *slackevents.AppMentionEvent:
@@ -118,17 +99,6 @@ func NewMessage(ctx context.Context, ev *slackevents.EventsAPIEvent) *Message {
 		}
 
 	case *slackevents.MessageEvent:
-		// Determine if this is a Trace message by checking for ContextBlock
-		isTraceMessage := false
-		if len(inEv.Blocks.BlockSet) > 0 {
-			for _, block := range inEv.Blocks.BlockSet {
-				if block.BlockType() == slack.MBTContext {
-					isTraceMessage = true
-					break
-				}
-			}
-		}
-
 		return &Message{
 			id:       inEv.TimeStamp,
 			channel:  inEv.Channel,
@@ -138,9 +108,8 @@ func NewMessage(ctx context.Context, ev *slackevents.EventsAPIEvent) *Message {
 				ID:   inEv.User,
 				Name: inEv.User,
 			},
-			msg:            inEv.Text,
-			ts:             inEv.TimeStamp,
-			isTraceMessage: isTraceMessage,
+			msg: inEv.Text,
+			ts:  inEv.TimeStamp,
 		}
 
 	default:
