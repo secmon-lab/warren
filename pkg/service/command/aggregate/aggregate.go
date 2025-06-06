@@ -104,18 +104,15 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 
 	clusters := alert.ClusterAlerts(ctx, alerts, threshold, topN)
 
-	var lists []*alert.List
 	for _, cluster := range clusters {
 		newList, err := clients.CreateList(ctx, *alertList.SlackThread, slackMsg.User(), cluster)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to create alert list")
 		}
 
-		lists = append(lists, newList)
-	}
-
-	if err := clients.Thread().PostAlertLists(ctx, lists); err != nil {
-		return nil, goerr.Wrap(err, "failed to post alert clusters")
+		if err := clients.Thread().PostAlertList(ctx, newList); err != nil {
+			return nil, goerr.Wrap(err, "failed to post alert list")
+		}
 	}
 
 	return nil, nil
