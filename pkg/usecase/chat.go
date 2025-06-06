@@ -82,7 +82,6 @@ func (x *UseCases) chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
-			ticketComment := target.NewComment(ctx, message)
 			msg.Notify(ctx, "💬 %s", message)
 			return nil
 		}),
