@@ -18,7 +18,7 @@ import (
 //		// make and configure a mocked SlackEvent
 //		mockedSlackEvent := &SlackEventMock{
 //			HandleSlackAppMentionFunc: func(ctx context.Context, slackMsg slack.Message) error {
-
+//				panic("mock out the HandleSlackAppMention method")
 //			},
 //			HandleSlackMessageFunc: func(ctx context.Context, slackMsg slack.Message) error {
 //				panic("mock out the HandleSlackMessage method")
