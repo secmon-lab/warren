@@ -100,7 +100,7 @@ func test(ctx context.Context, queryFunc QueryFunc, testData *TestData, shouldDe
 			var resp alert.QueryOutput
 
 			hook := func(ctx context.Context, loc opaq.PrintLocation, msg string) error {
-				logging.From(ctx).Debug("[print] "+msg, "loc", loc)
+				logging.From(ctx).Debug("[print] "+msg, "file", loc.File, "row", loc.Row, "col", loc.Col, "offset", loc.Offset)
 				return nil
 			}
 
