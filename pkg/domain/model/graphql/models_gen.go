@@ -2,6 +2,10 @@
 
 package graphql
 
+import (
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+)
+
 type AlertAttribute struct {
 	Key   string  `json:"key"`
 	Value string  `json:"value"`
@@ -13,6 +17,11 @@ type Mutation struct {
 }
 
 type Query struct {
+}
+
+type TicketsResponse struct {
+	Tickets    []*ticket.Ticket `json:"tickets"`
+	TotalCount int              `json:"totalCount"`
 }
 
 type User struct {

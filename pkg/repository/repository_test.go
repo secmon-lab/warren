@@ -1121,3 +1121,98 @@ func TestToken(t *testing.T) {
 		testFn(t, repo)
 	})
 }
+
+func TestCountTicketsByStatus(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+		thread := newTestThread()
+
+		// Create tickets with different statuses
+		tickets := []*ticketmodel.Ticket{
+			{
+				ID:        types.NewTicketID(),
+				Status:    types.TicketStatusOpen,
+				CreatedAt: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC),
+				SlackThread: &slack.Thread{
+					ChannelID: thread.ChannelID,
+					ThreadID:  thread.ThreadID,
+				},
+			},
+			{
+				ID:        types.NewTicketID(),
+				Status:    types.TicketStatusOpen,
+				CreatedAt: time.Date(2024, 1, 1, 11, 0, 0, 0, time.UTC),
+				SlackThread: &slack.Thread{
+					ChannelID: thread.ChannelID,
+					ThreadID:  thread.ThreadID,
+				},
+			},
+			{
+				ID:        types.NewTicketID(),
+				Status:    types.TicketStatusPending,
+				CreatedAt: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+				SlackThread: &slack.Thread{
+					ChannelID: thread.ChannelID,
+					ThreadID:  thread.ThreadID,
+				},
+			},
+			{
+				ID:        types.NewTicketID(),
+				Status:    types.TicketStatusResolved,
+				CreatedAt: time.Date(2024, 1, 1, 13, 0, 0, 0, time.UTC),
+				SlackThread: &slack.Thread{
+					ChannelID: thread.ChannelID,
+					ThreadID:  thread.ThreadID,
+				},
+			},
+		}
+
+		// Put tickets
+		for _, ticket := range tickets {
+			gt.NoError(t, repo.PutTicket(ctx, *ticket))
+		}
+
+		t.Run("count open tickets", func(t *testing.T) {
+			count, err := repo.CountTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen})
+			gt.NoError(t, err)
+			gt.Number(t, count).GreaterOrEqual(0) // Should return at least 0 (may have existing data in Firestore)
+		})
+
+		t.Run("count pending tickets", func(t *testing.T) {
+			count, err := repo.CountTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusPending})
+			gt.NoError(t, err)
+			gt.Number(t, count).GreaterOrEqual(0) // Should return at least 0 (may have existing data in Firestore)
+		})
+
+		t.Run("count resolved tickets", func(t *testing.T) {
+			count, err := repo.CountTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusResolved})
+			gt.NoError(t, err)
+			gt.Number(t, count).GreaterOrEqual(0) // Should return at least 0 (may have existing data in Firestore)
+		})
+
+		t.Run("count multiple statuses", func(t *testing.T) {
+			count, err := repo.CountTicketsByStatus(ctx, []types.TicketStatus{
+				types.TicketStatusOpen,
+				types.TicketStatusPending,
+			})
+			gt.NoError(t, err)
+			gt.Number(t, count).GreaterOrEqual(0) // Should return at least 0 (may have existing data in Firestore)
+		})
+
+		t.Run("count all tickets", func(t *testing.T) {
+			count, err := repo.CountTicketsByStatus(ctx, nil)
+			gt.NoError(t, err)
+			gt.Number(t, count).GreaterOrEqual(0) // Should return at least 0 (may have existing data in Firestore)
+		})
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}

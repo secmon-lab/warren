@@ -114,6 +114,11 @@ type ComplexityRoot struct {
 		UpdatedAt   func(childComplexity int) int
 	}
 
+	TicketsResponse struct {
+		Tickets    func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
 	User struct {
 		ID   func(childComplexity int) int
 		Name func(childComplexity int) int
@@ -146,7 +151,7 @@ type MutationResolver interface {
 }
 type QueryResolver interface {
 	Ticket(ctx context.Context, id string) (*ticket.Ticket, error)
-	Tickets(ctx context.Context, statuses []string, offset *int, limit *int) ([]*ticket.Ticket, error)
+	Tickets(ctx context.Context, statuses []string, offset *int, limit *int) (*graphql1.TicketsResponse, error)
 	Alert(ctx context.Context, id string) (*alert.Alert, error)
 	Alerts(ctx context.Context) ([]*alert.Alert, error)
 }
@@ -499,6 +504,20 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Ticket.UpdatedAt(childComplexity), true
 
+	case "TicketsResponse.tickets":
+		if e.complexity.TicketsResponse.Tickets == nil {
+			break
+		}
+
+		return e.complexity.TicketsResponse.Tickets(childComplexity), true
+
+	case "TicketsResponse.totalCount":
+		if e.complexity.TicketsResponse.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.TicketsResponse.TotalCount(childComplexity), true
+
 	case "User.id":
 		if e.complexity.User.ID == nil {
 			break
@@ -671,9 +690,14 @@ type Finding {
   recommendation: String!
 }
 
+type TicketsResponse {
+  tickets: [Ticket!]!
+  totalCount: Int!
+}
+
 type Query {
   ticket(id: ID!): Ticket
-  tickets(statuses: [String!], offset: Int, limit: Int): [Ticket!]!
+  tickets(statuses: [String!], offset: Int, limit: Int): TicketsResponse!
   alert(id: ID!): Alert
   alerts: [Alert!]!
 }
@@ -2461,9 +2485,9 @@ func (ec *executionContext) _Query_tickets(ctx context.Context, field graphql.Co
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*ticket.Ticket)
+	res := resTmp.(*graphql1.TicketsResponse)
 	fc.Result = res
-	return ec.marshalNTicket2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐTicketᚄ(ctx, field.Selections, res)
+	return ec.marshalNTicketsResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐTicketsResponse(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_tickets(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -2474,34 +2498,12 @@ func (ec *executionContext) fieldContext_Query_tickets(ctx context.Context, fiel
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Ticket_id(ctx, field)
-			case "status":
-				return ec.fieldContext_Ticket_status(ctx, field)
-			case "title":
-				return ec.fieldContext_Ticket_title(ctx, field)
-			case "description":
-				return ec.fieldContext_Ticket_description(ctx, field)
-			case "summary":
-				return ec.fieldContext_Ticket_summary(ctx, field)
-			case "assignee":
-				return ec.fieldContext_Ticket_assignee(ctx, field)
-			case "alerts":
-				return ec.fieldContext_Ticket_alerts(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
-			case "conclusion":
-				return ec.fieldContext_Ticket_conclusion(ctx, field)
-			case "reason":
-				return ec.fieldContext_Ticket_reason(ctx, field)
-			case "finding":
-				return ec.fieldContext_Ticket_finding(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Ticket_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "tickets":
+				return ec.fieldContext_TicketsResponse_tickets(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_TicketsResponse_totalCount(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type TicketsResponse", field.Name)
 		},
 	}
 	defer func() {
@@ -3382,6 +3384,122 @@ func (ec *executionContext) fieldContext_Ticket_updatedAt(_ context.Context, fie
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TicketsResponse_tickets(ctx context.Context, field graphql.CollectedField, obj *graphql1.TicketsResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TicketsResponse_tickets(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Tickets, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*ticket.Ticket)
+	fc.Result = res
+	return ec.marshalNTicket2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐTicketᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TicketsResponse_tickets(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TicketsResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Ticket_id(ctx, field)
+			case "status":
+				return ec.fieldContext_Ticket_status(ctx, field)
+			case "title":
+				return ec.fieldContext_Ticket_title(ctx, field)
+			case "description":
+				return ec.fieldContext_Ticket_description(ctx, field)
+			case "summary":
+				return ec.fieldContext_Ticket_summary(ctx, field)
+			case "assignee":
+				return ec.fieldContext_Ticket_assignee(ctx, field)
+			case "alerts":
+				return ec.fieldContext_Ticket_alerts(ctx, field)
+			case "comments":
+				return ec.fieldContext_Ticket_comments(ctx, field)
+			case "conclusion":
+				return ec.fieldContext_Ticket_conclusion(ctx, field)
+			case "reason":
+				return ec.fieldContext_Ticket_reason(ctx, field)
+			case "finding":
+				return ec.fieldContext_Ticket_finding(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Ticket_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TicketsResponse_totalCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.TicketsResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TicketsResponse_totalCount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TotalCount, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TicketsResponse_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TicketsResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -6565,6 +6683,50 @@ func (ec *executionContext) _Ticket(ctx context.Context, sel ast.SelectionSet, o
 	return out
 }
 
+var ticketsResponseImplementors = []string{"TicketsResponse"}
+
+func (ec *executionContext) _TicketsResponse(ctx context.Context, sel ast.SelectionSet, obj *graphql1.TicketsResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, ticketsResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TicketsResponse")
+		case "tickets":
+			out.Values[i] = ec._TicketsResponse_tickets(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._TicketsResponse_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var userImplementors = []string{"User"}
 
 func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj *graphql1.User) graphql.Marshaler {
@@ -7168,6 +7330,22 @@ func (ec *executionContext) marshalNID2ᚕstringᚄ(ctx context.Context, sel ast
 	return ret
 }
 
+func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v any) (int, error) {
+	res, err := graphql.UnmarshalInt(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalInt(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -7240,6 +7418,20 @@ func (ec *executionContext) marshalNTicket2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarr
 		return graphql.Null
 	}
 	return ec._Ticket(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNTicketsResponse2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐTicketsResponse(ctx context.Context, sel ast.SelectionSet, v graphql1.TicketsResponse) graphql.Marshaler {
+	return ec._TicketsResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNTicketsResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐTicketsResponse(ctx context.Context, sel ast.SelectionSet, v *graphql1.TicketsResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TicketsResponse(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {

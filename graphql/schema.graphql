@@ -52,9 +52,14 @@ type Finding {
   recommendation: String!
 }
 
+type TicketsResponse {
+  tickets: [Ticket!]!
+  totalCount: Int!
+}
+
 type Query {
   ticket(id: ID!): Ticket
-  tickets(statuses: [String!], offset: Int, limit: Int): [Ticket!]!
+  tickets(statuses: [String!], offset: Int, limit: Int): TicketsResponse!
   alert(id: ID!): Alert
   alerts: [Alert!]!
 }

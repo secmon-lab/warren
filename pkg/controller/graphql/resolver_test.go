@@ -59,8 +59,9 @@ func TestTicketResolver(t *testing.T) {
 		status := "open"
 		got, err := resolver.Query().Tickets(ctx, []string{status}, nil, nil)
 		gt.NoError(t, err)
-		gt.Array(t, got).Length(1)
-		gt.Value(t, got[0].ID).Equal(testTicket.ID)
+		gt.Array(t, got.Tickets).Length(1)
+		gt.Value(t, got.Tickets[0].ID).Equal(testTicket.ID)
+		gt.Value(t, got.TotalCount).Equal(1)
 	})
 
 	t.Run("GetTicketsWithPagination", func(t *testing.T) {
@@ -89,14 +90,16 @@ func TestTicketResolver(t *testing.T) {
 			limit := 2
 			got, err := resolver.Query().Tickets(ctx, nil, nil, &limit)
 			gt.NoError(t, err)
-			gt.Array(t, got).Length(2)
+			gt.Array(t, got.Tickets).Length(2)
+			gt.Value(t, got.TotalCount).Equal(3)
 		})
 
 		t.Run("with offset", func(t *testing.T) {
 			offset := 1
 			got, err := resolver.Query().Tickets(ctx, nil, &offset, nil)
 			gt.NoError(t, err)
-			gt.Array(t, got).Length(2)
+			gt.Array(t, got.Tickets).Length(2)
+			gt.Value(t, got.TotalCount).Equal(3)
 		})
 
 		t.Run("with offset and limit", func(t *testing.T) {
@@ -104,13 +107,15 @@ func TestTicketResolver(t *testing.T) {
 			limit := 1
 			got, err := resolver.Query().Tickets(ctx, nil, &offset, &limit)
 			gt.NoError(t, err)
-			gt.Array(t, got).Length(1)
+			gt.Array(t, got.Tickets).Length(1)
+			gt.Value(t, got.TotalCount).Equal(3)
 		})
 
 		t.Run("with multiple statuses", func(t *testing.T) {
 			got, err := resolver.Query().Tickets(ctx, []string{"open", "pending"}, nil, nil)
 			gt.NoError(t, err)
-			gt.Array(t, got).Length(2)
+			gt.Array(t, got.Tickets).Length(2)
+			gt.Value(t, got.TotalCount).Equal(2)
 		})
 	})
 

@@ -603,6 +603,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			BindAlertToTicketFunc: func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
 //				panic("mock out the BindAlertToTicket method")
 //			},
+//			CountTicketsByStatusFunc: func(ctx context.Context, statuses []types.TicketStatus) (int, error) {
+//				panic("mock out the CountTicketsByStatus method")
+//			},
 //			DeleteTokenFunc: func(ctx context.Context, tokenID auth.TokenID) error {
 //				panic("mock out the DeleteToken method")
 //			},
@@ -717,6 +720,9 @@ type RepositoryMock struct {
 
 	// BindAlertToTicketFunc mocks the BindAlertToTicket method.
 	BindAlertToTicketFunc func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error
+
+	// CountTicketsByStatusFunc mocks the CountTicketsByStatus method.
+	CountTicketsByStatusFunc func(ctx context.Context, statuses []types.TicketStatus) (int, error)
 
 	// DeleteTokenFunc mocks the DeleteToken method.
 	DeleteTokenFunc func(ctx context.Context, tokenID auth.TokenID) error
@@ -857,6 +863,13 @@ type RepositoryMock struct {
 			AlertID types.AlertID
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
+		}
+		// CountTicketsByStatus holds details about calls to the CountTicketsByStatus method.
+		CountTicketsByStatus []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Statuses is the statuses argument value.
+			Statuses []types.TicketStatus
 		}
 		// DeleteToken holds details about calls to the DeleteToken method.
 		DeleteToken []struct {
@@ -1103,6 +1116,7 @@ type RepositoryMock struct {
 	lockBatchPutAlerts              sync.RWMutex
 	lockBatchUpdateTicketsStatus    sync.RWMutex
 	lockBindAlertToTicket           sync.RWMutex
+	lockCountTicketsByStatus        sync.RWMutex
 	lockDeleteToken                 sync.RWMutex
 	lockFindNearestAlerts           sync.RWMutex
 	lockFindNearestTickets          sync.RWMutex
@@ -1380,6 +1394,46 @@ func (mock *RepositoryMock) BindAlertToTicketCalls() []struct {
 	mock.lockBindAlertToTicket.RLock()
 	calls = mock.calls.BindAlertToTicket
 	mock.lockBindAlertToTicket.RUnlock()
+	return calls
+}
+
+// CountTicketsByStatus calls CountTicketsByStatusFunc.
+func (mock *RepositoryMock) CountTicketsByStatus(ctx context.Context, statuses []types.TicketStatus) (int, error) {
+	callInfo := struct {
+		Ctx      context.Context
+		Statuses []types.TicketStatus
+	}{
+		Ctx:      ctx,
+		Statuses: statuses,
+	}
+	mock.lockCountTicketsByStatus.Lock()
+	mock.calls.CountTicketsByStatus = append(mock.calls.CountTicketsByStatus, callInfo)
+	mock.lockCountTicketsByStatus.Unlock()
+	if mock.CountTicketsByStatusFunc == nil {
+		var (
+			nOut   int
+			errOut error
+		)
+		return nOut, errOut
+	}
+	return mock.CountTicketsByStatusFunc(ctx, statuses)
+}
+
+// CountTicketsByStatusCalls gets all the calls that were made to CountTicketsByStatus.
+// Check the length with:
+//
+//	len(mockedRepository.CountTicketsByStatusCalls())
+func (mock *RepositoryMock) CountTicketsByStatusCalls() []struct {
+	Ctx      context.Context
+	Statuses []types.TicketStatus
+} {
+	var calls []struct {
+		Ctx      context.Context
+		Statuses []types.TicketStatus
+	}
+	mock.lockCountTicketsByStatus.RLock()
+	calls = mock.calls.CountTicketsByStatus
+	mock.lockCountTicketsByStatus.RUnlock()
 	return calls
 }
 

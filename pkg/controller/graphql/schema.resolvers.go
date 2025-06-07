@@ -193,7 +193,7 @@ func (r *queryResolver) Ticket(ctx context.Context, id string) (*ticket.Ticket, 
 }
 
 // Tickets is the resolver for the tickets field.
-func (r *queryResolver) Tickets(ctx context.Context, statuses []string, offset *int, limit *int) ([]*ticket.Ticket, error) {
+func (r *queryResolver) Tickets(ctx context.Context, statuses []string, offset *int, limit *int) (*graphql1.TicketsResponse, error) {
 	var ticketStatuses []types.TicketStatus
 	for _, s := range statuses {
 		status := types.TicketStatus(s)
@@ -215,7 +215,16 @@ func (r *queryResolver) Tickets(ctx context.Context, statuses []string, offset *
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list tickets")
 	}
-	return tickets, nil
+
+	totalCount, err := r.repo.CountTicketsByStatus(ctx, ticketStatuses)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to count tickets")
+	}
+
+	return &graphql1.TicketsResponse{
+		Tickets:    tickets,
+		TotalCount: totalCount,
+	}, nil
 }
 
 // Alert is the resolver for the alert field.
