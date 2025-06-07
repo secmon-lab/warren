@@ -384,3 +384,47 @@ func TestRateLimitedUpdater_RateLimitError_NilMessages(t *testing.T) {
 	calls := mockClient.UpdateMessageContextCalls()
 	gt.Number(t, len(calls)).Equal(3)
 }
+
+func TestRateLimitedUpdater_GracefulStop(t *testing.T) {
+	ctx := context.Background()
+
+	mockClient := &mock.SlackClientMock{
+		UpdateMessageContextFunc: func(ctx context.Context, channelID, timestamp string, options ...slack_sdk.MsgOption) (string, string, string, error) {
+			return channelID, timestamp, "test-message-ts", nil
+		},
+	}
+
+	// Use fast interval for testing
+	updater := slack.NewRateLimitedUpdater(mockClient, slack.WithInterval(1*time.Millisecond))
+
+	testAlert := alert.Alert{
+		ID:     types.AlertID("test-alert-1"),
+		Schema: "test.v1",
+		Metadata: alert.Metadata{
+			Title: "Test Alert",
+		},
+		SlackThread: &model.Thread{
+			ChannelID: "C1234567890",
+			ThreadID:  "1234567890.123456",
+		},
+	}
+
+	// Start updater by sending an update
+	updater.UpdateAlert(ctx, testAlert)
+
+	// Wait for the goroutine to start and process the request
+	time.Sleep(10 * time.Millisecond)
+
+	// Stop the updater
+	updater.Stop()
+
+	// Try to send another update after stop - should still queue but processing should stop
+	updater.UpdateAlert(ctx, testAlert)
+
+	// Wait a bit to see if any processing happens
+	time.Sleep(50 * time.Millisecond)
+
+	// Should have processed at least the first request
+	calls := mockClient.UpdateMessageContextCalls()
+	gt.Number(t, len(calls)).GreaterOrEqual(1)
+}

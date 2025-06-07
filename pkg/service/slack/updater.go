@@ -23,6 +23,7 @@ type AlertUpdateRequest struct {
 // AlertUpdater defines the interface for updating alert messages with rate limiting
 type AlertUpdater interface {
 	UpdateAlert(ctx context.Context, alert alert.Alert)
+	Stop()
 }
 
 // RateLimitedUpdater provides rate-limited alert message updates
@@ -36,6 +37,10 @@ type RateLimitedUpdater struct {
 	// Rate limiting configuration
 	interval      time.Duration
 	retryInterval time.Duration // Base interval for exponential backoff
+
+	// Graceful shutdown
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // UpdaterOption represents a configuration option for RateLimitedUpdater
@@ -57,11 +62,15 @@ func WithRetryInterval(interval time.Duration) UpdaterOption {
 
 // NewRateLimitedUpdater creates a new rate-limited updater with optional configurations
 func NewRateLimitedUpdater(client interfaces.SlackClient, opts ...UpdaterOption) AlertUpdater {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	r := &RateLimitedUpdater{
 		client:        client,
 		requestChan:   make(chan *AlertUpdateRequest, 10), // Short buffer to prevent blocking
 		interval:      2 * time.Second,                    // Default: 30 requests/min with safety margin
 		retryInterval: 1 * time.Second,                    // Default: 1 second base for exponential backoff
+		ctx:           ctx,
+		cancel:        cancel,
 	}
 
 	// Apply options
@@ -79,7 +88,7 @@ func (r *RateLimitedUpdater) UpdateAlert(ctx context.Context, alert alert.Alert)
 		r.mu.Lock()
 		r.started = true
 		r.mu.Unlock()
-		go r.processRequests(context.Background())
+		go r.processRequests(r.ctx)
 	})
 
 	// Send request to processing goroutine asynchronously
@@ -241,4 +250,11 @@ func (r *RateLimitedUpdater) extractRetryAfter(err error) time.Duration {
 	}
 
 	return 0
+}
+
+// Stop gracefully stops the rate-limited updater
+func (r *RateLimitedUpdater) Stop() {
+	if r.cancel != nil {
+		r.cancel()
+	}
 }

@@ -676,3 +676,10 @@ func (x *Service) ClearExpiredProfileCache() {
 		}
 	}
 }
+
+// Stop gracefully stops the service and its rate-limited updater
+func (x *Service) Stop() {
+	if x.rateLimitedUpdater != nil {
+		x.rateLimitedUpdater.Stop()
+	}
+}
