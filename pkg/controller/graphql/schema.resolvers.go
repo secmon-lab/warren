@@ -73,6 +73,10 @@ func (r *commentResolver) ID(ctx context.Context, obj *ticket.Comment) (string, 
 
 // Content is the resolver for the content field.
 func (r *commentResolver) Content(ctx context.Context, obj *ticket.Comment) (string, error) {
+	if r.mrkdwnConv != nil {
+		converted := r.mrkdwnConv.ConvertToMarkdown(ctx, obj.Comment)
+		return converted, nil
+	}
 	return obj.Comment, nil
 }
 

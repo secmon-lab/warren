@@ -31,6 +31,8 @@ type SlackClient interface {
 	OpenView(triggerID string, view slack.ModalViewRequest) (*slack.ViewResponse, error)
 	UploadFileV2Context(ctx context.Context, params slack.UploadFileV2Parameters) (*slack.FileSummary, error)
 	GetUserInfo(userID string) (*slack.User, error)
+	GetConversationInfo(input *slack.GetConversationInfoInput) (*slack.Channel, error)
+	GetUserGroups(options ...slack.GetUserGroupsOption) ([]slack.UserGroup, error)
 }
 
 type SlackThreadService interface {

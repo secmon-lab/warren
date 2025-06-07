@@ -14,6 +14,7 @@ import (
 	slack_controller "github.com/secmon-lab/warren/pkg/controller/slack"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
@@ -23,6 +24,7 @@ type Server struct {
 	policy         interfaces.PolicyClient
 	verifier       slack_model.PayloadVerifier
 	repo           interfaces.Repository // for GraphQL
+	slackService   *slack.Service        // for GraphQL resolver
 	authUC         AuthUseCase           // for authentication
 	enableGraphiQL bool                  // GraphiQL enable flag
 }
@@ -38,6 +40,12 @@ func WithSlackVerifier(verifier slack_model.PayloadVerifier) Options {
 func WithGraphQLRepo(repo interfaces.Repository) Options {
 	return func(s *Server) {
 		s.repo = repo
+	}
+}
+
+func WithSlackService(slackService *slack.Service) Options {
+	return func(s *Server) {
+		s.slackService = slackService
 	}
 }
 
@@ -107,7 +115,7 @@ func New(uc UseCase, opts ...Options) *Server {
 
 	// GraphQL endpoint
 	if s.repo != nil {
-		graphqlHandler := graphqlHandler(s.repo)
+		graphqlHandler := graphqlHandler(s.repo, s.slackService)
 
 		r.Route("/graphql", func(r chi.Router) {
 			// Apply authentication middleware to GraphQL
@@ -164,8 +172,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // GraphQL handler
-func graphqlHandler(repo interfaces.Repository) http.Handler {
-	resolver := graphql.NewResolver(repo)
+func graphqlHandler(repo interfaces.Repository, slackService *slack.Service) http.Handler {
+	resolver := graphql.NewResolver(repo, slackService)
 	srv := handler.New(
 		graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}),
 	)

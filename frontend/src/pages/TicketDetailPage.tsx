@@ -1,6 +1,8 @@
 import { useQuery, useMutation } from "@apollo/client";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,6 +68,68 @@ import { EditConclusionModal } from "@/components/ui/edit-conclusion-modal";
 
 const ALERTS_PER_PAGE = 5;
 
+// Secure markdown renderer component
+const SecureMarkdown = ({ content }: { content: string }) => {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      // Disable HTML parsing completely - this prevents all HTML-based XSS
+      skipHtml={true}
+      disallowedElements={[
+        "script",
+        "iframe",
+        "object",
+        "embed",
+        "form",
+        "input",
+        "button",
+        "textarea",
+        "select",
+        "style",
+        "link",
+        "meta",
+        "base",
+      ]}
+      unwrapDisallowed={true}
+      components={{
+        // Sanitize links to only allow safe protocols
+        a: ({ href, children, ...props }) => {
+          const safeProtocols = /^(https?:|mailto:|tel:)/i;
+          const isSafe = href && safeProtocols.test(href);
+          return isSafe ? (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline"
+              {...props}>
+              {children}
+            </a>
+          ) : (
+            <span className="text-muted-foreground">[Link: {children}]</span>
+          );
+        },
+        // Sanitize images
+        img: ({ src, alt, ...props }) => {
+          const safeProtocols = /^(https?:|data:image\/)/i;
+          const isSafe = src && safeProtocols.test(src);
+          return isSafe ? (
+            <img
+              src={src}
+              alt={alt}
+              {...props}
+              style={{ maxWidth: "100%", height: "auto" }}
+            />
+          ) : (
+            <span>[Image: {alt || "Unable to display"}]</span>
+          );
+        },
+      }}>
+      {content}
+    </ReactMarkdown>
+  );
+};
+
 export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -73,7 +137,8 @@ export default function TicketDetailPage() {
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [alertsCurrentPage, setAlertsCurrentPage] = useState(1);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [isEditConclusionModalOpen, setIsEditConclusionModalOpen] = useState(false);
+  const [isEditConclusionModalOpen, setIsEditConclusionModalOpen] =
+    useState(false);
 
   const errorToast = useErrorToast();
   const successToast = useSuccessToast();
@@ -339,7 +404,10 @@ export default function TicketDetailPage() {
           )}
 
           {/* Resolve Information Section */}
-          <ResolveInfo ticket={ticket} onEditConclusion={handleEditConclusion} />
+          <ResolveInfo
+            ticket={ticket}
+            onEditConclusion={handleEditConclusion}
+          />
 
           {/* Comments Section */}
           <Card>
@@ -392,8 +460,8 @@ export default function TicketDetailPage() {
                               {formatRelativeTime(comment.createdAt)}
                             </span>
                           </div>
-                          <div className="text-sm leading-relaxed whitespace-pre-wrap bg-muted/50 rounded-lg p-3">
-                            {comment.content}
+                          <div className="text-sm leading-relaxed bg-muted/50 rounded-lg p-3 prose prose-sm max-w-none">
+                            <SecureMarkdown content={comment.content} />
                           </div>
                         </div>
                       </div>
@@ -525,7 +593,9 @@ export default function TicketDetailPage() {
                       />
                     </div>
                   ) : (
-                    <span className="text-xs text-muted-foreground">Unassigned</span>
+                    <span className="text-xs text-muted-foreground">
+                      Unassigned
+                    </span>
                   )}
                 </div>
               </div>
@@ -538,7 +608,9 @@ export default function TicketDetailPage() {
                   </span>
                 </div>
                 <div className="ml-5">
-                  <span className="text-xs font-mono">{formatAbsoluteTime(ticket.createdAt)}</span>
+                  <span className="text-xs font-mono">
+                    {formatAbsoluteTime(ticket.createdAt)}
+                  </span>
                 </div>
               </div>
 
@@ -550,7 +622,9 @@ export default function TicketDetailPage() {
                   </span>
                 </div>
                 <div className="ml-5">
-                  <span className="text-xs font-mono">{formatAbsoluteTime(ticket.updatedAt)}</span>
+                  <span className="text-xs font-mono">
+                    {formatAbsoluteTime(ticket.updatedAt)}
+                  </span>
                 </div>
               </div>
 

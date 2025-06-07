@@ -2,6 +2,8 @@ package graphql
 
 import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/utils/mrkdwn"
 )
 
 // This file will not be regenerated automatically.
@@ -10,12 +12,21 @@ import (
 
 // Resolver serves as dependency injection point for the application.
 type Resolver struct {
-	repo interfaces.Repository
+	repo         interfaces.Repository
+	slackService *slack.Service
+	mrkdwnConv   *mrkdwn.Converter
 }
 
 // NewResolver creates a new resolver instance.
-func NewResolver(repo interfaces.Repository) *Resolver {
+func NewResolver(repo interfaces.Repository, slackService *slack.Service) *Resolver {
+	var mrkdwnConv *mrkdwn.Converter
+	if slackService != nil {
+		mrkdwnConv = mrkdwn.NewConverter(slackService)
+	}
+
 	return &Resolver{
-		repo: repo,
+		repo:         repo,
+		slackService: slackService,
+		mrkdwnConv:   mrkdwnConv,
 	}
 }

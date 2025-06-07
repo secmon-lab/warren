@@ -114,6 +114,7 @@ func cmdDev() *cli.Command {
 				server.WithSlackVerifier(nil), // No verifier needed for dev mode
 				server.WithGraphQLRepo(repo),
 				server.WithGraphiQL(true),
+				server.WithSlackService(slackSvc),
 			}
 
 			// Add AuthUseCase if authentication options are provided
