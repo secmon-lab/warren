@@ -173,5 +173,10 @@ func toolCallToText(ctx context.Context, llmClient gollem.LLMClient, spec *golle
 		return defaultMsg
 	}
 
+	if len(response.Texts) == 0 {
+		errs.Handle(ctx, eb.New("no response"))
+		return defaultMsg
+	}
+
 	return response.Texts[0]
 }
