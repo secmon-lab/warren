@@ -346,12 +346,12 @@ func TestConverter_DateFormatting(t *testing.T) {
 		{
 			name:     "Date format with fallback text",
 			input:    "<!date^1697250654^{date_long}|October 14, 2023>",
-			expected: "2023-10-14 11:30:54",
+			expected: "2023-10-14 02:30:54",
 		},
 		{
 			name:     "Date format with both link and fallback",
 			input:    "<!date^1697250654^{time}^https://example.com|12:30 PM>",
-			expected: "[11:30 AM](https://example.com|12:30 PM)",
+			expected: "[2:30 AM](https://example.com|12:30 PM)",
 		},
 	}
 

@@ -228,21 +228,24 @@ func (c *Converter) renderDateFormat(node *dateFormatNode) string {
 
 // formatDate formats a timestamp according to Slack date format tokens
 func formatDate(t time.Time, format string) string {
+	// Convert to UTC to ensure consistent behavior across different timezones
+	utc := t.UTC()
+
 	switch format {
 	case "{date_num}":
-		return t.Format("2006-01-02")
+		return utc.Format("2006-01-02")
 	case "{date}":
-		return t.Format("January 2, 2006")
+		return utc.Format("January 2, 2006")
 	case "{date_short}":
-		return t.Format("Jan 2, 2006")
+		return utc.Format("Jan 2, 2006")
 	case "{date_long}":
-		return t.Format("Monday, January 2, 2006")
+		return utc.Format("Monday, January 2, 2006")
 	case "{time}":
-		return t.Format("3:04 PM")
+		return utc.Format("3:04 PM")
 	case "{time_secs}":
-		return t.Format("3:04:05 PM")
+		return utc.Format("3:04:05 PM")
 	default:
-		// For unknown formats or combinations, use ISO format
-		return t.Format("2006-01-02 15:04:05")
+		// For unknown formats or combinations, use ISO format in UTC
+		return utc.Format("2006-01-02 15:04:05")
 	}
 }
