@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"sync"
 	"time"
@@ -33,7 +34,8 @@ type RateLimitedUpdater struct {
 	mu          sync.RWMutex
 
 	// Rate limiting configuration
-	interval time.Duration
+	interval      time.Duration
+	retryInterval time.Duration // Base interval for exponential backoff
 }
 
 // UpdaterOption represents a configuration option for RateLimitedUpdater
@@ -46,12 +48,20 @@ func WithInterval(interval time.Duration) UpdaterOption {
 	}
 }
 
+// WithRetryInterval sets the base retry interval for exponential backoff
+func WithRetryInterval(interval time.Duration) UpdaterOption {
+	return func(r *RateLimitedUpdater) {
+		r.retryInterval = interval
+	}
+}
+
 // NewRateLimitedUpdater creates a new rate-limited updater with optional configurations
 func NewRateLimitedUpdater(client interfaces.SlackClient, opts ...UpdaterOption) AlertUpdater {
 	r := &RateLimitedUpdater{
-		client:      client,
-		requestChan: make(chan *AlertUpdateRequest, 10), // Short buffer to prevent blocking
-		interval:    2 * time.Second,                    // Default: 30 requests/min with safety margin
+		client:        client,
+		requestChan:   make(chan *AlertUpdateRequest, 10), // Short buffer to prevent blocking
+		interval:      2 * time.Second,                    // Default: 30 requests/min with safety margin
+		retryInterval: 1 * time.Second,                    // Default: 1 second base for exponential backoff
 	}
 
 	// Apply options
@@ -156,7 +166,7 @@ func (r *RateLimitedUpdater) processRequest(ctx context.Context, request *AlertU
 		if r.isRateLimitError(err) {
 			waitTime := r.extractRetryAfter(err)
 			if waitTime == 0 {
-				waitTime = time.Duration(attempt) * time.Second // exponential backoff fallback
+				waitTime = time.Duration(attempt) * r.retryInterval // exponential backoff fallback
 			}
 
 			logger.Warn("rate limited, waiting before retry",
@@ -194,20 +204,41 @@ func (r *RateLimitedUpdater) processRequest(ctx context.Context, request *AlertU
 
 // isRateLimitError checks if the error is a rate limiting error
 func (r *RateLimitedUpdater) isRateLimitError(err error) bool {
-	if slackErr, ok := err.(*slack.SlackErrorResponse); ok {
+	// First check for RateLimitedError (most specific and standard)
+	var rateLimitErr *slack.RateLimitedError
+	if errors.As(err, &rateLimitErr) {
+		return true
+	}
+
+	// Fallback to SlackErrorResponse
+	var slackErr *slack.SlackErrorResponse
+	if errors.As(err, &slackErr) {
 		return slackErr.Err == "rate_limited"
 	}
+
 	return false
 }
 
 // extractRetryAfter extracts the retry-after duration from a rate limit error
 func (r *RateLimitedUpdater) extractRetryAfter(err error) time.Duration {
-	if slackErr, ok := err.(*slack.SlackErrorResponse); ok {
-		if retryAfterStr := slackErr.ResponseMetadata.Messages[0]; retryAfterStr != "" {
-			if seconds, parseErr := strconv.Atoi(retryAfterStr); parseErr == nil {
-				return time.Duration(seconds) * time.Second
+	// First check for RateLimitedError which has parsed RetryAfter field
+	var rateLimitErr *slack.RateLimitedError
+	if errors.As(err, &rateLimitErr) {
+		return rateLimitErr.RetryAfter
+	}
+
+	// Fallback to manual parsing from SlackErrorResponse
+	var slackErr *slack.SlackErrorResponse
+	if errors.As(err, &slackErr) {
+		// Safely check if Messages slice has elements
+		if len(slackErr.ResponseMetadata.Messages) > 0 {
+			if retryAfterStr := slackErr.ResponseMetadata.Messages[0]; retryAfterStr != "" {
+				if seconds, parseErr := strconv.Atoi(retryAfterStr); parseErr == nil {
+					return time.Duration(seconds) * time.Second
+				}
 			}
 		}
 	}
+
 	return 0
 }

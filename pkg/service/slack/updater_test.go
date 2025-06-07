@@ -180,12 +180,9 @@ func TestRateLimitedUpdater_RateLimitError_Retry(t *testing.T) {
 		UpdateMessageContextFunc: func(ctx context.Context, channelID, timestamp string, options ...slack_sdk.MsgOption) (string, string, string, error) {
 			callCount++
 			if callCount <= 2 {
-				// Return rate limit error for first 2 calls
-				return "", "", "", &slack_sdk.SlackErrorResponse{
-					Err: "rate_limited",
-					ResponseMetadata: slack_sdk.ResponseMetadata{
-						Messages: []string{"1"}, // Retry after 1 second
-					},
+				// Return RateLimitedError for first 2 calls (modern slack-go/slack approach)
+				return "", "", "", &slack_sdk.RateLimitedError{
+					RetryAfter: 1 * time.Second,
 				}
 			}
 			// Success on 3rd call
@@ -193,8 +190,10 @@ func TestRateLimitedUpdater_RateLimitError_Retry(t *testing.T) {
 		},
 	}
 
-	// Use fast interval for testing
-	updater := slack.NewRateLimitedUpdater(mockClient, slack.WithInterval(100*time.Millisecond))
+	// Use fast interval for testing with fast retry interval too
+	updater := slack.NewRateLimitedUpdater(mockClient,
+		slack.WithInterval(1*time.Millisecond),
+		slack.WithRetryInterval(10*time.Millisecond))
 
 	testAlert := alert.Alert{
 		ID:     types.AlertID("test-alert-1"),
@@ -208,11 +207,12 @@ func TestRateLimitedUpdater_RateLimitError_Retry(t *testing.T) {
 		},
 	}
 
+	// Mock returns 1 second retry-after, but we'll use 10ms retry interval instead for exponential backoff fallback
 	start := time.Now()
 	updater.UpdateAlert(ctx, testAlert)
 
-	// Wait for processing to complete (including retries)
-	time.Sleep(3 * time.Second) // Still need time for the 1s retry-after waits
+	// Wait for processing to complete (including retries with actual 1s retry-after from mock)
+	time.Sleep(3 * time.Second) // Still need time for the 1s retry-after waits from RateLimitedError
 	duration := time.Since(start)
 
 	// Should have been called 3 times (2 failures + 1 success)
@@ -246,4 +246,141 @@ func TestRateLimitedUpdater_NoSlackThread(t *testing.T) {
 	// Should not call UpdateMessage
 	calls := mockClient.UpdateMessageContextCalls()
 	gt.Number(t, len(calls)).Equal(0)
+}
+
+func TestRateLimitedUpdater_RateLimitError_LegacyFormat(t *testing.T) {
+	ctx := context.Background()
+
+	callCount := 0
+	mockClient := &mock.SlackClientMock{
+		UpdateMessageContextFunc: func(ctx context.Context, channelID, timestamp string, options ...slack_sdk.MsgOption) (string, string, string, error) {
+			callCount++
+			if callCount <= 2 {
+				// Return legacy SlackErrorResponse format
+				return "", "", "", &slack_sdk.SlackErrorResponse{
+					Err: "rate_limited",
+					ResponseMetadata: slack_sdk.ResponseMetadata{
+						Messages: []string{"1"}, // Retry after 1 second
+					},
+				}
+			}
+			// Success on 3rd call
+			return channelID, timestamp, "test-message-ts", nil
+		},
+	}
+
+	// Use fast interval for testing with fast retry interval too
+	updater := slack.NewRateLimitedUpdater(mockClient,
+		slack.WithInterval(1*time.Millisecond),
+		slack.WithRetryInterval(10*time.Millisecond))
+
+	testAlert := alert.Alert{
+		ID:     types.AlertID("test-alert-1"),
+		Schema: "test.v1",
+		Metadata: alert.Metadata{
+			Title: "Test Alert",
+		},
+		SlackThread: &model.Thread{
+			ChannelID: "C1234567890",
+			ThreadID:  "1234567890.123456",
+		},
+	}
+
+	start := time.Now()
+	updater.UpdateAlert(ctx, testAlert)
+
+	// Wait for processing to complete (including retries)
+	time.Sleep(3 * time.Second) // Still need time for the 1s retry-after waits from Messages[0]
+	duration := time.Since(start)
+
+	// Should have been called 3 times (2 failures + 1 success)
+	calls := mockClient.UpdateMessageContextCalls()
+	gt.Number(t, len(calls)).Equal(3)
+
+	// Should have taken some time due to retries (at least 2 seconds for 2 retries)
+	gt.Number(t, duration.Milliseconds()).Greater(int64(2000))
+}
+
+func TestRateLimitedUpdater_RateLimitError_EmptyMessages(t *testing.T) {
+	ctx := context.Background()
+
+	mockClient := &mock.SlackClientMock{
+		UpdateMessageContextFunc: func(ctx context.Context, channelID, timestamp string, options ...slack_sdk.MsgOption) (string, string, string, error) {
+			// Return SlackErrorResponse with empty Messages (should not panic)
+			return "", "", "", &slack_sdk.SlackErrorResponse{
+				Err: "rate_limited",
+				ResponseMetadata: slack_sdk.ResponseMetadata{
+					Messages: []string{}, // Empty messages array
+				},
+			}
+		},
+	}
+
+	// Use fast interval for testing with fast retry interval too
+	updater := slack.NewRateLimitedUpdater(mockClient,
+		slack.WithInterval(1*time.Millisecond),
+		slack.WithRetryInterval(10*time.Millisecond))
+
+	testAlert := alert.Alert{
+		ID:     types.AlertID("test-alert-1"),
+		Schema: "test.v1",
+		Metadata: alert.Metadata{
+			Title: "Test Alert",
+		},
+		SlackThread: &model.Thread{
+			ChannelID: "C1234567890",
+			ThreadID:  "1234567890.123456",
+		},
+	}
+
+	updater.UpdateAlert(ctx, testAlert)
+
+	// Wait for processing to complete (exponential backoff: 10ms + 20ms + 30ms)
+	time.Sleep(100 * time.Millisecond)
+
+	// Should have been called 3 times (max retries)
+	calls := mockClient.UpdateMessageContextCalls()
+	gt.Number(t, len(calls)).Equal(3)
+}
+
+func TestRateLimitedUpdater_RateLimitError_NilMessages(t *testing.T) {
+	ctx := context.Background()
+
+	mockClient := &mock.SlackClientMock{
+		UpdateMessageContextFunc: func(ctx context.Context, channelID, timestamp string, options ...slack_sdk.MsgOption) (string, string, string, error) {
+			// Return SlackErrorResponse with nil Messages (should not panic)
+			return "", "", "", &slack_sdk.SlackErrorResponse{
+				Err: "rate_limited",
+				ResponseMetadata: slack_sdk.ResponseMetadata{
+					Messages: nil, // Nil messages
+				},
+			}
+		},
+	}
+
+	// Use fast interval for testing with fast retry interval too
+	updater := slack.NewRateLimitedUpdater(mockClient,
+		slack.WithInterval(1*time.Millisecond),
+		slack.WithRetryInterval(10*time.Millisecond))
+
+	testAlert := alert.Alert{
+		ID:     types.AlertID("test-alert-1"),
+		Schema: "test.v1",
+		Metadata: alert.Metadata{
+			Title: "Test Alert",
+		},
+		SlackThread: &model.Thread{
+			ChannelID: "C1234567890",
+			ThreadID:  "1234567890.123456",
+		},
+	}
+
+	updater.UpdateAlert(ctx, testAlert)
+
+	// Wait for processing to complete (exponential backoff: 10ms + 20ms + 30ms)
+	time.Sleep(100 * time.Millisecond)
+
+	// Should have been called 3 times (max retries)
+	calls := mockClient.UpdateMessageContextCalls()
+	gt.Number(t, len(calls)).Equal(3)
 }

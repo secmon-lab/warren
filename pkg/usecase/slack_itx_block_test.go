@@ -123,7 +123,9 @@ func TestSlackActionAckAlert(t *testing.T) {
 
 	// Use fast interval for testing
 	slackSvc, err := slack_svc.New(slackMock, "#test-channel",
-		slack_svc.WithUpdaterOptions(slack_svc.WithInterval(1*time.Millisecond)))
+		slack_svc.WithUpdaterOptions(
+			slack_svc.WithInterval(1*time.Millisecond),
+			slack_svc.WithRetryInterval(1*time.Millisecond)))
 	gt.NoError(t, err)
 
 	// Create usecase instance
@@ -280,7 +282,9 @@ func TestSlackActionAckList(t *testing.T) {
 
 	// Use fast interval for testing
 	slackSvc, err := slack_svc.New(slackMock, "#test-channel",
-		slack_svc.WithUpdaterOptions(slack_svc.WithInterval(1*time.Millisecond)))
+		slack_svc.WithUpdaterOptions(
+			slack_svc.WithInterval(1*time.Millisecond),
+			slack_svc.WithRetryInterval(1*time.Millisecond)))
 	gt.NoError(t, err)
 
 	// Create usecase instance
