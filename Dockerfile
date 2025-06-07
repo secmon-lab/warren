@@ -4,13 +4,13 @@ WORKDIR /app/frontend
 
 # Copy package files first for better caching
 COPY frontend/package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy source files and build
 COPY frontend/ ./
 RUN npm run build
 
-# Go build stage  
+# Go build stage
 FROM golang:1.24-alpine AS build-go
 ENV CGO_ENABLED=0
 ARG BUILD_VERSION
