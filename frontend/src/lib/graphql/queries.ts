@@ -3,32 +3,35 @@ import { gql } from "@apollo/client";
 export const GET_TICKETS = gql`
   query GetTickets($statuses: [String!], $offset: Int, $limit: Int) {
     tickets(statuses: $statuses, offset: $offset, limit: $limit) {
-      id
-      status
-      title
-      description
-      conclusion
-      reason
-      assignee {
+      tickets {
         id
-        name
-      }
-      createdAt
-      updatedAt
-      alerts {
-        id
+        status
         title
-        createdAt
-      }
-      comments {
-        id
-        content
-        user {
+        description
+        conclusion
+        reason
+        assignee {
           id
           name
         }
         createdAt
+        updatedAt
+        alerts {
+          id
+          title
+          createdAt
+        }
+        comments {
+          id
+          content
+          user {
+            id
+            name
+          }
+          createdAt
+        }
       }
+      totalCount
     }
   }
 `;
@@ -151,7 +154,11 @@ export const UPDATE_MULTIPLE_TICKETS_STATUS = gql`
 `;
 
 export const UPDATE_TICKET_CONCLUSION = gql`
-  mutation UpdateTicketConclusion($id: ID!, $conclusion: String!, $reason: String!) {
+  mutation UpdateTicketConclusion(
+    $id: ID!
+    $conclusion: String!
+    $reason: String!
+  ) {
     updateTicketConclusion(id: $id, conclusion: $conclusion, reason: $reason) {
       id
       conclusion

@@ -58,9 +58,12 @@ func TestGraphQLQueries(t *testing.T) {
 			Query: `
 				query {
 					tickets {
-						id
-						status
-						createdAt
+						tickets {
+							id
+							status
+							createdAt
+						}
+						totalCount
 					}
 				}
 			`,
@@ -73,7 +76,10 @@ func TestGraphQLQueries(t *testing.T) {
 		data, ok := resp.Data.(map[string]interface{})
 		gt.True(t, ok)
 
-		tickets, ok := data["tickets"].([]interface{})
+		ticketsResponse, ok := data["tickets"].(map[string]interface{})
+		gt.True(t, ok)
+
+		tickets, ok := ticketsResponse["tickets"].([]interface{})
 		gt.True(t, ok)
 		gt.Array(t, tickets).Length(1)
 

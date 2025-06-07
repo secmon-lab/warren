@@ -2,10 +2,12 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 
 	"cloud.google.com/go/firestore"
+	"cloud.google.com/go/firestore/apiv1/firestorepb"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -791,6 +793,50 @@ func (r *Firestore) GetTicketsByStatus(ctx context.Context, statuses []types.Tic
 	}
 
 	return tickets, nil
+}
+
+func (r *Firestore) CountTicketsByStatus(ctx context.Context, statuses []types.TicketStatus) (int, error) {
+	// If no statuses specified, count all tickets
+	var query firestore.Query
+	if len(statuses) > 0 {
+		// Use "in" operator to match any of the specified statuses
+		query = r.db.Collection(collectionTickets).Where("Status", "in", statuses)
+	} else {
+		query = r.db.Collection(collectionTickets).Query
+	}
+
+	// Use the count aggregation query for efficiency
+	countQuery := query.NewAggregationQuery().WithCount("count")
+	result, err := countQuery.Get(ctx)
+	if err != nil {
+		return 0, goerr.Wrap(err, "failed to get ticket count")
+	}
+
+	// The Firestore client library for Go typically returns int64 for count aggregations.
+	// See: https://pkg.go.dev/cloud.google.com/go/firestore#AggregationResult
+	// It's good practice to handle the specific expected type.
+	countVal, ok := result["count"]
+	if !ok {
+		return 0, goerr.New("count alias not found in aggregation result")
+	}
+
+	switch v := countVal.(type) {
+	case int64:
+		return int(v), nil
+	// It's less common for *firestorepb.Value to appear here directly from AggregationResult values,
+	// but if it does, this handles it by checking the inner value type.
+	case *firestorepb.Value:
+		if v != nil && v.ValueType != nil {
+			if _, okType := v.ValueType.(*firestorepb.Value_IntegerValue); okType {
+				return int(v.GetIntegerValue()), nil
+			}
+			return 0, goerr.New("firestorepb.Value from count is not an integer type", goerr.V("value_type", fmt.Sprintf("%T", v.ValueType)))
+		}
+		return 0, goerr.New("count value is a nil or invalid *firestorepb.Value")
+	default:
+		// This case helps catch unexpected types if Firestore's behavior changes or if there's a misunderstanding.
+		return 0, goerr.New("unexpected count value type from Firestore aggregation", goerr.V("type", fmt.Sprintf("%T", v)), goerr.V("value", v))
+	}
 }
 
 func (r *Firestore) GetTicketsBySpan(ctx context.Context, begin, end time.Time) ([]*ticket.Ticket, error) {

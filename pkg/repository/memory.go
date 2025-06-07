@@ -516,37 +516,64 @@ func (r *Memory) GetTicketsByStatus(ctx context.Context, statuses []types.Ticket
 
 	var tickets []*ticket.Ticket
 	for _, t := range r.tickets {
-		// If no statuses specified, include all tickets
-		if len(statuses) == 0 {
-			tickets = append(tickets, t)
-			continue
-		}
-
-		// Check if ticket status matches any of the specified statuses
-		for _, status := range statuses {
-			if t.Status == status {
-				tickets = append(tickets, t)
-				break
+		// Filter by status if specified
+		if len(statuses) > 0 {
+			matched := false
+			for _, status := range statuses {
+				if t.Status == status {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
 			}
 		}
+		tickets = append(tickets, t)
 	}
 
-	// Sort by CreatedAt in descending order (newest first)
+	// Sort tickets by CreatedAt in descending order (newest first)
 	sort.Slice(tickets, func(i, j int) bool {
 		return tickets[i].CreatedAt.After(tickets[j].CreatedAt)
 	})
 
-	// Apply offset
+	// Apply offset and limit
 	if offset > 0 && offset < len(tickets) {
 		tickets = tickets[offset:]
+	} else if offset >= len(tickets) {
+		return []*ticket.Ticket{}, nil
 	}
 
-	// Apply limit if specified
 	if limit > 0 && limit < len(tickets) {
 		tickets = tickets[:limit]
 	}
 
 	return tickets, nil
+}
+
+func (r *Memory) CountTicketsByStatus(ctx context.Context, statuses []types.TicketStatus) (int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	count := 0
+	for _, t := range r.tickets {
+		// Filter by status if specified
+		if len(statuses) > 0 {
+			matched := false
+			for _, status := range statuses {
+				if t.Status == status {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+		count++
+	}
+
+	return count, nil
 }
 
 func (r *Memory) GetTicketsBySpan(ctx context.Context, start, end time.Time) ([]*ticket.Ticket, error) {

@@ -53,7 +53,7 @@ export default function TicketsPage() {
   });
 
   // Sort tickets by createdAt in descending order (newest first)
-  const tickets: Ticket[] = [...(ticketsData?.tickets || [])].sort(
+  const tickets: Ticket[] = [...(ticketsData?.tickets?.tickets || [])].sort(
     (a: Ticket, b: Ticket) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
@@ -91,7 +91,9 @@ export default function TicketsPage() {
     );
   }
 
-  const totalPages = Math.ceil((ticketsData?.totalCount || 0) / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(
+    (ticketsData?.tickets?.totalCount || 0) / ITEMS_PER_PAGE
+  );
 
   return (
     <div className="space-y-6">
@@ -164,8 +166,12 @@ export default function TicketsPage() {
                             <div className="mt-3">
                               <div className="flex items-start gap-3 flex-wrap">
                                 {ticket.conclusion && (
-                                  <Badge variant="outline" className="font-normal">
-                                    {ALERT_CONCLUSION_LABELS[ticket.conclusion as AlertConclusion] || ticket.conclusion}
+                                  <Badge
+                                    variant="outline"
+                                    className="font-normal">
+                                    {ALERT_CONCLUSION_LABELS[
+                                      ticket.conclusion as AlertConclusion
+                                    ] || ticket.conclusion}
                                   </Badge>
                                 )}
                                 {ticket.reason && (
