@@ -148,3 +148,14 @@ export const UPDATE_MULTIPLE_TICKETS_STATUS = gql`
     }
   }
 `;
+
+export const UPDATE_TICKET_CONCLUSION = gql`
+  mutation UpdateTicketConclusion($id: ID!, $conclusion: String!, $reason: String!) {
+    updateTicketConclusion(id: $id, conclusion: $conclusion, reason: $reason) {
+      id
+      conclusion
+      reason
+      updatedAt
+    }
+  }
+`;

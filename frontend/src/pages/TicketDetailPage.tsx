@@ -62,6 +62,7 @@ import {
   Check,
   ExternalLink,
 } from "lucide-react";
+import { EditConclusionModal } from "@/components/ui/edit-conclusion-modal";
 
 const ALERTS_PER_PAGE = 5;
 
@@ -72,6 +73,7 @@ export default function TicketDetailPage() {
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [alertsCurrentPage, setAlertsCurrentPage] = useState(1);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isEditConclusionModalOpen, setIsEditConclusionModalOpen] = useState(false);
 
   const errorToast = useErrorToast();
   const successToast = useSuccessToast();
@@ -210,6 +212,10 @@ export default function TicketDetailPage() {
     }
   };
 
+  const handleEditConclusion = () => {
+    setIsEditConclusionModalOpen(true);
+  };
+
   if (!id) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -333,7 +339,7 @@ export default function TicketDetailPage() {
           )}
 
           {/* Resolve Information Section */}
-          <ResolveInfo ticket={ticket} />
+          <ResolveInfo ticket={ticket} onEditConclusion={handleEditConclusion} />
 
           {/* Comments Section */}
           <Card>
@@ -764,6 +770,15 @@ export default function TicketDetailPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Conclusion Modal */}
+      <EditConclusionModal
+        isOpen={isEditConclusionModalOpen}
+        onClose={() => setIsEditConclusionModalOpen(false)}
+        ticketId={ticket.id}
+        currentConclusion={ticket.conclusion}
+        currentReason={ticket.reason}
+      />
     </div>
   );
 }

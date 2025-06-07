@@ -62,6 +62,7 @@ type Query {
 type Mutation {
   updateTicketStatus(id: ID!, status: String!): Ticket!
   updateMultipleTicketsStatus(ids: [ID!]!, status: String!): [Ticket!]!
+  updateTicketConclusion(id: ID!, conclusion: String!, reason: String!): Ticket!
 }
 
 schema {
