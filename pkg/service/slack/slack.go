@@ -47,6 +47,8 @@ type Service struct {
 	// User profile cache
 	profileCache      map[string]*userProfileCache
 	profileCacheMutex sync.RWMutex
+	// Singleton rate-limited updater shared across all threads
+	rateLimitedUpdater AlertUpdater
 }
 
 type slackMetadata struct {
@@ -65,13 +67,29 @@ func (x slackMetadata) ToMsgURL(channelID, threadID string) string {
 	return fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", x.enterpriseID, channelID, threadID)
 }
 
-func New(client interfaces.SlackClient, channelID string) (*Service, error) {
+// ServiceOption represents a configuration option for Service
+type ServiceOption func(*Service)
+
+// WithUpdaterOptions sets options for the rate-limited updater
+func WithUpdaterOptions(opts ...UpdaterOption) ServiceOption {
+	return func(s *Service) {
+		s.rateLimitedUpdater = NewRateLimitedUpdater(s.client, opts...)
+	}
+}
+
+func New(client interfaces.SlackClient, channelID string, opts ...ServiceOption) (*Service, error) {
 	s := &Service{
-		channelID:       channelID,
-		client:          client,
-		iconCache:       make(map[string]*userIconCache),
-		iconCacheExpiry: time.Hour, // 1時間でキャッシュ更新
-		profileCache:    make(map[string]*userProfileCache),
+		channelID:          channelID,
+		client:             client,
+		iconCache:          make(map[string]*userIconCache),
+		iconCacheExpiry:    time.Hour, // 1時間でキャッシュ更新
+		profileCache:       make(map[string]*userProfileCache),
+		rateLimitedUpdater: NewRateLimitedUpdater(client), // Default updater
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(s)
 	}
 
 	authTest, err := s.client.AuthTest()
@@ -93,7 +111,9 @@ func NewTestService(t *testing.T) *Service {
 	envs := test.NewEnvVars(t, "TEST_SLACK_CHANNEL_ID", "TEST_SLACK_OAUTH_TOKEN")
 	client := slack.New(envs.Get("TEST_SLACK_OAUTH_TOKEN"))
 
-	svc, err := New(client, envs.Get("TEST_SLACK_CHANNEL_ID"))
+	// Use fast interval for testing
+	svc, err := New(client, envs.Get("TEST_SLACK_CHANNEL_ID"),
+		WithUpdaterOptions(WithInterval(100*time.Millisecond)))
 	gt.NoError(t, err).Required()
 
 	return svc
@@ -113,10 +133,11 @@ func (x *Service) TeamID() string {
 
 func (x *Service) NewThread(thread model.Thread) *ThreadService {
 	return &ThreadService{
-		slackMetadata: x.slackMetadata,
-		channelID:     thread.ChannelID,
-		threadID:      thread.ThreadID,
-		client:        x.client,
+		slackMetadata:      x.slackMetadata,
+		channelID:          thread.ChannelID,
+		threadID:           thread.ThreadID,
+		client:             x.client,
+		rateLimitedUpdater: x.rateLimitedUpdater,
 	}
 }
 
@@ -147,10 +168,11 @@ func (x *Service) PostAlert(ctx context.Context, alert alert.Alert) (*ThreadServ
 	}
 
 	thread := &ThreadService{
-		channelID:     channelID,
-		threadID:      timestamp,
-		client:        x.client,
-		slackMetadata: x.slackMetadata,
+		channelID:          channelID,
+		threadID:           timestamp,
+		client:             x.client,
+		rateLimitedUpdater: x.rateLimitedUpdater,
+		slackMetadata:      x.slackMetadata,
 	}
 
 	var buf bytes.Buffer
@@ -168,9 +190,10 @@ func (x *Service) PostAlert(ctx context.Context, alert alert.Alert) (*ThreadServ
 }
 
 type ThreadService struct {
-	channelID string
-	threadID  string
-	client    interfaces.SlackClient
+	channelID          string
+	threadID           string
+	client             interfaces.SlackClient
+	rateLimitedUpdater AlertUpdater
 	slackMetadata
 }
 
@@ -186,19 +209,8 @@ func (x *ThreadService) Entity() *model.Thread {
 }
 
 func (x *ThreadService) UpdateAlert(ctx context.Context, alert alert.Alert) error {
-	blocks := buildAlertBlocks(alert)
-
-	_, _, _, err := x.client.UpdateMessageContext(
-		ctx,
-		alert.SlackThread.ChannelID,
-		alert.SlackThread.ThreadID,
-		slack.MsgOptionBlocks(blocks...),
-	)
-	if err != nil {
-		return goerr.Wrap(err, "failed to update message to slack", goerr.V("channelID", x.channelID), goerr.V("threadID", x.threadID), goerr.V("blocks", blocks))
-	}
-
-	return nil
+	x.rateLimitedUpdater.UpdateAlert(ctx, alert)
+	return nil // Return immediately, processing is done asynchronously
 }
 
 func (x *ThreadService) PostTicket(ctx context.Context, ticket ticket.Ticket, alerts alert.Alerts) (string, error) {
