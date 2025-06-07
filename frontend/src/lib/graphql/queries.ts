@@ -8,6 +8,7 @@ export const GET_TICKETS = gql`
       title
       description
       conclusion
+      reason
       assignee {
         id
         name
@@ -144,6 +145,17 @@ export const UPDATE_MULTIPLE_TICKETS_STATUS = gql`
     updateMultipleTicketsStatus(ids: $ids, status: $status) {
       id
       status
+      updatedAt
+    }
+  }
+`;
+
+export const UPDATE_TICKET_CONCLUSION = gql`
+  mutation UpdateTicketConclusion($id: ID!, $conclusion: String!, $reason: String!) {
+    updateTicketConclusion(id: $id, conclusion: $conclusion, reason: $reason) {
+      id
+      conclusion
+      reason
       updatedAt
     }
   }

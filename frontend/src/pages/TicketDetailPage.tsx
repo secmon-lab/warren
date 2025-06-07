@@ -62,6 +62,7 @@ import {
   Check,
   ExternalLink,
 } from "lucide-react";
+import { EditConclusionModal } from "@/components/ui/edit-conclusion-modal";
 
 const ALERTS_PER_PAGE = 5;
 
@@ -72,6 +73,7 @@ export default function TicketDetailPage() {
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [alertsCurrentPage, setAlertsCurrentPage] = useState(1);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isEditConclusionModalOpen, setIsEditConclusionModalOpen] = useState(false);
 
   const errorToast = useErrorToast();
   const successToast = useSuccessToast();
@@ -210,6 +212,10 @@ export default function TicketDetailPage() {
     }
   };
 
+  const handleEditConclusion = () => {
+    setIsEditConclusionModalOpen(true);
+  };
+
   if (!id) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -333,7 +339,7 @@ export default function TicketDetailPage() {
           )}
 
           {/* Resolve Information Section */}
-          <ResolveInfo ticket={ticket} />
+          <ResolveInfo ticket={ticket} onEditConclusion={handleEditConclusion} />
 
           {/* Comments Section */}
           <Card>
@@ -502,30 +508,50 @@ export default function TicketDetailPage() {
               <CardTitle>Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-2 text-sm">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Assignee:</span>
-                {ticket.assignee ? (
-                  <UserWithAvatar
-                    userID={ticket.assignee.id}
-                    fallback={ticket.assignee.name}
-                    avatarSize="sm"
-                  />
-                ) : (
-                  <span>Unassigned</span>
-                )}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <User className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
+                    Assignee
+                  </span>
+                </div>
+                <div className="ml-5">
+                  {ticket.assignee ? (
+                    <div className="text-xs">
+                      <UserWithAvatar
+                        userID={ticket.assignee.id}
+                        fallback={ticket.assignee.name}
+                        avatarSize="sm"
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Unassigned</span>
+                  )}
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Created:</span>
-                <span>{formatAbsoluteTime(ticket.createdAt)}</span>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
+                    Created
+                  </span>
+                </div>
+                <div className="ml-5">
+                  <span className="text-xs font-mono">{formatAbsoluteTime(ticket.createdAt)}</span>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Updated:</span>
-                <span>{formatAbsoluteTime(ticket.updatedAt)}</span>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
+                    Updated
+                  </span>
+                </div>
+                <div className="ml-5">
+                  <span className="text-xs font-mono">{formatAbsoluteTime(ticket.updatedAt)}</span>
+                </div>
               </div>
 
               <Separator />
@@ -744,6 +770,15 @@ export default function TicketDetailPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Conclusion Modal */}
+      <EditConclusionModal
+        isOpen={isEditConclusionModalOpen}
+        onClose={() => setIsEditConclusionModalOpen(false)}
+        ticketId={ticket.id}
+        currentConclusion={ticket.conclusion}
+        currentReason={ticket.reason}
+      />
     </div>
   );
 }

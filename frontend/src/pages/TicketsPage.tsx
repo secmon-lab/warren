@@ -19,6 +19,8 @@ import {
   TicketStatus,
   TICKET_STATUS_LABELS,
   TICKET_STATUS_COLORS,
+  AlertConclusion,
+  ALERT_CONCLUSION_LABELS,
 } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
 import { AlertCircle, MessageSquare, User, Clock } from "lucide-react";
@@ -132,7 +134,7 @@ export default function TicketsPage() {
                     <CardHeader className="pb-0">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-2">
+                          <div className="flex items-center gap-3 mb-2 flex-wrap">
                             <Badge
                               className={
                                 TICKET_STATUS_COLORS[
@@ -147,7 +149,7 @@ export default function TicketsPage() {
                               }
                             </Badge>
                             <CardTitle
-                              className="text-lg leading-tight truncate"
+                              className="text-lg leading-tight break-words min-w-0 flex-1"
                               title={
                                 ticket.title ||
                                 `Ticket ${ticket.id.slice(0, 8)}`
@@ -157,18 +159,23 @@ export default function TicketsPage() {
                             </CardTitle>
                           </div>
 
-                          {/* Show conclusion for resolved tickets */}
-                          {ticket.status === "resolved" &&
-                            ticket.conclusion && (
-                              <div className="mt-2">
-                                <p className="text-sm text-muted-foreground line-clamp-2">
-                                  <span className="font-medium text-foreground">
-                                    Conclusion:
-                                  </span>{" "}
-                                  {ticket.conclusion}
-                                </p>
+                          {/* Show conclusion and reason for resolved tickets */}
+                          {ticket.status === "resolved" && (
+                            <div className="mt-3">
+                              <div className="flex items-start gap-3 flex-wrap">
+                                {ticket.conclusion && (
+                                  <Badge variant="outline" className="font-normal">
+                                    {ALERT_CONCLUSION_LABELS[ticket.conclusion as AlertConclusion] || ticket.conclusion}
+                                  </Badge>
+                                )}
+                                {ticket.reason && (
+                                  <div className="text-sm text-muted-foreground leading-relaxed flex-1 min-w-0">
+                                    {ticket.reason}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
+                          )}
                         </div>
 
                         <div className="text-right text-sm text-muted-foreground shrink-0">
@@ -181,8 +188,8 @@ export default function TicketsPage() {
                     </CardHeader>
 
                     <CardContent className="pt-0 -mt-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                      <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div className="flex items-center gap-6 text-sm text-muted-foreground flex-wrap gap-y-2">
                           <div className="flex items-center gap-2">
                             <User className="h-4 w-4" />
                             {ticket.assignee ? (
@@ -213,8 +220,8 @@ export default function TicketsPage() {
                           </div>
                         </div>
 
-                        <div className="text-xs text-muted-foreground">
-                          #{ticket.id.slice(0, 8)}
+                        <div className="text-xs text-muted-foreground shrink-0">
+                          #{ticket.id}
                         </div>
                       </div>
                     </CardContent>

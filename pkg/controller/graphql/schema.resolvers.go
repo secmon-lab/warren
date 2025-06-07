@@ -149,6 +149,36 @@ func (r *mutationResolver) UpdateMultipleTicketsStatus(ctx context.Context, ids 
 	return tickets, nil
 }
 
+// UpdateTicketConclusion is the resolver for the updateTicketConclusion field.
+func (r *mutationResolver) UpdateTicketConclusion(ctx context.Context, id string, conclusion string, reason string) (*ticket.Ticket, error) {
+	t, err := r.repo.GetTicket(ctx, types.TicketID(id))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get ticket")
+	}
+
+	// Only allow updating conclusion for resolved tickets
+	if t.Status != types.TicketStatusResolved {
+		return nil, goerr.New("can only update conclusion for resolved tickets",
+			goerr.V("ticket_id", id),
+			goerr.V("current_status", t.Status))
+	}
+
+	// Validate conclusion value
+	alertConclusion := types.AlertConclusion(conclusion)
+	if err := alertConclusion.Validate(); err != nil {
+		return nil, goerr.Wrap(err, "invalid conclusion", goerr.V("conclusion", conclusion))
+	}
+
+	t.Conclusion = alertConclusion
+	t.Reason = reason
+
+	if err := r.repo.PutTicket(ctx, *t); err != nil {
+		return nil, goerr.Wrap(err, "failed to update ticket")
+	}
+
+	return t, nil
+}
+
 // Ticket is the resolver for the ticket field.
 func (r *queryResolver) Ticket(ctx context.Context, id string) (*ticket.Ticket, error) {
 	t, err := r.repo.GetTicket(ctx, types.TicketID(id))

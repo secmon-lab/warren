@@ -1,14 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { User, Bot, ShieldCheck, AlertTriangle, Info, Star } from 'lucide-react';
-import { Ticket } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import { User, Bot, ShieldCheck, AlertTriangle, Info, Star, Pencil } from 'lucide-react';
+import { Ticket, AlertConclusion, ALERT_CONCLUSION_LABELS } from '@/lib/types';
 
 interface ResolveInfoProps {
   ticket: Ticket;
+  onEditConclusion?: () => void;
 }
 
-export function ResolveInfo({ ticket }: ResolveInfoProps) {
+export function ResolveInfo({ ticket, onEditConclusion }: ResolveInfoProps) {
   const isResolved = ticket.status === 'resolved';
   const hasConclusion = ticket.conclusion || ticket.reason;
   const hasFinding = ticket.finding;
@@ -48,38 +49,96 @@ export function ResolveInfo({ ticket }: ResolveInfoProps) {
     }
   };
 
+  const getConclusionBadgeColor = (conclusion: string) => {
+    switch (conclusion) {
+      case 'true_positive':
+        return 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200';
+      case 'false_positive':
+        return 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200';
+      case 'unaffected':
+        return 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200';
+      case 'intended':
+        return 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200';
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Human Conclusion Section */}
-      {isResolved && hasConclusion && (
+      {isResolved && (
         <Card className="border-green-200 bg-green-50/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-green-800">
               <User className="h-5 w-5" />
-              Final Resolution
-              <Badge variant="outline" className="ml-auto text-xs bg-green-100 text-green-700 border-green-300">
-                Human Review
-              </Badge>
+              Human Review
+              
+              {/* Conclusion Badge in Header */}
+              {ticket.conclusion && (
+                <Badge 
+                  variant="outline" 
+                  className={`text-sm font-medium px-3 py-1 ${getConclusionBadgeColor(ticket.conclusion)}`}
+                >
+                  {ALERT_CONCLUSION_LABELS[ticket.conclusion as AlertConclusion]}
+                </Badge>
+              )}
+
+              <div className="ml-auto flex items-center gap-2">
+                {onEditConclusion && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onEditConclusion}
+                    className="h-7 px-2 bg-white hover:bg-green-100 border-green-300"
+                  >
+                    <Pencil className="h-3 w-3 mr-1" />
+                    Edit
+                  </Button>
+                )}
+              </div>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {ticket.conclusion && (
-              <div>
-                <label className="text-sm font-medium text-green-800">Conclusion</label>
-                <p className="text-sm text-green-700 mt-1 leading-relaxed">
-                  {ticket.conclusion}
+          
+          {hasConclusion ? (
+            <CardContent>
+              {ticket.reason && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-green-800">Reason</label>
+                  <div className="bg-white/70 border border-green-200 rounded-lg p-3">
+                    <p className="text-sm text-green-700 leading-relaxed whitespace-pre-wrap">
+                      {ticket.reason}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          ) : (
+            <CardContent>
+              <div className="text-center py-4">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <User className="h-5 w-5 text-green-600" />
+                </div>
+                <p className="text-sm text-green-600 mb-2 font-medium">
+                  No conclusion set
                 </p>
-              </div>
-            )}
-            {ticket.reason && (
-              <div>
-                <label className="text-sm font-medium text-green-800">Reason</label>
-                <p className="text-sm text-green-700 mt-1 leading-relaxed whitespace-pre-wrap">
-                  {ticket.reason}
+                <p className="text-xs text-green-500 mb-3">
+                  Add a conclusion to document the resolution.
                 </p>
+                {onEditConclusion && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onEditConclusion}
+                    className="bg-white hover:bg-green-100 border-green-300"
+                  >
+                    <Pencil className="h-3 w-3 mr-1" />
+                    Add Conclusion
+                  </Button>
+                )}
               </div>
-            )}
-          </CardContent>
+            </CardContent>
+          )}
         </Card>
       )}
 
@@ -90,15 +149,8 @@ export function ResolveInfo({ ticket }: ResolveInfoProps) {
             <CardTitle className="flex items-center gap-2 text-blue-800">
               <Bot className="h-5 w-5" />
               AI Analysis
-              <Badge variant="outline" className="ml-auto text-xs bg-blue-100 text-blue-700 border-blue-300">
-                AI Generated
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Severity */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-blue-800">Severity</label>
+              
+              {/* Severity Badge in Header */}
               <div className="flex items-center gap-2">
                 {getSeverityIcon(ticket.finding.severity)}
                 <Badge 
@@ -108,10 +160,13 @@ export function ResolveInfo({ ticket }: ResolveInfoProps) {
                   {ticket.finding.severity.toUpperCase()}
                 </Badge>
               </div>
-            </div>
 
-            <Separator className="bg-blue-200" />
-
+              <Badge variant="outline" className="ml-auto text-xs bg-blue-100 text-blue-700 border-blue-300">
+                AI Generated
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             {/* Summary */}
             {ticket.finding.summary && (
               <div>

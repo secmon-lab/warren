@@ -67,3 +67,24 @@ export const TICKET_STATUS_COLORS = {
   resolved: "bg-green-100 text-green-800",
   archived: "bg-gray-100 text-gray-800",
 } as const;
+
+// Alert conclusions
+export type AlertConclusion = 
+  | "intended"
+  | "unaffected" 
+  | "false_positive"
+  | "true_positive";
+
+export const ALERT_CONCLUSION_LABELS: Record<AlertConclusion, string> = {
+  intended: "👍 Intended",
+  unaffected: "🛡️ Unaffected",
+  false_positive: "🚫 False Positive",
+  true_positive: "🚨 True Positive",
+};
+
+export const ALERT_CONCLUSION_DESCRIPTIONS: Record<AlertConclusion, string> = {
+  intended: "The alert is intended behavior or configuration.",
+  unaffected: "The alert indicates actual attack or vulnerability, but it is no impact.",
+  false_positive: "The alert is not attack or impact on the system.",
+  true_positive: "The alert has actual impact on the system.",
+};
