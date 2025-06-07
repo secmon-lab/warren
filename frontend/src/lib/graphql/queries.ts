@@ -8,6 +8,7 @@ export const GET_TICKETS = gql`
       title
       description
       conclusion
+      reason
       assignee {
         id
         name

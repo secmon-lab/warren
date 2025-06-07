@@ -19,6 +19,8 @@ import {
   TicketStatus,
   TICKET_STATUS_LABELS,
   TICKET_STATUS_COLORS,
+  AlertConclusion,
+  ALERT_CONCLUSION_LABELS,
 } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
 import { AlertCircle, MessageSquare, User, Clock } from "lucide-react";
@@ -157,18 +159,23 @@ export default function TicketsPage() {
                             </CardTitle>
                           </div>
 
-                          {/* Show conclusion for resolved tickets */}
-                          {ticket.status === "resolved" &&
-                            ticket.conclusion && (
-                              <div className="mt-2">
-                                <p className="text-sm text-muted-foreground break-words">
-                                  <span className="font-medium text-foreground">
-                                    Conclusion:
-                                  </span>{" "}
-                                  {ticket.conclusion}
-                                </p>
+                          {/* Show conclusion and reason for resolved tickets */}
+                          {ticket.status === "resolved" && (
+                            <div className="mt-3">
+                              <div className="flex items-start gap-3 flex-wrap">
+                                {ticket.conclusion && (
+                                  <Badge variant="outline" className="font-normal">
+                                    {ALERT_CONCLUSION_LABELS[ticket.conclusion as AlertConclusion] || ticket.conclusion}
+                                  </Badge>
+                                )}
+                                {ticket.reason && (
+                                  <div className="text-sm text-muted-foreground leading-relaxed flex-1 min-w-0">
+                                    {ticket.reason}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
+                          )}
                         </div>
 
                         <div className="text-right text-sm text-muted-foreground shrink-0">
@@ -214,7 +221,7 @@ export default function TicketsPage() {
                         </div>
 
                         <div className="text-xs text-muted-foreground shrink-0">
-                          #{ticket.id.slice(0, 8)}
+                          #{ticket.id}
                         </div>
                       </div>
                     </CardContent>

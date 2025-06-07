@@ -1,7 +1,7 @@
 ---
 description: 
-globs: *.go
-alwaysApply: false
+globs: 
+alwaysApply: true
 ---
 # Implementation Plan
 
