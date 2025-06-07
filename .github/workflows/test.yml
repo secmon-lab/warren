@@ -1,6 +1,6 @@
 name: Unit test
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   testing:
@@ -8,11 +8,44 @@ jobs:
 
     steps:
       - name: Checkout upstream repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
-      - uses: actions/setup-go@v3
+
+      - uses: actions/setup-go@v5
         with:
           go-version-file: "go.mod"
-      - uses: google-github-actions/setup-gcloud@v0.5.0
-      - run: go test ./...
+          cache: true
+          cache-dependency-path: go.sum
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Explicitly restore Go module cache (supplement when using go-version-file)
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      # Generate mock and GraphQL code (accelerated with cache)
+      - name: Generate code
+        run: |
+          go install github.com/matryer/moq@latest
+          go install github.com/99designs/gqlgen@latest
+          go tool task mock graphql
+
+      # Run tests in parallel
+      - name: Run tests
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      # Upload coverage (optional)
+      - name: Upload coverage to Codecov
+        if: github.event_name == 'push'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          fail_ci_if_error: false
