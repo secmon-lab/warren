@@ -72,12 +72,20 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 			return nil, goerr.New("query_id parameter is required")
 		}
 		limit := 100
-		if l, ok := args["limit"].(int); ok {
-			limit = l
+		if l, ok := args["limit"].(float64); ok {
+			limit = int(l)
+		} else if args["limit"] != nil {
+			return nil, goerr.New("invalid limit parameter type",
+				goerr.V("type", fmt.Sprintf("%T", args["limit"])),
+				goerr.V("value", args["limit"]))
 		}
 		offset := 0
-		if o, ok := args["offset"].(int); ok {
-			offset = o
+		if o, ok := args["offset"].(float64); ok {
+			offset = int(o)
+		} else if args["offset"] != nil {
+			return nil, goerr.New("invalid offset parameter type",
+				goerr.V("type", fmt.Sprintf("%T", args["offset"])),
+				goerr.V("value", args["offset"]))
 		}
 		return x.getQueryResults(ctx, client, queryID, limit, offset)
 

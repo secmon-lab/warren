@@ -97,8 +97,12 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	// Add query parameters
 	q := req.URL.Query()
 	q.Add("ipAddress", ipAddress)
-	if maxAge, ok := args["maxAgeInDays"].(int); ok {
-		q.Add("maxAgeInDays", fmt.Sprintf("%d", maxAge))
+	if maxAge, ok := args["maxAgeInDays"].(float64); ok {
+		q.Add("maxAgeInDays", fmt.Sprintf("%d", int(maxAge)))
+	} else if args["maxAgeInDays"] != nil {
+		return nil, goerr.New("invalid maxAgeInDays parameter type",
+			goerr.V("type", fmt.Sprintf("%T", args["maxAgeInDays"])),
+			goerr.V("value", args["maxAgeInDays"]))
 	}
 	req.URL.RawQuery = q.Encode()
 

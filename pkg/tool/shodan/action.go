@@ -131,6 +131,10 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 
 		if limit, ok := args["limit"].(float64); ok {
 			queryParams.Set("limit", fmt.Sprintf("%d", int(limit)))
+		} else if args["limit"] != nil {
+			return nil, goerr.New("invalid limit parameter type",
+				goerr.V("type", fmt.Sprintf("%T", args["limit"])),
+				goerr.V("value", args["limit"]))
 		}
 
 	default:

@@ -37,9 +37,21 @@ func getArg[T any](args map[string]any, key string) (T, error) {
 		return null, nil
 	}
 
+	// Handle special case for numeric types from JSON (which come as float64)
+	if reflect.TypeOf(null).Kind() == reflect.Int64 {
+		if floatVal, ok := val.(float64); ok {
+			result := int64(floatVal)
+			return any(result).(T), nil
+		}
+	}
+
 	typedVal, ok := val.(T)
 	if !ok {
-		return null, goerr.New("key is not a", goerr.V("key", key), goerr.V("type", reflect.TypeOf(val).String()))
+		return null, goerr.New("invalid parameter type",
+			goerr.V("key", key),
+			goerr.V("expected_type", reflect.TypeOf(null).String()),
+			goerr.V("actual_type", reflect.TypeOf(val).String()),
+			goerr.V("value", val))
 	}
 
 	return typedVal, nil

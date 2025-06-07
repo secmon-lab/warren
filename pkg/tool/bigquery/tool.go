@@ -44,6 +44,19 @@ type Config struct {
 
 	// Columns of the table. It's not required to describe all column.
 	Columns []ColumnConfig `yaml:"columns" json:"columns"`
+
+	// Partitioning
+	Partitioning PartitioningConfig `yaml:"partitioning" json:"partitioning"`
+}
+
+type PartitioningConfig struct {
+	Field string `yaml:"field" json:"field"`
+
+	// Type of the partitioning. `integer`, `time`
+	Type string `yaml:"type" json:"type"`
+
+	// Time unit. `hourly`, `daily` or `monthly`
+	TimeUnit string `yaml:"time_unit" json:"time_unit"`
 }
 
 type ColumnConfig struct {
