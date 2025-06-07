@@ -812,27 +812,30 @@ func (r *Firestore) CountTicketsByStatus(ctx context.Context, statuses []types.T
 		return 0, goerr.Wrap(err, "failed to get ticket count")
 	}
 
-	count, ok := result["count"]
+	// The Firestore client library for Go typically returns int64 for count aggregations.
+	// See: https://pkg.go.dev/cloud.google.com/go/firestore#AggregationResult
+	// It's good practice to handle the specific expected type.
+	countVal, ok := result["count"]
 	if !ok {
-		return 0, goerr.New("failed to get count value from result")
+		return 0, goerr.New("count alias not found in aggregation result")
 	}
 
-	// Try different possible types for the count value
-	switch v := count.(type) {
+	switch v := countVal.(type) {
 	case int64:
 		return int(v), nil
-	case int:
-		return v, nil
-	case float64:
-		return int(v), nil
+	// It's less common for *firestorepb.Value to appear here directly from AggregationResult values,
+	// but if it does, this handles it by checking the inner value type.
 	case *firestorepb.Value:
-		if v != nil {
-			return int(v.GetIntegerValue()), nil
+		if v != nil && v.ValueType != nil {
+			if _, okType := v.ValueType.(*firestorepb.Value_IntegerValue); okType {
+				return int(v.GetIntegerValue()), nil
+			}
+			return 0, goerr.New("firestorepb.Value from count is not an integer type", goerr.V("value_type", fmt.Sprintf("%T", v.ValueType)))
 		}
-		return 0, goerr.New("nil firestorepb.Value")
+		return 0, goerr.New("count value is a nil or invalid *firestorepb.Value")
 	default:
-		// For debugging: log the actual type
-		return 0, goerr.New("unexpected count value type", goerr.V("type", fmt.Sprintf("%T", v)), goerr.V("value", v))
+		// This case helps catch unexpected types if Firestore's behavior changes or if there's a misunderstanding.
+		return 0, goerr.New("unexpected count value type from Firestore aggregation", goerr.V("type", fmt.Sprintf("%T", v)), goerr.V("value", v))
 	}
 }
 

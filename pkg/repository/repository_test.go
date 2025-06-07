@@ -871,7 +871,9 @@ func TestGetTicketsBySpan(t *testing.T) {
 
 			result, err := repo.GetTicketsBySpan(ctx, start, end)
 			gt.NoError(t, err)
-			gt.Array(t, result).Length(0)
+			// Filter by test tickets only - should be empty since no test tickets are in this range
+			filtered := filterByIDs(result, []types.TicketID{tickets[0].ID, tickets[1].ID, tickets[2].ID})
+			gt.Array(t, filtered).Length(0)
 		})
 
 		t.Run("all tickets in range", func(t *testing.T) {
