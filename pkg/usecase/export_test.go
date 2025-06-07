@@ -71,3 +71,5 @@ func (uc *AuthUseCase) TestGetCache() *TestAuthCache {
 func (uc *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message string) error {
 	return uc.chat(ctx, target, message)
 }
+
+var ToolCallToText = toolCallToText

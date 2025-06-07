@@ -92,6 +92,15 @@ const (
 	cmdUpdateFinding     = "warren.update_finding"
 )
 
+func IgnorableTool(name string) bool {
+	switch name {
+	case cmdUpdateFinding:
+		return true
+	default:
+		return false
+	}
+}
+
 func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return []gollem.ToolSpec{
 		{

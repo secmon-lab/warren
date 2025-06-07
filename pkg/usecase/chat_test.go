@@ -3,14 +3,17 @@ package usecase_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/m-mizutani/gollem"
+	"github.com/m-mizutani/gollem/llm/gemini"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
@@ -121,4 +124,49 @@ func TestHandlePrompt(t *testing.T) {
 	gt.NotNil(t, latestHistory)
 
 	gt.Equal(t, newSessionCount, 2)
+}
+
+func newLLMClient(t *testing.T) gollem.LLMClient {
+	projectID, ok := os.LookupEnv("TEST_GEMINI_PROJECT_ID")
+	if !ok {
+		t.Skip("TEST_GEMINI_PROJECT_ID is not set")
+	}
+	location, ok := os.LookupEnv("TEST_GEMINI_LOCATION")
+	if !ok {
+		t.Skip("TEST_GEMINI_LOCATION is not set")
+	}
+
+	client, err := gemini.New(t.Context(), projectID, location, gemini.WithModel("gemini-2.0-flash"))
+	gt.NoError(t, err)
+	return client
+}
+
+func TestToolCallToText(t *testing.T) {
+	llmClient := newLLMClient(t)
+
+	spec := &gollem.ToolSpec{
+		Name:        "random_number",
+		Description: "Generate a random number",
+		Parameters: map[string]*gollem.Parameter{
+			"min": {
+				Type: "integer",
+			},
+			"max": {
+				Type: "integer",
+			},
+		},
+		Required: []string{"min", "max"},
+	}
+	call := &gollem.FunctionCall{
+		Name: "random_number",
+		Arguments: map[string]any{
+			"min": 1,
+			"max": 100,
+		},
+	}
+
+	ctx := lang.With(t.Context(), lang.Japanese)
+	message := usecase.ToolCallToText(ctx, llmClient, spec, call)
+	t.Log("[message]", message)
+	gt.S(t, message).NotContains("⚡ Execute Tool")
 }
