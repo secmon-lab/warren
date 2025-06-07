@@ -134,6 +134,7 @@ func cmdServe() *cli.Command {
 			serverOptions := []server.Options{
 				server.WithSlackVerifier(slackCfg.Verifier()),
 				server.WithPolicy(policyClient),
+				server.WithSlackService(slackSvc),
 			}
 
 			// Add repository when GraphQL is enabled

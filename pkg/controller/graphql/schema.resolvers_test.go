@@ -12,7 +12,7 @@ import (
 
 func TestUpdateTicketConclusion(t *testing.T) {
 	repo := repository.NewMemory()
-	resolver := &Resolver{repo: repo}
+	resolver := &Resolver{repo: repo, slackService: nil, mrkdwnConv: nil}
 
 	// Create a resolved ticket
 	testTicket := &ticket.Ticket{

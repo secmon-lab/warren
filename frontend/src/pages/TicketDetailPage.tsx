@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@apollo/client";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -73,7 +74,8 @@ export default function TicketDetailPage() {
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [alertsCurrentPage, setAlertsCurrentPage] = useState(1);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [isEditConclusionModalOpen, setIsEditConclusionModalOpen] = useState(false);
+  const [isEditConclusionModalOpen, setIsEditConclusionModalOpen] =
+    useState(false);
 
   const errorToast = useErrorToast();
   const successToast = useSuccessToast();
@@ -339,7 +341,10 @@ export default function TicketDetailPage() {
           )}
 
           {/* Resolve Information Section */}
-          <ResolveInfo ticket={ticket} onEditConclusion={handleEditConclusion} />
+          <ResolveInfo
+            ticket={ticket}
+            onEditConclusion={handleEditConclusion}
+          />
 
           {/* Comments Section */}
           <Card>
@@ -392,8 +397,8 @@ export default function TicketDetailPage() {
                               {formatRelativeTime(comment.createdAt)}
                             </span>
                           </div>
-                          <div className="text-sm leading-relaxed whitespace-pre-wrap bg-muted/50 rounded-lg p-3">
-                            {comment.content}
+                          <div className="text-sm leading-relaxed bg-muted/50 rounded-lg p-3 prose prose-sm max-w-none">
+                            <ReactMarkdown>{comment.content}</ReactMarkdown>
                           </div>
                         </div>
                       </div>
@@ -525,7 +530,9 @@ export default function TicketDetailPage() {
                       />
                     </div>
                   ) : (
-                    <span className="text-xs text-muted-foreground">Unassigned</span>
+                    <span className="text-xs text-muted-foreground">
+                      Unassigned
+                    </span>
                   )}
                 </div>
               </div>
@@ -538,7 +545,9 @@ export default function TicketDetailPage() {
                   </span>
                 </div>
                 <div className="ml-5">
-                  <span className="text-xs font-mono">{formatAbsoluteTime(ticket.createdAt)}</span>
+                  <span className="text-xs font-mono">
+                    {formatAbsoluteTime(ticket.createdAt)}
+                  </span>
                 </div>
               </div>
 
@@ -550,7 +559,9 @@ export default function TicketDetailPage() {
                   </span>
                 </div>
                 <div className="ml-5">
-                  <span className="text-xs font-mono">{formatAbsoluteTime(ticket.updatedAt)}</span>
+                  <span className="text-xs font-mono">
+                    {formatAbsoluteTime(ticket.updatedAt)}
+                  </span>
                 </div>
               </div>
 

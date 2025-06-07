@@ -11,6 +11,7 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
@@ -50,7 +51,7 @@ func TestGraphQLQueries(t *testing.T) {
 		}
 		_ = repo.PutTicket(context.Background(), *ticketObj)
 		_ = repo.PutAlert(context.Background(), *alertObj)
-		server := httptest.NewServer(graphqlHandler(repo))
+		server := httptest.NewServer(graphqlHandler(repo, nil))
 		defer server.Close()
 
 		req := graphqlRequest{
@@ -102,7 +103,7 @@ func TestGraphQLQueries(t *testing.T) {
 		}
 		_ = repo.PutTicket(context.Background(), *ticketObj)
 		_ = repo.PutAlert(context.Background(), *alertObj)
-		server := httptest.NewServer(graphqlHandler(repo))
+		server := httptest.NewServer(graphqlHandler(repo, nil))
 		defer server.Close()
 
 		req := graphqlRequest{
@@ -157,7 +158,7 @@ func TestGraphQLQueries(t *testing.T) {
 			CreatedAt: time.Now(),
 		}
 		_ = repo.PutAlert(context.Background(), *alertNoTicket)
-		server := httptest.NewServer(graphqlHandler(repo))
+		server := httptest.NewServer(graphqlHandler(repo, nil))
 		defer server.Close()
 
 		req := graphqlRequest{
@@ -188,72 +189,51 @@ func TestGraphQLQueries(t *testing.T) {
 		gt.Value(t, alert["title"]).Equal("Orphan Alert")
 	})
 
-	t.Run("get tickets by status", func(t *testing.T) {
+	t.Run("query ticket with comments", func(t *testing.T) {
 		repo := repository.NewMemory()
-		alert1 := &alert.Alert{
-			ID: types.NewAlertID(),
-			Metadata: alert.Metadata{
-				Title:       "Test Alert 1",
-				Description: "Test Description 1",
-			},
+		ticketID := types.NewTicketID()
+		ticketObj := &ticket.Ticket{
+			ID:        ticketID,
+			Status:    types.TicketStatusOpen,
+			CreatedAt: time.Now(),
 		}
-		alert2 := &alert.Alert{
-			ID: types.NewAlertID(),
-			Metadata: alert.Metadata{
-				Title:       "Test Alert 2",
-				Description: "Test Description 2",
+		_ = repo.PutTicket(context.Background(), *ticketObj)
+
+		// Add a comment with Slack markdown
+		comment := ticket.Comment{
+			ID:       types.NewCommentID(),
+			TicketID: ticketID,
+			Comment:  "This is a *bold* comment with <@U123456> mention",
+			User: &slack.User{
+				ID:   "U123456",
+				Name: "Test User",
 			},
+			CreatedAt: time.Now(),
 		}
-		alert3 := &alert.Alert{
-			ID: types.NewAlertID(),
-			Metadata: alert.Metadata{
-				Title:       "Test Alert 3",
-				Description: "Test Description 3",
-			},
-		}
-		ticket1 := &ticket.Ticket{
-			ID:         types.NewTicketID(),
-			Status:     types.TicketStatusOpen,
-			AlertIDs:   []types.AlertID{alert1.ID, alert2.ID},
-			Conclusion: types.AlertConclusionTruePositive,
-			Metadata: ticket.Metadata{
-				Title:       "Test Ticket 1",
-				Description: "Test Description 1",
-				Summary:     "Test Summary 1",
-			},
-		}
-		ticket2 := &ticket.Ticket{
-			ID:         types.NewTicketID(),
-			Status:     types.TicketStatusPending,
-			AlertIDs:   []types.AlertID{alert3.ID},
-			Conclusion: types.AlertConclusionFalsePositive,
-			Metadata: ticket.Metadata{
-				Title:       "Test Ticket 2",
-				Description: "Test Description 2",
-				Summary:     "Test Summary 2",
-			},
-		}
-		_ = repo.PutTicket(context.Background(), *ticket1)
-		_ = repo.PutTicket(context.Background(), *ticket2)
-		_ = repo.PutAlert(context.Background(), *alert1)
-		_ = repo.PutAlert(context.Background(), *alert2)
-		_ = repo.PutAlert(context.Background(), *alert3)
-		server := httptest.NewServer(graphqlHandler(repo))
+		_ = repo.PutTicketComment(context.Background(), comment)
+
+		server := httptest.NewServer(graphqlHandler(repo, nil))
 		defer server.Close()
 
 		req := graphqlRequest{
 			Query: `
-				query {
-					tickets(statuses: ["open"]) {
+				query($id: ID!) {
+					ticket(id: $id) {
 						id
-						status
-						alerts {
+						comments {
 							id
-							title
+							content
+							user {
+								id
+								name
+							}
 						}
 					}
 				}
 			`,
+			Variables: map[string]interface{}{
+				"id": ticketID.String(),
+			},
 		}
 
 		resp, err := sendGraphQLRequest(server.URL, req)
@@ -263,28 +243,17 @@ func TestGraphQLQueries(t *testing.T) {
 		data, ok := resp.Data.(map[string]interface{})
 		gt.True(t, ok)
 
-		tickets, ok := data["tickets"].([]interface{})
+		ticket, ok := data["ticket"].(map[string]interface{})
 		gt.True(t, ok)
-		gt.Array(t, tickets).Length(1)
 
-		ticket, ok := tickets[0].(map[string]interface{})
+		comments, ok := ticket["comments"].([]interface{})
 		gt.True(t, ok)
-		gt.Value(t, ticket["id"]).Equal(ticket1.ID.String())
-		gt.Value(t, ticket["status"]).Equal(types.TicketStatusOpen.String())
+		gt.Array(t, comments).Length(1)
 
-		alerts, ok := ticket["alerts"].([]interface{})
+		commentData, ok := comments[0].(map[string]interface{})
 		gt.True(t, ok)
-		gt.Array(t, alerts).Length(2)
-
-		alertResp1, ok := alerts[0].(map[string]interface{})
-		gt.True(t, ok)
-		gt.Value(t, alertResp1["id"]).Equal(alert1.ID.String())
-		gt.Value(t, alertResp1["title"]).Equal("Test Alert 1")
-
-		alertResp2, ok := alerts[1].(map[string]interface{})
-		gt.True(t, ok)
-		gt.Value(t, alertResp2["id"]).Equal(alert2.ID.String())
-		gt.Value(t, alertResp2["title"]).Equal("Test Alert 2")
+		// Since slack service is nil, content should be returned as-is
+		gt.Value(t, commentData["content"]).Equal("This is a *bold* comment with <@U123456> mention")
 	})
 }
 

@@ -457,3 +457,89 @@ func TestConverter_MalformedMarkup(t *testing.T) {
 		})
 	}
 }
+
+func TestConverter_MultibyteCharacters(t *testing.T) {
+	mockService := NewMockSlackDataService()
+	mockService.users["U789GHIJK"] = "田中太郎"
+	mockService.channels["C789LMNOP"] = "日本語チャンネル"
+	converter := mrkdwn.NewConverter(mockService)
+
+	testCases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Japanese text plain",
+			input:    "こんにちは世界",
+			expected: "こんにちは世界",
+		},
+		{
+			name:     "Japanese text with bold",
+			input:    "*こんにちは* 世界",
+			expected: "**こんにちは** 世界",
+		},
+		{
+			name:     "Japanese text with italic",
+			input:    "_日本語_ テキスト",
+			expected: "*日本語* テキスト",
+		},
+		{
+			name:     "Japanese text with strikethrough",
+			input:    "~削除された~ テキスト",
+			expected: "~~削除された~~ テキスト",
+		},
+		{
+			name:     "Japanese text in inline code",
+			input:    "`日本語コード`",
+			expected: "`日本語コード`",
+		},
+		{
+			name:     "Japanese text in code block",
+			input:    "```\nfunction 日本語関数() {\n    console.log(\"こんにちは\");\n}\n```",
+			expected: "```\n\nfunction 日本語関数() {\n    console.log(\"こんにちは\");\n}\n\n```",
+		},
+		{
+			name:     "Japanese user mention",
+			input:    "<@U789GHIJK>さん、おはようございます",
+			expected: "@田中太郎さん、おはようございます",
+		},
+		{
+			name:     "Japanese channel mention",
+			input:    "<#C789LMNOP>で議論しましょう",
+			expected: "#日本語チャンネルで議論しましょう",
+		},
+		{
+			name:     "Mixed Japanese and English with formatting",
+			input:    "*Hello* <@U789GHIJK>、*こんにちは* world！",
+			expected: "**Hello** @田中太郎、**こんにちは** world！",
+		},
+		{
+			name:     "Japanese text with emoji",
+			input:    "こんにちは :wave: 世界 :sparkles:",
+			expected: "こんにちは :wave: 世界 :sparkles:",
+		},
+		{
+			name:     "Complex Japanese text with multiple formatting",
+			input:    "*重要*：<@U789GHIJK>さん、`config.yaml`を確認して<#C789LMNOP>で報告してください。",
+			expected: "**重要**：@田中太郎さん、`config.yaml`を確認して#日本語チャンネルで報告してください。",
+		},
+		{
+			name:     "Japanese text with blockquote",
+			input:    "> これは重要な引用です\n> 日本語のテキストです",
+			expected: "> これは重要な引用です\n> 日本語のテキストです",
+		},
+		{
+			name:     "Japanese text with special characters",
+			input:    "価格：¥1,000（税込）※送料別",
+			expected: "価格：¥1,000（税込）※送料別",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := converter.ConvertToMarkdown(context.Background(), tc.input)
+			gt.Equal(t, tc.expected, result)
+		})
+	}
+}

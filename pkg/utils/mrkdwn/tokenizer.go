@@ -2,6 +2,7 @@ package mrkdwn
 
 import (
 	"regexp"
+	"unicode/utf8"
 )
 
 // tokenize breaks down the input mrkdwn string into tokens
@@ -16,14 +17,20 @@ func (c *Converter) tokenize(input string) []token {
 			tokens = append(tokens, *tok)
 			pos = tok.End
 		} else {
-			// If no pattern matches, consume a single character as text
+			// If no pattern matches, consume a single UTF-8 character (rune) as text
+			r, width := utf8.DecodeRuneInString(input[pos:])
+			if r == utf8.RuneError && width == 1 {
+				// Invalid UTF-8, skip this byte
+				pos++
+				continue
+			}
 			tokens = append(tokens, token{
 				Type:  tokenText,
-				Value: string(input[pos]),
+				Value: string(r),
 				Start: pos,
-				End:   pos + 1,
+				End:   pos + width,
 			})
-			pos++
+			pos += width
 		}
 	}
 

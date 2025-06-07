@@ -3,6 +3,7 @@ package base
 import (
 	"context"
 	"log/slog"
+	"reflect"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
@@ -38,7 +39,7 @@ func getArg[T any](args map[string]any, key string) (T, error) {
 
 	typedVal, ok := val.(T)
 	if !ok {
-		return null, goerr.New("key is not a", goerr.V("key", key))
+		return null, goerr.New("key is not a", goerr.V("key", key), goerr.V("type", reflect.TypeOf(val).String()))
 	}
 
 	return typedVal, nil
