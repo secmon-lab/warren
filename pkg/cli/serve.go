@@ -102,6 +102,7 @@ func cmdServe() *cli.Command {
 			if err != nil {
 				return err
 			}
+			defer slackSvc.Stop()
 
 			firestore, err := firestoreCfg.Configure(ctx)
 			if err != nil {

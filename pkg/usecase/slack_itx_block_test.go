@@ -121,7 +121,11 @@ func TestSlackActionAckAlert(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+	// Use fast interval for testing
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel",
+		slack_svc.WithUpdaterOptions(
+			slack_svc.WithInterval(1*time.Millisecond),
+			slack_svc.WithRetryInterval(1*time.Millisecond)))
 	gt.NoError(t, err)
 
 	// Create usecase instance
@@ -165,6 +169,9 @@ func TestSlackActionAckAlert(t *testing.T) {
 	updatedAlert, err := repo.GetAlert(ctx, testAlert.ID)
 	gt.NoError(t, err)
 	gt.Value(t, updatedAlert.TicketID).Equal(ticket.ID)
+
+	// Wait for async alert updates to complete
+	time.Sleep(200 * time.Millisecond)
 
 	// Verify Slack interactions
 	gt.Value(t, len(slackMock.PostMessageContextCalls())).Equal(3)
@@ -273,7 +280,11 @@ func TestSlackActionAckList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+	// Use fast interval for testing
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel",
+		slack_svc.WithUpdaterOptions(
+			slack_svc.WithInterval(1*time.Millisecond),
+			slack_svc.WithRetryInterval(1*time.Millisecond)))
 	gt.NoError(t, err)
 
 	// Create usecase instance
@@ -312,6 +323,9 @@ func TestSlackActionAckList(t *testing.T) {
 		gt.NoError(t, err)
 		gt.Value(t, updatedAlert.TicketID).Equal(ticket.ID)
 	}
+
+	// Wait for async alert updates to complete
+	time.Sleep(200 * time.Millisecond)
 
 	// Verify Slack interactions
 	gt.Value(t, len(slackMock.PostMessageContextCalls())).Equal(3)
