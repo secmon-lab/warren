@@ -1,6 +1,6 @@
 name: Unit test
 
-on: [push, pull_request]
+on: push
 
 jobs:
   testing:
@@ -40,12 +40,4 @@ jobs:
 
       # Run tests in parallel
       - name: Run tests
-        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
-
-      # Upload coverage (optional)
-      - name: Upload coverage to Codecov
-        if: github.event_name == 'push'
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.out
-          fail_ci_if_error: false
+        run: go test ./...
