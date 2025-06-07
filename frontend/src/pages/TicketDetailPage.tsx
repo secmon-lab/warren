@@ -511,13 +511,15 @@ export default function TicketDetailPage() {
                 </div>
                 <div className="ml-5">
                   {ticket.assignee ? (
-                    <UserWithAvatar
-                      userID={ticket.assignee.id}
-                      fallback={ticket.assignee.name}
-                      avatarSize="sm"
-                    />
+                    <div className="text-xs">
+                      <UserWithAvatar
+                        userID={ticket.assignee.id}
+                        fallback={ticket.assignee.name}
+                        avatarSize="sm"
+                      />
+                    </div>
                   ) : (
-                    <span className="text-sm text-muted-foreground">Unassigned</span>
+                    <span className="text-xs text-muted-foreground">Unassigned</span>
                   )}
                 </div>
               </div>
@@ -530,7 +532,7 @@ export default function TicketDetailPage() {
                   </span>
                 </div>
                 <div className="ml-5">
-                  <span className="text-sm font-mono">{formatAbsoluteTime(ticket.createdAt)}</span>
+                  <span className="text-xs font-mono">{formatAbsoluteTime(ticket.createdAt)}</span>
                 </div>
               </div>
 
@@ -542,7 +544,7 @@ export default function TicketDetailPage() {
                   </span>
                 </div>
                 <div className="ml-5">
-                  <span className="text-sm font-mono">{formatAbsoluteTime(ticket.updatedAt)}</span>
+                  <span className="text-xs font-mono">{formatAbsoluteTime(ticket.updatedAt)}</span>
                 </div>
               </div>
 
