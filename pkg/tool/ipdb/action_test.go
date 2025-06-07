@@ -53,7 +53,7 @@ func TestIPDB(t *testing.T) {
 			funcName: "ipdb.check",
 			args: map[string]any{
 				"target":       "8.8.8.8",
-				"maxAgeInDays": 90,
+				"maxAgeInDays": float64(90),
 			},
 			apiResp:    `{"data":{"ipAddress":"8.8.8.8","isPublic":true,"ipVersion":4,"isWhitelisted":false,"abuseConfidenceScore":0,"countryCode":"US","usageType":"Data Center/Web Hosting/Transit","isp":"Google LLC","domain":"google.com","totalReports":0,"numDistinctUsers":0}}`,
 			statusCode: http.StatusOK,
