@@ -243,32 +243,6 @@ type paragraphNode struct {
 
 func (n *paragraphNode) Type() nodeType { return nodeParagraph }
 
-// cleanExpiredCache removes expired entries from cache
-func (c *cache) cleanExpiredCache() {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	now := time.Now()
-
-	for key, entry := range c.users {
-		if now.After(entry.ExpiresAt) {
-			delete(c.users, key)
-		}
-	}
-
-	for key, entry := range c.channels {
-		if now.After(entry.ExpiresAt) {
-			delete(c.channels, key)
-		}
-	}
-
-	for key, entry := range c.userGroups {
-		if now.After(entry.ExpiresAt) {
-			delete(c.userGroups, key)
-		}
-	}
-}
-
 // getCached retrieves cached value or returns empty string if not found/expired
 func (c *cache) getCached(category, key string) string {
 	c.mutex.RLock()
