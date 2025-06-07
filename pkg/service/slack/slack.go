@@ -677,6 +677,40 @@ func (x *Service) ClearExpiredProfileCache() {
 	}
 }
 
+// GetChannelName returns the channel name for the given channel ID
+func (x *Service) GetChannelName(ctx context.Context, channelID string) (string, error) {
+	input := &slack.GetConversationInfoInput{
+		ChannelID:     channelID,
+		IncludeLocale: false,
+	}
+	channel, err := x.client.GetConversationInfo(input)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to get channel info from slack", goerr.V("channel_id", channelID))
+	}
+
+	if channel == nil {
+		return "", goerr.New("channel data is nil", goerr.V("channel_id", channelID))
+	}
+
+	return channel.Name, nil
+}
+
+// GetUserGroupName returns the user group name for the given group ID
+func (x *Service) GetUserGroupName(ctx context.Context, groupID string) (string, error) {
+	groups, err := x.client.GetUserGroups()
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to get user groups from slack", goerr.V("group_id", groupID))
+	}
+
+	for _, group := range groups {
+		if group.ID == groupID {
+			return group.Handle, nil
+		}
+	}
+
+	return "", goerr.New("user group not found", goerr.V("group_id", groupID))
+}
+
 // Stop gracefully stops the service and its rate-limited updater
 func (x *Service) Stop() {
 	if x.rateLimitedUpdater != nil {

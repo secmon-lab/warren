@@ -27,6 +27,12 @@ import (
 //			AuthTestFunc: func() (*slackslack.AuthTestResponse, error) {
 //				panic("mock out the AuthTest method")
 //			},
+//			GetConversationInfoFunc: func(input *slackslack.GetConversationInfoInput) (*slackslack.Channel, error) {
+//				panic("mock out the GetConversationInfo method")
+//			},
+//			GetUserGroupsFunc: func(options ...slackslack.GetUserGroupsOption) ([]slackslack.UserGroup, error) {
+//				panic("mock out the GetUserGroups method")
+//			},
 //			GetUserInfoFunc: func(userID string) (*slackslack.User, error) {
 //				panic("mock out the GetUserInfo method")
 //			},
@@ -52,6 +58,12 @@ type SlackClientMock struct {
 	// AuthTestFunc mocks the AuthTest method.
 	AuthTestFunc func() (*slackslack.AuthTestResponse, error)
 
+	// GetConversationInfoFunc mocks the GetConversationInfo method.
+	GetConversationInfoFunc func(input *slackslack.GetConversationInfoInput) (*slackslack.Channel, error)
+
+	// GetUserGroupsFunc mocks the GetUserGroups method.
+	GetUserGroupsFunc func(options ...slackslack.GetUserGroupsOption) ([]slackslack.UserGroup, error)
+
 	// GetUserInfoFunc mocks the GetUserInfo method.
 	GetUserInfoFunc func(userID string) (*slackslack.User, error)
 
@@ -71,6 +83,16 @@ type SlackClientMock struct {
 	calls struct {
 		// AuthTest holds details about calls to the AuthTest method.
 		AuthTest []struct {
+		}
+		// GetConversationInfo holds details about calls to the GetConversationInfo method.
+		GetConversationInfo []struct {
+			// Input is the input argument value.
+			Input *slackslack.GetConversationInfoInput
+		}
+		// GetUserGroups holds details about calls to the GetUserGroups method.
+		GetUserGroups []struct {
+			// Options is the options argument value.
+			Options []slackslack.GetUserGroupsOption
 		}
 		// GetUserInfo holds details about calls to the GetUserInfo method.
 		GetUserInfo []struct {
@@ -113,6 +135,8 @@ type SlackClientMock struct {
 		}
 	}
 	lockAuthTest             sync.RWMutex
+	lockGetConversationInfo  sync.RWMutex
+	lockGetUserGroups        sync.RWMutex
 	lockGetUserInfo          sync.RWMutex
 	lockOpenView             sync.RWMutex
 	lockPostMessageContext   sync.RWMutex
@@ -148,6 +172,78 @@ func (mock *SlackClientMock) AuthTestCalls() []struct {
 	mock.lockAuthTest.RLock()
 	calls = mock.calls.AuthTest
 	mock.lockAuthTest.RUnlock()
+	return calls
+}
+
+// GetConversationInfo calls GetConversationInfoFunc.
+func (mock *SlackClientMock) GetConversationInfo(input *slackslack.GetConversationInfoInput) (*slackslack.Channel, error) {
+	callInfo := struct {
+		Input *slackslack.GetConversationInfoInput
+	}{
+		Input: input,
+	}
+	mock.lockGetConversationInfo.Lock()
+	mock.calls.GetConversationInfo = append(mock.calls.GetConversationInfo, callInfo)
+	mock.lockGetConversationInfo.Unlock()
+	if mock.GetConversationInfoFunc == nil {
+		var (
+			channelOut *slackslack.Channel
+			errOut     error
+		)
+		return channelOut, errOut
+	}
+	return mock.GetConversationInfoFunc(input)
+}
+
+// GetConversationInfoCalls gets all the calls that were made to GetConversationInfo.
+// Check the length with:
+//
+//	len(mockedSlackClient.GetConversationInfoCalls())
+func (mock *SlackClientMock) GetConversationInfoCalls() []struct {
+	Input *slackslack.GetConversationInfoInput
+} {
+	var calls []struct {
+		Input *slackslack.GetConversationInfoInput
+	}
+	mock.lockGetConversationInfo.RLock()
+	calls = mock.calls.GetConversationInfo
+	mock.lockGetConversationInfo.RUnlock()
+	return calls
+}
+
+// GetUserGroups calls GetUserGroupsFunc.
+func (mock *SlackClientMock) GetUserGroups(options ...slackslack.GetUserGroupsOption) ([]slackslack.UserGroup, error) {
+	callInfo := struct {
+		Options []slackslack.GetUserGroupsOption
+	}{
+		Options: options,
+	}
+	mock.lockGetUserGroups.Lock()
+	mock.calls.GetUserGroups = append(mock.calls.GetUserGroups, callInfo)
+	mock.lockGetUserGroups.Unlock()
+	if mock.GetUserGroupsFunc == nil {
+		var (
+			userGroupsOut []slackslack.UserGroup
+			errOut        error
+		)
+		return userGroupsOut, errOut
+	}
+	return mock.GetUserGroupsFunc(options...)
+}
+
+// GetUserGroupsCalls gets all the calls that were made to GetUserGroups.
+// Check the length with:
+//
+//	len(mockedSlackClient.GetUserGroupsCalls())
+func (mock *SlackClientMock) GetUserGroupsCalls() []struct {
+	Options []slackslack.GetUserGroupsOption
+} {
+	var calls []struct {
+		Options []slackslack.GetUserGroupsOption
+	}
+	mock.lockGetUserGroups.RLock()
+	calls = mock.calls.GetUserGroups
+	mock.lockGetUserGroups.RUnlock()
 	return calls
 }
 
