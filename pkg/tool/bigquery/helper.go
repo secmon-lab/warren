@@ -68,7 +68,7 @@ func subCommandGenerateConfig() *cli.Command {
 				Usage:       "Gemini location",
 				Destination: &cfg.geminiLocation,
 				Sources:     cli.EnvVars("WARREN_GEMINI_LOCATION"),
-				Required:    true,
+				Value:       "us-central1",
 			},
 			&cli.StringFlag{
 				Name:        "bigquery-table-id",
