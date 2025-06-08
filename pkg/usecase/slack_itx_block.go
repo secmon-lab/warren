@@ -70,10 +70,10 @@ func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread 
 	var ts string
 
 	if len(alertLists) > 1 {
-		// Multiple alert lists exist, post ticket outside thread
-		newThreadSvc, timestamp, err := st.PostTicketOutsideThread(ctx, newTicket, alerts)
+		// Multiple alert lists exist, post ticket to new thread
+		newThreadSvc, timestamp, err := uc.slackService.PostTicket(ctx, newTicket, alerts)
 		if err != nil {
-			return goerr.Wrap(err, "failed to post ticket outside thread")
+			return goerr.Wrap(err, "failed to post ticket to new thread")
 		}
 		ts = timestamp
 
