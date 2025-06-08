@@ -209,3 +209,8 @@ func (x *Action) LogValue() slog.Value {
 		slog.Duration("backoff", x.backoff),
 	)
 }
+
+// Prompt returns additional instructions for the system prompt
+func (x *Action) Prompt(ctx context.Context) (string, error) {
+	return "", nil
+}

@@ -96,6 +96,11 @@ func (x *Warren) LogValue() slog.Value {
 	)
 }
 
+// Prompt returns additional instructions for the system prompt
+func (x *Warren) Prompt(ctx context.Context) (string, error) {
+	return "", nil
+}
+
 const (
 	cmdGetAlerts         = "warren.get_alerts"
 	cmdFindNearestTicket = "warren.find_nearest_ticket"

@@ -210,6 +210,11 @@ func (x *Action) LogValue() slog.Value {
 	)
 }
 
+// Prompt returns additional instructions for the system prompt
+func (x *Action) Prompt(ctx context.Context) (string, error) {
+	return "", nil
+}
+
 func New() *Action {
 	return &Action{
 		baseURL: "https://api.shodan.io",

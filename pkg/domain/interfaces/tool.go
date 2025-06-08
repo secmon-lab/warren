@@ -14,5 +14,6 @@ type Tool interface {
 	Configure(ctx context.Context) error
 	LogValue() slog.Value
 	Helper() *cli.Command
+	Prompt(ctx context.Context) (string, error)
 	gollem.ToolSet
 }
