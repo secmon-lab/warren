@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
+	"text/template"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/dustin/go-humanize"
@@ -41,7 +44,8 @@ type generateConfigConfig struct {
 	bigqueryTableID   string
 	tableDescription  string
 	scanLimit         string
-	output            string
+	outputDir         string
+	outputFile        string
 }
 
 func subCommandGenerateConfig() *cli.Command {
@@ -57,39 +61,27 @@ func subCommandGenerateConfig() *cli.Command {
 				Name:        "gemini-project-id",
 				Usage:       "Gemini project ID",
 				Destination: &cfg.geminiProjectID,
-				Sources:     cli.EnvVars("GEMINI_PROJECT_ID"),
+				Sources:     cli.EnvVars("WARREN_GEMINI_PROJECT_ID"),
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "gemini-location",
 				Usage:       "Gemini location",
 				Destination: &cfg.geminiLocation,
-				Sources:     cli.EnvVars("GEMINI_LOCATION"),
-				Required:    true,
-			},
-			&cli.StringFlag{
-				Name:        "bigquery-project-id",
-				Usage:       "BigQuery project ID",
-				Destination: &cfg.bigqueryProjectID,
-				Sources:     cli.EnvVars("BIGQUERY_PROJECT_ID"),
-				Required:    true,
-			},
-			&cli.StringFlag{
-				Name:        "bigquery-dataset-id",
-				Usage:       "BigQuery dataset ID",
-				Destination: &cfg.bigqueryDatasetID,
-				Sources:     cli.EnvVars("BIGQUERY_DATASET_ID"),
+				Sources:     cli.EnvVars("WARREN_GEMINI_LOCATION"),
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "bigquery-table-id",
-				Usage:       "BigQuery table ID",
+				Aliases:     []string{"t"},
+				Usage:       "BigQuery table ID in format 'project_id.dataset_id.table_id'",
 				Destination: &cfg.bigqueryTableID,
-				Sources:     cli.EnvVars("BIGQUERY_TABLE_ID"),
+				Sources:     cli.EnvVars("WARREN_BIGQUERY_TABLE_ID"),
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "table-description",
+				Aliases:     []string{"desc"},
 				Usage:       "Description of the table, what type of data is stored in the table",
 				Destination: &cfg.tableDescription,
 				Required:    true,
@@ -101,12 +93,24 @@ func subCommandGenerateConfig() *cli.Command {
 				Value:       "1GB",
 			},
 			&cli.StringFlag{
-				Name:        "output",
-				Usage:       "Output file path. Default is {bigquery-project-id}.{bigquery-dataset-id}.{bigquery-table-id}.yaml",
-				Destination: &cfg.output,
+				Name:        "output-dir",
+				Usage:       "Output directory (default: current directory)",
+				Destination: &cfg.outputDir,
+				Value:       ".",
+			},
+			&cli.StringFlag{
+				Name:        "output-file",
+				Aliases:     []string{"o"},
+				Usage:       "Output filename (default: {project}.{dataset}.{table}.yaml)",
+				Destination: &cfg.outputFile,
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
+			// Parse table-id from flag
+			if err := parseTableID(cfg.bigqueryTableID, &cfg); err != nil {
+				return goerr.Wrap(err, "failed to parse table ID")
+			}
+
 			return generateConfigInternal(ctx, cfg)
 		},
 	}
@@ -118,6 +122,50 @@ var generateConfigQueryPrompt string
 //go:embed prompt/generate_config_schema.md
 var generateConfigSchemaPrompt string
 
+// parseTableID parses table ID in format "project_id.dataset_id.table_id"
+func parseTableID(tableID string, cfg *generateConfigConfig) error {
+	parts := strings.Split(tableID, ".")
+	if len(parts) != 3 {
+		return goerr.New("table ID must be in format 'project_id.dataset_id.table_id'")
+	}
+
+	// Set all parts from the table ID
+	cfg.bigqueryProjectID = parts[0]
+	cfg.bigqueryDatasetID = parts[1]
+	cfg.bigqueryTableID = parts[2]
+
+	return nil
+}
+
+// generateOutputPath generates the output file path from config
+func generateOutputPath(cfg generateConfigConfig) (string, error) {
+	filename := cfg.outputFile
+	if filename == "" {
+		filename = fmt.Sprintf("%s.%s.%s.yaml", cfg.bigqueryProjectID, cfg.bigqueryDatasetID, cfg.bigqueryTableID)
+	}
+
+	// If filename contains template variables, process them
+	if strings.Contains(filename, "{") {
+		tmpl, err := template.New("filename").Parse(filename)
+		if err != nil {
+			return "", goerr.Wrap(err, "failed to parse filename template")
+		}
+
+		var buf strings.Builder
+		err = tmpl.Execute(&buf, map[string]string{
+			"project_id": cfg.bigqueryProjectID,
+			"dataset_id": cfg.bigqueryDatasetID,
+			"table_id":   cfg.bigqueryTableID,
+		})
+		if err != nil {
+			return "", goerr.Wrap(err, "failed to execute filename template")
+		}
+		filename = buf.String()
+	}
+
+	return filepath.Join(cfg.outputDir, filename), nil
+}
+
 func generateConfigInternal(ctx context.Context, cfg generateConfigConfig) error {
 	factory := &DefaultBigQueryClientFactory{}
 	return generateConfigWithFactoryInternal(ctx, cfg, factory)
@@ -126,8 +174,10 @@ func generateConfigInternal(ctx context.Context, cfg generateConfigConfig) error
 func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigConfig, factory BigQueryClientFactory) error {
 	logger := logging.From(ctx)
 
-	if cfg.output == "" {
-		cfg.output = fmt.Sprintf("%s.%s.%s.yaml", cfg.bigqueryProjectID, cfg.bigqueryDatasetID, cfg.bigqueryTableID)
+	// Generate output path
+	outputPath, err := generateOutputPath(cfg)
+	if err != nil {
+		return goerr.Wrap(err, "failed to generate output path")
 	}
 
 	scanLimit, err := humanize.ParseBytes(cfg.scanLimit)
@@ -135,7 +185,7 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 		return goerr.Wrap(err, "failed to parse scan limit")
 	}
 
-	logger.Info("Generating config", "output", cfg.output)
+	logger.Info("Generating config", "output", outputPath)
 
 	bqClient, err := factory.NewClient(ctx, cfg.bigqueryProjectID)
 	if err != nil {
@@ -230,7 +280,7 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 			bigqueryClient: bqClient,
 			scanLimitStr:   cfg.scanLimit,
 			scanLimit:      scanLimit,
-			outputPath:     cfg.output,
+			outputPath:     outputPath,
 		}),
 		gollem.WithLogger(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 			Level: slog.LevelDebug,

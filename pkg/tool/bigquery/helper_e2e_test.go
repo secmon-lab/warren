@@ -8,26 +8,9 @@ import (
 	"testing"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/m-mizutani/gollem"
-	"github.com/m-mizutani/gollem/llm/gemini"
 	"github.com/m-mizutani/gt"
 	"gopkg.in/yaml.v3"
 )
-
-func newLLMClient(t *testing.T) gollem.LLMClient {
-	projectID, ok := os.LookupEnv("TEST_GEMINI_PROJECT_ID")
-	if !ok {
-		t.Skip("TEST_GEMINI_PROJECT_ID is not set")
-	}
-	location, ok := os.LookupEnv("TEST_GEMINI_LOCATION")
-	if !ok {
-		t.Skip("TEST_GEMINI_LOCATION is not set")
-	}
-
-	client, err := gemini.New(context.Background(), projectID, location, gemini.WithModel("gemini-2.0-flash"))
-	gt.NoError(t, err)
-	return client
-}
 
 func TestGenerateConfigWithRealLLM(t *testing.T) {
 	ctx := context.Background()
@@ -158,18 +141,21 @@ func TestGenerateConfigWithRealLLM(t *testing.T) {
 
 	// Create configuration using the actual helper function
 	cfg := generateConfigConfig{
-		geminiProjectID:   geminiProjectID,
-		geminiLocation:    geminiLocation,
-		bigqueryProjectID: "test-project",
-		bigqueryDatasetID: "security",
-		bigqueryTableID:   "auth_logs",
-		tableDescription:  "Authentication and authorization events table containing login attempts, API access, and session management data.",
-		scanLimit:         "1GB",
-		output:            outputPath,
+		geminiProjectID:  geminiProjectID,
+		geminiLocation:   geminiLocation,
+		bigqueryTableID:  "test-project.security.auth_logs",
+		tableDescription: "Authentication and authorization events table containing login attempts, API access, and session management data.",
+		scanLimit:        "1GB",
+		outputDir:        filepath.Dir(outputPath),
+		outputFile:       filepath.Base(outputPath),
 	}
 
+	// Parse the table ID to extract project, dataset, and table
+	err := parseTableID(cfg.bigqueryTableID, &cfg)
+	gt.NoError(t, err)
+
 	// Execute the actual helper function
-	err := generateConfigWithFactoryInternal(ctx, cfg, factory)
+	err = generateConfigWithFactoryInternal(ctx, cfg, factory)
 	gt.NoError(t, err)
 
 	// Verify YAML file was created
@@ -315,18 +301,21 @@ func TestGenerateConfigWithLargeSchema(t *testing.T) {
 
 	// Create configuration using the actual helper function
 	cfg := generateConfigConfig{
-		geminiProjectID:   geminiProjectID,
-		geminiLocation:    geminiLocation,
-		bigqueryProjectID: "test-project",
-		bigqueryDatasetID: "logs",
-		bigqueryTableID:   "security_events",
-		tableDescription:  "Large security events table with over 100 columns including network logs, threat detection data, and system metadata. Focus on security-relevant fields only.",
-		scanLimit:         "1GB",
-		output:            outputPath,
+		geminiProjectID:  geminiProjectID,
+		geminiLocation:   geminiLocation,
+		bigqueryTableID:  "test-project.logs.security_events",
+		tableDescription: "Large security events table with over 100 columns including network logs, threat detection data, and system metadata. Focus on security-relevant fields only.",
+		scanLimit:        "1GB",
+		outputDir:        filepath.Dir(outputPath),
+		outputFile:       filepath.Base(outputPath),
 	}
 
+	// Parse the table ID to extract project, dataset, and table
+	err := parseTableID(cfg.bigqueryTableID, &cfg)
+	gt.NoError(t, err)
+
 	// Execute the actual helper function
-	err := generateConfigWithFactoryInternal(ctx, cfg, factory)
+	err = generateConfigWithFactoryInternal(ctx, cfg, factory)
 	gt.NoError(t, err)
 
 	// Verify output
