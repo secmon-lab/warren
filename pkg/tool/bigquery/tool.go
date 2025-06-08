@@ -151,13 +151,13 @@ func (x *Action) Configure(ctx context.Context) error {
 		}
 
 		if fileInfo.IsDir() {
-			dirConfigs, err := loadConfigsFromDir(configPath)
+			dirConfigs, err := loadConfigsFromDirInternal(configPath)
 			if err != nil {
 				return err
 			}
 			configs = append(configs, dirConfigs...)
 		} else {
-			config, err := loadConfigFromFile(configPath)
+			config, err := loadConfigFromFileInternal(configPath)
 			if err != nil {
 				return err
 			}
@@ -179,7 +179,7 @@ func (x *Action) Configure(ctx context.Context) error {
 	return nil
 }
 
-func loadConfigFromFile(filePath string) (*Config, error) {
+func loadConfigFromFileInternal(filePath string) (*Config, error) {
 	data, err := os.ReadFile(filepath.Clean(filePath))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to read configuration file", goerr.V("path", filePath))
@@ -193,7 +193,7 @@ func loadConfigFromFile(filePath string) (*Config, error) {
 	return &config, nil
 }
 
-func loadConfigsFromDir(dirPath string) ([]*Config, error) {
+func loadConfigsFromDirInternal(dirPath string) ([]*Config, error) {
 	var configs []*Config
 
 	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
@@ -210,7 +210,7 @@ func loadConfigsFromDir(dirPath string) ([]*Config, error) {
 			return nil
 		}
 
-		config, err := loadConfigFromFile(path)
+		config, err := loadConfigFromFileInternal(path)
 		if err != nil {
 			return err
 		}

@@ -146,8 +146,8 @@ func TestBigQuery_Query(t *testing.T) {
 			// Get query results
 			runResult, err = action.Run(ctx, "bigquery_result", map[string]any{
 				"query_id": queryID,
-				"limit":    100,
-				"offset":   0,
+				"limit":    100.0,
+				"offset":   0.0,
 			})
 			gt.NoError(t, err)
 			gt.NotEqual(t, runResult, nil)
@@ -160,8 +160,8 @@ func TestBigQuery_Query(t *testing.T) {
 			if totalRows > 1 {
 				result1, err := action.Run(ctx, "bigquery_result", map[string]any{
 					"query_id": queryID,
-					"limit":    1,
-					"offset":   0,
+					"limit":    1.0,
+					"offset":   0.0,
 				})
 				gt.NoError(t, err).Required()
 				gt.NotEqual(t, result1, nil)
@@ -169,8 +169,8 @@ func TestBigQuery_Query(t *testing.T) {
 
 				result2, err := action.Run(ctx, "bigquery_result", map[string]any{
 					"query_id": queryID,
-					"limit":    1,
-					"offset":   0,
+					"limit":    1.0,
+					"offset":   0.0,
 				})
 				gt.NoError(t, err)
 				gt.NotEqual(t, result2, nil)
@@ -180,8 +180,8 @@ func TestBigQuery_Query(t *testing.T) {
 
 				result3, err := action.Run(ctx, "bigquery_result", map[string]any{
 					"query_id": queryID,
-					"limit":    1,
-					"offset":   1,
+					"limit":    1.0,
+					"offset":   1.0,
 				})
 				gt.NoError(t, err)
 				gt.NotEqual(t, result3, nil)

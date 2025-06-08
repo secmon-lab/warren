@@ -11,10 +11,6 @@ If there are markdown files in `.todo/` directory, refer to the markdown files a
 - You can update markdown files in `.todo/` ONLY filling checkbox.
 - If you have done work item not in the original markdown, you should add the item you implemented to the list. However DO NOT remove and modify existing work items.
 
-# Restriction
-
-- DO NOT REMOVE frontend/dist/.gitkeep
-
 # Coding Guideline
 
 - Do not expose unnecessary method, variable and type.

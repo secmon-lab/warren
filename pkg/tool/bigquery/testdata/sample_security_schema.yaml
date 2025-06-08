@@ -1,0 +1,75 @@
+dataset_id: security_logs
+table_id: auth_events
+description: Authentication and authorization events collected from various systems for security monitoring and incident investigation
+columns:
+  - name: timestamp
+    type: TIMESTAMP
+    description: Timestamp when the authentication event occurred (UTC)
+    
+  - name: user_id
+    type: STRING
+    description: Unique identifier for the user attempting authentication
+    
+  - name: username
+    type: STRING
+    description: Human-readable username used for authentication
+    
+  - name: email
+    type: STRING
+    description: Email address associated with the user account
+    
+  - name: source_ip
+    type: STRING
+    description: Source IP address from which the authentication attempt originated
+    
+  - name: user_agent
+    type: STRING
+    description: HTTP User-Agent string from the client browser or application
+    
+  - name: event_type
+    type: STRING
+    description: Type of authentication event (login, logout, password_change, mfa_challenge, etc.)
+    
+  - name: auth_method
+    type: STRING
+    description: Authentication method used (password, mfa, sso, api_key, certificate)
+    
+  - name: success
+    type: BOOLEAN
+    description: Whether the authentication attempt was successful
+    
+  - name: failure_reason
+    type: STRING
+    description: Specific reason for authentication failure (invalid_password, account_locked, mfa_failed, etc.)
+    
+  - name: session_id
+    type: STRING
+    description: Unique session identifier for successful authentications
+    
+  - name: device_fingerprint
+    type: STRING
+    description: Unique identifier for the device used for authentication
+    
+  - name: country_code
+    type: STRING
+    description: Two-letter country code derived from IP geolocation
+    
+  - name: city
+    type: STRING
+    description: City name derived from IP geolocation
+    
+  - name: organization
+    type: STRING
+    description: Organization name associated with the user account
+    
+  - name: risk_score
+    type: INTEGER
+    description: Calculated risk score from 0-100 based on behavioral analysis and threat intelligence
+    
+  - name: threat_indicators
+    type: STRING
+    description: Comma-separated list of threat indicators detected (suspicious_ip, known_bot, credential_stuffing, etc.)
+    
+  - name: is_admin
+    type: BOOLEAN
+    description: Whether the authenticated user has administrative privileges 
