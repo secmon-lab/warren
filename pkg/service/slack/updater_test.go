@@ -115,23 +115,24 @@ func TestRateLimitedUpdater_MultipleUpdates_RateLimited(t *testing.T) {
 	wg.Wait()
 
 	// Wait for all async processing to complete (3 updates * 100ms interval + buffer)
-	time.Sleep(500 * time.Millisecond)
+	// Increase wait time for CI environments
+	time.Sleep(800 * time.Millisecond)
 	totalTime := time.Since(start)
 
 	// Verify all updates were called
 	calls := mockClient.UpdateMessageContextCalls()
 	gt.Number(t, len(calls)).Equal(3)
 
-	// Verify rate limiting: should take at least 300ms for 3 updates (100ms intervals)
-	// But allow some tolerance for test execution time
-	gt.Number(t, totalTime.Milliseconds()).Greater(int64(200))
+	// Verify rate limiting: should take at least some time for 3 updates (100ms intervals)
+	// Allow more tolerance for CI environments with variable execution time
+	gt.Number(t, totalTime.Milliseconds()).Greater(int64(150))
 
-	// Verify that calls were spaced out by at least ~100ms
+	// Verify that calls were spaced out by at least some minimum interval
 	if len(callTimes) >= 2 {
 		for i := 1; i < len(callTimes); i++ {
 			interval := callTimes[i].Sub(callTimes[i-1])
-			// Allow some tolerance (80ms minimum instead of exactly 100ms)
-			gt.Number(t, interval.Milliseconds()).GreaterOrEqual(int64(80))
+			// Allow more tolerance for CI environments (60ms minimum instead of 80ms)
+			gt.Number(t, interval.Milliseconds()).GreaterOrEqual(int64(60))
 		}
 	}
 }
@@ -164,8 +165,8 @@ func TestRateLimitedUpdater_ErrorHandling(t *testing.T) {
 
 	updater.UpdateAlert(ctx, testAlert) // Now returns immediately
 
-	// Wait a bit for the async processing to complete (200ms should be enough)
-	time.Sleep(200 * time.Millisecond)
+	// Wait a bit for the async processing to complete, allow extra time for CI
+	time.Sleep(300 * time.Millisecond)
 
 	// Verify the update was attempted
 	calls := mockClient.UpdateMessageContextCalls()

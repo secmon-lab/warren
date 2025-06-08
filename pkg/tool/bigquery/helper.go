@@ -3,7 +3,12 @@ package bigquery
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"text/template"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/dustin/go-humanize"
@@ -16,6 +21,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 	"google.golang.org/api/iterator"
+	"gopkg.in/yaml.v3"
 )
 
 func (x *Action) Helper() *cli.Command {
@@ -37,7 +43,8 @@ type generateConfigConfig struct {
 	bigqueryTableID   string
 	tableDescription  string
 	scanLimit         string
-	output            string
+	outputDir         string
+	outputFile        string
 }
 
 func subCommandGenerateConfig() *cli.Command {
@@ -53,39 +60,27 @@ func subCommandGenerateConfig() *cli.Command {
 				Name:        "gemini-project-id",
 				Usage:       "Gemini project ID",
 				Destination: &cfg.geminiProjectID,
-				Sources:     cli.EnvVars("GEMINI_PROJECT_ID"),
+				Sources:     cli.EnvVars("WARREN_GEMINI_PROJECT_ID"),
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "gemini-location",
 				Usage:       "Gemini location",
 				Destination: &cfg.geminiLocation,
-				Sources:     cli.EnvVars("GEMINI_LOCATION"),
-				Required:    true,
-			},
-			&cli.StringFlag{
-				Name:        "bigquery-project-id",
-				Usage:       "BigQuery project ID",
-				Destination: &cfg.bigqueryProjectID,
-				Sources:     cli.EnvVars("BIGQUERY_PROJECT_ID"),
-				Required:    true,
-			},
-			&cli.StringFlag{
-				Name:        "bigquery-dataset-id",
-				Usage:       "BigQuery dataset ID",
-				Destination: &cfg.bigqueryDatasetID,
-				Sources:     cli.EnvVars("BIGQUERY_DATASET_ID"),
-				Required:    true,
+				Sources:     cli.EnvVars("WARREN_GEMINI_LOCATION"),
+				Value:       "us-central1",
 			},
 			&cli.StringFlag{
 				Name:        "bigquery-table-id",
-				Usage:       "BigQuery table ID",
+				Aliases:     []string{"t"},
+				Usage:       "BigQuery table ID in format 'project_id.dataset_id.table_id'",
 				Destination: &cfg.bigqueryTableID,
-				Sources:     cli.EnvVars("BIGQUERY_TABLE_ID"),
+				Sources:     cli.EnvVars("WARREN_BIGQUERY_TABLE_ID"),
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "table-description",
+				Aliases:     []string{"desc"},
 				Usage:       "Description of the table, what type of data is stored in the table",
 				Destination: &cfg.tableDescription,
 				Required:    true,
@@ -97,13 +92,25 @@ func subCommandGenerateConfig() *cli.Command {
 				Value:       "1GB",
 			},
 			&cli.StringFlag{
-				Name:        "output",
-				Usage:       "Output file path. Default is {bigquery-project-id}.{bigquery-dataset-id}.{bigquery-table-id}.yaml",
-				Destination: &cfg.output,
+				Name:        "output-dir",
+				Usage:       "Output directory (default: current directory)",
+				Destination: &cfg.outputDir,
+				Value:       ".",
+			},
+			&cli.StringFlag{
+				Name:        "output-file",
+				Aliases:     []string{"o"},
+				Usage:       "Output filename (default: {project}.{dataset}.{table}.yaml)",
+				Destination: &cfg.outputFile,
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			return generateConfig(ctx, cfg)
+			// Parse table-id from flag
+			if err := parseTableID(cfg.bigqueryTableID, &cfg); err != nil {
+				return goerr.Wrap(err, "failed to parse table ID")
+			}
+
+			return generateConfigInternal(ctx, cfg)
 		},
 	}
 }
@@ -114,11 +121,111 @@ var generateConfigQueryPrompt string
 //go:embed prompt/generate_config_schema.md
 var generateConfigSchemaPrompt string
 
-func generateConfig(ctx context.Context, cfg generateConfigConfig) error {
+// parseTableID parses table ID in format "project_id.dataset_id.table_id"
+func parseTableID(tableID string, cfg *generateConfigConfig) error {
+	parts := strings.Split(tableID, ".")
+	if len(parts) != 3 {
+		return goerr.New("table ID must be in format 'project_id.dataset_id.table_id'")
+	}
+
+	// Set all parts from the table ID
+	cfg.bigqueryProjectID = parts[0]
+	cfg.bigqueryDatasetID = parts[1]
+	cfg.bigqueryTableID = parts[2]
+
+	return nil
+}
+
+// generateOutputPath generates the output file path from config
+func generateOutputPath(cfg generateConfigConfig) (string, error) {
+	filename := cfg.outputFile
+	if filename == "" {
+		filename = fmt.Sprintf("%s.%s.%s.yaml", cfg.bigqueryProjectID, cfg.bigqueryDatasetID, cfg.bigqueryTableID)
+	}
+
+	// If filename contains template variables, process them
+	if strings.Contains(filename, "{") {
+		tmpl, err := template.New("filename").Parse(filename)
+		if err != nil {
+			return "", goerr.Wrap(err, "failed to parse filename template")
+		}
+
+		var buf strings.Builder
+		err = tmpl.Execute(&buf, map[string]string{
+			"project_id": cfg.bigqueryProjectID,
+			"dataset_id": cfg.bigqueryDatasetID,
+			"table_id":   cfg.bigqueryTableID,
+		})
+		if err != nil {
+			return "", goerr.Wrap(err, "failed to execute filename template")
+		}
+		filename = buf.String()
+	}
+
+	return filepath.Join(cfg.outputDir, filename), nil
+}
+
+// generateConfigSchema creates a JSON schema for the Config struct
+//
+// This function addresses the circular reference issue in ColumnConfig.Fields ([]ColumnConfig)
+// which would cause infinite recursion with pure reflection-based schema generation.
+//
+// While we could use prompt.ToSchema() for non-circular parts, we maintain a static schema here to:
+// 1. Avoid runtime errors from circular references
+// 2. Ensure schema consistency and reliability
+// 3. Maintain backward compatibility with existing LLM prompts
+//
+// TODO: Consider implementing a more sophisticated schema generator that can handle
+// circular references by using JSON Schema's $ref mechanism in the future.
+func generateConfigSchema() string {
+	// This schema must be kept in sync with the Config, ColumnConfig, and PartitioningConfig structs
+	return `{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "dataset_id": { "type": "string" },
+    "table_id": { "type": "string" },
+    "description": { "type": "string" },
+    "columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "value_example": { "type": "string" },
+          "type": { "type": "string" },
+          "fields": {
+            "type": "array",
+            "items": { "type": "object" }
+          }
+        }
+      }
+    },
+    "partitioning": {
+      "type": "object",
+      "properties": {
+        "field": { "type": "string" },
+        "type": { "type": "string" },
+        "time_unit": { "type": "string" }
+      }
+    }
+  }
+}`
+}
+
+func generateConfigInternal(ctx context.Context, cfg generateConfigConfig) error {
+	factory := &DefaultBigQueryClientFactory{}
+	return generateConfigWithFactoryInternal(ctx, cfg, factory)
+}
+
+func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigConfig, factory BigQueryClientFactory) error {
 	logger := logging.From(ctx)
 
-	if cfg.output == "" {
-		cfg.output = fmt.Sprintf("%s.%s.%s.yaml", cfg.bigqueryProjectID, cfg.bigqueryDatasetID, cfg.bigqueryTableID)
+	// Generate output path
+	outputPath, err := generateOutputPath(cfg)
+	if err != nil {
+		return goerr.Wrap(err, "failed to generate output path")
 	}
 
 	scanLimit, err := humanize.ParseBytes(cfg.scanLimit)
@@ -126,9 +233,9 @@ func generateConfig(ctx context.Context, cfg generateConfigConfig) error {
 		return goerr.Wrap(err, "failed to parse scan limit")
 	}
 
-	logger.Info("Generating config", "output", cfg.output)
+	logger.Info("Generating config", "output", outputPath)
 
-	bqClient, err := bigquery.NewClient(ctx, cfg.bigqueryProjectID)
+	bqClient, err := factory.NewClient(ctx, cfg.bigqueryProjectID)
 	if err != nil {
 		return err
 	}
@@ -159,10 +266,10 @@ func generateConfig(ctx context.Context, cfg generateConfigConfig) error {
 		return err
 	}
 
-	outputSchema, err := prompt.ToSchema(Config{}).Stringify()
-	if err != nil {
-		return err
-	}
+	// Generate JSON schema from the Config struct
+	// Note: We use a simplified representation to avoid circular reference issues
+	// from ColumnConfig.Fields which references ColumnConfig itself
+	outputSchema := generateConfigSchema()
 
 	queryPrompt, err := prompt.Generate(ctx, generateConfigQueryPrompt, map[string]any{
 		"table_description": cfg.tableDescription,
@@ -191,6 +298,7 @@ func generateConfig(ctx context.Context, cfg generateConfigConfig) error {
 			bigqueryClient: bqClient,
 			scanLimitStr:   cfg.scanLimit,
 			scanLimit:      scanLimit,
+			outputPath:     outputPath,
 		}),
 	)
 
@@ -204,7 +312,8 @@ func generateConfig(ctx context.Context, cfg generateConfigConfig) error {
 type generateConfigTool struct {
 	scanLimitStr   string
 	scanLimit      uint64
-	bigqueryClient *bigquery.Client
+	bigqueryClient BigQueryClient
+	outputPath     string
 }
 
 func (x *generateConfigTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
@@ -241,6 +350,17 @@ func (x *generateConfigTool) Specs(ctx context.Context) ([]gollem.ToolSpec, erro
 			},
 			Required: []string{"query_id"},
 		},
+		{
+			Name:        "generate_config_output",
+			Description: "Generate the final YAML configuration file with the analyzed table metadata",
+			Parameters: map[string]*gollem.Parameter{
+				"config": {
+					Type:        gollem.TypeObject,
+					Description: "The complete configuration object following the BigQuery Config schema",
+				},
+			},
+			Required: []string{"config"},
+		},
 	}, nil
 }
 
@@ -255,7 +375,7 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 		q := x.bigqueryClient.Query(query)
 
 		// Perform dry run to check scan size
-		q.DryRun = true
+		q.SetDryRun(true)
 		job, err := q.Run(ctx)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to dry run query")
@@ -275,7 +395,7 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 		}
 
 		// Execute the actual query
-		q.DryRun = false
+		q.SetDryRun(false)
 		job, err = q.Run(ctx)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to run query")
@@ -307,7 +427,8 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 			}
 
 			rowMap := make(map[string]any)
-			for i, field := range it.Schema {
+			schema := it.Schema()
+			for i, field := range schema {
 				rowMap[field.Name] = row[i]
 			}
 			rows = append(rows, rowMap)
@@ -364,6 +485,22 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 			"has_more":   end < len(rows),
 		}, nil
 
+	case "generate_config_output":
+		config, ok := args["config"].(map[string]any)
+		if !ok {
+			return nil, goerr.New("config parameter is required and must be an object")
+		}
+
+		// Convert to BigQuery Config and save as YAML
+		if err := x.saveConfigAsYAML(config); err != nil {
+			return nil, goerr.Wrap(err, "failed to save config as YAML")
+		}
+
+		return map[string]any{
+			"status":  "success",
+			"message": "Configuration saved successfully",
+		}, nil
+
 	default:
 		return nil, goerr.New("invalid function name", goerr.V("name", name))
 	}
@@ -374,4 +511,30 @@ var queryResultsCache = make(map[string][]map[string]any)
 
 func (x *generateConfigTool) getCachedResults(queryID string) []map[string]any {
 	return queryResultsCache[queryID]
+}
+
+func (x *generateConfigTool) saveConfigAsYAML(config map[string]any) error {
+	// Convert map to BigQuery Config struct
+	configData, err := json.Marshal(config)
+	if err != nil {
+		return goerr.Wrap(err, "failed to marshal config")
+	}
+
+	var bqConfig Config
+	if err := json.Unmarshal(configData, &bqConfig); err != nil {
+		return goerr.Wrap(err, "failed to unmarshal config to BigQuery Config")
+	}
+
+	// Convert to YAML
+	yamlData, err := yaml.Marshal(&bqConfig)
+	if err != nil {
+		return goerr.Wrap(err, "failed to marshal config to YAML")
+	}
+
+	// Write to file
+	if err := os.WriteFile(x.outputPath, yamlData, 0600); err != nil {
+		return goerr.Wrap(err, "failed to write YAML file", goerr.V("path", x.outputPath))
+	}
+
+	return nil
 }
