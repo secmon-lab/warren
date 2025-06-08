@@ -188,6 +188,38 @@ func (r *Firestore) GetLatestAlertListInThread(ctx context.Context, thread slack
 	return lists[0], nil
 }
 
+func (r *Firestore) GetAlertListsInThread(ctx context.Context, thread slack.Thread) ([]*alert.List, error) {
+	iter := r.db.Collection(collectionAlertLists).
+		Where("SlackThread.ChannelID", "==", thread.ChannelID).
+		Where("SlackThread.ThreadID", "==", thread.ThreadID).
+		Documents(ctx)
+
+	var lists []*alert.List
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get alert lists in thread", goerr.V("thread", thread))
+		}
+
+		var alertList alert.List
+		if err := doc.DataTo(&alertList); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert list")
+		}
+
+		lists = append(lists, &alertList)
+	}
+
+	// Sort by CreatedAt in ascending order (oldest first)
+	sort.Slice(lists, func(i, j int) bool {
+		return lists[i].CreatedAt.Before(lists[j].CreatedAt)
+	})
+
+	return lists, nil
+}
+
 func (r *Firestore) GetLatestAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
 	iter := r.db.Collection(collectionAlerts).
 		Where("SlackThread.ChannelID", "==", thread.ChannelID).

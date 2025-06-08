@@ -2,6 +2,7 @@ package usecase_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -573,4 +574,306 @@ func TestSlackActionResolveTicket(t *testing.T) {
 	// Verify results
 	gt.NoError(t, err)
 	gt.Value(t, len(slackMock.OpenViewCalls())).Equal(1)
+}
+
+func TestSlackActionAckAlert_MultipleAlertLists(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	// Setup mocks and repositories
+	repo := repository.NewMemory()
+
+	// Create test alert
+	testAlert := alert.Alert{
+		ID:        types.NewAlertID(),
+		CreatedAt: now,
+		Metadata: alert.Metadata{
+			Title:       "Test Alert",
+			Description: "Test Description",
+		},
+		SlackThread: &slack.Thread{
+			ChannelID: "test-channel",
+			ThreadID:  "test-thread",
+		},
+		Embedding: []float32{0.1, 0.2, 0.3},
+		Data:      map[string]interface{}{"key": "value"},
+	}
+
+	// Store test alert
+	if err := repo.PutAlert(ctx, testAlert); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create multiple alert lists in the same thread
+	alertList1 := &alert.List{
+		ID: types.NewAlertListID(),
+		Metadata: alert.Metadata{
+			Title:       "Alert List 1",
+			Description: "First alert list",
+		},
+		AlertIDs: []types.AlertID{testAlert.ID},
+		SlackThread: &slack.Thread{
+			ChannelID: "test-channel",
+			ThreadID:  "test-thread",
+		},
+		CreatedAt: now.Add(-time.Hour),
+		CreatedBy: &slack.User{ID: "user1", Name: "User 1"},
+	}
+
+	alertList2 := &alert.List{
+		ID: types.NewAlertListID(),
+		Metadata: alert.Metadata{
+			Title:       "Alert List 2",
+			Description: "Second alert list",
+		},
+		AlertIDs: []types.AlertID{testAlert.ID},
+		SlackThread: &slack.Thread{
+			ChannelID: "test-channel",
+			ThreadID:  "test-thread",
+		},
+		CreatedAt: now.Add(-30 * time.Minute),
+		CreatedBy: &slack.User{ID: "user2", Name: "User 2"},
+	}
+
+	// Store alert lists
+	if err := repo.PutAlertList(ctx, alertList1); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.PutAlertList(ctx, alertList2); err != nil {
+		t.Fatal(err)
+	}
+
+	var postMessageCalls []slack_sdk.MsgOption
+	var postMessageCallCount int
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			postMessageCallCount++
+			postMessageCalls = append(postMessageCalls, options...)
+
+			// Return different timestamps for different calls
+			return "test-channel", fmt.Sprintf("timestamp-%d", postMessageCallCount), nil
+		},
+		UpdateMessageContextFunc: func(ctx context.Context, channelID, timestamp string, options ...slack_sdk.MsgOption) (string, string, string, error) {
+			return channelID, timestamp, "updated-timestamp", nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "test-user",
+				TeamID: "test-team",
+				Team:   "test-team-name",
+			}, nil
+		},
+	}
+
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel",
+		slack_svc.WithUpdaterOptions(
+			slack_svc.WithInterval(1*time.Millisecond),
+			slack_svc.WithRetryInterval(1*time.Millisecond)))
+	gt.NoError(t, err)
+
+	// Create LLM mock
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{
+							`{"title": "Test Ticket", "description": "Test Description", "summary": "Test Summary"}`,
+						},
+					}, nil
+				},
+			}, nil
+		},
+	}
+
+	// Create usecase instance
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackService(slackSvc),
+		usecase.WithLLMClient(llmMock),
+	)
+
+	// Test data
+	user := slack.User{ID: "test-user", Name: "Test User"}
+	thread := slack.Thread{
+		ChannelID: "test-channel",
+		ThreadID:  "test-thread",
+	}
+
+	// Execute test
+	err = uc.HandleSlackInteractionBlockActions(
+		ctx,
+		user,
+		thread,
+		slack.ActionIDAckAlert,
+		testAlert.ID.String(),
+		"trigger-id",
+	)
+
+	// Verify results
+	gt.NoError(t, err)
+
+	// Verify ticket was created
+	tickets, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 0)
+	gt.NoError(t, err)
+	gt.Array(t, tickets).Length(1)
+
+	ticket := tickets[0]
+	gt.Value(t, ticket.Assignee.ID).Equal(user.ID)
+
+	// Verify ticket is in new thread, not original thread
+	gt.Value(t, ticket.SlackThread.ChannelID).Equal("test-channel")
+	// The ticket should NOT be in the original thread
+	gt.Value(t, ticket.SlackThread.ThreadID).NotEqual("test-thread")
+
+	// Verify that multiple PostMessage calls were made (ticket + link + other processing)
+	gt.Value(t, postMessageCallCount >= 2).Equal(true)
+
+	// Verify alert was updated with ticket ID
+	updatedAlert, err := repo.GetAlert(ctx, testAlert.ID)
+	gt.NoError(t, err)
+	gt.Value(t, updatedAlert.TicketID).Equal(ticket.ID)
+
+	// Wait for async alert updates to complete
+	time.Sleep(200 * time.Millisecond)
+}
+
+func TestSlackActionAckAlert_SingleAlertList(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	// Setup mocks and repositories
+	repo := repository.NewMemory()
+
+	// Create test alert
+	testAlert := alert.Alert{
+		ID:        types.NewAlertID(),
+		CreatedAt: now,
+		Metadata: alert.Metadata{
+			Title:       "Test Alert",
+			Description: "Test Description",
+		},
+		SlackThread: &slack.Thread{
+			ChannelID: "test-channel",
+			ThreadID:  "test-thread",
+		},
+		Embedding: []float32{0.1, 0.2, 0.3},
+		Data:      map[string]interface{}{"key": "value"},
+	}
+
+	// Store test alert
+	if err := repo.PutAlert(ctx, testAlert); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create only one alert list in the thread
+	alertList := &alert.List{
+		ID: types.NewAlertListID(),
+		Metadata: alert.Metadata{
+			Title:       "Alert List",
+			Description: "Single alert list",
+		},
+		AlertIDs: []types.AlertID{testAlert.ID},
+		SlackThread: &slack.Thread{
+			ChannelID: "test-channel",
+			ThreadID:  "test-thread",
+		},
+		CreatedAt: now.Add(-time.Hour),
+		CreatedBy: &slack.User{ID: "user1", Name: "User 1"},
+	}
+
+	// Store alert list
+	if err := repo.PutAlertList(ctx, alertList); err != nil {
+		t.Fatal(err)
+	}
+
+	var postMessageCallCount int
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			postMessageCallCount++
+			return "test-channel", fmt.Sprintf("timestamp-%d", postMessageCallCount), nil
+		},
+		UpdateMessageContextFunc: func(ctx context.Context, channelID, timestamp string, options ...slack_sdk.MsgOption) (string, string, string, error) {
+			return channelID, timestamp, "updated-timestamp", nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "test-user",
+				TeamID: "test-team",
+				Team:   "test-team-name",
+			}, nil
+		},
+	}
+
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel",
+		slack_svc.WithUpdaterOptions(
+			slack_svc.WithInterval(1*time.Millisecond),
+			slack_svc.WithRetryInterval(1*time.Millisecond)))
+	gt.NoError(t, err)
+
+	// Create LLM mock
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{
+							`{"title": "Test Ticket", "description": "Test Description", "summary": "Test Summary"}`,
+						},
+					}, nil
+				},
+			}, nil
+		},
+	}
+
+	// Create usecase instance
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackService(slackSvc),
+		usecase.WithLLMClient(llmMock),
+	)
+
+	// Test data
+	user := slack.User{ID: "test-user", Name: "Test User"}
+	thread := slack.Thread{
+		ChannelID: "test-channel",
+		ThreadID:  "test-thread",
+	}
+
+	// Execute test
+	err = uc.HandleSlackInteractionBlockActions(
+		ctx,
+		user,
+		thread,
+		slack.ActionIDAckAlert,
+		testAlert.ID.String(),
+		"trigger-id",
+	)
+
+	// Verify results
+	gt.NoError(t, err)
+
+	// Verify ticket was created
+	tickets, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 0)
+	gt.NoError(t, err)
+	gt.Array(t, tickets).Length(1)
+
+	ticket := tickets[0]
+	gt.Value(t, ticket.Assignee.ID).Equal(user.ID)
+
+	// Verify ticket is in the SAME thread (original thread)
+	gt.Value(t, ticket.SlackThread.ChannelID).Equal("test-channel")
+	gt.Value(t, ticket.SlackThread.ThreadID).Equal("test-thread")
+
+	// Verify alert was updated with ticket ID
+	updatedAlert, err := repo.GetAlert(ctx, testAlert.ID)
+	gt.NoError(t, err)
+	gt.Value(t, updatedAlert.TicketID).Equal(ticket.ID)
+
+	// Wait for async alert updates to complete
+	time.Sleep(200 * time.Millisecond)
 }

@@ -131,6 +131,10 @@ func (x *Service) TeamID() string {
 	return x.teamID
 }
 
+func (x *Service) ToMsgURL(channelID, threadID string) string {
+	return x.slackMetadata.ToMsgURL(channelID, threadID)
+}
+
 func (x *Service) NewThread(thread model.Thread) *ThreadService {
 	return &ThreadService{
 		slackMetadata:      x.slackMetadata,
@@ -189,6 +193,37 @@ func (x *Service) PostAlert(ctx context.Context, alert alert.Alert) (*ThreadServ
 	return thread, nil
 }
 
+func (x *Service) UpdateAlerts(ctx context.Context, alerts alert.Alerts) {
+	for _, alert := range alerts {
+		x.rateLimitedUpdater.UpdateAlert(ctx, *alert)
+	}
+}
+
+// PostTicket posts a ticket to a new thread and returns the thread service
+func (x *Service) PostTicket(ctx context.Context, ticket ticket.Ticket, alerts alert.Alerts) (*ThreadService, string, error) {
+	blocks := buildTicketBlocks(ticket, alerts, x.slackMetadata)
+
+	channelID, ts, err := x.client.PostMessageContext(
+		ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionBroadcast(),
+	)
+	if err != nil {
+		return nil, "", goerr.Wrap(err, "failed to post ticket", goerr.V("channelID", x.channelID), goerr.V("blocks", blocks))
+	}
+
+	newThread := &ThreadService{
+		channelID:          channelID,
+		threadID:           ts,
+		client:             x.client,
+		rateLimitedUpdater: x.rateLimitedUpdater,
+		slackMetadata:      x.slackMetadata,
+	}
+
+	return newThread, ts, nil
+}
+
 type ThreadService struct {
 	channelID          string
 	threadID           string
@@ -241,6 +276,23 @@ func (x *ThreadService) PostTicket(ctx context.Context, ticket ticket.Ticket, al
 	}
 
 	return ticket.SlackMessageID, nil
+}
+
+// PostLinkToTicket posts a link to a ticket in the current thread
+func (x *ThreadService) PostLinkToTicket(ctx context.Context, ticketURL, ticketTitle string) error {
+	message := fmt.Sprintf("🎫 Ticket created: <%s|%s>", ticketURL, ticketTitle)
+
+	_, _, err := x.client.PostMessageContext(
+		ctx,
+		x.channelID,
+		slack.MsgOptionText(message, false),
+		slack.MsgOptionTS(x.threadID),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post link to ticket", goerr.V("channelID", x.channelID), goerr.V("threadID", x.threadID), goerr.V("message", message))
+	}
+
+	return nil
 }
 
 func (x *ThreadService) AttachFile(ctx context.Context, title, fileName string, data []byte) error {

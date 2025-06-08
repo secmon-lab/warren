@@ -627,6 +627,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			GetAlertListByThreadFunc: func(ctx context.Context, thread modelslack.Thread) (*alert.List, error) {
 //				panic("mock out the GetAlertListByThread method")
 //			},
+//			GetAlertListsInThreadFunc: func(ctx context.Context, thread modelslack.Thread) ([]*alert.List, error) {
+//				panic("mock out the GetAlertListsInThread method")
+//			},
 //			GetAlertWithoutEmbeddingFunc: func(ctx context.Context) (alert.Alerts, error) {
 //				panic("mock out the GetAlertWithoutEmbedding method")
 //			},
@@ -744,6 +747,9 @@ type RepositoryMock struct {
 
 	// GetAlertListByThreadFunc mocks the GetAlertListByThread method.
 	GetAlertListByThreadFunc func(ctx context.Context, thread modelslack.Thread) (*alert.List, error)
+
+	// GetAlertListsInThreadFunc mocks the GetAlertListsInThread method.
+	GetAlertListsInThreadFunc func(ctx context.Context, thread modelslack.Thread) ([]*alert.List, error)
 
 	// GetAlertWithoutEmbeddingFunc mocks the GetAlertWithoutEmbedding method.
 	GetAlertWithoutEmbeddingFunc func(ctx context.Context) (alert.Alerts, error)
@@ -925,6 +931,13 @@ type RepositoryMock struct {
 		}
 		// GetAlertListByThread holds details about calls to the GetAlertListByThread method.
 		GetAlertListByThread []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Thread is the thread argument value.
+			Thread modelslack.Thread
+		}
+		// GetAlertListsInThread holds details about calls to the GetAlertListsInThread method.
+		GetAlertListsInThread []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Thread is the thread argument value.
@@ -1124,6 +1137,7 @@ type RepositoryMock struct {
 	lockGetAlert                    sync.RWMutex
 	lockGetAlertList                sync.RWMutex
 	lockGetAlertListByThread        sync.RWMutex
+	lockGetAlertListsInThread       sync.RWMutex
 	lockGetAlertWithoutEmbedding    sync.RWMutex
 	lockGetAlertWithoutTicket       sync.RWMutex
 	lockGetAlertsBySpan             sync.RWMutex
@@ -1733,6 +1747,46 @@ func (mock *RepositoryMock) GetAlertListByThreadCalls() []struct {
 	mock.lockGetAlertListByThread.RLock()
 	calls = mock.calls.GetAlertListByThread
 	mock.lockGetAlertListByThread.RUnlock()
+	return calls
+}
+
+// GetAlertListsInThread calls GetAlertListsInThreadFunc.
+func (mock *RepositoryMock) GetAlertListsInThread(ctx context.Context, thread modelslack.Thread) ([]*alert.List, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Thread modelslack.Thread
+	}{
+		Ctx:    ctx,
+		Thread: thread,
+	}
+	mock.lockGetAlertListsInThread.Lock()
+	mock.calls.GetAlertListsInThread = append(mock.calls.GetAlertListsInThread, callInfo)
+	mock.lockGetAlertListsInThread.Unlock()
+	if mock.GetAlertListsInThreadFunc == nil {
+		var (
+			listsOut []*alert.List
+			errOut   error
+		)
+		return listsOut, errOut
+	}
+	return mock.GetAlertListsInThreadFunc(ctx, thread)
+}
+
+// GetAlertListsInThreadCalls gets all the calls that were made to GetAlertListsInThread.
+// Check the length with:
+//
+//	len(mockedRepository.GetAlertListsInThreadCalls())
+func (mock *RepositoryMock) GetAlertListsInThreadCalls() []struct {
+	Ctx    context.Context
+	Thread modelslack.Thread
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Thread modelslack.Thread
+	}
+	mock.lockGetAlertListsInThread.RLock()
+	calls = mock.calls.GetAlertListsInThread
+	mock.lockGetAlertListsInThread.RUnlock()
 	return calls
 }
 
