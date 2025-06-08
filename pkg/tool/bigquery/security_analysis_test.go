@@ -286,3 +286,32 @@ func TestGenerateExamples(t *testing.T) {
 		})
 	}
 }
+
+func TestCapitalizeFirst(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{"", ""},
+		{"a", "A"},
+		{"hello", "Hello"},
+		{"HELLO", "HELLO"},
+		{"identity", "Identity"},
+		{"network", "Network"},
+		{"temporal", "Temporal"},
+		{"authentication", "Authentication"},
+		{"threat", "Threat"},
+		{"hash", "Hash"},
+		{"geographic", "Geographic"},
+		{"event", "Event"},
+		{"resource", "Resource"},
+		{"metadata", "Metadata"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.input, func(t *testing.T) {
+			result := capitalizeFirst(tc.input)
+			gt.Equal(t, result, tc.expected)
+		})
+	}
+}

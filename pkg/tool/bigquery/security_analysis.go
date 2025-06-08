@@ -384,6 +384,14 @@ func (x *generateConfigTool) EnhanceSecurityAnalysis(ctx context.Context) error 
 	return nil
 }
 
+// capitalizeFirst capitalizes the first letter of a string
+func capitalizeFirst(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
+
 // GenerateSecurityPrompt creates a security-focused prompt for LLM analysis
 func generateSecurityPrompt(fields []securityField) string {
 	var prompt strings.Builder
@@ -397,7 +405,7 @@ func generateSecurityPrompt(fields []securityField) string {
 	}
 
 	for category, categoryFields := range categories {
-		prompt.WriteString(fmt.Sprintf("### %s Fields\n", strings.Title(string(category))))
+		prompt.WriteString(fmt.Sprintf("### %s Fields\n", capitalizeFirst(string(category))))
 		for _, field := range categoryFields {
 			prompt.WriteString(fmt.Sprintf("- **%s** (%s): %s\n", field.Name, field.Type, field.Description))
 			if len(field.Examples) > 0 {
