@@ -2,6 +2,7 @@ package bigquery_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -115,4 +116,29 @@ func TestDefaultBigQueryClientFactory(t *testing.T) {
 	// This test would require actual BigQuery credentials
 	// Skip if not running integration tests
 	t.Skip("Requires actual BigQuery credentials for integration testing")
+}
+
+func TestConfigSchemaGeneration(t *testing.T) {
+	// Test that the config schema generation works correctly
+	schema := bq.GenerateConfigSchema()
+	gt.True(t, len(schema) > 0)
+
+	// Verify that the schema contains expected fields
+	gt.S(t, schema).Contains("dataset_id")
+	gt.S(t, schema).Contains("table_id")
+	gt.S(t, schema).Contains("description")
+	gt.S(t, schema).Contains("columns")
+	gt.S(t, schema).Contains("partitioning")
+
+	// Verify that nested structures are included
+	gt.S(t, schema).Contains("value_example")
+	gt.S(t, schema).Contains("fields")
+	gt.S(t, schema).Contains("time_unit")
+
+	// Verify it's valid JSON
+	var parsed map[string]any
+	err := json.Unmarshal([]byte(schema), &parsed)
+	gt.NoError(t, err)
+
+	t.Logf("Generated schema: %s", schema)
 }

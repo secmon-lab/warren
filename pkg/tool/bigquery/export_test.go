@@ -12,6 +12,7 @@ type MockBigQueryClientFactory = mockBigQueryClientFactory
 
 // Test exports for helper functions
 var GenerateConfigWithFactory = generateConfigWithFactoryInternal
+var GenerateConfigSchema = generateConfigSchema
 
 // Test exports for security analysis
 var AnalyzeSecurityFields = analyzesecurityFields

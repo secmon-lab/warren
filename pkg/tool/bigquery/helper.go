@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -166,6 +165,55 @@ func generateOutputPath(cfg generateConfigConfig) (string, error) {
 	return filepath.Join(cfg.outputDir, filename), nil
 }
 
+// generateConfigSchema creates a JSON schema for the Config struct
+//
+// This function addresses the circular reference issue in ColumnConfig.Fields ([]ColumnConfig)
+// which would cause infinite recursion with pure reflection-based schema generation.
+//
+// While we could use prompt.ToSchema() for non-circular parts, we maintain a static schema here to:
+// 1. Avoid runtime errors from circular references
+// 2. Ensure schema consistency and reliability
+// 3. Maintain backward compatibility with existing LLM prompts
+//
+// TODO: Consider implementing a more sophisticated schema generator that can handle
+// circular references by using JSON Schema's $ref mechanism in the future.
+func generateConfigSchema() string {
+	// This schema must be kept in sync with the Config, ColumnConfig, and PartitioningConfig structs
+	return `{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "dataset_id": { "type": "string" },
+    "table_id": { "type": "string" },
+    "description": { "type": "string" },
+    "columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "value_example": { "type": "string" },
+          "type": { "type": "string" },
+          "fields": {
+            "type": "array",
+            "items": { "type": "object" }
+          }
+        }
+      }
+    },
+    "partitioning": {
+      "type": "object",
+      "properties": {
+        "field": { "type": "string" },
+        "type": { "type": "string" },
+        "time_unit": { "type": "string" }
+      }
+    }
+  }
+}`
+}
+
 func generateConfigInternal(ctx context.Context, cfg generateConfigConfig) error {
 	factory := &DefaultBigQueryClientFactory{}
 	return generateConfigWithFactoryInternal(ctx, cfg, factory)
@@ -218,40 +266,10 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 		return err
 	}
 
-	// Use a simplified schema representation to avoid circular reference issues
-	outputSchema := `{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "dataset_id": { "type": "string" },
-    "table_id": { "type": "string" },
-    "description": { "type": "string" },
-    "columns": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "name": { "type": "string" },
-          "description": { "type": "string" },
-          "value_example": { "type": "string" },
-          "type": { "type": "string" },
-          "fields": {
-            "type": "array",
-            "items": { "type": "object" }
-          }
-        }
-      }
-    },
-    "partitioning": {
-      "type": "object",
-      "properties": {
-        "field": { "type": "string" },
-        "type": { "type": "string" },
-        "time_unit": { "type": "string" }
-      }
-    }
-  }
-}`
+	// Generate JSON schema from the Config struct
+	// Note: We use a simplified representation to avoid circular reference issues
+	// from ColumnConfig.Fields which references ColumnConfig itself
+	outputSchema := generateConfigSchema()
 
 	queryPrompt, err := prompt.Generate(ctx, generateConfigQueryPrompt, map[string]any{
 		"table_description": cfg.tableDescription,
@@ -282,9 +300,6 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 			scanLimit:      scanLimit,
 			outputPath:     outputPath,
 		}),
-		gollem.WithLogger(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelDebug,
-		}))),
 	)
 
 	if _, err := agent.Prompt(ctx, "Generate config"); err != nil {
@@ -517,7 +532,7 @@ func (x *generateConfigTool) saveConfigAsYAML(config map[string]any) error {
 	}
 
 	// Write to file
-	if err := os.WriteFile(x.outputPath, yamlData, 0644); err != nil {
+	if err := os.WriteFile(x.outputPath, yamlData, 0600); err != nil {
 		return goerr.Wrap(err, "failed to write YAML file", goerr.V("path", x.outputPath))
 	}
 
