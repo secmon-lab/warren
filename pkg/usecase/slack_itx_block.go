@@ -61,10 +61,41 @@ func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread 
 		return goerr.Wrap(err, "failed to fill ticket metadata")
 	}
 
-	ts, err := st.PostTicket(ctx, newTicket, alerts)
+	// Check if there are multiple alert lists in the thread
+	alertLists, err := uc.repository.GetAlertListsInThread(ctx, slackThread)
 	if err != nil {
-		return goerr.Wrap(err, "failed to post ticket")
+		return goerr.Wrap(err, "failed to get alert lists in thread")
 	}
+
+	var ts string
+
+	if len(alertLists) > 1 {
+		// Multiple alert lists exist, post ticket outside thread
+		newThreadSvc, timestamp, err := st.PostTicketOutsideThread(ctx, newTicket, alerts)
+		if err != nil {
+			return goerr.Wrap(err, "failed to post ticket outside thread")
+		}
+		ts = timestamp
+
+		// Update ticket's slack thread to the new thread
+		newTicket.SlackThread = &slack.Thread{
+			ChannelID: newThreadSvc.ChannelID(),
+			ThreadID:  newThreadSvc.ThreadID(),
+		}
+
+		// Post link to the new ticket in the original thread
+		ticketURL := uc.slackService.ToMsgURL(newThreadSvc.ChannelID(), newThreadSvc.ThreadID())
+		if err := st.PostLinkToTicket(ctx, ticketURL, newTicket.Metadata.Title); err != nil {
+			return goerr.Wrap(err, "failed to post link to ticket")
+		}
+	} else {
+		// Single or no alert list, post ticket in the current thread
+		ts, err = st.PostTicket(ctx, newTicket, alerts)
+		if err != nil {
+			return goerr.Wrap(err, "failed to post ticket")
+		}
+	}
+
 	newTicket.SlackMessageID = ts
 	for _, alert := range alerts {
 		alert.TicketID = newTicket.ID
@@ -77,11 +108,7 @@ func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread 
 		return goerr.Wrap(err, "failed to put alert")
 	}
 
-	for _, alert := range alerts {
-		if err := st.UpdateAlert(ctx, *alert); err != nil {
-			return goerr.Wrap(err, "failed to update slack thread")
-		}
-	}
+	uc.slackService.UpdateAlerts(ctx, alerts)
 
 	_ = msg.Trace(ctx, "🎫 Ticket created. Why don't you ask <@%s> about it?", uc.slackService.BotID())
 	return nil

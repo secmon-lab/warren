@@ -147,6 +147,25 @@ func (r *Memory) GetLatestAlertListInThread(ctx context.Context, thread slack.Th
 	return latestList, nil
 }
 
+func (r *Memory) GetAlertListsInThread(ctx context.Context, thread slack.Thread) ([]*alert.List, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var lists []*alert.List
+	for _, list := range r.lists {
+		if list.SlackThread.ChannelID == thread.ChannelID && list.SlackThread.ThreadID == thread.ThreadID {
+			lists = append(lists, list)
+		}
+	}
+
+	// Sort by CreatedAt in ascending order (oldest first)
+	sort.Slice(lists, func(i, j int) bool {
+		return lists[i].CreatedAt.Before(lists[j].CreatedAt)
+	})
+
+	return lists, nil
+}
+
 func (r *Memory) GetTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
