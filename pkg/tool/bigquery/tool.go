@@ -247,7 +247,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 		},
 		{
 			Name:        "bigquery_result",
-			Description: "Get the results of a previously executed query",
+			Description: "Get the results of a previously executed query. Returns rows as JSON string in 'rows_json' field due to Vertex AI type limitations.",
 			Parameters: map[string]*gollem.Parameter{
 				"query_id": {
 					Type:        gollem.TypeString,

@@ -353,7 +353,7 @@ func (x *generateConfigTool) Specs(ctx context.Context) ([]gollem.ToolSpec, erro
 		},
 		{
 			Name:        "bigquery_result",
-			Description: "Get the results of a previously executed query",
+			Description: "Get the results of a previously executed query. Returns rows as JSON string in 'rows_json' field due to Vertex AI type limitations.",
 			Parameters: map[string]*gollem.Parameter{
 				"query_id": {
 					Type:        gollem.TypeString,
@@ -403,17 +403,13 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to dry run query")
 		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to wait for dry run job")
-		}
-		if status.Statistics.TotalBytesProcessed < 0 {
+		if job.LastStatus().Statistics.TotalBytesProcessed < 0 {
 			return nil, goerr.New("invalid negative bytes processed",
-				goerr.V("bytes_processed", status.Statistics.TotalBytesProcessed))
+				goerr.V("bytes_processed", job.LastStatus().Statistics.TotalBytesProcessed))
 		}
-		if uint64(status.Statistics.TotalBytesProcessed) > x.scanLimit {
+		if uint64(job.LastStatus().Statistics.TotalBytesProcessed) > x.scanLimit {
 			return nil, goerr.New("query scan size exceeds limit",
-				goerr.V("scan_size", status.Statistics.TotalBytesProcessed),
+				goerr.V("scan_size", job.LastStatus().Statistics.TotalBytesProcessed),
 				goerr.V("scan_limit", x.scanLimit))
 		}
 
@@ -425,7 +421,7 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 		}
 
 		// Wait for the job to complete
-		status, err = job.Wait(ctx)
+		status, err := job.Wait(ctx)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to wait for job")
 		}
@@ -452,7 +448,8 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 			rowMap := make(map[string]any)
 			schema := it.Schema()
 			for i, field := range schema {
-				rowMap[field.Name] = row[i]
+				// Convert BigQuery values to JSON-safe types for Vertex AI
+				rowMap[field.Name] = convertBigQueryValue(row[i])
 			}
 			rows = append(rows, rowMap)
 		}
@@ -500,8 +497,15 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 			end = len(rows)
 		}
 
+		// Convert rows to JSON string to avoid Vertex AI type conversion issues
+		paginatedRows := rows[offset:end]
+		rowsJSON, err := json.Marshal(paginatedRows)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to marshal rows to JSON")
+		}
+
 		return map[string]any{
-			"rows":       rows[offset:end],
+			"rows_json":  string(rowsJSON),
 			"total_rows": len(rows),
 			"limit":      limit,
 			"offset":     offset,
