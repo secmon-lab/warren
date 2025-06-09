@@ -38,9 +38,10 @@ func (x *Action) Helper() *cli.Command {
 type generateConfigConfig struct {
 	geminiProjectID   string
 	geminiLocation    string
-	bigqueryProjectID string
-	bigqueryDatasetID string
-	bigqueryTableID   string
+	bigqueryProjectID string // BigQuery client project ID
+	tableProjectID    string // Table project ID (parsed from table ID)
+	tableDatasetID    string // Table dataset ID (parsed from table ID)
+	tableTableID      string // Table table ID (parsed from table ID)
 	tableDescription  string
 	scanLimit         string
 	outputDir         string
@@ -49,7 +50,8 @@ type generateConfigConfig struct {
 
 func subCommandGenerateConfig() *cli.Command {
 	var (
-		cfg generateConfigConfig
+		cfg     generateConfigConfig
+		tableID string // temporary variable for parsing
 	)
 	return &cli.Command{
 		Name:    "generate-config",
@@ -71,42 +73,54 @@ func subCommandGenerateConfig() *cli.Command {
 				Value:       "us-central1",
 			},
 			&cli.StringFlag{
+				Name:        "bigquery-project-id",
+				Usage:       "BigQuery client project ID",
+				Destination: &cfg.bigqueryProjectID,
+				Sources:     cli.EnvVars("WARREN_BIGQUERY_PROJECT_ID"),
+				Required:    true,
+			},
+			&cli.StringFlag{
 				Name:        "bigquery-table-id",
 				Aliases:     []string{"t"},
 				Usage:       "BigQuery table ID in format 'project_id.dataset_id.table_id'",
-				Destination: &cfg.bigqueryTableID,
+				Destination: &tableID,
 				Sources:     cli.EnvVars("WARREN_BIGQUERY_TABLE_ID"),
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "table-description",
-				Aliases:     []string{"desc"},
+				Aliases:     []string{"d"},
 				Usage:       "Description of the table, what type of data is stored in the table",
 				Destination: &cfg.tableDescription,
+				Sources:     cli.EnvVars("WARREN_BIGQUERY_TABLE_DESCRIPTION"),
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "scan-limit",
 				Usage:       "Scan limit",
 				Destination: &cfg.scanLimit,
+				Sources:     cli.EnvVars("WARREN_BIGQUERY_SCAN_LIMIT"),
 				Value:       "1GB",
 			},
 			&cli.StringFlag{
 				Name:        "output-dir",
 				Usage:       "Output directory (default: current directory)",
 				Destination: &cfg.outputDir,
+				Sources:     cli.EnvVars("WARREN_BIGQUERY_OUTPUT_DIR"),
 				Value:       ".",
 			},
 			&cli.StringFlag{
 				Name:        "output-file",
 				Aliases:     []string{"o"},
-				Usage:       "Output filename (default: {project}.{dataset}.{table}.yaml)",
+				Usage:       "Output filename",
 				Destination: &cfg.outputFile,
+				Sources:     cli.EnvVars("WARREN_BIGQUERY_OUTPUT_FILE"),
+				Value:       "{{ .project_id }}.{{ .dataset_id }}.{{ .table_id }}.yaml",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			// Parse table-id from flag
-			if err := parseTableID(cfg.bigqueryTableID, &cfg); err != nil {
+			if err := parseTableID(tableID, &cfg); err != nil {
 				return goerr.Wrap(err, "failed to parse table ID")
 			}
 
@@ -128,10 +142,10 @@ func parseTableID(tableID string, cfg *generateConfigConfig) error {
 		return goerr.New("table ID must be in format 'project_id.dataset_id.table_id'")
 	}
 
-	// Set all parts from the table ID
-	cfg.bigqueryProjectID = parts[0]
-	cfg.bigqueryDatasetID = parts[1]
-	cfg.bigqueryTableID = parts[2]
+	// Set table parts from the table ID (completely separate from BigQuery client project)
+	cfg.tableProjectID = parts[0]
+	cfg.tableDatasetID = parts[1]
+	cfg.tableTableID = parts[2]
 
 	return nil
 }
@@ -140,7 +154,7 @@ func parseTableID(tableID string, cfg *generateConfigConfig) error {
 func generateOutputPath(cfg generateConfigConfig) (string, error) {
 	filename := cfg.outputFile
 	if filename == "" {
-		filename = fmt.Sprintf("%s.%s.%s.yaml", cfg.bigqueryProjectID, cfg.bigqueryDatasetID, cfg.bigqueryTableID)
+		filename = fmt.Sprintf("%s.%s.%s.yaml", cfg.tableProjectID, cfg.tableDatasetID, cfg.tableTableID)
 	}
 
 	// If filename contains template variables, process them
@@ -152,9 +166,9 @@ func generateOutputPath(cfg generateConfigConfig) (string, error) {
 
 		var buf strings.Builder
 		err = tmpl.Execute(&buf, map[string]string{
-			"project_id": cfg.bigqueryProjectID,
-			"dataset_id": cfg.bigqueryDatasetID,
-			"table_id":   cfg.bigqueryTableID,
+			"project_id": cfg.tableProjectID,
+			"dataset_id": cfg.tableDatasetID,
+			"table_id":   cfg.tableTableID,
 		})
 		if err != nil {
 			return "", goerr.Wrap(err, "failed to execute filename template")
@@ -246,7 +260,7 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 		return err
 	}
 
-	tableMetadata, err := bqClient.Dataset(cfg.bigqueryDatasetID).Table(cfg.bigqueryTableID).Metadata(ctx)
+	tableMetadata, err := bqClient.Dataset(cfg.tableDatasetID).Table(cfg.tableTableID).Metadata(ctx)
 	if err != nil {
 		return err
 	}
@@ -266,6 +280,10 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 		return err
 	}
 
+	println("======== Schema summary =========")
+	println(schemaSummary)
+	println("=================================")
+
 	// Generate JSON schema from the Config struct
 	// Note: We use a simplified representation to avoid circular reference issues
 	// from ColumnConfig.Fields which references ColumnConfig itself
@@ -276,9 +294,9 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 		"schema_summary":    schemaSummary,
 		"output_schema":     outputSchema,
 		"scan_limit":        cfg.scanLimit,
-		"project_id":        cfg.bigqueryProjectID,
-		"dataset_id":        cfg.bigqueryDatasetID,
-		"table_id":          cfg.bigqueryTableID,
+		"project_id":        cfg.tableProjectID,
+		"dataset_id":        cfg.tableDatasetID,
+		"table_id":          cfg.tableTableID,
 	})
 	if err != nil {
 		return err
@@ -288,6 +306,10 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 		gollem.WithSystemPrompt(queryPrompt),
 		gollem.WithMessageHook(func(ctx context.Context, msg string) error {
 			println(msg)
+			return nil
+		}),
+		gollem.WithToolErrorHook(func(ctx context.Context, err error, tool gollem.FunctionCall) error {
+			println("❌", err.Error())
 			return nil
 		}),
 		gollem.WithToolRequestHook(func(ctx context.Context, tool gollem.FunctionCall) error {
@@ -372,6 +394,7 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 			return nil, goerr.New("query parameter is required")
 		}
 
+		println("🔍", query)
 		q := x.bigqueryClient.Query(query)
 
 		// Perform dry run to check scan size

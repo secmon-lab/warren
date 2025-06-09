@@ -102,6 +102,8 @@ func (x *UseCases) chat(ctx context.Context, target *ticket.Ticket, message stri
 		return goerr.Wrap(err, "failed to build system prompt")
 	}
 
+	threadSvc := x.slackService.NewThread(*target.SlackThread)
+
 	agent := gollem.New(x.llmClient,
 		gollem.WithHistory(history),
 		gollem.WithToolSets(tools...),
@@ -109,7 +111,7 @@ func (x *UseCases) chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
-			msg.Notify(ctx, "💬 %s", message)
+			threadSvc.Reply(ctx, "💬 "+message)
 			return nil
 		}),
 		gollem.WithToolRequestHook(func(ctx context.Context, call gollem.FunctionCall) error {
