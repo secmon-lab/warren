@@ -3,6 +3,7 @@ package bigquery_test
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -277,4 +278,78 @@ func TestBigQuery_WithEnvVars(t *testing.T) {
 			}))
 		})
 	}
+}
+
+func TestBigQuery_Prompt(t *testing.T) {
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "test_config.yaml")
+
+	// Create a test configuration file
+	configContent := `dataset_id: "test_dataset"
+table_id: "test_table"
+description: "Test table for security events"
+columns:
+  - name: "timestamp"
+    description: "Event timestamp"
+    value_example: "2023-01-01 00:00:00"
+    type: "TIMESTAMP"
+  - name: "src_ip"
+    description: "Source IP address"
+    value_example: "192.168.1.1"
+    type: "STRING"
+  - name: "event_type"
+    description: "Type of security event"
+    value_example: "login_failure"
+    type: "STRING"
+partitioning:
+  field: "timestamp"
+  type: "time"
+  time_unit: "daily"
+`
+
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
+	gt.NoError(t, err)
+
+	var action bigquery.Action
+	cmd := cli.Command{
+		Name:  "bigquery",
+		Flags: action.Flags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			gt.NoError(t, action.Configure(ctx))
+
+			// Test Prompt method
+			prompt, err := action.Prompt(ctx)
+			gt.NoError(t, err)
+
+			// Verify the prompt contains expected information
+			gt.S(t, prompt).Contains("Available BigQuery Tables")
+			gt.S(t, prompt).Contains("test_dataset")
+			gt.S(t, prompt).Contains("test_table")
+			gt.S(t, prompt).Contains("Test table for security events")
+			gt.S(t, prompt).Contains("bigquery_query")
+
+			// Verify the prompt does not contain column or partitioning details
+			gt.S(t, prompt).NotContains("timestamp")
+			gt.S(t, prompt).NotContains("src_ip")
+			gt.S(t, prompt).NotContains("Key Columns")
+			gt.S(t, prompt).NotContains("Partitioning")
+
+			return nil
+		},
+	}
+
+	gt.NoError(t, cmd.Run(t.Context(), []string{
+		"bigquery",
+		"--bigquery-project-id", "test-project",
+		"--bigquery-config", configFile,
+	}))
+}
+
+func TestBigQuery_PromptEmpty(t *testing.T) {
+	var action bigquery.Action
+
+	// Test Prompt method without configuration
+	prompt, err := action.Prompt(context.Background())
+	gt.NoError(t, err)
+	gt.Value(t, prompt).Equal("")
 }

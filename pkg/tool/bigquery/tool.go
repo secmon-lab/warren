@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -285,4 +286,29 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			Required: []string{"project_id", "dataset_id", "table_id"},
 		},
 	}, nil
+}
+
+// Prompt returns additional instructions for the system prompt
+// It provides information about available BigQuery tables and their descriptions
+func (x *Action) Prompt(ctx context.Context) (string, error) {
+	if len(x.configs) == 0 {
+		return "", nil
+	}
+
+	var prompt strings.Builder
+	prompt.WriteString("## Available BigQuery Tables\n\n")
+	prompt.WriteString("You have access to the following BigQuery tables for investigation:\n\n")
+
+	for _, config := range x.configs {
+		prompt.WriteString(fmt.Sprintf("### Dataset: %s, Table: %s\n", config.DatasetID, config.TableID))
+		if config.Description != "" {
+			prompt.WriteString(fmt.Sprintf("**Description**: %s\n\n", config.Description))
+		} else {
+			prompt.WriteString("\n")
+		}
+	}
+
+	prompt.WriteString("Use the `bigquery_query` tool to execute SQL queries against these tables for investigation.\n")
+
+	return prompt.String(), nil
 }

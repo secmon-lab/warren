@@ -152,3 +152,7 @@ When you call this command, the system will:
 3. Provide confirmation of the successful update
 
 Use this command after completing your thorough analysis of the alerts to ensure that the findings are properly documented and communicated to the response team.
+
+{{ if .additional_instructions }}
+
+{{ .additional_instructions }}{{ end }}

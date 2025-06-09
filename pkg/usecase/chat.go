@@ -4,9 +4,11 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
@@ -69,10 +71,32 @@ func (x *UseCases) chat(ctx context.Context, target *ticket.Ticket, message stri
 		showAlerts = showAlerts[:3]
 	}
 
+	// Collect additional prompts from tools
+	var toolPrompts []string
+	for _, toolSet := range tools {
+		if tool, ok := toolSet.(interfaces.Tool); ok {
+			additionalPrompt, err := tool.Prompt(ctx)
+			if err != nil {
+				logger.Warn("failed to get prompt from tool", "tool", tool, "error", err)
+				continue
+			}
+			if additionalPrompt != "" {
+				toolPrompts = append(toolPrompts, additionalPrompt)
+			}
+		}
+	}
+
+	// Prepare additional instructions from tool prompts
+	var additionalInstructions string
+	if len(toolPrompts) > 0 {
+		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
+	}
+
 	systemPrompt, err := prompt.Generate(ctx, chatSystemPromptTemplate, map[string]any{
-		"ticket": target,
-		"alerts": showAlerts,
-		"total":  len(alerts),
+		"ticket":                  target,
+		"alerts":                  showAlerts,
+		"total":                   len(alerts),
+		"additional_instructions": additionalInstructions,
 	})
 	if err != nil {
 		return goerr.Wrap(err, "failed to build system prompt")

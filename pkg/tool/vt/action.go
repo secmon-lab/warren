@@ -172,3 +172,8 @@ func (x *Action) LogValue() slog.Value {
 		slog.String("base_url", x.baseURL),
 	)
 }
+
+// Prompt returns additional instructions for the system prompt
+func (x *Action) Prompt(ctx context.Context) (string, error) {
+	return "", nil
+}
