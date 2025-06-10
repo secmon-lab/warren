@@ -22,30 +22,54 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 		return nil, goerr.New("BigQuery project ID is required")
 	}
 
-	var opts []option.ClientOption
-	if x.credentials != "" {
-		opts = append(opts, option.WithCredentialsFile(x.credentials))
-	}
-	if x.impersonateServiceAccount != "" {
-		ts, err := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
-			TargetPrincipal: x.impersonateServiceAccount,
-			Scopes: []string{
-				"https://www.googleapis.com/auth/bigquery",
-				"https://www.googleapis.com/auth/cloud-platform",
-			},
-		})
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to create impersonated credentials")
+	switch name {
+	case "bigquery_table_summary":
+		if len(x.configs) == 0 {
+			return nil, goerr.New("configuration is not loaded")
 		}
-		opts = append(opts, option.WithTokenSource(ts))
-	}
+		var projectID, datasetID, tableID string
+		if pid, ok := args["project_id"].(string); ok {
+			projectID = pid
+		}
+		if did, ok := args["dataset_id"].(string); ok {
+			datasetID = did
+		}
+		if tid, ok := args["table_id"].(string); ok {
+			tableID = tid
+		}
+		return x.getTableSummary(projectID, datasetID, tableID)
 
-	client, err := bigquery.NewClient(ctx, x.projectID, opts...)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create BigQuery client")
-	}
-	defer safe.Close(ctx, client)
+	default:
+		// For other operations that need BigQuery client
+		var opts []option.ClientOption
+		if x.credentials != "" {
+			opts = append(opts, option.WithCredentialsFile(x.credentials))
+		}
+		if x.impersonateServiceAccount != "" {
+			ts, err := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
+				TargetPrincipal: x.impersonateServiceAccount,
+				Scopes: []string{
+					"https://www.googleapis.com/auth/bigquery",
+					"https://www.googleapis.com/auth/cloud-platform",
+				},
+			})
+			if err != nil {
+				return nil, goerr.Wrap(err, "failed to create impersonated credentials")
+			}
+			opts = append(opts, option.WithTokenSource(ts))
+		}
 
+		client, err := bigquery.NewClient(ctx, x.projectID, opts...)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to create BigQuery client")
+		}
+		defer safe.Close(ctx, client)
+
+		return x.runWithClient(ctx, name, args, client)
+	}
+}
+
+func (x *Action) runWithClient(ctx context.Context, name string, args map[string]any, client *bigquery.Client) (map[string]any, error) {
 	switch name {
 	case "bigquery_list_dataset":
 		if len(x.configs) == 0 {
@@ -88,22 +112,6 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 				goerr.V("value", args["offset"]))
 		}
 		return x.getQueryResults(ctx, client, queryID, limit, offset)
-
-	case "bigquery_table_summary":
-		if len(x.configs) == 0 {
-			return nil, goerr.New("configuration is not loaded")
-		}
-		var projectID, datasetID, tableID string
-		if pid, ok := args["project_id"].(string); ok {
-			projectID = pid
-		}
-		if did, ok := args["dataset_id"].(string); ok {
-			datasetID = did
-		}
-		if tid, ok := args["table_id"].(string); ok {
-			tableID = tid
-		}
-		return x.getTableSummary(projectID, datasetID, tableID)
 
 	case "bigquery_schema":
 		projectID, ok := args["project_id"].(string)
