@@ -20,7 +20,6 @@ type Warren struct {
 	repo         interfaces.Repository
 	ticketID     types.TicketID
 	policyClient interfaces.PolicyClient
-	ticket       *ticket.Ticket
 	slackUpdate  SlackUpdateFunc
 }
 
@@ -91,7 +90,6 @@ func (x *Warren) Configure(ctx context.Context) error {
 
 func (x *Warren) LogValue() slog.Value {
 	return slog.GroupValue(
-		slog.Int("alerts.number", len(x.ticket.AlertIDs)),
 		slog.String("ticket.id", string(x.ticketID)),
 	)
 }
