@@ -545,7 +545,6 @@ func (x *ThreadService) PostAlertList(ctx context.Context, list *alert.List) err
 		x.channelID,
 		slack.MsgOptionBlocks(blocks...),
 		slack.MsgOptionTS(x.threadID),
-		slack.MsgOptionBroadcast(),
 	)
 	if err != nil {
 		return goerr.Wrap(err, "failed to post alert list to slack", goerr.V("blocks", blocks))
