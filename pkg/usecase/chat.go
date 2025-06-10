@@ -114,9 +114,11 @@ func (x *UseCases) chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
-			if threadSvc != nil {
-				threadSvc.Reply(ctx, "💬 "+message)
-			}
+			msg.Notify(ctx, "💬 %s", message)
+			return nil
+		}),
+		gollem.WithToolErrorHook(func(ctx context.Context, err error, call gollem.FunctionCall) error {
+			msg.Trace(ctx, "❌ Error: %s", err.Error())
 			return nil
 		}),
 		gollem.WithToolRequestHook(func(ctx context.Context, call gollem.FunctionCall) error {
