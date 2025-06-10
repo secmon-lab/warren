@@ -16,7 +16,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/m-mizutani/clog v0.0.8
 	github.com/m-mizutani/goerr/v2 v2.0.0-beta.2
-	github.com/m-mizutani/gollem v0.3.3-0.20250610010200-c2b04583f3e0
+	github.com/m-mizutani/gollem v0.3.3-0.20250610014616-4578914e538d
 	github.com/m-mizutani/gt v0.0.16
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.1.11

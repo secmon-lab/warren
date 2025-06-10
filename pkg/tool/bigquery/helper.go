@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -323,10 +322,6 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 			scanLimit:      scanLimit,
 			outputPath:     outputPath,
 		}),
-		gollem.WithLogger(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-			Level:     slog.LevelDebug,
-			AddSource: true,
-		}))),
 	)
 
 	if _, err := agent.Prompt(ctx, "Generate config"); err != nil {
