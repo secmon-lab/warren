@@ -21,15 +21,24 @@ func (x *Warren) findNearestTicket(ctx context.Context, args map[string]any) (ma
 		return nil, goerr.Wrap(err, "failed to get duration")
 	}
 
+	// Get current ticket
+	currentTicket, err := x.repo.GetTicket(ctx, x.ticketID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get current ticket")
+	}
+	if currentTicket == nil {
+		return nil, goerr.New("ticket not found", goerr.V("ticket_id", x.ticketID))
+	}
+
 	now := clock.Now(ctx)
-	nearestTickets, err := x.repo.FindNearestTicketsWithSpan(ctx, x.ticket.Embedding, now.Add(-time.Duration(duration)*24*time.Hour), now, int(limit)+1)
+	nearestTickets, err := x.repo.FindNearestTicketsWithSpan(ctx, currentTicket.Embedding, now.Add(-time.Duration(duration)*24*time.Hour), now, int(limit)+1)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to find nearest tickets")
 	}
 
 	var results []*ticket.Ticket
 	for _, t := range nearestTickets {
-		if t.ID == x.ticket.ID {
+		if t.ID == currentTicket.ID {
 			continue
 		}
 		results = append(results, t)
@@ -125,9 +134,6 @@ func (x *Warren) updateFinding(ctx context.Context, args map[string]any) (map[st
 		}
 		slackUpdated = true
 	}
-
-	// Update our internal ticket reference
-	x.ticket = currentTicket
 
 	response := map[string]any{
 		"success":        true,

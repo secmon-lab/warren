@@ -19,7 +19,16 @@ func (x *Warren) getAlerts(ctx context.Context, args map[string]any) (map[string
 		return nil, goerr.Wrap(err, "failed to get offset")
 	}
 
-	alerts, err := x.repo.BatchGetAlerts(ctx, x.ticket.AlertIDs)
+	// Get current ticket
+	currentTicket, err := x.repo.GetTicket(ctx, x.ticketID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get current ticket")
+	}
+	if currentTicket == nil {
+		return nil, goerr.New("ticket not found", goerr.V("ticket_id", x.ticketID))
+	}
+
+	alerts, err := x.repo.BatchGetAlerts(ctx, currentTicket.AlertIDs)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get alerts")
 	}
