@@ -272,7 +272,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			Parameters: map[string]*gollem.Parameter{
 				"project_id": {
 					Type:        gollem.TypeString,
-					Description: "The project ID",
+					Description: "The Google Cloud project ID",
 				},
 				"dataset_id": {
 					Type:        gollem.TypeString,
@@ -300,7 +300,7 @@ func (x *Action) Prompt(ctx context.Context) (string, error) {
 	prompt.WriteString("You have access to the following BigQuery tables for investigation:\n\n")
 
 	for _, config := range x.configs {
-		prompt.WriteString(fmt.Sprintf("### Dataset: %s, Table: %s\n", config.DatasetID, config.TableID))
+		prompt.WriteString(fmt.Sprintf("### Project: %s, Dataset: %s, Table: %s\n", x.projectID, config.DatasetID, config.TableID))
 		if config.Description != "" {
 			prompt.WriteString(fmt.Sprintf("**Description**: %s\n\n", config.Description))
 		} else {
