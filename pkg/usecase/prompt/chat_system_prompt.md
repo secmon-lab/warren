@@ -33,6 +33,7 @@ When receiving security alerts via HTTP API, warren passes the body data as `inp
 - Policies are written in Rego.
 - Policies are evaluated with input data that is posted to `/alert/{format}/{schema}`.
 - Policies can be managed using the `warren.list_policies` and `warren.get_policy` commands.
+- **Important**: The policy package name and file name are different. When using `warren.get_policy`, you need to specify the file name, not the package name. Use `warren.list_policies` to obtain the correct file names.
 - Only policies matching the schema are evaluated. For example, if an alert is received at the path `/alert/raw/my_schema`, the policy in the `alert.my_schema` package is evaluated.
 - The policy has a variable called `alert` which behaves as a set. Elements contained in this set are treated as alerts.
 - The main roles of the policy are:
@@ -136,6 +137,8 @@ There are {{ .total }} alerts in total, but only a portion is shown here. You ca
 ## Updating Finding Information
 
 You can update the finding information of a ticket using the `warren.update_finding` command. This command allows you to record your analysis results and assessment of the alerts bound to the ticket.
+
+**Important**: Only call `warren.update_finding` when you have sufficient information and have completed a thorough analysis. Do not call this command prematurely or as a placeholder when you lack adequate information for proper assessment.
 
 The command requires the following parameters:
 - `summary`: A comprehensive summary of your investigation results and analysis of the alerts. Include key findings, evidence discovered, and overall assessment of the security incident.
