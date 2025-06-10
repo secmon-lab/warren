@@ -102,11 +102,6 @@ func (x *UseCases) chat(ctx context.Context, target *ticket.Ticket, message stri
 		return goerr.Wrap(err, "failed to build system prompt")
 	}
 
-	var threadSvc interfaces.SlackThreadService
-	if x.slackService != nil && target.SlackThread != nil {
-		threadSvc = x.slackService.NewThread(*target.SlackThread)
-	}
-
 	agent := gollem.New(x.llmClient,
 		gollem.WithHistory(history),
 		gollem.WithToolSets(tools...),
