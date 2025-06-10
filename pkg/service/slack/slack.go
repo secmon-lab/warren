@@ -64,29 +64,11 @@ type slackMetadata struct {
 }
 
 func (x slackMetadata) ToMsgURL(channelID, threadID string) string {
-	return x.ToMsgURLWithThread(channelID, threadID, "")
-}
-
-func (x slackMetadata) ToMsgURLWithThread(channelID, messageID, threadID string) string {
-	// Format timestamp for URL (remove decimal point)
-	formattedTimestamp := strings.ReplaceAll(messageID, ".", "")
-
-	var baseURL string
 	if x.enterpriseID == "" {
-		baseURL = fmt.Sprintf("https://%s.slack.com", x.teamName)
-	} else {
-		baseURL = fmt.Sprintf("https://%s.slack.com", x.enterpriseID)
+		return fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", x.teamName, channelID, threadID)
 	}
 
-	// Basic message URL format
-	msgURL := fmt.Sprintf("%s/archives/%s/p%s", baseURL, channelID, formattedTimestamp)
-
-	// If this is a message in a thread, add thread parameters
-	if threadID != "" && threadID != messageID {
-		msgURL += fmt.Sprintf("?thread_ts=%s&cid=%s", threadID, channelID)
-	}
-
-	return msgURL
+	return fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", x.enterpriseID, channelID, threadID)
 }
 
 // ToExternalMsgURL generates an external Slack URL that can be accessed from outside Slack
