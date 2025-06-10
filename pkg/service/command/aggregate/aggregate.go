@@ -22,7 +22,7 @@ func showAggregateHelp(ctx context.Context) {
 
 func parseArgs(ctx context.Context, args []string) (threshold float64, topN int, retErr error) {
 	threshold = 0.99
-	topN = 10
+	topN = 5
 
 	defer func() {
 		if retErr != nil {
