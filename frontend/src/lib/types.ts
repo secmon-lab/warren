@@ -10,6 +10,7 @@ export interface Ticket {
   conclusion?: string;
   reason?: string;
   finding?: Finding;
+  slackLink?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -69,9 +70,9 @@ export const TICKET_STATUS_COLORS = {
 } as const;
 
 // Alert conclusions
-export type AlertConclusion = 
+export type AlertConclusion =
   | "intended"
-  | "unaffected" 
+  | "unaffected"
   | "false_positive"
   | "true_positive";
 
@@ -84,7 +85,8 @@ export const ALERT_CONCLUSION_LABELS: Record<AlertConclusion, string> = {
 
 export const ALERT_CONCLUSION_DESCRIPTIONS: Record<AlertConclusion, string> = {
   intended: "The alert is intended behavior or configuration.",
-  unaffected: "The alert indicates actual attack or vulnerability, but it is no impact.",
+  unaffected:
+    "The alert indicates actual attack or vulnerability, but it is no impact.",
   false_positive: "The alert is not attack or impact on the system.",
   true_positive: "The alert has actual impact on the system.",
 };

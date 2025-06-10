@@ -28,6 +28,7 @@ type SlackClient interface {
 	PostMessageContext(ctx context.Context, channelID string, options ...slack.MsgOption) (string, string, error)
 	UpdateMessageContext(ctx context.Context, channelID, timestamp string, options ...slack.MsgOption) (string, string, string, error)
 	AuthTest() (*slack.AuthTestResponse, error)
+	GetTeamInfo() (*slack.TeamInfo, error)
 	OpenView(triggerID string, view slack.ModalViewRequest) (*slack.ViewResponse, error)
 	UploadFileV2Context(ctx context.Context, params slack.UploadFileV2Parameters) (*slack.FileSummary, error)
 	GetUserInfo(userID string) (*slack.User, error)

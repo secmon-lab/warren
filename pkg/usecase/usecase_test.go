@@ -23,6 +23,13 @@ func TestUseCases_GetUserIcon(t *testing.T) {
 				BotID:  "B123456",
 			}, nil
 		},
+		GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
+			return &slack_sdk.TeamInfo{
+				ID:     "T123456",
+				Name:   "test-team",
+				Domain: "test-workspace",
+			}, nil
+		},
 		GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
 			return &slack_sdk.User{
 				ID: userID,
@@ -73,6 +80,13 @@ func TestUseCases_GetUserProfile(t *testing.T) {
 				TeamID: "T123456",
 				Team:   "test-team",
 				BotID:  "B123456",
+			}, nil
+		},
+		GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
+			return &slack_sdk.TeamInfo{
+				ID:     "T123456",
+				Name:   "test-team",
+				Domain: "test-workspace",
 			}, nil
 		},
 		GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {

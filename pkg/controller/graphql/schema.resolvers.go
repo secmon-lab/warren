@@ -299,6 +299,20 @@ func (r *ticketResolver) Conclusion(ctx context.Context, obj *ticket.Ticket) (*s
 	return &conclusion, nil
 }
 
+// SlackLink is the resolver for the slackLink field.
+func (r *ticketResolver) SlackLink(ctx context.Context, obj *ticket.Ticket) (*string, error) {
+	if obj.SlackThread == nil || r.slackService == nil {
+		return nil, nil
+	}
+
+	slackURL := r.slackService.ToExternalMsgURL(obj.SlackThread.ChannelID, obj.SlackThread.ThreadID)
+	if slackURL == "" {
+		return nil, nil
+	}
+
+	return &slackURL, nil
+}
+
 // CreatedAt is the resolver for the createdAt field.
 func (r *ticketResolver) CreatedAt(ctx context.Context, obj *ticket.Ticket) (string, error) {
 	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil

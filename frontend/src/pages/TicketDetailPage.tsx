@@ -628,6 +628,27 @@ export default function TicketDetailPage() {
                 </div>
               </div>
 
+              {ticket.slackLink && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
+                      Slack
+                    </span>
+                  </div>
+                  <div className="ml-5">
+                    <a
+                      href={ticket.slackLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:text-blue-800 underline flex items-center gap-1">
+                      View in Slack
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
               <Separator />
 
               {/* Status Management */}

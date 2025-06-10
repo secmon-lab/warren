@@ -56,6 +56,7 @@ export const GET_TICKET = gql`
         id
         name
       }
+      slackLink
       createdAt
       updatedAt
       alerts {

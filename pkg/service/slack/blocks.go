@@ -111,7 +111,7 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 	return blocks
 }
 
-func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slackMetadata) []slack.Block {
+func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slackMetadata, frontendURL string) []slack.Block {
 	var blocks []slack.Block
 
 	// Header with Title and emoji
@@ -119,9 +119,17 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 		slack.NewTextBlockObject(slack.PlainTextType, fmt.Sprintf("🎫 %s", ticket.Metadata.Title), false, false),
 	))
 
-	// ID and Description
+	// ID, Description and Frontend Link
+	var idDescText string
+	if frontendURL != "" {
+		ticketURL := fmt.Sprintf("%s/tickets/%s", frontendURL, ticket.ID.String())
+		idDescText = fmt.Sprintf("*ID:* `%s` | <%s|🔗 View Details>\n%s", ticket.ID.String(), ticketURL, ticket.Metadata.Description)
+	} else {
+		idDescText = fmt.Sprintf("*ID:* `%s`\n%s", ticket.ID.String(), ticket.Metadata.Description)
+	}
+
 	blocks = append(blocks, slack.NewSectionBlock(
-		slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*ID:* `%s`\n%s", ticket.ID.String(), ticket.Metadata.Description), false, false),
+		slack.NewTextBlockObject(slack.MarkdownType, idDescText, false, false),
 		nil,
 		nil,
 	))

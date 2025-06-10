@@ -30,6 +30,9 @@ import (
 //			GetConversationInfoFunc: func(input *slackslack.GetConversationInfoInput) (*slackslack.Channel, error) {
 //				panic("mock out the GetConversationInfo method")
 //			},
+//			GetTeamInfoFunc: func() (*slackslack.TeamInfo, error) {
+//				panic("mock out the GetTeamInfo method")
+//			},
 //			GetUserGroupsFunc: func(options ...slackslack.GetUserGroupsOption) ([]slackslack.UserGroup, error) {
 //				panic("mock out the GetUserGroups method")
 //			},
@@ -61,6 +64,9 @@ type SlackClientMock struct {
 	// GetConversationInfoFunc mocks the GetConversationInfo method.
 	GetConversationInfoFunc func(input *slackslack.GetConversationInfoInput) (*slackslack.Channel, error)
 
+	// GetTeamInfoFunc mocks the GetTeamInfo method.
+	GetTeamInfoFunc func() (*slackslack.TeamInfo, error)
+
 	// GetUserGroupsFunc mocks the GetUserGroups method.
 	GetUserGroupsFunc func(options ...slackslack.GetUserGroupsOption) ([]slackslack.UserGroup, error)
 
@@ -88,6 +94,9 @@ type SlackClientMock struct {
 		GetConversationInfo []struct {
 			// Input is the input argument value.
 			Input *slackslack.GetConversationInfoInput
+		}
+		// GetTeamInfo holds details about calls to the GetTeamInfo method.
+		GetTeamInfo []struct {
 		}
 		// GetUserGroups holds details about calls to the GetUserGroups method.
 		GetUserGroups []struct {
@@ -136,6 +145,7 @@ type SlackClientMock struct {
 	}
 	lockAuthTest             sync.RWMutex
 	lockGetConversationInfo  sync.RWMutex
+	lockGetTeamInfo          sync.RWMutex
 	lockGetUserGroups        sync.RWMutex
 	lockGetUserInfo          sync.RWMutex
 	lockOpenView             sync.RWMutex
@@ -208,6 +218,37 @@ func (mock *SlackClientMock) GetConversationInfoCalls() []struct {
 	mock.lockGetConversationInfo.RLock()
 	calls = mock.calls.GetConversationInfo
 	mock.lockGetConversationInfo.RUnlock()
+	return calls
+}
+
+// GetTeamInfo calls GetTeamInfoFunc.
+func (mock *SlackClientMock) GetTeamInfo() (*slackslack.TeamInfo, error) {
+	callInfo := struct {
+	}{}
+	mock.lockGetTeamInfo.Lock()
+	mock.calls.GetTeamInfo = append(mock.calls.GetTeamInfo, callInfo)
+	mock.lockGetTeamInfo.Unlock()
+	if mock.GetTeamInfoFunc == nil {
+		var (
+			teamInfoOut *slackslack.TeamInfo
+			errOut      error
+		)
+		return teamInfoOut, errOut
+	}
+	return mock.GetTeamInfoFunc()
+}
+
+// GetTeamInfoCalls gets all the calls that were made to GetTeamInfo.
+// Check the length with:
+//
+//	len(mockedSlackClient.GetTeamInfoCalls())
+func (mock *SlackClientMock) GetTeamInfoCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockGetTeamInfo.RLock()
+	calls = mock.calls.GetTeamInfo
+	mock.lockGetTeamInfo.RUnlock()
 	return calls
 }
 
