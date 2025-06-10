@@ -308,6 +308,7 @@ func (x *Action) Prompt(ctx context.Context) (string, error) {
 		}
 	}
 
+	prompt.WriteString("**Important**: Before executing any SQL queries, you MUST first use the `bigquery_schema` tool to check the table schema. This ensures you understand the structure, column names, and data types before constructing your queries.\n\n")
 	prompt.WriteString("Use the `bigquery_query` tool to execute SQL queries against these tables for investigation.\n")
 
 	return prompt.String(), nil
