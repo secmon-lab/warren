@@ -1,5 +1,5 @@
 import { useQuery } from "@apollo/client";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -53,9 +53,13 @@ export default function TicketsPage() {
   });
 
   // Sort tickets by createdAt in descending order (newest first)
-  const tickets: Ticket[] = [...(ticketsData?.tickets?.tickets || [])].sort(
-    (a: Ticket, b: Ticket) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  const tickets: Ticket[] = useMemo(
+    () =>
+      [...(ticketsData?.tickets?.tickets || [])].sort(
+        (a: Ticket, b: Ticket) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [ticketsData?.tickets?.tickets]
   );
 
   const handleStatusFilter = (status: TicketStatus | "all") => {

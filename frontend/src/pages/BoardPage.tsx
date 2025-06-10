@@ -65,7 +65,10 @@ export default function BoardPage() {
     },
   });
 
-  const tickets: Ticket[] = useMemo(() => data?.tickets || [], [data?.tickets]);
+  const tickets: Ticket[] = useMemo(
+    () => data?.tickets?.tickets || [],
+    [data?.tickets?.tickets]
+  );
 
   const ticketsByStatus = useMemo(() => {
     return BOARD_STATUSES.reduce((acc, status) => {
