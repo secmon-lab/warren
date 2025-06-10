@@ -155,7 +155,8 @@ func (p *bigQueryRowProcessor) processRow() (map[string]bigquery.Value, error) {
 
 	rowMap := make(map[string]bigquery.Value)
 	for i, field := range p.iterator.Schema {
-		rowMap[field.Name] = row[i]
+		// Convert BigQuery values to JSON-safe types for Vertex AI
+		rowMap[field.Name] = convertBigQueryValue(row[i])
 	}
 	return rowMap, nil
 }
@@ -224,8 +225,14 @@ func (x *Action) processResults(_ context.Context, processor rowProcessor, limit
 		currentRow++
 	}
 
+	// Convert rows to JSON string to avoid Vertex AI type conversion issues
+	rowsJSON, err := json.Marshal(rows)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to marshal rows to JSON")
+	}
+
 	return map[string]any{
-		"rows":       rows,
+		"rows_json":  string(rowsJSON),
 		"total_rows": totalRows,
 		"total_size": totalSize,
 		"limit":      limit,
