@@ -114,6 +114,7 @@ func (x *UseCases) chat(ctx context.Context, target *ticket.Ticket, message stri
 		}),
 		gollem.WithToolErrorHook(func(ctx context.Context, err error, call gollem.FunctionCall) error {
 			msg.Trace(ctx, "❌ Error: %s", err.Error())
+			logger.Error("tool error", "error", err, "call", call)
 			return nil
 		}),
 		gollem.WithToolRequestHook(func(ctx context.Context, call gollem.FunctionCall) error {

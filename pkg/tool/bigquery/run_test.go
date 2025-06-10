@@ -42,6 +42,12 @@ func TestBigQuery(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name:     "get table summary without config",
+			funcName: "bigquery_table_summary",
+			args:     map[string]any{},
+			wantErr:  true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -93,7 +99,7 @@ func TestBigQuery_Specs(t *testing.T) {
 	var action bigquery.Action
 	specs, err := action.Specs(context.Background())
 	gt.NoError(t, err)
-	gt.A(t, specs).Length(4)
+	gt.A(t, specs).Length(5)
 
 	// Check specifications of each tool
 	for _, spec := range specs {
@@ -106,6 +112,11 @@ func TestBigQuery_Specs(t *testing.T) {
 		case "bigquery_result":
 			gt.Map(t, spec.Parameters).HasKey("query_id")
 			gt.Value(t, spec.Parameters["query_id"].Type).Equal("string")
+		case "bigquery_table_summary":
+			gt.Map(t, spec.Parameters).HasKey("project_id")
+			gt.Map(t, spec.Parameters).HasKey("dataset_id")
+			gt.Map(t, spec.Parameters).HasKey("table_id")
+			gt.Value(t, len(spec.Required)).Equal(0) // All parameters are optional
 		case "bigquery_schema":
 			gt.Map(t, spec.Parameters).HasKey("dataset_id")
 			gt.Map(t, spec.Parameters).HasKey("table_id")
@@ -327,6 +338,9 @@ partitioning:
 			gt.S(t, prompt).Contains("test_table")
 			gt.S(t, prompt).Contains("Test table for security events")
 			gt.S(t, prompt).Contains("bigquery_query")
+			gt.S(t, prompt).Contains("bigquery_table_summary")
+			gt.S(t, prompt).Contains("Important Investigation Workflow")
+			gt.S(t, prompt).Contains("First**, use the `bigquery_table_summary`")
 
 			// Verify the prompt does not contain column or partitioning details
 			gt.S(t, prompt).NotContains("timestamp")
@@ -352,4 +366,85 @@ func TestBigQuery_PromptEmpty(t *testing.T) {
 	prompt, err := action.Prompt(context.Background())
 	gt.NoError(t, err)
 	gt.Value(t, prompt).Equal("")
+}
+
+func TestBigQuery_TableSummary(t *testing.T) {
+	var action bigquery.Action
+
+	cmd := cli.Command{
+		Name:  "bigquery",
+		Flags: action.Flags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			gt.NoError(t, action.Configure(ctx))
+
+			// Test getting all table summaries
+			runResult, err := action.Run(ctx, "bigquery_table_summary", map[string]any{})
+			gt.NoError(t, err)
+			gt.NotEqual(t, runResult, nil)
+			gt.Map(t, runResult).HasKey("tables").Required()
+			gt.Map(t, runResult).HasKey("total").Required()
+
+			tables := gt.Cast[[]map[string]any](t, runResult["tables"])
+			gt.Array(t, tables).Length(1) // Should have one table from testdata
+
+			table := tables[0]
+			gt.Map(t, table).HasKey("project_id").Required()
+			gt.Map(t, table).HasKey("dataset_id").Required()
+			gt.Map(t, table).HasKey("table_id").Required()
+			gt.Map(t, table).HasKey("description").Required()
+			gt.Map(t, table).HasKey("columns").Required()
+
+			gt.Value(t, table["dataset_id"]).Equal("test_dataset")
+			gt.Value(t, table["table_id"]).Equal("test_table")
+			gt.Value(t, table["description"]).Equal("Test table for BigQuery actions")
+
+			columns := gt.Cast[[]map[string]any](t, table["columns"])
+			gt.Array(t, columns).Length(4) // id, timestamp, value, metadata
+
+			// Check column structure
+			for _, col := range columns {
+				gt.Map(t, col).HasKey("name").Required()
+				gt.Map(t, col).HasKey("type").Required()
+
+				if col["name"] == "metadata" {
+					gt.Map(t, col).HasKey("has_nested_fields").Required()
+					gt.Map(t, col).HasKey("nested_fields_count").Required()
+					gt.Value(t, col["has_nested_fields"]).Equal(true)
+					gt.Value(t, col["nested_fields_count"]).Equal(2)
+				}
+			}
+
+			// Test filtering by dataset
+			runResult, err = action.Run(ctx, "bigquery_table_summary", map[string]any{
+				"dataset_id": "test_dataset",
+			})
+			gt.NoError(t, err)
+			tables = gt.Cast[[]map[string]any](t, runResult["tables"])
+			gt.Array(t, tables).Length(1)
+
+			// Test filtering by non-existent dataset
+			runResult, err = action.Run(ctx, "bigquery_table_summary", map[string]any{
+				"dataset_id": "non_existent",
+			})
+			gt.NoError(t, err)
+			tables = gt.Cast[[]map[string]any](t, runResult["tables"])
+			gt.Array(t, tables).Length(0)
+
+			// Test filtering by table
+			runResult, err = action.Run(ctx, "bigquery_table_summary", map[string]any{
+				"table_id": "test_table",
+			})
+			gt.NoError(t, err)
+			tables = gt.Cast[[]map[string]any](t, runResult["tables"])
+			gt.Array(t, tables).Length(1)
+
+			return nil
+		},
+	}
+
+	gt.NoError(t, cmd.Run(t.Context(), []string{
+		"bigquery",
+		"--bigquery-project-id", "test-project",
+		"--bigquery-config", "testdata/config.yml",
+	}))
 }

@@ -112,7 +112,7 @@ func New(client interfaces.SlackClient, channelID string, opts ...ServiceOption)
 		channelID:          channelID,
 		client:             client,
 		iconCache:          make(map[string]*userIconCache),
-		iconCacheExpiry:    time.Hour, // 1時間でキャッシュ更新
+		iconCacheExpiry:    time.Hour, // 1 hour
 		profileCache:       make(map[string]*userProfileCache),
 		rateLimitedUpdater: NewRateLimitedUpdater(client), // Default updater
 	}
