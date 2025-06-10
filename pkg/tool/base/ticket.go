@@ -36,7 +36,7 @@ func (x *Warren) findNearestTicket(ctx context.Context, args map[string]any) (ma
 		return nil, goerr.Wrap(err, "failed to find nearest tickets")
 	}
 
-	var results []*ticket.Ticket
+	var results []any
 	for _, t := range nearestTickets {
 		if t.ID == currentTicket.ID {
 			continue

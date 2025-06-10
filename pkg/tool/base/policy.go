@@ -78,7 +78,13 @@ func (x *Warren) execPolicy(ctx context.Context, args map[string]any) (map[strin
 		return nil, goerr.Wrap(err, "failed to query policy", goerr.V("schema", schema), goerr.V("alert", inputData))
 	}
 
+	// Convert []alert.Metadata to []any for compatibility with Vertex AI API
+	alerts := make([]any, len(result.Alert))
+	for i, alert := range result.Alert {
+		alerts[i] = alert
+	}
+
 	return map[string]any{
-		"alert": result.Alert,
+		"alert": alerts,
 	}, nil
 }

@@ -46,7 +46,7 @@ func (x *Warren) getAlerts(ctx context.Context, args map[string]any) (map[string
 		alerts = alerts[:limit]
 	}
 
-	rows := make([]string, 0, len(alerts))
+	rows := make([]any, 0, len(alerts))
 	for _, alert := range alerts {
 		raw, err := json.Marshal(alert)
 		if err != nil {
