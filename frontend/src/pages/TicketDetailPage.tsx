@@ -342,6 +342,19 @@ export default function TicketDetailPage() {
               variant="secondary">
               {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
             </Badge>
+            {ticket.slackLink && (
+              <Button variant="outline" size="sm" asChild>
+                <a
+                  href={ticket.slackLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Open in Slack
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </Button>
+            )}
           </div>
           <h1
             className="text-3xl font-bold tracking-tight break-words"
@@ -627,6 +640,28 @@ export default function TicketDetailPage() {
                   </span>
                 </div>
               </div>
+
+              {ticket.slackLink && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
+                      Slack Discussion
+                    </span>
+                  </div>
+                  <div className="ml-5">
+                    <a
+                      href={ticket.slackLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 w-full px-3 py-1 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 hover:text-purple-800 rounded-md border border-purple-200 transition-colors">
+                      <MessageSquare className="h-4 w-4" />
+                      Open in Slack
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+              )}
 
               <Separator />
 

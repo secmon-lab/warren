@@ -61,6 +61,21 @@ func (x *Slack) Configure() (*slack.Service, error) {
 	return slack.New(client, x.channelID)
 }
 
+func (x *Slack) ConfigureWithFrontendURL(frontendURL string) (*slack.Service, error) {
+	if x.oauthToken == "" {
+		return nil, goerr.New("slack oauth token is not set")
+	}
+
+	client := sdk.New(x.oauthToken)
+
+	var opts []slack.ServiceOption
+	if frontendURL != "" {
+		opts = append(opts, slack.WithFrontendURL(frontendURL))
+	}
+
+	return slack.New(client, x.channelID, opts...)
+}
+
 func (x *Slack) Verifier() model.PayloadVerifier {
 	if x.signingSecret == "" {
 		return nil

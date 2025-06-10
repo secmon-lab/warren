@@ -72,6 +72,11 @@ func cmdDev() *cli.Command {
 			policyClient := &mock.PolicyClientMock{}
 
 			// Create mock Slack service
+			var slackOpts []slack_svc.ServiceOption
+			if webUICfg.GetFrontendURL() != "" {
+				slackOpts = append(slackOpts, slack_svc.WithFrontendURL(webUICfg.GetFrontendURL()))
+			}
+
 			slackSvc, err := slack_svc.New(&mock.SlackClientMock{
 				AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
 					return &slack_sdk.AuthTestResponse{
@@ -83,7 +88,7 @@ func cmdDev() *cli.Command {
 						BotID:  "B0000000000",
 					}, nil
 				},
-			}, "C_DEV_CHANNEL")
+			}, "C_DEV_CHANNEL", slackOpts...)
 			if err != nil {
 				return err
 			}

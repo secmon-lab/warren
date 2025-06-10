@@ -98,7 +98,7 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			slackSvc, err := slackCfg.Configure()
+			slackSvc, err := slackCfg.ConfigureWithFrontendURL(webUICfg.GetFrontendURL())
 			if err != nil {
 				return err
 			}

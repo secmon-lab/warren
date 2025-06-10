@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -49,22 +50,62 @@ type Service struct {
 	profileCacheMutex sync.RWMutex
 	// Singleton rate-limited updater shared across all threads
 	rateLimitedUpdater AlertUpdater
+	// Frontend URL for generating ticket detail URLs
+	frontendURL string
 }
 
 type slackMetadata struct {
-	teamID       string
-	teamName     string
-	botID        string
-	userID       string
-	enterpriseID string
+	teamID          string
+	teamName        string
+	workspaceDomain string // Add workspace domain for external URLs
+	botID           string
+	userID          string
+	enterpriseID    string
 }
 
 func (x slackMetadata) ToMsgURL(channelID, threadID string) string {
+	return x.ToMsgURLWithThread(channelID, threadID, "")
+}
+
+func (x slackMetadata) ToMsgURLWithThread(channelID, messageID, threadID string) string {
+	// Format timestamp for URL (remove decimal point)
+	formattedTimestamp := strings.ReplaceAll(messageID, ".", "")
+
+	var baseURL string
 	if x.enterpriseID == "" {
-		return fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", x.teamName, channelID, threadID)
+		baseURL = fmt.Sprintf("https://%s.slack.com", x.teamName)
+	} else {
+		baseURL = fmt.Sprintf("https://%s.slack.com", x.enterpriseID)
 	}
 
-	return fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", x.enterpriseID, channelID, threadID)
+	// Basic message URL format
+	msgURL := fmt.Sprintf("%s/archives/%s/p%s", baseURL, channelID, formattedTimestamp)
+
+	// If this is a message in a thread, add thread parameters
+	if threadID != "" && threadID != messageID {
+		msgURL += fmt.Sprintf("?thread_ts=%s&cid=%s", threadID, channelID)
+	}
+
+	return msgURL
+}
+
+// ToExternalMsgURL generates an external Slack URL that can be accessed from outside Slack
+// This is different from ToMsgURL which is designed for internal Slack navigation
+func (x slackMetadata) ToExternalMsgURL(channelID, messageID, threadID string) string {
+	// Format timestamp for URL (remove decimal point and add 'p' prefix)
+	formattedTimestamp := "p" + strings.ReplaceAll(messageID, ".", "")
+
+	baseURL := fmt.Sprintf("https://%s.slack.com", x.workspaceDomain)
+
+	// Basic external message URL format
+	msgURL := fmt.Sprintf("%s/archives/%s/%s", baseURL, channelID, formattedTimestamp)
+
+	// If this is a message in a thread, add thread parameters
+	if threadID != "" && threadID != messageID {
+		msgURL += fmt.Sprintf("?thread_ts=%s&cid=%s", threadID, channelID)
+	}
+
+	return msgURL
 }
 
 // ServiceOption represents a configuration option for Service
@@ -74,6 +115,13 @@ type ServiceOption func(*Service)
 func WithUpdaterOptions(opts ...UpdaterOption) ServiceOption {
 	return func(s *Service) {
 		s.rateLimitedUpdater = NewRateLimitedUpdater(s.client, opts...)
+	}
+}
+
+// WithFrontendURL sets the frontend URL for generating ticket detail URLs
+func WithFrontendURL(frontendURL string) ServiceOption {
+	return func(s *Service) {
+		s.frontendURL = frontendURL
 	}
 }
 
@@ -101,8 +149,18 @@ func New(client interfaces.SlackClient, channelID string, opts ...ServiceOption)
 	s.teamID = authTest.TeamID
 	s.teamName = authTest.Team
 	s.enterpriseID = authTest.EnterpriseID
-
 	s.botID = authTest.BotID
+
+	// Get workspace domain from team.info API
+	teamInfo, err := s.client.GetTeamInfo()
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get team info from slack")
+	}
+	if teamInfo != nil {
+		s.slackMetadata.workspaceDomain = teamInfo.Domain
+	} else {
+		logging.Default().Error("failed to get team info from slack", "error", err)
+	}
 
 	return s, nil
 }
@@ -135,6 +193,10 @@ func (x *Service) ToMsgURL(channelID, threadID string) string {
 	return x.slackMetadata.ToMsgURL(channelID, threadID)
 }
 
+func (x *Service) ToExternalMsgURL(channelID, threadID string) string {
+	return x.slackMetadata.ToExternalMsgURL(channelID, threadID, "")
+}
+
 func (x *Service) NewThread(thread model.Thread) *ThreadService {
 	return &ThreadService{
 		slackMetadata:      x.slackMetadata,
@@ -142,6 +204,7 @@ func (x *Service) NewThread(thread model.Thread) *ThreadService {
 		threadID:           thread.ThreadID,
 		client:             x.client,
 		rateLimitedUpdater: x.rateLimitedUpdater,
+		frontendURL:        x.frontendURL,
 	}
 }
 
@@ -177,6 +240,7 @@ func (x *Service) PostAlert(ctx context.Context, alert alert.Alert) (*ThreadServ
 		client:             x.client,
 		rateLimitedUpdater: x.rateLimitedUpdater,
 		slackMetadata:      x.slackMetadata,
+		frontendURL:        x.frontendURL,
 	}
 
 	var buf bytes.Buffer
@@ -201,7 +265,7 @@ func (x *Service) UpdateAlerts(ctx context.Context, alerts alert.Alerts) {
 
 // PostTicket posts a ticket to a new thread and returns the thread service
 func (x *Service) PostTicket(ctx context.Context, ticket ticket.Ticket, alerts alert.Alerts) (*ThreadService, string, error) {
-	blocks := buildTicketBlocks(ticket, alerts, x.slackMetadata)
+	blocks := buildTicketBlocks(ticket, alerts, x.slackMetadata, x.frontendURL)
 
 	channelID, ts, err := x.client.PostMessageContext(
 		ctx,
@@ -219,6 +283,7 @@ func (x *Service) PostTicket(ctx context.Context, ticket ticket.Ticket, alerts a
 		client:             x.client,
 		rateLimitedUpdater: x.rateLimitedUpdater,
 		slackMetadata:      x.slackMetadata,
+		frontendURL:        x.frontendURL,
 	}
 
 	return newThread, ts, nil
@@ -230,6 +295,7 @@ type ThreadService struct {
 	client             interfaces.SlackClient
 	rateLimitedUpdater AlertUpdater
 	slackMetadata
+	frontendURL string
 }
 
 func (x *ThreadService) ChannelID() string { return x.channelID }
@@ -243,13 +309,17 @@ func (x *ThreadService) Entity() *model.Thread {
 	}
 }
 
+func (x *ThreadService) ToExternalMsgURL() string {
+	return x.slackMetadata.ToExternalMsgURL(x.channelID, x.threadID, "")
+}
+
 func (x *ThreadService) UpdateAlert(ctx context.Context, alert alert.Alert) error {
 	x.rateLimitedUpdater.UpdateAlert(ctx, alert)
 	return nil // Return immediately, processing is done asynchronously
 }
 
 func (x *ThreadService) PostTicket(ctx context.Context, ticket ticket.Ticket, alerts alert.Alerts) (string, error) {
-	blocks := buildTicketBlocks(ticket, alerts, x.slackMetadata)
+	blocks := buildTicketBlocks(ticket, alerts, x.slackMetadata, x.frontendURL)
 
 	if ticket.SlackMessageID == "" {
 		_, ts, err := x.client.PostMessageContext(
@@ -769,4 +839,12 @@ func (x *Service) Stop() {
 	if x.rateLimitedUpdater != nil {
 		x.rateLimitedUpdater.Stop()
 	}
+}
+
+// ToTicketURL generates a URL to the ticket detail page in the frontend
+func (x *Service) ToTicketURL(ticketID string) string {
+	if x.frontendURL == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s/tickets/%s", x.frontendURL, ticketID)
 }

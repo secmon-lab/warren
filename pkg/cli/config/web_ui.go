@@ -77,6 +77,10 @@ func (x *WebUI) GetCallbackURL() string {
 	return x.frontendURL + "/api/auth/callback"
 }
 
+func (x *WebUI) GetFrontendURL() string {
+	return x.frontendURL
+}
+
 func (x *WebUI) Configure(repo interfaces.Repository, slackSvc *slack.Service) (usecase.AuthUseCaseInterface, error) {
 	if !x.IsConfigured() {
 		return nil, nil // Return nil if not configured (authentication is optional)
