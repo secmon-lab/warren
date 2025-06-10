@@ -89,6 +89,22 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 		}
 		return x.getQueryResults(ctx, client, queryID, limit, offset)
 
+	case "bigquery_table_summary":
+		if len(x.configs) == 0 {
+			return nil, goerr.New("configuration is not loaded")
+		}
+		var projectID, datasetID, tableID string
+		if pid, ok := args["project_id"].(string); ok {
+			projectID = pid
+		}
+		if did, ok := args["dataset_id"].(string); ok {
+			datasetID = did
+		}
+		if tid, ok := args["table_id"].(string); ok {
+			tableID = tid
+		}
+		return x.getTableSummary(projectID, datasetID, tableID)
+
 	case "bigquery_schema":
 		projectID, ok := args["project_id"].(string)
 		if !ok {
@@ -450,6 +466,74 @@ func (x *Action) getTableSchema(ctx context.Context, projectID, datasetID, table
 
 	return map[string]any{
 		"schema": result,
+	}, nil
+}
+
+func (x *Action) getTableSummary(projectID, datasetID, tableID string) (map[string]any, error) {
+	var results []map[string]any
+
+	for _, config := range x.configs {
+		// Filter by project ID if specified (use configured project if not specified)
+		configProjectID := x.projectID
+		if projectID != "" && configProjectID != projectID {
+			continue
+		}
+
+		// Filter by dataset ID if specified
+		if datasetID != "" && config.DatasetID != datasetID {
+			continue
+		}
+
+		// Filter by table ID if specified
+		if tableID != "" && config.TableID != tableID {
+			continue
+		}
+
+		// Build column summary (name, type, description, example)
+		var columnSummaries []map[string]any
+		for _, col := range config.Columns {
+			colSummary := map[string]any{
+				"name": col.Name,
+				"type": col.Type,
+			}
+			if col.Description != "" {
+				colSummary["description"] = col.Description
+			}
+			if col.ValueExample != "" {
+				colSummary["value_example"] = col.ValueExample
+			}
+			if len(col.Fields) > 0 {
+				colSummary["has_nested_fields"] = true
+				colSummary["nested_fields_count"] = len(col.Fields)
+			}
+			columnSummaries = append(columnSummaries, colSummary)
+		}
+
+		tableSummary := map[string]any{
+			"project_id": configProjectID,
+			"dataset_id": config.DatasetID,
+			"table_id":   config.TableID,
+			"columns":    columnSummaries,
+		}
+
+		if config.Description != "" {
+			tableSummary["description"] = config.Description
+		}
+
+		if config.Partitioning.Field != "" {
+			tableSummary["partitioning"] = map[string]any{
+				"field":     config.Partitioning.Field,
+				"type":      config.Partitioning.Type,
+				"time_unit": config.Partitioning.TimeUnit,
+			}
+		}
+
+		results = append(results, tableSummary)
+	}
+
+	return map[string]any{
+		"tables": results,
+		"total":  len(results),
 	}, nil
 }
 

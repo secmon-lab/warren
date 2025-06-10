@@ -267,8 +267,30 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			Required: []string{"query_id"},
 		},
 		{
+			Name:        "bigquery_table_summary",
+			Description: "Get summary information about available BigQuery tables including description, column names and examples. Use this tool first to understand table structure before using bigquery_schema for detailed schema information.",
+			Parameters: map[string]*gollem.Parameter{
+				"project_id": {
+					Type:        gollem.TypeString,
+					Description: "The Google Cloud project ID (optional, defaults to configured project)",
+					Required:    []string{},
+				},
+				"dataset_id": {
+					Type:        gollem.TypeString,
+					Description: "The dataset ID to filter tables (optional, returns all if not specified)",
+					Required:    []string{},
+				},
+				"table_id": {
+					Type:        gollem.TypeString,
+					Description: "The table ID to get summary for (optional, returns all if not specified)",
+					Required:    []string{},
+				},
+			},
+			Required: []string{},
+		},
+		{
 			Name:        "bigquery_schema",
-			Description: "Get schema information for a specific table",
+			Description: "Get detailed schema information for a specific table. WARNING: Returns complete schema which may exceed token limits for large tables. Consider using bigquery_table_summary first to check if detailed schema is necessary.",
 			Parameters: map[string]*gollem.Parameter{
 				"project_id": {
 					Type:        gollem.TypeString,
@@ -308,7 +330,10 @@ func (x *Action) Prompt(ctx context.Context) (string, error) {
 		}
 	}
 
-	prompt.WriteString("**Important**: Before executing any SQL queries, you MUST first use the `bigquery_schema` tool to check the table schema. This ensures you understand the structure, column names, and data types before constructing your queries.\n\n")
+	prompt.WriteString("**Important Investigation Workflow**:\n")
+	prompt.WriteString("1. **First**, use the `bigquery_table_summary` tool to get an overview of available tables, their descriptions, and column summaries.\n")
+	prompt.WriteString("2. **If needed**, use the `bigquery_schema` tool only when you need detailed schema information (e.g., nested structures, exact data types). Note that this tool returns complete schema and may exceed token limits for large tables.\n")
+	prompt.WriteString("3. **Then**, execute SQL queries using the `bigquery_query` tool based on your understanding of the table structure.\n\n")
 	prompt.WriteString("Use the `bigquery_query` tool to execute SQL queries against these tables for investigation.\n")
 
 	return prompt.String(), nil
