@@ -383,6 +383,8 @@ func (x *Action) Prompt(ctx context.Context) (string, error) {
 	return prompt.String(), nil
 }
 
+const runbookEmbeddingDimensionality = 256
+
 // loadRunbooks loads SQL runbooks from configured paths and stores them in the repository
 func (x *Action) loadRunbooks(ctx context.Context) error {
 	if x.repository == nil || x.embeddingAdapter == nil {
@@ -409,7 +411,7 @@ func (x *Action) loadRunbooks(ctx context.Context) error {
 
 		// Generate embedding for the entry description and SQL content
 		text := entry.Title + " " + entry.Description + " " + entry.SQLContent
-		embeddings, err := x.embeddingAdapter.Embeddings(ctx, []string{text}, 0)
+		embeddings, err := x.embeddingAdapter.Embeddings(ctx, []string{text}, runbookEmbeddingDimensionality)
 		if err != nil {
 			return goerr.Wrap(err, "failed to generate embedding for runbook entry", goerr.V("entry_id", entry.ID))
 		}
