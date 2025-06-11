@@ -370,6 +370,10 @@ func (x *Action) Prompt(ctx context.Context) (string, error) {
 		}
 	}
 
+	// Note: Partitioning and column details are omitted from prompt to save tokens.
+	// Use bigquery_table_summary tool to get detailed column information when needed.
+	prompt.WriteString("**Note**: For detailed column information and schema, use the `bigquery_table_summary` tool.\n\n")
+
 	// Add runbook information if available
 	if len(x.runbookPaths) > 0 {
 		prompt.WriteString("## SQL Runbooks\n\n")

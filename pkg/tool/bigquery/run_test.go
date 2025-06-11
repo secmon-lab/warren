@@ -343,13 +343,16 @@ partitioning:
 			gt.S(t, prompt).Contains("test_dataset")
 			gt.S(t, prompt).Contains("test_table")
 			gt.S(t, prompt).Contains("Test table for security events")
-			gt.S(t, prompt).Contains("Partitioning")
-			gt.S(t, prompt).Contains("Available Columns")
 
-			// Check that column details are now included (prompt changed to include detailed info)
-			gt.S(t, prompt).Contains("timestamp")
-			gt.S(t, prompt).Contains("src_ip")
-			gt.S(t, prompt).Contains("event_type")
+			// Verify detailed information is NOT included (to save tokens)
+			gt.S(t, prompt).NotContains("Partitioning")
+			gt.S(t, prompt).NotContains("Available Columns")
+			gt.S(t, prompt).NotContains("timestamp")
+			gt.S(t, prompt).NotContains("src_ip")
+			gt.S(t, prompt).NotContains("event_type")
+
+			// Verify the helper comment is included
+			gt.S(t, prompt).Contains("For detailed column information and schema, use the `bigquery_table_summary` tool")
 
 			return nil
 		},
@@ -402,7 +405,7 @@ func TestBigQuery_TableSummary(t *testing.T) {
 			gt.Value(t, table["description"]).Equal("Test table for BigQuery actions")
 
 			columns := gt.Cast[[]map[string]any](t, table["columns"])
-			gt.Array(t, columns).Length(4) // id, timestamp, value, metadata
+			gt.Array(t, columns).Length(6) // id, timestamp, src_ip, event_type, value, metadata
 
 			// Check column structure
 			for _, col := range columns {
