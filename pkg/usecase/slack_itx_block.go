@@ -151,7 +151,20 @@ func (uc *UseCases) slackActionAckList(ctx context.Context, user slack.User, sla
 		return goerr.Wrap(err, "failed to get alerts")
 	}
 
-	return uc.ackAlerts(ctx, user, slackThread, alerts)
+	err = uc.ackAlerts(ctx, user, slackThread, alerts)
+	if err != nil {
+		return err
+	}
+
+	// Update the alert list message to show acknowledged status
+	st := uc.slackService.NewThread(slackThread)
+	if list.SlackMessageID != "" {
+		if err := st.UpdateAlertList(ctx, list, "acknowledged"); err != nil {
+			logger.Warn("failed to update alert list", "error", err)
+		}
+	}
+
+	return nil
 }
 
 func (uc *UseCases) slackActionBindAlert(ctx context.Context, targetAlertID types.AlertID, triggerID string) error {

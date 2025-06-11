@@ -129,7 +129,19 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Con
 		return err
 	}
 
-	return uc.handleBindAlerts(ctx, user, ticketID, list.AlertIDs)
+	err = uc.handleBindAlerts(ctx, user, ticketID, list.AlertIDs)
+	if err != nil {
+		return err
+	}
+
+	// Update the alert list message to show bound status
+	if list.SlackMessageID != "" {
+		if err := st.UpdateAlertList(ctx, list, "bound"); err != nil {
+			logger.Warn("failed to update alert list", "error", err)
+		}
+	}
+
+	return nil
 }
 
 func (uc *UseCases) handleBindAlerts(ctx context.Context, user slack.User, ticketID types.TicketID, alertIDs []types.AlertID) error {

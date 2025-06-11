@@ -428,8 +428,16 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 		return types.EmptyAlertListID, err
 	}
 
-	if err := th.PostAlertList(ctx, alertList); err != nil {
+	slackMessageID, err := th.PostAlertList(ctx, alertList)
+	if err != nil {
 		msg.Trace(ctx, "💥 Post alert list: %s", err)
+		return types.EmptyAlertListID, err
+	}
+
+	// Save SlackMessageID to the alert list
+	alertList.SlackMessageID = slackMessageID
+	if err := clients.Repo().PutAlertList(ctx, alertList); err != nil {
+		msg.Trace(ctx, "💥 Update alert list: %s", err)
 		return types.EmptyAlertListID, err
 	}
 

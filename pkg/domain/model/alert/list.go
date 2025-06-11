@@ -19,11 +19,12 @@ import (
 )
 
 type List struct {
-	ID          types.AlertListID `json:"id"`
-	AlertIDs    []types.AlertID   `json:"alert_ids"`
-	SlackThread *slack.Thread     `json:"slack_thread"`
-	CreatedAt   time.Time         `json:"created_at"`
-	CreatedBy   *slack.User       `json:"created_by"`
+	ID             types.AlertListID `json:"id"`
+	AlertIDs       []types.AlertID   `json:"alert_ids"`
+	SlackThread    *slack.Thread     `json:"slack_thread"`
+	SlackMessageID string            `json:"slack_message_id"`
+	CreatedAt      time.Time         `json:"created_at"`
+	CreatedBy      *slack.User       `json:"created_by"`
 
 	Metadata
 	Embedding firestore.Vector32 `json:"-"`
