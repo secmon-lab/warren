@@ -83,6 +83,15 @@ func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread 
 			ThreadID:  newThreadSvc.ThreadID(),
 		}
 
+		// Generate and post initial comment for the new ticket thread
+		if comment, err := uc.generateInitialTicketComment(ctx, newTicket, alerts); err != nil {
+			_ = msg.Trace(ctx, "💥 Failed to generate initial comment: %s", err.Error())
+		} else if comment != "" {
+			if err := newThreadSvc.PostComment(ctx, comment); err != nil {
+				_ = msg.Trace(ctx, "💥 Failed to post initial comment: %s", err.Error())
+			}
+		}
+
 		// Post link to the new ticket in the original thread
 		ticketURL := uc.slackService.ToMsgURL(newThreadSvc.ChannelID(), newThreadSvc.ThreadID())
 		if err := st.PostLinkToTicket(ctx, ticketURL, newTicket.Metadata.Title); err != nil {
