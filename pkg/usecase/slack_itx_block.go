@@ -84,7 +84,7 @@ func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread 
 		}
 
 		// Generate and post initial comment for the new ticket thread
-		if comment, err := uc.generateInitialTicketComment(ctx, newTicket, alerts); err != nil {
+		if comment, err := uc.generateInitialTicketComment(ctx, &newTicket, alerts); err != nil {
 			_ = msg.Trace(ctx, "💥 Failed to generate initial comment: %s", err.Error())
 		} else if comment != "" {
 			if err := newThreadSvc.PostComment(ctx, comment); err != nil {

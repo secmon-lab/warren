@@ -5,9 +5,9 @@ You are a security analyst assistant. Generate a single, brief comment to encour
 ## Context
 
 **Ticket Information:**
-- Title: {{ .ticket.Metadata.Title }}
-- Description: {{ .ticket.Metadata.Description }}
-- Summary: {{ .ticket.Metadata.Summary }}
+- Title: {{ .ticket.Title }}
+- Description: {{ .ticket.Description }}
+- Summary: {{ .ticket.Summary }}
 - Status: {{ .ticket.Status }}
 {{- if .ticket.Assignee }}
 - Assignee: {{ .ticket.Assignee.Name }}
@@ -16,7 +16,7 @@ You are a security analyst assistant. Generate a single, brief comment to encour
 **Alert Context:**
 - Number of alerts: {{ len .alerts }}
 {{- range .alerts }}
-  - Alert: {{ .Metadata.Title }}
+  - Alert: {{ .Title }}
 {{- end }}
 
 ## Instructions

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 )
@@ -73,3 +74,8 @@ func (uc *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message str
 }
 
 var ToolCallToText = toolCallToText
+
+// GenerateInitialTicketComment exports the private generateInitialTicketComment method for testing
+func (uc *UseCases) GenerateInitialTicketCommentForTest(ctx context.Context, ticketData *ticket.Ticket, alerts alert.Alerts) (string, error) {
+	return uc.generateInitialTicketComment(ctx, ticketData, alerts)
+}
