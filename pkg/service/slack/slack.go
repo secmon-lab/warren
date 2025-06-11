@@ -531,36 +531,48 @@ func (x *ThreadService) PostAlerts(ctx context.Context, alerts alert.Alerts) err
 	return nil
 }
 
-func (x *ThreadService) PostAlertList(ctx context.Context, list *alert.List) error {
+func (x *ThreadService) PostAlertList(ctx context.Context, list *alert.List) (string, error) {
 	alerts, err := list.Alerts()
 	if err != nil {
-		return goerr.Wrap(err, "failed to get alerts")
+		return "", goerr.Wrap(err, "failed to get alerts")
 	}
 	blocks := buildNewAlertListBlocks(list, alerts, x.slackMetadata)
 
-	_, _, err = x.client.PostMessageContext(ctx,
+	_, ts, err := x.client.PostMessageContext(ctx,
 		x.channelID,
 		slack.MsgOptionBlocks(blocks...),
 		slack.MsgOptionTS(x.threadID),
 	)
 	if err != nil {
-		return goerr.Wrap(err, "failed to post alert list to slack", goerr.V("blocks", blocks))
+		return "", goerr.Wrap(err, "failed to post alert list to slack", goerr.V("blocks", blocks))
+	}
+
+	return ts, nil
+}
+
+// UpdateAlertList updates an alert list message with completion status
+func (x *ThreadService) UpdateAlertList(ctx context.Context, list *alert.List, status string) error {
+	if list.SlackMessageID == "" {
+		return goerr.New("alert list has no slack message ID")
+	}
+
+	alerts, err := list.Alerts()
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alerts")
+	}
+	blocks := buildCompletedAlertListBlocks(list, alerts, x.slackMetadata, status)
+
+	_, _, _, err = x.client.UpdateMessageContext(
+		ctx,
+		x.channelID,
+		list.SlackMessageID,
+		slack.MsgOptionBlocks(blocks...),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to update alert list message", goerr.V("blocks", blocks))
 	}
 
 	return nil
-}
-
-func buildNewAlertListBlocks(list *alert.List, alerts alert.Alerts, metadata slackMetadata) []slack.Block {
-	blocks := []slack.Block{
-		slack.NewHeaderBlock(
-			slack.NewTextBlockObject("plain_text", fmt.Sprintf("📑 New list with %d alerts", len(alerts)), false, false),
-		),
-		slack.NewDividerBlock(),
-	}
-
-	blocks = append(blocks, buildAlertListBlocks(list, alerts, metadata)...)
-
-	return blocks
 }
 
 func (x *ThreadService) PostAlertLists(ctx context.Context, clusters []*alert.List) error {
@@ -594,10 +606,6 @@ func (x *ThreadService) PostTicketList(ctx context.Context, tickets []*ticket.Ti
 		return goerr.Wrap(err, "failed to post ticket list to slack", goerr.V("blocks", blocks))
 	}
 
-	return nil
-}
-
-func (x *Service) ShowResolveAlertListModal(ctx context.Context, list *alert.List, triggerID string) error {
 	return nil
 }
 
