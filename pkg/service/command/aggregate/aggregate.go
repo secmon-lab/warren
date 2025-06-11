@@ -110,8 +110,15 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 			return nil, goerr.Wrap(err, "failed to create alert list")
 		}
 
-		if err := clients.Thread().PostAlertList(ctx, newList); err != nil {
+		slackMessageID, err := clients.Thread().PostAlertList(ctx, newList)
+		if err != nil {
 			return nil, goerr.Wrap(err, "failed to post alert list")
+		}
+
+		// Save SlackMessageID to the alert list
+		newList.SlackMessageID = slackMessageID
+		if err := clients.Repo().PutAlertList(ctx, newList); err != nil {
+			return nil, goerr.Wrap(err, "failed to update alert list")
 		}
 	}
 

@@ -190,7 +190,8 @@ func TestPostAlertList(t *testing.T) {
 
 	thread, err := svc.PostMessage(context.Background(), "alert list test")
 	gt.NoError(t, err)
-	gt.NoError(t, thread.PostAlertList(context.Background(), alertList))
+	_, err = thread.PostAlertList(context.Background(), alertList)
+	gt.NoError(t, err)
 }
 
 func TestPostTicketList(t *testing.T) {
