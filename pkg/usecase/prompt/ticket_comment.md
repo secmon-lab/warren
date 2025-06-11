@@ -30,4 +30,4 @@ Generate a single, friendly comment (1-2 sentences max) that:
 
 **Language:** Respond in **{{ .lang }}**.
 
-**Output:** Return only the comment text, no formatting or quotation marks. 
+**Output:** Return only the comment text, no formatting or quotation marks.

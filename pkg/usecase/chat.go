@@ -216,7 +216,7 @@ func toolCallToText(ctx context.Context, llmClient gollem.LLMClient, spec *golle
 
 // generateInitialTicketComment generates an LLM-based initial comment for a ticket
 func (x *UseCases) generateInitialTicketComment(ctx context.Context, ticketData *ticket.Ticket, alerts alert.Alerts) (string, error) {
-	commentPrompt, err := prompt.Generate(ctx, ticketCommentPromptTemplate, map[string]any{
+	commentPrompt, err := prompt.GenerateWithStruct(ctx, ticketCommentPromptTemplate, map[string]any{
 		"ticket": ticketData,
 		"alerts": alerts,
 		"lang":   lang.From(ctx),
