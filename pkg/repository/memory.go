@@ -12,6 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/bigquery"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -26,6 +27,8 @@ type Memory struct {
 	tickets        map[types.TicketID]*ticket.Ticket
 	ticketComments map[types.TicketID][]ticket.Comment
 	tokens         map[auth.TokenID]*auth.Token
+	runbooks       map[types.RunbookID]*bigquery.RunbookEntry
+	runbooksByHash map[string]*bigquery.RunbookEntry
 }
 
 var _ interfaces.Repository = &Memory{}
@@ -38,6 +41,8 @@ func NewMemory() *Memory {
 		tickets:        make(map[types.TicketID]*ticket.Ticket),
 		ticketComments: make(map[types.TicketID][]ticket.Comment),
 		tokens:         make(map[auth.TokenID]*auth.Token),
+		runbooks:       make(map[types.RunbookID]*bigquery.RunbookEntry),
+		runbooksByHash: make(map[string]*bigquery.RunbookEntry),
 	}
 }
 
@@ -695,19 +700,99 @@ func (r *Memory) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []types
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	now := time.Now()
 	for _, ticketID := range ticketIDs {
-		t, ok := r.tickets[ticketID]
+		ticket, ok := r.tickets[ticketID]
 		if !ok {
 			return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
 		}
 
-		// Create a copy and update status
-		updatedTicket := *t
-		updatedTicket.Status = status
-		updatedTicket.UpdatedAt = now
-		r.tickets[ticketID] = &updatedTicket
+		ticket.Status = status
+		ticket.UpdatedAt = time.Now()
+		r.tickets[ticketID] = ticket
 	}
 
 	return nil
+}
+
+// cosine similarity calculation for float64 slices
+func cosineSimilarityFloat64(a, b []float64) float64 {
+	if len(a) != len(b) {
+		return 0
+	}
+
+	var dotProduct, normA, normB float64
+	for i := range a {
+		dotProduct += a[i] * b[i]
+		normA += a[i] * a[i]
+		normB += b[i] * b[i]
+	}
+
+	if normA == 0 || normB == 0 {
+		return 0
+	}
+
+	return dotProduct / (math.Sqrt(normA) * math.Sqrt(normB))
+}
+
+// Runbook methods implementation
+func (r *Memory) PutRunbookEntry(ctx context.Context, entry *bigquery.RunbookEntry) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.runbooks[entry.ID] = entry
+	r.runbooksByHash[entry.Hash] = entry
+	return nil
+}
+
+func (r *Memory) GetRunbookEntry(ctx context.Context, runbookID types.RunbookID) (*bigquery.RunbookEntry, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	entry, ok := r.runbooks[runbookID]
+	if !ok {
+		return nil, goerr.New("runbook entry not found", goerr.V("runbook_id", runbookID))
+	}
+	return entry, nil
+}
+
+func (r *Memory) GetRunbookEntryByHash(ctx context.Context, hash string) (*bigquery.RunbookEntry, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	entry, ok := r.runbooksByHash[hash]
+	if !ok {
+		return nil, goerr.New("runbook entry not found", goerr.V("hash", hash))
+	}
+	return entry, nil
+}
+
+func (r *Memory) SearchRunbooksByEmbedding(ctx context.Context, embedding []float64, limit int) (bigquery.RunbookSearchResults, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var results bigquery.RunbookSearchResults
+
+	for _, entry := range r.runbooks {
+		if len(entry.Embedding) == 0 {
+			continue // Skip entries without embeddings
+		}
+
+		similarity := cosineSimilarityFloat64(embedding, entry.Embedding)
+		results = append(results, &bigquery.RunbookSearchResult{
+			Entry:      entry,
+			Similarity: similarity,
+		})
+	}
+
+	// Sort by similarity in descending order
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Similarity > results[j].Similarity
+	})
+
+	// Limit results
+	if len(results) > limit {
+		results = results[:limit]
+	}
+
+	return results, nil
 }

@@ -99,7 +99,7 @@ func TestBigQuery_Specs(t *testing.T) {
 	var action bigquery.Action
 	specs, err := action.Specs(context.Background())
 	gt.NoError(t, err)
-	gt.A(t, specs).Length(5)
+	gt.A(t, specs).Length(6)
 
 	// Check specifications of each tool
 	for _, spec := range specs {
@@ -122,6 +122,12 @@ func TestBigQuery_Specs(t *testing.T) {
 			gt.Map(t, spec.Parameters).HasKey("table_id")
 			gt.Value(t, spec.Parameters["dataset_id"].Type).Equal("string")
 			gt.Value(t, spec.Parameters["table_id"].Type).Equal("string")
+		case "bigquery_runbook_search":
+			gt.Map(t, spec.Parameters).HasKey("query")
+			gt.Map(t, spec.Parameters).HasKey("limit")
+			gt.Value(t, spec.Parameters["query"].Type).Equal("string")
+			gt.Value(t, spec.Parameters["limit"].Type).Equal("integer")
+			gt.Array(t, spec.Required).Has("query")
 		}
 	}
 }
@@ -337,16 +343,16 @@ partitioning:
 			gt.S(t, prompt).Contains("test_dataset")
 			gt.S(t, prompt).Contains("test_table")
 			gt.S(t, prompt).Contains("Test table for security events")
-			gt.S(t, prompt).Contains("bigquery_query")
-			gt.S(t, prompt).Contains("bigquery_table_summary")
-			gt.S(t, prompt).Contains("Important Investigation Workflow")
-			gt.S(t, prompt).Contains("First**, use the `bigquery_table_summary`")
 
-			// Verify the prompt does not contain column or partitioning details
+			// Verify detailed information is NOT included (to save tokens)
+			gt.S(t, prompt).NotContains("Partitioning")
+			gt.S(t, prompt).NotContains("Available Columns")
 			gt.S(t, prompt).NotContains("timestamp")
 			gt.S(t, prompt).NotContains("src_ip")
-			gt.S(t, prompt).NotContains("Key Columns")
-			gt.S(t, prompt).NotContains("Partitioning")
+			gt.S(t, prompt).NotContains("event_type")
+
+			// Verify the helper comment is included
+			gt.S(t, prompt).Contains("For detailed column information and schema, use the `bigquery_table_summary` tool")
 
 			return nil
 		},
@@ -399,7 +405,7 @@ func TestBigQuery_TableSummary(t *testing.T) {
 			gt.Value(t, table["description"]).Equal("Test table for BigQuery actions")
 
 			columns := gt.Cast[[]map[string]any](t, table["columns"])
-			gt.Array(t, columns).Length(4) // id, timestamp, value, metadata
+			gt.Array(t, columns).Length(6) // id, timestamp, src_ip, event_type, value, metadata
 
 			// Check column structure
 			for _, col := range columns {

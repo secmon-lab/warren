@@ -9,12 +9,37 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
+
+// llmEmbeddingAdapter adapts gollem.LLMClient to interfaces.EmbeddingClient
+type llmEmbeddingAdapter struct {
+	client gollem.LLMClient
+}
+
+// Embeddings implements interfaces.EmbeddingClient.Embeddings
+func (a *llmEmbeddingAdapter) Embeddings(ctx context.Context, texts []string, dimensionality int) ([][]float32, error) {
+	embeddings, err := a.client.GenerateEmbedding(ctx, dimensionality, texts)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert from [][]float64 to [][]float32
+	result := make([][]float32, len(embeddings))
+	for i, embedding := range embeddings {
+		result[i] = make([]float32, len(embedding))
+		for j, val := range embedding {
+			result[i][j] = float32(val)
+		}
+	}
+
+	return result, nil
+}
 
 func cmdServe() *cli.Command {
 	var (
@@ -113,6 +138,12 @@ func cmdServe() *cli.Command {
 			if err != nil {
 				return err
 			}
+
+			// Create embedding adapter from LLM client
+			embeddingAdapter := &llmEmbeddingAdapter{client: geminiModel}
+
+			// Inject dependencies into tools that support them
+			tools.InjectDependencies(firestore, embeddingAdapter)
 
 			toolSets, err := tools.ToolSets(ctx)
 			if err != nil {
