@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/bigquery"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -52,6 +54,7 @@ const (
 	collectionTickets     = "tickets"
 	collectionComments    = "comments"
 	collectionTokens      = "tokens"
+	collectionRunbooks    = "runbooks"
 )
 
 func (r *Firestore) PutAlert(ctx context.Context, alert alert.Alert) error {
@@ -1066,4 +1069,118 @@ func (r *Firestore) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []ty
 	}
 
 	return nil
+}
+
+// Runbook methods implementation
+func (r *Firestore) PutRunbookEntry(ctx context.Context, entry *bigquery.RunbookEntry) error {
+	doc := r.db.Collection(collectionRunbooks).Doc(entry.ID.String())
+	_, err := doc.Set(ctx, entry)
+	if err != nil {
+		return goerr.Wrap(err, "failed to put runbook entry", goerr.V("id", entry.ID))
+	}
+	return nil
+}
+
+func (r *Firestore) GetRunbookEntry(ctx context.Context, runbookID types.RunbookID) (*bigquery.RunbookEntry, error) {
+	doc, err := r.db.Collection(collectionRunbooks).Doc(runbookID.String()).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, goerr.New("runbook entry not found", goerr.V("runbook_id", runbookID))
+		}
+		return nil, goerr.Wrap(err, "failed to get runbook entry", goerr.V("runbook_id", runbookID))
+	}
+
+	var entry bigquery.RunbookEntry
+	if err := doc.DataTo(&entry); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert data to runbook entry", goerr.V("runbook_id", runbookID))
+	}
+
+	return &entry, nil
+}
+
+func (r *Firestore) GetRunbookEntryByHash(ctx context.Context, hash string) (*bigquery.RunbookEntry, error) {
+	iter := r.db.Collection(collectionRunbooks).Where("Hash", "==", hash).Documents(ctx)
+
+	doc, err := iter.Next()
+	if err != nil {
+		if err == iterator.Done {
+			return nil, goerr.New("runbook entry not found", goerr.V("hash", hash))
+		}
+		return nil, goerr.Wrap(err, "failed to get runbook entry by hash", goerr.V("hash", hash))
+	}
+
+	var entry bigquery.RunbookEntry
+	if err := doc.DataTo(&entry); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert data to runbook entry")
+	}
+
+	return &entry, nil
+}
+
+func (r *Firestore) SearchRunbooksByEmbedding(ctx context.Context, embedding []float64, limit int) (bigquery.RunbookSearchResults, error) {
+	// Note: Firestore doesn't support vector similarity search natively
+	// This is a simplified implementation that fetches all runbooks and computes similarity in memory
+	// For production use, consider using a vector database like Pinecone or Vertex AI Vector Search
+
+	iter := r.db.Collection(collectionRunbooks).Documents(ctx)
+
+	var results bigquery.RunbookSearchResults
+
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to iterate runbook entries")
+		}
+
+		var entry bigquery.RunbookEntry
+		if err := doc.DataTo(&entry); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to runbook entry")
+		}
+
+		if len(entry.Embedding) == 0 {
+			continue // Skip entries without embeddings
+		}
+
+		// Calculate cosine similarity
+		similarity := firestoreCosineSimilarity(embedding, entry.Embedding)
+		results = append(results, &bigquery.RunbookSearchResult{
+			Entry:      &entry,
+			Similarity: similarity,
+		})
+	}
+
+	// Sort by similarity in descending order
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Similarity > results[j].Similarity
+	})
+
+	// Limit results
+	if len(results) > limit {
+		results = results[:limit]
+	}
+
+	return results, nil
+}
+
+// firestoreCosineSimilarity calculates cosine similarity for float64 slices (Firestore-specific to avoid conflicts)
+func firestoreCosineSimilarity(a, b []float64) float64 {
+	if len(a) != len(b) {
+		return 0
+	}
+
+	var dotProduct, normA, normB float64
+	for i := range a {
+		dotProduct += a[i] * b[i]
+		normA += a[i] * a[i]
+		normB += b[i] * b[i]
+	}
+
+	if normA == 0 || normB == 0 {
+		return 0
+	}
+
+	return dotProduct / (math.Sqrt(normA) * math.Sqrt(normB))
 }

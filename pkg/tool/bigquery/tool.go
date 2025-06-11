@@ -28,6 +28,11 @@ type Action struct {
 	scanLimitStr              string
 	scanLimit                 uint64
 	configs                   []*Config
+	runbookPaths              []string
+
+	// Dependencies for runbook functionality
+	repository       interfaces.Repository
+	embeddingAdapter interfaces.EmbeddingClient
 }
 
 var _ interfaces.Tool = &Action{}
@@ -48,6 +53,9 @@ type Config struct {
 
 	// Partitioning
 	Partitioning PartitioningConfig `yaml:"partitioning" json:"partitioning"`
+
+	// Runbook paths - list of SQL files or directories
+	RunbookPaths []string `yaml:"runbook_paths" json:"runbook_paths"`
 }
 
 type PartitioningConfig struct {
@@ -70,6 +78,16 @@ type ColumnConfig struct {
 
 func (x *Action) Name() string {
 	return "bigquery"
+}
+
+// SetRepository sets the repository for runbook functionality
+func (x *Action) SetRepository(repo interfaces.Repository) {
+	x.repository = repo
+}
+
+// SetEmbeddingClient sets the embedding client for runbook functionality
+func (x *Action) SetEmbeddingClient(client interfaces.EmbeddingClient) {
+	x.embeddingAdapter = client
 }
 
 func (x *Action) Flags() []cli.Flag {
@@ -101,6 +119,13 @@ func (x *Action) Flags() []cli.Flag {
 			Destination: &x.configFiles,
 			Category:    "Tool",
 			Sources:     cli.EnvVars("WARREN_BIGQUERY_CONFIG"),
+		},
+		&cli.StringSliceFlag{
+			Name:        "bigquery-runbook-path",
+			Usage:       "Path to SQL runbook files or directories",
+			Destination: &x.runbookPaths,
+			Category:    "Tool",
+			Sources:     cli.EnvVars("WARREN_BIGQUERY_RUNBOOK_PATH"),
 		},
 		&cli.StringFlag{
 			Name:        "bigquery-storage-bucket",
@@ -177,6 +202,14 @@ func (x *Action) Configure(ctx context.Context) error {
 	x.scanLimit = scanLimit
 
 	x.configs = configs
+
+	// Load runbooks if paths are configured and dependencies are available
+	if len(x.runbookPaths) > 0 && x.repository != nil && x.embeddingAdapter != nil {
+		if err := x.loadRunbooks(ctx); err != nil {
+			return goerr.Wrap(err, "failed to load runbooks")
+		}
+	}
+
 	return nil
 }
 
@@ -255,50 +288,44 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				},
 				"limit": {
 					Type:        gollem.TypeInteger,
-					Description: "Maximum number of rows to return (default: 100)",
-					Required:    []string{},
+					Description: "Maximum number of rows to return",
 				},
 				"offset": {
 					Type:        gollem.TypeInteger,
-					Description: "Number of rows to skip (default: 0)",
-					Required:    []string{},
+					Description: "Number of rows to skip",
 				},
 			},
 			Required: []string{"query_id"},
 		},
 		{
 			Name:        "bigquery_table_summary",
-			Description: "Get summary information about available BigQuery tables including description, column names and examples. Use this tool first to understand table structure before using bigquery_schema for detailed schema information.",
+			Description: "Get a summary of available BigQuery tables including all fields, examples, and descriptions",
 			Parameters: map[string]*gollem.Parameter{
 				"project_id": {
 					Type:        gollem.TypeString,
-					Description: "The Google Cloud project ID (optional, defaults to configured project)",
-					Required:    []string{},
+					Description: "The project ID to filter by (optional)",
 				},
 				"dataset_id": {
 					Type:        gollem.TypeString,
-					Description: "The dataset ID to filter tables (optional, returns all if not specified)",
-					Required:    []string{},
+					Description: "The dataset ID to filter by (optional)",
 				},
 				"table_id": {
 					Type:        gollem.TypeString,
-					Description: "The table ID to get summary for (optional, returns all if not specified)",
-					Required:    []string{},
+					Description: "The table ID to filter by (optional)",
 				},
 			},
-			Required: []string{},
 		},
 		{
 			Name:        "bigquery_schema",
-			Description: "Get detailed schema information for a specific table. WARNING: Returns complete schema which may exceed token limits for large tables. Consider using bigquery_table_summary first to check if detailed schema is necessary.",
+			Description: "Get detailed schema information for a specific BigQuery table",
 			Parameters: map[string]*gollem.Parameter{
 				"project_id": {
 					Type:        gollem.TypeString,
-					Description: "The Google Cloud project ID",
+					Description: "The project ID of the table",
 				},
 				"dataset_id": {
 					Type:        gollem.TypeString,
-					Description: "The dataset ID containing the table",
+					Description: "The dataset ID of the table",
 				},
 				"table_id": {
 					Type:        gollem.TypeString,
@@ -306,6 +333,21 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				},
 			},
 			Required: []string{"project_id", "dataset_id", "table_id"},
+		},
+		{
+			Name:        "bigquery_runbook_search",
+			Description: "Search pre-registered SQL runbooks using natural language. Returns similar SQL queries with their descriptions that can be used for investigation.",
+			Parameters: map[string]*gollem.Parameter{
+				"query": {
+					Type:        gollem.TypeString,
+					Description: "Natural language search query describing what kind of SQL investigation you want to perform",
+				},
+				"limit": {
+					Type:        gollem.TypeInteger,
+					Description: "Maximum number of runbook entries to return (default: 5)",
+				},
+			},
+			Required: []string{"query"},
 		},
 	}, nil
 }
@@ -325,16 +367,67 @@ func (x *Action) Prompt(ctx context.Context) (string, error) {
 		prompt.WriteString(fmt.Sprintf("### Project: %s, Dataset: %s, Table: %s\n", x.projectID, config.DatasetID, config.TableID))
 		if config.Description != "" {
 			prompt.WriteString(fmt.Sprintf("**Description**: %s\n\n", config.Description))
-		} else {
-			prompt.WriteString("\n")
 		}
 	}
 
-	prompt.WriteString("**Important Investigation Workflow**:\n")
-	prompt.WriteString("1. **First**, use the `bigquery_table_summary` tool to get an overview of available tables, their descriptions, and column summaries.\n")
-	prompt.WriteString("2. **If needed**, use the `bigquery_schema` tool only when you need detailed schema information (e.g., nested structures, exact data types). Note that this tool returns complete schema and may exceed token limits for large tables.\n")
-	prompt.WriteString("3. **Then**, execute SQL queries using the `bigquery_query` tool based on your understanding of the table structure.\n\n")
-	prompt.WriteString("Use the `bigquery_query` tool to execute SQL queries against these tables for investigation.\n")
+	// Add runbook information if available
+	if len(x.runbookPaths) > 0 {
+		prompt.WriteString("## SQL Runbooks\n\n")
+		prompt.WriteString("You also have access to pre-registered SQL runbooks. Use the `bigquery_runbook_search` tool to find relevant SQL queries for your investigation.\n\n")
+	}
 
 	return prompt.String(), nil
+}
+
+// loadRunbooks loads SQL runbooks from configured paths and stores them in the repository
+func (x *Action) loadRunbooks(ctx context.Context) error {
+	if x.repository == nil || x.embeddingAdapter == nil {
+		return goerr.New("repository and embedding adapter are required for runbook loading")
+	}
+
+	// Create runbook loader
+	loader := NewRunbookLoader(x.runbookPaths)
+
+	// Load runbooks from files
+	entries, err := loader.LoadRunbooks(ctx)
+	if err != nil {
+		return goerr.Wrap(err, "failed to load runbooks from files")
+	}
+
+	// Process each entry
+	for _, entry := range entries {
+		// Check if entry already exists by hash
+		existing, err := x.repository.GetRunbookEntryByHash(ctx, entry.Hash)
+		if err == nil && existing != nil {
+			// Entry with same hash already exists, skip
+			continue
+		}
+
+		// Generate embedding for the entry description and SQL content
+		text := entry.Title + " " + entry.Description + " " + entry.SQLContent
+		embeddings, err := x.embeddingAdapter.Embeddings(ctx, []string{text}, 0)
+		if err != nil {
+			return goerr.Wrap(err, "failed to generate embedding for runbook entry", goerr.V("entry_id", entry.ID))
+		}
+
+		if len(embeddings) == 0 || len(embeddings[0]) == 0 {
+			return goerr.New("empty embedding result for runbook entry", goerr.V("entry_id", entry.ID))
+		}
+
+		// Convert float32 to float64
+		embedding := make([]float64, len(embeddings[0]))
+		for i, v := range embeddings[0] {
+			embedding[i] = float64(v)
+		}
+
+		// Set embedding in entry
+		entry.Embedding = embedding
+
+		// Store in repository
+		if err := x.repository.PutRunbookEntry(ctx, entry); err != nil {
+			return goerr.Wrap(err, "failed to store runbook entry", goerr.V("entry_id", entry.ID))
+		}
+	}
+
+	return nil
 }

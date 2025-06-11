@@ -129,6 +129,17 @@ func (x *Action) runWithClient(ctx context.Context, name string, args map[string
 		}
 		return x.getTableSchema(ctx, projectID, datasetID, tableID)
 
+	case "bigquery_runbook_search":
+		query, ok := args["query"].(string)
+		if !ok {
+			return nil, goerr.New("query parameter is required")
+		}
+		limit := 5
+		if l, ok := args["limit"].(float64); ok {
+			limit = int(l)
+		}
+		return x.searchRunbooks(ctx, query, limit)
+
 	default:
 		return nil, goerr.New("invalid function name", goerr.V("name", name))
 	}
@@ -556,4 +567,58 @@ func (x *Action) LogValue() slog.Value {
 		slog.String("storage_bucket", x.storageBucket),
 		slog.Duration("timeout", x.timeout),
 	)
+}
+
+// searchRunbooks searches for similar runbooks using embedding-based similarity
+func (x *Action) searchRunbooks(ctx context.Context, query string, limit int) (map[string]any, error) {
+	// Check if dependencies are available
+	if x.repository == nil {
+		return nil, goerr.New("repository not configured for runbook search")
+	}
+	if x.embeddingAdapter == nil {
+		return nil, goerr.New("embedding adapter not configured for runbook search")
+	}
+
+	// Generate embedding for the search query
+	embeddings, err := x.embeddingAdapter.Embeddings(ctx, []string{query}, 0)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to generate embedding for search query")
+	}
+
+	if len(embeddings) == 0 || len(embeddings[0]) == 0 {
+		return nil, goerr.New("empty embedding result")
+	}
+
+	// Convert float32 to float64 for repository interface
+	queryEmbedding := make([]float64, len(embeddings[0]))
+	for i, v := range embeddings[0] {
+		queryEmbedding[i] = float64(v)
+	}
+
+	// Search for similar runbooks
+	results, err := x.repository.SearchRunbooksByEmbedding(ctx, queryEmbedding, limit)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to search runbooks")
+	}
+
+	// Convert results to response format
+	var runbookResults []map[string]any
+	for _, result := range results {
+		runbookResults = append(runbookResults, map[string]any{
+			"id":          result.Entry.ID.String(),
+			"title":       result.Entry.Title,
+			"description": result.Entry.Description,
+			"sql_content": result.Entry.SQLContent,
+			"file_path":   result.Entry.FilePath,
+			"similarity":  result.Similarity,
+			"created_at":  result.Entry.CreatedAt,
+			"updated_at":  result.Entry.UpdatedAt,
+		})
+	}
+
+	return map[string]any{
+		"query":   query,
+		"results": runbookResults,
+		"total":   len(runbookResults),
+	}, nil
 }

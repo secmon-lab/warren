@@ -37,6 +37,22 @@ var tools = toolList{
 	&bigquery.Action{},
 }
 
+// InjectDependencies injects repository and embedding client into tools that support them
+func (x toolList) InjectDependencies(repo interfaces.Repository, embeddingClient interfaces.EmbeddingClient) {
+	for _, tool := range x {
+		// Check if tool supports repository injection
+		if repoSetter, ok := tool.(interface{ SetRepository(interfaces.Repository) }); ok {
+			repoSetter.SetRepository(repo)
+		}
+		// Check if tool supports embedding client injection
+		if embeddingSetter, ok := tool.(interface {
+			SetEmbeddingClient(interfaces.EmbeddingClient)
+		}); ok {
+			embeddingSetter.SetEmbeddingClient(embeddingClient)
+		}
+	}
+}
+
 func (x toolList) Flags() []cli.Flag {
 	flags := []cli.Flag{}
 	for _, tool := range x {
