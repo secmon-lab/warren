@@ -11,6 +11,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/google/uuid"
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"google.golang.org/api/impersonate"
 	"google.golang.org/api/iterator"
@@ -307,6 +308,8 @@ type queryMetadata struct {
 }
 
 func (x *Action) executeQuery(ctx context.Context, client *bigquery.Client, query string) (map[string]any, error) {
+	ctx = msg.Trace(ctx, "📝 %s", query)
+
 	q := client.Query(query)
 
 	// Perform dry run to check scan size
