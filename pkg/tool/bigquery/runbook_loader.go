@@ -113,7 +113,7 @@ func (r *RunbookLoader) loadFromFile(ctx context.Context, filePath string) (*big
 	}
 
 	// Read file content
-	content, err := os.ReadFile(filePath)
+	content, err := os.ReadFile(filepath.Clean(filePath))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to read SQL file", goerr.V("path", filePath))
 	}
