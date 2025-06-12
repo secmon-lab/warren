@@ -119,7 +119,7 @@ func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread 
 
 	uc.slackService.UpdateAlerts(ctx, alerts)
 
-	_ = msg.Trace(ctx, "🎫 Ticket created. Why don't you ask <@%s> about it?", uc.slackService.BotID())
+	msg.Notify(ctx, "🎫 Ticket created. Why don't you ask <@%s> about it?", uc.slackService.BotID())
 	return nil
 }
 
