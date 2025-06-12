@@ -18,10 +18,44 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/embedding"
 )
 
+type ListStatus string
+
+const (
+	ListStatusUnbound ListStatus = "unbound"
+	ListStatusBound   ListStatus = "bound"
+)
+
+func (s ListStatus) String() string {
+	return string(s)
+}
+
+func (s ListStatus) Icon() string {
+	switch s {
+	case ListStatusBound:
+		return "🔗"
+	case ListStatusUnbound:
+		return "📋"
+	default:
+		return "❓"
+	}
+}
+
+func (s ListStatus) DisplayName() string {
+	switch s {
+	case ListStatusBound:
+		return "Bound to ticket"
+	case ListStatusUnbound:
+		return "Unbound"
+	default:
+		return "Unknown"
+	}
+}
+
 type List struct {
 	ID          types.AlertListID `json:"id"`
 	AlertIDs    []types.AlertID   `json:"alert_ids"`
 	SlackThread *slack.Thread     `json:"slack_thread"`
+	Status      ListStatus        `json:"status"`
 	CreatedAt   time.Time         `json:"created_at"`
 	CreatedBy   *slack.User       `json:"created_by"`
 
@@ -36,6 +70,7 @@ func NewList(ctx context.Context, thread slack.Thread, createdBy *slack.User, al
 	list := List{
 		ID:          types.NewAlertListID(),
 		SlackThread: &thread,
+		Status:      ListStatusUnbound,
 		CreatedAt:   clock.Now(ctx),
 		CreatedBy:   createdBy,
 	}

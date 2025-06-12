@@ -5,6 +5,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/embedding"
@@ -129,7 +130,18 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Con
 		return err
 	}
 
-	return uc.handleBindAlerts(ctx, user, ticketID, list.AlertIDs)
+	err = uc.handleBindAlerts(ctx, user, ticketID, list.AlertIDs)
+	if err != nil {
+		return err
+	}
+
+	// Update the alert list status to bound
+	list.Status = alert.ListStatusBound
+	if err := uc.repository.PutAlertList(ctx, list); err != nil {
+		logger.Warn("failed to update alert list status", "error", err)
+	}
+
+	return nil
 }
 
 func (uc *UseCases) handleBindAlerts(ctx context.Context, user slack.User, ticketID types.TicketID, alertIDs []types.AlertID) error {

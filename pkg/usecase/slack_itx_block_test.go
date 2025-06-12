@@ -325,6 +325,11 @@ func TestSlackActionAckList(t *testing.T) {
 		gt.Value(t, updatedAlert.TicketID).Equal(ticket.ID)
 	}
 
+	// Verify alert list status was updated to bound
+	updatedList, err := repo.GetAlertList(ctx, testList.ID)
+	gt.NoError(t, err)
+	gt.Value(t, updatedList.Status).Equal(alert.ListStatusBound)
+
 	// Wait for async alert updates to complete
 	time.Sleep(200 * time.Millisecond)
 

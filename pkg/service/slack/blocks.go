@@ -417,11 +417,14 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 func buildAlertListBlocks(list *alert.List, alerts alert.Alerts, metadata slackMetadata) []slack.Block {
 	var blocks []slack.Block
 
+	// Header with status icon and title
+	headerText := fmt.Sprintf("%s Alert List", list.Status.Icon())
 	if list.Title != "" {
-		blocks = append(blocks, slack.NewHeaderBlock(
-			slack.NewTextBlockObject("plain_text", list.Title, false, false),
-		))
+		headerText = fmt.Sprintf("%s %s", list.Status.Icon(), list.Title)
 	}
+	blocks = append(blocks, slack.NewHeaderBlock(
+		slack.NewTextBlockObject("plain_text", headerText, false, false),
+	))
 
 	if list.Description != "" {
 		blocks = append(blocks, slack.NewSectionBlock(
@@ -431,25 +434,36 @@ func buildAlertListBlocks(list *alert.List, alerts alert.Alerts, metadata slackM
 		))
 	}
 
+	// Status and ID information
+	statusText := fmt.Sprintf("*Status:* %s %s\n*ID:* `%s`",
+		list.Status.Icon(),
+		list.Status.DisplayName(),
+		list.ID.String())
 	blocks = append(blocks, slack.NewSectionBlock(
-		slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*ID*: `%s`", list.ID.String()), false, false),
+		slack.NewTextBlockObject("mrkdwn", statusText, false, false),
 		nil,
 		nil,
 	))
+
 	blocks = append(blocks, buildAlertsBlocks(alerts, metadata)...)
-	blocks = append(blocks, slack.NewActionBlock(
-		list.ID.String(),
-		slack.NewButtonBlockElement(
-			model.ActionIDAckList.String(),
+
+	// Add action buttons only if status is unbound
+	if list.Status == alert.ListStatusUnbound {
+		blocks = append(blocks, slack.NewActionBlock(
 			list.ID.String(),
-			slack.NewTextBlockObject("plain_text", "Acknowledge", false, false),
-		).WithStyle(slack.StyleDefault),
-		slack.NewButtonBlockElement(
-			model.ActionIDBindList.String(),
-			list.ID.String(),
-			slack.NewTextBlockObject("plain_text", "Bind to ticket", false, false),
-		).WithStyle(slack.StyleDanger),
-	))
+			slack.NewButtonBlockElement(
+				model.ActionIDAckList.String(),
+				list.ID.String(),
+				slack.NewTextBlockObject("plain_text", "Acknowledge", false, false),
+			).WithStyle(slack.StyleDefault),
+			slack.NewButtonBlockElement(
+				model.ActionIDBindList.String(),
+				list.ID.String(),
+				slack.NewTextBlockObject("plain_text", "Bind to ticket", false, false),
+			).WithStyle(slack.StyleDanger),
+		))
+	}
+
 	blocks = append(blocks, slack.NewDividerBlock())
 
 	return blocks
