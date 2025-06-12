@@ -2,16 +2,24 @@ package usecase
 
 import (
 	"context"
+	_ "embed"
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/lang"
+	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/embedding"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
+
+//go:embed prompt/resolve_message.md
+var resolveMessagePromptTemplate string
 
 func (uc *UseCases) HandleSlackInteractionViewSubmission(ctx context.Context, user slack.User, callbackID slack.CallbackID, metadata string, values slack.StateValue) error {
 	logger := logging.From(ctx)
@@ -226,6 +234,47 @@ func unifyAlertIDs(oldAlertIDs, newAlertIDs []types.AlertID) []types.AlertID {
 	return unified
 }
 
+// generateResolveMessage generates a humorous message for when a ticket is resolved
+func (uc *UseCases) generateResolveMessage(ctx context.Context, ticket *ticket.Ticket) string {
+	conclusionText := ""
+	if ticket.Conclusion != "" {
+		conclusionText = string(ticket.Conclusion)
+	}
+
+	reasonText := ticket.Reason
+	if reasonText == "" {
+		reasonText = "No reason provided"
+	}
+
+	// Generate prompt with ticket information
+	resolvePrompt, err := prompt.Generate(ctx, resolveMessagePromptTemplate, map[string]any{
+		"title":      ticket.Metadata.Title,
+		"conclusion": conclusionText,
+		"reason":     reasonText,
+		"lang":       lang.From(ctx),
+	})
+	if err != nil {
+		// Fallback to default message if prompt generation fails
+		return "🎉 Great work! Ticket resolved successfully 🎯"
+	}
+
+	// Create LLM session
+	session, err := uc.llmClient.NewSession(ctx)
+	if err != nil {
+		// Fallback to default message if session creation fails
+		return "🎉 Great work! Ticket resolved successfully 🎯"
+	}
+
+	// Generate content
+	response, err := session.GenerateContent(ctx, gollem.Text(resolvePrompt))
+	if err != nil || len(response.Texts) == 0 || response.Texts[0] == "" {
+		// Fallback to default message if generation fails
+		return "🎉 Great work! Ticket resolved successfully 🎯"
+	}
+
+	return response.Texts[0]
+}
+
 func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
 	logger := logging.From(ctx)
 	logger.Debug("resolving alert",
@@ -276,7 +325,9 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 		return goerr.Wrap(err, "failed to update slack thread")
 	}
 
-	msg.Notify(ctx, "🎉 Ticket resolved")
+	// Generate and send humorous resolve message
+	resolveMessage := uc.generateResolveMessage(ctx, target)
+	msg.Notify(ctx, "%s", resolveMessage)
 
 	return nil
 }
