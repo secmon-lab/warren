@@ -246,11 +246,19 @@ func (uc *UseCases) generateResolveMessage(ctx context.Context, ticket *ticket.T
 		reasonText = "No reason provided"
 	}
 
-	// Generate prompt with ticket information
-	resolvePrompt, err := prompt.Generate(ctx, resolveMessagePromptTemplate, map[string]any{
+	// Get ticket comments
+	comments, err := uc.repository.GetTicketComments(ctx, ticket.ID)
+	if err != nil {
+		// Continue without comments if there's an error
+		comments = nil
+	}
+
+	// Generate prompt with ticket information including comments
+	resolvePrompt, err := prompt.GenerateWithStruct(ctx, resolveMessagePromptTemplate, map[string]any{
 		"title":      ticket.Metadata.Title,
 		"conclusion": conclusionText,
 		"reason":     reasonText,
+		"comments":   comments,
 		"lang":       lang.From(ctx),
 	})
 	if err != nil {
