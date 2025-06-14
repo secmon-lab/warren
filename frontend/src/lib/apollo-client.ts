@@ -1,6 +1,6 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 
-// 開発時・本番時ともに相対パス'/graphql'を使用してNext.jsのプロキシ機能を活用
+// Use relative path '/graphql' for both development and production to leverage Next.js proxy functionality
 const getGraphQLUri = () => {
   return '/graphql';
 };

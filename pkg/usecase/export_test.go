@@ -69,10 +69,6 @@ func (uc *AuthUseCase) TestGetCache() *TestAuthCache {
 	return uc.cache
 }
 
-func (uc *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message string) error {
-	return uc.chat(ctx, target, message)
-}
-
 var ToolCallToText = toolCallToText
 
 // GenerateInitialTicketComment exports the private generateInitialTicketComment method for testing

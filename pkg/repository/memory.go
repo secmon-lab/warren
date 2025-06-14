@@ -313,14 +313,14 @@ func (r *Memory) SearchAlerts(ctx context.Context, path, op string, value any, l
 			break
 		}
 
-		// リフレクションを使用して動的にフィールドにアクセス
+		// Use reflection to access fields dynamically
 		alertValue := reflect.ValueOf(alert).Elem()
 		fieldValue := alertValue.FieldByName(path)
 		if !fieldValue.IsValid() {
 			continue
 		}
 
-		// ポインタ型の場合は、その値を取得
+		// For pointer types, get the value
 		if fieldValue.Kind() == reflect.Ptr {
 			if fieldValue.IsNil() {
 				continue
@@ -328,10 +328,10 @@ func (r *Memory) SearchAlerts(ctx context.Context, path, op string, value any, l
 			fieldValue = fieldValue.Elem()
 		}
 
-		// 比較演算子に基づいて値を比較
+		// Compare values based on comparison operator
 		var cmpValue any = value
 		if fieldValue.Type() != reflect.TypeOf(value) {
-			// string型→type alias(string)などの変換
+			// Convert from string type to type aliases like string
 			if fieldValue.Type().Kind() == reflect.String && reflect.TypeOf(value).Kind() == reflect.String {
 				cmpValue = fieldValue.Convert(fieldValue.Type()).Interface()
 			} else if fieldValue.Type().Kind() == reflect.Int && reflect.TypeOf(value).Kind() == reflect.Int {

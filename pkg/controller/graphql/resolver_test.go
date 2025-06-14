@@ -23,8 +23,8 @@ func TestTicketResolver(t *testing.T) {
 		Metadata:  ticket.Metadata{Title: "Test Ticket", Description: "desc"},
 		Status:    types.TicketStatus("open"),
 		AlertIDs:  []types.AlertID{"alert-1"},
-		CreatedAt: now.Add(-time.Hour), // 1時間前に作成
-		UpdatedAt: now,                 // 現在時刻で更新
+		CreatedAt: now.Add(-time.Hour), // Created 1 hour ago
+		UpdatedAt: now,                 // Updated at current time
 	}
 	_ = repo.PutTicket(ctx, *testTicket)
 
@@ -39,19 +39,19 @@ func TestTicketResolver(t *testing.T) {
 		got, err := resolver.Query().Ticket(ctx, string(testTicket.ID))
 		gt.NoError(t, err)
 
-		// CreatedAtリゾルバーのテスト
+		// Test CreatedAt resolver
 		createdAtStr, err := resolver.Ticket().CreatedAt(ctx, got)
 		gt.NoError(t, err)
 		expectedCreatedAt := testTicket.CreatedAt.Format("2006-01-02T15:04:05Z07:00")
 		gt.Value(t, createdAtStr).Equal(expectedCreatedAt)
 
-		// UpdatedAtリゾルバーのテスト
+		// Test UpdatedAt resolver
 		updatedAtStr, err := resolver.Ticket().UpdatedAt(ctx, got)
 		gt.NoError(t, err)
 		expectedUpdatedAt := testTicket.UpdatedAt.Format("2006-01-02T15:04:05Z07:00")
 		gt.Value(t, updatedAtStr).Equal(expectedUpdatedAt)
 
-		// UpdatedAtがCreatedAtより新しいことを確認
+		// Verify that UpdatedAt is newer than CreatedAt
 		gt.Value(t, testTicket.UpdatedAt.After(testTicket.CreatedAt)).Equal(true)
 	})
 

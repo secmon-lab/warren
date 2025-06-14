@@ -120,15 +120,15 @@ func TestOTX_Specs(t *testing.T) {
 	var action otx.Action
 	specs, err := action.Specs(context.Background())
 	gt.NoError(t, err)
-	gt.A(t, specs).Length(5) // 5つのツール仕様があることを確認
+	gt.A(t, specs).Length(5) // Verify there are 5 tool specifications
 
-	// 各ツールの仕様を確認
+	// Verify each tool specification
 	for _, spec := range specs {
 		gt.Map(t, spec.Parameters).HasKey("target")
 		gt.Value(t, spec.Parameters["target"].Type).Equal("string")
 	}
 
-	// 特定のツールの仕様を確認
+	// Verify specific tool specification
 	var found bool
 	for _, spec := range specs {
 		if spec.Name == "otx.ipv4" {
