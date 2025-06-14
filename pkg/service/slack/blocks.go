@@ -469,6 +469,67 @@ func buildAlertListBlocks(list *alert.List, alerts alert.Alerts, metadata slackM
 	return blocks
 }
 
+func buildNewAlertListBlocks(list *alert.List, alerts alert.Alerts, metadata slackMetadata) []slack.Block {
+	blocks := []slack.Block{
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", fmt.Sprintf("📑 New list with %d alerts", len(alerts)), false, false),
+		),
+		slack.NewDividerBlock(),
+	}
+
+	blocks = append(blocks, buildAlertListBlocks(list, alerts, metadata)...)
+
+	return blocks
+}
+
+func buildCompletedAlertListBlocks(list *alert.List, alerts alert.Alerts, metadata slackMetadata, status string) []slack.Block {
+	var blocks []slack.Block
+	var statusIcon string
+	var statusText string
+
+	switch status {
+	case "acknowledged":
+		statusIcon = "✅"
+		statusText = "Acknowledged"
+	case "bound":
+		statusIcon = "🔗"
+		statusText = "Bound to ticket"
+	default:
+		statusIcon = "✨"
+		statusText = "Completed"
+	}
+
+	blocks = append(blocks, slack.NewHeaderBlock(
+		slack.NewTextBlockObject("plain_text", fmt.Sprintf("📑 Alert list with %d alerts", len(alerts)), false, false),
+	))
+
+	if list.Title != "" {
+		blocks = append(blocks, slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", list.Title, false, false),
+		))
+	}
+
+	if list.Description != "" {
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", list.Description, false, false),
+			nil,
+			nil,
+		))
+	}
+
+	// Status section
+	blocks = append(blocks, slack.NewSectionBlock(
+		slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*ID*: `%s`\n*Status*: %s %s", list.ID.String(), statusIcon, statusText), false, false),
+		nil,
+		nil,
+	))
+
+	blocks = append(blocks, buildAlertsBlocks(alerts, metadata)...)
+	blocks = append(blocks, slack.NewDividerBlock())
+
+	return blocks
+}
+
 func buildAlertsBlocks(alerts alert.Alerts, metadata slackMetadata) []slack.Block {
 	if len(alerts) == 0 {
 		return []slack.Block{

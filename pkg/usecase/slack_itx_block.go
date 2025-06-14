@@ -162,6 +162,14 @@ func (uc *UseCases) slackActionAckList(ctx context.Context, user slack.User, sla
 		logger.Warn("failed to update alert list status", "error", err)
 	}
 
+	// Update the alert list message to show acknowledged status
+	st := uc.slackService.NewThread(slackThread)
+	if list.SlackMessageID != "" {
+		if err := st.UpdateAlertList(ctx, list, "acknowledged"); err != nil {
+			logger.Warn("failed to update alert list", "error", err)
+		}
+	}
+
 	return nil
 }
 

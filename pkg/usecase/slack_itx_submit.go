@@ -149,6 +149,13 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Con
 		logger.Warn("failed to update alert list status", "error", err)
 	}
 
+	// Update the alert list message to show bound status
+	if list.SlackMessageID != "" {
+		if err := st.UpdateAlertList(ctx, list, "bound"); err != nil {
+			logger.Warn("failed to update alert list", "error", err)
+		}
+	}
+
 	return nil
 }
 
