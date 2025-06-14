@@ -172,15 +172,15 @@ func TestVT_Specs(t *testing.T) {
 	var action vt.Action
 	specs, err := action.Specs(context.Background())
 	gt.NoError(t, err)
-	gt.A(t, specs).Length(4) // 4つのツール仕様があることを確認
+	gt.A(t, specs).Length(4) // Verify there are 4 tool specifications
 
-	// 各ツールの仕様を確認
+	// Verify each tool specification
 	for _, spec := range specs {
 		gt.Map(t, spec.Parameters).HasKey("target")
 		gt.Value(t, spec.Parameters["target"].Type).Equal("string")
 	}
 
-	// 特定のツールの仕様を確認
+	// Verify specific tool specification
 	var found bool
 	for _, spec := range specs {
 		if spec.Name == "vt.ip" {

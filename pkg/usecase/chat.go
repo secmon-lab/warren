@@ -23,7 +23,7 @@ import (
 //go:embed prompt/chat_system_prompt.md
 var chatSystemPromptTemplate string
 
-func (x *UseCases) chat(ctx context.Context, target *ticket.Ticket, message string) error {
+func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message string) error {
 	logger := logging.From(ctx)
 
 	// Create Slack update callback function

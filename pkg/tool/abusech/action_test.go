@@ -112,15 +112,15 @@ func TestAbusech_Specs(t *testing.T) {
 	var action abusech.Action
 	specs, err := action.Specs(context.Background())
 	gt.NoError(t, err)
-	gt.A(t, specs).Length(1) // 1つのツール仕様があることを確認
+	gt.A(t, specs).Length(1) // Verify there is 1 tool specification
 
-	// 各ツールの仕様を確認
+	// Verify each tool specification
 	for _, spec := range specs {
 		gt.Map(t, spec.Parameters).HasKey("hash")
 		gt.Value(t, spec.Parameters["hash"].Type).Equal("string")
 	}
 
-	// 特定のツールの仕様を確認
+	// Verify specific tool specification
 	var found bool
 	for _, spec := range specs {
 		if spec.Name == "abusech.bazaar.query" {
@@ -149,13 +149,13 @@ func TestAbusech_Enabled(t *testing.T) {
 		},
 	}
 
-	// 環境変数をクリア
+	// Clear environment variables
 	t.Setenv("WARREN_ABUSECH_AUTH_KEY", "")
 
-	// フラグを明示的に設定
+	// Explicitly set flags
 	gt.NoError(t, cmd.Run(t.Context(), []string{
 		"abusech",
-		"--abusech-api-key", "", // 空のAPIキーを明示的に設定
+		"--abusech-api-key", "", // Explicitly set empty API key
 		"--abusech-base-url", "https://mb-api.abuse.ch/api/v1",
 	}))
 }

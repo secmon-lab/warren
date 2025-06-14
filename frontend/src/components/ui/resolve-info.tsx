@@ -14,7 +14,7 @@ export function ResolveInfo({ ticket, onEditConclusion }: ResolveInfoProps) {
   const hasConclusion = ticket.conclusion || ticket.reason;
   const hasFinding = ticket.finding;
 
-  // Resolvedでない、またはConclusionもFindingもない場合は何も表示しない
+  // Don't display anything if not resolved or has neither conclusion nor finding
   if (!isResolved && !hasFinding) {
     return null;
   }

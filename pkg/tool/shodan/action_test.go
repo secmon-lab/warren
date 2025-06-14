@@ -145,9 +145,9 @@ func TestShodan_Specs(t *testing.T) {
 	var action shodan.Action
 	specs, err := action.Specs(context.Background())
 	gt.NoError(t, err)
-	gt.A(t, specs).Length(3) // 3つのツール仕様があることを確認
+	gt.A(t, specs).Length(3) // Verify there are 3 tool specifications
 
-	// 各ツールの仕様を確認
+	// Verify each tool specification
 	for _, spec := range specs {
 		switch spec.Name {
 		case "shodan.host", "shodan.domain":
@@ -161,7 +161,7 @@ func TestShodan_Specs(t *testing.T) {
 		}
 	}
 
-	// 特定のツールの仕様を確認
+	// Verify specific tool specification
 	var found bool
 	for _, spec := range specs {
 		if spec.Name == "shodan.host" {

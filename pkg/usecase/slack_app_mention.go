@@ -53,7 +53,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 			return nil
 		}
 
-		return uc.chat(ctx, ticket, mention.Message)
+		return uc.Chat(ctx, ticket, mention.Message)
 	}
 
 	return nil

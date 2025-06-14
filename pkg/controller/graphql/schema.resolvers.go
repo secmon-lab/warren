@@ -123,13 +123,13 @@ func (r *mutationResolver) UpdateTicketStatus(ctx context.Context, id string, st
 
 // UpdateMultipleTicketsStatus is the resolver for the updateMultipleTicketsStatus field.
 func (r *mutationResolver) UpdateMultipleTicketsStatus(ctx context.Context, ids []string, status string) ([]*ticket.Ticket, error) {
-	// ステータスのバリデーション
+	// Status validation
 	ticketStatus := types.TicketStatus(status)
 	if err := ticketStatus.Validate(); err != nil {
 		return nil, goerr.Wrap(err, "invalid ticket status", goerr.V("status", status))
 	}
 
-	// チケットIDの変換とバリデーション
+	// Convert and validate ticket IDs
 	ticketIDs := make([]types.TicketID, len(ids))
 	for i, id := range ids {
 		ticketID := types.TicketID(id)
@@ -139,12 +139,12 @@ func (r *mutationResolver) UpdateMultipleTicketsStatus(ctx context.Context, ids 
 		ticketIDs[i] = ticketID
 	}
 
-	// バッチでステータス更新
+	// Batch update status
 	if err := r.repo.BatchUpdateTicketsStatus(ctx, ticketIDs, ticketStatus); err != nil {
 		return nil, goerr.Wrap(err, "failed to batch update tickets status")
 	}
 
-	// 更新されたチケットを取得
+	// Retrieve updated tickets
 	tickets, err := r.repo.BatchGetTickets(ctx, ticketIDs)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get updated tickets")

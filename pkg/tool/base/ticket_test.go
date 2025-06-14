@@ -7,11 +7,13 @@ import (
 
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gt"
+	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/tool/base"
+	"github.com/secmon-lab/warren/pkg/utils/dryrun"
 )
 
 func TestWarren_UpdateFinding(t *testing.T) {
@@ -189,4 +191,103 @@ func TestWarren_Specs(t *testing.T) {
 			t.Errorf("Required parameter %s not found", required)
 		}
 	}
+}
+
+func TestWarren_UpdateFindingDryRun(t *testing.T) {
+	runTest := func(tc struct {
+		name              string
+		isDryRun          bool
+		expectRepoUpdate  bool
+		expectSlackUpdate bool
+	}) func(t *testing.T) {
+		return func(t *testing.T) {
+			// Setup mock repository
+			mockRepo := &mock.RepositoryMock{}
+			mockPolicy := &mock.PolicyClientMock{}
+
+			ticketID := types.TicketID("test-ticket-id")
+
+			// Create test ticket with Slack thread to enable Slack updates
+			testTicket := &ticket.Ticket{
+				ID: ticketID,
+				Metadata: ticket.Metadata{
+					Title:       "Test Ticket",
+					Description: "Test Description",
+					Summary:     "Test Summary",
+				},
+				Status: types.TicketStatusOpen,
+				SlackThread: &slack.Thread{
+					TeamID:    "T1234567890",
+					ChannelID: "C1234567890",
+					ThreadID:  "1234567890.123456",
+				},
+			}
+
+			// Setup mock expectations
+			mockRepo.GetTicketFunc = func(ctx context.Context, id types.TicketID) (*ticket.Ticket, error) {
+				return testTicket, nil
+			}
+
+			var repoUpdateCalled bool
+			var slackUpdateCalled bool
+
+			mockRepo.PutTicketFunc = func(ctx context.Context, t ticket.Ticket) error {
+				repoUpdateCalled = true
+				return nil
+			}
+
+			slackUpdateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
+				slackUpdateCalled = true
+				return nil
+			}
+
+			// Create Warren tool with slack update callback
+			warren := base.New(mockRepo, mockPolicy, ticketID, base.WithSlackUpdate(slackUpdateFunc))
+
+			// Create context with dry-run setting
+			ctx := context.Background()
+			if tc.isDryRun {
+				ctx = dryrun.With(ctx, true)
+			}
+
+			// Test update_finding tool call
+			args := map[string]any{
+				"summary":        "Test finding summary",
+				"severity":       "high",
+				"reason":         "Test reason for finding",
+				"recommendation": "Test recommendation",
+			}
+
+			_, err := warren.Run(ctx, "warren.update_finding", args)
+			gt.NoError(t, err)
+
+			// Verify expectations
+			gt.Equal(t, tc.expectRepoUpdate, repoUpdateCalled)
+			gt.Equal(t, tc.expectSlackUpdate, slackUpdateCalled)
+		}
+	}
+
+	t.Run("dry-run enabled", runTest(struct {
+		name              string
+		isDryRun          bool
+		expectRepoUpdate  bool
+		expectSlackUpdate bool
+	}{
+		name:              "dry-run enabled",
+		isDryRun:          true,
+		expectRepoUpdate:  false, // Should not update repository
+		expectSlackUpdate: false, // Should not update Slack
+	}))
+
+	t.Run("dry-run disabled", runTest(struct {
+		name              string
+		isDryRun          bool
+		expectRepoUpdate  bool
+		expectSlackUpdate bool
+	}{
+		name:              "dry-run disabled",
+		isDryRun:          false,
+		expectRepoUpdate:  true, // Should update repository
+		expectSlackUpdate: true, // Should update Slack
+	}))
 }

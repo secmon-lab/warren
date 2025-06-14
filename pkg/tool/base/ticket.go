@@ -8,6 +8,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/dryrun"
 )
 
 func (x *Warren) findNearestTicket(ctx context.Context, args map[string]any) (map[string]any, error) {
@@ -101,24 +102,30 @@ func (x *Warren) updateFinding(ctx context.Context, args map[string]any) (map[st
 		return nil, goerr.New("ticket not found", goerr.V("ticket_id", x.ticketID))
 	}
 
+	// Check if dry-run mode is enabled
+	isDryRun := dryrun.IsDryRun(ctx)
+
 	// Update finding
-	currentTicket.Finding = &ticket.Finding{
+	updatedTicket := *currentTicket
+	updatedTicket.Finding = &ticket.Finding{
 		Severity:       severity,
 		Summary:        summary,
 		Reason:         reason,
 		Recommendation: recommendation,
 	}
-	currentTicket.UpdatedAt = clock.Now(ctx)
+	updatedTicket.UpdatedAt = clock.Now(ctx)
 
-	// Save to database
-	if err := x.repo.PutTicket(ctx, *currentTicket); err != nil {
-		return nil, goerr.Wrap(err, "failed to update ticket in database")
+	// Save to database (skip if dry-run)
+	if !isDryRun {
+		if err := x.repo.PutTicket(ctx, updatedTicket); err != nil {
+			return nil, goerr.Wrap(err, "failed to update ticket in database")
+		}
 	}
 
-	// Update Slack message if callback is provided and ticket has Slack thread
+	// Update Slack message if callback is provided and ticket has Slack thread (skip if dry-run)
 	slackUpdated := false
-	if x.slackUpdate != nil && currentTicket.SlackThread != nil {
-		if err := x.slackUpdate(ctx, currentTicket); err != nil {
+	if !isDryRun && x.slackUpdate != nil && currentTicket.SlackThread != nil {
+		if err := x.slackUpdate(ctx, &updatedTicket); err != nil {
 			// Don't fail the entire operation if Slack update fails
 			// Just log the error and continue
 			return map[string]any{
@@ -129,24 +136,31 @@ func (x *Warren) updateFinding(ctx context.Context, args map[string]any) (map[st
 				"summary":        summary,
 				"reason":         reason,
 				"recommendation": recommendation,
-				"updated_at":     currentTicket.UpdatedAt.Format(time.RFC3339),
+				"updated_at":     updatedTicket.UpdatedAt.Format(time.RFC3339),
+				"dry_run":        isDryRun,
 			}, nil
 		}
 		slackUpdated = true
 	}
 
+	message := "Finding updated successfully"
+	if isDryRun {
+		message = "Finding update validated (dry-run mode)"
+	}
+
 	response := map[string]any{
 		"success":        true,
-		"message":        "Finding updated successfully",
+		"message":        message,
 		"severity":       string(severity),
 		"summary":        summary,
 		"reason":         reason,
 		"recommendation": recommendation,
-		"updated_at":     currentTicket.UpdatedAt.Format(time.RFC3339),
+		"updated_at":     updatedTicket.UpdatedAt.Format(time.RFC3339),
 		"slack_updated":  slackUpdated,
+		"dry_run":        isDryRun,
 	}
 
-	if !slackUpdated && currentTicket.SlackThread != nil {
+	if !isDryRun && !slackUpdated && currentTicket.SlackThread != nil {
 		response["slack_update_required"] = true
 		response["message"] = "Finding updated successfully. Slack message update may be needed."
 	}
