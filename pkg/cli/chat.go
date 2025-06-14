@@ -17,7 +17,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/dryrun"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
-	"golang.org/x/term"
 )
 
 func cmdChat() *cli.Command {
@@ -220,29 +219,4 @@ func runInteractiveMode(ctx context.Context, uc *usecase.UseCases, ticket *ticke
 	}
 
 	return nil
-}
-
-func recvInput() (string, error) {
-	fmt.Printf("\033[2K> ")
-
-	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to set raw mode")
-	}
-	defer func() {
-		if err := term.Restore(int(os.Stdin.Fd()), oldState); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to restore terminal: %v\n", err)
-		}
-	}()
-
-	t := term.NewTerminal(os.Stdin, "")
-	msg, err := t.ReadLine()
-	if err != nil {
-		if err == io.EOF {
-			return "", err
-		}
-		return "", goerr.Wrap(err, "failed to read line")
-	}
-
-	return msg, nil
 }
