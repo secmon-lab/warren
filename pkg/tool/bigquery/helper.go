@@ -17,7 +17,6 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/llm/gemini"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
-	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 	"google.golang.org/api/iterator"
@@ -424,41 +423,27 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 		return err
 	}
 
-	var tableSchema []any
-	for _, field := range flattenSchema(tableMetadata.Schema, []string{}) {
-		tableSchema = append(tableSchema, field)
-	}
-	schemaPrompt, err := prompt.Generate(ctx, generateConfigSchemaPrompt, map[string]any{
-		"table_schema": tableSchema,
-		"project_id":   cfg.tableProjectID,
-		"dataset_id":   cfg.tableDatasetID,
-		"table_id":     cfg.tableTableID,
-	})
-	if err != nil {
-		return err
-	}
-	schemaSummary, err := llm.Summary(ctx, llmClient, schemaPrompt, tableSchema)
-	if err != nil {
-		return err
-	}
+	// Get flattened schema fields directly
+	flattenedFields := flattenSchema(tableMetadata.Schema, []string{})
 
-	println("======== Schema summary =========")
-	println(schemaSummary)
+	println("======== Schema fields =========")
+	println(fmt.Sprintf("Total fields available: %d", len(flattenedFields)))
+	println(fmt.Sprintf("Fields used for analysis: %d", len(flattenedFields)))
 	println("=================================")
 
 	// Generate JSON schema from the Config struct
-	// Note: We use a simplified representation to avoid circular reference issues
-	// from ColumnConfig.Fields which references ColumnConfig itself
 	outputSchema := generateConfigSchema()
 
-	queryPrompt, err := prompt.Generate(ctx, generateConfigQueryPrompt, map[string]any{
-		"table_description": cfg.tableDescription,
-		"schema_summary":    schemaSummary,
-		"output_schema":     outputSchema,
-		"scan_limit":        cfg.scanLimit,
-		"project_id":        cfg.tableProjectID,
-		"dataset_id":        cfg.tableDatasetID,
-		"table_id":          cfg.tableTableID,
+	queryPrompt, err := prompt.GenerateWithStruct(ctx, generateConfigQueryPrompt, map[string]any{
+		"table_description":  cfg.tableDescription,
+		"schema_fields":      flattenedFields, // Use all fields
+		"total_fields_count": len(flattenedFields),
+		"used_fields_count":  len(flattenedFields),
+		"output_schema":      outputSchema,
+		"scan_limit":         cfg.scanLimit,
+		"project_id":         cfg.tableProjectID,
+		"dataset_id":         cfg.tableDatasetID,
+		"table_id":           cfg.tableTableID,
 	})
 	if err != nil {
 		return err
@@ -466,12 +451,17 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 
 	agent := gollem.New(llmClient,
 		gollem.WithSystemPrompt(queryPrompt),
+		gollem.WithLoopLimit(5), // Limit to 5 iterations to prevent infinite loops
 		gollem.WithMessageHook(func(ctx context.Context, msg string) error {
 			println(msg)
 			return nil
 		}),
 		gollem.WithToolErrorHook(func(ctx context.Context, err error, tool gollem.FunctionCall) error {
 			println("❌", err.Error())
+			// For schema validation errors, provide more guidance
+			if strings.Contains(err.Error(), "schema validation failed") {
+				println("💡 Hint: Only use fields from the provided schema list. Do not add or guess field names.")
+			}
 			return nil
 		}),
 		gollem.WithToolRequestHook(func(ctx context.Context, tool gollem.FunctionCall) error {
@@ -540,7 +530,7 @@ func (x *generateConfigTool) Specs(ctx context.Context) ([]gollem.ToolSpec, erro
 		},
 		{
 			Name:        "generate_config_output",
-			Description: "Generate the final YAML configuration file with the analyzed table metadata",
+			Description: "Generate the final YAML configuration file with the analyzed table metadata. If validation fails, the tool will return specific invalid fields that need to be removed. You should then immediately retry with a corrected configuration that removes only the invalid fields mentioned in the response.",
 			Parameters: map[string]*gollem.Parameter{
 				"config": {
 					Type:        gollem.TypeObject,
@@ -708,13 +698,33 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 			report := formatValidationReport(validationResult)
 			println("\n" + report + "\n")
 
+			// Provide specific guidance for common errors
+			fieldNotFoundCount := 0
+			invalidFields := []string{}
+			for _, issue := range validationResult.Issues {
+				if issue.Type == "field_not_found" {
+					fieldNotFoundCount++
+					invalidFields = append(invalidFields, issue.FieldPath)
+				}
+			}
+
+			if fieldNotFoundCount > 0 {
+				println("🔧 SOLUTION: Remove the non-existent fields listed above and retry.")
+				println("📋 REMINDER: Only use fields from the provided schema_fields list.")
+				println("❌ DO NOT add fields that are not explicitly listed in the schema.")
+			}
+
+			// Instead of failing, provide a success response with guidance for retry
 			return map[string]any{
-					"status":            "validation_failed",
-					"validation_report": report,
-					"message":           "Configuration validation failed. Please fix the issues and try again.",
-					"retry_required":    true,
-				}, goerr.New("schema validation failed",
-					goerr.V("issues_count", len(validationResult.Issues)))
+				"status":             "validation_failed_retry_needed",
+				"validation_report":  report,
+				"field_errors_count": fieldNotFoundCount,
+				"invalid_fields":     invalidFields,
+				"message":            "Configuration has validation errors. Please remove the invalid fields and generate a corrected configuration.",
+				"retry_instruction":  "Remove these invalid fields and call generate_config_output again with the corrected configuration.",
+				"success":            false,
+			}, nil // Return nil error to allow LLM to continue and retry
+
 		}
 
 		// If validation passes, save the config
@@ -726,6 +736,7 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 			"status":            "success",
 			"message":           "✅ Configuration validated and saved successfully",
 			"validation_status": "passed",
+			"success":           true,
 		}, nil
 
 	default:

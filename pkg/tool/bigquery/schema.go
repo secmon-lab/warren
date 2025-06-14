@@ -10,7 +10,6 @@ type schemaField struct {
 	Name        string
 	Type        string
 	Repeated    bool
-	Required    bool
 	Description string
 }
 
@@ -30,7 +29,6 @@ func flattenSchema(schema bigquery.Schema, prefix []string) []schemaField {
 			Name:        fieldName,
 			Type:        string(field.Type),
 			Repeated:    field.Repeated,
-			Required:    field.Required,
 			Description: field.Description,
 		})
 
