@@ -17,7 +17,6 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/llm/gemini"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
-	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 	"google.golang.org/api/iterator"
@@ -132,9 +131,6 @@ func subCommandGenerateConfig() *cli.Command {
 //go:embed prompt/generate_config_query.md
 var generateConfigQueryPrompt string
 
-//go:embed prompt/generate_config_schema.md
-var generateConfigSchemaPrompt string
-
 // parseTableID parses table ID in format "project_id.dataset_id.table_id"
 func parseTableID(tableID string, cfg *generateConfigConfig) error {
 	parts := strings.Split(tableID, ".")
@@ -228,6 +224,165 @@ func generateConfigSchema() string {
 }`
 }
 
+// SchemaValidationResult holds the result of schema validation
+type SchemaValidationResult struct {
+	Valid  bool
+	Issues []SchemaValidationIssue
+}
+
+type SchemaValidationIssue struct {
+	Type         string // "field_not_found", "type_mismatch", "nested_field_not_found"
+	FieldPath    string
+	ExpectedType string
+	ActualType   string
+	Message      string
+}
+
+// ValidateConfigAgainstSchema validates the generated config against the actual BigQuery table schema
+func ValidateConfigAgainstSchema(config *Config, tableMetadata *bigquery.TableMetadata) SchemaValidationResult {
+	result := SchemaValidationResult{
+		Valid:  true,
+		Issues: []SchemaValidationIssue{},
+	}
+
+	// Create a map of actual schema fields for quick lookup
+	actualFields := BuildSchemaFieldMap(tableMetadata.Schema, "")
+
+	// Validate each column in the config
+	for _, column := range config.Columns {
+		validateColumnConfig(column, actualFields, &result, "")
+	}
+
+	if len(result.Issues) > 0 {
+		result.Valid = false
+	}
+
+	return result
+}
+
+// BuildSchemaFieldMap creates a flat map of all fields (including nested) from BigQuery schema
+func BuildSchemaFieldMap(schema bigquery.Schema, prefix string) map[string]*bigquery.FieldSchema {
+	fieldMap := make(map[string]*bigquery.FieldSchema)
+
+	for _, field := range schema {
+		fieldName := field.Name
+		if prefix != "" {
+			fieldName = prefix + "." + field.Name
+		}
+
+		fieldMap[fieldName] = field
+
+		// Handle nested RECORD fields
+		if field.Type == bigquery.RecordFieldType && len(field.Schema) > 0 {
+			nestedFields := BuildSchemaFieldMap(field.Schema, fieldName)
+			for k, v := range nestedFields {
+				fieldMap[k] = v
+			}
+		}
+	}
+
+	return fieldMap
+}
+
+// validateColumnConfig validates a single column config against the actual schema
+func validateColumnConfig(column ColumnConfig, actualFields map[string]*bigquery.FieldSchema, result *SchemaValidationResult, prefix string) {
+	fieldPath := column.Name
+	if prefix != "" {
+		fieldPath = prefix + "." + column.Name
+	}
+
+	actualField, exists := actualFields[fieldPath]
+	if !exists {
+		result.Issues = append(result.Issues, SchemaValidationIssue{
+			Type:      "field_not_found",
+			FieldPath: fieldPath,
+			Message:   fmt.Sprintf("Field '%s' does not exist in the actual table schema", fieldPath),
+		})
+		return
+	}
+
+	// Validate data type
+	expectedType := strings.ToUpper(column.Type)
+	actualType := string(actualField.Type)
+	if expectedType != actualType {
+		result.Issues = append(result.Issues, SchemaValidationIssue{
+			Type:         "type_mismatch",
+			FieldPath:    fieldPath,
+			ExpectedType: expectedType,
+			ActualType:   actualType,
+			Message:      fmt.Sprintf("Field '%s' type mismatch: config has '%s', actual schema has '%s'", fieldPath, expectedType, actualType),
+		})
+	}
+
+	// Validate nested fields for RECORD types
+	if column.Type == "RECORD" && len(column.Fields) > 0 {
+		for _, nestedField := range column.Fields {
+			validateColumnConfig(nestedField, actualFields, result, fieldPath)
+		}
+	}
+}
+
+// formatValidationReport creates a formatted report of validation issues
+func formatValidationReport(result SchemaValidationResult) string {
+	if result.Valid {
+		return "✅ Schema validation passed. All fields in the configuration match the actual table schema."
+	}
+
+	var report strings.Builder
+	report.WriteString("❌ SCHEMA VALIDATION FAILED\n\n")
+	report.WriteString(fmt.Sprintf("Found %d issue(s) with the generated configuration:\n\n", len(result.Issues)))
+
+	// Group issues by type
+	fieldNotFound := []SchemaValidationIssue{}
+	typeMismatch := []SchemaValidationIssue{}
+	nestedIssues := []SchemaValidationIssue{}
+
+	for _, issue := range result.Issues {
+		switch issue.Type {
+		case "field_not_found":
+			fieldNotFound = append(fieldNotFound, issue)
+		case "type_mismatch":
+			typeMismatch = append(typeMismatch, issue)
+		case "nested_field_not_found":
+			nestedIssues = append(nestedIssues, issue)
+		}
+	}
+
+	if len(fieldNotFound) > 0 {
+		report.WriteString("🔍 FIELDS NOT FOUND IN ACTUAL SCHEMA:\n")
+		for i, issue := range fieldNotFound {
+			report.WriteString(fmt.Sprintf("  %d. %s\n", i+1, issue.Message))
+		}
+		report.WriteString("\n")
+	}
+
+	if len(typeMismatch) > 0 {
+		report.WriteString("🔄 DATA TYPE MISMATCHES:\n")
+		for i, issue := range typeMismatch {
+			report.WriteString(fmt.Sprintf("  %d. %s\n", i+1, issue.Message))
+		}
+		report.WriteString("\n")
+	}
+
+	if len(nestedIssues) > 0 {
+		report.WriteString("🏗️ NESTED FIELD ISSUES:\n")
+		for i, issue := range nestedIssues {
+			report.WriteString(fmt.Sprintf("  %d. %s\n", i+1, issue.Message))
+		}
+		report.WriteString("\n")
+	}
+
+	report.WriteString("REQUIRED ACTIONS:\n")
+	report.WriteString("1. Remove non-existent fields from your configuration\n")
+	report.WriteString("2. Correct data type mismatches\n")
+	report.WriteString("3. Verify nested field structures against the actual schema\n")
+	report.WriteString("4. Re-run field validation queries to confirm field existence\n")
+	report.WriteString("5. Generate a new configuration with only validated fields\n\n")
+	report.WriteString("Please fix these issues and regenerate the configuration.")
+
+	return report.String()
+}
+
 func generateConfigInternal(ctx context.Context, cfg generateConfigConfig) error {
 	factory := &DefaultBigQueryClientFactory{}
 	return generateConfigWithFactoryInternal(ctx, cfg, factory)
@@ -265,38 +420,27 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 		return err
 	}
 
-	var tableSchema []any
-	for _, field := range flattenSchema(tableMetadata.Schema, []string{}) {
-		tableSchema = append(tableSchema, field)
-	}
-	schemaPrompt, err := prompt.Generate(ctx, generateConfigSchemaPrompt, map[string]any{
-		"table_schema": tableSchema,
-	})
-	if err != nil {
-		return err
-	}
-	schemaSummary, err := llm.Summary(ctx, llmClient, schemaPrompt, tableSchema)
-	if err != nil {
-		return err
-	}
+	// Get flattened schema fields directly
+	flattenedFields := flattenSchema(tableMetadata.Schema, []string{})
 
-	println("======== Schema summary =========")
-	println(schemaSummary)
+	println("======== Schema fields =========")
+	println(fmt.Sprintf("Total fields available: %d", len(flattenedFields)))
+	println(fmt.Sprintf("Fields used for analysis: %d", len(flattenedFields)))
 	println("=================================")
 
 	// Generate JSON schema from the Config struct
-	// Note: We use a simplified representation to avoid circular reference issues
-	// from ColumnConfig.Fields which references ColumnConfig itself
 	outputSchema := generateConfigSchema()
 
-	queryPrompt, err := prompt.Generate(ctx, generateConfigQueryPrompt, map[string]any{
-		"table_description": cfg.tableDescription,
-		"schema_summary":    schemaSummary,
-		"output_schema":     outputSchema,
-		"scan_limit":        cfg.scanLimit,
-		"project_id":        cfg.tableProjectID,
-		"dataset_id":        cfg.tableDatasetID,
-		"table_id":          cfg.tableTableID,
+	queryPrompt, err := prompt.GenerateWithStruct(ctx, generateConfigQueryPrompt, map[string]any{
+		"table_description":  cfg.tableDescription,
+		"schema_fields":      flattenedFields, // Use all fields
+		"total_fields_count": len(flattenedFields),
+		"used_fields_count":  len(flattenedFields),
+		"output_schema":      outputSchema,
+		"scan_limit":         cfg.scanLimit,
+		"project_id":         cfg.tableProjectID,
+		"dataset_id":         cfg.tableDatasetID,
+		"table_id":           cfg.tableTableID,
 	})
 	if err != nil {
 		return err
@@ -304,12 +448,17 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 
 	agent := gollem.New(llmClient,
 		gollem.WithSystemPrompt(queryPrompt),
+		gollem.WithLoopLimit(12), // Increase to 12 iterations for comprehensive single-pass generation
 		gollem.WithMessageHook(func(ctx context.Context, msg string) error {
 			println(msg)
 			return nil
 		}),
 		gollem.WithToolErrorHook(func(ctx context.Context, err error, tool gollem.FunctionCall) error {
 			println("❌", err.Error())
+			// For schema validation errors, provide more guidance
+			if strings.Contains(err.Error(), "schema validation failed") {
+				println("💡 Hint: Only use fields from the provided schema list. Do not add or guess field names.")
+			}
 			return nil
 		}),
 		gollem.WithToolRequestHook(func(ctx context.Context, tool gollem.FunctionCall) error {
@@ -321,6 +470,8 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 			scanLimitStr:   cfg.scanLimit,
 			scanLimit:      scanLimit,
 			outputPath:     outputPath,
+			tableDatasetID: cfg.tableDatasetID,
+			tableTableID:   cfg.tableTableID,
 		}),
 	)
 
@@ -336,6 +487,8 @@ type generateConfigTool struct {
 	scanLimit      uint64
 	bigqueryClient BigQueryClient
 	outputPath     string
+	tableDatasetID string // Added to fetch metadata when needed
+	tableTableID   string // Added to fetch metadata when needed
 }
 
 func (x *generateConfigTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
@@ -374,7 +527,7 @@ func (x *generateConfigTool) Specs(ctx context.Context) ([]gollem.ToolSpec, erro
 		},
 		{
 			Name:        "generate_config_output",
-			Description: "Generate the final YAML configuration file with the analyzed table metadata",
+			Description: "Generate the final YAML configuration file with the analyzed table metadata. If validation fails, the tool will return specific invalid fields that need to be removed. You should then immediately retry with a corrected configuration that removes only the invalid fields mentioned in the response.",
 			Parameters: map[string]*gollem.Parameter{
 				"config": {
 					Type:        gollem.TypeObject,
@@ -518,14 +671,69 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 			return nil, goerr.New("config parameter is required and must be an object")
 		}
 
-		// Convert to BigQuery Config and save as YAML
+		// Convert to BigQuery Config for validation
+		configData, err := json.Marshal(config)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to marshal config for validation")
+		}
+
+		var bqConfig Config
+		if err := json.Unmarshal(configData, &bqConfig); err != nil {
+			return nil, goerr.Wrap(err, "failed to unmarshal config to BigQuery Config")
+		}
+
+		// Validate configuration against actual schema
+		tableMetadata, err := x.getTableMetadata(ctx)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to get table metadata for validation")
+		}
+
+		validationResult := ValidateConfigAgainstSchema(&bqConfig, tableMetadata)
+
+		if !validationResult.Valid {
+			// Print validation report
+			report := formatValidationReport(validationResult)
+			println("\n" + report + "\n")
+
+			// Provide specific guidance for common errors
+			fieldNotFoundCount := 0
+			invalidFields := []string{}
+			for _, issue := range validationResult.Issues {
+				if issue.Type == "field_not_found" {
+					fieldNotFoundCount++
+					invalidFields = append(invalidFields, issue.FieldPath)
+				}
+			}
+
+			if fieldNotFoundCount > 0 {
+				println("🔧 SOLUTION: Remove the non-existent fields listed above and retry.")
+				println("📋 REMINDER: Only use fields from the provided schema_fields list.")
+				println("❌ DO NOT add fields that are not explicitly listed in the schema.")
+			}
+
+			// Instead of failing, provide a success response with guidance for retry
+			return map[string]any{
+				"status":             "validation_failed_retry_needed",
+				"validation_report":  report,
+				"field_errors_count": fieldNotFoundCount,
+				"invalid_fields":     invalidFields,
+				"message":            "Configuration has validation errors. Please remove the invalid fields and generate a corrected configuration.",
+				"retry_instruction":  "Remove these invalid fields and call generate_config_output again with the corrected configuration.",
+				"success":            false,
+			}, nil // Return nil error to allow LLM to continue and retry
+
+		}
+
+		// If validation passes, save the config
 		if err := x.saveConfigAsYAML(config); err != nil {
 			return nil, goerr.Wrap(err, "failed to save config as YAML")
 		}
 
 		return map[string]any{
-			"status":  "success",
-			"message": "Configuration saved successfully",
+			"status":            "success",
+			"message":           "✅ Configuration validated and saved successfully",
+			"validation_status": "passed",
+			"success":           true,
 		}, nil
 
 	default:
@@ -538,6 +746,10 @@ var queryResultsCache = make(map[string][]map[string]any)
 
 func (x *generateConfigTool) getCachedResults(queryID string) []map[string]any {
 	return queryResultsCache[queryID]
+}
+
+func (x *generateConfigTool) getTableMetadata(ctx context.Context) (*bigquery.TableMetadata, error) {
+	return x.bigqueryClient.Dataset(x.tableDatasetID).Table(x.tableTableID).Metadata(ctx)
 }
 
 func (x *generateConfigTool) saveConfigAsYAML(config map[string]any) error {

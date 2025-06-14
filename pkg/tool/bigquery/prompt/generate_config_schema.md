@@ -2,160 +2,137 @@
 
 You are a data analyst specializing in comprehensive data analysis with a focus on security, business intelligence, and data quality. Your task is to analyze the provided BigQuery table schema and create a thorough summary that captures the full analytical potential of the data.
 
-## Table Information
+## CRITICAL OUTPUT CONSTRAINTS FOR GEMINI 2.0
 
-- ProjectID: {{ .project_id }}
-- DatasetID: {{ .dataset_id }}
-- TableID: {{ .table_id }}
+**ESSENTIAL TOKEN LIMITATION**: Your response must stay within 8,000 tokens (approximately 6,000 words) to comply with Gemini 2.0's 8,192 token output limit. This means:
 
-{{ .table_description }}
+- **Prioritize essential information** - Focus on fields most relevant for security analysis and business intelligence
+- **Use concise descriptions** - Keep field descriptions to 1-2 sentences maximum
+- **Employ structured formatting** - Use bullet points, tables, and hierarchical lists for information density
+- **Smart field grouping** - Group related fields together to avoid repetition
+- **Selective detail levels** - Provide detailed information for security-critical fields, summary-level for routine fields
+- **Efficient organization** - Structure information logically to maximize useful content per token
 
-## Schema Data
+## Analysis Focus Areas
 
-The following is the flattened schema of the BigQuery table:
+Your analysis should comprehensively cover these priority areas:
 
+### 1. **SECURITY & AUTHENTICATION FIELDS** (Priority: CRITICAL)
+Identify and analyze ALL fields related to:
+- User authentication (emails, principals, service accounts)
+- Authorization (permissions, roles, access grants)
+- Network security (IP addresses, geographic locations)
+- Audit trails (method names, resource access, status codes)
+- Error conditions and security events
+
+### 2. **TEMPORAL & CORRELATION FIELDS** (Priority: HIGH)
+Analyze fields for:
+- Time-based analysis (timestamps, duration fields)
+- Event correlation (trace IDs, span IDs, operation IDs)
+- Sequence tracking (first/last flags, ordering fields)
+- Lifecycle tracking (create/update/delete times)
+
+### 3. **RESOURCE & OPERATIONAL CONTEXT** (Priority: HIGH)
+Document fields for:
+- Resource identification (project IDs, dataset IDs, resource names)
+- Service context (service names, method names, API versions)
+- Geographic and infrastructure context (regions, zones, clusters)
+- Business context (labels, tags, metadata)
+
+### 4. **PERFORMANCE & METRICS** (Priority: MEDIUM)
+Cover fields for:
+- Query performance (bytes processed, execution time)
+- Request/response metrics (sizes, counts, response codes)
+- Job statistics and processing metrics
+- Error rates and success indicators
+
+### 5. **CONTENT & PAYLOAD DATA** (Priority: MEDIUM)
+Analyze fields containing:
+- Structured payloads (JSON strings, configuration data)
+- Request/response content
+- Error messages and diagnostic information
+- Business data and transaction details
+
+## Schema Information
+
+**Table Details:**
+- Project: {{ .project_id }}
+- Dataset: {{ .dataset_id }}
+- Table: {{ .table_id }}
+
+**Provided Schema Structure:**
 {{ .table_schema }}
 
-## Comprehensive Analysis Requirements
+## Expected Output Structure
 
-Please analyze the schema systematically and provide a detailed summary that includes:
+Organize your analysis in this efficient format:
 
-### 1. **Complete Field Inventory**
-Categorize ALL fields into the following comprehensive categories:
+### I. **Executive Summary**
+- Total field count and complexity assessment
+- Key analytical capabilities and use cases
+- Primary security and business intelligence opportunities
 
-#### **Identity & Authentication Fields**
-- User identifiers (IDs, usernames, email addresses, employee IDs)
-- Device/endpoint identifiers (device IDs, MAC addresses, hardware IDs)
-- Account identifiers (account names, tenant IDs, organization IDs)
-- Authentication data (login methods, tokens, certificates, session IDs)
-- Authorization data (roles, permissions, access levels, group memberships)
+### II. **Critical Field Categories** (Focus on top 50-100 most valuable fields)
 
-#### **Network & Communication Fields**
-- IP addresses (source, destination, internal, external)
-- Hostnames, domains, subdomains, FQDNs
-- Network infrastructure (ports, protocols, VLANs, subnets)
-- Communication metadata (bytes transferred, packet counts, connection states)
-- DNS data (queries, responses, resolution times)
-- URL components (paths, parameters, fragments, referrers)
+#### A. **Authentication & Authorization**
+- List key security fields with brief descriptions
+- Highlight nested structures and their purposes
+- Note query patterns for security analysis
 
-#### **Temporal & Time-based Fields**
-- Primary timestamps (creation, modification, access times)
-- Duration fields (session length, response times, processing times)
-- Date components (year, month, day, hour, timezone)
-- Sequence numbers, counters, version numbers
-- Time intervals, ranges, and periods
+#### B. **Temporal & Tracking**
+- Time-based fields for event correlation
+- Sequence and lifecycle tracking capabilities
+- Partitioning and time-based optimization opportunities
 
-#### **Event & Activity Fields**
-- Event types, categories, classifications
-- Action codes, operation types, method names
-- Status indicators (success/failure, error codes, response codes)
-- Severity levels, priority rankings, alert levels
-- Event sources, origins, generators
+#### C. **Resource & Business Context**
+- Resource identification and hierarchy
+- Business metadata and labeling
+- Geographic and operational context
 
-#### **Content & Data Fields**
-- Text content (messages, descriptions, comments, logs)
-- File information (names, paths, extensions, sizes, hashes)
-- Data payloads (request/response bodies, JSON blobs, binary data)
-- Configuration values, settings, parameters
-- Error messages, exceptions, stack traces
+#### D. **Performance & Operational Metrics**
+- Query and job performance indicators
+- Request/response metrics
+- Error tracking and diagnostics
 
-#### **Geographic & Location Fields**
-- Country/region codes, city names, postal codes
-- Coordinates (latitude, longitude, elevation)
-- Location hierarchies (continent, country, state, city)
-- Timezone information, locale settings
-- Physical location identifiers (building, floor, room)
+#### E. **Structured Content**
+- Nested RECORD structures and their purposes
+- JSON payload fields and their analysis potential
+- Complex data relationships
 
-#### **Business & Operational Fields**
-- Transaction data (amounts, currencies, payment methods)
-- Product/service identifiers (SKUs, product names, categories)
-- Customer data (customer IDs, demographics, preferences)
-- Organizational data (departments, teams, cost centers)
-- Workflow states (status, stage, phase, approval levels)
+### III. **Query Construction Guidance**
+- Field access patterns (direct, nested, array handling)
+- Common filtering and aggregation patterns
+- Join opportunities and correlation strategies
 
-#### **Technical & System Fields**
-- System identifiers (hostnames, instance IDs, container IDs)
-- Software information (versions, build numbers, components)
-- Performance metrics (CPU, memory, disk usage, latencies)
-- Configuration data (settings, flags, environment variables)
-- Debug information (trace IDs, correlation IDs, debug flags)
+### IV. **Analytical Applications**
+- **Security Use Cases**: Threat detection, incident response, compliance monitoring
+- **Business Intelligence**: Performance analytics, usage patterns, operational insights
+- **Data Quality**: Completeness assessment, anomaly detection, data validation
 
-#### **Data Quality & Metadata Fields**
-- Source system identifiers, data lineage information
-- Data validation flags, quality scores, confidence levels
-- Processing timestamps, ingestion metadata
-- Data classification labels, sensitivity markers
-- Audit trail information, change tracking data
+## Critical Requirements
 
-### 2. **Data Type Analysis**
-For each data type present in the schema:
-- **String fields**: Identify potential patterns (IDs, codes, free text, structured data)
-- **Numeric fields**: Distinguish between IDs, counters, measurements, monetary values
-- **Boolean fields**: Identify flags, status indicators, configuration switches
-- **Timestamp fields**: Analyze temporal patterns and relationships
-- **Array fields**: Understand list structures and cardinality
-- **Record fields**: Map nested structures and hierarchical relationships
-
-### 3. **Structural Complexity Assessment**
-- **Total field count**: Count all fields including nested ones
-- **Nesting depth**: Identify maximum levels of nested structures
-- **Array relationships**: Document repeated/array fields and their significance
-- **Complex types**: Highlight RECORD, STRUCT, and nested array types
-- **Normalization level**: Assess data normalization and potential denormalization
-- **Key relationships**: Identify potential primary keys, foreign keys, and composite keys
-
-### 4. **Analytical Potential Assessment**
-
-#### **Security Analysis Capabilities**
-- Threat detection scenarios this data enables
-- Incident response investigation support
-- Compliance monitoring possibilities
-- Risk assessment data points
-- Behavioral analysis opportunities
-
-#### **Business Intelligence Opportunities**
-- KPI calculation possibilities
-- Trend analysis potential
-- Customer behavior insights
-- Operational efficiency metrics
-- Revenue/cost analysis capabilities
-
-#### **Data Science Applications**
-- Machine learning feature candidates
-- Anomaly detection possibilities
-- Predictive modeling opportunities
-- Classification/clustering potential
-- Time series analysis capabilities
-
-#### **Correlation & Join Opportunities**
-- Internal correlation possibilities (within table)
-- External join candidates (with other tables)
-- Time-based correlation patterns
-- Geographic correlation possibilities
-- Hierarchical relationship mapping
-
-### 5. **Data Quality Considerations**
-- Fields likely to have missing/null values
-- Potential data consistency issues
-- Fields requiring validation or cleansing
-- Duplicate detection opportunities
-- Data freshness indicators
-
-### 6. **Query Optimization Insights**
-- High-cardinality fields suitable for filtering
-- Low-cardinality fields suitable for grouping
-- Time-partitioning candidates
-- Clustering column suggestions
-- Index optimization opportunities
+1. **COMPREHENSIVE FIELD COVERAGE**: Aim to document 50-100 of the most analytically valuable fields
+2. **EFFICIENT TOKEN USAGE**: Prioritize information density - more valuable fields documented concisely
+3. **ACTIONABLE INSIGHTS**: Focus on fields that enable specific analytical queries and use cases
+4. **SECURITY EMPHASIS**: Give priority to fields crucial for security monitoring and threat detection
+5. **QUERY ENABLEMENT**: Provide enough detail to construct effective SQL queries
 
 ## Output Format
 
 Provide your analysis as a comprehensive, well-structured summary that will be used by an LLM agent for detailed data investigation. The summary should:
 
-1. Be thorough enough to capture the full analytical potential of the table
-2. Prioritize fields and categories by their analytical value
-3. Highlight unique or interesting data structures
-4. Suggest specific analysis approaches based on the available data
-5. Remain concise enough for efficient processing in subsequent analysis phases
+1. **Prioritize schema accuracy** - Every field reference must be exact and queryable
+2. **Include complete nested structures** - Show full RECORD hierarchies with query patterns
+3. **Provide actionable field information** - Enable precise SQL query construction
+4. **Highlight unique data structures** - Call attention to complex nested patterns
+5. **Suggest specific analysis approaches** - Use exact field names in recommendations
+6. **Remain comprehensive yet focused** - Cover all analytically valuable fields without redundancy
 
-Focus on actionable insights that will enable comprehensive data exploration, analysis, and investigation across security, business, and operational use cases.
+**CRITICAL TOKEN MANAGEMENT**: 
+- **Stay within 8,000 tokens** - Monitor your output length and prioritize essential information
+- **Use efficient formatting** - Bullet points, tables, and structured lists over lengthy paragraphs
+- **Group related fields** - Avoid repetitive descriptions for similar field types
+- **Focus on high-value fields** - Prioritize fields that enable multiple analytical use cases
+- **Provide sufficient detail** - Enough information to enable accurate SQL query construction
+
+Begin your comprehensive analysis now, focusing on the most analytically valuable fields while maintaining efficient token usage.
