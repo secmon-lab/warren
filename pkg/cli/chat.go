@@ -1,44 +1,57 @@
 package cli
 
 import (
+	"bufio"
 	"context"
+	"fmt"
+	"io"
+	"os"
+	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/tool/base"
+	"github.com/secmon-lab/warren/pkg/usecase"
+	"github.com/secmon-lab/warren/pkg/utils/dryrun"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
+	"golang.org/x/term"
 )
 
 func cmdChat() *cli.Command {
 	var (
-		alertID     types.AlertID
-		alertListID types.AlertListID
+		ticketID    types.TicketID
 		firestoreDB config.Firestore
 		geminiCfg   config.GeminiCfg
 		policyCfg   config.Policy
 		storageCfg  config.Storage
-		query       string
+
+		query    string
+		noDryRun bool // --no-dry-runフラグの値
+		dryRun   bool // 実際のdry-run設定
 	)
 
 	flags := joinFlags(
 		[]cli.Flag{
 			&cli.StringFlag{
-				Name:        "alert-id",
-				Aliases:     []string{"a"},
-				Usage:       "Alert ID",
-				Destination: (*string)(&alertID),
-			},
-			&cli.StringFlag{
-				Name:        "alert-list-id",
-				Aliases:     []string{"l"},
-				Usage:       "Alert List ID",
-				Destination: (*string)(&alertListID),
+				Name:        "ticket-id",
+				Aliases:     []string{"t"},
+				Usage:       "Ticket ID to chat with",
+				Destination: (*string)(&ticketID),
+				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "query",
 				Aliases:     []string{"q"},
-				Usage:       "Query",
-				Destination: (*string)(&query),
+				Usage:       "Query prompt (if not provided, interactive mode will start)",
+				Destination: &query,
+			},
+			&cli.BoolFlag{
+				Name:        "no-dry-run",
+				Usage:       "Disable dry-run mode (dry-run is enabled by default)",
+				Destination: &noDryRun,
 			},
 		},
 		firestoreDB.Flags(),
@@ -51,158 +64,164 @@ func cmdChat() *cli.Command {
 	return &cli.Command{
 		Name:    "chat",
 		Aliases: []string{"c"},
-		Usage:   "Chat with the security analyst",
+		Usage:   "Chat with the security analyst about a specific ticket",
 		Flags:   flags,
 		Action: func(ctx context.Context, c *cli.Command) error {
-			return goerr.New("not implemented for now")
-			/*
-					logger := logging.From(ctx)
+			logger := logging.From(ctx)
 
-					repo, err := firestoreDB.Configure(ctx)
-					if err != nil {
-						return goerr.Wrap(err, "failed to configure firestore")
-					}
+			// Set dry-run mode: enabled by default, disabled if --no-dry-run is specified
+			dryRun = !noDryRun
 
-					llmClient, err := geminiCfg.Configure(ctx)
-					if err != nil {
-						return goerr.Wrap(err, "failed to configure gemini")
-					}
+			// Add dry-run information to context (enabled by default)
+			ctx = dryrun.With(ctx, dryRun)
+			if dryRun {
+				logger.Info("Dry-run mode enabled - database modifications will be skipped")
+			} else {
+				logger.Info("Dry-run mode disabled - database modifications will be executed")
+			}
 
-					if (alertID == "") == (alertListID == "") {
-						return goerr.New("either alert-id or alert-list-id must be provided")
-					}
+			// Configure repository
+			repo, err := firestoreDB.Configure(ctx)
+			if err != nil {
+				return goerr.Wrap(err, "failed to configure firestore")
+			}
 
-					var alertIDs []types.AlertID
-					var alertRecord *alert.Alert
-					var alertList *alert.List
-					if alertID != "" {
-						alertRecord, err = repo.GetAlert(ctx, alertID)
-						if err != nil {
-							return goerr.Wrap(err, "failed to get alert")
-						}
-						alertIDs = []types.AlertID{alertID}
-					}
-					if alertListID != "" {
-						list, err := repo.GetAlertList(ctx, alertListID)
-						if err != nil {
-							return goerr.Wrap(err, "failed to get alert list")
-						}
-						alertList = list
-						alertIDs = list.AlertIDs
-					}
-					if len(alertIDs) == 0 {
-						return goerr.New("no alert provided")
-					}
+			// Configure LLM client
+			llmClient, err := geminiCfg.Configure(ctx)
+			if err != nil {
+				return goerr.Wrap(err, "failed to configure gemini")
+			}
 
-					policyClient, err := policyCfg.Configure()
-					if err != nil {
-						return goerr.Wrap(err, "failed to configure policy")
-					}
+			// Configure policy client
+			policyClient, err := policyCfg.Configure()
+			if err != nil {
+				return goerr.Wrap(err, "failed to configure policy")
+			}
 
-					ssn := session.New(ctx, nil, alertIDs)
+			// Configure storage client
+			storageClient, err := storageCfg.Configure(ctx)
+			if err != nil {
+				return goerr.Wrap(err, "failed to configure storage")
+			}
 
-					tools = append(tools, base.New(repo, alertIDs, policyClient.Sources(), ssn.ID))
-					var toolNames []string
-					for _, tool := range tools {
-						specs, err := tool.Specs(ctx)
-						if err != nil {
-							return goerr.Wrap(err, "failed to get tool specs")
-						}
-						for _, spec := range specs {
-							toolNames = append(toolNames, spec.Name)
-						}
-					}
-					logger.Info("Enabled tools", "tools", toolNames)
-					logger.Debug("Enabled tool config", "config", tools)
+			// Get the ticket
+			ticket, err := repo.GetTicket(ctx, ticketID)
+			if err != nil {
+				return goerr.Wrap(err, "failed to get ticket", goerr.V("ticket_id", ticketID))
+			}
+			if ticket == nil {
+				return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+			}
 
-					fmt.Printf("\n")
-					if alertRecord != nil {
-						fmt.Printf("🔔 Alert Information:\n")
-						fmt.Printf("  📝 Title: %s\n", alertRecord.Title)
-						fmt.Printf("  📋 Description: %s\n", alertRecord.Description)
-						fmt.Printf("  🔍 Attributes:\n")
-						for _, attr := range alertRecord.Attributes {
-							fmt.Printf("    - %s: %v\n", attr.Key, attr.Value)
-						}
-					}
-					if alertList != nil {
-						fmt.Printf("📋 Alert List Information:\n")
-						fmt.Printf("  📝 Title: %s\n", alertList.Title)
-						fmt.Printf("  📋 Description: %s\n", alertList.Description)
-						fmt.Printf("  🔢 Number of Alerts: %d\n", len(alertList.AlertIDs))
-					}
-					fmt.Printf("\n")
+			// Get alerts bound to the ticket
+			alerts, err := repo.BatchGetAlerts(ctx, ticket.AlertIDs)
+			if err != nil {
+				return goerr.Wrap(err, "failed to get alerts")
+			}
 
-					alerts, err := repo.BatchGetAlerts(ctx, alertIDs)
-					if err != nil {
-						return goerr.Wrap(err, "failed to get alerts")
-					}
+			// Configure tools
+			baseAction := base.New(repo, policyClient, ticket.ID)
+			toolSets := append(tools, baseAction)
 
-					systemPrompt, err := prompt.BuildSessionInitPrompt(ctx, alerts)
-					if err != nil {
-						return goerr.Wrap(err, "failed to build system prompt")
-					}
+			// Get tool sets
+			allToolSets, err := toolSets.ToolSets(ctx)
+			if err != nil {
+				return goerr.Wrap(err, "failed to get tool sets")
+			}
 
-					toolSets, err := tools.ToolSets(ctx)
-					if err != nil {
-						return goerr.Wrap(err, "failed to get tool sets")
-					}
+			// Show ticket information
+			fmt.Printf("\n🎫 Ticket Information:\n")
+			fmt.Printf("  📝 ID: %s\n", ticket.ID)
+			fmt.Printf("  📋 Title: %s\n", ticket.Title)
+			fmt.Printf("  📄 Description: %s\n", ticket.Description)
+			fmt.Printf("  📊 Status: %s\n", ticket.Status.Label())
+			if ticket.Finding != nil {
+				fmt.Printf("  🔍 Finding: %s (%s)\n", ticket.Finding.Summary, ticket.Finding.Severity)
+			}
+			fmt.Printf("  🔢 Alerts: %d\n", len(alerts))
+			fmt.Printf("\n")
 
-					agent := gollem.New(llmClient,
-						gollem.WithToolSets(toolSets...),
-						gollem.WithResponseMode(gollem.ResponseModeStreaming),
-						gollem.WithSystemPrompt(systemPrompt),
-						gollem.WithMessageHook(func(ctx context.Context, msg string) error {
-							fmt.Print(msg)
-							return nil
-						}),
-						gollem.WithToolRequestHook(func(ctx context.Context, tool gollem.FunctionCall) error {
-							fmt.Printf("\n⚡ Execute Tool: %s\n", tool.Name)
-							for k, v := range tool.Arguments {
-								fmt.Printf("  ▶️ %s: %v\n", k, v)
-							}
-							fmt.Printf("\n")
-							return nil
-						}),
-					)
+			if dryRun {
+				fmt.Printf("🔒 Dry-run mode: Database modifications will be simulated\n\n")
+			}
 
-					ctx = msg.With(ctx, notify, newTrace)
+			// Create usecase
+			uc := usecase.New(
+				usecase.WithRepository(repo),
+				usecase.WithLLMClient(llmClient),
+				usecase.WithPolicyClient(policyClient),
+				usecase.WithStorageClient(storageClient),
+				usecase.WithTools(allToolSets),
+			)
 
-					if query != "" {
-						if _, err = agent.Prompt(ctx, query); err != nil {
-							return goerr.Wrap(err, "failed to chat")
-						}
-						return nil
-					}
+			// If query is provided, run once and exit
+			if query != "" {
+				return runSingleQuery(ctx, uc, ticket, query)
+			}
 
-					var history *gollem.History
-					for {
-						msg, err := recvInput()
-						if err != nil {
-							if err == io.EOF {
-								break
-							}
-							return goerr.Wrap(err, "failed to read line")
-						}
-
-						if msg == "exit" {
-							break
-						}
-
-						msg = "# Main instruction\n\n" + msg
-						history, err = agent.Prompt(ctx, msg, gollem.WithHistory(history))
-						if err != nil {
-							return goerr.Wrap(err, "failed to chat")
-						}
-						fmt.Printf("\n")
-					}
-				return nil
-			*/
+			// Otherwise, start interactive mode
+			return runInteractiveMode(ctx, uc, ticket)
 		},
 	}
 }
 
-/*
+func runSingleQuery(ctx context.Context, uc *usecase.UseCases, ticket *ticket.Ticket, query string) error {
+	logger := logging.From(ctx)
+	logger.Info("Running single query", "query", query)
+
+	if err := uc.Chat(ctx, ticket, query); err != nil {
+		return goerr.Wrap(err, "failed to process query")
+	}
+
+	return nil
+}
+
+func runInteractiveMode(ctx context.Context, uc *usecase.UseCases, ticket *ticket.Ticket) error {
+	logger := logging.From(ctx)
+	logger.Info("Starting interactive chat mode")
+
+	fmt.Println("💬 Interactive chat mode started. Type 'exit' or 'quit' to end the session.")
+	fmt.Println("📝 Type your questions about the ticket and alerts.")
+	if dryrun.IsDryRun(ctx) {
+		fmt.Println("🔒 Dry-run mode: Commands that modify the database will be simulated.")
+	}
+	fmt.Println()
+
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Print("> ")
+
+		input, _, err := reader.ReadLine()
+		if err != nil {
+			if err == io.EOF {
+				fmt.Println("\n👋 Session ended.")
+				break
+			}
+			return goerr.Wrap(err, "failed to read input")
+		}
+
+		message := strings.TrimSpace(string(input))
+		if message == "" {
+			continue
+		}
+
+		if message == "exit" || message == "quit" {
+			fmt.Println("👋 Session ended.")
+			break
+		}
+
+		if err := uc.Chat(ctx, ticket, message); err != nil {
+			fmt.Printf("❌ Error: %s\n", err.Error())
+			logger.Error("Chat error", "error", err)
+		}
+
+		fmt.Println()
+	}
+
+	return nil
+}
+
 func recvInput() (string, error) {
 	fmt.Printf("\033[2K> ")
 
@@ -227,15 +246,3 @@ func recvInput() (string, error) {
 
 	return msg, nil
 }
-
-func notify(ctx context.Context, msg string) {
-	fmt.Printf("\033[1m>>> %s\033[0m\n", msg)
-}
-
-func newTrace(ctx context.Context, msg string) func(ctx context.Context, msg string) {
-	fmt.Printf("<< %s >>\n", msg)
-	return func(ctx context.Context, msg string) {
-		fmt.Printf("%s\n", msg)
-	}
-}
-*/
