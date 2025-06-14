@@ -28,8 +28,8 @@ func cmdChat() *cli.Command {
 		storageCfg  config.Storage
 
 		query    string
-		noDryRun bool // --no-dry-runフラグの値
-		dryRun   bool // 実際のdry-run設定
+		noDryRun bool // Value for --no-dry-run flag
+		dryRun   bool // Actual dry-run setting
 	)
 
 	flags := joinFlags(

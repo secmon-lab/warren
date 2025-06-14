@@ -104,9 +104,9 @@ func TestURLScan_Specs(t *testing.T) {
 	var action urlscan.Action
 	specs, err := action.Specs(context.Background())
 	gt.NoError(t, err)
-	gt.A(t, specs).Length(1) // 1つのツール仕様があることを確認
+	gt.A(t, specs).Length(1) // Verify there is 1 tool specification
 
-	// ツールの仕様を確認
+	// Verify tool specification
 	spec := specs[0]
 	gt.Value(t, spec.Name).Equal("urlscan.scan")
 	gt.Value(t, spec.Description).Equal("Scan a URL with URLScan")

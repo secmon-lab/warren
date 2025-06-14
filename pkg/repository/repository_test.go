@@ -570,7 +570,7 @@ func TestHistory(t *testing.T) {
 		latest, err := repo.GetLatestHistory(ctx, ticket.ID)
 		gt.NoError(t, err).Required()
 		gt.NotNil(t, latest).Required()
-		gt.Value(t, latest.ID).Equal(histories[2].ID) // 最後に追加したものが最新
+		gt.Value(t, latest.ID).Equal(histories[2].ID) // The last added one is the latest
 
 		// Test with non-existent ticket ID
 		nonExistentID := types.NewTicketID()
@@ -898,7 +898,7 @@ func TestGetTicketsBySpan(t *testing.T) {
 	})
 }
 
-// Firestore用: 取得結果からテスト投入分のみ抽出してアサート
+// For Firestore: Extract only test-injected data from results and assert
 func filterByIDs(result []*ticketmodel.Ticket, ids []types.TicketID) []*ticketmodel.Ticket {
 	idMap := make(map[types.TicketID]struct{})
 	for _, id := range ids {
