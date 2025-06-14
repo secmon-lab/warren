@@ -3,14 +3,11 @@ package bigquery
 import (
 	"bufio"
 	"context"
-	"crypto/sha256"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/bigquery"
@@ -118,8 +115,6 @@ func (r *RunbookLoader) loadFromFile(ctx context.Context, filePath string) (*big
 		return nil, goerr.Wrap(err, "failed to read SQL file", goerr.V("path", filePath))
 	}
 
-	// Calculate file hash
-	hash := fmt.Sprintf("%x", sha256.Sum256(content))
 
 	// Extract title and description from comments
 	title, description := r.extractTitleAndDescription(string(content))
@@ -132,11 +127,7 @@ func (r *RunbookLoader) loadFromFile(ctx context.Context, filePath string) (*big
 		ID:          types.NewRunbookID(),
 		Title:       title,
 		Description: description,
-		FilePath:    filePath,
 		SQLContent:  string(content),
-		Hash:        hash,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
 	}
 
 	return entry, nil
