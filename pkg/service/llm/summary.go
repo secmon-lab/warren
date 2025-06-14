@@ -45,7 +45,7 @@ func Summary[T any](ctx context.Context, llm gollem.LLMClient, prompt string, da
 
 		partSize += len(rawData)
 		if partSize > cfg.maxPartSize {
-			ctx = msg.Trace(ctx, "✍️ generate part summary (%d-%d)", startIdx, idx)
+			ctx = msg.Trace(ctx, "✍️ reading data (%d-%d)", startIdx, idx)
 			startIdx = idx + 1
 
 			result, err := generatePartSummary(ctx, llm, prompt, parts)
@@ -59,7 +59,7 @@ func Summary[T any](ctx context.Context, llm gollem.LLMClient, prompt string, da
 	}
 
 	if len(parts) > 0 {
-		ctx = msg.Trace(ctx, "✍️ reading data (%d-%d)", startIdx, len(data))
+		ctx = msg.Trace(ctx, "✍️ reading data (%d-%d, last part)", startIdx, len(data))
 		result, err := generatePartSummary(ctx, llm, prompt, parts)
 		if err != nil {
 			return "", err
@@ -82,6 +82,16 @@ The summaries you create for each part will be combined later to generate a fina
 
 With this in mind, please analyze the current data part and extract/summarize the information that is essential for understanding this specific portion and contributing to the final overall summary (e.g., key trends, significant facts, notable points, relevant figures).
 To facilitate the final integration, please present your summary in a concise and structured format (e.g., bullet points or a short paragraph focusing on key findings).
+
+CRITICAL OUTPUT CONSTRAINTS:
+- Keep your summary within 8,000 tokens (approximately 6,000 words) to stay within Gemini 2.0's 8,192 token limit
+- Focus on the most essential and actionable information
+- Use bullet points or structured format for clarity and readability
+- Avoid unnecessary repetition or verbose explanations
+- Prioritize key insights and actionable data over detailed descriptions
+- If dealing with schema/field data, provide concise but precise field descriptions
+- For large datasets, group similar items together and summarize patterns rather than listing every individual item
+- Include specific field names and data types when relevant for downstream usage
 
 Specific instructions regarding the analysis policy and the type of information to extract will be provided separately in the "Instruction" section.
 	`
@@ -121,6 +131,13 @@ Carefully read these partial summaries and integrate them considering the follow
 3.  **Extract key insights:** Extract the most important findings or insights that emerge from the data as a whole.
 4.  **Organize and structure information:** Eliminate redundant information and organize the information in a logical flow.
 5.  **Present conclusions:** Clearly present the conclusions or main messages derived from the entire dataset based on the analysis results.
+
+CRITICAL OUTPUT CONSTRAINTS:
+- Keep your final summary within 8,000 tokens (approximately 6,000 words) to stay within Gemini 2.0's 8,192 token limit
+- Focus on synthesizing the most important insights across all partial summaries
+- Use structured format with clear sections and bullet points for readability
+- Eliminate redundant information while preserving essential details
+- Prioritize actionable insights and key findings that emerged from the complete dataset
 
 More detailed instructions regarding the report structure or specific analytical perspectives and data trends to focus on will be provided separately in the "Instruction" section.
 	`
