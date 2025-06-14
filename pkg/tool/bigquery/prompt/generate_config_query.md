@@ -34,18 +34,20 @@ Create a comprehensive BigQuery table configuration based on the provided schema
 - **Consistent Naming**: Use the exact field names from the schema
 
 ### **SCHEMA FIELD REFERENCE**
-You have access to the **top {{ .prioritized_fields_count }} most important fields** (out of {{ .total_fields_count }} total fields) with the following structure:
+You have access to **all {{ .total_fields_count }} fields** from the table schema with the following structure:
 - **Name**: Full field path (e.g., "protopayload_auditlog.authenticationInfo.principalEmail")
 - **Type**: BigQuery data type (STRING, INTEGER, TIMESTAMP, RECORD, etc.)
 - **Description**: Field description from BigQuery schema
-- **Required**: Whether the field is required
 - **Repeated**: Whether the field is an array
 
-These fields have been prioritized based on their importance for security monitoring and data analysis.
+All fields from the table schema are provided without any domain-specific prioritization.
 
 ## Schema Information
 
 **Table Description**: {{ .table_description }}
+
+**Schema Size**: {{ .total_fields_count }} total fields available
+**Coverage Strategy**: {{ if gt .total_fields_count 500 }}Large schema - focus on complete RECORD hierarchies with deep nesting{{ else if gt .total_fields_count 100 }}Medium schema - include most RECORD structures with good depth{{ else }}Small schema - include nearly all available fields{{ end }}
 
 **Available Schema Fields ({{ .used_fields_count }} out of {{ .total_fields_count }}):**
 
@@ -145,8 +147,8 @@ These fields have been prioritized based on their importance for security monito
 
 ## Field Selection Strategy
 
-### **Use the Available Fields as Your Foundation**
-The {{ .used_fields_count }} fields provided above represent the first {{ .used_fields_count }} fields from the table schema (out of {{ .total_fields_count }} total fields). These fields are provided in their original schema order without any domain-specific prioritization.
+### **Use All Available Fields as Your Foundation**
+All {{ .total_fields_count }} fields from the table schema are provided above. These fields represent the complete flattened schema without any domain-specific prioritization or filtering.
 
 ### **Build Proper Hierarchy from Flattened Paths**
 The schema fields are provided as flattened paths (e.g., "user_profile.personal_info.email").
@@ -157,73 +159,115 @@ You must reconstruct the proper nested RECORD structure:
 3. **Build Nested Structure**: Create proper hierarchy with nested RECORD fields
 4. **Add Complete Metadata**: Include descriptions and examples for ALL fields
 
-### **Explore Additional Fields via Queries**
-If you need additional fields beyond the provided set:
-1. Use `bigquery_query` to explore the schema structure
-2. Query for specific field patterns or categories
-3. Sample data to understand field usage and importance
-4. Add discovered fields to your configuration as needed
+### **Select Most Important Fields for Configuration**
+While all fields are provided, you should aim for comprehensive analytical coverage:
+1. Use `bigquery_query` to sample data and understand field usage
+2. Prioritize fields with actual data over empty/null fields
+3. Focus on fields that provide operational and analytical value
+4. **Include complete RECORD structures** - don't leave partial hierarchies
+5. **Cover all major data categories** - identifiers, timestamps, metadata, payloads, etc.
+6. **Ensure analytical completeness** - include fields needed for security, monitoring, and business analysis
+
+### **Adaptive Coverage Strategy**
+**For tables with many fields (500+ available)**: Focus on building complete, deep RECORD hierarchies. Include all major authentication, authorization, request metadata, and service-specific data structures with their important nested fields.
+
+**For tables with moderate fields (100-500 available)**: Include most available RECORD structures with good depth. Ensure comprehensive coverage of all major data categories.
+
+**For tables with fewer fields (<100 available)**: Include nearly all available fields that provide analytical value, building complete structures.
 
 ## Configuration Strategy
 
 ### **Phase 1: Core Infrastructure**
 Start with the essential fields for any analysis:
 - **timestamp** - Primary temporal field for partitioning and time-based queries
-- **logName** - Identifies the log source and type
-- **severity** - Critical for filtering and alerting
-- **insertId** - Unique identifier for deduplication
+- **logName** - Identifies the log source and type (if present)
+- **severity** - Critical for filtering and alerting (if present)
+- **insertId** - Unique identifier for deduplication (if present)
 
-### **Phase 2: Security & Authentication**
-Build comprehensive security monitoring capabilities:
-- **protopayload_auditlog.authenticationInfo** - User identity and authentication method
-- **protopayload_auditlog.authorizationInfo** - Permissions and access control decisions
-- **protopayload_auditlog.requestMetadata** - Request context including caller IP
-- **protopayload_auditlog.methodName** - API method being called
-- **protopayload_auditlog.serviceName** - Google Cloud service
-- **protopayload_auditlog.resourceName** - Resource being accessed
+### **Phase 2: Comprehensive Configuration Generation**
+1. **Build Complete Structure**: Generate the full configuration in a single pass
+2. **Include All Major RECORD Fields**: Add all significant RECORD structures with their complete hierarchies
+3. **Comprehensive Content Coverage**: Include all authentication, authorization, request metadata, service data, HTTP context, operational fields, and resource information
+4. **Complete Metadata**: Ensure every field has description and value_example
+5. **Single Validation**: Validate the complete configuration once
+
+**CRITICAL**: Generate a comprehensive configuration that includes all major data categories and complete RECORD hierarchies. Focus on analytical completeness rather than minimal configuration.
 
 ### **Phase 3: Operational Context**
 Add operational and resource information:
-- **resource** - Complete resource identification and metadata
-- **httpRequest** - HTTP request details for web API calls
-- **operation** - Operation tracking and correlation
+- Resource identification and metadata
+- HTTP request details for web API calls (if present)
+- Operation tracking and correlation fields
+- Geographic and network information
 
 ### **Phase 4: Advanced Analytics**
 Include specialized fields for deep analysis:
-- **protopayload_auditlog.servicedata_v1_bigquery** - BigQuery-specific metadata and job information
-- **trace/spanId** - Distributed tracing information
-- **labels** - Custom labels and annotations
+- Service-specific metadata and detailed information
+- Distributed tracing information (if present)
+- Custom labels and annotations
+- Performance and monitoring metrics
 
 ## Implementation Approach
 
-**Step-by-Step Process to Prevent JSON Truncation:**
+**Comprehensive Single-Pass Generation:**
 
-### **Phase 1: Data Exploration & Sampling**
+### **Phase 1: Data Exploration & Analysis**
 1. **Sample Recent Data**: Query recent records to understand actual field values and formats
-2. **Identify Value Patterns**: Understand the data formats and typical values
+2. **Identify Field Categories**: Understand the data structure and field relationships
 3. **Extract Representative Examples**: Generate realistic but anonymized examples
 
-### **Phase 2: Minimal Configuration First**
-1. **Start with Core Fields**: Begin with only essential fields (timestamp, logName, severity, insertId)
-2. **Test Basic Structure**: Ensure the minimal config validates successfully
-3. **Verify JSON Completeness**: Confirm all braces and brackets are properly closed
+### **Phase 2: Comprehensive Configuration Generation**
+1. **Build Complete Structure**: Generate the full configuration in a single pass
+2. **Include All Major RECORD Fields**: Add all significant RECORD structures with their complete hierarchies
+3. **Comprehensive Content Coverage**: Include all authentication, authorization, request metadata, service data, HTTP context, operational fields, and resource information
+4. **Complete Metadata**: Ensure every field has description and value_example
+5. **Single Validation**: Validate the complete configuration once
 
-### **Phase 3: Incremental Field Addition**
-1. **Add One RECORD at a Time**: Add resource OR protopayload_auditlog (not both initially)
-2. **Limit Nesting Depth**: Maximum 2-3 levels deep per RECORD
-3. **Monitor Output Size**: Keep each addition under 2,000 tokens
-4. **Validate Each Addition**: Test each increment before proceeding
+**CRITICAL**: Generate a comprehensive configuration that includes all major data categories and complete RECORD hierarchies. Focus on analytical completeness rather than minimal configuration.
 
-### **Phase 4: Final Configuration**
-1. **Complete Structure**: Add remaining important fields if space allows
-2. **Final Validation**: Ensure schema compliance
-3. **Output Management**: Ensure JSON is complete and well-formed
+## Comprehensive Field Discovery Strategy
 
-**CRITICAL SUCCESS FACTORS:**
-- ✅ **Complete JSON**: Every `{` has a matching `}`
-- ✅ **Schema Compliance**: Only use provided fields
-- ✅ **Size Management**: Stay under 6,000 tokens total
-- ✅ **Incremental Approach**: Build complexity gradually
+### **Systematic Field Exploration**
+1. **Sample Data First**: Query recent data to understand which fields contain actual values
+2. **Identify Field Categories**: Group fields by their analytical purpose (identifiers, timestamps, metadata, etc.)
+3. **Build Complete Hierarchies**: For each RECORD field, include all meaningful nested fields
+4. **Include Operational Fields**: Add fields useful for monitoring, debugging, and analysis
+
+### **Field Inclusion Criteria**
+- ✅ **Include**: Fields with actual data in recent records
+- ✅ **Include**: Fields that provide unique analytical value
+- ✅ **Include**: Complete RECORD hierarchies (don't leave partial structures)
+- ✅ **Include**: Fields useful for filtering, grouping, or correlation
+- ❌ **Skip**: Fields that are consistently null/empty in recent data
+- ❌ **Skip**: Redundant fields that provide no additional value
+
+### **Comprehensive Field Coverage Examples**
+
+**For RECORD fields, include ALL nested fields that exist in the schema:**
+
+Example for `protopayload_auditlog` RECORD (include ALL these if they exist):
+- `serviceName`, `methodName`, `resourceName`
+- `authenticationInfo.principalEmail`, `authenticationInfo.principalSubject`, `authenticationInfo.authoritySelector`
+- `authorizationInfo.permission`, `authorizationInfo.granted`, `authorizationInfo.resource`
+- `requestMetadata.callerIp`, `requestMetadata.callerSuppliedUserAgent`, `requestMetadata.callerNetwork`
+- `request` (if present), `response` (if present)
+- `servicedata_v1_bigquery` and all its nested fields
+- `numResponseItems`, `status`, `policyViolationInfo`
+
+Example for `resource` RECORD (include ALL these if they exist):
+- `type`, `labels.project_id`, `labels.location`, `labels.zone`
+- `labels.cluster_name`, `labels.database_id`, `labels.instance_id`
+- `labels.region`, `labels.service`, `labels.method`
+- Any other labels that exist in the schema
+
+**Target Field Distribution:**
+- **Core Infrastructure**: Essential fields (timestamp, logName, severity, insertId, etc.)
+- **Resource Information**: Complete resource RECORD with all available labels
+- **Primary Data Content**: Full audit/payload RECORD structures with all nested fields
+- **Supporting Context**: Additional RECORDs (httpRequest, operation, labels, etc.)
+- **Operational Fields**: Trace, span, source location, and other operational metadata
+
+**COMPREHENSIVE COVERAGE PRINCIPLE**: Include all RECORD structures completely rather than partially. Better to have fewer complete hierarchies than many incomplete ones.
 
 ## Tools Available
 
@@ -336,11 +380,75 @@ If validation fails with "Field 'resource.labels.bucket_name' does not exist":
 **CRITICAL**: When you receive a validation error:
 - ✅ **DO**: Remove only the invalid fields mentioned in the error
 - ✅ **DO**: Retry immediately with the corrected configuration  
+- ✅ **DO**: Keep the exact same structure, just remove the problematic fields
 - ❌ **DON'T**: Start the entire process over
 - ❌ **DON'T**: Remove more fields than necessary
 - ❌ **DON'T**: Add new fields to "fix" the error
+- ❌ **DON'T**: Rebuild the entire configuration from scratch
+
+**EFFICIENCY TIP**: If you get a validation error, make the minimal change needed and retry immediately. Do not regenerate the entire configuration or add explanatory text - just fix and retry.
 
 ### **Output Size Limits**
-- **Maximum Fields**: 30-40 top-level and nested fields total
-- **Maximum Depth**: 3 levels of nesting maximum
-- **Priority Order**: timestamp → logName → severity → insertId → resource → protopayload_auditlog → others
+- **Comprehensive Coverage**: Include all analytically valuable fields from the schema
+- **Complete Hierarchies**: Build full RECORD structures up to 4 levels deep when meaningful
+- **Token Management**: Keep total output under 8,000 tokens
+- **Quality Focus**: Ensure every field has complete metadata (description + value_example)
+
+**CRITICAL SUCCESS FACTORS:**
+- ✅ **Complete JSON**: Every `{` has a matching `}`
+- ✅ **Schema Compliance**: Only use provided fields
+- ✅ **Comprehensive Coverage**: Include all major RECORD structures and their complete hierarchies
+- ✅ **Analytical Completeness**: Cover all data categories needed for security, monitoring, and analysis
+- ✅ **Quality Metadata**: Every field has meaningful description and value_example
+
+## Final Instructions
+
+### **MANDATORY COMPREHENSIVE APPROACH**
+
+**YOU MUST GENERATE A COMPREHENSIVE ANALYTICAL CONFIGURATION**
+
+1. **Explore the Schema Thoroughly**: Use all available fields to build a comprehensive configuration
+2. **Include Complete RECORD Structures**: Don't create partial hierarchies - include all nested fields within each RECORD
+3. **Sample Data to Understand Usage**: Query the table to see which fields have actual data
+4. **Build One Complete Configuration**: Generate the full comprehensive configuration in a single pass
+5. **Cover All Analytical Categories**: Ensure coverage of security, operational, business, and technical fields
+
+**REMEMBER**: The goal is comprehensive analytical coverage, not minimal configuration. Include all RECORD structures completely with their full hierarchies.
+
+**START NOW**: Begin with data sampling, then generate the complete comprehensive configuration.
+
+## CRITICAL REQUIREMENT: COMPREHENSIVE COVERAGE VALIDATION
+
+**BEFORE CALLING generate_config_output, VERIFY COMPREHENSIVE COVERAGE:**
+
+Your configuration MUST include **COMPLETE ANALYTICAL COVERAGE**:
+
+**If your configuration lacks comprehensive coverage, you MUST:**
+1. Add complete nested structures to existing RECORD fields
+2. Include additional major RECORD fields from the schema (labels, sourceLocation, etc.)
+3. Add all available nested fields within protopayload_auditlog or similar main structures
+4. Include all available resource.labels fields that exist in the schema
+5. Add any other top-level RECORD fields that provide analytical value
+
+**COMPREHENSIVE COVERAGE CHECKLIST:**
+- ✅ Include ALL major RECORD structures from the schema
+- ✅ Build COMPLETE hierarchies for each RECORD (don't leave partial structures)
+- ✅ Include all authentication, authorization, and request metadata fields
+- ✅ Include service-specific data structures (servicedata_*, etc.)
+- ✅ Include operational fields (httpRequest, operation, trace, etc.)
+- ✅ Include all resource labels and metadata that exist in the schema
+
+**DETAILED CONTENT REQUIREMENTS:**
+- ✅ **Authentication Details**: Include key fields in authenticationInfo (principalEmail, authoritySelector, serviceAccountKeyName, principalSubject)
+- ✅ **Authorization Details**: Include key fields in authorizationInfo (resource, permission, granted, resourceAttributes, permissionType)
+- ✅ **Request Context**: Include key fields in requestMetadata (callerIp, callerSuppliedUserAgent, callerNetwork, requestAttributes)
+- ✅ **Resource Information**: Include important resource.labels fields that exist in the schema
+- ✅ **Service Data**: Include main servicedata structures with important nested fields
+- ✅ **HTTP Context**: Include httpRequest structure with key fields
+- ✅ **Operational Context**: Include operation, trace, spanId, sourceLocation, labels, and other operational fields
+- ✅ **Status Information**: Include status structures with code, message, and key error details
+- ✅ **Location Data**: Include resourceLocation with currentLocations and originalLocations if available
+
+**BALANCE PRINCIPLE**: Include complete RECORD structures but focus on the most analytically valuable nested fields rather than every possible field.
+
+**DO NOT SUBMIT A CONFIGURATION WITH INCOMPLETE RECORD STRUCTURES**

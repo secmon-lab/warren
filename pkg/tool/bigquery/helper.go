@@ -131,9 +131,6 @@ func subCommandGenerateConfig() *cli.Command {
 //go:embed prompt/generate_config_query.md
 var generateConfigQueryPrompt string
 
-//go:embed prompt/generate_config_schema.md
-var generateConfigSchemaPrompt string
-
 // parseTableID parses table ID in format "project_id.dataset_id.table_id"
 func parseTableID(tableID string, cfg *generateConfigConfig) error {
 	parts := strings.Split(tableID, ".")
@@ -451,7 +448,7 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 
 	agent := gollem.New(llmClient,
 		gollem.WithSystemPrompt(queryPrompt),
-		gollem.WithLoopLimit(5), // Limit to 5 iterations to prevent infinite loops
+		gollem.WithLoopLimit(12), // Increase to 12 iterations for comprehensive single-pass generation
 		gollem.WithMessageHook(func(ctx context.Context, msg string) error {
 			println(msg)
 			return nil
