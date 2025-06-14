@@ -12,7 +12,9 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model/bigquery"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 )
@@ -29,10 +31,10 @@ type Action struct {
 	scanLimit                 uint64
 	configs                   []*Config
 	runbookPaths              []string
+	
+	// In-memory storage for runbooks
+	runbooks map[types.RunbookID]*bigquery.RunbookEntry
 
-	// Dependencies for runbook functionality
-	repository       interfaces.Repository
-	embeddingAdapter interfaces.EmbeddingClient
 }
 
 var _ interfaces.Tool = &Action{}
@@ -80,15 +82,6 @@ func (x *Action) Name() string {
 	return "bigquery"
 }
 
-// SetRepository sets the repository for runbook functionality
-func (x *Action) SetRepository(repo interfaces.Repository) {
-	x.repository = repo
-}
-
-// SetEmbeddingClient sets the embedding client for runbook functionality
-func (x *Action) SetEmbeddingClient(client interfaces.EmbeddingClient) {
-	x.embeddingAdapter = client
-}
 
 func (x *Action) Flags() []cli.Flag {
 	return []cli.Flag{
@@ -169,6 +162,11 @@ func (x *Action) Configure(ctx context.Context) error {
 		return goerr.New("configuration file is required")
 	}
 
+	// Initialize runbooks map if not already done
+	if x.runbooks == nil {
+		x.runbooks = make(map[types.RunbookID]*bigquery.RunbookEntry)
+	}
+
 	var configs []*Config
 	for _, configPath := range x.configFiles {
 		fileInfo, err := os.Stat(configPath)
@@ -203,12 +201,13 @@ func (x *Action) Configure(ctx context.Context) error {
 
 	x.configs = configs
 
-	// Load runbooks if paths are configured and dependencies are available
-	if len(x.runbookPaths) > 0 && x.repository != nil && x.embeddingAdapter != nil {
+	// Load runbooks if paths are configured
+	if len(x.runbookPaths) > 0 {
 		if err := x.loadRunbooks(ctx); err != nil {
 			return goerr.Wrap(err, "failed to load runbooks")
 		}
 	}
+
 
 	return nil
 }
@@ -335,19 +334,15 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			Required: []string{"project_id", "dataset_id", "table_id"},
 		},
 		{
-			Name:        "bigquery_runbook_search",
-			Description: "Search pre-registered SQL runbooks using natural language. Returns similar SQL queries with their descriptions that can be used for investigation.",
+			Name:        "get_runbook_entry",
+			Description: "Get a specific runbook entry by its ID. Returns the SQL content and description of the runbook.",
 			Parameters: map[string]*gollem.Parameter{
-				"query": {
+				"runbook_id": {
 					Type:        gollem.TypeString,
-					Description: "Natural language search query describing what kind of SQL investigation you want to perform",
-				},
-				"limit": {
-					Type:        gollem.TypeInteger,
-					Description: "Maximum number of runbook entries to return (default: 5)",
+					Description: "The ID of the runbook entry to retrieve",
 				},
 			},
-			Required: []string{"query"},
+			Required: []string{"runbook_id"},
 		},
 	}, nil
 }
@@ -374,22 +369,23 @@ func (x *Action) Prompt(ctx context.Context) (string, error) {
 	// Use bigquery_table_summary tool to get detailed column information when needed.
 	prompt.WriteString("**Note**: For detailed column information and schema, use the `bigquery_table_summary` tool.\n\n")
 
+
 	// Add runbook information if available
-	if len(x.runbookPaths) > 0 {
+	if len(x.runbooks) > 0 {
 		prompt.WriteString("## SQL Runbooks\n\n")
-		prompt.WriteString("You also have access to pre-registered SQL runbooks. Use the `bigquery_runbook_search` tool to find relevant SQL queries for your investigation.\n\n")
+		prompt.WriteString("Available runbook entries (use `get_runbook_entry` with ID to get details):\n\n")
+		for id, entry := range x.runbooks {
+			prompt.WriteString(fmt.Sprintf("- ID: %s, Title: %s\n", id, entry.Title))
+		}
+		prompt.WriteString("\n")
 	}
 
 	return prompt.String(), nil
 }
 
-const runbookEmbeddingDimensionality = 256
-
-// loadRunbooks loads SQL runbooks from configured paths and stores them in the repository
+// loadRunbooks loads SQL runbooks from configured paths and stores them in memory
 func (x *Action) loadRunbooks(ctx context.Context) error {
-	if x.repository == nil || x.embeddingAdapter == nil {
-		return goerr.New("repository and embedding adapter are required for runbook loading")
-	}
+	x.runbooks = make(map[types.RunbookID]*bigquery.RunbookEntry)
 
 	// Create runbook loader
 	loader := NewRunbookLoader(x.runbookPaths)
@@ -400,40 +396,11 @@ func (x *Action) loadRunbooks(ctx context.Context) error {
 		return goerr.Wrap(err, "failed to load runbooks from files")
 	}
 
-	// Process each entry
+	// Store entries in memory with their IDs
 	for _, entry := range entries {
-		// Check if entry already exists by hash
-		existing, err := x.repository.GetRunbookEntryByHash(ctx, entry.Hash)
-		if err == nil && existing != nil {
-			// Entry with same hash already exists, skip
-			continue
-		}
-
-		// Generate embedding for the entry description and SQL content
-		text := entry.Title + " " + entry.Description + " " + entry.SQLContent
-		embeddings, err := x.embeddingAdapter.Embeddings(ctx, []string{text}, runbookEmbeddingDimensionality)
-		if err != nil {
-			return goerr.Wrap(err, "failed to generate embedding for runbook entry", goerr.V("entry_id", entry.ID))
-		}
-
-		if len(embeddings) == 0 || len(embeddings[0]) == 0 {
-			return goerr.New("empty embedding result for runbook entry", goerr.V("entry_id", entry.ID))
-		}
-
-		// Convert float32 to float64
-		embedding := make([]float64, len(embeddings[0]))
-		for i, v := range embeddings[0] {
-			embedding[i] = float64(v)
-		}
-
-		// Set embedding in entry
-		entry.Embedding = embedding
-
-		// Store in repository
-		if err := x.repository.PutRunbookEntry(ctx, entry); err != nil {
-			return goerr.Wrap(err, "failed to store runbook entry", goerr.V("entry_id", entry.ID))
-		}
+		x.runbooks[entry.ID] = entry
 	}
 
 	return nil
 }
+

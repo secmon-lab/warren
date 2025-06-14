@@ -9,7 +9,6 @@ import (
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
-	"github.com/secmon-lab/warren/pkg/domain/model/bigquery"
 	modelslack "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -690,12 +689,6 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			GetLatestHistoryFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
 //				panic("mock out the GetLatestHistory method")
 //			},
-//			GetRunbookEntryFunc: func(ctx context.Context, runbookID types.RunbookID) (*bigquery.RunbookEntry, error) {
-//				panic("mock out the GetRunbookEntry method")
-//			},
-//			GetRunbookEntryByHashFunc: func(ctx context.Context, hash string) (*bigquery.RunbookEntry, error) {
-//				panic("mock out the GetRunbookEntryByHash method")
-//			},
 //			GetTicketFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
 //				panic("mock out the GetTicket method")
 //			},
@@ -729,9 +722,6 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			PutHistoryFunc: func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
 //				panic("mock out the PutHistory method")
 //			},
-//			PutRunbookEntryFunc: func(ctx context.Context, entry *bigquery.RunbookEntry) error {
-//				panic("mock out the PutRunbookEntry method")
-//			},
 //			PutTicketFunc: func(ctx context.Context, ticketMoqParam ticket.Ticket) error {
 //				panic("mock out the PutTicket method")
 //			},
@@ -746,9 +736,6 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			},
 //			SearchAlertsFunc: func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
 //				panic("mock out the SearchAlerts method")
-//			},
-//			SearchRunbooksByEmbeddingFunc: func(ctx context.Context, embedding []float64, limit int) (bigquery.RunbookSearchResults, error) {
-//				panic("mock out the SearchRunbooksByEmbedding method")
 //			},
 //			UnbindAlertFromTicketFunc: func(ctx context.Context, alertID types.AlertID) error {
 //				panic("mock out the UnbindAlertFromTicket method")
@@ -823,12 +810,6 @@ type RepositoryMock struct {
 	// GetLatestHistoryFunc mocks the GetLatestHistory method.
 	GetLatestHistoryFunc func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error)
 
-	// GetRunbookEntryFunc mocks the GetRunbookEntry method.
-	GetRunbookEntryFunc func(ctx context.Context, runbookID types.RunbookID) (*bigquery.RunbookEntry, error)
-
-	// GetRunbookEntryByHashFunc mocks the GetRunbookEntryByHash method.
-	GetRunbookEntryByHashFunc func(ctx context.Context, hash string) (*bigquery.RunbookEntry, error)
-
 	// GetTicketFunc mocks the GetTicket method.
 	GetTicketFunc func(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error)
 
@@ -862,9 +843,6 @@ type RepositoryMock struct {
 	// PutHistoryFunc mocks the PutHistory method.
 	PutHistoryFunc func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error
 
-	// PutRunbookEntryFunc mocks the PutRunbookEntry method.
-	PutRunbookEntryFunc func(ctx context.Context, entry *bigquery.RunbookEntry) error
-
 	// PutTicketFunc mocks the PutTicket method.
 	PutTicketFunc func(ctx context.Context, ticketMoqParam ticket.Ticket) error
 
@@ -879,9 +857,6 @@ type RepositoryMock struct {
 
 	// SearchAlertsFunc mocks the SearchAlerts method.
 	SearchAlertsFunc func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error)
-
-	// SearchRunbooksByEmbeddingFunc mocks the SearchRunbooksByEmbedding method.
-	SearchRunbooksByEmbeddingFunc func(ctx context.Context, embedding []float64, limit int) (bigquery.RunbookSearchResults, error)
 
 	// UnbindAlertFromTicketFunc mocks the UnbindAlertFromTicket method.
 	UnbindAlertFromTicketFunc func(ctx context.Context, alertID types.AlertID) error
@@ -1049,20 +1024,6 @@ type RepositoryMock struct {
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
 		}
-		// GetRunbookEntry holds details about calls to the GetRunbookEntry method.
-		GetRunbookEntry []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// RunbookID is the runbookID argument value.
-			RunbookID types.RunbookID
-		}
-		// GetRunbookEntryByHash holds details about calls to the GetRunbookEntryByHash method.
-		GetRunbookEntryByHash []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Hash is the hash argument value.
-			Hash string
-		}
 		// GetTicket holds details about calls to the GetTicket method.
 		GetTicket []struct {
 			// Ctx is the ctx argument value.
@@ -1152,13 +1113,6 @@ type RepositoryMock struct {
 			// History is the history argument value.
 			History *ticket.History
 		}
-		// PutRunbookEntry holds details about calls to the PutRunbookEntry method.
-		PutRunbookEntry []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Entry is the entry argument value.
-			Entry *bigquery.RunbookEntry
-		}
 		// PutTicket holds details about calls to the PutTicket method.
 		PutTicket []struct {
 			// Ctx is the ctx argument value.
@@ -1202,15 +1156,6 @@ type RepositoryMock struct {
 			// Limit is the limit argument value.
 			Limit int
 		}
-		// SearchRunbooksByEmbedding holds details about calls to the SearchRunbooksByEmbedding method.
-		SearchRunbooksByEmbedding []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Embedding is the embedding argument value.
-			Embedding []float64
-			// Limit is the limit argument value.
-			Limit int
-		}
 		// UnbindAlertFromTicket holds details about calls to the UnbindAlertFromTicket method.
 		UnbindAlertFromTicket []struct {
 			// Ctx is the ctx argument value.
@@ -1240,8 +1185,6 @@ type RepositoryMock struct {
 	lockGetLatestAlertByThread      sync.RWMutex
 	lockGetLatestAlertListInThread  sync.RWMutex
 	lockGetLatestHistory            sync.RWMutex
-	lockGetRunbookEntry             sync.RWMutex
-	lockGetRunbookEntryByHash       sync.RWMutex
 	lockGetTicket                   sync.RWMutex
 	lockGetTicketByThread           sync.RWMutex
 	lockGetTicketComments           sync.RWMutex
@@ -1253,13 +1196,11 @@ type RepositoryMock struct {
 	lockPutAlert                    sync.RWMutex
 	lockPutAlertList                sync.RWMutex
 	lockPutHistory                  sync.RWMutex
-	lockPutRunbookEntry             sync.RWMutex
 	lockPutTicket                   sync.RWMutex
 	lockPutTicketComment            sync.RWMutex
 	lockPutTicketCommentsPrompted   sync.RWMutex
 	lockPutToken                    sync.RWMutex
 	lockSearchAlerts                sync.RWMutex
-	lockSearchRunbooksByEmbedding   sync.RWMutex
 	lockUnbindAlertFromTicket       sync.RWMutex
 }
 
@@ -2126,86 +2067,6 @@ func (mock *RepositoryMock) GetLatestHistoryCalls() []struct {
 	return calls
 }
 
-// GetRunbookEntry calls GetRunbookEntryFunc.
-func (mock *RepositoryMock) GetRunbookEntry(ctx context.Context, runbookID types.RunbookID) (*bigquery.RunbookEntry, error) {
-	callInfo := struct {
-		Ctx       context.Context
-		RunbookID types.RunbookID
-	}{
-		Ctx:       ctx,
-		RunbookID: runbookID,
-	}
-	mock.lockGetRunbookEntry.Lock()
-	mock.calls.GetRunbookEntry = append(mock.calls.GetRunbookEntry, callInfo)
-	mock.lockGetRunbookEntry.Unlock()
-	if mock.GetRunbookEntryFunc == nil {
-		var (
-			runbookEntryOut *bigquery.RunbookEntry
-			errOut          error
-		)
-		return runbookEntryOut, errOut
-	}
-	return mock.GetRunbookEntryFunc(ctx, runbookID)
-}
-
-// GetRunbookEntryCalls gets all the calls that were made to GetRunbookEntry.
-// Check the length with:
-//
-//	len(mockedRepository.GetRunbookEntryCalls())
-func (mock *RepositoryMock) GetRunbookEntryCalls() []struct {
-	Ctx       context.Context
-	RunbookID types.RunbookID
-} {
-	var calls []struct {
-		Ctx       context.Context
-		RunbookID types.RunbookID
-	}
-	mock.lockGetRunbookEntry.RLock()
-	calls = mock.calls.GetRunbookEntry
-	mock.lockGetRunbookEntry.RUnlock()
-	return calls
-}
-
-// GetRunbookEntryByHash calls GetRunbookEntryByHashFunc.
-func (mock *RepositoryMock) GetRunbookEntryByHash(ctx context.Context, hash string) (*bigquery.RunbookEntry, error) {
-	callInfo := struct {
-		Ctx  context.Context
-		Hash string
-	}{
-		Ctx:  ctx,
-		Hash: hash,
-	}
-	mock.lockGetRunbookEntryByHash.Lock()
-	mock.calls.GetRunbookEntryByHash = append(mock.calls.GetRunbookEntryByHash, callInfo)
-	mock.lockGetRunbookEntryByHash.Unlock()
-	if mock.GetRunbookEntryByHashFunc == nil {
-		var (
-			runbookEntryOut *bigquery.RunbookEntry
-			errOut          error
-		)
-		return runbookEntryOut, errOut
-	}
-	return mock.GetRunbookEntryByHashFunc(ctx, hash)
-}
-
-// GetRunbookEntryByHashCalls gets all the calls that were made to GetRunbookEntryByHash.
-// Check the length with:
-//
-//	len(mockedRepository.GetRunbookEntryByHashCalls())
-func (mock *RepositoryMock) GetRunbookEntryByHashCalls() []struct {
-	Ctx  context.Context
-	Hash string
-} {
-	var calls []struct {
-		Ctx  context.Context
-		Hash string
-	}
-	mock.lockGetRunbookEntryByHash.RLock()
-	calls = mock.calls.GetRunbookEntryByHash
-	mock.lockGetRunbookEntryByHash.RUnlock()
-	return calls
-}
-
 // GetTicket calls GetTicketFunc.
 func (mock *RepositoryMock) GetTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
 	callInfo := struct {
@@ -2667,45 +2528,6 @@ func (mock *RepositoryMock) PutHistoryCalls() []struct {
 	return calls
 }
 
-// PutRunbookEntry calls PutRunbookEntryFunc.
-func (mock *RepositoryMock) PutRunbookEntry(ctx context.Context, entry *bigquery.RunbookEntry) error {
-	callInfo := struct {
-		Ctx   context.Context
-		Entry *bigquery.RunbookEntry
-	}{
-		Ctx:   ctx,
-		Entry: entry,
-	}
-	mock.lockPutRunbookEntry.Lock()
-	mock.calls.PutRunbookEntry = append(mock.calls.PutRunbookEntry, callInfo)
-	mock.lockPutRunbookEntry.Unlock()
-	if mock.PutRunbookEntryFunc == nil {
-		var (
-			errOut error
-		)
-		return errOut
-	}
-	return mock.PutRunbookEntryFunc(ctx, entry)
-}
-
-// PutRunbookEntryCalls gets all the calls that were made to PutRunbookEntry.
-// Check the length with:
-//
-//	len(mockedRepository.PutRunbookEntryCalls())
-func (mock *RepositoryMock) PutRunbookEntryCalls() []struct {
-	Ctx   context.Context
-	Entry *bigquery.RunbookEntry
-} {
-	var calls []struct {
-		Ctx   context.Context
-		Entry *bigquery.RunbookEntry
-	}
-	mock.lockPutRunbookEntry.RLock()
-	calls = mock.calls.PutRunbookEntry
-	mock.lockPutRunbookEntry.RUnlock()
-	return calls
-}
-
 // PutTicket calls PutTicketFunc.
 func (mock *RepositoryMock) PutTicket(ctx context.Context, ticketMoqParam ticket.Ticket) error {
 	callInfo := struct {
@@ -2915,50 +2737,6 @@ func (mock *RepositoryMock) SearchAlertsCalls() []struct {
 	mock.lockSearchAlerts.RLock()
 	calls = mock.calls.SearchAlerts
 	mock.lockSearchAlerts.RUnlock()
-	return calls
-}
-
-// SearchRunbooksByEmbedding calls SearchRunbooksByEmbeddingFunc.
-func (mock *RepositoryMock) SearchRunbooksByEmbedding(ctx context.Context, embedding []float64, limit int) (bigquery.RunbookSearchResults, error) {
-	callInfo := struct {
-		Ctx       context.Context
-		Embedding []float64
-		Limit     int
-	}{
-		Ctx:       ctx,
-		Embedding: embedding,
-		Limit:     limit,
-	}
-	mock.lockSearchRunbooksByEmbedding.Lock()
-	mock.calls.SearchRunbooksByEmbedding = append(mock.calls.SearchRunbooksByEmbedding, callInfo)
-	mock.lockSearchRunbooksByEmbedding.Unlock()
-	if mock.SearchRunbooksByEmbeddingFunc == nil {
-		var (
-			runbookSearchResultsOut bigquery.RunbookSearchResults
-			errOut                  error
-		)
-		return runbookSearchResultsOut, errOut
-	}
-	return mock.SearchRunbooksByEmbeddingFunc(ctx, embedding, limit)
-}
-
-// SearchRunbooksByEmbeddingCalls gets all the calls that were made to SearchRunbooksByEmbedding.
-// Check the length with:
-//
-//	len(mockedRepository.SearchRunbooksByEmbeddingCalls())
-func (mock *RepositoryMock) SearchRunbooksByEmbeddingCalls() []struct {
-	Ctx       context.Context
-	Embedding []float64
-	Limit     int
-} {
-	var calls []struct {
-		Ctx       context.Context
-		Embedding []float64
-		Limit     int
-	}
-	mock.lockSearchRunbooksByEmbedding.RLock()
-	calls = mock.calls.SearchRunbooksByEmbedding
-	mock.lockSearchRunbooksByEmbedding.RUnlock()
 	return calls
 }
 

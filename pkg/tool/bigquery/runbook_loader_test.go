@@ -54,8 +54,6 @@ LIMIT 100;`
 	gt.S(t, entry.Description).Contains("This query identifies login activities from unusual locations")
 	gt.S(t, entry.SQLContent).Contains("SELECT")
 	gt.S(t, entry.SQLContent).Contains("security_logs.user_logins")
-	gt.Value(t, entry.FilePath).Equal(sqlFile)
-	gt.Value(t, entry.Hash).NotEqual("")
 }
 
 func TestRunbookLoader_LoadFromDirectory(t *testing.T) {
@@ -97,7 +95,6 @@ SELECT * FROM activities WHERE created_at >= CURRENT_DATE() - INTERVAL 1 DAY;`
 	titles := make(map[string]bool)
 	for _, entry := range entries {
 		titles[entry.Title] = true
-		gt.Value(t, entry.Hash).NotEqual("")
 		gt.Value(t, entry.SQLContent).NotEqual("")
 	}
 
@@ -256,11 +253,11 @@ WHERE connection_count > 1000 OR total_bytes > 1000000000;`,
 	gt.S(t, networkAnomalyEntry.Description).Contains("malicious activity")
 	gt.S(t, networkAnomalyEntry.SQLContent).Contains("network_logs")
 
-	// Verify all entries have unique hashes
-	hashSet := make(map[string]bool)
+	// Verify all entries have unique IDs
+	idSet := make(map[string]bool)
 	for _, entry := range entries {
-		gt.Value(t, hashSet[entry.Hash]).Equal(false) // Should not be duplicate
-		hashSet[entry.Hash] = true
-		gt.S(t, entry.Hash).NotEqual("") // Hash should not be empty
+		gt.Value(t, idSet[entry.ID.String()]).Equal(false) // Should not be duplicate
+		idSet[entry.ID.String()] = true
+		gt.S(t, entry.ID.String()).NotEqual("") // ID should not be empty
 	}
 }

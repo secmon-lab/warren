@@ -6,7 +6,6 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
-	"github.com/secmon-lab/warren/pkg/domain/model/bigquery"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -62,9 +61,4 @@ type Repository interface {
 	GetToken(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error)
 	DeleteToken(ctx context.Context, tokenID auth.TokenID) error
 
-	// For runbook management
-	PutRunbookEntry(ctx context.Context, entry *bigquery.RunbookEntry) error
-	GetRunbookEntry(ctx context.Context, runbookID types.RunbookID) (*bigquery.RunbookEntry, error)
-	GetRunbookEntryByHash(ctx context.Context, hash string) (*bigquery.RunbookEntry, error)
-	SearchRunbooksByEmbedding(ctx context.Context, embedding []float64, limit int) (bigquery.RunbookSearchResults, error)
 }
