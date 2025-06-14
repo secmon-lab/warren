@@ -86,11 +86,21 @@ func TestGenerateConfigTool_ConfigOutput(t *testing.T) {
 	// Create mock BigQuery client
 	mockClient := newMockBigQueryClient()
 
+	// Set up proper table metadata with the fields we're testing
+	mockClient.TableMetadata["security.auth_logs"] = &bigquery.TableMetadata{
+		Schema: bigquery.Schema{
+			{Name: "timestamp", Type: bigquery.TimestampFieldType, Description: "Event timestamp"},
+			{Name: "user_id", Type: bigquery.StringFieldType, Description: "User identifier"},
+		},
+	}
+
 	tool := &generateConfigTool{
 		scanLimitStr:   "1GB",
 		scanLimit:      1024 * 1024 * 1024,
 		bigqueryClient: mockClient,
 		outputPath:     outputPath,
+		tableDatasetID: "security",
+		tableTableID:   "auth_logs",
 	}
 
 	// Test generate_config_output tool call

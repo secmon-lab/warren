@@ -34,3 +34,9 @@ const (
 	CategoryHash     = categoryHash
 	CategoryMetadata = categoryMetadata
 )
+
+// Export functions for testing
+var (
+	ValidateColumnConfig   = validateColumnConfig
+	FormatValidationReport = formatValidationReport
+)
