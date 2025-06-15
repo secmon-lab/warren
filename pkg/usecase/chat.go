@@ -132,9 +132,15 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 
 	logger.Debug("run prompt", "prompt", message, "history", history, "ticket", target, "history_record", historyRecord)
 
-	newHistory, err := agent.Prompt(ctx, message)
+	err = agent.Execute(ctx, message)
 	if err != nil {
-		return goerr.Wrap(err, "failed to prompt")
+		return goerr.Wrap(err, "failed to execute")
+	}
+
+	// Get the updated history from the agent's current session
+	newHistory := agent.Session().History()
+	if newHistory == nil {
+		return goerr.New("failed to get history from agent")
 	}
 
 	newRecord := ticket.NewHistory(ctx, target.ID)

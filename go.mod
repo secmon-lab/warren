@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/bigquery v1.69.0
 	cloud.google.com/go/firestore v1.18.0
 	cloud.google.com/go/storage v1.53.0
-	cloud.google.com/go/vertexai v0.13.3
+	cloud.google.com/go/vertexai v0.13.4
 	github.com/99designs/gqlgen v0.17.73
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.18.0
@@ -16,7 +16,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/m-mizutani/clog v0.0.8
 	github.com/m-mizutani/goerr/v2 v2.0.0-beta.2
-	github.com/m-mizutani/gollem v0.3.4-0.20250610053315-5e4de1493442
+	github.com/m-mizutani/gollem v0.5.0
 	github.com/m-mizutani/gt v0.0.16
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.1.11
@@ -34,7 +34,7 @@ require (
 require (
 	cel.dev/expr v0.23.1 // indirect
 	cloud.google.com/go v0.121.2 // indirect
-	cloud.google.com/go/aiplatform v1.89.0 // indirect
+	cloud.google.com/go/aiplatform v1.90.0 // indirect
 	cloud.google.com/go/auth v0.16.2 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.7.0 // indirect
@@ -51,7 +51,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.1.5 // indirect
 	github.com/agnivade/levenshtein v1.2.1 // indirect
 	github.com/alecthomas/chroma/v2 v2.15.0 // indirect
-	github.com/anthropics/anthropic-sdk-go v0.2.0-beta.3 // indirect
+	github.com/anthropics/anthropic-sdk-go v1.4.0 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -121,7 +121,7 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sajari/fuzzy v1.0.0 // indirect
-	github.com/sashabaranov/go-openai v1.39.0 // indirect
+	github.com/sashabaranov/go-openai v1.40.1 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
