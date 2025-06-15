@@ -475,7 +475,7 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 		}),
 	)
 
-	if _, err := agent.Prompt(ctx, "Generate config"); err != nil {
+	if err := agent.Execute(ctx, "Generate config"); err != nil {
 		return err
 	}
 

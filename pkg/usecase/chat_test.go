@@ -37,6 +37,7 @@ func TestHandlePrompt(t *testing.T) {
 	newSessionCount := 0
 	genContentCount := 0
 	var contents []*genai.Content
+
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			newSessionCount++
@@ -48,7 +49,7 @@ func TestHandlePrompt(t *testing.T) {
 				gt.NotNil(t, cfg.History())
 			}
 
-			return &mock.LLMSessionMock{
+			session := &mock.LLMSessionMock{
 				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
 					genContentCount++
 					if genContentCount > 2 {
@@ -78,7 +79,8 @@ func TestHandlePrompt(t *testing.T) {
 				HistoryFunc: func() *gollem.History {
 					return gollem.NewHistoryFromGemini(contents)
 				},
-			}, nil
+			}
+			return session, nil
 		},
 	}
 
