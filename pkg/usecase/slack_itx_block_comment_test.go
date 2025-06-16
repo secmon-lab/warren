@@ -113,6 +113,14 @@ func TestTicketCreation_NewThread_WithInitialComment(t *testing.T) {
 				},
 			}, nil
 		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, inputs []string) ([][]float64, error) {
+			// Return mock embedding data with correct dimension
+			embedding := make([]float64, dimension)
+			for i := range embedding {
+				embedding[i] = 0.1 + float64(i)*0.01 // Generate some test values
+			}
+			return [][]float64{embedding}, nil
+		},
 	}
 
 	// Create usecase instance

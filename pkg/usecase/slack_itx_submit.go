@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 
-	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -13,7 +12,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/utils/embedding"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
@@ -182,11 +180,10 @@ func (uc *UseCases) handleBindAlerts(ctx context.Context, user slack.User, ticke
 
 	ticket.AlertIDs = unifyAlertIDs(ticket.AlertIDs, alertIDs)
 
-	embeddings := make([]firestore.Vector32, len(alerts))
-	for i, alert := range alerts {
-		embeddings[i] = alert.Embedding
+	// Recalculate embedding using the unified approach
+	if err := ticket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
+		return goerr.Wrap(err, "failed to recalculate ticket embedding")
 	}
-	ticket.Embedding = embedding.Average(embeddings)
 
 	// Update database
 	if err := uc.repository.BatchBindAlertsToTicket(ctx, ticket.AlertIDs, ticketID); err != nil {

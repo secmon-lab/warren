@@ -26,8 +26,12 @@ func TestCreateManualTicket(t *testing.T) {
 			// Create LLM client mock for embedding generation
 			llmMock := &mock.LLMClientMock{
 				GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
-					// Return mock embedding vector
-					return [][]float64{{0.1, 0.2, 0.3}}, nil
+					// Return mock embedding vector with correct dimension
+					embedding := make([]float64, dimension)
+					for i := range embedding {
+						embedding[i] = 0.1 + float64(i)*0.01 // Generate some test values
+					}
+					return [][]float64{embedding}, nil
 				},
 			}
 
@@ -48,9 +52,9 @@ func TestCreateManualTicket(t *testing.T) {
 			gt.Array(t, ticket.AlertIDs).Length(0)         // Should be empty array
 			gt.Value(t, ticket.Metadata.Summary).Equal("") // Should be empty per requirements
 
-			// Verify embedding was generated
-			if tc.title != "" || tc.description != "" {
-				gt.Array(t, ticket.Embedding).Length(3) // Mock returns 3-dimensional vector
+			// Verify embedding was generated for manual tickets (title + description only)
+			if tc.title != "" {
+				gt.Array(t, ticket.Embedding).Length(256) // Mock returns 256-dimensional vector
 			}
 
 			// Verify ticket was saved to repository
@@ -64,40 +68,31 @@ func TestCreateManualTicket(t *testing.T) {
 		}
 	}
 
-	t.Run("success case", runTest(testCase{
-		title:       "Test Manual Ticket",
-		description: "This is a test description",
-		user: &slack.User{
-			ID:   "U123456",
-			Name: "Test User",
-		},
+	t.Run("valid title and description", runTest(testCase{
+		title:       "Test Title",
+		description: "Test Description",
+		user:        &slack.User{ID: "user1", Name: "Test User"},
 		expectError: false,
 	}))
 
-	t.Run("success with empty user", runTest(testCase{
-		title:       "Test Manual Ticket",
-		description: "This is a test description",
+	t.Run("valid title only", runTest(testCase{
+		title:       "Test Title",
+		description: "",
+		user:        &slack.User{ID: "user1", Name: "Test User"},
+		expectError: false,
+	}))
+
+	t.Run("empty title", runTest(testCase{
+		title:       "",
+		description: "Test Description",
+		user:        &slack.User{ID: "user1", Name: "Test User"},
+		expectError: true,
+	}))
+
+	t.Run("nil user", runTest(testCase{
+		title:       "Test Title",
+		description: "Test Description",
 		user:        nil,
 		expectError: false,
-	}))
-
-	t.Run("success with empty description", runTest(testCase{
-		title:       "Test Manual Ticket",
-		description: "",
-		user: &slack.User{
-			ID:   "U123456",
-			Name: "Test User",
-		},
-		expectError: false,
-	}))
-
-	t.Run("error with empty title", runTest(testCase{
-		title:       "",
-		description: "This is a test description",
-		user: &slack.User{
-			ID:   "U123456",
-			Name: "Test User",
-		},
-		expectError: true,
 	}))
 }

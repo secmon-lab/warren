@@ -33,6 +33,15 @@ func checkMockCaller(t testing.TB, skip int, pkgPath string, funcName string) {
 	})
 }
 
+// make256DimEmbedding creates a 256-dimensional embedding with test values
+func make256DimEmbedding() []float32 {
+	embedding := make([]float32, 256)
+	for i := range embedding {
+		embedding[i] = 0.1 + float32(i)*0.01
+	}
+	return embedding
+}
+
 func TestSlackActionAckAlert(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -103,9 +112,21 @@ func TestSlackActionAckAlert(t *testing.T) {
 				},
 			}, nil
 		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, inputs []string) ([][]float64, error) {
+			// Return mock embedding data with correct dimension
+			embedding := make([]float64, dimension)
+			for i := range embedding {
+				embedding[i] = 0.1 + float64(i)*0.01 // Generate some test values
+			}
+			return [][]float64{embedding}, nil
+		},
 	}
 
-	// Create test alert
+	// Create test alert with 256-dimensional embedding
+	testAlertEmbedding := make([]float32, 256)
+	for i := range testAlertEmbedding {
+		testAlertEmbedding[i] = 0.1 + float32(i)*0.01
+	}
 	testAlert := &alert.Alert{
 		ID:        types.AlertID("test-alert-1"),
 		CreatedAt: now,
@@ -114,7 +135,7 @@ func TestSlackActionAckAlert(t *testing.T) {
 			ChannelID: "test-channel",
 			ThreadID:  "test-thread",
 		},
-		Embedding: []float32{0.1, 0.2, 0.3},
+		Embedding: testAlertEmbedding,
 	}
 
 	// Store test alert
@@ -237,15 +258,31 @@ func TestSlackActionAckList(t *testing.T) {
 				},
 			}, nil
 		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, inputs []string) ([][]float64, error) {
+			// Return mock embedding data with correct dimension
+			embedding := make([]float64, dimension)
+			for i := range embedding {
+				embedding[i] = 0.1 + float64(i)*0.01 // Generate some test values
+			}
+			return [][]float64{embedding}, nil
+		},
 	}
 
-	// Create test alerts
+	// Create test alerts with 256-dimensional embeddings
+	testAlert1Embedding := make([]float32, 256)
+	for i := range testAlert1Embedding {
+		testAlert1Embedding[i] = 0.1 + float32(i)*0.01
+	}
+	testAlert2Embedding := make([]float32, 256)
+	for i := range testAlert2Embedding {
+		testAlert2Embedding[i] = 0.2 + float32(i)*0.01
+	}
 	testAlerts := alert.Alerts{
 		&alert.Alert{
 			ID:        types.AlertID("test-alert-1"),
 			CreatedAt: now,
 			Metadata:  alert.Metadata{Title: "Test Alert 1"},
-			Embedding: []float32{0.1, 0.2, 0.3},
+			Embedding: testAlert1Embedding,
 			SlackThread: &slack.Thread{
 				ChannelID: "test-channel",
 				ThreadID:  "test-thread",
@@ -255,7 +292,7 @@ func TestSlackActionAckList(t *testing.T) {
 			ID:        types.AlertID("test-alert-2"),
 			CreatedAt: now,
 			Metadata:  alert.Metadata{Title: "Test Alert 2"},
-			Embedding: []float32{0.2, 0.3, 0.4},
+			Embedding: testAlert2Embedding,
 			SlackThread: &slack.Thread{
 				ChannelID: "test-channel",
 				ThreadID:  "test-thread",
@@ -364,14 +401,18 @@ func TestSlackActionBindAlert(t *testing.T) {
 
 	// Create test alert
 	testAlert := alert.Alert{
-		ID:        types.AlertID("test-alert-1"),
+		ID:        types.NewAlertID(),
 		CreatedAt: now,
-		Metadata:  alert.Metadata{Title: "Test Alert"},
-		Embedding: []float32{0.1, 0.2, 0.3},
+		Metadata: alert.Metadata{
+			Title:       "Test Alert",
+			Description: "Test Description",
+		},
+		Embedding: make256DimEmbedding(),
 		SlackThread: &slack.Thread{
 			ChannelID: "test-channel",
 			ThreadID:  "test-thread",
 		},
+		Data: map[string]interface{}{"key": "value"},
 	}
 
 	// Create test ticket
@@ -601,7 +642,7 @@ func TestSlackActionAckAlert_MultipleAlertLists(t *testing.T) {
 			ChannelID: "test-channel",
 			ThreadID:  "test-thread",
 		},
-		Embedding: []float32{0.1, 0.2, 0.3},
+		Embedding: make256DimEmbedding(),
 		Data:      map[string]interface{}{"key": "value"},
 	}
 
@@ -690,6 +731,14 @@ func TestSlackActionAckAlert_MultipleAlertLists(t *testing.T) {
 				},
 			}, nil
 		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, inputs []string) ([][]float64, error) {
+			// Return mock embedding data with correct dimension
+			embedding := make([]float64, dimension)
+			for i := range embedding {
+				embedding[i] = 0.1 + float64(i)*0.01 // Generate some test values
+			}
+			return [][]float64{embedding}, nil
+		},
 	}
 
 	// Create usecase instance
@@ -764,7 +813,7 @@ func TestSlackActionAckAlert_SingleAlertList(t *testing.T) {
 			ChannelID: "test-channel",
 			ThreadID:  "test-thread",
 		},
-		Embedding: []float32{0.1, 0.2, 0.3},
+		Embedding: make256DimEmbedding(),
 		Data:      map[string]interface{}{"key": "value"},
 	}
 
@@ -830,6 +879,14 @@ func TestSlackActionAckAlert_SingleAlertList(t *testing.T) {
 					}, nil
 				},
 			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, inputs []string) ([][]float64, error) {
+			// Return mock embedding data with correct dimension
+			embedding := make([]float64, dimension)
+			for i := range embedding {
+				embedding[i] = 0.1 + float64(i)*0.01 // Generate some test values
+			}
+			return [][]float64{embedding}, nil
 		},
 	}
 
@@ -925,6 +982,14 @@ func TestSlackActionAckAlert_UpdatesAlertList(t *testing.T) {
 				},
 			}, nil
 		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, inputs []string) ([][]float64, error) {
+			// Return mock embedding data with correct dimension
+			embedding := make([]float64, dimension)
+			for i := range embedding {
+				embedding[i] = 0.1 + float64(i)*0.01 // Generate some test values
+			}
+			return [][]float64{embedding}, nil
+		},
 	}
 
 	// Create test alert
@@ -939,7 +1004,7 @@ func TestSlackActionAckAlert_UpdatesAlertList(t *testing.T) {
 			ChannelID: "test-channel",
 			ThreadID:  "test-thread",
 		},
-		Embedding: []float32{0.1, 0.2, 0.3},
+		Embedding: make256DimEmbedding(),
 		Data:      map[string]interface{}{"key": "value"},
 	}
 

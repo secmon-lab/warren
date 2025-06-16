@@ -4,13 +4,11 @@ import (
 	"context"
 	"time"
 
-	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
-	"github.com/secmon-lab/warren/pkg/utils/embedding"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
@@ -46,13 +44,6 @@ func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread 
 		alertIDs[i] = alert.ID
 	}
 
-	// Calculate average embedding from alerts
-	embeddings := make([]firestore.Vector32, len(alerts))
-	for i, alert := range alerts {
-		embeddings[i] = alert.Embedding
-	}
-	averageEmbedding := embedding.Average(embeddings)
-
 	// Create ticket using common helper
 	opts := TicketCreationOptions{
 		AlertIDs:     alertIDs,
@@ -60,7 +51,6 @@ func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread 
 		Assignee:     &user,
 		Title:        "",
 		Description:  "",
-		Embedding:    averageEmbedding,
 		FillMetadata: true,  // Alert-based tickets use LLM to fill metadata
 		IsTest:       false, // Alert-based tickets are not test tickets
 	}

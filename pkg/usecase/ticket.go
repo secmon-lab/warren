@@ -3,14 +3,11 @@ package usecase
 import (
 	"context"
 
-	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/utils/embedding"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
@@ -21,7 +18,6 @@ type TicketCreationOptions struct {
 	Assignee     *slack.User
 	Title        string
 	Description  string
-	Embedding    firestore.Vector32
 	FillMetadata bool // Whether to use LLM to fill metadata
 	IsTest       bool // Whether this is a test ticket
 }
@@ -41,16 +37,16 @@ func (uc *UseCases) createTicketWithSlackPosting(ctx context.Context, opts Ticke
 		newTicket.Metadata.Description = opts.Description
 	}
 
-	// Set embedding
-	if opts.Embedding != nil {
-		newTicket.Embedding = opts.Embedding
-	}
-
 	// Fill metadata using LLM if requested
 	if opts.FillMetadata {
 		if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
 			return nil, goerr.Wrap(err, "failed to fill ticket metadata")
 		}
+	}
+
+	// Calculate embedding using the unified approach
+	if err := newTicket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
+		return nil, goerr.Wrap(err, "failed to calculate ticket embedding")
 	}
 
 	// Post to Slack if SlackThread is provided
@@ -148,20 +144,6 @@ func (uc *UseCases) CreateManualTicketWithTest(ctx context.Context, title, descr
 		return nil, goerr.New("title is required")
 	}
 
-	// Generate embedding from title and description
-	var embeddingVector firestore.Vector32
-	if uc.llmClient != nil {
-		embeddingText := title + " " + description
-		vector32, err := embedding.Generate(ctx, uc.llmClient, embeddingText)
-		if err != nil {
-			// Log error but don't fail ticket creation
-			logger := logging.From(ctx)
-			logger.Warn("failed to generate embedding for manual ticket", "error", err)
-		} else {
-			embeddingVector = vector32
-		}
-	}
-
 	// Create ticket using common helper
 	opts := TicketCreationOptions{
 		AlertIDs:     []types.AlertID{},
@@ -169,7 +151,6 @@ func (uc *UseCases) CreateManualTicketWithTest(ctx context.Context, title, descr
 		Assignee:     user,
 		Title:        title,
 		Description:  description,
-		Embedding:    embeddingVector,
 		FillMetadata: false, // Manual tickets don't use LLM to fill metadata
 		IsTest:       isTest,
 	}

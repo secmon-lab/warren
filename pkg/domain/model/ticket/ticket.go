@@ -15,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/embedding"
 )
 
 type Ticket struct {
@@ -142,6 +143,67 @@ func (x *Ticket) FillMetadata(ctx context.Context, llmClient gollem.LLMClient, a
 	}
 
 	x.Metadata = *meta
+
+	return nil
+}
+
+// CalculateEmbedding calculates the ticket embedding using a weighted average approach.
+// It combines embeddings from title/description (weight 0.3) and alerts (weight 0.7).
+func (x *Ticket) CalculateEmbedding(ctx context.Context, llmClient gollem.LLMClient, alertRepo AlertRepository) error {
+	var metadataEmbedding firestore.Vector32
+	var alertEmbedding firestore.Vector32
+
+	// Calculate embedding from title and description if title exists
+	// Description can be empty - this is explicitly allowed
+	if x.Metadata.Title != "" {
+		embeddingText := x.Metadata.Title
+		if x.Metadata.Description != "" {
+			embeddingText += " " + x.Metadata.Description
+		}
+		vector32, err := embedding.Generate(ctx, llmClient, embeddingText)
+		if err != nil {
+			return goerr.Wrap(err, "failed to generate embedding from metadata")
+		}
+		metadataEmbedding = vector32
+	}
+
+	// Calculate average embedding from alerts if they exist
+	if len(x.AlertIDs) > 0 {
+		alerts, err := alertRepo.BatchGetAlerts(ctx, x.AlertIDs)
+		if err != nil {
+			return goerr.Wrap(err, "failed to get alerts")
+		}
+
+		embeddings := make([]firestore.Vector32, 0, len(alerts))
+		for _, alert := range alerts {
+			if len(alert.Embedding) > 0 {
+				embeddings = append(embeddings, alert.Embedding)
+			}
+		}
+
+		if len(embeddings) > 0 {
+			alertEmbedding = embedding.Average(embeddings)
+		}
+	}
+
+	// Calculate weighted average if both embeddings exist
+	if len(metadataEmbedding) > 0 && len(alertEmbedding) > 0 {
+		weightedEmbedding, err := embedding.WeightedAverage(
+			[]firestore.Vector32{metadataEmbedding, alertEmbedding},
+			[]float32{0.3, 0.7},
+		)
+		if err != nil {
+			return goerr.Wrap(err, "failed to calculate weighted average embedding")
+		}
+		x.Embedding = weightedEmbedding
+	} else if len(metadataEmbedding) > 0 {
+		// Only metadata embedding available
+		x.Embedding = metadataEmbedding
+	} else if len(alertEmbedding) > 0 {
+		// Only alert embedding available
+		x.Embedding = alertEmbedding
+	}
+	// If no embeddings are available, x.Embedding remains empty
 
 	return nil
 }
