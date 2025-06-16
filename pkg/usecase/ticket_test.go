@@ -90,4 +90,14 @@ func TestCreateManualTicket(t *testing.T) {
 		},
 		expectError: false,
 	}))
+
+	t.Run("error with empty title", runTest(testCase{
+		title:       "",
+		description: "This is a test description",
+		user: &slack.User{
+			ID:   "U123456",
+			Name: "Test User",
+		},
+		expectError: true,
+	}))
 }

@@ -66,9 +66,7 @@ func (x *Metadata) Validate() error {
 	if x.Title == "" {
 		return goerr.New("title is required")
 	}
-	if x.Description == "" {
-		return goerr.New("description is required")
-	}
+	// Description is optional - it may be empty for manually created tickets
 	// Summary is optional - it may be empty for manually created tickets
 	return nil
 }

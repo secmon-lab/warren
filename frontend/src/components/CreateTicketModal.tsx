@@ -50,10 +50,10 @@ export function CreateTicketModal({ isOpen, onClose }: CreateTicketModalProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim()) {
+    if (!title.trim()) {
       toast({
         title: "Missing information",
-        description: "Please provide both title and description.",
+        description: "Please provide a title.",
         variant: "destructive",
       });
       return;

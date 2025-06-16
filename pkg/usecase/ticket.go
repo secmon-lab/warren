@@ -136,6 +136,11 @@ func (uc *UseCases) postTicketToSlack(ctx context.Context, newTicket *ticket.Tic
 
 // CreateManualTicket creates a ticket manually without associated alerts
 func (uc *UseCases) CreateManualTicket(ctx context.Context, title, description string, user *slack.User) (*ticket.Ticket, error) {
+	// Validate required fields
+	if title == "" {
+		return nil, goerr.New("title is required")
+	}
+
 	// Generate embedding from title and description
 	var embeddingVector firestore.Vector32
 	if uc.llmClient != nil {
