@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UserWithAvatar } from "@/components/ui/user-name";
+import { CreateTicketModal } from "@/components/CreateTicketModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +30,7 @@ import {
   User,
   MoreHorizontal,
   Archive,
+  Plus,
 } from "lucide-react";
 import { useErrorToast, useSuccessToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/hooks/use-confirm";
@@ -39,6 +41,7 @@ export default function BoardPage() {
   const navigate = useNavigate();
   const [draggedTicket, setDraggedTicket] = useState<Ticket | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const errorToast = useErrorToast();
   const successToast = useSuccessToast();
@@ -171,12 +174,25 @@ export default function BoardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Board</h1>
-        <p className="text-muted-foreground">
-          Kanban board view of security tickets
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Board</h1>
+          <p className="text-muted-foreground">
+            Kanban board view of security tickets
+          </p>
+        </div>
+        <Button
+          onClick={() => setCreateModalOpen(true)}
+          className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Create Ticket
+        </Button>
       </div>
+
+      <CreateTicketModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {BOARD_STATUSES.map((status) => (

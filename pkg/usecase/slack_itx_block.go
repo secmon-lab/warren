@@ -8,7 +8,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/embedding"
@@ -42,77 +41,39 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user
 }
 
 func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread slack.Thread, alerts alert.Alerts) error {
-	st := uc.slackService.NewThread(slackThread)
 	alertIDs := make([]types.AlertID, len(alerts))
 	for i, alert := range alerts {
 		alertIDs[i] = alert.ID
 	}
 
+	// Calculate average embedding from alerts
 	embeddings := make([]firestore.Vector32, len(alerts))
 	for i, alert := range alerts {
 		embeddings[i] = alert.Embedding
 	}
+	averageEmbedding := embedding.Average(embeddings)
 
-	newTicket := ticket.New(ctx, alertIDs, &slackThread)
-	newTicket.Assignee = &user
-	newTicket.Embedding = embedding.Average(embeddings)
-
-	if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
-		return goerr.Wrap(err, "failed to fill ticket metadata")
+	// Create ticket using common helper
+	opts := TicketCreationOptions{
+		AlertIDs:     alertIDs,
+		SlackThread:  &slackThread,
+		Assignee:     &user,
+		Title:        "",
+		Description:  "",
+		Embedding:    averageEmbedding,
+		FillMetadata: true, // Alert-based tickets use LLM to fill metadata
 	}
 
-	// Check if there are multiple alert lists in the thread
-	alertLists, err := uc.repository.GetAlertListsInThread(ctx, slackThread)
+	newTicket, err := uc.createTicketWithSlackPosting(ctx, opts, alerts)
 	if err != nil {
-		return goerr.Wrap(err, "failed to get alert lists in thread")
+		return goerr.Wrap(err, "failed to create ticket with slack posting")
 	}
 
-	var ts string
-
-	if len(alertLists) > 1 {
-		// Multiple alert lists exist, post ticket to new thread
-		newThreadSvc, timestamp, err := uc.slackService.PostTicket(ctx, newTicket, alerts)
-		if err != nil {
-			return goerr.Wrap(err, "failed to post ticket to new thread")
-		}
-		ts = timestamp
-
-		// Update ticket's slack thread to the new thread
-		newTicket.SlackThread = &slack.Thread{
-			ChannelID: newThreadSvc.ChannelID(),
-			ThreadID:  newThreadSvc.ThreadID(),
-		}
-
-		// Generate and post initial comment for the new ticket thread
-		if comment, err := uc.generateInitialTicketComment(ctx, &newTicket, alerts); err != nil {
-			_ = msg.Trace(ctx, "💥 Failed to generate initial comment: %s", err.Error())
-		} else if comment != "" {
-			if err := newThreadSvc.PostComment(ctx, comment); err != nil {
-				_ = msg.Trace(ctx, "💥 Failed to post initial comment: %s", err.Error())
-			}
-		}
-
-		// Post link to the new ticket in the original thread
-		ticketURL := uc.slackService.ToMsgURL(newThreadSvc.ChannelID(), newThreadSvc.ThreadID())
-		if err := st.PostLinkToTicket(ctx, ticketURL, newTicket.Metadata.Title); err != nil {
-			return goerr.Wrap(err, "failed to post link to ticket")
-		}
-	} else {
-		// Single or no alert list, post ticket in the current thread
-		ts, err = st.PostTicket(ctx, newTicket, alerts)
-		if err != nil {
-			return goerr.Wrap(err, "failed to post ticket")
-		}
-	}
-
-	newTicket.SlackMessageID = ts
+	// Update alerts to link them to the ticket
 	for _, alert := range alerts {
 		alert.TicketID = newTicket.ID
 	}
 
-	if err := uc.repository.PutTicket(ctx, newTicket); err != nil {
-		return goerr.Wrap(err, "failed to put ticket")
-	}
 	if err := uc.repository.BatchPutAlerts(ctx, alerts); err != nil {
 		return goerr.Wrap(err, "failed to put alert")
 	}

@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Pagination,
@@ -13,6 +14,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { UserWithAvatar } from "@/components/ui/user-name";
+import { CreateTicketModal } from "@/components/CreateTicketModal";
 import { GET_TICKETS } from "@/lib/graphql/queries";
 import {
   Ticket,
@@ -23,7 +25,7 @@ import {
   ALERT_CONCLUSION_LABELS,
 } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
-import { AlertCircle, MessageSquare, User, Clock } from "lucide-react";
+import { AlertCircle, MessageSquare, User, Clock, Plus } from "lucide-react";
 
 const ITEMS_PER_PAGE = 10;
 const ALL_STATUSES: TicketStatus[] = [
@@ -37,6 +39,7 @@ export default function TicketsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedStatuses, setSelectedStatuses] = useState<TicketStatus[]>([]);
   const [activeTab, setActiveTab] = useState<"all" | TicketStatus>("all");
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const navigate = useNavigate();
 
@@ -101,12 +104,25 @@ export default function TicketsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Tickets</h1>
-        <p className="text-muted-foreground">
-          Manage and track security incidents
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Tickets</h1>
+          <p className="text-muted-foreground">
+            Manage and track security incidents
+          </p>
+        </div>
+        <Button
+          onClick={() => setCreateModalOpen(true)}
+          className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Create Ticket
+        </Button>
       </div>
+
+      <CreateTicketModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+      />
 
       <Tabs
         value={activeTab}
