@@ -61,7 +61,8 @@ func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread 
 		Title:        "",
 		Description:  "",
 		Embedding:    averageEmbedding,
-		FillMetadata: true, // Alert-based tickets use LLM to fill metadata
+		FillMetadata: true,  // Alert-based tickets use LLM to fill metadata
+		IsTest:       false, // Alert-based tickets are not test tickets
 	}
 
 	newTicket, err := uc.createTicketWithSlackPosting(ctx, opts, alerts)

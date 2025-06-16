@@ -23,6 +23,7 @@ type TicketCreationOptions struct {
 	Description  string
 	Embedding    firestore.Vector32
 	FillMetadata bool // Whether to use LLM to fill metadata
+	IsTest       bool // Whether this is a test ticket
 }
 
 // createTicketWithSlackPosting creates a ticket and posts it to Slack
@@ -30,6 +31,7 @@ func (uc *UseCases) createTicketWithSlackPosting(ctx context.Context, opts Ticke
 	// Create new ticket
 	newTicket := ticket.New(ctx, opts.AlertIDs, opts.SlackThread)
 	newTicket.Assignee = opts.Assignee
+	newTicket.IsTest = opts.IsTest
 
 	// Set metadata
 	if opts.Title != "" {
@@ -136,6 +138,11 @@ func (uc *UseCases) postTicketToSlack(ctx context.Context, newTicket *ticket.Tic
 
 // CreateManualTicket creates a ticket manually without associated alerts
 func (uc *UseCases) CreateManualTicket(ctx context.Context, title, description string, user *slack.User) (*ticket.Ticket, error) {
+	return uc.CreateManualTicketWithTest(ctx, title, description, user, false)
+}
+
+// CreateManualTicketWithTest creates a ticket manually without associated alerts with test flag
+func (uc *UseCases) CreateManualTicketWithTest(ctx context.Context, title, description string, user *slack.User, isTest bool) (*ticket.Ticket, error) {
 	// Validate required fields
 	if title == "" {
 		return nil, goerr.New("title is required")
@@ -164,6 +171,7 @@ func (uc *UseCases) CreateManualTicket(ctx context.Context, title, description s
 		Description:  description,
 		Embedding:    embeddingVector,
 		FillMetadata: false, // Manual tickets don't use LLM to fill metadata
+		IsTest:       isTest,
 	}
 
 	return uc.createTicketWithSlackPosting(ctx, opts, alert.Alerts{})

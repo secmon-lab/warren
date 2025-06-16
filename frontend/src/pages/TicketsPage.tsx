@@ -16,16 +16,8 @@ import {
 import { UserWithAvatar } from "@/components/ui/user-name";
 import { CreateTicketModal } from "@/components/CreateTicketModal";
 import { GET_TICKETS } from "@/lib/graphql/queries";
-import {
-  Ticket,
-  TicketStatus,
-  TICKET_STATUS_LABELS,
-  TICKET_STATUS_COLORS,
-  AlertConclusion,
-  ALERT_CONCLUSION_LABELS,
-} from "@/lib/types";
-import { formatRelativeTime } from "@/lib/utils-extended";
-import { AlertCircle, MessageSquare, User, Clock, Plus } from "lucide-react";
+import { Ticket, TicketStatus, TICKET_STATUS_LABELS } from "@/lib/types";
+import { AlertCircle, MessageSquare, User, Plus } from "lucide-react";
 
 const ITEMS_PER_PAGE = 10;
 const ALL_STATUSES: TicketStatus[] = [
@@ -34,6 +26,22 @@ const ALL_STATUSES: TicketStatus[] = [
   "resolved",
   "archived",
 ];
+
+// Badge variants for ticket statuses
+const getStatusBadgeVariant = (status: TicketStatus) => {
+  switch (status) {
+    case "open":
+      return "default";
+    case "pending":
+      return "secondary";
+    case "resolved":
+      return "outline";
+    case "archived":
+      return "secondary";
+    default:
+      return "secondary";
+  }
+};
 
 export default function TicketsPage() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -151,64 +159,48 @@ export default function TicketsPage() {
                 {tickets.map((ticket) => (
                   <Card
                     key={ticket.id}
-                    className="hover:shadow-md hover:border-primary/20 transition-all duration-200 cursor-pointer"
+                    className="cursor-pointer hover:shadow-md transition-shadow"
                     onClick={() => handleTicketClick(ticket.id)}>
-                    <CardHeader className="pb-0">
-                      <div className="flex items-start justify-between gap-4">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-2 flex-wrap">
+                          <div className="flex items-center gap-2 mb-2">
                             <Badge
-                              className={
-                                TICKET_STATUS_COLORS[
-                                  ticket.status as TicketStatus
-                                ]
-                              }
-                              variant="secondary">
+                              variant={getStatusBadgeVariant(
+                                ticket.status as TicketStatus
+                              )}>
                               {
                                 TICKET_STATUS_LABELS[
                                   ticket.status as TicketStatus
                                 ]
                               }
                             </Badge>
-                            <CardTitle
-                              className="text-lg leading-tight break-words min-w-0 flex-1"
-                              title={
-                                ticket.title ||
-                                `Ticket ${ticket.id.slice(0, 8)}`
-                              }>
-                              {ticket.title ||
-                                `Ticket ${ticket.id.slice(0, 8)}`}
-                            </CardTitle>
+                            {ticket.isTest && (
+                              <Badge
+                                variant="outline"
+                                className="bg-orange-50 text-orange-700 border-orange-200">
+                                🧪 TEST
+                              </Badge>
+                            )}
                           </div>
-
-                          {/* Show conclusion and reason for resolved tickets */}
-                          {ticket.status === "resolved" && (
-                            <div className="mt-3">
-                              <div className="flex items-start gap-3 flex-wrap">
-                                {ticket.conclusion && (
-                                  <Badge
-                                    variant="outline"
-                                    className="font-normal">
-                                    {ALERT_CONCLUSION_LABELS[
-                                      ticket.conclusion as AlertConclusion
-                                    ] || ticket.conclusion}
-                                  </Badge>
-                                )}
-                                {ticket.reason && (
-                                  <div className="text-sm text-muted-foreground leading-relaxed flex-1 min-w-0">
-                                    {ticket.reason}
-                                  </div>
-                                )}
-                              </div>
+                          <CardTitle className="text-lg leading-6 break-words">
+                            {ticket.isTest && "🧪 [TEST] "}
+                            {ticket.title}
+                          </CardTitle>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                          {ticket.alerts.length > 0 && (
+                            <div className="flex items-center text-sm text-muted-foreground">
+                              <AlertCircle className="h-4 w-4 mr-1" />
+                              {ticket.alerts.length}
                             </div>
                           )}
-                        </div>
-
-                        <div className="text-right text-sm text-muted-foreground shrink-0">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            {formatRelativeTime(ticket.createdAt)}
-                          </div>
+                          {ticket.comments.length > 0 && (
+                            <div className="flex items-center text-sm text-muted-foreground">
+                              <MessageSquare className="h-4 w-4 mr-1" />
+                              {ticket.comments.length}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </CardHeader>

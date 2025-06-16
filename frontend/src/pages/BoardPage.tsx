@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { UserWithAvatar } from "@/components/ui/user-name";
 import { CreateTicketModal } from "@/components/CreateTicketModal";
 import {
   DropdownMenu,
@@ -12,26 +11,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  GET_TICKETS,
-  UPDATE_TICKET_STATUS,
-  UPDATE_MULTIPLE_TICKETS_STATUS,
-} from "@/lib/graphql/queries";
-import {
-  Ticket,
-  TicketStatus,
-  TICKET_STATUS_LABELS,
-  TICKET_STATUS_COLORS,
-} from "@/lib/types";
-import { formatRelativeTime } from "@/lib/utils-extended";
-import {
-  AlertCircle,
-  MessageSquare,
-  User,
-  MoreHorizontal,
-  Archive,
-  Plus,
-} from "lucide-react";
+import { GET_TICKETS, UPDATE_TICKET_STATUS } from "@/lib/graphql/queries";
+import { Ticket, TicketStatus, TICKET_STATUS_LABELS } from "@/lib/types";
+import { MoreHorizontal, Archive, Plus } from "lucide-react";
 import { useErrorToast, useSuccessToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/hooks/use-confirm";
 
@@ -52,15 +34,6 @@ export default function BoardPage() {
       { query: GET_TICKETS, variables: { statuses: BOARD_STATUSES } },
     ],
   });
-
-  const [updateMultipleTicketsStatus] = useMutation(
-    UPDATE_MULTIPLE_TICKETS_STATUS,
-    {
-      refetchQueries: [
-        { query: GET_TICKETS, variables: { statuses: BOARD_STATUSES } },
-      ],
-    }
-  );
 
   const { data, loading, error } = useQuery(GET_TICKETS, {
     variables: {
@@ -124,13 +97,12 @@ export default function BoardPage() {
     }
   };
 
-  const handleArchiveResolved = async () => {
-    const resolvedTickets = ticketsByStatus["resolved"];
-    if (resolvedTickets.length === 0) return;
+  const handleArchiveTicket = async (ticketId: string) => {
+    if (isUpdatingStatus) return;
 
     const confirmed = await confirm({
-      title: "Archive Resolved Tickets",
-      description: `Are you sure you want to archive ${resolvedTickets.length} resolved tickets?`,
+      title: "Archive Ticket",
+      description: "Are you sure you want to archive this ticket?",
       confirmText: "Archive",
       variant: "destructive",
     });
@@ -139,16 +111,16 @@ export default function BoardPage() {
 
     setIsUpdatingStatus(true);
     try {
-      await updateMultipleTicketsStatus({
+      await updateTicketStatus({
         variables: {
-          ids: resolvedTickets.map((ticket) => ticket.id),
+          id: ticketId,
           status: "archived",
         },
       });
-      successToast(`Successfully archived ${resolvedTickets.length} tickets`);
+      successToast("Ticket archived successfully");
     } catch (error) {
-      console.error("Failed to archive tickets:", error);
-      errorToast("Failed to archive tickets");
+      console.error("Failed to archive ticket:", error);
+      errorToast("Failed to archive ticket");
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -196,43 +168,24 @@ export default function BoardPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         {BOARD_STATUSES.map((status) => (
-          <div key={status} className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Badge
-                  className={TICKET_STATUS_COLORS[status]}
-                  variant="secondary">
+          <div
+            key={status}
+            className="flex-1"
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, status)}>
+            <div className="mb-4">
+              <h2 className="font-semibold text-lg flex items-center gap-2">
+                <Badge variant="secondary" className="px-2">
                   {TICKET_STATUS_LABELS[status]}
                 </Badge>
                 <span className="text-sm text-muted-foreground">
                   ({ticketsByStatus[status].length})
                 </span>
               </h2>
-
-              {status === "resolved" && ticketsByStatus[status].length > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={isUpdatingStatus}>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={handleArchiveResolved}>
-                      <Archive className="h-4 w-4 mr-2" />
-                      Archive All Resolved
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
             </div>
 
             <div
               className="space-y-2 min-h-[400px] p-2 border-2 border-dashed border-transparent rounded-lg transition-colors"
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, status)}
               style={{
                 borderColor:
                   draggedTicket && draggedTicket.status !== status
@@ -242,51 +195,62 @@ export default function BoardPage() {
               {ticketsByStatus[status].map((ticket) => (
                 <Card
                   key={ticket.id}
-                  className="hover:shadow-md transition-shadow cursor-move"
+                  className="mb-3 cursor-pointer hover:shadow-md transition-shadow"
                   draggable
                   onDragStart={(e) => handleDragStart(e, ticket)}
                   onClick={() => handleTicketClick(ticket.id)}>
-                  <CardContent className="p-3">
-                    <h3
-                      className="font-medium text-sm mb-2 line-clamp-2"
-                      title={ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}>
-                      {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
-                    </h3>
-
-                    {/* Show conclusion for resolved tickets */}
-                    {ticket.status === "resolved" && ticket.conclusion && (
-                      <p className="text-xs text-muted-foreground mb-2 line-clamp-1">
-                        <span className="font-medium">Resolution:</span>{" "}
-                        {ticket.conclusion}
-                      </p>
-                    )}
-
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          {ticket.assignee ? (
-                            <UserWithAvatar
-                              userID={ticket.assignee.id}
-                              fallback={ticket.assignee.name}
-                              avatarSize="sm"
-                            />
-                          ) : (
-                            <span>Unassigned</span>
+                  <CardContent className="p-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              status === "resolved" ? "outline" : "secondary"
+                            }>
+                            {TICKET_STATUS_LABELS[status]}
+                          </Badge>
+                          {ticket.isTest && (
+                            <Badge
+                              variant="outline"
+                              className="bg-orange-50 text-orange-700 border-orange-200">
+                              🧪 TEST
+                            </Badge>
                           )}
                         </div>
-                        <span>{formatRelativeTime(ticket.createdAt)}</span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => e.stopPropagation()}>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {status !== "archived" && (
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleArchiveTicket(ticket.id);
+                                }}>
+                                <Archive className="h-4 w-4 mr-2" />
+                                Archive
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <MessageSquare className="h-3 w-3" />
-                          <span>{ticket.comments.length}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          <span>{ticket.alerts.length}</span>
-                        </div>
+                      <div>
+                        <h3 className="font-medium text-sm leading-tight">
+                          {ticket.isTest && "🧪 [TEST] "}
+                          {ticket.title}
+                        </h3>
+                        {ticket.description && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {ticket.description}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </CardContent>
