@@ -86,10 +86,10 @@ func TestSlackActionAckAlert(t *testing.T) {
 						}, nil
 
 					case 3:
-						// ack alerts
+						// ack alerts (now calls createTicketWithSlackPosting after refactoring)
 						checkMockCaller(t, 2,
 							"github.com/secmon-lab/warren/pkg/usecase",
-							"(*UseCases).ackAlerts",
+							"(*UseCases).createTicketWithSlackPosting",
 						)
 						return &gollem.Response{
 							Texts: []string{
@@ -175,7 +175,7 @@ func TestSlackActionAckAlert(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify Slack interactions
-	gt.Value(t, len(slackMock.PostMessageContextCalls())).Equal(3)
+	gt.Value(t, len(slackMock.PostMessageContextCalls())).Equal(4)
 	gt.Value(t, len(slackMock.UpdateMessageContextCalls())).Equal(2)
 }
 
@@ -334,7 +334,7 @@ func TestSlackActionAckList(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify Slack interactions
-	gt.Value(t, len(slackMock.PostMessageContextCalls())).Equal(3)
+	gt.Value(t, len(slackMock.PostMessageContextCalls())).Equal(4)
 	gt.Value(t, len(slackMock.UpdateMessageContextCalls())).Equal(3)
 }
 

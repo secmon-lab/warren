@@ -15,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
@@ -115,7 +116,7 @@ func New(uc UseCase, opts ...Options) *Server {
 
 	// GraphQL endpoint
 	if s.repo != nil {
-		graphqlHandler := graphqlHandler(s.repo, s.slackService)
+		graphqlHandler := graphqlHandler(s.repo, s.slackService, uc)
 
 		r.Route("/graphql", func(r chi.Router) {
 			// Apply authentication middleware to GraphQL
@@ -172,8 +173,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // GraphQL handler
-func graphqlHandler(repo interfaces.Repository, slackService *slack.Service) http.Handler {
-	resolver := graphql.NewResolver(repo, slackService)
+func graphqlHandler(repo interfaces.Repository, slackService *slack.Service, uc UseCase) http.Handler {
+	var useCases *usecase.UseCases
+	if uc != nil {
+		// Type assertion to convert interface to concrete type
+		var ok bool
+		useCases, ok = uc.(*usecase.UseCases)
+		if !ok {
+			panic("uc must be of type *usecase.UseCases")
+		}
+	}
+	resolver := graphql.NewResolver(repo, slackService, useCases)
 	srv := handler.New(
 		graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}),
 	)

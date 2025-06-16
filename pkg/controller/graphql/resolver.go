@@ -3,6 +3,7 @@ package graphql
 import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/mrkdwn"
 )
 
@@ -15,10 +16,11 @@ type Resolver struct {
 	repo         interfaces.Repository
 	slackService *slack.Service
 	mrkdwnConv   *mrkdwn.Converter
+	uc           *usecase.UseCases
 }
 
 // NewResolver creates a new resolver instance.
-func NewResolver(repo interfaces.Repository, slackService *slack.Service) *Resolver {
+func NewResolver(repo interfaces.Repository, slackService *slack.Service, uc *usecase.UseCases) *Resolver {
 	var mrkdwnConv *mrkdwn.Converter
 	if slackService != nil {
 		mrkdwnConv = mrkdwn.NewConverter(slackService)
@@ -28,5 +30,6 @@ func NewResolver(repo interfaces.Repository, slackService *slack.Service) *Resol
 		repo:         repo,
 		slackService: slackService,
 		mrkdwnConv:   mrkdwnConv,
+		uc:           uc,
 	}
 }

@@ -51,7 +51,7 @@ func TestGraphQLQueries(t *testing.T) {
 		}
 		_ = repo.PutTicket(context.Background(), *ticketObj)
 		_ = repo.PutAlert(context.Background(), *alertObj)
-		server := httptest.NewServer(graphqlHandler(repo, nil))
+		server := httptest.NewServer(graphqlHandler(repo, nil, nil))
 		defer server.Close()
 
 		req := graphqlRequest{
@@ -109,7 +109,7 @@ func TestGraphQLQueries(t *testing.T) {
 		}
 		_ = repo.PutTicket(context.Background(), *ticketObj)
 		_ = repo.PutAlert(context.Background(), *alertObj)
-		server := httptest.NewServer(graphqlHandler(repo, nil))
+		server := httptest.NewServer(graphqlHandler(repo, nil, nil))
 		defer server.Close()
 
 		req := graphqlRequest{
@@ -164,7 +164,7 @@ func TestGraphQLQueries(t *testing.T) {
 			CreatedAt: time.Now(),
 		}
 		_ = repo.PutAlert(context.Background(), *alertNoTicket)
-		server := httptest.NewServer(graphqlHandler(repo, nil))
+		server := httptest.NewServer(graphqlHandler(repo, nil, nil))
 		defer server.Close()
 
 		req := graphqlRequest{
@@ -218,7 +218,7 @@ func TestGraphQLQueries(t *testing.T) {
 		}
 		_ = repo.PutTicketComment(context.Background(), comment)
 
-		server := httptest.NewServer(graphqlHandler(repo, nil))
+		server := httptest.NewServer(graphqlHandler(repo, nil, nil))
 		defer server.Close()
 
 		req := graphqlRequest{

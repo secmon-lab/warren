@@ -168,3 +168,20 @@ export const UPDATE_TICKET_CONCLUSION = gql`
     }
   }
 `;
+
+export const CREATE_TICKET = gql`
+  mutation CreateTicket($title: String!, $description: String!) {
+    createTicket(title: $title, description: $description) {
+      id
+      status
+      title
+      description
+      assignee {
+        id
+        name
+      }
+      createdAt
+      updatedAt
+    }
+  }
+`;

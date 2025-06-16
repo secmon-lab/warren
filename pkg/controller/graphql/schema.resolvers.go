@@ -10,7 +10,9 @@ import (
 
 	goerr "github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
@@ -181,6 +183,29 @@ func (r *mutationResolver) UpdateTicketConclusion(ctx context.Context, id string
 	}
 
 	return t, nil
+}
+
+// CreateTicket is the resolver for the createTicket field.
+func (r *mutationResolver) CreateTicket(ctx context.Context, title string, description string) (*ticket.Ticket, error) {
+	// Extract user information from authentication context
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "authentication required")
+	}
+
+	// Create user from authentication token
+	user := &slack.User{
+		ID:   token.Sub,
+		Name: token.Name,
+	}
+
+	// Call the use case to create manual ticket
+	newTicket, err := r.uc.CreateManualTicket(ctx, title, description, user)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to create ticket")
+	}
+
+	return newTicket, nil
 }
 
 // Ticket is the resolver for the ticket field.

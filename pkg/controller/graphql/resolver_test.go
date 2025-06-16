@@ -14,7 +14,7 @@ import (
 
 func TestTicketResolver(t *testing.T) {
 	repo := repository.NewMemory()
-	resolver := NewResolver(repo, nil)
+	resolver := NewResolver(repo, nil, nil)
 	ctx := context.Background()
 
 	now := time.Now()
@@ -129,7 +129,7 @@ func TestTicketResolver(t *testing.T) {
 
 func TestAlertResolver(t *testing.T) {
 	repo := repository.NewMemory()
-	resolver := NewResolver(repo, nil)
+	resolver := NewResolver(repo, nil, nil)
 	ctx := context.Background()
 
 	testAlert := &alert.Alert{
@@ -149,7 +149,7 @@ func TestAlertResolver(t *testing.T) {
 
 func TestCrossReference(t *testing.T) {
 	repo := repository.NewMemory()
-	resolver := NewResolver(repo, nil)
+	resolver := NewResolver(repo, nil, nil)
 	ctx := context.Background()
 
 	ticketID := types.TicketID("ticket-1")
