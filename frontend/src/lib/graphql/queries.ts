@@ -171,6 +171,58 @@ export const UPDATE_TICKET_CONCLUSION = gql`
   }
 `;
 
+export const UPDATE_TICKET = gql`
+  mutation UpdateTicket($id: ID!, $title: String!, $description: String) {
+    updateTicket(id: $id, title: $title, description: $description) {
+      id
+      status
+      title
+      description
+      summary
+      conclusion
+      reason
+      isTest
+      finding {
+        severity
+        summary
+        reason
+        recommendation
+      }
+      assignee {
+        id
+        name
+      }
+      slackLink
+      createdAt
+      updatedAt
+      alerts {
+        id
+        title
+        description
+        schema
+        data
+        attributes {
+          key
+          value
+          link
+          auto
+        }
+        createdAt
+      }
+      comments {
+        id
+        content
+        user {
+          id
+          name
+        }
+        createdAt
+        updatedAt
+      }
+    }
+  }
+`;
+
 export const CREATE_TICKET = gql`
   mutation CreateTicket(
     $title: String!

@@ -185,6 +185,35 @@ func (r *mutationResolver) UpdateTicketConclusion(ctx context.Context, id string
 	return t, nil
 }
 
+// UpdateTicket is the resolver for the updateTicket field.
+func (r *mutationResolver) UpdateTicket(ctx context.Context, id string, title string, description *string) (*ticket.Ticket, error) {
+	// Extract user information from authentication context
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "authentication required")
+	}
+
+	// Create user from authentication token
+	user := &slack.User{
+		ID:   token.Sub,
+		Name: token.Name,
+	}
+
+	// Set default value for description if not provided
+	desc := ""
+	if description != nil {
+		desc = *description
+	}
+
+	// Call the use case to update ticket
+	updatedTicket, err := r.uc.UpdateTicket(ctx, types.TicketID(id), title, desc, user)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to update ticket")
+	}
+
+	return updatedTicket, nil
+}
+
 // CreateTicket is the resolver for the createTicket field.
 func (r *mutationResolver) CreateTicket(ctx context.Context, title string, description string, isTest *bool) (*ticket.Ticket, error) {
 	// Extract user information from authentication context

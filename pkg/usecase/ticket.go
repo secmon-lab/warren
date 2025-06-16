@@ -8,6 +8,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
@@ -156,4 +157,54 @@ func (uc *UseCases) CreateManualTicketWithTest(ctx context.Context, title, descr
 	}
 
 	return uc.createTicketWithSlackPosting(ctx, opts, alert.Alerts{})
+}
+
+// UpdateTicket updates a ticket's title and description
+func (uc *UseCases) UpdateTicket(ctx context.Context, ticketID types.TicketID, title, description string, user *slack.User) (*ticket.Ticket, error) {
+	// Validate required fields
+	if title == "" {
+		return nil, goerr.New("title is required")
+	}
+
+	// Get existing ticket
+	existingTicket, err := uc.repository.GetTicket(ctx, ticketID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get ticket")
+	}
+	if existingTicket == nil {
+		return nil, goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+	}
+
+	// Update metadata
+	existingTicket.Metadata.Title = title
+	existingTicket.Metadata.Description = description
+	existingTicket.UpdatedAt = clock.Now(ctx)
+
+	// Recalculate embedding since title/description changed
+	if err := existingTicket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
+		return nil, goerr.Wrap(err, "failed to recalculate ticket embedding")
+	}
+
+	// Save updated ticket
+	if err := uc.repository.PutTicket(ctx, *existingTicket); err != nil {
+		return nil, goerr.Wrap(err, "failed to save updated ticket")
+	}
+
+	// Update Slack post if ticket has a Slack thread
+	if existingTicket.SlackThread != nil {
+		// Get associated alerts for Slack update
+		alerts, err := uc.repository.BatchGetAlerts(ctx, existingTicket.AlertIDs)
+		if err != nil {
+			// Log error but don't fail the update
+			_ = msg.Trace(ctx, "💥 Failed to get alerts for Slack update: %s", err.Error())
+		} else {
+			st := uc.slackService.NewThread(*existingTicket.SlackThread)
+			if _, err := st.PostTicket(ctx, *existingTicket, alerts); err != nil {
+				// Log error but don't fail the update
+				_ = msg.Trace(ctx, "💥 Failed to update Slack post: %s", err.Error())
+			}
+		}
+	}
+
+	return existingTicket, nil
 }

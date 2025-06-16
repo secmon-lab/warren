@@ -63,8 +63,10 @@ import {
   ChevronUp,
   ArchiveRestore,
   Copy,
+  Pencil,
 } from "lucide-react";
 import { EditConclusionModal } from "@/components/ui/edit-conclusion-modal";
+import { EditTicketModal } from "@/components/EditTicketModal";
 
 const ALERTS_PER_PAGE = 5;
 
@@ -137,6 +139,7 @@ export default function TicketDetailPage() {
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [alertsCurrentPage, setAlertsCurrentPage] = useState(1);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isEditTicketModalOpen, setIsEditTicketModalOpen] = useState(false);
   const [isEditConclusionModalOpen, setIsEditConclusionModalOpen] =
     useState(false);
 
@@ -281,6 +284,10 @@ export default function TicketDetailPage() {
     setIsEditConclusionModalOpen(true);
   };
 
+  const handleEditTicket = () => {
+    setIsEditTicketModalOpen(true);
+  };
+
   if (!id) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -363,12 +370,22 @@ export default function TicketDetailPage() {
               </Button>
             )}
           </div>
-          <h1
-            className="text-3xl font-bold tracking-tight break-words"
-            title={ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}>
-            {ticket.isTest && "🧪 [TEST] "}
-            {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
-          </h1>
+          <div className="flex items-start gap-3">
+            <h1
+              className="text-3xl font-bold tracking-tight break-words flex-1"
+              title={ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}>
+              {ticket.isTest && "🧪 [TEST] "}
+              {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
+            </h1>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleEditTicket}
+              className="flex items-center gap-2 flex-shrink-0">
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Button>
+          </div>
           <p className="text-muted-foreground">
             #{ticket.id} • Created {formatRelativeTime(ticket.createdAt)} •
             Updated {formatRelativeTime(ticket.updatedAt)}
@@ -895,6 +912,12 @@ export default function TicketDetailPage() {
         ticketId={ticket.id}
         currentConclusion={ticket.conclusion}
         currentReason={ticket.reason}
+      />
+
+      <EditTicketModal
+        isOpen={isEditTicketModalOpen}
+        onClose={() => setIsEditTicketModalOpen(false)}
+        ticket={ticket}
       />
     </div>
   );
