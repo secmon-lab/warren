@@ -54,8 +54,12 @@ jobs:
           tags: ${{ env.GITHUB_IMAGE_NAME }}
           build-args: |
             BUILD_VERSION=${{ steps.version.outputs.TAG_OR_COMMIT }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            type=registry,ref=${{ env.GITHUB_IMAGE_REPO }}:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=${{ env.GITHUB_IMAGE_REPO }}:buildcache,mode=max
           platforms: linux/amd64
 
   release-ghcr:
