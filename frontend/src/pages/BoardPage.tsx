@@ -11,11 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  GET_TICKETS,
-  UPDATE_TICKET_STATUS,
-  UPDATE_MULTIPLE_TICKETS_STATUS,
-} from "@/lib/graphql/queries";
+import { GET_TICKETS, UPDATE_TICKET_STATUS } from "@/lib/graphql/queries";
 import { Ticket, TicketStatus, TICKET_STATUS_LABELS } from "@/lib/types";
 import { MoreHorizontal, Archive, Plus } from "lucide-react";
 import { useErrorToast, useSuccessToast } from "@/hooks/use-toast";
@@ -38,15 +34,6 @@ export default function BoardPage() {
       { query: GET_TICKETS, variables: { statuses: BOARD_STATUSES } },
     ],
   });
-
-  const [updateMultipleTicketsStatus] = useMutation(
-    UPDATE_MULTIPLE_TICKETS_STATUS,
-    {
-      refetchQueries: [
-        { query: GET_TICKETS, variables: { statuses: BOARD_STATUSES } },
-      ],
-    }
-  );
 
   const { data, loading, error } = useQuery(GET_TICKETS, {
     variables: {
