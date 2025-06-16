@@ -47,22 +47,22 @@ import {
 } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
 import {
+  ChevronLeft,
+  Archive,
+  User,
   AlertCircle,
   MessageSquare,
-  User,
   Calendar,
   Clock,
+  Check,
+  ExternalLink,
   FileText,
   Eye,
   Hash,
   ChevronDown,
   ChevronUp,
-  ArrowLeft,
-  Archive,
   ArchiveRestore,
   Copy,
-  Check,
-  ExternalLink,
 } from "lucide-react";
 import { EditConclusionModal } from "@/components/ui/edit-conclusion-modal";
 
@@ -307,7 +307,7 @@ export default function TicketDetailPage() {
         </div>
         <div className="flex justify-center">
           <Button variant="outline" onClick={handleBackToList}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ChevronLeft className="h-4 w-4 mr-2" />
             Back to tickets
           </Button>
         </div>
@@ -334,7 +334,7 @@ export default function TicketDetailPage() {
         <div className="space-y-3 flex-1">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={handleBackToList}>
-              <ArrowLeft className="h-4 w-4 mr-1" />
+              <ChevronLeft className="h-4 w-4 mr-1" />
               Back to tickets
             </Button>
             <Badge
@@ -342,6 +342,13 @@ export default function TicketDetailPage() {
               variant="secondary">
               {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
             </Badge>
+            {ticket.isTest && (
+              <Badge
+                variant="outline"
+                className="bg-orange-50 text-orange-700 border-orange-200">
+                🧪 TEST TICKET
+              </Badge>
+            )}
             {ticket.slackLink && (
               <Button variant="outline" size="sm" asChild>
                 <a
@@ -359,6 +366,7 @@ export default function TicketDetailPage() {
           <h1
             className="text-3xl font-bold tracking-tight break-words"
             title={ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}>
+            {ticket.isTest && "🧪 [TEST] "}
             {ticket.title || `Ticket ${ticket.id.slice(0, 8)}`}
           </h1>
           <p className="text-muted-foreground">

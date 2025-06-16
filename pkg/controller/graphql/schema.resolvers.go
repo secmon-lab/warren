@@ -186,7 +186,7 @@ func (r *mutationResolver) UpdateTicketConclusion(ctx context.Context, id string
 }
 
 // CreateTicket is the resolver for the createTicket field.
-func (r *mutationResolver) CreateTicket(ctx context.Context, title string, description string) (*ticket.Ticket, error) {
+func (r *mutationResolver) CreateTicket(ctx context.Context, title string, description string, isTest *bool) (*ticket.Ticket, error) {
 	// Extract user information from authentication context
 	token, err := auth.TokenFromContext(ctx)
 	if err != nil {
@@ -199,8 +199,14 @@ func (r *mutationResolver) CreateTicket(ctx context.Context, title string, descr
 		Name: token.Name,
 	}
 
+	// Set default value for isTest if not provided
+	testFlag := false
+	if isTest != nil {
+		testFlag = *isTest
+	}
+
 	// Call the use case to create manual ticket
-	newTicket, err := r.uc.CreateManualTicket(ctx, title, description, user)
+	newTicket, err := r.uc.CreateManualTicketWithTest(ctx, title, description, user, testFlag)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create ticket")
 	}

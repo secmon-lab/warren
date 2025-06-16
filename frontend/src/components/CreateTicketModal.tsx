@@ -23,19 +23,24 @@ interface CreateTicketModalProps {
 export function CreateTicketModal({ isOpen, onClose }: CreateTicketModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [isTest, setIsTest] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const [createTicket, { loading }] = useMutation(CREATE_TICKET, {
     refetchQueries: [{ query: GET_TICKETS }],
     onCompleted: (data) => {
+      const ticketType = data.createTicket.isTest ? "test ticket" : "ticket";
       toast({
-        title: "Ticket created",
-        description: "Your ticket has been successfully created.",
+        title: `${
+          ticketType.charAt(0).toUpperCase() + ticketType.slice(1)
+        } created`,
+        description: `Your ${ticketType} has been successfully created.`,
       });
       onClose();
       setTitle("");
       setDescription("");
+      setIsTest(false);
       // Navigate to the created ticket
       navigate(`/tickets/${data.createTicket.id}`);
     },
@@ -63,6 +68,7 @@ export function CreateTicketModal({ isOpen, onClose }: CreateTicketModalProps) {
       variables: {
         title: title.trim(),
         description: description.trim(),
+        isTest: isTest,
       },
     });
   };
@@ -70,6 +76,7 @@ export function CreateTicketModal({ isOpen, onClose }: CreateTicketModalProps) {
   const handleClose = () => {
     setTitle("");
     setDescription("");
+    setIsTest(false);
     onClose();
   };
 
@@ -101,6 +108,21 @@ export function CreateTicketModal({ isOpen, onClose }: CreateTicketModalProps) {
                 rows={4}
                 disabled={loading}
               />
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="isTest"
+                checked={isTest}
+                onChange={(e) => setIsTest(e.target.checked)}
+                disabled={loading}
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+              />
+              <Label
+                htmlFor="isTest"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                This is a test ticket 🧪
+              </Label>
             </div>
           </div>
           <DialogFooter>

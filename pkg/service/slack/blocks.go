@@ -114,18 +114,29 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slackMetadata, frontendURL string) []slack.Block {
 	var blocks []slack.Block
 
-	// Header with Title and emoji
+	// Header with Title and emoji - add TEST indicator if it's a test ticket
+	var headerTitle string
+	if ticket.IsTest {
+		headerTitle = fmt.Sprintf("🧪 [TEST] %s", ticket.Metadata.Title)
+	} else {
+		headerTitle = fmt.Sprintf("🎫 %s", ticket.Metadata.Title)
+	}
 	blocks = append(blocks, slack.NewHeaderBlock(
-		slack.NewTextBlockObject(slack.PlainTextType, fmt.Sprintf("🎫 %s", ticket.Metadata.Title), false, false),
+		slack.NewTextBlockObject(slack.PlainTextType, headerTitle, false, false),
 	))
 
-	// ID, Description and Frontend Link
+	// ID, Description and Frontend Link - add TEST indicator
 	var idDescText string
+	testPrefix := ""
+	if ticket.IsTest {
+		testPrefix = "🧪 *[TEST TICKET]* "
+	}
+
 	if frontendURL != "" {
 		ticketURL := fmt.Sprintf("%s/tickets/%s", frontendURL, ticket.ID.String())
-		idDescText = fmt.Sprintf("*ID:* `%s` | <%s|🔗 View Details>\n%s", ticket.ID.String(), ticketURL, ticket.Metadata.Description)
+		idDescText = fmt.Sprintf("%s*ID:* `%s` | <%s|🔗 View Details>\n%s", testPrefix, ticket.ID.String(), ticketURL, ticket.Metadata.Description)
 	} else {
-		idDescText = fmt.Sprintf("*ID:* `%s`\n%s", ticket.ID.String(), ticket.Metadata.Description)
+		idDescText = fmt.Sprintf("%s*ID:* `%s`\n%s", testPrefix, ticket.ID.String(), ticket.Metadata.Description)
 	}
 
 	blocks = append(blocks, slack.NewSectionBlock(
@@ -623,8 +634,14 @@ func buildTicketListBlocks(ctx context.Context, tickets []*ticket.Ticket, metada
 	var messageText strings.Builder
 	now := clock.Now(ctx)
 	for _, t := range tickets {
-		// Create a link to the ticket
-		ticketLink := fmt.Sprintf("<%s|%s>", metadata.ToMsgURL(t.SlackThread.ChannelID, t.SlackThread.ThreadID), t.Metadata.Title)
+		// Create a link to the ticket with test indicator
+		var ticketTitle string
+		if t.IsTest {
+			ticketTitle = fmt.Sprintf("🧪 [TEST] %s", t.Metadata.Title)
+		} else {
+			ticketTitle = t.Metadata.Title
+		}
+		ticketLink := fmt.Sprintf("<%s|%s>", metadata.ToMsgURL(t.SlackThread.ChannelID, t.SlackThread.ThreadID), ticketTitle)
 
 		// Calculate relative time
 		elapsed := now.Sub(t.CreatedAt)

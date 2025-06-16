@@ -13,6 +13,7 @@ export interface Ticket {
   slackLink?: string;
   createdAt: string;
   updatedAt: string;
+  isTest: boolean;
 }
 
 export interface Comment {

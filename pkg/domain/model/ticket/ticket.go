@@ -34,6 +34,8 @@ type Ticket struct {
 	Finding  *Finding    `json:"finding"`
 	Assignee *slack.User `json:"assignee"`
 
+	IsTest bool `json:"is_test"`
+
 	Embedding firestore.Vector32 `json:"-"`
 }
 

@@ -10,6 +10,7 @@ export const GET_TICKETS = gql`
         description
         conclusion
         reason
+        isTest
         assignee {
           id
           name
@@ -46,6 +47,7 @@ export const GET_TICKET = gql`
       summary
       conclusion
       reason
+      isTest
       finding {
         severity
         summary
@@ -170,12 +172,17 @@ export const UPDATE_TICKET_CONCLUSION = gql`
 `;
 
 export const CREATE_TICKET = gql`
-  mutation CreateTicket($title: String!, $description: String!) {
-    createTicket(title: $title, description: $description) {
+  mutation CreateTicket(
+    $title: String!
+    $description: String!
+    $isTest: Boolean
+  ) {
+    createTicket(title: $title, description: $description, isTest: $isTest) {
       id
       status
       title
       description
+      isTest
       assignee {
         id
         name
