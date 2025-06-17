@@ -94,20 +94,9 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
 	}
 
-	systemPrompt, err := prompt.Generate(ctx, chatSystemPromptTemplate, map[string]any{
-		"ticket":                  target,
-		"alerts":                  showAlerts,
-		"total":                   len(alerts),
-		"additional_instructions": additionalInstructions,
-	})
-	if err != nil {
-		return goerr.Wrap(err, "failed to build system prompt")
-	}
-
 	agent := gollem.New(x.llmClient,
 		gollem.WithHistory(history),
 		gollem.WithToolSets(tools...),
-		gollem.WithSystemPrompt(systemPrompt),
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
@@ -158,9 +147,20 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		}),
 	)
 
+	systemPrompt, err := prompt.Generate(ctx, chatSystemPromptTemplate, map[string]any{
+		"ticket":                  target,
+		"alerts":                  showAlerts,
+		"total":                   len(alerts),
+		"additional_instructions": additionalInstructions,
+		"exit_tool_name":          agent.Facilitator().Spec().Name,
+	})
+	if err != nil {
+		return goerr.Wrap(err, "failed to build system prompt")
+	}
+
 	logger.Debug("run prompt", "prompt", message, "history", history, "ticket", target, "history_record", historyRecord)
 
-	err = agent.Execute(ctx, message)
+	err = agent.Execute(ctx, message, gollem.WithSystemPrompt(systemPrompt))
 	if err != nil {
 		return goerr.Wrap(err, "failed to execute")
 	}
