@@ -6,10 +6,13 @@ import (
 	"time"
 
 	"github.com/m-mizutani/gt"
+	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/usecase"
 )
 
 func TestTicketResolver(t *testing.T) {
@@ -184,5 +187,71 @@ func TestCrossReference(t *testing.T) {
 		gt.NoError(t, err)
 		gt.Array(t, got).Length(1)
 		gt.Value(t, got[0].ID).Equal(alertID)
+	})
+}
+
+func TestCreateTicket(t *testing.T) {
+	repo := repository.NewMemory()
+	
+	// Create LLM client mock for embedding generation
+	llmMock := &mock.LLMClientMock{
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
+			// Return mock embedding vector with correct dimension
+			embedding := make([]float64, dimension)
+			for i := range embedding {
+				embedding[i] = 0.1 + float64(i)*0.01 // Generate some test values
+			}
+			return [][]float64{embedding}, nil
+		},
+	}
+	
+	uc := usecase.New(usecase.WithRepository(repo), usecase.WithLLMClient(llmMock))
+	resolver := NewResolver(repo, nil, uc)
+
+	// Create a context with authentication token
+	token := &auth.Token{
+		Sub:  "user123",
+		Name: "Test User",
+	}
+	ctx := auth.ContextWithToken(context.Background(), token)
+
+	t.Run("CreateTicket without Slack service", func(t *testing.T) {
+		title := "Test Manual Ticket"
+		description := "This is a test ticket created manually"
+		
+		// Test creating a ticket without test flag
+		got, err := resolver.Mutation().CreateTicket(ctx, title, description, nil)
+		gt.NoError(t, err)
+		gt.Value(t, got.Metadata.Title).Equal(title)
+		gt.Value(t, got.Metadata.Description).Equal(description)
+		gt.Value(t, got.Assignee.ID).Equal("user123")
+		gt.Value(t, got.Assignee.Name).Equal("Test User")
+		gt.Value(t, got.IsTest).Equal(false)
+		
+		// Verify ticket was saved to repository
+		savedTicket, err := repo.GetTicket(ctx, got.ID)
+		gt.NoError(t, err)
+		gt.Value(t, savedTicket.Metadata.Title).Equal(title)
+	})
+
+	t.Run("CreateTicket with test flag", func(t *testing.T) {
+		title := "Test Manual Ticket with Flag"
+		description := "This is a test ticket with test flag"
+		isTest := true
+		
+		got, err := resolver.Mutation().CreateTicket(ctx, title, description, &isTest)
+		gt.NoError(t, err)
+		gt.Value(t, got.IsTest).Equal(true)
+	})
+
+	t.Run("CreateTicket with empty title should fail", func(t *testing.T) {
+		_, err := resolver.Mutation().CreateTicket(ctx, "", "description", nil)
+		gt.Error(t, err)
+	})
+
+	t.Run("CreateTicket without authentication should fail", func(t *testing.T) {
+		ctxNoAuth := context.Background()
+		_, err := resolver.Mutation().CreateTicket(ctxNoAuth, "title", "description", nil)
+		gt.Error(t, err)
 	})
 }

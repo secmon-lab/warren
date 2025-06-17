@@ -171,6 +171,10 @@ func (x *Service) TeamID() string {
 	return x.teamID
 }
 
+func (x *Service) DefaultChannelID() string {
+	return x.channelID
+}
+
 func (x *Service) ToMsgURL(channelID, threadID string) string {
 	return x.slackMetadata.ToMsgURL(channelID, threadID)
 }
