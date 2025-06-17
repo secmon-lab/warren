@@ -19,14 +19,14 @@ type Comment struct {
 	Prompted       bool            `json:"prompted"`
 }
 
-func (x *Ticket) NewComment(ctx context.Context, msg slack.Message) Comment {
+func (x *Ticket) NewComment(ctx context.Context, message string, user *slack.User, slackMessageID string) Comment {
 	return Comment{
 		ID:             types.NewCommentID(),
 		TicketID:       x.ID,
 		CreatedAt:      clock.Now(ctx),
-		Comment:        msg.Text(),
-		User:           msg.User(),
-		SlackMessageID: msg.ID(),
+		Comment:        message,
+		User:           user,
+		SlackMessageID: slackMessageID,
 		Prompted:       false,
 	}
 }

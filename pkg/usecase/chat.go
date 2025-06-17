@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
@@ -111,6 +112,33 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
 			msg.Notify(ctx, "💬 %s", message)
+
+			if x.slackService == nil || target.SlackThread == nil {
+				return nil
+			}
+
+			// Record agent message as TicketComment
+			// Create bot user for agent messages
+			botUser := &slack.User{
+				ID:   x.slackService.BotID(),
+				Name: "Warren",
+			}
+
+			// Post agent message to Slack and get message ID
+			threadSvc := x.slackService.NewThread(*target.SlackThread)
+			ts, err := threadSvc.PostCommentWithMessageID(ctx, message)
+			if err != nil {
+				errs.Handle(ctx, goerr.Wrap(err, "failed to post agent message to slack"))
+				return nil
+			}
+
+			comment := target.NewComment(ctx, message, botUser, ts)
+
+			if err := x.repository.PutTicketComment(ctx, comment); err != nil {
+				logger.Error("failed to record agent message as comment", "error", err)
+				// Continue execution even if comment recording fails
+			}
+
 			return nil
 		}),
 		gollem.WithToolErrorHook(func(ctx context.Context, err error, call gollem.FunctionCall) error {

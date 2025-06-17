@@ -493,6 +493,21 @@ func (x *ThreadService) PostComment(ctx context.Context, comment string) error {
 	return nil
 }
 
+// PostCommentWithMessageID posts a simple text comment to the thread and returns the message ID
+func (x *ThreadService) PostCommentWithMessageID(ctx context.Context, comment string) (string, error) {
+	_, ts, err := x.client.PostMessageContext(
+		ctx,
+		x.channelID,
+		slack.MsgOptionText(comment, false),
+		slack.MsgOptionTS(x.threadID),
+	)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to post comment to slack", goerr.V("comment", comment))
+	}
+
+	return ts, nil
+}
+
 func buildFindingBlocks(finding ticket.Finding) []slack.Block {
 	return []slack.Block{
 		slack.NewHeaderBlock(

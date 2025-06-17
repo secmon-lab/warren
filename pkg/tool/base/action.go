@@ -106,11 +106,12 @@ const (
 	cmdGetPolicy         = "warren.get_policy"
 	cmdExecPolicy        = "warren.exec_policy"
 	cmdUpdateFinding     = "warren.update_finding"
+	cmdRespondToUser     = "respond_to_user"
 )
 
 func IgnorableTool(name string) bool {
 	switch name {
-	case cmdUpdateFinding:
+	case cmdUpdateFinding, cmdRespondToUser:
 		return true
 	default:
 		return false

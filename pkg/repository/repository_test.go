@@ -184,7 +184,7 @@ func TestAlertTicketBinding(t *testing.T) {
 		gt.Value(t, gotAlert3.TicketID).Equal(ticketObj.ID)
 
 		// PutTicketComment
-		comment := ticketObj.NewComment(ctx, *slack.NewMessage(ctx, &slackevents.EventsAPIEvent{
+		slackMsg := slack.NewMessage(ctx, &slackevents.EventsAPIEvent{
 			InnerEvent: slackevents.EventsAPIInnerEvent{
 				Data: &slackevents.AppMentionEvent{
 					TimeStamp: "test-message-id",
@@ -193,7 +193,8 @@ func TestAlertTicketBinding(t *testing.T) {
 					Channel:   "test-channel",
 				},
 			},
-		}))
+		})
+		comment := ticketObj.NewComment(ctx, slackMsg.Text(), slackMsg.User(), slackMsg.ID())
 		gt.NoError(t, repo.PutTicketComment(ctx, comment))
 
 		// GetTicketComments
@@ -602,7 +603,7 @@ func TestTicketComments(t *testing.T) {
 		// Create and put multiple comments
 		comments := make([]ticketmodel.Comment, 3)
 		for i := 0; i < 3; i++ {
-			comment := ticket.NewComment(ctx, *slack.NewMessage(ctx, &slackevents.EventsAPIEvent{
+			slackMsg := slack.NewMessage(ctx, &slackevents.EventsAPIEvent{
 				InnerEvent: slackevents.EventsAPIInnerEvent{
 					Data: &slackevents.AppMentionEvent{
 						TimeStamp: fmt.Sprintf("test-message-id-%d", i),
@@ -611,7 +612,8 @@ func TestTicketComments(t *testing.T) {
 						Channel:   "test-channel",
 					},
 				},
-			}))
+			})
+			comment := ticket.NewComment(ctx, slackMsg.Text(), slackMsg.User(), slackMsg.ID())
 			gt.NoError(t, repo.PutTicketComment(ctx, comment))
 			comments[i] = comment
 		}
