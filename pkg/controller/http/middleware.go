@@ -354,6 +354,8 @@ func authorizeWithPolicy(policy interfaces.PolicyClient) func(http.Handler) http
 				return
 			}
 
+			logging.From(ctx).Debug("authorization result", "input", authCtx, "output", result)
+
 			if !result.Allow {
 				logging.From(ctx).Warn("authorization failed", "auth", authCtx)
 				http.Error(w, `Authorization failed. Check your policy.`, http.StatusForbidden)
