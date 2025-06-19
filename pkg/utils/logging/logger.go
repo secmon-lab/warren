@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"reflect"
 	"sync"
-	"time"
 
 	"github.com/fatih/color"
 	"github.com/m-mizutani/clog"
@@ -58,10 +56,8 @@ func goerrNoStacktrace(_ []string, attr slog.Attr) *clog.HandleAttr {
 func New(w io.Writer, level slog.Level, format Format, stacktrace bool) *slog.Logger {
 	filter := masq.New(
 		masq.WithTag("secret"),
-		masq.WithTag("quiet"),
 		masq.WithFieldPrefix("secret_"),
 		masq.WithFieldName("Authorization"),
-		masq.WithAllowedType(reflect.TypeOf(time.Time{})),
 	)
 
 	attrHook := clog.GoerrHook

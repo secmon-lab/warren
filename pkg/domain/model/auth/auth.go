@@ -8,7 +8,7 @@ type Context struct {
 	SNS    *message.SNS           `json:"sns"`
 
 	Req *HTTPRequest      `json:"req"`
-	Env map[string]string `json:"-"`
+	Env map[string]string `json:"env" masq:"secret"`
 }
 
 type HTTPRequest struct {
