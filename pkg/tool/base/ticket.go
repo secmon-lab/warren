@@ -167,21 +167,3 @@ func (x *Warren) updateFinding(ctx context.Context, args map[string]any) (map[st
 
 	return response, nil
 }
-
-func (x *Warren) respondToUser(ctx context.Context, args map[string]any) (map[string]any, error) {
-	message, err := getArg[string](args, "message")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get message")
-	}
-
-	response := map[string]any{
-		"success": true,
-		"status":  "completed",
-	}
-
-	if message != "" {
-		response["message"] = message
-	}
-
-	return response, nil
-}
