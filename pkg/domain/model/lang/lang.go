@@ -11,18 +11,15 @@ const (
 	Default Lang = English
 )
 
-var langNames = map[Lang]string{
-	English:  "English",
-	Japanese: "Japanese",
-}
-
 func (l Lang) Name() string {
-	return langNames[l]
+	// Return the language code directly for any language
+	return string(l)
 }
 
 func (l Lang) Validate() error {
-	if _, ok := langNames[l]; !ok {
-		return goerr.New("invalid language", goerr.V("lang", l), goerr.V("valid", langNames))
+	// Accept any non-empty language code
+	if string(l) == "" {
+		return goerr.New("language cannot be empty")
 	}
 	return nil
 }

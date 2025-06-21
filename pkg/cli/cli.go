@@ -19,8 +19,8 @@ func Run(ctx context.Context, args []string) error {
 		Flags: append(loggerCfg.Flags(),
 			&cli.StringFlag{
 				Name:        "lang",
-				Usage:       "Language of the text [en, ja]",
-				Value:       "en",
+				Usage:       "Language for text output (e.g., English, Japanese, Spanish, French, German, etc.)",
+				Value:       "English",
 				Sources:     cli.EnvVars("WARREN_LANG"),
 				Destination: (*string)(&language),
 			},
