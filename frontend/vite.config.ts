@@ -26,6 +26,9 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: [
+      ".ngrok-free.app"
+    ],
     proxy: {
       "/graphql": "http://localhost:8080",
       "/api": "http://localhost:8080",
