@@ -22,10 +22,8 @@ export function Header() {
     return (
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
-          <div className="flex flex-1 items-center justify-between space-x-2">
-            <div className="w-full flex-1">
-              {/* Empty space when not authenticated */}
-            </div>
+          <div className="flex flex-1 items-center justify-end space-x-2">
+            {/* ロゴと名前を削除 */}
           </div>
         </div>
       </header>
@@ -35,10 +33,8 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
-        <div className="flex flex-1 items-center justify-between space-x-2">
-          <div className="w-full flex-1">
-            {/* Add search bar here if needed */}
-          </div>
+        <div className="flex flex-1 items-center justify-end space-x-2">
+          {/* ロゴと名前を削除 */}
           <nav className="flex items-center pr-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

@@ -28,6 +28,11 @@ export function Sidebar() {
     <div className="flex h-full w-52 flex-col fixed inset-y-0 z-50 bg-background border-r">
       <div className="flex h-14 items-center border-b px-4">
         <NavLink className="flex items-center space-x-2" to="/">
+          <img 
+            src="/logo.png" 
+            alt="Warren Logo" 
+            className="h-8 w-8 object-contain"
+          />
           <span className="font-bold">Warren</span>
         </NavLink>
       </div>
