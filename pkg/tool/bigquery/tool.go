@@ -15,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/bigquery"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 )
@@ -31,10 +32,9 @@ type Action struct {
 	scanLimit                 uint64
 	configs                   []*Config
 	runbookPaths              []string
-	
+
 	// In-memory storage for runbooks
 	runbooks map[types.RunbookID]*bigquery.RunbookEntry
-
 }
 
 var _ interfaces.Tool = &Action{}
@@ -81,7 +81,6 @@ type ColumnConfig struct {
 func (x *Action) Name() string {
 	return "bigquery"
 }
-
 
 func (x *Action) Flags() []cli.Flag {
 	return []cli.Flag{
@@ -159,7 +158,8 @@ func (x *Action) Configure(ctx context.Context) error {
 	}
 
 	if len(x.configFiles) == 0 {
-		return goerr.New("configuration file is required")
+		logging.Default().Warn("project ID is provided, but no configuration file is provided. bigquery tool is disabled.")
+		return errs.ErrActionUnavailable
 	}
 
 	// Initialize runbooks map if not already done
@@ -207,7 +207,6 @@ func (x *Action) Configure(ctx context.Context) error {
 			return goerr.Wrap(err, "failed to load runbooks")
 		}
 	}
-
 
 	return nil
 }
@@ -369,7 +368,6 @@ func (x *Action) Prompt(ctx context.Context) (string, error) {
 	// Use bigquery_table_summary tool to get detailed column information when needed.
 	prompt.WriteString("**Note**: For detailed column information and schema, use the `bigquery_table_summary` tool.\n\n")
 
-
 	// Add runbook information if available
 	if len(x.runbooks) > 0 {
 		prompt.WriteString("## SQL Runbooks\n\n")
@@ -403,4 +401,3 @@ func (x *Action) loadRunbooks(ctx context.Context) error {
 
 	return nil
 }
-
