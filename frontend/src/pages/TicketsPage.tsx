@@ -97,6 +97,31 @@ export default function TicketsPage() {
   }
 
   if (ticketsError) {
+    // Check if this is an authentication/authorization error
+    if (ticketsError.message?.includes('Authentication required') ||
+        ticketsError.message?.includes('Invalid authentication token') ||
+        ticketsError.message?.includes('JSON.parse') ||
+        ticketsError.message?.includes('unexpected character')) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="text-lg text-red-600 mb-4">
+              Authentication required
+            </div>
+            <div className="text-sm text-muted-foreground mb-4">
+              Please log in to access tickets
+            </div>
+            <Button 
+              onClick={() => window.location.href = '/api/auth/login'}
+              className="flex items-center gap-2"
+            >
+              Sign In with Slack
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-lg text-red-600">

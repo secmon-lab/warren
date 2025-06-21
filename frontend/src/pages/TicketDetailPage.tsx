@@ -304,12 +304,49 @@ export default function TicketDetailPage() {
     );
   }
 
-  if (ticketError || !ticket) {
+  if (ticketError) {
+    const errorMessage = (ticketError as any)?.message || String(ticketError);
+    
+    // Check if this is an authentication/authorization error
+    if (errorMessage.includes('Authentication required') ||
+        errorMessage.includes('Invalid authentication token') ||
+        errorMessage.includes('JSON.parse') ||
+        errorMessage.includes('unexpected character')) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="text-lg text-red-600 mb-4">
+              Authentication required
+            </div>
+            <div className="text-sm text-muted-foreground mb-4">
+              Please log in to access this ticket
+            </div>
+            <Button 
+              onClick={() => window.location.href = '/api/auth/login'}
+              className="flex items-center gap-2"
+            >
+              Sign In with Slack
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-red-600">
+          Error loading ticket: {errorMessage}
+        </div>
+      </div>
+    );
+  }
+
+  if (!ticket) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-center h-64">
           <div className="text-lg text-red-600">
-            Error loading ticket: {ticketError?.message || "Ticket not found"}
+            Ticket not found
           </div>
         </div>
         <div className="flex justify-center">
