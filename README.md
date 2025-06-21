@@ -2,59 +2,68 @@
 AI agent and Slack based security alert management tool
 
 <p align="center">
-  <img src="./doc/images/logo.png" height="128" />
+  <img src="./doc/images/logo2.png" height="128" />
 </p>
 
 ## Concept
 
+Warren is a security alert management platform that combines AI-powered analysis with collaborative incident response. It processes security alerts from various sources, evaluates them using policy-driven detection rules, and facilitates team collaboration through integrated Slack workflows and a modern web interface.
+
+The platform addresses key challenges in security operations:
+- **Alert Fatigue**: Reduces noise by grouping similar alerts and using AI to prioritize based on context
+- **Manual Triage**: Automates initial analysis using external threat intelligence sources
+- **Knowledge Silos**: Centralizes alert investigation and maintains institutional knowledge
+- **Response Coordination**: Streamlines team communication through native Slack integration
+
+Warren operates on a ticket-based workflow where security alerts are grouped into manageable tickets, analyzed using AI agents, and tracked through resolution.
+
 ## How it works
 
-## Usage
+### Alert Processing Pipeline
 
-## Options
+1. **Alert Ingestion**: Security alerts arrive via HTTP endpoints from sources like AWS GuardDuty, SIEM systems, or Pub/Sub messaging
+2. **Policy Evaluation**: Incoming data is processed through Rego policies that determine whether events qualify as security alerts
+3. **Alert Grouping**: Similar alerts are automatically clustered using semantic similarity to reduce duplicate work
+4. **Ticket Creation**: Alert groups are organized into tickets for structured investigation and tracking
 
-The following options can be configured via command line flags or environment variables:
+### AI-Powered Analysis
 
-### `serve` mode
+Warren integrates with Google Vertex AI (Gemini) to provide intelligent analysis capabilities:
+- **Metadata Extraction**: Automatically generates titles, descriptions, and key attributes from raw alert data
+- **Threat Intelligence**: Queries external services (OTX, VirusTotal, URLScan, Shodan, AbuseIPDB) for indicators of compromise
+- **Security Analysis**: Provides context-aware analysis and recommendations based on alert patterns and historical data
+- **Interactive Chat**: Enables conversational analysis where security analysts can ask questions about specific tickets
 
-- `--addr` (WARREN_ADDR): Address to listen on [default: "127.0.0.1:8080"]
+### Collaborative Workflow
 
-### `run` mode
+- **Slack Integration**: Native bot integration for real-time notifications, interactive buttons, and team discussions
+- **Web Dashboard**: React-based interface for ticket management, alert browsing, and investigation tracking
+- **GraphQL API**: Flexible API for custom integrations and automation workflows
+- **Policy Management**: Version-controlled Rego policies for customizable alert detection rules
 
-- `--alert, -a` (WARREN_ALERT_PATH): Alert file path [required]
-- `--schema, -s` (WARREN_ALERT_SCHEMA): Alert schema definition [required]
+### External Integrations
 
-### Common
+Warren connects to multiple security intelligence sources:
+- **Threat Intelligence**: AlienVault OTX, VirusTotal
+- **URL Analysis**: URLScan.io
+- **IP Reputation**: AbuseIPDB, Shodan
+- **Malware Analysis**: abuse.ch MalwareBazaar
+- **Security Analytics**: Google BigQuery for data analysis and pattern detection
 
-#### Gemini (Required)
-- `--gemini-location`: GCP Location for Vertex AI (default: "us-central1") [$WARREN_GEMINI_LOCATION]
-- `--gemini-model`: Gemini model (default: "gemini-2.0-flash-exp")
-- `--gemini-project-id`: GCP Project ID for Vertex AI [$WARREN_GEMINI_PROJECT_ID]
+### Architecture
 
-#### Policy (Required)
-- `--policy, -p`: Policy file/dir path [$WARREN_POLICY]
+The system follows clean architecture principles with clear separation between:
+- **Domain Layer**: Core business logic for alerts, tickets, and policies
+- **Service Layer**: Application services coordinating business operations
+- **Interface Layer**: HTTP/GraphQL APIs and Slack integration
+- **Infrastructure Layer**: Database (Firestore), storage (Cloud Storage), and external service adapters
 
-#### Firestore (Required for `serve` mode)
-- `--firestore-database-id`: Firestore database ID (default: "(default)") [$WARREN_FIRESTORE_DATABASE_ID]
-- `--firestore-project-id`: Firestore project ID [$WARREN_FIRESTORE_PROJECT_ID]
+This design ensures maintainability, testability, and flexibility for different deployment environments.
 
-#### Slack (Required for `serve` mode)
-- `--slack-channel-name`: Slack channel name, # is not required [$WARREN_SLACK_CHANNEL_NAME]
-- `--slack-oauth-token`: Slack OAuth token [$WARREN_SLACK_OAUTH_TOKEN]
-- `--slack-signing-secret`: Slack signing secret [$WARREN_SLACK_SIGNING_SECRET]
+## Documentation
 
-#### Sentry (Optional for `serve` mode)
-- `--sentry-dsn`: Sentry DSN [$WARREN_SENTRY_DSN]
-- `--sentry-env`: Sentry environment [$WARREN_SENTRY_ENV]
-
-#### Action
-- `--bigquery-config`: BigQuery config file [$WARREN_BIGQUERY_CONFIG]
-- `--bigquery-project-id`: BigQuery project ID [$WARREN_BIGQUERY_PROJECT_ID]
-- `--otx-api-key`: OTX API key [$WARREN_OTX_API_KEY]
-- `--otx-base-url`: OTX API base URL (default: "https://otx.alienvault.com/api/v1") [$WARREN_OTX_BASE_URL]
-- `--urlscan-api-key`: URLScan API key [$WARREN_URLSCAN_API_KEY]
-- `--urlscan-backoff`: URLScan API backoff duration (default: 3s) [$WARREN_URLSCAN_BACKOFF]
-- `--urlscan-base-url`: URLScan API base URL (default: "https://urlscan.io/api/v1") [$WARREN_URLSCAN_BASE_URL]
+- [Installation](./doc/installation.md)
+- [Getting Started](./doc/getting_started.md)
 
 ## License
 
