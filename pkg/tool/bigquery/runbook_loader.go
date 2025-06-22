@@ -115,7 +115,6 @@ func (r *RunbookLoader) loadFromFile(ctx context.Context, filePath string) (*big
 		return nil, goerr.Wrap(err, "failed to read SQL file", goerr.V("path", filePath))
 	}
 
-
 	// Extract title and description from comments
 	title, description := r.extractTitleAndDescription(string(content))
 	if title == "" {

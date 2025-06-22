@@ -60,5 +60,4 @@ type Repository interface {
 	PutToken(ctx context.Context, token *auth.Token) error
 	GetToken(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error)
 	DeleteToken(ctx context.Context, tokenID auth.TokenID) error
-
 }

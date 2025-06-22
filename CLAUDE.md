@@ -79,7 +79,7 @@ The application follows Domain-Driven Design (DDD) with clean architecture:
 
 ### Key Interfaces
 - `interfaces.Repository` - Data persistence abstraction
-- `interfaces.LLMClient` - AI/LLM client abstraction  
+- `interfaces.LLMClient` - AI/LLM client abstraction
 - `interfaces.SlackClient` - Slack API client abstraction
 - `interfaces.PolicyClient` - Policy evaluation using OPA
 - `interfaces.StorageClient` - Cloud storage abstraction
@@ -87,7 +87,7 @@ The application follows Domain-Driven Design (DDD) with clean architecture:
 ### Tools Integration
 External security tools integrated via `pkg/tool/`:
 - BigQuery for data analysis
-- VirusTotal, OTX, URLScan for threat intelligence  
+- VirusTotal, OTX, URLScan for threat intelligence
 - AbuseChip, Shodan, IPDB for IP/domain analysis
 
 ## Configuration
@@ -105,3 +105,8 @@ Test files follow Go conventions (`*_test.go`). The codebase includes:
 - Integration tests with mock dependencies
 - Test data in `testdata/` directories
 - Mock generation using `moq` tool
+
+## Restrictions and Rules
+
+- If you need to create a temporary file as mid-process, please create it in the `tmp` directory. No need to delete the temporary files.
+- When you finish to edit source code, please run `go mod tidy` and `go fmt ./...` to update the dependencies and format the code. If you have any error, please fix it before complete the task.

@@ -45,6 +45,18 @@ type generateConfigConfig struct {
 	scanLimit         string
 	outputDir         string
 	outputFile        string
+	configFile        string // Config file for bulk processing
+}
+
+// BulkConfigEntry represents a single table configuration for bulk processing
+type BulkConfigEntry struct {
+	TableID     string `yaml:"table_id" json:"table_id"`
+	Description string `yaml:"description" json:"description"`
+}
+
+// BulkConfig represents the configuration file format for bulk processing
+type BulkConfig struct {
+	Tables []BulkConfigEntry `yaml:"tables" json:"tables"`
 }
 
 func subCommandGenerateConfig() *cli.Command {
@@ -84,7 +96,6 @@ func subCommandGenerateConfig() *cli.Command {
 				Usage:       "BigQuery table ID in format 'project_id.dataset_id.table_id'",
 				Destination: &tableID,
 				Sources:     cli.EnvVars("WARREN_BIGQUERY_TABLE_ID"),
-				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "table-description",
@@ -92,7 +103,13 @@ func subCommandGenerateConfig() *cli.Command {
 				Usage:       "Description of the table, what type of data is stored in the table",
 				Destination: &cfg.tableDescription,
 				Sources:     cli.EnvVars("WARREN_BIGQUERY_TABLE_DESCRIPTION"),
-				Required:    true,
+			},
+			&cli.StringFlag{
+				Name:        "config",
+				Aliases:     []string{"c"},
+				Usage:       "Config file containing tables and descriptions for bulk processing (YAML format)",
+				Destination: &cfg.configFile,
+				Sources:     cli.EnvVars("WARREN_BIGQUERY_BULK_CONFIG"),
 			},
 			&cli.StringFlag{
 				Name:        "scan-limit",
@@ -118,12 +135,29 @@ func subCommandGenerateConfig() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			// Parse table-id from flag
-			if err := parseTableID(tableID, &cfg); err != nil {
-				return goerr.Wrap(err, "failed to parse table ID")
-			}
+			// Validate input: either config file or table-id + description required
+			if cfg.configFile != "" {
+				// Bulk processing mode
+				if tableID != "" || cfg.tableDescription != "" {
+					return goerr.New("cannot specify both --config and individual table flags (--bigquery-table-id, --table-description)")
+				}
+				return generateBulkConfigs(ctx, cfg)
+			} else {
+				// Single table mode
+				if tableID == "" {
+					return goerr.New("--bigquery-table-id is required when not using --config")
+				}
+				if cfg.tableDescription == "" {
+					return goerr.New("--table-description is required when not using --config")
+				}
 
-			return generateConfigInternal(ctx, cfg)
+				// Parse table-id from flag
+				if err := parseTableID(tableID, &cfg); err != nil {
+					return goerr.Wrap(err, "failed to parse table ID")
+				}
+
+				return generateConfigInternal(ctx, cfg)
+			}
 		},
 	}
 }
@@ -383,6 +417,62 @@ func formatValidationReport(result SchemaValidationResult) string {
 	return report.String()
 }
 
+// generateBulkConfigs processes multiple tables from a config file
+func generateBulkConfigs(ctx context.Context, cfg generateConfigConfig) error {
+	// Load bulk config from file
+	bulkConfig, err := loadBulkConfig(cfg.configFile)
+	if err != nil {
+		return goerr.Wrap(err, "failed to load bulk config file")
+	}
+
+	if len(bulkConfig.Tables) == 0 {
+		return goerr.New("no tables found in config file")
+	}
+
+	logger := logging.From(ctx)
+	logger.Info("Processing bulk config", "file", cfg.configFile, "table_count", len(bulkConfig.Tables))
+
+	// Process each table
+	for i, entry := range bulkConfig.Tables {
+		logger.Info("Processing table", "index", i+1, "total", len(bulkConfig.Tables), "table_id", entry.TableID)
+
+		// Create a copy of cfg for this table
+		tableCfg := cfg
+		tableCfg.tableDescription = entry.Description
+
+		// Parse table ID
+		if err := parseTableID(entry.TableID, &tableCfg); err != nil {
+			logger.Error("Failed to parse table ID, skipping", "table_id", entry.TableID, "error", err)
+			continue
+		}
+
+		// Generate config for this table
+		if err := generateConfigInternal(ctx, tableCfg); err != nil {
+			logger.Error("Failed to generate config for table, skipping", "table_id", entry.TableID, "error", err)
+			continue
+		}
+
+		logger.Info("Successfully generated config", "table_id", entry.TableID)
+	}
+
+	return nil
+}
+
+// loadBulkConfig loads the bulk configuration from a YAML file
+func loadBulkConfig(filePath string) (*BulkConfig, error) {
+	data, err := os.ReadFile(filepath.Clean(filePath))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to read bulk config file", goerr.V("path", filePath))
+	}
+
+	var config BulkConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, goerr.Wrap(err, "failed to parse bulk config file", goerr.V("path", filePath))
+	}
+
+	return &config, nil
+}
+
 func generateConfigInternal(ctx context.Context, cfg generateConfigConfig) error {
 	factory := &DefaultBigQueryClientFactory{}
 	return generateConfigWithFactoryInternal(ctx, cfg, factory)
@@ -425,7 +515,6 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 
 	println("======== Schema fields =========")
 	println(fmt.Sprintf("Total fields available: %d", len(flattenedFields)))
-	println(fmt.Sprintf("Fields used for analysis: %d", len(flattenedFields)))
 	println("=================================")
 
 	// Generate JSON schema from the Config struct
@@ -450,7 +539,7 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 		gollem.WithSystemPrompt(queryPrompt),
 		gollem.WithLoopLimit(12), // Increase to 12 iterations for comprehensive single-pass generation
 		gollem.WithMessageHook(func(ctx context.Context, msg string) error {
-			println(msg)
+			println("💬", msg)
 			return nil
 		}),
 		gollem.WithToolErrorHook(func(ctx context.Context, err error, tool gollem.FunctionCall) error {

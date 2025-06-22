@@ -1067,4 +1067,3 @@ func (r *Firestore) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []ty
 
 	return nil
 }
-

@@ -192,7 +192,7 @@ func TestCrossReference(t *testing.T) {
 
 func TestCreateTicket(t *testing.T) {
 	repo := repository.NewMemory()
-	
+
 	// Create LLM client mock for embedding generation
 	llmMock := &mock.LLMClientMock{
 		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
@@ -204,7 +204,7 @@ func TestCreateTicket(t *testing.T) {
 			return [][]float64{embedding}, nil
 		},
 	}
-	
+
 	uc := usecase.New(usecase.WithRepository(repo), usecase.WithLLMClient(llmMock))
 	resolver := NewResolver(repo, nil, uc)
 
@@ -218,7 +218,7 @@ func TestCreateTicket(t *testing.T) {
 	t.Run("CreateTicket without Slack service", func(t *testing.T) {
 		title := "Test Manual Ticket"
 		description := "This is a test ticket created manually"
-		
+
 		// Test creating a ticket without test flag
 		got, err := resolver.Mutation().CreateTicket(ctx, title, description, nil)
 		gt.NoError(t, err)
@@ -227,7 +227,7 @@ func TestCreateTicket(t *testing.T) {
 		gt.Value(t, got.Assignee.ID).Equal("user123")
 		gt.Value(t, got.Assignee.Name).Equal("Test User")
 		gt.Value(t, got.IsTest).Equal(false)
-		
+
 		// Verify ticket was saved to repository
 		savedTicket, err := repo.GetTicket(ctx, got.ID)
 		gt.NoError(t, err)
@@ -238,7 +238,7 @@ func TestCreateTicket(t *testing.T) {
 		title := "Test Manual Ticket with Flag"
 		description := "This is a test ticket with test flag"
 		isTest := true
-		
+
 		got, err := resolver.Mutation().CreateTicket(ctx, title, description, &isTest)
 		gt.NoError(t, err)
 		gt.Value(t, got.IsTest).Equal(true)

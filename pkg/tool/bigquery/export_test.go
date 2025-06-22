@@ -39,4 +39,11 @@ const (
 var (
 	ValidateColumnConfig   = validateColumnConfig
 	FormatValidationReport = formatValidationReport
+	LoadBulkConfig         = loadBulkConfig
+	ParseTableID           = parseTableID
 )
+
+// Export types for testing
+type GenerateConfigConfig = generateConfigConfig
+type TestBulkConfigEntry = BulkConfigEntry
+type TestBulkConfig = BulkConfig
