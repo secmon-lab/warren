@@ -487,6 +487,12 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 		return goerr.Wrap(err, "failed to generate output path")
 	}
 
+	// Ensure output directory exists
+	outputDir := filepath.Dir(outputPath)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return goerr.Wrap(err, "failed to create output directory", goerr.V("dir", outputDir))
+	}
+
 	scanLimit, err := humanize.ParseBytes(cfg.scanLimit)
 	if err != nil {
 		return goerr.Wrap(err, "failed to parse scan limit")
@@ -513,16 +519,14 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 	// Get flattened schema fields directly
 	flattenedFields := flattenSchema(tableMetadata.Schema, []string{})
 
-	println("======== Schema fields =========")
-	println(fmt.Sprintf("Total fields available: %d", len(flattenedFields)))
-	println("=================================")
+	logger.Info("Total fields available", "count", len(flattenedFields))
 
 	// Generate JSON schema from the Config struct
 	outputSchema := generateConfigSchema()
 
 	queryPrompt, err := prompt.GenerateWithStruct(ctx, generateConfigQueryPrompt, map[string]any{
 		"table_description":  cfg.tableDescription,
-		"schema_fields":      flattenedFields, // Use all fields
+		"schema_fields":      flattenedFields, // Use all fields - LLM will process internally
 		"total_fields_count": len(flattenedFields),
 		"used_fields_count":  len(flattenedFields),
 		"output_schema":      outputSchema,
@@ -537,7 +541,7 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 
 	agent := gollem.New(llmClient,
 		gollem.WithSystemPrompt(queryPrompt),
-		gollem.WithLoopLimit(12), // Increase to 12 iterations for comprehensive single-pass generation
+		gollem.WithLoopLimit(20), // Increase to 20 iterations to handle complex schemas and validation retries
 		gollem.WithMessageHook(func(ctx context.Context, msg string) error {
 			println("💬", msg)
 			return nil
@@ -616,11 +620,11 @@ func (x *generateConfigTool) Specs(ctx context.Context) ([]gollem.ToolSpec, erro
 		},
 		{
 			Name:        "generate_config_output",
-			Description: "Generate the final YAML configuration file with the analyzed table metadata. If validation fails, the tool will return specific invalid fields that need to be removed. You should then immediately retry with a corrected configuration that removes only the invalid fields mentioned in the response.",
+			Description: "Generate the final YAML configuration file with the analyzed table metadata. MUST include complete nested field structures for all RECORD types - include ALL nested fields that exist in the schema, with proper hierarchy and 3-4 levels of nesting when available. If validation fails, the tool will return specific invalid fields that need to be removed. You should then immediately retry with a corrected configuration that removes only the invalid fields mentioned in the response.",
 			Parameters: map[string]*gollem.Parameter{
 				"config": {
 					Type:        gollem.TypeObject,
-					Description: "The complete configuration object following the BigQuery Config schema",
+					Description: "The complete configuration object following the BigQuery Config schema. Must include complete nested structures for all RECORD fields with ALL their nested children.",
 				},
 			},
 			Required: []string{"config"},
@@ -643,6 +647,10 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 		q.SetDryRun(true)
 		job, err := q.Run(ctx)
 		if err != nil {
+			// Provide helpful error message for field not found errors during dry run
+			if strings.Contains(err.Error(), "field") || strings.Contains(err.Error(), "column") {
+				return nil, goerr.Wrap(err, "SQL query validation failed - likely invalid field name. Only use fields from the provided schema_fields list. Try using SELECT * LIMIT 10 first to see available fields.")
+			}
 			return nil, goerr.Wrap(err, "failed to dry run query")
 		}
 		if job.LastStatus().Statistics.TotalBytesProcessed < 0 {
@@ -659,6 +667,10 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 		q.SetDryRun(false)
 		job, err = q.Run(ctx)
 		if err != nil {
+			// Provide helpful error message for field not found errors
+			if strings.Contains(err.Error(), "field") || strings.Contains(err.Error(), "column") {
+				return nil, goerr.Wrap(err, "SQL query failed - likely invalid field name. Only use fields from the provided schema_fields list. Try using SELECT * LIMIT 10 first to see available fields.")
+			}
 			return nil, goerr.Wrap(err, "failed to run query")
 		}
 
