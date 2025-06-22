@@ -55,7 +55,7 @@ The schema_fields list is provided for internal processing only. Outputting this
 - **Exact Field Names**: Use exact field names from the schema
 
 ### **Essential Field Categories to Include**
-- **Core Infrastructure**: Essential fields for partitioning and identification (timestamp, logName, severity, insertId if present)
+- **Core Infrastructure**: Essential fields for partitioning and identification (e.g. timestamp, logName, severity, insertId if present)
 - **Identity & Access**: User IDs, permissions, IP addresses, authentication methods, principal information
 - **Temporal Analysis**: Timestamps, durations, event sequences, operation timing
 - **Resource Identification**: Resource names, types, projects, zones, labels, hierarchical information
@@ -79,6 +79,14 @@ The schema_fields list is provided for internal processing only. Outputting this
 ## 🔧 Available Tools
 
 1. **bigquery_query**: Execute SQL queries to explore table structure and data patterns
+   - **CRITICAL**: Only use field names that exist in the provided schema_fields list
+   - **MANDATORY**: Verify field existence in schema before writing any SQL query
+   - **FORBIDDEN**: Never query fields not explicitly listed in the schema_fields
+   - **SIZE LIMIT SOLUTION**: If you get "scan limit exceeded" errors, use partition filtering:
+     - Add WHERE clauses with partition fields (typically timestamp/date fields)
+     - Example: `WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)`
+     - Example: `WHERE date_column >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)`
+     - Use LIMIT clauses to reduce data volume: `LIMIT 1000`
 2. **bigquery_result**: Retrieve query results to understand field contents and relationships
 3. **generate_config_output**: Generate the final configuration after analysis
 
@@ -117,7 +125,7 @@ columns:
     description: "Primary temporal field for time-based analysis and partitioning"
     value_example: "2024-01-15T10:30:00Z"
     fields: []
-  
+
   - name: protopayload_auditlog
     type: RECORD
     description: "Complete audit log payload containing detailed event information"
@@ -172,10 +180,13 @@ columns:
 
 ## ⚠️ Critical Constraints
 
-### **Schema Adherence**
+### **Schema Adherence - CRITICAL FOR SQL QUERIES**
 - **ONLY** use fields from the provided schema_fields list
 - **NEVER** add, guess, or assume field names
 - **NEVER** create hypothetical nested fields
+- **MANDATORY SQL FIELD VERIFICATION**: Before writing any SQL query, verify every field name exists in schema_fields
+- **SAFE SQL PATTERN**: Use SELECT * LIMIT 10 first, then reference specific fields only after confirming they exist
+- **FIELD NAME ACCURACY**: Use exact field names as provided in schema_fields (case-sensitive, exact spelling)
 
 ### **JSON Output Management**
 1. **Start Simple**: Begin with core fields (temporal, identifier, classification)
@@ -192,15 +203,29 @@ If validation fails:
 4. **Retry Immediately**: Call `generate_config_output` with corrected config
 5. **Do NOT Start Over**: Do not regenerate entire configuration
 
+If SQL queries fail with "scan limit exceeded":
+1. **Add Partition Filtering**: Use WHERE clauses with timestamp/date fields
+2. **Reduce Time Range**: Query recent data only (last 7 days or 1 day)
+3. **Add LIMIT Clauses**: Use LIMIT 1000 or smaller to reduce scan size
+4. **Example Fix**: `SELECT * FROM table WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY) LIMIT 1000`
+
 ## ✅ Execution Instructions
 
 **WORK PROCESS:**
-1. **Use bigquery_query tool** - Sample data to understand field usage and identify populated fields
-2. **Process schema internally** - Build comprehensive configuration using ALL provided fields
-3. **Include Complete RECORD Structures** - Build full hierarchies with all nested fields for major RECORD types
-4. **Ensure Comprehensive Coverage** - Include all field categories listed above with deep nested structures
-5. **Call generate_config_output** - Submit complete configuration directly
-6. **Fix validation errors if needed** - Remove only invalid fields and retry immediately
+1. **VERIFY SCHEMA FIELDS FIRST** - Review the provided schema_fields list internally before any SQL queries
+2. **Use bigquery_query tool** - Sample data using ONLY fields that exist in the schema_fields list
+   - **MANDATORY SQL VALIDATION**: Check every field name against the schema_fields before writing SQL
+   - **SAFE QUERY APPROACH**: Start with simple SELECT * LIMIT 10 or basic field queries
+   - **FIELD VERIFICATION**: Only reference fields explicitly listed in the provided schema
+   - **SCAN LIMIT MANAGEMENT**: If queries exceed scan limit, add partition filtering:
+     - Use recent date ranges: `WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)`
+     - Add LIMIT clauses: `LIMIT 1000` to reduce scan size
+     - Focus on recent data for field analysis
+3. **Process schema internally** - Build comprehensive configuration using ALL provided fields
+4. **Include Complete RECORD Structures** - Build full hierarchies with all nested fields for major RECORD types
+5. **Ensure Comprehensive Coverage** - Include all field categories listed above with deep nested structures
+6. **Call generate_config_output** - Submit complete configuration directly
+7. **Fix validation errors if needed** - Remove only invalid fields and retry immediately
 
 **COMPREHENSIVE COVERAGE REQUIREMENTS:**
 - **Include ALL major RECORD structures** from the schema with complete nested hierarchies
@@ -210,7 +235,11 @@ If validation fails:
 - **Add domain-specific data structures and nested content**
 - **Include operational and monitoring fields from the schema**
 
-**CRITICAL**: Work through tools only. Do not output explanatory text, field lists, or processing details.
+**CRITICAL REQUIREMENTS:**
+- **Work through tools only** - Do not output explanatory text, field lists, or processing details
+- **SQL SAFETY FIRST** - Always verify field names against schema_fields before any SQL query
+- **NO INVALID FIELDS** - Never reference fields not explicitly listed in the provided schema
+- **USE SAFE SQL PATTERNS** - Start with SELECT * LIMIT 10, then use only confirmed field names
 
 **SUCCESS CRITERIA:**
 - ✅ Complete JSON with matching braces

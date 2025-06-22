@@ -823,7 +823,7 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 			"message":           "✅ Configuration validated and saved successfully",
 			"validation_status": "passed",
 			"success":           true,
-		}, nil
+		}, gollem.ErrExitConversation
 
 	default:
 		return nil, goerr.New("invalid function name", goerr.V("name", name))
