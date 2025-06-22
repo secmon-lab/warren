@@ -22,7 +22,7 @@ The schema_fields list is provided for your internal processing only. Outputting
 Create a comprehensive BigQuery table configuration based on the provided schema fields. Your configuration should:
 
 1. **Maximize Field Coverage**: Include ALL analytically valuable fields from the complete schema
-2. **Prioritize Security Fields**: Give special attention to authentication, authorization, and audit fields
+2. **Prioritize Important Fields**: Give special attention to fields relevant to the table's analytical purpose
 3. **Maintain Nested Structure**: Preserve the hierarchical relationships in RECORD fields
 4. **Provide Rich Metadata**: Include meaningful descriptions and representative value examples
 5. **Ensure Data Integrity**: Correctly represent data types and field constraints
@@ -34,7 +34,7 @@ Create a comprehensive BigQuery table configuration based on the provided schema
 - **Select Strategically**: Choose fields that provide maximum analytical value for {{ .table_description }}
 - **Include Nested Hierarchies**: Properly structure RECORD fields with their complete child field sets
 - **Cover All Categories**: Include fields for:
-  - **Security & Authentication**: User IDs, permissions, IP addresses, authentication methods
+  - **Identity & Access**: User IDs, permissions, IP addresses, authentication methods
   - **Temporal Analysis**: Timestamps, durations, event sequences
   - **Resource Identification**: Resource names, types, projects, zones
   - **Operational Metrics**: Performance data, error rates, response times
@@ -50,7 +50,7 @@ Create a comprehensive BigQuery table configuration based on the provided schema
 
 ### **SCHEMA FIELD REFERENCE**
 You have access to **all {{ .total_fields_count }} fields** from the table schema with the following structure:
-- **Name**: Full field path (e.g., "protopayload_auditlog.authenticationInfo.principalEmail")
+- **Name**: Full field path (e.g., "user_profile.personal_info.email")
 - **Type**: BigQuery data type (STRING, INTEGER, TIMESTAMP, RECORD, etc.)
 - **Description**: Field description from BigQuery schema
 - **Repeated**: Whether the field is an array
@@ -183,10 +183,10 @@ While all fields are provided, you should aim for comprehensive analytical cover
 3. Focus on fields that provide operational and analytical value
 4. **Include complete RECORD structures** - don't leave partial hierarchies
 5. **Cover all major data categories** - identifiers, timestamps, metadata, payloads, etc.
-6. **Ensure analytical completeness** - include fields needed for security, monitoring, and business analysis
+6. **Ensure analytical completeness** - include fields needed for security monitoring and operational insights
 
 ### **Adaptive Coverage Strategy**
-**For tables with many fields (500+ available)**: Focus on building complete, deep RECORD hierarchies. Include all major authentication, authorization, request metadata, and service-specific data structures with their important nested fields.
+**For tables with many fields (500+ available)**: Focus on building complete, deep RECORD hierarchies. Include all major identity, permission, contextual metadata, and domain-specific data structures with their important nested fields.
 
 **For tables with moderate fields (100-500 available)**: Include most available RECORD structures with good depth. Ensure comprehensive coverage of all major data categories.
 
@@ -196,15 +196,15 @@ While all fields are provided, you should aim for comprehensive analytical cover
 
 ### **Phase 1: Core Infrastructure**
 Start with the essential fields for any analysis:
-- **timestamp** - Primary temporal field for partitioning and time-based queries
-- **logName** - Identifies the log source and type (if present)
-- **severity** - Critical for filtering and alerting (if present)
-- **insertId** - Unique identifier for deduplication (if present)
+- **Temporal fields** - Primary time-based fields for partitioning and time-based queries
+- **Identifier fields** - Unique identifiers for deduplication and referencing
+- **Category/type fields** - Fields that classify or categorize the data
+- **Status/level fields** - Fields indicating status, severity, or importance levels
 
 ### **Phase 2: Comprehensive Configuration Generation**
 1. **Build Complete Structure**: Generate the full configuration in a single pass
 2. **Include All Major RECORD Fields**: Add all significant RECORD structures with their complete hierarchies
-3. **Comprehensive Content Coverage**: Include all authentication, authorization, request metadata, service data, HTTP context, operational fields, and resource information
+3. **Comprehensive Content Coverage**: Include all relevant domain-specific fields, metadata, operational context, and business-critical information
 4. **Complete Metadata**: Ensure every field has description and value_example
 5. **Single Validation**: Validate the complete configuration once
 
@@ -236,7 +236,7 @@ Include specialized fields for deep analysis:
 ### **Phase 2: Comprehensive Configuration Generation**
 1. **Build Complete Structure**: Generate the full configuration in a single pass
 2. **Include All Major RECORD Fields**: Add all significant RECORD structures with their complete hierarchies
-3. **Comprehensive Content Coverage**: Include all authentication, authorization, request metadata, service data, HTTP context, operational fields, and resource information
+3. **Comprehensive Content Coverage**: Include all relevant domain-specific fields, metadata, operational context, and business-critical information
 4. **Complete Metadata**: Ensure every field has description and value_example
 5. **Single Validation**: Validate the complete configuration once
 
@@ -271,9 +271,9 @@ Include specialized fields for deep analysis:
 **Target Field Distribution Approach:**
 - **Core Infrastructure**: Essential fields for partitioning and identification
 - **Resource Information**: Complete resource RECORD with all available labels
-- **Primary Data Content**: Full audit/payload RECORD structures with all nested fields
-- **Supporting Context**: Additional RECORDs for HTTP, operations, and tracing
-- **Operational Fields**: Trace, span, source location, and other metadata
+- **Primary Data Content**: Full main/payload RECORD structures with all nested fields
+- **Supporting Context**: Additional RECORDs for metadata, operations, and tracking
+- **Operational Fields**: Tracking, monitoring, location, and other operational metadata
 
 ⚠️ **NO FIELD EXAMPLES IN OUTPUT** - Use schema internally for field identification
 
@@ -301,15 +301,16 @@ description: {{ .table_description }}
 ### **2. Partitioning Configuration**
 ```yaml
 partitioning:
-  field: timestamp
+  field: [primary_time_field]
   type: time
   time_unit: day
 ```
+Note: Use the primary temporal field from your schema for partitioning
 
 ### **3. Complete Column Definitions**
 Every column must have:
 - **name**: Exact field name (use proper nesting, not flattened paths)
-- **description**: Meaningful description explaining the field's purpose and security relevance
+- **description**: Meaningful description explaining the field's purpose and analytical relevance
 - **value_example**: Realistic example value (anonymized but representative)
 - **type**: Correct BigQuery data type
 - **fields**: For RECORD types, complete nested field structure
@@ -386,7 +387,7 @@ Each field includes:
 ### **JSON OUTPUT MANAGEMENT**
 To prevent truncation and infinite loops:
 
-1. **Start Simple**: Begin with core fields (timestamp, logName, severity, insertId)
+1. **Start Simple**: Begin with core fields (temporal, identifier, classification fields)
 2. **Add Incrementally**: Add one major RECORD field at a time
 3. **Monitor Size**: Keep total output under 6,000 tokens
 4. **Complete Structure**: Ensure every opened brace/bracket is properly closed
@@ -401,10 +402,10 @@ If schema validation fails:
 5. **Do NOT Start Over**: Do not regenerate the entire configuration from scratch
 
 **Example Error Recovery:**
-If validation fails with "Field 'resource.labels.bucket_name' does not exist":
-- Remove ONLY the `bucket_name` field from `resource.labels.fields`
-- Keep all other fields in `resource.labels.fields` (project_id, location, etc.)
-- Keep the entire `resource` structure intact
+If validation fails with "Field 'main_record.nested_field.invalid_field' does not exist":
+- Remove ONLY the `invalid_field` from `main_record.nested_field.fields`
+- Keep all other valid fields in `main_record.nested_field.fields`
+- Keep the entire `main_record` structure intact
 - Call `generate_config_output` again with the corrected config
 
 **CRITICAL**: When you receive a validation error:
@@ -428,7 +429,7 @@ If validation fails with "Field 'resource.labels.bucket_name' does not exist":
 - ✅ **Complete JSON**: Every `{` has a matching `}`
 - ✅ **Schema Compliance**: Only use provided fields
 - ✅ **Comprehensive Coverage**: Include all major RECORD structures and their complete hierarchies
-- ✅ **Analytical Completeness**: Cover all data categories needed for security, monitoring, and analysis
+- ✅ **Analytical Completeness**: Cover all data categories needed for security monitoring and analysis
 - ✅ **Quality Metadata**: Every field has meaningful description and value_example
 
 ## Final Instructions
@@ -467,29 +468,29 @@ Your configuration MUST include **COMPLETE ANALYTICAL COVERAGE**:
 
 **If your configuration lacks comprehensive coverage, you MUST:**
 1. Add complete nested structures to existing RECORD fields
-2. Include additional major RECORD fields from the schema (labels, sourceLocation, etc.)
-3. Add all available nested fields within protopayload_auditlog or similar main structures
-4. Include all available resource.labels fields that exist in the schema
+2. Include additional major RECORD fields from the schema
+3. Add all available nested fields within main RECORD structures
+4. Include all available nested fields within RECORD structures that exist in the schema
 5. Add any other top-level RECORD fields that provide analytical value
 
 **COMPREHENSIVE COVERAGE CHECKLIST:**
 - ✅ Include ALL major RECORD structures from the schema
 - ✅ Build COMPLETE hierarchies for each RECORD (don't leave partial structures)
-- ✅ Include all authentication, authorization, and request metadata fields
-- ✅ Include service-specific data structures (servicedata_*, etc.)
-- ✅ Include operational fields (httpRequest, operation, trace, etc.)
+- ✅ Include all identity, permission, and contextual metadata fields
+- ✅ Include domain-specific data structures and nested content
+- ✅ Include operational and monitoring fields from the schema
 - ✅ Include all resource labels and metadata that exist in the schema
 
 **DETAILED CONTENT REQUIREMENTS:**
-- ✅ **Authentication Details**: Include key authentication fields from the schema
-- ✅ **Authorization Details**: Include key authorization fields from the schema  
-- ✅ **Request Context**: Include key request metadata fields from the schema
+- ✅ **Identity Fields**: Include key identity and user-related fields from the schema
+- ✅ **Permission Fields**: Include access control and permission fields from the schema  
+- ✅ **Context Metadata**: Include key contextual and metadata fields from the schema
 - ✅ **Resource Information**: Include important resource labels that exist in the schema
-- ✅ **Service Data**: Include main service data structures with important nested fields
-- ✅ **HTTP Context**: Include HTTP request structure with key fields
-- ✅ **Operational Context**: Include operational fields like trace, span, and location data
-- ✅ **Status Information**: Include status structures with codes and error details
-- ✅ **Location Data**: Include resource location fields if available
+- ✅ **Business Data**: Include main business data structures with important nested fields
+- ✅ **Network Context**: Include network and connection-related fields if present
+- ✅ **Operational Context**: Include operational fields like tracking, monitoring, and location data
+- ✅ **Status Information**: Include status structures with codes and outcome details
+- ✅ **Geographic Data**: Include location and geographic fields if available
 
 ⚠️ **PROCESS FIELD NAMES INTERNALLY** - Use provided schema to identify specific field names
 
