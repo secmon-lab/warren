@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { GET_TICKETS, UPDATE_TICKET_STATUS } from "@/lib/graphql/queries";
+import { GET_TICKETS, UPDATE_TICKET_STATUS, UPDATE_MULTIPLE_TICKETS_STATUS } from "@/lib/graphql/queries";
 import { Ticket, TicketStatus, TICKET_STATUS_LABELS } from "@/lib/types";
 import { MoreHorizontal, Archive, Plus } from "lucide-react";
 import { useErrorToast, useSuccessToast } from "@/hooks/use-toast";
@@ -30,6 +30,12 @@ export default function BoardPage() {
   const confirm = useConfirm();
 
   const [updateTicketStatus] = useMutation(UPDATE_TICKET_STATUS, {
+    refetchQueries: [
+      { query: GET_TICKETS, variables: { statuses: BOARD_STATUSES } },
+    ],
+  });
+
+  const [updateMultipleTicketsStatus] = useMutation(UPDATE_MULTIPLE_TICKETS_STATUS, {
     refetchQueries: [
       { query: GET_TICKETS, variables: { statuses: BOARD_STATUSES } },
     ],
@@ -126,6 +132,42 @@ export default function BoardPage() {
     }
   };
 
+  const handleBulkArchiveResolved = async () => {
+    if (isUpdatingStatus) return;
+
+    const resolvedTickets = ticketsByStatus["resolved"];
+    if (resolvedTickets.length === 0) {
+      errorToast("No resolved tickets to archive");
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: "Archive All Resolved Tickets",
+      description: `Are you sure you want to archive all ${resolvedTickets.length} resolved tickets?`,
+      confirmText: "Archive All",
+      variant: "destructive",
+    });
+
+    if (!confirmed) return;
+
+    setIsUpdatingStatus(true);
+    try {
+      // Archive all resolved tickets using bulk mutation
+      await updateMultipleTicketsStatus({
+        variables: {
+          ids: resolvedTickets.map((ticket) => ticket.id),
+          status: "archived",
+        },
+      });
+      successToast(`${resolvedTickets.length} tickets archived successfully`);
+    } catch (error) {
+      console.error("Failed to archive tickets:", error);
+      errorToast("Failed to archive tickets");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -201,13 +243,36 @@ export default function BoardPage() {
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, status)}>
             <div className="mb-4">
-              <h2 className="font-semibold text-lg flex items-center gap-2">
-                <Badge variant="secondary" className="px-2">
-                  {TICKET_STATUS_LABELS[status]}
-                </Badge>
-                <span className="text-sm text-muted-foreground">
-                  ({ticketsByStatus[status].length})
-                </span>
+              <h2 className="font-semibold text-lg flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="px-2">
+                    {TICKET_STATUS_LABELS[status]}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    ({ticketsByStatus[status].length})
+                  </span>
+                </div>
+                {status === "resolved" && ticketsByStatus[status].length > 0 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        disabled={isUpdatingStatus}>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={handleBulkArchiveResolved}
+                        className="text-destructive">
+                        <Archive className="h-4 w-4 mr-2" />
+                        Archive All Resolved ({ticketsByStatus[status].length})
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </h2>
             </div>
 
