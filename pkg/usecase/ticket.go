@@ -270,7 +270,13 @@ func (uc *UseCases) UpdateTicket(ctx context.Context, ticketID types.TicketID, t
 // UpdateTicketStatus updates a ticket's status
 func (uc *UseCases) UpdateTicketStatus(ctx context.Context, ticketID types.TicketID, status types.TicketStatus) (*ticket.Ticket, error) {
 	updateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
+		oldStatus := ticket.Status
 		ticket.Status = status
+
+		// Trace ticket status change
+		_ = msg.Trace(ctx, "🎫 Ticket status updated: %s → %s",
+			oldStatus, status)
+
 		return nil
 	}
 
@@ -308,6 +314,9 @@ func (uc *UseCases) UpdateMultipleTicketsStatus(ctx context.Context, ticketIDs [
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get updated tickets")
 	}
+
+	// Trace batch status update
+	_ = msg.Trace(ctx, "🎫 Batch updated %d tickets to status %s", len(tickets), status)
 
 	// Update Slack posts for tickets that have Slack threads
 	for _, t := range tickets {
