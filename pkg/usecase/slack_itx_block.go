@@ -249,6 +249,10 @@ func (uc *UseCases) getSalvageableAlerts(ctx context.Context, ticket *ticket.Tic
 }
 
 func calculateCosineSimilarity(a, b []float32) float64 {
+	if a == nil || b == nil {
+		return 0
+	}
+
 	if len(a) != len(b) {
 		return 0
 	}
