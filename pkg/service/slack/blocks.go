@@ -220,8 +220,8 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 		}
 	}
 
-	// Add Resolve button if ticket is not resolved
-	if ticket.Status != types.TicketStatusResolved {
+	// Add Resolve button if ticket is not resolved or archived
+	if ticket.Status != types.TicketStatusResolved && ticket.Status != types.TicketStatusArchived {
 		blocks = append(blocks, slack.NewActionBlock(
 			"ticket_actions",
 			slack.NewButtonBlockElement(
