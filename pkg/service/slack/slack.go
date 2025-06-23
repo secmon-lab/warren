@@ -646,6 +646,15 @@ func (x *Service) ShowResolveTicketModal(ctx context.Context, ticket *ticket.Tic
 	return nil
 }
 
+func (x *Service) ShowSalvageModal(ctx context.Context, ticket *ticket.Ticket, unboundAlerts alert.Alerts, triggerID string) error {
+	req := buildSalvageModalViewRequest(model.CallbackSubmitSalvage, ticket, unboundAlerts)
+	if _, err := x.client.OpenView(triggerID, req); err != nil {
+		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
+	}
+
+	return nil
+}
+
 func (x *ThreadService) PostAlert(ctx context.Context, alert alert.Alert) error {
 	blocks := buildAlertBlocks(alert)
 	_, _, err := x.client.PostMessageContext(

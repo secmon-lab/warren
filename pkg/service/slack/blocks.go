@@ -220,16 +220,21 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 		}
 	}
 
-	// Add Resolve button if ticket is not resolved or archived
+	// Add Resolve and Salvage buttons if ticket is not resolved or archived
 	if ticket.Status != types.TicketStatusResolved && ticket.Status != types.TicketStatusArchived {
-		blocks = append(blocks, slack.NewActionBlock(
-			"ticket_actions",
+		buttons := []slack.BlockElement{
 			slack.NewButtonBlockElement(
 				model.ActionIDResolveTicket.String(),
 				ticket.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Resolve", false, false),
 			).WithStyle(slack.StylePrimary),
-		))
+			slack.NewButtonBlockElement(
+				model.ActionIDSalvage.String(),
+				ticket.ID.String(),
+				slack.NewTextBlockObject("plain_text", "Salvage", false, false),
+			).WithStyle(slack.StyleDefault),
+		}
+		blocks = append(blocks, slack.NewActionBlock("ticket_actions", buttons...))
 	}
 
 	return blocks
@@ -417,6 +422,91 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 		Submit: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
 			Text: "Resolve",
+		},
+		Close: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Cancel",
+		},
+	}
+}
+
+func buildSalvageModalViewRequest(callbackID model.CallbackID, ticket *ticket.Ticket, unboundAlerts alert.Alerts) slack.ModalViewRequest {
+	// Build the alert list section
+	var alertListText string
+	displayCount := min(len(unboundAlerts), 10)
+	totalCount := len(unboundAlerts)
+
+	if displayCount == 0 {
+		alertListText = "No unbound alerts found"
+	} else {
+		for i := range displayCount {
+			alert := unboundAlerts[i]
+			alertListText += fmt.Sprintf("• %s (ID: %s)\n", alert.Title, alert.ID.String())
+		}
+		if displayCount < totalCount {
+			alertListText += fmt.Sprintf("\nShowing %d of %d alerts", displayCount, totalCount)
+		} else {
+			alertListText += fmt.Sprintf("\nTotal: %d alerts", totalCount)
+		}
+	}
+
+	blocks := []slack.Block{
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.PlainTextType, "Search and bind unbound alerts to this ticket", false, false),
+			nil,
+			nil,
+		),
+		slack.NewInputBlock(
+			model.BlockIDSalvageThreshold.String(),
+			slack.NewTextBlockObject(slack.PlainTextType, "Similarity Threshold", false, false),
+			slack.NewTextBlockObject(slack.PlainTextType, "Filter alerts by embedding similarity (0-1)", false, false),
+			slack.NewPlainTextInputBlockElement(
+				slack.NewTextBlockObject(slack.PlainTextType, "0.99", false, false),
+				model.BlockActionIDSalvageThreshold.String(),
+			).WithInitialValue("0.99"),
+		).WithOptional(true),
+		slack.NewInputBlock(
+			model.BlockIDSalvageKeyword.String(),
+			slack.NewTextBlockObject(slack.PlainTextType, "Keyword Filter", false, false),
+			slack.NewTextBlockObject(slack.PlainTextType, "Filter alerts by keyword in data", false, false),
+			slack.NewPlainTextInputBlockElement(
+				slack.NewTextBlockObject(slack.PlainTextType, "Enter keyword", false, false),
+				model.BlockActionIDSalvageKeyword.String(),
+			),
+		).WithOptional(true),
+		slack.NewActionBlock(
+			"refresh_action",
+			slack.NewButtonBlockElement(
+				model.BlockActionIDSalvageRefresh.String(),
+				"refresh",
+				slack.NewTextBlockObject("plain_text", "Refresh", false, false),
+			).WithStyle(slack.StyleDefault),
+		),
+		slack.NewDividerBlock(),
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject(slack.PlainTextType, "Matching Alerts", false, false),
+		),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.MarkdownType, alertListText, false, false),
+			nil,
+			nil,
+		),
+	}
+
+	return slack.ModalViewRequest{
+		Type: slack.VTModal,
+		Title: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Salvage Alerts",
+		},
+		Blocks: slack.Blocks{
+			BlockSet: blocks,
+		},
+		CallbackID:      callbackID.String(),
+		PrivateMetadata: ticket.ID.String(),
+		Submit: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Submit",
 		},
 		Close: &slack.TextBlockObject{
 			Type: slack.PlainTextType,

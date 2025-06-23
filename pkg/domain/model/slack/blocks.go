@@ -27,6 +27,7 @@ const (
 	CallbackSubmitResolveTicket CallbackID = "submit_resolve_ticket"
 	CallbackSubmitBindAlert     CallbackID = "submit_bind_alert"
 	CallbackSubmitBindList      CallbackID = "submit_bind_list"
+	CallbackSubmitSalvage       CallbackID = "submit_salvage"
 )
 
 type BlockID string
@@ -40,6 +41,8 @@ const (
 	BlockIDTicketID         BlockID = "ticket_id_block"
 	BlockIDTicketConclusion BlockID = "ticket_conclusion_block"
 	BlockIDTicketComment    BlockID = "ticket_comment_block"
+	BlockIDSalvageThreshold BlockID = "salvage_threshold_block"
+	BlockIDSalvageKeyword   BlockID = "salvage_keyword_block"
 )
 
 // ActionID in block
@@ -54,6 +57,9 @@ const (
 	BlockActionIDTicketID         BlockActionID = "ticket_id_input"
 	BlockActionIDTicketComment    BlockActionID = "ticket_comment_input"
 	BlockActionIDTicketConclusion BlockActionID = "ticket_conclusion_input"
+	BlockActionIDSalvageThreshold BlockActionID = "salvage_threshold_input"
+	BlockActionIDSalvageKeyword   BlockActionID = "salvage_keyword_input"
+	BlockActionIDSalvageRefresh   BlockActionID = "salvage_refresh_button"
 )
 
 type ActionID string
@@ -73,6 +79,7 @@ const (
 
 	// For ticket
 	ActionIDResolveTicket ActionID = "resolve_ticket"
+	ActionIDSalvage       ActionID = "salvage"
 )
 
 type Mention struct {
