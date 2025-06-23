@@ -23,6 +23,9 @@ type TicketCreationOptions struct {
 	IsTest       bool // Whether this is a test ticket
 }
 
+// TicketUpdateFunction defines a function that updates a ticket
+type TicketUpdateFunction func(ctx context.Context, ticket *ticket.Ticket) error
+
 // createTicketWithSlackPosting creates a ticket and posts it to Slack
 func (uc *UseCases) createTicketWithSlackPosting(ctx context.Context, opts TicketCreationOptions, alerts alert.Alerts) (*ticket.Ticket, error) {
 	// Create new ticket
@@ -188,13 +191,8 @@ func (uc *UseCases) CreateManualTicketWithTest(ctx context.Context, title, descr
 	return uc.createTicketWithSlackPosting(ctx, opts, alert.Alerts{})
 }
 
-// UpdateTicket updates a ticket's title and description
-func (uc *UseCases) UpdateTicket(ctx context.Context, ticketID types.TicketID, title, description string, user *slack.User) (*ticket.Ticket, error) {
-	// Validate required fields
-	if title == "" {
-		return nil, goerr.New("title is required")
-	}
-
+// updateTicketWithSlackSync is a common helper function for updating tickets with Slack synchronization
+func (uc *UseCases) updateTicketWithSlackSync(ctx context.Context, ticketID types.TicketID, updateFunc TicketUpdateFunction) (*ticket.Ticket, error) {
 	// Get existing ticket
 	existingTicket, err := uc.repository.GetTicket(ctx, ticketID)
 	if err != nil {
@@ -204,15 +202,13 @@ func (uc *UseCases) UpdateTicket(ctx context.Context, ticketID types.TicketID, t
 		return nil, goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
 	}
 
-	// Update metadata
-	existingTicket.Metadata.Title = title
-	existingTicket.Metadata.Description = description
-	existingTicket.UpdatedAt = clock.Now(ctx)
-
-	// Recalculate embedding since title/description changed
-	if err := existingTicket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
-		return nil, goerr.Wrap(err, "failed to recalculate ticket embedding")
+	// Apply the update function
+	if err := updateFunc(ctx, existingTicket); err != nil {
+		return nil, err
 	}
+
+	// Update timestamp
+	existingTicket.UpdatedAt = clock.Now(ctx)
 
 	// Save updated ticket
 	if err := uc.repository.PutTicket(ctx, *existingTicket); err != nil {
@@ -220,20 +216,106 @@ func (uc *UseCases) UpdateTicket(ctx context.Context, ticketID types.TicketID, t
 	}
 
 	// Update Slack post if ticket has a Slack thread
-	if existingTicket.SlackThread != nil {
-		// Get associated alerts for Slack update
-		alerts, err := uc.repository.BatchGetAlerts(ctx, existingTicket.AlertIDs)
-		if err != nil {
-			// Log error but don't fail the update
-			_ = msg.Trace(ctx, "💥 Failed to get alerts for Slack update: %s", err.Error())
-		} else {
-			st := uc.slackService.NewThread(*existingTicket.SlackThread)
-			if _, err := st.PostTicket(ctx, *existingTicket, alerts); err != nil {
-				// Log error but don't fail the update
-				_ = msg.Trace(ctx, "💥 Failed to update Slack post: %s", err.Error())
-			}
-		}
+	if err := uc.syncTicketToSlack(ctx, existingTicket); err != nil {
+		// Log error but don't fail the update
+		_ = msg.Trace(ctx, "💥 Failed to sync ticket to Slack: %s", err.Error())
 	}
 
 	return existingTicket, nil
+}
+
+// syncTicketToSlack syncs a single ticket to Slack
+func (uc *UseCases) syncTicketToSlack(ctx context.Context, ticket *ticket.Ticket) error {
+	if ticket.SlackThread == nil || uc.slackService == nil {
+		return nil // No Slack thread or service, skip sync
+	}
+
+	// Get associated alerts for Slack update
+	alerts, err := uc.repository.BatchGetAlerts(ctx, ticket.AlertIDs)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alerts for Slack update")
+	}
+
+	st := uc.slackService.NewThread(*ticket.SlackThread)
+	if _, err := st.PostTicket(ctx, *ticket, alerts); err != nil {
+		return goerr.Wrap(err, "failed to update Slack post")
+	}
+
+	return nil
+}
+
+// UpdateTicket updates a ticket's title and description
+func (uc *UseCases) UpdateTicket(ctx context.Context, ticketID types.TicketID, title, description string, user *slack.User) (*ticket.Ticket, error) {
+	// Validate required fields
+	if title == "" {
+		return nil, goerr.New("title is required")
+	}
+
+	updateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
+		// Update metadata
+		ticket.Metadata.Title = title
+		ticket.Metadata.Description = description
+
+		// Recalculate embedding since title/description changed
+		if err := ticket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
+			return goerr.Wrap(err, "failed to recalculate ticket embedding")
+		}
+
+		return nil
+	}
+
+	return uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
+}
+
+// UpdateTicketStatus updates a ticket's status
+func (uc *UseCases) UpdateTicketStatus(ctx context.Context, ticketID types.TicketID, status types.TicketStatus) (*ticket.Ticket, error) {
+	updateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
+		ticket.Status = status
+		return nil
+	}
+
+	return uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
+}
+
+// UpdateTicketConclusion updates a ticket's conclusion and reason
+func (uc *UseCases) UpdateTicketConclusion(ctx context.Context, ticketID types.TicketID, conclusion types.AlertConclusion, reason string) (*ticket.Ticket, error) {
+	updateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
+		// Only allow updating conclusion for resolved tickets
+		if ticket.Status != types.TicketStatusResolved {
+			return goerr.New("can only update conclusion for resolved tickets",
+				goerr.V("ticket_id", ticketID),
+				goerr.V("current_status", ticket.Status))
+		}
+
+		// Update conclusion and reason
+		ticket.Conclusion = conclusion
+		ticket.Reason = reason
+		return nil
+	}
+
+	return uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
+}
+
+// UpdateMultipleTicketsStatus updates multiple tickets' status
+func (uc *UseCases) UpdateMultipleTicketsStatus(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) ([]*ticket.Ticket, error) {
+	// Batch update status in repository
+	if err := uc.repository.BatchUpdateTicketsStatus(ctx, ticketIDs, status); err != nil {
+		return nil, goerr.Wrap(err, "failed to batch update tickets status")
+	}
+
+	// Retrieve updated tickets
+	tickets, err := uc.repository.BatchGetTickets(ctx, ticketIDs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get updated tickets")
+	}
+
+	// Update Slack posts for tickets that have Slack threads
+	for _, t := range tickets {
+		if err := uc.syncTicketToSlack(ctx, t); err != nil {
+			// Log error but don't fail the update
+			_ = msg.Trace(ctx, "💥 Failed to sync ticket to Slack (ticket %s): %s", t.ID, err.Error())
+		}
+	}
+
+	return tickets, nil
 }

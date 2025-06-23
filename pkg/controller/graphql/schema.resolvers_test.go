@@ -5,14 +5,29 @@ import (
 	"testing"
 
 	"github.com/m-mizutani/gt"
+	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/usecase"
 )
 
 func TestUpdateTicketConclusion(t *testing.T) {
 	repo := repository.NewMemory()
-	resolver := &Resolver{repo: repo, slackService: nil, mrkdwnConv: nil}
+
+	// Create LLM client mock for embedding generation
+	llmMock := &mock.LLMClientMock{
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
+			embedding := make([]float64, dimension)
+			for i := range embedding {
+				embedding[i] = 0.1 + float64(i)*0.01
+			}
+			return [][]float64{embedding}, nil
+		},
+	}
+
+	uc := usecase.New(usecase.WithRepository(repo), usecase.WithLLMClient(llmMock))
+	resolver := NewResolver(repo, nil, uc)
 
 	// Create a resolved ticket
 	testTicket := &ticket.Ticket{

@@ -7,6 +7,7 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 )
 
@@ -95,4 +96,128 @@ func TestCreateManualTicket(t *testing.T) {
 		user:        nil,
 		expectError: false,
 	}))
+}
+
+func TestUpdateTicketStatus(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewMemory()
+
+	// Create LLM client mock
+	llmMock := &mock.LLMClientMock{
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
+			embedding := make([]float64, dimension)
+			for i := range embedding {
+				embedding[i] = 0.1 + float64(i)*0.01
+			}
+			return [][]float64{embedding}, nil
+		},
+	}
+
+	// Create use case without Slack service to test core functionality
+	uc := New(WithRepository(repo), WithLLMClient(llmMock))
+
+	// Create a test ticket first
+	user := &slack.User{ID: "user1", Name: "Test User"}
+	ticket, err := uc.CreateManualTicket(ctx, "Test Title", "Test Description", user)
+	gt.NoError(t, err)
+	gt.Value(t, ticket).NotNil()
+
+	// Test updating ticket status
+	updatedTicket, err := uc.UpdateTicketStatus(ctx, ticket.ID, types.TicketStatus("resolved"))
+	gt.NoError(t, err)
+	gt.Value(t, updatedTicket).NotNil()
+	gt.Value(t, updatedTicket.Status).Equal(types.TicketStatus("resolved"))
+}
+
+func TestUpdateTicketConclusion(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewMemory()
+
+	// Create LLM client mock
+	llmMock := &mock.LLMClientMock{
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
+			embedding := make([]float64, dimension)
+			for i := range embedding {
+				embedding[i] = 0.1 + float64(i)*0.01
+			}
+			return [][]float64{embedding}, nil
+		},
+	}
+
+	// Create use case without Slack service to test core functionality
+	uc := New(WithRepository(repo), WithLLMClient(llmMock))
+
+	// Create a test ticket first and set it to resolved
+	user := &slack.User{ID: "user1", Name: "Test User"}
+	ticket, err := uc.CreateManualTicket(ctx, "Test Title", "Test Description", user)
+	gt.NoError(t, err)
+	gt.Value(t, ticket).NotNil()
+
+	// Set ticket to resolved status
+	ticket.Status = types.TicketStatus("resolved")
+	err = repo.PutTicket(ctx, *ticket)
+	gt.NoError(t, err)
+
+	// Test updating ticket conclusion
+	updatedTicket, err := uc.UpdateTicketConclusion(ctx, ticket.ID, types.AlertConclusion("true_positive"), "Test reason")
+	gt.NoError(t, err)
+	gt.Value(t, updatedTicket).NotNil()
+	gt.Value(t, updatedTicket.Conclusion).Equal(types.AlertConclusion("true_positive"))
+	gt.Value(t, updatedTicket.Reason).Equal("Test reason")
+}
+
+func TestUpdateTicketSlackIntegration(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewMemory()
+
+	// Create LLM client mock
+	llmMock := &mock.LLMClientMock{
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
+			embedding := make([]float64, dimension)
+			for i := range embedding {
+				embedding[i] = 0.1 + float64(i)*0.01
+			}
+			return [][]float64{embedding}, nil
+		},
+	}
+
+	// Create use case without Slack service to test core functionality
+	uc := New(WithRepository(repo), WithLLMClient(llmMock))
+
+	// Create a test ticket
+	user := &slack.User{ID: "user1", Name: "Test User"}
+	ticket, err := uc.CreateManualTicket(ctx, "Test Title", "Test Description", user)
+	gt.NoError(t, err)
+	gt.Value(t, ticket).NotNil()
+
+	// Test updating ticket title and description
+	updatedTicket, err := uc.UpdateTicket(ctx, ticket.ID, "Updated Title", "Updated Description", user)
+	gt.NoError(t, err)
+	gt.Value(t, updatedTicket).NotNil()
+	gt.Value(t, updatedTicket.Metadata.Title).Equal("Updated Title")
+	gt.Value(t, updatedTicket.Metadata.Description).Equal("Updated Description")
+
+	// Test updating ticket status
+	updatedTicket, err = uc.UpdateTicketStatus(ctx, ticket.ID, types.TicketStatus("resolved"))
+	gt.NoError(t, err)
+	gt.Value(t, updatedTicket).NotNil()
+	gt.Value(t, updatedTicket.Status).Equal(types.TicketStatus("resolved"))
+
+	// Test updating ticket conclusion (requires resolved status)
+	updatedTicket, err = uc.UpdateTicketConclusion(ctx, ticket.ID, types.AlertConclusion("true_positive"), "Test conclusion reason")
+	gt.NoError(t, err)
+	gt.Value(t, updatedTicket).NotNil()
+	gt.Value(t, updatedTicket.Conclusion).Equal(types.AlertConclusion("true_positive"))
+	gt.Value(t, updatedTicket.Reason).Equal("Test conclusion reason")
+
+	// Test updating multiple tickets status
+	// Create another ticket for batch testing
+	ticket2, err := uc.CreateManualTicket(ctx, "Test Title 2", "Test Description 2", user)
+	gt.NoError(t, err)
+
+	tickets, err := uc.UpdateMultipleTicketsStatus(ctx, []types.TicketID{ticket.ID, ticket2.ID}, types.TicketStatus("open"))
+	gt.NoError(t, err)
+	gt.Array(t, tickets).Length(2)
+	gt.Value(t, tickets[0].Status).Equal(types.TicketStatus("open"))
+	gt.Value(t, tickets[1].Status).Equal(types.TicketStatus("open"))
 }

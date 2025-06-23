@@ -126,7 +126,8 @@ func TestGenerateConfigTool_ConfigOutput(t *testing.T) {
 		},
 	})
 
-	gt.NoError(t, err)
+	// The tool returns gollem.ErrExitConversation on success, which is expected
+	gt.True(t, err != nil && err.Error() == "exit conversation")
 	gt.Equal(t, result["status"], "success")
 
 	// Verify YAML file was created

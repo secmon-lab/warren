@@ -110,17 +110,19 @@ func (r *findingResolver) Severity(ctx context.Context, obj *ticket.Finding) (st
 
 // UpdateTicketStatus is the resolver for the updateTicketStatus field.
 func (r *mutationResolver) UpdateTicketStatus(ctx context.Context, id string, status string) (*ticket.Ticket, error) {
-	t, err := r.repo.GetTicket(ctx, types.TicketID(id))
+	// Validate status
+	ticketStatus := types.TicketStatus(status)
+	if err := ticketStatus.Validate(); err != nil {
+		return nil, goerr.Wrap(err, "invalid ticket status", goerr.V("status", status))
+	}
+
+	// Call the use case to update ticket status with Slack notification
+	updatedTicket, err := r.uc.UpdateTicketStatus(ctx, types.TicketID(id), ticketStatus)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get ticket")
+		return nil, goerr.Wrap(err, "failed to update ticket status")
 	}
 
-	t.Status = types.TicketStatus(status)
-	if err := r.repo.PutTicket(ctx, *t); err != nil {
-		return nil, goerr.Wrap(err, "failed to update ticket")
-	}
-
-	return t, nil
+	return updatedTicket, nil
 }
 
 // UpdateMultipleTicketsStatus is the resolver for the updateMultipleTicketsStatus field.
@@ -141,15 +143,10 @@ func (r *mutationResolver) UpdateMultipleTicketsStatus(ctx context.Context, ids 
 		ticketIDs[i] = ticketID
 	}
 
-	// Batch update status
-	if err := r.repo.BatchUpdateTicketsStatus(ctx, ticketIDs, ticketStatus); err != nil {
-		return nil, goerr.Wrap(err, "failed to batch update tickets status")
-	}
-
-	// Retrieve updated tickets
-	tickets, err := r.repo.BatchGetTickets(ctx, ticketIDs)
+	// Call the use case to update multiple tickets status with Slack notification
+	tickets, err := r.uc.UpdateMultipleTicketsStatus(ctx, ticketIDs, ticketStatus)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get updated tickets")
+		return nil, goerr.Wrap(err, "failed to update multiple tickets status")
 	}
 
 	return tickets, nil
@@ -157,32 +154,19 @@ func (r *mutationResolver) UpdateMultipleTicketsStatus(ctx context.Context, ids 
 
 // UpdateTicketConclusion is the resolver for the updateTicketConclusion field.
 func (r *mutationResolver) UpdateTicketConclusion(ctx context.Context, id string, conclusion string, reason string) (*ticket.Ticket, error) {
-	t, err := r.repo.GetTicket(ctx, types.TicketID(id))
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get ticket")
-	}
-
-	// Only allow updating conclusion for resolved tickets
-	if t.Status != types.TicketStatusResolved {
-		return nil, goerr.New("can only update conclusion for resolved tickets",
-			goerr.V("ticket_id", id),
-			goerr.V("current_status", t.Status))
-	}
-
 	// Validate conclusion value
 	alertConclusion := types.AlertConclusion(conclusion)
 	if err := alertConclusion.Validate(); err != nil {
 		return nil, goerr.Wrap(err, "invalid conclusion", goerr.V("conclusion", conclusion))
 	}
 
-	t.Conclusion = alertConclusion
-	t.Reason = reason
-
-	if err := r.repo.PutTicket(ctx, *t); err != nil {
-		return nil, goerr.Wrap(err, "failed to update ticket")
+	// Call the use case to update ticket conclusion with Slack notification
+	updatedTicket, err := r.uc.UpdateTicketConclusion(ctx, types.TicketID(id), alertConclusion, reason)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to update ticket conclusion")
 	}
 
-	return t, nil
+	return updatedTicket, nil
 }
 
 // UpdateTicket is the resolver for the updateTicket field.

@@ -17,7 +17,20 @@ import (
 
 func TestTicketResolver(t *testing.T) {
 	repo := repository.NewMemory()
-	resolver := NewResolver(repo, nil, nil)
+
+	// Create LLM client mock for embedding generation
+	llmMock := &mock.LLMClientMock{
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
+			embedding := make([]float64, dimension)
+			for i := range embedding {
+				embedding[i] = 0.1 + float64(i)*0.01
+			}
+			return [][]float64{embedding}, nil
+		},
+	}
+
+	uc := usecase.New(usecase.WithRepository(repo), usecase.WithLLMClient(llmMock))
+	resolver := NewResolver(repo, nil, uc)
 	ctx := context.Background()
 
 	now := time.Now()
@@ -80,7 +93,7 @@ func TestTicketResolver(t *testing.T) {
 			{
 				ID:        types.TicketID("ticket-3"),
 				Metadata:  ticket.Metadata{Title: "Test Ticket 3", Description: "desc"},
-				Status:    types.TicketStatus("closed"),
+				Status:    types.TicketStatus("resolved"),
 				CreatedAt: time.Now().Add(2 * time.Hour),
 				UpdatedAt: time.Now().Add(2*time.Hour + time.Minute),
 			},
@@ -123,7 +136,7 @@ func TestTicketResolver(t *testing.T) {
 	})
 
 	t.Run("UpdateTicketStatus", func(t *testing.T) {
-		newStatus := types.TicketStatus("closed")
+		newStatus := types.TicketStatus("resolved")
 		got, err := resolver.Mutation().UpdateTicketStatus(ctx, string(testTicket.ID), string(newStatus))
 		gt.NoError(t, err)
 		gt.Value(t, got.Status).Equal(newStatus)
