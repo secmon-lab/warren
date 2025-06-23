@@ -232,7 +232,7 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 				model.ActionIDSalvage.String(),
 				ticket.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Salvage", false, false),
-			).WithStyle(slack.StyleDefault),
+			).WithStyle(slack.StyleSecondary),
 		}
 		blocks = append(blocks, slack.NewActionBlock("ticket_actions", buttons...))
 	}
