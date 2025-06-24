@@ -124,8 +124,17 @@ func (x *Controller) handleSlackInteractionBlockActions(ctx context.Context, int
 
 	// Handle modal block actions differently (they don't have channel/thread context)
 	if interaction.View.ID != "" {
+		logging.From(ctx).Info("modal block action", 
+			"view_id", interaction.View.ID,
+			"action_count", len(interaction.ActionCallback.BlockActions))
+		
 		for _, action := range interaction.ActionCallback.BlockActions {
+			logging.From(ctx).Info("checking action", 
+				"action_id", action.ActionID,
+				"action_value", action.Value)
+			
 			if action.ActionID == "salvage_refresh_button" {
+				logging.From(ctx).Info("handling salvage refresh")
 				return x.handleSalvageRefresh(ctx, interaction, user)
 			}
 		}
@@ -164,7 +173,15 @@ func (x *Controller) handleSalvageRefresh(ctx context.Context, interaction slack
 	values := interaction.View.State.Values
 	metadata := interaction.View.PrivateMetadata
 
+	logging.From(ctx).Info("handleSalvageRefresh", 
+		"view_id", interaction.View.ID,
+		"metadata", metadata,
+		"raw_values", values)
+
 	sv := slack_model.BlockActionFromValue(values)
+	
+	logging.From(ctx).Info("converted state values", 
+		"state_values", sv)
 
 	return x.interaction.HandleSalvageRefresh(ctx, user, metadata, sv, interaction.View.ID)
 }
