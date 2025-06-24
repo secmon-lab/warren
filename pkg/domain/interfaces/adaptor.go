@@ -30,6 +30,7 @@ type SlackClient interface {
 	AuthTest() (*slack.AuthTestResponse, error)
 	GetTeamInfo() (*slack.TeamInfo, error)
 	OpenView(triggerID string, view slack.ModalViewRequest) (*slack.ViewResponse, error)
+	UpdateView(view slack.ModalViewRequest, externalID, hash, viewID string) (*slack.ViewResponse, error)
 	UploadFileV2Context(ctx context.Context, params slack.UploadFileV2Parameters) (*slack.FileSummary, error)
 	GetUserInfo(userID string) (*slack.User, error)
 	GetConversationInfo(input *slack.GetConversationInfoInput) (*slack.Channel, error)

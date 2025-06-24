@@ -121,6 +121,17 @@ func (x *Controller) handleSlackInteractionBlockActions(ctx context.Context, int
 		ID:   interaction.User.ID,
 		Name: interaction.User.Name,
 	}
+
+	// Handle modal block actions differently (they don't have channel/thread context)
+	if interaction.View.ID != "" {
+		for _, action := range interaction.ActionCallback.BlockActions {
+			if action.ActionID == "salvage_refresh_button" {
+				return x.handleSalvageRefresh(ctx, interaction, user)
+			}
+		}
+		return nil
+	}
+
 	th := slack_model.Thread{
 		ChannelID: interaction.Channel.ID,
 		ThreadID:  interaction.Message.ThreadTimestamp,
@@ -146,4 +157,14 @@ func (x *Controller) handleSlackInteractionViewSubmission(ctx context.Context, i
 	callbackID := slack_model.CallbackID(interaction.View.CallbackID)
 
 	return x.interaction.HandleSlackInteractionViewSubmission(ctx, user, callbackID, metadata, sv)
+}
+
+func (x *Controller) handleSalvageRefresh(ctx context.Context, interaction slack.InteractionCallback, user slack_model.User) error {
+	// Extract current values from the modal state
+	values := interaction.View.State.Values
+	metadata := interaction.View.PrivateMetadata
+
+	sv := slack_model.BlockActionFromValue(values)
+
+	return x.interaction.HandleSalvageRefresh(ctx, user, metadata, sv, interaction.View.ID)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -259,7 +260,7 @@ func calculateCosineSimilarity(a, b []float32) float64 {
 
 	var dotProduct, normA, normB float64
 
-	for i := 0; i < len(a); i++ {
+	for i := range len(a) {
 		dotProduct += float64(a[i] * b[i])
 		normA += float64(a[i] * a[i])
 		normB += float64(b[i] * b[i])
@@ -274,4 +275,46 @@ func calculateCosineSimilarity(a, b []float32) float64 {
 
 func containsKeyword(text, keyword string) bool {
 	return strings.Contains(strings.ToLower(text), strings.ToLower(keyword))
+}
+
+func (uc *UseCases) HandleSalvageRefresh(ctx context.Context, user slack.User, metadata string, values slack.StateValue, viewID string) error {
+	ticketID := types.TicketID(metadata)
+	target, err := uc.repository.GetTicket(ctx, ticketID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get ticket")
+	} else if target == nil {
+		return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+	}
+
+	// Extract threshold and keyword from current form values
+	thresholdStr, _ := getSlackValue[string](values,
+		slack.BlockIDSalvageThreshold,
+		slack.BlockActionIDSalvageThreshold,
+	)
+
+	keyword, _ := getSlackValue[string](values,
+		slack.BlockIDSalvageKeyword,
+		slack.BlockActionIDSalvageKeyword,
+	)
+
+	// Parse threshold
+	var threshold float64
+	if thresholdStr != "" {
+		if parsed, err := strconv.ParseFloat(thresholdStr, 64); err == nil {
+			threshold = parsed
+		}
+	}
+
+	// Get updated salvageable alerts based on current form values
+	unboundAlerts, err := uc.getSalvageableAlerts(ctx, target, threshold, keyword)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get salvageable alerts")
+	}
+
+	// Update the modal view with refreshed alert list
+	if err := uc.slackService.UpdateSalvageModal(ctx, target, unboundAlerts, viewID, threshold, keyword); err != nil {
+		return goerr.Wrap(err, "failed to update salvage modal")
+	}
+
+	return nil
 }

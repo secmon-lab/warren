@@ -48,6 +48,9 @@ import (
 //			UpdateMessageContextFunc: func(ctx context.Context, channelID string, timestamp string, options ...slackslack.MsgOption) (string, string, string, error) {
 //				panic("mock out the UpdateMessageContext method")
 //			},
+//			UpdateViewFunc: func(view slackslack.ModalViewRequest, externalID string, hash string, viewID string) (*slackslack.ViewResponse, error) {
+//				panic("mock out the UpdateView method")
+//			},
 //			UploadFileV2ContextFunc: func(ctx context.Context, params slackslack.UploadFileV2Parameters) (*slackslack.FileSummary, error) {
 //				panic("mock out the UploadFileV2Context method")
 //			},
@@ -81,6 +84,9 @@ type SlackClientMock struct {
 
 	// UpdateMessageContextFunc mocks the UpdateMessageContext method.
 	UpdateMessageContextFunc func(ctx context.Context, channelID string, timestamp string, options ...slackslack.MsgOption) (string, string, string, error)
+
+	// UpdateViewFunc mocks the UpdateView method.
+	UpdateViewFunc func(view slackslack.ModalViewRequest, externalID string, hash string, viewID string) (*slackslack.ViewResponse, error)
 
 	// UploadFileV2ContextFunc mocks the UploadFileV2Context method.
 	UploadFileV2ContextFunc func(ctx context.Context, params slackslack.UploadFileV2Parameters) (*slackslack.FileSummary, error)
@@ -135,6 +141,17 @@ type SlackClientMock struct {
 			// Options is the options argument value.
 			Options []slackslack.MsgOption
 		}
+		// UpdateView holds details about calls to the UpdateView method.
+		UpdateView []struct {
+			// View is the view argument value.
+			View slackslack.ModalViewRequest
+			// ExternalID is the externalID argument value.
+			ExternalID string
+			// Hash is the hash argument value.
+			Hash string
+			// ViewID is the viewID argument value.
+			ViewID string
+		}
 		// UploadFileV2Context holds details about calls to the UploadFileV2Context method.
 		UploadFileV2Context []struct {
 			// Ctx is the ctx argument value.
@@ -151,6 +168,7 @@ type SlackClientMock struct {
 	lockOpenView             sync.RWMutex
 	lockPostMessageContext   sync.RWMutex
 	lockUpdateMessageContext sync.RWMutex
+	lockUpdateView           sync.RWMutex
 	lockUploadFileV2Context  sync.RWMutex
 }
 
@@ -456,6 +474,54 @@ func (mock *SlackClientMock) UpdateMessageContextCalls() []struct {
 	mock.lockUpdateMessageContext.RLock()
 	calls = mock.calls.UpdateMessageContext
 	mock.lockUpdateMessageContext.RUnlock()
+	return calls
+}
+
+// UpdateView calls UpdateViewFunc.
+func (mock *SlackClientMock) UpdateView(view slackslack.ModalViewRequest, externalID string, hash string, viewID string) (*slackslack.ViewResponse, error) {
+	callInfo := struct {
+		View       slackslack.ModalViewRequest
+		ExternalID string
+		Hash       string
+		ViewID     string
+	}{
+		View:       view,
+		ExternalID: externalID,
+		Hash:       hash,
+		ViewID:     viewID,
+	}
+	mock.lockUpdateView.Lock()
+	mock.calls.UpdateView = append(mock.calls.UpdateView, callInfo)
+	mock.lockUpdateView.Unlock()
+	if mock.UpdateViewFunc == nil {
+		var (
+			viewResponseOut *slackslack.ViewResponse
+			errOut          error
+		)
+		return viewResponseOut, errOut
+	}
+	return mock.UpdateViewFunc(view, externalID, hash, viewID)
+}
+
+// UpdateViewCalls gets all the calls that were made to UpdateView.
+// Check the length with:
+//
+//	len(mockedSlackClient.UpdateViewCalls())
+func (mock *SlackClientMock) UpdateViewCalls() []struct {
+	View       slackslack.ModalViewRequest
+	ExternalID string
+	Hash       string
+	ViewID     string
+} {
+	var calls []struct {
+		View       slackslack.ModalViewRequest
+		ExternalID string
+		Hash       string
+		ViewID     string
+	}
+	mock.lockUpdateView.RLock()
+	calls = mock.calls.UpdateView
+	mock.lockUpdateView.RUnlock()
 	return calls
 }
 
@@ -3583,6 +3649,9 @@ func (mock *SlackEventUsecasesMock) HandleSlackMessageCalls() []struct {
 //
 //		// make and configure a mocked interfaces.SlackInteractionUsecases
 //		mockedSlackInteractionUsecases := &SlackInteractionUsecasesMock{
+//			HandleSalvageRefreshFunc: func(ctx context.Context, user modelslack.User, metadata string, values modelslack.StateValue, viewID string) error {
+//				panic("mock out the HandleSalvageRefresh method")
+//			},
 //			HandleSlackInteractionBlockActionsFunc: func(ctx context.Context, user modelslack.User, slackThread modelslack.Thread, actionID modelslack.ActionID, value string, triggerID string) error {
 //				panic("mock out the HandleSlackInteractionBlockActions method")
 //			},
@@ -3596,6 +3665,9 @@ func (mock *SlackEventUsecasesMock) HandleSlackMessageCalls() []struct {
 //
 //	}
 type SlackInteractionUsecasesMock struct {
+	// HandleSalvageRefreshFunc mocks the HandleSalvageRefresh method.
+	HandleSalvageRefreshFunc func(ctx context.Context, user modelslack.User, metadata string, values modelslack.StateValue, viewID string) error
+
 	// HandleSlackInteractionBlockActionsFunc mocks the HandleSlackInteractionBlockActions method.
 	HandleSlackInteractionBlockActionsFunc func(ctx context.Context, user modelslack.User, slackThread modelslack.Thread, actionID modelslack.ActionID, value string, triggerID string) error
 
@@ -3604,6 +3676,19 @@ type SlackInteractionUsecasesMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// HandleSalvageRefresh holds details about calls to the HandleSalvageRefresh method.
+		HandleSalvageRefresh []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// User is the user argument value.
+			User modelslack.User
+			// Metadata is the metadata argument value.
+			Metadata string
+			// Values is the values argument value.
+			Values modelslack.StateValue
+			// ViewID is the viewID argument value.
+			ViewID string
+		}
 		// HandleSlackInteractionBlockActions holds details about calls to the HandleSlackInteractionBlockActions method.
 		HandleSlackInteractionBlockActions []struct {
 			// Ctx is the ctx argument value.
@@ -3633,8 +3718,60 @@ type SlackInteractionUsecasesMock struct {
 			Values modelslack.StateValue
 		}
 	}
+	lockHandleSalvageRefresh                 sync.RWMutex
 	lockHandleSlackInteractionBlockActions   sync.RWMutex
 	lockHandleSlackInteractionViewSubmission sync.RWMutex
+}
+
+// HandleSalvageRefresh calls HandleSalvageRefreshFunc.
+func (mock *SlackInteractionUsecasesMock) HandleSalvageRefresh(ctx context.Context, user modelslack.User, metadata string, values modelslack.StateValue, viewID string) error {
+	callInfo := struct {
+		Ctx      context.Context
+		User     modelslack.User
+		Metadata string
+		Values   modelslack.StateValue
+		ViewID   string
+	}{
+		Ctx:      ctx,
+		User:     user,
+		Metadata: metadata,
+		Values:   values,
+		ViewID:   viewID,
+	}
+	mock.lockHandleSalvageRefresh.Lock()
+	mock.calls.HandleSalvageRefresh = append(mock.calls.HandleSalvageRefresh, callInfo)
+	mock.lockHandleSalvageRefresh.Unlock()
+	if mock.HandleSalvageRefreshFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.HandleSalvageRefreshFunc(ctx, user, metadata, values, viewID)
+}
+
+// HandleSalvageRefreshCalls gets all the calls that were made to HandleSalvageRefresh.
+// Check the length with:
+//
+//	len(mockedSlackInteractionUsecases.HandleSalvageRefreshCalls())
+func (mock *SlackInteractionUsecasesMock) HandleSalvageRefreshCalls() []struct {
+	Ctx      context.Context
+	User     modelslack.User
+	Metadata string
+	Values   modelslack.StateValue
+	ViewID   string
+} {
+	var calls []struct {
+		Ctx      context.Context
+		User     modelslack.User
+		Metadata string
+		Values   modelslack.StateValue
+		ViewID   string
+	}
+	mock.lockHandleSalvageRefresh.RLock()
+	calls = mock.calls.HandleSalvageRefresh
+	mock.lockHandleSalvageRefresh.RUnlock()
+	return calls
 }
 
 // HandleSlackInteractionBlockActions calls HandleSlackInteractionBlockActionsFunc.

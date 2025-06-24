@@ -232,7 +232,7 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 				model.ActionIDSalvage.String(),
 				ticket.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Salvage", false, false),
-			).WithStyle(slack.StyleSecondary),
+			).WithStyle(slack.StyleDefault),
 		}
 		blocks = append(blocks, slack.NewActionBlock("ticket_actions", buttons...))
 	}
@@ -430,7 +430,7 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 	}
 }
 
-func buildSalvageModalViewRequest(callbackID model.CallbackID, ticket *ticket.Ticket, unboundAlerts alert.Alerts) slack.ModalViewRequest {
+func buildSalvageModalViewRequest(callbackID model.CallbackID, ticket *ticket.Ticket, unboundAlerts alert.Alerts, threshold float64, keyword string) slack.ModalViewRequest {
 	// Build the alert list section
 	var alertListText string
 	displayCount := min(len(unboundAlerts), 10)
@@ -450,6 +450,12 @@ func buildSalvageModalViewRequest(callbackID model.CallbackID, ticket *ticket.Ti
 		}
 	}
 
+	// Set current threshold value
+	thresholdValue := "0.99"
+	if threshold > 0 {
+		thresholdValue = fmt.Sprintf("%.2f", threshold)
+	}
+
 	blocks := []slack.Block{
 		slack.NewSectionBlock(
 			slack.NewTextBlockObject(slack.PlainTextType, "Search and bind unbound alerts to this ticket", false, false),
@@ -463,7 +469,7 @@ func buildSalvageModalViewRequest(callbackID model.CallbackID, ticket *ticket.Ti
 			slack.NewPlainTextInputBlockElement(
 				slack.NewTextBlockObject(slack.PlainTextType, "0.99", false, false),
 				model.BlockActionIDSalvageThreshold.String(),
-			).WithInitialValue("0.99"),
+			).WithInitialValue(thresholdValue),
 		).WithOptional(true),
 		slack.NewInputBlock(
 			model.BlockIDSalvageKeyword.String(),
@@ -472,7 +478,7 @@ func buildSalvageModalViewRequest(callbackID model.CallbackID, ticket *ticket.Ti
 			slack.NewPlainTextInputBlockElement(
 				slack.NewTextBlockObject(slack.PlainTextType, "Enter keyword", false, false),
 				model.BlockActionIDSalvageKeyword.String(),
-			),
+			).WithInitialValue(keyword),
 		).WithOptional(true),
 		slack.NewActionBlock(
 			"refresh_action",

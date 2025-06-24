@@ -647,9 +647,20 @@ func (x *Service) ShowResolveTicketModal(ctx context.Context, ticket *ticket.Tic
 }
 
 func (x *Service) ShowSalvageModal(ctx context.Context, ticket *ticket.Ticket, unboundAlerts alert.Alerts, triggerID string) error {
-	req := buildSalvageModalViewRequest(model.CallbackSubmitSalvage, ticket, unboundAlerts)
+	req := buildSalvageModalViewRequest(model.CallbackSubmitSalvage, ticket, unboundAlerts, 0.99, "")
 	if _, err := x.client.OpenView(triggerID, req); err != nil {
 		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
+	}
+
+	return nil
+}
+
+func (x *Service) UpdateSalvageModal(ctx context.Context, ticket *ticket.Ticket, unboundAlerts alert.Alerts, viewID string, threshold float64, keyword string) error {
+	req := buildSalvageModalViewRequest(model.CallbackSubmitSalvage, ticket, unboundAlerts, threshold, keyword)
+
+	// Update the view using the correct parameters
+	if _, err := x.client.UpdateView(req, "", "", viewID); err != nil {
+		return goerr.Wrap(err, "failed to update view", goerr.V("req", req), goerr.V("viewID", viewID))
 	}
 
 	return nil
