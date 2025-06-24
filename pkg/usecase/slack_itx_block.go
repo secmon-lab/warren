@@ -197,8 +197,8 @@ func (uc *UseCases) showSalvageModal(ctx context.Context, _ slack.User, _ slack.
 		return goerr.New("ticket not found", goerr.V("ticket_id", targetTicketID))
 	}
 
-	// Get all unbound alerts (threshold=0, keyword="")
-	unboundAlerts, err := uc.getSalvageableAlerts(ctx, ticket, 0, "")
+	// Get all unbound alerts with default threshold 0.99
+	unboundAlerts, err := uc.getSalvageableAlerts(ctx, ticket, 0.99, "")
 	if err != nil {
 		return goerr.Wrap(err, "failed to get salvageable alerts")
 	}
@@ -217,13 +217,6 @@ func (uc *UseCases) getSalvageableAlerts(ctx context.Context, ticket *ticket.Tic
 		return nil, goerr.Wrap(err, "failed to get unbound alerts")
 	}
 
-	// Debug log
-	logging.From(ctx).Info("getSalvageableAlerts", 
-		"unbound_count", len(unboundAlerts), 
-		"threshold", threshold, 
-		"keyword", keyword,
-		"ticket_has_embedding", ticket.Embedding != nil)
-
 	var filteredAlerts alert.Alerts
 
 	for _, alert := range unboundAlerts {
@@ -235,12 +228,6 @@ func (uc *UseCases) getSalvageableAlerts(ctx context.Context, ticket *ticket.Tic
 			if similarity < threshold {
 				include = false
 			}
-			// Debug log for similarity calculation
-			logging.From(ctx).Debug("similarity check", 
-				"alert_id", alert.ID,
-				"similarity", similarity, 
-				"threshold", threshold,
-				"include", include)
 		}
 
 		// Apply keyword filter if keyword is not empty
@@ -258,10 +245,6 @@ func (uc *UseCases) getSalvageableAlerts(ctx context.Context, ticket *ticket.Tic
 			filteredAlerts = append(filteredAlerts, alert)
 		}
 	}
-
-	// Debug log for result
-	logging.From(ctx).Info("getSalvageableAlerts result", 
-		"filtered_count", len(filteredAlerts))
 
 	return filteredAlerts, nil
 }
@@ -303,32 +286,19 @@ func (uc *UseCases) HandleSalvageRefresh(ctx context.Context, user slack.User, m
 		return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
 	}
 
-	// Debug log for incoming values
-	logging.From(ctx).Info("HandleSalvageRefresh", 
-		"ticket_id", ticketID, 
-		"view_id", viewID,
-		"values", values)
-
 	// Extract threshold and keyword from current form values
-	thresholdStr, thresholdOk := getSlackValue[string](values,
+	thresholdStr, _ := getSlackValue[string](values,
 		slack.BlockIDSalvageThreshold,
 		slack.BlockActionIDSalvageThreshold,
 	)
 
-	keyword, keywordOk := getSlackValue[string](values,
+	keyword, _ := getSlackValue[string](values,
 		slack.BlockIDSalvageKeyword,
 		slack.BlockActionIDSalvageKeyword,
 	)
 
-	// Debug log for extracted values
-	logging.From(ctx).Info("extracted values", 
-		"threshold_str", thresholdStr,
-		"threshold_ok", thresholdOk,
-		"keyword", keyword,
-		"keyword_ok", keywordOk)
-
-	// Parse threshold
-	var threshold float64
+	// Parse threshold - default to 0.99
+	threshold := 0.99 // Default threshold
 	if thresholdStr != "" {
 		if parsed, err := strconv.ParseFloat(thresholdStr, 64); err == nil {
 			threshold = parsed
@@ -336,10 +306,6 @@ func (uc *UseCases) HandleSalvageRefresh(ctx context.Context, user slack.User, m
 			logging.From(ctx).Warn("failed to parse threshold", "threshold_str", thresholdStr, "error", err)
 		}
 	}
-
-	logging.From(ctx).Info("final parsed values", 
-		"threshold", threshold,
-		"keyword", keyword)
 
 	// Get updated salvageable alerts based on current form values
 	unboundAlerts, err := uc.getSalvageableAlerts(ctx, target, threshold, keyword)

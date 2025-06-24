@@ -647,6 +647,7 @@ func (x *Service) ShowResolveTicketModal(ctx context.Context, ticket *ticket.Tic
 }
 
 func (x *Service) ShowSalvageModal(ctx context.Context, ticket *ticket.Ticket, unboundAlerts alert.Alerts, triggerID string) error {
+	// Use threshold 0.99 for initial display
 	req := buildSalvageModalViewRequest(model.CallbackSubmitSalvage, ticket, unboundAlerts, 0.99, "")
 	if _, err := x.client.OpenView(triggerID, req); err != nil {
 		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))

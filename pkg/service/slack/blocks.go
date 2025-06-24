@@ -467,7 +467,7 @@ func buildSalvageModalViewRequest(callbackID model.CallbackID, ticket *ticket.Ti
 			slack.NewTextBlockObject(slack.PlainTextType, "Similarity Threshold", false, false),
 			slack.NewTextBlockObject(slack.PlainTextType, "Filter alerts by embedding similarity (0-1)", false, false),
 			slack.NewPlainTextInputBlockElement(
-				slack.NewTextBlockObject(slack.PlainTextType, "0.99", false, false),
+				slack.NewTextBlockObject(slack.PlainTextType, "0", false, false),
 				model.BlockActionIDSalvageThreshold.String(),
 			).WithInitialValue(thresholdValue),
 		).WithOptional(true),
