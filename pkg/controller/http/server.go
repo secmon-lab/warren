@@ -114,6 +114,32 @@ func New(uc UseCase, opts ...Options) *Server {
 		r.Post("/interaction", slackInteractionHandler(s.slackCtrl))
 	})
 
+	// Migration to /hooks
+	r.Route("/hooks", func(r chi.Router) {
+		r.Route("/alert", func(r chi.Router) {
+			r.Route("/raw", func(r chi.Router) {
+				r.Use(authorizeWithPolicy(s.policy))
+				r.Post("/{schema}", alertRawHandler(uc))
+			})
+			r.Route("/pubsub", func(r chi.Router) {
+				r.Use(validateGoogleIDToken)
+				r.Use(authorizeWithPolicy(s.policy))
+				r.Post("/{schema}", alertPubSubHandler(uc))
+			})
+			r.Route("/sns", func(r chi.Router) {
+				r.Use(verifySNSRequest)
+				r.Use(authorizeWithPolicy(s.policy))
+				r.Post("/{schema}", alertSNSHandler(uc))
+			})
+		})
+
+		r.Route("/slack", func(r chi.Router) {
+			r.Use(verifySlackRequest(s.verifier))
+			r.Post("/event", slackEventHandler(s.slackCtrl))
+			r.Post("/interaction", slackInteractionHandler(s.slackCtrl))
+		})
+	})
+
 	// GraphQL endpoint
 	if s.repo != nil {
 		graphqlHandler := graphqlHandler(s.repo, s.slackService, uc)
