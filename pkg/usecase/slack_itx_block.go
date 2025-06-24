@@ -2,11 +2,16 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
+	"math"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -33,6 +38,9 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user
 
 	case slack.ActionIDResolveTicket:
 		return uc.showResolveTicketModal(ctx, user, slackThread, types.TicketID(value), triggerID)
+
+	case slack.ActionIDSalvage:
+		return uc.showSalvageModal(ctx, user, slackThread, types.TicketID(value), triggerID)
 	}
 
 	return nil
@@ -176,6 +184,138 @@ func (uc *UseCases) showResolveTicketModal(ctx context.Context, _ slack.User, _ 
 
 	if err := uc.slackService.ShowResolveTicketModal(ctx, ticket, triggerID); err != nil {
 		return goerr.Wrap(err, "failed to show resolve ticket modal")
+	}
+
+	return nil
+}
+
+func (uc *UseCases) showSalvageModal(ctx context.Context, _ slack.User, _ slack.Thread, targetTicketID types.TicketID, triggerID string) error {
+	ticket, err := uc.repository.GetTicket(ctx, targetTicketID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get ticket")
+	} else if ticket == nil {
+		return goerr.New("ticket not found", goerr.V("ticket_id", targetTicketID))
+	}
+
+	// Get all unbound alerts with default threshold 0.99
+	unboundAlerts, err := uc.getSalvageableAlerts(ctx, ticket, 0.99, "")
+	if err != nil {
+		return goerr.Wrap(err, "failed to get salvageable alerts")
+	}
+
+	if err := uc.slackService.ShowSalvageModal(ctx, ticket, unboundAlerts, triggerID); err != nil {
+		return goerr.Wrap(err, "failed to show salvage modal")
+	}
+
+	return nil
+}
+
+func (uc *UseCases) getSalvageableAlerts(ctx context.Context, ticket *ticket.Ticket, threshold float64, keyword string) (alert.Alerts, error) {
+	// Get all unbound alerts
+	unboundAlerts, err := uc.repository.GetAlertWithoutTicket(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get unbound alerts")
+	}
+
+	var filteredAlerts alert.Alerts
+
+	for _, alert := range unboundAlerts {
+		include := true
+
+		// Apply threshold filter if threshold > 0
+		if threshold > 0 && ticket.Embedding != nil && alert.Embedding != nil {
+			similarity := calculateCosineSimilarity(ticket.Embedding, alert.Embedding)
+			if similarity < threshold {
+				include = false
+			}
+		}
+
+		// Apply keyword filter if keyword is not empty
+		if include && keyword != "" {
+			dataBytes, err := json.Marshal(alert.Data)
+			if err != nil {
+				continue // Skip this alert if data can't be marshaled
+			}
+			if !containsKeyword(string(dataBytes), keyword) {
+				include = false
+			}
+		}
+
+		if include {
+			filteredAlerts = append(filteredAlerts, alert)
+		}
+	}
+
+	return filteredAlerts, nil
+}
+
+func calculateCosineSimilarity(a, b []float32) float64 {
+	if a == nil || b == nil {
+		return 0
+	}
+
+	if len(a) != len(b) {
+		return 0
+	}
+
+	var dotProduct, normA, normB float64
+
+	for i := range len(a) {
+		dotProduct += float64(a[i] * b[i])
+		normA += float64(a[i] * a[i])
+		normB += float64(b[i] * b[i])
+	}
+
+	if normA == 0 || normB == 0 {
+		return 0
+	}
+
+	return dotProduct / (math.Sqrt(normA) * math.Sqrt(normB))
+}
+
+func containsKeyword(text, keyword string) bool {
+	return strings.Contains(strings.ToLower(text), strings.ToLower(keyword))
+}
+
+func (uc *UseCases) HandleSalvageRefresh(ctx context.Context, user slack.User, metadata string, values slack.StateValue, viewID string) error {
+	ticketID := types.TicketID(metadata)
+	target, err := uc.repository.GetTicket(ctx, ticketID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get ticket")
+	} else if target == nil {
+		return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+	}
+
+	// Extract threshold and keyword from current form values
+	thresholdStr, _ := getSlackValue[string](values,
+		slack.BlockIDSalvageThreshold,
+		slack.BlockActionIDSalvageThreshold,
+	)
+
+	keyword, _ := getSlackValue[string](values,
+		slack.BlockIDSalvageKeyword,
+		slack.BlockActionIDSalvageKeyword,
+	)
+
+	// Parse threshold - default to 0.99
+	threshold := 0.99 // Default threshold
+	if thresholdStr != "" {
+		if parsed, err := strconv.ParseFloat(thresholdStr, 64); err == nil {
+			threshold = parsed
+		} else {
+			logging.From(ctx).Warn("failed to parse threshold", "threshold_str", thresholdStr, "error", err)
+		}
+	}
+
+	// Get updated salvageable alerts based on current form values
+	unboundAlerts, err := uc.getSalvageableAlerts(ctx, target, threshold, keyword)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get salvageable alerts")
+	}
+
+	// Update the modal view with refreshed alert list
+	if err := uc.slackService.UpdateSalvageModal(ctx, target, unboundAlerts, viewID, threshold, keyword); err != nil {
+		return goerr.Wrap(err, "failed to update salvage modal")
 	}
 
 	return nil

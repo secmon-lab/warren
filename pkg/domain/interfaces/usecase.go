@@ -18,6 +18,7 @@ type SlackInteractionUsecases interface {
 	// Slack interaction handlers
 	HandleSlackInteractionViewSubmission(ctx context.Context, user slack.User, callbackID slack.CallbackID, metadata string, values slack.StateValue) error
 	HandleSlackInteractionBlockActions(ctx context.Context, user slack.User, slackThread slack.Thread, actionID slack.ActionID, value, triggerID string) error
+	HandleSalvageRefresh(ctx context.Context, user slack.User, metadata string, values slack.StateValue, viewID string) error
 }
 
 type AlertUsecases interface {

@@ -26,6 +26,9 @@ import (
 //			HandleAlertFunc: func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 //				panic("mock out the HandleAlert method")
 //			},
+//			HandleSalvageRefreshFunc: func(ctx context.Context, user slack_model.User, metadata string, values slack_model.StateValue, viewID string) error {
+//				panic("mock out the HandleSalvageRefresh method")
+//			},
 //			HandleSlackAppMentionFunc: func(ctx context.Context, slackMsg slack_model.Message) error {
 //				panic("mock out the HandleSlackAppMention method")
 //			},
@@ -53,6 +56,9 @@ type UseCaseMock struct {
 
 	// HandleAlertFunc mocks the HandleAlert method.
 	HandleAlertFunc func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error)
+
+	// HandleSalvageRefreshFunc mocks the HandleSalvageRefresh method.
+	HandleSalvageRefreshFunc func(ctx context.Context, user slack_model.User, metadata string, values slack_model.StateValue, viewID string) error
 
 	// HandleSlackAppMentionFunc mocks the HandleSlackAppMention method.
 	HandleSlackAppMentionFunc func(ctx context.Context, slackMsg slack_model.Message) error
@@ -90,6 +96,19 @@ type UseCaseMock struct {
 			Schema types.AlertSchema
 			// AlertData is the alertData argument value.
 			AlertData any
+		}
+		// HandleSalvageRefresh holds details about calls to the HandleSalvageRefresh method.
+		HandleSalvageRefresh []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// User is the user argument value.
+			User slack_model.User
+			// Metadata is the metadata argument value.
+			Metadata string
+			// Values is the values argument value.
+			Values slack_model.StateValue
+			// ViewID is the viewID argument value.
+			ViewID string
 		}
 		// HandleSlackAppMention holds details about calls to the HandleSlackAppMention method.
 		HandleSlackAppMention []struct {
@@ -137,6 +156,7 @@ type UseCaseMock struct {
 	lockGetUserIcon                          sync.RWMutex
 	lockGetUserProfile                       sync.RWMutex
 	lockHandleAlert                          sync.RWMutex
+	lockHandleSalvageRefresh                 sync.RWMutex
 	lockHandleSlackAppMention                sync.RWMutex
 	lockHandleSlackInteractionBlockActions   sync.RWMutex
 	lockHandleSlackInteractionViewSubmission sync.RWMutex
@@ -265,6 +285,57 @@ func (mock *UseCaseMock) HandleAlertCalls() []struct {
 	mock.lockHandleAlert.RLock()
 	calls = mock.calls.HandleAlert
 	mock.lockHandleAlert.RUnlock()
+	return calls
+}
+
+// HandleSalvageRefresh calls HandleSalvageRefreshFunc.
+func (mock *UseCaseMock) HandleSalvageRefresh(ctx context.Context, user slack_model.User, metadata string, values slack_model.StateValue, viewID string) error {
+	callInfo := struct {
+		Ctx      context.Context
+		User     slack_model.User
+		Metadata string
+		Values   slack_model.StateValue
+		ViewID   string
+	}{
+		Ctx:      ctx,
+		User:     user,
+		Metadata: metadata,
+		Values:   values,
+		ViewID:   viewID,
+	}
+	mock.lockHandleSalvageRefresh.Lock()
+	mock.calls.HandleSalvageRefresh = append(mock.calls.HandleSalvageRefresh, callInfo)
+	mock.lockHandleSalvageRefresh.Unlock()
+	if mock.HandleSalvageRefreshFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.HandleSalvageRefreshFunc(ctx, user, metadata, values, viewID)
+}
+
+// HandleSalvageRefreshCalls gets all the calls that were made to HandleSalvageRefresh.
+// Check the length with:
+//
+//	len(mockedUseCase.HandleSalvageRefreshCalls())
+func (mock *UseCaseMock) HandleSalvageRefreshCalls() []struct {
+	Ctx      context.Context
+	User     slack_model.User
+	Metadata string
+	Values   slack_model.StateValue
+	ViewID   string
+} {
+	var calls []struct {
+		Ctx      context.Context
+		User     slack_model.User
+		Metadata string
+		Values   slack_model.StateValue
+		ViewID   string
+	}
+	mock.lockHandleSalvageRefresh.RLock()
+	calls = mock.calls.HandleSalvageRefresh
+	mock.lockHandleSalvageRefresh.RUnlock()
 	return calls
 }
 

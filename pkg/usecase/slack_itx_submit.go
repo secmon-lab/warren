@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	_ "embed"
+	"strconv"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
@@ -34,6 +35,8 @@ func (uc *UseCases) HandleSlackInteractionViewSubmission(ctx context.Context, us
 		return uc.handleSlackInteractionViewSubmissionBindAlert(ctx, user, metadata, values)
 	case slack.CallbackSubmitBindList:
 		return uc.handleSlackInteractionViewSubmissionBindList(ctx, user, metadata, values)
+	case slack.CallbackSubmitSalvage:
+		return uc.handleSlackInteractionViewSubmissionSalvage(ctx, user, metadata, values)
 	}
 
 	return nil
@@ -340,6 +343,106 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 	// Generate and send humorous resolve message
 	resolveMessage := uc.generateResolveMessage(ctx, target)
 	msg.Notify(ctx, "%s", resolveMessage)
+
+	return nil
+}
+
+func (uc *UseCases) handleSlackInteractionViewSubmissionSalvage(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
+	logger := logging.From(ctx)
+	logger.Debug("salvaging alerts",
+		"user", user,
+		"metadata", metadata,
+		"values", values,
+	)
+
+	ticketID := types.TicketID(metadata)
+	target, err := uc.repository.GetTicket(ctx, ticketID)
+	if err != nil {
+		_ = msg.Trace(ctx, "💥 Failed to get ticket\n> %s", err.Error())
+		return goerr.Wrap(err, "failed to get ticket")
+	}
+	if target == nil {
+		msg.Notify(ctx, "💥 Ticket not found")
+		return nil
+	}
+
+	st := uc.slackService.NewThread(*target.SlackThread)
+	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
+
+	// Get threshold and keyword from form values
+	thresholdStr, _ := getSlackValue[string](values,
+		slack.BlockIDSalvageThreshold,
+		slack.BlockActionIDSalvageThreshold,
+	)
+
+	keyword, _ := getSlackValue[string](values,
+		slack.BlockIDSalvageKeyword,
+		slack.BlockActionIDSalvageKeyword,
+	)
+
+	// Parse threshold
+	var threshold float64
+	if thresholdStr != "" {
+		if parsed, err := strconv.ParseFloat(thresholdStr, 64); err == nil {
+			threshold = parsed
+		}
+	}
+
+	// Get salvageable alerts based on current form values
+	unboundAlerts, err := uc.getSalvageableAlerts(ctx, target, threshold, keyword)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get salvageable alerts")
+	}
+
+	if len(unboundAlerts) == 0 {
+		msg.Notify(ctx, "📭 No alerts found matching the criteria")
+		return nil
+	}
+
+	// Convert alerts to alert IDs
+	alertIDs := make([]types.AlertID, len(unboundAlerts))
+	for i, alert := range unboundAlerts {
+		alertIDs[i] = alert.ID
+	}
+
+	// Bind alerts to ticket
+	target.AlertIDs = unifyAlertIDs(target.AlertIDs, alertIDs)
+
+	// Recalculate embedding using the unified approach
+	if err := target.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
+		return goerr.Wrap(err, "failed to recalculate ticket embedding")
+	}
+
+	// Update database
+	if err := uc.repository.BatchBindAlertsToTicket(ctx, target.AlertIDs, ticketID); err != nil {
+		return goerr.Wrap(err, "failed to bind alerts to ticket", goerr.V("ticket_id", ticketID), goerr.V("alert_ids", alertIDs))
+	}
+
+	if err := uc.repository.PutTicket(ctx, *target); err != nil {
+		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID))
+	}
+
+	// Update slack view
+	allAlerts, err := uc.repository.BatchGetAlerts(ctx, target.AlertIDs)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get all alerts for ticket")
+	}
+
+	if _, err := st.PostTicket(ctx, *target, allAlerts); err != nil {
+		return goerr.Wrap(err, "failed to update slack thread")
+	}
+
+	// Update individual alert slack threads
+	for _, alert := range unboundAlerts {
+		if alert.SlackThread != nil {
+			alertSt := uc.slackService.NewThread(*alert.SlackThread)
+			if err := alertSt.UpdateAlert(ctx, *alert); err != nil {
+				logger.Warn("failed to update alert slack thread", "alert_id", alert.ID, "error", err)
+			}
+		}
+	}
+
+	msg.Notify(ctx, "🎉 Salvaged %d alerts to ticket %s", len(unboundAlerts), target.Metadata.Title)
 
 	return nil
 }
