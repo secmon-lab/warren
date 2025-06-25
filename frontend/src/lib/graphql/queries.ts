@@ -244,3 +244,24 @@ export const CREATE_TICKET = gql`
     }
   }
 `;
+
+export const GET_SIMILAR_TICKETS = gql`
+  query GetSimilarTickets($ticketId: ID!, $threshold: Float!, $offset: Int, $limit: Int) {
+    similarTickets(ticketId: $ticketId, threshold: $threshold, offset: $offset, limit: $limit) {
+      tickets {
+        id
+        status
+        title
+        description
+        isTest
+        assignee {
+          id
+          name
+        }
+        createdAt
+        updatedAt
+      }
+      totalCount
+    }
+  }
+`;

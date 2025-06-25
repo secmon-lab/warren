@@ -67,6 +67,7 @@ import {
 } from "lucide-react";
 import { EditConclusionModal } from "@/components/ui/edit-conclusion-modal";
 import { EditTicketModal } from "@/components/EditTicketModal";
+import { SimilarTickets } from "@/components/SimilarTickets";
 
 const ALERTS_PER_PAGE = 5;
 
@@ -809,6 +810,9 @@ export default function TicketDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Similar Tickets */}
+          <SimilarTickets ticketId={ticket.id} />
         </div>
       </div>
 

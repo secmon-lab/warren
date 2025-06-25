@@ -94,10 +94,11 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Alert   func(childComplexity int, id string) int
-		Alerts  func(childComplexity int) int
-		Ticket  func(childComplexity int, id string) int
-		Tickets func(childComplexity int, statuses []string, offset *int, limit *int) int
+		Alert          func(childComplexity int, id string) int
+		Alerts         func(childComplexity int) int
+		SimilarTickets func(childComplexity int, ticketID string, threshold float64, offset *int, limit *int) int
+		Ticket         func(childComplexity int, id string) int
+		Tickets        func(childComplexity int, statuses []string, offset *int, limit *int) int
 	}
 
 	Ticket struct {
@@ -158,6 +159,7 @@ type MutationResolver interface {
 type QueryResolver interface {
 	Ticket(ctx context.Context, id string) (*ticket.Ticket, error)
 	Tickets(ctx context.Context, statuses []string, offset *int, limit *int) (*graphql1.TicketsResponse, error)
+	SimilarTickets(ctx context.Context, ticketID string, threshold float64, offset *int, limit *int) (*graphql1.TicketsResponse, error)
 	Alert(ctx context.Context, id string) (*alert.Alert, error)
 	Alerts(ctx context.Context) ([]*alert.Alert, error)
 }
@@ -419,6 +421,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Alerts(childComplexity), true
+
+	case "Query.similarTickets":
+		if e.complexity.Query.SimilarTickets == nil {
+			break
+		}
+
+		args, err := ec.field_Query_similarTickets_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.SimilarTickets(childComplexity, args["ticketId"].(string), args["threshold"].(float64), args["offset"].(*int), args["limit"].(*int)), true
 
 	case "Query.ticket":
 		if e.complexity.Query.Ticket == nil {
@@ -745,6 +759,7 @@ type TicketsResponse {
 type Query {
   ticket(id: ID!): Ticket
   tickets(statuses: [String!], offset: Int, limit: Int): TicketsResponse!
+  similarTickets(ticketId: ID!, threshold: Float!, offset: Int, limit: Int): TicketsResponse!
   alert(id: ID!): Alert
   alerts: [Alert!]!
 }
@@ -1146,6 +1161,103 @@ func (ec *executionContext) field_Query_alert_argsID(
 	}
 
 	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_similarTickets_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_similarTickets_argsTicketID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["ticketId"] = arg0
+	arg1, err := ec.field_Query_similarTickets_argsThreshold(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["threshold"] = arg1
+	arg2, err := ec.field_Query_similarTickets_argsOffset(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg2
+	arg3, err := ec.field_Query_similarTickets_argsLimit(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg3
+	return args, nil
+}
+func (ec *executionContext) field_Query_similarTickets_argsTicketID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["ticketId"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("ticketId"))
+	if tmp, ok := rawArgs["ticketId"]; ok {
+		return ec.unmarshalNID2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_similarTickets_argsThreshold(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (float64, error) {
+	if _, ok := rawArgs["threshold"]; !ok {
+		var zeroVal float64
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("threshold"))
+	if tmp, ok := rawArgs["threshold"]; ok {
+		return ec.unmarshalNFloat2float64(ctx, tmp)
+	}
+
+	var zeroVal float64
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_similarTickets_argsOffset(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["offset"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
+	if tmp, ok := rawArgs["offset"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_similarTickets_argsLimit(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["limit"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+	if tmp, ok := rawArgs["limit"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
 	return zeroVal, nil
 }
 
@@ -2905,6 +3017,67 @@ func (ec *executionContext) fieldContext_Query_tickets(ctx context.Context, fiel
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_tickets_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_similarTickets(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_similarTickets(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().SimilarTickets(rctx, fc.Args["ticketId"].(string), fc.Args["threshold"].(float64), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*graphql1.TicketsResponse)
+	fc.Result = res
+	return ec.marshalNTicketsResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐTicketsResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_similarTickets(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "tickets":
+				return ec.fieldContext_TicketsResponse_tickets(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_TicketsResponse_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TicketsResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_similarTickets_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -6770,6 +6943,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "similarTickets":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_similarTickets(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "alert":
 			field := field
 
@@ -7814,6 +8009,22 @@ func (ec *executionContext) marshalNComment2ᚖgithubᚗcomᚋsecmonᚑlabᚋwar
 		return graphql.Null
 	}
 	return ec._Comment(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v any) (float64, error) {
+	res, err := graphql.UnmarshalFloat(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFloat2float64(ctx context.Context, sel ast.SelectionSet, v float64) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalFloat(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v any) (string, error) {
