@@ -346,6 +346,47 @@ func (r *queryResolver) SimilarTickets(ctx context.Context, ticketID string, thr
 	}, nil
 }
 
+// TicketComments is the resolver for the ticketComments field.
+func (r *queryResolver) TicketComments(ctx context.Context, ticketID string, offset *int, limit *int) (*graphql1.CommentsResponse, error) {
+	// Set default values for offset and limit
+	var offsetVal, limitVal int
+	if offset != nil {
+		offsetVal = *offset
+	}
+	if limit != nil {
+		limitVal = *limit
+		// Restrict limit to allowed values: 20, 50, 100
+		if limitVal != 20 && limitVal != 50 && limitVal != 100 {
+			limitVal = defaultCommentsLimit
+		}
+	} else {
+		limitVal = defaultCommentsLimit
+	}
+
+	// Get paginated comments sorted by timestamp descending (newest first)
+	comments, err := r.repo.GetTicketCommentsPaginated(ctx, types.TicketID(ticketID), offsetVal, limitVal)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get ticket comments")
+	}
+
+	// Get total count for pagination
+	totalCount, err := r.repo.CountTicketComments(ctx, types.TicketID(ticketID))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to count ticket comments")
+	}
+
+	// Convert []ticket.Comment to []*ticket.Comment
+	commentPtrs := make([]*ticket.Comment, len(comments))
+	for i := range comments {
+		commentPtrs[i] = &comments[i]
+	}
+
+	return &graphql1.CommentsResponse{
+		Comments:   commentPtrs,
+		TotalCount: totalCount,
+	}, nil
+}
+
 // Alert is the resolver for the alert field.
 func (r *queryResolver) Alert(ctx context.Context, id string) (*alert.Alert, error) {
 	a, err := r.repo.GetAlert(ctx, types.AlertID(id))

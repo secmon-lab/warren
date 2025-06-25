@@ -357,6 +357,59 @@ func (r *Firestore) GetTicketComments(ctx context.Context, ticketID types.Ticket
 	return comments, nil
 }
 
+func (r *Firestore) GetTicketCommentsPaginated(ctx context.Context, ticketID types.TicketID, offset, limit int) ([]ticket.Comment, error) {
+	iter := r.db.Collection(collectionTickets).
+		Doc(ticketID.String()).
+		Collection(collectionComments).
+		OrderBy("CreatedAt", firestore.Desc).
+		Offset(offset).
+		Limit(limit).
+		Documents(ctx)
+
+	var comments []ticket.Comment
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get paginated ticket comments", goerr.V("ticket_id", ticketID))
+		}
+
+		var comment ticket.Comment
+		if err := doc.DataTo(&comment); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket comment", goerr.V("ticket_id", ticketID))
+		}
+		comments = append(comments, comment)
+	}
+	return comments, nil
+}
+
+func (r *Firestore) CountTicketComments(ctx context.Context, ticketID types.TicketID) (int, error) {
+	// Use Firestore aggregation query to count documents efficiently
+	result, err := r.db.Collection(collectionTickets).
+		Doc(ticketID.String()).
+		Collection(collectionComments).
+		NewAggregationQuery().
+		WithCount("total").
+		Get(ctx)
+	if err != nil {
+		return 0, goerr.Wrap(err, "failed to count ticket comments", goerr.V("ticket_id", ticketID))
+	}
+
+	count, ok := result["total"]
+	if !ok {
+		return 0, goerr.New("count result not found")
+	}
+
+	countValue, ok := count.(*firestorepb.Value)
+	if !ok {
+		return 0, goerr.New("invalid count value type")
+	}
+
+	return int(countValue.GetIntegerValue()), nil
+}
+
 func (r *Firestore) GetTicketUnpromptedComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
 	iter := r.db.Collection(collectionTickets).
 		Doc(ticketID.String()).

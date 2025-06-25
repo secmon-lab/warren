@@ -59,10 +59,16 @@ type TicketsResponse {
   totalCount: Int!
 }
 
+type CommentsResponse {
+  comments: [Comment!]!
+  totalCount: Int!
+}
+
 type Query {
   ticket(id: ID!): Ticket
   tickets(statuses: [String!], offset: Int, limit: Int): TicketsResponse!
   similarTickets(ticketId: ID!, threshold: Float!, offset: Int, limit: Int): TicketsResponse!
+  ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
   alert(id: ID!): Alert
   alerts: [Alert!]!
 }

@@ -27,6 +27,8 @@ type Repository interface {
 	// For comment management
 	PutTicketComment(ctx context.Context, comment ticket.Comment) error
 	GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
+	GetTicketCommentsPaginated(ctx context.Context, ticketID types.TicketID, offset, limit int) ([]ticket.Comment, error)
+	CountTicketComments(ctx context.Context, ticketID types.TicketID) (int, error)
 	GetTicketUnpromptedComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
 	PutTicketCommentsPrompted(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error
 

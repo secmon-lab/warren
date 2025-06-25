@@ -710,6 +710,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			BindAlertToTicketFunc: func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
 //				panic("mock out the BindAlertToTicket method")
 //			},
+//			CountTicketCommentsFunc: func(ctx context.Context, ticketID types.TicketID) (int, error) {
+//				panic("mock out the CountTicketComments method")
+//			},
 //			CountTicketsByStatusFunc: func(ctx context.Context, statuses []types.TicketStatus) (int, error) {
 //				panic("mock out the CountTicketsByStatus method")
 //			},
@@ -763,6 +766,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			},
 //			GetTicketCommentsFunc: func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
 //				panic("mock out the GetTicketComments method")
+//			},
+//			GetTicketCommentsPaginatedFunc: func(ctx context.Context, ticketID types.TicketID, offset int, limit int) ([]ticket.Comment, error) {
+//				panic("mock out the GetTicketCommentsPaginated method")
 //			},
 //			GetTicketUnpromptedCommentsFunc: func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
 //				panic("mock out the GetTicketUnpromptedComments method")
@@ -831,6 +837,9 @@ type RepositoryMock struct {
 	// BindAlertToTicketFunc mocks the BindAlertToTicket method.
 	BindAlertToTicketFunc func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error
 
+	// CountTicketCommentsFunc mocks the CountTicketComments method.
+	CountTicketCommentsFunc func(ctx context.Context, ticketID types.TicketID) (int, error)
+
 	// CountTicketsByStatusFunc mocks the CountTicketsByStatus method.
 	CountTicketsByStatusFunc func(ctx context.Context, statuses []types.TicketStatus) (int, error)
 
@@ -884,6 +893,9 @@ type RepositoryMock struct {
 
 	// GetTicketCommentsFunc mocks the GetTicketComments method.
 	GetTicketCommentsFunc func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
+
+	// GetTicketCommentsPaginatedFunc mocks the GetTicketCommentsPaginated method.
+	GetTicketCommentsPaginatedFunc func(ctx context.Context, ticketID types.TicketID, offset int, limit int) ([]ticket.Comment, error)
 
 	// GetTicketUnpromptedCommentsFunc mocks the GetTicketUnpromptedComments method.
 	GetTicketUnpromptedCommentsFunc func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
@@ -974,6 +986,13 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// AlertID is the alertID argument value.
 			AlertID types.AlertID
+			// TicketID is the ticketID argument value.
+			TicketID types.TicketID
+		}
+		// CountTicketComments holds details about calls to the CountTicketComments method.
+		CountTicketComments []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
 		}
@@ -1111,6 +1130,17 @@ type RepositoryMock struct {
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
 		}
+		// GetTicketCommentsPaginated holds details about calls to the GetTicketCommentsPaginated method.
+		GetTicketCommentsPaginated []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TicketID is the ticketID argument value.
+			TicketID types.TicketID
+			// Offset is the offset argument value.
+			Offset int
+			// Limit is the limit argument value.
+			Limit int
+		}
 		// GetTicketUnpromptedComments holds details about calls to the GetTicketUnpromptedComments method.
 		GetTicketUnpromptedComments []struct {
 			// Ctx is the ctx argument value.
@@ -1236,6 +1266,7 @@ type RepositoryMock struct {
 	lockBatchPutAlerts              sync.RWMutex
 	lockBatchUpdateTicketsStatus    sync.RWMutex
 	lockBindAlertToTicket           sync.RWMutex
+	lockCountTicketComments         sync.RWMutex
 	lockCountTicketsByStatus        sync.RWMutex
 	lockDeleteToken                 sync.RWMutex
 	lockFindNearestAlerts           sync.RWMutex
@@ -1254,6 +1285,7 @@ type RepositoryMock struct {
 	lockGetTicket                   sync.RWMutex
 	lockGetTicketByThread           sync.RWMutex
 	lockGetTicketComments           sync.RWMutex
+	lockGetTicketCommentsPaginated  sync.RWMutex
 	lockGetTicketUnpromptedComments sync.RWMutex
 	lockGetTicketsBySpan            sync.RWMutex
 	lockGetTicketsByStatus          sync.RWMutex
@@ -1515,6 +1547,46 @@ func (mock *RepositoryMock) BindAlertToTicketCalls() []struct {
 	mock.lockBindAlertToTicket.RLock()
 	calls = mock.calls.BindAlertToTicket
 	mock.lockBindAlertToTicket.RUnlock()
+	return calls
+}
+
+// CountTicketComments calls CountTicketCommentsFunc.
+func (mock *RepositoryMock) CountTicketComments(ctx context.Context, ticketID types.TicketID) (int, error) {
+	callInfo := struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+	}{
+		Ctx:      ctx,
+		TicketID: ticketID,
+	}
+	mock.lockCountTicketComments.Lock()
+	mock.calls.CountTicketComments = append(mock.calls.CountTicketComments, callInfo)
+	mock.lockCountTicketComments.Unlock()
+	if mock.CountTicketCommentsFunc == nil {
+		var (
+			nOut   int
+			errOut error
+		)
+		return nOut, errOut
+	}
+	return mock.CountTicketCommentsFunc(ctx, ticketID)
+}
+
+// CountTicketCommentsCalls gets all the calls that were made to CountTicketComments.
+// Check the length with:
+//
+//	len(mockedRepository.CountTicketCommentsCalls())
+func (mock *RepositoryMock) CountTicketCommentsCalls() []struct {
+	Ctx      context.Context
+	TicketID types.TicketID
+} {
+	var calls []struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+	}
+	mock.lockCountTicketComments.RLock()
+	calls = mock.calls.CountTicketComments
+	mock.lockCountTicketComments.RUnlock()
 	return calls
 }
 
@@ -2250,6 +2322,54 @@ func (mock *RepositoryMock) GetTicketCommentsCalls() []struct {
 	mock.lockGetTicketComments.RLock()
 	calls = mock.calls.GetTicketComments
 	mock.lockGetTicketComments.RUnlock()
+	return calls
+}
+
+// GetTicketCommentsPaginated calls GetTicketCommentsPaginatedFunc.
+func (mock *RepositoryMock) GetTicketCommentsPaginated(ctx context.Context, ticketID types.TicketID, offset int, limit int) ([]ticket.Comment, error) {
+	callInfo := struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+		Offset   int
+		Limit    int
+	}{
+		Ctx:      ctx,
+		TicketID: ticketID,
+		Offset:   offset,
+		Limit:    limit,
+	}
+	mock.lockGetTicketCommentsPaginated.Lock()
+	mock.calls.GetTicketCommentsPaginated = append(mock.calls.GetTicketCommentsPaginated, callInfo)
+	mock.lockGetTicketCommentsPaginated.Unlock()
+	if mock.GetTicketCommentsPaginatedFunc == nil {
+		var (
+			commentsOut []ticket.Comment
+			errOut      error
+		)
+		return commentsOut, errOut
+	}
+	return mock.GetTicketCommentsPaginatedFunc(ctx, ticketID, offset, limit)
+}
+
+// GetTicketCommentsPaginatedCalls gets all the calls that were made to GetTicketCommentsPaginated.
+// Check the length with:
+//
+//	len(mockedRepository.GetTicketCommentsPaginatedCalls())
+func (mock *RepositoryMock) GetTicketCommentsPaginatedCalls() []struct {
+	Ctx      context.Context
+	TicketID types.TicketID
+	Offset   int
+	Limit    int
+} {
+	var calls []struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+		Offset   int
+		Limit    int
+	}
+	mock.lockGetTicketCommentsPaginated.RLock()
+	calls = mock.calls.GetTicketCommentsPaginated
+	mock.lockGetTicketCommentsPaginated.RUnlock()
 	return calls
 }
 

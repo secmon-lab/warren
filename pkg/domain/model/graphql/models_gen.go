@@ -13,6 +13,11 @@ type AlertAttribute struct {
 	Auto  bool    `json:"auto"`
 }
 
+type CommentsResponse struct {
+	Comments   []*ticket.Comment `json:"comments"`
+	TotalCount int               `json:"totalCount"`
+}
+
 type Mutation struct {
 }
 

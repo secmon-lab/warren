@@ -265,3 +265,21 @@ export const GET_SIMILAR_TICKETS = gql`
     }
   }
 `;
+
+export const GET_TICKET_COMMENTS = gql`
+  query GetTicketComments($ticketId: ID!, $offset: Int, $limit: Int) {
+    ticketComments(ticketId: $ticketId, offset: $offset, limit: $limit) {
+      comments {
+        id
+        content
+        user {
+          id
+          name
+        }
+        createdAt
+        updatedAt
+      }
+      totalCount
+    }
+  }
+`;

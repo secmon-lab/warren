@@ -1,8 +1,6 @@
 import { useQuery, useMutation } from "@apollo/client";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,7 +25,6 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { UserWithAvatar } from "@/components/ui/user-name";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ResolveInfo } from "@/components/ui/resolve-info";
 import {
   DropdownMenu,
@@ -68,70 +65,10 @@ import {
 import { EditConclusionModal } from "@/components/ui/edit-conclusion-modal";
 import { EditTicketModal } from "@/components/EditTicketModal";
 import { SimilarTickets } from "@/components/SimilarTickets";
+import { TicketComments } from "@/components/TicketComments";
 
 const ALERTS_PER_PAGE = 5;
 
-// Secure markdown renderer component
-const SecureMarkdown = ({ content }: { content: string }) => {
-  return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      // Disable HTML parsing completely - this prevents all HTML-based XSS
-      skipHtml={true}
-      disallowedElements={[
-        "script",
-        "iframe",
-        "object",
-        "embed",
-        "form",
-        "input",
-        "button",
-        "textarea",
-        "select",
-        "style",
-        "link",
-        "meta",
-        "base",
-      ]}
-      unwrapDisallowed={true}
-      components={{
-        // Sanitize links to only allow safe protocols
-        a: ({ href, children, ...props }) => {
-          const safeProtocols = /^(https?:|mailto:|tel:)/i;
-          const isSafe = href && safeProtocols.test(href);
-          return isSafe ? (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 underline"
-              {...props}>
-              {children}
-            </a>
-          ) : (
-            <span className="text-muted-foreground">[Link: {children}]</span>
-          );
-        },
-        // Sanitize images
-        img: ({ src, alt, ...props }) => {
-          const safeProtocols = /^(https?:|data:image\/)/i;
-          const isSafe = src && safeProtocols.test(src);
-          return isSafe ? (
-            <img
-              src={src}
-              alt={alt}
-              {...props}
-              style={{ maxWidth: "100%", height: "auto" }}
-            />
-          ) : (
-            <span>[Image: {alt || "Unable to display"}]</span>
-          );
-        },
-      }}>
-      {content}
-    </ReactMarkdown>
-  );
-};
 
 export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -486,67 +423,7 @@ export default function TicketDetailPage() {
           />
 
           {/* Comments Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                Comments ({ticket.comments.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y">
-                {ticket.comments.length === 0 ? (
-                  <div className="p-4 text-center text-muted-foreground">
-                    No comments yet
-                  </div>
-                ) : (
-                  ticket.comments.map((comment) => (
-                    <div key={comment.id} className="p-4">
-                      <div className="flex items-start gap-3">
-                        {comment.user ? (
-                          <Avatar className="w-8 h-8 flex-shrink-0">
-                            <AvatarImage
-                              src={`/api/user/${comment.user.id}/icon`}
-                              alt={comment.user.name}
-                            />
-                            <AvatarFallback className="text-xs">
-                              {comment.user.name.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                        ) : (
-                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                            <User className="h-4 w-4" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="font-medium text-sm">
-                              {comment.user ? (
-                                <UserWithAvatar
-                                  userID={comment.user.id}
-                                  fallback={comment.user.name}
-                                  showAvatar={false}
-                                  className="inline"
-                                />
-                              ) : (
-                                "System"
-                              )}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatRelativeTime(comment.createdAt)}
-                            </span>
-                          </div>
-                          <div className="text-sm leading-relaxed bg-muted/50 rounded-lg p-3 prose prose-sm max-w-none">
-                            <SecureMarkdown content={comment.content} />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <TicketComments ticketId={ticket.id} />
 
           {/* Alerts Section with Pagination */}
           <Card>
@@ -802,7 +679,7 @@ export default function TicketDetailPage() {
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Comments</span>
-                <span className="font-medium">{ticket.comments.length}</span>
+                <span className="font-medium">Paginated</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Alerts</span>

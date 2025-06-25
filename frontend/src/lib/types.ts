@@ -24,6 +24,11 @@ export interface Comment {
   updatedAt: string;
 }
 
+export interface CommentsResponse {
+  comments: Comment[];
+  totalCount: number;
+}
+
 export interface Alert {
   id: string;
   title: string;

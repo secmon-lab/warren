@@ -1220,3 +1220,160 @@ func TestCountTicketsByStatus(t *testing.T) {
 		testFn(t, repo)
 	})
 }
+
+func TestTicketCommentsPagination(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+		thread := newTestThread()
+		ticket := newTestTicket(&thread)
+
+		// PutTicket
+		gt.NoError(t, repo.PutTicket(ctx, ticket))
+
+		// Create and put multiple comments with different timestamps
+		comments := make([]ticketmodel.Comment, 10)
+		baseTime := time.Now().Add(-time.Hour) // Start from 1 hour ago
+
+		for i := 0; i < 10; i++ {
+			slackMsg := slack.NewMessage(ctx, &slackevents.EventsAPIEvent{
+				InnerEvent: slackevents.EventsAPIInnerEvent{
+					Data: &slackevents.AppMentionEvent{
+						TimeStamp: fmt.Sprintf("test-message-id-%d", i),
+						Text:      fmt.Sprintf("Test Comment %d", i),
+						User:      "test-user",
+						Channel:   "test-channel",
+					},
+				},
+			})
+			comment := ticket.NewComment(ctx, slackMsg.Text(), slackMsg.User(), slackMsg.ID())
+			// Set different timestamps to ensure proper ordering (newer first)
+			comment.CreatedAt = baseTime.Add(time.Duration(i) * time.Minute)
+
+			gt.NoError(t, repo.PutTicketComment(ctx, comment))
+			comments[i] = comment
+		}
+
+		t.Run("CountTicketComments", func(t *testing.T) {
+			// Test count with existing ticket
+			count, err := repo.CountTicketComments(ctx, ticket.ID)
+			gt.NoError(t, err)
+			gt.Number(t, count).Equal(10)
+
+			// Test count with non-existent ticket
+			nonExistentID := types.NewTicketID()
+			count, err = repo.CountTicketComments(ctx, nonExistentID)
+			gt.NoError(t, err)
+			gt.Number(t, count).Equal(0)
+		})
+
+		t.Run("GetTicketCommentsPaginated - basic pagination", func(t *testing.T) {
+			// Test first page
+			paginatedComments, err := repo.GetTicketCommentsPaginated(ctx, ticket.ID, 0, 3)
+			gt.NoError(t, err)
+			gt.Array(t, paginatedComments).Length(3)
+
+			// Comments should be ordered by CreatedAt descending (newest first)
+			// So comment 9 should be first, comment 8 second, etc.
+			gt.Value(t, paginatedComments[0].Comment).Equal("Test Comment 9")
+			gt.Value(t, paginatedComments[1].Comment).Equal("Test Comment 8")
+			gt.Value(t, paginatedComments[2].Comment).Equal("Test Comment 7")
+
+			// Test second page
+			paginatedComments, err = repo.GetTicketCommentsPaginated(ctx, ticket.ID, 3, 3)
+			gt.NoError(t, err)
+			gt.Array(t, paginatedComments).Length(3)
+			gt.Value(t, paginatedComments[0].Comment).Equal("Test Comment 6")
+			gt.Value(t, paginatedComments[1].Comment).Equal("Test Comment 5")
+			gt.Value(t, paginatedComments[2].Comment).Equal("Test Comment 4")
+
+			// Test third page
+			paginatedComments, err = repo.GetTicketCommentsPaginated(ctx, ticket.ID, 6, 3)
+			gt.NoError(t, err)
+			gt.Array(t, paginatedComments).Length(3)
+			gt.Value(t, paginatedComments[0].Comment).Equal("Test Comment 3")
+			gt.Value(t, paginatedComments[1].Comment).Equal("Test Comment 2")
+			gt.Value(t, paginatedComments[2].Comment).Equal("Test Comment 1")
+
+			// Test last page (partial)
+			paginatedComments, err = repo.GetTicketCommentsPaginated(ctx, ticket.ID, 9, 3)
+			gt.NoError(t, err)
+			gt.Array(t, paginatedComments).Length(1)
+			gt.Value(t, paginatedComments[0].Comment).Equal("Test Comment 0")
+		})
+
+		t.Run("GetTicketCommentsPaginated - edge cases", func(t *testing.T) {
+			// Test offset beyond available comments
+			paginatedComments, err := repo.GetTicketCommentsPaginated(ctx, ticket.ID, 15, 5)
+			gt.NoError(t, err)
+			gt.Array(t, paginatedComments).Length(0)
+
+			// Test limit larger than remaining comments
+			paginatedComments, err = repo.GetTicketCommentsPaginated(ctx, ticket.ID, 8, 5)
+			gt.NoError(t, err)
+			gt.Array(t, paginatedComments).Length(2)
+			gt.Value(t, paginatedComments[0].Comment).Equal("Test Comment 1")
+			gt.Value(t, paginatedComments[1].Comment).Equal("Test Comment 0")
+
+			// Test zero limit
+			paginatedComments, err = repo.GetTicketCommentsPaginated(ctx, ticket.ID, 0, 0)
+			gt.NoError(t, err)
+			gt.Array(t, paginatedComments).Length(0)
+
+			// Test with non-existent ticket
+			nonExistentID := types.NewTicketID()
+			paginatedComments, err = repo.GetTicketCommentsPaginated(ctx, nonExistentID, 0, 5)
+			gt.NoError(t, err)
+			gt.Array(t, paginatedComments).Length(0)
+		})
+
+		t.Run("GetTicketCommentsPaginated - timestamp ordering", func(t *testing.T) {
+			// Verify that comments are consistently ordered by CreatedAt descending
+			allComments, err := repo.GetTicketCommentsPaginated(ctx, ticket.ID, 0, 10)
+			gt.NoError(t, err)
+			gt.Array(t, allComments).Length(10)
+
+			// Check that each comment is older than the previous one
+			for i := 1; i < len(allComments); i++ {
+				gt.Value(t, allComments[i].CreatedAt.Before(allComments[i-1].CreatedAt)).Equal(true)
+			}
+
+			// Verify that the newest comment (index 9) is first
+			gt.Value(t, allComments[0].Comment).Equal("Test Comment 9")
+			// Verify that the oldest comment (index 0) is last
+			gt.Value(t, allComments[9].Comment).Equal("Test Comment 0")
+		})
+
+		t.Run("GetTicketCommentsPaginated - different page sizes", func(t *testing.T) {
+			// Test with page size 20 (should return all 10 comments)
+			paginatedComments, err := repo.GetTicketCommentsPaginated(ctx, ticket.ID, 0, 20)
+			gt.NoError(t, err)
+			gt.Array(t, paginatedComments).Length(10)
+
+			// Test with page size 50 (should return all 10 comments)
+			paginatedComments, err = repo.GetTicketCommentsPaginated(ctx, ticket.ID, 0, 50)
+			gt.NoError(t, err)
+			gt.Array(t, paginatedComments).Length(10)
+
+			// Test with page size 100 (should return all 10 comments)
+			paginatedComments, err = repo.GetTicketCommentsPaginated(ctx, ticket.ID, 0, 100)
+			gt.NoError(t, err)
+			gt.Array(t, paginatedComments).Length(10)
+
+			// Test with page size 1 (should return only 1 comment)
+			paginatedComments, err = repo.GetTicketCommentsPaginated(ctx, ticket.ID, 0, 1)
+			gt.NoError(t, err)
+			gt.Array(t, paginatedComments).Length(1)
+			gt.Value(t, paginatedComments[0].Comment).Equal("Test Comment 9")
+		})
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}

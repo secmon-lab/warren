@@ -78,6 +78,11 @@ type ComplexityRoot struct {
 		User      func(childComplexity int) int
 	}
 
+	CommentsResponse struct {
+		Comments   func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
 	Finding struct {
 		Reason         func(childComplexity int) int
 		Recommendation func(childComplexity int) int
@@ -98,6 +103,7 @@ type ComplexityRoot struct {
 		Alerts         func(childComplexity int) int
 		SimilarTickets func(childComplexity int, ticketID string, threshold float64, offset *int, limit *int) int
 		Ticket         func(childComplexity int, id string) int
+		TicketComments func(childComplexity int, ticketID string, offset *int, limit *int) int
 		Tickets        func(childComplexity int, statuses []string, offset *int, limit *int) int
 	}
 
@@ -160,6 +166,7 @@ type QueryResolver interface {
 	Ticket(ctx context.Context, id string) (*ticket.Ticket, error)
 	Tickets(ctx context.Context, statuses []string, offset *int, limit *int) (*graphql1.TicketsResponse, error)
 	SimilarTickets(ctx context.Context, ticketID string, threshold float64, offset *int, limit *int) (*graphql1.TicketsResponse, error)
+	TicketComments(ctx context.Context, ticketID string, offset *int, limit *int) (*graphql1.CommentsResponse, error)
 	Alert(ctx context.Context, id string) (*alert.Alert, error)
 	Alerts(ctx context.Context) ([]*alert.Alert, error)
 }
@@ -315,6 +322,20 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Comment.User(childComplexity), true
 
+	case "CommentsResponse.comments":
+		if e.complexity.CommentsResponse.Comments == nil {
+			break
+		}
+
+		return e.complexity.CommentsResponse.Comments(childComplexity), true
+
+	case "CommentsResponse.totalCount":
+		if e.complexity.CommentsResponse.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.CommentsResponse.TotalCount(childComplexity), true
+
 	case "Finding.reason":
 		if e.complexity.Finding.Reason == nil {
 			break
@@ -445,6 +466,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Ticket(childComplexity, args["id"].(string)), true
+
+	case "Query.ticketComments":
+		if e.complexity.Query.TicketComments == nil {
+			break
+		}
+
+		args, err := ec.field_Query_ticketComments_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.TicketComments(childComplexity, args["ticketId"].(string), args["offset"].(*int), args["limit"].(*int)), true
 
 	case "Query.tickets":
 		if e.complexity.Query.Tickets == nil {
@@ -756,10 +789,16 @@ type TicketsResponse {
   totalCount: Int!
 }
 
+type CommentsResponse {
+  comments: [Comment!]!
+  totalCount: Int!
+}
+
 type Query {
   ticket(id: ID!): Ticket
   tickets(statuses: [String!], offset: Int, limit: Int): TicketsResponse!
   similarTickets(ticketId: ID!, threshold: Float!, offset: Int, limit: Int): TicketsResponse!
+  ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
   alert(id: ID!): Alert
   alerts: [Alert!]!
 }
@@ -1244,6 +1283,80 @@ func (ec *executionContext) field_Query_similarTickets_argsOffset(
 }
 
 func (ec *executionContext) field_Query_similarTickets_argsLimit(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["limit"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+	if tmp, ok := rawArgs["limit"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_ticketComments_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_ticketComments_argsTicketID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["ticketId"] = arg0
+	arg1, err := ec.field_Query_ticketComments_argsOffset(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg1
+	arg2, err := ec.field_Query_ticketComments_argsLimit(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg2
+	return args, nil
+}
+func (ec *executionContext) field_Query_ticketComments_argsTicketID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["ticketId"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("ticketId"))
+	if tmp, ok := rawArgs["ticketId"]; ok {
+		return ec.unmarshalNID2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_ticketComments_argsOffset(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["offset"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
+	if tmp, ok := rawArgs["offset"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_ticketComments_argsLimit(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (*int, error) {
@@ -2267,6 +2380,106 @@ func (ec *executionContext) fieldContext_Comment_updatedAt(_ context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _CommentsResponse_comments(ctx context.Context, field graphql.CollectedField, obj *graphql1.CommentsResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommentsResponse_comments(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Comments, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*ticket.Comment)
+	fc.Result = res
+	return ec.marshalNComment2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐCommentᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommentsResponse_comments(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommentsResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Comment_id(ctx, field)
+			case "content":
+				return ec.fieldContext_Comment_content(ctx, field)
+			case "user":
+				return ec.fieldContext_Comment_user(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Comment_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Comment_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommentsResponse_totalCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.CommentsResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommentsResponse_totalCount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TotalCount, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommentsResponse_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommentsResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Finding_severity(ctx context.Context, field graphql.CollectedField, obj *ticket.Finding) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Finding_severity(ctx, field)
 	if err != nil {
@@ -3078,6 +3291,67 @@ func (ec *executionContext) fieldContext_Query_similarTickets(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_similarTickets_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_ticketComments(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_ticketComments(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().TicketComments(rctx, fc.Args["ticketId"].(string), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*graphql1.CommentsResponse)
+	fc.Result = res
+	return ec.marshalNCommentsResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐCommentsResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_ticketComments(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "comments":
+				return ec.fieldContext_CommentsResponse_comments(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_CommentsResponse_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CommentsResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_ticketComments_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -6721,6 +6995,50 @@ func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, 
 	return out
 }
 
+var commentsResponseImplementors = []string{"CommentsResponse"}
+
+func (ec *executionContext) _CommentsResponse(ctx context.Context, sel ast.SelectionSet, obj *graphql1.CommentsResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, commentsResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CommentsResponse")
+		case "comments":
+			out.Values[i] = ec._CommentsResponse_comments(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._CommentsResponse_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var findingImplementors = []string{"Finding"}
 
 func (ec *executionContext) _Finding(ctx context.Context, sel ast.SelectionSet, obj *ticket.Finding) graphql.Marshaler {
@@ -6953,6 +7271,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_similarTickets(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "ticketComments":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_ticketComments(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -8009,6 +8349,20 @@ func (ec *executionContext) marshalNComment2ᚖgithubᚗcomᚋsecmonᚑlabᚋwar
 		return graphql.Null
 	}
 	return ec._Comment(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNCommentsResponse2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐCommentsResponse(ctx context.Context, sel ast.SelectionSet, v graphql1.CommentsResponse) graphql.Marshaler {
+	return ec._CommentsResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNCommentsResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐCommentsResponse(ctx context.Context, sel ast.SelectionSet, v *graphql1.CommentsResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CommentsResponse(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v any) (float64, error) {

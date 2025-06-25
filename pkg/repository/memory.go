@@ -204,6 +204,47 @@ func (r *Memory) GetTicketComments(ctx context.Context, ticketID types.TicketID)
 	return comments, nil
 }
 
+func (r *Memory) GetTicketCommentsPaginated(ctx context.Context, ticketID types.TicketID, offset, limit int) ([]ticket.Comment, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	comments, ok := r.ticketComments[ticketID]
+	if !ok {
+		return []ticket.Comment{}, nil
+	}
+
+	// Sort comments by CreatedAt in descending order (newest first)
+	sortedComments := make([]ticket.Comment, len(comments))
+	copy(sortedComments, comments)
+	sort.Slice(sortedComments, func(i, j int) bool {
+		return sortedComments[i].CreatedAt.After(sortedComments[j].CreatedAt)
+	})
+
+	// Apply pagination
+	start := offset
+	if start > len(sortedComments) {
+		return []ticket.Comment{}, nil
+	}
+
+	end := start + limit
+	if end > len(sortedComments) {
+		end = len(sortedComments)
+	}
+
+	return sortedComments[start:end], nil
+}
+
+func (r *Memory) CountTicketComments(ctx context.Context, ticketID types.TicketID) (int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	comments, ok := r.ticketComments[ticketID]
+	if !ok {
+		return 0, nil
+	}
+	return len(comments), nil
+}
+
 func (r *Memory) GetTicketUnpromptedComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
