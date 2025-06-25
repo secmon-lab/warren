@@ -91,7 +91,7 @@ export function SimilarTickets({ ticketId }: SimilarTicketsProps) {
             max={1}
             step={0.01}
             value={threshold}
-            onValueChange={handleThresholdChange}
+            onValueCommit={handleThresholdChange}
             className="w-full"
           />
           <div className="flex justify-between text-xs text-muted-foreground">
