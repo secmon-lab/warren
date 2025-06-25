@@ -7,6 +7,7 @@ package graphql
 import (
 	"context"
 	"encoding/json"
+	"math"
 
 	goerr "github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -271,6 +272,86 @@ func (r *queryResolver) Tickets(ctx context.Context, statuses []string, offset *
 	}, nil
 }
 
+// SimilarTickets is the resolver for the similarTickets field.
+func (r *queryResolver) SimilarTickets(ctx context.Context, ticketID string, threshold float64, offset *int, limit *int) (*graphql1.TicketsResponse, error) {
+	// Get target ticket
+	targetTicket, err := r.repo.GetTicket(ctx, types.TicketID(ticketID))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get target ticket")
+	}
+
+	// If target ticket has no embedding, return empty results
+	if len(targetTicket.Embedding) == 0 {
+		return &graphql1.TicketsResponse{
+			Tickets:    []*ticket.Ticket{},
+			TotalCount: 0,
+		}, nil
+	}
+
+	// Set default values for offset and limit
+	var offsetVal, limitVal int
+	if offset != nil {
+		offsetVal = *offset
+	}
+	if limit != nil {
+		limitVal = *limit
+	} else {
+		limitVal = 5 // Default limit
+	}
+
+	// Get more tickets than needed for threshold filtering
+	maxSearch := offsetVal + limitVal + 20 // Get extra for filtering
+	if maxSearch < 50 {
+		maxSearch = 50
+	}
+
+	// Find nearest tickets using embedding
+	candidates, err := r.repo.FindNearestTickets(ctx, targetTicket.Embedding, maxSearch)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to find nearest tickets")
+	}
+
+	// Filter by threshold and exclude target ticket
+	var filteredTickets []*ticket.Ticket
+	for _, candidate := range candidates {
+		// Exclude the target ticket itself
+		if candidate.ID == targetTicket.ID {
+			continue
+		}
+
+		// Only include tickets with embeddings
+		if len(candidate.Embedding) == 0 {
+			continue
+		}
+
+		// Calculate cosine similarity
+		similarity := cosineSimilarity(targetTicket.Embedding, candidate.Embedding)
+		if float64(similarity) >= threshold {
+			filteredTickets = append(filteredTickets, candidate)
+		}
+	}
+
+	// Apply offset and limit
+	totalCount := len(filteredTickets)
+
+	start := offsetVal
+	if start > len(filteredTickets) {
+		start = len(filteredTickets)
+	}
+
+	end := start + limitVal
+	if end > len(filteredTickets) {
+		end = len(filteredTickets)
+	}
+
+	result := filteredTickets[start:end]
+
+	return &graphql1.TicketsResponse{
+		Tickets:    result,
+		TotalCount: totalCount,
+	}, nil
+}
+
 // Alert is the resolver for the alert field.
 func (r *queryResolver) Alert(ctx context.Context, id string) (*alert.Alert, error) {
 	a, err := r.repo.GetAlert(ctx, types.AlertID(id))
@@ -391,3 +472,16 @@ type findingResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }
+
+func cosineSimilarity(a, b []float32) float32 {
+	var dot, normA, normB float32
+	for i := range a {
+		dot += a[i] * b[i]
+		normA += a[i] * a[i]
+		normB += b[i] * b[i]
+	}
+	if normA == 0 || normB == 0 {
+		return 0
+	}
+	return dot / (float32(math.Sqrt(float64(normA))) * float32(math.Sqrt(float64(normB))))
+}

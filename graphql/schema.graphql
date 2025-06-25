@@ -62,6 +62,7 @@ type TicketsResponse {
 type Query {
   ticket(id: ID!): Ticket
   tickets(statuses: [String!], offset: Int, limit: Int): TicketsResponse!
+  similarTickets(ticketId: ID!, threshold: Float!, offset: Int, limit: Int): TicketsResponse!
   alert(id: ID!): Alert
   alerts: [Alert!]!
 }
