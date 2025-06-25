@@ -204,14 +204,8 @@ func (uc *UseCases) handleBindAlerts(ctx context.Context, user slack.User, ticke
 		return goerr.Wrap(err, "failed to update slack thread")
 	}
 
-	for _, alert := range alerts {
-		if alert.SlackThread != nil {
-			st := uc.slackService.NewThread(*alert.SlackThread)
-			if err := st.UpdateAlert(ctx, *alert); err != nil {
-				return goerr.Wrap(err, "failed to update slack thread")
-			}
-		}
-	}
+	// Update individual alert slack threads using rate-limited updater
+	uc.slackService.UpdateAlerts(ctx, alerts)
 
 	msg.Notify(ctx, "🎉 Alert bound to ticket to %s (%s)", ticketID, ticket.Metadata.Title)
 
@@ -432,15 +426,8 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionSalvage(ctx context.Cont
 		return goerr.Wrap(err, "failed to update slack thread")
 	}
 
-	// Update individual alert slack threads
-	for _, alert := range unboundAlerts {
-		if alert.SlackThread != nil {
-			alertSt := uc.slackService.NewThread(*alert.SlackThread)
-			if err := alertSt.UpdateAlert(ctx, *alert); err != nil {
-				logger.Warn("failed to update alert slack thread", "alert_id", alert.ID, "error", err)
-			}
-		}
-	}
+	// Update individual alert slack threads using rate-limited updater
+	uc.slackService.UpdateAlerts(ctx, unboundAlerts)
 
 	msg.Notify(ctx, "🎉 Salvaged %d alerts to ticket %s", len(unboundAlerts), target.Metadata.Title)
 
