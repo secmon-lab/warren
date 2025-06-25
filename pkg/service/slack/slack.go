@@ -45,9 +45,15 @@ type Service struct {
 	iconCache       map[string]*userIconCache
 	iconCacheMutex  sync.RWMutex
 	iconCacheExpiry time.Duration
+	// User icon lock per userID to prevent concurrent API calls
+	iconLocks      map[string]*sync.Mutex
+	iconLocksMutex sync.Mutex
 	// User profile cache
 	profileCache      map[string]*userProfileCache
 	profileCacheMutex sync.RWMutex
+	// User profile lock per userID to prevent concurrent API calls
+	profileLocks      map[string]*sync.Mutex
+	profileLocksMutex sync.Mutex
 	// Singleton rate-limited updater shared across all threads
 	rateLimitedUpdater AlertUpdater
 	// Frontend URL for generating ticket detail URLs
@@ -113,7 +119,9 @@ func New(client interfaces.SlackClient, channelID string, opts ...ServiceOption)
 		client:             client,
 		iconCache:          make(map[string]*userIconCache),
 		iconCacheExpiry:    time.Hour, // 1 hour
+		iconLocks:          make(map[string]*sync.Mutex),
 		profileCache:       make(map[string]*userProfileCache),
+		profileLocks:       make(map[string]*sync.Mutex),
 		rateLimitedUpdater: NewRateLimitedUpdater(client), // Default updater
 	}
 
@@ -695,6 +703,27 @@ func (x *Service) GetUserIcon(ctx context.Context, userID string) ([]byte, strin
 	}
 	x.iconCacheMutex.RUnlock()
 
+	// Get or create a lock for this userID to prevent concurrent API calls
+	x.iconLocksMutex.Lock()
+	if _, exists := x.iconLocks[userID]; !exists {
+		x.iconLocks[userID] = &sync.Mutex{}
+	}
+	userLock := x.iconLocks[userID]
+	x.iconLocksMutex.Unlock()
+
+	// Lock for this specific userID
+	userLock.Lock()
+	defer userLock.Unlock()
+
+	// Check cache again after acquiring lock in case another goroutine already fetched it
+	x.iconCacheMutex.RLock()
+	if cached, exists := x.iconCache[userID]; exists && time.Now().Before(cached.ExpiresAt) {
+		x.iconCacheMutex.RUnlock()
+		logger.Debug("returning cached user icon after lock", "user_id", userID)
+		return cached.ImageData, "image/jpeg", nil
+	}
+	x.iconCacheMutex.RUnlock()
+
 	// Fetch user info from Slack
 	user, err := x.client.GetUserInfo(userID)
 	if err != nil {
@@ -795,6 +824,27 @@ func (x *Service) GetUserProfile(ctx context.Context, userID string) (string, er
 	if cached, exists := x.profileCache[userID]; exists && time.Now().Before(cached.ExpiresAt) {
 		x.profileCacheMutex.RUnlock()
 		logger.Debug("returning cached user profile", "user_id", userID)
+		return cached.Name, nil
+	}
+	x.profileCacheMutex.RUnlock()
+
+	// Get or create a lock for this userID to prevent concurrent API calls
+	x.profileLocksMutex.Lock()
+	if _, exists := x.profileLocks[userID]; !exists {
+		x.profileLocks[userID] = &sync.Mutex{}
+	}
+	userLock := x.profileLocks[userID]
+	x.profileLocksMutex.Unlock()
+
+	// Lock for this specific userID
+	userLock.Lock()
+	defer userLock.Unlock()
+
+	// Check cache again after acquiring lock in case another goroutine already fetched it
+	x.profileCacheMutex.RLock()
+	if cached, exists := x.profileCache[userID]; exists && time.Now().Before(cached.ExpiresAt) {
+		x.profileCacheMutex.RUnlock()
+		logger.Debug("returning cached user profile after lock", "user_id", userID)
 		return cached.Name, nil
 	}
 	x.profileCacheMutex.RUnlock()
