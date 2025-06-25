@@ -18,6 +18,12 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
+const (
+	// Constants for similar tickets pagination
+	defaultSimilarTicketsLimit  = 5
+	maxSimilarTicketsCandidates = 1000 // Fixed large number of candidates to fetch
+)
+
 // ID is the resolver for the id field.
 func (r *alertResolver) ID(ctx context.Context, obj *alert.Alert) (string, error) {
 	return string(obj.ID), nil
@@ -296,22 +302,16 @@ func (r *queryResolver) SimilarTickets(ctx context.Context, ticketID string, thr
 	if limit != nil {
 		limitVal = *limit
 	} else {
-		limitVal = 5 // Default limit
+		limitVal = defaultSimilarTicketsLimit
 	}
 
-	// Get more tickets than needed for threshold filtering
-	maxSearch := offsetVal + limitVal + 20 // Get extra for filtering
-	if maxSearch < 50 {
-		maxSearch = 50
-	}
-
-	// Find nearest tickets using embedding
-	candidates, err := r.repo.FindNearestTickets(ctx, targetTicket.Embedding, maxSearch)
+	// Fetch a fixed, large number of nearest neighbors to ensure stable pagination
+	candidates, err := r.repo.FindNearestTickets(ctx, targetTicket.Embedding, maxSimilarTicketsCandidates)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to find nearest tickets")
 	}
 
-	// Filter by threshold and exclude target ticket
+	// Filter by threshold and exclude target ticket to get complete result set
 	var filteredTickets []*ticket.Ticket
 	for _, candidate := range candidates {
 		// Exclude the target ticket itself
@@ -324,16 +324,17 @@ func (r *queryResolver) SimilarTickets(ctx context.Context, ticketID string, thr
 			continue
 		}
 
-		// Calculate cosine similarity
+		// Calculate cosine similarity and apply threshold
 		similarity := cosineSimilarity(targetTicket.Embedding, candidate.Embedding)
 		if float64(similarity) >= threshold {
 			filteredTickets = append(filteredTickets, candidate)
 		}
 	}
 
-	// Apply offset and limit
+	// Calculate correct total count from complete filtered result set
 	totalCount := len(filteredTickets)
 
+	// Apply pagination to the complete filtered result set
 	start := offsetVal
 	if start > len(filteredTickets) {
 		start = len(filteredTickets)
