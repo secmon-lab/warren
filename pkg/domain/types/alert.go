@@ -88,11 +88,12 @@ const (
 	AlertConclusionUnaffected    AlertConclusion = "unaffected"
 	AlertConclusionFalsePositive AlertConclusion = "false_positive"
 	AlertConclusionTruePositive  AlertConclusion = "true_positive"
+	AlertConclusionEscalated     AlertConclusion = "escalated"
 )
 
 func (r AlertConclusion) Validate() error {
 	switch r {
-	case AlertConclusionIntended, AlertConclusionUnaffected, AlertConclusionFalsePositive, AlertConclusionTruePositive:
+	case AlertConclusionIntended, AlertConclusionUnaffected, AlertConclusionFalsePositive, AlertConclusionTruePositive, AlertConclusionEscalated:
 		return nil
 	}
 	return goerr.New("invalid alert result", goerr.V("result", r))
@@ -107,6 +108,7 @@ var alertConclusionLabels = map[AlertConclusion]string{
 	AlertConclusionUnaffected:    "🛡️ Unaffected",
 	AlertConclusionFalsePositive: "🚫 False Positive",
 	AlertConclusionTruePositive:  "🚨 True Positive",
+	AlertConclusionEscalated:     "⬆️ Escalated",
 }
 
 func (r AlertConclusion) Label() string {

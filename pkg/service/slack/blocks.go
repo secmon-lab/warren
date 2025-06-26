@@ -369,6 +369,11 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 			Label:       types.AlertConclusionTruePositive.Label(),
 			Description: "The alert has actual impact on the system.",
 		},
+		{
+			Conclusion:  types.AlertConclusionEscalated,
+			Label:       types.AlertConclusionEscalated.Label(),
+			Description: "The alert requires escalation to higher-level security team or external resources.",
+		},
 	}
 
 	conclusionOptionBlocks := make([]*slack.OptionBlockObject, 0, len(conclusionOptions))

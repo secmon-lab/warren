@@ -80,13 +80,15 @@ export type AlertConclusion =
   | "intended"
   | "unaffected"
   | "false_positive"
-  | "true_positive";
+  | "true_positive"
+  | "escalated";
 
 export const ALERT_CONCLUSION_LABELS: Record<AlertConclusion, string> = {
   intended: "👍 Intended",
   unaffected: "🛡️ Unaffected",
   false_positive: "🚫 False Positive",
   true_positive: "🚨 True Positive",
+  escalated: "⬆️ Escalated",
 };
 
 export const ALERT_CONCLUSION_DESCRIPTIONS: Record<AlertConclusion, string> = {
@@ -95,4 +97,5 @@ export const ALERT_CONCLUSION_DESCRIPTIONS: Record<AlertConclusion, string> = {
     "The alert indicates actual attack or vulnerability, but it is no impact.",
   false_positive: "The alert is not attack or impact on the system.",
   true_positive: "The alert has actual impact on the system.",
+  escalated: "The alert requires escalation to higher-level security team or external resources.",
 };
