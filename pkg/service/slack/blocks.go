@@ -372,7 +372,7 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 		{
 			Conclusion:  types.AlertConclusionEscalated,
 			Label:       types.AlertConclusionEscalated.Label(),
-			Description: "The alert requires escalation to higher-level security team or external resources.",
+			Description: "The alert has been escalated to external management.",
 		},
 	}
 

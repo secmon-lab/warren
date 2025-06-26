@@ -97,5 +97,5 @@ export const ALERT_CONCLUSION_DESCRIPTIONS: Record<AlertConclusion, string> = {
     "The alert indicates actual attack or vulnerability, but it is no impact.",
   false_positive: "The alert is not attack or impact on the system.",
   true_positive: "The alert has actual impact on the system.",
-  escalated: "The alert requires escalation to higher-level security team or external resources.",
+  escalated: "The alert has been escalated to external management.",
 };
