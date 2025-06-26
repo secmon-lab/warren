@@ -43,25 +43,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 
 	default:
 		// For other operations that need BigQuery client
-		var opts []option.ClientOption
-		if x.credentials != "" {
-			opts = append(opts, option.WithCredentialsFile(x.credentials))
-		}
-		if x.impersonateServiceAccount != "" {
-			ts, err := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
-				TargetPrincipal: x.impersonateServiceAccount,
-				Scopes: []string{
-					"https://www.googleapis.com/auth/bigquery",
-					"https://www.googleapis.com/auth/cloud-platform",
-				},
-			})
-			if err != nil {
-				return nil, goerr.Wrap(err, "failed to create impersonated credentials")
-			}
-			opts = append(opts, option.WithTokenSource(ts))
-		}
-
-		client, err := bigquery.NewClient(ctx, x.projectID, opts...)
+		client, err := x.newClient(ctx, x.projectID)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to create BigQuery client")
 		}
@@ -371,12 +353,30 @@ func (x *Action) executeQuery(ctx context.Context, client *bigquery.Client, quer
 	}, nil
 }
 
-func (x *Action) newStorageClient(ctx context.Context) (*storage.Client, error) {
+func (x *Action) newClient(ctx context.Context, projectID string) (*bigquery.Client, error) {
 	var opts []option.ClientOption
 	if x.credentials != "" {
 		opts = append(opts, option.WithCredentialsFile(x.credentials))
 	}
-	return storage.NewClient(ctx, opts...)
+	if x.impersonateServiceAccount != "" {
+		ts, err := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
+			TargetPrincipal: x.impersonateServiceAccount,
+			Scopes: []string{
+				"https://www.googleapis.com/auth/bigquery",
+				"https://www.googleapis.com/auth/cloud-platform",
+			},
+		})
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to create impersonated credentials")
+		}
+		opts = append(opts, option.WithTokenSource(ts))
+	}
+
+	return bigquery.NewClient(ctx, projectID, opts...)
+}
+
+func (x *Action) newStorageClient(ctx context.Context) (*storage.Client, error) {
+	return storage.NewClient(ctx)
 }
 
 func (x *Action) getQueryResults(ctx context.Context, client *bigquery.Client, queryID string, limit, offset int) (map[string]any, error) {
@@ -460,7 +460,7 @@ func (x *Action) getQueryResults(ctx context.Context, client *bigquery.Client, q
 }
 
 func (x *Action) getTableSchema(ctx context.Context, projectID, datasetID, tableID string) (map[string]any, error) {
-	client, err := bigquery.NewClient(ctx, projectID)
+	client, err := x.newClient(ctx, projectID)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create BigQuery client")
 	}
