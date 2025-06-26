@@ -10,7 +10,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { UserWithAvatar } from "@/components/ui/user-name";
 import { GET_TICKET_COMMENTS } from "@/lib/graphql/queries";
 import { Comment, CommentsResponse } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
@@ -115,29 +115,18 @@ export function TicketComments({ ticketId }: TicketCommentsProps) {
                 comments.map((comment) => (
                   <div key={comment.id} className="p-4">
                     <div className="flex items-start gap-3">
-                      {comment.user ? (
-                        <Avatar className="w-8 h-8 flex-shrink-0">
-                          <AvatarImage
-                            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-                              comment.user.name
-                            )}&background=random`}
-                            alt={comment.user.name}
-                          />
-                          <AvatarFallback>
-                            {comment.user.name.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      ) : (
-                        <Avatar className="w-8 h-8 flex-shrink-0">
-                          <AvatarFallback>?</AvatarFallback>
-                        </Avatar>
-                      )}
-                      
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm">
-                            {comment.user?.name || "Unknown User"}
-                          </span>
+                          {comment.user ? (
+                            <UserWithAvatar
+                              userID={comment.user.id}
+                              fallback={comment.user.name}
+                              avatarSize="md"
+                              className="font-medium text-sm"
+                            />
+                          ) : (
+                            <span className="font-medium text-sm">Unknown User</span>
+                          )}
                           <span className="text-xs text-muted-foreground">
                             {formatRelativeTime(comment.createdAt)}
                           </span>
