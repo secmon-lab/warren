@@ -27,6 +27,9 @@ import (
 //			AuthTestFunc: func() (*slackslack.AuthTestResponse, error) {
 //				panic("mock out the AuthTest method")
 //			},
+//			GetBotInfoContextFunc: func(ctx context.Context, parameters slackslack.GetBotInfoParameters) (*slackslack.Bot, error) {
+//				panic("mock out the GetBotInfoContext method")
+//			},
 //			GetConversationInfoFunc: func(input *slackslack.GetConversationInfoInput) (*slackslack.Channel, error) {
 //				panic("mock out the GetConversationInfo method")
 //			},
@@ -64,6 +67,9 @@ type SlackClientMock struct {
 	// AuthTestFunc mocks the AuthTest method.
 	AuthTestFunc func() (*slackslack.AuthTestResponse, error)
 
+	// GetBotInfoContextFunc mocks the GetBotInfoContext method.
+	GetBotInfoContextFunc func(ctx context.Context, parameters slackslack.GetBotInfoParameters) (*slackslack.Bot, error)
+
 	// GetConversationInfoFunc mocks the GetConversationInfo method.
 	GetConversationInfoFunc func(input *slackslack.GetConversationInfoInput) (*slackslack.Channel, error)
 
@@ -95,6 +101,13 @@ type SlackClientMock struct {
 	calls struct {
 		// AuthTest holds details about calls to the AuthTest method.
 		AuthTest []struct {
+		}
+		// GetBotInfoContext holds details about calls to the GetBotInfoContext method.
+		GetBotInfoContext []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Parameters is the parameters argument value.
+			Parameters slackslack.GetBotInfoParameters
 		}
 		// GetConversationInfo holds details about calls to the GetConversationInfo method.
 		GetConversationInfo []struct {
@@ -161,6 +174,7 @@ type SlackClientMock struct {
 		}
 	}
 	lockAuthTest             sync.RWMutex
+	lockGetBotInfoContext    sync.RWMutex
 	lockGetConversationInfo  sync.RWMutex
 	lockGetTeamInfo          sync.RWMutex
 	lockGetUserGroups        sync.RWMutex
@@ -200,6 +214,46 @@ func (mock *SlackClientMock) AuthTestCalls() []struct {
 	mock.lockAuthTest.RLock()
 	calls = mock.calls.AuthTest
 	mock.lockAuthTest.RUnlock()
+	return calls
+}
+
+// GetBotInfoContext calls GetBotInfoContextFunc.
+func (mock *SlackClientMock) GetBotInfoContext(ctx context.Context, parameters slackslack.GetBotInfoParameters) (*slackslack.Bot, error) {
+	callInfo := struct {
+		Ctx        context.Context
+		Parameters slackslack.GetBotInfoParameters
+	}{
+		Ctx:        ctx,
+		Parameters: parameters,
+	}
+	mock.lockGetBotInfoContext.Lock()
+	mock.calls.GetBotInfoContext = append(mock.calls.GetBotInfoContext, callInfo)
+	mock.lockGetBotInfoContext.Unlock()
+	if mock.GetBotInfoContextFunc == nil {
+		var (
+			botOut *slackslack.Bot
+			errOut error
+		)
+		return botOut, errOut
+	}
+	return mock.GetBotInfoContextFunc(ctx, parameters)
+}
+
+// GetBotInfoContextCalls gets all the calls that were made to GetBotInfoContext.
+// Check the length with:
+//
+//	len(mockedSlackClient.GetBotInfoContextCalls())
+func (mock *SlackClientMock) GetBotInfoContextCalls() []struct {
+	Ctx        context.Context
+	Parameters slackslack.GetBotInfoParameters
+} {
+	var calls []struct {
+		Ctx        context.Context
+		Parameters slackslack.GetBotInfoParameters
+	}
+	mock.lockGetBotInfoContext.RLock()
+	calls = mock.calls.GetBotInfoContext
+	mock.lockGetBotInfoContext.RUnlock()
 	return calls
 }
 

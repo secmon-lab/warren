@@ -823,6 +823,23 @@ func (x *Service) fetchUserImageURL(ctx context.Context, userID string) (string,
 		}
 	}
 
+	// If users.info failed or returned no image, try bots.info for bot users
+	bot, err := x.client.GetBotInfoContext(ctx, slack.GetBotInfoParameters{
+		Bot: userID,
+	})
+	if err == nil && bot != nil {
+		// Try bot icons in order of preference (only use existing fields)
+		if bot.Icons.Image72 != "" {
+			return bot.Icons.Image72, nil
+		}
+		if bot.Icons.Image48 != "" {
+			return bot.Icons.Image48, nil
+		}
+		if bot.Icons.Image36 != "" {
+			return bot.Icons.Image36, nil
+		}
+	}
+
 	// No profile image available
 	return "", goerr.New("no profile image available", goerr.V("user_id", userID))
 }
@@ -846,8 +863,18 @@ func (x *Service) fetchUserDisplayName(ctx context.Context, userID string) (stri
 	}
 
 	// If users.info failed or returned no useful name, try bots.info for bot users
-	// Note: This requires 'users:read' scope, and bot information might be limited
-	// We'll use the userID as fallback since bots.info API is not always accessible
+	bot, err := x.client.GetBotInfoContext(ctx, slack.GetBotInfoParameters{
+		Bot: userID,
+	})
+	if err == nil && bot != nil {
+		if bot.Name != "" {
+			return bot.Name, nil
+		}
+		if bot.AppID != "" {
+			// Use app name as fallback
+			return bot.AppID, nil
+		}
+	}
 
 	// Fallback to userID if no display name found
 	return userID, nil

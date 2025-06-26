@@ -327,6 +327,9 @@ func TestService_GetUserIcon(t *testing.T) {
 			GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
 				return nil, fmt.Errorf("user not found")
 			},
+			GetBotInfoContextFunc: func(ctx context.Context, parameters slack_sdk.GetBotInfoParameters) (*slack_sdk.Bot, error) {
+				return nil, fmt.Errorf("bot not found")
+			},
 		}
 
 		service, err := slack.New(slackMock, "C123456")
@@ -334,7 +337,7 @@ func TestService_GetUserIcon(t *testing.T) {
 
 		_, _, err = service.GetUserIcon(ctx, "U123456")
 		gt.Error(t, err)
-		gt.S(t, err.Error()).Contains("failed to get user info from slack")
+		gt.S(t, err.Error()).Contains("failed to get user image URL")
 	})
 
 	t.Run("returns error when user is nil", func(t *testing.T) {
@@ -357,6 +360,9 @@ func TestService_GetUserIcon(t *testing.T) {
 			GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
 				return nil, nil // Return nil user without error
 			},
+			GetBotInfoContextFunc: func(ctx context.Context, parameters slack_sdk.GetBotInfoParameters) (*slack_sdk.Bot, error) {
+				return nil, nil // Return nil bot without error
+			},
 		}
 
 		service, err := slack.New(slackMock, "C123456")
@@ -364,7 +370,7 @@ func TestService_GetUserIcon(t *testing.T) {
 
 		_, _, err = service.GetUserIcon(ctx, "U123456")
 		gt.Error(t, err)
-		gt.S(t, err.Error()).Contains("user data is nil")
+		gt.S(t, err.Error()).Contains("failed to get user image URL")
 	})
 
 	t.Run("returns error when no profile image available", func(t *testing.T) {
@@ -388,6 +394,14 @@ func TestService_GetUserIcon(t *testing.T) {
 				return &slack_sdk.User{
 					ID:      userID,
 					Profile: slack_sdk.UserProfile{
+						// No image URLs
+					},
+				}, nil
+			},
+			GetBotInfoContextFunc: func(ctx context.Context, parameters slack_sdk.GetBotInfoParameters) (*slack_sdk.Bot, error) {
+				return &slack_sdk.Bot{
+					ID:    parameters.Bot,
+					Icons: slack_sdk.Icons{
 						// No image URLs
 					},
 				}, nil
@@ -533,6 +547,9 @@ func TestService_GetUserProfile(t *testing.T) {
 					},
 				}, nil
 			},
+			GetBotInfoContextFunc: func(ctx context.Context, parameters slack_sdk.GetBotInfoParameters) (*slack_sdk.Bot, error) {
+				return nil, fmt.Errorf("not a bot")
+			},
 		}
 
 		service, err := slack.New(slackMock, "C123456")
@@ -563,14 +580,17 @@ func TestService_GetUserProfile(t *testing.T) {
 			GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
 				return nil, fmt.Errorf("user not found")
 			},
+			GetBotInfoContextFunc: func(ctx context.Context, parameters slack_sdk.GetBotInfoParameters) (*slack_sdk.Bot, error) {
+				return nil, fmt.Errorf("bot not found")
+			},
 		}
 
 		service, err := slack.New(slackMock, "C123456")
 		gt.NoError(t, err)
 
-		_, err = service.GetUserProfile(ctx, "U123456")
-		gt.Error(t, err)
-		gt.S(t, err.Error()).Contains("failed to get user info from slack")
+		name, err := service.GetUserProfile(ctx, "U123456")
+		gt.NoError(t, err)                 // No longer expects error since we fallback to userID
+		gt.Value(t, name).Equal("U123456") // Should return userID as fallback
 	})
 
 	t.Run("returns error when user is nil", func(t *testing.T) {
@@ -593,14 +613,17 @@ func TestService_GetUserProfile(t *testing.T) {
 			GetUserInfoFunc: func(userID string) (*slack_sdk.User, error) {
 				return nil, nil // Return nil user without error
 			},
+			GetBotInfoContextFunc: func(ctx context.Context, parameters slack_sdk.GetBotInfoParameters) (*slack_sdk.Bot, error) {
+				return nil, nil // Return nil bot without error
+			},
 		}
 
 		service, err := slack.New(slackMock, "C123456")
 		gt.NoError(t, err)
 
-		_, err = service.GetUserProfile(ctx, "U123456")
-		gt.Error(t, err)
-		gt.S(t, err.Error()).Contains("user data is nil")
+		name, err := service.GetUserProfile(ctx, "U123456")
+		gt.NoError(t, err)                 // No longer expects error since we fallback to userID
+		gt.Value(t, name).Equal("U123456") // Should return userID as fallback
 	})
 
 	t.Run("falls back to real name when display name is empty", func(t *testing.T) {
@@ -628,6 +651,9 @@ func TestService_GetUserProfile(t *testing.T) {
 						RealName:    "John Doe",
 					},
 				}, nil
+			},
+			GetBotInfoContextFunc: func(ctx context.Context, parameters slack_sdk.GetBotInfoParameters) (*slack_sdk.Bot, error) {
+				return nil, fmt.Errorf("not a bot")
 			},
 		}
 
@@ -665,14 +691,17 @@ func TestService_GetUserProfile(t *testing.T) {
 					},
 				}, nil
 			},
+			GetBotInfoContextFunc: func(ctx context.Context, parameters slack_sdk.GetBotInfoParameters) (*slack_sdk.Bot, error) {
+				return nil, fmt.Errorf("not a bot")
+			},
 		}
 
 		service, err := slack.New(slackMock, "C123456")
 		gt.NoError(t, err)
 
-		_, err = service.GetUserProfile(ctx, "U123456")
-		gt.Error(t, err)
-		gt.S(t, err.Error()).Contains("no user name available")
+		name, err := service.GetUserProfile(ctx, "U123456")
+		gt.NoError(t, err)                 // No longer expects error since we fallback to userID
+		gt.Value(t, name).Equal("U123456") // Should return userID as fallback
 	})
 }
 
@@ -703,6 +732,9 @@ func TestService_GetUserProfile_Cache(t *testing.T) {
 					DisplayName: "Test User",
 				},
 			}, nil
+		},
+		GetBotInfoContextFunc: func(ctx context.Context, parameters slack_sdk.GetBotInfoParameters) (*slack_sdk.Bot, error) {
+			return nil, fmt.Errorf("not a bot")
 		},
 	}
 
