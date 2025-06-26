@@ -416,7 +416,7 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 					slack.NewTextBlockObject(slack.PlainTextType, "Comment", false, false),
 					slack.NewTextBlockObject(slack.PlainTextType, "Add any reason, context, or information.", false, false),
 					slack.NewPlainTextInputBlockElement(
-						slack.NewTextBlockObject(slack.PlainTextType, "comment", false, false),
+						slack.NewTextBlockObject(slack.PlainTextType, "Enter comment", false, false),
 						model.BlockActionIDTicketComment.String(),
 					),
 				).WithOptional(true),
