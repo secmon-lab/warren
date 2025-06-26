@@ -724,28 +724,10 @@ func (x *Service) GetUserIcon(ctx context.Context, userID string) ([]byte, strin
 	}
 	x.iconCacheMutex.RUnlock()
 
-	// Fetch user info from Slack
-	user, err := x.client.GetUserInfo(userID)
+	// Try to get user icon URL - handle both regular users and bots
+	imageURL, err := x.fetchUserImageURL(ctx, userID)
 	if err != nil {
-		return nil, "", goerr.Wrap(err, "failed to get user info from slack", goerr.V("user_id", userID))
-	}
-
-	// Check if user data is valid
-	if user == nil {
-		return nil, "", goerr.New("user data is nil", goerr.V("user_id", userID))
-	}
-
-	// Get profile image URL (use image_192 for good quality)
-	imageURL := user.Profile.Image192
-	if imageURL == "" {
-		// Fallback to other sizes if image_192 is not available
-		imageURL = user.Profile.Image512
-		if imageURL == "" {
-			imageURL = user.Profile.Image72
-			if imageURL == "" {
-				return nil, "", goerr.New("no profile image available", goerr.V("user_id", userID))
-			}
-		}
+		return nil, "", goerr.Wrap(err, "failed to get user image URL", goerr.V("user_id", userID))
 	}
 
 	// Download the image
@@ -815,6 +797,62 @@ func (x *Service) ClearExpiredIconCache() {
 	}
 }
 
+// fetchUserImageURL fetches profile image URL for both regular users and bots
+func (x *Service) fetchUserImageURL(ctx context.Context, userID string) (string, error) {
+	// Try users.info API first (works for both users and some bots)
+	user, err := x.client.GetUserInfo(userID)
+	if err == nil && user != nil {
+		// Try different image sizes in order of preference
+		if user.Profile.Image192 != "" {
+			return user.Profile.Image192, nil
+		}
+		if user.Profile.Image512 != "" {
+			return user.Profile.Image512, nil
+		}
+		if user.Profile.Image72 != "" {
+			return user.Profile.Image72, nil
+		}
+		if user.Profile.Image48 != "" {
+			return user.Profile.Image48, nil
+		}
+		if user.Profile.Image32 != "" {
+			return user.Profile.Image32, nil
+		}
+		if user.Profile.Image24 != "" {
+			return user.Profile.Image24, nil
+		}
+	}
+
+	// No profile image available
+	return "", goerr.New("no profile image available", goerr.V("user_id", userID))
+}
+
+// fetchUserDisplayName fetches display name for both regular users and bots
+func (x *Service) fetchUserDisplayName(ctx context.Context, userID string) (string, error) {
+	// First try users.info API (works for both users and some bots)
+	user, err := x.client.GetUserInfo(userID)
+	if err == nil && user != nil {
+		// For regular users, try display name first, then real name
+		if user.Profile.DisplayName != "" {
+			return user.Profile.DisplayName, nil
+		}
+		if user.Profile.RealName != "" {
+			return user.Profile.RealName, nil
+		}
+		// For bots, user.Name might be available
+		if user.Name != "" {
+			return user.Name, nil
+		}
+	}
+
+	// If users.info failed or returned no useful name, try bots.info for bot users
+	// Note: This requires 'users:read' scope, and bot information might be limited
+	// We'll use the userID as fallback since bots.info API is not always accessible
+
+	// Fallback to userID if no display name found
+	return userID, nil
+}
+
 // GetUserProfile returns the user's profile name
 func (x *Service) GetUserProfile(ctx context.Context, userID string) (string, error) {
 	logger := logging.From(ctx)
@@ -849,24 +887,10 @@ func (x *Service) GetUserProfile(ctx context.Context, userID string) (string, er
 	}
 	x.profileCacheMutex.RUnlock()
 
-	// Fetch user info from Slack
-	user, err := x.client.GetUserInfo(userID)
+	// Try to get user profile - handle both regular users and bots
+	displayName, err := x.fetchUserDisplayName(ctx, userID)
 	if err != nil {
-		return "", goerr.Wrap(err, "failed to get user info from slack", goerr.V("user_id", userID))
-	}
-
-	// Check if user data is valid
-	if user == nil {
-		return "", goerr.New("user data is nil", goerr.V("user_id", userID))
-	}
-
-	// Get the display name, with fallback to real name
-	displayName := user.Profile.DisplayName
-	if displayName == "" {
-		displayName = user.Profile.RealName
-		if displayName == "" {
-			return "", goerr.New("no user name available", goerr.V("user_id", userID))
-		}
+		return "", goerr.Wrap(err, "failed to get user display name", goerr.V("user_id", userID))
 	}
 
 	// Cache the profile
