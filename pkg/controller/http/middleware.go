@@ -20,6 +20,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 	"google.golang.org/api/idtoken"
 )
 
@@ -328,8 +329,9 @@ func authMiddleware(authUC AuthUseCase) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Add user context to request
+			// Add user context to request with Slack User ID
 			ctx := auth.ContextWithToken(r.Context(), token)
+			ctx = user.WithUserID(ctx, token.Sub) // Use Slack User ID
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

@@ -330,19 +330,10 @@ func (r *Firestore) PutTicket(ctx context.Context, t ticket.Ticket) error {
 	}
 
 	// Create activity for ticket creation (except when called from agent)
-	userID := user.FromContext(ctx)
-	isAgent := user.IsAgent(ctx)
-	fmt.Printf("DEBUG: PutTicket - UserID: '%s', IsAgent: %v\n", userID, isAgent)
-
 	if !user.IsAgent(ctx) {
-		fmt.Printf("DEBUG: Creating ticket activity for ticket %s\n", t.ID)
 		if err := createTicketActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
-			fmt.Printf("DEBUG: Failed to create ticket activity: %v\n", err)
 			return goerr.Wrap(err, "failed to create ticket activity", goerr.V("ticket_id", t.ID))
 		}
-		fmt.Printf("DEBUG: Successfully created ticket activity\n")
-	} else {
-		fmt.Printf("DEBUG: Skipping activity creation for agent\n")
 	}
 
 	return nil

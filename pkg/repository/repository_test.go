@@ -1420,15 +1420,12 @@ func TestActivityCreation(t *testing.T) {
 				err := repo.PutTicket(ctx, ticket)
 				gt.NoError(t, err).Required()
 
+				// Wait a bit for Firestore eventual consistency
+				time.Sleep(100 * time.Millisecond)
+
 				// Check that activity was created
 				activities, err := repo.GetActivities(ctx, 0, 100) // Get more activities to account for test accumulation
 				gt.NoError(t, err).Required()
-
-				// Debug: Print activity count and details
-				t.Logf("Total activities found: %d", len(activities))
-				for i, act := range activities {
-					t.Logf("Activity %d: Type=%s, TicketID=%s, UserID=%s", i, act.Type, act.TicketID, act.UserID)
-				}
 
 				gt.Number(t, len(activities)).GreaterOrEqual(1).Required()
 
