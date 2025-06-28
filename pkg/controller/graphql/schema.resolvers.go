@@ -17,6 +17,48 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
+// ActivityResolver implementations
+
+// User is the resolver for the user field.
+func (r *activityResolver) User(ctx context.Context, obj *graphql1.Activity) (*graphql1.User, error) {
+	if obj.UserID == nil || *obj.UserID == "" {
+		return nil, nil
+	}
+
+	// Get user profile from Slack service
+	name := *obj.UserID // fallback to user ID
+	if r.slackService != nil {
+		if profile, err := r.slackService.GetUserProfile(ctx, *obj.UserID); err == nil {
+			name = profile
+		}
+	}
+
+	return &graphql1.User{
+		ID:   *obj.UserID,
+		Name: name,
+	}, nil
+}
+
+// Alert is the resolver for the alert field.
+func (r *activityResolver) Alert(ctx context.Context, obj *graphql1.Activity) (*alert.Alert, error) {
+	if obj.AlertID == nil || *obj.AlertID == "" {
+		return nil, nil
+	}
+
+	alertID := types.AlertID(*obj.AlertID)
+	return r.repo.GetAlert(ctx, alertID)
+}
+
+// Ticket is the resolver for the ticket field.
+func (r *activityResolver) Ticket(ctx context.Context, obj *graphql1.Activity) (*ticket.Ticket, error) {
+	if obj.TicketID == nil || *obj.TicketID == "" {
+		return nil, nil
+	}
+
+	ticketID := types.TicketID(*obj.TicketID)
+	return r.repo.GetTicket(ctx, ticketID)
+}
+
 // ID is the resolver for the id field.
 func (r *alertResolver) ID(ctx context.Context, obj *alert.Alert) (string, error) {
 	return string(obj.ID), nil
@@ -590,6 +632,9 @@ func (r *ticketResolver) UpdatedAt(ctx context.Context, obj *ticket.Ticket) (str
 	return obj.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
 }
 
+// Activity returns ActivityResolver implementation.
+func (r *Resolver) Activity() ActivityResolver { return &activityResolver{r} }
+
 // Alert returns AlertResolver implementation.
 func (r *Resolver) Alert() AlertResolver { return &alertResolver{r} }
 
@@ -608,6 +653,7 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 // Ticket returns TicketResolver implementation.
 func (r *Resolver) Ticket() TicketResolver { return &ticketResolver{r} }
 
+type activityResolver struct{ *Resolver }
 type alertResolver struct{ *Resolver }
 type commentResolver struct{ *Resolver }
 type findingResolver struct{ *Resolver }

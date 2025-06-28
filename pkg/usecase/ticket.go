@@ -269,29 +269,25 @@ func (uc *UseCases) UpdateTicket(ctx context.Context, ticketID types.TicketID, t
 
 // UpdateTicketStatus updates a ticket's status
 func (uc *UseCases) UpdateTicketStatus(ctx context.Context, ticketID types.TicketID, status types.TicketStatus) (*ticket.Ticket, error) {
-	// Get existing ticket to capture old status
-	existingTicket, err := uc.repository.GetTicket(ctx, ticketID)
+	// Use batch update to ensure proper activity creation
+	if err := uc.repository.BatchUpdateTicketsStatus(ctx, []types.TicketID{ticketID}, status); err != nil {
+		return nil, goerr.Wrap(err, "failed to update ticket status")
+	}
+
+	// Get the updated ticket
+	updatedTicket, err := uc.repository.GetTicket(ctx, ticketID)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get ticket for status update")
-	}
-	if existingTicket == nil {
-		return nil, goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
-	}
-	oldStatus := existingTicket.Status
-
-	updateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
-		ticket.Status = status
-
-		// Trace ticket status change
-		_ = msg.Trace(ctx, "🎫 Ticket status updated: %s → %s",
-			oldStatus, status)
-
-		return nil
+		return nil, goerr.Wrap(err, "failed to get updated ticket")
 	}
 
-	updatedTicket, err := uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
-	if err != nil {
-		return nil, err
+	// Trace ticket status change
+	_ = msg.Trace(ctx, "🎫 Ticket status updated: %s",
+		status)
+
+	// Update Slack post if ticket has a Slack thread
+	if err := uc.syncTicketToSlack(ctx, updatedTicket); err != nil {
+		// Log error but don't fail the update
+		_ = msg.Trace(ctx, "💥 Failed to sync ticket to Slack (ticket %s): %s", updatedTicket.ID, err.Error())
 	}
 
 	return updatedTicket, nil

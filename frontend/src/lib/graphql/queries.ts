@@ -178,6 +178,18 @@ export const GET_ACTIVITIES = gql`
         commentID
         createdAt
         metadata
+        user {
+          id
+          name
+        }
+        alert {
+          id
+          title
+        }
+        ticket {
+          id
+          title
+        }
       }
       totalCount
     }

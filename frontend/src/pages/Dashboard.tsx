@@ -20,6 +20,41 @@ import {
   AlertCircle
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useUserName } from "@/components/ui/user-name";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+// UserAvatar component
+function UserAvatar({ userID }: { userID: string }) {
+  const { name, isLoading } = useUserName(userID);
+  
+  const displayName = name || userID || "Unknown User";
+  
+  if (isLoading) {
+    return (
+      <div className="w-10 h-10 bg-muted rounded-full animate-pulse" />
+    );
+  }
+  
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Avatar className="w-10 h-10 cursor-help">
+            <AvatarImage src={`/api/user/${userID}/icon`} alt={displayName} />
+            <AvatarFallback className="text-sm font-medium">
+              {displayName.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{displayName}</p>
+          <p className="text-xs text-muted-foreground">ID: {userID}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 export default function Dashboard() {
   const [isCreateTicketOpen, setIsCreateTicketOpen] = useState(false);
@@ -49,23 +84,6 @@ export default function Dashboard() {
       navigate(`/tickets/${activity.ticketID}`);
     } else if (activity.alertID) {
       navigate(`/alerts/${activity.alertID}`);
-    }
-  };
-
-  const formatActivityDescription = (activity: any) => {
-    switch (activity.type) {
-      case "ticket_created":
-        return "Created new ticket";
-      case "ticket_status_changed":
-        return "Changed ticket status";
-      case "comment_added":
-        return "Added comment";
-      case "alert_bound":
-        return "Bound alert to ticket";
-      case "alerts_bulk_bound":
-        return "Bulk bound alerts to ticket";
-      default:
-        return activity.description;
     }
   };
 
@@ -232,7 +250,7 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Right Section - Activity Feed in vertical layout */}
+        {/* Right Section - Activity Feed using full width within the column */}
         <div className="lg:col-span-1">
           <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white h-full">
             <CardHeader className="pb-4">
@@ -249,31 +267,77 @@ export default function Dashboard() {
             <CardContent className="space-y-3">
               {activitiesLoading ? (
                 <div className="text-sm text-muted-foreground">Loading...</div>
-              ) : activitiesData?.activities?.activities?.length > 0 ? (
+              ) : (
                 <>
                   <div className="space-y-3">
-                    {activitiesData.activities.activities.map((activity: any) => (
-                      <div
-                        key={activity.id}
-                        className="p-3 bg-white border border-green-100 rounded-lg cursor-pointer hover:border-green-200 hover:shadow-sm transition-all"
-                        onClick={() => handleActivityClick(activity)}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="mt-0.5 flex-shrink-0">
-                            {getActivityIcon(activity.type)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-green-900 truncate">{activity.title}</p>
-                            <p className="text-xs text-green-600 mt-1">
-                              {formatActivityDescription(activity)}
-                            </p>
-                            <p className="text-xs text-green-500 mt-1">
-                              {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
-                            </p>
+                    {activitiesData.activities.activities.map((activity: any) => {
+                      return (
+                        <div
+                          key={activity.id}
+                          className="p-3 bg-white border border-green-100 rounded-lg cursor-pointer hover:border-green-200 hover:shadow-md transition-all duration-200 w-full"
+                          onClick={() => handleActivityClick(activity)}
+                        >
+                          <div className="flex items-start gap-3">
+                            {/* User Avatar - Left */}
+                            <div className="flex-shrink-0">
+                              <UserAvatar userID={activity.userID || ''} />
+                            </div>
+                            
+                            {/* Event Info - Right */}
+                            <div className="flex-1 min-w-0">
+                              {/* Time */}
+                              <div className="text-xs text-gray-500 mb-2">
+                                {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
+                              </div>
+                              
+                              {/* Action with icon */}
+                              <div className="flex items-center gap-2 mb-2">
+                                {getActivityIcon(activity.type)}
+                                <span className="text-sm text-gray-800">
+                                  {activity.type === 'ticket_status_changed' && activity.metadata ? 
+                                    (() => {
+                                      try {
+                                        const metadata = JSON.parse(activity.metadata);
+                                        return `${metadata.old_status} → ${metadata.new_status}`;
+                                      } catch {
+                                        return activity.title;
+                                      }
+                                    })() : 
+                                    activity.title
+                                  }
+                                </span>
+                              </div>
+                              
+                              {/* Ticket/Alert info */}
+                              {(activity.ticket || activity.alert) && (
+                                <div className="mb-2">
+                                  <p className="text-sm font-medium text-gray-900 mb-1 leading-tight">
+                                    {activity.ticket?.title || activity.alert?.title}
+                                  </p>
+                                  {/* Show ticket/alert description */}
+                                  <p className="text-xs text-gray-500 line-clamp-2">
+                                    {(() => {
+                                      const description = activity.ticket?.description || activity.alert?.description;
+                                      return description && description.length > 50 
+                                        ? `${description.substring(0, 50)}...`
+                                        : description || '';
+                                    })()}
+                                  </p>
+                                </div>
+                              )}
+                              
+                              {/* Action link */}
+                              {(activity.ticketID || activity.alertID) && (
+                                <div className="flex items-center gap-1 text-xs text-green-600">
+                                  <span>View details</span>
+                                  <ArrowRight className="h-3 w-3" />
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   
                   {/* Pagination */}
@@ -303,14 +367,6 @@ export default function Dashboard() {
                     </div>
                   )}
                 </>
-              ) : (
-                <div className="text-center py-8">
-                  <Activity className="h-12 w-12 text-green-300 mx-auto mb-3" />
-                  <p className="text-sm text-green-700 mb-2">No recent activities</p>
-                  <p className="text-xs text-green-600">
-                    Create tickets or bind alerts to see activities here
-                  </p>
-                </div>
               )}
             </CardContent>
           </Card>
