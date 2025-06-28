@@ -10,6 +10,8 @@ import { Toaster } from "@/components/ui/toaster";
 import Dashboard from "@/pages/Dashboard";
 import TicketsPage from "@/pages/TicketsPage";
 import TicketDetailPage from "@/pages/TicketDetailPage";
+import AlertsPage from "@/pages/AlertsPage";
+import AlertDetailPage from "@/pages/AlertDetailPage";
 import BoardPage from "@/pages/BoardPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 
@@ -20,6 +22,8 @@ function AuthenticatedApp() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/tickets" element={<TicketsPage />} />
         <Route path="/tickets/:id" element={<TicketDetailPage />} />
+        <Route path="/alerts" element={<AlertsPage />} />
+        <Route path="/alerts/:id" element={<AlertDetailPage />} />
         <Route path="/board" element={<BoardPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

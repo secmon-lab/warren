@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, List, Kanban } from "lucide-react";
+import { Home, List, Kanban, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +13,11 @@ const navigation = [
     name: "Tickets",
     href: "/tickets",
     icon: List,
+  },
+  {
+    name: "Alerts",
+    href: "/alerts",
+    icon: AlertTriangle,
   },
   {
     name: "Board",
