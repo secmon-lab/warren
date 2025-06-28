@@ -165,6 +165,12 @@ export default function Dashboard() {
                             {ticket.status}
                           </Badge>
                         </div>
+                        {/* Add ticket description */}
+                        {ticket.description && (
+                          <p className="text-xs text-gray-500 line-clamp-2">
+                            {ticket.description}
+                          </p>
+                        )}
                         <div className="flex items-center justify-between text-xs">
                           {ticket.assignee && (
                             <div className="flex items-center gap-1 text-blue-600">
