@@ -64,6 +64,31 @@ type CommentsResponse {
   totalCount: Int!
 }
 
+type Activity {
+  id: ID!
+  type: String!
+  title: String!
+  description: String!
+  userID: String
+  alertID: String
+  ticketID: String
+  commentID: String
+  createdAt: String!
+  metadata: String
+}
+
+type ActivitiesResponse {
+  activities: [Activity!]!
+  totalCount: Int!
+}
+
+type DashboardStats {
+  openTicketsCount: Int!
+  unboundAlertsCount: Int!
+  openTickets: [Ticket!]!
+  unboundAlerts: [Alert!]!
+}
+
 type Query {
   ticket(id: ID!): Ticket
   tickets(statuses: [String!], offset: Int, limit: Int): TicketsResponse!
@@ -71,6 +96,8 @@ type Query {
   ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
   alert(id: ID!): Alert
   alerts: [Alert!]!
+  dashboard: DashboardStats!
+  activities(offset: Int, limit: Int): ActivitiesResponse!
 }
 
 type Mutation {

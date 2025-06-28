@@ -10,6 +10,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -26,6 +27,7 @@ type Memory struct {
 	tickets        map[types.TicketID]*ticket.Ticket
 	ticketComments map[types.TicketID][]ticket.Comment
 	tokens         map[auth.TokenID]*auth.Token
+	activities     map[types.ActivityID]*activity.Activity
 }
 
 var _ interfaces.Repository = &Memory{}
@@ -38,6 +40,7 @@ func NewMemory() *Memory {
 		tickets:        make(map[types.TicketID]*ticket.Ticket),
 		ticketComments: make(map[types.TicketID][]ticket.Comment),
 		tokens:         make(map[auth.TokenID]*auth.Token),
+		activities:     make(map[types.ActivityID]*activity.Activity),
 	}
 }
 
@@ -748,4 +751,48 @@ func (r *Memory) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []types
 	}
 
 	return nil
+}
+
+// Activity related methods
+func (r *Memory) PutActivity(ctx context.Context, activity *activity.Activity) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.activities[activity.ID] = activity
+	return nil
+}
+
+func (r *Memory) GetActivities(ctx context.Context, offset, limit int) ([]*activity.Activity, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var activities []*activity.Activity
+	for _, a := range r.activities {
+		activities = append(activities, a)
+	}
+
+	// Sort by CreatedAt in descending order (newest first)
+	sort.Slice(activities, func(i, j int) bool {
+		return activities[i].CreatedAt.After(activities[j].CreatedAt)
+	})
+
+	// Apply offset and limit
+	start := offset
+	if start >= len(activities) {
+		return []*activity.Activity{}, nil
+	}
+
+	end := start + limit
+	if end > len(activities) {
+		end = len(activities)
+	}
+
+	return activities[start:end], nil
+}
+
+func (r *Memory) CountActivities(ctx context.Context) (int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	return len(r.activities), nil
 }

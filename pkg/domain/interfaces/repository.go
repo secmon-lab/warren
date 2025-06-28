@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -62,4 +63,9 @@ type Repository interface {
 	PutToken(ctx context.Context, token *auth.Token) error
 	GetToken(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error)
 	DeleteToken(ctx context.Context, tokenID auth.TokenID) error
+
+	// For activity management
+	PutActivity(ctx context.Context, activity *activity.Activity) error
+	GetActivities(ctx context.Context, offset, limit int) ([]*activity.Activity, error)
+	CountActivities(ctx context.Context) (int, error)
 }

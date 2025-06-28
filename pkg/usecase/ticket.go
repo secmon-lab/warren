@@ -9,6 +9,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
@@ -65,6 +66,19 @@ func (uc *UseCases) createTicketWithSlackPosting(ctx context.Context, opts Ticke
 	// Save ticket to repository
 	if err := uc.repository.PutTicket(ctx, newTicket); err != nil {
 		return nil, goerr.Wrap(err, "failed to save ticket")
+	}
+
+	// Create activity for ticket creation
+	var userID string
+	if newTicket.Assignee != nil {
+		userID = newTicket.Assignee.ID
+	} else {
+		userID = "system" // Default when no assignee
+	}
+	if err := uc.activityService.CreateTicketActivity(ctx, newTicket.ID, newTicket.Metadata.Title, userID); err != nil {
+		// Log error but don't fail ticket creation
+		logger := logging.From(ctx)
+		logger.Error("failed to create ticket activity", "error", err, "ticket_id", newTicket.ID)
 	}
 
 	return &newTicket, nil
@@ -269,8 +283,17 @@ func (uc *UseCases) UpdateTicket(ctx context.Context, ticketID types.TicketID, t
 
 // UpdateTicketStatus updates a ticket's status
 func (uc *UseCases) UpdateTicketStatus(ctx context.Context, ticketID types.TicketID, status types.TicketStatus) (*ticket.Ticket, error) {
+	// Get existing ticket to capture old status
+	existingTicket, err := uc.repository.GetTicket(ctx, ticketID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get ticket for status update")
+	}
+	if existingTicket == nil {
+		return nil, goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+	}
+	oldStatus := existingTicket.Status
+
 	updateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
-		oldStatus := ticket.Status
 		ticket.Status = status
 
 		// Trace ticket status change
@@ -280,7 +303,20 @@ func (uc *UseCases) UpdateTicketStatus(ctx context.Context, ticketID types.Ticke
 		return nil
 	}
 
-	return uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
+	updatedTicket, err := uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create activity for status change
+	var userID string = "system" // Default to system if no user context available
+	if err := uc.activityService.CreateTicketStatusChangedActivity(ctx, ticketID, updatedTicket.Metadata.Title, string(oldStatus), string(status), userID); err != nil {
+		// Log error but don't fail the status update
+		logger := logging.From(ctx)
+		logger.Error("failed to create ticket status changed activity", "error", err, "ticket_id", ticketID)
+	}
+
+	return updatedTicket, nil
 }
 
 // UpdateTicketConclusion updates a ticket's conclusion and reason

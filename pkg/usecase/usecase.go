@@ -9,6 +9,7 @@ import (
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/service/activity"
 	"github.com/secmon-lab/warren/pkg/service/slack"
 )
 
@@ -19,6 +20,7 @@ var (
 type UseCases struct {
 	// services and adapters
 	slackService    *slack.Service
+	activityService *activity.Service
 	llmClient       gollem.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
@@ -130,6 +132,9 @@ func New(opts ...Option) *UseCases {
 	for _, opt := range opts {
 		opt(u)
 	}
+
+	// Initialize activity service with repository
+	u.activityService = activity.New(u.repository)
 
 	return u
 }

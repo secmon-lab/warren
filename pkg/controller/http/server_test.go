@@ -148,10 +148,20 @@ func TestSlackMentionHandler(t *testing.T) {
 		},
 	}
 
-	uc := &useCaseInterface{
-		SlackEventUsecases: slackEventMock,
+	// Create a real usecase with minimal dependencies for testing
+	uc := usecase.New(
+		usecase.WithRepository(repository.NewMemory()),
+	)
+
+	// Override the SlackEventUsecases to use our mock
+	ucInterface := &useCaseInterface{
+		AlertUsecases:            uc,
+		SlackEventUsecases:       slackEventMock,
+		SlackInteractionUsecases: uc,
+		UserUsecases:             uc,
 	}
-	srv := server.New(uc, server.WithSlackVerifier(slack_model.NewPayloadVerifier(signingSecret)))
+
+	srv := server.New(ucInterface, server.WithSlackVerifier(slack_model.NewPayloadVerifier(signingSecret)))
 
 	t.Run("with valid signature", func(t *testing.T) {
 		ctx := slack_ctrl.WithSync(t.Context())
@@ -187,10 +197,21 @@ func TestAlertSNS(t *testing.T) {
 			return nil, nil
 		},
 	}
-	uc := &useCaseInterface{
-		AlertUsecases: alertUsecasesMock,
+
+	// Create a real usecase with minimal dependencies for testing
+	uc := usecase.New(
+		usecase.WithRepository(repository.NewMemory()),
+	)
+
+	// Override the AlertUsecases to use our mock
+	ucInterface := &useCaseInterface{
+		AlertUsecases:            alertUsecasesMock,
+		SlackEventUsecases:       uc,
+		SlackInteractionUsecases: uc,
+		UserUsecases:             uc,
 	}
-	srv := server.New(uc)
+
+	srv := server.New(ucInterface)
 
 	ctx := server.WithHTTPClient(t.Context(), &mockHTTPClient{
 		GetFunc: func(url string) (*http.Response, error) {

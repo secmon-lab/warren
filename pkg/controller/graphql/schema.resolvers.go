@@ -405,6 +405,113 @@ func (r *queryResolver) Alerts(ctx context.Context) ([]*alert.Alert, error) {
 	return alerts, nil
 }
 
+// Dashboard is the resolver for the dashboard field.
+func (r *queryResolver) Dashboard(ctx context.Context) (*graphql1.DashboardStats, error) {
+	// Get open tickets count and list
+	openTickets, err := r.repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 5)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get open tickets")
+	}
+
+	openTicketsCount, err := r.repo.CountTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen})
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to count open tickets")
+	}
+
+	// Get unbound alerts (alerts without ticket)
+	unboundAlerts, err := r.repo.GetAlertWithoutTicket(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get unbound alerts")
+	}
+
+	// Limit to 5 alerts
+	unboundAlertsCount := len(unboundAlerts)
+	if len(unboundAlerts) > 5 {
+		unboundAlerts = unboundAlerts[:5]
+	}
+
+	return &graphql1.DashboardStats{
+		OpenTicketsCount:   openTicketsCount,
+		UnboundAlertsCount: unboundAlertsCount,
+		OpenTickets:        openTickets,
+		UnboundAlerts:      unboundAlerts,
+	}, nil
+}
+
+// Activities is the resolver for the activities field.
+func (r *queryResolver) Activities(ctx context.Context, offset *int, limit *int) (*graphql1.ActivitiesResponse, error) {
+	const defaultActivitiesLimit = 10
+	const maxActivitiesLimit = 50
+
+	// Set default values for offset and limit
+	var offsetVal, limitVal int
+	if offset != nil {
+		offsetVal = *offset
+	}
+	if limit != nil {
+		limitVal = *limit
+		if limitVal > maxActivitiesLimit {
+			limitVal = maxActivitiesLimit
+		}
+	} else {
+		limitVal = defaultActivitiesLimit
+	}
+
+	// Get paginated activities
+	activities, err := r.repo.GetActivities(ctx, offsetVal, limitVal)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get activities")
+	}
+
+	// Get total count for pagination
+	totalCount, err := r.repo.CountActivities(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to count activities")
+	}
+
+	// Convert to GraphQL activities
+	graphqlActivities := make([]*graphql1.Activity, len(activities))
+	for i, a := range activities {
+		graphqlActivity := &graphql1.Activity{
+			ID:          string(a.ID),
+			Type:        string(a.Type),
+			Title:       a.Title,
+			Description: a.Description,
+			CreatedAt:   a.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+
+		if a.UserID != "" {
+			graphqlActivity.UserID = &a.UserID
+		}
+		if a.AlertID != types.AlertID("") {
+			alertID := string(a.AlertID)
+			graphqlActivity.AlertID = &alertID
+		}
+		if a.TicketID != types.TicketID("") {
+			ticketID := string(a.TicketID)
+			graphqlActivity.TicketID = &ticketID
+		}
+		if a.CommentID != types.CommentID("") {
+			commentID := string(a.CommentID)
+			graphqlActivity.CommentID = &commentID
+		}
+		if a.Metadata != nil {
+			metadataBytes, err := json.Marshal(a.Metadata)
+			if err == nil {
+				metadataStr := string(metadataBytes)
+				graphqlActivity.Metadata = &metadataStr
+			}
+		}
+
+		graphqlActivities[i] = graphqlActivity
+	}
+
+	return &graphql1.ActivitiesResponse{
+		Activities: graphqlActivities,
+		TotalCount: totalCount,
+	}, nil
+}
+
 // ID is the resolver for the id field.
 func (r *ticketResolver) ID(ctx context.Context, obj *ticket.Ticket) (string, error) {
 	return string(obj.ID), nil

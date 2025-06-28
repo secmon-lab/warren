@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/firestore/apiv1/firestorepb"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -52,6 +53,7 @@ const (
 	collectionTickets     = "tickets"
 	collectionComments    = "comments"
 	collectionTokens      = "tokens"
+	collectionActivities  = "activities"
 )
 
 func (r *Firestore) PutAlert(ctx context.Context, alert alert.Alert) error {
@@ -1058,4 +1060,70 @@ func (r *Firestore) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []ty
 	}
 
 	return nil
+}
+
+// Activity related methods
+func (r *Firestore) PutActivity(ctx context.Context, activity *activity.Activity) error {
+	doc := r.db.Collection(collectionActivities).Doc(activity.ID.String())
+	_, err := doc.Set(ctx, activity)
+	if err != nil {
+		return goerr.Wrap(err, "failed to put activity", goerr.V("activity_id", activity.ID))
+	}
+	return nil
+}
+
+func (r *Firestore) GetActivities(ctx context.Context, offset, limit int) ([]*activity.Activity, error) {
+	iter := r.db.Collection(collectionActivities).
+		OrderBy("CreatedAt", firestore.Desc).
+		Offset(offset).
+		Limit(limit).
+		Documents(ctx)
+
+	var activities []*activity.Activity
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next activity")
+		}
+
+		var a activity.Activity
+		if err := doc.DataTo(&a); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to activity")
+		}
+
+		activities = append(activities, &a)
+	}
+
+	return activities, nil
+}
+
+func (r *Firestore) CountActivities(ctx context.Context) (int, error) {
+	countQuery := r.db.Collection(collectionActivities).NewAggregationQuery().WithCount("count")
+	result, err := countQuery.Get(ctx)
+	if err != nil {
+		return 0, goerr.Wrap(err, "failed to get activity count")
+	}
+
+	countVal, ok := result["count"]
+	if !ok {
+		return 0, goerr.New("count alias not found in aggregation result")
+	}
+
+	switch v := countVal.(type) {
+	case int64:
+		return int(v), nil
+	case *firestorepb.Value:
+		if v != nil && v.ValueType != nil {
+			if _, okType := v.ValueType.(*firestorepb.Value_IntegerValue); okType {
+				return int(v.GetIntegerValue()), nil
+			}
+			return 0, goerr.New("firestorepb.Value from count is not an integer type", goerr.V("value_type", fmt.Sprintf("%T", v.ValueType)))
+		}
+		return 0, goerr.New("count value is a nil or invalid *firestorepb.Value")
+	default:
+		return 0, goerr.New("unexpected count value type from Firestore aggregation", goerr.V("type", fmt.Sprintf("%T", v)), goerr.V("value", v))
+	}
 }

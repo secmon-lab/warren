@@ -136,11 +136,85 @@ export const GET_ALERTS = gql`
   }
 `;
 
+export const GET_DASHBOARD = gql`
+  query GetDashboard {
+    dashboard {
+      openTicketsCount
+      unboundAlertsCount
+      openTickets {
+        id
+        status
+        title
+        description
+        isTest
+        assignee {
+          id
+          name
+        }
+        createdAt
+        updatedAt
+      }
+      unboundAlerts {
+        id
+        title
+        description
+        createdAt
+      }
+    }
+  }
+`;
+
+export const GET_ACTIVITIES = gql`
+  query GetActivities($offset: Int, $limit: Int) {
+    activities(offset: $offset, limit: $limit) {
+      activities {
+        id
+        type
+        title
+        description
+        userID
+        alertID
+        ticketID
+        commentID
+        createdAt
+        metadata
+      }
+      totalCount
+    }
+  }
+`;
+
+export const GET_TICKET_COMMENTS = gql`
+  query GetTicketComments($ticketId: ID!, $offset: Int, $limit: Int) {
+    ticketComments(ticketId: $ticketId, offset: $offset, limit: $limit) {
+      comments {
+        id
+        content
+        user {
+          id
+          name
+        }
+        createdAt
+        updatedAt
+      }
+      totalCount
+    }
+  }
+`;
+
 export const UPDATE_TICKET_STATUS = gql`
   mutation UpdateTicketStatus($id: ID!, $status: String!) {
     updateTicketStatus(id: $id, status: $status) {
       id
       status
+      title
+      description
+      isTest
+      assignee {
+        id
+        name
+      }
+      createdAt
       updatedAt
     }
   }
@@ -151,6 +225,14 @@ export const UPDATE_MULTIPLE_TICKETS_STATUS = gql`
     updateMultipleTicketsStatus(ids: $ids, status: $status) {
       id
       status
+      title
+      description
+      isTest
+      assignee {
+        id
+        name
+      }
+      createdAt
       updatedAt
     }
   }
@@ -164,8 +246,17 @@ export const UPDATE_TICKET_CONCLUSION = gql`
   ) {
     updateTicketConclusion(id: $id, conclusion: $conclusion, reason: $reason) {
       id
+      status
+      title
+      description
       conclusion
       reason
+      isTest
+      assignee {
+        id
+        name
+      }
+      createdAt
       updatedAt
     }
   }
@@ -255,24 +346,6 @@ export const GET_SIMILAR_TICKETS = gql`
         description
         isTest
         assignee {
-          id
-          name
-        }
-        createdAt
-        updatedAt
-      }
-      totalCount
-    }
-  }
-`;
-
-export const GET_TICKET_COMMENTS = gql`
-  query GetTicketComments($ticketId: ID!, $offset: Int, $limit: Int) {
-    ticketComments(ticketId: $ticketId, offset: $offset, limit: $limit) {
-      comments {
-        id
-        content
-        user {
           id
           name
         }

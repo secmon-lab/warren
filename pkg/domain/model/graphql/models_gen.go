@@ -3,8 +3,27 @@
 package graphql
 
 import (
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 )
+
+type ActivitiesResponse struct {
+	Activities []*Activity `json:"activities"`
+	TotalCount int         `json:"totalCount"`
+}
+
+type Activity struct {
+	ID          string  `json:"id"`
+	Type        string  `json:"type"`
+	Title       string  `json:"title"`
+	Description string  `json:"description"`
+	UserID      *string `json:"userID,omitempty"`
+	AlertID     *string `json:"alertID,omitempty"`
+	TicketID    *string `json:"ticketID,omitempty"`
+	CommentID   *string `json:"commentID,omitempty"`
+	CreatedAt   string  `json:"createdAt"`
+	Metadata    *string `json:"metadata,omitempty"`
+}
 
 type AlertAttribute struct {
 	Key   string  `json:"key"`
@@ -16,6 +35,13 @@ type AlertAttribute struct {
 type CommentsResponse struct {
 	Comments   []*ticket.Comment `json:"comments"`
 	TotalCount int               `json:"totalCount"`
+}
+
+type DashboardStats struct {
+	OpenTicketsCount   int              `json:"openTicketsCount"`
+	UnboundAlertsCount int              `json:"unboundAlertsCount"`
+	OpenTickets        []*ticket.Ticket `json:"openTickets"`
+	UnboundAlerts      []*alert.Alert   `json:"unboundAlerts"`
 }
 
 type Mutation struct {
