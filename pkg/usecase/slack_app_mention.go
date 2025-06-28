@@ -9,6 +9,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/command"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 // HandleSlackAppMention handles a slack app mention event. It will dispatch a slack action to the alert.
@@ -18,12 +19,17 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 
 	threadSvc := uc.slackService.NewThread(slackMsg.Thread())
 	ctx = msg.With(ctx, threadSvc.Reply, threadSvc.NewStateFunc)
+	if slackMsg.User() != nil {
+		ctx = user.WithUserID(ctx, slackMsg.User().ID)
+	}
 
 	// Nothing to do
 	for i, mention := range slackMsg.Mention() {
 		if !uc.slackService.IsBotUser(mention.UserID) {
 			continue
 		}
+
+		// Set user ID in context for activity tracking
 
 		// Try to parse message as command when it's first mention.
 		if i == 0 && len(mention.Message) > 0 {
@@ -53,6 +59,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 			return nil
 		}
 
+		// Pass user-enriched context to chat function
 		return uc.Chat(ctx, ticket, mention.Message)
 	}
 

@@ -16,31 +16,38 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 // HandleSlackInteractionBlockActions handles a slack interaction block action.
-func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, user slack.User, slackThread slack.Thread, actionID slack.ActionID, value, triggerID string) error {
+func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, slackUser slack.User, slackThread slack.Thread, actionID slack.ActionID, value, triggerID string) error {
+	// Set user ID in context for activity tracking
+	userCtx := user.WithUserID(ctx, slackUser.ID)
+
+	logger := logging.From(userCtx)
+	logger.Info("HandleSlackInteractionBlockActions", "action_id", actionID, "value", value, "user", slackUser.ID)
+
 	threadSvc := uc.slackService.NewThread(slackThread)
 	ctx = msg.With(ctx, threadSvc.Reply, threadSvc.NewStateFunc)
 
 	switch actionID {
 	case slack.ActionIDAckAlert:
-		return uc.slackActionAckAlert(ctx, user, slackThread, types.AlertID(value))
+		return uc.slackActionAckAlert(userCtx, slackUser, slackThread, types.AlertID(value))
 
 	case slack.ActionIDAckList:
-		return uc.slackActionAckList(ctx, user, slackThread, types.AlertListID(value))
+		return uc.slackActionAckList(userCtx, slackUser, slackThread, types.AlertListID(value))
 
 	case slack.ActionIDBindAlert:
 		return uc.slackActionBindAlert(ctx, types.AlertID(value), triggerID)
 
 	case slack.ActionIDBindList:
-		return uc.slackActionBindList(ctx, user, slackThread, types.AlertListID(value), triggerID)
+		return uc.slackActionBindList(userCtx, slackUser, slackThread, types.AlertListID(value), triggerID)
 
 	case slack.ActionIDResolveTicket:
-		return uc.showResolveTicketModal(ctx, user, slackThread, types.TicketID(value), triggerID)
+		return uc.showResolveTicketModal(ctx, slackUser, slackThread, types.TicketID(value), triggerID)
 
 	case slack.ActionIDSalvage:
-		return uc.showSalvageModal(ctx, user, slackThread, types.TicketID(value), triggerID)
+		return uc.showSalvageModal(ctx, slackUser, slackThread, types.TicketID(value), triggerID)
 	}
 
 	return nil
@@ -153,7 +160,7 @@ func (uc *UseCases) slackActionBindAlert(ctx context.Context, targetAlertID type
 	return nil
 }
 
-func (uc *UseCases) slackActionBindList(ctx context.Context, _ slack.User, _ slack.Thread, targetListID types.AlertListID, triggerID string) error {
+func (uc *UseCases) slackActionBindList(ctx context.Context, user slack.User, slackThread slack.Thread, targetListID types.AlertListID, triggerID string) error {
 	list, err := uc.repository.GetAlertList(ctx, targetListID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alert list")

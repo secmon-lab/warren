@@ -170,7 +170,7 @@ func TestSlackMentionHandler(t *testing.T) {
 		// Calculate signature
 		signature := calculateSlackSignature(string(slackMentionJSON), ts, signingSecret)
 
-		req := httptest.NewRequest("POST", "/slack/event", strings.NewReader(string(slackMentionJSON)))
+		req := httptest.NewRequest("POST", "/hooks/slack/event", strings.NewReader(string(slackMentionJSON)))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Slack-Signature", signature)
 		req.Header.Set("X-Slack-Request-Timestamp", ts)

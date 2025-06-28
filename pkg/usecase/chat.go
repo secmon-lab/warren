@@ -19,6 +19,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 //go:embed prompt/chat_system_prompt.md
@@ -104,6 +105,9 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 				return nil
 			}
 
+			// Set agent context for agent messages
+			agentCtx := user.WithAgent(user.WithUserID(ctx, x.slackService.BotID()))
+
 			// Record agent message as TicketComment
 			// Create bot user for agent messages
 			botUser := &slack.User{
@@ -119,9 +123,9 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 				return nil
 			}
 
-			comment := target.NewComment(ctx, message, botUser, ts)
+			comment := target.NewComment(agentCtx, message, botUser, ts)
 
-			if err := x.repository.PutTicketComment(ctx, comment); err != nil {
+			if err := x.repository.PutTicketComment(agentCtx, comment); err != nil {
 				logger.Error("failed to record agent message as comment", "error", err)
 				// Continue execution even if comment recording fails
 			}

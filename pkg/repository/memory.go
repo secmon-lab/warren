@@ -2,9 +2,11 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 type Memory struct {
@@ -185,6 +188,10 @@ func (r *Memory) PutTicket(ctx context.Context, t ticket.Ticket) error {
 	defer r.mu.Unlock()
 
 	r.tickets[t.ID] = &t
+
+	// Create activity for ticket creation
+	r.createTicketActivity(ctx, t.ID, t.Metadata.Title)
+
 	return nil
 }
 
@@ -193,6 +200,15 @@ func (r *Memory) PutTicketComment(ctx context.Context, comment ticket.Comment) e
 	defer r.mu.Unlock()
 
 	r.ticketComments[comment.TicketID] = append(r.ticketComments[comment.TicketID], comment)
+
+	// Create activity for comment addition - only for user comments, not agent
+	if !user.IsAgent(ctx) {
+		// Get ticket for activity creation
+		if t, exists := r.tickets[comment.TicketID]; exists {
+			r.createCommentActivity(ctx, comment.TicketID, comment.ID, t.Metadata.Title)
+		}
+	}
+
 	return nil
 }
 
@@ -296,12 +312,22 @@ func (r *Memory) BindAlertToTicket(ctx context.Context, alertID types.AlertID, t
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	// Get ticket for activity creation
+	t, ticketExists := r.tickets[ticketID]
+	if !ticketExists {
+		return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+	}
+
 	alert, ok := r.alerts[alertID]
 	if !ok {
 		return goerr.New("alert not found", goerr.V("alert_id", alertID))
 	}
 
 	alert.TicketID = ticketID
+
+	// Create activity for alert binding
+	r.createAlertBoundActivity(ctx, alertID, ticketID, alert.Metadata.Title, t.Metadata.Title)
+
 	return nil
 }
 
@@ -473,13 +499,34 @@ func (r *Memory) BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.A
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	// Get ticket for activity creation
+	t, ticketExists := r.tickets[ticketID]
+	if !ticketExists {
+		return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+	}
+
+	// Get alerts for activity creation
+	var alertTitles []string
 	for _, alertID := range alertIDs {
 		alert, ok := r.alerts[alertID]
 		if !ok {
 			return goerr.New("alert not found", goerr.V("alert_id", alertID))
 		}
 		alert.TicketID = ticketID
+		alertTitles = append(alertTitles, alert.Metadata.Title)
 	}
+
+	// Create activity for bulk alert binding
+	if len(alertIDs) > 1 {
+		r.createBulkAlertBoundActivity(ctx, alertIDs, ticketID, t.Metadata.Title, alertTitles)
+	} else if len(alertIDs) == 1 {
+		alertTitle := ""
+		if len(alertTitles) > 0 {
+			alertTitle = alertTitles[0]
+		}
+		r.createAlertBoundActivity(ctx, alertIDs[0], ticketID, alertTitle, t.Metadata.Title)
+	}
+
 	return nil
 }
 
@@ -745,9 +792,15 @@ func (r *Memory) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []types
 			return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
 		}
 
+		oldStatus := string(ticket.Status)
+		newStatus := string(status)
+
 		ticket.Status = status
 		ticket.UpdatedAt = time.Now()
 		r.tickets[ticketID] = ticket
+
+		// Create activity for status change
+		r.createStatusChangeActivity(ctx, ticketID, ticket.Metadata.Title, oldStatus, newStatus)
 	}
 
 	return nil
@@ -795,4 +848,95 @@ func (r *Memory) CountActivities(ctx context.Context) (int, error) {
 	defer r.mu.RUnlock()
 
 	return len(r.activities), nil
+}
+
+// Activity creation helper functions
+func (r *Memory) createTicketActivity(ctx context.Context, ticketID types.TicketID, title string) *activity.Activity {
+	userID := user.FromContext(ctx)
+	activityID := types.NewActivityID()
+	act := &activity.Activity{
+		ID:          activityID,
+		Type:        types.ActivityTypeTicketCreated,
+		Title:       "Ticket Created",
+		Description: fmt.Sprintf("Created ticket: %s", title),
+		UserID:      userID,
+		TicketID:    ticketID,
+		CreatedAt:   time.Now(),
+	}
+	r.activities[activityID] = act
+	return act
+}
+
+func (r *Memory) createCommentActivity(ctx context.Context, ticketID types.TicketID, commentID types.CommentID, title string) *activity.Activity {
+	userID := user.FromContext(ctx)
+	activityID := types.NewActivityID()
+	act := &activity.Activity{
+		ID:          activityID,
+		Type:        types.ActivityTypeCommentAdded,
+		Title:       "Comment Added",
+		Description: fmt.Sprintf("Added comment to ticket: %s", title),
+		UserID:      userID,
+		TicketID:    ticketID,
+		CommentID:   commentID,
+		CreatedAt:   time.Now(),
+	}
+	r.activities[activityID] = act
+	return act
+}
+
+func (r *Memory) createStatusChangeActivity(ctx context.Context, ticketID types.TicketID, title, oldStatus, newStatus string) *activity.Activity {
+	userID := user.FromContext(ctx)
+	activityID := types.NewActivityID()
+	act := &activity.Activity{
+		ID:          activityID,
+		Type:        types.ActivityTypeTicketStatusChanged,
+		Title:       "Status Changed",
+		Description: fmt.Sprintf("Changed status of %s from %s to %s", title, oldStatus, newStatus),
+		UserID:      userID,
+		TicketID:    ticketID,
+		CreatedAt:   time.Now(),
+		Metadata: map[string]interface{}{
+			"old_status": oldStatus,
+			"new_status": newStatus,
+		},
+	}
+	r.activities[activityID] = act
+	return act
+}
+
+func (r *Memory) createAlertBoundActivity(ctx context.Context, alertID types.AlertID, ticketID types.TicketID, alertTitle, ticketTitle string) *activity.Activity {
+	userID := user.FromContext(ctx)
+	activityID := types.NewActivityID()
+	act := &activity.Activity{
+		ID:          activityID,
+		Type:        types.ActivityTypeAlertBound,
+		Title:       "Alert Bound",
+		Description: fmt.Sprintf("Bound alert %s to ticket: %s", alertTitle, ticketTitle),
+		UserID:      userID,
+		AlertID:     alertID,
+		TicketID:    ticketID,
+		CreatedAt:   time.Now(),
+	}
+	r.activities[activityID] = act
+	return act
+}
+
+func (r *Memory) createBulkAlertBoundActivity(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID, ticketTitle string, alertTitles []string) *activity.Activity {
+	userID := user.FromContext(ctx)
+	activityID := types.NewActivityID()
+	act := &activity.Activity{
+		ID:          activityID,
+		Type:        types.ActivityTypeAlertsBulkBound,
+		Title:       "Bulk Alert Bound",
+		Description: fmt.Sprintf("Bound %d alerts to ticket: %s", len(alertIDs), ticketTitle),
+		UserID:      userID,
+		TicketID:    ticketID,
+		CreatedAt:   time.Now(),
+		Metadata: map[string]interface{}{
+			"alert_count":  len(alertIDs),
+			"alert_titles": strings.Join(alertTitles, ", "),
+		},
+	}
+	r.activities[activityID] = act
+	return act
 }

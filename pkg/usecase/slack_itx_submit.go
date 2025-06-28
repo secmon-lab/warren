@@ -15,28 +15,32 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 //go:embed prompt/resolve_message.md
 var resolveMessagePromptTemplate string
 
-func (uc *UseCases) HandleSlackInteractionViewSubmission(ctx context.Context, user slack.User, callbackID slack.CallbackID, metadata string, values slack.StateValue) error {
-	logger := logging.From(ctx)
+func (uc *UseCases) HandleSlackInteractionViewSubmission(ctx context.Context, slackUser slack.User, callbackID slack.CallbackID, metadata string, values slack.StateValue) error {
+	// Set user ID in context for activity tracking
+	userCtx := user.WithUserID(ctx, slackUser.ID)
+
+	logger := logging.From(userCtx)
 	logger.Debug("resolving alert",
-		"user", user,
+		"user", slackUser,
 		"callback_id", callbackID,
 		"metadata", metadata,
 		"values", values,
 	)
 	switch callbackID {
 	case slack.CallbackSubmitResolveTicket:
-		return uc.handleSlackInteractionViewSubmissionResolveTicket(ctx, user, metadata, values)
+		return uc.handleSlackInteractionViewSubmissionResolveTicket(userCtx, slackUser, metadata, values)
 	case slack.CallbackSubmitBindAlert:
-		return uc.handleSlackInteractionViewSubmissionBindAlert(ctx, user, metadata, values)
+		return uc.handleSlackInteractionViewSubmissionBindAlert(userCtx, slackUser, metadata, values)
 	case slack.CallbackSubmitBindList:
-		return uc.handleSlackInteractionViewSubmissionBindList(ctx, user, metadata, values)
+		return uc.handleSlackInteractionViewSubmissionBindList(userCtx, slackUser, metadata, values)
 	case slack.CallbackSubmitSalvage:
-		return uc.handleSlackInteractionViewSubmissionSalvage(ctx, user, metadata, values)
+		return uc.handleSlackInteractionViewSubmissionSalvage(userCtx, slackUser, metadata, values)
 	}
 
 	return nil
@@ -83,10 +87,10 @@ func getTicketID(values slack.StateValue) (types.TicketID, error) {
 	return ticketID, nil
 }
 
-func (uc *UseCases) handleSlackInteractionViewSubmissionBindAlert(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
+func (uc *UseCases) handleSlackInteractionViewSubmissionBindAlert(ctx context.Context, slackUser slack.User, metadata string, values slack.StateValue) error {
 	logger := logging.From(ctx)
 	logger.Debug("binding alert",
-		"user", user,
+		"user", slackUser,
 		"metadata", metadata,
 		"values", values,
 	)
@@ -110,13 +114,13 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindAlert(ctx context.Co
 		return err
 	}
 
-	return uc.handleBindAlerts(ctx, user, ticketID, []types.AlertID{alertID})
+	return uc.handleBindAlerts(ctx, slackUser, ticketID, []types.AlertID{alertID})
 }
 
-func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
+func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Context, slackUser slack.User, metadata string, values slack.StateValue) error {
 	logger := logging.From(ctx)
 	logger.Debug("binding list",
-		"user", user,
+		"user", slackUser,
 		"metadata", metadata,
 		"values", values,
 	)
@@ -139,7 +143,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Con
 		return err
 	}
 
-	err = uc.handleBindAlerts(ctx, user, ticketID, list.AlertIDs)
+	err = uc.handleBindAlerts(ctx, slackUser, ticketID, list.AlertIDs)
 	if err != nil {
 		return err
 	}
@@ -160,10 +164,10 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Con
 	return nil
 }
 
-func (uc *UseCases) handleBindAlerts(ctx context.Context, user slack.User, ticketID types.TicketID, alertIDs []types.AlertID) error {
+func (uc *UseCases) handleBindAlerts(ctx context.Context, slackUser slack.User, ticketID types.TicketID, alertIDs []types.AlertID) error {
 	logger := logging.From(ctx)
 	logger.Debug("binding alerts",
-		"user", user,
+		"user", slackUser,
 		"ticket_id", ticketID,
 		"alert_ids", alertIDs,
 	)
@@ -195,31 +199,6 @@ func (uc *UseCases) handleBindAlerts(ctx context.Context, user slack.User, ticke
 
 	if err := uc.repository.PutTicket(ctx, *ticket); err != nil {
 		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID))
-	}
-
-	// Create activity for alert binding
-	if len(alertIDs) > 1 {
-		// Multiple alerts - use bulk activity
-		alertTitles := make([]string, len(alerts))
-		for i, alert := range alerts {
-			alertTitles[i] = alert.Metadata.Title
-		}
-		if err := uc.activityService.CreateAlertsBulkBoundActivity(ctx, alertIDs, ticketID, ticket.Metadata.Title, user.ID, alertTitles); err != nil {
-			// Log error but don't fail the binding operation
-			logger := logging.From(ctx)
-			logger.Error("failed to create alerts bulk bound activity", "error", err, "ticket_id", ticketID, "alert_ids", alertIDs)
-		}
-	} else if len(alertIDs) == 1 {
-		// Single alert - use individual activity
-		alertTitle := ""
-		if len(alerts) > 0 {
-			alertTitle = alerts[0].Metadata.Title
-		}
-		if err := uc.activityService.CreateAlertBoundActivity(ctx, alertIDs[0], ticketID, alertTitle, ticket.Metadata.Title, user.ID); err != nil {
-			// Log error but don't fail the binding operation
-			logger := logging.From(ctx)
-			logger.Error("failed to create alert bound activity", "error", err, "ticket_id", ticketID, "alert_id", alertIDs[0])
-		}
 	}
 
 	// Update slack view
@@ -439,17 +418,6 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionSalvage(ctx context.Cont
 
 	if err := uc.repository.PutTicket(ctx, *target); err != nil {
 		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID))
-	}
-
-	// Create activity for salvage operation (bulk alert binding)
-	alertTitles := make([]string, len(unboundAlerts))
-	for i, alert := range unboundAlerts {
-		alertTitles[i] = alert.Metadata.Title
-	}
-	if err := uc.activityService.CreateAlertsBulkBoundActivity(ctx, alertIDs, ticketID, target.Metadata.Title, user.ID, alertTitles); err != nil {
-		// Log error but don't fail the salvage operation
-		logger := logging.From(ctx)
-		logger.Error("failed to create salvage activity", "error", err, "ticket_id", ticketID, "alert_ids", alertIDs)
 	}
 
 	// Update slack view

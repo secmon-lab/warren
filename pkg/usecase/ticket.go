@@ -9,7 +9,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
@@ -65,20 +64,7 @@ func (uc *UseCases) createTicketWithSlackPosting(ctx context.Context, opts Ticke
 
 	// Save ticket to repository
 	if err := uc.repository.PutTicket(ctx, newTicket); err != nil {
-		return nil, goerr.Wrap(err, "failed to save ticket")
-	}
-
-	// Create activity for ticket creation
-	var userID string
-	if newTicket.Assignee != nil {
-		userID = newTicket.Assignee.ID
-	} else {
-		userID = "system" // Default when no assignee
-	}
-	if err := uc.activityService.CreateTicketActivity(ctx, newTicket.ID, newTicket.Metadata.Title, userID); err != nil {
-		// Log error but don't fail ticket creation
-		logger := logging.From(ctx)
-		logger.Error("failed to create ticket activity", "error", err, "ticket_id", newTicket.ID)
+		return nil, goerr.Wrap(err, "failed to put new ticket")
 	}
 
 	return &newTicket, nil
@@ -306,14 +292,6 @@ func (uc *UseCases) UpdateTicketStatus(ctx context.Context, ticketID types.Ticke
 	updatedTicket, err := uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
 	if err != nil {
 		return nil, err
-	}
-
-	// Create activity for status change
-	var userID string = "system" // Default to system if no user context available
-	if err := uc.activityService.CreateTicketStatusChangedActivity(ctx, ticketID, updatedTicket.Metadata.Title, string(oldStatus), string(status), userID); err != nil {
-		// Log error but don't fail the status update
-		logger := logging.From(ctx)
-		logger.Error("failed to create ticket status changed activity", "error", err, "ticket_id", ticketID)
 	}
 
 	return updatedTicket, nil
