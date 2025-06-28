@@ -16,6 +16,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -327,6 +328,23 @@ func (r *Firestore) PutTicket(ctx context.Context, t ticket.Ticket) error {
 	if err != nil {
 		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", t.ID))
 	}
+
+	// Create activity for ticket creation (except when called from agent)
+	userID := user.FromContext(ctx)
+	isAgent := user.IsAgent(ctx)
+	fmt.Printf("DEBUG: PutTicket - UserID: '%s', IsAgent: %v\n", userID, isAgent)
+
+	if !user.IsAgent(ctx) {
+		fmt.Printf("DEBUG: Creating ticket activity for ticket %s\n", t.ID)
+		if err := createTicketActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
+			fmt.Printf("DEBUG: Failed to create ticket activity: %v\n", err)
+			return goerr.Wrap(err, "failed to create ticket activity", goerr.V("ticket_id", t.ID))
+		}
+		fmt.Printf("DEBUG: Successfully created ticket activity\n")
+	} else {
+		fmt.Printf("DEBUG: Skipping activity creation for agent\n")
+	}
+
 	return nil
 }
 
@@ -335,6 +353,17 @@ func (r *Firestore) PutTicketComment(ctx context.Context, comment ticket.Comment
 	if err != nil {
 		return goerr.Wrap(err, "failed to put ticket comment", goerr.V("ticket_id", comment.TicketID))
 	}
+
+	// Create activity for comment addition - only for user comments, not agent
+	if !user.IsAgent(ctx) {
+		// Get ticket for activity creation
+		if t, err := r.GetTicket(ctx, comment.TicketID); err == nil {
+			if err := createCommentActivity(ctx, r, comment.TicketID, comment.ID, t.Metadata.Title); err != nil {
+				return goerr.Wrap(err, "failed to create comment activity", goerr.V("ticket_id", comment.TicketID), goerr.V("comment_id", comment.ID))
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -483,6 +512,17 @@ func (r *Firestore) BindAlertToTicket(ctx context.Context, alertID types.AlertID
 	if err != nil {
 		return goerr.Wrap(err, "failed to bind alert to ticket", goerr.V("alert_id", alertID), goerr.V("ticket_id", ticketID))
 	}
+
+	// Create activity for alert binding
+	// Get alert and ticket for activity creation
+	alert, alertErr := r.GetAlert(ctx, alertID)
+	ticket, ticketErr := r.GetTicket(ctx, ticketID)
+	if alertErr == nil && ticketErr == nil {
+		if err := createAlertBoundActivity(ctx, r, alertID, ticketID, alert.Metadata.Title, ticket.Metadata.Title); err != nil {
+			return goerr.Wrap(err, "failed to create alert bound activity", goerr.V("alert_id", alertID), goerr.V("ticket_id", ticketID))
+		}
+	}
+
 	return nil
 }
 
@@ -641,6 +681,33 @@ func (r *Firestore) BatchBindAlertsToTicket(ctx context.Context, alertIDs []type
 	for _, job := range jobs {
 		if _, err := job.Results(); err != nil {
 			return goerr.Wrap(err, "failed to commit bulk writer job")
+		}
+	}
+
+	// Create activity for bulk alert binding
+	// Get ticket for activity creation
+	ticket, ticketErr := r.GetTicket(ctx, ticketID)
+	if ticketErr == nil {
+		// Get alerts for activity creation
+		var alertTitles []string
+		for _, alertID := range alertIDs {
+			if alert, err := r.GetAlert(ctx, alertID); err == nil {
+				alertTitles = append(alertTitles, alert.Metadata.Title)
+			}
+		}
+
+		if len(alertIDs) > 1 {
+			if err := createBulkAlertBoundActivity(ctx, r, alertIDs, ticketID, ticket.Metadata.Title, alertTitles); err != nil {
+				return goerr.Wrap(err, "failed to create bulk alert bound activity", goerr.V("ticket_id", ticketID))
+			}
+		} else if len(alertIDs) == 1 {
+			alertTitle := ""
+			if len(alertTitles) > 0 {
+				alertTitle = alertTitles[0]
+			}
+			if err := createAlertBoundActivity(ctx, r, alertIDs[0], ticketID, alertTitle, ticket.Metadata.Title); err != nil {
+				return goerr.Wrap(err, "failed to create alert bound activity", goerr.V("alert_id", alertIDs[0]), goerr.V("ticket_id", ticketID))
+			}
 		}
 	}
 
@@ -1028,6 +1095,14 @@ func (r *Firestore) DeleteToken(ctx context.Context, tokenID auth.TokenID) error
 }
 
 func (r *Firestore) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error {
+	// Get current tickets for activity creation
+	var ticketsForActivity []*ticket.Ticket
+	for _, ticketID := range ticketIDs {
+		if t, err := r.GetTicket(ctx, ticketID); err == nil {
+			ticketsForActivity = append(ticketsForActivity, t)
+		}
+	}
+
 	bw := r.db.BulkWriter(ctx)
 	var jobs []*firestore.BulkWriterJob
 
@@ -1059,16 +1134,26 @@ func (r *Firestore) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []ty
 		}
 	}
 
+	// Create activity for status changes
+	for _, t := range ticketsForActivity {
+		oldStatus := string(t.Status)
+		newStatus := string(status)
+		if err := createStatusChangeActivity(ctx, r, t.ID, t.Metadata.Title, oldStatus, newStatus); err != nil {
+			return goerr.Wrap(err, "failed to create status change activity", goerr.V("ticket_id", t.ID))
+		}
+	}
+
 	return nil
 }
 
 // Activity related methods
 func (r *Firestore) PutActivity(ctx context.Context, activity *activity.Activity) error {
 	doc := r.db.Collection(collectionActivities).Doc(activity.ID.String())
-	_, err := doc.Set(ctx, activity)
+	resp, err := doc.Set(ctx, activity)
 	if err != nil {
 		return goerr.Wrap(err, "failed to put activity", goerr.V("activity_id", activity.ID))
 	}
+	println(resp.UpdateTime.String())
 	return nil
 }
 

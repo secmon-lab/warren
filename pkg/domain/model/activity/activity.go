@@ -7,16 +7,16 @@ import (
 )
 
 type Activity struct {
-	ID          types.ActivityID   `firestore:"id"`
-	Type        types.ActivityType `firestore:"type"`
-	Title       string             `firestore:"title"`
-	Description string             `firestore:"description"`
-	UserID      string             `firestore:"user_id,omitempty"`
-	AlertID     types.AlertID      `firestore:"alert_id,omitempty"`
-	TicketID    types.TicketID     `firestore:"ticket_id,omitempty"`
-	CommentID   types.CommentID    `firestore:"comment_id,omitempty"`
-	CreatedAt   time.Time          `firestore:"created_at"`
-	Metadata    map[string]any     `firestore:"metadata,omitempty"`
+	ID          types.ActivityID
+	Type        types.ActivityType
+	Title       string
+	Description string
+	UserID      string
+	AlertID     types.AlertID
+	TicketID    types.TicketID
+	CommentID   types.CommentID
+	CreatedAt   time.Time
+	Metadata    map[string]any
 }
 
 func New(activityType types.ActivityType, title, description string) *Activity {

@@ -1384,26 +1384,25 @@ func TestTicketCommentsPagination(t *testing.T) {
 func TestActivityCreation(t *testing.T) {
 	repositories := []struct {
 		name string
-		repo func() interfaces.Repository
+		repo func(t *testing.T) interfaces.Repository
 	}{
 		{
 			name: "Memory",
-			repo: func() interfaces.Repository {
+			repo: func(t *testing.T) interfaces.Repository {
 				return repository.NewMemory()
 			},
 		},
-		// Firestore test commented out due to emulator consistency issues
-		// {
-		// 	name: "Firestore",
-		// 	repo: func() interfaces.Repository {
-		// 		return newFirestoreClient(t)
-		// 	},
-		// },
+		{
+			name: "Firestore",
+			repo: func(t *testing.T) interfaces.Repository {
+				return newFirestoreClient(t)
+			},
+		},
 	}
 
 	for _, repoTest := range repositories {
 		t.Run(repoTest.name, func(t *testing.T) {
-			repo := repoTest.repo()
+			repo := repoTest.repo(t)
 
 			// Test ticket creation activity
 			t.Run("TicketCreation", func(t *testing.T) {
@@ -1419,12 +1418,19 @@ func TestActivityCreation(t *testing.T) {
 				}
 
 				err := repo.PutTicket(ctx, ticket)
-				gt.NoError(t, err)
+				gt.NoError(t, err).Required()
 
 				// Check that activity was created
 				activities, err := repo.GetActivities(ctx, 0, 100) // Get more activities to account for test accumulation
-				gt.NoError(t, err)
-				gt.Number(t, len(activities)).GreaterOrEqual(1)
+				gt.NoError(t, err).Required()
+
+				// Debug: Print activity count and details
+				t.Logf("Total activities found: %d", len(activities))
+				for i, act := range activities {
+					t.Logf("Activity %d: Type=%s, TicketID=%s, UserID=%s", i, act.Type, act.TicketID, act.UserID)
+				}
+
+				gt.Number(t, len(activities)).GreaterOrEqual(1).Required()
 
 				// Find ticket creation activity
 				var ticketActivity *activity.Activity
@@ -1505,6 +1511,7 @@ func TestActivityCreation(t *testing.T) {
 				gt.NoError(t, err)
 
 				// Count activities for this specific ticket after ticket creation
+				// Agent context should not create ticket creation activity
 				activitiesAfterTicket, err := repo.GetActivities(ctx, 0, 100)
 				gt.NoError(t, err)
 				ticketCreationCount := 0
@@ -1513,7 +1520,7 @@ func TestActivityCreation(t *testing.T) {
 						ticketCreationCount++
 					}
 				}
-				gt.Number(t, ticketCreationCount).Equal(1) // Should have exactly 1 ticket creation activity
+				gt.Number(t, ticketCreationCount).Equal(0) // Should have no ticket creation activity for agent
 
 				comment := ticketmodel.Comment{
 					ID:        types.NewCommentID(),
@@ -1541,10 +1548,10 @@ func TestActivityCreation(t *testing.T) {
 					}
 				}
 
-				// Should still have exactly 1 ticket creation activity, no comment activity
-				gt.Number(t, ticketActivityCount).Equal(1)
-				gt.Value(t, ticketActivity).NotNil() // Ticket creation should exist
-				gt.Value(t, commentActivity).Nil()   // Comment activity should not exist
+				// Should have no activities for agent context
+				gt.Number(t, ticketActivityCount).Equal(0)
+				gt.Value(t, ticketActivity).Nil()  // Ticket creation should not exist for agent
+				gt.Value(t, commentActivity).Nil() // Comment activity should not exist for agent
 			})
 
 			// Test alert binding activity
