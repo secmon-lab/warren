@@ -325,15 +325,15 @@ export default function AlertDetailPage() {
             <CardContent className="space-y-3">
               <div>
                 <span className="text-sm font-medium">Alert ID</span>
-                <div className="flex items-center gap-2 mt-1">
-                  <p className="text-sm text-muted-foreground font-mono">
+                <div className="flex items-start gap-2 mt-1">
+                  <p className="text-sm text-muted-foreground font-mono break-all flex-1">
                     {alert.id}
                   </p>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleCopyToClipboard(alert.id)}
-                    className="h-6 w-6 p-0"
+                    className="h-6 w-6 p-0 flex-shrink-0"
                   >
                     <Copy className="h-3 w-3" />
                   </Button>
