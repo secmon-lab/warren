@@ -23,9 +23,9 @@ var resolveMessagePromptTemplate string
 
 func (uc *UseCases) HandleSlackInteractionViewSubmission(ctx context.Context, slackUser slack.User, callbackID slack.CallbackID, metadata string, values slack.StateValue) error {
 	// Set user ID in context for activity tracking
-	userCtx := user.WithUserID(ctx, slackUser.ID)
+	ctx = user.WithUserID(ctx, slackUser.ID)
 
-	logger := logging.From(userCtx)
+	logger := logging.From(ctx)
 	logger.Debug("resolving alert",
 		"user", slackUser,
 		"callback_id", callbackID,
@@ -34,13 +34,13 @@ func (uc *UseCases) HandleSlackInteractionViewSubmission(ctx context.Context, sl
 	)
 	switch callbackID {
 	case slack.CallbackSubmitResolveTicket:
-		return uc.handleSlackInteractionViewSubmissionResolveTicket(userCtx, slackUser, metadata, values)
+		return uc.handleSlackInteractionViewSubmissionResolveTicket(ctx, slackUser, metadata, values)
 	case slack.CallbackSubmitBindAlert:
-		return uc.handleSlackInteractionViewSubmissionBindAlert(userCtx, slackUser, metadata, values)
+		return uc.handleSlackInteractionViewSubmissionBindAlert(ctx, slackUser, metadata, values)
 	case slack.CallbackSubmitBindList:
-		return uc.handleSlackInteractionViewSubmissionBindList(userCtx, slackUser, metadata, values)
+		return uc.handleSlackInteractionViewSubmissionBindList(ctx, slackUser, metadata, values)
 	case slack.CallbackSubmitSalvage:
-		return uc.handleSlackInteractionViewSubmissionSalvage(userCtx, slackUser, metadata, values)
+		return uc.handleSlackInteractionViewSubmissionSalvage(ctx, slackUser, metadata, values)
 	}
 
 	return nil
