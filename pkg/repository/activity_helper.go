@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -18,13 +17,11 @@ func createTicketActivity(ctx context.Context, repo interfaces.Repository, ticke
 	userID := user.FromContext(ctx)
 	activityID := types.NewActivityID()
 	act := &activity.Activity{
-		ID:          activityID,
-		Type:        types.ActivityTypeTicketCreated,
-		Title:       "Ticket Created",
-		Description: fmt.Sprintf("Created ticket: %s", title),
-		UserID:      userID,
-		TicketID:    ticketID,
-		CreatedAt:   time.Now(),
+		ID:        activityID,
+		Type:      types.ActivityTypeTicketCreated,
+		UserID:    userID,
+		TicketID:  ticketID,
+		CreatedAt: time.Now(),
 	}
 
 	if err := repo.PutActivity(ctx, act); err != nil {
@@ -38,14 +35,12 @@ func createCommentActivity(ctx context.Context, repo interfaces.Repository, tick
 	userID := user.FromContext(ctx)
 	activityID := types.NewActivityID()
 	act := &activity.Activity{
-		ID:          activityID,
-		Type:        types.ActivityTypeCommentAdded,
-		Title:       "Comment Added",
-		Description: fmt.Sprintf("Added comment to ticket: %s", title),
-		UserID:      userID,
-		TicketID:    ticketID,
-		CommentID:   commentID,
-		CreatedAt:   time.Now(),
+		ID:        activityID,
+		Type:      types.ActivityTypeCommentAdded,
+		UserID:    userID,
+		TicketID:  ticketID,
+		CommentID: commentID,
+		CreatedAt: time.Now(),
 	}
 
 	if err := repo.PutActivity(ctx, act); err != nil {
@@ -59,13 +54,11 @@ func createStatusChangeActivity(ctx context.Context, repo interfaces.Repository,
 	userID := user.FromContext(ctx)
 	activityID := types.NewActivityID()
 	act := &activity.Activity{
-		ID:          activityID,
-		Type:        types.ActivityTypeTicketStatusChanged,
-		Title:       "Status Changed",
-		Description: fmt.Sprintf("Changed status of %s from %s to %s", title, oldStatus, newStatus),
-		UserID:      userID,
-		TicketID:    ticketID,
-		CreatedAt:   time.Now(),
+		ID:        activityID,
+		Type:      types.ActivityTypeTicketStatusChanged,
+		UserID:    userID,
+		TicketID:  ticketID,
+		CreatedAt: time.Now(),
 		Metadata: map[string]interface{}{
 			"old_status": oldStatus,
 			"new_status": newStatus,
@@ -83,14 +76,12 @@ func createAlertBoundActivity(ctx context.Context, repo interfaces.Repository, a
 	userID := user.FromContext(ctx)
 	activityID := types.NewActivityID()
 	act := &activity.Activity{
-		ID:          activityID,
-		Type:        types.ActivityTypeAlertBound,
-		Title:       "Alert Bound",
-		Description: fmt.Sprintf("Bound alert %s to ticket: %s", alertTitle, ticketTitle),
-		UserID:      userID,
-		AlertID:     alertID,
-		TicketID:    ticketID,
-		CreatedAt:   time.Now(),
+		ID:        activityID,
+		Type:      types.ActivityTypeAlertBound,
+		UserID:    userID,
+		AlertID:   alertID,
+		TicketID:  ticketID,
+		CreatedAt: time.Now(),
 	}
 
 	if err := repo.PutActivity(ctx, act); err != nil {
@@ -104,13 +95,11 @@ func createBulkAlertBoundActivity(ctx context.Context, repo interfaces.Repositor
 	userID := user.FromContext(ctx)
 	activityID := types.NewActivityID()
 	act := &activity.Activity{
-		ID:          activityID,
-		Type:        types.ActivityTypeAlertsBulkBound,
-		Title:       "Bulk Alert Bound",
-		Description: fmt.Sprintf("Bound %d alerts to ticket: %s", len(alertIDs), ticketTitle),
-		UserID:      userID,
-		TicketID:    ticketID,
-		CreatedAt:   time.Now(),
+		ID:        activityID,
+		Type:      types.ActivityTypeAlertsBulkBound,
+		UserID:    userID,
+		TicketID:  ticketID,
+		CreatedAt: time.Now(),
 		Metadata: map[string]interface{}{
 			"alert_count":  len(alertIDs),
 			"alert_titles": strings.Join(alertTitles, ", "),

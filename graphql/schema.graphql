@@ -67,8 +67,6 @@ type CommentsResponse {
 type Activity {
   id: ID!
   type: String!
-  title: String!
-  description: String!
   userID: String
   alertID: String
   ticketID: String

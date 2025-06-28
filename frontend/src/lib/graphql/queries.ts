@@ -108,6 +108,7 @@ export const GET_ALERT = gql`
         id
         status
         title
+        description
       }
     }
   }
@@ -131,6 +132,8 @@ export const GET_ALERTS = gql`
       ticket {
         id
         status
+        title
+        description
       }
     }
   }
@@ -170,8 +173,6 @@ export const GET_ACTIVITIES = gql`
       activities {
         id
         type
-        title
-        description
         userID
         alertID
         ticketID
@@ -185,10 +186,12 @@ export const GET_ACTIVITIES = gql`
         alert {
           id
           title
+          description
         }
         ticket {
           id
           title
+          description
         }
       }
       totalCount

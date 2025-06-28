@@ -1442,7 +1442,6 @@ func TestActivityCreation(t *testing.T) {
 				gt.Value(t, ticketActivity.Type).Equal(types.ActivityTypeTicketCreated)
 				gt.Value(t, ticketActivity.TicketID).Equal(ticket.ID)
 				gt.Value(t, ticketActivity.UserID).Equal("test-user")
-				gt.Value(t, ticketActivity.Title).Equal("Ticket Created")
 			})
 
 			// Test comment activity

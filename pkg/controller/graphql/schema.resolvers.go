@@ -17,8 +17,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
-// ActivityResolver implementations
-
 // User is the resolver for the user field.
 func (r *activityResolver) User(ctx context.Context, obj *graphql1.Activity) (*graphql1.User, error) {
 	if obj.UserID == nil || *obj.UserID == "" {
@@ -515,11 +513,9 @@ func (r *queryResolver) Activities(ctx context.Context, offset *int, limit *int)
 	graphqlActivities := make([]*graphql1.Activity, len(activities))
 	for i, a := range activities {
 		graphqlActivity := &graphql1.Activity{
-			ID:          string(a.ID),
-			Type:        string(a.Type),
-			Title:       a.Title,
-			Description: a.Description,
-			CreatedAt:   a.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			ID:        string(a.ID),
+			Type:      string(a.Type),
+			CreatedAt: a.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 
 		if a.UserID != "" {

@@ -7,26 +7,22 @@ import (
 )
 
 type Activity struct {
-	ID          types.ActivityID
-	Type        types.ActivityType
-	Title       string
-	Description string
-	UserID      string
-	AlertID     types.AlertID
-	TicketID    types.TicketID
-	CommentID   types.CommentID
-	CreatedAt   time.Time
-	Metadata    map[string]any
+	ID        types.ActivityID
+	Type      types.ActivityType
+	UserID    string
+	AlertID   types.AlertID
+	TicketID  types.TicketID
+	CommentID types.CommentID
+	CreatedAt time.Time
+	Metadata  map[string]any
 }
 
-func New(activityType types.ActivityType, title, description string) *Activity {
+func New(activityType types.ActivityType) *Activity {
 	return &Activity{
-		ID:          types.NewActivityID(),
-		Type:        activityType,
-		Title:       title,
-		Description: description,
-		CreatedAt:   time.Now(),
-		Metadata:    make(map[string]any),
+		ID:        types.NewActivityID(),
+		Type:      activityType,
+		CreatedAt: time.Now(),
+		Metadata:  make(map[string]any),
 	}
 }
 

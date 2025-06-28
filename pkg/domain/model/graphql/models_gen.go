@@ -13,19 +13,17 @@ type ActivitiesResponse struct {
 }
 
 type Activity struct {
-	ID          string         `json:"id"`
-	Type        string         `json:"type"`
-	Title       string         `json:"title"`
-	Description string         `json:"description"`
-	UserID      *string        `json:"userID,omitempty"`
-	AlertID     *string        `json:"alertID,omitempty"`
-	TicketID    *string        `json:"ticketID,omitempty"`
-	CommentID   *string        `json:"commentID,omitempty"`
-	CreatedAt   string         `json:"createdAt"`
-	Metadata    *string        `json:"metadata,omitempty"`
-	User        *User          `json:"user,omitempty"`
-	Alert       *alert.Alert   `json:"alert,omitempty"`
-	Ticket      *ticket.Ticket `json:"ticket,omitempty"`
+	ID        string         `json:"id"`
+	Type      string         `json:"type"`
+	UserID    *string        `json:"userID,omitempty"`
+	AlertID   *string        `json:"alertID,omitempty"`
+	TicketID  *string        `json:"ticketID,omitempty"`
+	CommentID *string        `json:"commentID,omitempty"`
+	CreatedAt string         `json:"createdAt"`
+	Metadata  *string        `json:"metadata,omitempty"`
+	User      *User          `json:"user,omitempty"`
+	Alert     *alert.Alert   `json:"alert,omitempty"`
+	Ticket    *ticket.Ticket `json:"ticket,omitempty"`
 }
 
 type AlertAttribute struct {

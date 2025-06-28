@@ -59,19 +59,17 @@ type ComplexityRoot struct {
 	}
 
 	Activity struct {
-		Alert       func(childComplexity int) int
-		AlertID     func(childComplexity int) int
-		CommentID   func(childComplexity int) int
-		CreatedAt   func(childComplexity int) int
-		Description func(childComplexity int) int
-		ID          func(childComplexity int) int
-		Metadata    func(childComplexity int) int
-		Ticket      func(childComplexity int) int
-		TicketID    func(childComplexity int) int
-		Title       func(childComplexity int) int
-		Type        func(childComplexity int) int
-		User        func(childComplexity int) int
-		UserID      func(childComplexity int) int
+		Alert     func(childComplexity int) int
+		AlertID   func(childComplexity int) int
+		CommentID func(childComplexity int) int
+		CreatedAt func(childComplexity int) int
+		ID        func(childComplexity int) int
+		Metadata  func(childComplexity int) int
+		Ticket    func(childComplexity int) int
+		TicketID  func(childComplexity int) int
+		Type      func(childComplexity int) int
+		User      func(childComplexity int) int
+		UserID    func(childComplexity int) int
 	}
 
 	Alert struct {
@@ -283,13 +281,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Activity.CreatedAt(childComplexity), true
 
-	case "Activity.description":
-		if e.complexity.Activity.Description == nil {
-			break
-		}
-
-		return e.complexity.Activity.Description(childComplexity), true
-
 	case "Activity.id":
 		if e.complexity.Activity.ID == nil {
 			break
@@ -317,13 +308,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Activity.TicketID(childComplexity), true
-
-	case "Activity.title":
-		if e.complexity.Activity.Title == nil {
-			break
-		}
-
-		return e.complexity.Activity.Title(childComplexity), true
 
 	case "Activity.type":
 		if e.complexity.Activity.Type == nil {
@@ -987,8 +971,6 @@ type CommentsResponse {
 type Activity {
   id: ID!
   type: String!
-  title: String!
-  description: String!
   userID: String
   alertID: String
   ticketID: String
@@ -1910,10 +1892,6 @@ func (ec *executionContext) fieldContext_ActivitiesResponse_activities(_ context
 				return ec.fieldContext_Activity_id(ctx, field)
 			case "type":
 				return ec.fieldContext_Activity_type(ctx, field)
-			case "title":
-				return ec.fieldContext_Activity_title(ctx, field)
-			case "description":
-				return ec.fieldContext_Activity_description(ctx, field)
 			case "userID":
 				return ec.fieldContext_Activity_userID(ctx, field)
 			case "alertID":
@@ -2059,94 +2037,6 @@ func (ec *executionContext) _Activity_type(ctx context.Context, field graphql.Co
 }
 
 func (ec *executionContext) fieldContext_Activity_type(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Activity",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Activity_title(ctx context.Context, field graphql.CollectedField, obj *graphql1.Activity) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Activity_title(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Title, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Activity_title(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Activity",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Activity_description(ctx context.Context, field graphql.CollectedField, obj *graphql1.Activity) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Activity_description(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Description, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Activity_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Activity",
 		Field:      field,
@@ -7873,16 +7763,6 @@ func (ec *executionContext) _Activity(ctx context.Context, sel ast.SelectionSet,
 			}
 		case "type":
 			out.Values[i] = ec._Activity_type(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
-		case "title":
-			out.Values[i] = ec._Activity_title(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
-		case "description":
-			out.Values[i] = ec._Activity_description(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}

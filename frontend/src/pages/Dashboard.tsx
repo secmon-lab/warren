@@ -17,7 +17,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Activity,
-  AlertCircle
+  AlertCircle,
+  MessageSquare,
+  Link,
+  Layers
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useUserName } from "@/components/ui/user-name";
@@ -90,14 +93,34 @@ export default function Dashboard() {
   const getActivityIcon = (type: string) => {
     switch (type) {
       case "ticket_created":
-        return <Ticket className="h-4 w-4 text-blue-500" />;
+        return <Ticket className="h-4 w-4 text-blue-600" />;
+      case "ticket_status_changed":
+        return <Clock className="h-4 w-4 text-amber-600" />;
       case "comment_added":
-        return <MessageCircle className="h-4 w-4 text-green-500" />;
+        return <MessageSquare className="h-4 w-4 text-purple-600" />;
       case "alert_bound":
+        return <Link className="h-4 w-4 text-green-600" />;
       case "alerts_bulk_bound":
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+        return <Layers className="h-4 w-4 text-green-600" />;
       default:
-        return <Clock className="h-4 w-4 text-gray-500" />;
+        return <Activity className="h-4 w-4 text-gray-600" />;
+    }
+  };
+
+  const getActivityTitle = (type: string) => {
+    switch (type) {
+      case "ticket_created":
+        return "Ticket Created";
+      case "ticket_status_changed":
+        return "Status Changed";
+      case "comment_added":
+        return "Comment Added";
+      case "alert_bound":
+        return "Alert Bound";
+      case "alerts_bulk_bound":
+        return "Alerts Bulk Bound";
+      default:
+        return "Activity";
     }
   };
 
@@ -306,10 +329,10 @@ export default function Dashboard() {
                                         const metadata = JSON.parse(activity.metadata);
                                         return `${metadata.old_status} → ${metadata.new_status}`;
                                       } catch {
-                                        return activity.title;
+                                        return getActivityTitle(activity.type);
                                       }
                                     })() : 
-                                    activity.title
+                                    getActivityTitle(activity.type)
                                   }
                                 </span>
                               </div>
