@@ -68,7 +68,7 @@ func TestValidateGoogleIDToken(t *testing.T) {
 	server := server.New(uc, server.WithPolicy(policyClient))
 
 	t.Run("with valid token", func(t *testing.T) {
-		req := httptest.NewRequest("POST", "/alert/pubsub/test", bytes.NewReader(pubsubJSON))
+		req := httptest.NewRequest("POST", "/hooks/alert/pubsub/test", bytes.NewReader(pubsubJSON))
 		req.Header.Set("Authorization", "Bearer "+vars.Get("TEST_GOOGLE_ID_TOKEN"))
 		w := httptest.NewRecorder()
 		server.ServeHTTP(w, req)
@@ -122,7 +122,7 @@ func TestSlackInteractionHandler(t *testing.T) {
 		// Calculate signature
 		signature := calculateSlackSignature(body, ts, signingSecret)
 
-		req := httptest.NewRequest("POST", "/slack/interaction", strings.NewReader(body))
+		req := httptest.NewRequest("POST", "/hooks/slack/interaction", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("X-Slack-Signature", signature)
 		req.Header.Set("X-Slack-Request-Timestamp", ts)
@@ -160,7 +160,7 @@ func TestSlackMentionHandler(t *testing.T) {
 		// Calculate signature
 		signature := calculateSlackSignature(string(slackMentionJSON), ts, signingSecret)
 
-		req := httptest.NewRequest("POST", "/slack/event", strings.NewReader(string(slackMentionJSON)))
+		req := httptest.NewRequest("POST", "/hooks/slack/event", strings.NewReader(string(slackMentionJSON)))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Slack-Signature", signature)
 		req.Header.Set("X-Slack-Request-Timestamp", ts)
@@ -206,6 +206,8 @@ func TestAlertSNS(t *testing.T) {
 		gt.A(t, logs).Length(1)
 
 		log := logs[0]
+		// Update the URL to use the new path with /hooks prefix
+		log.Request.URL.Path = "/hooks/alert/sns/test"
 		w := httptest.NewRecorder()
 		srv.ServeHTTP(w, log.Request.WithContext(ctx))
 
