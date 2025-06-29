@@ -54,8 +54,8 @@ func TestGraphQLQueries(t *testing.T) {
 			},
 			CreatedAt: time.Now(),
 		}
-		_ = repo.PutTicket(context.Background(), *ticketObj)
-		_ = repo.PutAlert(context.Background(), *alertObj)
+		gt.NoError(t, repo.PutTicket(context.Background(), *ticketObj))
+		gt.NoError(t, repo.PutAlert(context.Background(), *alertObj))
 		server := httptest.NewServer(graphqlHandler(repo, nil, nil))
 		defer server.Close()
 
@@ -112,8 +112,8 @@ func TestGraphQLQueries(t *testing.T) {
 			},
 			CreatedAt: time.Now(),
 		}
-		_ = repo.PutTicket(context.Background(), *ticketObj)
-		_ = repo.PutAlert(context.Background(), *alertObj)
+		gt.NoError(t, repo.PutTicket(context.Background(), *ticketObj))
+		gt.NoError(t, repo.PutAlert(context.Background(), *alertObj))
 		server := httptest.NewServer(graphqlHandler(repo, nil, nil))
 		defer server.Close()
 
@@ -168,7 +168,7 @@ func TestGraphQLQueries(t *testing.T) {
 			},
 			CreatedAt: time.Now(),
 		}
-		_ = repo.PutAlert(context.Background(), *alertNoTicket)
+		gt.NoError(t, repo.PutAlert(context.Background(), *alertNoTicket))
 		server := httptest.NewServer(graphqlHandler(repo, nil, nil))
 		defer server.Close()
 
@@ -208,7 +208,7 @@ func TestGraphQLQueries(t *testing.T) {
 			Status:    types.TicketStatusOpen,
 			CreatedAt: time.Now(),
 		}
-		_ = repo.PutTicket(context.Background(), *ticketObj)
+		gt.NoError(t, repo.PutTicket(context.Background(), *ticketObj))
 
 		// Add a comment with Slack markdown
 		comment := ticket.Comment{
@@ -221,7 +221,7 @@ func TestGraphQLQueries(t *testing.T) {
 			},
 			CreatedAt: time.Now(),
 		}
-		_ = repo.PutTicketComment(context.Background(), comment)
+		gt.NoError(t, repo.PutTicketComment(context.Background(), comment))
 
 		server := httptest.NewServer(graphqlHandler(repo, nil, nil))
 		defer server.Close()
@@ -288,7 +288,7 @@ func sendGraphQLRequest(url string, req graphqlRequest) (*graphqlResponse, error
 	return &graphqlResp, nil
 }
 
-func setupGraphQLTestData() *repository.Memory {
+func setupGraphQLTestData(t *testing.T) *repository.Memory {
 	repo := repository.NewMemory()
 	ctx := context.Background()
 
@@ -333,9 +333,9 @@ func setupGraphQLTestData() *repository.Memory {
 	}
 
 	// Use agent context to prevent automatic activity creation
-	repo.PutTicket(agentCtx, ticket1)
-	repo.PutTicket(agentCtx, ticket2)
-	repo.PutTicket(agentCtx, ticket3)
+	gt.NoError(t, repo.PutTicket(agentCtx, ticket1))
+	gt.NoError(t, repo.PutTicket(agentCtx, ticket2))
+	gt.NoError(t, repo.PutTicket(agentCtx, ticket3))
 
 	// Add test alerts
 	alertID1 := types.AlertID("alert1")
@@ -358,8 +358,8 @@ func setupGraphQLTestData() *repository.Memory {
 		},
 	}
 
-	repo.PutAlert(ctx, alert1)
-	repo.PutAlert(ctx, alert2)
+	gt.NoError(t, repo.PutAlert(ctx, alert1))
+	gt.NoError(t, repo.PutAlert(ctx, alert2))
 
 	// Add test activities
 	activity1 := &activity.Activity{
@@ -398,11 +398,11 @@ func setupGraphQLTestData() *repository.Memory {
 		CreatedAt: time.Now().Add(-1 * time.Minute),
 	}
 
-	_ = repo.PutActivity(ctx, activity1)
-	_ = repo.PutActivity(ctx, activity2)
-	_ = repo.PutActivity(ctx, activity3)
-	_ = repo.PutActivity(ctx, activity4)
-	_ = repo.PutActivity(ctx, activity5)
+	gt.NoError(t, repo.PutActivity(ctx, activity1))
+	gt.NoError(t, repo.PutActivity(ctx, activity2))
+	gt.NoError(t, repo.PutActivity(ctx, activity3))
+	gt.NoError(t, repo.PutActivity(ctx, activity4))
+	gt.NoError(t, repo.PutActivity(ctx, activity5))
 
 	return repo
 }
@@ -445,7 +445,7 @@ func setupMockSlackService() (*slack_service.Service, error) {
 func TestDataLoaderIntegration(t *testing.T) {
 	t.Run("ActivityFeed_DataLoader_Batching", func(t *testing.T) {
 		// Setup repository using existing test data setup
-		repo := setupGraphQLTestData()
+		repo := setupGraphQLTestData(t)
 
 		// Setup mock Slack service
 		slackService, err := setupMockSlackService()
@@ -590,7 +590,7 @@ func TestDataLoaderIntegration(t *testing.T) {
 				Title: "Multi-Alert Ticket",
 			},
 		}
-		repo.PutTicket(ctx, ticketObj)
+		gt.NoError(t, repo.PutTicket(ctx, ticketObj))
 
 		alert1 := alert.Alert{
 			ID:        alert1ID,
@@ -608,8 +608,8 @@ func TestDataLoaderIntegration(t *testing.T) {
 				Title: "Second Alert",
 			},
 		}
-		repo.PutAlert(ctx, alert1)
-		repo.PutAlert(ctx, alert2)
+		gt.NoError(t, repo.PutAlert(ctx, alert1))
+		gt.NoError(t, repo.PutAlert(ctx, alert2))
 
 		server := httptest.NewServer(graphqlHandler(repo, slackService, nil))
 		defer server.Close()
@@ -665,7 +665,7 @@ func TestDataLoaderIntegration(t *testing.T) {
 
 	t.Run("DataLoader_Batch_Method_Verification", func(t *testing.T) {
 		// Test to verify that DataLoader uses batch methods instead of individual gets
-		repo := setupGraphQLTestData()
+		repo := setupGraphQLTestData(t)
 
 		// Reset counters before test
 		repo.ResetCallCounts()
