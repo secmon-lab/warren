@@ -75,6 +75,11 @@ type UseCase interface {
 	interfaces.UserUsecases
 }
 
+// Static file extensions that should be served directly (not fallback to SPA)
+var staticFileExtensions = []string{
+	".ico", // favicon files
+}
+
 func New(uc UseCase, opts ...Options) *Server {
 	r := chi.NewRouter()
 
@@ -213,15 +218,30 @@ func spaHandler(staticFS fs.FS) http.HandlerFunc {
 			urlPath = "index.html"
 		}
 
-		// Try to open the file
-		if _, err := staticFS.Open(urlPath); err != nil {
+		// Try to open the file to check if it exists
+		if file, err := staticFS.Open(urlPath); err != nil {
+			// File not found
+			file = nil
+
 			// For SPA routes (not assets), serve index.html for client-side routing
-			// Assets like _next/, api/, static/, etc. should return 404
-			if strings.HasPrefix(urlPath, "_next/") ||
+			// But first check if this looks like an asset request
+			isStaticFile := strings.HasPrefix(urlPath, "_next/") ||
 				strings.HasPrefix(urlPath, "api/") ||
 				strings.HasPrefix(urlPath, "static/") ||
-				strings.Contains(urlPath, ".") { // Files with extensions
-				// File not found, return 404
+				strings.HasPrefix(urlPath, "assets/")
+
+			// Check for static file extensions
+			if !isStaticFile {
+				for _, ext := range staticFileExtensions {
+					if strings.HasSuffix(urlPath, ext) {
+						isStaticFile = true
+						break
+					}
+				}
+			}
+
+			if isStaticFile {
+				// This looks like an asset request, return 404
 				http.NotFound(w, r)
 				return
 			}
@@ -237,9 +257,12 @@ func spaHandler(staticFS fs.FS) http.HandlerFunc {
 			// If index.html is also not found, return 404
 			http.NotFound(w, r)
 			return
+		} else {
+			// File exists, close it and let fileServer handle it
+			file.Close()
 		}
 
-		// Serve the requested file
+		// Serve the requested file using the file server
 		fileServer.ServeHTTP(w, r)
 	}
 }
