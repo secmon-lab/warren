@@ -61,6 +61,16 @@ func setupTestData() (*repository.Memory, *mock.SlackClientMock) {
 				Name: getUserName(userID),
 			}, nil
 		},
+		GetUsersInfoFunc: func(users ...string) (*[]slack_api.User, error) {
+			result := make([]slack_api.User, len(users))
+			for i, userID := range users {
+				result[i] = slack_api.User{
+					ID:   userID,
+					Name: getUserName(userID),
+				}
+			}
+			return &result, nil
+		},
 	}
 
 	return repo, slackClient
@@ -175,9 +185,12 @@ func TestUserLoader_BatchLoad(t *testing.T) {
 func TestErrorHandling(t *testing.T) {
 	repo, slackClient := setupTestData()
 
-	// Set slack client to simulate error
+	// Set slack client to simulate error for both individual and batch methods
 	slackClient.GetUserInfoFunc = func(userID string) (*slack_api.User, error) {
 		return nil, errors.New("simulated slack error")
+	}
+	slackClient.GetUsersInfoFunc = func(users ...string) (*[]slack_api.User, error) {
+		return nil, errors.New("simulated slack batch error")
 	}
 
 	loaders := NewDataLoaders(repo, slackClient)
@@ -319,6 +332,55 @@ func TestDataLoaderUseBatchMethods(t *testing.T) {
 	gt.Number(t, counts["GetAlert"]).Equal(0)
 
 	t.Logf("Call counts: %+v", counts)
+}
+
+func TestUserLoaderUseBatchMethod(t *testing.T) {
+	repo, slackClient := setupTestData()
+	loaders := NewDataLoaders(repo, slackClient)
+	ctx := context.Background()
+
+	// Load multiple users concurrently to trigger DataLoader batching
+	userIDs := []string{"user1", "user2", "user3"}
+	var wg sync.WaitGroup
+	for _, id := range userIDs {
+		wg.Add(1)
+		go func(userID string) {
+			defer wg.Done()
+			user, err := GetUserWithLoaders(ctx, loaders, userID)
+			gt.NoError(t, err)
+			gt.Equal(t, user.ID, userID)
+			gt.Equal(t, user.Name, getUserName(userID))
+		}(id)
+	}
+	wg.Wait()
+
+	// Verify that GetUsersInfo was called instead of individual GetUserInfo calls
+	getUsersInfoCalls := slackClient.GetUsersInfoCalls()
+	getUserInfoCalls := slackClient.GetUserInfoCalls()
+
+	// Should have at least one call to GetUsersInfo
+	gt.Number(t, len(getUsersInfoCalls)).Greater(0)
+
+	// Should have no calls to individual GetUserInfo (N+1 problem avoided)
+	gt.Number(t, len(getUserInfoCalls)).Equal(0)
+
+	t.Logf("GetUsersInfo calls: %d, GetUserInfo calls: %d", len(getUsersInfoCalls), len(getUserInfoCalls))
+
+	// Verify the GetUsersInfo call contains all expected user IDs
+	if len(getUsersInfoCalls) > 0 {
+		calledUsers := getUsersInfoCalls[0].Users
+		gt.Number(t, len(calledUsers)).Equal(3)
+
+		// Check that all user IDs are present in the batch call
+		userIDMap := make(map[string]bool)
+		for _, userID := range calledUsers {
+			userIDMap[userID] = true
+		}
+
+		for _, expectedID := range userIDs {
+			gt.True(t, userIDMap[expectedID])
+		}
+	}
 }
 
 // Helper functions for testing with loaders

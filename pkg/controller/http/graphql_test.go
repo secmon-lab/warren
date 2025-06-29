@@ -423,6 +423,25 @@ func setupMockSlackService() (*slack_service.Service, error) {
 				Name: name,
 			}, nil
 		},
+		GetUsersInfoFunc: func(users ...string) (*[]slack_api.User, error) {
+			userNames := map[string]string{
+				"user1": "User One",
+				"user2": "User Two",
+			}
+
+			result := make([]slack_api.User, len(users))
+			for i, userID := range users {
+				name := userNames[userID]
+				if name == "" {
+					name = userID
+				}
+				result[i] = slack_api.User{
+					ID:   userID,
+					Name: name,
+				}
+			}
+			return &result, nil
+		},
 		AuthTestFunc: func() (*slack_api.AuthTestResponse, error) {
 			return &slack_api.AuthTestResponse{
 				UserID:       "bot-user",

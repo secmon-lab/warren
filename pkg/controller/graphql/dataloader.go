@@ -10,7 +10,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
-	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
@@ -114,21 +113,39 @@ func userBatchFn(slackClient interfaces.SlackClient) func(ctx context.Context, k
 	return func(ctx context.Context, keys []string) []*dataloader.Result[*graphql1.User] {
 		results := make([]*dataloader.Result[*graphql1.User], len(keys))
 
-		for i, id := range keys {
-			slackUser := slack_model.User{ID: id}
-			user := &graphql1.User{
-				ID:   id,
-				Name: slackUser.ID, // fallback to ID if name not available
-			}
-
-			if slackClient != nil {
-				if userInfo, err := slackClient.GetUserInfo(id); err == nil {
-					user.Name = userInfo.Name
+		if slackClient != nil {
+			// Use batch API to fetch all users at once
+			slackUsers, err := slackClient.GetUsersInfo(keys...)
+			if err == nil && slackUsers != nil {
+				// Create map for O(1) lookup
+				userMap := make(map[string]*graphql1.User)
+				for _, slackUser := range *slackUsers {
+					userMap[slackUser.ID] = &graphql1.User{
+						ID:   slackUser.ID,
+						Name: slackUser.Name,
+					}
 				}
-			}
 
+				// Build results in the same order as keys
+				for i, key := range keys {
+					if user, found := userMap[key]; found {
+						results[i] = &dataloader.Result[*graphql1.User]{Data: user, Error: nil}
+					} else {
+						// User not found, fallback to ID
+						results[i] = &dataloader.Result[*graphql1.User]{
+							Data:  &graphql1.User{ID: key, Name: key},
+							Error: nil,
+						}
+					}
+				}
+				return results
+			}
+		}
+
+		// Fallback for when SlackClient is nil or batch API fails
+		for i, id := range keys {
 			results[i] = &dataloader.Result[*graphql1.User]{
-				Data:  user,
+				Data:  &graphql1.User{ID: id, Name: id},
 				Error: nil,
 			}
 		}
