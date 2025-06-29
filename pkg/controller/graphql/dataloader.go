@@ -116,7 +116,18 @@ func userBatchFn(slackClient interfaces.SlackClient) func(ctx context.Context, k
 		if slackClient != nil {
 			// Use batch API to fetch all users at once
 			slackUsers, err := slackClient.GetUsersInfo(keys...)
-			if err == nil && slackUsers != nil {
+			if err != nil {
+				// If Slack API fails, propagate error to all keys
+				for i := range keys {
+					results[i] = &dataloader.Result[*graphql1.User]{
+						Data:  nil,
+						Error: goerr.Wrap(err, "failed to fetch user info from Slack", goerr.V("user_ids", keys)),
+					}
+				}
+				return results
+			}
+
+			if slackUsers != nil {
 				// Create map for O(1) lookup
 				userMap := make(map[string]*graphql1.User)
 				for _, slackUser := range *slackUsers {
@@ -131,7 +142,7 @@ func userBatchFn(slackClient interfaces.SlackClient) func(ctx context.Context, k
 					if user, found := userMap[key]; found {
 						results[i] = &dataloader.Result[*graphql1.User]{Data: user, Error: nil}
 					} else {
-						// User not found, fallback to ID
+						// User not found in Slack response, fallback to ID
 						results[i] = &dataloader.Result[*graphql1.User]{
 							Data:  &graphql1.User{ID: key, Name: key},
 							Error: nil,
@@ -142,7 +153,7 @@ func userBatchFn(slackClient interfaces.SlackClient) func(ctx context.Context, k
 			}
 		}
 
-		// Fallback for when SlackClient is nil or batch API fails
+		// Fallback for when SlackClient is nil (not an error condition)
 		for i, id := range keys {
 			results[i] = &dataloader.Result[*graphql1.User]{
 				Data:  &graphql1.User{ID: id, Name: id},

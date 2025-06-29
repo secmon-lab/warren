@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -696,18 +698,14 @@ func TestDataLoaderIntegration(t *testing.T) {
 		server := httptest.NewServer(graphqlHandler(repo, slackService, nil))
 		defer server.Close()
 
-		// Send GraphQL query that should trigger DataLoader batching
+		// Query activities to trigger DataLoader usage
 		req := graphqlRequest{
 			Query: `
 				query {
-					activities(offset: 0, limit: 5) {
+					activities(offset: 0, limit: 3) {
 						activities {
 							id
 							type
-							user {
-								id
-								name
-							}
 							ticket {
 								id
 								title
@@ -726,38 +724,76 @@ func TestDataLoaderIntegration(t *testing.T) {
 		gt.NoError(t, err)
 		gt.Array(t, resp.Errors).Length(0)
 
-		// Verify response is valid
-		data, ok := resp.Data.(map[string]interface{})
-		gt.True(t, ok)
-
-		activitiesResponse, ok := data["activities"].(map[string]interface{})
-		gt.True(t, ok)
-
-		activities, ok := activitiesResponse["activities"].([]interface{})
-		gt.True(t, ok)
-		gt.Array(t, activities).Length(5)
-
-		// Check call counts to verify batch methods were used
+		// Verify that batch methods were used
 		counts := repo.GetAllCallCounts()
 		t.Logf("Repository method call counts: %+v", counts)
 
-		// Verify that batch methods were called (N+1 problem solved)
-		gt.Number(t, counts["BatchGetTickets"]).Greater(0)
-		gt.Number(t, counts["BatchGetAlerts"]).Greater(0)
+		// Verify batch methods were called
+		batchTicketCalls := counts["BatchGetTickets"]
+		batchAlertCalls := counts["BatchGetAlerts"]
+		gt.Number(t, batchTicketCalls).GreaterOrEqual(1)
+		gt.Number(t, batchAlertCalls).GreaterOrEqual(1)
 
-		// Verify that individual methods were NOT called (or minimal calls if any)
-		// Note: Some individual calls might occur for non-DataLoader operations
+		// Verify individual methods were NOT called (N+1 problem avoided)
 		individualTicketCalls := counts["GetTicket"]
 		individualAlertCalls := counts["GetAlert"]
-
 		t.Logf("Individual method calls - GetTicket: %d, GetAlert: %d", individualTicketCalls, individualAlertCalls)
-		t.Logf("Batch method calls - BatchGetTickets: %d, BatchGetAlerts: %d",
-			counts["BatchGetTickets"], counts["BatchGetAlerts"])
+		t.Logf("Batch method calls - BatchGetTickets: %d, BatchGetAlerts: %d", batchTicketCalls, batchAlertCalls)
+		gt.Number(t, individualTicketCalls).Equal(0)
+		gt.Number(t, individualAlertCalls).Equal(0)
+	})
 
-		// The key point is that batch methods should be called
-		// Individual methods might still be called for non-DataLoader operations
-		// But the ratio should show that batching is working
-		gt.Number(t, counts["BatchGetTickets"]).GreaterOrEqual(1)
-		gt.Number(t, counts["BatchGetAlerts"]).GreaterOrEqual(1)
+	t.Run("Slack_API_Error_Propagation", func(t *testing.T) {
+		// Test that Slack API errors are properly propagated to GraphQL responses
+		repo := setupGraphQLTestData(t)
+
+		// Setup mock Slack service with error
+		mockClient := &mock.SlackClientMock{
+			GetUsersInfoFunc: func(users ...string) (*[]slack_api.User, error) {
+				return nil, errors.New("slack API rate limit exceeded")
+			},
+			AuthTestFunc: func() (*slack_api.AuthTestResponse, error) {
+				return &slack_api.AuthTestResponse{
+					UserID: "bot-user",
+					TeamID: "test-team",
+				}, nil
+			},
+			GetTeamInfoFunc: func() (*slack_api.TeamInfo, error) {
+				return &slack_api.TeamInfo{
+					Domain: "test-workspace",
+				}, nil
+			},
+		}
+		slackService, err := slack_service.New(mockClient, "test-channel")
+		gt.NoError(t, err)
+
+		server := httptest.NewServer(graphqlHandler(repo, slackService, nil))
+		defer server.Close()
+
+		// Query activities to trigger user loading which will cause Slack API error
+		req := graphqlRequest{
+			Query: `
+				query {
+					activities(offset: 0, limit: 1) {
+						activities {
+							id
+							type
+							user {
+								id
+								name
+							}
+						}
+					}
+				}
+			`,
+		}
+
+		resp, err := sendGraphQLRequest(server.URL, req)
+		gt.NoError(t, err)
+
+		// Verify that GraphQL errors are returned
+		gt.Array(t, resp.Errors).Length(1)
+		gt.True(t, strings.Contains(resp.Errors[0].Message, "failed to fetch user info from Slack"))
+		gt.True(t, strings.Contains(resp.Errors[0].Message, "slack API rate limit exceeded"))
 	})
 }

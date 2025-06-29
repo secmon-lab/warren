@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -183,32 +184,67 @@ func TestUserLoader_BatchLoad(t *testing.T) {
 }
 
 func TestErrorHandling(t *testing.T) {
-	repo, slackClient := setupTestData()
+	t.Run("Repository errors are propagated", func(t *testing.T) {
+		repo, slackClient := setupTestData()
+		loaders := NewDataLoaders(repo, slackClient)
+		ctx := context.Background()
 
-	// Set slack client to simulate error for both individual and batch methods
-	slackClient.GetUserInfoFunc = func(userID string) (*slack_api.User, error) {
-		return nil, errors.New("simulated slack error")
-	}
-	slackClient.GetUsersInfoFunc = func(users ...string) (*[]slack_api.User, error) {
-		return nil, errors.New("simulated slack batch error")
-	}
+		// Test ticket not found error
+		_, err := GetTicketWithLoaders(ctx, loaders, "nonexistent")
+		gt.Error(t, err)
 
-	loaders := NewDataLoaders(repo, slackClient)
-	ctx := context.Background()
+		// Test alert not found error
+		_, err = GetAlertWithLoaders(ctx, loaders, "nonexistent")
+		gt.Error(t, err)
+	})
 
-	// Test ticket not found error
-	_, err := GetTicketWithLoaders(ctx, loaders, "nonexistent")
-	gt.Error(t, err)
+	t.Run("Slack API errors are propagated", func(t *testing.T) {
+		repo, slackClient := setupTestData()
 
-	// Test alert not found error
-	_, err = GetAlertWithLoaders(ctx, loaders, "nonexistent")
-	gt.Error(t, err)
+		// Set slack client to simulate error for batch method
+		slackClient.GetUsersInfoFunc = func(users ...string) (*[]slack_api.User, error) {
+			return nil, errors.New("simulated slack batch error")
+		}
 
-	// Test user error handling (user loader doesn't propagate slack errors, it falls back)
-	user, err := GetUserWithLoaders(ctx, loaders, "user1")
-	gt.NoError(t, err) // Should not error, falls back to ID
-	gt.Equal(t, user.ID, "user1")
-	gt.Equal(t, user.Name, "user1") // Fallback to ID
+		loaders := NewDataLoaders(repo, slackClient)
+		ctx := context.Background()
+
+		// Test user error handling - Slack API errors should now be propagated
+		_, err := GetUserWithLoaders(ctx, loaders, "user1")
+		gt.Error(t, err) // Should error with Slack API error
+		gt.True(t, strings.Contains(err.Error(), "failed to fetch user info from Slack"))
+		gt.True(t, strings.Contains(err.Error(), "simulated slack batch error"))
+	})
+
+	t.Run("Nil SlackClient falls back without error", func(t *testing.T) {
+		repo, _ := setupTestData()
+		loaders := NewDataLoaders(repo, nil) // nil SlackClient
+		ctx := context.Background()
+
+		// Test user loading with nil SlackClient - should fallback to ID without error
+		user, err := GetUserWithLoaders(ctx, loaders, "user1")
+		gt.NoError(t, err) // Should not error, falls back to ID
+		gt.Equal(t, user.ID, "user1")
+		gt.Equal(t, user.Name, "user1") // Fallback to ID
+	})
+
+	t.Run("User not found in Slack response falls back without error", func(t *testing.T) {
+		repo, slackClient := setupTestData()
+
+		// Set slack client to return empty result (user not found)
+		slackClient.GetUsersInfoFunc = func(users ...string) (*[]slack_api.User, error) {
+			return &[]slack_api.User{}, nil // Empty response
+		}
+
+		loaders := NewDataLoaders(repo, slackClient)
+		ctx := context.Background()
+
+		// Test user not found in Slack response - should fallback to ID without error
+		user, err := GetUserWithLoaders(ctx, loaders, "user1")
+		gt.NoError(t, err) // Should not error, falls back to ID
+		gt.Equal(t, user.ID, "user1")
+		gt.Equal(t, user.Name, "user1") // Fallback to ID
+	})
 }
 
 func TestMiddleware(t *testing.T) {
