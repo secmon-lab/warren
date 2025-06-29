@@ -398,11 +398,11 @@ func setupGraphQLTestData() *repository.Memory {
 		CreatedAt: time.Now().Add(-1 * time.Minute),
 	}
 
-	repo.PutActivity(ctx, activity1)
-	repo.PutActivity(ctx, activity2)
-	repo.PutActivity(ctx, activity3)
-	repo.PutActivity(ctx, activity4)
-	repo.PutActivity(ctx, activity5)
+	_ = repo.PutActivity(ctx, activity1)
+	_ = repo.PutActivity(ctx, activity2)
+	_ = repo.PutActivity(ctx, activity3)
+	_ = repo.PutActivity(ctx, activity4)
+	_ = repo.PutActivity(ctx, activity5)
 
 	return repo
 }

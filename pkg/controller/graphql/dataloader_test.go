@@ -36,23 +36,23 @@ func setupTestData() (*repository.Memory, *mock.SlackClientMock) {
 
 	// Setup test tickets
 	ctx := context.Background()
-	repo.PutTicket(ctx, ticket.Ticket{
+	_ = repo.PutTicket(ctx, ticket.Ticket{
 		ID:       "ticket1",
 		Metadata: ticket.Metadata{Title: "Test Ticket 1"},
 	})
-	repo.PutTicket(ctx, ticket.Ticket{
+	_ = repo.PutTicket(ctx, ticket.Ticket{
 		ID:       "ticket2",
 		Metadata: ticket.Metadata{Title: "Test Ticket 2"},
 	})
-	repo.PutTicket(ctx, ticket.Ticket{
+	_ = repo.PutTicket(ctx, ticket.Ticket{
 		ID:       "ticket3",
 		Metadata: ticket.Metadata{Title: "Test Ticket 3"},
 	})
 
 	// Setup test alerts
-	repo.PutAlert(ctx, alert.Alert{ID: "alert1"})
-	repo.PutAlert(ctx, alert.Alert{ID: "alert2"})
-	repo.PutAlert(ctx, alert.Alert{ID: "alert3"})
+	_ = repo.PutAlert(ctx, alert.Alert{ID: "alert1"})
+	_ = repo.PutAlert(ctx, alert.Alert{ID: "alert2"})
+	_ = repo.PutAlert(ctx, alert.Alert{ID: "alert3"})
 
 	slackClient := &mock.SlackClientMock{
 		GetUserInfoFunc: func(userID string) (*slack_api.User, error) {
