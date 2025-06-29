@@ -191,7 +191,14 @@ func graphqlHandler(repo interfaces.Repository, slackService *slack.Service, uc 
 		graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}),
 	)
 	srv.AddTransport(transport.POST{})
-	return srv
+
+	// Add DataLoader middleware using the official implementation
+	var slackClient interfaces.SlackClient
+	if slackService != nil {
+		slackClient = slackService.GetClient()
+	}
+
+	return graphql.DataLoaderMiddleware(repo, slackClient)(srv)
 }
 
 // spaHandler handles SPA routing by serving static files and falling back to index.html

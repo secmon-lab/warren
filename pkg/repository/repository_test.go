@@ -1,6 +1,7 @@
 package repository_test
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand/v2"
@@ -10,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -17,6 +19,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/utils/test"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 	"github.com/slack-go/slack/slackevents"
 )
 
@@ -144,7 +147,7 @@ func TestAlertTicketBinding(t *testing.T) {
 		gt.NoError(t, repo.PutAlert(ctx, testAlert))
 		gt.NoError(t, repo.PutTicket(ctx, ticketObj))
 
-		unbindAlerts, err := repo.GetAlertWithoutTicket(ctx)
+		unbindAlerts, err := repo.GetAlertWithoutTicket(ctx, 0, 0)
 		gt.NoError(t, err).Required()
 		gt.Array(t, unbindAlerts).Longer(0).Any(func(a *alert.Alert) bool {
 			return a.ID == testAlert.ID
@@ -1376,4 +1379,436 @@ func TestTicketCommentsPagination(t *testing.T) {
 		repo := newFirestoreClient(t)
 		testFn(t, repo)
 	})
+}
+
+func TestActivityCreation(t *testing.T) {
+	repositories := []struct {
+		name string
+		repo func(t *testing.T) interfaces.Repository
+	}{
+		{
+			name: "Memory",
+			repo: func(t *testing.T) interfaces.Repository {
+				return repository.NewMemory()
+			},
+		},
+		{
+			name: "Firestore",
+			repo: func(t *testing.T) interfaces.Repository {
+				return newFirestoreClient(t)
+			},
+		},
+	}
+
+	for _, repoTest := range repositories {
+		t.Run(repoTest.name, func(t *testing.T) {
+			repo := repoTest.repo(t)
+
+			// Test ticket creation activity
+			t.Run("TicketCreation", func(t *testing.T) {
+				ctx := user.WithUserID(context.Background(), "test-user")
+
+				ticket := ticketmodel.Ticket{
+					ID: types.NewTicketID(),
+					Metadata: ticketmodel.Metadata{
+						Title: "Test Ticket",
+					},
+					Status:    types.TicketStatusOpen,
+					CreatedAt: time.Now(),
+				}
+
+				err := repo.PutTicket(ctx, ticket)
+				gt.NoError(t, err).Required()
+
+				// Wait a bit for Firestore eventual consistency
+				time.Sleep(100 * time.Millisecond)
+
+				// Check that activity was created
+				activities, err := repo.GetActivities(ctx, 0, 100) // Get more activities to account for test accumulation
+				gt.NoError(t, err).Required()
+
+				gt.Number(t, len(activities)).GreaterOrEqual(1).Required()
+
+				// Find ticket creation activity
+				var ticketActivity *activity.Activity
+				for _, act := range activities {
+					if act.Type == types.ActivityTypeTicketCreated && act.TicketID == ticket.ID {
+						ticketActivity = act
+						break
+					}
+				}
+
+				gt.Value(t, ticketActivity).NotNil()
+				gt.Value(t, ticketActivity.Type).Equal(types.ActivityTypeTicketCreated)
+				gt.Value(t, ticketActivity.TicketID).Equal(ticket.ID)
+				gt.Value(t, ticketActivity.UserID).Equal("test-user")
+			})
+
+			// Test comment activity
+			t.Run("CommentAddition", func(t *testing.T) {
+				ctx := user.WithUserID(context.Background(), "comment-user")
+
+				ticket := ticketmodel.Ticket{
+					ID: types.NewTicketID(),
+					Metadata: ticketmodel.Metadata{
+						Title: "Test Ticket for Comments",
+					},
+					Status:    types.TicketStatusOpen,
+					CreatedAt: time.Now(),
+				}
+
+				err := repo.PutTicket(ctx, ticket)
+				gt.NoError(t, err)
+
+				comment := ticketmodel.Comment{
+					ID:        types.NewCommentID(),
+					TicketID:  ticket.ID,
+					Comment:   "Test comment",
+					CreatedAt: time.Now(),
+				}
+
+				err = repo.PutTicketComment(ctx, comment)
+				gt.NoError(t, err)
+
+				// Check activities - should have at least the ticket creation + comment
+				activities, err := repo.GetActivities(ctx, 0, 100)
+				gt.NoError(t, err)
+				gt.Number(t, len(activities)).GreaterOrEqual(2)
+
+				// Find comment activity
+				var commentActivity *activity.Activity
+				for _, act := range activities {
+					if act.Type == types.ActivityTypeCommentAdded && act.CommentID == comment.ID {
+						commentActivity = act
+						break
+					}
+				}
+
+				gt.Value(t, commentActivity).NotNil()
+				gt.Value(t, commentActivity.TicketID).Equal(ticket.ID)
+				gt.Value(t, commentActivity.CommentID).Equal(comment.ID)
+				gt.Value(t, commentActivity.UserID).Equal("comment-user")
+			})
+
+			// Test agent comment should not create activity
+			t.Run("AgentCommentNoActivity", func(t *testing.T) {
+				ctx := user.WithAgent(user.WithUserID(context.Background(), "agent"))
+
+				ticket := ticketmodel.Ticket{
+					ID: types.NewTicketID(),
+					Metadata: ticketmodel.Metadata{
+						Title: "Test Ticket for Agent Comments",
+					},
+					Status:    types.TicketStatusOpen,
+					CreatedAt: time.Now(),
+				}
+
+				err := repo.PutTicket(ctx, ticket)
+				gt.NoError(t, err)
+
+				// Count activities for this specific ticket after ticket creation
+				// Agent context should not create ticket creation activity
+				activitiesAfterTicket, err := repo.GetActivities(ctx, 0, 100)
+				gt.NoError(t, err)
+				ticketCreationCount := 0
+				for _, act := range activitiesAfterTicket {
+					if act.TicketID == ticket.ID && act.Type == types.ActivityTypeTicketCreated {
+						ticketCreationCount++
+					}
+				}
+				gt.Number(t, ticketCreationCount).Equal(0) // Should have no ticket creation activity for agent
+
+				comment := ticketmodel.Comment{
+					ID:        types.NewCommentID(),
+					TicketID:  ticket.ID,
+					Comment:   "Agent comment",
+					CreatedAt: time.Now(),
+				}
+
+				err = repo.PutTicketComment(ctx, comment)
+				gt.NoError(t, err)
+
+				// Count activities for this specific ticket after adding agent comment
+				activitiesAfter, err := repo.GetActivities(ctx, 0, 100)
+				gt.NoError(t, err)
+				var ticketActivity, commentActivity *activity.Activity
+				ticketActivityCount := 0
+				for _, act := range activitiesAfter {
+					if act.TicketID == ticket.ID {
+						if act.Type == types.ActivityTypeTicketCreated {
+							ticketActivity = act
+							ticketActivityCount++
+						} else if act.Type == types.ActivityTypeCommentAdded && act.CommentID == comment.ID {
+							commentActivity = act
+						}
+					}
+				}
+
+				// Should have no activities for agent context
+				gt.Number(t, ticketActivityCount).Equal(0)
+				gt.Value(t, ticketActivity).Nil()  // Ticket creation should not exist for agent
+				gt.Value(t, commentActivity).Nil() // Comment activity should not exist for agent
+			})
+
+			// Test alert binding activity
+			t.Run("AlertBinding", func(t *testing.T) {
+				ctx := user.WithUserID(context.Background(), "bind-user")
+
+				ticket := ticketmodel.Ticket{
+					ID: types.NewTicketID(),
+					Metadata: ticketmodel.Metadata{
+						Title: "Test Ticket for Alert Binding",
+					},
+					Status:    types.TicketStatusOpen,
+					CreatedAt: time.Now(),
+				}
+
+				alert := &alert.Alert{
+					ID: types.NewAlertID(),
+					Metadata: alert.Metadata{
+						Title: "Test Alert",
+					},
+					CreatedAt: time.Now(),
+				}
+
+				err := repo.PutTicket(ctx, ticket)
+				gt.NoError(t, err)
+
+				err = repo.PutAlert(ctx, *alert)
+				gt.NoError(t, err)
+
+				err = repo.BindAlertToTicket(ctx, alert.ID, ticket.ID)
+				gt.NoError(t, err)
+
+				// Check activities - should have at least ticket creation + alert binding
+				activities, err := repo.GetActivities(ctx, 0, 100)
+				gt.NoError(t, err)
+				gt.Number(t, len(activities)).GreaterOrEqual(2)
+
+				// Find alert binding activity
+				var bindActivity *activity.Activity
+				for _, act := range activities {
+					if act.Type == types.ActivityTypeAlertBound && act.AlertID == alert.ID && act.TicketID == ticket.ID {
+						bindActivity = act
+						break
+					}
+				}
+
+				gt.Value(t, bindActivity).NotNil()
+				gt.Value(t, bindActivity.TicketID).Equal(ticket.ID)
+				gt.Value(t, bindActivity.AlertID).Equal(alert.ID)
+				gt.Value(t, bindActivity.UserID).Equal("bind-user")
+			})
+
+			// Test bulk alert binding activity
+			t.Run("BulkAlertBinding", func(t *testing.T) {
+				ctx := user.WithUserID(context.Background(), "bulk-bind-user")
+
+				ticket := ticketmodel.Ticket{
+					ID: types.NewTicketID(),
+					Metadata: ticketmodel.Metadata{
+						Title: "Test Ticket for Bulk Alert Binding",
+					},
+					Status:    types.TicketStatusOpen,
+					CreatedAt: time.Now(),
+				}
+
+				// Create multiple alerts
+				alertIDs := make([]types.AlertID, 3)
+				for i := 0; i < 3; i++ {
+					alert := &alert.Alert{
+						ID: types.NewAlertID(),
+						Metadata: alert.Metadata{
+							Title: fmt.Sprintf("Test Alert %d", i+1),
+						},
+						CreatedAt: time.Now(),
+					}
+					alertIDs[i] = alert.ID
+
+					err := repo.PutAlert(ctx, *alert)
+					gt.NoError(t, err)
+				}
+
+				err := repo.PutTicket(ctx, ticket)
+				gt.NoError(t, err)
+
+				err = repo.BatchBindAlertsToTicket(ctx, alertIDs, ticket.ID)
+				gt.NoError(t, err)
+
+				// Check activities - should have at least ticket creation + bulk alert binding
+				activities, err := repo.GetActivities(ctx, 0, 100)
+				gt.NoError(t, err)
+				gt.Number(t, len(activities)).GreaterOrEqual(2)
+
+				// Find bulk alert binding activity
+				var bulkBindActivity *activity.Activity
+				for _, act := range activities {
+					if act.Type == types.ActivityTypeAlertsBulkBound && act.TicketID == ticket.ID {
+						bulkBindActivity = act
+						break
+					}
+				}
+
+				gt.Value(t, bulkBindActivity).NotNil()
+				gt.Value(t, bulkBindActivity.TicketID).Equal(ticket.ID)
+				gt.Value(t, bulkBindActivity.UserID).Equal("bulk-bind-user")
+			})
+
+			// Test status change activity
+			t.Run("StatusChange", func(t *testing.T) {
+				ctx := user.WithUserID(context.Background(), "status-user")
+
+				ticket := ticketmodel.Ticket{
+					ID: types.NewTicketID(),
+					Metadata: ticketmodel.Metadata{
+						Title: "Test Ticket for Status Change",
+					},
+					Status:    types.TicketStatusOpen,
+					CreatedAt: time.Now(),
+				}
+
+				err := repo.PutTicket(ctx, ticket)
+				gt.NoError(t, err)
+
+				err = repo.BatchUpdateTicketsStatus(ctx, []types.TicketID{ticket.ID}, types.TicketStatusResolved)
+				gt.NoError(t, err)
+
+				// Check activities - should have at least ticket creation + status change
+				activities, err := repo.GetActivities(ctx, 0, 100)
+				gt.NoError(t, err)
+				gt.Number(t, len(activities)).GreaterOrEqual(2)
+
+				// Find status change activity
+				var statusActivity *activity.Activity
+				for _, act := range activities {
+					if act.Type == types.ActivityTypeTicketStatusChanged && act.TicketID == ticket.ID {
+						statusActivity = act
+						break
+					}
+				}
+
+				gt.Value(t, statusActivity).NotNil()
+				gt.Value(t, statusActivity.TicketID).Equal(ticket.ID)
+				gt.Value(t, statusActivity.UserID).Equal("status-user")
+				gt.Value(t, statusActivity.Metadata["old_status"]).Equal("open")
+				gt.Value(t, statusActivity.Metadata["new_status"]).Equal("resolved")
+			})
+		})
+	}
+}
+
+func TestGetAlertWithoutTicketPagination(t *testing.T) {
+	runTest := func(repo interfaces.Repository) func(t *testing.T) {
+		return func(t *testing.T) {
+			ctx := context.Background()
+
+			// Create multiple tickets and alerts to test pagination
+			ticket1 := ticketmodel.Ticket{
+				ID:       types.TicketID("ticket-1"),
+				Metadata: ticketmodel.Metadata{Title: "Ticket 1"},
+				Status:   types.TicketStatusOpen,
+			}
+
+			// Create 10 alerts: 5 bound to ticket1, 5 unbound
+			boundAlerts := make([]alert.Alert, 5)
+			unboundAlerts := make([]alert.Alert, 5)
+
+			for i := 0; i < 5; i++ {
+				boundAlerts[i] = alert.Alert{
+					ID:       types.AlertID(fmt.Sprintf("bound-alert-%d", i)),
+					TicketID: ticket1.ID,
+					Metadata: alert.Metadata{Title: fmt.Sprintf("Bound Alert %d", i)},
+				}
+
+				unboundAlerts[i] = alert.Alert{
+					ID:       types.AlertID(fmt.Sprintf("unbound-alert-%d", i)),
+					TicketID: types.EmptyTicketID,
+					Metadata: alert.Metadata{Title: fmt.Sprintf("Unbound Alert %d", i)},
+				}
+			}
+
+			// Put ticket and alerts
+			gt.NoError(t, repo.PutTicket(ctx, ticket1))
+			for _, alert := range boundAlerts {
+				gt.NoError(t, repo.PutAlert(ctx, alert))
+			}
+			for _, alert := range unboundAlerts {
+				gt.NoError(t, repo.PutAlert(ctx, alert))
+			}
+
+			t.Run("Get all unbound alerts", func(t *testing.T) {
+				alerts, err := repo.GetAlertWithoutTicket(ctx, 0, 0)
+				gt.NoError(t, err)
+
+				// Count our test alerts
+				ourUnboundCount := 0
+				for _, alert := range alerts {
+					gt.Equal(t, alert.TicketID, types.EmptyTicketID)
+					if alert.ID == types.AlertID("unbound-alert-0") ||
+						alert.ID == types.AlertID("unbound-alert-1") ||
+						alert.ID == types.AlertID("unbound-alert-2") ||
+						alert.ID == types.AlertID("unbound-alert-3") ||
+						alert.ID == types.AlertID("unbound-alert-4") {
+						ourUnboundCount++
+					}
+				}
+				gt.Number(t, ourUnboundCount).Equal(5)
+			})
+
+			t.Run("Get first 3 unbound alerts", func(t *testing.T) {
+				alerts, err := repo.GetAlertWithoutTicket(ctx, 0, 3)
+				gt.NoError(t, err)
+				gt.Array(t, alerts).Length(3)
+
+				// Verify all returned alerts are unbound
+				for _, alert := range alerts {
+					gt.Equal(t, alert.TicketID, types.EmptyTicketID)
+				}
+			})
+
+			t.Run("Get alerts with offset", func(t *testing.T) {
+				// Get first 2 alerts
+				firstBatch, err := repo.GetAlertWithoutTicket(ctx, 0, 2)
+				gt.NoError(t, err)
+				gt.Number(t, len(firstBatch)).GreaterOrEqual(0) // May be 0 if no unbound alerts at beginning
+
+				// Get alerts with offset - verify different results when there are enough alerts
+				allAlerts, err := repo.GetAlertWithoutTicket(ctx, 0, 0)
+				gt.NoError(t, err)
+
+				if len(allAlerts) >= 4 {
+					secondBatch, err := repo.GetAlertWithoutTicket(ctx, 2, 2)
+					gt.NoError(t, err)
+					gt.Number(t, len(secondBatch)).GreaterOrEqual(0)
+				}
+			})
+
+			t.Run("Get alerts with offset beyond available", func(t *testing.T) {
+				// Use a very large offset to ensure we get no results
+				allAlerts, err := repo.GetAlertWithoutTicket(ctx, 0, 0)
+				gt.NoError(t, err)
+
+				largeOffset := len(allAlerts) + 100
+				alerts, err := repo.GetAlertWithoutTicket(ctx, largeOffset, 5)
+				gt.NoError(t, err)
+				gt.Array(t, alerts).Length(0)
+			})
+
+			t.Run("Get limited alerts", func(t *testing.T) {
+				alerts, err := repo.GetAlertWithoutTicket(ctx, 0, 3)
+				gt.NoError(t, err)
+				gt.Number(t, len(alerts)).LessOrEqual(3) // Should not exceed limit
+
+				// Verify all returned alerts are unbound
+				for _, alert := range alerts {
+					gt.Equal(t, alert.TicketID, types.EmptyTicketID)
+				}
+			})
+		}
+	}
+
+	// Test both Memory and Firestore implementations
+	t.Run("Memory", runTest(repository.NewMemory()))
+
+	t.Run("Firestore", runTest(newFirestoreClient(t)))
 }

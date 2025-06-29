@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -41,7 +42,7 @@ type Repository interface {
 	GetAlert(ctx context.Context, alertID types.AlertID) (*alert.Alert, error)
 	GetLatestAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error)
 	SearchAlerts(ctx context.Context, path, op string, value any, limit int) (alert.Alerts, error)
-	GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, error)
+	GetAlertWithoutTicket(ctx context.Context, offset, limit int) (alert.Alerts, error)
 	GetAlertsBySpan(ctx context.Context, begin, end time.Time) (alert.Alerts, error)
 	BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
 	FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error)
@@ -62,4 +63,9 @@ type Repository interface {
 	PutToken(ctx context.Context, token *auth.Token) error
 	GetToken(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error)
 	DeleteToken(ctx context.Context, tokenID auth.TokenID) error
+
+	// For activity management
+	PutActivity(ctx context.Context, activity *activity.Activity) error
+	GetActivities(ctx context.Context, offset, limit int) ([]*activity.Activity, error)
+	CountActivities(ctx context.Context) (int, error)
 }

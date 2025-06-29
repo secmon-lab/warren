@@ -11,6 +11,7 @@ import (
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 )
@@ -20,6 +21,10 @@ func newBackgroundContext(ctx context.Context) context.Context {
 	newCtx = logging.With(newCtx, logging.From(ctx))
 	newCtx = msg.WithContext(newCtx)
 	newCtx = lang.With(newCtx, lang.From(ctx))
+	// Preserve user context if available
+	if userID := user.FromContext(ctx); userID != "" {
+		newCtx = user.WithUserID(newCtx, userID)
+	}
 	return newCtx
 }
 
@@ -63,6 +68,9 @@ func (x *Controller) HandleSlackAppMention(ctx context.Context, apiEvent *slacke
 	logger := logging.From(ctx).With("event_ts", event.EventTimeStamp)
 	ctx = logging.With(ctx, logger)
 
+	// Set user context from Slack event
+	ctx = user.WithUserID(ctx, event.User)
+
 	slackMsg := slack_model.NewMessage(ctx, apiEvent)
 	if slackMsg == nil {
 		return nil
@@ -78,6 +86,9 @@ func (x *Controller) HandleSlackAppMention(ctx context.Context, apiEvent *slacke
 func (x *Controller) HandleSlackMessage(ctx context.Context, apiEvent *slackevents.EventsAPIEvent, event *slackevents.MessageEvent) error {
 	logger := logging.From(ctx).With("event_ts", event.EventTimeStamp)
 	ctx = logging.With(ctx, logger)
+
+	// Set user context from Slack event
+	ctx = user.WithUserID(ctx, event.User)
 
 	logger.Debug("slack message event", "event", event)
 
@@ -100,6 +111,9 @@ func (x *Controller) HandleSlackMessage(ctx context.Context, apiEvent *slackeven
 func (x *Controller) HandleSlackInteraction(ctx context.Context, interaction slack.InteractionCallback) error {
 	logger := logging.From(ctx)
 	logger.Info("slack interaction event", "event", interaction)
+
+	// Set user context from Slack interaction
+	ctx = user.WithUserID(ctx, interaction.User.ID)
 
 	dispatch(ctx, func(ctx context.Context) error {
 		switch interaction.Type {

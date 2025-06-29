@@ -41,6 +41,14 @@ autobind:
 # modelgen, the others will be allowed when binding to fields. Configure them to
 # your liking
 models:
+  Activity:
+    fields:
+      user:
+        resolver: true
+      alert:
+        resolver: true
+      ticket:
+        resolver: true
   ID:
     model:
       - github.com/99designs/gqlgen/graphql.ID

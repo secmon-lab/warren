@@ -7,6 +7,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 // HandleSlackMessage handles a message from a slack user. It saves the message as an alert comment if the message is in the Alert thread.
@@ -18,6 +19,11 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg slack.Messa
 	// Skip if the message is from the bot
 	if uc.slackService.IsBotUser(slackMsg.User().ID) {
 		return nil
+	}
+
+	// Set user ID in context for activity tracking
+	if slackMsg.User() != nil {
+		ctx = user.WithUserID(ctx, slackMsg.User().ID)
 	}
 
 	ticket, err := uc.repository.GetTicketByThread(ctx, slackMsg.Thread())

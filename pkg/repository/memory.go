@@ -10,15 +10,18 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 type Memory struct {
-	mu sync.RWMutex
+	mu         sync.RWMutex
+	activityMu sync.RWMutex
 
 	alerts         map[types.AlertID]*alert.Alert
 	lists          map[types.AlertListID]*alert.List
@@ -26,6 +29,11 @@ type Memory struct {
 	tickets        map[types.TicketID]*ticket.Ticket
 	ticketComments map[types.TicketID][]ticket.Comment
 	tokens         map[auth.TokenID]*auth.Token
+	activities     map[types.ActivityID]*activity.Activity
+
+	// Call counter for tracking method invocations
+	callCounts map[string]int
+	callMu     sync.RWMutex
 }
 
 var _ interfaces.Repository = &Memory{}
@@ -38,7 +46,42 @@ func NewMemory() *Memory {
 		tickets:        make(map[types.TicketID]*ticket.Ticket),
 		ticketComments: make(map[types.TicketID][]ticket.Comment),
 		tokens:         make(map[auth.TokenID]*auth.Token),
+		activities:     make(map[types.ActivityID]*activity.Activity),
+		callCounts:     make(map[string]int),
 	}
+}
+
+// incrementCallCount safely increments the call counter for a method
+func (r *Memory) incrementCallCount(methodName string) {
+	r.callMu.Lock()
+	defer r.callMu.Unlock()
+	r.callCounts[methodName]++
+}
+
+// GetCallCount returns the number of times a method has been called
+func (r *Memory) GetCallCount(methodName string) int {
+	r.callMu.RLock()
+	defer r.callMu.RUnlock()
+	return r.callCounts[methodName]
+}
+
+// GetAllCallCounts returns a copy of all call counts
+func (r *Memory) GetAllCallCounts() map[string]int {
+	r.callMu.RLock()
+	defer r.callMu.RUnlock()
+
+	counts := make(map[string]int)
+	for k, v := range r.callCounts {
+		counts[k] = v
+	}
+	return counts
+}
+
+// ResetCallCounts clears all call counters
+func (r *Memory) ResetCallCounts() {
+	r.callMu.Lock()
+	defer r.callMu.Unlock()
+	r.callCounts = make(map[string]int)
 }
 
 func (r *Memory) PutAlert(ctx context.Context, alert alert.Alert) error {
@@ -50,6 +93,7 @@ func (r *Memory) PutAlert(ctx context.Context, alert alert.Alert) error {
 }
 
 func (r *Memory) GetAlert(ctx context.Context, alertID types.AlertID) (*alert.Alert, error) {
+	r.incrementCallCount("GetAlert")
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -167,6 +211,7 @@ func (r *Memory) GetAlertListsInThread(ctx context.Context, thread slack.Thread)
 }
 
 func (r *Memory) GetTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
+	r.incrementCallCount("GetTicket")
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -182,14 +227,38 @@ func (r *Memory) PutTicket(ctx context.Context, t ticket.Ticket) error {
 	defer r.mu.Unlock()
 
 	r.tickets[t.ID] = &t
+
+	// Create activity for ticket creation (except when called from agent)
+	if !user.IsAgent(ctx) {
+		if err := createTicketActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
+			return goerr.Wrap(err, "failed to create ticket activity", goerr.V("ticket_id", t.ID))
+		}
+	}
+
 	return nil
 }
 
 func (r *Memory) PutTicketComment(ctx context.Context, comment ticket.Comment) error {
+	// Store comment first
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	r.ticketComments[comment.TicketID] = append(r.ticketComments[comment.TicketID], comment)
+
+	// Get ticket title for activity creation
+	var ticketTitle string
+	var hasTicket bool
+	if t, exists := r.tickets[comment.TicketID]; exists {
+		ticketTitle = t.Metadata.Title
+		hasTicket = true
+	}
+	r.mu.Unlock()
+
+	// Create activity for comment addition - only for user comments, not agent
+	if !user.IsAgent(ctx) && hasTicket {
+		if err := createCommentActivity(ctx, r, comment.TicketID, comment.ID, ticketTitle); err != nil {
+			return goerr.Wrap(err, "failed to create comment activity", goerr.V("ticket_id", comment.TicketID), goerr.V("comment_id", comment.ID))
+		}
+	}
+
 	return nil
 }
 
@@ -290,15 +359,32 @@ func (r *Memory) PutTicketCommentsPrompted(ctx context.Context, ticketID types.T
 }
 
 func (r *Memory) BindAlertToTicket(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
+	// Bind alert to ticket first
 	r.mu.Lock()
-	defer r.mu.Unlock()
+
+	// Get ticket for activity creation
+	t, ticketExists := r.tickets[ticketID]
+	if !ticketExists {
+		r.mu.Unlock()
+		return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+	}
 
 	alert, ok := r.alerts[alertID]
 	if !ok {
+		r.mu.Unlock()
 		return goerr.New("alert not found", goerr.V("alert_id", alertID))
 	}
 
 	alert.TicketID = ticketID
+	alertTitle := alert.Metadata.Title
+	ticketTitle := t.Metadata.Title
+	r.mu.Unlock()
+
+	// Create activity for alert binding
+	if err := createAlertBoundActivity(ctx, r, alertID, ticketID, alertTitle, ticketTitle); err != nil {
+		return goerr.Wrap(err, "failed to create alert bound activity", goerr.V("alert_id", alertID), goerr.V("ticket_id", ticketID))
+	}
+
 	return nil
 }
 
@@ -315,7 +401,7 @@ func (r *Memory) UnbindAlertFromTicket(ctx context.Context, alertID types.AlertI
 	return nil
 }
 
-func (r *Memory) GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, error) {
+func (r *Memory) GetAlertWithoutTicket(ctx context.Context, offset, limit int) (alert.Alerts, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -325,6 +411,20 @@ func (r *Memory) GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, error
 			alerts = append(alerts, alert)
 		}
 	}
+
+	// Apply offset
+	if offset >= len(alerts) {
+		return alert.Alerts{}, nil
+	}
+	if offset > 0 {
+		alerts = alerts[offset:]
+	}
+
+	// Apply limit
+	if limit > 0 && limit < len(alerts) {
+		alerts = alerts[:limit]
+	}
+
 	if alerts == nil {
 		return alert.Alerts{}, nil
 	}
@@ -410,6 +510,7 @@ func (r *Memory) SearchAlerts(ctx context.Context, path, op string, value any, l
 }
 
 func (r *Memory) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
+	r.incrementCallCount("BatchGetAlerts")
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -467,20 +568,51 @@ func (r *Memory) GetTicketByThread(ctx context.Context, thread slack.Thread) (*t
 }
 
 func (r *Memory) BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
+	// Bind alerts to ticket first
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
+	// Get ticket for activity creation
+	t, ticketExists := r.tickets[ticketID]
+	if !ticketExists {
+		r.mu.Unlock()
+		return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+	}
+
+	// Get alerts for activity creation
+	var alertTitles []string
 	for _, alertID := range alertIDs {
 		alert, ok := r.alerts[alertID]
 		if !ok {
+			r.mu.Unlock()
 			return goerr.New("alert not found", goerr.V("alert_id", alertID))
 		}
 		alert.TicketID = ticketID
+		alertTitles = append(alertTitles, alert.Metadata.Title)
 	}
+
+	ticketTitle := t.Metadata.Title
+	r.mu.Unlock()
+
+	// Create activity for bulk alert binding
+	if len(alertIDs) > 1 {
+		if err := createBulkAlertBoundActivity(ctx, r, alertIDs, ticketID, ticketTitle, alertTitles); err != nil {
+			return goerr.Wrap(err, "failed to create bulk alert bound activity", goerr.V("ticket_id", ticketID))
+		}
+	} else if len(alertIDs) == 1 {
+		alertTitle := ""
+		if len(alertTitles) > 0 {
+			alertTitle = alertTitles[0]
+		}
+		if err := createAlertBoundActivity(ctx, r, alertIDs[0], ticketID, alertTitle, ticketTitle); err != nil {
+			return goerr.Wrap(err, "failed to create alert bound activity", goerr.V("alert_id", alertIDs[0]), goerr.V("ticket_id", ticketID))
+		}
+	}
+
 	return nil
 }
 
 func (r *Memory) BatchGetTickets(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error) {
+	r.incrementCallCount("BatchGetTickets")
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -733,19 +865,90 @@ func (r *Memory) DeleteToken(ctx context.Context, tokenID auth.TokenID) error {
 }
 
 func (r *Memory) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	// Collect ticket information for activity creation
+	type ticketUpdate struct {
+		id        types.TicketID
+		title     string
+		oldStatus string
+		newStatus string
+	}
+	var updates []ticketUpdate
 
+	// Update tickets first
+	r.mu.Lock()
 	for _, ticketID := range ticketIDs {
 		ticket, ok := r.tickets[ticketID]
 		if !ok {
+			r.mu.Unlock()
 			return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
 		}
+
+		oldStatus := string(ticket.Status)
+		newStatus := string(status)
 
 		ticket.Status = status
 		ticket.UpdatedAt = time.Now()
 		r.tickets[ticketID] = ticket
+
+		updates = append(updates, ticketUpdate{
+			id:        ticketID,
+			title:     ticket.Metadata.Title,
+			oldStatus: oldStatus,
+			newStatus: newStatus,
+		})
+	}
+	r.mu.Unlock()
+
+	// Create activities after releasing the main mutex
+	for _, update := range updates {
+		if err := createStatusChangeActivity(ctx, r, update.id, update.title, update.oldStatus, update.newStatus); err != nil {
+			return goerr.Wrap(err, "failed to create status change activity", goerr.V("ticket_id", update.id))
+		}
 	}
 
 	return nil
+}
+
+// Activity related methods
+func (r *Memory) PutActivity(ctx context.Context, activity *activity.Activity) error {
+	r.activityMu.Lock()
+	defer r.activityMu.Unlock()
+
+	r.activities[activity.ID] = activity
+	return nil
+}
+
+func (r *Memory) GetActivities(ctx context.Context, offset, limit int) ([]*activity.Activity, error) {
+	r.activityMu.RLock()
+	defer r.activityMu.RUnlock()
+
+	var activities []*activity.Activity
+	for _, a := range r.activities {
+		activities = append(activities, a)
+	}
+
+	// Sort by CreatedAt in descending order (newest first)
+	sort.Slice(activities, func(i, j int) bool {
+		return activities[i].CreatedAt.After(activities[j].CreatedAt)
+	})
+
+	// Apply offset and limit
+	start := offset
+	if start >= len(activities) {
+		return []*activity.Activity{}, nil
+	}
+
+	end := start + limit
+	if end > len(activities) {
+		end = len(activities)
+	}
+
+	return activities[start:end], nil
+}
+
+func (r *Memory) CountActivities(ctx context.Context) (int, error) {
+	r.activityMu.RLock()
+	defer r.activityMu.RUnlock()
+
+	return len(r.activities), nil
 }

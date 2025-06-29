@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 
-	goerr "github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
@@ -16,6 +16,40 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
+
+// User is the resolver for the user field.
+func (r *activityResolver) User(ctx context.Context, obj *graphql1.Activity) (*graphql1.User, error) {
+	if obj.UserID == nil || *obj.UserID == "" {
+		return nil, nil
+	}
+
+	// Use DataLoader to efficiently fetch user
+	return GetUser(ctx, *obj.UserID)
+}
+
+// Alert is the resolver for the alert field.
+func (r *activityResolver) Alert(ctx context.Context, obj *graphql1.Activity) (*alert.Alert, error) {
+	if obj.AlertID == nil || *obj.AlertID == "" {
+		return nil, nil
+	}
+
+	alertID := types.AlertID(*obj.AlertID)
+
+	// Use DataLoader to efficiently fetch alert
+	return GetAlert(ctx, alertID)
+}
+
+// Ticket is the resolver for the ticket field.
+func (r *activityResolver) Ticket(ctx context.Context, obj *graphql1.Activity) (*ticket.Ticket, error) {
+	if obj.TicketID == nil || *obj.TicketID == "" {
+		return nil, nil
+	}
+
+	ticketID := types.TicketID(*obj.TicketID)
+
+	// Use DataLoader to efficiently fetch ticket
+	return GetTicket(ctx, ticketID)
+}
 
 // ID is the resolver for the id field.
 func (r *alertResolver) ID(ctx context.Context, obj *alert.Alert) (string, error) {
@@ -398,11 +432,117 @@ func (r *queryResolver) Alert(ctx context.Context, id string) (*alert.Alert, err
 
 // Alerts is the resolver for the alerts field.
 func (r *queryResolver) Alerts(ctx context.Context) ([]*alert.Alert, error) {
-	alerts, err := r.repo.GetAlertWithoutTicket(ctx)
+	alerts, err := r.repo.GetAlertWithoutTicket(ctx, 0, 0)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list alerts")
 	}
 	return alerts, nil
+}
+
+// Dashboard is the resolver for the dashboard field.
+func (r *queryResolver) Dashboard(ctx context.Context) (*graphql1.DashboardStats, error) {
+	// Get open tickets count and list
+	openTickets, err := r.repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 5)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get open tickets")
+	}
+
+	openTicketsCount, err := r.repo.CountTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen})
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to count open tickets")
+	}
+
+	// Get unbound alerts count (for accurate count, we need to get all first)
+	allUnboundAlerts, err := r.repo.GetAlertWithoutTicket(ctx, 0, 0) // Get all for count
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get unbound alerts count")
+	}
+	unboundAlertsCount := len(allUnboundAlerts)
+
+	// Get only the first 5 unbound alerts
+	unboundAlerts, err := r.repo.GetAlertWithoutTicket(ctx, 0, 5)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get unbound alerts")
+	}
+
+	return &graphql1.DashboardStats{
+		OpenTicketsCount:   openTicketsCount,
+		UnboundAlertsCount: unboundAlertsCount,
+		OpenTickets:        openTickets,
+		UnboundAlerts:      unboundAlerts,
+	}, nil
+}
+
+// Activities is the resolver for the activities field.
+func (r *queryResolver) Activities(ctx context.Context, offset *int, limit *int) (*graphql1.ActivitiesResponse, error) {
+	const defaultActivitiesLimit = 10
+	const maxActivitiesLimit = 50
+
+	// Set default values for offset and limit
+	var offsetVal, limitVal int
+	if offset != nil {
+		offsetVal = *offset
+	}
+	if limit != nil {
+		limitVal = *limit
+		if limitVal > maxActivitiesLimit {
+			limitVal = maxActivitiesLimit
+		}
+	} else {
+		limitVal = defaultActivitiesLimit
+	}
+
+	// Get paginated activities
+	activities, err := r.repo.GetActivities(ctx, offsetVal, limitVal)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get activities")
+	}
+
+	// Get total count for pagination
+	totalCount, err := r.repo.CountActivities(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to count activities")
+	}
+
+	// Convert to GraphQL activities
+	graphqlActivities := make([]*graphql1.Activity, len(activities))
+	for i, a := range activities {
+		graphqlActivity := &graphql1.Activity{
+			ID:        string(a.ID),
+			Type:      string(a.Type),
+			CreatedAt: a.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+
+		if a.UserID != "" {
+			graphqlActivity.UserID = &a.UserID
+		}
+		if a.AlertID != types.AlertID("") {
+			alertID := string(a.AlertID)
+			graphqlActivity.AlertID = &alertID
+		}
+		if a.TicketID != types.TicketID("") {
+			ticketID := string(a.TicketID)
+			graphqlActivity.TicketID = &ticketID
+		}
+		if a.CommentID != types.CommentID("") {
+			commentID := string(a.CommentID)
+			graphqlActivity.CommentID = &commentID
+		}
+		if a.Metadata != nil {
+			metadataBytes, err := json.Marshal(a.Metadata)
+			if err == nil {
+				metadataStr := string(metadataBytes)
+				graphqlActivity.Metadata = &metadataStr
+			}
+		}
+
+		graphqlActivities[i] = graphqlActivity
+	}
+
+	return &graphql1.ActivitiesResponse{
+		Activities: graphqlActivities,
+		TotalCount: totalCount,
+	}, nil
 }
 
 // ID is the resolver for the id field.
@@ -483,6 +623,9 @@ func (r *ticketResolver) UpdatedAt(ctx context.Context, obj *ticket.Ticket) (str
 	return obj.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
 }
 
+// Activity returns ActivityResolver implementation.
+func (r *Resolver) Activity() ActivityResolver { return &activityResolver{r} }
+
 // Alert returns AlertResolver implementation.
 func (r *Resolver) Alert() AlertResolver { return &alertResolver{r} }
 
@@ -501,6 +644,7 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 // Ticket returns TicketResolver implementation.
 func (r *Resolver) Ticket() TicketResolver { return &ticketResolver{r} }
 
+type activityResolver struct{ *Resolver }
 type alertResolver struct{ *Resolver }
 type commentResolver struct{ *Resolver }
 type findingResolver struct{ *Resolver }

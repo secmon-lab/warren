@@ -7,6 +7,7 @@ import (
 	"context"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/opaq"
+	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	modelslack "github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -41,6 +42,9 @@ import (
 //			},
 //			GetUserInfoFunc: func(userID string) (*slackslack.User, error) {
 //				panic("mock out the GetUserInfo method")
+//			},
+//			GetUsersInfoFunc: func(users ...string) (*[]slackslack.User, error) {
+//				panic("mock out the GetUsersInfo method")
 //			},
 //			OpenViewFunc: func(triggerID string, view slackslack.ModalViewRequest) (*slackslack.ViewResponse, error) {
 //				panic("mock out the OpenView method")
@@ -81,6 +85,9 @@ type SlackClientMock struct {
 
 	// GetUserInfoFunc mocks the GetUserInfo method.
 	GetUserInfoFunc func(userID string) (*slackslack.User, error)
+
+	// GetUsersInfoFunc mocks the GetUsersInfo method.
+	GetUsersInfoFunc func(users ...string) (*[]slackslack.User, error)
 
 	// OpenViewFunc mocks the OpenView method.
 	OpenViewFunc func(triggerID string, view slackslack.ModalViewRequest) (*slackslack.ViewResponse, error)
@@ -126,6 +133,11 @@ type SlackClientMock struct {
 		GetUserInfo []struct {
 			// UserID is the userID argument value.
 			UserID string
+		}
+		// GetUsersInfo holds details about calls to the GetUsersInfo method.
+		GetUsersInfo []struct {
+			// Users is the users argument value.
+			Users []string
 		}
 		// OpenView holds details about calls to the OpenView method.
 		OpenView []struct {
@@ -179,6 +191,7 @@ type SlackClientMock struct {
 	lockGetTeamInfo          sync.RWMutex
 	lockGetUserGroups        sync.RWMutex
 	lockGetUserInfo          sync.RWMutex
+	lockGetUsersInfo         sync.RWMutex
 	lockOpenView             sync.RWMutex
 	lockPostMessageContext   sync.RWMutex
 	lockUpdateMessageContext sync.RWMutex
@@ -393,6 +406,42 @@ func (mock *SlackClientMock) GetUserInfoCalls() []struct {
 	mock.lockGetUserInfo.RLock()
 	calls = mock.calls.GetUserInfo
 	mock.lockGetUserInfo.RUnlock()
+	return calls
+}
+
+// GetUsersInfo calls GetUsersInfoFunc.
+func (mock *SlackClientMock) GetUsersInfo(users ...string) (*[]slackslack.User, error) {
+	callInfo := struct {
+		Users []string
+	}{
+		Users: users,
+	}
+	mock.lockGetUsersInfo.Lock()
+	mock.calls.GetUsersInfo = append(mock.calls.GetUsersInfo, callInfo)
+	mock.lockGetUsersInfo.Unlock()
+	if mock.GetUsersInfoFunc == nil {
+		var (
+			usersOut *[]slackslack.User
+			errOut   error
+		)
+		return usersOut, errOut
+	}
+	return mock.GetUsersInfoFunc(users...)
+}
+
+// GetUsersInfoCalls gets all the calls that were made to GetUsersInfo.
+// Check the length with:
+//
+//	len(mockedSlackClient.GetUsersInfoCalls())
+func (mock *SlackClientMock) GetUsersInfoCalls() []struct {
+	Users []string
+} {
+	var calls []struct {
+		Users []string
+	}
+	mock.lockGetUsersInfo.RLock()
+	calls = mock.calls.GetUsersInfo
+	mock.lockGetUsersInfo.RUnlock()
 	return calls
 }
 
@@ -764,6 +813,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			BindAlertToTicketFunc: func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
 //				panic("mock out the BindAlertToTicket method")
 //			},
+//			CountActivitiesFunc: func(ctx context.Context) (int, error) {
+//				panic("mock out the CountActivities method")
+//			},
 //			CountTicketCommentsFunc: func(ctx context.Context, ticketID types.TicketID) (int, error) {
 //				panic("mock out the CountTicketComments method")
 //			},
@@ -782,6 +834,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			FindNearestTicketsWithSpanFunc: func(ctx context.Context, embedding []float32, begin time.Time, end time.Time, limit int) ([]*ticket.Ticket, error) {
 //				panic("mock out the FindNearestTicketsWithSpan method")
 //			},
+//			GetActivitiesFunc: func(ctx context.Context, offset int, limit int) ([]*activity.Activity, error) {
+//				panic("mock out the GetActivities method")
+//			},
 //			GetAlertFunc: func(ctx context.Context, alertID types.AlertID) (*alert.Alert, error) {
 //				panic("mock out the GetAlert method")
 //			},
@@ -797,7 +852,7 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			GetAlertWithoutEmbeddingFunc: func(ctx context.Context) (alert.Alerts, error) {
 //				panic("mock out the GetAlertWithoutEmbedding method")
 //			},
-//			GetAlertWithoutTicketFunc: func(ctx context.Context) (alert.Alerts, error) {
+//			GetAlertWithoutTicketFunc: func(ctx context.Context, offset int, limit int) (alert.Alerts, error) {
 //				panic("mock out the GetAlertWithoutTicket method")
 //			},
 //			GetAlertsBySpanFunc: func(ctx context.Context, begin time.Time, end time.Time) (alert.Alerts, error) {
@@ -838,6 +893,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			},
 //			GetTokenFunc: func(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error) {
 //				panic("mock out the GetToken method")
+//			},
+//			PutActivityFunc: func(ctx context.Context, activityMoqParam *activity.Activity) error {
+//				panic("mock out the PutActivity method")
 //			},
 //			PutAlertFunc: func(ctx context.Context, alertMoqParam alert.Alert) error {
 //				panic("mock out the PutAlert method")
@@ -891,6 +949,9 @@ type RepositoryMock struct {
 	// BindAlertToTicketFunc mocks the BindAlertToTicket method.
 	BindAlertToTicketFunc func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error
 
+	// CountActivitiesFunc mocks the CountActivities method.
+	CountActivitiesFunc func(ctx context.Context) (int, error)
+
 	// CountTicketCommentsFunc mocks the CountTicketComments method.
 	CountTicketCommentsFunc func(ctx context.Context, ticketID types.TicketID) (int, error)
 
@@ -909,6 +970,9 @@ type RepositoryMock struct {
 	// FindNearestTicketsWithSpanFunc mocks the FindNearestTicketsWithSpan method.
 	FindNearestTicketsWithSpanFunc func(ctx context.Context, embedding []float32, begin time.Time, end time.Time, limit int) ([]*ticket.Ticket, error)
 
+	// GetActivitiesFunc mocks the GetActivities method.
+	GetActivitiesFunc func(ctx context.Context, offset int, limit int) ([]*activity.Activity, error)
+
 	// GetAlertFunc mocks the GetAlert method.
 	GetAlertFunc func(ctx context.Context, alertID types.AlertID) (*alert.Alert, error)
 
@@ -925,7 +989,7 @@ type RepositoryMock struct {
 	GetAlertWithoutEmbeddingFunc func(ctx context.Context) (alert.Alerts, error)
 
 	// GetAlertWithoutTicketFunc mocks the GetAlertWithoutTicket method.
-	GetAlertWithoutTicketFunc func(ctx context.Context) (alert.Alerts, error)
+	GetAlertWithoutTicketFunc func(ctx context.Context, offset int, limit int) (alert.Alerts, error)
 
 	// GetAlertsBySpanFunc mocks the GetAlertsBySpan method.
 	GetAlertsBySpanFunc func(ctx context.Context, begin time.Time, end time.Time) (alert.Alerts, error)
@@ -965,6 +1029,9 @@ type RepositoryMock struct {
 
 	// GetTokenFunc mocks the GetToken method.
 	GetTokenFunc func(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error)
+
+	// PutActivityFunc mocks the PutActivity method.
+	PutActivityFunc func(ctx context.Context, activityMoqParam *activity.Activity) error
 
 	// PutAlertFunc mocks the PutAlert method.
 	PutAlertFunc func(ctx context.Context, alertMoqParam alert.Alert) error
@@ -1043,6 +1110,11 @@ type RepositoryMock struct {
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
 		}
+		// CountActivities holds details about calls to the CountActivities method.
+		CountActivities []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// CountTicketComments holds details about calls to the CountTicketComments method.
 		CountTicketComments []struct {
 			// Ctx is the ctx argument value.
@@ -1095,6 +1167,15 @@ type RepositoryMock struct {
 			// Limit is the limit argument value.
 			Limit int
 		}
+		// GetActivities holds details about calls to the GetActivities method.
+		GetActivities []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Offset is the offset argument value.
+			Offset int
+			// Limit is the limit argument value.
+			Limit int
+		}
 		// GetAlert holds details about calls to the GetAlert method.
 		GetAlert []struct {
 			// Ctx is the ctx argument value.
@@ -1132,6 +1213,10 @@ type RepositoryMock struct {
 		GetAlertWithoutTicket []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// Offset is the offset argument value.
+			Offset int
+			// Limit is the limit argument value.
+			Limit int
 		}
 		// GetAlertsBySpan holds details about calls to the GetAlertsBySpan method.
 		GetAlertsBySpan []struct {
@@ -1240,6 +1325,13 @@ type RepositoryMock struct {
 			// TokenID is the tokenID argument value.
 			TokenID auth.TokenID
 		}
+		// PutActivity holds details about calls to the PutActivity method.
+		PutActivity []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ActivityMoqParam is the activityMoqParam argument value.
+			ActivityMoqParam *activity.Activity
+		}
 		// PutAlert holds details about calls to the PutAlert method.
 		PutAlert []struct {
 			// Ctx is the ctx argument value.
@@ -1320,12 +1412,14 @@ type RepositoryMock struct {
 	lockBatchPutAlerts              sync.RWMutex
 	lockBatchUpdateTicketsStatus    sync.RWMutex
 	lockBindAlertToTicket           sync.RWMutex
+	lockCountActivities             sync.RWMutex
 	lockCountTicketComments         sync.RWMutex
 	lockCountTicketsByStatus        sync.RWMutex
 	lockDeleteToken                 sync.RWMutex
 	lockFindNearestAlerts           sync.RWMutex
 	lockFindNearestTickets          sync.RWMutex
 	lockFindNearestTicketsWithSpan  sync.RWMutex
+	lockGetActivities               sync.RWMutex
 	lockGetAlert                    sync.RWMutex
 	lockGetAlertList                sync.RWMutex
 	lockGetAlertListByThread        sync.RWMutex
@@ -1345,6 +1439,7 @@ type RepositoryMock struct {
 	lockGetTicketsByStatus          sync.RWMutex
 	lockGetTicketsByStatusAndSpan   sync.RWMutex
 	lockGetToken                    sync.RWMutex
+	lockPutActivity                 sync.RWMutex
 	lockPutAlert                    sync.RWMutex
 	lockPutAlertList                sync.RWMutex
 	lockPutHistory                  sync.RWMutex
@@ -1601,6 +1696,42 @@ func (mock *RepositoryMock) BindAlertToTicketCalls() []struct {
 	mock.lockBindAlertToTicket.RLock()
 	calls = mock.calls.BindAlertToTicket
 	mock.lockBindAlertToTicket.RUnlock()
+	return calls
+}
+
+// CountActivities calls CountActivitiesFunc.
+func (mock *RepositoryMock) CountActivities(ctx context.Context) (int, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockCountActivities.Lock()
+	mock.calls.CountActivities = append(mock.calls.CountActivities, callInfo)
+	mock.lockCountActivities.Unlock()
+	if mock.CountActivitiesFunc == nil {
+		var (
+			nOut   int
+			errOut error
+		)
+		return nOut, errOut
+	}
+	return mock.CountActivitiesFunc(ctx)
+}
+
+// CountActivitiesCalls gets all the calls that were made to CountActivities.
+// Check the length with:
+//
+//	len(mockedRepository.CountActivitiesCalls())
+func (mock *RepositoryMock) CountActivitiesCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockCountActivities.RLock()
+	calls = mock.calls.CountActivities
+	mock.lockCountActivities.RUnlock()
 	return calls
 }
 
@@ -1863,6 +1994,50 @@ func (mock *RepositoryMock) FindNearestTicketsWithSpanCalls() []struct {
 	return calls
 }
 
+// GetActivities calls GetActivitiesFunc.
+func (mock *RepositoryMock) GetActivities(ctx context.Context, offset int, limit int) ([]*activity.Activity, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Offset int
+		Limit  int
+	}{
+		Ctx:    ctx,
+		Offset: offset,
+		Limit:  limit,
+	}
+	mock.lockGetActivities.Lock()
+	mock.calls.GetActivities = append(mock.calls.GetActivities, callInfo)
+	mock.lockGetActivities.Unlock()
+	if mock.GetActivitiesFunc == nil {
+		var (
+			activitysOut []*activity.Activity
+			errOut       error
+		)
+		return activitysOut, errOut
+	}
+	return mock.GetActivitiesFunc(ctx, offset, limit)
+}
+
+// GetActivitiesCalls gets all the calls that were made to GetActivities.
+// Check the length with:
+//
+//	len(mockedRepository.GetActivitiesCalls())
+func (mock *RepositoryMock) GetActivitiesCalls() []struct {
+	Ctx    context.Context
+	Offset int
+	Limit  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Offset int
+		Limit  int
+	}
+	mock.lockGetActivities.RLock()
+	calls = mock.calls.GetActivities
+	mock.lockGetActivities.RUnlock()
+	return calls
+}
+
 // GetAlert calls GetAlertFunc.
 func (mock *RepositoryMock) GetAlert(ctx context.Context, alertID types.AlertID) (*alert.Alert, error) {
 	callInfo := struct {
@@ -2060,11 +2235,15 @@ func (mock *RepositoryMock) GetAlertWithoutEmbeddingCalls() []struct {
 }
 
 // GetAlertWithoutTicket calls GetAlertWithoutTicketFunc.
-func (mock *RepositoryMock) GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, error) {
+func (mock *RepositoryMock) GetAlertWithoutTicket(ctx context.Context, offset int, limit int) (alert.Alerts, error) {
 	callInfo := struct {
-		Ctx context.Context
+		Ctx    context.Context
+		Offset int
+		Limit  int
 	}{
-		Ctx: ctx,
+		Ctx:    ctx,
+		Offset: offset,
+		Limit:  limit,
 	}
 	mock.lockGetAlertWithoutTicket.Lock()
 	mock.calls.GetAlertWithoutTicket = append(mock.calls.GetAlertWithoutTicket, callInfo)
@@ -2076,7 +2255,7 @@ func (mock *RepositoryMock) GetAlertWithoutTicket(ctx context.Context) (alert.Al
 		)
 		return alertsOut, errOut
 	}
-	return mock.GetAlertWithoutTicketFunc(ctx)
+	return mock.GetAlertWithoutTicketFunc(ctx, offset, limit)
 }
 
 // GetAlertWithoutTicketCalls gets all the calls that were made to GetAlertWithoutTicket.
@@ -2084,10 +2263,14 @@ func (mock *RepositoryMock) GetAlertWithoutTicket(ctx context.Context) (alert.Al
 //
 //	len(mockedRepository.GetAlertWithoutTicketCalls())
 func (mock *RepositoryMock) GetAlertWithoutTicketCalls() []struct {
-	Ctx context.Context
+	Ctx    context.Context
+	Offset int
+	Limit  int
 } {
 	var calls []struct {
-		Ctx context.Context
+		Ctx    context.Context
+		Offset int
+		Limit  int
 	}
 	mock.lockGetAlertWithoutTicket.RLock()
 	calls = mock.calls.GetAlertWithoutTicket
@@ -2644,6 +2827,45 @@ func (mock *RepositoryMock) GetTokenCalls() []struct {
 	mock.lockGetToken.RLock()
 	calls = mock.calls.GetToken
 	mock.lockGetToken.RUnlock()
+	return calls
+}
+
+// PutActivity calls PutActivityFunc.
+func (mock *RepositoryMock) PutActivity(ctx context.Context, activityMoqParam *activity.Activity) error {
+	callInfo := struct {
+		Ctx              context.Context
+		ActivityMoqParam *activity.Activity
+	}{
+		Ctx:              ctx,
+		ActivityMoqParam: activityMoqParam,
+	}
+	mock.lockPutActivity.Lock()
+	mock.calls.PutActivity = append(mock.calls.PutActivity, callInfo)
+	mock.lockPutActivity.Unlock()
+	if mock.PutActivityFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutActivityFunc(ctx, activityMoqParam)
+}
+
+// PutActivityCalls gets all the calls that were made to PutActivity.
+// Check the length with:
+//
+//	len(mockedRepository.PutActivityCalls())
+func (mock *RepositoryMock) PutActivityCalls() []struct {
+	Ctx              context.Context
+	ActivityMoqParam *activity.Activity
+} {
+	var calls []struct {
+		Ctx              context.Context
+		ActivityMoqParam *activity.Activity
+	}
+	mock.lockPutActivity.RLock()
+	calls = mock.calls.PutActivity
+	mock.lockPutActivity.RUnlock()
 	return calls
 }
 
