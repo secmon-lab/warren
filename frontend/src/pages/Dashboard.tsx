@@ -1,11 +1,14 @@
-import { useQuery } from "@apollo/client";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CreateTicketModal } from "@/components/CreateTicketModal";
-import { GET_DASHBOARD, GET_ACTIVITIES } from "@/lib/graphql/queries";
+import { 
+  useGetDashboardQuery, 
+  useGetActivitiesQuery,
+  type GetActivitiesQuery
+} from "@/lib/graphql/generated";
 import { 
   AlertTriangle, 
   Ticket, 
@@ -63,11 +66,11 @@ export default function Dashboard() {
   const [activitiesPage, setActivitiesPage] = useState(0);
   const navigate = useNavigate();
   
-  const { data: dashboardData, loading: dashboardLoading } = useQuery(GET_DASHBOARD, {
+  const { data: dashboardData, loading: dashboardLoading } = useGetDashboardQuery({
     fetchPolicy: "cache-and-network",
   });
 
-  const { data: activitiesData, loading: activitiesLoading } = useQuery(GET_ACTIVITIES, {
+  const { data: activitiesData, loading: activitiesLoading } = useGetActivitiesQuery({
     variables: { offset: activitiesPage * 10, limit: 10 },
     fetchPolicy: "cache-and-network",
   });
@@ -80,7 +83,7 @@ export default function Dashboard() {
     navigate(`/alerts/${alertId}`);
   };
 
-  const handleActivityClick = (activity: any) => {
+  const handleActivityClick = (activity: GetActivitiesQuery['activities']['activities'][0]) => {
     // Priority: Ticket > Alert
     if (activity.ticketID) {
       navigate(`/tickets/${activity.ticketID}`);
@@ -172,7 +175,7 @@ export default function Dashboard() {
             <CardContent className="space-y-3">
               {dashboardLoading ? (
                 <div className="text-sm text-muted-foreground">Loading...</div>
-              ) : dashboardData?.dashboard.openTickets?.length > 0 ? (
+              ) : dashboardData?.dashboard?.openTickets && dashboardData.dashboard.openTickets.length > 0 ? (
                 <>
                   {dashboardData.dashboard.openTickets.slice(0, 5).map((ticket: any) => (
                     <div
@@ -246,7 +249,7 @@ export default function Dashboard() {
             <CardContent className="space-y-3">
               {dashboardLoading ? (
                 <div className="text-sm text-muted-foreground">Loading...</div>
-              ) : dashboardData?.dashboard.unboundAlerts?.length > 0 ? (
+              ) : dashboardData?.dashboard?.unboundAlerts && dashboardData.dashboard.unboundAlerts.length > 0 ? (
                 <>
                   {dashboardData.dashboard.unboundAlerts.slice(0, 5).map((alert: any) => (
                     <div
@@ -295,7 +298,7 @@ export default function Dashboard() {
             <CardContent className="space-y-3">
               {activitiesLoading ? (
                 <div className="text-sm text-muted-foreground">Loading...</div>
-              ) : (
+              ) : activitiesData?.activities?.activities && activitiesData.activities.activities.length > 0 ? (
                 <>
                   <div className="space-y-3">
                     {activitiesData.activities.activities.map((activity: any) => {
@@ -395,6 +398,11 @@ export default function Dashboard() {
                     </div>
                   )}
                 </>
+              ) : (
+                <div className="text-center py-8">
+                  <Activity className="h-12 w-12 text-green-300 mx-auto mb-3" />
+                  <p className="text-sm text-green-600">No recent activities</p>
+                </div>
               )}
             </CardContent>
           </Card>
