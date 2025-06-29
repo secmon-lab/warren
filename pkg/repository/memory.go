@@ -431,6 +431,20 @@ func (r *Memory) GetAlertWithoutTicket(ctx context.Context, offset, limit int) (
 	return alerts, nil
 }
 
+func (r *Memory) CountAlertsWithoutTicket(ctx context.Context) (int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	count := 0
+	for _, alert := range r.alerts {
+		if alert.TicketID == types.EmptyTicketID {
+			count++
+		}
+	}
+
+	return count, nil
+}
+
 func (r *Memory) GetAlertsBySpan(ctx context.Context, begin, end time.Time) (alert.Alerts, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

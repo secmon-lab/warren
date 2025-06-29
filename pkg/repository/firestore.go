@@ -565,6 +565,25 @@ func (r *Firestore) GetAlertWithoutTicket(ctx context.Context, offset, limit int
 	return alerts, nil
 }
 
+func (r *Firestore) CountAlertsWithoutTicket(ctx context.Context) (int, error) {
+	query := r.db.Collection(collectionAlerts).Where("TicketID", "==", "")
+
+	iter := query.Documents(ctx)
+	count := 0
+	for {
+		_, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return 0, goerr.Wrap(err, "failed to count alerts")
+		}
+		count++
+	}
+
+	return count, nil
+}
+
 func (r *Firestore) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
 	var alerts alert.Alerts
 	var docRefs []*firestore.DocumentRef
