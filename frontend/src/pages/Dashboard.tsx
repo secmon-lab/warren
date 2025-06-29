@@ -12,7 +12,6 @@ import {
   Plus, 
   Clock, 
   User, 
-  MessageCircle,
   ArrowRight,
   ChevronLeft,
   ChevronRight,
