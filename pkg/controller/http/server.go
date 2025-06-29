@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/secmon-lab/warren/frontend"
 	"github.com/secmon-lab/warren/pkg/controller/graphql"
+	"github.com/secmon-lab/warren/pkg/controller/graphql/loaders"
 	slack_controller "github.com/secmon-lab/warren/pkg/controller/slack"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -191,7 +192,14 @@ func graphqlHandler(repo interfaces.Repository, slackService *slack.Service, uc 
 		graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}),
 	)
 	srv.AddTransport(transport.POST{})
-	return srv
+
+	// Add DataLoader middleware using the official implementation
+	var slackClient interfaces.SlackClient
+	if slackService != nil {
+		slackClient = slackService.GetClient()
+	}
+
+	return loaders.Middleware(repo, slackClient)(srv)
 }
 
 // spaHandler handles SPA routing by serving static files and falling back to index.html

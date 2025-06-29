@@ -8,7 +8,8 @@ import (
 	"context"
 	"encoding/json"
 
-	goerr "github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/controller/graphql/loaders"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
@@ -23,18 +24,8 @@ func (r *activityResolver) User(ctx context.Context, obj *graphql1.Activity) (*g
 		return nil, nil
 	}
 
-	// Get user profile from Slack service
-	name := *obj.UserID // fallback to user ID
-	if r.slackService != nil {
-		if profile, err := r.slackService.GetUserProfile(ctx, *obj.UserID); err == nil {
-			name = profile
-		}
-	}
-
-	return &graphql1.User{
-		ID:   *obj.UserID,
-		Name: name,
-	}, nil
+	// Use DataLoader to efficiently fetch user
+	return loaders.GetUser(ctx, *obj.UserID)
 }
 
 // Alert is the resolver for the alert field.
@@ -44,7 +35,9 @@ func (r *activityResolver) Alert(ctx context.Context, obj *graphql1.Activity) (*
 	}
 
 	alertID := types.AlertID(*obj.AlertID)
-	return r.repo.GetAlert(ctx, alertID)
+
+	// Use DataLoader to efficiently fetch alert
+	return loaders.GetAlert(ctx, alertID)
 }
 
 // Ticket is the resolver for the ticket field.
@@ -54,7 +47,9 @@ func (r *activityResolver) Ticket(ctx context.Context, obj *graphql1.Activity) (
 	}
 
 	ticketID := types.TicketID(*obj.TicketID)
-	return r.repo.GetTicket(ctx, ticketID)
+
+	// Use DataLoader to efficiently fetch ticket
+	return loaders.GetTicket(ctx, ticketID)
 }
 
 // ID is the resolver for the id field.

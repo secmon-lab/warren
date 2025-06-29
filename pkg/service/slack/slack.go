@@ -648,7 +648,7 @@ func (x *Service) ShowBindToTicketModal(ctx context.Context, callbackID model.Ca
 func (x *Service) ShowResolveTicketModal(ctx context.Context, ticket *ticket.Ticket, triggerID string) error {
 	req := buildResolveTicketModalViewRequest(model.CallbackSubmitResolveTicket, ticket)
 	if _, err := x.client.OpenView(triggerID, req); err != nil {
-		return goerr.Wrap(err, "failed to open view", 
+		return goerr.Wrap(err, "failed to open view",
 			goerr.V("callback_id", req.CallbackID),
 			goerr.V("ticket_id", ticket.ID.String()))
 	}
@@ -986,6 +986,11 @@ func (x *Service) Stop() {
 	if x.rateLimitedUpdater != nil {
 		x.rateLimitedUpdater.Stop()
 	}
+}
+
+// GetClient returns the underlying SlackClient
+func (x *Service) GetClient() interfaces.SlackClient {
+	return x.client
 }
 
 // ToTicketURL generates a URL to the ticket detail page in the frontend
