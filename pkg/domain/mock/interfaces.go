@@ -852,7 +852,7 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			GetAlertWithoutEmbeddingFunc: func(ctx context.Context) (alert.Alerts, error) {
 //				panic("mock out the GetAlertWithoutEmbedding method")
 //			},
-//			GetAlertWithoutTicketFunc: func(ctx context.Context) (alert.Alerts, error) {
+//			GetAlertWithoutTicketFunc: func(ctx context.Context, offset int, limit int) (alert.Alerts, error) {
 //				panic("mock out the GetAlertWithoutTicket method")
 //			},
 //			GetAlertsBySpanFunc: func(ctx context.Context, begin time.Time, end time.Time) (alert.Alerts, error) {
@@ -989,7 +989,7 @@ type RepositoryMock struct {
 	GetAlertWithoutEmbeddingFunc func(ctx context.Context) (alert.Alerts, error)
 
 	// GetAlertWithoutTicketFunc mocks the GetAlertWithoutTicket method.
-	GetAlertWithoutTicketFunc func(ctx context.Context) (alert.Alerts, error)
+	GetAlertWithoutTicketFunc func(ctx context.Context, offset int, limit int) (alert.Alerts, error)
 
 	// GetAlertsBySpanFunc mocks the GetAlertsBySpan method.
 	GetAlertsBySpanFunc func(ctx context.Context, begin time.Time, end time.Time) (alert.Alerts, error)
@@ -1213,6 +1213,10 @@ type RepositoryMock struct {
 		GetAlertWithoutTicket []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// Offset is the offset argument value.
+			Offset int
+			// Limit is the limit argument value.
+			Limit int
 		}
 		// GetAlertsBySpan holds details about calls to the GetAlertsBySpan method.
 		GetAlertsBySpan []struct {
@@ -2231,11 +2235,15 @@ func (mock *RepositoryMock) GetAlertWithoutEmbeddingCalls() []struct {
 }
 
 // GetAlertWithoutTicket calls GetAlertWithoutTicketFunc.
-func (mock *RepositoryMock) GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, error) {
+func (mock *RepositoryMock) GetAlertWithoutTicket(ctx context.Context, offset int, limit int) (alert.Alerts, error) {
 	callInfo := struct {
-		Ctx context.Context
+		Ctx    context.Context
+		Offset int
+		Limit  int
 	}{
-		Ctx: ctx,
+		Ctx:    ctx,
+		Offset: offset,
+		Limit:  limit,
 	}
 	mock.lockGetAlertWithoutTicket.Lock()
 	mock.calls.GetAlertWithoutTicket = append(mock.calls.GetAlertWithoutTicket, callInfo)
@@ -2247,7 +2255,7 @@ func (mock *RepositoryMock) GetAlertWithoutTicket(ctx context.Context) (alert.Al
 		)
 		return alertsOut, errOut
 	}
-	return mock.GetAlertWithoutTicketFunc(ctx)
+	return mock.GetAlertWithoutTicketFunc(ctx, offset, limit)
 }
 
 // GetAlertWithoutTicketCalls gets all the calls that were made to GetAlertWithoutTicket.
@@ -2255,10 +2263,14 @@ func (mock *RepositoryMock) GetAlertWithoutTicket(ctx context.Context) (alert.Al
 //
 //	len(mockedRepository.GetAlertWithoutTicketCalls())
 func (mock *RepositoryMock) GetAlertWithoutTicketCalls() []struct {
-	Ctx context.Context
+	Ctx    context.Context
+	Offset int
+	Limit  int
 } {
 	var calls []struct {
-		Ctx context.Context
+		Ctx    context.Context
+		Offset int
+		Limit  int
 	}
 	mock.lockGetAlertWithoutTicket.RLock()
 	calls = mock.calls.GetAlertWithoutTicket

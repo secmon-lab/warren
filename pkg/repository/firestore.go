@@ -531,8 +531,18 @@ func (r *Firestore) UnbindAlertFromTicket(ctx context.Context, alertID types.Ale
 	return nil
 }
 
-func (r *Firestore) GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, error) {
-	iter := r.db.Collection(collectionAlerts).Where("TicketID", "==", "").Documents(ctx)
+func (r *Firestore) GetAlertWithoutTicket(ctx context.Context, offset, limit int) (alert.Alerts, error) {
+	query := r.db.Collection(collectionAlerts).Where("TicketID", "==", "")
+
+	// Apply offset and limit to the query
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	iter := query.Documents(ctx)
 
 	var alerts alert.Alerts
 	for {
@@ -1140,11 +1150,11 @@ func (r *Firestore) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []ty
 // Activity related methods
 func (r *Firestore) PutActivity(ctx context.Context, activity *activity.Activity) error {
 	doc := r.db.Collection(collectionActivities).Doc(activity.ID.String())
-	resp, err := doc.Set(ctx, activity)
+	_, err := doc.Set(ctx, activity)
 	if err != nil {
 		return goerr.Wrap(err, "failed to put activity", goerr.V("activity_id", activity.ID))
 	}
-	println(resp.UpdateTime.String())
+
 	return nil
 }
 

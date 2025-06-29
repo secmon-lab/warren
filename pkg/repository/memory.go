@@ -401,7 +401,7 @@ func (r *Memory) UnbindAlertFromTicket(ctx context.Context, alertID types.AlertI
 	return nil
 }
 
-func (r *Memory) GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, error) {
+func (r *Memory) GetAlertWithoutTicket(ctx context.Context, offset, limit int) (alert.Alerts, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -411,6 +411,20 @@ func (r *Memory) GetAlertWithoutTicket(ctx context.Context) (alert.Alerts, error
 			alerts = append(alerts, alert)
 		}
 	}
+
+	// Apply offset
+	if offset >= len(alerts) {
+		return alert.Alerts{}, nil
+	}
+	if offset > 0 {
+		alerts = alerts[offset:]
+	}
+
+	// Apply limit
+	if limit > 0 && limit < len(alerts) {
+		alerts = alerts[:limit]
+	}
+
 	if alerts == nil {
 		return alert.Alerts{}, nil
 	}

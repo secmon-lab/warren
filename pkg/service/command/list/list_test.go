@@ -93,7 +93,7 @@ func setupTestService(t *testing.T) (*command.Service, *mock.RepositoryMock, *sl
 
 	alertListMap := map[types.AlertListID]*alert.List{}
 
-	repo.GetAlertWithoutTicketFunc = func(ctx context.Context) (alert.Alerts, error) {
+	repo.GetAlertWithoutTicketFunc = func(ctx context.Context, offset, limit int) (alert.Alerts, error) {
 		return alerts, nil
 	}
 

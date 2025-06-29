@@ -432,7 +432,7 @@ func (r *queryResolver) Alert(ctx context.Context, id string) (*alert.Alert, err
 
 // Alerts is the resolver for the alerts field.
 func (r *queryResolver) Alerts(ctx context.Context) ([]*alert.Alert, error) {
-	alerts, err := r.repo.GetAlertWithoutTicket(ctx)
+	alerts, err := r.repo.GetAlertWithoutTicket(ctx, 0, 0)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list alerts")
 	}
@@ -452,16 +452,17 @@ func (r *queryResolver) Dashboard(ctx context.Context) (*graphql1.DashboardStats
 		return nil, goerr.Wrap(err, "failed to count open tickets")
 	}
 
-	// Get unbound alerts (alerts without ticket)
-	unboundAlerts, err := r.repo.GetAlertWithoutTicket(ctx)
+	// Get unbound alerts count (for accurate count, we need to get all first)
+	allUnboundAlerts, err := r.repo.GetAlertWithoutTicket(ctx, 0, 0) // Get all for count
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get unbound alerts count")
+	}
+	unboundAlertsCount := len(allUnboundAlerts)
+
+	// Get only the first 5 unbound alerts
+	unboundAlerts, err := r.repo.GetAlertWithoutTicket(ctx, 0, 5)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get unbound alerts")
-	}
-
-	// Limit to 5 alerts
-	unboundAlertsCount := len(unboundAlerts)
-	if len(unboundAlerts) > 5 {
-		unboundAlerts = unboundAlerts[:5]
 	}
 
 	return &graphql1.DashboardStats{

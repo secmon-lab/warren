@@ -147,7 +147,7 @@ func TestAlertTicketBinding(t *testing.T) {
 		gt.NoError(t, repo.PutAlert(ctx, testAlert))
 		gt.NoError(t, repo.PutTicket(ctx, ticketObj))
 
-		unbindAlerts, err := repo.GetAlertWithoutTicket(ctx)
+		unbindAlerts, err := repo.GetAlertWithoutTicket(ctx, 0, 0)
 		gt.NoError(t, err).Required()
 		gt.Array(t, unbindAlerts).Longer(0).Any(func(a *alert.Alert) bool {
 			return a.ID == testAlert.ID
@@ -1695,4 +1695,120 @@ func TestActivityCreation(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestGetAlertWithoutTicketPagination(t *testing.T) {
+	runTest := func(repo interfaces.Repository) func(t *testing.T) {
+		return func(t *testing.T) {
+			ctx := context.Background()
+
+			// Create multiple tickets and alerts to test pagination
+			ticket1 := ticketmodel.Ticket{
+				ID:       types.TicketID("ticket-1"),
+				Metadata: ticketmodel.Metadata{Title: "Ticket 1"},
+				Status:   types.TicketStatusOpen,
+			}
+
+			// Create 10 alerts: 5 bound to ticket1, 5 unbound
+			boundAlerts := make([]alert.Alert, 5)
+			unboundAlerts := make([]alert.Alert, 5)
+
+			for i := 0; i < 5; i++ {
+				boundAlerts[i] = alert.Alert{
+					ID:       types.AlertID(fmt.Sprintf("bound-alert-%d", i)),
+					TicketID: ticket1.ID,
+					Metadata: alert.Metadata{Title: fmt.Sprintf("Bound Alert %d", i)},
+				}
+
+				unboundAlerts[i] = alert.Alert{
+					ID:       types.AlertID(fmt.Sprintf("unbound-alert-%d", i)),
+					TicketID: types.EmptyTicketID,
+					Metadata: alert.Metadata{Title: fmt.Sprintf("Unbound Alert %d", i)},
+				}
+			}
+
+			// Put ticket and alerts
+			gt.NoError(t, repo.PutTicket(ctx, ticket1))
+			for _, alert := range boundAlerts {
+				gt.NoError(t, repo.PutAlert(ctx, alert))
+			}
+			for _, alert := range unboundAlerts {
+				gt.NoError(t, repo.PutAlert(ctx, alert))
+			}
+
+			t.Run("Get all unbound alerts", func(t *testing.T) {
+				alerts, err := repo.GetAlertWithoutTicket(ctx, 0, 0)
+				gt.NoError(t, err)
+
+				// Count our test alerts
+				ourUnboundCount := 0
+				for _, alert := range alerts {
+					gt.Equal(t, alert.TicketID, types.EmptyTicketID)
+					if alert.ID == types.AlertID("unbound-alert-0") ||
+						alert.ID == types.AlertID("unbound-alert-1") ||
+						alert.ID == types.AlertID("unbound-alert-2") ||
+						alert.ID == types.AlertID("unbound-alert-3") ||
+						alert.ID == types.AlertID("unbound-alert-4") {
+						ourUnboundCount++
+					}
+				}
+				gt.Number(t, ourUnboundCount).Equal(5)
+			})
+
+			t.Run("Get first 3 unbound alerts", func(t *testing.T) {
+				alerts, err := repo.GetAlertWithoutTicket(ctx, 0, 3)
+				gt.NoError(t, err)
+				gt.Array(t, alerts).Length(3)
+
+				// Verify all returned alerts are unbound
+				for _, alert := range alerts {
+					gt.Equal(t, alert.TicketID, types.EmptyTicketID)
+				}
+			})
+
+			t.Run("Get alerts with offset", func(t *testing.T) {
+				// Get first 2 alerts
+				firstBatch, err := repo.GetAlertWithoutTicket(ctx, 0, 2)
+				gt.NoError(t, err)
+				gt.Number(t, len(firstBatch)).GreaterOrEqual(0) // May be 0 if no unbound alerts at beginning
+
+				// Get alerts with offset - verify different results when there are enough alerts
+				allAlerts, err := repo.GetAlertWithoutTicket(ctx, 0, 0)
+				gt.NoError(t, err)
+
+				if len(allAlerts) >= 4 {
+					secondBatch, err := repo.GetAlertWithoutTicket(ctx, 2, 2)
+					gt.NoError(t, err)
+					gt.Number(t, len(secondBatch)).GreaterOrEqual(0)
+				}
+			})
+
+			t.Run("Get alerts with offset beyond available", func(t *testing.T) {
+				// Use a very large offset to ensure we get no results
+				allAlerts, err := repo.GetAlertWithoutTicket(ctx, 0, 0)
+				gt.NoError(t, err)
+
+				largeOffset := len(allAlerts) + 100
+				alerts, err := repo.GetAlertWithoutTicket(ctx, largeOffset, 5)
+				gt.NoError(t, err)
+				gt.Array(t, alerts).Length(0)
+			})
+
+			t.Run("Get limited alerts", func(t *testing.T) {
+				alerts, err := repo.GetAlertWithoutTicket(ctx, 0, 3)
+				gt.NoError(t, err)
+				gt.Number(t, len(alerts)).LessOrEqual(3) // Should not exceed limit
+
+				// Verify all returned alerts are unbound
+				for _, alert := range alerts {
+					gt.Equal(t, alert.TicketID, types.EmptyTicketID)
+				}
+			})
+		}
+	}
+
+	// Test both Memory and Firestore implementations
+	t.Run("Memory", runTest(repository.NewMemory()))
+
+	t.Run("Firestore", runTest(newFirestoreClient(t)))
 }

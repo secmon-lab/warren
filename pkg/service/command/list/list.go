@@ -396,7 +396,7 @@ func Create(ctx context.Context, clients *core.Clients, slackMsg *slack.Message,
 
 	msg.Notify(ctx, "🤖 Getting and filtering alerts without ticket...")
 
-	alerts, err := clients.Repo().GetAlertWithoutTicket(ctx)
+	alerts, err := clients.Repo().GetAlertWithoutTicket(ctx, 0, 0)
 	if err != nil {
 		msg.Trace(ctx, "💥 Get alerts without ticket: %s", err)
 		return types.EmptyAlertListID, goerr.Wrap(err, "failed to get unbound alerts")

@@ -218,7 +218,7 @@ func (uc *UseCases) showSalvageModal(ctx context.Context, _ slack.User, _ slack.
 
 func (uc *UseCases) getSalvageableAlerts(ctx context.Context, ticket *ticket.Ticket, threshold float64, keyword string) (alert.Alerts, error) {
 	// Get all unbound alerts
-	unboundAlerts, err := uc.repository.GetAlertWithoutTicket(ctx)
+	unboundAlerts, err := uc.repository.GetAlertWithoutTicket(ctx, 0, 0)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get unbound alerts")
 	}
