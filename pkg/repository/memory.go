@@ -30,6 +30,10 @@ type Memory struct {
 	ticketComments map[types.TicketID][]ticket.Comment
 	tokens         map[auth.TokenID]*auth.Token
 	activities     map[types.ActivityID]*activity.Activity
+
+	// Call counter for tracking method invocations
+	callCounts map[string]int
+	callMu     sync.RWMutex
 }
 
 var _ interfaces.Repository = &Memory{}
@@ -43,7 +47,41 @@ func NewMemory() *Memory {
 		ticketComments: make(map[types.TicketID][]ticket.Comment),
 		tokens:         make(map[auth.TokenID]*auth.Token),
 		activities:     make(map[types.ActivityID]*activity.Activity),
+		callCounts:     make(map[string]int),
 	}
+}
+
+// incrementCallCount safely increments the call counter for a method
+func (r *Memory) incrementCallCount(methodName string) {
+	r.callMu.Lock()
+	defer r.callMu.Unlock()
+	r.callCounts[methodName]++
+}
+
+// GetCallCount returns the number of times a method has been called
+func (r *Memory) GetCallCount(methodName string) int {
+	r.callMu.RLock()
+	defer r.callMu.RUnlock()
+	return r.callCounts[methodName]
+}
+
+// GetAllCallCounts returns a copy of all call counts
+func (r *Memory) GetAllCallCounts() map[string]int {
+	r.callMu.RLock()
+	defer r.callMu.RUnlock()
+
+	counts := make(map[string]int)
+	for k, v := range r.callCounts {
+		counts[k] = v
+	}
+	return counts
+}
+
+// ResetCallCounts clears all call counters
+func (r *Memory) ResetCallCounts() {
+	r.callMu.Lock()
+	defer r.callMu.Unlock()
+	r.callCounts = make(map[string]int)
 }
 
 func (r *Memory) PutAlert(ctx context.Context, alert alert.Alert) error {
@@ -55,6 +93,7 @@ func (r *Memory) PutAlert(ctx context.Context, alert alert.Alert) error {
 }
 
 func (r *Memory) GetAlert(ctx context.Context, alertID types.AlertID) (*alert.Alert, error) {
+	r.incrementCallCount("GetAlert")
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -172,6 +211,7 @@ func (r *Memory) GetAlertListsInThread(ctx context.Context, thread slack.Thread)
 }
 
 func (r *Memory) GetTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
+	r.incrementCallCount("GetTicket")
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -456,6 +496,7 @@ func (r *Memory) SearchAlerts(ctx context.Context, path, op string, value any, l
 }
 
 func (r *Memory) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
+	r.incrementCallCount("BatchGetAlerts")
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -557,6 +598,7 @@ func (r *Memory) BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.A
 }
 
 func (r *Memory) BatchGetTickets(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error) {
+	r.incrementCallCount("BatchGetTickets")
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

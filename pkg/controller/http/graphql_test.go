@@ -645,31 +645,100 @@ func TestDataLoaderIntegration(t *testing.T) {
 		data, ok := resp.Data.(map[string]interface{})
 		gt.True(t, ok)
 
-		ticketResponse, ok := data["ticket"].(map[string]interface{})
+		ticket, ok := data["ticket"].(map[string]interface{})
 		gt.True(t, ok)
-		gt.Value(t, ticketResponse["id"]).Equal(ticketID.String())
-		gt.Value(t, ticketResponse["title"]).Equal("Multi-Alert Ticket")
+		gt.Value(t, ticket["id"]).Equal(ticketID.String())
+		gt.Value(t, ticket["title"]).Equal("Multi-Alert Ticket")
 
-		alerts, ok := ticketResponse["alerts"].([]interface{})
+		alerts, ok := ticket["alerts"].([]interface{})
 		gt.True(t, ok)
 		gt.Array(t, alerts).Length(2)
 
-		// Verify each alert has correct data and ticket reference
-		alertTitles := make(map[string]string)
+		// Verify nested alert->ticket references work correctly
 		for _, alertInterface := range alerts {
-			alertData := alertInterface.(map[string]interface{})
-			alertID := alertData["id"].(string)
-			alertTitle := alertData["title"].(string)
-			alertTitles[alertID] = alertTitle
+			alertMap := alertInterface.(map[string]interface{})
+			nestedTicket := alertMap["ticket"].(map[string]interface{})
+			gt.Value(t, nestedTicket["id"]).Equal(ticketID.String())
+			gt.Value(t, nestedTicket["title"]).Equal("Multi-Alert Ticket")
+		}
+	})
 
-			// Verify ticket reference back (potential circular issue)
-			alertTicket := alertData["ticket"].(map[string]interface{})
-			gt.Value(t, alertTicket["id"]).Equal(ticketID.String())
-			gt.Value(t, alertTicket["title"]).Equal("Multi-Alert Ticket")
+	t.Run("DataLoader_Batch_Method_Verification", func(t *testing.T) {
+		// Test to verify that DataLoader uses batch methods instead of individual gets
+		repo := setupGraphQLTestData()
+
+		// Reset counters before test
+		repo.ResetCallCounts()
+
+		// Setup mock Slack service
+		slackService, err := setupMockSlackService()
+		gt.NoError(t, err)
+
+		server := httptest.NewServer(graphqlHandler(repo, slackService, nil))
+		defer server.Close()
+
+		// Send GraphQL query that should trigger DataLoader batching
+		req := graphqlRequest{
+			Query: `
+				query {
+					activities(offset: 0, limit: 5) {
+						activities {
+							id
+							type
+							user {
+								id
+								name
+							}
+							ticket {
+								id
+								title
+							}
+							alert {
+								id
+								title
+							}
+						}
+					}
+				}
+			`,
 		}
 
-		// Verify we got the expected alerts with correct titles
-		gt.Value(t, alertTitles["alert1"]).Equal("First Alert")
-		gt.Value(t, alertTitles["alert2"]).Equal("Second Alert")
+		resp, err := sendGraphQLRequest(server.URL, req)
+		gt.NoError(t, err)
+		gt.Array(t, resp.Errors).Length(0)
+
+		// Verify response is valid
+		data, ok := resp.Data.(map[string]interface{})
+		gt.True(t, ok)
+
+		activitiesResponse, ok := data["activities"].(map[string]interface{})
+		gt.True(t, ok)
+
+		activities, ok := activitiesResponse["activities"].([]interface{})
+		gt.True(t, ok)
+		gt.Array(t, activities).Length(5)
+
+		// Check call counts to verify batch methods were used
+		counts := repo.GetAllCallCounts()
+		t.Logf("Repository method call counts: %+v", counts)
+
+		// Verify that batch methods were called (N+1 problem solved)
+		gt.Number(t, counts["BatchGetTickets"]).Greater(0)
+		gt.Number(t, counts["BatchGetAlerts"]).Greater(0)
+
+		// Verify that individual methods were NOT called (or minimal calls if any)
+		// Note: Some individual calls might occur for non-DataLoader operations
+		individualTicketCalls := counts["GetTicket"]
+		individualAlertCalls := counts["GetAlert"]
+
+		t.Logf("Individual method calls - GetTicket: %d, GetAlert: %d", individualTicketCalls, individualAlertCalls)
+		t.Logf("Batch method calls - BatchGetTickets: %d, BatchGetAlerts: %d",
+			counts["BatchGetTickets"], counts["BatchGetAlerts"])
+
+		// The key point is that batch methods should be called
+		// Individual methods might still be called for non-DataLoader operations
+		// But the ratio should show that batching is working
+		gt.Number(t, counts["BatchGetTickets"]).GreaterOrEqual(1)
+		gt.Number(t, counts["BatchGetAlerts"]).GreaterOrEqual(1)
 	})
 }

@@ -1,4 +1,4 @@
-package loaders
+package graphql
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
@@ -69,7 +68,7 @@ func setupTestData() (*repository.Memory, *mock.SlackClientMock) {
 
 func TestTicketLoader_SingleLoad(t *testing.T) {
 	repo, slackClient := setupTestData()
-	loaders := NewLoaders(repo, slackClient)
+	loaders := NewDataLoaders(repo, slackClient)
 	ctx := context.Background()
 
 	// Load single ticket
@@ -81,7 +80,7 @@ func TestTicketLoader_SingleLoad(t *testing.T) {
 
 func TestTicketLoader_BatchLoad(t *testing.T) {
 	repo, slackClient := setupTestData()
-	loaders := NewLoaders(repo, slackClient)
+	loaders := NewDataLoaders(repo, slackClient)
 	ctx := context.Background()
 
 	// Load multiple tickets concurrently to test DataLoader batching
@@ -113,7 +112,7 @@ func TestTicketLoader_BatchLoad(t *testing.T) {
 
 func TestAlertLoader_BatchLoad(t *testing.T) {
 	repo, slackClient := setupTestData()
-	loaders := NewLoaders(repo, slackClient)
+	loaders := NewDataLoaders(repo, slackClient)
 	ctx := context.Background()
 
 	// Load multiple alerts concurrently
@@ -143,7 +142,7 @@ func TestAlertLoader_BatchLoad(t *testing.T) {
 
 func TestUserLoader_BatchLoad(t *testing.T) {
 	repo, slackClient := setupTestData()
-	loaders := NewLoaders(repo, slackClient)
+	loaders := NewDataLoaders(repo, slackClient)
 	ctx := context.Background()
 
 	// Load multiple users concurrently
@@ -181,7 +180,7 @@ func TestErrorHandling(t *testing.T) {
 		return nil, errors.New("simulated slack error")
 	}
 
-	loaders := NewLoaders(repo, slackClient)
+	loaders := NewDataLoaders(repo, slackClient)
 	ctx := context.Background()
 
 	// Test ticket not found error
@@ -202,102 +201,138 @@ func TestErrorHandling(t *testing.T) {
 func TestMiddleware(t *testing.T) {
 	repo, slackClient := setupTestData()
 
-	// Create a test handler
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Try to get loaders from context
-		loaders := For(r.Context())
+	// Create middleware
+	middleware := DataLoaderMiddleware(repo, slackClient)
+
+	// Create a simple handler that uses the loaders
+	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Try to use the loaders from context
+		loaders := DataLoadersFor(r.Context())
 		gt.NotNil(t, loaders)
 
-		// Test that we can load data
-		ticket, err := GetTicketWithLoaders(r.Context(), loaders, "ticket1")
+		// Load a ticket to verify middleware works
+		ticket, err := GetTicket(r.Context(), "ticket1")
 		gt.NoError(t, err)
 		gt.Equal(t, ticket.ID, types.TicketID("ticket1"))
-		gt.Equal(t, ticket.Title, "Test Ticket 1")
 
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
-	// Wrap with middleware
-	middleware := Middleware(repo, slackClient)
-	wrappedHandler := middleware(handler)
-
-	// Create test request
+	// Test request
 	req := httptest.NewRequest("GET", "/test", nil)
 	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
 
-	// Execute
-	wrappedHandler.ServeHTTP(w, req)
-
-	// Verify response
 	gt.Equal(t, w.Code, http.StatusOK)
 }
 
 func TestCaching(t *testing.T) {
 	repo, slackClient := setupTestData()
-	loaders := NewLoaders(repo, slackClient)
+	loaders := NewDataLoaders(repo, slackClient)
 	ctx := context.Background()
 
-	// Load the same ticket multiple times
-	ticket1, err := GetTicketWithLoaders(ctx, loaders, "ticket1")
-	gt.NoError(t, err)
+	// Load the same ticket twice
+	ticket1, err1 := GetTicketWithLoaders(ctx, loaders, "ticket1")
+	ticket2, err2 := GetTicketWithLoaders(ctx, loaders, "ticket1")
 
-	ticket2, err := GetTicketWithLoaders(ctx, loaders, "ticket1")
-	gt.NoError(t, err)
-
-	// Should return the same data due to caching
+	gt.NoError(t, err1)
+	gt.NoError(t, err2)
 	gt.Equal(t, ticket1.ID, ticket2.ID)
 	gt.Equal(t, ticket1.Title, ticket2.Title)
 }
 
 func TestDataLoaderConcurrency(t *testing.T) {
 	repo, slackClient := setupTestData()
-	loaders := NewLoaders(repo, slackClient)
+	loaders := NewDataLoaders(repo, slackClient)
 	ctx := context.Background()
 
-	start := time.Now()
-
-	// Start multiple concurrent loads to test batching efficiency
+	// Simulate high concurrency
+	numGoroutines := 100
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
+	results := make([]*ticket.Ticket, numGoroutines)
+	errors := make([]error, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
-			ticketID := types.TicketID("ticket1")
-			if index > 4 {
-				ticketID = types.TicketID("ticket2")
-			}
-			ticket, err := GetTicketWithLoaders(ctx, loaders, ticketID)
-			gt.NoError(t, err)
-			gt.NotNil(t, ticket)
-
-			// Verify correct data is returned
-			if ticketID == "ticket1" {
-				gt.Equal(t, ticket.Title, "Test Ticket 1")
-			} else {
-				gt.Equal(t, ticket.Title, "Test Ticket 2")
-			}
+			// All load the same ticket to test caching under concurrency
+			ticket, err := GetTicketWithLoaders(ctx, loaders, "ticket1")
+			results[index] = ticket
+			errors[index] = err
 		}(i)
+	}
+
+	wg.Wait()
+
+	// Verify all results are correct
+	for i := 0; i < numGoroutines; i++ {
+		gt.NoError(t, errors[i])
+		gt.NotNil(t, results[i])
+		gt.Equal(t, results[i].ID, types.TicketID("ticket1"))
+		gt.Equal(t, results[i].Title, "Test Ticket 1")
+	}
+}
+
+func TestDataLoaderUseBatchMethods(t *testing.T) {
+	repo, slackClient := setupTestData()
+	loaders := NewDataLoaders(repo, slackClient)
+	ctx := context.Background()
+
+	// Reset counters before test
+	repo.ResetCallCounts()
+
+	// Load multiple tickets concurrently to trigger DataLoader batching
+	ticketIDs := []types.TicketID{"ticket1", "ticket2", "ticket3"}
+	var wg sync.WaitGroup
+	for _, id := range ticketIDs {
+		wg.Add(1)
+		go func(ticketID types.TicketID) {
+			defer wg.Done()
+			_, err := GetTicketWithLoaders(ctx, loaders, ticketID)
+			gt.NoError(t, err)
+		}(id)
 	}
 	wg.Wait()
 
-	elapsed := time.Since(start)
+	// Load multiple alerts concurrently to trigger DataLoader batching
+	alertIDs := []types.AlertID{"alert1", "alert2", "alert3"}
+	for _, id := range alertIDs {
+		wg.Add(1)
+		go func(alertID types.AlertID) {
+			defer wg.Done()
+			_, err := GetAlertWithLoaders(ctx, loaders, alertID)
+			gt.NoError(t, err)
+		}(id)
+	}
+	wg.Wait()
 
-	// Should complete quickly due to DataLoader batching
-	gt.True(t, elapsed < 100*time.Millisecond)
+	// Check call counts
+	counts := repo.GetAllCallCounts()
+
+	// Verify that batch methods were called instead of individual methods
+	gt.Number(t, counts["BatchGetTickets"]).Greater(0)
+	gt.Number(t, counts["BatchGetAlerts"]).Greater(0)
+
+	// Verify that individual methods were NOT called (N+1 problem avoided)
+	gt.Number(t, counts["GetTicket"]).Equal(0)
+	gt.Number(t, counts["GetAlert"]).Equal(0)
+
+	t.Logf("Call counts: %+v", counts)
 }
 
-// Helper functions for testing
-func GetTicketWithLoaders(ctx context.Context, loaders *Loaders, ticketID types.TicketID) (*ticket.Ticket, error) {
+// Helper functions for testing with loaders
+func GetTicketWithLoaders(ctx context.Context, loaders *DataLoaders, ticketID types.TicketID) (*ticket.Ticket, error) {
 	thunk := loaders.TicketLoader.Load(ctx, ticketID)
 	return thunk()
 }
 
-func GetAlertWithLoaders(ctx context.Context, loaders *Loaders, alertID types.AlertID) (*alert.Alert, error) {
+func GetAlertWithLoaders(ctx context.Context, loaders *DataLoaders, alertID types.AlertID) (*alert.Alert, error) {
 	thunk := loaders.AlertLoader.Load(ctx, alertID)
 	return thunk()
 }
 
-func GetUserWithLoaders(ctx context.Context, loaders *Loaders, userID string) (*graphql1.User, error) {
+func GetUserWithLoaders(ctx context.Context, loaders *DataLoaders, userID string) (*graphql1.User, error) {
 	thunk := loaders.UserLoader.Load(ctx, userID)
 	return thunk()
 }

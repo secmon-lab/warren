@@ -1,4 +1,4 @@
-package loaders
+package graphql
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/graph-gophers/dataloader/v7"
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
@@ -25,11 +26,39 @@ func ticketBatchFn(repo interfaces.Repository) func(ctx context.Context, keys []
 	return func(ctx context.Context, keys []types.TicketID) []*dataloader.Result[*ticket.Ticket] {
 		results := make([]*dataloader.Result[*ticket.Ticket], len(keys))
 
+		// Use batch get to solve N+1 problem
+		tickets, err := repo.BatchGetTickets(ctx, keys)
+		if err != nil {
+			// If batch get fails, return error for all keys
+			for i := range keys {
+				results[i] = &dataloader.Result[*ticket.Ticket]{
+					Data:  nil,
+					Error: err,
+				}
+			}
+			return results
+		}
+
+		// Create a map for O(1) lookup
+		ticketMap := make(map[types.TicketID]*ticket.Ticket)
+		for _, t := range tickets {
+			if t != nil {
+				ticketMap[t.ID] = t
+			}
+		}
+
+		// Map results back to the original order
 		for i, id := range keys {
-			t, err := repo.GetTicket(ctx, id)
-			results[i] = &dataloader.Result[*ticket.Ticket]{
-				Data:  t,
-				Error: err,
+			if t, found := ticketMap[id]; found {
+				results[i] = &dataloader.Result[*ticket.Ticket]{
+					Data:  t,
+					Error: nil,
+				}
+			} else {
+				results[i] = &dataloader.Result[*ticket.Ticket]{
+					Data:  nil,
+					Error: goerr.New("ticket not found", goerr.V("ticket_id", id)),
+				}
 			}
 		}
 
@@ -41,11 +70,39 @@ func alertBatchFn(repo interfaces.Repository) func(ctx context.Context, keys []t
 	return func(ctx context.Context, keys []types.AlertID) []*dataloader.Result[*alert.Alert] {
 		results := make([]*dataloader.Result[*alert.Alert], len(keys))
 
+		// Use batch get to solve N+1 problem
+		alerts, err := repo.BatchGetAlerts(ctx, keys)
+		if err != nil {
+			// If batch get fails, return error for all keys
+			for i := range keys {
+				results[i] = &dataloader.Result[*alert.Alert]{
+					Data:  nil,
+					Error: err,
+				}
+			}
+			return results
+		}
+
+		// Create a map for O(1) lookup
+		alertMap := make(map[types.AlertID]*alert.Alert)
+		for _, a := range alerts {
+			if a != nil {
+				alertMap[a.ID] = a
+			}
+		}
+
+		// Map results back to the original order
 		for i, id := range keys {
-			a, err := repo.GetAlert(ctx, id)
-			results[i] = &dataloader.Result[*alert.Alert]{
-				Data:  a,
-				Error: err,
+			if a, found := alertMap[id]; found {
+				results[i] = &dataloader.Result[*alert.Alert]{
+					Data:  a,
+					Error: nil,
+				}
+			} else {
+				results[i] = &dataloader.Result[*alert.Alert]{
+					Data:  nil,
+					Error: goerr.New("alert not found", goerr.V("alert_id", id)),
+				}
 			}
 		}
 
@@ -80,16 +137,16 @@ func userBatchFn(slackClient interfaces.SlackClient) func(ctx context.Context, k
 	}
 }
 
-// Loaders wrap your data loaders to inject via middleware
-type Loaders struct {
+// dataLoaders wrap your data loaders to inject via middleware
+type dataLoaders struct {
 	TicketLoader *dataloader.Loader[types.TicketID, *ticket.Ticket]
 	AlertLoader  *dataloader.Loader[types.AlertID, *alert.Alert]
 	UserLoader   *dataloader.Loader[string, *graphql1.User]
 }
 
-// NewLoaders instantiates data loaders for the middleware
-func NewLoaders(repo interfaces.Repository, slackClient interfaces.SlackClient) *Loaders {
-	return &Loaders{
+// newDataLoaders instantiates data loaders for the middleware
+func newDataLoaders(repo interfaces.Repository, slackClient interfaces.SlackClient) *dataLoaders {
+	return &dataLoaders{
 		TicketLoader: dataloader.NewBatchedLoader[types.TicketID, *ticket.Ticket](
 			ticketBatchFn(repo),
 			dataloader.WithWait[types.TicketID, *ticket.Ticket](5*time.Millisecond),
@@ -105,39 +162,39 @@ func NewLoaders(repo interfaces.Repository, slackClient interfaces.SlackClient) 
 	}
 }
 
-// Middleware injects data loaders into the context
-func Middleware(repo interfaces.Repository, slackClient interfaces.SlackClient) func(http.Handler) http.Handler {
+// DataLoaderMiddleware injects data loaders into the context
+func DataLoaderMiddleware(repo interfaces.Repository, slackClient interfaces.SlackClient) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			loaders := NewLoaders(repo, slackClient)
+			loaders := newDataLoaders(repo, slackClient)
 			r = r.WithContext(context.WithValue(r.Context(), loadersKey, loaders))
 			next.ServeHTTP(w, r)
 		})
 	}
 }
 
-// For returns the dataloader for a given context
-func For(ctx context.Context) *Loaders {
-	return ctx.Value(loadersKey).(*Loaders)
+// dataLoadersFor returns the dataloader for a given context
+func dataLoadersFor(ctx context.Context) *dataLoaders {
+	return ctx.Value(loadersKey).(*dataLoaders)
 }
 
 // GetTicket returns single ticket by id efficiently
 func GetTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
-	loaders := For(ctx)
+	loaders := dataLoadersFor(ctx)
 	thunk := loaders.TicketLoader.Load(ctx, ticketID)
 	return thunk()
 }
 
 // GetAlert returns single alert by id efficiently
 func GetAlert(ctx context.Context, alertID types.AlertID) (*alert.Alert, error) {
-	loaders := For(ctx)
+	loaders := dataLoadersFor(ctx)
 	thunk := loaders.AlertLoader.Load(ctx, alertID)
 	return thunk()
 }
 
 // GetUser returns single user by id efficiently
 func GetUser(ctx context.Context, userID string) (*graphql1.User, error) {
-	loaders := For(ctx)
+	loaders := dataLoadersFor(ctx)
 	thunk := loaders.UserLoader.Load(ctx, userID)
 	return thunk()
 }

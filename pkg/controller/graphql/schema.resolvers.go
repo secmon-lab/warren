@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/controller/graphql/loaders"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
@@ -25,7 +24,7 @@ func (r *activityResolver) User(ctx context.Context, obj *graphql1.Activity) (*g
 	}
 
 	// Use DataLoader to efficiently fetch user
-	return loaders.GetUser(ctx, *obj.UserID)
+	return GetUser(ctx, *obj.UserID)
 }
 
 // Alert is the resolver for the alert field.
@@ -37,7 +36,7 @@ func (r *activityResolver) Alert(ctx context.Context, obj *graphql1.Activity) (*
 	alertID := types.AlertID(*obj.AlertID)
 
 	// Use DataLoader to efficiently fetch alert
-	return loaders.GetAlert(ctx, alertID)
+	return GetAlert(ctx, alertID)
 }
 
 // Ticket is the resolver for the ticket field.
@@ -49,7 +48,7 @@ func (r *activityResolver) Ticket(ctx context.Context, obj *graphql1.Activity) (
 	ticketID := types.TicketID(*obj.TicketID)
 
 	// Use DataLoader to efficiently fetch ticket
-	return loaders.GetTicket(ctx, ticketID)
+	return GetTicket(ctx, ticketID)
 }
 
 // ID is the resolver for the id field.
