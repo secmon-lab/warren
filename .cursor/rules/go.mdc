@@ -23,7 +23,7 @@ If there are markdown files in `.todo/` directory, refer to the markdown files a
 # Code Generation
 
 - Generate mock: `go tool task mock`
-- Generete GraphQL code: `go tool task graphql`
+- Generate GraphQL code: `go tool task graphql`
 
 # Coding Guideline
 
