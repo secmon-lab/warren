@@ -115,26 +115,29 @@ export const GET_ALERT = gql`
 `;
 
 export const GET_ALERTS = gql`
-  query GetAlerts {
-    alerts {
-      id
-      title
-      description
-      schema
-      data
-      attributes {
-        key
-        value
-        link
-        auto
-      }
-      createdAt
-      ticket {
+  query GetAlerts($offset: Int, $limit: Int) {
+    alerts(offset: $offset, limit: $limit) {
+      alerts {
         id
-        status
         title
         description
+        schema
+        data
+        attributes {
+          key
+          value
+          link
+          auto
+        }
+        createdAt
+        ticket {
+          id
+          status
+          title
+          description
+        }
       }
+      totalCount
     }
   }
 `;

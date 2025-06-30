@@ -1,33 +1,55 @@
 import { useQuery } from "@apollo/client";
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { GET_ALERTS } from "@/lib/graphql/queries";
 import { Alert } from "@/lib/types";
 import { AlertTriangle } from "lucide-react";
 
 interface AlertsData {
-  alerts: Alert[];
+  alerts: {
+    alerts: Alert[];
+    totalCount: number;
+  };
 }
 
 export default function AlertsPage() {
   const navigate = useNavigate();
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   const {
     data: alertsData,
     loading: alertsLoading,
     error: alertsError,
-  } = useQuery<AlertsData>(GET_ALERTS);
+  } = useQuery<AlertsData>(GET_ALERTS, {
+    variables: {
+      offset: (currentPage - 1) * ITEMS_PER_PAGE,
+      limit: ITEMS_PER_PAGE,
+    },
+  });
 
   // Sort alerts by createdAt in descending order (newest first)
   const sortedAlerts: Alert[] = useMemo(() => {
-    if (!alertsData?.alerts) return [];
+    if (!alertsData?.alerts?.alerts) return [];
     
-    return [...alertsData.alerts].sort((a, b) => 
+    return [...alertsData.alerts.alerts].sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-  }, [alertsData?.alerts]);
+  }, [alertsData?.alerts?.alerts]);
+
+  // Calculate pagination values
+  const totalCount = alertsData?.alerts?.totalCount || 0;
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
   const handleAlertClick = (alertId: string) => {
     navigate(`/alerts/${alertId}`);
@@ -171,6 +193,39 @@ export default function AlertsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    onClick={() => setCurrentPage(page)}
+                    isActive={currentPage === page}
+                    className="cursor-pointer"
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       )}
     </div>

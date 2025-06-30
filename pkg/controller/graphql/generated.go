@@ -90,6 +90,11 @@ type ComplexityRoot struct {
 		Value func(childComplexity int) int
 	}
 
+	AlertsResponse struct {
+		Alerts     func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
 	Comment struct {
 		Content   func(childComplexity int) int
 		CreatedAt func(childComplexity int) int
@@ -128,7 +133,7 @@ type ComplexityRoot struct {
 	Query struct {
 		Activities     func(childComplexity int, offset *int, limit *int) int
 		Alert          func(childComplexity int, id string) int
-		Alerts         func(childComplexity int) int
+		Alerts         func(childComplexity int, offset *int, limit *int) int
 		Dashboard      func(childComplexity int) int
 		SimilarTickets func(childComplexity int, ticketID string, threshold float64, offset *int, limit *int) int
 		Ticket         func(childComplexity int, id string) int
@@ -202,7 +207,7 @@ type QueryResolver interface {
 	SimilarTickets(ctx context.Context, ticketID string, threshold float64, offset *int, limit *int) (*graphql1.TicketsResponse, error)
 	TicketComments(ctx context.Context, ticketID string, offset *int, limit *int) (*graphql1.CommentsResponse, error)
 	Alert(ctx context.Context, id string) (*alert.Alert, error)
-	Alerts(ctx context.Context) ([]*alert.Alert, error)
+	Alerts(ctx context.Context, offset *int, limit *int) (*graphql1.AlertsResponse, error)
 	Dashboard(ctx context.Context) (*graphql1.DashboardStats, error)
 	Activities(ctx context.Context, offset *int, limit *int) (*graphql1.ActivitiesResponse, error)
 }
@@ -414,6 +419,20 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.AlertAttribute.Value(childComplexity), true
 
+	case "AlertsResponse.alerts":
+		if e.complexity.AlertsResponse.Alerts == nil {
+			break
+		}
+
+		return e.complexity.AlertsResponse.Alerts(childComplexity), true
+
+	case "AlertsResponse.totalCount":
+		if e.complexity.AlertsResponse.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.AlertsResponse.TotalCount(childComplexity), true
+
 	case "Comment.content":
 		if e.complexity.Comment.Content == nil {
 			break
@@ -608,7 +627,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			break
 		}
 
-		return e.complexity.Query.Alerts(childComplexity), true
+		args, err := ec.field_Query_alerts_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Alerts(childComplexity, args["offset"].(*int), args["limit"].(*int)), true
 
 	case "Query.dashboard":
 		if e.complexity.Query.Dashboard == nil {
@@ -987,6 +1011,11 @@ type ActivitiesResponse {
   totalCount: Int!
 }
 
+type AlertsResponse {
+  alerts: [Alert!]!
+  totalCount: Int!
+}
+
 type DashboardStats {
   openTicketsCount: Int!
   unboundAlertsCount: Int!
@@ -1000,7 +1029,7 @@ type Query {
   similarTickets(ticketId: ID!, threshold: Float!, offset: Int, limit: Int): TicketsResponse!
   ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
   alert(id: ID!): Alert
-  alerts: [Alert!]!
+  alerts(offset: Int, limit: Int): AlertsResponse!
   dashboard: DashboardStats!
   activities(offset: Int, limit: Int): ActivitiesResponse!
 }
@@ -1453,6 +1482,57 @@ func (ec *executionContext) field_Query_alert_argsID(
 	}
 
 	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_alerts_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_alerts_argsOffset(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg0
+	arg1, err := ec.field_Query_alerts_argsLimit(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Query_alerts_argsOffset(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["offset"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
+	if tmp, ok := rawArgs["offset"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_alerts_argsLimit(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["limit"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+	if tmp, ok := rawArgs["limit"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
 	return zeroVal, nil
 }
 
@@ -3038,6 +3118,112 @@ func (ec *executionContext) fieldContext_AlertAttribute_auto(_ context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _AlertsResponse_alerts(ctx context.Context, field graphql.CollectedField, obj *graphql1.AlertsResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AlertsResponse_alerts(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Alerts, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*alert.Alert)
+	fc.Result = res
+	return ec.marshalNAlert2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐAlertᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AlertsResponse_alerts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AlertsResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Alert_id(ctx, field)
+			case "title":
+				return ec.fieldContext_Alert_title(ctx, field)
+			case "description":
+				return ec.fieldContext_Alert_description(ctx, field)
+			case "schema":
+				return ec.fieldContext_Alert_schema(ctx, field)
+			case "data":
+				return ec.fieldContext_Alert_data(ctx, field)
+			case "attributes":
+				return ec.fieldContext_Alert_attributes(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Alert_createdAt(ctx, field)
+			case "ticket":
+				return ec.fieldContext_Alert_ticket(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Alert", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AlertsResponse_totalCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.AlertsResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AlertsResponse_totalCount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TotalCount, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AlertsResponse_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AlertsResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Comment_id(ctx context.Context, field graphql.CollectedField, obj *ticket.Comment) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Comment_id(ctx, field)
 	if err != nil {
@@ -4549,7 +4735,7 @@ func (ec *executionContext) _Query_alerts(ctx context.Context, field graphql.Col
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Alerts(rctx)
+		return ec.resolvers.Query().Alerts(rctx, fc.Args["offset"].(*int), fc.Args["limit"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4561,12 +4747,12 @@ func (ec *executionContext) _Query_alerts(ctx context.Context, field graphql.Col
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*alert.Alert)
+	res := resTmp.(*graphql1.AlertsResponse)
 	fc.Result = res
-	return ec.marshalNAlert2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐAlertᚄ(ctx, field.Selections, res)
+	return ec.marshalNAlertsResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAlertsResponse(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Query_alerts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_alerts(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -4574,25 +4760,24 @@ func (ec *executionContext) fieldContext_Query_alerts(_ context.Context, field g
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Alert_id(ctx, field)
-			case "title":
-				return ec.fieldContext_Alert_title(ctx, field)
-			case "description":
-				return ec.fieldContext_Alert_description(ctx, field)
-			case "schema":
-				return ec.fieldContext_Alert_schema(ctx, field)
-			case "data":
-				return ec.fieldContext_Alert_data(ctx, field)
-			case "attributes":
-				return ec.fieldContext_Alert_attributes(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Alert_createdAt(ctx, field)
-			case "ticket":
-				return ec.fieldContext_Alert_ticket(ctx, field)
+			case "alerts":
+				return ec.fieldContext_AlertsResponse_alerts(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_AlertsResponse_totalCount(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Alert", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type AlertsResponse", field.Name)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_alerts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -8208,6 +8393,50 @@ func (ec *executionContext) _AlertAttribute(ctx context.Context, sel ast.Selecti
 	return out
 }
 
+var alertsResponseImplementors = []string{"AlertsResponse"}
+
+func (ec *executionContext) _AlertsResponse(ctx context.Context, sel ast.SelectionSet, obj *graphql1.AlertsResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, alertsResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AlertsResponse")
+		case "alerts":
+			out.Values[i] = ec._AlertsResponse_alerts(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._AlertsResponse_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var commentImplementors = []string{"Comment"}
 
 func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, obj *ticket.Comment) graphql.Marshaler {
@@ -9869,6 +10098,20 @@ func (ec *executionContext) marshalNAlertAttribute2ᚖgithubᚗcomᚋsecmonᚑla
 		return graphql.Null
 	}
 	return ec._AlertAttribute(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNAlertsResponse2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAlertsResponse(ctx context.Context, sel ast.SelectionSet, v graphql1.AlertsResponse) graphql.Marshaler {
+	return ec._AlertsResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNAlertsResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAlertsResponse(ctx context.Context, sel ast.SelectionSet, v *graphql1.AlertsResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AlertsResponse(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {

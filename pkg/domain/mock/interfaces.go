@@ -816,6 +816,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			CountActivitiesFunc: func(ctx context.Context) (int, error) {
 //				panic("mock out the CountActivities method")
 //			},
+//			CountAlertsWithoutTicketFunc: func(ctx context.Context) (int, error) {
+//				panic("mock out the CountAlertsWithoutTicket method")
+//			},
 //			CountTicketCommentsFunc: func(ctx context.Context, ticketID types.TicketID) (int, error) {
 //				panic("mock out the CountTicketComments method")
 //			},
@@ -951,6 +954,9 @@ type RepositoryMock struct {
 
 	// CountActivitiesFunc mocks the CountActivities method.
 	CountActivitiesFunc func(ctx context.Context) (int, error)
+
+	// CountAlertsWithoutTicketFunc mocks the CountAlertsWithoutTicket method.
+	CountAlertsWithoutTicketFunc func(ctx context.Context) (int, error)
 
 	// CountTicketCommentsFunc mocks the CountTicketComments method.
 	CountTicketCommentsFunc func(ctx context.Context, ticketID types.TicketID) (int, error)
@@ -1112,6 +1118,11 @@ type RepositoryMock struct {
 		}
 		// CountActivities holds details about calls to the CountActivities method.
 		CountActivities []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
+		// CountAlertsWithoutTicket holds details about calls to the CountAlertsWithoutTicket method.
+		CountAlertsWithoutTicket []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
@@ -1413,6 +1424,7 @@ type RepositoryMock struct {
 	lockBatchUpdateTicketsStatus    sync.RWMutex
 	lockBindAlertToTicket           sync.RWMutex
 	lockCountActivities             sync.RWMutex
+	lockCountAlertsWithoutTicket    sync.RWMutex
 	lockCountTicketComments         sync.RWMutex
 	lockCountTicketsByStatus        sync.RWMutex
 	lockDeleteToken                 sync.RWMutex
@@ -1732,6 +1744,42 @@ func (mock *RepositoryMock) CountActivitiesCalls() []struct {
 	mock.lockCountActivities.RLock()
 	calls = mock.calls.CountActivities
 	mock.lockCountActivities.RUnlock()
+	return calls
+}
+
+// CountAlertsWithoutTicket calls CountAlertsWithoutTicketFunc.
+func (mock *RepositoryMock) CountAlertsWithoutTicket(ctx context.Context) (int, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockCountAlertsWithoutTicket.Lock()
+	mock.calls.CountAlertsWithoutTicket = append(mock.calls.CountAlertsWithoutTicket, callInfo)
+	mock.lockCountAlertsWithoutTicket.Unlock()
+	if mock.CountAlertsWithoutTicketFunc == nil {
+		var (
+			nOut   int
+			errOut error
+		)
+		return nOut, errOut
+	}
+	return mock.CountAlertsWithoutTicketFunc(ctx)
+}
+
+// CountAlertsWithoutTicketCalls gets all the calls that were made to CountAlertsWithoutTicket.
+// Check the length with:
+//
+//	len(mockedRepository.CountAlertsWithoutTicketCalls())
+func (mock *RepositoryMock) CountAlertsWithoutTicketCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockCountAlertsWithoutTicket.RLock()
+	calls = mock.calls.CountAlertsWithoutTicket
+	mock.lockCountAlertsWithoutTicket.RUnlock()
 	return calls
 }
 
