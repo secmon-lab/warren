@@ -203,12 +203,52 @@ func (uc *UseCases) GetUnboundAlertsFiltered(ctx context.Context, threshold *flo
 	return result, totalCount, nil
 }
 
-// BindAlertsToTicket binds multiple alerts to a ticket
+// BindAlertsToTicket binds multiple alerts to a ticket and updates Slack display
 func (uc *UseCases) BindAlertsToTicket(ctx context.Context, ticketID types.TicketID, alertIDs []types.AlertID) error {
 	// Bind alerts to ticket
 	err := uc.repository.BatchBindAlertsToTicket(ctx, alertIDs, ticketID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to bind alerts to ticket")
+	}
+
+	// Get the ticket to access its Slack thread
+	ticket, err := uc.repository.GetTicket(ctx, ticketID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get ticket for Slack update")
+	}
+
+	// Update Slack display for both ticket and individual alerts
+	if uc.slackService != nil {
+		// Update ticket display if it has a Slack thread
+		if ticket.SlackThread != nil {
+			// Get all alerts bound to the ticket for display
+			alerts, err := uc.repository.BatchGetAlerts(ctx, ticket.AlertIDs)
+			if err != nil {
+				logging.From(ctx).Warn("failed to get alerts for Slack update", "error", err, "ticket_id", ticketID)
+			} else {
+				thread := uc.slackService.NewThread(*ticket.SlackThread)
+				if _, err := thread.PostTicket(ctx, *ticket, alerts); err != nil {
+					// Log error but don't fail the operation
+					logging.From(ctx).Warn("failed to update Slack thread after binding alerts", "error", err, "ticket_id", ticketID)
+				}
+			}
+		}
+
+		// Update individual alert displays in their respective threads
+		boundAlerts, err := uc.repository.BatchGetAlerts(ctx, alertIDs)
+		if err != nil {
+			logging.From(ctx).Warn("failed to get bound alerts for individual Slack updates", "error", err, "alert_ids", alertIDs)
+		} else {
+			for _, alert := range boundAlerts {
+				if alert.SlackThread != nil {
+					alertThread := uc.slackService.NewThread(*alert.SlackThread)
+					if err := alertThread.UpdateAlert(ctx, *alert); err != nil {
+						// Log error but don't fail the operation
+						logging.From(ctx).Warn("failed to update alert Slack display", "error", err, "alert_id", alert.ID)
+					}
+				}
+			}
+		}
 	}
 
 	return nil
