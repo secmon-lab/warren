@@ -177,7 +177,7 @@ func TestAlertTicketBinding(t *testing.T) {
 		gt.NoError(t, repo.PutAlert(ctx, alert3))
 		gt.NoError(t, repo.BatchBindAlertsToTicket(ctx, []types.AlertID{alert2.ID, alert3.ID}, ticketObj.ID))
 
-		// Verify alerts are bound
+		// Verify alerts are bound to ticket
 		gotAlert2, err := repo.GetAlert(ctx, alert2.ID)
 		gt.NoError(t, err)
 		gt.Value(t, gotAlert2.TicketID).Equal(ticketObj.ID)
@@ -185,6 +185,14 @@ func TestAlertTicketBinding(t *testing.T) {
 		gotAlert3, err := repo.GetAlert(ctx, alert3.ID)
 		gt.NoError(t, err)
 		gt.Value(t, gotAlert3.TicketID).Equal(ticketObj.ID)
+
+		// Verify ticket's AlertIDs array is updated with bound alerts
+		updatedTicket, err := repo.GetTicket(ctx, ticketObj.ID)
+		gt.NoError(t, err)
+		gt.Array(t, updatedTicket.AlertIDs).Any(func(id types.AlertID) bool { return id == testAlert.ID }) // From BindAlertToTicket
+		gt.Array(t, updatedTicket.AlertIDs).Any(func(id types.AlertID) bool { return id == alert2.ID })    // From BatchBindAlertsToTicket
+		gt.Array(t, updatedTicket.AlertIDs).Any(func(id types.AlertID) bool { return id == alert3.ID })    // From BatchBindAlertsToTicket
+		gt.Number(t, len(updatedTicket.AlertIDs)).GreaterOrEqual(3)                                        // Should have at least 3 alerts
 
 		// PutTicketComment
 		slackMsg := slack.NewMessage(ctx, &slackevents.EventsAPIEvent{
@@ -206,6 +214,93 @@ func TestAlertTicketBinding(t *testing.T) {
 		gt.Array(t, gotComments).Longer(0).Required()
 		gt.Value(t, gotComments[0].Comment).Equal("Test Comment")
 		gt.Value(t, gotComments[0].SlackMessageID).Equal("test-message-id")
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+func TestBatchBindAlertsToTicketBidirectional(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+		thread := newTestThread()
+
+		// Create a ticket
+		ticketObj := newTestTicket(&thread)
+		gt.NoError(t, repo.PutTicket(ctx, ticketObj))
+
+		// Create multiple alerts
+		alert1 := newTestAlert(&thread)
+		alert2 := newTestAlert(&thread)
+		alert3 := newTestAlert(&thread)
+
+		gt.NoError(t, repo.PutAlert(ctx, alert1))
+		gt.NoError(t, repo.PutAlert(ctx, alert2))
+		gt.NoError(t, repo.PutAlert(ctx, alert3))
+
+		// Verify initial state: ticket has no alerts
+		initialTicket, err := repo.GetTicket(ctx, ticketObj.ID)
+		gt.NoError(t, err)
+		gt.Array(t, initialTicket.AlertIDs).Length(0)
+
+		// Verify initial state: alerts are not bound to any ticket
+		gt.Value(t, alert1.TicketID).Equal(types.EmptyTicketID)
+		gt.Value(t, alert2.TicketID).Equal(types.EmptyTicketID)
+		gt.Value(t, alert3.TicketID).Equal(types.EmptyTicketID)
+
+		// Bind alerts to ticket using BatchBindAlertsToTicket
+		alertIDs := []types.AlertID{alert1.ID, alert2.ID, alert3.ID}
+		gt.NoError(t, repo.BatchBindAlertsToTicket(ctx, alertIDs, ticketObj.ID))
+
+		// Verify bidirectional binding: alerts → ticket
+		boundAlert1, err := repo.GetAlert(ctx, alert1.ID)
+		gt.NoError(t, err)
+		gt.Value(t, boundAlert1.TicketID).Equal(ticketObj.ID)
+
+		boundAlert2, err := repo.GetAlert(ctx, alert2.ID)
+		gt.NoError(t, err)
+		gt.Value(t, boundAlert2.TicketID).Equal(ticketObj.ID)
+
+		boundAlert3, err := repo.GetAlert(ctx, alert3.ID)
+		gt.NoError(t, err)
+		gt.Value(t, boundAlert3.TicketID).Equal(ticketObj.ID)
+
+		// Verify bidirectional binding: ticket → alerts
+		updatedTicket, err := repo.GetTicket(ctx, ticketObj.ID)
+		gt.NoError(t, err)
+		gt.Array(t, updatedTicket.AlertIDs).Length(3)
+		gt.Array(t, updatedTicket.AlertIDs).Any(func(id types.AlertID) bool { return id == alert1.ID })
+		gt.Array(t, updatedTicket.AlertIDs).Any(func(id types.AlertID) bool { return id == alert2.ID })
+		gt.Array(t, updatedTicket.AlertIDs).Any(func(id types.AlertID) bool { return id == alert3.ID })
+
+		// Verify no duplicate alerts in ticket
+		alertIDMap := make(map[types.AlertID]int)
+		for _, id := range updatedTicket.AlertIDs {
+			alertIDMap[id]++
+		}
+		for alertID, count := range alertIDMap {
+			gt.Value(t, count).Equal(1) // Alert should appear only once in ticket AlertIDs
+			_ = alertID                 // Suppress unused variable warning
+		}
+
+		// Test binding additional alerts to the same ticket
+		alert4 := newTestAlert(&thread)
+		gt.NoError(t, repo.PutAlert(ctx, alert4))
+
+		gt.NoError(t, repo.BatchBindAlertsToTicket(ctx, []types.AlertID{alert4.ID}, ticketObj.ID))
+
+		// Verify the additional alert is bound
+		finalTicket, err := repo.GetTicket(ctx, ticketObj.ID)
+		gt.NoError(t, err)
+		gt.Array(t, finalTicket.AlertIDs).Length(4)
+		gt.Array(t, finalTicket.AlertIDs).Any(func(id types.AlertID) bool { return id == alert4.ID })
 	}
 
 	t.Run("Memory", func(t *testing.T) {

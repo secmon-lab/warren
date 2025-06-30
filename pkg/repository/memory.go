@@ -387,6 +387,19 @@ func (r *Memory) BindAlertToTicket(ctx context.Context, alertID types.AlertID, t
 	alert.TicketID = ticketID
 	alertTitle := alert.Metadata.Title
 	ticketTitle := t.Metadata.Title
+
+	// Update ticket's AlertIDs array to include the newly bound alert
+	found := false
+	for _, existingID := range t.AlertIDs {
+		if existingID == alertID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.AlertIDs = append(t.AlertIDs, alertID)
+	}
+
 	r.mu.Unlock()
 
 	// Create activity for alert binding
@@ -601,7 +614,7 @@ func (r *Memory) BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.A
 		return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
 	}
 
-	// Get alerts for activity creation
+	// Get alerts for activity creation and bind them to ticket
 	var alertTitles []string
 	for _, alertID := range alertIDs {
 		alert, ok := r.alerts[alertID]
@@ -611,6 +624,21 @@ func (r *Memory) BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.A
 		}
 		alert.TicketID = ticketID
 		alertTitles = append(alertTitles, alert.Metadata.Title)
+	}
+
+	// Update ticket's AlertIDs array to include newly bound alerts
+	for _, alertID := range alertIDs {
+		// Check if alert is already in the ticket's AlertIDs to avoid duplicates
+		found := false
+		for _, existingID := range t.AlertIDs {
+			if existingID == alertID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.AlertIDs = append(t.AlertIDs, alertID)
+		}
 	}
 
 	ticketTitle := t.Metadata.Title

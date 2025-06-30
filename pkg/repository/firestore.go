@@ -530,6 +530,18 @@ func (r *Firestore) BindAlertToTicket(ctx context.Context, alertID types.AlertID
 		return goerr.Wrap(err, "failed to bind alert to ticket", goerr.V("alert_id", alertID), goerr.V("ticket_id", ticketID))
 	}
 
+	// Update ticket's AlertIDs array to include the newly bound alert
+	ticketDoc := r.db.Collection(collectionTickets).Doc(ticketID.String())
+	_, err = ticketDoc.Update(ctx, []firestore.Update{
+		{
+			Path:  "AlertIDs",
+			Value: firestore.ArrayUnion(alertID.String()),
+		},
+	})
+	if err != nil {
+		return goerr.Wrap(err, "failed to update ticket AlertIDs", goerr.V("ticket_id", ticketID))
+	}
+
 	// Create activity for alert binding
 	// Get alert and ticket for activity creation
 	alert, alertErr := r.GetAlert(ctx, alertID)
@@ -720,6 +732,18 @@ func (r *Firestore) BatchBindAlertsToTicket(ctx context.Context, alertIDs []type
 		if _, err := job.Results(); err != nil {
 			return goerr.Wrap(err, "failed to commit bulk writer job")
 		}
+	}
+
+	// Update ticket's AlertIDs array to include the newly bound alerts
+	ticketDoc := r.db.Collection(collectionTickets).Doc(ticketID.String())
+	_, err := ticketDoc.Update(ctx, []firestore.Update{
+		{
+			Path:  "AlertIDs",
+			Value: firestore.ArrayUnion(alertIDsToInterface(alertIDs)...),
+		},
+	})
+	if err != nil {
+		return goerr.Wrap(err, "failed to update ticket AlertIDs", goerr.V("ticket_id", ticketID))
 	}
 
 	// Create activity for bulk alert binding
@@ -1207,4 +1231,13 @@ func (r *Firestore) CountActivities(ctx context.Context) (int, error) {
 	}
 
 	return extractCountFromAggregationResult(result, "count")
+}
+
+// alertIDsToInterface converts []types.AlertID to []interface{} for Firestore ArrayUnion
+func alertIDsToInterface(alertIDs []types.AlertID) []interface{} {
+	interfaces := make([]interface{}, len(alertIDs))
+	for i, id := range alertIDs {
+		interfaces[i] = id.String()
+	}
+	return interfaces
 }
