@@ -133,13 +133,41 @@ func (uc *UseCases) postTicketToSlack(ctx context.Context, newTicket *ticket.Tic
 				threadService = st
 			}
 		} else {
-			// Manual ticket - post ticket in the current thread
-			ts, err := st.PostTicket(ctx, *newTicket, alerts)
+			// Manual ticket - check if there's already a ticket in this thread
+			existingTicket, err := uc.repository.GetTicketByThread(ctx, slackThread)
 			if err != nil {
-				return "", goerr.Wrap(err, "failed to post ticket")
+				return "", goerr.Wrap(err, "failed to check for existing ticket in thread")
 			}
-			timestamp = ts
-			threadService = st
+
+			if existingTicket != nil {
+				// Ticket already exists in this thread, post new ticket to separate thread
+				newThreadSvc, ts, err := uc.slackService.PostTicket(ctx, *newTicket, alerts)
+				if err != nil {
+					return "", goerr.Wrap(err, "failed to post ticket to new thread")
+				}
+				timestamp = ts
+				threadService = newThreadSvc
+
+				// Update ticket's slack thread to the new thread
+				newTicket.SlackThread = &slack.Thread{
+					ChannelID: newThreadSvc.ChannelID(),
+					ThreadID:  newThreadSvc.ThreadID(),
+				}
+
+				// Post link to the new ticket in the original thread
+				ticketURL := uc.slackService.ToMsgURL(newThreadSvc.ChannelID(), newThreadSvc.ThreadID())
+				if err := st.PostLinkToTicket(ctx, ticketURL, newTicket.Metadata.Title); err != nil {
+					return "", goerr.Wrap(err, "failed to post link to ticket")
+				}
+			} else {
+				// No existing ticket - post ticket in the current thread
+				ts, err := st.PostTicket(ctx, *newTicket, alerts)
+				if err != nil {
+					return "", goerr.Wrap(err, "failed to post ticket")
+				}
+				timestamp = ts
+				threadService = st
+			}
 		}
 	}
 
