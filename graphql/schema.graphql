@@ -83,6 +83,11 @@ type ActivitiesResponse {
   totalCount: Int!
 }
 
+type AlertsResponse {
+  alerts: [Alert!]!
+  totalCount: Int!
+}
+
 type DashboardStats {
   openTicketsCount: Int!
   unboundAlertsCount: Int!
@@ -96,7 +101,7 @@ type Query {
   similarTickets(ticketId: ID!, threshold: Float!, offset: Int, limit: Int): TicketsResponse!
   ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
   alert(id: ID!): Alert
-  alerts: [Alert!]!
+  alerts(offset: Int, limit: Int): AlertsResponse!
   dashboard: DashboardStats!
   activities(offset: Int, limit: Int): ActivitiesResponse!
 }

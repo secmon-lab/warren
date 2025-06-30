@@ -33,6 +33,11 @@ type AlertAttribute struct {
 	Auto  bool    `json:"auto"`
 }
 
+type AlertsResponse struct {
+	Alerts     []*alert.Alert `json:"alerts"`
+	TotalCount int            `json:"totalCount"`
+}
+
 type CommentsResponse struct {
 	Comments   []*ticket.Comment `json:"comments"`
 	TotalCount int               `json:"totalCount"`

@@ -43,6 +43,7 @@ type Repository interface {
 	GetLatestAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error)
 	SearchAlerts(ctx context.Context, path, op string, value any, limit int) (alert.Alerts, error)
 	GetAlertWithoutTicket(ctx context.Context, offset, limit int) (alert.Alerts, error)
+	CountAlertsWithoutTicket(ctx context.Context) (int, error)
 	GetAlertsBySpan(ctx context.Context, begin, end time.Time) (alert.Alerts, error)
 	BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
 	FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error)

@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/m-mizutani/goerr/v2"
+	goerr "github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
@@ -431,12 +431,29 @@ func (r *queryResolver) Alert(ctx context.Context, id string) (*alert.Alert, err
 }
 
 // Alerts is the resolver for the alerts field.
-func (r *queryResolver) Alerts(ctx context.Context) ([]*alert.Alert, error) {
-	alerts, err := r.repo.GetAlertWithoutTicket(ctx, 0, 0)
+func (r *queryResolver) Alerts(ctx context.Context, offset *int, limit *int) (*graphql1.AlertsResponse, error) {
+	var offsetVal, limitVal int
+	if offset != nil {
+		offsetVal = *offset
+	}
+	if limit != nil {
+		limitVal = *limit
+	}
+
+	alerts, err := r.repo.GetAlertWithoutTicket(ctx, offsetVal, limitVal)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list alerts")
 	}
-	return alerts, nil
+
+	totalCount, err := r.repo.CountAlertsWithoutTicket(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to count alerts")
+	}
+
+	return &graphql1.AlertsResponse{
+		Alerts:     alerts,
+		TotalCount: totalCount,
+	}, nil
 }
 
 // Dashboard is the resolver for the dashboard field.

@@ -11,6 +11,11 @@ const httpLink = createHttpLink({
   credentials: 'include',
 });
 
+// Prevent infinite redirect loops by tracking redirect attempts
+let redirectAttempts = 0;
+const MAX_REDIRECT_ATTEMPTS = 1;
+const REDIRECT_RESET_TIMEOUT = 30000; // 30 seconds
+
 // Error handling link
 const errorLink = onError(({ graphQLErrors, networkError }) => {
   if (graphQLErrors) {
@@ -28,6 +33,21 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
     if ('statusCode' in networkError) {
       const statusCode = (networkError as any).statusCode;
       if (statusCode === 401 || statusCode === 403) {
+        // Prevent infinite redirect loops
+        if (redirectAttempts >= MAX_REDIRECT_ATTEMPTS) {
+          console.error('Too many redirect attempts, avoiding infinite loop');
+          return;
+        }
+        
+        // Check if we're already on an auth page to prevent loops
+        if (window.location.pathname.startsWith('/api/auth/')) {
+          console.error('Already on auth page, avoiding redirect loop');
+          return;
+        }
+        
+        redirectAttempts++;
+        setTimeout(() => { redirectAttempts = 0; }, REDIRECT_RESET_TIMEOUT);
+        
         // Authentication/authorization error - redirect to login
         window.location.href = '/api/auth/login';
         return;
@@ -41,6 +61,21 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
       
       // Check if we're getting an HTML error page
       if (networkError.message.includes('line 1 column 1')) {
+        // Prevent infinite redirect loops
+        if (redirectAttempts >= MAX_REDIRECT_ATTEMPTS) {
+          console.error('Too many redirect attempts, avoiding infinite loop');
+          return;
+        }
+        
+        // Check if we're already on an auth page to prevent loops
+        if (window.location.pathname.startsWith('/api/auth/')) {
+          console.error('Already on auth page, avoiding redirect loop');
+          return;
+        }
+        
+        redirectAttempts++;
+        setTimeout(() => { redirectAttempts = 0; }, REDIRECT_RESET_TIMEOUT);
+        
         // This is likely an HTML response (like a login page or error page)
         console.error('GraphQL endpoint returned HTML instead of JSON. Redirecting to login...');
         window.location.href = '/api/auth/login';
