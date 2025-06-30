@@ -205,7 +205,7 @@ export default function AlertsPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex justify-center">
+        <div className="flex justify-center mt-6">
           <Pagination>
             <PaginationContent>
               <PaginationItem>
@@ -214,17 +214,59 @@ export default function AlertsPage() {
                   className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                 />
               </PaginationItem>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    onClick={() => setCurrentPage(page)}
-                    isActive={currentPage === page}
-                    className="cursor-pointer"
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
+              {/* Show page numbers with truncation */}
+              {(() => {
+                const maxVisiblePages = 10;
+                const pageNumbers = [];
+                
+                if (totalPages <= maxVisiblePages) {
+                  // Show all pages if total is 10 or less
+                  for (let i = 1; i <= totalPages; i++) {
+                    pageNumbers.push(i);
+                  }
+                } else {
+                  // Show truncated pagination for more than 10 pages
+                  const startPage = Math.max(1, currentPage - 4);
+                  const endPage = Math.min(totalPages, currentPage + 4);
+                  
+                  // Always show first page
+                  if (startPage > 1) {
+                    pageNumbers.push(1);
+                    if (startPage > 2) {
+                      pageNumbers.push('...');
+                    }
+                  }
+                  
+                  // Show pages around current page
+                  for (let i = startPage; i <= endPage; i++) {
+                    pageNumbers.push(i);
+                  }
+                  
+                  // Always show last page
+                  if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) {
+                      pageNumbers.push('...');
+                    }
+                    pageNumbers.push(totalPages);
+                  }
+                }
+                
+                return pageNumbers.map((page, index) => (
+                  <PaginationItem key={index}>
+                    {page === '...' ? (
+                      <span className="px-3 py-2 text-sm text-muted-foreground">...</span>
+                    ) : (
+                      <PaginationLink
+                        isActive={page === currentPage}
+                        onClick={() => setCurrentPage(page as number)}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    )}
+                  </PaginationItem>
+                ));
+              })()}
               <PaginationItem>
                 <PaginationNext
                   onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
