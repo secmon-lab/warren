@@ -324,15 +324,25 @@ func (r *Firestore) GetTicket(ctx context.Context, ticketID types.TicketID) (*ti
 }
 
 func (r *Firestore) PutTicket(ctx context.Context, t ticket.Ticket) error {
-	_, err := r.db.Collection(collectionTickets).Doc(t.ID.String()).Set(ctx, t)
+	// Check if ticket already exists to determine if this is create or update
+	existingTicket, err := r.GetTicket(ctx, t.ID)
+	isUpdate := err == nil && existingTicket != nil
+
+	_, err = r.db.Collection(collectionTickets).Doc(t.ID.String()).Set(ctx, t)
 	if err != nil {
 		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", t.ID))
 	}
 
-	// Create activity for ticket creation (except when called from agent)
+	// Create activity for ticket creation or update (except when called from agent)
 	if !user.IsAgent(ctx) {
-		if err := createTicketActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
-			return goerr.Wrap(err, "failed to create ticket activity", goerr.V("ticket_id", t.ID))
+		if isUpdate {
+			if err := createTicketUpdateActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
+				return goerr.Wrap(err, "failed to create ticket update activity", goerr.V("ticket_id", t.ID))
+			}
+		} else {
+			if err := createTicketActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
+				return goerr.Wrap(err, "failed to create ticket activity", goerr.V("ticket_id", t.ID))
+			}
 		}
 	}
 

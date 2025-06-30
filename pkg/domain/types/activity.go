@@ -37,6 +37,7 @@ type ActivityType string
 
 const (
 	ActivityTypeTicketCreated       ActivityType = "ticket_created"
+	ActivityTypeTicketUpdated       ActivityType = "ticket_updated"
 	ActivityTypeTicketStatusChanged ActivityType = "ticket_status_changed"
 	ActivityTypeCommentAdded        ActivityType = "comment_added"
 	ActivityTypeAlertBound          ActivityType = "alert_bound"
@@ -45,6 +46,7 @@ const (
 
 var activityTypeLabels = map[ActivityType]string{
 	ActivityTypeTicketCreated:       "Ticket Created",
+	ActivityTypeTicketUpdated:       "Ticket Updated",
 	ActivityTypeTicketStatusChanged: "Status Changed",
 	ActivityTypeCommentAdded:        "Comment Added",
 	ActivityTypeAlertBound:          "Alert Bound",
@@ -61,7 +63,7 @@ func (t ActivityType) Label() string {
 
 func (t ActivityType) Validate() error {
 	switch t {
-	case ActivityTypeTicketCreated, ActivityTypeTicketStatusChanged, ActivityTypeCommentAdded, ActivityTypeAlertBound, ActivityTypeAlertsBulkBound:
+	case ActivityTypeTicketCreated, ActivityTypeTicketUpdated, ActivityTypeTicketStatusChanged, ActivityTypeCommentAdded, ActivityTypeAlertBound, ActivityTypeAlertsBulkBound:
 		return nil
 	}
 	return goerr.New("invalid activity type", goerr.V("type", t))

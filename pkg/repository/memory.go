@@ -224,14 +224,23 @@ func (r *Memory) GetTicket(ctx context.Context, ticketID types.TicketID) (*ticke
 
 func (r *Memory) PutTicket(ctx context.Context, t ticket.Ticket) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
+
+	// Check if ticket already exists to determine if this is create or update
+	_, isUpdate := r.tickets[t.ID]
 
 	r.tickets[t.ID] = &t
+	r.mu.Unlock()
 
-	// Create activity for ticket creation (except when called from agent)
+	// Create activity for ticket creation or update (except when called from agent)
 	if !user.IsAgent(ctx) {
-		if err := createTicketActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
-			return goerr.Wrap(err, "failed to create ticket activity", goerr.V("ticket_id", t.ID))
+		if isUpdate {
+			if err := createTicketUpdateActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
+				return goerr.Wrap(err, "failed to create ticket update activity", goerr.V("ticket_id", t.ID))
+			}
+		} else {
+			if err := createTicketActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
+				return goerr.Wrap(err, "failed to create ticket activity", goerr.V("ticket_id", t.ID))
+			}
 		}
 	}
 
