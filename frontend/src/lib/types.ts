@@ -7,6 +7,8 @@ export interface Ticket {
   assignee?: User;
   alerts: Alert[];
   comments: Comment[];
+  alertsCount: number;
+  commentsCount: number;
   conclusion?: string;
   reason?: string;
   finding?: Finding;

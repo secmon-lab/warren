@@ -1,5 +1,5 @@
 import { useQuery } from "@apollo/client";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -63,15 +63,8 @@ export default function TicketsPage() {
     },
   });
 
-  // Sort tickets by createdAt in descending order (newest first)
-  const tickets: Ticket[] = useMemo(
-    () =>
-      [...(ticketsData?.tickets?.tickets || [])].sort(
-        (a: Ticket, b: Ticket) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      ),
-    [ticketsData?.tickets?.tickets]
-  );
+  // Backend already sorts by createdAt DESC, no need to sort again
+  const tickets: Ticket[] = ticketsData?.tickets?.tickets || [];
 
   const handleStatusFilter = (status: TicketStatus | "all") => {
     if (status === "all") {
@@ -214,16 +207,16 @@ export default function TicketsPage() {
                           </CardTitle>
                         </div>
                         <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-                          {ticket.alerts.length > 0 && (
+                          {ticket.alertsCount > 0 && (
                             <div className="flex items-center text-sm text-muted-foreground">
                               <AlertCircle className="h-4 w-4 mr-1" />
-                              {ticket.alerts.length}
+                              {ticket.alertsCount}
                             </div>
                           )}
-                          {ticket.comments.length > 0 && (
+                          {ticket.commentsCount > 0 && (
                             <div className="flex items-center text-sm text-muted-foreground">
                               <MessageSquare className="h-4 w-4 mr-1" />
-                              {ticket.comments.length}
+                              {ticket.commentsCount}
                             </div>
                           )}
                         </div>
@@ -249,16 +242,16 @@ export default function TicketsPage() {
                           <div className="flex items-center gap-2">
                             <MessageSquare className="h-4 w-4" />
                             <span>
-                              {ticket.comments.length} comment
-                              {ticket.comments.length !== 1 ? "s" : ""}
+                              {ticket.commentsCount} comment
+                              {ticket.commentsCount !== 1 ? "s" : ""}
                             </span>
                           </div>
 
                           <div className="flex items-center gap-2">
                             <AlertCircle className="h-4 w-4" />
                             <span>
-                              {ticket.alerts.length} alert
-                              {ticket.alerts.length !== 1 ? "s" : ""}
+                              {ticket.alertsCount} alert
+                              {ticket.alertsCount !== 1 ? "s" : ""}
                             </span>
                           </div>
                         </div>
@@ -287,18 +280,59 @@ export default function TicketsPage() {
                         }
                       />
                     </PaginationItem>
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                      (page) => (
-                        <PaginationItem key={page}>
-                          <PaginationLink
-                            onClick={() => setCurrentPage(page)}
-                            isActive={currentPage === page}
-                            className="cursor-pointer">
-                            {page}
-                          </PaginationLink>
+                    {/* Show page numbers with truncation */}
+                    {(() => {
+                      const maxVisiblePages = 10;
+                      const pageNumbers = [];
+                      
+                      if (totalPages <= maxVisiblePages) {
+                        // Show all pages if total is 10 or less
+                        for (let i = 1; i <= totalPages; i++) {
+                          pageNumbers.push(i);
+                        }
+                      } else {
+                        // Show truncated pagination for more than 10 pages
+                        const startPage = Math.max(1, currentPage - 4);
+                        const endPage = Math.min(totalPages, currentPage + 4);
+                        
+                        // Always show first page
+                        if (startPage > 1) {
+                          pageNumbers.push(1);
+                          if (startPage > 2) {
+                            pageNumbers.push('...');
+                          }
+                        }
+                        
+                        // Show pages around current page
+                        for (let i = startPage; i <= endPage; i++) {
+                          pageNumbers.push(i);
+                        }
+                        
+                        // Always show last page
+                        if (endPage < totalPages) {
+                          if (endPage < totalPages - 1) {
+                            pageNumbers.push('...');
+                          }
+                          pageNumbers.push(totalPages);
+                        }
+                      }
+                      
+                      return pageNumbers.map((page, index) => (
+                        <PaginationItem key={index}>
+                          {page === '...' ? (
+                            <span className="px-3 py-2 text-sm text-muted-foreground">...</span>
+                          ) : (
+                            <PaginationLink
+                              isActive={page === currentPage}
+                              onClick={() => setCurrentPage(page as number)}
+                              className="cursor-pointer"
+                            >
+                              {page}
+                            </PaginationLink>
+                          )}
                         </PaginationItem>
-                      )
-                    )}
+                      ));
+                    })()}
                     <PaginationItem>
                       <PaginationNext
                         onClick={() =>

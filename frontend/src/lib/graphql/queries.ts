@@ -17,20 +17,8 @@ export const GET_TICKETS = gql`
         }
         createdAt
         updatedAt
-        alerts {
-          id
-          title
-          createdAt
-        }
-        comments {
-          id
-          content
-          user {
-            id
-            name
-          }
-          createdAt
-        }
+        alertsCount
+        commentsCount
       }
       totalCount
     }

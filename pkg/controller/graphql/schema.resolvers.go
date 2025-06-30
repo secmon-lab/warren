@@ -607,6 +607,16 @@ func (r *ticketResolver) Comments(ctx context.Context, obj *ticket.Ticket) ([]*t
 	return commentPtrs, nil
 }
 
+// AlertsCount is the resolver for the alertsCount field.
+func (r *ticketResolver) AlertsCount(ctx context.Context, obj *ticket.Ticket) (int, error) {
+	return len(obj.AlertIDs), nil
+}
+
+// CommentsCount is the resolver for the commentsCount field.
+func (r *ticketResolver) CommentsCount(ctx context.Context, obj *ticket.Ticket) (int, error) {
+	return r.repo.CountTicketComments(ctx, obj.ID)
+}
+
 // Conclusion is the resolver for the conclusion field.
 func (r *ticketResolver) Conclusion(ctx context.Context, obj *ticket.Ticket) (*string, error) {
 	if obj.Conclusion == "" {

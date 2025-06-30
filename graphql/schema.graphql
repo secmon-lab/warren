@@ -7,6 +7,8 @@ type Ticket {
   assignee: User
   alerts: [Alert!]!
   comments: [Comment!]!
+  alertsCount: Int!
+  commentsCount: Int!
   conclusion: String
   reason: String
   finding: Finding
