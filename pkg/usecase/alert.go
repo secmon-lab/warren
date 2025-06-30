@@ -113,35 +113,12 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 
 // GetUnboundAlertsFiltered returns unbound alerts filtered by similarity threshold and keyword
 func (uc *UseCases) GetUnboundAlertsFiltered(ctx context.Context, threshold *float64, keyword *string, ticketID *types.TicketID, offset, limit int) ([]*alert.Alert, int, error) {
-	// Get unbound alerts
-	alerts, err := uc.repository.GetAlertWithoutTicket(ctx, offset, limit)
-	if err != nil {
-		return nil, 0, goerr.Wrap(err, "failed to get unbound alerts")
-	}
+	var candidateAlerts []*alert.Alert
+	var err error
 
-	// Filter by keyword if provided
-	if keyword != nil && *keyword != "" {
-		filteredAlerts := make([]*alert.Alert, 0)
-		for _, a := range alerts {
-			// Convert data to JSON string for keyword search
-			dataBytes, err := json.Marshal(a.Data)
-			if err != nil {
-				continue
-			}
-			dataStr := string(dataBytes)
-
-			// Check if keyword exists in title, description, or data
-			if containsIgnoreCase(a.Title, *keyword) ||
-				containsIgnoreCase(a.Description, *keyword) ||
-				containsIgnoreCase(dataStr, *keyword) {
-				filteredAlerts = append(filteredAlerts, a)
-			}
-		}
-		alerts = filteredAlerts
-	}
-
-	// Filter by similarity threshold if provided and ticketID is provided
+	// Step 1: Get candidate alerts based on similarity filtering
 	if threshold != nil && ticketID != nil && *ticketID != types.EmptyTicketID {
+		// Use similarity-based filtering as the primary source
 		ticketObj, err := uc.repository.GetTicket(ctx, *ticketID)
 		if err != nil {
 			return nil, 0, goerr.Wrap(err, "failed to get ticket for similarity filtering")
@@ -156,31 +133,74 @@ func (uc *UseCases) GetUnboundAlertsFiltered(ctx context.Context, threshold *flo
 
 			// Use the first alert's embedding for similarity
 			if len(ticketAlerts) > 0 && len(ticketAlerts[0].Embedding) > 0 {
-				similarAlerts, err := uc.repository.FindNearestAlerts(ctx, ticketAlerts[0].Embedding, 100)
+				similarAlerts, err := uc.repository.FindNearestAlerts(ctx, ticketAlerts[0].Embedding, 1000) // Get more candidates
 				if err != nil {
 					return nil, 0, goerr.Wrap(err, "failed to find similar alerts")
 				}
 
 				// Filter alerts by threshold and ensure they are unbound
-				filteredAlerts := make([]*alert.Alert, 0)
 				for _, a := range similarAlerts {
 					if a.TicketID == types.EmptyTicketID {
 						// Calculate similarity and filter by threshold
 						similarity := ticketAlerts[0].CosineSimilarity(a.Embedding)
 						if float64(similarity) >= *threshold {
-							filteredAlerts = append(filteredAlerts, a)
+							candidateAlerts = append(candidateAlerts, a)
 						}
 					}
 				}
-				alerts = filteredAlerts
 			}
+		}
+	} else {
+		// Get all unbound alerts as candidates
+		candidateAlerts, err = uc.repository.GetAlertWithoutTicket(ctx, 0, 0) // Get all for filtering
+		if err != nil {
+			return nil, 0, goerr.Wrap(err, "failed to get unbound alerts")
 		}
 	}
 
-	// Get total count (for pagination, we'll just return the filtered count for now)
-	totalCount := len(alerts)
+	// Step 2: Apply keyword filter to candidate alerts
+	var filteredAlerts []*alert.Alert
+	if keyword != nil && *keyword != "" {
+		for _, a := range candidateAlerts {
+			// Convert data to JSON string for keyword search
+			dataBytes, err := json.Marshal(a.Data)
+			if err != nil {
+				continue
+			}
+			dataStr := string(dataBytes)
 
-	return alerts, totalCount, nil
+			// Check if keyword exists in title, description, or data
+			if containsIgnoreCase(a.Title, *keyword) ||
+				containsIgnoreCase(a.Description, *keyword) ||
+				containsIgnoreCase(dataStr, *keyword) {
+				filteredAlerts = append(filteredAlerts, a)
+			}
+		}
+	} else {
+		// No keyword filter, use all candidates
+		filteredAlerts = candidateAlerts
+	}
+
+	// Step 3: Calculate total count from fully filtered results
+	totalCount := len(filteredAlerts)
+
+	// Step 4: Apply pagination to the filtered results
+	start := offset
+	if start > len(filteredAlerts) {
+		start = len(filteredAlerts)
+	}
+
+	end := start + limit
+	if limit > 0 && end > len(filteredAlerts) {
+		end = len(filteredAlerts)
+	}
+	if limit == 0 {
+		end = len(filteredAlerts)
+	}
+
+	result := filteredAlerts[start:end]
+
+	return result, totalCount, nil
 }
 
 // BindAlertsToTicket binds multiple alerts to a ticket

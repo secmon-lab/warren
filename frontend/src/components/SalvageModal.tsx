@@ -18,7 +18,7 @@ import { Alert } from "@/lib/types";
 import { AlertCircle, Search, X } from "lucide-react";
 import { useSuccessToast, useErrorToast } from "@/hooks/use-toast";
 
-interface SalvateModalProps {
+interface SalvageModalProps {
   isOpen: boolean;
   onClose: () => void;
   ticketId: string;
@@ -31,7 +31,7 @@ interface UnboundAlertsData {
   };
 }
 
-export function SalvateModal({ isOpen, onClose, ticketId }: SalvateModalProps) {
+export function SalvageModal({ isOpen, onClose, ticketId }: SalvageModalProps) {
   const [threshold, setThreshold] = useState([0.95]);
   const [keyword, setKeyword] = useState("");
   const [selectedAlerts, setSelectedAlerts] = useState<Set<string>>(new Set());
@@ -145,7 +145,7 @@ export function SalvateModal({ isOpen, onClose, ticketId }: SalvateModalProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5" />
-            Salvate Alerts
+            Salvage Alerts
           </DialogTitle>
         </DialogHeader>
 

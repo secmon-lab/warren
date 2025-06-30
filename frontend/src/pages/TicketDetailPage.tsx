@@ -66,7 +66,7 @@ import { EditConclusionModal } from "@/components/ui/edit-conclusion-modal";
 import { EditTicketModal } from "@/components/EditTicketModal";
 import { SimilarTickets } from "@/components/SimilarTickets";
 import { TicketComments } from "@/components/TicketComments";
-import { SalvateModal } from "@/components/SalvateModal";
+import { SalvageModal } from "@/components/SalvageModal";
 
 const ALERTS_PER_PAGE = 5;
 
@@ -81,7 +81,7 @@ export default function TicketDetailPage() {
   const [isEditTicketModalOpen, setIsEditTicketModalOpen] = useState(false);
   const [isEditConclusionModalOpen, setIsEditConclusionModalOpen] =
     useState(false);
-  const [isSalvateModalOpen, setIsSalvateModalOpen] = useState(false);
+  const [isSalvageModalOpen, setIsSalvageModalOpen] = useState(false);
 
   const errorToast = useErrorToast();
   const successToast = useSuccessToast();
@@ -438,11 +438,11 @@ export default function TicketDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setIsSalvateModalOpen(true)}
+                  onClick={() => setIsSalvageModalOpen(true)}
                   className="flex items-center gap-2"
                 >
                   <AlertCircle className="h-4 w-4" />
-                  Salvate
+                  Salvage
                 </Button>
               </div>
             </CardHeader>
@@ -851,10 +851,10 @@ export default function TicketDetailPage() {
         ticket={ticket}
       />
 
-      {/* Salvate Modal */}
-      <SalvateModal
-        isOpen={isSalvateModalOpen}
-        onClose={() => setIsSalvateModalOpen(false)}
+      {/* Salvage Modal */}
+      <SalvageModal
+        isOpen={isSalvageModalOpen}
+        onClose={() => setIsSalvageModalOpen(false)}
         ticketId={ticket.id}
       />
     </div>
