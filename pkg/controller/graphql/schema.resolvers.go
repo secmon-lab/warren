@@ -7,7 +7,6 @@ package graphql
 import (
 	"context"
 	"encoding/json"
-	"strings"
 
 	goerr "github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -257,6 +256,35 @@ func (r *mutationResolver) CreateTicket(ctx context.Context, title string, descr
 	newTicket, err := r.uc.CreateManualTicketWithTest(ctx, title, description, user, testFlag)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create ticket")
+	}
+
+	return newTicket, nil
+}
+
+// CreateTicketFromAlerts is the resolver for the createTicketFromAlerts field.
+func (r *mutationResolver) CreateTicketFromAlerts(ctx context.Context, alertIds []string) (*ticket.Ticket, error) {
+	// Extract user information from authentication context
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "authentication required")
+	}
+
+	// Create user from authentication token
+	user := &slack.User{
+		ID:   token.Sub,
+		Name: token.Name,
+	}
+
+	// Convert string IDs to typed IDs
+	alertIDsTyped := make([]types.AlertID, len(alertIds))
+	for i, id := range alertIds {
+		alertIDsTyped[i] = types.AlertID(id)
+	}
+
+	// Call the use case to create ticket from alerts (no Slack thread for Web UI)
+	newTicket, err := r.uc.CreateTicketFromAlerts(ctx, alertIDsTyped, user, nil)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to create ticket from alerts")
 	}
 
 	return newTicket, nil
@@ -729,8 +757,3 @@ type findingResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }
-
-// Helper functions
-func containsIgnoreCase(s, substr string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
-}

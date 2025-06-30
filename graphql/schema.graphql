@@ -115,6 +115,7 @@ type Mutation {
   updateTicketConclusion(id: ID!, conclusion: String!, reason: String!): Ticket!
   updateTicket(id: ID!, title: String!, description: String): Ticket!
   createTicket(title: String!, description: String!, isTest: Boolean): Ticket!
+  createTicketFromAlerts(alertIds: [ID!]!): Ticket!
   bindAlertsToTicket(ticketId: ID!, alertIds: [ID!]!): Ticket!
 }
 
