@@ -399,3 +399,28 @@ export const BIND_ALERTS_TO_TICKET = gql`
     }
   }
 `;
+
+export const CREATE_TICKET_FROM_ALERTS = gql`
+  mutation CreateTicketFromAlerts($alertIds: [ID!]!) {
+    createTicketFromAlerts(alertIds: $alertIds) {
+      id
+      status
+      title
+      description
+      summary
+      isTest
+      assignee {
+        id
+        name
+      }
+      createdAt
+      updatedAt
+      alertsCount
+      alerts {
+        id
+        title
+        description
+      }
+    }
+  }
+`;
