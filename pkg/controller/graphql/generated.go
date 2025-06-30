@@ -123,6 +123,7 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
+		BindAlertsToTicket          func(childComplexity int, ticketID string, alertIds []string) int
 		CreateTicket                func(childComplexity int, title string, description string, isTest *bool) int
 		UpdateMultipleTicketsStatus func(childComplexity int, ids []string, status string) int
 		UpdateTicket                func(childComplexity int, id string, title string, description *string) int
@@ -139,6 +140,7 @@ type ComplexityRoot struct {
 		Ticket         func(childComplexity int, id string) int
 		TicketComments func(childComplexity int, ticketID string, offset *int, limit *int) int
 		Tickets        func(childComplexity int, statuses []string, offset *int, limit *int) int
+		UnboundAlerts  func(childComplexity int, threshold *float64, keyword *string, ticketID *string, offset *int, limit *int) int
 	}
 
 	Ticket struct {
@@ -202,6 +204,7 @@ type MutationResolver interface {
 	UpdateTicketConclusion(ctx context.Context, id string, conclusion string, reason string) (*ticket.Ticket, error)
 	UpdateTicket(ctx context.Context, id string, title string, description *string) (*ticket.Ticket, error)
 	CreateTicket(ctx context.Context, title string, description string, isTest *bool) (*ticket.Ticket, error)
+	BindAlertsToTicket(ctx context.Context, ticketID string, alertIds []string) (*ticket.Ticket, error)
 }
 type QueryResolver interface {
 	Ticket(ctx context.Context, id string) (*ticket.Ticket, error)
@@ -210,6 +213,7 @@ type QueryResolver interface {
 	TicketComments(ctx context.Context, ticketID string, offset *int, limit *int) (*graphql1.CommentsResponse, error)
 	Alert(ctx context.Context, id string) (*alert.Alert, error)
 	Alerts(ctx context.Context, offset *int, limit *int) (*graphql1.AlertsResponse, error)
+	UnboundAlerts(ctx context.Context, threshold *float64, keyword *string, ticketID *string, offset *int, limit *int) (*graphql1.AlertsResponse, error)
 	Dashboard(ctx context.Context) (*graphql1.DashboardStats, error)
 	Activities(ctx context.Context, offset *int, limit *int) (*graphql1.ActivitiesResponse, error)
 }
@@ -542,6 +546,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Finding.Summary(childComplexity), true
 
+	case "Mutation.bindAlertsToTicket":
+		if e.complexity.Mutation.BindAlertsToTicket == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_bindAlertsToTicket_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.BindAlertsToTicket(childComplexity, args["ticketId"].(string), args["alertIds"].([]string)), true
+
 	case "Mutation.createTicket":
 		if e.complexity.Mutation.CreateTicket == nil {
 			break
@@ -692,6 +708,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Tickets(childComplexity, args["statuses"].([]string), args["offset"].(*int), args["limit"].(*int)), true
+
+	case "Query.unboundAlerts":
+		if e.complexity.Query.UnboundAlerts == nil {
+			break
+		}
+
+		args, err := ec.field_Query_unboundAlerts_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.UnboundAlerts(childComplexity, args["threshold"].(*float64), args["keyword"].(*string), args["ticketId"].(*string), args["offset"].(*int), args["limit"].(*int)), true
 
 	case "Ticket.alerts":
 		if e.complexity.Ticket.Alerts == nil {
@@ -1050,6 +1078,7 @@ type Query {
   ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
   alert(id: ID!): Alert
   alerts(offset: Int, limit: Int): AlertsResponse!
+  unboundAlerts(threshold: Float, keyword: String, ticketId: ID, offset: Int, limit: Int): AlertsResponse!
   dashboard: DashboardStats!
   activities(offset: Int, limit: Int): ActivitiesResponse!
 }
@@ -1060,6 +1089,7 @@ type Mutation {
   updateTicketConclusion(id: ID!, conclusion: String!, reason: String!): Ticket!
   updateTicket(id: ID!, title: String!, description: String): Ticket!
   createTicket(title: String!, description: String!, isTest: Boolean): Ticket!
+  bindAlertsToTicket(ticketId: ID!, alertIds: [ID!]!): Ticket!
 }
 
 schema {
@@ -1073,6 +1103,57 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_Mutation_bindAlertsToTicket_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_bindAlertsToTicket_argsTicketID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["ticketId"] = arg0
+	arg1, err := ec.field_Mutation_bindAlertsToTicket_argsAlertIds(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["alertIds"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_bindAlertsToTicket_argsTicketID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["ticketId"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("ticketId"))
+	if tmp, ok := rawArgs["ticketId"]; ok {
+		return ec.unmarshalNID2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_bindAlertsToTicket_argsAlertIds(
+	ctx context.Context,
+	rawArgs map[string]any,
+) ([]string, error) {
+	if _, ok := rawArgs["alertIds"]; !ok {
+		var zeroVal []string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("alertIds"))
+	if tmp, ok := rawArgs["alertIds"]; ok {
+		return ec.unmarshalNID2ᚕstringᚄ(ctx, tmp)
+	}
+
+	var zeroVal []string
+	return zeroVal, nil
+}
 
 func (ec *executionContext) field_Mutation_createTicket_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
@@ -1812,6 +1893,126 @@ func (ec *executionContext) field_Query_tickets_argsOffset(
 }
 
 func (ec *executionContext) field_Query_tickets_argsLimit(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["limit"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+	if tmp, ok := rawArgs["limit"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_unboundAlerts_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_unboundAlerts_argsThreshold(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["threshold"] = arg0
+	arg1, err := ec.field_Query_unboundAlerts_argsKeyword(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["keyword"] = arg1
+	arg2, err := ec.field_Query_unboundAlerts_argsTicketID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["ticketId"] = arg2
+	arg3, err := ec.field_Query_unboundAlerts_argsOffset(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg3
+	arg4, err := ec.field_Query_unboundAlerts_argsLimit(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg4
+	return args, nil
+}
+func (ec *executionContext) field_Query_unboundAlerts_argsThreshold(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*float64, error) {
+	if _, ok := rawArgs["threshold"]; !ok {
+		var zeroVal *float64
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("threshold"))
+	if tmp, ok := rawArgs["threshold"]; ok {
+		return ec.unmarshalOFloat2ᚖfloat64(ctx, tmp)
+	}
+
+	var zeroVal *float64
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_unboundAlerts_argsKeyword(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*string, error) {
+	if _, ok := rawArgs["keyword"]; !ok {
+		var zeroVal *string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("keyword"))
+	if tmp, ok := rawArgs["keyword"]; ok {
+		return ec.unmarshalOString2ᚖstring(ctx, tmp)
+	}
+
+	var zeroVal *string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_unboundAlerts_argsTicketID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*string, error) {
+	if _, ok := rawArgs["ticketId"]; !ok {
+		var zeroVal *string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("ticketId"))
+	if tmp, ok := rawArgs["ticketId"]; ok {
+		return ec.unmarshalOID2ᚖstring(ctx, tmp)
+	}
+
+	var zeroVal *string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_unboundAlerts_argsOffset(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["offset"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
+	if tmp, ok := rawArgs["offset"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_unboundAlerts_argsLimit(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (*int, error) {
@@ -4436,6 +4637,97 @@ func (ec *executionContext) fieldContext_Mutation_createTicket(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_bindAlertsToTicket(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_bindAlertsToTicket(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().BindAlertsToTicket(rctx, fc.Args["ticketId"].(string), fc.Args["alertIds"].([]string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*ticket.Ticket)
+	fc.Result = res
+	return ec.marshalNTicket2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐTicket(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_bindAlertsToTicket(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Ticket_id(ctx, field)
+			case "status":
+				return ec.fieldContext_Ticket_status(ctx, field)
+			case "title":
+				return ec.fieldContext_Ticket_title(ctx, field)
+			case "description":
+				return ec.fieldContext_Ticket_description(ctx, field)
+			case "summary":
+				return ec.fieldContext_Ticket_summary(ctx, field)
+			case "assignee":
+				return ec.fieldContext_Ticket_assignee(ctx, field)
+			case "alerts":
+				return ec.fieldContext_Ticket_alerts(ctx, field)
+			case "comments":
+				return ec.fieldContext_Ticket_comments(ctx, field)
+			case "alertsCount":
+				return ec.fieldContext_Ticket_alertsCount(ctx, field)
+			case "commentsCount":
+				return ec.fieldContext_Ticket_commentsCount(ctx, field)
+			case "conclusion":
+				return ec.fieldContext_Ticket_conclusion(ctx, field)
+			case "reason":
+				return ec.fieldContext_Ticket_reason(ctx, field)
+			case "finding":
+				return ec.fieldContext_Ticket_finding(ctx, field)
+			case "slackLink":
+				return ec.fieldContext_Ticket_slackLink(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Ticket_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "isTest":
+				return ec.fieldContext_Ticket_isTest(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_bindAlertsToTicket_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_ticket(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_ticket(ctx, field)
 	if err != nil {
@@ -4832,6 +5124,67 @@ func (ec *executionContext) fieldContext_Query_alerts(ctx context.Context, field
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_alerts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_unboundAlerts(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_unboundAlerts(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().UnboundAlerts(rctx, fc.Args["threshold"].(*float64), fc.Args["keyword"].(*string), fc.Args["ticketId"].(*string), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*graphql1.AlertsResponse)
+	fc.Result = res
+	return ec.marshalNAlertsResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAlertsResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_unboundAlerts(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "alerts":
+				return ec.fieldContext_AlertsResponse_alerts(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_AlertsResponse_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AlertsResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_unboundAlerts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -9033,6 +9386,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "bindAlertsToTicket":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_bindAlertsToTicket(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -9189,6 +9549,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_alerts(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "unboundAlerts":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_unboundAlerts(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -10893,6 +11275,42 @@ func (ec *executionContext) marshalOFinding2ᚖgithubᚗcomᚋsecmonᚑlabᚋwar
 		return graphql.Null
 	}
 	return ec._Finding(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v any) (*float64, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalFloat(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel ast.SelectionSet, v *float64) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalFloat(*v)
+	return res
+}
+
+func (ec *executionContext) unmarshalOID2ᚖstring(ctx context.Context, v any) (*string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalID(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOID2ᚖstring(ctx context.Context, sel ast.SelectionSet, v *string) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalID(*v)
+	return res
 }
 
 func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {

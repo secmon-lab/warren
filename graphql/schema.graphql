@@ -104,6 +104,7 @@ type Query {
   ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
   alert(id: ID!): Alert
   alerts(offset: Int, limit: Int): AlertsResponse!
+  unboundAlerts(threshold: Float, keyword: String, ticketId: ID, offset: Int, limit: Int): AlertsResponse!
   dashboard: DashboardStats!
   activities(offset: Int, limit: Int): ActivitiesResponse!
 }
@@ -114,6 +115,7 @@ type Mutation {
   updateTicketConclusion(id: ID!, conclusion: String!, reason: String!): Ticket!
   updateTicket(id: ID!, title: String!, description: String): Ticket!
   createTicket(title: String!, description: String!, isTest: Boolean): Ticket!
+  bindAlertsToTicket(ticketId: ID!, alertIds: [ID!]!): Ticket!
 }
 
 schema {

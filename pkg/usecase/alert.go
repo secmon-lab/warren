@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -107,4 +109,92 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 	logger.Info("alert created", "alert", newAlert)
 
 	return &newAlert, nil
+}
+
+// GetUnboundAlertsFiltered returns unbound alerts filtered by similarity threshold and keyword
+func (uc *UseCases) GetUnboundAlertsFiltered(ctx context.Context, threshold *float64, keyword *string, ticketID *types.TicketID, offset, limit int) ([]*alert.Alert, int, error) {
+	// Get unbound alerts
+	alerts, err := uc.repository.GetAlertWithoutTicket(ctx, offset, limit)
+	if err != nil {
+		return nil, 0, goerr.Wrap(err, "failed to get unbound alerts")
+	}
+
+	// Filter by keyword if provided
+	if keyword != nil && *keyword != "" {
+		filteredAlerts := make([]*alert.Alert, 0)
+		for _, a := range alerts {
+			// Convert data to JSON string for keyword search
+			dataBytes, err := json.Marshal(a.Data)
+			if err != nil {
+				continue
+			}
+			dataStr := string(dataBytes)
+
+			// Check if keyword exists in title, description, or data
+			if containsIgnoreCase(a.Title, *keyword) ||
+				containsIgnoreCase(a.Description, *keyword) ||
+				containsIgnoreCase(dataStr, *keyword) {
+				filteredAlerts = append(filteredAlerts, a)
+			}
+		}
+		alerts = filteredAlerts
+	}
+
+	// Filter by similarity threshold if provided and ticketID is provided
+	if threshold != nil && ticketID != nil && *ticketID != types.EmptyTicketID {
+		ticketObj, err := uc.repository.GetTicket(ctx, *ticketID)
+		if err != nil {
+			return nil, 0, goerr.Wrap(err, "failed to get ticket for similarity filtering")
+		}
+
+		// Get ticket's alerts to use for similarity comparison
+		if len(ticketObj.AlertIDs) > 0 {
+			ticketAlerts, err := uc.repository.BatchGetAlerts(ctx, ticketObj.AlertIDs)
+			if err != nil {
+				return nil, 0, goerr.Wrap(err, "failed to get ticket alerts for similarity")
+			}
+
+			// Use the first alert's embedding for similarity
+			if len(ticketAlerts) > 0 && len(ticketAlerts[0].Embedding) > 0 {
+				similarAlerts, err := uc.repository.FindNearestAlerts(ctx, ticketAlerts[0].Embedding, 100)
+				if err != nil {
+					return nil, 0, goerr.Wrap(err, "failed to find similar alerts")
+				}
+
+				// Filter alerts by threshold and ensure they are unbound
+				filteredAlerts := make([]*alert.Alert, 0)
+				for _, a := range similarAlerts {
+					if a.TicketID == types.EmptyTicketID {
+						// Calculate similarity and filter by threshold
+						similarity := ticketAlerts[0].CosineSimilarity(a.Embedding)
+						if float64(similarity) >= *threshold {
+							filteredAlerts = append(filteredAlerts, a)
+						}
+					}
+				}
+				alerts = filteredAlerts
+			}
+		}
+	}
+
+	// Get total count (for pagination, we'll just return the filtered count for now)
+	totalCount := len(alerts)
+
+	return alerts, totalCount, nil
+}
+
+// BindAlertsToTicket binds multiple alerts to a ticket
+func (uc *UseCases) BindAlertsToTicket(ctx context.Context, ticketID types.TicketID, alertIDs []types.AlertID) error {
+	// Bind alerts to ticket
+	err := uc.repository.BatchBindAlertsToTicket(ctx, alertIDs, ticketID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to bind alerts to ticket")
+	}
+
+	return nil
+}
+
+// containsIgnoreCase checks if substr exists in s (case insensitive)
+func containsIgnoreCase(s, substr string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
