@@ -7,6 +7,7 @@ package graphql
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	goerr "github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -261,6 +262,29 @@ func (r *mutationResolver) CreateTicket(ctx context.Context, title string, descr
 	return newTicket, nil
 }
 
+// BindAlertsToTicket is the resolver for the bindAlertsToTicket field.
+func (r *mutationResolver) BindAlertsToTicket(ctx context.Context, ticketID string, alertIds []string) (*ticket.Ticket, error) {
+	// Convert string IDs to typed IDs
+	alertIDsTyped := make([]types.AlertID, len(alertIds))
+	for i, id := range alertIds {
+		alertIDsTyped[i] = types.AlertID(id)
+	}
+
+	// Bind alerts to ticket using UseCase
+	err := r.uc.BindAlertsToTicket(ctx, types.TicketID(ticketID), alertIDsTyped)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to bind alerts to ticket")
+	}
+
+	// Get updated ticket
+	updatedTicket, err := r.repo.GetTicket(ctx, types.TicketID(ticketID))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get updated ticket")
+	}
+
+	return updatedTicket, nil
+}
+
 // Ticket is the resolver for the ticket field.
 func (r *queryResolver) Ticket(ctx context.Context, id string) (*ticket.Ticket, error) {
 	t, err := r.repo.GetTicket(ctx, types.TicketID(id))
@@ -448,6 +472,33 @@ func (r *queryResolver) Alerts(ctx context.Context, offset *int, limit *int) (*g
 	totalCount, err := r.repo.CountAlertsWithoutTicket(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to count alerts")
+	}
+
+	return &graphql1.AlertsResponse{
+		Alerts:     alerts,
+		TotalCount: totalCount,
+	}, nil
+}
+
+// UnboundAlerts is the resolver for the unboundAlerts field.
+func (r *queryResolver) UnboundAlerts(ctx context.Context, threshold *float64, keyword *string, ticketID *string, offset *int, limit *int) (*graphql1.AlertsResponse, error) {
+	var offsetVal, limitVal int
+	if offset != nil {
+		offsetVal = *offset
+	}
+	if limit != nil {
+		limitVal = *limit
+	}
+
+	var ticketIDTyped *types.TicketID
+	if ticketID != nil && *ticketID != "" {
+		tid := types.TicketID(*ticketID)
+		ticketIDTyped = &tid
+	}
+
+	alerts, totalCount, err := r.uc.GetUnboundAlertsFiltered(ctx, threshold, keyword, ticketIDTyped, offsetVal, limitVal)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get unbound alerts")
 	}
 
 	return &graphql1.AlertsResponse{
@@ -678,3 +729,8 @@ type findingResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }
+
+// Helper functions
+func containsIgnoreCase(s, substr string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
+}

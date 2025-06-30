@@ -362,3 +362,40 @@ export const GET_SIMILAR_TICKETS = gql`
     }
   }
 `;
+
+export const GET_UNBOUND_ALERTS = gql`
+  query GetNewAlerts($threshold: Float, $keyword: String, $ticketId: ID, $offset: Int, $limit: Int) {
+    unboundAlerts(threshold: $threshold, keyword: $keyword, ticketId: $ticketId, offset: $offset, limit: $limit) {
+      alerts {
+        id
+        title
+        description
+        schema
+        data
+        attributes {
+          key
+          value
+          link
+          auto
+        }
+        createdAt
+      }
+      totalCount
+    }
+  }
+`;
+
+export const BIND_ALERTS_TO_TICKET = gql`
+  mutation BindAlertsToTicket($ticketId: ID!, $alertIds: [ID!]!) {
+    bindAlertsToTicket(ticketId: $ticketId, alertIds: $alertIds) {
+      id
+      title
+      alertsCount
+      alerts {
+        id
+        title
+        createdAt
+      }
+    }
+  }
+`;

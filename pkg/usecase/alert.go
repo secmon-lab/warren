@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -107,4 +109,162 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 	logger.Info("alert created", "alert", newAlert)
 
 	return &newAlert, nil
+}
+
+// GetUnboundAlertsFiltered returns unbound alerts filtered by similarity threshold and keyword
+func (uc *UseCases) GetUnboundAlertsFiltered(ctx context.Context, threshold *float64, keyword *string, ticketID *types.TicketID, offset, limit int) ([]*alert.Alert, int, error) {
+	var candidateAlerts []*alert.Alert
+	var err error
+
+	// Step 1: Get candidate alerts based on similarity filtering
+	if threshold != nil && ticketID != nil && *ticketID != types.EmptyTicketID {
+		// Use similarity-based filtering as the primary source
+		ticketObj, err := uc.repository.GetTicket(ctx, *ticketID)
+		if err != nil {
+			return nil, 0, goerr.Wrap(err, "failed to get ticket for similarity filtering")
+		}
+
+		// Get ticket's alerts to use for similarity comparison
+		if len(ticketObj.AlertIDs) > 0 {
+			ticketAlerts, err := uc.repository.BatchGetAlerts(ctx, ticketObj.AlertIDs)
+			if err != nil {
+				return nil, 0, goerr.Wrap(err, "failed to get ticket alerts for similarity")
+			}
+
+			// Use the first alert's embedding for similarity
+			if len(ticketAlerts) > 0 && len(ticketAlerts[0].Embedding) > 0 {
+				similarAlerts, err := uc.repository.FindNearestAlerts(ctx, ticketAlerts[0].Embedding, 1000) // Get more candidates
+				if err != nil {
+					return nil, 0, goerr.Wrap(err, "failed to find similar alerts")
+				}
+
+				// Filter alerts by threshold and ensure they are unbound
+				for _, a := range similarAlerts {
+					if a.TicketID == types.EmptyTicketID {
+						// Calculate similarity and filter by threshold
+						similarity := ticketAlerts[0].CosineSimilarity(a.Embedding)
+						if float64(similarity) >= *threshold {
+							candidateAlerts = append(candidateAlerts, a)
+						}
+					}
+				}
+			}
+		}
+	} else {
+		// Get all unbound alerts as candidates
+		candidateAlerts, err = uc.repository.GetAlertWithoutTicket(ctx, 0, 0) // Get all for filtering
+		if err != nil {
+			return nil, 0, goerr.Wrap(err, "failed to get unbound alerts")
+		}
+	}
+
+	// Step 2: Apply keyword filter to candidate alerts
+	var filteredAlerts []*alert.Alert
+	if keyword != nil && *keyword != "" {
+		for _, a := range candidateAlerts {
+			// Convert data to JSON string for keyword search
+			dataBytes, err := json.Marshal(a.Data)
+			if err != nil {
+				continue
+			}
+			dataStr := string(dataBytes)
+
+			// Check if keyword exists in title, description, or data
+			if containsIgnoreCase(a.Title, *keyword) ||
+				containsIgnoreCase(a.Description, *keyword) ||
+				containsIgnoreCase(dataStr, *keyword) {
+				filteredAlerts = append(filteredAlerts, a)
+			}
+		}
+	} else {
+		// No keyword filter, use all candidates
+		filteredAlerts = candidateAlerts
+	}
+
+	// Step 3: Calculate total count from fully filtered results
+	totalCount := len(filteredAlerts)
+
+	// Step 4: Apply pagination to the filtered results
+	start := offset
+	if start > len(filteredAlerts) {
+		start = len(filteredAlerts)
+	}
+
+	end := start + limit
+	if limit > 0 && end > len(filteredAlerts) {
+		end = len(filteredAlerts)
+	}
+	if limit == 0 {
+		end = len(filteredAlerts)
+	}
+
+	result := filteredAlerts[start:end]
+
+	return result, totalCount, nil
+}
+
+// BindAlertsToTicket binds multiple alerts to a ticket, recalculates embedding, and updates Slack display
+func (uc *UseCases) BindAlertsToTicket(ctx context.Context, ticketID types.TicketID, alertIDs []types.AlertID) error {
+	// Bind alerts to ticket (repository handles bidirectional binding)
+	err := uc.repository.BindAlertsToTicket(ctx, alertIDs, ticketID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to bind alerts to ticket")
+	}
+
+	// Get the updated ticket with new AlertIDs
+	ticket, err := uc.repository.GetTicket(ctx, ticketID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get updated ticket")
+	}
+
+	// Recalculate ticket embedding with all bound alerts
+	if err := ticket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
+		return goerr.Wrap(err, "failed to recalculate ticket embedding")
+	}
+
+	// Save the updated ticket with new embedding
+	if err := uc.repository.PutTicket(ctx, *ticket); err != nil {
+		return goerr.Wrap(err, "failed to save ticket with updated embedding")
+	}
+
+	// Update Slack display for both ticket and individual alerts
+	if uc.slackService != nil {
+		// Update ticket display if it has a Slack thread
+		if ticket.SlackThread != nil {
+			// Get all alerts bound to the ticket for display
+			alerts, err := uc.repository.BatchGetAlerts(ctx, ticket.AlertIDs)
+			if err != nil {
+				logging.From(ctx).Warn("failed to get alerts for Slack update", "error", err, "ticket_id", ticketID)
+			} else {
+				thread := uc.slackService.NewThread(*ticket.SlackThread)
+				if _, err := thread.PostTicket(ctx, *ticket, alerts); err != nil {
+					// Log error but don't fail the operation
+					logging.From(ctx).Warn("failed to update Slack thread after binding alerts", "error", err, "ticket_id", ticketID)
+				}
+			}
+		}
+
+		// Update individual alert displays in their respective threads
+		boundAlerts, err := uc.repository.BatchGetAlerts(ctx, alertIDs)
+		if err != nil {
+			logging.From(ctx).Warn("failed to get bound alerts for individual Slack updates", "error", err, "alert_ids", alertIDs)
+		} else {
+			for _, alert := range boundAlerts {
+				if alert.SlackThread != nil {
+					alertThread := uc.slackService.NewThread(*alert.SlackThread)
+					if err := alertThread.UpdateAlert(ctx, *alert); err != nil {
+						// Log error but don't fail the operation
+						logging.From(ctx).Warn("failed to update alert Slack display", "error", err, "alert_id", alert.ID)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// containsIgnoreCase checks if substr exists in s (case insensitive)
+func containsIgnoreCase(s, substr string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }

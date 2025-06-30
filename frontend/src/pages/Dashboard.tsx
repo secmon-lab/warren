@@ -224,7 +224,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Unbound Alerts Section */}
+          {/* New Alerts Section */}
           <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
@@ -233,7 +233,7 @@ export default function Dashboard() {
                     <AlertTriangle className="h-6 w-6 text-amber-600" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg font-semibold text-amber-900">Unbound Alerts</CardTitle>
+                    <CardTitle className="text-lg font-semibold text-amber-900">New Alerts</CardTitle>
                     <p className="text-sm text-amber-600">
                       {dashboardLoading ? "..." : dashboardData?.dashboard.unboundAlertsCount || 0} alerts need attention
                     </p>
@@ -278,7 +278,7 @@ export default function Dashboard() {
               ) : (
                 <div className="text-center py-8">
                   <AlertCircle className="h-12 w-12 text-amber-300 mx-auto mb-3" />
-                  <p className="text-sm text-amber-600">No unbound alerts</p>
+                  <p className="text-sm text-amber-600">No new alerts</p>
                 </div>
               )}
             </CardContent>

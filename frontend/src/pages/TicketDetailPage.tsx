@@ -66,6 +66,7 @@ import { EditConclusionModal } from "@/components/ui/edit-conclusion-modal";
 import { EditTicketModal } from "@/components/EditTicketModal";
 import { SimilarTickets } from "@/components/SimilarTickets";
 import { TicketComments } from "@/components/TicketComments";
+import { SalvageModal } from "@/components/SalvageModal";
 
 const ALERTS_PER_PAGE = 5;
 
@@ -80,6 +81,7 @@ export default function TicketDetailPage() {
   const [isEditTicketModalOpen, setIsEditTicketModalOpen] = useState(false);
   const [isEditConclusionModalOpen, setIsEditConclusionModalOpen] =
     useState(false);
+  const [isSalvageModalOpen, setIsSalvageModalOpen] = useState(false);
 
   const errorToast = useErrorToast();
   const successToast = useSuccessToast();
@@ -428,10 +430,21 @@ export default function TicketDetailPage() {
           {/* Alerts Section with Pagination */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5" />
-                Related Alerts ({ticket.alerts.length})
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5" />
+                  Related Alerts ({ticket.alerts.length})
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsSalvageModalOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <AlertCircle className="h-4 w-4" />
+                  Salvage
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y">
@@ -836,6 +849,13 @@ export default function TicketDetailPage() {
         isOpen={isEditTicketModalOpen}
         onClose={() => setIsEditTicketModalOpen(false)}
         ticket={ticket}
+      />
+
+      {/* Salvage Modal */}
+      <SalvageModal
+        isOpen={isSalvageModalOpen}
+        onClose={() => setIsSalvageModalOpen(false)}
+        ticketId={ticket.id}
       />
     </div>
   );

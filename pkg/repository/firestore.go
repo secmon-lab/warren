@@ -518,25 +518,86 @@ func (r *Firestore) PutTicketCommentsPrompted(ctx context.Context, ticketID type
 }
 
 // Alert-Ticket binding methods
-func (r *Firestore) BindAlertToTicket(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
-	alertDoc := r.db.Collection(collectionAlerts).Doc(alertID.String())
-	_, err := alertDoc.Update(ctx, []firestore.Update{
-		{
-			Path:  "TicketID",
-			Value: ticketID,
-		},
-	})
-	if err != nil {
-		return goerr.Wrap(err, "failed to bind alert to ticket", goerr.V("alert_id", alertID), goerr.V("ticket_id", ticketID))
+func (r *Firestore) BindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
+	// Update alerts using BulkWriter for performance
+	bw := r.db.BulkWriter(ctx)
+	var jobs []*firestore.BulkWriterJob
+	for _, alertID := range alertIDs {
+		alertDoc := r.db.Collection(collectionAlerts).Doc(alertID.String())
+		job, err := bw.Update(alertDoc, []firestore.Update{
+			{
+				Path:  "TicketID",
+				Value: ticketID,
+			},
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to bind alert to ticket", goerr.V("alert_id", alertID), goerr.V("ticket_id", ticketID))
+		}
+		jobs = append(jobs, job)
+	}
+	bw.End()
+
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil {
+			return goerr.Wrap(err, "failed to commit bulk writer job")
+		}
 	}
 
-	// Create activity for alert binding
-	// Get alert and ticket for activity creation
-	alert, alertErr := r.GetAlert(ctx, alertID)
+	// Update ticket's AlertIDs array using transaction for consistency
+	err := r.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		ticketDoc := r.db.Collection(collectionTickets).Doc(ticketID.String())
+
+		// Verify the ticket exists
+		ticketSnap, err := tx.Get(ticketDoc)
+		if err != nil {
+			return goerr.Wrap(err, "failed to get ticket in transaction", goerr.V("ticket_id", ticketID))
+		}
+		if !ticketSnap.Exists() {
+			return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+		}
+
+		// Update ticket's AlertIDs array to include the newly bound alerts
+		err = tx.Update(ticketDoc, []firestore.Update{
+			{
+				Path:  "AlertIDs",
+				Value: firestore.ArrayUnion(alertIDsToInterface(alertIDs)...),
+			},
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to update ticket AlertIDs in transaction", goerr.V("ticket_id", ticketID))
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return goerr.Wrap(err, "transaction failed for updating ticket AlertIDs")
+	}
+
+	// Create activity for bulk alert binding (outside transaction to avoid conflicts)
+	// Get ticket for activity creation
 	ticket, ticketErr := r.GetTicket(ctx, ticketID)
-	if alertErr == nil && ticketErr == nil {
-		if err := createAlertBoundActivity(ctx, r, alertID, ticketID, alert.Metadata.Title, ticket.Metadata.Title); err != nil {
-			return goerr.Wrap(err, "failed to create alert bound activity", goerr.V("alert_id", alertID), goerr.V("ticket_id", ticketID))
+	if ticketErr == nil {
+		// Get alerts for activity creation
+		var alertTitles []string
+		for _, alertID := range alertIDs {
+			if alert, err := r.GetAlert(ctx, alertID); err == nil {
+				alertTitles = append(alertTitles, alert.Metadata.Title)
+			}
+		}
+
+		if len(alertIDs) > 1 {
+			if err := createBulkAlertBoundActivity(ctx, r, alertIDs, ticketID, ticket.Metadata.Title, alertTitles); err != nil {
+				return goerr.Wrap(err, "failed to create bulk alert bound activity", goerr.V("ticket_id", ticketID))
+			}
+		} else if len(alertIDs) == 1 {
+			alertTitle := ""
+			if len(alertTitles) > 0 {
+				alertTitle = alertTitles[0]
+			}
+			if err := createAlertBoundActivity(ctx, r, alertIDs[0], ticketID, alertTitle, ticket.Metadata.Title); err != nil {
+				return goerr.Wrap(err, "failed to create alert bound activity", goerr.V("alert_id", alertIDs[0]), goerr.V("ticket_id", ticketID))
+			}
 		}
 	}
 
@@ -696,60 +757,6 @@ func (r *Firestore) GetTicketByThread(ctx context.Context, thread slack.Thread) 
 	}
 
 	return &t, nil
-}
-
-func (r *Firestore) BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
-	bw := r.db.BulkWriter(ctx)
-	var jobs []*firestore.BulkWriterJob
-	for _, alertID := range alertIDs {
-		alertDoc := r.db.Collection(collectionAlerts).Doc(alertID.String())
-		job, err := bw.Update(alertDoc, []firestore.Update{
-			{
-				Path:  "TicketID",
-				Value: ticketID,
-			},
-		})
-		if err != nil {
-			return goerr.Wrap(err, "failed to bind alert to ticket", goerr.V("alert_id", alertID), goerr.V("ticket_id", ticketID))
-		}
-		jobs = append(jobs, job)
-	}
-	bw.End()
-
-	for _, job := range jobs {
-		if _, err := job.Results(); err != nil {
-			return goerr.Wrap(err, "failed to commit bulk writer job")
-		}
-	}
-
-	// Create activity for bulk alert binding
-	// Get ticket for activity creation
-	ticket, ticketErr := r.GetTicket(ctx, ticketID)
-	if ticketErr == nil {
-		// Get alerts for activity creation
-		var alertTitles []string
-		for _, alertID := range alertIDs {
-			if alert, err := r.GetAlert(ctx, alertID); err == nil {
-				alertTitles = append(alertTitles, alert.Metadata.Title)
-			}
-		}
-
-		if len(alertIDs) > 1 {
-			if err := createBulkAlertBoundActivity(ctx, r, alertIDs, ticketID, ticket.Metadata.Title, alertTitles); err != nil {
-				return goerr.Wrap(err, "failed to create bulk alert bound activity", goerr.V("ticket_id", ticketID))
-			}
-		} else if len(alertIDs) == 1 {
-			alertTitle := ""
-			if len(alertTitles) > 0 {
-				alertTitle = alertTitles[0]
-			}
-			if err := createAlertBoundActivity(ctx, r, alertIDs[0], ticketID, alertTitle, ticket.Metadata.Title); err != nil {
-				return goerr.Wrap(err, "failed to create alert bound activity", goerr.V("alert_id", alertIDs[0]), goerr.V("ticket_id", ticketID))
-			}
-		}
-	}
-
-	return nil
 }
 
 // BatchGetTickets gets tickets by their IDs. If some tickets are not found, it will be ignored.
@@ -1207,4 +1214,13 @@ func (r *Firestore) CountActivities(ctx context.Context) (int, error) {
 	}
 
 	return extractCountFromAggregationResult(result, "count")
+}
+
+// alertIDsToInterface converts []types.AlertID to []interface{} for Firestore ArrayUnion
+func alertIDsToInterface(alertIDs []types.AlertID) []interface{} {
+	interfaces := make([]interface{}, len(alertIDs))
+	for i, id := range alertIDs {
+		interfaces[i] = id.String()
+	}
+	return interfaces
 }

@@ -367,8 +367,8 @@ func (r *Memory) PutTicketCommentsPrompted(ctx context.Context, ticketID types.T
 	return nil
 }
 
-func (r *Memory) BindAlertToTicket(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
-	// Bind alert to ticket first
+func (r *Memory) BindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
+	// Bind alerts to ticket first
 	r.mu.Lock()
 
 	// Get ticket for activity creation
@@ -378,20 +378,49 @@ func (r *Memory) BindAlertToTicket(ctx context.Context, alertID types.AlertID, t
 		return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
 	}
 
-	alert, ok := r.alerts[alertID]
-	if !ok {
-		r.mu.Unlock()
-		return goerr.New("alert not found", goerr.V("alert_id", alertID))
+	// Get alerts for activity creation and bind them to ticket
+	var alertTitles []string
+	for _, alertID := range alertIDs {
+		alert, ok := r.alerts[alertID]
+		if !ok {
+			r.mu.Unlock()
+			return goerr.New("alert not found", goerr.V("alert_id", alertID))
+		}
+		alert.TicketID = ticketID
+		alertTitles = append(alertTitles, alert.Metadata.Title)
 	}
 
-	alert.TicketID = ticketID
-	alertTitle := alert.Metadata.Title
+	// Update ticket's AlertIDs array to include newly bound alerts
+	for _, alertID := range alertIDs {
+		// Check if alert is already in the ticket's AlertIDs to avoid duplicates
+		found := false
+		for _, existingID := range t.AlertIDs {
+			if existingID == alertID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.AlertIDs = append(t.AlertIDs, alertID)
+		}
+	}
+
 	ticketTitle := t.Metadata.Title
 	r.mu.Unlock()
 
-	// Create activity for alert binding
-	if err := createAlertBoundActivity(ctx, r, alertID, ticketID, alertTitle, ticketTitle); err != nil {
-		return goerr.Wrap(err, "failed to create alert bound activity", goerr.V("alert_id", alertID), goerr.V("ticket_id", ticketID))
+	// Create activity for bulk alert binding
+	if len(alertIDs) > 1 {
+		if err := createBulkAlertBoundActivity(ctx, r, alertIDs, ticketID, ticketTitle, alertTitles); err != nil {
+			return goerr.Wrap(err, "failed to create bulk alert bound activity", goerr.V("ticket_id", ticketID))
+		}
+	} else if len(alertIDs) == 1 {
+		alertTitle := ""
+		if len(alertTitles) > 0 {
+			alertTitle = alertTitles[0]
+		}
+		if err := createAlertBoundActivity(ctx, r, alertIDs[0], ticketID, alertTitle, ticketTitle); err != nil {
+			return goerr.Wrap(err, "failed to create alert bound activity", goerr.V("alert_id", alertIDs[0]), goerr.V("ticket_id", ticketID))
+		}
 	}
 
 	return nil
@@ -588,50 +617,6 @@ func (r *Memory) GetTicketByThread(ctx context.Context, thread slack.Thread) (*t
 		}
 	}
 	return nil, nil
-}
-
-func (r *Memory) BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
-	// Bind alerts to ticket first
-	r.mu.Lock()
-
-	// Get ticket for activity creation
-	t, ticketExists := r.tickets[ticketID]
-	if !ticketExists {
-		r.mu.Unlock()
-		return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
-	}
-
-	// Get alerts for activity creation
-	var alertTitles []string
-	for _, alertID := range alertIDs {
-		alert, ok := r.alerts[alertID]
-		if !ok {
-			r.mu.Unlock()
-			return goerr.New("alert not found", goerr.V("alert_id", alertID))
-		}
-		alert.TicketID = ticketID
-		alertTitles = append(alertTitles, alert.Metadata.Title)
-	}
-
-	ticketTitle := t.Metadata.Title
-	r.mu.Unlock()
-
-	// Create activity for bulk alert binding
-	if len(alertIDs) > 1 {
-		if err := createBulkAlertBoundActivity(ctx, r, alertIDs, ticketID, ticketTitle, alertTitles); err != nil {
-			return goerr.Wrap(err, "failed to create bulk alert bound activity", goerr.V("ticket_id", ticketID))
-		}
-	} else if len(alertIDs) == 1 {
-		alertTitle := ""
-		if len(alertTitles) > 0 {
-			alertTitle = alertTitles[0]
-		}
-		if err := createAlertBoundActivity(ctx, r, alertIDs[0], ticketID, alertTitle, ticketTitle); err != nil {
-			return goerr.Wrap(err, "failed to create alert bound activity", goerr.V("alert_id", alertIDs[0]), goerr.V("ticket_id", ticketID))
-		}
-	}
-
-	return nil
 }
 
 func (r *Memory) BatchGetTickets(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error) {

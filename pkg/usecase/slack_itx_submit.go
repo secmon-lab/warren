@@ -172,71 +172,23 @@ func (uc *UseCases) handleBindAlerts(ctx context.Context, slackUser slack.User, 
 		"alert_ids", alertIDs,
 	)
 
+	// Use the unified BindAlertsToTicket usecase which handles:
+	// - Repository binding (bidirectional)
+	// - Embedding recalculation
+	// - Slack updates for ticket and individual alerts
+	if err := uc.BindAlertsToTicket(ctx, ticketID, alertIDs); err != nil {
+		return goerr.Wrap(err, "failed to bind alerts to ticket", goerr.V("ticket_id", ticketID), goerr.V("alert_ids", alertIDs))
+	}
+
+	// Get updated ticket for notification
 	ticket, err := uc.repository.GetTicket(ctx, ticketID)
 	if err != nil {
-		return goerr.Wrap(err, "failed to get ticket", goerr.V("ticket_id", ticketID))
+		return goerr.Wrap(err, "failed to get updated ticket", goerr.V("ticket_id", ticketID))
 	}
-	if ticket == nil {
-		return goerr.Wrap(err, "ticket not found", goerr.V("ticket_id", ticketID))
-	}
-
-	alerts, err := uc.repository.BatchGetAlerts(ctx, alertIDs)
-	if err != nil {
-		return goerr.Wrap(err, "failed to get alerts", goerr.V("alert_ids", alertIDs))
-	}
-
-	ticket.AlertIDs = unifyAlertIDs(ticket.AlertIDs, alertIDs)
-
-	// Recalculate embedding using the unified approach
-	if err := ticket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
-		return goerr.Wrap(err, "failed to recalculate ticket embedding")
-	}
-
-	// Update database
-	if err := uc.repository.BatchBindAlertsToTicket(ctx, ticket.AlertIDs, ticketID); err != nil {
-		return goerr.Wrap(err, "failed to bind alerts to ticket", goerr.V("ticket_id", ticketID), goerr.V("new_alert_ids", ticket.AlertIDs))
-	}
-
-	if err := uc.repository.PutTicket(ctx, *ticket); err != nil {
-		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID))
-	}
-
-	// Update slack view
-	st := uc.slackService.NewThread(*ticket.SlackThread)
-
-	if _, err := st.PostTicket(ctx, *ticket, alerts); err != nil {
-		return goerr.Wrap(err, "failed to update slack thread")
-	}
-
-	// Update individual alert slack threads using rate-limited updater
-	uc.slackService.UpdateAlerts(ctx, alerts)
 
 	msg.Notify(ctx, "🎉 Alert bound to ticket to %s (%s)", ticketID, ticket.Metadata.Title)
 
 	return nil
-}
-
-func unifyAlertIDs(oldAlertIDs, newAlertIDs []types.AlertID) []types.AlertID {
-	// Create a map to eliminate duplicates
-	idMap := make(map[types.AlertID]struct{})
-
-	// Add old IDs to the map
-	for _, id := range oldAlertIDs {
-		idMap[id] = struct{}{}
-	}
-
-	// Add new IDs to the map
-	for _, id := range newAlertIDs {
-		idMap[id] = struct{}{}
-	}
-
-	// Create a slice from the map
-	unified := make([]types.AlertID, 0, len(idMap))
-	for id := range idMap {
-		unified = append(unified, id)
-	}
-
-	return unified
 }
 
 // generateResolveMessage generates a humorous message for when a ticket is resolved
@@ -403,35 +355,19 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionSalvage(ctx context.Cont
 		alertIDs[i] = alert.ID
 	}
 
-	// Bind alerts to ticket
-	target.AlertIDs = unifyAlertIDs(target.AlertIDs, alertIDs)
-
-	// Recalculate embedding using the unified approach
-	if err := target.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
-		return goerr.Wrap(err, "failed to recalculate ticket embedding")
-	}
-
-	// Update database
-	if err := uc.repository.BatchBindAlertsToTicket(ctx, target.AlertIDs, ticketID); err != nil {
+	// Use the unified BindAlertsToTicket usecase which handles:
+	// - Repository binding (bidirectional)
+	// - Embedding recalculation
+	// - Slack updates for ticket and individual alerts
+	if err := uc.BindAlertsToTicket(ctx, ticketID, alertIDs); err != nil {
 		return goerr.Wrap(err, "failed to bind alerts to ticket", goerr.V("ticket_id", ticketID), goerr.V("alert_ids", alertIDs))
 	}
 
-	if err := uc.repository.PutTicket(ctx, *target); err != nil {
-		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID))
-	}
-
-	// Update slack view
-	allAlerts, err := uc.repository.BatchGetAlerts(ctx, target.AlertIDs)
+	// Get updated ticket for notification
+	target, err = uc.repository.GetTicket(ctx, ticketID)
 	if err != nil {
-		return goerr.Wrap(err, "failed to get all alerts for ticket")
+		return goerr.Wrap(err, "failed to get updated ticket", goerr.V("ticket_id", ticketID))
 	}
-
-	if _, err := st.PostTicket(ctx, *target, allAlerts); err != nil {
-		return goerr.Wrap(err, "failed to update slack thread")
-	}
-
-	// Update individual alert slack threads using rate-limited updater
-	uc.slackService.UpdateAlerts(ctx, unboundAlerts)
 
 	msg.Notify(ctx, "🎉 Salvaged %d alerts to ticket %s", len(unboundAlerts), target.Metadata.Title)
 

@@ -33,8 +33,7 @@ type Repository interface {
 	GetTicketUnpromptedComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
 	PutTicketCommentsPrompted(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error
 
-	BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error
-	BindAlertToTicket(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error
+	BindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error
 	UnbindAlertFromTicket(ctx context.Context, alertID types.AlertID) error
 
 	PutAlert(ctx context.Context, alert alert.Alert) error

@@ -795,9 +795,6 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //
 //		// make and configure a mocked interfaces.Repository
 //		mockedRepository := &RepositoryMock{
-//			BatchBindAlertsToTicketFunc: func(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
-//				panic("mock out the BatchBindAlertsToTicket method")
-//			},
 //			BatchGetAlertsFunc: func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
 //				panic("mock out the BatchGetAlerts method")
 //			},
@@ -810,8 +807,8 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			BatchUpdateTicketsStatusFunc: func(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error {
 //				panic("mock out the BatchUpdateTicketsStatus method")
 //			},
-//			BindAlertToTicketFunc: func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
-//				panic("mock out the BindAlertToTicket method")
+//			BindAlertsToTicketFunc: func(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
+//				panic("mock out the BindAlertsToTicket method")
 //			},
 //			CountActivitiesFunc: func(ctx context.Context) (int, error) {
 //				panic("mock out the CountActivities method")
@@ -934,9 +931,6 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //
 //	}
 type RepositoryMock struct {
-	// BatchBindAlertsToTicketFunc mocks the BatchBindAlertsToTicket method.
-	BatchBindAlertsToTicketFunc func(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error
-
 	// BatchGetAlertsFunc mocks the BatchGetAlerts method.
 	BatchGetAlertsFunc func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
 
@@ -949,8 +943,8 @@ type RepositoryMock struct {
 	// BatchUpdateTicketsStatusFunc mocks the BatchUpdateTicketsStatus method.
 	BatchUpdateTicketsStatusFunc func(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error
 
-	// BindAlertToTicketFunc mocks the BindAlertToTicket method.
-	BindAlertToTicketFunc func(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error
+	// BindAlertsToTicketFunc mocks the BindAlertsToTicket method.
+	BindAlertsToTicketFunc func(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error
 
 	// CountActivitiesFunc mocks the CountActivities method.
 	CountActivitiesFunc func(ctx context.Context) (int, error)
@@ -1068,15 +1062,6 @@ type RepositoryMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
-		// BatchBindAlertsToTicket holds details about calls to the BatchBindAlertsToTicket method.
-		BatchBindAlertsToTicket []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// AlertIDs is the alertIDs argument value.
-			AlertIDs []types.AlertID
-			// TicketID is the ticketID argument value.
-			TicketID types.TicketID
-		}
 		// BatchGetAlerts holds details about calls to the BatchGetAlerts method.
 		BatchGetAlerts []struct {
 			// Ctx is the ctx argument value.
@@ -1107,12 +1092,12 @@ type RepositoryMock struct {
 			// Status is the status argument value.
 			Status types.TicketStatus
 		}
-		// BindAlertToTicket holds details about calls to the BindAlertToTicket method.
-		BindAlertToTicket []struct {
+		// BindAlertsToTicket holds details about calls to the BindAlertsToTicket method.
+		BindAlertsToTicket []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// AlertID is the alertID argument value.
-			AlertID types.AlertID
+			// AlertIDs is the alertIDs argument value.
+			AlertIDs []types.AlertID
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
 		}
@@ -1417,12 +1402,11 @@ type RepositoryMock struct {
 			AlertID types.AlertID
 		}
 	}
-	lockBatchBindAlertsToTicket     sync.RWMutex
 	lockBatchGetAlerts              sync.RWMutex
 	lockBatchGetTickets             sync.RWMutex
 	lockBatchPutAlerts              sync.RWMutex
 	lockBatchUpdateTicketsStatus    sync.RWMutex
-	lockBindAlertToTicket           sync.RWMutex
+	lockBindAlertsToTicket          sync.RWMutex
 	lockCountActivities             sync.RWMutex
 	lockCountAlertsWithoutTicket    sync.RWMutex
 	lockCountTicketComments         sync.RWMutex
@@ -1461,49 +1445,6 @@ type RepositoryMock struct {
 	lockPutToken                    sync.RWMutex
 	lockSearchAlerts                sync.RWMutex
 	lockUnbindAlertFromTicket       sync.RWMutex
-}
-
-// BatchBindAlertsToTicket calls BatchBindAlertsToTicketFunc.
-func (mock *RepositoryMock) BatchBindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
-	callInfo := struct {
-		Ctx      context.Context
-		AlertIDs []types.AlertID
-		TicketID types.TicketID
-	}{
-		Ctx:      ctx,
-		AlertIDs: alertIDs,
-		TicketID: ticketID,
-	}
-	mock.lockBatchBindAlertsToTicket.Lock()
-	mock.calls.BatchBindAlertsToTicket = append(mock.calls.BatchBindAlertsToTicket, callInfo)
-	mock.lockBatchBindAlertsToTicket.Unlock()
-	if mock.BatchBindAlertsToTicketFunc == nil {
-		var (
-			errOut error
-		)
-		return errOut
-	}
-	return mock.BatchBindAlertsToTicketFunc(ctx, alertIDs, ticketID)
-}
-
-// BatchBindAlertsToTicketCalls gets all the calls that were made to BatchBindAlertsToTicket.
-// Check the length with:
-//
-//	len(mockedRepository.BatchBindAlertsToTicketCalls())
-func (mock *RepositoryMock) BatchBindAlertsToTicketCalls() []struct {
-	Ctx      context.Context
-	AlertIDs []types.AlertID
-	TicketID types.TicketID
-} {
-	var calls []struct {
-		Ctx      context.Context
-		AlertIDs []types.AlertID
-		TicketID types.TicketID
-	}
-	mock.lockBatchBindAlertsToTicket.RLock()
-	calls = mock.calls.BatchBindAlertsToTicket
-	mock.lockBatchBindAlertsToTicket.RUnlock()
-	return calls
 }
 
 // BatchGetAlerts calls BatchGetAlertsFunc.
@@ -1668,46 +1609,46 @@ func (mock *RepositoryMock) BatchUpdateTicketsStatusCalls() []struct {
 	return calls
 }
 
-// BindAlertToTicket calls BindAlertToTicketFunc.
-func (mock *RepositoryMock) BindAlertToTicket(ctx context.Context, alertID types.AlertID, ticketID types.TicketID) error {
+// BindAlertsToTicket calls BindAlertsToTicketFunc.
+func (mock *RepositoryMock) BindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
 	callInfo := struct {
 		Ctx      context.Context
-		AlertID  types.AlertID
+		AlertIDs []types.AlertID
 		TicketID types.TicketID
 	}{
 		Ctx:      ctx,
-		AlertID:  alertID,
+		AlertIDs: alertIDs,
 		TicketID: ticketID,
 	}
-	mock.lockBindAlertToTicket.Lock()
-	mock.calls.BindAlertToTicket = append(mock.calls.BindAlertToTicket, callInfo)
-	mock.lockBindAlertToTicket.Unlock()
-	if mock.BindAlertToTicketFunc == nil {
+	mock.lockBindAlertsToTicket.Lock()
+	mock.calls.BindAlertsToTicket = append(mock.calls.BindAlertsToTicket, callInfo)
+	mock.lockBindAlertsToTicket.Unlock()
+	if mock.BindAlertsToTicketFunc == nil {
 		var (
 			errOut error
 		)
 		return errOut
 	}
-	return mock.BindAlertToTicketFunc(ctx, alertID, ticketID)
+	return mock.BindAlertsToTicketFunc(ctx, alertIDs, ticketID)
 }
 
-// BindAlertToTicketCalls gets all the calls that were made to BindAlertToTicket.
+// BindAlertsToTicketCalls gets all the calls that were made to BindAlertsToTicket.
 // Check the length with:
 //
-//	len(mockedRepository.BindAlertToTicketCalls())
-func (mock *RepositoryMock) BindAlertToTicketCalls() []struct {
+//	len(mockedRepository.BindAlertsToTicketCalls())
+func (mock *RepositoryMock) BindAlertsToTicketCalls() []struct {
 	Ctx      context.Context
-	AlertID  types.AlertID
+	AlertIDs []types.AlertID
 	TicketID types.TicketID
 } {
 	var calls []struct {
 		Ctx      context.Context
-		AlertID  types.AlertID
+		AlertIDs []types.AlertID
 		TicketID types.TicketID
 	}
-	mock.lockBindAlertToTicket.RLock()
-	calls = mock.calls.BindAlertToTicket
-	mock.lockBindAlertToTicket.RUnlock()
+	mock.lockBindAlertsToTicket.RLock()
+	calls = mock.calls.BindAlertsToTicket
+	mock.lockBindAlertsToTicket.RUnlock()
 	return calls
 }
 
