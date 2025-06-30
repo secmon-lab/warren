@@ -203,18 +203,28 @@ func (uc *UseCases) GetUnboundAlertsFiltered(ctx context.Context, threshold *flo
 	return result, totalCount, nil
 }
 
-// BindAlertsToTicket binds multiple alerts to a ticket and updates Slack display
+// BindAlertsToTicket binds multiple alerts to a ticket, recalculates embedding, and updates Slack display
 func (uc *UseCases) BindAlertsToTicket(ctx context.Context, ticketID types.TicketID, alertIDs []types.AlertID) error {
-	// Bind alerts to ticket
+	// Bind alerts to ticket (repository handles bidirectional binding)
 	err := uc.repository.BindAlertsToTicket(ctx, alertIDs, ticketID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to bind alerts to ticket")
 	}
 
-	// Get the ticket to access its Slack thread
+	// Get the updated ticket with new AlertIDs
 	ticket, err := uc.repository.GetTicket(ctx, ticketID)
 	if err != nil {
-		return goerr.Wrap(err, "failed to get ticket for Slack update")
+		return goerr.Wrap(err, "failed to get updated ticket")
+	}
+
+	// Recalculate ticket embedding with all bound alerts
+	if err := ticket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
+		return goerr.Wrap(err, "failed to recalculate ticket embedding")
+	}
+
+	// Save the updated ticket with new embedding
+	if err := uc.repository.PutTicket(ctx, *ticket); err != nil {
+		return goerr.Wrap(err, "failed to save ticket with updated embedding")
 	}
 
 	// Update Slack display for both ticket and individual alerts
