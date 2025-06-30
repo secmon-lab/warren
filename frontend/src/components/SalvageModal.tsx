@@ -36,6 +36,7 @@ export function SalvageModal({ isOpen, onClose, ticketId }: SalvageModalProps) {
   const [keyword, setKeyword] = useState("");
   const [selectedAlerts, setSelectedAlerts] = useState<Set<string>>(new Set());
   const [debouncedKeyword, setDebouncedKeyword] = useState("");
+  const [selectAllMatching, setSelectAllMatching] = useState(false); // Track if all matching alerts are selected
   
   const successToast = useSuccessToast();
   const errorToast = useErrorToast();
@@ -63,6 +64,21 @@ export function SalvageModal({ isOpen, onClose, ticketId }: SalvageModalProps) {
     }
   );
 
+  // Query for all matching alerts when "Select All Matching" is used
+  const { data: allAlertsData, loading: allAlertsLoading, refetch: refetchAll } = useQuery<NewAlertsData>(
+    GET_UNBOUND_ALERTS,
+    {
+      variables: {
+        threshold: threshold[0],
+        keyword: debouncedKeyword || undefined,
+        ticketId,
+        offset: 0,
+        limit: 0, // 0 means no limit, get all matching alerts
+      },
+      skip: !isOpen || !selectAllMatching,
+    }
+  );
+
   const [bindAlerts, { loading: bindingLoading }] = useMutation(BIND_ALERTS_TO_TICKET, {
     refetchQueries: [{ query: GET_TICKET, variables: { id: ticketId } }],
   });
@@ -70,6 +86,10 @@ export function SalvageModal({ isOpen, onClose, ticketId }: SalvageModalProps) {
   // Auto-refresh when threshold changes
   useEffect(() => {
     if (isOpen) {
+      // Reset selections when filters change
+      setSelectedAlerts(new Set());
+      setSelectAllMatching(false);
+      
       refetch({
         threshold: threshold[0],
         keyword: debouncedKeyword || undefined,
@@ -102,8 +122,36 @@ export function SalvageModal({ isOpen, onClose, ticketId }: SalvageModalProps) {
       setSelectedAlerts(new Set(allAlertIds));
     } else {
       setSelectedAlerts(new Set());
+      setSelectAllMatching(false);
     }
   }, [alertsData?.unboundAlerts.alerts]);
+
+  const handleSelectAllMatching = useCallback(async (checked: boolean) => {
+    if (checked) {
+      setSelectAllMatching(true);
+      // This will trigger the query for all matching alerts
+      try {
+        const result = await refetchAll({
+          threshold: threshold[0],
+          keyword: debouncedKeyword || undefined,
+          ticketId,
+          offset: 0,
+          limit: 0, // Get all matching alerts
+        });
+        
+        if (result.data?.unboundAlerts.alerts) {
+          const allMatchingIds = result.data.unboundAlerts.alerts.map(alert => alert.id);
+          setSelectedAlerts(new Set(allMatchingIds));
+        }
+      } catch (error) {
+        errorToast("Failed to fetch all matching alerts");
+        setSelectAllMatching(false);
+      }
+    } else {
+      setSelectedAlerts(new Set());
+      setSelectAllMatching(false);
+    }
+  }, [threshold, debouncedKeyword, ticketId, refetchAll, errorToast]);
 
   const handleSubmit = async () => {
     if (selectedAlerts.size === 0) {
@@ -129,6 +177,7 @@ export function SalvageModal({ isOpen, onClose, ticketId }: SalvageModalProps) {
 
   const handleClose = () => {
     setSelectedAlerts(new Set());
+    setSelectAllMatching(false);
     setKeyword("");
     setThreshold([0.95]);
     onClose();
@@ -136,8 +185,9 @@ export function SalvageModal({ isOpen, onClose, ticketId }: SalvageModalProps) {
 
   const alerts = alertsData?.unboundAlerts.alerts || [];
   const totalCount = alertsData?.unboundAlerts.totalCount || 0;
-  const isAllSelected = selectedAlerts.size > 0 && selectedAlerts.size === alerts.length;
+  const isAllDisplayedSelected = selectedAlerts.size > 0 && selectedAlerts.size === alerts.length;
   const isIndeterminate = selectedAlerts.size > 0 && selectedAlerts.size < alerts.length;
+  const isAllMatchingSelected = selectAllMatching && selectedAlerts.size === totalCount;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -213,25 +263,48 @@ export function SalvageModal({ isOpen, onClose, ticketId }: SalvageModalProps) {
                   Matching Alerts ({totalCount})
                 </h3>
                 {alerts.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="select-all"
-                      checked={isAllSelected}
-                      ref={(el: HTMLButtonElement | null) => {
-                        if (el) (el as any).indeterminate = isIndeterminate;
-                      }}
-                      onCheckedChange={handleSelectAll}
-                    />
-                    <Label htmlFor="select-all" className="text-sm">
-                      Select All ({alerts.length})
-                    </Label>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="select-visible"
+                        checked={isAllDisplayedSelected}
+                        ref={(el: HTMLButtonElement | null) => {
+                          if (el) (el as any).indeterminate = isIndeterminate && !selectAllMatching;
+                        }}
+                        onCheckedChange={handleSelectAll}
+                      />
+                      <Label htmlFor="select-visible" className="text-sm">
+                        Select Visible ({alerts.length})
+                      </Label>
+                    </div>
+                    {totalCount > alerts.length && (
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="select-all-matching"
+                          checked={isAllMatchingSelected}
+                          onCheckedChange={handleSelectAllMatching}
+                          disabled={allAlertsLoading}
+                        />
+                        <Label htmlFor="select-all-matching" className="text-sm font-medium text-blue-600">
+                          Select All Matching ({totalCount})
+                          {allAlertsLoading && <span className="text-xs text-muted-foreground ml-1">(Loading...)</span>}
+                        </Label>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
               {selectedAlerts.size > 0 && (
-                <Badge variant="secondary">
-                  {selectedAlerts.size} selected
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">
+                    {selectedAlerts.size} selected
+                  </Badge>
+                  {selectAllMatching && (
+                    <Badge variant="outline" className="text-blue-600 border-blue-600">
+                      All Matching
+                    </Badge>
+                  )}
+                </div>
               )}
             </div>
 
@@ -313,7 +386,7 @@ export function SalvageModal({ isOpen, onClose, ticketId }: SalvageModalProps) {
               disabled={selectedAlerts.size === 0 || bindingLoading}
               className="min-w-[120px]"
             >
-              {bindingLoading ? "Binding..." : `Bind ${selectedAlerts.size} Alert(s)`}
+              {bindingLoading ? "Binding..." : `Bind ${selectedAlerts.size} Alert(s)${selectAllMatching ? ' (All Matching)' : ''}`}
             </Button>
           </div>
         </div>
