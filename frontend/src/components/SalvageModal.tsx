@@ -24,7 +24,7 @@ interface SalvageModalProps {
   ticketId: string;
 }
 
-interface UnboundAlertsData {
+interface NewAlertsData {
   unboundAlerts: {
     alerts: Alert[];
     totalCount: number;
@@ -49,7 +49,7 @@ export function SalvageModal({ isOpen, onClose, ticketId }: SalvageModalProps) {
     return () => clearTimeout(timer);
   }, [keyword]);
 
-  const { data: alertsData, loading: alertsLoading, refetch } = useQuery<UnboundAlertsData>(
+  const { data: alertsData, loading: alertsLoading, refetch } = useQuery<NewAlertsData>(
     GET_UNBOUND_ALERTS,
     {
       variables: {

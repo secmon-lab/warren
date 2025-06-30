@@ -364,7 +364,7 @@ export const GET_SIMILAR_TICKETS = gql`
 `;
 
 export const GET_UNBOUND_ALERTS = gql`
-  query GetUnboundAlerts($threshold: Float, $keyword: String, $ticketId: ID, $offset: Int, $limit: Int) {
+  query GetNewAlerts($threshold: Float, $keyword: String, $ticketId: ID, $offset: Int, $limit: Int) {
     unboundAlerts(threshold: $threshold, keyword: $keyword, ticketId: $ticketId, offset: $offset, limit: $limit) {
       alerts {
         id
