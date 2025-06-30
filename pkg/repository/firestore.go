@@ -519,6 +519,7 @@ func (r *Firestore) PutTicketCommentsPrompted(ctx context.Context, ticketID type
 
 // Alert-Ticket binding methods
 func (r *Firestore) BindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
+	// Update alerts using BulkWriter for performance
 	bw := r.db.BulkWriter(ctx)
 	var jobs []*firestore.BulkWriterJob
 	for _, alertID := range alertIDs {
@@ -542,19 +543,38 @@ func (r *Firestore) BindAlertsToTicket(ctx context.Context, alertIDs []types.Ale
 		}
 	}
 
-	// Update ticket's AlertIDs array to include the newly bound alerts
-	ticketDoc := r.db.Collection(collectionTickets).Doc(ticketID.String())
-	_, err := ticketDoc.Update(ctx, []firestore.Update{
-		{
-			Path:  "AlertIDs",
-			Value: firestore.ArrayUnion(alertIDsToInterface(alertIDs)...),
-		},
+	// Update ticket's AlertIDs array using transaction for consistency
+	err := r.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		ticketDoc := r.db.Collection(collectionTickets).Doc(ticketID.String())
+
+		// Verify the ticket exists
+		ticketSnap, err := tx.Get(ticketDoc)
+		if err != nil {
+			return goerr.Wrap(err, "failed to get ticket in transaction", goerr.V("ticket_id", ticketID))
+		}
+		if !ticketSnap.Exists() {
+			return goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+		}
+
+		// Update ticket's AlertIDs array to include the newly bound alerts
+		err = tx.Update(ticketDoc, []firestore.Update{
+			{
+				Path:  "AlertIDs",
+				Value: firestore.ArrayUnion(alertIDsToInterface(alertIDs)...),
+			},
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to update ticket AlertIDs in transaction", goerr.V("ticket_id", ticketID))
+		}
+
+		return nil
 	})
+
 	if err != nil {
-		return goerr.Wrap(err, "failed to update ticket AlertIDs", goerr.V("ticket_id", ticketID))
+		return goerr.Wrap(err, "transaction failed for updating ticket AlertIDs")
 	}
 
-	// Create activity for bulk alert binding
+	// Create activity for bulk alert binding (outside transaction to avoid conflicts)
 	// Get ticket for activity creation
 	ticket, ticketErr := r.GetTicket(ctx, ticketID)
 	if ticketErr == nil {
