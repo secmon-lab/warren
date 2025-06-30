@@ -130,7 +130,7 @@ export default function AlertsPage() {
           {sortedAlerts.map((alert: Alert) => (
             <div
               key={alert.id}
-              className="bg-card text-card-foreground rounded-xl border shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+              className="bg-card text-card-foreground rounded-xl border shadow-sm cursor-pointer hover:shadow-md transition-shadow overflow-hidden"
               onClick={() => handleAlertClick(alert.id)}
             >
               <div className="px-4 py-6">
@@ -151,7 +151,7 @@ export default function AlertsPage() {
                   </div>
                   
                   <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 pr-2">
                       <h3 className="text-base font-semibold mb-1 line-clamp-1">
                         {alert.title}
                       </h3>
@@ -162,18 +162,25 @@ export default function AlertsPage() {
                       )}
                       
                       {/* Alert Attributes */}
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1 max-w-full">
                         {alert.attributes && alert.attributes.length > 0 && (
                           <>
-                            {alert.attributes.slice(0, 3).map((attr, index: number) => (
-                              <Badge 
-                                key={index} 
-                                variant={attr.auto ? "secondary" : "default"}
-                                className="text-xs"
-                              >
-                                {attr.key}: {attr.value}
-                              </Badge>
-                            ))}
+                            {alert.attributes.slice(0, 3).map((attr, index: number) => {
+                              const displayText = `${attr.key}: ${attr.value}`;
+                              const isLong = displayText.length > 40;
+                              const truncatedText = isLong ? `${displayText.substring(0, 37)}...` : displayText;
+                              
+                              return (
+                                <Badge 
+                                  key={index} 
+                                  variant={attr.auto ? "secondary" : "default"}
+                                  className="text-xs max-w-[280px] truncate inline-block"
+                                  title={displayText}
+                                >
+                                  {truncatedText}
+                                </Badge>
+                              );
+                            })}
                             {alert.attributes.length > 3 && (
                               <Badge variant="outline" className="text-xs">
                                 +{alert.attributes.length - 3} more
@@ -182,7 +189,7 @@ export default function AlertsPage() {
                           </>
                         )}
                         {alert.ticket && (
-                          <Badge variant="outline" className="text-xs ml-auto">
+                          <Badge variant="outline" className="text-xs">
                             Ticket #{alert.ticket.id.slice(-8)}
                           </Badge>
                         )}
