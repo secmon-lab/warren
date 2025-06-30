@@ -33,7 +33,6 @@ export default function AlertDetailPage() {
     data: alertData,
     loading: alertLoading,
     error: alertError,
-    refetch: refetchAlert,
   } = useQuery(GET_ALERT, {
     variables: { id },
     skip: !id,

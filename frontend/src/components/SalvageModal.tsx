@@ -65,7 +65,7 @@ export function SalvageModal({ isOpen, onClose, ticketId }: SalvageModalProps) {
   );
 
   // Query for all matching alerts when "Select All Matching" is used
-  const { data: allAlertsData, loading: allAlertsLoading, refetch: refetchAll } = useQuery<NewAlertsData>(
+  const { loading: allAlertsLoading, refetch: refetchAll } = useQuery<NewAlertsData>(
     GET_UNBOUND_ALERTS,
     {
       variables: {
@@ -278,12 +278,11 @@ export function SalvageModal({ isOpen, onClose, ticketId }: SalvageModalProps) {
                       </Label>
                     </div>
                     {totalCount > alerts.length && (
-                      <div className="flex items-center gap-2">
+                      <div className={`flex items-center gap-2 ${allAlertsLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                         <Checkbox
                           id="select-all-matching"
                           checked={isAllMatchingSelected}
-                          onCheckedChange={handleSelectAllMatching}
-                          disabled={allAlertsLoading}
+                          onCheckedChange={allAlertsLoading ? undefined : handleSelectAllMatching}
                         />
                         <Label htmlFor="select-all-matching" className="text-sm font-medium text-blue-600">
                           Select All Matching ({totalCount})
