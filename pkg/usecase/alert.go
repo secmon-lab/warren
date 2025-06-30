@@ -206,7 +206,7 @@ func (uc *UseCases) GetUnboundAlertsFiltered(ctx context.Context, threshold *flo
 // BindAlertsToTicket binds multiple alerts to a ticket and updates Slack display
 func (uc *UseCases) BindAlertsToTicket(ctx context.Context, ticketID types.TicketID, alertIDs []types.AlertID) error {
 	// Bind alerts to ticket
-	err := uc.repository.BatchBindAlertsToTicket(ctx, alertIDs, ticketID)
+	err := uc.repository.BindAlertsToTicket(ctx, alertIDs, ticketID)
 	if err != nil {
 		return goerr.Wrap(err, "failed to bind alerts to ticket")
 	}

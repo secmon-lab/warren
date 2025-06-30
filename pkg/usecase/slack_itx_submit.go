@@ -193,7 +193,7 @@ func (uc *UseCases) handleBindAlerts(ctx context.Context, slackUser slack.User, 
 	}
 
 	// Update database
-	if err := uc.repository.BatchBindAlertsToTicket(ctx, ticket.AlertIDs, ticketID); err != nil {
+	if err := uc.repository.BindAlertsToTicket(ctx, ticket.AlertIDs, ticketID); err != nil {
 		return goerr.Wrap(err, "failed to bind alerts to ticket", goerr.V("ticket_id", ticketID), goerr.V("new_alert_ids", ticket.AlertIDs))
 	}
 
@@ -412,7 +412,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionSalvage(ctx context.Cont
 	}
 
 	// Update database
-	if err := uc.repository.BatchBindAlertsToTicket(ctx, target.AlertIDs, ticketID); err != nil {
+	if err := uc.repository.BindAlertsToTicket(ctx, target.AlertIDs, ticketID); err != nil {
 		return goerr.Wrap(err, "failed to bind alerts to ticket", goerr.V("ticket_id", ticketID), goerr.V("alert_ids", alertIDs))
 	}
 

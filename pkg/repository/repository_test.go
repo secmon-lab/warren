@@ -167,15 +167,15 @@ func TestAlertTicketBinding(t *testing.T) {
 		gt.Value(t, got.SlackThread.ChannelID).Equal(thread.ChannelID)
 		gt.Value(t, got.SlackThread.ThreadID).Equal(thread.ThreadID)
 
-		// BindAlertToTicket
-		gt.NoError(t, repo.BindAlertToTicket(ctx, testAlert.ID, ticketObj.ID))
+		// BindAlertsToTicket
+		gt.NoError(t, repo.BindAlertsToTicket(ctx, []types.AlertID{testAlert.ID}, ticketObj.ID))
 
-		// BatchBindAlertsToTicket
+		// BindAlertsToTicket
 		alert2 := newTestAlert(&thread)
 		alert3 := newTestAlert(&thread)
 		gt.NoError(t, repo.PutAlert(ctx, alert2))
 		gt.NoError(t, repo.PutAlert(ctx, alert3))
-		gt.NoError(t, repo.BatchBindAlertsToTicket(ctx, []types.AlertID{alert2.ID, alert3.ID}, ticketObj.ID))
+		gt.NoError(t, repo.BindAlertsToTicket(ctx, []types.AlertID{alert2.ID, alert3.ID}, ticketObj.ID))
 
 		// Verify alerts are bound to ticket
 		gotAlert2, err := repo.GetAlert(ctx, alert2.ID)
@@ -189,9 +189,9 @@ func TestAlertTicketBinding(t *testing.T) {
 		// Verify ticket's AlertIDs array is updated with bound alerts
 		updatedTicket, err := repo.GetTicket(ctx, ticketObj.ID)
 		gt.NoError(t, err)
-		gt.Array(t, updatedTicket.AlertIDs).Any(func(id types.AlertID) bool { return id == testAlert.ID }) // From BindAlertToTicket
-		gt.Array(t, updatedTicket.AlertIDs).Any(func(id types.AlertID) bool { return id == alert2.ID })    // From BatchBindAlertsToTicket
-		gt.Array(t, updatedTicket.AlertIDs).Any(func(id types.AlertID) bool { return id == alert3.ID })    // From BatchBindAlertsToTicket
+		gt.Array(t, updatedTicket.AlertIDs).Any(func(id types.AlertID) bool { return id == testAlert.ID }) // From BindAlertsToTicket
+		gt.Array(t, updatedTicket.AlertIDs).Any(func(id types.AlertID) bool { return id == alert2.ID })    // From BindAlertsToTicket
+		gt.Array(t, updatedTicket.AlertIDs).Any(func(id types.AlertID) bool { return id == alert3.ID })    // From BindAlertsToTicket
 		gt.Number(t, len(updatedTicket.AlertIDs)).GreaterOrEqual(3)                                        // Should have at least 3 alerts
 
 		// PutTicketComment
@@ -227,7 +227,7 @@ func TestAlertTicketBinding(t *testing.T) {
 	})
 }
 
-func TestBatchBindAlertsToTicketBidirectional(t *testing.T) {
+func TestBindAlertsToTicketBidirectional(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
 		thread := newTestThread()
@@ -255,9 +255,9 @@ func TestBatchBindAlertsToTicketBidirectional(t *testing.T) {
 		gt.Value(t, alert2.TicketID).Equal(types.EmptyTicketID)
 		gt.Value(t, alert3.TicketID).Equal(types.EmptyTicketID)
 
-		// Bind alerts to ticket using BatchBindAlertsToTicket
+		// Bind alerts to ticket using BindAlertsToTicket
 		alertIDs := []types.AlertID{alert1.ID, alert2.ID, alert3.ID}
-		gt.NoError(t, repo.BatchBindAlertsToTicket(ctx, alertIDs, ticketObj.ID))
+		gt.NoError(t, repo.BindAlertsToTicket(ctx, alertIDs, ticketObj.ID))
 
 		// Verify bidirectional binding: alerts → ticket
 		boundAlert1, err := repo.GetAlert(ctx, alert1.ID)
@@ -294,7 +294,7 @@ func TestBatchBindAlertsToTicketBidirectional(t *testing.T) {
 		alert4 := newTestAlert(&thread)
 		gt.NoError(t, repo.PutAlert(ctx, alert4))
 
-		gt.NoError(t, repo.BatchBindAlertsToTicket(ctx, []types.AlertID{alert4.ID}, ticketObj.ID))
+		gt.NoError(t, repo.BindAlertsToTicket(ctx, []types.AlertID{alert4.ID}, ticketObj.ID))
 
 		// Verify the additional alert is bound
 		finalTicket, err := repo.GetTicket(ctx, ticketObj.ID)
@@ -1731,7 +1731,7 @@ func TestActivityCreation(t *testing.T) {
 				err = repo.PutAlert(ctx, *alert)
 				gt.NoError(t, err)
 
-				err = repo.BindAlertToTicket(ctx, alert.ID, ticket.ID)
+				err = repo.BindAlertsToTicket(ctx, []types.AlertID{alert.ID}, ticket.ID)
 				gt.NoError(t, err)
 
 				// Check activities - should have at least ticket creation + alert binding
@@ -1786,7 +1786,7 @@ func TestActivityCreation(t *testing.T) {
 				err := repo.PutTicket(ctx, ticket)
 				gt.NoError(t, err)
 
-				err = repo.BatchBindAlertsToTicket(ctx, alertIDs, ticket.ID)
+				err = repo.BindAlertsToTicket(ctx, alertIDs, ticket.ID)
 				gt.NoError(t, err)
 
 				// Check activities - should have at least ticket creation + bulk alert binding
