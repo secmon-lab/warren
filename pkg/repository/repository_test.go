@@ -1444,6 +1444,65 @@ func TestActivityCreation(t *testing.T) {
 				gt.Value(t, ticketActivity.UserID).Equal("test-user")
 			})
 
+			// Test ticket update activity
+			t.Run("TicketUpdate", func(t *testing.T) {
+				ctx := user.WithUserID(context.Background(), "update-user")
+
+				// First create a ticket
+				ticket := ticketmodel.Ticket{
+					ID: types.NewTicketID(),
+					Metadata: ticketmodel.Metadata{
+						Title: "Original Title",
+					},
+					Status:    types.TicketStatusOpen,
+					CreatedAt: time.Now(),
+				}
+
+				err := repo.PutTicket(ctx, ticket)
+				gt.NoError(t, err).Required()
+
+				// Wait a bit for Firestore eventual consistency
+				time.Sleep(100 * time.Millisecond)
+
+				// Now update the ticket
+				ticket.Metadata.Title = "Updated Title"
+				ticket.UpdatedAt = time.Now()
+
+				err = repo.PutTicket(ctx, ticket)
+				gt.NoError(t, err).Required()
+
+				// Wait a bit for Firestore eventual consistency
+				time.Sleep(100 * time.Millisecond)
+
+				// Check that both creation and update activities were created
+				activities, err := repo.GetActivities(ctx, 0, 100)
+				gt.NoError(t, err).Required()
+
+				gt.Number(t, len(activities)).GreaterOrEqual(2).Required()
+
+				// Find both activities
+				var creationActivity, updateActivity *activity.Activity
+				for _, act := range activities {
+					if act.TicketID == ticket.ID {
+						if act.Type == types.ActivityTypeTicketCreated {
+							creationActivity = act
+						} else if act.Type == types.ActivityTypeTicketUpdated {
+							updateActivity = act
+						}
+					}
+				}
+
+				gt.Value(t, creationActivity).NotNil()
+				gt.Value(t, creationActivity.Type).Equal(types.ActivityTypeTicketCreated)
+				gt.Value(t, creationActivity.TicketID).Equal(ticket.ID)
+				gt.Value(t, creationActivity.UserID).Equal("update-user")
+
+				gt.Value(t, updateActivity).NotNil()
+				gt.Value(t, updateActivity.Type).Equal(types.ActivityTypeTicketUpdated)
+				gt.Value(t, updateActivity.TicketID).Equal(ticket.ID)
+				gt.Value(t, updateActivity.UserID).Equal("update-user")
+			})
+
 			// Test comment activity
 			t.Run("CommentAddition", func(t *testing.T) {
 				ctx := user.WithUserID(context.Background(), "comment-user")

@@ -96,6 +96,8 @@ export default function Dashboard() {
     switch (type) {
       case "ticket_created":
         return <Ticket className="h-4 w-4 text-blue-600" />;
+      case "ticket_updated":
+        return <Ticket className="h-4 w-4 text-orange-600" />;
       case "ticket_status_changed":
         return <Clock className="h-4 w-4 text-amber-600" />;
       case "comment_added":
@@ -113,6 +115,8 @@ export default function Dashboard() {
     switch (type) {
       case "ticket_created":
         return "Ticket Created";
+      case "ticket_updated":
+        return "Ticket Updated";
       case "ticket_status_changed":
         return "Status Changed";
       case "comment_added":

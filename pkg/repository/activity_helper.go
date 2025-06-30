@@ -14,11 +14,21 @@ import (
 
 // createTicketActivity creates a ticket creation activity
 func createTicketActivity(ctx context.Context, repo interfaces.Repository, ticketID types.TicketID, title string) error {
+	return createTicketActivityWithType(ctx, repo, ticketID, title, types.ActivityTypeTicketCreated)
+}
+
+// createTicketUpdateActivity creates a ticket update activity
+func createTicketUpdateActivity(ctx context.Context, repo interfaces.Repository, ticketID types.TicketID, title string) error {
+	return createTicketActivityWithType(ctx, repo, ticketID, title, types.ActivityTypeTicketUpdated)
+}
+
+// createTicketActivityWithType creates a ticket activity with specified type
+func createTicketActivityWithType(ctx context.Context, repo interfaces.Repository, ticketID types.TicketID, title string, activityType types.ActivityType) error {
 	userID := user.FromContext(ctx)
 	activityID := types.NewActivityID()
 	act := &activity.Activity{
 		ID:        activityID,
-		Type:      types.ActivityTypeTicketCreated,
+		Type:      activityType,
 		UserID:    userID,
 		TicketID:  ticketID,
 		CreatedAt: time.Now(),
