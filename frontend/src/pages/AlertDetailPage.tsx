@@ -333,9 +333,9 @@ export default function AlertDetailPage() {
                   <Button
                     onClick={handleCreateTicket}
                     disabled={isCreatingTicket}
-                    className="w-full"
+                    className="w-full flex items-center gap-2"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
+                    <Plus className="h-4 w-4" />
                     {isCreatingTicket ? "Creating..." : "Create Ticket"}
                   </Button>
                 </div>
