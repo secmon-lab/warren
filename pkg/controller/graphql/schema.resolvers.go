@@ -432,6 +432,31 @@ func (r *queryResolver) SimilarTickets(ctx context.Context, ticketID string, thr
 	}, nil
 }
 
+// SimilarTicketsForAlert is the resolver for the similarTicketsForAlert field.
+func (r *queryResolver) SimilarTicketsForAlert(ctx context.Context, alertID string, threshold float64, offset *int, limit *int) (*graphql1.TicketsResponse, error) {
+	// Set default values for offset and limit
+	var offsetVal, limitVal int
+	if offset != nil {
+		offsetVal = *offset
+	}
+	if limit != nil {
+		limitVal = *limit
+	} else {
+		limitVal = defaultSimilarTicketsLimit
+	}
+
+	// Delegate to usecase
+	tickets, totalCount, err := r.uc.GetSimilarTicketsForAlert(ctx, types.AlertID(alertID), threshold, offsetVal, limitVal)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get similar tickets for alert")
+	}
+
+	return &graphql1.TicketsResponse{
+		Tickets:    tickets,
+		TotalCount: totalCount,
+	}, nil
+}
+
 // TicketComments is the resolver for the ticketComments field.
 func (r *queryResolver) TicketComments(ctx context.Context, ticketID string, offset *int, limit *int) (*graphql1.CommentsResponse, error) {
 	// Set default values for offset and limit

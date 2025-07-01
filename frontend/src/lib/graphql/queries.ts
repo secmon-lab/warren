@@ -363,6 +363,27 @@ export const GET_SIMILAR_TICKETS = gql`
   }
 `;
 
+export const GET_SIMILAR_TICKETS_FOR_ALERT = gql`
+  query GetSimilarTicketsForAlert($alertId: ID!, $threshold: Float!, $offset: Int, $limit: Int) {
+    similarTicketsForAlert(alertId: $alertId, threshold: $threshold, offset: $offset, limit: $limit) {
+      tickets {
+        id
+        status
+        title
+        description
+        isTest
+        assignee {
+          id
+          name
+        }
+        createdAt
+        updatedAt
+      }
+      totalCount
+    }
+  }
+`;
+
 export const GET_UNBOUND_ALERTS = gql`
   query GetNewAlerts($threshold: Float, $keyword: String, $ticketId: ID, $offset: Int, $limit: Int) {
     unboundAlerts(threshold: $threshold, keyword: $keyword, ticketId: $ticketId, offset: $offset, limit: $limit) {

@@ -5,22 +5,33 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { useToast } from "@/hooks/use-toast";
 
-import { GET_ALERT, CREATE_TICKET_FROM_ALERTS } from "@/lib/graphql/queries";
-import { Alert } from "@/lib/types";
+import { GET_ALERT, CREATE_TICKET_FROM_ALERTS, GET_SIMILAR_TICKETS_FOR_ALERT, BIND_ALERTS_TO_TICKET } from "@/lib/graphql/queries";
+import { Alert, Ticket, TICKET_STATUS_COLORS, TICKET_STATUS_LABELS, TicketStatus } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
 import {
   ChevronLeft,
   AlertTriangle,
   ExternalLink,
-  FileText,
   Eye,
   Copy,
   Database,
   Link2,
   Tag,
   Plus,
+  Hash,
+  Users,
 } from "lucide-react";
 
 export default function AlertDetailPage() {
@@ -28,6 +39,13 @@ export default function AlertDetailPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isCreatingTicket, setIsCreatingTicket] = useState(false);
+  const [isBindingTicket, setIsBindingTicket] = useState(false);
+  const [similarTicketsThreshold, setSimilarTicketsThreshold] = useState([0.95]);
+  const [similarTicketsCommittedThreshold, setSimilarTicketsCommittedThreshold] = useState([0.95]);
+  const [similarTicketsCurrentPage, setSimilarTicketsCurrentPage] = useState(1);
+
+  const ITEMS_PER_PAGE = 5;
+  const similarTicketsOffset = (similarTicketsCurrentPage - 1) * ITEMS_PER_PAGE;
 
   const {
     data: alertData,
@@ -36,6 +54,24 @@ export default function AlertDetailPage() {
   } = useQuery(GET_ALERT, {
     variables: { id },
     skip: !id,
+  });
+
+  const alert: Alert = alertData?.alert;
+
+  const {
+    data: similarTicketsData,
+    loading: similarTicketsLoading,
+    error: similarTicketsError,
+    refetch: refetchSimilarTickets,
+  } = useQuery(GET_SIMILAR_TICKETS_FOR_ALERT, {
+    variables: {
+      alertId: alert?.id,
+      threshold: similarTicketsCommittedThreshold[0],
+      offset: similarTicketsOffset,
+      limit: ITEMS_PER_PAGE,
+    },
+    skip: !alert?.id,
+    fetchPolicy: "cache-and-network",
   });
 
   const [createTicketFromAlerts] = useMutation(CREATE_TICKET_FROM_ALERTS, {
@@ -57,7 +93,24 @@ export default function AlertDetailPage() {
     },
   });
 
-  const alert: Alert = alertData?.alert;
+  const [bindAlertsToTicket] = useMutation(BIND_ALERTS_TO_TICKET, {
+    onCompleted: (data) => {
+      toast({
+        title: "Alert Bound",
+        description: `Alert has been bound to ticket "${data.bindAlertsToTicket.title}".`,
+      });
+      // Navigate to the ticket
+      navigate(`/tickets/${data.bindAlertsToTicket.id}`);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to bind alert: ${error.message}`,
+        variant: "destructive",
+      });
+      setIsBindingTicket(false);
+    },
+  });
 
   const handleBackToList = () => {
     navigate("/alerts");
@@ -79,12 +132,50 @@ export default function AlertDetailPage() {
     }
   };
 
+  const handleBindToTicket = async (ticketId: string) => {
+    if (!alert?.id) return;
+
+    setIsBindingTicket(true);
+    try {
+      await bindAlertsToTicket({
+        variables: {
+          ticketId,
+          alertIds: [alert.id],
+        },
+      });
+    } catch (error) {
+      console.error("Error binding alert to ticket:", error);
+    }
+  };
+
   const handleCopyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
     } catch (error) {
       console.error("Failed to copy to clipboard:", error);
     }
+  };
+
+  const handleSimilarTicketsThresholdChange = (value: number[]) => {
+    setSimilarTicketsCommittedThreshold(value);
+    setSimilarTicketsCurrentPage(1); // Reset to first page when threshold changes
+    // Trigger refetch with new threshold
+    if (alert?.id) {
+      refetchSimilarTickets({
+        alertId: alert.id,
+        threshold: value[0],
+        offset: 0,
+        limit: ITEMS_PER_PAGE,
+      });
+    }
+  };
+
+  const handleSimilarTicketClick = (ticket: Ticket) => {
+    navigate(`/tickets/${ticket.id}`);
+  };
+
+  const handleSimilarTicketsPageChange = (page: number) => {
+    setSimilarTicketsCurrentPage(page);
   };
 
   const formatAbsoluteTime = (dateString: string) => {
@@ -144,6 +235,11 @@ export default function AlertDetailPage() {
   }
 
   const parsedData = parseAlertData(alert.data);
+
+  // Similar tickets data
+  const similarTickets: Ticket[] = similarTicketsData?.similarTicketsForAlert?.tickets || [];
+  const similarTicketsTotalCount = similarTicketsData?.similarTicketsForAlert?.totalCount || 0;
+  const similarTicketsTotalPages = Math.ceil(similarTicketsTotalCount / ITEMS_PER_PAGE);
 
   return (
     <div className="space-y-6">
@@ -342,31 +438,6 @@ export default function AlertDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Alert Schema */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Schema
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="font-mono">
-                  {alert.schema}
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleCopyToClipboard(alert.schema)}
-                  className="h-6 w-6 p-0"
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Alert Metadata */}
           <Card>
             <CardHeader>
@@ -394,6 +465,23 @@ export default function AlertDetailPage() {
               </div>
               <Separator />
               <div>
+                <span className="text-sm font-medium">Schema</span>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className="font-mono">
+                    {alert.schema}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleCopyToClipboard(alert.schema)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+              <Separator />
+              <div>
                 <span className="text-sm font-medium">Created</span>
                 <p className="text-sm text-muted-foreground">
                   {formatAbsoluteTime(alert.createdAt)}
@@ -404,6 +492,229 @@ export default function AlertDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Similar Tickets */}
+          {!alert.ticket && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Hash className="h-5 w-5" />
+                  Similar Tickets
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Threshold Slider */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="threshold" className="text-sm font-medium">
+                      Similarity Threshold
+                    </Label>
+                    <span className="text-sm text-muted-foreground">
+                      {similarTicketsThreshold[0].toFixed(2)}
+                    </span>
+                  </div>
+                  <Slider
+                    id="threshold"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={similarTicketsThreshold}
+                    onValueChange={setSimilarTicketsThreshold}
+                    onValueCommit={handleSimilarTicketsThresholdChange}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>0.0 (Less similar)</span>
+                    <span>1.0 (More similar)</span>
+                  </div>
+                </div>
+
+                {/* Loading State */}
+                {similarTicketsLoading && (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-sm text-muted-foreground">Loading similar tickets...</div>
+                  </div>
+                )}
+
+                {/* Error State */}
+                {similarTicketsError && (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-sm text-red-600">
+                      Error loading similar tickets: {similarTicketsError.message}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty State */}
+                {!similarTicketsLoading && !similarTicketsError && similarTickets.length === 0 && (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-center">
+                      <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <div className="text-sm text-muted-foreground">
+                        No similar tickets found with threshold {similarTicketsCommittedThreshold[0].toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tickets List */}
+                {!similarTicketsLoading && !similarTicketsError && similarTickets.length > 0 && (
+                  <div className="space-y-3">
+                    {similarTickets.map((ticket) => (
+                      <div
+                        key={ticket.id}
+                        className="p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleSimilarTicketClick(ticket)}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-sm truncate">
+                              {ticket.isTest && "🧪 [TEST] "}
+                              {ticket.title}
+                            </h4>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              #{ticket.id.slice(0, 8)} • Created {formatRelativeTime(ticket.createdAt)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              className={TICKET_STATUS_COLORS[ticket.status as TicketStatus]}
+                              variant="secondary"
+                            >
+                              {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
+                            </Badge>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleBindToTicket(ticket.id);
+                              }}
+                              disabled={isBindingTicket}
+                              className="flex-shrink-0"
+                            >
+                              Bind
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {ticket.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {ticket.description}
+                          </p>
+                        )}
+                        
+                        {ticket.assignee && (
+                          <div className="flex items-center gap-1 mt-2">
+                            <Users className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">
+                              {ticket.assignee.name}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Pagination */}
+                {!similarTicketsLoading && !similarTicketsError && similarTicketsTotalPages > 1 && (
+                  <div className="pt-4">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious
+                            onClick={() => {
+                              if (similarTicketsCurrentPage > 1) handleSimilarTicketsPageChange(similarTicketsCurrentPage - 1);
+                            }}
+                            className={
+                              similarTicketsCurrentPage === 1
+                                ? "pointer-events-none opacity-50"
+                                : "cursor-pointer"
+                            }
+                          />
+                        </PaginationItem>
+                        
+                        {/* Show page numbers with truncation */}
+                        {(() => {
+                          const maxVisiblePages = 10;
+                          const pageNumbers = [];
+                          
+                          if (similarTicketsTotalPages <= maxVisiblePages) {
+                            // Show all pages if total is 10 or less
+                            for (let i = 1; i <= similarTicketsTotalPages; i++) {
+                              pageNumbers.push(i);
+                            }
+                          } else {
+                            // Show truncated pagination for more than 10 pages
+                            const startPage = Math.max(1, similarTicketsCurrentPage - 4);
+                            const endPage = Math.min(similarTicketsTotalPages, similarTicketsCurrentPage + 4);
+                            
+                            // Always show first page
+                            if (startPage > 1) {
+                              pageNumbers.push(1);
+                              if (startPage > 2) {
+                                pageNumbers.push('...');
+                              }
+                            }
+                            
+                            // Show pages around current page
+                            for (let i = startPage; i <= endPage; i++) {
+                              pageNumbers.push(i);
+                            }
+                            
+                            // Always show last page
+                            if (endPage < similarTicketsTotalPages) {
+                              if (endPage < similarTicketsTotalPages - 1) {
+                                pageNumbers.push('...');
+                              }
+                              pageNumbers.push(similarTicketsTotalPages);
+                            }
+                          }
+                          
+                          return pageNumbers.map((page, index) => (
+                            <PaginationItem key={index}>
+                              {page === '...' ? (
+                                <span className="px-3 py-2 text-sm text-muted-foreground">...</span>
+                              ) : (
+                                <PaginationLink
+                                  isActive={page === similarTicketsCurrentPage}
+                                  onClick={() => handleSimilarTicketsPageChange(page as number)}
+                                  className="cursor-pointer"
+                                >
+                                  {page}
+                                </PaginationLink>
+                              )}
+                            </PaginationItem>
+                          ));
+                        })()}
+
+                        <PaginationItem>
+                          <PaginationNext
+                            onClick={() => {
+                              if (similarTicketsCurrentPage < similarTicketsTotalPages) handleSimilarTicketsPageChange(similarTicketsCurrentPage + 1);
+                            }}
+                            className={
+                              similarTicketsCurrentPage === similarTicketsTotalPages
+                                ? "pointer-events-none opacity-50"
+                                : "cursor-pointer"
+                            }
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+
+                    <div className="text-center mt-2">
+                      <span className="text-xs text-muted-foreground">
+                        Showing {Math.min((similarTicketsCurrentPage - 1) * ITEMS_PER_PAGE + 1, similarTicketsTotalCount)}-
+                        {Math.min(similarTicketsCurrentPage * ITEMS_PER_PAGE, similarTicketsTotalCount)} of {similarTicketsTotalCount} tickets
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
