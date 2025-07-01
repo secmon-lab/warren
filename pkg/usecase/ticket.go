@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"math"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -456,4 +457,86 @@ func (uc *UseCases) CreateTicketFromAlerts(ctx context.Context, alertIDs []types
 	}
 
 	return newTicketPtr, nil
+}
+
+// GetSimilarTicketsForAlert finds tickets similar to a given alert based on embedding similarity
+func (uc *UseCases) GetSimilarTicketsForAlert(ctx context.Context, alertID types.AlertID, threshold float64, offset, limit int) ([]*ticket.Ticket, int, error) {
+	// Get target alert
+	targetAlert, err := uc.repository.GetAlert(ctx, alertID)
+	if err != nil {
+		return nil, 0, goerr.Wrap(err, "failed to get target alert")
+	}
+	if targetAlert == nil {
+		return nil, 0, goerr.New("alert not found", goerr.V("alert_id", alertID))
+	}
+
+	// If target alert has no embedding, return empty results
+	if len(targetAlert.Embedding) == 0 {
+		return []*ticket.Ticket{}, 0, nil
+	}
+
+	// Set default limit if not provided
+	if limit <= 0 {
+		limit = 5 // defaultSimilarTicketsLimit
+	}
+
+	// Fetch a fixed, large number of nearest neighbors to ensure stable pagination
+	const maxCandidates = 1000 // maxSimilarTicketsCandidates
+	candidates, err := uc.repository.FindNearestTickets(ctx, targetAlert.Embedding, maxCandidates)
+	if err != nil {
+		return nil, 0, goerr.Wrap(err, "failed to find nearest tickets")
+	}
+
+	// Filter by threshold to get complete result set
+	var filteredTickets []*ticket.Ticket
+	for _, candidate := range candidates {
+		// Only include tickets with embeddings
+		if len(candidate.Embedding) == 0 {
+			continue
+		}
+
+		// Calculate cosine similarity and apply threshold
+		similarity := cosineSimilarity(targetAlert.Embedding, candidate.Embedding)
+		if float64(similarity) >= threshold {
+			filteredTickets = append(filteredTickets, candidate)
+		}
+	}
+
+	// Calculate correct total count from complete filtered result set
+	totalCount := len(filteredTickets)
+
+	// Apply pagination to the complete filtered result set
+	start := offset
+	if start > len(filteredTickets) {
+		start = len(filteredTickets)
+	}
+
+	end := start + limit
+	if end > len(filteredTickets) {
+		end = len(filteredTickets)
+	}
+
+	result := filteredTickets[start:end]
+
+	return result, totalCount, nil
+}
+
+// cosineSimilarity calculates the cosine similarity between two float32 vectors
+func cosineSimilarity(a, b []float32) float32 {
+	if len(a) != len(b) {
+		return 0
+	}
+
+	var dotProduct, normA, normB float32
+	for i := 0; i < len(a); i++ {
+		dotProduct += a[i] * b[i]
+		normA += a[i] * a[i]
+		normB += b[i] * b[i]
+	}
+
+	if normA == 0 || normB == 0 {
+		return 0
+	}
+
+	return dotProduct / (float32(math.Sqrt(float64(normA))) * float32(math.Sqrt(float64(normB))))
 }

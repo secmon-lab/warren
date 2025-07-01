@@ -7,14 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 
-import { GET_ALERT, CREATE_TICKET_FROM_ALERTS } from "@/lib/graphql/queries";
-import { Alert } from "@/lib/types";
+import { GET_ALERT, CREATE_TICKET_FROM_ALERTS, GET_SIMILAR_TICKETS_FOR_ALERT, BIND_ALERTS_TO_TICKET } from "@/lib/graphql/queries";
+import { Alert, Ticket } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
 import {
   ChevronLeft,
   AlertTriangle,
   ExternalLink,
-  FileText,
   Eye,
   Copy,
   Database,
@@ -28,6 +27,8 @@ export default function AlertDetailPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isCreatingTicket, setIsCreatingTicket] = useState(false);
+  const [isBindingTicket, setIsBindingTicket] = useState(false);
+  const [similarTicketsThreshold] = useState(0.95);
 
   const {
     data: alertData,
@@ -36,6 +37,20 @@ export default function AlertDetailPage() {
   } = useQuery(GET_ALERT, {
     variables: { id },
     skip: !id,
+  });
+
+  const alert: Alert = alertData?.alert;
+
+  const {
+    data: similarTicketsData,
+  } = useQuery(GET_SIMILAR_TICKETS_FOR_ALERT, {
+    variables: {
+      alertId: alert?.id,
+      threshold: similarTicketsThreshold,
+      offset: 0,
+      limit: 10,
+    },
+    skip: !alert?.id,
   });
 
   const [createTicketFromAlerts] = useMutation(CREATE_TICKET_FROM_ALERTS, {
@@ -57,7 +72,24 @@ export default function AlertDetailPage() {
     },
   });
 
-  const alert: Alert = alertData?.alert;
+  const [bindAlertsToTicket] = useMutation(BIND_ALERTS_TO_TICKET, {
+    onCompleted: (data) => {
+      toast({
+        title: "Alert Bound",
+        description: `Alert has been bound to ticket "${data.bindAlertsToTicket.title}".`,
+      });
+      // Navigate to the ticket
+      navigate(`/tickets/${data.bindAlertsToTicket.id}`);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to bind alert: ${error.message}`,
+        variant: "destructive",
+      });
+      setIsBindingTicket(false);
+    },
+  });
 
   const handleBackToList = () => {
     navigate("/alerts");
@@ -76,6 +108,22 @@ export default function AlertDetailPage() {
     } catch (error) {
       // Error handling is done in the onError callback
       console.error("Error creating ticket:", error);
+    }
+  };
+
+  const handleBindToTicket = async (ticketId: string) => {
+    if (!alert?.id) return;
+
+    setIsBindingTicket(true);
+    try {
+      await bindAlertsToTicket({
+        variables: {
+          ticketId,
+          alertIds: [alert.id],
+        },
+      });
+    } catch (error) {
+      console.error("Error binding alert to ticket:", error);
     }
   };
 
@@ -342,31 +390,6 @@ export default function AlertDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Alert Schema */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Schema
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="font-mono">
-                  {alert.schema}
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleCopyToClipboard(alert.schema)}
-                  className="h-6 w-6 p-0"
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Alert Metadata */}
           <Card>
             <CardHeader>
@@ -394,6 +417,23 @@ export default function AlertDetailPage() {
               </div>
               <Separator />
               <div>
+                <span className="text-sm font-medium">Schema</span>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className="font-mono">
+                    {alert.schema}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleCopyToClipboard(alert.schema)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+              <Separator />
+              <div>
                 <span className="text-sm font-medium">Created</span>
                 <p className="text-sm text-muted-foreground">
                   {formatAbsoluteTime(alert.createdAt)}
@@ -404,6 +444,53 @@ export default function AlertDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Similar Tickets */}
+          {!alert.ticket && similarTicketsData?.similarTicketsForAlert?.tickets && similarTicketsData.similarTicketsForAlert.tickets.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Link2 className="h-4 w-4" />
+                  Similar Tickets
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {similarTicketsData.similarTicketsForAlert.tickets.map((ticket: Ticket) => (
+                    <div key={ticket.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-medium text-muted-foreground font-mono">
+                            {ticket.id.substring(0, 8)}...
+                          </span>
+                          <Badge variant="outline" className="text-xs">
+                            {ticket.status}
+                          </Badge>
+                        </div>
+                        <p className="text-sm font-medium truncate">
+                          {ticket.title}
+                        </p>
+                        {ticket.description && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {ticket.description}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleBindToTicket(ticket.id)}
+                        disabled={isBindingTicket}
+                        className="ml-2 flex-shrink-0"
+                      >
+                        Bind
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
