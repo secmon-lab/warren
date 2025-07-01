@@ -16,6 +16,6 @@ Output the result in JSON format. Schema is described below as a JSON schema.
 
 Fields rules are as follows. Language of `title` and `description` must be {{ .lang }}.
 
-- `title`: Provide a one-line title that summarizes the entire alert. Use the field values from the original alert data as much as possible; however, if these expressions are inadequate, update the original text or generate a new one. Title must be less than 140 characters.
+- `title`: Provide a one-line title that summarizes the entire alert, clearly indicating what actor/subject performed what action against which resource/target and what potential impact occurred. The title should follow the pattern "Actor/Subject → Action → Resource/Target → Impact" where possible. Use the field values from the original alert data as much as possible; however, if these expressions are inadequate, update the original text or generate a new one. Title must be less than 140 characters.
 - `description`: Give a concise summary of the alert.
 - `attrs`: Extract the field values that highlight the key characteristics of the alert. Focus particularly on unique identifiers that can be used for investigation such as IP addresses, host names, domain names, usernames, resource IDs, etc. Avoid redundancy and limit the number of attributes to no more than 4.
