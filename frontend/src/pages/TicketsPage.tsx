@@ -45,11 +45,13 @@ const getStatusBadgeVariant = (status: TicketStatus) => {
 
 export default function TicketsPage() {
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedStatuses, setSelectedStatuses] = useState<TicketStatus[]>([]);
-  const [activeTab, setActiveTab] = useState<"all" | TicketStatus>("all");
+  const [activeTab, setActiveTab] = useState<"all" | TicketStatus>("open");
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const navigate = useNavigate();
+
+  // Derive selectedStatuses from activeTab. No useState needed for it.
+  const selectedStatuses = activeTab === "all" ? [] : [activeTab];
 
   const {
     data: ticketsData,
@@ -67,13 +69,7 @@ export default function TicketsPage() {
   const tickets: Ticket[] = ticketsData?.tickets?.tickets || [];
 
   const handleStatusFilter = (status: TicketStatus | "all") => {
-    if (status === "all") {
-      setSelectedStatuses([]);
-      setActiveTab("all");
-    } else {
-      setSelectedStatuses([status]);
-      setActiveTab(status);
-    }
+    setActiveTab(status);
     setCurrentPage(1);
   };
 
