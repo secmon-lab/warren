@@ -41,6 +41,7 @@ export default function AlertDetailPage() {
   const [isCreatingTicket, setIsCreatingTicket] = useState(false);
   const [isBindingTicket, setIsBindingTicket] = useState(false);
   const [similarTicketsThreshold, setSimilarTicketsThreshold] = useState([0.95]);
+  const [similarTicketsCommittedThreshold, setSimilarTicketsCommittedThreshold] = useState([0.95]);
   const [similarTicketsCurrentPage, setSimilarTicketsCurrentPage] = useState(1);
 
   const ITEMS_PER_PAGE = 5;
@@ -65,7 +66,7 @@ export default function AlertDetailPage() {
   } = useQuery(GET_SIMILAR_TICKETS_FOR_ALERT, {
     variables: {
       alertId: alert?.id,
-      threshold: similarTicketsThreshold[0],
+      threshold: similarTicketsCommittedThreshold[0],
       offset: similarTicketsOffset,
       limit: ITEMS_PER_PAGE,
     },
@@ -156,7 +157,7 @@ export default function AlertDetailPage() {
   };
 
   const handleSimilarTicketsThresholdChange = (value: number[]) => {
-    setSimilarTicketsThreshold(value);
+    setSimilarTicketsCommittedThreshold(value);
     setSimilarTicketsCurrentPage(1); // Reset to first page when threshold changes
     // Trigger refetch with new threshold
     if (alert?.id) {
@@ -550,7 +551,7 @@ export default function AlertDetailPage() {
                     <div className="text-center">
                       <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                       <div className="text-sm text-muted-foreground">
-                        No similar tickets found with threshold {similarTicketsThreshold[0].toFixed(2)}
+                        No similar tickets found with threshold {similarTicketsCommittedThreshold[0].toFixed(2)}
                       </div>
                     </div>
                   </div>
