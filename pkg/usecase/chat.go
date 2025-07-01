@@ -154,6 +154,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		"alerts":                  showAlerts,
 		"total":                   len(alerts),
 		"additional_instructions": additionalInstructions,
+		"lang":                    lang.From(ctx),
 		"exit_tool_name":          agent.Facilitator().Spec().Name,
 	})
 	if err != nil {
