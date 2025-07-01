@@ -45,8 +45,8 @@ const getStatusBadgeVariant = (status: TicketStatus) => {
 
 export default function TicketsPage() {
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedStatuses, setSelectedStatuses] = useState<TicketStatus[]>([]);
-  const [activeTab, setActiveTab] = useState<"all" | TicketStatus>("all");
+  const [selectedStatuses, setSelectedStatuses] = useState<TicketStatus[]>(["open"]);
+  const [activeTab, setActiveTab] = useState<"all" | TicketStatus>("open");
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const navigate = useNavigate();
