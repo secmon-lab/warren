@@ -366,3 +366,94 @@ func (uc *UseCases) UpdateMultipleTicketsStatus(ctx context.Context, ticketIDs [
 
 	return tickets, nil
 }
+
+// CreateTicketFromAlerts creates a ticket from one or more alerts (used by both Slack and Web UI)
+func (uc *UseCases) CreateTicketFromAlerts(ctx context.Context, alertIDs []types.AlertID, user *slack.User, slackThread *slack.Thread) (*ticket.Ticket, error) {
+	if len(alertIDs) == 0 {
+		return nil, goerr.New("no alerts provided")
+	}
+
+	// Get all alerts to validate they exist and are unbound
+	alerts, err := uc.repository.BatchGetAlerts(ctx, alertIDs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get alerts", goerr.V("alert_ids", alertIDs))
+	}
+
+	if len(alerts) != len(alertIDs) {
+		return nil, goerr.New("some alerts not found", goerr.V("requested", len(alertIDs)), goerr.V("found", len(alerts)))
+	}
+
+	// Check if any alerts are already bound to tickets
+	for _, alert := range alerts {
+		if alert.TicketID != types.EmptyTicketID {
+			return nil, goerr.New("alert is already bound to a ticket",
+				goerr.V("alert_id", alert.ID),
+				goerr.V("ticket_id", alert.TicketID))
+		}
+	}
+
+	// For single alert with no explicit slackThread, use the alert's Slack thread if available
+	if len(alerts) == 1 && slackThread == nil && alerts[0].SlackThread != nil && uc.slackService != nil {
+		slackThread = alerts[0].SlackThread
+	}
+
+	// Create ticket
+	newTicket := ticket.New(ctx, alertIDs, slackThread)
+	newTicket.Assignee = user
+	newTicket.IsTest = false
+
+	// Fill metadata using LLM
+	if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
+		return nil, goerr.Wrap(err, "failed to fill ticket metadata")
+	}
+
+	// Calculate embedding
+	if err := newTicket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
+		return nil, goerr.Wrap(err, "failed to calculate ticket embedding")
+	}
+
+	// Save ticket to repository
+	if err := uc.repository.PutTicket(ctx, newTicket); err != nil {
+		return nil, goerr.Wrap(err, "failed to put new ticket")
+	}
+
+	newTicketPtr := &newTicket
+
+	// Update alerts to link them to the ticket
+	for _, alert := range alerts {
+		alert.TicketID = newTicketPtr.ID
+	}
+
+	if err := uc.repository.BatchPutAlerts(ctx, alerts); err != nil {
+		return nil, goerr.Wrap(err, "failed to update alerts with ticket ID")
+	}
+
+	// Post ticket to Slack if SlackThread is provided (for Slack-originated requests)
+	if slackThread != nil && uc.slackService != nil {
+		messageID, err := uc.postTicketToSlack(ctx, newTicketPtr, *slackThread, alerts)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to post ticket to slack")
+		}
+		newTicketPtr.SlackMessageID = messageID
+
+		// Save ticket again with Slack message ID
+		if err := uc.repository.PutTicket(ctx, *newTicketPtr); err != nil {
+			return nil, goerr.Wrap(err, "failed to update ticket with slack message ID")
+		}
+	}
+
+	// Update individual alerts' Slack display (for all cases)
+	if uc.slackService != nil {
+		for _, alert := range alerts {
+			if alert.SlackThread != nil {
+				st := uc.slackService.NewThread(*alert.SlackThread)
+				if err := st.UpdateAlert(ctx, *alert); err != nil {
+					// Log error but don't fail the main operation
+					_ = msg.Trace(ctx, "💥 Failed to update alert in Slack: %s", err.Error())
+				}
+			}
+		}
+	}
+
+	return newTicketPtr, nil
+}

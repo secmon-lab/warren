@@ -1,12 +1,13 @@
-import { useQuery } from "@apollo/client";
+import { useQuery, useMutation } from "@apollo/client";
 import { useParams, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
 
-
-import { GET_ALERT } from "@/lib/graphql/queries";
+import { GET_ALERT, CREATE_TICKET_FROM_ALERTS } from "@/lib/graphql/queries";
 import { Alert } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
 import {
@@ -19,11 +20,14 @@ import {
   Database,
   Link2,
   Tag,
+  Plus,
 } from "lucide-react";
 
 export default function AlertDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isCreatingTicket, setIsCreatingTicket] = useState(false);
 
   const {
     data: alertData,
@@ -34,10 +38,45 @@ export default function AlertDetailPage() {
     skip: !id,
   });
 
+  const [createTicketFromAlerts] = useMutation(CREATE_TICKET_FROM_ALERTS, {
+    onCompleted: (data) => {
+      toast({
+        title: "Ticket Created",
+        description: `Ticket "${data.createTicketFromAlerts.title}" has been created successfully.`,
+      });
+      // Navigate to the new ticket
+      navigate(`/tickets/${data.createTicketFromAlerts.id}`);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to create ticket: ${error.message}`,
+        variant: "destructive",
+      });
+      setIsCreatingTicket(false);
+    },
+  });
+
   const alert: Alert = alertData?.alert;
 
   const handleBackToList = () => {
     navigate("/alerts");
+  };
+
+  const handleCreateTicket = async () => {
+    if (!alert?.id) return;
+
+    setIsCreatingTicket(true);
+    try {
+      await createTicketFromAlerts({
+        variables: {
+          alertIds: [alert.id],
+        },
+      });
+    } catch (error) {
+      // Error handling is done in the onError callback
+      console.error("Error creating ticket:", error);
+    }
   };
 
   const handleCopyToClipboard = async (text: string) => {
@@ -246,15 +285,15 @@ export default function AlertDetailPage() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Ticket Information */}
-          {alert.ticket && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Link2 className="h-4 w-4" />
-                  Associated Ticket
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Link2 className="h-4 w-4" />
+                {alert.ticket ? "Associated Ticket" : "Ticket"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {alert.ticket ? (
                 <div className="space-y-3">
                   <div>
                     <span className="text-sm font-medium">ID</span>
@@ -285,9 +324,23 @@ export default function AlertDetailPage() {
                     View Ticket
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    This alert is not associated with any ticket.
+                  </p>
+                  <Button
+                    onClick={handleCreateTicket}
+                    disabled={isCreatingTicket}
+                    className="w-full flex items-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {isCreatingTicket ? "Creating..." : "Create Ticket"}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Alert Schema */}
           <Card>

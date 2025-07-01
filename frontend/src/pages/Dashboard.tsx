@@ -140,7 +140,7 @@ export default function Dashboard() {
             Security monitoring and ticket management system
           </p>
         </div>
-        <Button onClick={() => setIsCreateTicketOpen(true)} className="gap-2 bg-blue-600 hover:bg-blue-700">
+        <Button onClick={() => setIsCreateTicketOpen(true)} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           Create Ticket
         </Button>

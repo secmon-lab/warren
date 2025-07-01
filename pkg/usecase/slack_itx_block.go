@@ -53,39 +53,20 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, slac
 }
 
 func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread slack.Thread, alerts alert.Alerts) error {
+	// Extract alert IDs
 	alertIDs := make([]types.AlertID, len(alerts))
 	for i, alert := range alerts {
 		alertIDs[i] = alert.ID
 	}
 
-	// Create ticket using common helper
-	opts := TicketCreationOptions{
-		AlertIDs:     alertIDs,
-		SlackThread:  &slackThread,
-		Assignee:     &user,
-		Title:        "",
-		Description:  "",
-		FillMetadata: true,  // Alert-based tickets use LLM to fill metadata
-		IsTest:       false, // Alert-based tickets are not test tickets
-	}
-
-	newTicket, err := uc.createTicketWithSlackPosting(ctx, opts, alerts)
+	// Use the unified CreateTicketFromAlerts method for both single and multiple alerts
+	_, err := uc.CreateTicketFromAlerts(ctx, alertIDs, &user, &slackThread)
 	if err != nil {
-		return goerr.Wrap(err, "failed to create ticket with slack posting")
+		return goerr.Wrap(err, "failed to create ticket from alerts")
 	}
-
-	// Update alerts to link them to the ticket
-	for _, alert := range alerts {
-		alert.TicketID = newTicket.ID
-	}
-
-	if err := uc.repository.BatchPutAlerts(ctx, alerts); err != nil {
-		return goerr.Wrap(err, "failed to put alert")
-	}
-
-	uc.slackService.UpdateAlerts(ctx, alerts)
 
 	msg.Trace(ctx, "🎫 Ticket created")
+
 	return nil
 }
 
