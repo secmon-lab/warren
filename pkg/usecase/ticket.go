@@ -447,7 +447,10 @@ func (uc *UseCases) CreateTicketFromAlerts(ctx context.Context, alertIDs []types
 		for _, alert := range alerts {
 			if alert.SlackThread != nil {
 				st := uc.slackService.NewThread(*alert.SlackThread)
-				st.UpdateAlert(ctx, *alert)
+				if err := st.UpdateAlert(ctx, *alert); err != nil {
+					// Log error but don't fail the main operation
+					_ = msg.Trace(ctx, "💥 Failed to update alert in Slack: %s", err.Error())
+				}
 			}
 		}
 	}
