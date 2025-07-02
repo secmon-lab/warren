@@ -97,6 +97,23 @@ Only update findings when explicitly requested and after thorough investigation 
 - If you find yourself repeating the same actions or unable to proceed, immediately call `{{ .exit_tool_name }}`
 - Complete all necessary investigation before calling this tool - you cannot continue analysis after calling it
 
+## Facilitator Response Format
+When the system asks "What is the next action needed to advance the task?", respond ONLY in the following JSON format:
+
+```json
+{
+  "action": "continue|complete|wait_user",
+  "reason": "Brief explanation for the chosen action",
+  "completion": "Summary of completed analysis (required only when action is 'complete')"
+}
+```
+
+- Use "continue" if you need to perform more analysis or investigation
+- Use "complete" if your analysis is finished and you're ready to present findings (must include "completion" field)
+- Use "wait_user" if you need additional input from the user
+
+**IMPORTANT**: This response must be valid JSON only - no additional text or explanation.
+
 {{ if .additional_instructions }}
 
 {{ .additional_instructions }}{{ end }}

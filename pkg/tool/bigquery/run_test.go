@@ -347,9 +347,12 @@ partitioning:
 			// Verify detailed information is NOT included (to save tokens)
 			gt.S(t, prompt).NotContains("Partitioning")
 			gt.S(t, prompt).NotContains("Available Columns")
-			gt.S(t, prompt).NotContains("timestamp")
 			gt.S(t, prompt).NotContains("src_ip")
 			gt.S(t, prompt).NotContains("event_type")
+			
+			// Verify exploratory strategy is included
+			gt.S(t, prompt).Contains("BigQuery Exploratory Investigation Strategy")
+			gt.S(t, prompt).Contains("Verify Field Values")
 
 			// Verify the helper comment is included
 			gt.S(t, prompt).Contains("For detailed column information and schema, use the `bigquery_table_summary` tool")

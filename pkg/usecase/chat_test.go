@@ -52,28 +52,40 @@ func TestHandlePrompt(t *testing.T) {
 			session := &mock.LLMSessionMock{
 				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
 					genContentCount++
-					if genContentCount > 2 {
+					
+					// Always check if this looks like a facilitator prompt first
+					if genContentCount == 1 {
+						// First call is likely the main analysis
+						contents = append(contents, &genai.Content{
+							Role:  "user",
+							Parts: []genai.Part{genai.Text(fmt.Sprintf("prompt:%d", genContentCount))},
+						})
+						contents = append(contents, &genai.Content{
+							Role:  "assistant",
+							Parts: []genai.Part{genai.Text(fmt.Sprintf("result:%d", genContentCount))},
+						})
+
 						return &gollem.Response{
-							FunctionCalls: []*gollem.FunctionCall{
-								{
-									Name:      "respond_to_user",
-									Arguments: map[string]any{},
-								},
-							},
+							Texts: []string{fmt.Sprintf("result:%d", genContentCount)},
 						}, nil
 					}
-
-					contents = append(contents, &genai.Content{
-						Role:  "user",
-						Parts: []genai.Part{genai.Text(fmt.Sprintf("prompt:%d", genContentCount))},
-					})
-					contents = append(contents, &genai.Content{
-						Role:  "assistant",
-						Parts: []genai.Part{genai.Text(fmt.Sprintf("result:%d", genContentCount))},
-					})
-
+					
+					// Second call is likely the facilitator asking for next action
+					if genContentCount == 2 {
+						// Return JSON response for facilitator with completion field
+						return &gollem.Response{
+							Texts: []string{`{"action": "complete", "reason": "Analysis complete", "completion": "Test analysis completed successfully"}`},
+						}, nil
+					}
+					
+					// For any additional calls, return the exit tool
 					return &gollem.Response{
-						Texts: []string{fmt.Sprintf("result:%d", genContentCount)},
+						FunctionCalls: []*gollem.FunctionCall{
+							{
+								Name:      "respond_to_user",
+								Arguments: map[string]any{},
+							},
+						},
 					}, nil
 				},
 				HistoryFunc: func() *gollem.History {
@@ -112,7 +124,8 @@ func TestHandlePrompt(t *testing.T) {
 	gt.NoError(t, err)
 	geminiHistory, err := history.ToGemini()
 	gt.NoError(t, err)
-	gt.A(t, geminiHistory).Length(4).At(0, func(t testing.TB, v *genai.Content) {
+	// With facilitator, we expect 2 exchanges (user/assistant pairs)
+	gt.A(t, geminiHistory).Length(2).At(0, func(t testing.TB, v *genai.Content) {
 		gt.Equal(t, v.Role, "user")
 		p := gt.Cast[genai.Text](t, v.Parts[0])
 		gt.Equal(t, p, "prompt:1")
@@ -125,7 +138,7 @@ func TestHandlePrompt(t *testing.T) {
 	gt.NoError(t, err)
 	gt.NotNil(t, latestHistory)
 
-	gt.Equal(t, newSessionCount, 2)
+	gt.Equal(t, newSessionCount, 3)
 }
 
 func newLLMClient(t *testing.T) gollem.LLMClient {
