@@ -349,7 +349,7 @@ partitioning:
 			gt.S(t, prompt).NotContains("Available Columns")
 			gt.S(t, prompt).NotContains("src_ip")
 			gt.S(t, prompt).NotContains("event_type")
-			
+
 			// Verify exploratory strategy is included
 			gt.S(t, prompt).Contains("BigQuery Exploratory Investigation Strategy")
 			gt.S(t, prompt).Contains("Verify Field Values")
