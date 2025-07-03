@@ -107,6 +107,9 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			if x.slackService == nil || target.SlackThread == nil {
 				return nil
 			}
+			if strings.TrimSpace(message) == "" {
+				return nil
+			}
 
 			// Set agent context for agent messages
 			agentCtx := user.WithAgent(user.WithUserID(ctx, x.slackService.BotID()))
