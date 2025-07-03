@@ -62,6 +62,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		if err != nil {
 			return goerr.Wrap(err, "failed to get history data")
 		}
+		logger.Debug("history loaded", "history_id", historyRecord.ID, "ticket_id", target.ID)
 	}
 
 	alerts, err := x.repository.BatchGetAlerts(ctx, target.AlertIDs)
@@ -183,6 +184,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	if err = x.repository.PutHistory(ctx, target.ID, &newRecord); err != nil {
 		return goerr.Wrap(err, "failed to put history")
 	}
+
+	logger.Debug("history saved", "history_id", newRecord.ID, "ticket_id", target.ID)
 
 	return nil
 }
