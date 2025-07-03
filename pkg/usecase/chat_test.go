@@ -56,21 +56,21 @@ func TestHandlePrompt(t *testing.T) {
 				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
 					sessionGenCount++
 					genContentCount++
-					
+
 					// Check if this is a facilitator call by session and call number
 					var isFacilitatorCall bool
 					if (newSessionCount == 1 && sessionGenCount == 2) || (newSessionCount == 2 && sessionGenCount == 2) {
 						// Second call in any session is likely facilitator
 						isFacilitatorCall = true
 					}
-					
+
 					if isFacilitatorCall {
 						// Return JSON response for facilitator
 						return &gollem.Response{
 							Texts: []string{`{"action": "complete", "reason": "Analysis complete", "completion": "Test analysis completed successfully"}`},
 						}, nil
 					}
-					
+
 					// Regular analysis response
 					contents = append(contents, &genai.Content{
 						Role:  "user",
