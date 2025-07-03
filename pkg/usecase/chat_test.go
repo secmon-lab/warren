@@ -49,43 +49,40 @@ func TestHandlePrompt(t *testing.T) {
 				gt.NotNil(t, cfg.History())
 			}
 
+			// Reset genContentCount for each new session
+			sessionGenCount := 0
+
 			session := &mock.LLMSessionMock{
 				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					sessionGenCount++
 					genContentCount++
 					
-					// Always check if this looks like a facilitator prompt first
-					if genContentCount == 1 {
-						// First call is likely the main analysis
-						contents = append(contents, &genai.Content{
-							Role:  "user",
-							Parts: []genai.Part{genai.Text(fmt.Sprintf("prompt:%d", genContentCount))},
-						})
-						contents = append(contents, &genai.Content{
-							Role:  "assistant",
-							Parts: []genai.Part{genai.Text(fmt.Sprintf("result:%d", genContentCount))},
-						})
-
-						return &gollem.Response{
-							Texts: []string{fmt.Sprintf("result:%d", genContentCount)},
-						}, nil
+					// Check if this is a facilitator call by session and call number
+					var isFacilitatorCall bool
+					if (newSessionCount == 1 && sessionGenCount == 2) || (newSessionCount == 2 && sessionGenCount == 2) {
+						// Second call in any session is likely facilitator
+						isFacilitatorCall = true
 					}
 					
-					// Second call is likely the facilitator asking for next action
-					if genContentCount == 2 {
-						// Return JSON response for facilitator with completion field
+					if isFacilitatorCall {
+						// Return JSON response for facilitator
 						return &gollem.Response{
 							Texts: []string{`{"action": "complete", "reason": "Analysis complete", "completion": "Test analysis completed successfully"}`},
 						}, nil
 					}
 					
-					// For any additional calls, return the exit tool
+					// Regular analysis response
+					contents = append(contents, &genai.Content{
+						Role:  "user",
+						Parts: []genai.Part{genai.Text(fmt.Sprintf("prompt:%d", genContentCount))},
+					})
+					contents = append(contents, &genai.Content{
+						Role:  "assistant",
+						Parts: []genai.Part{genai.Text(fmt.Sprintf("result:%d", genContentCount))},
+					})
+
 					return &gollem.Response{
-						FunctionCalls: []*gollem.FunctionCall{
-							{
-								Name:      "respond_to_user",
-								Arguments: map[string]any{},
-							},
-						},
+						Texts: []string{fmt.Sprintf("result:%d", genContentCount)},
 					}, nil
 				},
 				HistoryFunc: func() *gollem.History {
