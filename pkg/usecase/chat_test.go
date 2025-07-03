@@ -135,7 +135,7 @@ func TestHandlePrompt(t *testing.T) {
 	gt.NoError(t, err)
 	gt.NotNil(t, latestHistory)
 
-	gt.Equal(t, newSessionCount, 3)
+	gt.Equal(t, newSessionCount, 4)
 }
 
 func newLLMClient(t *testing.T) gollem.LLMClient {
