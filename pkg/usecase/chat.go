@@ -63,6 +63,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			return goerr.Wrap(err, "failed to get history data")
 		}
 		logger.Debug("history loaded", "history_id", historyRecord.ID, "ticket_id", target.ID)
+	} else {
+		logger.Debug("no history found")
 	}
 
 	alerts, err := x.repository.BatchGetAlerts(ctx, target.AlertIDs)
