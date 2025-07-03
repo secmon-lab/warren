@@ -57,21 +57,15 @@ func TestHandlePrompt(t *testing.T) {
 					sessionGenCount++
 					genContentCount++
 
-					// Check if this is a facilitator call by session and call number
-					var isFacilitatorCall bool
-					if (newSessionCount == 1 && sessionGenCount == 2) || (newSessionCount == 2 && sessionGenCount == 2) {
-						// Second call in any session is likely facilitator
-						isFacilitatorCall = true
-					}
-
-					if isFacilitatorCall {
-						// Return JSON response for facilitator
+					// Always return JSON for facilitator calls (even numbered calls globally)
+					if genContentCount%2 == 0 {
+						// Even numbered calls globally are facilitator calls
 						return &gollem.Response{
 							Texts: []string{`{"action": "complete", "reason": "Analysis complete", "completion": "Test analysis completed successfully"}`},
 						}, nil
 					}
 
-					// Regular analysis response
+					// Odd numbered calls are regular analysis
 					contents = append(contents, &genai.Content{
 						Role:  "user",
 						Parts: []genai.Part{genai.Text(fmt.Sprintf("prompt:%d", genContentCount))},
@@ -121,7 +115,7 @@ func TestHandlePrompt(t *testing.T) {
 	gt.NoError(t, err)
 	geminiHistory, err := history.ToGemini()
 	gt.NoError(t, err)
-	// With facilitator, we expect 2 exchanges (user/assistant pairs)
+	// With facilitator, we expect 2 exchanges (user/assistant pairs) - only odd numbered calls add to history
 	gt.A(t, geminiHistory).Length(2).At(0, func(t testing.TB, v *genai.Content) {
 		gt.Equal(t, v.Role, "user")
 		p := gt.Cast[genai.Text](t, v.Parts[0])
