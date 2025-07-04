@@ -2,7 +2,6 @@ package bigquery
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -353,32 +352,13 @@ func (x *Action) Prompt(ctx context.Context) (string, error) {
 		return "", nil
 	}
 
-	var prompt strings.Builder
-	prompt.WriteString("## Available BigQuery Tables\n\n")
-	prompt.WriteString("You have access to the following BigQuery tables for investigation:\n\n")
-
-	for _, config := range x.configs {
-		prompt.WriteString(fmt.Sprintf("### Project: %s, Dataset: %s, Table: %s\n", x.projectID, config.DatasetID, config.TableID))
-		if config.Description != "" {
-			prompt.WriteString(fmt.Sprintf("**Description**: %s\n\n", config.Description))
-		}
+	data := map[string]any{
+		"projectID": x.projectID,
+		"configs":   x.configs,
+		"runbooks":  x.runbooks,
 	}
 
-	// Note: Partitioning and column details are omitted from prompt to save tokens.
-	// Use bigquery_table_summary tool to get detailed column information when needed.
-	prompt.WriteString("**Note**: For detailed column information and schema, use the `bigquery_table_summary` tool.\n\n")
-
-	// Add runbook information if available
-	if len(x.runbooks) > 0 {
-		prompt.WriteString("## SQL Runbooks\n\n")
-		prompt.WriteString("Available runbook entries (use `get_runbook_entry` with ID to get details):\n\n")
-		for id, entry := range x.runbooks {
-			prompt.WriteString(fmt.Sprintf("- ID: %s, Title: %s\n", id, entry.Title))
-		}
-		prompt.WriteString("\n")
-	}
-
-	return prompt.String(), nil
+	return bigquerySystemPrompt(data)
 }
 
 // loadRunbooks loads SQL runbooks from configured paths and stores them in memory
