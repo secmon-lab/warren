@@ -2,6 +2,7 @@ package bigquery_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -169,7 +170,7 @@ func TestBigQuery_Query(t *testing.T) {
 			})
 			gt.NoError(t, err)
 			gt.NotEqual(t, runResult, nil)
-			gt.Map(t, runResult).HasKey("rows").Required()
+			gt.Map(t, runResult).HasKey("rows_json").Required()
 			gt.Map(t, runResult).HasKey("total_rows").Required()
 			gt.Map(t, runResult).HasKey("total_size").Required()
 			gt.Map(t, runResult).HasKey("has_more").Required()
@@ -183,7 +184,11 @@ func TestBigQuery_Query(t *testing.T) {
 				})
 				gt.NoError(t, err).Required()
 				gt.NotEqual(t, result1, nil)
-				rows1 := gt.Cast[[]map[string]any](t, result1["rows"])
+				// Parse rows_json to get actual rows
+				rowsJSON1 := gt.Cast[string](t, result1["rows_json"])
+				var rows1 []map[string]any
+				err = json.Unmarshal([]byte(rowsJSON1), &rows1)
+				gt.NoError(t, err)
 
 				result2, err := action.Run(ctx, "bigquery_result", map[string]any{
 					"query_id": queryID,
@@ -193,7 +198,11 @@ func TestBigQuery_Query(t *testing.T) {
 				gt.NoError(t, err)
 				gt.NotEqual(t, result2, nil)
 
-				rows2 := gt.Cast[[]map[string]any](t, result2["rows"])
+				// Parse rows_json to get actual rows
+				rowsJSON2 := gt.Cast[string](t, result2["rows_json"])
+				var rows2 []map[string]any
+				err = json.Unmarshal([]byte(rowsJSON2), &rows2)
+				gt.NoError(t, err)
 				gt.Equal(t, rows1, rows2)
 
 				result3, err := action.Run(ctx, "bigquery_result", map[string]any{
@@ -203,7 +212,11 @@ func TestBigQuery_Query(t *testing.T) {
 				})
 				gt.NoError(t, err)
 				gt.NotEqual(t, result3, nil)
-				rows3 := gt.Cast[[]map[string]any](t, result3["rows"])
+				// Parse rows_json to get actual rows
+				rowsJSON3 := gt.Cast[string](t, result3["rows_json"])
+				var rows3 []map[string]any
+				err = json.Unmarshal([]byte(rowsJSON3), &rows3)
+				gt.NoError(t, err)
 				gt.NotEqual(t, rows1, rows3)
 			}
 			return nil

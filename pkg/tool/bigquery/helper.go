@@ -521,19 +521,28 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 
 	logger.Info("Total fields available", "count", len(flattenedFields))
 
+	// Analyze security fields to provide focused guidance
+	securityFields := AnalyzeSecurityFields(tableMetadata.Schema)
+	securityPrompt := ""
+	if len(securityFields) > 0 {
+		securityPrompt = generateSecurityPrompt(securityFields)
+	}
+
 	// Generate JSON schema from the Config struct
 	outputSchema := generateConfigSchema()
 
 	queryPrompt, err := prompt.GenerateWithStruct(ctx, generateConfigQueryPrompt, map[string]any{
-		"table_description":  cfg.tableDescription,
-		"schema_fields":      flattenedFields, // Use all fields - LLM will process internally
-		"total_fields_count": len(flattenedFields),
-		"used_fields_count":  len(flattenedFields),
-		"output_schema":      outputSchema,
-		"scan_limit":         cfg.scanLimit,
-		"project_id":         cfg.tableProjectID,
-		"dataset_id":         cfg.tableDatasetID,
-		"table_id":           cfg.tableTableID,
+		"table_description":     cfg.tableDescription,
+		"schema_fields":         flattenedFields, // Use all fields - LLM will process internally
+		"total_fields_count":    len(flattenedFields),
+		"used_fields_count":     len(flattenedFields),
+		"security_analysis":     securityPrompt,
+		"security_fields_count": len(securityFields),
+		"output_schema":         outputSchema,
+		"scan_limit":            cfg.scanLimit,
+		"project_id":            cfg.tableProjectID,
+		"dataset_id":            cfg.tableDatasetID,
+		"table_id":              cfg.tableTableID,
 	})
 	if err != nil {
 		return err

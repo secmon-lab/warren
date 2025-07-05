@@ -54,8 +54,8 @@ var (
 	devicePattern   = regexp.MustCompile(`^(device|client|agent|browser|os|platform|fingerprint)`)
 )
 
-// AnalyzesecurityFields analyzes BigQuery schema fields and categorizes them by security relevance
-func analyzesecurityFields(schema bigquery.Schema) []securityField {
+// AnalyzeSecurityFields analyzes BigQuery schema fields and categorizes them by security relevance
+func AnalyzeSecurityFields(schema bigquery.Schema) []securityField {
 	var securityFields []securityField
 
 	for _, field := range schema {
@@ -392,7 +392,7 @@ func capitalizeFirst(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-// GenerateSecurityPrompt creates a security-focused prompt for LLM analysis
+// generateSecurityPrompt creates a security-focused prompt for LLM analysis
 func generateSecurityPrompt(fields []securityField) string {
 	var prompt strings.Builder
 

@@ -16,7 +16,7 @@ If there are markdown files in `.todo/` directory, refer to the markdown files a
 - All comments and literals in code MUST be in English.
 - Run all test by `go test ./...` before finishing the task.
 - Fix all failed test before you finish the task.
-- DO NOT expose method, structure, variable if it's not required.
+- DO NOT expose method, structure, variable if it's not required for external use.
 - DO NOT use `firestore` tag for model structures. It's complicated and causes bug.
 - Consider to use `pkg/domain/mock` at first before creating a new mock structure.
 

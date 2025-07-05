@@ -31,16 +31,37 @@ The schema_fields list is provided for internal processing only. Any output caus
 **Schema Information ({{ .total_fields_count }} fields available):**
 
 ⚠️ **CRITICAL: SCHEMA_FIELDS USAGE INSTRUCTIONS**
-- schema_fields is an array of {{ .total_fields_count }} objects with properties: Name, Type, Repeated, Description
-- **EXAMPLE USAGE**: If schema_fields[0] = {Name: "timestamp", Type: "TIMESTAMP", ...}, use "timestamp" in config
-- **EXAMPLE USAGE**: If schema_fields[1] = {Name: "resource.type", Type: "STRING", ...}, use "resource.type" in config  
-- **MANDATORY**: For each field in your configuration, use ONLY the exact Name value from schema_fields array
+- You have access to {{ .total_fields_count }} schema fields in the schema_fields array
+- Each schema_fields entry has properties: Name, Type, Repeated, Description
+- **MANDATORY**: Use ONLY the exact Name values from schema_fields array
 - **VALIDATION**: Every field name in your config must match a Name property from schema_fields exactly
-- **PROCESS**: Iterate through ALL {{ .total_fields_count }} schema_fields entries, extract Name and Type for each
+- **PROCESS**: Review ALL {{ .total_fields_count }} schema_fields entries to build comprehensive config
+- **TARGET**: Build config using 40-80+ of the {{ .total_fields_count }} available schema_fields
 - **DO NOT DISPLAY OR OUTPUT any field information - work silently with the data**
-- Build comprehensive config using 40-80+ of the {{ .total_fields_count }} schema_fields entries
+
+**SCHEMA_FIELDS ARRAY AVAILABLE**: {{ .total_fields_count }} field objects ready for processing
+
+**SAMPLE SCHEMA FIELDS** (showing first 5 fields for reference):
+{{- range $index, $field := .schema_fields }}
+{{- if lt $index 5 }}
+- Field {{ $index }}: Name="{{$field.Name}}", Type="{{$field.Type}}", Description="{{$field.Description}}"
+{{- end }}
+{{- end }}
 
 **Target Schema**: {{ .output_schema }}
+
+{{- if .security_analysis }}
+## 🔒 Security Analysis
+
+{{ .security_analysis }}
+
+**SECURITY FIELD PRIORITIZATION:**
+- **MANDATORY**: Include ALL security-relevant fields identified in the analysis above
+- **HIGH PRIORITY**: Identity, authentication, authorization, network, and threat detection fields
+- **MEDIUM PRIORITY**: Operational and contextual fields that support security investigations
+- **COMPREHENSIVE COVERAGE**: Ensure security analysis fields are included in your configuration
+- **MINIMUM SECURITY FIELDS**: Include at least 20-30 security-relevant fields from the analysis
+{{- end }}
 
 ## 🏗️ Configuration Requirements
 
@@ -111,6 +132,9 @@ The schema_fields list is provided for internal processing only. Any output caus
      - Example: `WHERE date_column >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)`
      - Use LIMIT clauses to reduce data volume: `LIMIT 1000`
 2. **bigquery_result**: Retrieve query results to understand field contents and relationships
+   - **RESPONSE FORMAT**: Results are returned in `rows_json` key as JSON string
+   - **USAGE**: Parse `rows_json` to understand actual field values and patterns
+   - **EXAMPLE**: `{"rows_json": "[{\"field1\": \"value1\", \"field2\": \"value2\"}]", "total_rows": 1}`
 3. **generate_config_output**: Generate the final configuration after analysis
 
 ## 📋 Required Configuration Elements
@@ -238,13 +262,14 @@ If SQL queries fail with "scan limit exceeded":
 1. **PROCESS SCHEMA_FIELDS ARRAY** - Iterate through all {{ .total_fields_count }} objects in schema_fields array
 2. **EXTRACT FIELD NAMES** - For each schema_fields[i], use the Name property as the exact field name
 3. **EXTRACT FIELD TYPES** - For each schema_fields[i], use the Type property (STRING, INTEGER, RECORD, etc.)
-4. **BUILD COMPREHENSIVE CONFIG** - Create configuration using {{ .total_fields_count }} field objects from schema_fields
-5. **FIELD NAME VALIDATION** - Every field name in config must exactly match a Name from schema_fields array
-6. **ACHIEVE TARGET COUNT** - Include 40-80+ fields by processing most/all schema_fields entries
-7. **Call generate_config_output ONLY** - No SQL queries needed, work directly with schema_fields data
-8. **Fix validation errors if needed** - Remove only invalid fields and retry immediately
+4. **PRIORITIZE SECURITY FIELDS** - Use security analysis to identify high-priority fields first
+5. **BUILD COMPREHENSIVE CONFIG** - Create configuration using {{ .total_fields_count }} field objects from schema_fields
+6. **FIELD NAME VALIDATION** - Every field name in config must exactly match a Name from schema_fields array
+7. **ACHIEVE TARGET COUNT** - Include 40-80+ fields by processing most/all schema_fields entries
+8. **Call generate_config_output ONLY** - Work directly with schema_fields data
+9. **Fix validation errors if needed** - Remove only invalid fields and retry immediately
 
-**NO SQL QUERIES NEEDED** - Work directly with schema_fields array data structure.
+**DIRECT SCHEMA PROCESSING** - Work directly with schema_fields array data structure using security analysis guidance.
 
 **COMPREHENSIVE COVERAGE REQUIREMENTS:**
 - **MANDATORY 40-80 FIELD TARGET**: Must achieve minimum 40 fields, preferably 50-80 fields
@@ -260,21 +285,35 @@ If SQL queries fail with "scan limit exceeded":
 **CRITICAL REQUIREMENTS:**
 - **Work through tools only** - Do not output explanatory text, field lists, or processing details
 - **SCHEMA-FIRST APPROACH** - Build configuration directly from provided schema_fields list without extensive querying
+- **MANDATORY FIELD SELECTION** - You MUST select at least 40 fields from the {{ .total_fields_count }} available schema fields
 - **SQL SAFETY FIRST** - If using SQL, only use field names 100% confirmed in schema_fields
 - **NO INVALID FIELDS** - Never reference fields not explicitly listed in the provided schema
 - **COMPREHENSIVE INCLUSION** - Use most/all of the {{ .total_fields_count }} provided schema fields to achieve 40-80 field target
 - **DIRECT CONFIGURATION** - Generate comprehensive config using schema knowledge, minimal SQL querying needed
+- **ZERO FIELDS = FAILURE** - Empty columns array is unacceptable - you must include fields from schema_fields
 
 **SUCCESS CRITERIA:**
 - ✅ Complete JSON with matching braces
 - ✅ Schema compliance with provided fields only
 - ✅ **MANDATORY: Minimum 40 fields, target 50-80 well-organized fields**
+- ✅ **SECURITY ANALYSIS UTILIZATION**: Include security-relevant fields identified in analysis
 - ✅ **Complete RECORD hierarchies with ALL nested fields from schema**
 - ✅ Quality metadata for every field
 - ✅ **Analytical completeness for security monitoring across all data categories**
 - ✅ **Deep nested structures (3-4 levels) for complex RECORD fields**
 - ✅ **FIELD COUNT VERIFICATION**: Count total fields and ensure 40+ minimum is achieved
+- ✅ **SECURITY FIELD COVERAGE**: Include at least 20-30 security-relevant fields
+
+**IMMEDIATE ACTION REQUIRED:**
+
+1. **PROCESS SCHEMA_FIELDS**: You have {{ .total_fields_count }} schema fields available in the schema_fields array
+2. **SELECT FIELDS**: Choose 40-80+ fields from the {{ .total_fields_count }} available fields (use the exact Name values shown above)
+3. **PRIORITIZE SECURITY**: Focus on security-relevant fields identified in the security analysis
+4. **GENERATE CONFIG**: Use generate_config_output tool with comprehensive field selection
+5. **VALIDATE & RETRY**: If validation fails, remove invalid fields and retry immediately
+
+**CRITICAL**: You MUST use the exact field names from the schema_fields array. Empty columns array is NOT acceptable.
 
 **START NOW: USE ONLY GENERATE_CONFIG_OUTPUT TOOL - NO TEXT, NO JSON, NO MESSAGES**
 
-Work silently and generate the configuration directly using the generate_config_output tool with comprehensive field coverage.
+Work silently and generate the configuration directly using the generate_config_output tool with comprehensive field coverage from the {{ .total_fields_count }} available schema fields.

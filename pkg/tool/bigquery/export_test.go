@@ -15,7 +15,6 @@ var GenerateConfigWithFactory = generateConfigWithFactoryInternal
 var GenerateConfigSchema = generateConfigSchema
 
 // Test exports for security analysis
-var AnalyzeSecurityFields = analyzesecurityFields
 var GenerateSecurityPrompt = generateSecurityPrompt
 
 type SecurityField = securityField
