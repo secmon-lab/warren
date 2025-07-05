@@ -223,7 +223,11 @@ func ticketAlertsDownloadHandler(uc UseCase) http.HandlerFunc {
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
 		// Write JSONL content
-		w.Write(jsonlData)
+		if _, err := w.Write(jsonlData); err != nil {
+			// Log error but don't try to write error response since headers are already sent
+			// This follows the pattern of other handlers in the codebase
+			return
+		}
 	}
 }
 

@@ -26,7 +26,10 @@ func userIconHandler(uc interfaces.ApiUsecases) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", contentType)
 		w.Header().Set("Cache-Control", "public, max-age=3600") // Cache for 1 hour
-		w.Write(iconData)
+		if _, err := w.Write(iconData); err != nil {
+			// Log error but don't try to write error response since headers are already sent
+			return
+		}
 	}
 }
 
@@ -47,6 +50,9 @@ func userProfileHandler(uc interfaces.ApiUsecases) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			// Log error but don't try to write error response since headers are already sent
+			return
+		}
 	}
 }
