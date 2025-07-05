@@ -80,7 +80,13 @@ type UseCase interface {
 
 // Static file extensions that should be served directly (not fallback to SPA)
 var staticFileExtensions = []string{
-	".ico", // favicon files
+	".ico",            // favicon files
+	".png",            // favicon PNG files
+	".svg",            // SVG files
+	".css",            // CSS files
+	".js",             // JavaScript files
+	".woff", ".woff2", // Web fonts
+	".ttf", ".otf", // Font files
 }
 
 func New(uc UseCase, opts ...Options) *Server {
@@ -176,6 +182,11 @@ func New(uc UseCase, opts ...Options) *Server {
 	// Static file serving for SPA
 	staticFS, err := fs.Sub(frontend.StaticFiles, "dist")
 	if err == nil {
+		// Dedicated favicon handlers for better reliability
+		r.Get("/favicon.ico", faviconHandler(staticFS, "favicon.ico", "image/x-icon"))
+		r.Get("/favicon-192x192.png", faviconHandler(staticFS, "favicon-192x192.png", "image/png"))
+		r.Get("/favicon-512x512.png", faviconHandler(staticFS, "favicon-512x512.png", "image/png"))
+
 		// Serve static files and handle SPA routing
 		r.HandleFunc("/*", spaHandler(staticFS))
 	}
@@ -246,6 +257,22 @@ func graphqlHandler(repo interfaces.Repository, slackService *slack.Service, uc 
 	return graphql.DataLoaderMiddleware(repo, slackClient)(srv)
 }
 
+// faviconHandler serves favicon files with appropriate Content-Type headers
+func faviconHandler(staticFS fs.FS, filename, contentType string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		file, err := staticFS.Open(filename)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		defer file.Close()
+
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Cache-Control", "public, max-age=31536000") // Cache for 1 year
+		safe.Copy(r.Context(), w, file)
+	}
+}
+
 // spaHandler handles SPA routing by serving static files and falling back to index.html
 func spaHandler(staticFS fs.FS) http.HandlerFunc {
 	fileServer := http.FileServer(http.FS(staticFS))
@@ -300,6 +327,13 @@ func spaHandler(staticFS fs.FS) http.HandlerFunc {
 		} else {
 			// File exists, close it and let fileServer handle it
 			file.Close()
+		}
+
+		// Set appropriate Content-Type for favicon files
+		if strings.HasSuffix(urlPath, ".ico") {
+			w.Header().Set("Content-Type", "image/x-icon")
+		} else if strings.HasSuffix(urlPath, ".png") && strings.Contains(urlPath, "favicon") {
+			w.Header().Set("Content-Type", "image/png")
 		}
 
 		// Serve the requested file using the file server
