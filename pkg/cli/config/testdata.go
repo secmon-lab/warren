@@ -1,7 +1,10 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -71,18 +74,14 @@ func loadTestFiles(basePath string) (*policy.TestData, error) {
 			return nil
 		}
 
-		if filepath.Ext(d.Name()) != ".json" {
+		ext := filepath.Ext(d.Name())
+		if ext != ".json" && ext != ".jsonl" {
 			return nil
 		}
 
 		data, err := os.ReadFile(filepath.Clean(path))
 		if err != nil {
 			return goerr.Wrap(err, "failed to read file", goerr.V("path", path))
-		}
-
-		var v any
-		if err := json.Unmarshal(data, &v); err != nil {
-			return goerr.Wrap(err, "failed to unmarshal json", goerr.V("path", path))
 		}
 
 		// Get relative path from basePath
@@ -109,8 +108,42 @@ func loadTestFiles(basePath string) (*policy.TestData, error) {
 			result.Data[schema] = make(map[string]any)
 		}
 
-		// Store value with remaining path as key
-		result.Data[schema][remainPath] = v
+		// Use json.Decoder to read multiple JSON objects regardless of extension
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		objectCount := 0
+
+		for {
+			var v any
+			if err := decoder.Decode(&v); err != nil {
+				if err == io.EOF {
+					break // End of file reached
+				}
+				return goerr.Wrap(err, "failed to decode JSON object",
+					goerr.V("path", path),
+					goerr.V("object_number", objectCount+1))
+			}
+
+			// Create unique key for each JSON object
+			var key string
+			if objectCount == 0 {
+				// For first object, use the original filename
+				key = remainPath
+			} else {
+				// For subsequent objects, add object number
+				baseKey := strings.TrimSuffix(remainPath, filepath.Ext(remainPath))
+				key = fmt.Sprintf("%s_obj%d%s", baseKey, objectCount+1, filepath.Ext(remainPath))
+			}
+
+			// Store value with unique key
+			result.Data[schema][key] = v
+			objectCount++
+		}
+
+		// If no objects were found, that's an error
+		if objectCount == 0 {
+			return goerr.New("no JSON objects found in file", goerr.V("path", path))
+		}
+
 		return nil
 	})
 	if err != nil {
