@@ -228,6 +228,26 @@ export default function TicketDetailPage() {
     setIsEditTicketModalOpen(true);
   };
 
+  const handleDownloadAlerts = () => {
+    if (!ticket?.id || ticket.alerts.length === 0) {
+      errorToast("No alerts to download");
+      return;
+    }
+
+    // Create download URL
+    const downloadUrl = `/api/tickets/${ticket.id}/alerts/download`;
+    
+    // Create a temporary link element and trigger download
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `ticket-${ticket.id}-alerts-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jsonl`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    successToast(`Downloading ${ticket.alerts.length} alert(s)`);
+  };
+
   if (!id) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -435,15 +455,27 @@ export default function TicketDetailPage() {
                   <AlertCircle className="h-5 w-5" />
                   Related Alerts ({ticket.alerts.length})
                 </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsSalvageModalOpen(true)}
-                  className="flex items-center gap-2"
-                >
-                  <AlertCircle className="h-4 w-4" />
-                  Salvage
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsSalvageModalOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <AlertCircle className="h-4 w-4" />
+                    Salvage
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDownloadAlerts}
+                    className="flex items-center gap-2"
+                    disabled={ticket.alerts.length === 0}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Download
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">

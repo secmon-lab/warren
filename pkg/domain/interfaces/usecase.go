@@ -26,8 +26,11 @@ type AlertUsecases interface {
 	HandleAlert(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error)
 }
 
-type UserUsecases interface {
+type ApiUsecases interface {
 	// User related handlers
 	GetUserIcon(ctx context.Context, userID string) ([]byte, string, error)
 	GetUserProfile(ctx context.Context, userID string) (string, error)
+
+	// Ticket related handlers
+	GenerateTicketAlertsJSONL(ctx context.Context, ticketID types.TicketID) ([]byte, error)
 }

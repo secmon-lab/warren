@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"runtime"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -214,11 +216,45 @@ func verifySlackRequest(verifier slack.PayloadVerifier) func(http.Handler) http.
 	}
 }
 
+// getDetailedStackTrace returns a detailed stack trace with function names and line numbers
+func getDetailedStackTrace() string {
+	var buf strings.Builder
+	buf.WriteString("Detailed Stack Trace:\n")
+
+	// Get callers (skip the first few frames that are in the panic recovery code)
+	callers := make([]uintptr, 64)
+	n := runtime.Callers(3, callers)
+	frames := runtime.CallersFrames(callers[:n])
+
+	for {
+		frame, more := frames.Next()
+		buf.WriteString(fmt.Sprintf("  %s\n    %s:%d\n", frame.Function, frame.File, frame.Line))
+		if !more {
+			break
+		}
+	}
+
+	return buf.String()
+}
+
 func panicRecoveryMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				handleError(w, r, goerr.New(fmt.Sprintf("%v", err)))
+				// Get both debug.Stack() and detailed stack trace
+				debugStack := debug.Stack()
+				detailedStack := getDetailedStackTrace()
+
+				// Create error with stack trace information
+				panicErr := goerr.New("panic recovered",
+					goerr.V("panic", fmt.Sprintf("%v", err)),
+					goerr.V("debug_stack", string(debugStack)),
+					goerr.V("detailed_stack", detailedStack),
+					goerr.V("method", r.Method),
+					goerr.V("path", r.URL.Path),
+				)
+
+				handleError(w, r, panicErr)
 			}
 		}()
 		next.ServeHTTP(w, r)
@@ -306,6 +342,7 @@ func withHTTPClient(ctx context.Context, client httpClient) context.Context {
 func authMiddleware(authUC AuthUseCase) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
 			// Get tokens from cookies
 			tokenIDCookie, err := r.Cookie("token_id")
 			if err != nil {

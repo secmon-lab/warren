@@ -1,9 +1,11 @@
 package http
 
 import (
+	"fmt"
 	"io/fs"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
@@ -14,6 +16,7 @@ import (
 	slack_controller "github.com/secmon-lab/warren/pkg/controller/slack"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
@@ -72,7 +75,7 @@ type UseCase interface {
 	interfaces.AlertUsecases
 	interfaces.SlackEventUsecases
 	interfaces.SlackInteractionUsecases
-	interfaces.UserUsecases
+	interfaces.ApiUsecases
 }
 
 // Static file extensions that should be served directly (not fallback to SPA)
@@ -163,6 +166,10 @@ func New(uc UseCase, opts ...Options) *Server {
 				r.Get("/{userID}/icon", userIconHandler(uc))
 				r.Get("/{userID}/profile", userProfileHandler(uc))
 			})
+			r.Route("/tickets", func(r chi.Router) {
+				r.Use(authMiddleware(s.authUC))
+				r.Get("/{ticketID}/alerts/download", ticketAlertsDownloadHandler(uc))
+			})
 		})
 	}
 
@@ -174,6 +181,39 @@ func New(uc UseCase, opts ...Options) *Server {
 	}
 
 	return s
+}
+
+// ticketAlertsDownloadHandler handles downloading alert data as JSONL for a specific ticket
+func ticketAlertsDownloadHandler(uc UseCase) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		ticketID := chi.URLParam(r, "ticketID")
+
+		// Parse ticket ID
+		tID := types.TicketID(ticketID)
+
+		// Generate JSONL data using usecase
+		jsonlData, err := uc.GenerateTicketAlertsJSONL(ctx, tID)
+		if err != nil {
+
+			// Check if it's a "not found" error
+			if strings.Contains(err.Error(), "ticket not found") {
+				http.Error(w, "Ticket not found", http.StatusNotFound)
+				return
+			}
+
+			http.Error(w, "Failed to generate alert data", http.StatusInternalServerError)
+			return
+		}
+
+		// Set response headers for file download
+		filename := fmt.Sprintf("ticket-%s-alerts-%s.jsonl", ticketID, time.Now().Format("20060102-150405"))
+		w.Header().Set("Content-Type", "application/jsonl")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+
+		// Write JSONL content
+		w.Write(jsonlData)
+	}
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

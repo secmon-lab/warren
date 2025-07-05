@@ -13,7 +13,7 @@ type useCaseInterface struct {
 	AlertUsecases            interfaces.AlertUsecases
 	SlackEventUsecases       interfaces.SlackEventUsecases
 	SlackInteractionUsecases interfaces.SlackInteractionUsecases
-	UserUsecases             interfaces.UserUsecases
+	ApiUsecases              interfaces.ApiUsecases
 }
 
 // AlertUsecases methods
@@ -61,18 +61,28 @@ func (u *useCaseInterface) HandleSalvageRefresh(ctx context.Context, user slack.
 	return nil
 }
 
-// UserUsecases methods
+// ApiUsecases methods
 func (u *useCaseInterface) GetUserIcon(ctx context.Context, userID string) ([]byte, string, error) {
-	if u.UserUsecases != nil {
-		return u.UserUsecases.GetUserIcon(ctx, userID)
+	if u.ApiUsecases != nil {
+		return u.ApiUsecases.GetUserIcon(ctx, userID)
 	}
 	// Mock implementation for testing
 	return []byte("mock-icon-data"), "image/png", nil
 }
 
 func (u *useCaseInterface) GetUserProfile(ctx context.Context, userID string) (string, error) {
-	if u.UserUsecases != nil {
-		return u.UserUsecases.GetUserProfile(ctx, userID)
+	if u.ApiUsecases != nil {
+		return u.ApiUsecases.GetUserProfile(ctx, userID)
 	}
 	return "", nil
+}
+
+func (u *useCaseInterface) GenerateTicketAlertsJSONL(ctx context.Context, ticketID types.TicketID) ([]byte, error) {
+	if u.ApiUsecases != nil {
+		return u.ApiUsecases.GenerateTicketAlertsJSONL(ctx, ticketID)
+	}
+	// Mock implementation for testing - return only data without metadata
+	return []byte(`{"test":"data","value":123}
+{"another":"record","count":456}
+`), nil
 }

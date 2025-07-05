@@ -158,7 +158,7 @@ func TestSlackMentionHandler(t *testing.T) {
 		AlertUsecases:            uc,
 		SlackEventUsecases:       slackEventMock,
 		SlackInteractionUsecases: uc,
-		UserUsecases:             uc,
+		ApiUsecases:              uc,
 	}
 
 	srv := server.New(ucInterface, server.WithSlackVerifier(slack_model.NewPayloadVerifier(signingSecret)))
@@ -208,7 +208,7 @@ func TestAlertSNS(t *testing.T) {
 		AlertUsecases:            alertUsecasesMock,
 		SlackEventUsecases:       uc,
 		SlackInteractionUsecases: uc,
-		UserUsecases:             uc,
+		ApiUsecases:              uc,
 	}
 
 	srv := server.New(ucInterface)
