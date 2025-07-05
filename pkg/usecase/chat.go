@@ -62,6 +62,9 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		if err != nil {
 			return goerr.Wrap(err, "failed to get history data")
 		}
+		logger.Debug("history loaded", "history_id", historyRecord.ID, "ticket_id", target.ID)
+	} else {
+		logger.Debug("no history found")
 	}
 
 	alerts, err := x.repository.BatchGetAlerts(ctx, target.AlertIDs)
@@ -102,6 +105,9 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
 			if x.slackService == nil || target.SlackThread == nil {
+				return nil
+			}
+			if strings.TrimSpace(message) == "" {
 				return nil
 			}
 
@@ -183,6 +189,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	if err = x.repository.PutHistory(ctx, target.ID, &newRecord); err != nil {
 		return goerr.Wrap(err, "failed to put history")
 	}
+
+	logger.Debug("history saved", "history_id", newRecord.ID, "ticket_id", target.ID)
 
 	return nil
 }

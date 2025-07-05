@@ -49,20 +49,23 @@ func TestHandlePrompt(t *testing.T) {
 				gt.NotNil(t, cfg.History())
 			}
 
+			// Reset genContentCount for each new session
+			sessionGenCount := 0
+
 			session := &mock.LLMSessionMock{
 				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					sessionGenCount++
 					genContentCount++
-					if genContentCount > 2 {
+
+					// Always return JSON for facilitator calls (even numbered calls globally)
+					if genContentCount%2 == 0 {
+						// Even numbered calls globally are facilitator calls
 						return &gollem.Response{
-							FunctionCalls: []*gollem.FunctionCall{
-								{
-									Name:      "respond_to_user",
-									Arguments: map[string]any{},
-								},
-							},
+							Texts: []string{`{"action": "complete", "reason": "Analysis complete", "completion": "Test analysis completed successfully"}`},
 						}, nil
 					}
 
+					// Odd numbered calls are regular analysis
 					contents = append(contents, &genai.Content{
 						Role:  "user",
 						Parts: []genai.Part{genai.Text(fmt.Sprintf("prompt:%d", genContentCount))},
@@ -112,7 +115,8 @@ func TestHandlePrompt(t *testing.T) {
 	gt.NoError(t, err)
 	geminiHistory, err := history.ToGemini()
 	gt.NoError(t, err)
-	gt.A(t, geminiHistory).Length(4).At(0, func(t testing.TB, v *genai.Content) {
+	// With facilitator, we expect 2 exchanges (user/assistant pairs) - only odd numbered calls add to history
+	gt.A(t, geminiHistory).Length(2).At(0, func(t testing.TB, v *genai.Content) {
 		gt.Equal(t, v.Role, "user")
 		p := gt.Cast[genai.Text](t, v.Parts[0])
 		gt.Equal(t, p, "prompt:1")
@@ -125,7 +129,7 @@ func TestHandlePrompt(t *testing.T) {
 	gt.NoError(t, err)
 	gt.NotNil(t, latestHistory)
 
-	gt.Equal(t, newSessionCount, 2)
+	gt.Equal(t, newSessionCount, 4)
 }
 
 func newLLMClient(t *testing.T) gollem.LLMClient {
