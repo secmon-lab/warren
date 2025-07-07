@@ -1,0 +1,520 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Implementation Plan
+
+If there are markdown files in `.todo/` directory, refer to the markdown files and implement code to fill checklists. When you completing the task, fill checkbox in the markdown file.
+
+- DO NOT remove and brake already implemented features in the checked items.
+- You can update markdown files in `.todo/` ONLY filling checkbox.
+- If you have done work item not in the original markdown, you should add the item you implemented to the list. However DO NOT remove and modify existing work items.
+
+# Restriction
+
+- All comments and literals in code MUST be in English.
+- Run all test by `go test ./...` before finishing the task.
+- Fix all failed test before you finish the task.
+- DO NOT expose method, structure, variable if it's not required for external use even if for testing. You should use `export_test.go` to expose them.
+- Use `package {name}_test` for testing. DO NOT use `package {name}` for testing.
+- DO NOT use `firestore` tag for model structures. It's complicated and causes bug.
+- Consider to use `pkg/domain/mock` at first before creating a new mock structure.
+
+# Code Generation
+
+- Generate mock: `go tool task mock`
+- Generate GraphQL code: `go tool task graphql`
+
+# Coding Guideline
+
+- Do not expose unnecessary method, variable and type.
+- If you need to expose method, variable and type for only testing, you should use `export_test.go` to expose them.
+
+# Repository Architecture
+
+This repository is structured with a clear separation of concerns following a layered, domain-driven design architecture. It's a full-stack application with a Go backend and a React frontend that integrates with multiple external services and systems (e.g., Slack, Google Cloud, BigQuery, Firestore).
+
+## Root Directory
+
+- **`main.go`**: Entry point of the application.
+- **`Dockerfile`**: Containerization setup.
+- **`Taskfile.yml`**: Task automation using go-task/task (building, testing, code generation).
+- **`gqlgen.yml`**: GraphQL code generation configuration.
+- **`graphql/schema.graphql`**: GraphQL schema definition.
+- **`README.md`, `LICENSE`, `doc/`**: Documentation and licensing.
+
+## Frontend Architecture (`frontend/`)
+
+Modern React application with TypeScript:
+- **Framework**: React 19 + Vite + TypeScript
+- **UI Components**: Radix UI + Tailwind CSS with shadcn/ui components
+- **State Management**: Apollo Client for GraphQL state management
+- **Routing**: React Router DOM v7 for SPA routing
+- **Authentication**: Custom auth context with Google IAP integration
+- **Build System**: Vite with development proxy to backend GraphQL/API endpoints
+
+### Frontend Structure:
+- `src/pages/`: Main application pages (Dashboard, Tickets, Board)
+- `src/components/`: Reusable UI components organized by feature
+- `src/lib/`: Utilities, GraphQL queries/mutations, Apollo Client setup
+- `src/contexts/`: React contexts for auth and global state
+- `src/hooks/`: Custom React hooks for common functionality
+- `dist/`: Built static files embedded in Go binary
+
+---
+
+## `pkg/` - Core Backend Logic
+
+Go backend organized into the following sub-packages:
+
+### 1. **`tool/`** (previously `tools/`)
+Contains implementations of specific actions or integrations with external services (e.g., BigQuery, OTX, URLScan). Each action has its own subpackage with dedicated logic, tests, and sometimes test data.
+
+### 2. **`adapter/`**
+Implements adapters for external systems (e.g., embedding APIs like Gemini, GitHub App). This is part of a clean architecture approach to abstract dependencies.
+
+### 3. **`cli/`**
+Contains the command-line interface logic, configuration parsing, and CLI-specific helpers.
+
+### 4. **`controller/`**
+Implements interface layers with multiple protocols:
+- `http/`: HTTP server with middleware, authentication, and SPA serving
+- `graphql/`: Generated GraphQL resolvers and handlers (via gqlgen)
+- `slack/`: Slack webhook and interaction handlers
+
+### 5. **`domain/`**
+This is the heart of the business logic:
+- `interfaces/`: Defines interfaces for actions, adapters, repositories.
+- `model/`: Domain models organized by context (e.g., alert, policy, slack, ticket).
+- `prompt/`: Handles structured prompts and schema used in LLM integrations.
+- `types/`: Shared domain-specific types.
+
+### 6. **`repository/`**
+Provides implementations of data storage mechanisms, such as Firestore or in-memory stores.
+
+### 7. **`service/`**
+Contains business logic that coordinates domain models and repositories. Divided by functionality (e.g., action, alert, session, logic for ignore policies, Slack integration).
+
+### 8. **`usecase/`**
+Implements application use cases. This layer coordinates services to fulfill specific workflows like alert handling or Slack-based interactions.
+
+### 9. **`utils/`**
+Houses utility packages for logging, pointer handling, clock abstraction, etc.
+
+---
+
+## Architectural Characteristics
+
+- **Full-Stack Architecture**: React SPA frontend with Go backend serving both API and static files
+- **GraphQL API**: Type-safe API with code generation for both frontend and backend
+- **Layered Architecture**: Separation between UI (`frontend`), HTTP/GraphQL interface (`controller`), application logic (`usecase`, `service`), and domain logic (`domain`, `repository`)
+- **Hexagonal/Clean Architecture Elements**: Interfaces and adapters allow decoupling from infrastructure
+- **Authentication & Security**: Google IAP integration, policy-based authorization middleware
+- **Testability**: Strong emphasis on testability, with test data and `_test.go` files across layers
+- **LLM/AI Integration**: Includes prompt templates and schema, suggesting integration with large language models (Vertex AI, Gemini)
+- **Cloud-Native**: Designed for Google Cloud Platform with Firestore, BigQuery, and Vertex AI integration
+
+# Coding Standards and Best Practices
+
+## Error Handling
+
+- Use `github.com/m-mizutani/goerr/v2` for error handling
+- Must wrap errors with `goerr.Wrap` to maintain error context
+- Add helpful variables with `goerr.V` for debugging
+- Always provide meaningful error messages
+
+```go
+return goerr.Wrap(err, "failed to process user data", 
+    goerr.V("userID", userID),
+    goerr.V("operation", "update"),
+)
+```
+
+### Error Handling Guidelines
+- **Error Categorization**: Distinguish between business logic errors (validation, policy violations) and system errors (network, database failures)
+  - Business errors should be wrapped with context using `goerr.V("validation", "reason")`
+  - System errors should include retry information and external service details
+- **Error Logging Strategy**: 
+  - Use structured logging with consistent error fields
+  - Include request ID, user context, and service identifiers
+  - Log errors at appropriate levels (ERROR for system failures, WARN for business logic issues)
+- **Error Response Format**: For HTTP APIs, return structured JSON errors with:
+  ```json
+  {
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": "Human readable message",
+      "details": {...}
+    }
+  }
+  ```
+- **Panic Recovery**: Implement middleware for HTTP handlers and background workers to gracefully handle panics and convert them to appropriate error responses
+
+## Code Generation
+
+Code generation is managed by Task runner (`go tool task`):
+- Generating mock code (`pkg/domain/mock`) using `moq`
+- Generating GraphQL code (`pkg/controller/graphql`) using `gqlgen`
+- Frontend static files embedded in Go using `go:embed`
+
+### Code Generation Guidelines
+- **When to Use**: Use code generation for:
+  - Mock implementations for testing (`pkg/domain/mock`)
+  - GraphQL schema and resolvers (`pkg/controller/graphql`) from `graphql/schema.graphql`
+  - Repository interfaces with common CRUD patterns
+- **Frontend Integration**: 
+  - Frontend builds are embedded via `frontend/static.go` using `go:embed`
+  - GraphQL schema is shared between frontend and backend
+  - Frontend TypeScript types are generated from GraphQL schema
+- **Maintenance Practices**:
+  - Generated code should not be manually edited
+  - Include `//go:generate` directives in source files
+  - Run `task generate` or `go generate ./...` before commits
+  - Review generated code changes in pull requests
+  - Frontend GraphQL queries should use the generated types from Apollo Client codegen
+
+# Testing Guidelines
+
+## Testing Style - Helper Driven Testing
+
+Use Helper Driven Testing style instead of general Table Driven Test for better readability and maintainability:
+
+```go
+type testCase struct {
+    input    string
+    expected string
+}
+
+runTest := func(tc testCase) func(t *testing.T) {
+    return func(t *testing.T) {
+        actual := someFunc(tc.input)
+        gt.Equal(t, tc.expected, actual)
+    }
+}
+
+t.Run("success case", runTest(testCase{
+    input:    "blue",
+    expected: "BLUE",
+}))
+
+t.Run("empty input case", runTest(testCase{
+    input:    "",
+    expected: "",
+}))
+```
+
+## Mocking Strategy
+
+- Use mock implementations from `pkg/domain/mock` instead of creating custom mock structures
+- For repository testing, use Memory repository in `pkg/repository` instead of mocks
+- **Mock Data Setup**: Create test fixtures in `testdata/` directory organized by domain:
+  ```
+  testdata/
+  ├── alerts/
+  │   ├── valid_alert.json
+  │   └── malformed_alert.json
+  ├── policies/
+  │   └── sample_policy.rego
+  └── slack/
+      └── sample_events.json
+  ```
+- **Integration Testing**: Use docker-compose for external service dependencies:
+  - Firestore emulator for database testing
+  - Mock Slack API server for webhook testing
+  - BigQuery emulator for data pipeline testing
+
+## Test Framework - gt Package
+
+Use `github.com/m-mizutani/gt` package for type-safe testing.
+
+`gt` is a test library leveraging Go generics to check variable types in IDE and compiler:
+
+```go
+color := "blue"
+
+// gt.Value(t, color).Equal(5) // <- Compile error
+gt.Value(t, color).Equal("orange") // <- Fail
+gt.Value(t, color).Equal("blue")   // <- Pass
+```
+
+```go
+colors := []string{"red", "blue"}
+
+// gt.Array(t, colors).Equal("red")       // <- Compile error
+// gt.Array(t, colors).Equal([]int{1, 2}) // <- Compile error
+
+gt.Array(t, colors).Equal([]string{"red", "blue"}) // <- Pass
+gt.Array(t, colors).Has("orange")                  // <- Fail
+```
+
+### gt Usage Patterns
+
+#### Value Testing
+Generic test type with minimum set of test methods:
+
+```go
+type user struct {
+    Name string
+}
+u1 := user{Name: "blue"}
+
+// gt.Value(t, u1).Equal(1)                  // Compile error
+// gt.Value(t, u1).Equal("blue")             // Compile error
+// gt.Value(t, u1).Equal(&user{Name:"blue"}) // Compile error
+
+gt.Value(t, u1).Equal(user{Name: "blue"}) // Pass
+```
+
+#### Number Testing
+Accepts only number types: `int`, `uint`, `int64`, `float64`, etc:
+
+```go
+var f float64 = 12.5
+gt.Number(t, f).
+    Equal(12.5).         // Pass
+    Greater(12).         // Pass
+    Less(10).            // Fail
+    GreaterOrEqual(12.5) // Pass
+```
+
+#### Array Testing
+Accepts arrays of any type including structs:
+
+```go
+colors := []string{"red", "blue", "yellow"}
+
+gt.Array(t, colors).
+    Equal([]string{"red", "blue", "yellow"}). // Pass
+    Equal([]string{"red", "blue"}).           // Fail
+    // Equal([]int{1, 2})                    // Compile error
+    Contain([]string{"red", "blue"}).         // Pass
+    Has("yellow").                            // Pass
+    Length(3)                                 // Pass
+
+gt.Array(t, colors).Must().Has("orange") // Fail and stop test
+```
+
+#### Map Testing
+
+```go
+colorMap := map[string]int{
+    "red":    1,
+    "yellow": 2,
+    "blue":   5,
+}
+
+gt.Map(t, colorMap).
+    HasKey("blue").           // Pass
+    HasValue(5).              // Pass
+    // HasValue("red")        // Compile error
+    HasKeyValue("yellow", 2)  // Pass
+
+gt.Map(t, colorMap).Must().HasKey("orange") // Fail and stop test
+```
+
+## Test Organization and Structure
+
+- **Test File Naming**: Follow Go conventions:
+  - `*_test.go` for unit tests in same package
+  - `*_integration_test.go` for integration tests
+  - `testdata/` directory for test fixtures and sample data
+- **Test Data Management**: 
+  - Use JSON files in `testdata/` for complex test scenarios
+  - Create builder patterns for domain objects in tests
+  - Use table-driven tests sparingly, prefer helper-driven tests
+- **Performance Testing**: 
+  - Benchmark critical paths like alert processing and LLM integration
+  - Use `testing.B` for benchmark tests with meaningful names
+  - Set performance baselines for CI/CD pipelines
+- **Integration Test Setup**:
+  - Use `docker-compose.test.yml` for external dependencies
+  - Implement `TestMain` for setup/teardown of integration tests
+  - Use build tags to separate unit and integration tests: `//go:build integration`
+
+# Development Workflow
+
+## Code Style and Formatting
+- **TO_BE_WRITTEN**: Go formatting rules (gofmt, goimports)
+- **TO_BE_WRITTEN**: Linting configuration (golangci-lint)
+- **TO_BE_WRITTEN**: Code review checklist
+
+## Documentation Standards
+- **TO_BE_WRITTEN**: Function and package documentation requirements
+- **TO_BE_WRITTEN**: API documentation generation
+- **TO_BE_WRITTEN**: Architecture decision records (ADR)
+
+## Dependency Management
+- **TO_BE_WRITTEN**: Go module management practices
+- **TO_BE_WRITTEN**: Dependency update and security scanning
+- **TO_BE_WRITTEN**: Vendor directory usage guidelines
+
+## Configuration Management
+- **Environment-Specific Configuration**: Use CLI flags with environment variable fallbacks:
+  ```go
+  --slack-oauth-token (WARREN_SLACK_OAUTH_TOKEN)
+  --gemini-project-id (WARREN_GEMINI_PROJECT_ID)
+  --firestore-project-id (WARREN_FIRESTORE_PROJECT_ID)
+  --sentry-dsn (WARREN_SENTRY_DSN)
+  --google-oauth-client-id (WARREN_GOOGLE_OAUTH_CLIENT_ID)
+  --google-oauth-client-secret (WARREN_GOOGLE_OAUTH_CLIENT_SECRET)
+  ```
+- **Frontend Configuration**: 
+  - Frontend configuration is handled via Vite's environment variables
+  - Development proxy configuration in `vite.config.ts` for GraphQL and API endpoints
+  - Build-time environment variables for production builds
+- **Secret Management**: 
+  - Use Google Secret Manager for production secrets
+  - Environment variables for local development
+  - Never commit secrets to version control
+  - Use `.env.example` files to document required variables
+- **Configuration Validation**: 
+  - Implement `Validate()` methods on config structs
+  - Fail fast on startup with clear error messages
+  - Use struct tags for validation rules: `validate:"required,url"`
+
+## Logging and Observability
+- **Structured Logging**: Use `github.com/m-mizutani/clog` with structured fields:
+  ```go
+  clog.With("alert_id", alertID).
+       With("source", "slack").
+       With("duration", time.Since(start)).
+       Info("processing alert")
+  ```
+- **Metrics and Monitoring**: 
+  - Integrate with Sentry for error tracking (WARREN_SENTRY_DSN)
+  - Use Google Cloud Monitoring for metrics and alerting
+  - Track alert processing times, GraphQL response times, and error rates
+  - Monitor frontend performance and user interactions
+- **Distributed Tracing**: 
+  - Use OpenTelemetry for request tracing across services
+  - Include trace IDs in log messages for correlation
+  - Trace external API calls (Slack, BigQuery, Vertex AI, Gemini)
+  - Frontend error tracking with client-side error reporting to Sentry
+
+## Security Practices
+- **Input Validation**: 
+  - Validate all Slack webhook payloads using signing secrets
+  - Sanitize user inputs before processing with LLM
+  - Use struct validation tags and custom validators for complex rules
+  - Validate GraphQL input types and implement proper field-level authorization
+- **Authentication and Authorization**: 
+  - Use Google IAP (Identity-Aware Proxy) for user authentication
+  - Implement JWT token validation for API requests
+  - Use Slack OAuth tokens for API authentication
+  - Implement middleware for request authentication in HTTP handlers
+  - Policy-based authorization using OPA (Open Policy Agent) middleware
+  - Validate user permissions before executing sensitive actions
+- **Frontend Security**: 
+  - Use HttpOnly cookies for session management
+  - Implement CSRF protection for state-changing operations
+  - Validate user permissions on the client side (UI only, not security)
+  - Secure GraphQL queries with proper authentication headers
+- **Secure Coding**: 
+  - Never log sensitive data (tokens, API keys, user messages)
+  - Use secure defaults for all configurations
+  - Implement rate limiting for external API calls
+  - Sanitize data before BigQuery insertion to prevent injection attacks
+  - Use parameterized queries and proper escaping for all data operations
+
+## Performance Guidelines
+- **Memory Management**: 
+  - Use object pooling for frequently allocated objects (alert processing, HTTP requests)
+  - Implement proper cleanup in defer statements
+  - Monitor memory usage with pprof in production
+  - Optimize GraphQL resolver memory allocation
+- **Concurrency Patterns**: 
+  - Use worker pools for alert processing to control resource usage
+  - Implement graceful shutdown with context cancellation
+  - Use channels for inter-goroutine communication, avoid shared state
+  - Set reasonable timeouts for external API calls (URLScan backoff: 3s)
+  - Use context propagation for GraphQL resolvers
+- **Database Query Optimization**: 
+  - Use indexed queries in Firestore for alert retrieval
+  - Implement query result caching for frequently accessed data
+  - Use batch operations for BigQuery insertions
+  - Monitor query performance and set up alerts for slow queries
+  - Optimize GraphQL N+1 query problems with DataLoader pattern
+- **Frontend Performance**: 
+  - Use React.memo for expensive component renders
+  - Implement proper GraphQL query caching with Apollo Client
+  - Use pagination for large data sets (tickets, alerts)
+  - Optimize bundle size with code splitting and lazy loading
+  - Use Vite's build optimization features for production builds
+
+## Deployment and Operations
+- **Docker Best Practices**: 
+  - Use multi-stage builds to minimize image size
+  - Frontend build stage separate from Go build stage
+  - Run as non-root user in container
+  - Use distroless base images for security
+  - Set proper resource limits and health checks
+- **Build Process**: 
+  - Frontend builds are embedded in Go binary via `go:embed`
+  - Single binary deployment contains both frontend and backend
+  - Use Task runner for consistent build processes across environments
+- **Health Check Endpoints**: 
+  - Implement `/health` endpoint for liveness probes
+  - Implement `/ready` endpoint for readiness probes
+  - Include dependency health checks (Firestore, BigQuery connectivity)
+  - Monitor GraphQL endpoint health and response times
+- **Graceful Shutdown**: 
+  - Listen for SIGTERM and SIGINT signals
+  - Complete in-flight requests before shutting down
+  - Close database connections and external service clients cleanly
+  - Set reasonable shutdown timeout (30s default)
+  - Properly handle WebSocket connections for real-time features
+- **Cloud Deployment**: 
+  - Designed for Google Cloud Run or GKE deployment
+  - Use Google IAP for authentication in production
+  - Configure proper CORS settings for frontend-backend communication
+  - Implement proper logging for Cloud Logging integration
+
+# Frontend Development Guidelines
+
+## React and TypeScript Best Practices
+- **Component Design**: 
+  - Use functional components with hooks
+  - Implement proper TypeScript typing for all props and state
+  - Use React.memo for performance optimization when needed
+  - Keep components small and focused on single responsibility
+- **State Management**: 
+  - Use Apollo Client for GraphQL data management
+  - Use React Context for global UI state (auth, theme, etc.)
+  - Prefer server state (GraphQL cache) over client state when possible
+  - Use custom hooks to encapsulate complex state logic
+
+## UI/UX Standards
+- **Design System**: 
+  - Use shadcn/ui components as the foundation
+  - Maintain consistent spacing using Tailwind CSS utilities
+  - Follow Radix UI accessibility standards
+  - Implement responsive design for mobile and desktop
+- **User Experience**: 
+  - Provide loading states for all async operations
+  - Implement proper error boundaries and error handling
+  - Use toast notifications for user feedback
+  - Implement confirmation dialogs for destructive actions
+
+## GraphQL Integration
+- **Query Management**: 
+  - Use Apollo Client hooks (`useQuery`, `useMutation`) consistently
+  - Implement proper error handling for GraphQL operations
+  - Use GraphQL fragments for reusable field selections
+  - Implement optimistic updates for better user experience
+- **Type Safety**: 
+  - Generate TypeScript types from GraphQL schema
+  - Use typed queries and mutations throughout the application
+  - Validate GraphQL responses at runtime when necessary
+
+## Testing Frontend Code
+- **Component Testing**: 
+  - Use React Testing Library for component tests
+  - Test user interactions and behaviors, not implementation details
+  - Mock GraphQL queries using Apollo Client testing utilities
+  - Test accessibility features and keyboard navigation
+- **Integration Testing**: 
+  - Test complete user workflows end-to-end
+  - Use MSW (Mock Service Worker) for API mocking in tests
+  - Test error scenarios and edge cases
+  - Validate responsive design across different screen sizes

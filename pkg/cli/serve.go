@@ -1,0 +1,226 @@
+package cli
+
+import (
+	"context"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/cli/config"
+	server "github.com/secmon-lab/warren/pkg/controller/http"
+	"github.com/secmon-lab/warren/pkg/usecase"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/urfave/cli/v3"
+)
+
+// llmEmbeddingAdapter adapts gollem.LLMClient to interfaces.EmbeddingClient
+type llmEmbeddingAdapter struct {
+	client gollem.LLMClient
+}
+
+// Embeddings implements interfaces.EmbeddingClient.Embeddings
+func (a *llmEmbeddingAdapter) Embeddings(ctx context.Context, texts []string, dimensionality int) ([][]float32, error) {
+	embeddings, err := a.client.GenerateEmbedding(ctx, dimensionality, texts)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert from [][]float64 to [][]float32
+	result := make([][]float32, len(embeddings))
+	for i, embedding := range embeddings {
+		result[i] = make([]float32, len(embedding))
+		for j, val := range embedding {
+			result[i][j] = float32(val)
+		}
+	}
+
+	return result, nil
+}
+
+func cmdServe() *cli.Command {
+	var (
+		addr           string
+		enableGraphQL  bool
+		enableGraphiQL bool
+		webUICfg       config.WebUI
+		policyCfg      config.Policy
+		sentryCfg      config.Sentry
+		slackCfg       config.Slack
+		geminiCfg      config.GeminiCfg
+		firestoreCfg   config.Firestore
+		storageCfg     config.Storage
+	)
+
+	flags := joinFlags(
+		[]cli.Flag{
+			&cli.StringFlag{
+				Name:        "addr",
+				Aliases:     []string{"a"},
+				Sources:     cli.EnvVars("WARREN_ADDR"),
+				Usage:       "Listen address (default: 127.0.0.1:8080)",
+				Value:       "127.0.0.1:8080",
+				Destination: &addr,
+			},
+			&cli.BoolFlag{
+				Name:        "enable-graphql",
+				Usage:       "Enable GraphQL endpoint",
+				Category:    "GraphQL",
+				Sources:     cli.EnvVars("WARREN_ENABLE_GRAPHQL"),
+				Destination: &enableGraphQL,
+			},
+			&cli.BoolFlag{
+				Name:        "enable-graphiql",
+				Usage:       "Enable GraphiQL playground (requires --enable-graphql)",
+				Category:    "GraphQL",
+				Sources:     cli.EnvVars("WARREN_ENABLE_GRAPHIQL"),
+				Destination: &enableGraphiQL,
+			},
+		},
+		webUICfg.Flags(),
+		policyCfg.Flags(),
+		sentryCfg.Flags(),
+		slackCfg.Flags(),
+		geminiCfg.Flags(),
+		firestoreCfg.Flags(),
+		tools.Flags(),
+		storageCfg.Flags(),
+	)
+
+	return &cli.Command{
+		Name:    "serve",
+		Aliases: []string{"s"},
+		Usage:   "Run server",
+		Flags:   flags,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			logging.Default().Info("starting server",
+				"addr", addr,
+				"enableGraphQL", enableGraphQL,
+				"enableGraphiQL", enableGraphiQL,
+				"web-ui", webUICfg,
+				"policy", policyCfg,
+				"sentry", sentryCfg,
+				"slack", slackCfg,
+				"gemini", geminiCfg,
+				"firestore", firestoreCfg,
+				"storage", storageCfg,
+			)
+
+			policyClient, err := policyCfg.Configure()
+			if err != nil {
+				return err
+			}
+
+			geminiModel, err := geminiCfg.Configure(ctx)
+			if err != nil {
+				return err
+			}
+
+			if err := sentryCfg.Configure(); err != nil {
+				return err
+			}
+
+			slackSvc, err := slackCfg.ConfigureWithFrontendURL(webUICfg.GetFrontendURL())
+			if err != nil {
+				return err
+			}
+			defer slackSvc.Stop()
+
+			firestore, err := firestoreCfg.Configure(ctx)
+			if err != nil {
+				return err
+			}
+
+			storageClient, err := storageCfg.Configure(ctx)
+			if err != nil {
+				return err
+			}
+
+			// Create embedding adapter from LLM client
+			embeddingAdapter := &llmEmbeddingAdapter{client: geminiModel}
+
+			// Inject dependencies into tools that support them
+			tools.InjectDependencies(firestore, embeddingAdapter)
+
+			toolSets, err := tools.ToolSets(ctx)
+			if err != nil {
+				return err
+			}
+
+			ucOptions := []usecase.Option{
+				usecase.WithLLMClient(geminiModel),
+				usecase.WithPolicyClient(policyClient),
+				usecase.WithRepository(firestore),
+				usecase.WithSlackService(slackSvc),
+				usecase.WithStorageClient(storageClient),
+				usecase.WithTools(toolSets),
+			}
+
+			uc := usecase.New(ucOptions...)
+
+			// Build HTTP server options
+			serverOptions := []server.Options{
+				server.WithSlackVerifier(slackCfg.Verifier()),
+				server.WithPolicy(policyClient),
+				server.WithSlackService(slackSvc),
+			}
+
+			// Add repository when GraphQL is enabled
+			if enableGraphQL {
+				serverOptions = append(serverOptions, server.WithGraphQLRepo(firestore))
+			}
+
+			// Add GraphiQL option when GraphiQL is enabled
+			if enableGraphiQL {
+				serverOptions = append(serverOptions, server.WithGraphiQL(true))
+				if !enableGraphQL {
+					logging.From(ctx).Warn("GraphiQL is enabled but GraphQL is not enabled. GraphiQL will not work.")
+				}
+			}
+
+			// Add AuthUseCase if authentication options are provided
+			authUC, err := webUICfg.Configure(firestore, slackSvc)
+			if err != nil {
+				return err
+			}
+			if authUC != nil {
+				serverOptions = append(serverOptions, server.WithAuthUseCase(authUC))
+			} else {
+				logging.From(ctx).Warn("Authentication is not configured, Web UI will not work.")
+			}
+
+			httpServer := http.Server{
+				Addr:              addr,
+				Handler:           server.New(uc, serverOptions...),
+				ReadTimeout:       30 * time.Second,
+				ReadHeaderTimeout: 10 * time.Second,
+				BaseContext: func(l net.Listener) context.Context {
+					return ctx
+				},
+			}
+
+			errCh := make(chan error, 1)
+			go func() {
+				defer close(errCh)
+				if err := httpServer.ListenAndServe(); err != nil {
+					errCh <- err
+				}
+			}()
+
+			sigCh := make(chan os.Signal, 1)
+			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+			select {
+			case err := <-errCh:
+				return err
+			case <-sigCh:
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				return httpServer.Shutdown(ctx)
+			}
+		},
+	}
+}

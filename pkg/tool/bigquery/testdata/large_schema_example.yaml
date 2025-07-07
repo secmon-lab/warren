@@ -1,0 +1,149 @@
+dataset_id: enterprise_logs
+table_id: comprehensive_security_events
+description: Large-scale security event table with extensive metadata and system fields (100+ columns)
+columns:
+  # Core Security Fields (these should be prioritized)
+  - name: event_timestamp
+    type: TIMESTAMP
+    description: Timestamp when the security event occurred
+    
+  - name: user_id
+    type: STRING
+    description: Unique user identifier
+    
+  - name: username
+    type: STRING
+    description: Human-readable username
+    
+  - name: email_address
+    type: STRING
+    description: User email address
+    
+  - name: source_ip_address
+    type: STRING
+    description: Source IP address of the event
+    
+  - name: destination_ip_address
+    type: STRING
+    description: Destination IP address
+    
+  - name: source_port
+    type: INTEGER
+    description: Source network port number
+    
+  - name: destination_port
+    type: INTEGER
+    description: Destination network port number
+    
+  - name: network_protocol
+    type: STRING
+    description: Network protocol used (TCP, UDP, ICMP, etc.)
+    
+  - name: security_event_type
+    type: STRING
+    description: Type of security event detected
+    
+  - name: threat_category
+    type: STRING
+    description: Category of threat (malware, phishing, intrusion, etc.)
+    
+  - name: severity_level
+    type: STRING
+    description: Severity level of the security event
+    
+  - name: risk_score
+    type: INTEGER
+    description: Calculated risk score (0-100)
+    
+  - name: file_hash_md5
+    type: STRING
+    description: MD5 hash of associated file
+    
+  - name: file_hash_sha256
+    type: STRING
+    description: SHA256 hash of associated file
+    
+  - name: url_accessed
+    type: STRING
+    description: URL that was accessed
+    
+  - name: domain_name
+    type: STRING
+    description: Domain name involved in the event
+    
+  - name: country_code
+    type: STRING
+    description: Country code from IP geolocation
+    
+  - name: geographic_region
+    type: STRING
+    description: Geographic region
+    
+  - name: city_name
+    type: STRING
+    description: City name from geolocation
+    
+  # System Metadata Fields (should be deprioritized or excluded)
+  - name: internal_record_id
+    type: INTEGER
+    description: Internal database record ID
+    
+  - name: etl_processing_timestamp
+    type: TIMESTAMP
+    description: Timestamp when record was processed by ETL
+    
+  - name: data_pipeline_version
+    type: STRING
+    description: Version of data processing pipeline
+    
+  - name: schema_version
+    type: STRING
+    description: Schema version identifier
+    
+  - name: partition_date
+    type: DATE
+    description: Table partition date
+    
+  - name: ingestion_batch_id
+    type: STRING
+    description: Batch ID for data ingestion
+    
+  - name: raw_log_size_bytes
+    type: INTEGER
+    description: Size of original log entry in bytes
+    
+  - name: processing_node_id
+    type: STRING
+    description: ID of processing node that handled the record
+    
+  - name: checksum_validation_status
+    type: STRING
+    description: Status of data integrity checksum validation
+    
+  - name: compression_algorithm
+    type: STRING
+    description: Algorithm used for data compression
+    
+  # Additional metadata fields (80+ more to simulate real complexity)
+  - name: metadata_field_01
+    type: STRING
+    description: System metadata field 1
+    
+  - name: metadata_field_02
+    type: STRING
+    description: System metadata field 2
+    
+  - name: metadata_field_03
+    type: STRING
+    description: System metadata field 3
+    
+  - name: metadata_field_04
+    type: STRING
+    description: System metadata field 4
+    
+  - name: metadata_field_05
+    type: STRING
+    description: System metadata field 5
+    
+  # ... continuing pattern for metadata_field_06 through metadata_field_80
+  # (In real scenario, this would be 80+ additional non-security system fields) 

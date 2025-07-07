@@ -1,0 +1,127 @@
+type Ticket {
+  id: ID!
+  status: String!
+  title: String!
+  description: String!
+  summary: String!
+  assignee: User
+  alerts: [Alert!]!
+  alertsPaginated(offset: Int, limit: Int): AlertsResponse!
+  comments: [Comment!]!
+  alertsCount: Int!
+  commentsCount: Int!
+  conclusion: String
+  reason: String
+  finding: Finding
+  slackLink: String
+  createdAt: String!
+  updatedAt: String!
+  isTest: Boolean!
+}
+
+type User {
+  id: ID!
+  name: String!
+}
+
+type Comment {
+  id: ID!
+  content: String!
+  user: User
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Alert {
+  id: ID!
+  title: String!
+  description: String
+  schema: String!
+  data: String!
+  attributes: [AlertAttribute!]!
+  createdAt: String!
+  ticket: Ticket
+}
+
+type AlertAttribute {
+  key: String!
+  value: String!
+  link: String
+  auto: Boolean!
+}
+
+type Finding {
+  severity: String!
+  summary: String!
+  reason: String!
+  recommendation: String!
+}
+
+type TicketsResponse {
+  tickets: [Ticket!]!
+  totalCount: Int!
+}
+
+type CommentsResponse {
+  comments: [Comment!]!
+  totalCount: Int!
+}
+
+type Activity {
+  id: ID!
+  type: String!
+  userID: String
+  alertID: String
+  ticketID: String
+  commentID: String
+  createdAt: String!
+  metadata: String
+  user: User
+  alert: Alert
+  ticket: Ticket
+}
+
+type ActivitiesResponse {
+  activities: [Activity!]!
+  totalCount: Int!
+}
+
+type AlertsResponse {
+  alerts: [Alert!]!
+  totalCount: Int!
+}
+
+type DashboardStats {
+  openTicketsCount: Int!
+  unboundAlertsCount: Int!
+  openTickets: [Ticket!]!
+  unboundAlerts: [Alert!]!
+}
+
+type Query {
+  ticket(id: ID!): Ticket
+  tickets(statuses: [String!], offset: Int, limit: Int): TicketsResponse!
+  similarTickets(ticketId: ID!, threshold: Float!, offset: Int, limit: Int): TicketsResponse!
+  similarTicketsForAlert(alertId: ID!, threshold: Float!, offset: Int, limit: Int): TicketsResponse!
+  ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
+  alert(id: ID!): Alert
+  alerts(offset: Int, limit: Int): AlertsResponse!
+  unboundAlerts(threshold: Float, keyword: String, ticketId: ID, offset: Int, limit: Int): AlertsResponse!
+  dashboard: DashboardStats!
+  activities(offset: Int, limit: Int): ActivitiesResponse!
+}
+
+type Mutation {
+  updateTicketStatus(id: ID!, status: String!): Ticket!
+  updateMultipleTicketsStatus(ids: [ID!]!, status: String!): [Ticket!]!
+  updateTicketConclusion(id: ID!, conclusion: String!, reason: String!): Ticket!
+  updateTicket(id: ID!, title: String!, description: String): Ticket!
+  createTicket(title: String!, description: String!, isTest: Boolean): Ticket!
+  createTicketFromAlerts(alertIds: [ID!]!): Ticket!
+  bindAlertsToTicket(ticketId: ID!, alertIds: [ID!]!): Ticket!
+}
+
+schema {
+  query: Query
+  mutation: Mutation
+}

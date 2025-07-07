@@ -1,0 +1,65 @@
+{
+  "Findings": [
+    {
+      "AccountId": "783957204773",
+      "Arn": "arn:aws:guardduty:ap-northeast-1:783957204773:detector/c6b248a96abef3c6dd24b07e13380b04/finding/034f3664616c49cb85349d0511ecd307",
+      "CreatedAt": "2023-04-16T08:15:23.438Z",
+      "Description": "API GetCredentialReport was invoked from an IP address that is not associated with previously observed API activity for this user.",
+      "Id": "034f3664616c49cb85349d0511ecd307",
+      "Partition": "aws",
+      "Region": "ap-northeast-1",
+      "Resource": {
+        "AccessKeyDetails": {
+          "AccessKeyId": "ASIA1234567890EXAMPLE",
+          "PrincipalId": "AIDA1234567890EXAMPLE",
+          "UserName": "suspicious-user",
+          "UserType": "IAMUser"
+        },
+        "ResourceType": "AccessKey"
+      },
+      "SchemaVersion": "2.0",
+      "Service": {
+        "Action": {
+          "ActionType": "AWS_API_CALL",
+          "AwsApiCallAction": {
+            "Api": "GetCredentialReport",
+            "ServiceName": "iam.amazonaws.com",
+            "RemoteIpDetails": {
+              "City": {
+                "CityName": "Tokyo"
+              },
+              "Country": {
+                "CountryName": "Japan"
+              },
+              "IpAddressV4": "192.0.2.1",
+              "Organization": {
+                "Asn": "12345",
+                "AsnOrg": "Example ISP",
+                "Org": "Example Organization",
+                "IspOrg": "Example ISP"
+              }
+            }
+          }
+        },
+        "Evidence": {
+          "ThreatIntelligenceDetails": []
+        },
+        "Archived": false,
+        "Count": 1,
+        "DetectorId": "c6b248a96abef3c6dd24b07e13380b04",
+        "EventFirstSeen": "2023-04-16T08:15:23.000Z",
+        "EventLastSeen": "2023-04-16T08:15:23.000Z",
+        "ResourceRole": "TARGET",
+        "ServiceName": "guardduty",
+        "AdditionalInfo": {
+          "Value": "{\"recentApiCalls\":[{\"count\":12,\"api\":\"GetUser\",\"firstSeen\":1681632923,\"lastSeen\":1681633923}],\"sample\":true}",
+          "Type": "default"
+        }
+      },
+      "Severity": 5,
+      "Title": "API GetCredentialReport was invoked from an unusual network location.",
+      "Type": "InitialAccess:IAMUser/AnomalousBehavior",
+      "UpdatedAt": "2023-04-16T08:15:23.438Z"
+    }
+  ]
+}

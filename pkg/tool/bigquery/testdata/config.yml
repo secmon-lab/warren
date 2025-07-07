@@ -1,0 +1,40 @@
+dataset_id: test_dataset
+table_id: test_table
+description: "Test table for BigQuery actions"
+columns:
+  - name: id
+    description: "Unique identifier"
+    value_example: "test-123"
+    type: STRING
+  - name: timestamp
+    description: "Event timestamp"
+    value_example: "2024-03-20T12:00:00Z"
+    type: TIMESTAMP
+  - name: src_ip
+    description: "Source IP address"
+    value_example: "192.168.1.1"
+    type: STRING
+  - name: event_type
+    description: "Type of security event"
+    value_example: "login_failure"
+    type: STRING
+  - name: value
+    description: "Numeric value"
+    value_example: "42"
+    type: INTEGER
+  - name: metadata
+    description: "Additional metadata"
+    type: RECORD
+    fields:
+      - name: source
+        description: "Data source"
+        value_example: "test-source"
+        type: STRING
+      - name: tags
+        description: "Associated tags"
+        value_example: "tag1,tag2"
+        type: STRING
+partitioning:
+  field: "timestamp"
+  type: "time"
+  time_unit: "daily"

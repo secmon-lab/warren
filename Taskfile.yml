@@ -1,0 +1,61 @@
+# https://taskfile.dev
+
+version: "3"
+
+tasks:
+  default:
+    cmds:
+      - task mock
+      - task graphql
+
+  mock:
+    aliases:
+      - m
+    desc: "Generate mock files"
+    deps:
+      - mock_controller_http
+      - mock_model_message
+      - mock_interfaces
+
+  mock_controller_http:
+    desc: "Generate mock files for controller/http"
+    cmds:
+      - go tool moq
+        -out pkg/controller/http/mock_test.go
+        -pkg http_test
+        -rm -skip-ensure -stub
+        pkg/controller/http UseCase
+
+  mock_model_message:
+    desc: "Generate mock files for model/message"
+    cmds:
+      - go tool moq
+        -out pkg/domain/model/message/mock_test.go
+        -pkg message_test
+        -rm -skip-ensure -stub
+        pkg/domain/model/message HTTPClient
+
+  mock_interfaces:
+    desc: "Generate mock files for interfaces"
+    cmds:
+      - go tool moq
+        -out pkg/domain/mock/interfaces.go
+        -pkg mock
+        -rm -skip-ensure -stub
+        pkg/domain/interfaces
+        SlackClient
+        SlackThreadService
+        Repository
+        PolicyClient
+        EmbeddingClient
+        StorageClient
+        LLMClient
+        LLMSession
+        SlackEventUsecases
+        SlackInteractionUsecases
+        AlertUsecases
+
+  graphql:
+    desc: "Generate GraphQL code"
+    cmds:
+      - go tool gqlgen generate

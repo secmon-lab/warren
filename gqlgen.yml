@@ -1,0 +1,89 @@
+# Where are all the schema files located? globs are supported eg  src/**/*.graphqls
+schema:
+  - graphql/*.graphql
+
+# Where should the generated server code go?
+exec:
+  filename: pkg/controller/graphql/generated.go
+  package: graphql
+
+# Where should any generated models go?
+model:
+  filename: pkg/domain/model/graphql/models_gen.go
+  package: graphql
+
+# Where should the resolver implementations go?
+resolver:
+  layout: follow-schema
+  dir: pkg/controller/graphql
+  package: graphql
+  filename_template: "{name}.resolvers.go"
+
+# Optional: turn on use ` + "`" + `@preloadable` + "`" + ` tags for sql
+# See https://gqlgen.com/reference/scalars/#automatic-binding-to-uint64
+# gqlgen will scan your schema and add this tag to uint64 if you use this
+# preloadable: true
+
+# Optional: turn on use ` + "`" + `@model` + "`" + ` tags for sql
+# See https://gqlgen.com/reference/scalars/#automatic-binding-to-uint64
+# gqlgen will scan your schema and add this tag to uint64 if you use this
+# model: true
+
+# gqlgen will search for any type names in the schema in these go packages
+# if they match it will use them, otherwise it will generate them.
+autobind:
+  - "github.com/secmon-lab/warren/pkg/domain/model/ticket"
+  - "github.com/secmon-lab/warren/pkg/domain/model/alert"
+
+# This section declares type mapping between the GraphQL and go type systems
+#
+# The first line in each type will be used as defaults for resolver arguments and
+# modelgen, the others will be allowed when binding to fields. Configure them to
+# your liking
+models:
+  Activity:
+    fields:
+      user:
+        resolver: true
+      alert:
+        resolver: true
+      ticket:
+        resolver: true
+  ID:
+    model:
+      - github.com/99designs/gqlgen/graphql.ID
+      - github.com/99designs/gqlgen/graphql.Int
+      - github.com/99designs/gqlgen/graphql.Int64
+      - github.com/99designs/gqlgen/graphql.Int32
+  Int:
+    model:
+      - github.com/99designs/gqlgen/graphql.Int
+      - github.com/99designs/gqlgen/graphql.Int64
+      - github.com/99designs/gqlgen/graphql.Int32
+  Float:
+    model:
+      - github.com/99designs/gqlgen/graphql.Float
+      - github.com/99designs/gqlgen/graphql.Float64
+      - github.com/99designs/gqlgen/graphql.Float32
+  String:
+    model:
+      - github.com/99designs/gqlgen/graphql.String
+  Boolean:
+    model:
+      - github.com/99designs/gqlgen/graphql.Boolean
+  Time:
+    model:
+      - github.com/99designs/gqlgen/graphql.Time
+  Map:
+    model:
+      - github.com/99designs/gqlgen/graphql.Map
+      - github.com/99designs/gqlgen/graphql.JSON
+      - github.com/99designs/gqlgen/graphql.JSONObject
+  Upload:
+    model:
+      - github.com/99designs/gqlgen/graphql.Upload
+      - github.com/99designs/gqlgen/graphql.Upload
+  Any:
+    model:
+      - github.com/99designs/gqlgen/graphql.Any
+      - github.com/99designs/gqlgen/graphql.Any

@@ -1,0 +1,43 @@
+name: Unit test
+
+on: push
+
+jobs:
+  testing:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout upstream repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+          cache-dependency-path: go.sum
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Explicitly restore Go module cache (supplement when using go-version-file)
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      # Generate mock and GraphQL code (accelerated with cache)
+      - name: Generate code
+        run: |
+          go install github.com/matryer/moq@latest
+          go install github.com/99designs/gqlgen@latest
+          go tool task mock graphql
+
+      # Run tests in parallel
+      - name: Run tests
+        run: go test ./...

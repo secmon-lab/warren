@@ -1,0 +1,94 @@
+name: publish
+
+on:
+  push:
+
+env:
+  TAG_NAME: warren:${{ github.sha }}
+  BUILD_VERSION: ${{ github.sha }}
+  GITHUB_IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/warren
+  GITHUB_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/warren:${{ github.sha }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Set up Docker buildx
+        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get the tag or commit id
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            # If a tag is present, strip the 'refs/tags/' prefix
+            TAG_OR_COMMIT=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
+            echo "This is a tag: $TAG_OR_COMMIT"
+          else
+            # If no tag is present, use the commit SHA
+            TAG_OR_COMMIT=$(echo $GITHUB_SHA)
+            echo "This is a commit SHA: $TAG_OR_COMMIT"
+          fi
+          # Set the variable for use in other steps
+          echo "TAG_OR_COMMIT=$TAG_OR_COMMIT" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Build and push
+        uses: docker/build-push-action@4a13e500e55cf31b7a5d59a38ab2040ab0f42f56 # v5.1.0
+        with:
+          context: .
+          push: true
+          tags: ${{ env.GITHUB_IMAGE_NAME }}
+          build-args: |
+            BUILD_VERSION=${{ steps.version.outputs.TAG_OR_COMMIT }}
+          cache-from: |
+            type=gha
+            type=registry,ref=${{ env.GITHUB_IMAGE_REPO }}:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=${{ env.GITHUB_IMAGE_REPO }}:buildcache,mode=max
+          platforms: linux/amd64
+
+  release-ghcr:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: extract tag
+        id: tag
+        run: |
+          TAG=$(echo ${{ github.ref }} | sed -e "s#refs/tags/##g")
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull Docker image
+        run: docker pull ${{ env.GITHUB_IMAGE_NAME }}
+      - name: Rename Docker image (tag name)
+        run: docker tag ${{ env.GITHUB_IMAGE_NAME }} "${{ env.GITHUB_IMAGE_REPO }}:${{ steps.tag.outputs.tag }}"
+      - name: Rename Docker image (latest)
+        run: docker tag ${{ env.GITHUB_IMAGE_NAME }} "${{ env.GITHUB_IMAGE_REPO }}:latest"
+      - name: Push Docker image (tag name)
+        run: docker push "${{ env.GITHUB_IMAGE_REPO }}:${{ steps.tag.outputs.tag }}"
+      - name: Push Docker image (latest)
+        run: docker push "${{ env.GITHUB_IMAGE_REPO }}:latest"
