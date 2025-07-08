@@ -172,7 +172,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	// Always use plan mode for comprehensive task handling
 	plan, err := agent.Plan(ctx, message,
 		gollem.WithPlanSystemPrompt(systemPrompt),
-		gollem.WithMaxPlanSteps(10),
 		gollem.WithPlanCreatedHook(func(ctx context.Context, plan *gollem.Plan) error {
 			return displayPlanProgress(ctx, plan, "Plan created")
 		}),
@@ -204,19 +203,17 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	}
 	msg.Trace(ctx, "✅ Plan execution completed (%d/%d tasks)", completedCount, len(todos))
 
-	// TODO: Use plan.Session() when enhanced plan mode API becomes available
-	// Get the updated history from the agent's current session
-	session := agent.Session()
+	// Get the updated history from the plan's session
+	session := plan.Session()
 	if session == nil {
-		logger.Warn("agent session is nil after plan execution - plan.Session() will be used when enhanced API is available")
+		logger.Warn("plan session is nil after execution")
 		// Skip history saving when session is unavailable
-		// This will be resolved when enhanced plan mode becomes available
 		return nil
 	}
 
 	newHistory := session.History()
 	if newHistory == nil {
-		return goerr.New("failed to get history from agent session")
+		return goerr.New("failed to get history from plan session")
 	}
 
 	newRecord := ticket.NewHistory(ctx, target.ID)
@@ -342,10 +339,11 @@ func displayPlanProgress(ctx context.Context, plan *gollem.Plan, action string) 
 		}
 	}
 
-	// Display progress header
-	msg.Trace(ctx, "📋 %s (%d/%d tasks completed)", action, completedCount, len(todos))
+	// Build complete message with all task details
+	var messageBuilder strings.Builder
+	messageBuilder.WriteString(fmt.Sprintf("📋 %s (%d/%d tasks completed)\n", action, completedCount, len(todos)))
 
-	// Display task list with status indicators
+	// Add task list with status indicators
 	for i, todo := range todos {
 		var status string
 		var icon string
@@ -372,8 +370,11 @@ func displayPlanProgress(ctx context.Context, plan *gollem.Plan, action string) 
 			icon = "?"
 		}
 
-		msg.Trace(ctx, "  %s %d. %s", icon, i+1, status)
+		messageBuilder.WriteString(fmt.Sprintf("  %s %d. %s\n", icon, i+1, status))
 	}
+
+	// Output everything in a single Trace call
+	msg.Trace(ctx, "%s", messageBuilder.String())
 
 	return nil
 }
