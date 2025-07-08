@@ -12,7 +12,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/dryrun"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -27,9 +26,7 @@ func cmdChat() *cli.Command {
 		policyCfg   config.Policy
 		storageCfg  config.Storage
 
-		query    string
-		noDryRun bool // Value for --no-dry-run flag
-		dryRun   bool // Actual dry-run setting
+		query string
 	)
 
 	flags := joinFlags(
@@ -47,11 +44,6 @@ func cmdChat() *cli.Command {
 				Usage:       "Query prompt (if not provided, interactive mode will start)",
 				Destination: &query,
 			},
-			&cli.BoolFlag{
-				Name:        "no-dry-run",
-				Usage:       "Disable dry-run mode (dry-run is enabled by default)",
-				Destination: &noDryRun,
-			},
 		},
 		firestoreDB.Flags(),
 		geminiCfg.Flags(),
@@ -66,19 +58,6 @@ func cmdChat() *cli.Command {
 		Usage:   "Chat with the security analyst about a specific ticket",
 		Flags:   flags,
 		Action: func(ctx context.Context, c *cli.Command) error {
-			logger := logging.From(ctx)
-
-			// Set dry-run mode: enabled by default, disabled if --no-dry-run is specified
-			dryRun = !noDryRun
-
-			// Add dry-run information to context (enabled by default)
-			ctx = dryrun.With(ctx, dryRun)
-			if dryRun {
-				logger.Info("Dry-run mode enabled - database modifications will be skipped")
-			} else {
-				logger.Info("Dry-run mode disabled - database modifications will be executed")
-			}
-
 			// Configure repository
 			repo, err := firestoreDB.Configure(ctx)
 			if err != nil {
@@ -118,12 +97,8 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to get alerts")
 			}
 
-			// Configure tools
-			baseAction := base.New(repo, policyClient, ticket.ID)
-			toolSets := append(tools, baseAction)
-
 			// Get tool sets
-			allToolSets, err := toolSets.ToolSets(ctx)
+			allToolSets, err := tools.ToolSets(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to get tool sets")
 			}
@@ -139,10 +114,6 @@ func cmdChat() *cli.Command {
 			}
 			fmt.Printf("  🔢 Alerts: %d\n", len(alerts))
 			fmt.Printf("\n")
-
-			if dryRun {
-				fmt.Printf("🔒 Dry-run mode: Database modifications will be simulated\n\n")
-			}
 
 			// Create usecase
 			uc := usecase.New(
