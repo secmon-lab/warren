@@ -173,6 +173,15 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	plan, err := agent.Plan(ctx, message,
 		gollem.WithPlanSystemPrompt(systemPrompt),
 		gollem.WithMaxPlanSteps(10),
+		gollem.WithPlanCreatedHook(func(ctx context.Context, plan *gollem.Plan) error {
+			return displayPlanProgress(ctx, plan, "Plan created")
+		}),
+		gollem.WithToDoStartHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
+			return displayPlanProgress(ctx, plan, fmt.Sprintf("Starting: %s", todo.Description))
+		}),
+		gollem.WithToDoCompletedHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
+			return displayPlanProgress(ctx, plan, fmt.Sprintf("Completed: %s", todo.Description))
+		}),
 	)
 	if err != nil {
 		return goerr.Wrap(err, "failed to create plan")
@@ -195,11 +204,12 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	}
 	msg.Trace(ctx, "✅ Plan execution completed (%d/%d tasks)", completedCount, len(todos))
 
+	// TODO: Use plan.Session() when enhanced plan mode API becomes available
 	// Get the updated history from the agent's current session
 	session := agent.Session()
 	if session == nil {
-		logger.Warn("agent session is nil after plan execution - this is a known limitation with current gollem plan mode")
-		// For now, skip history saving when session is unavailable
+		logger.Warn("agent session is nil after plan execution - plan.Session() will be used when enhanced API is available")
+		// Skip history saving when session is unavailable
 		// This will be resolved when enhanced plan mode becomes available
 		return nil
 	}
@@ -314,4 +324,56 @@ func (x *UseCases) generateInitialTicketComment(ctx context.Context, ticketData 
 	}
 
 	return response.Texts[0], nil
+}
+
+// displayPlanProgress shows the current plan progress with task status and strike-through for completed items
+func displayPlanProgress(ctx context.Context, plan *gollem.Plan, action string) error {
+	todos := plan.GetToDos()
+	if len(todos) == 0 {
+		msg.Trace(ctx, "📋 %s (no tasks yet)", action)
+		return nil
+	}
+
+	// Count completed tasks
+	completedCount := 0
+	for _, todo := range todos {
+		if todo.Completed {
+			completedCount++
+		}
+	}
+
+	// Display progress header
+	msg.Trace(ctx, "📋 %s (%d/%d tasks completed)", action, completedCount, len(todos))
+
+	// Display task list with status indicators
+	for i, todo := range todos {
+		var status string
+		var icon string
+
+		switch todo.Status {
+		case "Pending":
+			status = todo.Description
+			icon = "☐"
+		case "Executing":
+			status = todo.Description
+			icon = "⟳"
+		case "Completed":
+			// Strike-through for completed tasks
+			status = fmt.Sprintf("~~%s~~", todo.Description)
+			icon = "☑"
+		case "Failed":
+			status = fmt.Sprintf("%s (FAILED)", todo.Description)
+			icon = "❌"
+		case "Skipped":
+			status = fmt.Sprintf("~~%s~~ (skipped)", todo.Description)
+			icon = "⏭"
+		default:
+			status = todo.Description
+			icon = "?"
+		}
+
+		msg.Trace(ctx, "  %s %d. %s", icon, i+1, status)
+	}
+
+	return nil
 }
