@@ -17,7 +17,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/m-mizutani/clog v0.0.8
 	github.com/m-mizutani/goerr/v2 v2.0.0-beta.2
-	github.com/m-mizutani/gollem v0.7.1-0.20250708120446-2b8e91e0c040
+	github.com/m-mizutani/gollem v0.7.1-0.20250708134731-68acd3ccbb91
 	github.com/m-mizutani/gt v0.0.16
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.1.11
@@ -31,6 +31,8 @@ require (
 	google.golang.org/grpc v1.73.0
 	gopkg.in/yaml.v3 v3.0.1
 )
+
+replace github.com/m-mizutani/gollem => /Users/mizutani/.ghq/github.com/m-mizutani/gollem
 
 require (
 	cel.dev/expr v0.23.1 // indirect
