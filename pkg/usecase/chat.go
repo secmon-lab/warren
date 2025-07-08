@@ -29,6 +29,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	logger := logging.From(ctx)
 
 	// Create Slack update callback function
+
 	slackUpdateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
 		if x.slackService == nil {
 			return nil // Skip if Slack service is not configured
@@ -167,7 +168,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		return goerr.Wrap(err, "failed to build system prompt")
 	}
 
-	logger.Debug("run prompt", "prompt", message, "history", history, "ticket", target, "history_record", historyRecord)
+	// logger.Debug("run prompt", "prompt", message, "history", history, "ticket", target, "history_record", historyRecord)
 
 	// Always use plan mode for comprehensive task handling
 	plan, err := agent.Plan(ctx, message,
