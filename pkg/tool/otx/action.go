@@ -55,7 +55,7 @@ func (x *Action) Flags() []cli.Flag {
 func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return []gollem.ToolSpec{
 		{
-			Name:        "otx.ipv4",
+			Name:        "otx_ipv4",
 			Description: "Search the indicator of IPv4 from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -63,9 +63,10 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The IPv4 address to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 		{
-			Name:        "otx.domain",
+			Name:        "otx_domain",
 			Description: "Search the indicator of domain from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -73,9 +74,10 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The domain to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 		{
-			Name:        "otx.ipv6",
+			Name:        "otx_ipv6",
 			Description: "Search the indicator of IPv6 from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -83,9 +85,10 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The IPv6 address to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 		{
-			Name:        "otx.hostname",
+			Name:        "otx_hostname",
 			Description: "Search the indicator of hostname from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -93,9 +96,10 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The hostname to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 		{
-			Name:        "otx.file_hash",
+			Name:        "otx_file_hash",
 			Description: "Search the indicator of file hash from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -103,6 +107,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The file hash to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 	}, nil
 }
