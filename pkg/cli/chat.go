@@ -181,6 +181,7 @@ func runInteractiveMode(ctx context.Context, uc *usecase.UseCases, ticket *ticke
 
 	fmt.Println("💬 Interactive chat mode started. Type 'exit' or 'quit' to end the session.")
 	fmt.Println("📝 Type your questions about the ticket and alerts.")
+	fmt.Println("📋 Plan mode enabled: Complex tasks will be automatically broken down into steps.")
 	if dryrun.IsDryRun(ctx) {
 		fmt.Println("🔒 Dry-run mode: Commands that modify the database will be simulated.")
 	}

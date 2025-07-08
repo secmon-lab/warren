@@ -169,24 +169,53 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 
 	logger.Debug("run prompt", "prompt", message, "history", history, "ticket", target, "history_record", historyRecord)
 
-	err = agent.Execute(ctx, message, gollem.WithSystemPrompt(systemPrompt))
+	// Always use plan mode for comprehensive task handling
+	plan, err := agent.Plan(ctx, message,
+		gollem.WithPlanSystemPrompt(systemPrompt),
+		gollem.WithMaxPlanSteps(10),
+	)
 	if err != nil {
-		return goerr.Wrap(err, "failed to execute")
+		return goerr.Wrap(err, "failed to create plan")
 	}
 
+	msg.Trace(ctx, "🚀 Executing plan...")
+
+	_, err = plan.Execute(ctx)
+	if err != nil {
+		return goerr.Wrap(err, "failed to execute plan")
+	}
+
+	// Count completed tasks
+	todos := plan.GetToDos()
+	completedCount := 0
+	for _, todo := range todos {
+		if todo.Completed {
+			completedCount++
+		}
+	}
+	msg.Trace(ctx, "✅ Plan execution completed (%d/%d tasks)", completedCount, len(todos))
+
 	// Get the updated history from the agent's current session
-	newHistory := agent.Session().History()
+	session := agent.Session()
+	if session == nil {
+		logger.Warn("agent session is nil after plan execution - this is a known limitation with current gollem plan mode")
+		// For now, skip history saving when session is unavailable
+		// This will be resolved when enhanced plan mode becomes available
+		return nil
+	}
+
+	newHistory := session.History()
 	if newHistory == nil {
-		return goerr.New("failed to get history from agent")
+		return goerr.New("failed to get history from agent session")
 	}
 
 	newRecord := ticket.NewHistory(ctx, target.ID)
 
-	if err = storageSvc.PutHistory(ctx, target.ID, newRecord.ID, newHistory); err != nil {
+	if err := storageSvc.PutHistory(ctx, target.ID, newRecord.ID, newHistory); err != nil {
 		return goerr.Wrap(err, "failed to put history")
 	}
 
-	if err = x.repository.PutHistory(ctx, target.ID, &newRecord); err != nil {
+	if err := x.repository.PutHistory(ctx, target.ID, &newRecord); err != nil {
 		return goerr.Wrap(err, "failed to put history")
 	}
 
