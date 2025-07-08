@@ -176,7 +176,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			return displayPlanProgress(ctx, plan, "Plan created")
 		}),
 		gollem.WithToDoStartHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
-			return displayPlanProgress(ctx, plan, fmt.Sprintf("Starting: %s", todo.Description))
+			msg.Trace(ctx, "🚀 Starting: %s", todo.Description)
+			return nil
 		}),
 		gollem.WithToDoCompletedHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
 			return displayPlanProgress(ctx, plan, fmt.Sprintf("Completed: %s", todo.Description))
