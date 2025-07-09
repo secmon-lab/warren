@@ -28,8 +28,6 @@ var chatSystemPromptTemplate string
 func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message string) error {
 	logger := logging.From(ctx)
 
-	// Create Slack update callback function
-
 	slackUpdateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
 		if x.slackService == nil {
 			return nil // Skip if Slack service is not configured
@@ -63,9 +61,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		if err != nil {
 			return goerr.Wrap(err, "failed to get history data")
 		}
-		logger.Debug("history loaded", "history_id", historyRecord.ID, "ticket_id", target.ID)
-	} else {
-		logger.Debug("no history found")
 	}
 
 	alerts, err := x.repository.BatchGetAlerts(ctx, target.AlertIDs)

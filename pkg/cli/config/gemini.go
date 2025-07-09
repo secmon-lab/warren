@@ -23,7 +23,7 @@ func (x *GeminiCfg) Flags() []cli.Flag {
 			Usage:       "Gemini model",
 			Destination: &x.model,
 			Category:    "Gemini",
-			Value:       "gemini-2.0-flash",
+			Value:       "gemini-2.5-flash", // Test latest 2.5 model for tool handling
 		},
 		&cli.StringFlag{
 			Name:        "gemini-project-id",
@@ -62,6 +62,11 @@ func (x GeminiCfg) LogValue() slog.Value {
 func (x *GeminiCfg) Configure(ctx context.Context) (*gemini.Client, error) {
 	options := []gemini.Option{
 		gemini.WithModel(x.model),
+		// Temporarily use default settings like gollem test to isolate the issue
+		// gemini.WithTemperature(0.1),     // Lower temperature for consistency
+		// gemini.WithTopK(40),             // Controlled diversity
+		// gemini.WithTopP(0.95),           // Nucleus sampling
+		// gemini.WithMaxTokens(8192),      // Prevent oversized responses
 	}
 	if x.embeddingModel != "" {
 		options = append(options, gemini.WithEmbeddingModel(x.embeddingModel))

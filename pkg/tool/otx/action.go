@@ -55,7 +55,7 @@ func (x *Action) Flags() []cli.Flag {
 func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return []gollem.ToolSpec{
 		{
-			Name:        "otx_ipv4",
+			Name:        "otx.ipv4",
 			Description: "Search the indicator of IPv4 from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -66,7 +66,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			Required: []string{"target"},
 		},
 		{
-			Name:        "otx_domain",
+			Name:        "otx.domain",
 			Description: "Search the indicator of domain from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -77,7 +77,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			Required: []string{"target"},
 		},
 		{
-			Name:        "otx_ipv6",
+			Name:        "otx.ipv6",
 			Description: "Search the indicator of IPv6 from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -88,7 +88,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			Required: []string{"target"},
 		},
 		{
-			Name:        "otx_hostname",
+			Name:        "otx.hostname",
 			Description: "Search the indicator of hostname from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -99,7 +99,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			Required: []string{"target"},
 		},
 		{
-			Name:        "otx_file_hash",
+			Name:        "otx.file_hash",
 			Description: "Search the indicator of file hash from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {

@@ -84,6 +84,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The URL to scan",
 				},
 			},
+			Required: []string{"url"},
 		},
 	}, nil
 }
@@ -92,6 +93,14 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	logger := logging.From(ctx)
 	if x.apiKey == "" {
 		return nil, goerr.New("URLScan API key is required")
+	}
+
+	// Validate function name
+	switch name {
+	case "urlscan.scan":
+		// Valid function name, continue
+	default:
+		return nil, goerr.New("invalid function name", goerr.V("name", name))
 	}
 
 	urlStr, ok := args["url"].(string)
