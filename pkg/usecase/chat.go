@@ -171,23 +171,48 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithPlanCreatedHook(func(ctx context.Context, plan *gollem.Plan) error {
 			return displayPlanProgress(ctx, plan, "Plan created")
 		}),
-		gollem.WithToDoStartHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
+		gollem.WithPlanToDoStartHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
 			msg.Trace(ctx, "🚀 Starting: %s", todo.Description)
 			return nil
 		}),
-		gollem.WithToDoCompletedHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
+		gollem.WithPlanToDoCompletedHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
 			return displayPlanProgress(ctx, plan, fmt.Sprintf("Completed: %s", todo.Description))
+		}),
+		gollem.WithPlanToDoUpdatedHook(func(ctx context.Context, plan *gollem.Plan, changes []gollem.PlanToDoChange) error {
+			if len(changes) == 0 {
+				return nil
+			}
+
+			msg.Trace(ctx, "📝 Plan updated (%d todos)", len(changes))
+			return nil
+		}),
+		gollem.WithPlanMessageHook(func(ctx context.Context, plan *gollem.Plan, message gollem.PlanExecutionMessage) error {
+			switch message.Type {
+			case gollem.PlanMessageThought:
+				msg.Trace(ctx, "💭 %s", message.Content)
+			case gollem.PlanMessageAction:
+				msg.Trace(ctx, "⚡ %s", message.Content)
+			case gollem.PlanMessageResponse:
+				msg.Trace(ctx, "📨 %s", message.Content)
+			case gollem.PlanMessageSystem:
+				msg.Trace(ctx, "⚙️  %s", message.Content)
+			}
+			return nil
 		}),
 	)
 	if err != nil {
 		return goerr.Wrap(err, "failed to create plan")
 	}
 
-	msg.Trace(ctx, "🚀 Executing plan...")
+	ctx = msg.Trace(ctx, "🚀 Executing plan...")
 
-	_, err = plan.Execute(ctx)
+	execResp, err := plan.Execute(ctx)
 	if err != nil {
 		return goerr.Wrap(err, "failed to execute plan")
+	}
+
+	if len(execResp) > 0 {
+		msg.Notify(ctx, "💬 %s", execResp)
 	}
 
 	// Count completed tasks
@@ -198,7 +223,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			completedCount++
 		}
 	}
-	msg.Trace(ctx, "✅ Plan execution completed (%d/%d tasks)", completedCount, len(todos))
+	ctx = msg.Trace(ctx, "✅ Plan execution completed (%d/%d tasks)", completedCount, len(todos))
 
 	// Get the updated history from the plan's session
 	session := plan.Session()
