@@ -23,7 +23,7 @@ func (x *GeminiCfg) Flags() []cli.Flag {
 			Usage:       "Gemini model",
 			Destination: &x.model,
 			Category:    "Gemini",
-			Value:       "gemini-2.5-flash", // Test latest 2.5 model for tool handling
+			Value:       "gemini-2.0-flash",
 		},
 		&cli.StringFlag{
 			Name:        "gemini-project-id",
