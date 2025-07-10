@@ -94,47 +94,51 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
 	}
 
+	postWarrenMessage := func(ctx context.Context, message string) {
+		if x.slackService == nil || target.SlackThread == nil {
+			return
+		}
+		if strings.TrimSpace(message) == "" {
+			return
+		}
+
+		// Set agent context for agent messages
+		agentCtx := user.WithAgent(user.WithUserID(ctx, x.slackService.BotID()))
+
+		// Record agent message as TicketComment
+		// Create bot user for agent messages
+		botUser := &slack.User{
+			ID:   x.slackService.BotID(),
+			Name: "Warren",
+		}
+
+		// Post agent message to Slack and get message ID
+		threadSvc := x.slackService.NewThread(*target.SlackThread)
+		logging.From(ctx).Debug("message notify", "from", "MessageHook", "msg", message)
+		ts, err := threadSvc.PostCommentWithMessageID(ctx, "💬 "+message)
+		if err != nil {
+			errs.Handle(ctx, goerr.Wrap(err, "failed to post agent message to slack"))
+			return
+		}
+
+		comment := target.NewComment(agentCtx, message, botUser, ts)
+
+		if err := x.repository.PutTicketComment(agentCtx, comment); err != nil {
+			logger.Error("failed to record agent message as comment", "error", err)
+			// Continue execution even if comment recording fails
+		}
+	}
+
 	agent := gollem.New(x.llmClient,
 		gollem.WithHistory(history),
 		gollem.WithToolSets(tools...),
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
+		/* Disable because of duplication with PlanHook
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
-			if x.slackService == nil || target.SlackThread == nil {
-				return nil
-			}
-			if strings.TrimSpace(message) == "" {
-				return nil
-			}
-
-			// Set agent context for agent messages
-			agentCtx := user.WithAgent(user.WithUserID(ctx, x.slackService.BotID()))
-
-			// Record agent message as TicketComment
-			// Create bot user for agent messages
-			botUser := &slack.User{
-				ID:   x.slackService.BotID(),
-				Name: "Warren",
-			}
-
-			// Post agent message to Slack and get message ID
-			threadSvc := x.slackService.NewThread(*target.SlackThread)
-			logging.From(ctx).Debug("message notify", "from", "MessageHook", "msg", message)
-			ts, err := threadSvc.PostCommentWithMessageID(ctx, "💬 "+message)
-			if err != nil {
-				errs.Handle(ctx, goerr.Wrap(err, "failed to post agent message to slack"))
-				return nil
-			}
-
-			comment := target.NewComment(agentCtx, message, botUser, ts)
-
-			if err := x.repository.PutTicketComment(agentCtx, comment); err != nil {
-				logger.Error("failed to record agent message as comment", "error", err)
-				// Continue execution even if comment recording fails
-			}
-
 			return nil
 		}),
+		*/
 		gollem.WithToolErrorHook(func(ctx context.Context, err error, call gollem.FunctionCall) error {
 			msg.Trace(ctx, "❌ Error: %s", err.Error())
 			logger.Error("tool error", "error", err, "call", call)
@@ -197,8 +201,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			case gollem.PlanMessageAction:
 				msg.Trace(ctx, "⚡ %s", message.Content)
 			case gollem.PlanMessageResponse:
-				logging.From(ctx).Debug("message notify", "from", "PlanMessageHook", "msg", message.Content)
-				msg.Notify(ctx, "💬 %s", message.Content)
+				msg.Trace(ctx, "💬 %s", message.Content)
 			case gollem.PlanMessageSystem:
 				msg.Trace(ctx, "⚙️  %s", message.Content)
 			}
@@ -209,7 +212,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		return goerr.Wrap(err, "failed to create plan")
 	}
 
-	ctx = msg.Trace(ctx, "🚀 Executing plan...")
+	ctx = msg.NewTrace(ctx, "🚀 Executing plan...")
 
 	execResp, err := plan.Execute(ctx)
 	if err != nil {
@@ -217,8 +220,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	}
 
 	if len(execResp) > 0 {
-		logging.From(ctx).Debug("message notify", "from", "ExecResponse", "msg", execResp)
-		msg.Notify(ctx, "💬 %s", execResp)
+		logging.From(ctx).Debug("message notify", "from", "ExecResponse", "message", execResp)
+		postWarrenMessage(ctx, message)
 	}
 
 	// Count completed tasks
