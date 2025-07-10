@@ -166,18 +166,21 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 
 	// logger.Debug("run prompt", "prompt", message, "history", history, "ticket", target, "history_record", historyRecord)
 
+	// Create updatable message function for plan progress tracking
+	progressUpdate := msg.NewUpdatable(ctx, "Initializing AI plan...")
+
 	// Always use plan mode for comprehensive task handling
 	plan, err := agent.Plan(ctx, message,
 		gollem.WithPlanSystemPrompt(systemPrompt),
 		gollem.WithPlanCreatedHook(func(ctx context.Context, plan *gollem.Plan) error {
-			return displayPlanProgress(ctx, plan, "Plan created")
+			return updatePlanProgress(progressUpdate, plan, "Plan created")
 		}),
 		gollem.WithPlanToDoStartHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
 			msg.Trace(ctx, "🚀 Starting: %s", todo.Description)
 			return nil
 		}),
 		gollem.WithPlanToDoCompletedHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
-			return displayPlanProgress(ctx, plan, fmt.Sprintf("Completed: %s", todo.Description))
+			return updatePlanProgress(progressUpdate, plan, fmt.Sprintf("Completed: %s", todo.Description))
 		}),
 		gollem.WithPlanToDoUpdatedHook(func(ctx context.Context, plan *gollem.Plan, changes []gollem.PlanToDoChange) error {
 			if len(changes) == 0 {
@@ -348,11 +351,11 @@ func (x *UseCases) generateInitialTicketComment(ctx context.Context, ticketData 
 	return response.Texts[0], nil
 }
 
-// displayPlanProgress shows the current plan progress with task status and strike-through for completed items
-func displayPlanProgress(ctx context.Context, plan *gollem.Plan, action string) error {
+// updatePlanProgress formats and updates the plan progress message using an updatable message function
+func updatePlanProgress(updateFunc func(ctx context.Context, msg string), plan *gollem.Plan, action string) error {
 	todos := plan.GetToDos()
 	if len(todos) == 0 {
-		msg.Trace(ctx, "📋 %s (no tasks yet)", action)
+		updateFunc(context.Background(), fmt.Sprintf("🤖 **%s** (no tasks yet)", action))
 		return nil
 	}
 
@@ -366,10 +369,11 @@ func displayPlanProgress(ctx context.Context, plan *gollem.Plan, action string) 
 
 	// Build complete message with all task details
 	var messageBuilder strings.Builder
-	messageBuilder.WriteString(fmt.Sprintf("📋 %s (%d/%d tasks completed)\n", action, completedCount, len(todos)))
+	messageBuilder.WriteString(fmt.Sprintf("🤖 **%s**\n\n", action))
+	messageBuilder.WriteString(fmt.Sprintf("**Progress: %d/%d tasks completed**\n\n", completedCount, len(todos)))
 
 	// Add task list with status indicators
-	for i, todo := range todos {
+	for _, todo := range todos {
 		var status string
 		var icon string
 
@@ -395,11 +399,9 @@ func displayPlanProgress(ctx context.Context, plan *gollem.Plan, action string) 
 			icon = "?"
 		}
 
-		messageBuilder.WriteString(fmt.Sprintf("  %s %d. %s\n", icon, i+1, status))
+		messageBuilder.WriteString(fmt.Sprintf("%s %s\n", icon, status))
 	}
 
-	// Output everything in a single Trace call
-	msg.Trace(ctx, "%s", messageBuilder.String())
-
+	updateFunc(context.Background(), messageBuilder.String())
 	return nil
 }
