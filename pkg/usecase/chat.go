@@ -193,7 +193,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			case gollem.PlanMessageAction:
 				msg.Trace(ctx, "⚡ %s", message.Content)
 			case gollem.PlanMessageResponse:
-				msg.Trace(ctx, "📨 %s", message.Content)
+				msg.Notify(ctx, "💬 %s", message.Content)
 			case gollem.PlanMessageSystem:
 				msg.Trace(ctx, "⚙️  %s", message.Content)
 			}
@@ -373,14 +373,14 @@ func displayPlanProgress(ctx context.Context, plan *gollem.Plan, action string) 
 		switch todo.Status {
 		case "Pending":
 			status = todo.Description
-			icon = "☐"
+			icon = "☑️"
 		case "Executing":
 			status = todo.Description
 			icon = "⟳"
 		case "Completed":
 			// Strike-through for completed tasks
 			status = fmt.Sprintf("~~%s~~", todo.Description)
-			icon = "☑"
+			icon = "✅"
 		case "Failed":
 			status = fmt.Sprintf("%s (FAILED)", todo.Description)
 			icon = "❌"
