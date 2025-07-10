@@ -13,7 +13,6 @@ type ctxNotifyFuncKey struct{}
 type ctxNewTraceFuncKey struct{}
 type ctxTraceFuncKey struct{}
 type ctxNewUpdatableFuncKey struct{}
-type ctxUpdatableFuncKey struct{}
 
 func With(ctx context.Context, NotifyFunc NotifyFunc, NewTraceFunc NewTraceFunc) context.Context {
 	ctx = context.WithValue(ctx, ctxNotifyFuncKey{}, NotifyFunc)
