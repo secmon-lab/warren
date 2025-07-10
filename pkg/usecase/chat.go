@@ -119,6 +119,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 
 			// Post agent message to Slack and get message ID
 			threadSvc := x.slackService.NewThread(*target.SlackThread)
+			logging.From(ctx).Debug("message notify", "from", "MessageHook", "msg", message)
 			ts, err := threadSvc.PostCommentWithMessageID(ctx, "💬 "+message)
 			if err != nil {
 				errs.Handle(ctx, goerr.Wrap(err, "failed to post agent message to slack"))
@@ -193,6 +194,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			case gollem.PlanMessageAction:
 				msg.Trace(ctx, "⚡ %s", message.Content)
 			case gollem.PlanMessageResponse:
+				logging.From(ctx).Debug("message notify", "from", "PlanMessageHook", "msg", message.Content)
 				msg.Notify(ctx, "💬 %s", message.Content)
 			case gollem.PlanMessageSystem:
 				msg.Trace(ctx, "⚙️  %s", message.Content)
@@ -212,6 +214,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	}
 
 	if len(execResp) > 0 {
+		logging.From(ctx).Debug("message notify", "from", "ExecResponse", "msg", execResp)
 		msg.Notify(ctx, "💬 %s", execResp)
 	}
 
