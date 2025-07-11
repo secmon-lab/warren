@@ -134,11 +134,10 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithToolSets(tools...),
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
-		/* Disable because of duplication with PlanHook
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
+			msg.Trace(ctx, "💭 %s", message)
 			return nil
 		}),
-		*/
 		gollem.WithToolErrorHook(func(ctx context.Context, err error, call gollem.FunctionCall) error {
 			msg.Trace(ctx, "❌ Error: %s", err.Error())
 			logger.Error("tool error", "error", err, "call", call)
@@ -192,19 +191,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			}
 
 			msg.Trace(ctx, "📝 Plan updated (%d todos)", len(changes))
-			return nil
-		}),
-		gollem.WithPlanMessageHook(func(ctx context.Context, plan *gollem.Plan, message gollem.PlanExecutionMessage) error {
-			switch message.Type {
-			case gollem.PlanMessageThought:
-				msg.Trace(ctx, "💭 %s", message.Content)
-			case gollem.PlanMessageAction:
-				msg.Trace(ctx, "⚡ %s", message.Content)
-			case gollem.PlanMessageResponse:
-				msg.Trace(ctx, "💬 %s", message.Content)
-			case gollem.PlanMessageSystem:
-				msg.Trace(ctx, "⚙️  %s", message.Content)
-			}
 			return nil
 		}),
 	)
