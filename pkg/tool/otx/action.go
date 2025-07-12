@@ -63,6 +63,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The IPv4 address to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 		{
 			Name:        "otx.domain",
@@ -73,6 +74,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The domain to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 		{
 			Name:        "otx.ipv6",
@@ -83,6 +85,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The IPv6 address to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 		{
 			Name:        "otx.hostname",
@@ -93,6 +96,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The hostname to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 		{
 			Name:        "otx.file_hash",
@@ -103,6 +107,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The file hash to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 	}, nil
 }
@@ -150,21 +155,21 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	}
 	defer safe.Close(ctx, resp.Body)
 
+	eb := goerr.NewBuilder(goerr.V("status", resp.StatusCode), goerr.V("header", resp.Header))
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, goerr.New("failed to query OTX",
-			goerr.V("status_code", resp.StatusCode),
-			goerr.V("body", string(body)))
+		return nil, eb.New("failed to query OTX", goerr.V("body", string(body)))
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to read response body")
+		return nil, eb.Wrap(err, "failed to read response body")
 	}
 
 	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, goerr.Wrap(err, "failed to unmarshal response")
+		return nil, eb.Wrap(err, "failed to unmarshal response", goerr.V("body", body))
 	}
 
 	return result, nil

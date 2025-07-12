@@ -28,8 +28,9 @@ func joinFlags(flags ...[]cli.Flag) []cli.Flag {
 type toolList []interfaces.Tool
 
 var tools = toolList{
-	&urlscan.Action{},
+	// All external tools restored with gemini-2.5-flash
 	&otx.Action{},
+	&urlscan.Action{},
 	&vt.Action{},
 	&shodan.Action{},
 	&abusech.Action{},

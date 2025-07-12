@@ -439,6 +439,28 @@ func (x *ThreadService) NewStateFunc(ctx context.Context, message string) func(c
 	}
 }
 
+func (x *ThreadService) NewUpdatableMessage(ctx context.Context, initialMessage string) func(ctx context.Context, newMsg string) {
+	var msgID string
+	var mutex sync.Mutex
+
+	return func(ctx context.Context, newMsg string) {
+		mutex.Lock()
+		defer mutex.Unlock()
+
+		blocks := buildStateMessageBlocks([]string{newMsg})
+		if len(blocks) == 0 {
+			return
+		}
+
+		if msgID == "" {
+			msgID = x.postInitialMessage(ctx, blocks)
+			return
+		}
+
+		x.updateMessage(ctx, msgID, blocks)
+	}
+}
+
 func (x *ThreadService) postInitialMessage(ctx context.Context, blocks []slack.Block) string {
 	_, ts, err := x.client.PostMessageContext(ctx,
 		x.channelID,

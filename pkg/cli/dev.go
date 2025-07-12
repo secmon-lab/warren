@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
@@ -34,6 +35,7 @@ func cmdDev() *cli.Command {
 		addr      string
 		webUICfg  config.WebUI
 		geminiCfg config.GeminiCfg
+		claudeCfg config.ClaudeCfg
 	)
 
 	flags := joinFlags(
@@ -49,6 +51,7 @@ func cmdDev() *cli.Command {
 		},
 		webUICfg.Flags(),
 		geminiCfg.Flags(),
+		claudeCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -61,11 +64,25 @@ func cmdDev() *cli.Command {
 				"addr", addr,
 				"web-ui", webUICfg,
 				"gemini", geminiCfg,
+				"claude", claudeCfg,
 			)
 
-			geminiModel, err := geminiCfg.Configure(ctx)
+			// Configure Gemini client (always required for embeddings)
+			geminiClient, err := geminiCfg.Configure(ctx)
 			if err != nil {
 				return err
+			}
+
+			// Configure LLM client with Gemini for embeddings and Claude for content if available
+			var llmClient gollem.LLMClient
+			if claudeCfg.ProjectID != "" {
+				claudeClient, err := claudeCfg.Configure(ctx)
+				if err != nil {
+					return err
+				}
+				llmClient = config.NewCompositeLLMClient(claudeClient, geminiClient)
+			} else {
+				llmClient = geminiClient
 			}
 
 			// Create mock policy
@@ -105,7 +122,7 @@ func cmdDev() *cli.Command {
 			}
 
 			ucOptions := []usecase.Option{
-				usecase.WithLLMClient(geminiModel),
+				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(repo),
 				usecase.WithSlackService(slackSvc),

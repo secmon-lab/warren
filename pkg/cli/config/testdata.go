@@ -14,6 +14,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
 
@@ -81,6 +82,7 @@ func loadTestFiles(basePath string) (*policy.TestData, error) {
 
 		data, err := os.ReadFile(filepath.Clean(path))
 		if err != nil {
+			logging.Default().Warn("Unreadable test data (only .json or .jsonl)", "path", path)
 			return goerr.Wrap(err, "failed to read file", goerr.V("path", path))
 		}
 

@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/dryrun"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -24,12 +24,11 @@ func cmdChat() *cli.Command {
 		ticketID    types.TicketID
 		firestoreDB config.Firestore
 		geminiCfg   config.GeminiCfg
+		claudeCfg   config.ClaudeCfg
 		policyCfg   config.Policy
 		storageCfg  config.Storage
 
-		query    string
-		noDryRun bool // Value for --no-dry-run flag
-		dryRun   bool // Actual dry-run setting
+		query string
 	)
 
 	flags := joinFlags(
@@ -47,14 +46,10 @@ func cmdChat() *cli.Command {
 				Usage:       "Query prompt (if not provided, interactive mode will start)",
 				Destination: &query,
 			},
-			&cli.BoolFlag{
-				Name:        "no-dry-run",
-				Usage:       "Disable dry-run mode (dry-run is enabled by default)",
-				Destination: &noDryRun,
-			},
 		},
 		firestoreDB.Flags(),
 		geminiCfg.Flags(),
+		claudeCfg.Flags(),
 		policyCfg.Flags(),
 		storageCfg.Flags(),
 		tools.Flags(),
@@ -66,29 +61,28 @@ func cmdChat() *cli.Command {
 		Usage:   "Chat with the security analyst about a specific ticket",
 		Flags:   flags,
 		Action: func(ctx context.Context, c *cli.Command) error {
-			logger := logging.From(ctx)
-
-			// Set dry-run mode: enabled by default, disabled if --no-dry-run is specified
-			dryRun = !noDryRun
-
-			// Add dry-run information to context (enabled by default)
-			ctx = dryrun.With(ctx, dryRun)
-			if dryRun {
-				logger.Info("Dry-run mode enabled - database modifications will be skipped")
-			} else {
-				logger.Info("Dry-run mode disabled - database modifications will be executed")
-			}
-
 			// Configure repository
 			repo, err := firestoreDB.Configure(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to configure firestore")
 			}
 
-			// Configure LLM client
-			llmClient, err := geminiCfg.Configure(ctx)
+			// Configure Gemini client (always required for embeddings)
+			geminiClient, err := geminiCfg.Configure(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to configure gemini")
+			}
+
+			// Configure LLM client with Gemini for embeddings and Claude for content if available
+			var llmClient gollem.LLMClient
+			if claudeCfg.ProjectID != "" {
+				claudeClient, err := claudeCfg.Configure(ctx)
+				if err != nil {
+					return goerr.Wrap(err, "failed to configure claude")
+				}
+				llmClient = config.NewCompositeLLMClient(claudeClient, geminiClient)
+			} else {
+				llmClient = geminiClient
 			}
 
 			// Configure policy client
@@ -118,12 +112,8 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to get alerts")
 			}
 
-			// Configure tools
-			baseAction := base.New(repo, policyClient, ticket.ID)
-			toolSets := append(tools, baseAction)
-
 			// Get tool sets
-			allToolSets, err := toolSets.ToolSets(ctx)
+			allToolSets, err := tools.ToolSets(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to get tool sets")
 			}
@@ -139,10 +129,6 @@ func cmdChat() *cli.Command {
 			}
 			fmt.Printf("  🔢 Alerts: %d\n", len(alerts))
 			fmt.Printf("\n")
-
-			if dryRun {
-				fmt.Printf("🔒 Dry-run mode: Database modifications will be simulated\n\n")
-			}
 
 			// Create usecase
 			uc := usecase.New(
@@ -181,6 +167,7 @@ func runInteractiveMode(ctx context.Context, uc *usecase.UseCases, ticket *ticke
 
 	fmt.Println("💬 Interactive chat mode started. Type 'exit' or 'quit' to end the session.")
 	fmt.Println("📝 Type your questions about the ticket and alerts.")
+	fmt.Println("📋 Plan mode enabled: Complex tasks will be automatically broken down into steps.")
 	if dryrun.IsDryRun(ctx) {
 		fmt.Println("🔒 Dry-run mode: Commands that modify the database will be simulated.")
 	}
