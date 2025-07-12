@@ -51,6 +51,7 @@ func cmdServe() *cli.Command {
 		sentryCfg      config.Sentry
 		slackCfg       config.Slack
 		geminiCfg      config.GeminiCfg
+		claudeCfg      config.ClaudeCfg
 		firestoreCfg   config.Firestore
 		storageCfg     config.Storage
 	)
@@ -85,6 +86,7 @@ func cmdServe() *cli.Command {
 		sentryCfg.Flags(),
 		slackCfg.Flags(),
 		geminiCfg.Flags(),
+		claudeCfg.Flags(),
 		firestoreCfg.Flags(),
 		tools.Flags(),
 		storageCfg.Flags(),
@@ -105,6 +107,7 @@ func cmdServe() *cli.Command {
 				"sentry", sentryCfg,
 				"slack", slackCfg,
 				"gemini", geminiCfg,
+				"claude", claudeCfg,
 				"firestore", firestoreCfg,
 				"storage", storageCfg,
 			)
@@ -114,9 +117,22 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			geminiModel, err := geminiCfg.Configure(ctx)
+			// Configure Gemini client (always required for embeddings)
+			geminiClient, err := geminiCfg.Configure(ctx)
 			if err != nil {
 				return err
+			}
+
+			// Configure LLM client with Gemini for embeddings and Claude for content if available
+			var llmClient gollem.LLMClient
+			if claudeCfg.ProjectID != "" {
+				claudeClient, err := claudeCfg.Configure(ctx)
+				if err != nil {
+					return err
+				}
+				llmClient = config.NewCompositeLLMClient(claudeClient, geminiClient)
+			} else {
+				llmClient = geminiClient
 			}
 
 			if err := sentryCfg.Configure(); err != nil {
@@ -140,7 +156,7 @@ func cmdServe() *cli.Command {
 			}
 
 			// Create embedding adapter from LLM client
-			embeddingAdapter := &llmEmbeddingAdapter{client: geminiModel}
+			embeddingAdapter := &llmEmbeddingAdapter{client: llmClient}
 
 			// Inject dependencies into tools that support them
 			tools.InjectDependencies(firestore, embeddingAdapter)
@@ -151,7 +167,7 @@ func cmdServe() *cli.Command {
 			}
 
 			ucOptions := []usecase.Option{
-				usecase.WithLLMClient(geminiModel),
+				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(firestore),
 				usecase.WithSlackService(slackSvc),

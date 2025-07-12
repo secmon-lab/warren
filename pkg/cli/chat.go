@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -23,6 +24,7 @@ func cmdChat() *cli.Command {
 		ticketID    types.TicketID
 		firestoreDB config.Firestore
 		geminiCfg   config.GeminiCfg
+		claudeCfg   config.ClaudeCfg
 		policyCfg   config.Policy
 		storageCfg  config.Storage
 
@@ -47,6 +49,7 @@ func cmdChat() *cli.Command {
 		},
 		firestoreDB.Flags(),
 		geminiCfg.Flags(),
+		claudeCfg.Flags(),
 		policyCfg.Flags(),
 		storageCfg.Flags(),
 		tools.Flags(),
@@ -64,10 +67,22 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to configure firestore")
 			}
 
-			// Configure LLM client
-			llmClient, err := geminiCfg.Configure(ctx)
+			// Configure Gemini client (always required for embeddings)
+			geminiClient, err := geminiCfg.Configure(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to configure gemini")
+			}
+
+			// Configure LLM client with Gemini for embeddings and Claude for content if available
+			var llmClient gollem.LLMClient
+			if claudeCfg.ProjectID != "" {
+				claudeClient, err := claudeCfg.Configure(ctx)
+				if err != nil {
+					return goerr.Wrap(err, "failed to configure claude")
+				}
+				llmClient = config.NewCompositeLLMClient(claudeClient, geminiClient)
+			} else {
+				llmClient = geminiClient
 			}
 
 			// Configure policy client

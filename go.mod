@@ -17,7 +17,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/m-mizutani/clog v0.0.8
 	github.com/m-mizutani/goerr/v2 v2.0.0-beta.2
-	github.com/m-mizutani/gollem v0.7.1-0.20250711033525-13fa266b3dc6
+	github.com/m-mizutani/gollem v0.7.1-0.20250712010333-677a09f64eb4
 	github.com/m-mizutani/gt v0.0.16
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.1.11
@@ -52,7 +52,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.1.5 // indirect
 	github.com/agnivade/levenshtein v1.2.1 // indirect
 	github.com/alecthomas/chroma/v2 v2.15.0 // indirect
-	github.com/anthropics/anthropic-sdk-go v1.4.0 // indirect
+	github.com/anthropics/anthropic-sdk-go v1.5.0 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
