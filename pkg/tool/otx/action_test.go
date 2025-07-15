@@ -25,7 +25,7 @@ func TestOTX(t *testing.T) {
 	}{
 		{
 			name:     "valid domain response",
-			funcName: "otx.domain",
+			funcName: "otx_domain",
 			args: map[string]any{
 				"target": "example.com",
 			},
@@ -39,7 +39,7 @@ func TestOTX(t *testing.T) {
 		},
 		{
 			name:     "valid ipv4 response",
-			funcName: "otx.ipv4",
+			funcName: "otx_ipv4",
 			args: map[string]any{
 				"target": "8.8.8.8",
 			},
@@ -53,7 +53,7 @@ func TestOTX(t *testing.T) {
 		},
 		{
 			name:     "api error response",
-			funcName: "otx.domain",
+			funcName: "otx_domain",
 			args: map[string]any{
 				"target": "example.com",
 			},
@@ -63,7 +63,7 @@ func TestOTX(t *testing.T) {
 		},
 		{
 			name:     "api unauthorized response",
-			funcName: "otx.domain",
+			funcName: "otx_domain",
 			args: map[string]any{
 				"target": "example.com",
 			},
@@ -131,7 +131,7 @@ func TestOTX_Specs(t *testing.T) {
 	// Verify specific tool specification
 	var found bool
 	for _, spec := range specs {
-		if spec.Name == "otx.ipv4" {
+		if spec.Name == "otx_ipv4" {
 			found = true
 			gt.Value(t, spec.Description).Equal("Search the indicator of IPv4 from OTX.")
 			break
@@ -173,7 +173,7 @@ func TestSendRequest(t *testing.T) {
 		Name:  "otx",
 		Flags: act.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			resp, err := act.Run(ctx, "otx.ipv4", map[string]any{
+			resp, err := act.Run(ctx, "otx_ipv4", map[string]any{
 				"target": vars.Get("TEST_OTX_TARGET_IPADDR"),
 			})
 			gt.NoError(t, err)

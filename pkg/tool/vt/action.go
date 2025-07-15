@@ -54,7 +54,7 @@ func (x *Action) Flags() []cli.Flag {
 func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return []gollem.ToolSpec{
 		{
-			Name:        "vt.ip",
+			Name:        "vt_ip",
 			Description: "Search the indicator of IPv4/IPv6 from VirusTotal.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -64,7 +64,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			},
 		},
 		{
-			Name:        "vt.domain",
+			Name:        "vt_domain",
 			Description: "Search the indicator of domain from VirusTotal.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -74,7 +74,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			},
 		},
 		{
-			Name:        "vt.file_hash",
+			Name:        "vt_file_hash",
 			Description: "Search the indicator of file hash from VirusTotal.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -84,7 +84,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			},
 		},
 		{
-			Name:        "vt.url",
+			Name:        "vt_url",
 			Description: "Search the indicator of URL from VirusTotal.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -106,16 +106,16 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 
 	// Determine which indicator type was provided based on function name
 	switch name {
-	case "vt.domain":
+	case "vt_domain":
 		indicator = args["target"].(string)
 		indicatorType = "domains"
-	case "vt.ip":
+	case "vt_ip":
 		indicator = args["target"].(string)
 		indicatorType = "ip_addresses"
-	case "vt.file_hash":
+	case "vt_file_hash":
 		indicator = args["target"].(string)
 		indicatorType = "files"
-	case "vt.url":
+	case "vt_url":
 		indicator = args["target"].(string)
 		indicatorType = "urls"
 	default:

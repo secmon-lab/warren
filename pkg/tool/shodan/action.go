@@ -55,7 +55,7 @@ func (x *Action) Flags() []cli.Flag {
 func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return []gollem.ToolSpec{
 		{
-			Name:        "shodan.host",
+			Name:        "shodan_host",
 			Description: "Search the host information from Shodan.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -65,7 +65,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			},
 		},
 		{
-			Name:        "shodan.domain",
+			Name:        "shodan_domain",
 			Description: "Search the domain information from Shodan.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -75,7 +75,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			},
 		},
 		{
-			Name:        "shodan.search",
+			Name:        "shodan_search",
 			Description: "Search the internet using Shodan search query.",
 			Parameters: map[string]*gollem.Parameter{
 				"query": {
@@ -101,7 +101,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	var queryParams url.Values
 
 	switch name {
-	case "shodan.host":
+	case "shodan_host":
 		target, ok := args["target"].(string)
 		if !ok {
 			return nil, goerr.New("target parameter is required")
@@ -110,7 +110,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 		queryParams = url.Values{}
 		queryParams.Set("key", x.apiKey)
 
-	case "shodan.domain":
+	case "shodan_domain":
 		target, ok := args["target"].(string)
 		if !ok {
 			return nil, goerr.New("target parameter is required")
@@ -119,7 +119,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 		queryParams = url.Values{}
 		queryParams.Set("key", x.apiKey)
 
-	case "shodan.search":
+	case "shodan_search":
 		query, ok := args["query"].(string)
 		if !ok {
 			return nil, goerr.New("query parameter is required")
@@ -176,15 +176,15 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	}
 
 	switch name {
-	case "shodan.host":
+	case "shodan_host":
 		if _, ok := data["ip"].(string); !ok {
 			return nil, goerr.New("invalid response: missing ip")
 		}
-	case "shodan.domain":
+	case "shodan_domain":
 		if _, ok := data["domain"].(string); !ok {
 			return nil, goerr.New("invalid response: missing domain")
 		}
-	case "shodan.search":
+	case "shodan_search":
 		if _, ok := data["matches"].([]interface{}); !ok {
 			return nil, goerr.New("invalid response: missing matches")
 		}

@@ -100,12 +100,12 @@ func (x *Warren) Prompt(ctx context.Context) (string, error) {
 }
 
 const (
-	cmdGetAlerts         = "warren.get_alerts"
-	cmdFindNearestTicket = "warren.find_nearest_ticket"
-	cmdListPolicies      = "warren.list_policies"
-	cmdGetPolicy         = "warren.get_policy"
-	cmdExecPolicy        = "warren.exec_policy"
-	cmdUpdateFinding     = "warren.update_finding"
+	cmdGetAlerts         = "warren_get_alerts"
+	cmdFindNearestTicket = "warren_find_nearest_ticket"
+	cmdListPolicies      = "warren_list_policies"
+	cmdGetPolicy         = "warren_get_policy"
+	cmdExecPolicy        = "warren_exec_policy"
+	cmdUpdateFinding     = "warren_update_finding"
 )
 
 func IgnorableTool(name string) bool {

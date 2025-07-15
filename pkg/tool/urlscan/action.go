@@ -76,7 +76,7 @@ func (x *Action) Flags() []cli.Flag {
 func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return []gollem.ToolSpec{
 		{
-			Name:        "urlscan.scan",
+			Name:        "urlscan_scan",
 			Description: "Scan a URL with URLScan",
 			Parameters: map[string]*gollem.Parameter{
 				"url": {
@@ -97,7 +97,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 
 	// Validate function name
 	switch name {
-	case "urlscan.scan":
+	case "urlscan_scan":
 		// Valid function name, continue
 	default:
 		return nil, goerr.New("invalid function name", goerr.V("name", name))
