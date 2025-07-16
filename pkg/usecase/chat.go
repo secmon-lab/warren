@@ -28,7 +28,6 @@ var chatSystemPromptTemplate string
 func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message string) error {
 	logger := logging.From(ctx)
 
-	// Create Slack update callback function
 	slackUpdateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
 		if x.slackService == nil {
 			return nil // Skip if Slack service is not configured
@@ -62,9 +61,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		if err != nil {
 			return goerr.Wrap(err, "failed to get history data")
 		}
-		logger.Debug("history loaded", "history_id", historyRecord.ID, "ticket_id", target.ID)
-	} else {
-		logger.Debug("no history found")
 	}
 
 	alerts, err := x.repository.BatchGetAlerts(ctx, target.AlertIDs)
@@ -98,44 +94,48 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
 	}
 
+	postWarrenMessage := func(ctx context.Context, message string) {
+		if x.slackService == nil || target.SlackThread == nil {
+			return
+		}
+		if strings.TrimSpace(message) == "" {
+			return
+		}
+
+		// Set agent context for agent messages
+		agentCtx := user.WithAgent(user.WithUserID(ctx, x.slackService.BotID()))
+
+		// Record agent message as TicketComment
+		// Create bot user for agent messages
+		botUser := &slack.User{
+			ID:   x.slackService.BotID(),
+			Name: "Warren",
+		}
+
+		// Post agent message to Slack and get message ID
+		threadSvc := x.slackService.NewThread(*target.SlackThread)
+		logging.From(ctx).Debug("message notify", "from", "MessageHook", "msg", message)
+		ts, err := threadSvc.PostCommentWithMessageID(ctx, "💬 "+message)
+		if err != nil {
+			errs.Handle(ctx, goerr.Wrap(err, "failed to post agent message to slack"))
+			return
+		}
+
+		comment := target.NewComment(agentCtx, message, botUser, ts)
+
+		if err := x.repository.PutTicketComment(agentCtx, comment); err != nil {
+			logger.Error("failed to record agent message as comment", "error", err)
+			// Continue execution even if comment recording fails
+		}
+	}
+
 	agent := gollem.New(x.llmClient,
 		gollem.WithHistory(history),
 		gollem.WithToolSets(tools...),
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
-			if x.slackService == nil || target.SlackThread == nil {
-				return nil
-			}
-			if strings.TrimSpace(message) == "" {
-				return nil
-			}
-
-			// Set agent context for agent messages
-			agentCtx := user.WithAgent(user.WithUserID(ctx, x.slackService.BotID()))
-
-			// Record agent message as TicketComment
-			// Create bot user for agent messages
-			botUser := &slack.User{
-				ID:   x.slackService.BotID(),
-				Name: "Warren",
-			}
-
-			// Post agent message to Slack and get message ID
-			threadSvc := x.slackService.NewThread(*target.SlackThread)
-			ts, err := threadSvc.PostCommentWithMessageID(ctx, "💬 "+message)
-			if err != nil {
-				errs.Handle(ctx, goerr.Wrap(err, "failed to post agent message to slack"))
-				return nil
-			}
-
-			comment := target.NewComment(agentCtx, message, botUser, ts)
-
-			if err := x.repository.PutTicketComment(agentCtx, comment); err != nil {
-				logger.Error("failed to record agent message as comment", "error", err)
-				// Continue execution even if comment recording fails
-			}
-
+			msg.Trace(ctx, "💭 %s", message)
 			return nil
 		}),
 		gollem.WithToolErrorHook(func(ctx context.Context, err error, call gollem.FunctionCall) error {
@@ -167,26 +167,80 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		return goerr.Wrap(err, "failed to build system prompt")
 	}
 
-	logger.Debug("run prompt", "prompt", message, "history", history, "ticket", target, "history_record", historyRecord)
+	// logger.Debug("run prompt", "prompt", message, "history", history, "ticket", target, "history_record", historyRecord)
 
-	err = agent.Execute(ctx, message, gollem.WithSystemPrompt(systemPrompt))
+	// Create updatable message function for plan progress tracking
+	progressUpdate := msg.NewUpdatable(ctx, "Initializing AI plan...")
+
+	// Always use plan mode for comprehensive task handling
+	plan, err := agent.Plan(ctx, message,
+		gollem.WithPlanLanguage("Japanese"),
+		gollem.WithPlanSystemPrompt(systemPrompt),
+		gollem.WithPlanCreatedHook(func(ctx context.Context, plan *gollem.Plan) error {
+			return updatePlanProgress(progressUpdate, plan, "Plan created")
+		}),
+		gollem.WithPlanToDoStartHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
+			msg.Trace(ctx, "🚀 Starting: %s", todo.Description)
+			return nil
+		}),
+		gollem.WithPlanToDoCompletedHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
+			return updatePlanProgress(progressUpdate, plan, fmt.Sprintf("Completed: %s", todo.Description))
+		}),
+		gollem.WithPlanToDoUpdatedHook(func(ctx context.Context, plan *gollem.Plan, changes []gollem.PlanToDoChange) error {
+			if len(changes) == 0 {
+				return nil
+			}
+
+			msg.Trace(ctx, "📝 Plan updated (%d todos)", len(changes))
+			return nil
+		}),
+	)
 	if err != nil {
-		return goerr.Wrap(err, "failed to execute")
+		return goerr.Wrap(err, "failed to create plan")
 	}
 
-	// Get the updated history from the agent's current session
-	newHistory := agent.Session().History()
+	ctx = msg.NewTrace(ctx, "🚀 Executing plan...")
+
+	execResp, err := plan.Execute(ctx)
+	if err != nil {
+		return goerr.Wrap(err, "failed to execute plan")
+	}
+
+	if len(execResp) > 0 {
+		logging.From(ctx).Debug("message notify", "from", "ExecResponse", "message", execResp)
+		postWarrenMessage(ctx, message)
+	}
+
+	// Count completed tasks
+	todos := plan.GetToDos()
+	completedCount := 0
+	for _, todo := range todos {
+		if todo.Completed {
+			completedCount++
+		}
+	}
+	ctx = msg.Trace(ctx, "✅ Plan execution completed (%d/%d tasks)", completedCount, len(todos))
+
+	// Get the updated history from the plan's session
+	session := plan.Session()
+	if session == nil {
+		logger.Warn("plan session is nil after execution")
+		// Skip history saving when session is unavailable
+		return nil
+	}
+
+	newHistory := session.History()
 	if newHistory == nil {
-		return goerr.New("failed to get history from agent")
+		return goerr.New("failed to get history from plan session")
 	}
 
 	newRecord := ticket.NewHistory(ctx, target.ID)
 
-	if err = storageSvc.PutHistory(ctx, target.ID, newRecord.ID, newHistory); err != nil {
+	if err := storageSvc.PutHistory(ctx, target.ID, newRecord.ID, newHistory); err != nil {
 		return goerr.Wrap(err, "failed to put history")
 	}
 
-	if err = x.repository.PutHistory(ctx, target.ID, &newRecord); err != nil {
+	if err := x.repository.PutHistory(ctx, target.ID, &newRecord); err != nil {
 		return goerr.Wrap(err, "failed to put history")
 	}
 
@@ -285,4 +339,59 @@ func (x *UseCases) generateInitialTicketComment(ctx context.Context, ticketData 
 	}
 
 	return response.Texts[0], nil
+}
+
+// updatePlanProgress formats and updates the plan progress message using an updatable message function
+func updatePlanProgress(updateFunc func(ctx context.Context, msg string), plan *gollem.Plan, action string) error {
+	todos := plan.GetToDos()
+	if len(todos) == 0 {
+		updateFunc(context.Background(), fmt.Sprintf("🤖 **%s** (no tasks yet)", action))
+		return nil
+	}
+
+	// Count completed tasks
+	completedCount := 0
+	for _, todo := range todos {
+		if todo.Completed {
+			completedCount++
+		}
+	}
+
+	// Build complete message with all task details
+	var messageBuilder strings.Builder
+	messageBuilder.WriteString(fmt.Sprintf("🤖 **%s**\n\n", action))
+	messageBuilder.WriteString(fmt.Sprintf("**Progress: %d/%d tasks completed**\n\n", completedCount, len(todos)))
+
+	// Add task list with status indicators
+	for _, todo := range todos {
+		var status string
+		var icon string
+
+		switch todo.Status {
+		case "Pending":
+			status = todo.Description
+			icon = "☑️"
+		case "Executing":
+			status = todo.Description
+			icon = "⟳"
+		case "Completed":
+			// Strike-through for completed tasks
+			status = fmt.Sprintf("~~%s~~", todo.Description)
+			icon = "✅"
+		case "Failed":
+			status = fmt.Sprintf("%s (FAILED)", todo.Description)
+			icon = "❌"
+		case "Skipped":
+			status = fmt.Sprintf("~~%s~~ (skipped)", todo.Description)
+			icon = "⏭"
+		default:
+			status = todo.Description
+			icon = "?"
+		}
+
+		messageBuilder.WriteString(fmt.Sprintf("%s %s\n", icon, status))
+	}
+
+	updateFunc(context.Background(), messageBuilder.String())
+	return nil
 }

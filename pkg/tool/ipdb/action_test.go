@@ -25,7 +25,7 @@ func TestIPDB(t *testing.T) {
 	}{
 		{
 			name:     "valid ip response",
-			funcName: "ipdb.check",
+			funcName: "ipdb_check",
 			args: map[string]any{
 				"target": "8.8.8.8",
 			},
@@ -50,7 +50,7 @@ func TestIPDB(t *testing.T) {
 		},
 		{
 			name:     "valid ip response with maxAgeInDays",
-			funcName: "ipdb.check",
+			funcName: "ipdb_check",
 			args: map[string]any{
 				"target":       "8.8.8.8",
 				"maxAgeInDays": float64(90),
@@ -76,7 +76,7 @@ func TestIPDB(t *testing.T) {
 		},
 		{
 			name:     "api error response",
-			funcName: "ipdb.check",
+			funcName: "ipdb_check",
 			args: map[string]any{
 				"target": "8.8.8.8",
 			},
@@ -86,7 +86,7 @@ func TestIPDB(t *testing.T) {
 		},
 		{
 			name:     "invalid ip response",
-			funcName: "ipdb.check",
+			funcName: "ipdb_check",
 			args: map[string]any{
 				"target": "invalid-ip",
 			},
@@ -155,7 +155,7 @@ func TestIPDB_Specs(t *testing.T) {
 	// Verify specific tool specification
 	var found bool
 	for _, spec := range specs {
-		if spec.Name == "ipdb.check" {
+		if spec.Name == "ipdb_check" {
 			found = true
 			gt.Value(t, spec.Description).Equal("Check IP address information from AbuseIPDB.")
 			break
@@ -197,7 +197,7 @@ func TestSendRequest(t *testing.T) {
 		Name:  "ipdb",
 		Flags: act.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			resp, err := act.Run(ctx, "ipdb.check", map[string]any{
+			resp, err := act.Run(ctx, "ipdb_check", map[string]any{
 				"target": vars.Get("TEST_IPDB_TARGET_IPADDR"),
 			})
 			gt.NoError(t, err)

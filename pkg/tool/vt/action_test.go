@@ -25,7 +25,7 @@ func TestVT(t *testing.T) {
 	}{
 		{
 			name:     "valid domain response",
-			funcName: "vt.domain",
+			funcName: "vt_domain",
 			args: map[string]any{
 				"target": "example.com",
 			},
@@ -45,7 +45,7 @@ func TestVT(t *testing.T) {
 		},
 		{
 			name:     "valid ip response",
-			funcName: "vt.ip",
+			funcName: "vt_ip",
 			args: map[string]any{
 				"target": "8.8.8.8",
 			},
@@ -65,7 +65,7 @@ func TestVT(t *testing.T) {
 		},
 		{
 			name:     "valid file hash response",
-			funcName: "vt.file_hash",
+			funcName: "vt_file_hash",
 			args: map[string]any{
 				"target": "44d88612fea8a8f36de82e1278abb02f",
 			},
@@ -85,7 +85,7 @@ func TestVT(t *testing.T) {
 		},
 		{
 			name:     "valid url response",
-			funcName: "vt.url",
+			funcName: "vt_url",
 			args: map[string]any{
 				"target": "https://example.com",
 			},
@@ -105,7 +105,7 @@ func TestVT(t *testing.T) {
 		},
 		{
 			name:     "api error response",
-			funcName: "vt.domain",
+			funcName: "vt_domain",
 			args: map[string]any{
 				"target": "example.com",
 			},
@@ -115,7 +115,7 @@ func TestVT(t *testing.T) {
 		},
 		{
 			name:     "api unauthorized response",
-			funcName: "vt.domain",
+			funcName: "vt_domain",
 			args: map[string]any{
 				"target": "example.com",
 			},
@@ -183,7 +183,7 @@ func TestVT_Specs(t *testing.T) {
 	// Verify specific tool specification
 	var found bool
 	for _, spec := range specs {
-		if spec.Name == "vt.ip" {
+		if spec.Name == "vt_ip" {
 			found = true
 			gt.Value(t, spec.Description).Equal("Search the indicator of IPv4/IPv6 from VirusTotal.")
 			break
@@ -225,7 +225,7 @@ func TestSendRequest(t *testing.T) {
 		Name:  "vt",
 		Flags: act.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			resp, err := act.Run(ctx, "vt.ip", map[string]any{
+			resp, err := act.Run(ctx, "vt_ip", map[string]any{
 				"target": vars.Get("TEST_VT_TARGET_IPADDR"),
 			})
 			gt.NoError(t, err)

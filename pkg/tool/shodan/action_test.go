@@ -25,7 +25,7 @@ func TestShodan(t *testing.T) {
 	}{
 		{
 			name:     "valid host response",
-			funcName: "shodan.host",
+			funcName: "shodan_host",
 			args: map[string]any{
 				"target": "8.8.8.8",
 			},
@@ -40,7 +40,7 @@ func TestShodan(t *testing.T) {
 		},
 		{
 			name:     "valid domain response",
-			funcName: "shodan.domain",
+			funcName: "shodan_domain",
 			args: map[string]any{
 				"target": "example.com",
 			},
@@ -55,7 +55,7 @@ func TestShodan(t *testing.T) {
 		},
 		{
 			name:     "valid search response",
-			funcName: "shodan.search",
+			funcName: "shodan_search",
 			args: map[string]any{
 				"query": "apache",
 				"limit": float64(2),
@@ -78,7 +78,7 @@ func TestShodan(t *testing.T) {
 		},
 		{
 			name:     "api error response",
-			funcName: "shodan.host",
+			funcName: "shodan_host",
 			args: map[string]any{
 				"target": "8.8.8.8",
 			},
@@ -88,7 +88,7 @@ func TestShodan(t *testing.T) {
 		},
 		{
 			name:     "invalid host response",
-			funcName: "shodan.host",
+			funcName: "shodan_host",
 			args: map[string]any{
 				"target": "invalid-ip",
 			},
@@ -150,10 +150,10 @@ func TestShodan_Specs(t *testing.T) {
 	// Verify each tool specification
 	for _, spec := range specs {
 		switch spec.Name {
-		case "shodan.host", "shodan.domain":
+		case "shodan_host", "shodan_domain":
 			gt.Map(t, spec.Parameters).HasKey("target")
 			gt.Value(t, spec.Parameters["target"].Type).Equal("string")
-		case "shodan.search":
+		case "shodan_search":
 			gt.Map(t, spec.Parameters).HasKey("query")
 			gt.Value(t, spec.Parameters["query"].Type).Equal("string")
 			gt.Map(t, spec.Parameters).HasKey("limit")
@@ -164,7 +164,7 @@ func TestShodan_Specs(t *testing.T) {
 	// Verify specific tool specification
 	var found bool
 	for _, spec := range specs {
-		if spec.Name == "shodan.host" {
+		if spec.Name == "shodan_host" {
 			found = true
 			gt.Value(t, spec.Description).Equal("Search the host information from Shodan.")
 			break
@@ -206,7 +206,7 @@ func TestSendRequest(t *testing.T) {
 		Name:  "shodan",
 		Flags: act.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			resp, err := act.Run(ctx, "shodan.host", map[string]any{
+			resp, err := act.Run(ctx, "shodan_host", map[string]any{
 				"target": vars.Get("TEST_SHODAN_TARGET_IPADDR"),
 			})
 			gt.NoError(t, err)

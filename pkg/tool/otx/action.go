@@ -55,7 +55,7 @@ func (x *Action) Flags() []cli.Flag {
 func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return []gollem.ToolSpec{
 		{
-			Name:        "otx.ipv4",
+			Name:        "otx_ipv4",
 			Description: "Search the indicator of IPv4 from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -63,9 +63,10 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The IPv4 address to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 		{
-			Name:        "otx.domain",
+			Name:        "otx_domain",
 			Description: "Search the indicator of domain from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -73,9 +74,10 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The domain to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 		{
-			Name:        "otx.ipv6",
+			Name:        "otx_ipv6",
 			Description: "Search the indicator of IPv6 from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -83,9 +85,10 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The IPv6 address to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 		{
-			Name:        "otx.hostname",
+			Name:        "otx_hostname",
 			Description: "Search the indicator of hostname from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -93,9 +96,10 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The hostname to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 		{
-			Name:        "otx.file_hash",
+			Name:        "otx_file_hash",
 			Description: "Search the indicator of file hash from OTX.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -103,6 +107,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The file hash to search",
 				},
 			},
+			Required: []string{"target"},
 		},
 	}, nil
 }
@@ -117,19 +122,19 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 
 	// Determine which indicator type was provided based on function name
 	switch name {
-	case "otx.domain":
+	case "otx_domain":
 		indicator = args["target"].(string)
 		indicatorType = "domain"
-	case "otx.ipv4":
+	case "otx_ipv4":
 		indicator = args["target"].(string)
 		indicatorType = "IPv4"
-	case "otx.ipv6":
+	case "otx_ipv6":
 		indicator = args["target"].(string)
 		indicatorType = "IPv6"
-	case "otx.hostname":
+	case "otx_hostname":
 		indicator = args["target"].(string)
 		indicatorType = "hostname"
-	case "otx.file_hash":
+	case "otx_file_hash":
 		indicator = args["target"].(string)
 		indicatorType = "file"
 	default:
@@ -150,21 +155,21 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	}
 	defer safe.Close(ctx, resp.Body)
 
+	eb := goerr.NewBuilder(goerr.V("status", resp.StatusCode), goerr.V("header", resp.Header))
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, goerr.New("failed to query OTX",
-			goerr.V("status_code", resp.StatusCode),
-			goerr.V("body", string(body)))
+		return nil, eb.New("failed to query OTX", goerr.V("body", string(body)))
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to read response body")
+		return nil, eb.Wrap(err, "failed to read response body")
 	}
 
 	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, goerr.Wrap(err, "failed to unmarshal response")
+		return nil, eb.Wrap(err, "failed to unmarshal response", goerr.V("body", body))
 	}
 
 	return result, nil

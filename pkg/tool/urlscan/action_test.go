@@ -25,7 +25,7 @@ func TestURLScan(t *testing.T) {
 	}{
 		{
 			name:     "valid scan response",
-			funcName: "urlscan.scan",
+			funcName: "urlscan_scan",
 			args: map[string]any{
 				"url": "https://example.com",
 			},
@@ -36,7 +36,7 @@ func TestURLScan(t *testing.T) {
 		},
 		{
 			name:     "api error response",
-			funcName: "urlscan.scan",
+			funcName: "urlscan_scan",
 			args: map[string]any{
 				"url": "https://example.com",
 			},
@@ -46,7 +46,7 @@ func TestURLScan(t *testing.T) {
 		},
 		{
 			name:     "api unauthorized response",
-			funcName: "urlscan.scan",
+			funcName: "urlscan_scan",
 			args: map[string]any{
 				"url": "https://example.com",
 			},
@@ -108,7 +108,7 @@ func TestURLScan_Specs(t *testing.T) {
 
 	// Verify tool specification
 	spec := specs[0]
-	gt.Value(t, spec.Name).Equal("urlscan.scan")
+	gt.Value(t, spec.Name).Equal("urlscan_scan")
 	gt.Value(t, spec.Description).Equal("Scan a URL with URLScan")
 	gt.Map(t, spec.Parameters).HasKey("url")
 	gt.Value(t, spec.Parameters["url"].Type).Equal("string")
@@ -147,7 +147,7 @@ func TestSendRequest(t *testing.T) {
 		Name:  "urlscan",
 		Flags: act.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			resp, err := act.Run(ctx, "urlscan.scan", map[string]any{
+			resp, err := act.Run(ctx, "urlscan_scan", map[string]any{
 				"url": vars.Get("TEST_URLSCAN_TARGET_URL"),
 			})
 			gt.NoError(t, err)

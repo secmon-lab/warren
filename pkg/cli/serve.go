@@ -9,37 +9,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
-
-// llmEmbeddingAdapter adapts gollem.LLMClient to interfaces.EmbeddingClient
-type llmEmbeddingAdapter struct {
-	client gollem.LLMClient
-}
-
-// Embeddings implements interfaces.EmbeddingClient.Embeddings
-func (a *llmEmbeddingAdapter) Embeddings(ctx context.Context, texts []string, dimensionality int) ([][]float32, error) {
-	embeddings, err := a.client.GenerateEmbedding(ctx, dimensionality, texts)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert from [][]float64 to [][]float32
-	result := make([][]float32, len(embeddings))
-	for i, embedding := range embeddings {
-		result[i] = make([]float32, len(embedding))
-		for j, val := range embedding {
-			result[i][j] = float32(val)
-		}
-	}
-
-	return result, nil
-}
 
 func cmdServe() *cli.Command {
 	var (
@@ -50,7 +25,7 @@ func cmdServe() *cli.Command {
 		policyCfg      config.Policy
 		sentryCfg      config.Sentry
 		slackCfg       config.Slack
-		geminiCfg      config.GeminiCfg
+		llmCfg         config.LLMCfg
 		firestoreCfg   config.Firestore
 		storageCfg     config.Storage
 	)
@@ -84,7 +59,7 @@ func cmdServe() *cli.Command {
 		policyCfg.Flags(),
 		sentryCfg.Flags(),
 		slackCfg.Flags(),
-		geminiCfg.Flags(),
+		llmCfg.Flags(),
 		firestoreCfg.Flags(),
 		tools.Flags(),
 		storageCfg.Flags(),
@@ -104,7 +79,7 @@ func cmdServe() *cli.Command {
 				"policy", policyCfg,
 				"sentry", sentryCfg,
 				"slack", slackCfg,
-				"gemini", geminiCfg,
+				"llm", llmCfg,
 				"firestore", firestoreCfg,
 				"storage", storageCfg,
 			)
@@ -114,7 +89,8 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			geminiModel, err := geminiCfg.Configure(ctx)
+			// Configure LLM client (automatically selects Claude if available, otherwise Gemini)
+			llmClient, err := llmCfg.Configure(ctx)
 			if err != nil {
 				return err
 			}
@@ -139,8 +115,11 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			// Create embedding adapter from LLM client
-			embeddingAdapter := &llmEmbeddingAdapter{client: geminiModel}
+			// Create embedding client using unified LLM configuration
+			embeddingAdapter, err := llmCfg.ConfigureEmbeddingClient(ctx)
+			if err != nil {
+				return err
+			}
 
 			// Inject dependencies into tools that support them
 			tools.InjectDependencies(firestore, embeddingAdapter)
@@ -151,7 +130,7 @@ func cmdServe() *cli.Command {
 			}
 
 			ucOptions := []usecase.Option{
-				usecase.WithLLMClient(geminiModel),
+				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(firestore),
 				usecase.WithSlackService(slackSvc),

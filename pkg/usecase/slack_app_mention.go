@@ -18,7 +18,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 	logger.Debug("slack app mention event", "mention", slackMsg.Mention(), "slack_thread", slackMsg.Thread())
 
 	threadSvc := uc.slackService.NewThread(slackMsg.Thread())
-	ctx = msg.With(ctx, threadSvc.Reply, threadSvc.NewStateFunc)
+	ctx = msg.WithUpdatable(ctx, threadSvc.Reply, threadSvc.NewStateFunc, threadSvc.NewUpdatableMessage)
 	if slackMsg.User() != nil {
 		ctx = user.WithUserID(ctx, slackMsg.User().ID)
 	}

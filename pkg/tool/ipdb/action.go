@@ -55,7 +55,7 @@ func (x *Action) Flags() []cli.Flag {
 func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return []gollem.ToolSpec{
 		{
-			Name:        "ipdb.check",
+			Name:        "ipdb_check",
 			Description: "Check IP address information from AbuseIPDB.",
 			Parameters: map[string]*gollem.Parameter{
 				"target": {
@@ -81,7 +81,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 
 	// Determine which function was called
 	switch name {
-	case "ipdb.check":
+	case "ipdb_check":
 		ipAddress = args["target"].(string)
 	default:
 		return nil, goerr.New("invalid function name", goerr.V("name", name))

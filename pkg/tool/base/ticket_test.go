@@ -47,7 +47,7 @@ func TestWarren_UpdateFinding(t *testing.T) {
 			"recommendation": "Review user account and consider temporary suspension",
 		}
 
-		result, err := warren.Run(ctx, "warren.update_finding", args)
+		result, err := warren.Run(ctx, "warren_update_finding", args)
 		gt.NoError(t, err)
 
 		// Verify result structure
@@ -75,7 +75,7 @@ func TestWarren_UpdateFinding(t *testing.T) {
 			"recommendation": "Test recommendation",
 		}
 
-		_, err := warren.Run(ctx, "warren.update_finding", args)
+		_, err := warren.Run(ctx, "warren_update_finding", args)
 		gt.Error(t, err)
 	})
 
@@ -87,7 +87,7 @@ func TestWarren_UpdateFinding(t *testing.T) {
 			// missing recommendation
 		}
 
-		_, err := warren.Run(ctx, "warren.update_finding", args)
+		_, err := warren.Run(ctx, "warren_update_finding", args)
 		gt.Error(t, err)
 	})
 }
@@ -135,7 +135,7 @@ func TestWarren_UpdateFindingWithSlackCallback(t *testing.T) {
 			"recommendation": "Monitor closely",
 		}
 
-		result, err := warren.Run(ctx, "warren.update_finding", args)
+		result, err := warren.Run(ctx, "warren_update_finding", args)
 		gt.NoError(t, err)
 
 		// Verify Slack update was called
@@ -157,14 +157,14 @@ func TestWarren_Specs(t *testing.T) {
 	// Find the update_finding command spec
 	var updateFindingSpec *gollem.ToolSpec
 	for i, spec := range specs {
-		if spec.Name == "warren.update_finding" {
+		if spec.Name == "warren_update_finding" {
 			updateFindingSpec = &specs[i]
 			break
 		}
 	}
 
 	gt.NotNil(t, updateFindingSpec)
-	gt.Value(t, updateFindingSpec.Name).Equal("warren.update_finding")
+	gt.Value(t, updateFindingSpec.Name).Equal("warren_update_finding")
 
 	// Check description contains expected text
 	description := updateFindingSpec.Description
@@ -258,7 +258,7 @@ func TestWarren_UpdateFindingDryRun(t *testing.T) {
 				"recommendation": "Test recommendation",
 			}
 
-			_, err := warren.Run(ctx, "warren.update_finding", args)
+			_, err := warren.Run(ctx, "warren_update_finding", args)
 			gt.NoError(t, err)
 
 			// Verify expectations
