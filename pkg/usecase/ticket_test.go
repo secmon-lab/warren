@@ -56,6 +56,10 @@ func TestCreateManualTicket(t *testing.T) {
 			gt.Array(t, ticket.AlertIDs).Length(0)         // Should be empty array
 			gt.Value(t, ticket.Metadata.Summary).Equal("") // Should be empty per requirements
 
+			// Verify source fields are set to human for manual tickets
+			gt.Value(t, ticket.Metadata.TitleSource).Equal(types.SourceHuman)
+			gt.Value(t, ticket.Metadata.DescriptionSource).Equal(types.SourceHuman)
+
 			// Verify embedding was generated for manual tickets (title + description only)
 			if tc.title != "" {
 				gt.Array(t, ticket.Embedding).Length(256) // Mock returns 256-dimensional vector
@@ -200,6 +204,10 @@ func TestUpdateTicketSlackIntegration(t *testing.T) {
 	gt.Value(t, updatedTicket.Metadata.Title).Equal("Updated Title")
 	gt.Value(t, updatedTicket.Metadata.Description).Equal("Updated Description")
 
+	// Verify source fields are set to human for manual updates
+	gt.Value(t, updatedTicket.Metadata.TitleSource).Equal(types.SourceHuman)
+	gt.Value(t, updatedTicket.Metadata.DescriptionSource).Equal(types.SourceHuman)
+
 	// Test updating ticket status
 	updatedTicket, err = uc.UpdateTicketStatus(ctx, ticket.ID, types.TicketStatus("resolved"))
 	gt.NoError(t, err)
@@ -286,6 +294,12 @@ func TestCreateTicketFromAlerts(t *testing.T) {
 		gt.Value(t, ticket).NotNil()
 		gt.Array(t, ticket.AlertIDs).Length(2)
 		gt.Value(t, ticket.Assignee).Equal(user)
+
+		// For multi-alert tickets, title and description should be AI-generated
+		gt.Value(t, ticket.Metadata.TitleSource).Equal(types.SourceAI)
+		gt.Value(t, ticket.Metadata.DescriptionSource).Equal(types.SourceAI)
+		gt.Value(t, ticket.Metadata.Title).NotEqual("")       // Should have AI-generated content
+		gt.Value(t, ticket.Metadata.Description).NotEqual("") // Should have AI-generated content
 
 		// Verify alerts are now bound to the ticket
 		updatedAlert1, err := repo.GetAlert(ctx, alert1.ID)
@@ -387,5 +401,46 @@ func TestCreateTicketFromAlerts(t *testing.T) {
 		if !strings.Contains(errorMsg, "some alerts not found") {
 			t.Errorf("Expected error to contain 'some alerts not found', got: %s", errorMsg)
 		}
+	})
+
+	t.Run("single alert inheritance behavior", func(t *testing.T) {
+		// Create test alert with specific metadata and sources
+		singleAlert := &alert.Alert{
+			ID:       types.NewAlertID(),
+			TicketID: types.EmptyTicketID,
+			Metadata: alert.Metadata{
+				Title:             "Inherited Alert Title",
+				Description:       "Inherited Alert Description",
+				TitleSource:       types.SourceAI, // Simulating AI-generated alert metadata
+				DescriptionSource: types.SourceAI,
+			},
+			Embedding: make([]float32, 256),
+		}
+
+		// Store alert in repository
+		err := repo.PutAlert(ctx, *singleAlert)
+		gt.NoError(t, err)
+
+		user := &slack.User{ID: "user1", Name: "Test User"}
+		alertIDs := []types.AlertID{singleAlert.ID}
+
+		// Create ticket from single alert (should inherit metadata)
+		ticket, err := uc.CreateTicketFromAlerts(ctx, alertIDs, user, nil)
+
+		gt.NoError(t, err)
+		gt.Value(t, ticket).NotNil()
+		gt.Array(t, ticket.AlertIDs).Length(1)
+		gt.Value(t, ticket.Assignee).Equal(user)
+
+		// For single alert tickets, metadata should be inherited
+		gt.Value(t, ticket.Metadata.Title).Equal("Inherited Alert Title")
+		gt.Value(t, ticket.Metadata.Description).Equal("Inherited Alert Description")
+		gt.Value(t, ticket.Metadata.TitleSource).Equal(types.SourceAI)       // Should inherit source
+		gt.Value(t, ticket.Metadata.DescriptionSource).Equal(types.SourceAI) // Should inherit source
+
+		// Verify alert is bound to the ticket
+		updatedAlert, err := repo.GetAlert(ctx, singleAlert.ID)
+		gt.NoError(t, err)
+		gt.Value(t, updatedAlert.TicketID).Equal(ticket.ID)
 	})
 }

@@ -20,11 +20,13 @@ type TicketCreationOptions struct {
 	Assignee             *slack.User
 	Title                string
 	Description          string
-	FillMetadata         bool // Whether to use LLM to fill metadata
-	IsTest               bool // Whether this is a test ticket
-	ValidateAlerts       bool // Whether to validate alerts exist and are unbound
-	UpdateAlerts         bool // Whether to update alerts with ticket ID
-	AutoInheritFromAlert bool // Whether to auto-inherit metadata from single alert
+	TitleSource          types.Source // Source of title
+	DescriptionSource    types.Source // Source of description
+	FillMetadata         bool         // Whether to use LLM to fill metadata
+	IsTest               bool         // Whether this is a test ticket
+	ValidateAlerts       bool         // Whether to validate alerts exist and are unbound
+	UpdateAlerts         bool         // Whether to update alerts with ticket ID
+	AutoInheritFromAlert bool         // Whether to auto-inherit metadata from single alert
 }
 
 // TicketUpdateFunction defines a function that updates a ticket
@@ -82,6 +84,8 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 		alert := alerts[0]
 		newTicket.Metadata.Title = alert.Metadata.Title
 		newTicket.Metadata.Description = alert.Metadata.Description
+		newTicket.Metadata.TitleSource = alert.Metadata.TitleSource
+		newTicket.Metadata.DescriptionSource = alert.Metadata.DescriptionSource
 		newTicket.Embedding = alert.Embedding
 	} else {
 		// Set metadata from options
@@ -91,8 +95,36 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 		if opts.Description != "" {
 			newTicket.Metadata.Description = opts.Description
 		}
+		// Set sources from options regardless of content
+		if opts.TitleSource != "" {
+			newTicket.Metadata.TitleSource = opts.TitleSource
+		}
+		if opts.DescriptionSource != "" {
+			newTicket.Metadata.DescriptionSource = opts.DescriptionSource
+		}
 
-		// Fill metadata using LLM if requested
+		// Set sources based on whether content was provided or should be AI-generated
+		// Only set sources if they haven't been explicitly set in options
+		if newTicket.Metadata.TitleSource == "" {
+			if opts.TitleSource != "" {
+				newTicket.Metadata.TitleSource = opts.TitleSource
+			} else if opts.Title != "" {
+				newTicket.Metadata.TitleSource = types.SourceHuman
+			} else {
+				newTicket.Metadata.TitleSource = types.SourceAI
+			}
+		}
+		if newTicket.Metadata.DescriptionSource == "" {
+			if opts.DescriptionSource != "" {
+				newTicket.Metadata.DescriptionSource = opts.DescriptionSource
+			} else if opts.Description != "" {
+				newTicket.Metadata.DescriptionSource = types.SourceHuman
+			} else {
+				newTicket.Metadata.DescriptionSource = types.SourceAI
+			}
+		}
+
+		// Fill metadata using LLM for fields marked as SourceAI
 		if opts.FillMetadata {
 			if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
 				return nil, goerr.Wrap(err, "failed to fill ticket metadata")
@@ -300,9 +332,11 @@ func (uc *UseCases) CreateManualTicketWithTest(ctx context.Context, title, descr
 		Description:          description,
 		FillMetadata:         false, // Manual tickets don't use LLM to fill metadata
 		IsTest:               isTest,
-		ValidateAlerts:       false, // No alerts to validate
-		UpdateAlerts:         false, // No alerts to update
-		AutoInheritFromAlert: false, // Manual ticket, no inheritance
+		ValidateAlerts:       false,             // No alerts to validate
+		UpdateAlerts:         false,             // No alerts to update
+		AutoInheritFromAlert: false,             // Manual ticket, no inheritance
+		TitleSource:          types.SourceHuman, // Manual title is human-generated
+		DescriptionSource:    types.SourceHuman, // Manual description is human-generated
 	}
 
 	return uc.createTicket(ctx, opts)
@@ -372,6 +406,9 @@ func (uc *UseCases) UpdateTicket(ctx context.Context, ticketID types.TicketID, t
 		// Update metadata
 		ticket.Metadata.Title = title
 		ticket.Metadata.Description = description
+		// Manual updates (like from GraphQL) are human-generated
+		ticket.Metadata.TitleSource = types.SourceHuman
+		ticket.Metadata.DescriptionSource = types.SourceHuman
 
 		// Recalculate embedding since title/description changed
 		if err := ticket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
@@ -474,6 +511,8 @@ func (uc *UseCases) CreateTicketFromAlerts(ctx context.Context, alertIDs []types
 		ValidateAlerts:       true, // Validate alerts exist and are unbound
 		UpdateAlerts:         true, // Update alerts with ticket ID
 		AutoInheritFromAlert: true, // Auto-inherit from single alert
+		TitleSource:          "",   // Will be set in logic based on inheritance or AI
+		DescriptionSource:    "",   // Will be set in logic based on inheritance or AI
 	}
 
 	return uc.createTicket(ctx, opts)

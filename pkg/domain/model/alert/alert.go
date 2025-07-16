@@ -45,9 +45,11 @@ type QueryOutput struct {
 }
 
 type Metadata struct {
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
-	Attributes  []Attribute `json:"attributes"`
+	Title             string       `json:"title"`
+	Description       string       `json:"description"`
+	Attributes        []Attribute  `json:"attributes"`
+	TitleSource       types.Source `json:"title_source"`
+	DescriptionSource types.Source `json:"description_source"`
 }
 
 func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metadata) Alert {
@@ -65,6 +67,14 @@ func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metad
 	}
 	if newAlert.Metadata.Description == "" {
 		newAlert.Metadata.Description = DefaultAlertDescription
+	}
+
+	// Set default sources if not specified
+	if newAlert.Metadata.TitleSource == "" {
+		newAlert.Metadata.TitleSource = types.SourceHuman // Default alert metadata is human-provided
+	}
+	if newAlert.Metadata.DescriptionSource == "" {
+		newAlert.Metadata.DescriptionSource = types.SourceHuman // Default alert metadata is human-provided
 	}
 
 	return newAlert
@@ -140,10 +150,12 @@ func (x *Alert) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) er
 
 		if x.Metadata.Title == "" || x.Metadata.Title == DefaultAlertTitle {
 			x.Metadata.Title = resp.Title
+			x.Metadata.TitleSource = types.SourceAI
 		}
 
 		if x.Metadata.Description == "" || x.Metadata.Description == DefaultAlertDescription {
 			x.Metadata.Description = resp.Description
+			x.Metadata.DescriptionSource = types.SourceAI
 		}
 
 		for _, resAttr := range resp.Attributes {
