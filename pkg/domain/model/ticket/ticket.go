@@ -167,27 +167,15 @@ func (x *Ticket) FillMetadata(ctx context.Context, llmClient gollem.LLMClient, a
 	}
 
 	meta, err := llm.Ask(ctx, llmClient, metaPrompt, llm.WithValidate(func(meta Metadata) error {
-		// Validate that generated content has required fields
-		if meta.Title == "" {
-			return goerr.New("title is required")
+		if err := meta.Validate(); err != nil {
+			return err
 		}
+
+		// For AI-generated metadata, description is also required.
 		if meta.Description == "" {
 			return goerr.New("description is required")
 		}
-		// Set sources for validation
-		if meta.TitleSource == "" {
-			meta.TitleSource = types.SourceAI
-		}
-		if meta.DescriptionSource == "" {
-			meta.DescriptionSource = types.SourceAI
-		}
-		// Validate source fields only
-		if err := meta.TitleSource.Validate(); err != nil {
-			return goerr.Wrap(err, "invalid title source")
-		}
-		if err := meta.DescriptionSource.Validate(); err != nil {
-			return goerr.Wrap(err, "invalid description source")
-		}
+
 		return nil
 	}))
 	if err != nil {
