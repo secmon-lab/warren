@@ -63,62 +63,19 @@ func TestSlackActionAckAlert(t *testing.T) {
 			}, nil
 		},
 	}
-	llmCallCount := 0
+	// For single alert tickets, no LLM calls should be made since metadata is inherited
 	llmMock := &gollem_mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &gollem_mock.SessionMock{
 				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
-					llmCallCount++
-					switch llmCallCount {
-					case 1:
-						// creating summary
-						checkMockCaller(t, 2,
-							"github.com/secmon-lab/warren/pkg/domain/model/ticket",
-							"(*Ticket).FillMetadata",
-						)
-						return &gollem.Response{
-							Texts: []string{
-								`{"title": "test title", "description": "test description"}`,
-							},
-						}, nil
-
-					case 2:
-						// summarize ticket
-						checkMockCaller(t, 2,
-							"github.com/secmon-lab/warren/pkg/domain/model/ticket",
-							"(*Ticket).FillMetadata",
-						)
-						return &gollem.Response{
-							Texts: []string{
-								`{"title": "test title", "description": "test description", "summary": "test summary"}`,
-							},
-						}, nil
-
-					case 3:
-						// ack alerts (now calls CreateTicketFromAlerts after refactoring)
-						checkMockCaller(t, 2,
-							"github.com/secmon-lab/warren/pkg/usecase",
-							"(*UseCases).CreateTicketFromAlerts",
-						)
-						return &gollem.Response{
-							Texts: []string{
-								`{"title": "test title", "description": "test description", "summary": "test summary"}`,
-							},
-						}, nil
-
-					default:
-						return nil, goerr.New("unexpected call")
-					}
+					t.Fatal("LLM should not be called for single alert ticket - metadata should be inherited")
+					return nil, nil
 				},
 			}, nil
 		},
 		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, inputs []string) ([][]float64, error) {
-			// Return mock embedding data with correct dimension
-			embedding := make([]float64, dimension)
-			for i := range embedding {
-				embedding[i] = 0.1 + float64(i)*0.01 // Generate some test values
-			}
-			return [][]float64{embedding}, nil
+			t.Fatal("LLM embedding should not be called for single alert ticket - embedding should be inherited")
+			return nil, nil
 		},
 	}
 
@@ -130,7 +87,7 @@ func TestSlackActionAckAlert(t *testing.T) {
 	testAlert := &alert.Alert{
 		ID:        types.AlertID("test-alert-1"),
 		CreatedAt: now,
-		Metadata:  alert.Metadata{Title: "Test Alert"},
+		Metadata:  alert.Metadata{Title: "Test Alert", Description: "Test Description"},
 		SlackThread: &slack.Thread{
 			ChannelID: "test-channel",
 			ThreadID:  "test-thread",
@@ -195,10 +152,10 @@ func TestSlackActionAckAlert(t *testing.T) {
 	// Wait for async alert updates to complete
 	time.Sleep(200 * time.Millisecond)
 
-	// Verify Slack interactions (updated for unified CreateTicketFromAlerts)
-	// Note: 4 PostMessage calls due to ticket creation flow + 2 UpdateMessage for alert updates
-	gt.Value(t, len(slackMock.PostMessageContextCalls())).Equal(4)
-	gt.Value(t, len(slackMock.UpdateMessageContextCalls())).Equal(2)
+	// Verify Slack interactions for single alert inheritance
+	// Note: 2 PostMessage calls (ticket post only, no comment for single alert) + 1 UpdateMessage for alert update
+	gt.Value(t, len(slackMock.PostMessageContextCalls())).Equal(2)
+	gt.Value(t, len(slackMock.UpdateMessageContextCalls())).Equal(1)
 }
 
 func TestSlackActionAckList(t *testing.T) {
@@ -972,25 +929,19 @@ func TestSlackActionAckAlert_UpdatesAlertList(t *testing.T) {
 		},
 	}
 
-	// Mock LLM client
+	// Mock LLM client - for single alert tickets, LLM should not be called
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
 				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
-					// Return appropriate JSON response for ticket metadata
-					return &gollem.Response{
-						Texts: []string{`{"title": "Test Ticket", "description": "Test Description", "summary": "Test Summary"}`},
-					}, nil
+					t.Fatal("LLM should not be called for single alert ticket - metadata should be inherited")
+					return nil, nil
 				},
 			}, nil
 		},
 		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, inputs []string) ([][]float64, error) {
-			// Return mock embedding data with correct dimension
-			embedding := make([]float64, dimension)
-			for i := range embedding {
-				embedding[i] = 0.1 + float64(i)*0.01 // Generate some test values
-			}
-			return [][]float64{embedding}, nil
+			t.Fatal("LLM embedding should not be called for single alert ticket - embedding should be inherited")
+			return nil, nil
 		},
 	}
 
@@ -1037,7 +988,11 @@ func TestSlackActionAckAlert_UpdatesAlertList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+	// Use fast interval for testing
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel",
+		slack_svc.WithUpdaterOptions(
+			slack_svc.WithInterval(1*time.Millisecond),
+			slack_svc.WithRetryInterval(1*time.Millisecond)))
 	gt.NoError(t, err)
 
 	// Create usecase instance
@@ -1059,6 +1014,9 @@ func TestSlackActionAckAlert_UpdatesAlertList(t *testing.T) {
 
 	// Verify results
 	gt.NoError(t, err)
+
+	// Wait for async alert updates to complete
+	time.Sleep(200 * time.Millisecond)
 
 	// Verify that alert list message was updated
 	gt.Number(t, updateMessageCount).Greater(0)

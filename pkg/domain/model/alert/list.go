@@ -202,6 +202,9 @@ func (x *List) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) err
 	}
 
 	x.Metadata = *resp
+	// Mark metadata as AI-generated since it was filled by LLM
+	x.Metadata.TitleSource = types.SourceAI
+	x.Metadata.DescriptionSource = types.SourceAI
 
 	return nil
 }

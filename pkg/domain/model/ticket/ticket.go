@@ -63,6 +63,10 @@ type Metadata struct {
 	Description string `json:"description"`
 	// Summary is the summary of the ticket for AI analysis.
 	Summary string `json:"summary"`
+	// TitleSource indicates the source of the title (human, ai, inherited)
+	TitleSource types.Source `json:"title_source"`
+	// DescriptionSource indicates the source of the description (human, ai, inherited)
+	DescriptionSource types.Source `json:"description_source"`
 }
 
 func (x *Metadata) Validate() error {
@@ -71,6 +75,23 @@ func (x *Metadata) Validate() error {
 	}
 	// Description is optional - it may be empty for manually created tickets
 	// Summary is optional - it may be empty for manually created tickets
+
+	// Set default sources if not specified
+	if x.TitleSource == "" {
+		x.TitleSource = types.SourceAI
+	}
+	if x.DescriptionSource == "" {
+		x.DescriptionSource = types.SourceAI
+	}
+
+	// Validate source fields
+	if err := x.TitleSource.Validate(); err != nil {
+		return goerr.Wrap(err, "invalid title source")
+	}
+	if err := x.DescriptionSource.Validate(); err != nil {
+		return goerr.Wrap(err, "invalid description source")
+	}
+
 	return nil
 }
 
@@ -82,6 +103,10 @@ func New(ctx context.Context, alertIDs []types.AlertID, slackThread *slack.Threa
 		Status:      types.TicketStatusOpen,
 		CreatedAt:   clock.Now(ctx),
 		UpdatedAt:   clock.Now(ctx),
+		Metadata: Metadata{
+			TitleSource:       types.SourceAI, // Default to AI source
+			DescriptionSource: types.SourceAI, // Default to AI source
+		},
 	}
 }
 
@@ -108,6 +133,15 @@ type AlertRepository interface {
 var ticketMetaPrompt string
 
 func (x *Ticket) FillMetadata(ctx context.Context, llmClient gollem.LLMClient, alertRepo AlertRepository) error {
+	// Only generate metadata for fields that have SourceAI
+	needsTitle := x.Metadata.TitleSource == types.SourceAI
+	needsDescription := x.Metadata.DescriptionSource == types.SourceAI
+
+	// If no AI generation is needed, return early
+	if !needsTitle && !needsDescription {
+		return nil
+	}
+
 	alerts, err := alertRepo.BatchGetAlerts(ctx, x.AlertIDs)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alerts")
@@ -133,7 +167,28 @@ func (x *Ticket) FillMetadata(ctx context.Context, llmClient gollem.LLMClient, a
 	}
 
 	meta, err := llm.Ask(ctx, llmClient, metaPrompt, llm.WithValidate(func(meta Metadata) error {
-		return meta.Validate()
+		// Validate that generated content has required fields
+		if meta.Title == "" {
+			return goerr.New("title is required")
+		}
+		if meta.Description == "" {
+			return goerr.New("description is required")
+		}
+		// Set sources for validation
+		if meta.TitleSource == "" {
+			meta.TitleSource = types.SourceAI
+		}
+		if meta.DescriptionSource == "" {
+			meta.DescriptionSource = types.SourceAI
+		}
+		// Validate source fields only
+		if err := meta.TitleSource.Validate(); err != nil {
+			return goerr.Wrap(err, "invalid title source")
+		}
+		if err := meta.DescriptionSource.Validate(); err != nil {
+			return goerr.Wrap(err, "invalid description source")
+		}
+		return nil
 	}))
 	if err != nil {
 		return goerr.Wrap(err, "failed to generate meta")
@@ -142,7 +197,15 @@ func (x *Ticket) FillMetadata(ctx context.Context, llmClient gollem.LLMClient, a
 		return goerr.New("failed to generate meta")
 	}
 
-	x.Metadata = *meta
+	// Only update fields that were marked for AI generation
+	if needsTitle {
+		x.Metadata.Title = meta.Title
+	}
+	if needsDescription {
+		x.Metadata.Description = meta.Description
+	}
+	// Keep the existing Summary as it's always generated
+	x.Metadata.Summary = meta.Summary
 
 	return nil
 }
