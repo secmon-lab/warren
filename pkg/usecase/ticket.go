@@ -15,52 +15,94 @@ import (
 
 // TicketCreationOptions contains options for ticket creation
 type TicketCreationOptions struct {
-	AlertIDs     []types.AlertID
-	SlackThread  *slack.Thread
-	Assignee     *slack.User
-	Title        string
-	Description  string
-	FillMetadata bool // Whether to use LLM to fill metadata
-	IsTest       bool // Whether this is a test ticket
+	AlertIDs             []types.AlertID
+	SlackThread          *slack.Thread
+	Assignee             *slack.User
+	Title                string
+	Description          string
+	FillMetadata         bool // Whether to use LLM to fill metadata
+	IsTest               bool // Whether this is a test ticket
+	ValidateAlerts       bool // Whether to validate alerts exist and are unbound
+	UpdateAlerts         bool // Whether to update alerts with ticket ID
+	AutoInheritFromAlert bool // Whether to auto-inherit metadata from single alert
 }
 
 // TicketUpdateFunction defines a function that updates a ticket
 type TicketUpdateFunction func(ctx context.Context, ticket *ticket.Ticket) error
 
-// createTicketWithSlackPosting creates a ticket and posts it to Slack
-func (uc *UseCases) createTicketWithSlackPosting(ctx context.Context, opts TicketCreationOptions, alerts alert.Alerts) (*ticket.Ticket, error) {
+// createTicket is the unified ticket creation method
+func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions) (*ticket.Ticket, error) {
+	var alerts alert.Alerts
+	var err error
+
+	// Validate and fetch alerts if needed
+	if len(opts.AlertIDs) > 0 {
+		if opts.ValidateAlerts {
+			// Get all alerts to validate they exist and are unbound
+			alerts, err = uc.repository.BatchGetAlerts(ctx, opts.AlertIDs)
+			if err != nil {
+				return nil, goerr.Wrap(err, "failed to get alerts", goerr.V("alert_ids", opts.AlertIDs))
+			}
+
+			if len(alerts) != len(opts.AlertIDs) {
+				return nil, goerr.New("some alerts not found", goerr.V("requested", len(opts.AlertIDs)), goerr.V("found", len(alerts)))
+			}
+
+			// Check if any alerts are already bound to tickets
+			for _, alert := range alerts {
+				if alert.TicketID != types.EmptyTicketID {
+					return nil, goerr.New("alert is already bound to a ticket",
+						goerr.V("alert_id", alert.ID),
+						goerr.V("ticket_id", alert.TicketID))
+				}
+			}
+		} else {
+			// Just fetch alerts without validation
+			alerts, err = uc.repository.BatchGetAlerts(ctx, opts.AlertIDs)
+			if err != nil {
+				return nil, goerr.Wrap(err, "failed to get alerts", goerr.V("alert_ids", opts.AlertIDs))
+			}
+		}
+
+		// For single alert with no explicit slackThread, use the alert's Slack thread if available
+		if len(alerts) == 1 && opts.SlackThread == nil && alerts[0].SlackThread != nil && uc.slackService != nil {
+			opts.SlackThread = alerts[0].SlackThread
+		}
+	}
+
 	// Create new ticket
 	newTicket := ticket.New(ctx, opts.AlertIDs, opts.SlackThread)
 	newTicket.Assignee = opts.Assignee
 	newTicket.IsTest = opts.IsTest
 
-	// Set metadata
-	if opts.Title != "" {
-		newTicket.Metadata.Title = opts.Title
-	}
-	if opts.Description != "" {
-		newTicket.Metadata.Description = opts.Description
-	}
-
-	// Fill metadata using LLM if requested
-	if opts.FillMetadata {
-		if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
-			return nil, goerr.Wrap(err, "failed to fill ticket metadata")
+	// Handle metadata setting with auto-inheritance logic
+	shouldInherit := opts.AutoInheritFromAlert && len(alerts) == 1 && opts.Title == "" && opts.Description == ""
+	if shouldInherit {
+		// Inherit from single alert
+		alert := alerts[0]
+		newTicket.Metadata.Title = alert.Metadata.Title
+		newTicket.Metadata.Description = alert.Metadata.Description
+		newTicket.Embedding = alert.Embedding
+	} else {
+		// Set metadata from options
+		if opts.Title != "" {
+			newTicket.Metadata.Title = opts.Title
 		}
-	}
-
-	// Calculate embedding using the unified approach
-	if err := newTicket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
-		return nil, goerr.Wrap(err, "failed to calculate ticket embedding")
-	}
-
-	// Post to Slack if SlackThread is provided
-	if opts.SlackThread != nil {
-		messageID, err := uc.postTicketToSlack(ctx, &newTicket, *opts.SlackThread, alerts)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to post ticket to slack")
+		if opts.Description != "" {
+			newTicket.Metadata.Description = opts.Description
 		}
-		newTicket.SlackMessageID = messageID
+
+		// Fill metadata using LLM if requested
+		if opts.FillMetadata {
+			if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
+				return nil, goerr.Wrap(err, "failed to fill ticket metadata")
+			}
+		}
+
+		// Calculate embedding using the unified approach
+		if err := newTicket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
+			return nil, goerr.Wrap(err, "failed to calculate ticket embedding")
+		}
 	}
 
 	// Save ticket to repository
@@ -68,7 +110,47 @@ func (uc *UseCases) createTicketWithSlackPosting(ctx context.Context, opts Ticke
 		return nil, goerr.Wrap(err, "failed to put new ticket")
 	}
 
-	return &newTicket, nil
+	newTicketPtr := &newTicket
+
+	// Update alerts to link them to the ticket if requested
+	if opts.UpdateAlerts && len(alerts) > 0 {
+		for _, alert := range alerts {
+			alert.TicketID = newTicketPtr.ID
+		}
+
+		if err := uc.repository.BatchPutAlerts(ctx, alerts); err != nil {
+			return nil, goerr.Wrap(err, "failed to update alerts with ticket ID")
+		}
+	}
+
+	// Post to Slack if SlackThread is provided
+	if opts.SlackThread != nil && uc.slackService != nil {
+		messageID, err := uc.postTicketToSlack(ctx, newTicketPtr, *opts.SlackThread, alerts)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to post ticket to slack")
+		}
+		newTicketPtr.SlackMessageID = messageID
+
+		// Save ticket again with Slack message ID
+		if err := uc.repository.PutTicket(ctx, *newTicketPtr); err != nil {
+			return nil, goerr.Wrap(err, "failed to update ticket with slack message ID")
+		}
+	}
+
+	// Update individual alerts' Slack display if alerts exist and slack service is available
+	if uc.slackService != nil && len(alerts) > 0 {
+		for _, alert := range alerts {
+			if alert.SlackThread != nil {
+				st := uc.slackService.NewThread(*alert.SlackThread)
+				if err := st.UpdateAlert(ctx, *alert); err != nil {
+					// Log error but don't fail the main operation
+					_ = msg.Trace(ctx, "💥 Failed to update alert in Slack: %s", err.Error())
+				}
+			}
+		}
+	}
+
+	return newTicketPtr, nil
 }
 
 // postTicketToSlack handles Slack posting logic including thread management
@@ -172,12 +254,15 @@ func (uc *UseCases) postTicketToSlack(ctx context.Context, newTicket *ticket.Tic
 		}
 	}
 
-	// Generate and post initial comment for all tickets (regardless of alerts)
-	if comment, err := uc.generateInitialTicketComment(ctx, newTicket, alerts); err != nil {
-		_ = msg.Trace(ctx, "💥 Failed to generate initial comment: %s", err.Error())
-	} else if comment != "" {
-		if err := threadService.PostComment(ctx, comment); err != nil {
-			_ = msg.Trace(ctx, "💥 Failed to post initial comment: %s", err.Error())
+	// Generate and post initial comment only for multi-alert tickets or manual tickets
+	// For single alert tickets, the inherited metadata should be sufficient
+	if len(alerts) != 1 {
+		if comment, err := uc.generateInitialTicketComment(ctx, newTicket, alerts); err != nil {
+			_ = msg.Trace(ctx, "💥 Failed to generate initial comment: %s", err.Error())
+		} else if comment != "" {
+			if err := threadService.PostComment(ctx, comment); err != nil {
+				_ = msg.Trace(ctx, "💥 Failed to post initial comment: %s", err.Error())
+			}
 		}
 	}
 
@@ -206,18 +291,21 @@ func (uc *UseCases) CreateManualTicketWithTest(ctx context.Context, title, descr
 		}
 	}
 
-	// Create ticket using common helper
+	// Create ticket using unified method
 	opts := TicketCreationOptions{
-		AlertIDs:     []types.AlertID{},
-		SlackThread:  slackThread,
-		Assignee:     user,
-		Title:        title,
-		Description:  description,
-		FillMetadata: false, // Manual tickets don't use LLM to fill metadata
-		IsTest:       isTest,
+		AlertIDs:             []types.AlertID{},
+		SlackThread:          slackThread,
+		Assignee:             user,
+		Title:                title,
+		Description:          description,
+		FillMetadata:         false, // Manual tickets don't use LLM to fill metadata
+		IsTest:               isTest,
+		ValidateAlerts:       false, // No alerts to validate
+		UpdateAlerts:         false, // No alerts to update
+		AutoInheritFromAlert: false, // Manual ticket, no inheritance
 	}
 
-	return uc.createTicketWithSlackPosting(ctx, opts, alert.Alerts{})
+	return uc.createTicket(ctx, opts)
 }
 
 // updateTicketWithSlackSync is a common helper function for updating tickets with Slack synchronization
@@ -374,89 +462,21 @@ func (uc *UseCases) CreateTicketFromAlerts(ctx context.Context, alertIDs []types
 		return nil, goerr.New("no alerts provided")
 	}
 
-	// Get all alerts to validate they exist and are unbound
-	alerts, err := uc.repository.BatchGetAlerts(ctx, alertIDs)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get alerts", goerr.V("alert_ids", alertIDs))
+	// Create ticket using unified method
+	opts := TicketCreationOptions{
+		AlertIDs:             alertIDs,
+		SlackThread:          slackThread,
+		Assignee:             user,
+		Title:                "",   // No explicit title
+		Description:          "",   // No explicit description
+		FillMetadata:         true, // Use LLM for multi-alert tickets
+		IsTest:               false,
+		ValidateAlerts:       true, // Validate alerts exist and are unbound
+		UpdateAlerts:         true, // Update alerts with ticket ID
+		AutoInheritFromAlert: true, // Auto-inherit from single alert
 	}
 
-	if len(alerts) != len(alertIDs) {
-		return nil, goerr.New("some alerts not found", goerr.V("requested", len(alertIDs)), goerr.V("found", len(alerts)))
-	}
-
-	// Check if any alerts are already bound to tickets
-	for _, alert := range alerts {
-		if alert.TicketID != types.EmptyTicketID {
-			return nil, goerr.New("alert is already bound to a ticket",
-				goerr.V("alert_id", alert.ID),
-				goerr.V("ticket_id", alert.TicketID))
-		}
-	}
-
-	// For single alert with no explicit slackThread, use the alert's Slack thread if available
-	if len(alerts) == 1 && slackThread == nil && alerts[0].SlackThread != nil && uc.slackService != nil {
-		slackThread = alerts[0].SlackThread
-	}
-
-	// Create ticket
-	newTicket := ticket.New(ctx, alertIDs, slackThread)
-	newTicket.Assignee = user
-	newTicket.IsTest = false
-
-	// Fill metadata using LLM
-	if err := newTicket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
-		return nil, goerr.Wrap(err, "failed to fill ticket metadata")
-	}
-
-	// Calculate embedding
-	if err := newTicket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
-		return nil, goerr.Wrap(err, "failed to calculate ticket embedding")
-	}
-
-	// Save ticket to repository
-	if err := uc.repository.PutTicket(ctx, newTicket); err != nil {
-		return nil, goerr.Wrap(err, "failed to put new ticket")
-	}
-
-	newTicketPtr := &newTicket
-
-	// Update alerts to link them to the ticket
-	for _, alert := range alerts {
-		alert.TicketID = newTicketPtr.ID
-	}
-
-	if err := uc.repository.BatchPutAlerts(ctx, alerts); err != nil {
-		return nil, goerr.Wrap(err, "failed to update alerts with ticket ID")
-	}
-
-	// Post ticket to Slack if SlackThread is provided (for Slack-originated requests)
-	if slackThread != nil && uc.slackService != nil {
-		messageID, err := uc.postTicketToSlack(ctx, newTicketPtr, *slackThread, alerts)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to post ticket to slack")
-		}
-		newTicketPtr.SlackMessageID = messageID
-
-		// Save ticket again with Slack message ID
-		if err := uc.repository.PutTicket(ctx, *newTicketPtr); err != nil {
-			return nil, goerr.Wrap(err, "failed to update ticket with slack message ID")
-		}
-	}
-
-	// Update individual alerts' Slack display (for all cases)
-	if uc.slackService != nil {
-		for _, alert := range alerts {
-			if alert.SlackThread != nil {
-				st := uc.slackService.NewThread(*alert.SlackThread)
-				if err := st.UpdateAlert(ctx, *alert); err != nil {
-					// Log error but don't fail the main operation
-					_ = msg.Trace(ctx, "💥 Failed to update alert in Slack: %s", err.Error())
-				}
-			}
-		}
-	}
-
-	return newTicketPtr, nil
+	return uc.createTicket(ctx, opts)
 }
 
 // GetSimilarTicketsForAlert finds tickets similar to a given alert based on embedding similarity
