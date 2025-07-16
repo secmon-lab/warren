@@ -174,6 +174,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 
 	// Always use plan mode for comprehensive task handling
 	plan, err := agent.Plan(ctx, message,
+		gollem.WithPlanLanguage("Japanese"),
 		gollem.WithPlanSystemPrompt(systemPrompt),
 		gollem.WithPlanCreatedHook(func(ctx context.Context, plan *gollem.Plan) error {
 			return updatePlanProgress(progressUpdate, plan, "Plan created")
