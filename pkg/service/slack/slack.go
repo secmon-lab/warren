@@ -532,7 +532,7 @@ func (x *ThreadService) PostCommentWithMessageID(ctx context.Context, comment st
 	_, ts, err := x.client.PostMessageContext(
 		ctx,
 		x.channelID,
-		slack.MsgOptionText(comment, true),
+		slack.MsgOptionText(comment, false),
 		slack.MsgOptionTS(x.threadID),
 	)
 	if err != nil {
