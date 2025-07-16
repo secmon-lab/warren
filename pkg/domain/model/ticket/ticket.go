@@ -20,7 +20,7 @@ import (
 
 type Ticket struct {
 	ID             types.TicketID  `json:"id"`
-	AlertIDs       []types.AlertID `json:"alert_ids"`
+	AlertIDs       []types.AlertID `json:"-"`
 	SlackThread    *slack.Thread   `json:"slack_thread"`
 	SlackMessageID string          `json:"slack_message_id"`
 	CreatedAt      time.Time       `json:"created_at"`
