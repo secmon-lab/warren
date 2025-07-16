@@ -134,12 +134,27 @@ func (x LLMCfg) LogValue() slog.Value {
 
 // Configure creates and returns an LLM client, preferring Claude if configured
 func (x *LLMCfg) Configure(ctx context.Context) (gollem.LLMClient, error) {
-	// Prefer Claude if project ID is configured
+	// If Claude is configured, Gemini is required for embeddings
 	if x.claudeProjectID != "" {
-		return x.configureClaude(ctx)
+		if x.geminiProjectID == "" {
+			return nil, goerr.New("Gemini configuration is required when using Claude (Claude doesn't support embeddings)")
+		}
+
+		claudeClient, err := x.configureClaude(ctx)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to configure Claude client")
+		}
+
+		geminiClient, err := x.configureGemini(ctx)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to configure Gemini client for embeddings")
+		}
+
+		// Use Claude for content generation, Gemini for embeddings
+		return NewCompositeLLMClient(claudeClient, geminiClient), nil
 	}
 
-	// Fall back to Gemini
+	// Fall back to Gemini only
 	return x.configureGemini(ctx)
 }
 
