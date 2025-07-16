@@ -167,3 +167,73 @@ func (x *Warren) updateFinding(ctx context.Context, args map[string]any) (map[st
 
 	return response, nil
 }
+
+func (x *Warren) getTicketComments(ctx context.Context, args map[string]any) (map[string]any, error) {
+	// Get optional pagination parameters
+	limitVal, err := getArg[int64](args, "limit")
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get limit")
+	}
+
+	offsetVal, err := getArg[int64](args, "offset")
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get offset")
+	}
+
+	// Set default values
+	limit := int(limitVal)
+	offset := int(offsetVal)
+	if limit <= 0 {
+		limit = 50 // Default limit
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	// Get comments with pagination
+	comments, err := x.repo.GetTicketCommentsPaginated(ctx, x.ticketID, offset, limit)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get ticket comments")
+	}
+
+	// Get total count
+	totalCount, err := x.repo.CountTicketComments(ctx, x.ticketID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to count ticket comments")
+	}
+
+	// Convert comments to serializable format
+	var results []map[string]any
+	for _, comment := range comments {
+		commentData := map[string]any{
+			"id":         string(comment.ID),
+			"ticket_id":  string(comment.TicketID),
+			"created_at": comment.CreatedAt.Format(time.RFC3339),
+			"comment":    comment.Comment,
+			"prompted":   comment.Prompted,
+		}
+
+		// Add user information if available
+		if comment.User != nil {
+			commentData["user"] = map[string]any{
+				"id":   comment.User.ID,
+				"name": comment.User.Name,
+			}
+		}
+
+		// Add Slack message ID if available
+		if comment.SlackMessageID != "" {
+			commentData["slack_message_id"] = comment.SlackMessageID
+		}
+
+		results = append(results, commentData)
+	}
+
+	return map[string]any{
+		"comments":    results,
+		"total_count": totalCount,
+		"offset":      offset,
+		"limit":       limit,
+		"has_more":    offset+len(results) < totalCount,
+	}, nil
+}

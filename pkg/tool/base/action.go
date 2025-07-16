@@ -106,6 +106,7 @@ const (
 	cmdGetPolicy         = "warren_get_policy"
 	cmdExecPolicy        = "warren_exec_policy"
 	cmdUpdateFinding     = "warren_update_finding"
+	cmdGetTicketComments = "warren_get_ticket_comments"
 )
 
 func IgnorableTool(name string) bool {
@@ -200,6 +201,20 @@ func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			},
 			Required: []string{"summary", "severity", "reason", "recommendation"},
 		},
+		{
+			Name:        cmdGetTicketComments,
+			Description: "Get comments associated with the current ticket with pagination support",
+			Parameters: map[string]*gollem.Parameter{
+				"limit": {
+					Type:        gollem.TypeInteger,
+					Description: "Maximum number of comments to return (default: 50)",
+				},
+				"offset": {
+					Type:        gollem.TypeInteger,
+					Description: "Number of comments to skip for pagination (default: 0)",
+				},
+			},
+		},
 	}, nil
 }
 
@@ -217,6 +232,8 @@ func (x *Warren) Run(ctx context.Context, name string, args map[string]any) (map
 		return x.execPolicy(ctx, args)
 	case cmdUpdateFinding:
 		return x.updateFinding(ctx, args)
+	case cmdGetTicketComments:
+		return x.getTicketComments(ctx, args)
 	default:
 		return nil, goerr.New("invalid function name", goerr.V("name", name))
 	}
