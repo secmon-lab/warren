@@ -444,3 +444,90 @@ func TestCreateTicketFromAlerts(t *testing.T) {
 		gt.Value(t, updatedAlert.TicketID).Equal(ticket.ID)
 	})
 }
+
+func TestSourceLogic(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewMemory()
+
+	// Create LLM client mock
+	llmMock := &mock.LLMClientMock{
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
+			embedding := make([]float64, dimension)
+			for i := range embedding {
+				embedding[i] = 0.1 + float64(i)*0.01
+			}
+			return [][]float64{embedding}, nil
+		},
+	}
+
+	uc := New(WithRepository(repo), WithLLMClient(llmMock))
+
+	t.Run("explicit source override", func(t *testing.T) {
+		// Test that explicit TitleSource and DescriptionSource override the default logic
+		opts := TicketCreationOptions{
+			AlertIDs:             []types.AlertID{},
+			Title:                "Test Title",      // Has content (would normally be SourceHuman)
+			Description:          "",                // No content (would normally be SourceAI)
+			TitleSource:          types.SourceAI,    // Explicitly override to AI
+			DescriptionSource:    types.SourceHuman, // Explicitly override to Human
+			FillMetadata:         false,
+			ValidateAlerts:       false,
+			UpdateAlerts:         false,
+			AutoInheritFromAlert: false,
+		}
+
+		ticket, err := uc.createTicket(ctx, opts)
+		gt.NoError(t, err)
+		gt.Value(t, ticket).NotNil()
+
+		// Verify explicit sources are used, not the default logic
+		gt.Value(t, ticket.Metadata.TitleSource).Equal(types.SourceAI)          // Overridden despite having content
+		gt.Value(t, ticket.Metadata.DescriptionSource).Equal(types.SourceHuman) // Overridden despite no content
+	})
+
+	t.Run("default source logic", func(t *testing.T) {
+		// Test the default logic when no explicit sources are provided
+		opts := TicketCreationOptions{
+			AlertIDs:             []types.AlertID{},
+			Title:                "Test Title", // Has content -> should be SourceHuman
+			Description:          "",           // No content -> should be SourceAI
+			TitleSource:          "",           // Not specified
+			DescriptionSource:    "",           // Not specified
+			FillMetadata:         false,
+			ValidateAlerts:       false,
+			UpdateAlerts:         false,
+			AutoInheritFromAlert: false,
+		}
+
+		ticket, err := uc.createTicket(ctx, opts)
+		gt.NoError(t, err)
+		gt.Value(t, ticket).NotNil()
+
+		// Verify default logic is applied
+		gt.Value(t, ticket.Metadata.TitleSource).Equal(types.SourceHuman)    // Has content
+		gt.Value(t, ticket.Metadata.DescriptionSource).Equal(types.SourceAI) // No content
+	})
+
+	t.Run("no content defaults to AI", func(t *testing.T) {
+		// Test that empty title and description default to SourceAI
+		opts := TicketCreationOptions{
+			AlertIDs:             []types.AlertID{},
+			Title:                "", // No content -> should be SourceAI
+			Description:          "", // No content -> should be SourceAI
+			TitleSource:          "", // Not specified
+			DescriptionSource:    "", // Not specified
+			FillMetadata:         false,
+			ValidateAlerts:       false,
+			UpdateAlerts:         false,
+			AutoInheritFromAlert: false,
+		}
+
+		ticket, err := uc.createTicket(ctx, opts)
+		gt.NoError(t, err)
+		gt.Value(t, ticket).NotNil()
+
+		// Both should default to AI since no content is provided
+		gt.Value(t, ticket.Metadata.TitleSource).Equal(types.SourceAI)
+		gt.Value(t, ticket.Metadata.DescriptionSource).Equal(types.SourceAI)
+	})
+}

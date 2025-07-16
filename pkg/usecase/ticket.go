@@ -95,33 +95,24 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 		if opts.Description != "" {
 			newTicket.Metadata.Description = opts.Description
 		}
-		// Set sources from options regardless of content
+		// Set sources based on the intended logic:
+		// 1. Use opts.Source if provided
+		// 2. Otherwise, if opts.Title/Description is provided, use SourceHuman
+		// 3. Otherwise, default to SourceAI
 		if opts.TitleSource != "" {
 			newTicket.Metadata.TitleSource = opts.TitleSource
-		}
-		if opts.DescriptionSource != "" {
-			newTicket.Metadata.DescriptionSource = opts.DescriptionSource
+		} else if opts.Title != "" {
+			newTicket.Metadata.TitleSource = types.SourceHuman
+		} else {
+			newTicket.Metadata.TitleSource = types.SourceAI
 		}
 
-		// Set sources based on whether content was provided or should be AI-generated
-		// Only set sources if they haven't been explicitly set in options
-		if newTicket.Metadata.TitleSource == "" {
-			if opts.TitleSource != "" {
-				newTicket.Metadata.TitleSource = opts.TitleSource
-			} else if opts.Title != "" {
-				newTicket.Metadata.TitleSource = types.SourceHuman
-			} else {
-				newTicket.Metadata.TitleSource = types.SourceAI
-			}
-		}
-		if newTicket.Metadata.DescriptionSource == "" {
-			if opts.DescriptionSource != "" {
-				newTicket.Metadata.DescriptionSource = opts.DescriptionSource
-			} else if opts.Description != "" {
-				newTicket.Metadata.DescriptionSource = types.SourceHuman
-			} else {
-				newTicket.Metadata.DescriptionSource = types.SourceAI
-			}
+		if opts.DescriptionSource != "" {
+			newTicket.Metadata.DescriptionSource = opts.DescriptionSource
+		} else if opts.Description != "" {
+			newTicket.Metadata.DescriptionSource = types.SourceHuman
+		} else {
+			newTicket.Metadata.DescriptionSource = types.SourceAI
 		}
 
 		// Fill metadata using LLM for fields marked as SourceAI
