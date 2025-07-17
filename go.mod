@@ -173,7 +173,7 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/m-mizutani/gollem => /Users/mizutani/.ghq/github.com/m-mizutani/gollem
+// replace github.com/m-mizutani/gollem => ../../m-mizutani/gollem
 
 tool (
 	github.com/99designs/gqlgen
