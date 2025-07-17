@@ -22,12 +22,12 @@ func cmdServe() *cli.Command {
 		enableGraphQL  bool
 		enableGraphiQL bool
 		webUICfg       config.WebUI
-		policyCfg      config.Policy
 		sentryCfg      config.Sentry
 		slackCfg       config.Slack
 		llmCfg         config.LLMCfg
 		firestoreCfg   config.Firestore
 		storageCfg     config.Storage
+		policyCfg      config.PolicyCfg
 	)
 
 	flags := joinFlags(
@@ -56,13 +56,13 @@ func cmdServe() *cli.Command {
 			},
 		},
 		webUICfg.Flags(),
-		policyCfg.Flags(),
 		sentryCfg.Flags(),
 		slackCfg.Flags(),
 		llmCfg.Flags(),
 		firestoreCfg.Flags(),
 		tools.Flags(),
 		storageCfg.Flags(),
+		policyCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -76,18 +76,13 @@ func cmdServe() *cli.Command {
 				"enableGraphQL", enableGraphQL,
 				"enableGraphiQL", enableGraphiQL,
 				"web-ui", webUICfg,
-				"policy", policyCfg,
 				"sentry", sentryCfg,
 				"slack", slackCfg,
 				"llm", llmCfg,
 				"firestore", firestoreCfg,
 				"storage", storageCfg,
+				"policy", policyCfg,
 			)
-
-			policyClient, err := policyCfg.Configure()
-			if err != nil {
-				return err
-			}
 
 			// Configure LLM client (automatically selects Claude if available, otherwise Gemini)
 			llmClient, err := llmCfg.Configure(ctx)
@@ -121,6 +116,12 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
+			// Configure policy client
+			policyClient, err := policyCfg.Configure(ctx)
+			if err != nil {
+				return err
+			}
+
 			// Inject dependencies into tools that support them
 			tools.InjectDependencies(firestore, embeddingAdapter)
 
@@ -131,11 +132,11 @@ func cmdServe() *cli.Command {
 
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(llmClient),
-				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(firestore),
 				usecase.WithSlackService(slackSvc),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(toolSets),
+				usecase.WithPolicyClient(policyClient),
 			}
 
 			uc := usecase.New(ucOptions...)
@@ -143,7 +144,6 @@ func cmdServe() *cli.Command {
 			// Build HTTP server options
 			serverOptions := []server.Options{
 				server.WithSlackVerifier(slackCfg.Verifier()),
-				server.WithPolicy(policyClient),
 				server.WithSlackService(slackSvc),
 			}
 

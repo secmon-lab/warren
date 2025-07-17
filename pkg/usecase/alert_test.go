@@ -10,7 +10,6 @@ import (
 	"github.com/m-mizutani/gollem"
 	gollem_mock "github.com/m-mizutani/gollem/mock"
 	"github.com/m-mizutani/gt"
-	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -65,20 +64,6 @@ func TestHandleAlert_NoSimilarAlert(t *testing.T) {
 		},
 	}
 
-	policyMock := &mock.PolicyClientMock{
-		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
-			if queryResult, ok := result.(*alert.QueryOutput); ok {
-				queryResult.Alert = []alert.Metadata{
-					{
-						Title:       "Test Alert",
-						Description: "Test Description",
-					},
-				}
-			}
-			return nil
-		},
-	}
-
 	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
 	gt.NoError(t, err)
 
@@ -86,7 +71,6 @@ func TestHandleAlert_NoSimilarAlert(t *testing.T) {
 		usecase.WithRepository(repo),
 		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
-		usecase.WithPolicyClient(policyMock),
 	)
 
 	// Execute
@@ -171,20 +155,6 @@ func TestHandleAlert_SimilarAlertFound(t *testing.T) {
 		},
 	}
 
-	policyMock := &mock.PolicyClientMock{
-		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
-			if queryResult, ok := result.(*alert.QueryOutput); ok {
-				queryResult.Alert = []alert.Metadata{
-					{
-						Title:       "Test Alert",
-						Description: "Test Description",
-					},
-				}
-			}
-			return nil
-		},
-	}
-
 	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
 	gt.NoError(t, err)
 
@@ -192,7 +162,6 @@ func TestHandleAlert_SimilarAlertFound(t *testing.T) {
 		usecase.WithRepository(repo),
 		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
-		usecase.WithPolicyClient(policyMock),
 	)
 
 	// Execute
@@ -271,20 +240,6 @@ func TestHandleAlert_SimilarAlertBoundToTicket(t *testing.T) {
 		},
 	}
 
-	policyMock := &mock.PolicyClientMock{
-		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
-			if queryResult, ok := result.(*alert.QueryOutput); ok {
-				queryResult.Alert = []alert.Metadata{
-					{
-						Title:       "Test Alert",
-						Description: "Test Description",
-					},
-				}
-			}
-			return nil
-		},
-	}
-
 	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
 	gt.NoError(t, err)
 
@@ -292,7 +247,6 @@ func TestHandleAlert_SimilarAlertBoundToTicket(t *testing.T) {
 		usecase.WithRepository(repo),
 		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
-		usecase.WithPolicyClient(policyMock),
 	)
 
 	// Execute
@@ -367,20 +321,6 @@ func TestHandleAlert_LowSimilarity(t *testing.T) {
 		},
 	}
 
-	policyMock := &mock.PolicyClientMock{
-		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
-			if queryResult, ok := result.(*alert.QueryOutput); ok {
-				queryResult.Alert = []alert.Metadata{
-					{
-						Title:       "Test Alert",
-						Description: "Test Description",
-					},
-				}
-			}
-			return nil
-		},
-	}
-
 	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
 	gt.NoError(t, err)
 
@@ -388,7 +328,6 @@ func TestHandleAlert_LowSimilarity(t *testing.T) {
 		usecase.WithRepository(repo),
 		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
-		usecase.WithPolicyClient(policyMock),
 	)
 
 	// Execute

@@ -19,12 +19,10 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/harlog"
-	"github.com/m-mizutani/opaq"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	slack_ctrl "github.com/secmon-lab/warren/pkg/controller/slack"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -49,23 +47,9 @@ var snsPem []byte
 func TestValidateGoogleIDToken(t *testing.T) {
 	vars := test.NewEnvVars(t, "TEST_GOOGLE_ID_TOKEN", "TEST_GOOGLE_ID_TOKEN_EMAIL")
 
-	policyClient := &mock.PolicyClientMock{
-		QueryFunc: func(ctx context.Context, s string, v1, v2 any, queryOptions ...opaq.QueryOption) error {
-			if s == "data.alert.test" {
-				return nil
-			}
+	uc := usecase.New()
 
-			m1, ok := v1.(auth.Context)
-			gt.True(t, ok)
-			gt.Equal(t, m1.Google["email"].(string), vars.Get("TEST_GOOGLE_ID_TOKEN_EMAIL"))
-			gt.NoError(t, json.Unmarshal([]byte(`{"allow":true}`), &v2))
-			return nil
-		},
-	}
-
-	uc := usecase.New(usecase.WithPolicyClient(policyClient))
-
-	server := server.New(uc, server.WithPolicy(policyClient))
+	server := server.New(uc)
 
 	t.Run("with valid token", func(t *testing.T) {
 		req := httptest.NewRequest("POST", "/hooks/alert/pubsub/test", bytes.NewReader(pubsubJSON))
@@ -74,25 +58,7 @@ func TestValidateGoogleIDToken(t *testing.T) {
 		server.ServeHTTP(w, req)
 
 		gt.Equal(t, http.StatusOK, w.Code)
-		gt.A(t, policyClient.QueryCalls()).Length(2).
-			At(0, func(t testing.TB, v struct {
-				ContextMoqParam context.Context
-				S               string
-				V1              any
-				V2              any
-				QueryOptions    []opaq.QueryOption
-			}) {
-				gt.Equal(t, v.S, "data.auth")
-			}).
-			At(1, func(t testing.TB, v struct {
-				ContextMoqParam context.Context
-				S               string
-				V1              any
-				V2              any
-				QueryOptions    []opaq.QueryOption
-			}) {
-				gt.Equal(t, v.S, "data.alert.test")
-			})
+		// Policy checks are no longer performed
 	})
 }
 

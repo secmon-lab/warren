@@ -23,7 +23,6 @@ func cmdChat() *cli.Command {
 		ticketID    types.TicketID
 		firestoreDB config.Firestore
 		llmCfg      config.LLMCfg
-		policyCfg   config.Policy
 		storageCfg  config.Storage
 
 		query string
@@ -47,7 +46,6 @@ func cmdChat() *cli.Command {
 		},
 		firestoreDB.Flags(),
 		llmCfg.Flags(),
-		policyCfg.Flags(),
 		storageCfg.Flags(),
 		tools.Flags(),
 	)
@@ -68,12 +66,6 @@ func cmdChat() *cli.Command {
 			llmClient, err := llmCfg.Configure(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to configure LLM client")
-			}
-
-			// Configure policy client
-			policyClient, err := policyCfg.Configure()
-			if err != nil {
-				return goerr.Wrap(err, "failed to configure policy")
 			}
 
 			// Configure storage client
@@ -119,7 +111,6 @@ func cmdChat() *cli.Command {
 			uc := usecase.New(
 				usecase.WithRepository(repo),
 				usecase.WithLLMClient(llmClient),
-				usecase.WithPolicyClient(policyClient),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(allToolSets),
 			)

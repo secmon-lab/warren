@@ -179,10 +179,7 @@ func (uc *UseCases) GetUnboundAlertsFiltered(ctx context.Context, threshold *flo
 	totalCount := len(filteredAlerts)
 
 	// Step 4: Apply pagination to the filtered results
-	start := offset
-	if start > len(filteredAlerts) {
-		start = len(filteredAlerts)
-	}
+	start := min(offset, len(filteredAlerts))
 
 	end := start + limit
 	if limit > 0 && end > len(filteredAlerts) {

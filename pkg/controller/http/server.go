@@ -25,7 +25,6 @@ import (
 type Server struct {
 	router         *chi.Mux
 	slackCtrl      *slack_controller.Controller
-	policy         interfaces.PolicyClient
 	verifier       slack_model.PayloadVerifier
 	repo           interfaces.Repository // for GraphQL
 	slackService   *slack.Service        // for GraphQL resolver
@@ -62,12 +61,6 @@ func WithGraphiQL(enabled bool) Options {
 func WithAuthUseCase(authUC AuthUseCase) Options {
 	return func(s *Server) {
 		s.authUC = authUC
-	}
-}
-
-func WithPolicy(policy interfaces.PolicyClient) Options {
-	return func(s *Server) {
-		s.policy = policy
 	}
 }
 
@@ -109,17 +102,14 @@ func New(uc UseCase, opts ...Options) *Server {
 	r.Route("/hooks", func(r chi.Router) {
 		r.Route("/alert", func(r chi.Router) {
 			r.Route("/raw", func(r chi.Router) {
-				r.Use(authorizeWithPolicy(s.policy))
 				r.Post("/{schema}", alertRawHandler(uc))
 			})
 			r.Route("/pubsub", func(r chi.Router) {
 				r.Use(validateGoogleIDToken)
-				r.Use(authorizeWithPolicy(s.policy))
 				r.Post("/{schema}", alertPubSubHandler(uc))
 			})
 			r.Route("/sns", func(r chi.Router) {
 				r.Use(verifySNSRequest)
-				r.Use(authorizeWithPolicy(s.policy))
 				r.Post("/{schema}", alertSNSHandler(uc))
 			})
 		})
@@ -141,7 +131,6 @@ func New(uc UseCase, opts ...Options) *Server {
 				r.Use(authMiddleware(s.authUC))
 			}
 
-			r.Use(authorizeWithPolicy(s.policy))
 			r.Handle("/", graphqlHandler)
 		})
 
@@ -151,7 +140,6 @@ func New(uc UseCase, opts ...Options) *Server {
 				if s.authUC != nil {
 					r.Use(authMiddleware(s.authUC))
 				}
-				r.Use(authorizeWithPolicy(s.policy))
 				r.Handle("/", playground.Handler("GraphQL playground", "/graphql"))
 			})
 		}
@@ -160,7 +148,6 @@ func New(uc UseCase, opts ...Options) *Server {
 	// Authentication endpoints
 	if s.authUC != nil {
 		r.Route("/api", func(r chi.Router) {
-			r.Use(authorizeWithPolicy(s.policy))
 			r.Route("/auth", func(r chi.Router) {
 				r.Get("/login", authLoginHandler(s.authUC))
 				r.Get("/callback", authCallbackHandler(s.authUC))

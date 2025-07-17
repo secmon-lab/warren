@@ -556,15 +556,8 @@ func (uc *UseCases) GetSimilarTicketsForAlert(ctx context.Context, alertID types
 	totalCount := len(filteredTickets)
 
 	// Apply pagination to the complete filtered result set
-	start := offset
-	if start > len(filteredTickets) {
-		start = len(filteredTickets)
-	}
-
-	end := start + limit
-	if end > len(filteredTickets) {
-		end = len(filteredTickets)
-	}
+	start := min(offset, len(filteredTickets))
+	end := min(start+limit, len(filteredTickets))
 
 	result := filteredTickets[start:end]
 
@@ -578,7 +571,7 @@ func cosineSimilarity(a, b []float32) float32 {
 	}
 
 	var dotProduct, normA, normB float32
-	for i := 0; i < len(a); i++ {
+	for i := range len(a) {
 		dotProduct += a[i] * b[i]
 		normA += a[i] * a[i]
 		normB += b[i] * b[i]

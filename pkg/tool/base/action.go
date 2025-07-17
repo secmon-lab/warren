@@ -17,10 +17,9 @@ import (
 type SlackUpdateFunc func(ctx context.Context, ticket *ticket.Ticket) error
 
 type Warren struct {
-	repo         interfaces.Repository
-	ticketID     types.TicketID
-	policyClient interfaces.PolicyClient
-	slackUpdate  SlackUpdateFunc
+	repo        interfaces.Repository
+	ticketID    types.TicketID
+	slackUpdate SlackUpdateFunc
 }
 
 var _ interfaces.Tool = &Warren{}
@@ -56,11 +55,10 @@ func getArg[T any](args map[string]any, key string) (T, error) {
 	return typedVal, nil
 }
 
-func New(repo interfaces.Repository, policy interfaces.PolicyClient, ticketID types.TicketID, opts ...func(*Warren)) *Warren {
+func New(repo interfaces.Repository, ticketID types.TicketID, opts ...func(*Warren)) *Warren {
 	w := &Warren{
-		repo:         repo,
-		ticketID:     ticketID,
-		policyClient: policy,
+		repo:     repo,
+		ticketID: ticketID,
 	}
 
 	for _, opt := range opts {
@@ -102,9 +100,6 @@ func (x *Warren) Prompt(ctx context.Context) (string, error) {
 const (
 	cmdGetAlerts         = "warren_get_alerts"
 	cmdFindNearestTicket = "warren_find_nearest_ticket"
-	cmdListPolicies      = "warren_list_policies"
-	cmdGetPolicy         = "warren_get_policy"
-	cmdExecPolicy        = "warren_exec_policy"
 	cmdUpdateFinding     = "warren_update_finding"
 	cmdGetTicketComments = "warren_get_ticket_comments"
 )
@@ -147,36 +142,6 @@ func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "Duration of the ticket in days",
 				},
 			},
-		},
-		{
-			Name:        cmdListPolicies,
-			Description: "List all policies in Rego to detect an alert",
-		},
-		{
-			Name:        cmdGetPolicy,
-			Description: "Get a policy in Rego to detect an alert by name",
-			Parameters: map[string]*gollem.Parameter{
-				"name": {
-					Type:        gollem.TypeString,
-					Description: "The name of the policy. It must be in the list of policies returned by `warren.list_policies`",
-				},
-			},
-			Required: []string{"name"},
-		},
-		{
-			Name:        cmdExecPolicy,
-			Description: "Execute a policy in Rego to detect an alert by schema and input data. It returns detected alert data.",
-			Parameters: map[string]*gollem.Parameter{
-				"schema": {
-					Type:        gollem.TypeString,
-					Description: "The schema of the alert. It must be in 'package line' in the policy.",
-				},
-				"input": {
-					Type:        gollem.TypeString,
-					Description: "The input data to the policy. It must be a JSON string.",
-				},
-			},
-			Required: []string{"schema", "input"},
 		},
 		{
 			Name:        cmdUpdateFinding,
@@ -224,12 +189,6 @@ func (x *Warren) Run(ctx context.Context, name string, args map[string]any) (map
 		return x.getAlerts(ctx, args)
 	case cmdFindNearestTicket:
 		return x.findNearestTicket(ctx, args)
-	case cmdListPolicies:
-		return x.listPolicies(ctx, args)
-	case cmdGetPolicy:
-		return x.getPolicy(ctx, args)
-	case cmdExecPolicy:
-		return x.execPolicy(ctx, args)
 	case cmdUpdateFinding:
 		return x.updateFinding(ctx, args)
 	case cmdGetTicketComments:

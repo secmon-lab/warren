@@ -17,6 +17,9 @@ import (
 //
 //		// make and configure a mocked http.UseCase
 //		mockedUseCase := &UseCaseMock{
+//			GenerateTicketAlertsJSONLFunc: func(ctx context.Context, ticketID types.TicketID) ([]byte, error) {
+//				panic("mock out the GenerateTicketAlertsJSONL method")
+//			},
 //			GetUserIconFunc: func(ctx context.Context, userID string) ([]byte, string, error) {
 //				panic("mock out the GetUserIcon method")
 //			},
@@ -48,6 +51,9 @@ import (
 //
 //	}
 type UseCaseMock struct {
+	// GenerateTicketAlertsJSONLFunc mocks the GenerateTicketAlertsJSONL method.
+	GenerateTicketAlertsJSONLFunc func(ctx context.Context, ticketID types.TicketID) ([]byte, error)
+
 	// GetUserIconFunc mocks the GetUserIcon method.
 	GetUserIconFunc func(ctx context.Context, userID string) ([]byte, string, error)
 
@@ -74,6 +80,13 @@ type UseCaseMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// GenerateTicketAlertsJSONL holds details about calls to the GenerateTicketAlertsJSONL method.
+		GenerateTicketAlertsJSONL []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TicketID is the ticketID argument value.
+			TicketID types.TicketID
+		}
 		// GetUserIcon holds details about calls to the GetUserIcon method.
 		GetUserIcon []struct {
 			// Ctx is the ctx argument value.
@@ -153,6 +166,7 @@ type UseCaseMock struct {
 			SlackMsg slack_model.Message
 		}
 	}
+	lockGenerateTicketAlertsJSONL            sync.RWMutex
 	lockGetUserIcon                          sync.RWMutex
 	lockGetUserProfile                       sync.RWMutex
 	lockHandleAlert                          sync.RWMutex
@@ -161,6 +175,46 @@ type UseCaseMock struct {
 	lockHandleSlackInteractionBlockActions   sync.RWMutex
 	lockHandleSlackInteractionViewSubmission sync.RWMutex
 	lockHandleSlackMessage                   sync.RWMutex
+}
+
+// GenerateTicketAlertsJSONL calls GenerateTicketAlertsJSONLFunc.
+func (mock *UseCaseMock) GenerateTicketAlertsJSONL(ctx context.Context, ticketID types.TicketID) ([]byte, error) {
+	callInfo := struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+	}{
+		Ctx:      ctx,
+		TicketID: ticketID,
+	}
+	mock.lockGenerateTicketAlertsJSONL.Lock()
+	mock.calls.GenerateTicketAlertsJSONL = append(mock.calls.GenerateTicketAlertsJSONL, callInfo)
+	mock.lockGenerateTicketAlertsJSONL.Unlock()
+	if mock.GenerateTicketAlertsJSONLFunc == nil {
+		var (
+			bytesOut []byte
+			errOut   error
+		)
+		return bytesOut, errOut
+	}
+	return mock.GenerateTicketAlertsJSONLFunc(ctx, ticketID)
+}
+
+// GenerateTicketAlertsJSONLCalls gets all the calls that were made to GenerateTicketAlertsJSONL.
+// Check the length with:
+//
+//	len(mockedUseCase.GenerateTicketAlertsJSONLCalls())
+func (mock *UseCaseMock) GenerateTicketAlertsJSONLCalls() []struct {
+	Ctx      context.Context
+	TicketID types.TicketID
+} {
+	var calls []struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+	}
+	mock.lockGenerateTicketAlertsJSONL.RLock()
+	calls = mock.calls.GenerateTicketAlertsJSONL
+	mock.lockGenerateTicketAlertsJSONL.RUnlock()
+	return calls
 }
 
 // GetUserIcon calls GetUserIconFunc.

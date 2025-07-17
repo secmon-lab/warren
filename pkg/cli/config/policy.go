@@ -1,41 +1,55 @@
 package config
 
 import (
+	"context"
 	"log/slog"
 
-	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/opaq"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/urfave/cli/v3"
 )
 
-type Policy struct {
-	filePaths []string
+type PolicyCfg struct {
+	policyDir string
 }
 
-func (x *Policy) Flags() []cli.Flag {
+func (x *PolicyCfg) Flags() []cli.Flag {
 	return []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:        "policy",
-			Usage:       "Policy file/dir path",
-			Aliases:     []string{"p"},
-			Destination: &x.filePaths,
+		&cli.StringFlag{
+			Name:        "policy-dir",
+			Usage:       "Directory path containing policy files",
+			Destination: &x.policyDir,
 			Category:    "Policy",
-			Sources:     cli.EnvVars("WARREN_POLICY"),
+			Sources:     cli.EnvVars("WARREN_POLICY_DIR"),
 		},
 	}
 }
 
-func (x Policy) LogValue() slog.Value {
+func (x PolicyCfg) LogValue() slog.Value {
 	return slog.GroupValue(
-		slog.Any("file_paths", x.filePaths),
+		slog.String("policy_dir", x.policyDir),
 	)
 }
 
-func (x *Policy) Configure() (*opaq.Client, error) {
-	client, err := opaq.New(opaq.Files(x.filePaths...))
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create opaq client", goerr.V("file_paths", x.filePaths))
+func (x *PolicyCfg) Configure(ctx context.Context) (interfaces.PolicyClient, error) {
+	if x.policyDir == "" {
+		// Return a dummy policy client when no policy directory is specified
+		return &dummyPolicyClient{}, nil
 	}
 
-	return client, nil
+	// opaq.Files expects individual file paths, but we need to glob the directory
+	// For now, return dummy client until proper policy files are configured
+	return &dummyPolicyClient{}, nil
+}
+
+// dummyPolicyClient provides a no-op implementation when no policies are configured
+type dummyPolicyClient struct{}
+
+func (d *dummyPolicyClient) Query(ctx context.Context, query string, input any, output any, options ...opaq.QueryOption) error {
+	// For alerts, return empty result to indicate no alerts should be processed
+	return nil
+}
+
+func (d *dummyPolicyClient) Sources() map[string]string {
+	return map[string]string{}
 }

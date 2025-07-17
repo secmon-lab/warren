@@ -15,7 +15,6 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
@@ -370,38 +369,6 @@ func authMiddleware(authUC AuthUseCase) func(http.Handler) http.Handler {
 			ctx := auth.ContextWithToken(r.Context(), token)
 			ctx = user.WithUserID(ctx, token.Sub) // Use Slack User ID
 			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
-}
-
-func authorizeWithPolicy(policy interfaces.PolicyClient) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if policy == nil {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			var result struct {
-				Allow bool `json:"allow"`
-			}
-
-			ctx := r.Context()
-			authCtx := auth.BuildContext(ctx)
-			if err := policy.Query(ctx, "data.auth", authCtx, &result); err != nil {
-				handleError(w, r, goerr.Wrap(err, "failed to authorize request"))
-				return
-			}
-
-			logging.From(ctx).Debug("authorization result", "input", authCtx, "output", result)
-
-			if !result.Allow {
-				logging.From(ctx).Warn("authorization failed", "auth", authCtx)
-				http.Error(w, `Authorization failed. Check your policy.`, http.StatusForbidden)
-				return
-			}
-
-			next.ServeHTTP(w, r)
 		})
 	}
 }
