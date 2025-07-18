@@ -216,12 +216,17 @@ func (uc *UseCases) BindAlertsToTicket(ctx context.Context, ticketID types.Ticke
 		return goerr.Wrap(err, "failed to recalculate ticket embedding")
 	}
 
-	// Save the updated ticket with new embedding
-	if err := uc.repository.PutTicket(ctx, *ticket); err != nil {
-		return goerr.Wrap(err, "failed to save ticket with updated embedding")
+	// Update ticket metadata based on existing title/description and new alert information
+	if err := ticket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
+		return goerr.Wrap(err, "failed to update ticket metadata with new alert information")
 	}
 
-	// Update Slack display for both ticket and individual alerts
+	// Save the updated ticket with new embedding and metadata
+	if err := uc.repository.PutTicket(ctx, *ticket); err != nil {
+		return goerr.Wrap(err, "failed to save ticket with updated embedding and metadata")
+	}
+
+	// Update Slack display for both ticket and individual alerts (using updated metadata)
 	if uc.slackService != nil {
 		// Update ticket display if it has a Slack thread
 		if ticket.SlackThread != nil {
