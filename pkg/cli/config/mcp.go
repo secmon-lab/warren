@@ -220,7 +220,7 @@ func (x *MCPConfig) IsConfigured() bool {
 
 // GetServerNames returns a list of configured server names (both servers and local)
 func (x *MCPConfig) GetServerNames() []string {
-	var names []string
+	names := make([]string, 0, len(x.Servers)+len(x.Local))
 	for _, server := range x.Servers {
 		if !server.Disabled {
 			names = append(names, server.Name)
