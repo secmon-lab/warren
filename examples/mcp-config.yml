@@ -1,0 +1,60 @@
+# Example MCP (Model Context Protocol) configuration for Warren
+# This configuration allows Warren to connect to external MCP servers
+# that provide additional tools and capabilities.
+
+# Remote/External MCP servers
+servers:
+  # Example SSE (Server-Sent Events) MCP server
+  - name: "web-search"
+    type: "sse"
+    url: "https://api.example.com/mcp/sse"
+    headers:
+      Authorization: "Bearer YOUR_API_TOKEN"
+      Content-Type: "application/json"
+
+  # Example HTTP MCP server (streamable)
+  - name: "database"
+    type: "http"
+    url: "https://db.example.com/mcp"
+    headers:
+      Authorization: "Bearer YOUR_DB_TOKEN"
+
+# Local MCP servers (typically stdio-based)
+local:
+  # Example stdio MCP server (local executable)
+  - name: "filesystem"
+    type: "stdio"
+    command: "npx"
+    args: ["@modelcontextprotocol/server-filesystem", "/tmp"]
+    env:
+      NODE_ENV: "production"
+    # disabled: false  # Optional: set to true to disable this server
+
+  # Local Python MCP server
+  - name: "python-tools"
+    type: "stdio"
+    command: "python"
+    args: ["-m", "mcp_server_python", "--debug"]
+    env:
+      PYTHONPATH: "/path/to/mcp/servers"
+
+  # Local shell tools
+  - name: "shell-tools"
+    type: "stdio"
+    command: "mcp-server-shell"
+    args: ["--allow-commands", "ls,cat,grep"]
+
+# Environment Variables:
+# You can also specify the config file using environment variables:
+#   export WARREN_MCP_CONFIG=/path/to/mcp-config.yml
+#   export MCP_CONFIG=/path/to/mcp-config.yml
+
+# Notes:
+# - Each server must have a unique name across both servers and local sections
+# - Supported types: "stdio", "sse", "http"
+# - For stdio servers: command and args are required
+# - For sse/http servers: url is required
+# - Environment variables and headers are optional
+# - Set disabled: true to temporarily disable a server
+# - Local servers are typically stdio-based for security and reliability
+# - Remote servers can use sse or http for network-based services

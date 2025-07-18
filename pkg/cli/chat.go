@@ -25,6 +25,7 @@ func cmdChat() *cli.Command {
 		llmCfg      config.LLMCfg
 		policyCfg   config.Policy
 		storageCfg  config.Storage
+		mcpCfg      config.MCPConfig
 
 		query string
 	)
@@ -50,6 +51,7 @@ func cmdChat() *cli.Command {
 		policyCfg.Flags(),
 		storageCfg.Flags(),
 		tools.Flags(),
+		mcpCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -101,6 +103,18 @@ func cmdChat() *cli.Command {
 			allToolSets, err := tools.ToolSets(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to get tool sets")
+			}
+
+			// Add MCP tool sets if configured
+			mcpToolSets, err := mcpCfg.CreateMCPToolSets(ctx)
+			if err != nil {
+				return goerr.Wrap(err, "failed to create MCP tool sets")
+			}
+			if len(mcpToolSets) > 0 {
+				allToolSets = append(allToolSets, mcpToolSets...)
+				logging.From(ctx).Info("MCP tool sets configured",
+					"servers", mcpCfg.GetServerNames(),
+					"count", len(mcpToolSets))
 			}
 
 			// Show ticket information
