@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -28,6 +29,7 @@ func cmdServe() *cli.Command {
 		llmCfg         config.LLMCfg
 		firestoreCfg   config.Firestore
 		storageCfg     config.Storage
+		mcpCfg         config.MCPConfig
 	)
 
 	flags := joinFlags(
@@ -63,6 +65,7 @@ func cmdServe() *cli.Command {
 		firestoreCfg.Flags(),
 		tools.Flags(),
 		storageCfg.Flags(),
+		mcpCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -82,6 +85,7 @@ func cmdServe() *cli.Command {
 				"llm", llmCfg,
 				"firestore", firestoreCfg,
 				"storage", storageCfg,
+				"mcp", mcpCfg,
 			)
 
 			policyClient, err := policyCfg.Configure()
@@ -127,6 +131,18 @@ func cmdServe() *cli.Command {
 			toolSets, err := tools.ToolSets(ctx)
 			if err != nil {
 				return err
+			}
+
+			// Add MCP tool sets if configured
+			mcpToolSets, err := mcpCfg.CreateMCPToolSets(ctx)
+			if err != nil {
+				return goerr.Wrap(err, "failed to create MCP tool sets")
+			}
+			if len(mcpToolSets) > 0 {
+				toolSets = append(toolSets, mcpToolSets...)
+				logging.From(ctx).Info("MCP tool sets configured",
+					"servers", mcpCfg.GetServerNames(),
+					"count", len(mcpToolSets))
 			}
 
 			ucOptions := []usecase.Option{
