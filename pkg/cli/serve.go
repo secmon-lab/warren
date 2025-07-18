@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -135,7 +136,7 @@ func cmdServe() *cli.Command {
 			// Add MCP tool sets if configured
 			mcpToolSets, err := mcpCfg.CreateMCPToolSets(ctx)
 			if err != nil {
-				return err
+				return goerr.Wrap(err, "failed to create MCP tool sets")
 			}
 			if len(mcpToolSets) > 0 {
 				toolSets = append(toolSets, mcpToolSets...)
