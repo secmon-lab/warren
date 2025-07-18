@@ -3,6 +3,7 @@ package usecase_test
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -730,7 +731,7 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 		},
 		SlackThread: &slack.Thread{
 			ChannelID: "alert1-channel",
-			ThreadID:  "alert1-thread",
+			ThreadID:  "1234567890.123456", // Valid Slack message timestamp format
 		},
 		Data: map[string]interface{}{"key": "value1"},
 	}
@@ -746,7 +747,7 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 		},
 		SlackThread: &slack.Thread{
 			ChannelID: "alert2-channel",
-			ThreadID:  "alert2-thread",
+			ThreadID:  "1234567890.123457", // Valid Slack message timestamp format
 		},
 		Data: map[string]interface{}{"key": "value2"},
 	}
@@ -814,7 +815,8 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 		},
 	}
 
-	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel", 
+		slack_svc.WithUpdaterOptions(slack_svc.WithInterval(10*time.Millisecond)))
 	gt.NoError(t, err)
 
 	uc := usecase.New(
@@ -826,6 +828,9 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 	// Execute: Bind alerts to ticket
 	err = uc.BindAlertsToTicket(ctx, testTicket.ID, []types.AlertID{alert1.ID, alert2.ID})
 	gt.NoError(t, err)
+
+	// Wait for async alert update processing (rate-limited updater with 10ms interval)
+	time.Sleep(100 * time.Millisecond)
 
 	// Verify: Check that alerts are bound
 	boundAlert1, err := repo.GetAlert(ctx, alert1.ID)
@@ -840,25 +845,22 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 	updatedTicket, err := repo.GetTicket(ctx, testTicket.ID)
 	gt.NoError(t, err)
 	gt.Array(t, updatedTicket.AlertIDs).Length(2)
-	found1, found2 := false, false
-	for _, id := range updatedTicket.AlertIDs {
-		if id == alert1.ID {
-			found1 = true
-		}
-		if id == alert2.ID {
-			found2 = true
-		}
-	}
-	gt.Value(t, found1).Equal(true)
-	gt.Value(t, found2).Equal(true)
+	
+	// Check that both alerts are in the ticket
+	gt.Value(t, slices.Contains(updatedTicket.AlertIDs, alert1.ID)).Equal(true)
+	gt.Value(t, slices.Contains(updatedTicket.AlertIDs, alert2.ID)).Equal(true)
 
 	// Verify: Check that FillMetadata was called (metadata update)
 	gt.Value(t, fillMetadataCalled).Equal(true)
 	gt.Value(t, updatedTicket.Metadata.Title).Equal(generatedTitle)
 	gt.Value(t, updatedTicket.Metadata.Description).Equal(generatedDescription)
 
-	// Verify: Check that Slack was updated for the ticket
+	// Verify: Check that Slack was updated for the ticket and individual alerts
 	gt.Value(t, slackTicketUpdateCalled).Equal(true)
+	
+	// Check that individual alert messages were updated
+	updateCalls := slackMock.UpdateMessageContextCalls()
+	gt.Value(t, len(updateCalls)).Equal(2)
 
 	// Verify: Check that embedding was recalculated (not nil/empty)
 	gt.Value(t, len(updatedTicket.Embedding) > 0).Equal(true)
