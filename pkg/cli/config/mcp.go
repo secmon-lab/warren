@@ -12,6 +12,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const Version = "1.0.0"
+
 // MCPServerConfig represents configuration for a remote MCP server
 type MCPServerConfig struct {
 	Name     string            `yaml:"name"`
@@ -23,11 +25,11 @@ type MCPServerConfig struct {
 
 // MCPLocalConfig represents configuration for a local MCP server
 type MCPLocalConfig struct {
-	Name     string   `yaml:"name"`
-	Command  string   `yaml:"command"`
-	Args     []string `yaml:"args,omitempty"`
-	Env      []string `yaml:"env,omitempty"`
-	Disabled bool     `yaml:"disabled,omitempty"`
+	Name     string            `yaml:"name"`
+	Command  string            `yaml:"command"`
+	Args     []string          `yaml:"args,omitempty"`
+	Env      map[string]string `yaml:"env,omitempty"`
+	Disabled bool              `yaml:"disabled,omitempty"`
 }
 
 // MCPConfig represents MCP configuration
@@ -130,7 +132,7 @@ func (x *MCPConfig) createMCPServerClient(ctx context.Context, serverCfg MCPServ
 		if len(serverCfg.Headers) > 0 {
 			opts = append(opts, mcp.WithSSEHeaders(serverCfg.Headers))
 		}
-		opts = append(opts, mcp.WithSSEClientInfo("warren", "1.0.0"))
+		opts = append(opts, mcp.WithSSEClientInfo("warren", Version))
 
 		client, err = mcp.NewSSE(ctx, serverCfg.URL, opts...)
 
@@ -143,7 +145,7 @@ func (x *MCPConfig) createMCPServerClient(ctx context.Context, serverCfg MCPServ
 		if len(serverCfg.Headers) > 0 {
 			opts = append(opts, mcp.WithStreamableHTTPHeaders(serverCfg.Headers))
 		}
-		opts = append(opts, mcp.WithStreamableHTTPClientInfo("warren", "1.0.0"))
+		opts = append(opts, mcp.WithStreamableHTTPClientInfo("warren", Version))
 
 		client, err = mcp.NewStreamableHTTP(ctx, serverCfg.URL, opts...)
 
@@ -174,9 +176,13 @@ func (x *MCPConfig) createMCPLocalClient(ctx context.Context, localCfg MCPLocalC
 
 	var opts []mcp.StdioOption
 	if len(localCfg.Env) > 0 {
-		opts = append(opts, mcp.WithEnvVars(localCfg.Env))
+		envVars := make([]string, 0, len(localCfg.Env))
+		for key, value := range localCfg.Env {
+			envVars = append(envVars, key+"="+value)
+		}
+		opts = append(opts, mcp.WithEnvVars(envVars))
 	}
-	opts = append(opts, mcp.WithStdioClientInfo("warren", "1.0.0"))
+	opts = append(opts, mcp.WithStdioClientInfo("warren", Version))
 
 	client, err := mcp.NewStdio(ctx, localCfg.Command, localCfg.Args, opts...)
 	if err != nil {

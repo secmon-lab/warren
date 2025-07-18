@@ -180,4 +180,4 @@ tool (
 	github.com/matryer/moq
 )
 
-replace github.com/modelcontextprotocol/go-sdk => github.com/modelcontextprotocol/go-sdk v0.0.0-20250627194314-8a3f272dbbcf
+// replace github.com/modelcontextprotocol/go-sdk => github.com/modelcontextprotocol/go-sdk v0.0.0-20250627194314-8a3f272dbbcf
