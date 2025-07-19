@@ -9,6 +9,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/dryrun"
+	"github.com/secmon-lab/warren/pkg/utils/embedding"
 )
 
 func (x *Warren) findNearestTicket(ctx context.Context, args map[string]any) (map[string]any, error) {
@@ -51,6 +52,61 @@ func (x *Warren) findNearestTicket(ctx context.Context, args map[string]any) (ma
 
 	return map[string]any{
 		"tickets": results,
+	}, nil
+}
+
+func (x *Warren) searchTicketsByWords(ctx context.Context, args map[string]any) (map[string]any, error) {
+	query, err := getArg[string](args, "query")
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get query")
+	}
+	if query == "" {
+		return nil, goerr.New("query is required")
+	}
+
+	// Check if LLM client is available
+	if x.llmClient == nil {
+		return nil, goerr.New("LLM client is not configured for word-based search")
+	}
+
+	limit, err := getArg[int64](args, "limit")
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get limit")
+	}
+	if limit <= 0 {
+		limit = 10 // Default limit
+	}
+
+	duration, err := getArg[int64](args, "duration")
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get duration")
+	}
+	if duration <= 0 {
+		duration = 30 // Default 30 days
+	}
+
+	// Generate embedding from the search query
+	queryEmbedding, err := embedding.Generate(ctx, x.llmClient, query)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to generate embedding for query")
+	}
+
+	now := clock.Now(ctx)
+	nearestTickets, err := x.repo.FindNearestTicketsWithSpan(ctx, queryEmbedding, now.Add(-time.Duration(duration)*24*time.Hour), now, int(limit))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to find nearest tickets")
+	}
+
+	// Convert tickets to result format
+	var results []any
+	for _, t := range nearestTickets {
+		results = append(results, t)
+	}
+
+	return map[string]any{
+		"tickets": results,
+		"query":   query,
+		"count":   len(results),
 	}, nil
 }
 

@@ -21,6 +21,7 @@ type Warren struct {
 	ticketID     types.TicketID
 	policyClient interfaces.PolicyClient
 	slackUpdate  SlackUpdateFunc
+	llmClient    gollem.LLMClient
 }
 
 var _ interfaces.Tool = &Warren{}
@@ -76,6 +77,12 @@ func WithSlackUpdate(updateFunc SlackUpdateFunc) func(*Warren) {
 	}
 }
 
+func WithLLMClient(client gollem.LLMClient) func(*Warren) {
+	return func(w *Warren) {
+		w.llmClient = client
+	}
+}
+
 func (x *Warren) Name() string {
 	return "warren"
 }
@@ -100,13 +107,14 @@ func (x *Warren) Prompt(ctx context.Context) (string, error) {
 }
 
 const (
-	cmdGetAlerts         = "warren_get_alerts"
-	cmdFindNearestTicket = "warren_find_nearest_ticket"
-	cmdListPolicies      = "warren_list_policies"
-	cmdGetPolicy         = "warren_get_policy"
-	cmdExecPolicy        = "warren_exec_policy"
-	cmdUpdateFinding     = "warren_update_finding"
-	cmdGetTicketComments = "warren_get_ticket_comments"
+	cmdGetAlerts            = "warren_get_alerts"
+	cmdFindNearestTicket    = "warren_find_nearest_ticket"
+	cmdSearchTicketsByWords = "warren_search_tickets_by_words"
+	cmdListPolicies         = "warren_list_policies"
+	cmdGetPolicy            = "warren_get_policy"
+	cmdExecPolicy           = "warren_exec_policy"
+	cmdUpdateFinding        = "warren_update_finding"
+	cmdGetTicketComments    = "warren_get_ticket_comments"
 )
 
 func IgnorableTool(name string) bool {
@@ -147,6 +155,25 @@ func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "Duration of the ticket in days",
 				},
 			},
+		},
+		{
+			Name:        cmdSearchTicketsByWords,
+			Description: "Search tickets using natural language query or keywords. Uses semantic similarity to find relevant tickets.",
+			Parameters: map[string]*gollem.Parameter{
+				"query": {
+					Type:        gollem.TypeString,
+					Description: "Search query using natural language or keywords to find similar tickets",
+				},
+				"limit": {
+					Type:        gollem.TypeInteger,
+					Description: "Maximum number of tickets to return (default: 10)",
+				},
+				"duration": {
+					Type:        gollem.TypeInteger,
+					Description: "Duration to search back in days (default: 30)",
+				},
+			},
+			Required: []string{"query"},
 		},
 		{
 			Name:        cmdListPolicies,
@@ -224,6 +251,8 @@ func (x *Warren) Run(ctx context.Context, name string, args map[string]any) (map
 		return x.getAlerts(ctx, args)
 	case cmdFindNearestTicket:
 		return x.findNearestTicket(ctx, args)
+	case cmdSearchTicketsByWords:
+		return x.searchTicketsByWords(ctx, args)
 	case cmdListPolicies:
 		return x.listPolicies(ctx, args)
 	case cmdGetPolicy:

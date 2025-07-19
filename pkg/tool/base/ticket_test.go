@@ -2,9 +2,11 @@ package base_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
@@ -158,6 +160,7 @@ func TestWarren_Specs(t *testing.T) {
 	expectedCommands := []string{
 		"warren_get_alerts",
 		"warren_find_nearest_ticket",
+		"warren_search_tickets_by_words",
 		"warren_list_policies",
 		"warren_get_policy",
 		"warren_exec_policy",
@@ -455,5 +458,109 @@ func TestWarren_GetTicketComments(t *testing.T) {
 		gt.Value(t, len(comments)).Equal(0)
 		gt.Value(t, result["total_count"].(int)).Equal(0)
 		gt.Value(t, result["has_more"].(bool)).Equal(false)
+	})
+}
+
+func TestWarren_SearchTicketsByWords(t *testing.T) {
+	repo := repository.NewMemory()
+	ctx := context.Background()
+
+	// Create test embeddings with proper dimensions (256)
+	embedding1 := make(firestore.Vector32, 256)
+	embedding2 := make(firestore.Vector32, 256)
+	queryEmbedding := make([]float64, 256)
+
+	// Fill with test values - make first embedding more similar to query
+	for i := 0; i < 256; i++ {
+		embedding1[i] = 0.1 + float32(i)*0.001
+		embedding2[i] = 0.5 + float32(i)*0.001
+		queryEmbedding[i] = 0.15 + float64(i)*0.001 // Similar to embedding1
+	}
+
+	// Create a test ticket with embedding
+	now := time.Now()
+	testTicket := ticket.Ticket{
+		ID: types.NewTicketID(),
+		Metadata: ticket.Metadata{
+			Title:       "Test security incident",
+			Description: "A suspicious malware detection alert",
+		},
+		Embedding: embedding1,
+		CreatedAt: now.Add(-time.Hour), // Created 1 hour ago
+		UpdatedAt: now.Add(-time.Hour),
+	}
+	gt.NoError(t, repo.PutTicket(ctx, testTicket))
+
+	// Create another ticket for comparison
+	testTicket2 := ticket.Ticket{
+		ID: types.NewTicketID(),
+		Metadata: ticket.Metadata{
+			Title:       "Network anomaly",
+			Description: "Unusual network traffic detected",
+		},
+		Embedding: embedding2,
+		CreatedAt: now.Add(-2 * time.Hour), // Created 2 hours ago
+		UpdatedAt: now.Add(-2 * time.Hour),
+	}
+	gt.NoError(t, repo.PutTicket(ctx, testTicket2))
+
+	// Create mock LLM client that returns a test embedding
+	mockLLM := &mock.LLMClientMock{}
+	mockLLM.GenerateEmbeddingFunc = func(ctx context.Context, dimension int, inputs []string) ([][]float64, error) {
+		// Return embedding similar to first ticket
+		return [][]float64{queryEmbedding}, nil
+	}
+
+	warren := base.New(repo, nil, testTicket.ID, base.WithLLMClient(mockLLM))
+
+	t.Run("search with query", func(t *testing.T) {
+		// Use actual JSON unmarshalling to simulate real usage
+		jsonData := `{
+			"query": "malware security incident",
+			"limit": 5,
+			"duration": 30
+		}`
+		var args map[string]any
+		gt.NoError(t, json.Unmarshal([]byte(jsonData), &args))
+
+		result, err := warren.Run(ctx, "warren_search_tickets_by_words", args)
+		gt.NoError(t, err)
+
+		// Check response structure
+		tickets, ok := result["tickets"].([]any)
+		gt.Value(t, ok).Equal(true)
+		gt.Value(t, len(tickets) > 0).Equal(true)
+
+		query, ok := result["query"].(string)
+		gt.Value(t, ok).Equal(true)
+		gt.Value(t, query).Equal("malware security incident")
+
+		count, ok := result["count"].(int)
+		gt.Value(t, ok).Equal(true)
+		gt.Value(t, count).Equal(len(tickets))
+	})
+
+	t.Run("missing query parameter", func(t *testing.T) {
+		// Use actual JSON unmarshalling - missing query field
+		jsonData := `{
+			"limit": 5
+		}`
+		var args map[string]any
+		gt.NoError(t, json.Unmarshal([]byte(jsonData), &args))
+
+		_, err := warren.Run(ctx, "warren_search_tickets_by_words", args)
+		gt.Error(t, err)
+	})
+
+	t.Run("no LLM client configured", func(t *testing.T) {
+		warrenWithoutLLM := base.New(repo, nil, testTicket.ID)
+		jsonData := `{
+			"query": "test query"
+		}`
+		var args map[string]any
+		gt.NoError(t, json.Unmarshal([]byte(jsonData), &args))
+
+		_, err := warrenWithoutLLM.Run(ctx, "warren_search_tickets_by_words", args)
+		gt.Error(t, err)
 	})
 }

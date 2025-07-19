@@ -45,7 +45,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		return threadSvc.PostFinding(ctx, *ticket.Finding)
 	}
 
-	baseAction := base.New(x.repository, x.policyClient, target.ID, base.WithSlackUpdate(slackUpdateFunc))
+	baseAction := base.New(x.repository, x.policyClient, target.ID, base.WithSlackUpdate(slackUpdateFunc), base.WithLLMClient(x.llmClient))
 	tools := append(x.tools, baseAction)
 
 	storageSvc := storage.New(x.storageClient, storage.WithPrefix(x.storagePrefix))
