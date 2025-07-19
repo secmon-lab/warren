@@ -34,6 +34,30 @@ func newFirestoreClient(t *testing.T) *repository.Firestore {
 	return client
 }
 
+// cleanupFirestoreCollection removes all documents from a Firestore collection
+func cleanupFirestoreCollection(t *testing.T, repo interfaces.Repository, collectionName string) {
+	fsRepo, ok := repo.(*repository.Firestore)
+	if !ok {
+		return // Not a Firestore repository, nothing to clean
+	}
+
+	ctx := t.Context()
+	iter := fsRepo.GetClient().Collection(collectionName).Documents(ctx)
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			t.Fatalf("failed to iterate %s: %v", collectionName, err)
+		}
+		_, err = doc.Ref.Delete(ctx)
+		if err != nil {
+			t.Fatalf("failed to delete %s document: %v", collectionName, err)
+		}
+	}
+}
+
 func newTestThread() slack.Thread {
 	return slack.Thread{
 		ChannelID: "test-channel",
@@ -516,28 +540,13 @@ func TestBatchGetTickets(t *testing.T) {
 func TestFindSimilarTickets(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
-		
+
 		// Clean up for Firestore
-		if fsRepo, ok := repo.(*repository.Firestore); ok {
-			iter := fsRepo.GetClient().Collection("tickets").Documents(ctx)
-			for {
-				doc, err := iter.Next()
-				if err == iterator.Done {
-					break
-				}
-				if err != nil {
-					t.Fatalf("failed to iterate tickets: %v", err)
-				}
-				_, err = doc.Ref.Delete(ctx)
-				if err != nil {
-					t.Fatalf("failed to delete ticket: %v", err)
-				}
-			}
-		}
-		
+		cleanupFirestoreCollection(t, repo, "tickets")
+
 		// Track created tickets for cleanup
 		var createdTickets []*ticketmodel.Ticket
-		
+
 		// Register cleanup function
 		t.Cleanup(func() {
 			if fsRepo, ok := repo.(*repository.Firestore); ok {
@@ -549,7 +558,7 @@ func TestFindSimilarTickets(t *testing.T) {
 				}
 			}
 		})
-		
+
 		tickets := make([]*ticketmodel.Ticket, 10)
 		for i := 0; i < 10; i++ {
 			// Generate random embedding array with 256 dimensions
@@ -602,28 +611,13 @@ func TestFindSimilarTickets(t *testing.T) {
 func TestFindNearestTickets(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
-		
+
 		// Clean up for Firestore
-		if fsRepo, ok := repo.(*repository.Firestore); ok {
-			iter := fsRepo.GetClient().Collection("tickets").Documents(ctx)
-			for {
-				doc, err := iter.Next()
-				if err == iterator.Done {
-					break
-				}
-				if err != nil {
-					t.Fatalf("failed to iterate tickets: %v", err)
-				}
-				_, err = doc.Ref.Delete(ctx)
-				if err != nil {
-					t.Fatalf("failed to delete ticket: %v", err)
-				}
-			}
-		}
-		
+		cleanupFirestoreCollection(t, repo, "tickets")
+
 		// Track created tickets for cleanup
 		var createdTickets []*ticketmodel.Ticket
-		
+
 		// Register cleanup function
 		t.Cleanup(func() {
 			if fsRepo, ok := repo.(*repository.Firestore); ok {
@@ -635,7 +629,7 @@ func TestFindNearestTickets(t *testing.T) {
 				}
 			}
 		})
-		
+
 		tickets := make([]*ticketmodel.Ticket, 10)
 		for i := 0; i < 10; i++ {
 			// Generate random embedding array with 256 dimensions
@@ -684,23 +678,7 @@ func TestFindNearestAlerts(t *testing.T) {
 		ctx := t.Context()
 
 		// Clean up any existing alerts with zero vectors for Firestore
-		if fsRepo, ok := repo.(*repository.Firestore); ok {
-			// Delete all alerts in the collection before test
-			iter := fsRepo.GetClient().Collection("alerts").Documents(ctx)
-			for {
-				doc, err := iter.Next()
-				if err == iterator.Done {
-					break
-				}
-				if err != nil {
-					t.Fatalf("failed to iterate alerts: %v", err)
-				}
-				_, err = doc.Ref.Delete(ctx)
-				if err != nil {
-					t.Fatalf("failed to delete alert: %v", err)
-				}
-			}
-		}
+		cleanupFirestoreCollection(t, repo, "alerts")
 
 		alerts := alert.Alerts{}
 		for i := 0; i < 10; i++ {
@@ -750,26 +728,11 @@ func TestGetAlertsWithInvalidEmbedding(t *testing.T) {
 		ctx := t.Context()
 
 		// Clean up for Firestore
-		if fsRepo, ok := repo.(*repository.Firestore); ok {
-			iter := fsRepo.GetClient().Collection("alerts").Documents(ctx)
-			for {
-				doc, err := iter.Next()
-				if err == iterator.Done {
-					break
-				}
-				if err != nil {
-					t.Fatalf("failed to iterate alerts: %v", err)
-				}
-				_, err = doc.Ref.Delete(ctx)
-				if err != nil {
-					t.Fatalf("failed to delete alert: %v", err)
-				}
-			}
-		}
+		cleanupFirestoreCollection(t, repo, "alerts")
 
 		// Track created alerts for cleanup
 		var createdAlerts []*alert.Alert
-		
+
 		// Register cleanup function
 		t.Cleanup(func() {
 			if fsRepo, ok := repo.(*repository.Firestore); ok {
@@ -873,26 +836,11 @@ func TestGetTicketsWithInvalidEmbedding(t *testing.T) {
 		ctx := t.Context()
 
 		// Clean up for Firestore
-		if fsRepo, ok := repo.(*repository.Firestore); ok {
-			iter := fsRepo.GetClient().Collection("tickets").Documents(ctx)
-			for {
-				doc, err := iter.Next()
-				if err == iterator.Done {
-					break
-				}
-				if err != nil {
-					t.Fatalf("failed to iterate tickets: %v", err)
-				}
-				_, err = doc.Ref.Delete(ctx)
-				if err != nil {
-					t.Fatalf("failed to delete ticket: %v", err)
-				}
-			}
-		}
+		cleanupFirestoreCollection(t, repo, "tickets")
 
 		// Track created tickets for cleanup
 		var createdTickets []*ticketmodel.Ticket
-		
+
 		// Register cleanup function
 		t.Cleanup(func() {
 			if fsRepo, ok := repo.(*repository.Firestore); ok {
@@ -1400,28 +1348,13 @@ func TestFindNearestTicketsWithSpan(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
 		now := time.Now()
-		
+
 		// Clean up for Firestore
-		if fsRepo, ok := repo.(*repository.Firestore); ok {
-			iter := fsRepo.GetClient().Collection("tickets").Documents(ctx)
-			for {
-				doc, err := iter.Next()
-				if err == iterator.Done {
-					break
-				}
-				if err != nil {
-					t.Fatalf("failed to iterate tickets: %v", err)
-				}
-				_, err = doc.Ref.Delete(ctx)
-				if err != nil {
-					t.Fatalf("failed to delete ticket: %v", err)
-				}
-			}
-		}
-		
+		cleanupFirestoreCollection(t, repo, "tickets")
+
 		// Track created tickets for cleanup
 		var createdTickets []*ticketmodel.Ticket
-		
+
 		// Register cleanup function
 		t.Cleanup(func() {
 			if fsRepo, ok := repo.(*repository.Firestore); ok {

@@ -811,7 +811,7 @@ func (r *Memory) GetAlertsWithInvalidEmbedding(ctx context.Context) (alert.Alert
 
 	var alerts alert.Alerts
 	for _, alert := range r.alerts {
-		if isInvalidEmbedding(alert.Embedding) {
+		if isInvalidEmbeddingMemory(alert.Embedding) {
 			alerts = append(alerts, alert)
 		}
 	}
@@ -821,13 +821,28 @@ func (r *Memory) GetAlertsWithInvalidEmbedding(ctx context.Context) (alert.Alert
 	return alerts, nil
 }
 
+// isInvalidEmbeddingMemory checks if embedding is invalid (helper for memory repository)
+func isInvalidEmbeddingMemory(embedding []float32) bool {
+	if len(embedding) == 0 {
+		return true
+	}
+
+	// Check if all values are zero
+	for _, v := range embedding {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func (r *Memory) GetTicketsWithInvalidEmbedding(ctx context.Context) ([]*ticket.Ticket, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	var tickets []*ticket.Ticket
 	for _, t := range r.tickets {
-		if isInvalidEmbedding(t.Embedding) {
+		if isInvalidEmbeddingMemory(t.Embedding) {
 			tickets = append(tickets, t)
 		}
 	}
