@@ -115,6 +115,11 @@ const (
 	cmdExecPolicy           = "warren_exec_policy"
 	cmdUpdateFinding        = "warren_update_finding"
 	cmdGetTicketComments    = "warren_get_ticket_comments"
+
+	// Default values for search operations
+	DefaultSearchTicketsLimit    = 10
+	DefaultSearchTicketsDuration = 30
+	DefaultCommentsLimit         = 50
 )
 
 func IgnorableTool(name string) bool {

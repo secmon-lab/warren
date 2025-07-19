@@ -33,7 +33,7 @@ func (x *Warren) findNearestTicket(ctx context.Context, args map[string]any) (ma
 	}
 
 	now := clock.Now(ctx)
-	nearestTickets, err := x.repo.FindNearestTicketsWithSpan(ctx, currentTicket.Embedding, now.Add(-time.Duration(duration)*24*time.Hour), now, int(limit)+1)
+	nearestTickets, err := x.repo.FindNearestTicketsWithSpan(ctx, currentTicket.Embedding, now.AddDate(0, 0, -int(duration)), now, int(limit)+1)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to find nearest tickets")
 	}
@@ -74,7 +74,7 @@ func (x *Warren) searchTicketsByWords(ctx context.Context, args map[string]any) 
 		return nil, goerr.Wrap(err, "failed to get limit")
 	}
 	if limit <= 0 {
-		limit = 10 // Default limit
+		limit = DefaultSearchTicketsLimit
 	}
 
 	duration, err := getArg[int64](args, "duration")
@@ -82,7 +82,7 @@ func (x *Warren) searchTicketsByWords(ctx context.Context, args map[string]any) 
 		return nil, goerr.Wrap(err, "failed to get duration")
 	}
 	if duration <= 0 {
-		duration = 30 // Default 30 days
+		duration = DefaultSearchTicketsDuration
 	}
 
 	// Generate embedding from the search query
@@ -92,7 +92,7 @@ func (x *Warren) searchTicketsByWords(ctx context.Context, args map[string]any) 
 	}
 
 	now := clock.Now(ctx)
-	nearestTickets, err := x.repo.FindNearestTicketsWithSpan(ctx, queryEmbedding, now.Add(-time.Duration(duration)*24*time.Hour), now, int(limit))
+	nearestTickets, err := x.repo.FindNearestTicketsWithSpan(ctx, queryEmbedding, now.AddDate(0, 0, -int(duration)), now, int(limit))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to find nearest tickets")
 	}
@@ -240,7 +240,7 @@ func (x *Warren) getTicketComments(ctx context.Context, args map[string]any) (ma
 	limit := int(limitVal)
 	offset := int(offsetVal)
 	if limit <= 0 {
-		limit = 50 // Default limit
+		limit = DefaultCommentsLimit
 	}
 	if offset < 0 {
 		offset = 0
