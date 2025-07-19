@@ -805,6 +805,50 @@ func (r *Memory) GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts, er
 	return alerts, nil
 }
 
+func (r *Memory) GetAlertsWithInvalidEmbedding(ctx context.Context) (alert.Alerts, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var alerts alert.Alerts
+	for _, alert := range r.alerts {
+		if isInvalidEmbeddingMemory(alert.Embedding) {
+			alerts = append(alerts, alert)
+		}
+	}
+	if alerts == nil {
+		return alert.Alerts{}, nil
+	}
+	return alerts, nil
+}
+
+// isInvalidEmbeddingMemory checks if embedding is invalid (helper for memory repository)
+func isInvalidEmbeddingMemory(embedding []float32) bool {
+	if len(embedding) == 0 {
+		return true
+	}
+
+	// Check if all values are zero
+	for _, v := range embedding {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func (r *Memory) GetTicketsWithInvalidEmbedding(ctx context.Context) ([]*ticket.Ticket, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var tickets []*ticket.Ticket
+	for _, t := range r.tickets {
+		if isInvalidEmbeddingMemory(t.Embedding) {
+			tickets = append(tickets, t)
+		}
+	}
+	return tickets, nil
+}
+
 func (r *Memory) FindNearestTicketsWithSpan(ctx context.Context, embedding []float32, begin, end time.Time, limit int) ([]*ticket.Ticket, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

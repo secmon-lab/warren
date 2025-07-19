@@ -84,6 +84,21 @@ func extractCountFromAggregationResult(result firestore.AggregationResult, alias
 }
 
 func (r *Firestore) PutAlert(ctx context.Context, alert alert.Alert) error {
+	// Check if embedding is zero vector and skip it to prevent Firestore vector search errors
+	if len(alert.Embedding) > 0 {
+		isZeroVector := true
+		for _, v := range alert.Embedding {
+			if v != 0 {
+				isZeroVector = false
+				break
+			}
+		}
+		if isZeroVector {
+			// Clear the embedding if it's a zero vector
+			alert.Embedding = nil
+		}
+	}
+
 	alertDoc := r.db.Collection(collectionAlerts).Doc(alert.ID.String())
 	_, err := alertDoc.Set(ctx, alert)
 	if err != nil {
@@ -697,7 +712,7 @@ func (r *Firestore) FindSimilarAlerts(ctx context.Context, target alert.Alert, l
 		FindNearest("Embedding",
 			target.Embedding,
 			limit+1, // Add 1 to exclude target itself
-			firestore.DistanceMeasureEuclidean,
+			firestore.DistanceMeasureCosine,
 			&firestore.FindNearestOptions{
 				DistanceResultField: "vector_distance",
 			})
@@ -798,7 +813,7 @@ func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32,
 		FindNearest("Embedding",
 			vector32,
 			limit,
-			firestore.DistanceMeasureEuclidean,
+			firestore.DistanceMeasureCosine,
 			&firestore.FindNearestOptions{
 				DistanceResultField: "vector_distance",
 			})
@@ -832,12 +847,24 @@ func (r *Firestore) FindNearestAlerts(ctx context.Context, embedding []float32, 
 	// Convert []float32 to firestore.Vector32
 	vector32 := firestore.Vector32(embedding[:])
 
+	// Check if the input embedding is zero vector
+	isZeroVector := true
+	for _, v := range embedding {
+		if v != 0 {
+			isZeroVector = false
+			break
+		}
+	}
+	if isZeroVector {
+		return alert.Alerts{}, nil
+	}
+
 	// Build vector search query
 	query := r.db.Collection(collectionAlerts).
 		FindNearest("Embedding",
 			vector32,
 			limit,
-			firestore.DistanceMeasureEuclidean,
+			firestore.DistanceMeasureCosine,
 			&firestore.FindNearestOptions{
 				DistanceResultField: "vector_distance",
 			})
@@ -872,6 +899,21 @@ func (r *Firestore) BatchPutAlerts(ctx context.Context, alerts alert.Alerts) err
 	var jobs []*firestore.BulkWriterJob
 
 	for _, alert := range alerts {
+		// Check if embedding is zero vector and skip it to prevent Firestore vector search errors
+		if len(alert.Embedding) > 0 {
+			isZeroVector := true
+			for _, v := range alert.Embedding {
+				if v != 0 {
+					isZeroVector = false
+					break
+				}
+			}
+			if isZeroVector {
+				// Clear the embedding if it's a zero vector
+				alert.Embedding = nil
+			}
+		}
+
 		alertDoc := r.db.Collection(collectionAlerts).Doc(alert.ID.String())
 		job, err := bw.Set(alertDoc, alert)
 		if err != nil {
@@ -1007,6 +1049,78 @@ func (r *Firestore) GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts,
 	return alerts, nil
 }
 
+func (r *Firestore) GetAlertsWithInvalidEmbedding(ctx context.Context) (alert.Alerts, error) {
+	// Get all alerts and filter for invalid embeddings
+	// This is necessary because Firestore doesn't support complex queries for array fields
+	iter := r.db.Collection(collectionAlerts).Documents(ctx)
+
+	var alerts alert.Alerts
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next alert")
+		}
+
+		var v alert.Alert
+		if err := doc.DataTo(&v); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert")
+		}
+
+		// Check if embedding is invalid (nil, empty, or zero vector)
+		if isInvalidEmbedding(v.Embedding) {
+			alerts = append(alerts, &v)
+		}
+	}
+
+	return alerts, nil
+}
+
+func (r *Firestore) GetTicketsWithInvalidEmbedding(ctx context.Context) ([]*ticket.Ticket, error) {
+	// Get all tickets and filter for invalid embeddings
+	iter := r.db.Collection(collectionTickets).Documents(ctx)
+
+	var tickets []*ticket.Ticket
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next ticket")
+		}
+
+		var t ticket.Ticket
+		if err := doc.DataTo(&t); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		// Check if embedding is invalid (nil, empty, or zero vector)
+		if isInvalidEmbedding(t.Embedding) {
+			tickets = append(tickets, &t)
+		}
+	}
+
+	return tickets, nil
+}
+
+// Helper function to check if embedding is invalid
+func isInvalidEmbedding(embedding []float32) bool {
+	if len(embedding) == 0 {
+		return true
+	}
+
+	// Check if all values are zero
+	for _, v := range embedding {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func (r *Firestore) FindNearestTicketsWithSpan(ctx context.Context, embedding []float32, begin, end time.Time, limit int) ([]*ticket.Ticket, error) {
 	iter := r.db.Collection(collectionTickets).
 		OrderBy("CreatedAt", firestore.Desc).
@@ -1015,7 +1129,7 @@ func (r *Firestore) FindNearestTicketsWithSpan(ctx context.Context, embedding []
 		FindNearest("Embedding",
 			firestore.Vector32(embedding[:]),
 			limit,
-			firestore.DistanceMeasureEuclidean,
+			firestore.DistanceMeasureCosine,
 			&firestore.FindNearestOptions{
 				DistanceResultField: "vector_distance",
 			}).Documents(ctx)
@@ -1216,9 +1330,9 @@ func (r *Firestore) CountActivities(ctx context.Context) (int, error) {
 	return extractCountFromAggregationResult(result, "count")
 }
 
-// alertIDsToInterface converts []types.AlertID to []interface{} for Firestore ArrayUnion
-func alertIDsToInterface(alertIDs []types.AlertID) []interface{} {
-	interfaces := make([]interface{}, len(alertIDs))
+// alertIDsToInterface converts []types.AlertID to []any for Firestore ArrayUnion
+func alertIDsToInterface(alertIDs []types.AlertID) []any {
+	interfaces := make([]any, len(alertIDs))
 	for i, id := range alertIDs {
 		interfaces[i] = id.String()
 	}

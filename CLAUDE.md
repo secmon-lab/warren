@@ -57,8 +57,8 @@ The application follows Domain-Driven Design (DDD) with clean architecture:
 - Uses AI to generate titles, descriptions, and semantic embeddings
 
 #### Command System
-- `pkg/service/command/` - Slack command processing (list, aggregate, ticket, recover)
-- Commands: `l`/`ls`/`list`, `a`/`aggr`/`aggregate`, `t`/`ticket`, `recover`
+- `pkg/service/command/` - Slack command processing (list, aggregate, ticket)
+- Commands: `l`/`ls`/`list`, `a`/`aggr`/`aggregate`, `t`/`ticket`
 
 #### LLM Integration
 - Uses Vertex AI Gemini for alert analysis and metadata generation

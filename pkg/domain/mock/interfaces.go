@@ -858,6 +858,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			GetAlertsBySpanFunc: func(ctx context.Context, begin time.Time, end time.Time) (alert.Alerts, error) {
 //				panic("mock out the GetAlertsBySpan method")
 //			},
+//			GetAlertsWithInvalidEmbeddingFunc: func(ctx context.Context) (alert.Alerts, error) {
+//				panic("mock out the GetAlertsWithInvalidEmbedding method")
+//			},
 //			GetLatestAlertByThreadFunc: func(ctx context.Context, thread modelslack.Thread) (*alert.Alert, error) {
 //				panic("mock out the GetLatestAlertByThread method")
 //			},
@@ -890,6 +893,9 @@ func (mock *SlackThreadServiceMock) ReplyCalls() []struct {
 //			},
 //			GetTicketsByStatusAndSpanFunc: func(ctx context.Context, status types.TicketStatus, begin time.Time, end time.Time) ([]*ticket.Ticket, error) {
 //				panic("mock out the GetTicketsByStatusAndSpan method")
+//			},
+//			GetTicketsWithInvalidEmbeddingFunc: func(ctx context.Context) ([]*ticket.Ticket, error) {
+//				panic("mock out the GetTicketsWithInvalidEmbedding method")
 //			},
 //			GetTokenFunc: func(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error) {
 //				panic("mock out the GetToken method")
@@ -994,6 +1000,9 @@ type RepositoryMock struct {
 	// GetAlertsBySpanFunc mocks the GetAlertsBySpan method.
 	GetAlertsBySpanFunc func(ctx context.Context, begin time.Time, end time.Time) (alert.Alerts, error)
 
+	// GetAlertsWithInvalidEmbeddingFunc mocks the GetAlertsWithInvalidEmbedding method.
+	GetAlertsWithInvalidEmbeddingFunc func(ctx context.Context) (alert.Alerts, error)
+
 	// GetLatestAlertByThreadFunc mocks the GetLatestAlertByThread method.
 	GetLatestAlertByThreadFunc func(ctx context.Context, thread modelslack.Thread) (*alert.Alert, error)
 
@@ -1026,6 +1035,9 @@ type RepositoryMock struct {
 
 	// GetTicketsByStatusAndSpanFunc mocks the GetTicketsByStatusAndSpan method.
 	GetTicketsByStatusAndSpanFunc func(ctx context.Context, status types.TicketStatus, begin time.Time, end time.Time) ([]*ticket.Ticket, error)
+
+	// GetTicketsWithInvalidEmbeddingFunc mocks the GetTicketsWithInvalidEmbedding method.
+	GetTicketsWithInvalidEmbeddingFunc func(ctx context.Context) ([]*ticket.Ticket, error)
 
 	// GetTokenFunc mocks the GetToken method.
 	GetTokenFunc func(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error)
@@ -1223,6 +1235,11 @@ type RepositoryMock struct {
 			// End is the end argument value.
 			End time.Time
 		}
+		// GetAlertsWithInvalidEmbedding holds details about calls to the GetAlertsWithInvalidEmbedding method.
+		GetAlertsWithInvalidEmbedding []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// GetLatestAlertByThread holds details about calls to the GetLatestAlertByThread method.
 		GetLatestAlertByThread []struct {
 			// Ctx is the ctx argument value.
@@ -1314,6 +1331,11 @@ type RepositoryMock struct {
 			// End is the end argument value.
 			End time.Time
 		}
+		// GetTicketsWithInvalidEmbedding holds details about calls to the GetTicketsWithInvalidEmbedding method.
+		GetTicketsWithInvalidEmbedding []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// GetToken holds details about calls to the GetToken method.
 		GetToken []struct {
 			// Ctx is the ctx argument value.
@@ -1402,49 +1424,51 @@ type RepositoryMock struct {
 			AlertID types.AlertID
 		}
 	}
-	lockBatchGetAlerts              sync.RWMutex
-	lockBatchGetTickets             sync.RWMutex
-	lockBatchPutAlerts              sync.RWMutex
-	lockBatchUpdateTicketsStatus    sync.RWMutex
-	lockBindAlertsToTicket          sync.RWMutex
-	lockCountActivities             sync.RWMutex
-	lockCountAlertsWithoutTicket    sync.RWMutex
-	lockCountTicketComments         sync.RWMutex
-	lockCountTicketsByStatus        sync.RWMutex
-	lockDeleteToken                 sync.RWMutex
-	lockFindNearestAlerts           sync.RWMutex
-	lockFindNearestTickets          sync.RWMutex
-	lockFindNearestTicketsWithSpan  sync.RWMutex
-	lockGetActivities               sync.RWMutex
-	lockGetAlert                    sync.RWMutex
-	lockGetAlertList                sync.RWMutex
-	lockGetAlertListByThread        sync.RWMutex
-	lockGetAlertListsInThread       sync.RWMutex
-	lockGetAlertWithoutEmbedding    sync.RWMutex
-	lockGetAlertWithoutTicket       sync.RWMutex
-	lockGetAlertsBySpan             sync.RWMutex
-	lockGetLatestAlertByThread      sync.RWMutex
-	lockGetLatestAlertListInThread  sync.RWMutex
-	lockGetLatestHistory            sync.RWMutex
-	lockGetTicket                   sync.RWMutex
-	lockGetTicketByThread           sync.RWMutex
-	lockGetTicketComments           sync.RWMutex
-	lockGetTicketCommentsPaginated  sync.RWMutex
-	lockGetTicketUnpromptedComments sync.RWMutex
-	lockGetTicketsBySpan            sync.RWMutex
-	lockGetTicketsByStatus          sync.RWMutex
-	lockGetTicketsByStatusAndSpan   sync.RWMutex
-	lockGetToken                    sync.RWMutex
-	lockPutActivity                 sync.RWMutex
-	lockPutAlert                    sync.RWMutex
-	lockPutAlertList                sync.RWMutex
-	lockPutHistory                  sync.RWMutex
-	lockPutTicket                   sync.RWMutex
-	lockPutTicketComment            sync.RWMutex
-	lockPutTicketCommentsPrompted   sync.RWMutex
-	lockPutToken                    sync.RWMutex
-	lockSearchAlerts                sync.RWMutex
-	lockUnbindAlertFromTicket       sync.RWMutex
+	lockBatchGetAlerts                 sync.RWMutex
+	lockBatchGetTickets                sync.RWMutex
+	lockBatchPutAlerts                 sync.RWMutex
+	lockBatchUpdateTicketsStatus       sync.RWMutex
+	lockBindAlertsToTicket             sync.RWMutex
+	lockCountActivities                sync.RWMutex
+	lockCountAlertsWithoutTicket       sync.RWMutex
+	lockCountTicketComments            sync.RWMutex
+	lockCountTicketsByStatus           sync.RWMutex
+	lockDeleteToken                    sync.RWMutex
+	lockFindNearestAlerts              sync.RWMutex
+	lockFindNearestTickets             sync.RWMutex
+	lockFindNearestTicketsWithSpan     sync.RWMutex
+	lockGetActivities                  sync.RWMutex
+	lockGetAlert                       sync.RWMutex
+	lockGetAlertList                   sync.RWMutex
+	lockGetAlertListByThread           sync.RWMutex
+	lockGetAlertListsInThread          sync.RWMutex
+	lockGetAlertWithoutEmbedding       sync.RWMutex
+	lockGetAlertWithoutTicket          sync.RWMutex
+	lockGetAlertsBySpan                sync.RWMutex
+	lockGetAlertsWithInvalidEmbedding  sync.RWMutex
+	lockGetLatestAlertByThread         sync.RWMutex
+	lockGetLatestAlertListInThread     sync.RWMutex
+	lockGetLatestHistory               sync.RWMutex
+	lockGetTicket                      sync.RWMutex
+	lockGetTicketByThread              sync.RWMutex
+	lockGetTicketComments              sync.RWMutex
+	lockGetTicketCommentsPaginated     sync.RWMutex
+	lockGetTicketUnpromptedComments    sync.RWMutex
+	lockGetTicketsBySpan               sync.RWMutex
+	lockGetTicketsByStatus             sync.RWMutex
+	lockGetTicketsByStatusAndSpan      sync.RWMutex
+	lockGetTicketsWithInvalidEmbedding sync.RWMutex
+	lockGetToken                       sync.RWMutex
+	lockPutActivity                    sync.RWMutex
+	lockPutAlert                       sync.RWMutex
+	lockPutAlertList                   sync.RWMutex
+	lockPutHistory                     sync.RWMutex
+	lockPutTicket                      sync.RWMutex
+	lockPutTicketComment               sync.RWMutex
+	lockPutTicketCommentsPrompted      sync.RWMutex
+	lockPutToken                       sync.RWMutex
+	lockSearchAlerts                   sync.RWMutex
+	lockUnbindAlertFromTicket          sync.RWMutex
 }
 
 // BatchGetAlerts calls BatchGetAlertsFunc.
@@ -2311,6 +2335,42 @@ func (mock *RepositoryMock) GetAlertsBySpanCalls() []struct {
 	return calls
 }
 
+// GetAlertsWithInvalidEmbedding calls GetAlertsWithInvalidEmbeddingFunc.
+func (mock *RepositoryMock) GetAlertsWithInvalidEmbedding(ctx context.Context) (alert.Alerts, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockGetAlertsWithInvalidEmbedding.Lock()
+	mock.calls.GetAlertsWithInvalidEmbedding = append(mock.calls.GetAlertsWithInvalidEmbedding, callInfo)
+	mock.lockGetAlertsWithInvalidEmbedding.Unlock()
+	if mock.GetAlertsWithInvalidEmbeddingFunc == nil {
+		var (
+			alertsOut alert.Alerts
+			errOut    error
+		)
+		return alertsOut, errOut
+	}
+	return mock.GetAlertsWithInvalidEmbeddingFunc(ctx)
+}
+
+// GetAlertsWithInvalidEmbeddingCalls gets all the calls that were made to GetAlertsWithInvalidEmbedding.
+// Check the length with:
+//
+//	len(mockedRepository.GetAlertsWithInvalidEmbeddingCalls())
+func (mock *RepositoryMock) GetAlertsWithInvalidEmbeddingCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockGetAlertsWithInvalidEmbedding.RLock()
+	calls = mock.calls.GetAlertsWithInvalidEmbedding
+	mock.lockGetAlertsWithInvalidEmbedding.RUnlock()
+	return calls
+}
+
 // GetLatestAlertByThread calls GetLatestAlertByThreadFunc.
 func (mock *RepositoryMock) GetLatestAlertByThread(ctx context.Context, thread modelslack.Thread) (*alert.Alert, error) {
 	callInfo := struct {
@@ -2776,6 +2836,42 @@ func (mock *RepositoryMock) GetTicketsByStatusAndSpanCalls() []struct {
 	mock.lockGetTicketsByStatusAndSpan.RLock()
 	calls = mock.calls.GetTicketsByStatusAndSpan
 	mock.lockGetTicketsByStatusAndSpan.RUnlock()
+	return calls
+}
+
+// GetTicketsWithInvalidEmbedding calls GetTicketsWithInvalidEmbeddingFunc.
+func (mock *RepositoryMock) GetTicketsWithInvalidEmbedding(ctx context.Context) ([]*ticket.Ticket, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockGetTicketsWithInvalidEmbedding.Lock()
+	mock.calls.GetTicketsWithInvalidEmbedding = append(mock.calls.GetTicketsWithInvalidEmbedding, callInfo)
+	mock.lockGetTicketsWithInvalidEmbedding.Unlock()
+	if mock.GetTicketsWithInvalidEmbeddingFunc == nil {
+		var (
+			ticketsOut []*ticket.Ticket
+			errOut     error
+		)
+		return ticketsOut, errOut
+	}
+	return mock.GetTicketsWithInvalidEmbeddingFunc(ctx)
+}
+
+// GetTicketsWithInvalidEmbeddingCalls gets all the calls that were made to GetTicketsWithInvalidEmbedding.
+// Check the length with:
+//
+//	len(mockedRepository.GetTicketsWithInvalidEmbeddingCalls())
+func (mock *RepositoryMock) GetTicketsWithInvalidEmbeddingCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockGetTicketsWithInvalidEmbedding.RLock()
+	calls = mock.calls.GetTicketsWithInvalidEmbedding
+	mock.lockGetTicketsWithInvalidEmbedding.RUnlock()
 	return calls
 }
 
