@@ -815,7 +815,7 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 		},
 	}
 
-	slackSvc, err := slack_svc.New(slackMock, "#test-channel", 
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel",
 		slack_svc.WithUpdaterOptions(slack_svc.WithInterval(10*time.Millisecond)))
 	gt.NoError(t, err)
 
@@ -845,7 +845,7 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 	updatedTicket, err := repo.GetTicket(ctx, testTicket.ID)
 	gt.NoError(t, err)
 	gt.Array(t, updatedTicket.AlertIDs).Length(2)
-	
+
 	// Check that both alerts are in the ticket
 	gt.Value(t, slices.Contains(updatedTicket.AlertIDs, alert1.ID)).Equal(true)
 	gt.Value(t, slices.Contains(updatedTicket.AlertIDs, alert2.ID)).Equal(true)
@@ -857,7 +857,7 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 
 	// Verify: Check that Slack was updated for the ticket and individual alerts
 	gt.Value(t, slackTicketUpdateCalled).Equal(true)
-	
+
 	// Check that individual alert messages were updated
 	updateCalls := slackMock.UpdateMessageContextCalls()
 	gt.Value(t, len(updateCalls)).Equal(2)

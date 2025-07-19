@@ -84,6 +84,21 @@ func extractCountFromAggregationResult(result firestore.AggregationResult, alias
 }
 
 func (r *Firestore) PutAlert(ctx context.Context, alert alert.Alert) error {
+	// Check if embedding is zero vector and skip it to prevent Firestore vector search errors
+	if len(alert.Embedding) > 0 {
+		isZeroVector := true
+		for _, v := range alert.Embedding {
+			if v != 0 {
+				isZeroVector = false
+				break
+			}
+		}
+		if isZeroVector {
+			// Clear the embedding if it's a zero vector
+			alert.Embedding = nil
+		}
+	}
+
 	alertDoc := r.db.Collection(collectionAlerts).Doc(alert.ID.String())
 	_, err := alertDoc.Set(ctx, alert)
 	if err != nil {
@@ -697,7 +712,7 @@ func (r *Firestore) FindSimilarAlerts(ctx context.Context, target alert.Alert, l
 		FindNearest("Embedding",
 			target.Embedding,
 			limit+1, // Add 1 to exclude target itself
-			firestore.DistanceMeasureEuclidean,
+			firestore.DistanceMeasureCosine,
 			&firestore.FindNearestOptions{
 				DistanceResultField: "vector_distance",
 			})
@@ -798,7 +813,7 @@ func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32,
 		FindNearest("Embedding",
 			vector32,
 			limit,
-			firestore.DistanceMeasureEuclidean,
+			firestore.DistanceMeasureCosine,
 			&firestore.FindNearestOptions{
 				DistanceResultField: "vector_distance",
 			})
@@ -832,12 +847,24 @@ func (r *Firestore) FindNearestAlerts(ctx context.Context, embedding []float32, 
 	// Convert []float32 to firestore.Vector32
 	vector32 := firestore.Vector32(embedding[:])
 
+	// Check if the input embedding is zero vector
+	isZeroVector := true
+	for _, v := range embedding {
+		if v != 0 {
+			isZeroVector = false
+			break
+		}
+	}
+	if isZeroVector {
+		return alert.Alerts{}, nil
+	}
+
 	// Build vector search query
 	query := r.db.Collection(collectionAlerts).
 		FindNearest("Embedding",
 			vector32,
 			limit,
-			firestore.DistanceMeasureEuclidean,
+			firestore.DistanceMeasureCosine,
 			&firestore.FindNearestOptions{
 				DistanceResultField: "vector_distance",
 			})
@@ -872,6 +899,21 @@ func (r *Firestore) BatchPutAlerts(ctx context.Context, alerts alert.Alerts) err
 	var jobs []*firestore.BulkWriterJob
 
 	for _, alert := range alerts {
+		// Check if embedding is zero vector and skip it to prevent Firestore vector search errors
+		if len(alert.Embedding) > 0 {
+			isZeroVector := true
+			for _, v := range alert.Embedding {
+				if v != 0 {
+					isZeroVector = false
+					break
+				}
+			}
+			if isZeroVector {
+				// Clear the embedding if it's a zero vector
+				alert.Embedding = nil
+			}
+		}
+
 		alertDoc := r.db.Collection(collectionAlerts).Doc(alert.ID.String())
 		job, err := bw.Set(alertDoc, alert)
 		if err != nil {
@@ -1015,7 +1057,7 @@ func (r *Firestore) FindNearestTicketsWithSpan(ctx context.Context, embedding []
 		FindNearest("Embedding",
 			firestore.Vector32(embedding[:]),
 			limit,
-			firestore.DistanceMeasureEuclidean,
+			firestore.DistanceMeasureCosine,
 			&firestore.FindNearestOptions{
 				DistanceResultField: "vector_distance",
 			}).Documents(ctx)

@@ -21,6 +21,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 	"github.com/slack-go/slack/slackevents"
+	"google.golang.org/api/iterator"
 )
 
 func newFirestoreClient(t *testing.T) *repository.Firestore {
@@ -41,6 +42,12 @@ func newTestThread() slack.Thread {
 }
 
 func newTestAlert(thread *slack.Thread) alert.Alert {
+	// Generate random embedding to avoid zero vector issues
+	embedding := make([]float32, 256)
+	for i := range embedding {
+		embedding[i] = rand.Float32()
+	}
+
 	return alert.Alert{
 		ID:          types.NewAlertID(),
 		Schema:      types.AlertSchema("test-schema." + uuid.New().String()),
@@ -53,7 +60,7 @@ func newTestAlert(thread *slack.Thread) alert.Alert {
 				{Key: "test-key", Value: "test-value"},
 			},
 		},
-		Embedding: make([]float32, 256),
+		Embedding: embedding,
 		Data:      map[string]any{"key": "value"},
 	}
 }
@@ -604,6 +611,26 @@ func TestFindNearestTickets(t *testing.T) {
 func TestFindNearestAlerts(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
+
+		// Clean up any existing alerts with zero vectors for Firestore
+		if fsRepo, ok := repo.(*repository.Firestore); ok {
+			// Delete all alerts in the collection before test
+			iter := fsRepo.GetClient().Collection("alerts").Documents(ctx)
+			for {
+				doc, err := iter.Next()
+				if err == iterator.Done {
+					break
+				}
+				if err != nil {
+					t.Fatalf("failed to iterate alerts: %v", err)
+				}
+				_, err = doc.Ref.Delete(ctx)
+				if err != nil {
+					t.Fatalf("failed to delete alert: %v", err)
+				}
+			}
+		}
+
 		alerts := alert.Alerts{}
 		for i := 0; i < 10; i++ {
 			// Generate random embedding array with 256 dimensions
