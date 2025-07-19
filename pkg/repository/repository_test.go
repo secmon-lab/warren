@@ -516,6 +516,40 @@ func TestBatchGetTickets(t *testing.T) {
 func TestFindSimilarTickets(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
+		
+		// Clean up for Firestore
+		if fsRepo, ok := repo.(*repository.Firestore); ok {
+			iter := fsRepo.GetClient().Collection("tickets").Documents(ctx)
+			for {
+				doc, err := iter.Next()
+				if err == iterator.Done {
+					break
+				}
+				if err != nil {
+					t.Fatalf("failed to iterate tickets: %v", err)
+				}
+				_, err = doc.Ref.Delete(ctx)
+				if err != nil {
+					t.Fatalf("failed to delete ticket: %v", err)
+				}
+			}
+		}
+		
+		// Track created tickets for cleanup
+		var createdTickets []*ticketmodel.Ticket
+		
+		// Register cleanup function
+		t.Cleanup(func() {
+			if fsRepo, ok := repo.(*repository.Firestore); ok {
+				for _, ticket := range createdTickets {
+					if ticket != nil {
+						doc := fsRepo.GetClient().Collection("tickets").Doc(ticket.ID.String())
+						_, _ = doc.Delete(ctx)
+					}
+				}
+			}
+		})
+		
 		tickets := make([]*ticketmodel.Ticket, 10)
 		for i := 0; i < 10; i++ {
 			// Generate random embedding array with 256 dimensions
@@ -528,6 +562,7 @@ func TestFindSimilarTickets(t *testing.T) {
 				Embedding: embeddings,
 				CreatedAt: time.Now(),
 			}
+			createdTickets = append(createdTickets, tickets[i])
 			gt.NoError(t, repo.PutTicket(ctx, *tickets[i]))
 		}
 
@@ -544,6 +579,7 @@ func TestFindSimilarTickets(t *testing.T) {
 			Embedding: newEmbedding,
 			CreatedAt: time.Now(),
 		}
+		createdTickets = append(createdTickets, &target)
 		gt.NoError(t, repo.PutTicket(ctx, target))
 		got, err := repo.FindNearestTickets(ctx, target.Embedding, 3)
 		gt.NoError(t, err).Required()
@@ -566,6 +602,40 @@ func TestFindSimilarTickets(t *testing.T) {
 func TestFindNearestTickets(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
+		
+		// Clean up for Firestore
+		if fsRepo, ok := repo.(*repository.Firestore); ok {
+			iter := fsRepo.GetClient().Collection("tickets").Documents(ctx)
+			for {
+				doc, err := iter.Next()
+				if err == iterator.Done {
+					break
+				}
+				if err != nil {
+					t.Fatalf("failed to iterate tickets: %v", err)
+				}
+				_, err = doc.Ref.Delete(ctx)
+				if err != nil {
+					t.Fatalf("failed to delete ticket: %v", err)
+				}
+			}
+		}
+		
+		// Track created tickets for cleanup
+		var createdTickets []*ticketmodel.Ticket
+		
+		// Register cleanup function
+		t.Cleanup(func() {
+			if fsRepo, ok := repo.(*repository.Firestore); ok {
+				for _, ticket := range createdTickets {
+					if ticket != nil {
+						doc := fsRepo.GetClient().Collection("tickets").Doc(ticket.ID.String())
+						_, _ = doc.Delete(ctx)
+					}
+				}
+			}
+		})
+		
 		tickets := make([]*ticketmodel.Ticket, 10)
 		for i := 0; i < 10; i++ {
 			// Generate random embedding array with 256 dimensions
@@ -578,6 +648,7 @@ func TestFindNearestTickets(t *testing.T) {
 				Embedding: embeddings,
 				CreatedAt: time.Now(),
 			}
+			createdTickets = append(createdTickets, tickets[i])
 			gt.NoError(t, repo.PutTicket(ctx, *tickets[i]))
 		}
 
@@ -661,6 +732,256 @@ func TestFindNearestAlerts(t *testing.T) {
 		gt.NoError(t, err).Required()
 		gt.Array(t, got).Longer(0).Required()
 		gt.Value(t, got[0].ID).Equal(alerts[0].ID)
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+func TestGetAlertsWithInvalidEmbedding(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+
+		// Clean up for Firestore
+		if fsRepo, ok := repo.(*repository.Firestore); ok {
+			iter := fsRepo.GetClient().Collection("alerts").Documents(ctx)
+			for {
+				doc, err := iter.Next()
+				if err == iterator.Done {
+					break
+				}
+				if err != nil {
+					t.Fatalf("failed to iterate alerts: %v", err)
+				}
+				_, err = doc.Ref.Delete(ctx)
+				if err != nil {
+					t.Fatalf("failed to delete alert: %v", err)
+				}
+			}
+		}
+
+		// Track created alerts for cleanup
+		var createdAlerts []*alert.Alert
+		
+		// Register cleanup function
+		t.Cleanup(func() {
+			if fsRepo, ok := repo.(*repository.Firestore); ok {
+				for _, a := range createdAlerts {
+					if a != nil {
+						doc := fsRepo.GetClient().Collection("alerts").Doc(a.ID.String())
+						_, _ = doc.Delete(ctx)
+					}
+				}
+			}
+		})
+
+		// Create alerts with various embedding states
+		alertsWithValidEmbedding := &alert.Alert{
+			ID:        types.NewAlertID(),
+			Schema:    types.AlertSchema("test-schema-valid"),
+			CreatedAt: time.Now(),
+			Embedding: []float32{0.1, 0.2, 0.3}, // Valid embedding
+		}
+		createdAlerts = append(createdAlerts, alertsWithValidEmbedding)
+
+		alertWithNilEmbedding := &alert.Alert{
+			ID:        types.NewAlertID(),
+			Schema:    types.AlertSchema("test-schema-nil"),
+			CreatedAt: time.Now(),
+			Embedding: nil, // Nil embedding
+		}
+		createdAlerts = append(createdAlerts, alertWithNilEmbedding)
+
+		alertWithEmptyEmbedding := &alert.Alert{
+			ID:        types.NewAlertID(),
+			Schema:    types.AlertSchema("test-schema-empty"),
+			CreatedAt: time.Now(),
+			Embedding: []float32{}, // Empty embedding
+		}
+		createdAlerts = append(createdAlerts, alertWithEmptyEmbedding)
+
+		alertWithZeroEmbedding := &alert.Alert{
+			ID:        types.NewAlertID(),
+			Schema:    types.AlertSchema("test-schema-zero"),
+			CreatedAt: time.Now(),
+			Embedding: make([]float32, 256), // Zero vector
+		}
+		createdAlerts = append(createdAlerts, alertWithZeroEmbedding)
+
+		// Put all alerts
+		gt.NoError(t, repo.PutAlert(ctx, *alertsWithValidEmbedding))
+		gt.NoError(t, repo.PutAlert(ctx, *alertWithNilEmbedding))
+		// Skip empty embedding for Firestore as it rejects empty vectors
+		if _, ok := repo.(*repository.Firestore); !ok {
+			gt.NoError(t, repo.PutAlert(ctx, *alertWithEmptyEmbedding))
+		}
+		gt.NoError(t, repo.PutAlert(ctx, *alertWithZeroEmbedding))
+
+		// Get alerts with invalid embeddings
+		invalidAlerts, err := repo.GetAlertsWithInvalidEmbedding(ctx)
+		gt.NoError(t, err).Required()
+
+		// Should return at least 2 alerts
+		// For Firestore, empty embedding will be converted to nil during PutAlert, so it might be 2 instead of 3
+		if _, ok := repo.(*repository.Firestore); ok {
+			gt.Array(t, invalidAlerts).Length(2).Required()
+		} else {
+			gt.Array(t, invalidAlerts).Length(3).Required()
+		}
+
+		// Verify the returned alerts are the ones with invalid embeddings
+		invalidIDs := map[types.AlertID]bool{
+			alertWithNilEmbedding.ID:  false,
+			alertWithZeroEmbedding.ID: false,
+		}
+		// Add empty embedding check only for Memory repo
+		if _, ok := repo.(*repository.Firestore); !ok {
+			invalidIDs[alertWithEmptyEmbedding.ID] = false
+		}
+
+		for _, alert := range invalidAlerts {
+			if _, ok := invalidIDs[alert.ID]; ok {
+				invalidIDs[alert.ID] = true
+			}
+		}
+
+		for _, found := range invalidIDs {
+			gt.True(t, found)
+		}
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+func TestGetTicketsWithInvalidEmbedding(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+
+		// Clean up for Firestore
+		if fsRepo, ok := repo.(*repository.Firestore); ok {
+			iter := fsRepo.GetClient().Collection("tickets").Documents(ctx)
+			for {
+				doc, err := iter.Next()
+				if err == iterator.Done {
+					break
+				}
+				if err != nil {
+					t.Fatalf("failed to iterate tickets: %v", err)
+				}
+				_, err = doc.Ref.Delete(ctx)
+				if err != nil {
+					t.Fatalf("failed to delete ticket: %v", err)
+				}
+			}
+		}
+
+		// Track created tickets for cleanup
+		var createdTickets []*ticketmodel.Ticket
+		
+		// Register cleanup function
+		t.Cleanup(func() {
+			if fsRepo, ok := repo.(*repository.Firestore); ok {
+				for _, ticket := range createdTickets {
+					if ticket != nil {
+						doc := fsRepo.GetClient().Collection("tickets").Doc(ticket.ID.String())
+						_, _ = doc.Delete(ctx)
+					}
+				}
+			}
+		})
+
+		// Create tickets with various embedding states
+		ticketWithValidEmbedding := &ticketmodel.Ticket{
+			ID:          types.NewTicketID(),
+			Status:      types.TicketStatusOpen,
+			CreatedAt:   time.Now(),
+			SlackThread: &slack.Thread{ChannelID: "test", ThreadID: "1"},
+			Embedding:   []float32{0.1, 0.2, 0.3}, // Valid embedding
+		}
+		createdTickets = append(createdTickets, ticketWithValidEmbedding)
+
+		ticketWithNilEmbedding := &ticketmodel.Ticket{
+			ID:          types.NewTicketID(),
+			Status:      types.TicketStatusOpen,
+			CreatedAt:   time.Now(),
+			SlackThread: &slack.Thread{ChannelID: "test", ThreadID: "2"},
+			Embedding:   nil, // Nil embedding
+		}
+		createdTickets = append(createdTickets, ticketWithNilEmbedding)
+
+		ticketWithEmptyEmbedding := &ticketmodel.Ticket{
+			ID:          types.NewTicketID(),
+			Status:      types.TicketStatusOpen,
+			CreatedAt:   time.Now(),
+			SlackThread: &slack.Thread{ChannelID: "test", ThreadID: "3"},
+			Embedding:   []float32{}, // Empty embedding
+		}
+		createdTickets = append(createdTickets, ticketWithEmptyEmbedding)
+
+		ticketWithZeroEmbedding := &ticketmodel.Ticket{
+			ID:          types.NewTicketID(),
+			Status:      types.TicketStatusOpen,
+			CreatedAt:   time.Now(),
+			SlackThread: &slack.Thread{ChannelID: "test", ThreadID: "4"},
+			Embedding:   make([]float32, 256), // Zero vector
+		}
+		createdTickets = append(createdTickets, ticketWithZeroEmbedding)
+
+		// Put all tickets
+		gt.NoError(t, repo.PutTicket(ctx, *ticketWithValidEmbedding))
+		gt.NoError(t, repo.PutTicket(ctx, *ticketWithNilEmbedding))
+		// Skip empty embedding for Firestore as it rejects empty vectors
+		if _, ok := repo.(*repository.Firestore); !ok {
+			gt.NoError(t, repo.PutTicket(ctx, *ticketWithEmptyEmbedding))
+		}
+		gt.NoError(t, repo.PutTicket(ctx, *ticketWithZeroEmbedding))
+
+		// Get tickets with invalid embeddings
+		invalidTickets, err := repo.GetTicketsWithInvalidEmbedding(ctx)
+		gt.NoError(t, err).Required()
+
+		// Should return at least 2 tickets
+		// For Firestore, empty embedding will be converted to nil during PutTicket, so it might be 2 instead of 3
+		if _, ok := repo.(*repository.Firestore); ok {
+			gt.Array(t, invalidTickets).Length(2).Required()
+		} else {
+			gt.Array(t, invalidTickets).Length(3).Required()
+		}
+
+		// Verify the returned tickets are the ones with invalid embeddings
+		invalidIDs := map[types.TicketID]bool{
+			ticketWithNilEmbedding.ID:  false,
+			ticketWithZeroEmbedding.ID: false,
+		}
+		// Add empty embedding check only for Memory repo
+		if _, ok := repo.(*repository.Firestore); !ok {
+			invalidIDs[ticketWithEmptyEmbedding.ID] = false
+		}
+
+		for _, ticket := range invalidTickets {
+			if _, ok := invalidIDs[ticket.ID]; ok {
+				invalidIDs[ticket.ID] = true
+			}
+		}
+
+		for _, found := range invalidIDs {
+			gt.True(t, found)
+		}
 	}
 
 	t.Run("Memory", func(t *testing.T) {
@@ -1079,6 +1400,39 @@ func TestFindNearestTicketsWithSpan(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
 		now := time.Now()
+		
+		// Clean up for Firestore
+		if fsRepo, ok := repo.(*repository.Firestore); ok {
+			iter := fsRepo.GetClient().Collection("tickets").Documents(ctx)
+			for {
+				doc, err := iter.Next()
+				if err == iterator.Done {
+					break
+				}
+				if err != nil {
+					t.Fatalf("failed to iterate tickets: %v", err)
+				}
+				_, err = doc.Ref.Delete(ctx)
+				if err != nil {
+					t.Fatalf("failed to delete ticket: %v", err)
+				}
+			}
+		}
+		
+		// Track created tickets for cleanup
+		var createdTickets []*ticketmodel.Ticket
+		
+		// Register cleanup function
+		t.Cleanup(func() {
+			if fsRepo, ok := repo.(*repository.Firestore); ok {
+				for _, ticket := range createdTickets {
+					if ticket != nil {
+						doc := fsRepo.GetClient().Collection("tickets").Doc(ticket.ID.String())
+						_, _ = doc.Delete(ctx)
+					}
+				}
+			}
+		})
 
 		// Generate random 256-dim embeddings
 		emb1 := make([]float32, 256)
@@ -1111,8 +1465,9 @@ func TestFindNearestTicketsWithSpan(t *testing.T) {
 			},
 		}
 
-		for _, ticket := range tickets {
-			gt.NoError(t, repo.PutTicket(ctx, ticket))
+		for i := range tickets {
+			createdTickets = append(createdTickets, &tickets[i])
+			gt.NoError(t, repo.PutTicket(ctx, tickets[i]))
 		}
 
 		begin := now.Add(-3 * time.Hour)

@@ -58,6 +58,8 @@ type Repository interface {
 	GetAlertListsInThread(ctx context.Context, thread slack.Thread) ([]*alert.List, error)
 
 	GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts, error)
+	GetAlertsWithInvalidEmbedding(ctx context.Context) (alert.Alerts, error)
+	GetTicketsWithInvalidEmbedding(ctx context.Context) ([]*ticket.Ticket, error)
 
 	// For authentication management
 	PutToken(ctx context.Context, token *auth.Token) error

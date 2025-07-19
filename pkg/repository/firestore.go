@@ -1049,6 +1049,78 @@ func (r *Firestore) GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts,
 	return alerts, nil
 }
 
+func (r *Firestore) GetAlertsWithInvalidEmbedding(ctx context.Context) (alert.Alerts, error) {
+	// Get all alerts and filter for invalid embeddings
+	// This is necessary because Firestore doesn't support complex queries for array fields
+	iter := r.db.Collection(collectionAlerts).Documents(ctx)
+
+	var alerts alert.Alerts
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next alert")
+		}
+
+		var v alert.Alert
+		if err := doc.DataTo(&v); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert")
+		}
+
+		// Check if embedding is invalid (nil, empty, or zero vector)
+		if isInvalidEmbedding(v.Embedding) {
+			alerts = append(alerts, &v)
+		}
+	}
+
+	return alerts, nil
+}
+
+func (r *Firestore) GetTicketsWithInvalidEmbedding(ctx context.Context) ([]*ticket.Ticket, error) {
+	// Get all tickets and filter for invalid embeddings
+	iter := r.db.Collection(collectionTickets).Documents(ctx)
+
+	var tickets []*ticket.Ticket
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next ticket")
+		}
+
+		var t ticket.Ticket
+		if err := doc.DataTo(&t); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		// Check if embedding is invalid (nil, empty, or zero vector)
+		if isInvalidEmbedding(t.Embedding) {
+			tickets = append(tickets, &t)
+		}
+	}
+
+	return tickets, nil
+}
+
+// Helper function to check if embedding is invalid
+func isInvalidEmbedding(embedding []float32) bool {
+	if len(embedding) == 0 {
+		return true
+	}
+
+	// Check if all values are zero
+	for _, v := range embedding {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func (r *Firestore) FindNearestTicketsWithSpan(ctx context.Context, embedding []float32, begin, end time.Time, limit int) ([]*ticket.Ticket, error) {
 	iter := r.db.Collection(collectionTickets).
 		OrderBy("CreatedAt", firestore.Desc).
@@ -1258,9 +1330,9 @@ func (r *Firestore) CountActivities(ctx context.Context) (int, error) {
 	return extractCountFromAggregationResult(result, "count")
 }
 
-// alertIDsToInterface converts []types.AlertID to []interface{} for Firestore ArrayUnion
-func alertIDsToInterface(alertIDs []types.AlertID) []interface{} {
-	interfaces := make([]interface{}, len(alertIDs))
+// alertIDsToInterface converts []types.AlertID to []any for Firestore ArrayUnion
+func alertIDsToInterface(alertIDs []types.AlertID) []any {
+	interfaces := make([]any, len(alertIDs))
 	for i, id := range alertIDs {
 		interfaces[i] = id.String()
 	}

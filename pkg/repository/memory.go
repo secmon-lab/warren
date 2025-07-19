@@ -805,6 +805,35 @@ func (r *Memory) GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts, er
 	return alerts, nil
 }
 
+func (r *Memory) GetAlertsWithInvalidEmbedding(ctx context.Context) (alert.Alerts, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var alerts alert.Alerts
+	for _, alert := range r.alerts {
+		if isInvalidEmbedding(alert.Embedding) {
+			alerts = append(alerts, alert)
+		}
+	}
+	if alerts == nil {
+		return alert.Alerts{}, nil
+	}
+	return alerts, nil
+}
+
+func (r *Memory) GetTicketsWithInvalidEmbedding(ctx context.Context) ([]*ticket.Ticket, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var tickets []*ticket.Ticket
+	for _, t := range r.tickets {
+		if isInvalidEmbedding(t.Embedding) {
+			tickets = append(tickets, t)
+		}
+	}
+	return tickets, nil
+}
+
 func (r *Memory) FindNearestTicketsWithSpan(ctx context.Context, embedding []float32, begin, end time.Time, limit int) ([]*ticket.Ticket, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
