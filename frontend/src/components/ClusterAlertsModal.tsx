@@ -1,6 +1,7 @@
 import { useState, memo, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { formatTimeAgo, getSeverityColor } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -80,31 +81,6 @@ const ClusterAlertsModal = memo(({
     onBindToTicket(clusterId);
   }, [clusterId, onBindToTicket]);
 
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
-    if (diffInHours < 1) return "Just now";
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return `${diffInDays}d ago`;
-    return date.toLocaleDateString();
-  };
-
-  const getSeverityColor = (schema: string) => {
-    const lowerSchema = schema.toLowerCase();
-    if (lowerSchema.includes('critical') || lowerSchema.includes('high')) {
-      return 'bg-red-100 text-red-800 border-red-200';
-    }
-    if (lowerSchema.includes('medium') || lowerSchema.includes('warning')) {
-      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    }
-    if (lowerSchema.includes('low') || lowerSchema.includes('info')) {
-      return 'bg-blue-100 text-blue-800 border-blue-200';
-    }
-    return 'bg-gray-100 text-gray-800 border-gray-200';
-  };
 
   const totalCount = clusterAlertsData?.clusterAlerts?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/m-mizutani/goerr"
+	goerr "github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -115,7 +115,7 @@ func (uc *ClusteringUseCase) GetClusterAlerts(ctx context.Context, clusterID str
 	uc.cache.mu.RUnlock()
 
 	if targetCluster == nil {
-		return nil, 0, goerr.New("cluster not found").With("clusterID", clusterID)
+		return nil, 0, goerr.New("cluster not found", goerr.V("clusterID", clusterID))
 	}
 
 	// Batch get alerts

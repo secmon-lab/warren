@@ -6,7 +6,7 @@ import (
 	"sort"
 
 	"cloud.google.com/go/firestore"
-	"github.com/m-mizutani/goerr"
+	goerr "github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )

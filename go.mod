@@ -16,7 +16,6 @@ require (
 	github.com/graph-gophers/dataloader/v7 v7.1.0
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/m-mizutani/clog v0.0.8
-	github.com/m-mizutani/goerr v1.0.0
 	github.com/m-mizutani/goerr/v2 v2.0.0-beta.2
 	github.com/m-mizutani/gollem v0.8.3-0.20250717005850-1feb570e3f11
 	github.com/m-mizutani/gt v0.0.16
