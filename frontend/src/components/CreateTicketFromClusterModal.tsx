@@ -125,6 +125,25 @@ const CreateTicketFromClusterModal = memo(({
     }
   }, [clusterAlertsData?.clusterAlerts?.alerts]);
 
+  const handleSelectAllInCluster = useCallback(async () => {
+    try {
+      // Fetch all alerts in the cluster without pagination
+      const allAlertsResult = await refetch({
+        clusterID: clusterId,
+        keyword: searchKeyword.trim() || undefined,
+        limit: 10000, // High limit to get all alerts
+        offset: 0,
+      });
+      
+      if (allAlertsResult.data?.clusterAlerts?.alerts) {
+        const allAlertIds = new Set(allAlertsResult.data.clusterAlerts.alerts.map(alert => alert.id));
+        setSelectedAlerts(allAlertIds);
+      }
+    } catch (error) {
+      console.error('Failed to fetch all cluster alerts:', error);
+    }
+  }, [clusterId, searchKeyword, refetch]);
+
   const handleCreateTicket = useCallback(async () => {
     if (selectedAlerts.size === 0) {
       toast({
@@ -145,7 +164,7 @@ const CreateTicketFromClusterModal = memo(({
           description: ticketDescription.trim() || undefined,
         },
       });
-    } catch (error) {
+    } catch {
       // Error handling is done in onError callback
     }
   }, [selectedAlerts, ticketTitle, ticketDescription, createTicketFromAlerts, toast]);
@@ -238,15 +257,25 @@ const CreateTicketFromClusterModal = memo(({
                 {searchKeyword ? `${totalCount} matching alerts` : `${clusterSize} total alerts`}
               </div>
               {alerts.length > 0 && (
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="select-all"
-                    checked={allCurrentPageSelected}
-                    onCheckedChange={handleSelectAll}
-                  />
-                  <Label htmlFor="select-all" className="text-sm">
-                    Select all on this page
-                  </Label>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="select-all-page"
+                      checked={allCurrentPageSelected}
+                      onCheckedChange={handleSelectAll}
+                    />
+                    <Label htmlFor="select-all-page" className="text-sm">
+                      Select all on this page
+                    </Label>
+                  </div>
+                  <Button
+                    onClick={handleSelectAllInCluster}
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                  >
+                    Select all in cluster
+                  </Button>
                 </div>
               )}
             </div>
