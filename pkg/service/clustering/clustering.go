@@ -95,7 +95,8 @@ func (s *service) ClusterAlerts(ctx context.Context, alerts []*alert.Alert, para
 		}
 
 		neighbors := s.getNeighbors(alertsWithEmbedding, i, params.Eps)
-		if len(neighbors) < params.MinSamples {
+		// In DBSCAN, we need to count the point itself
+		if len(neighbors)+1 < params.MinSamples {
 			continue // Mark as noise (already -1)
 		}
 
@@ -118,7 +119,8 @@ func (s *service) ClusterAlerts(ctx context.Context, alerts []*alert.Alert, para
 			}
 
 			currentNeighbors := s.getNeighbors(alertsWithEmbedding, currentPoint, params.Eps)
-			if len(currentNeighbors) >= params.MinSamples {
+			// In DBSCAN, we need to count the point itself
+			if len(currentNeighbors)+1 >= params.MinSamples {
 				for _, neighbor := range currentNeighbors {
 					if labels[neighbor] == -1 {
 						seeds = append(seeds, neighbor)

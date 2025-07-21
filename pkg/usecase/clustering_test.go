@@ -2,6 +2,7 @@ package usecase_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -30,8 +31,8 @@ func TestClusteringUseCase_GetAlertClusters(t *testing.T) {
 			},
 			{
 				ID:        types.AlertID("alert2"),
-				Embedding: firestore.Vector32{0.9, 0.1, 0.0},
-				TicketID:  types.EmptyTicketID, // unbound
+				Embedding: firestore.Vector32{0.99, 0.01, 0.0}, // very similar
+				TicketID:  types.EmptyTicketID,                 // unbound
 			},
 			{
 				ID:        types.AlertID("alert3"),
@@ -50,7 +51,7 @@ func TestClusteringUseCase_GetAlertClusters(t *testing.T) {
 		params := usecase.GetClustersParams{
 			MinClusterSize: 1,
 			DBSCANParams: clustering.DBSCANParams{
-				Eps:        0.3,
+				Eps:        0.15,
 				MinSamples: 2,
 			},
 		}
@@ -74,8 +75,8 @@ func TestClusteringUseCase_GetAlertClusters(t *testing.T) {
 			},
 			{
 				ID:        types.AlertID("alert2"),
-				Embedding: firestore.Vector32{0.9, 0.1, 0.0},
-				TicketID:  ticketID, // bound
+				Embedding: firestore.Vector32{0.99, 0.01, 0.0}, // very similar
+				TicketID:  ticketID,                            // bound
 			},
 		}
 
@@ -89,7 +90,7 @@ func TestClusteringUseCase_GetAlertClusters(t *testing.T) {
 		params := usecase.GetClustersParams{
 			MinClusterSize: 1,
 			DBSCANParams: clustering.DBSCANParams{
-				Eps:        0.3,
+				Eps:        0.15,
 				MinSamples: 1,
 			},
 		}
@@ -129,7 +130,7 @@ func TestClusteringUseCase_GetAlertClusters(t *testing.T) {
 		params := usecase.GetClustersParams{
 			MinClusterSize: 3,
 			DBSCANParams: clustering.DBSCANParams{
-				Eps:        0.3,
+				Eps:        0.15,
 				MinSamples: 2,
 			},
 		}
@@ -158,7 +159,7 @@ func TestClusteringUseCase_GetAlertClusters(t *testing.T) {
 
 		params := usecase.GetClustersParams{
 			DBSCANParams: clustering.DBSCANParams{
-				Eps:        0.3,
+				Eps:        0.15,
 				MinSamples: 2,
 			},
 		}
@@ -196,7 +197,7 @@ func TestClusteringUseCase_GetClusterAlerts(t *testing.T) {
 			{
 				ID:        types.AlertID("alert2"),
 				Data:      map[string]interface{}{"message": "warning in database"},
-				Embedding: firestore.Vector32{0.9, 0.1, 0.0},
+				Embedding: firestore.Vector32{0.99, 0.01, 0.0}, // very similar
 				TicketID:  types.EmptyTicketID,
 			},
 			{
@@ -215,7 +216,7 @@ func TestClusteringUseCase_GetClusterAlerts(t *testing.T) {
 		// Get clusters first to populate cache
 		params := usecase.GetClustersParams{
 			DBSCANParams: clustering.DBSCANParams{
-				Eps:        0.3,
+				Eps:        0.15,
 				MinSamples: 2,
 			},
 		}
@@ -241,7 +242,7 @@ func TestClusteringUseCase_GetClusterAlerts(t *testing.T) {
 		var alerts []alert.Alert
 		for i := 0; i < 5; i++ {
 			alerts = append(alerts, alert.Alert{
-				ID:        types.AlertID(i),
+				ID:        types.AlertID(fmt.Sprintf("alert-%d", i)),
 				Data:      map[string]interface{}{"index": i},
 				Embedding: firestore.Vector32{1.0, float32(i) * 0.01, 0.0}, // Similar embeddings
 				TicketID:  types.EmptyTicketID,
@@ -256,7 +257,7 @@ func TestClusteringUseCase_GetClusterAlerts(t *testing.T) {
 		// Get clusters
 		params := usecase.GetClustersParams{
 			DBSCANParams: clustering.DBSCANParams{
-				Eps:        0.3,
+				Eps:        0.15,
 				MinSamples: 2,
 			},
 		}

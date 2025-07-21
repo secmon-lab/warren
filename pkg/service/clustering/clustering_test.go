@@ -2,7 +2,6 @@ package clustering_test
 
 import (
 	"context"
-	"math"
 	"testing"
 
 	"cloud.google.com/go/firestore"
@@ -61,16 +60,16 @@ func TestDBSCANClustering(t *testing.T) {
 	t.Run("multiple clusters", func(t *testing.T) {
 		// Create alerts with two distinct groups
 		alerts := []*alert.Alert{
-			// Cluster 1
+			// Cluster 1 - very similar vectors
 			{ID: types.AlertID("alert1"), Embedding: firestore.Vector32{1.0, 0.0, 0.0}},
-			{ID: types.AlertID("alert2"), Embedding: firestore.Vector32{0.95, 0.05, 0.0}},
-			// Cluster 2
+			{ID: types.AlertID("alert2"), Embedding: firestore.Vector32{0.99, 0.01, 0.0}},
+			// Cluster 2 - very similar vectors
 			{ID: types.AlertID("alert3"), Embedding: firestore.Vector32{0.0, 1.0, 0.0}},
-			{ID: types.AlertID("alert4"), Embedding: firestore.Vector32{0.05, 0.95, 0.0}},
+			{ID: types.AlertID("alert4"), Embedding: firestore.Vector32{0.01, 0.99, 0.0}},
 		}
 
 		result, err := service.ClusterAlerts(ctx, alerts, clustering.DBSCANParams{
-			Eps:        0.5,
+			Eps:        0.15,
 			MinSamples: 2,
 		})
 		gt.NoError(t, err)
@@ -81,16 +80,16 @@ func TestDBSCANClustering(t *testing.T) {
 	t.Run("noise points", func(t *testing.T) {
 		// Create alerts with outliers
 		alerts := []*alert.Alert{
-			// Cluster
+			// Cluster - very similar vectors
 			{ID: types.AlertID("alert1"), Embedding: firestore.Vector32{1.0, 0.0, 0.0}},
-			{ID: types.AlertID("alert2"), Embedding: firestore.Vector32{0.95, 0.05, 0.0}},
+			{ID: types.AlertID("alert2"), Embedding: firestore.Vector32{0.99, 0.01, 0.0}},
 			// Noise points (isolated)
 			{ID: types.AlertID("alert3"), Embedding: firestore.Vector32{0.0, 0.0, 1.0}},
 			{ID: types.AlertID("alert4"), Embedding: firestore.Vector32{-1.0, 0.0, 0.0}},
 		}
 
 		result, err := service.ClusterAlerts(ctx, alerts, clustering.DBSCANParams{
-			Eps:        0.5,
+			Eps:        0.15,
 			MinSamples: 2,
 		})
 		gt.NoError(t, err)
@@ -117,18 +116,18 @@ func TestDBSCANClustering(t *testing.T) {
 	t.Run("clusters sorted by size", func(t *testing.T) {
 		// Create alerts with different cluster sizes
 		alerts := []*alert.Alert{
-			// Small cluster
+			// Small cluster - very similar vectors
 			{ID: types.AlertID("alert1"), Embedding: firestore.Vector32{1.0, 0.0, 0.0}},
-			{ID: types.AlertID("alert2"), Embedding: firestore.Vector32{0.95, 0.05, 0.0}},
-			// Large cluster
+			{ID: types.AlertID("alert2"), Embedding: firestore.Vector32{0.99, 0.01, 0.0}},
+			// Large cluster - very similar vectors
 			{ID: types.AlertID("alert3"), Embedding: firestore.Vector32{0.0, 1.0, 0.0}},
-			{ID: types.AlertID("alert4"), Embedding: firestore.Vector32{0.05, 0.95, 0.0}},
-			{ID: types.AlertID("alert5"), Embedding: firestore.Vector32{0.0, 0.95, 0.05}},
-			{ID: types.AlertID("alert6"), Embedding: firestore.Vector32{0.05, 0.9, 0.05}},
+			{ID: types.AlertID("alert4"), Embedding: firestore.Vector32{0.01, 0.99, 0.0}},
+			{ID: types.AlertID("alert5"), Embedding: firestore.Vector32{0.0, 0.99, 0.01}},
+			{ID: types.AlertID("alert6"), Embedding: firestore.Vector32{0.01, 0.98, 0.01}},
 		}
 
 		result, err := service.ClusterAlerts(ctx, alerts, clustering.DBSCANParams{
-			Eps:        0.5,
+			Eps:        0.15,
 			MinSamples: 2,
 		})
 		gt.NoError(t, err)
@@ -196,26 +195,11 @@ func TestCosineDistance(t *testing.T) {
 		}
 
 		result, err := service.ClusterAlerts(ctx, alerts, clustering.DBSCANParams{
-			Eps:        0.5, // Cosine distance between orthogonal vectors is 1.0
+			Eps:        0.15, // Cosine distance between orthogonal vectors is 1.0
 			MinSamples: 2,
 		})
 		gt.NoError(t, err)
 		gt.Equal(t, len(result.Clusters), 0)
 		gt.Equal(t, len(result.NoiseAlertIDs), 2)
 	})
-}
-
-// Helper function to normalize a vector
-func normalize(v []float32) firestore.Vector32 {
-	norm := float32(0.0)
-	for _, val := range v {
-		norm += val * val
-	}
-	norm = float32(math.Sqrt(float64(norm)))
-
-	normalized := make(firestore.Vector32, len(v))
-	for i, val := range v {
-		normalized[i] = val / norm
-	}
-	return normalized
 }
