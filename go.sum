@@ -242,6 +242,8 @@ github.com/lestrrat-go/option v1.0.1 h1:oAzP2fvZGQKWkvHa1/SAcFolBEca1oN+mQ7eooNB
 github.com/lestrrat-go/option v1.0.1/go.mod h1:5ZHFbivi4xwXxhxY9XHDe2FHo6/Z7WWmtT7T5nBBp3I=
 github.com/m-mizutani/clog v0.0.8 h1:keZtDEAtBmLc2HEF1z0CVeSYn+7VQ74UQC4BYeBKgK8=
 github.com/m-mizutani/clog v0.0.8/go.mod h1:f3mNeMaSkE0SIQG/dR1xDu2hAfbptqdvI5CIRbzG34A=
+github.com/m-mizutani/goerr v1.0.0 h1:Qugt5SOgewtoE10r7of83ngbL9glRt+vSIxHcKfIfjo=
+github.com/m-mizutani/goerr v1.0.0/go.mod h1:OoNepSLW5oF3dQWWZ3D2lVOTbzRsePvc6LrqhXcff5Y=
 github.com/m-mizutani/goerr/v2 v2.0.0-beta.2 h1:3aA8RKFlWS6kX99+AJohdgIxiE5+Qwv6aIUD1QQXS2E=
 github.com/m-mizutani/goerr/v2 v2.0.0-beta.2/go.mod h1:K9+tBb0+0681yHpyHYqJmoijxn9qJf5grjRb9nMXevc=
 github.com/m-mizutani/gollem v0.8.3-0.20250717005850-1feb570e3f11 h1:QkCS+jDOa9UgQIXmk5vfsu6yEiQyF/HcSTlOACqBdb4=

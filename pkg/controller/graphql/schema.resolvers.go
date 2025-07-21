@@ -7,6 +7,7 @@ package graphql
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	goerr "github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -15,6 +16,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/service/clustering"
+	"github.com/secmon-lab/warren/pkg/usecase"
 )
 
 // User is the resolver for the user field.
@@ -306,6 +309,98 @@ func (r *mutationResolver) BindAlertsToTicket(ctx context.Context, ticketID stri
 
 	// Get updated ticket
 	updatedTicket, err := r.repo.GetTicket(ctx, types.TicketID(ticketID))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get updated ticket")
+	}
+
+	return updatedTicket, nil
+}
+
+// CreateTicketFromCluster is the resolver for the createTicketFromCluster field.
+func (r *mutationResolver) CreateTicketFromCluster(ctx context.Context, clusterID string, alertIDs []string, title *string, description *string) (*ticket.Ticket, error) {
+	// Authentication check
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "authentication required")
+	}
+
+	// Create user from authentication token
+	user := &slack.User{
+		ID:   token.Sub,
+		Name: token.Name,
+	}
+
+	// Convert string alert IDs to types.AlertID
+	alertIDsTyped := make([]types.AlertID, len(alertIDs))
+	for i, id := range alertIDs {
+		alertIDsTyped[i] = types.AlertID(id)
+	}
+
+	// Prepare title and description
+	titleStr := ""
+	if title != nil {
+		titleStr = *title
+	}
+	descStr := ""
+	if description != nil {
+		descStr = *description
+	}
+
+	// For now, use CreateTicketFromAlerts when title is empty for auto-generation
+	if titleStr == "" {
+		createdTicket, err := r.uc.CreateTicketFromAlerts(ctx, alertIDsTyped, user, nil)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to create ticket from cluster")
+		}
+		return createdTicket, nil
+	}
+
+	// When title is provided, create a manual ticket first, then bind alerts
+	createdTicket, err := r.uc.CreateManualTicket(ctx, titleStr, descStr, user)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to create manual ticket")
+	}
+
+	// Bind alerts to the created ticket
+	err = r.uc.BindAlertsToTicket(ctx, createdTicket.ID, alertIDsTyped)
+	if err != nil {
+		// If binding fails, we should ideally delete the ticket, but for now just return error
+		return nil, goerr.Wrap(err, "failed to bind alerts to ticket")
+	}
+
+	// Get the updated ticket with alerts
+	updatedTicket, err := r.repo.GetTicket(ctx, createdTicket.ID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get updated ticket")
+	}
+
+	return updatedTicket, nil
+}
+
+// BindClusterToTicket is the resolver for the bindClusterToTicket field.
+func (r *mutationResolver) BindClusterToTicket(ctx context.Context, clusterID string, ticketID string, alertIDs []string) (*ticket.Ticket, error) {
+	// Authentication check
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "authentication required")
+	}
+	_ = token // For now, just check authentication
+
+	// Convert string IDs to typed IDs
+	ticketIDTyped := types.TicketID(ticketID)
+	alertIDsTyped := make([]types.AlertID, len(alertIDs))
+	for i, id := range alertIDs {
+		alertIDsTyped[i] = types.AlertID(id)
+	}
+
+	// Use existing BindAlertsToTicket method (which returns error only)
+	err = r.uc.BindAlertsToTicket(ctx, ticketIDTyped, alertIDsTyped)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to bind cluster to ticket")
+	}
+
+	// Get the updated ticket
+	updatedTicket, err := r.repo.GetTicket(ctx, ticketIDTyped)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get updated ticket")
 	}
@@ -666,6 +761,98 @@ func (r *queryResolver) Activities(ctx context.Context, offset *int, limit *int)
 	}, nil
 }
 
+// AlertClusters is the resolver for the alertClusters field.
+func (r *queryResolver) AlertClusters(ctx context.Context, limit *int, offset *int, minClusterSize *int, eps *float64, minSamples *int) (*graphql1.ClusteringSummary, error) {
+	// Authentication check
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "authentication required")
+	}
+	_ = token // For now, just check authentication
+
+	// Set default values
+	l := 50
+	if limit != nil {
+		l = *limit
+	}
+	o := 0
+	if offset != nil {
+		o = *offset
+	}
+	mcs := 1
+	if minClusterSize != nil {
+		mcs = *minClusterSize
+	}
+
+	// Set DBSCAN parameters with defaults
+	epsVal := 0.15 // Default adjusted for cosine distance
+	if eps != nil {
+		epsVal = *eps
+	}
+	minSamplesVal := 2
+	if minSamples != nil {
+		minSamplesVal = *minSamples
+	}
+
+	// Call clustering use case
+	params := usecase.GetClustersParams{
+		MinClusterSize: mcs,
+		Limit:          l,
+		Offset:         o,
+		DBSCANParams: clustering.DBSCANParams{
+			Eps:        epsVal,
+			MinSamples: minSamplesVal,
+		},
+	}
+
+	summary, err := r.uc.ClusteringUC.GetAlertClusters(ctx, params)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get alert clusters")
+	}
+
+	// Convert to GraphQL model
+	result, err := r.convertToGraphQLClusteringSummary(ctx, summary)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to convert clustering summary")
+	}
+	return result, nil
+}
+
+// ClusterAlerts is the resolver for the clusterAlerts field.
+func (r *queryResolver) ClusterAlerts(ctx context.Context, clusterID string, keyword *string, limit *int, offset *int) (*graphql1.AlertsConnection, error) {
+	// Authentication check
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "authentication required")
+	}
+	_ = token
+
+	// Set default values
+	l := 50
+	if limit != nil {
+		l = *limit
+	}
+	o := 0
+	if offset != nil {
+		o = *offset
+	}
+	kw := ""
+	if keyword != nil {
+		kw = *keyword
+	}
+
+	// Call clustering use case
+	alerts, totalCount, err := r.uc.ClusteringUC.GetClusterAlerts(ctx, clusterID, kw, l, o)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get cluster alerts")
+	}
+
+	return &graphql1.AlertsConnection{
+		Alerts:     alerts,
+		TotalCount: totalCount,
+	}, nil
+}
+
 // ID is the resolver for the id field.
 func (r *ticketResolver) ID(ctx context.Context, obj *ticket.Ticket) (string, error) {
 	return string(obj.ID), nil
@@ -822,3 +1009,62 @@ type findingResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }
+
+// Helper functions for clustering
+
+func (r *queryResolver) convertToGraphQLClusteringSummary(ctx context.Context, summary *usecase.ClusteringSummary) (*graphql1.ClusteringSummary, error) {
+	clusters := make([]*graphql1.AlertCluster, len(summary.Clusters))
+	for i, cluster := range summary.Clusters {
+		graphqlCluster, err := r.convertToGraphQLAlertCluster(ctx, cluster)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to convert alert cluster")
+		}
+		clusters[i] = graphqlCluster
+	}
+
+	// Fetch noise alerts
+	noiseAlerts := make([]*alert.Alert, len(summary.NoiseAlertIDs))
+	for i, alertID := range summary.NoiseAlertIDs {
+		alertData, err := r.repo.GetAlert(ctx, alertID)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to get noise alert", goerr.V("alertID", alertID))
+		}
+		noiseAlerts[i] = alertData
+	}
+
+	return &graphql1.ClusteringSummary{
+		Clusters:    clusters,
+		NoiseAlerts: noiseAlerts,
+		Parameters: &graphql1.DBSCANParameters{
+			Eps:        summary.Parameters.Eps,
+			MinSamples: summary.Parameters.MinSamples,
+		},
+		ComputedAt: summary.ComputedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}, nil
+}
+func (r *queryResolver) convertToGraphQLAlertCluster(ctx context.Context, cluster *clustering.AlertCluster) (*graphql1.AlertCluster, error) {
+	// Fetch center alert
+	centerAlert, err := r.repo.GetAlert(ctx, cluster.CenterAlertID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get center alert", goerr.V("centerAlertID", cluster.CenterAlertID))
+	}
+
+	// Fetch all alerts in the cluster
+	alerts := make([]*alert.Alert, len(cluster.AlertIDs))
+	for i, alertID := range cluster.AlertIDs {
+		alertData, err := r.repo.GetAlert(ctx, alertID)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to get cluster alert", goerr.V("alertID", alertID))
+		}
+		alerts[i] = alertData
+	}
+
+	return &graphql1.AlertCluster{
+		ID:          cluster.ID,
+		CenterAlert: centerAlert,
+		Alerts:      alerts,
+		Size:        cluster.Size,
+		Keywords:    cluster.Keywords,
+		CreatedAt:   time.Now().Format("2006-01-02T15:04:05Z07:00"), // Use current time as creation time
+	}, nil
+}

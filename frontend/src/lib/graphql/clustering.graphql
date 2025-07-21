@@ -1,0 +1,77 @@
+# Alert Clustering GraphQL Queries and Mutations
+
+# Query to get alert clusters
+query AlertClusters($limit: Int, $offset: Int, $minClusterSize: Int, $eps: Float, $minSamples: Int) {
+  alertClusters(limit: $limit, offset: $offset, minClusterSize: $minClusterSize, eps: $eps, minSamples: $minSamples) {
+    clusters {
+      id
+      size
+      keywords
+      createdAt
+      centerAlert {
+        id
+        title
+        description
+        schema
+        data
+        createdAt
+      }
+    }
+    noiseAlerts {
+      id
+      title
+      description
+      schema
+      createdAt
+    }
+    parameters {
+      eps
+      minSamples
+    }
+    computedAt
+  }
+}
+
+# Query to get alerts in a specific cluster
+query ClusterAlerts($clusterID: ID!, $keyword: String, $limit: Int, $offset: Int) {
+  clusterAlerts(clusterID: $clusterID, keyword: $keyword, limit: $limit, offset: $offset) {
+    alerts {
+      id
+      title
+      description
+      schema
+      data
+      createdAt
+      ticket {
+        id
+        title
+        status
+      }
+    }
+    totalCount
+  }
+}
+
+# Mutation to create a ticket from cluster
+mutation CreateTicketFromCluster($clusterID: ID!, $alertIDs: [ID!]!, $title: String, $description: String) {
+  createTicketFromCluster(clusterID: $clusterID, alertIDs: $alertIDs, title: $title, description: $description) {
+    id
+    title
+    description
+    status
+    createdAt
+    alertsCount
+  }
+}
+
+# Mutation to bind cluster to existing ticket
+mutation BindClusterToTicket($clusterID: ID!, $ticketID: ID!, $alertIDs: [ID!]!) {
+  bindClusterToTicket(clusterID: $clusterID, ticketID: $ticketID, alertIDs: $alertIDs) {
+    id
+    title
+    description
+    status
+    updatedAt
+    alertsCount
+  }
+}

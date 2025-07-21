@@ -13,6 +13,7 @@ import TicketDetailPage from "@/pages/TicketDetailPage";
 import AlertsPage from "@/pages/AlertsPage";
 import AlertDetailPage from "@/pages/AlertDetailPage";
 import BoardPage from "@/pages/BoardPage";
+import ClusteringPage from "@/pages/ClusteringPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 
 function AuthenticatedApp() {
@@ -25,6 +26,7 @@ function AuthenticatedApp() {
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/alerts/:id" element={<AlertDetailPage />} />
         <Route path="/board" element={<BoardPage />} />
+        <Route path="/clusters" element={<ClusteringPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </MainLayout>

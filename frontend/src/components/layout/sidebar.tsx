@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, List, Kanban, AlertTriangle } from "lucide-react";
+import { Home, List, Kanban, AlertTriangle, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -18,6 +18,11 @@ const navigation = [
     name: "Alerts",
     href: "/alerts",
     icon: AlertTriangle,
+  },
+  {
+    name: "Clusters",
+    href: "/clusters",
+    icon: GitBranch,
   },
   {
     name: "Board",
