@@ -318,28 +318,6 @@ export type User = {
   name: Scalars['String']['output'];
 };
 
-export type AlertClustersQueryVariables = Exact<{
-  limit?: InputMaybe<Scalars['Int']['input']>;
-  offset?: InputMaybe<Scalars['Int']['input']>;
-  minClusterSize?: InputMaybe<Scalars['Int']['input']>;
-  eps?: InputMaybe<Scalars['Float']['input']>;
-  minSamples?: InputMaybe<Scalars['Int']['input']>;
-  keyword?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type AlertClustersQuery = { __typename?: 'Query', alertClusters: { __typename?: 'ClusteringSummary', computedAt: string, totalCount: number, clusters: Array<{ __typename?: 'AlertCluster', id: string, size: number, keywords?: Array<string> | null, createdAt: string, centerAlert: { __typename?: 'Alert', id: string, title: string, description?: string | null, schema: string, data: string, createdAt: string } }>, noiseAlerts: Array<{ __typename?: 'Alert', id: string, title: string, description?: string | null, schema: string, createdAt: string }>, parameters: { __typename?: 'DBSCANParameters', eps: number, minSamples: number } } };
-
-export type ClusterAlertsQueryVariables = Exact<{
-  clusterID: Scalars['ID']['input'];
-  keyword?: InputMaybe<Scalars['String']['input']>;
-  limit?: InputMaybe<Scalars['Int']['input']>;
-  offset?: InputMaybe<Scalars['Int']['input']>;
-}>;
-
-
-export type ClusterAlertsQuery = { __typename?: 'Query', clusterAlerts: { __typename?: 'AlertsConnection', totalCount: number, alerts: Array<{ __typename?: 'Alert', id: string, title: string, description?: string | null, schema: string, data: string, createdAt: string, ticket?: { __typename?: 'Ticket', id: string, title: string, status: string } | null }> } };
-
 export type GetTicketsQueryVariables = Exact<{
   statuses?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -493,83 +471,29 @@ export type CreateTicketFromAlertsMutationVariables = Exact<{
 
 export type CreateTicketFromAlertsMutation = { __typename?: 'Mutation', createTicketFromAlerts: { __typename?: 'Ticket', id: string, status: string, title: string, description: string, summary: string, isTest: boolean, createdAt: string, updatedAt: string, alertsCount: number, assignee?: { __typename?: 'User', id: string, name: string } | null, alerts: Array<{ __typename?: 'Alert', id: string, title: string, description?: string | null }> } };
 
+export type AlertClustersQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  minClusterSize?: InputMaybe<Scalars['Int']['input']>;
+  eps?: InputMaybe<Scalars['Float']['input']>;
+  minSamples?: InputMaybe<Scalars['Int']['input']>;
+  keyword?: InputMaybe<Scalars['String']['input']>;
+}>;
 
-export const AlertClustersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"AlertClusters"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"minClusterSize"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"eps"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Float"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"minSamples"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"alertClusters"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"minClusterSize"},"value":{"kind":"Variable","name":{"kind":"Name","value":"minClusterSize"}}},{"kind":"Argument","name":{"kind":"Name","value":"eps"},"value":{"kind":"Variable","name":{"kind":"Name","value":"eps"}}},{"kind":"Argument","name":{"kind":"Name","value":"minSamples"},"value":{"kind":"Variable","name":{"kind":"Name","value":"minSamples"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"clusters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"size"}},{"kind":"Field","name":{"kind":"Name","value":"keywords"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"centerAlert"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"schema"}},{"kind":"Field","name":{"kind":"Name","value":"data"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"noiseAlerts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"schema"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"parameters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eps"}},{"kind":"Field","name":{"kind":"Name","value":"minSamples"}}]}},{"kind":"Field","name":{"kind":"Name","value":"computedAt"}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
 
-/**
- * __useAlertClustersQuery__
- *
- * To run a query within a React component, call `useAlertClustersQuery` and pass it any options that fit your needs.
- * When your component renders, `useAlertClustersQuery` returns an object from Apollo Client that contains loading, error, and data properties
- * you can use to render your UI.
- *
- * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
- *
- * @example
- * const { data, loading, error } = useAlertClustersQuery({
- *   variables: {
- *      limit: // value for 'limit'
- *      offset: // value for 'offset'
- *      minClusterSize: // value for 'minClusterSize'
- *      eps: // value for 'eps'
- *      minSamples: // value for 'minSamples'
- *      keyword: // value for 'keyword'
- *   },
- * });
- */
-export function useAlertClustersQuery(baseOptions?: Apollo.QueryHookOptions<AlertClustersQuery, AlertClustersQueryVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<AlertClustersQuery, AlertClustersQueryVariables>(AlertClustersDocument, options);
-      }
-export function useAlertClustersLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<AlertClustersQuery, AlertClustersQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<AlertClustersQuery, AlertClustersQueryVariables>(AlertClustersDocument, options);
-        }
-export function useAlertClustersSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<AlertClustersQuery, AlertClustersQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<AlertClustersQuery, AlertClustersQueryVariables>(AlertClustersDocument, options);
-        }
-export type AlertClustersQueryHookResult = ReturnType<typeof useAlertClustersQuery>;
-export type AlertClustersLazyQueryHookResult = ReturnType<typeof useAlertClustersLazyQuery>;
-export type AlertClustersSuspenseQueryHookResult = ReturnType<typeof useAlertClustersSuspenseQuery>;
-export type AlertClustersQueryResult = Apollo.QueryResult<AlertClustersQuery, AlertClustersQueryVariables>;
-export const ClusterAlertsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ClusterAlerts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"clusterID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"clusterAlerts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"clusterID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"clusterID"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"alerts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"schema"}},{"kind":"Field","name":{"kind":"Name","value":"data"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"ticket"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
+export type AlertClustersQuery = { __typename?: 'Query', alertClusters: { __typename?: 'ClusteringSummary', computedAt: string, totalCount: number, clusters: Array<{ __typename?: 'AlertCluster', id: string, size: number, keywords?: Array<string> | null, createdAt: string, centerAlert: { __typename?: 'Alert', id: string, title: string, description?: string | null, schema: string, data: string, createdAt: string } }>, noiseAlerts: Array<{ __typename?: 'Alert', id: string, title: string, description?: string | null, schema: string, createdAt: string }>, parameters: { __typename?: 'DBSCANParameters', eps: number, minSamples: number } } };
 
-/**
- * __useClusterAlertsQuery__
- *
- * To run a query within a React component, call `useClusterAlertsQuery` and pass it any options that fit your needs.
- * When your component renders, `useClusterAlertsQuery` returns an object from Apollo Client that contains loading, error, and data properties
- * you can use to render your UI.
- *
- * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
- *
- * @example
- * const { data, loading, error } = useClusterAlertsQuery({
- *   variables: {
- *      clusterID: // value for 'clusterID'
- *      keyword: // value for 'keyword'
- *      limit: // value for 'limit'
- *      offset: // value for 'offset'
- *   },
- * });
- */
-export function useClusterAlertsQuery(baseOptions: Apollo.QueryHookOptions<ClusterAlertsQuery, ClusterAlertsQueryVariables> & ({ variables: ClusterAlertsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<ClusterAlertsQuery, ClusterAlertsQueryVariables>(ClusterAlertsDocument, options);
-      }
-export function useClusterAlertsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<ClusterAlertsQuery, ClusterAlertsQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<ClusterAlertsQuery, ClusterAlertsQueryVariables>(ClusterAlertsDocument, options);
-        }
-export function useClusterAlertsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<ClusterAlertsQuery, ClusterAlertsQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<ClusterAlertsQuery, ClusterAlertsQueryVariables>(ClusterAlertsDocument, options);
-        }
-export type ClusterAlertsQueryHookResult = ReturnType<typeof useClusterAlertsQuery>;
-export type ClusterAlertsLazyQueryHookResult = ReturnType<typeof useClusterAlertsLazyQuery>;
-export type ClusterAlertsSuspenseQueryHookResult = ReturnType<typeof useClusterAlertsSuspenseQuery>;
-export type ClusterAlertsQueryResult = Apollo.QueryResult<ClusterAlertsQuery, ClusterAlertsQueryVariables>;
+export type ClusterAlertsQueryVariables = Exact<{
+  clusterID: Scalars['ID']['input'];
+  keyword?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type ClusterAlertsQuery = { __typename?: 'Query', clusterAlerts: { __typename?: 'AlertsConnection', totalCount: number, alerts: Array<{ __typename?: 'Alert', id: string, title: string, description?: string | null, schema: string, data: string, createdAt: string, ticket?: { __typename?: 'Ticket', id: string, title: string, status: string } | null }> } };
+
+
 export const GetTicketsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTickets"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"statuses"},"value":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"commentsCount"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
 
 /**
@@ -1161,3 +1085,79 @@ export function useCreateTicketFromAlertsMutation(baseOptions?: Apollo.MutationH
 export type CreateTicketFromAlertsMutationHookResult = ReturnType<typeof useCreateTicketFromAlertsMutation>;
 export type CreateTicketFromAlertsMutationResult = Apollo.MutationResult<CreateTicketFromAlertsMutation>;
 export type CreateTicketFromAlertsMutationOptions = Apollo.BaseMutationOptions<CreateTicketFromAlertsMutation, CreateTicketFromAlertsMutationVariables>;
+export const AlertClustersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"AlertClusters"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"minClusterSize"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"eps"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Float"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"minSamples"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"alertClusters"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"minClusterSize"},"value":{"kind":"Variable","name":{"kind":"Name","value":"minClusterSize"}}},{"kind":"Argument","name":{"kind":"Name","value":"eps"},"value":{"kind":"Variable","name":{"kind":"Name","value":"eps"}}},{"kind":"Argument","name":{"kind":"Name","value":"minSamples"},"value":{"kind":"Variable","name":{"kind":"Name","value":"minSamples"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"clusters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"size"}},{"kind":"Field","name":{"kind":"Name","value":"keywords"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"centerAlert"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"schema"}},{"kind":"Field","name":{"kind":"Name","value":"data"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"noiseAlerts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"schema"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"parameters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eps"}},{"kind":"Field","name":{"kind":"Name","value":"minSamples"}}]}},{"kind":"Field","name":{"kind":"Name","value":"computedAt"}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useAlertClustersQuery__
+ *
+ * To run a query within a React component, call `useAlertClustersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useAlertClustersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useAlertClustersQuery({
+ *   variables: {
+ *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
+ *      minClusterSize: // value for 'minClusterSize'
+ *      eps: // value for 'eps'
+ *      minSamples: // value for 'minSamples'
+ *      keyword: // value for 'keyword'
+ *   },
+ * });
+ */
+export function useAlertClustersQuery(baseOptions?: Apollo.QueryHookOptions<AlertClustersQuery, AlertClustersQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<AlertClustersQuery, AlertClustersQueryVariables>(AlertClustersDocument, options);
+      }
+export function useAlertClustersLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<AlertClustersQuery, AlertClustersQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<AlertClustersQuery, AlertClustersQueryVariables>(AlertClustersDocument, options);
+        }
+export function useAlertClustersSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<AlertClustersQuery, AlertClustersQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<AlertClustersQuery, AlertClustersQueryVariables>(AlertClustersDocument, options);
+        }
+export type AlertClustersQueryHookResult = ReturnType<typeof useAlertClustersQuery>;
+export type AlertClustersLazyQueryHookResult = ReturnType<typeof useAlertClustersLazyQuery>;
+export type AlertClustersSuspenseQueryHookResult = ReturnType<typeof useAlertClustersSuspenseQuery>;
+export type AlertClustersQueryResult = Apollo.QueryResult<AlertClustersQuery, AlertClustersQueryVariables>;
+export const ClusterAlertsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ClusterAlerts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"clusterID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"clusterAlerts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"clusterID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"clusterID"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"alerts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"schema"}},{"kind":"Field","name":{"kind":"Name","value":"data"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"ticket"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useClusterAlertsQuery__
+ *
+ * To run a query within a React component, call `useClusterAlertsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useClusterAlertsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useClusterAlertsQuery({
+ *   variables: {
+ *      clusterID: // value for 'clusterID'
+ *      keyword: // value for 'keyword'
+ *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
+ *   },
+ * });
+ */
+export function useClusterAlertsQuery(baseOptions: Apollo.QueryHookOptions<ClusterAlertsQuery, ClusterAlertsQueryVariables> & ({ variables: ClusterAlertsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<ClusterAlertsQuery, ClusterAlertsQueryVariables>(ClusterAlertsDocument, options);
+      }
+export function useClusterAlertsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<ClusterAlertsQuery, ClusterAlertsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<ClusterAlertsQuery, ClusterAlertsQueryVariables>(ClusterAlertsDocument, options);
+        }
+export function useClusterAlertsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<ClusterAlertsQuery, ClusterAlertsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<ClusterAlertsQuery, ClusterAlertsQueryVariables>(ClusterAlertsDocument, options);
+        }
+export type ClusterAlertsQueryHookResult = ReturnType<typeof useClusterAlertsQuery>;
+export type ClusterAlertsLazyQueryHookResult = ReturnType<typeof useClusterAlertsLazyQuery>;
+export type ClusterAlertsSuspenseQueryHookResult = ReturnType<typeof useClusterAlertsSuspenseQuery>;
+export type ClusterAlertsQueryResult = Apollo.QueryResult<ClusterAlertsQuery, ClusterAlertsQueryVariables>;
