@@ -117,5 +117,16 @@ Test files follow Go conventions (`*_test.go`). The codebase includes:
 
 ## Restrictions and Rules
 
-- If you need to create a temporary file as mid-process, please create it in the `tmp` directory. No need to delete the temporary files.
-- When you finish to edit source code, please run `go mod tidy` and `go fmt ./...` to update the dependencies and format the code. If you have any error, please fix it before complete the task.
+- In principle, do not trust developers who use this library from outside
+  - Do not export unnecessary methods, structs, and variables
+  - Assume that exposed items will be changed. Never expose fields that would be problematic if changed
+  - Use `export_test.go` for items that need to be exposed for testing purposes
+- When making changes, before finishing the task, always:
+  - Run `go vet ./...`, `go fmt ./...` to format the code
+  - Run `golangci-lint run ./...` to check lint error
+  - Run `gosec -quiet ./...` to check security issue
+  - Run tests to ensure no impact on other code
+- All comment and character literal in source code must be in English
+- Test files should have `package {name}_test`. Do not use same package name
+- Test must be included in same name test file. (e.g. test for `abc.go` must be in `abc_test.go`)
+- Do not create binary. If you need to run, use `go run` command instead
