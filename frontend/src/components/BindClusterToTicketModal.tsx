@@ -470,7 +470,7 @@ const BindClusterToTicketModal = memo(({
                     onCheckedChange={handleSelectAll}
                   />
                   <Label htmlFor="select-all" className="text-sm">
-                    Select all {searchKeyword ? 'filtered' : totalCount} alerts
+                    Select all on this page
                   </Label>
                 </div>
               )}
