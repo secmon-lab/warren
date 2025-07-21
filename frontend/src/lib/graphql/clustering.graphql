@@ -1,8 +1,8 @@
 # Alert Clustering GraphQL Queries and Mutations
 
 # Query to get alert clusters
-query AlertClusters($limit: Int, $offset: Int, $minClusterSize: Int, $eps: Float, $minSamples: Int) {
-  alertClusters(limit: $limit, offset: $offset, minClusterSize: $minClusterSize, eps: $eps, minSamples: $minSamples) {
+query AlertClusters($limit: Int, $offset: Int, $minClusterSize: Int, $eps: Float, $minSamples: Int, $keyword: String) {
+  alertClusters(limit: $limit, offset: $offset, minClusterSize: $minClusterSize, eps: $eps, minSamples: $minSamples, keyword: $keyword) {
     clusters {
       id
       size
@@ -29,6 +29,7 @@ query AlertClusters($limit: Int, $offset: Int, $minClusterSize: Int, $eps: Float
       minSamples
     }
     computedAt
+    totalCount
   }
 }
 

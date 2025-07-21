@@ -57,6 +57,7 @@ type ClusteringSummary struct {
 	NoiseAlerts []*alert.Alert    `json:"noiseAlerts"`
 	Parameters  *DBSCANParameters `json:"parameters"`
 	ComputedAt  string            `json:"computedAt"`
+	TotalCount  int               `json:"totalCount"`
 }
 
 type CommentsResponse struct {

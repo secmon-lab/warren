@@ -47,41 +47,25 @@ const ClusteringPage = memo(() => {
       minClusterSize: parseInt(minClusterSize),
       eps: parseFloat(eps),
       minSamples: parseInt(minSamples),
+      keyword: searchQuery.trim() || undefined,
     },
     pollInterval: 30000, // Poll every 30 seconds for updates
   });
 
-  // Filter clusters by search query (search in center alert data field)
-  const filteredClusters = useMemo(() => {
-    if (!clustersData?.alertClusters?.clusters) return [];
-    
-    let clusters = clustersData.alertClusters.clusters;
-    
-    if (searchQuery.trim()) {
-      const lowerSearchQuery = searchQuery.toLowerCase();
-      clusters = clusters.filter((cluster) => {
-        // Search in stringified data field of center alert
-        const dataString = cluster.centerAlert?.data ? 
-          JSON.stringify(cluster.centerAlert.data).toLowerCase() : '';
-        return dataString.includes(lowerSearchQuery) ||
-          cluster.keywords?.some((keyword) => 
-            keyword.toLowerCase().includes(lowerSearchQuery)
-          );
-      });
-    }
-    
-    return clusters;
-  }, [clustersData?.alertClusters?.clusters, searchQuery]);
+  // Get clusters directly from backend (already filtered)
+  const clusters = useMemo(() => {
+    return clustersData?.alertClusters?.clusters || [];
+  }, [clustersData?.alertClusters?.clusters]);
 
-  // Calculate pagination values
-  const totalClusters = filteredClusters.length;
+  // Calculate pagination values from backend totalCount
+  const totalClusters = clustersData?.alertClusters?.totalCount || 0;
   const totalPages = Math.ceil(totalClusters / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalClusters);
-  const paginatedClusters = filteredClusters.slice(startIndex, endIndex);
+  // Backend already handles pagination, so we use clusters directly
+  const paginatedClusters = clusters;
 
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
+    // Backend will handle fetching the correct page
   }, []);
 
   const handleRefresh = useCallback(() => {
@@ -89,25 +73,25 @@ const ClusteringPage = memo(() => {
   }, [refetchClusters]);
 
   const handleCreateTicket = useCallback((clusterId: string) => {
-    const cluster = filteredClusters.find(c => c.id === clusterId);
+    const cluster = clusters.find(c => c.id === clusterId);
     if (cluster) {
       setCreateTicketModal({ id: clusterId, size: cluster.size });
     }
-  }, [filteredClusters]);
+  }, [clusters]);
 
   const handleBindToTicket = useCallback((clusterId: string) => {
-    const cluster = filteredClusters.find(c => c.id === clusterId);
+    const cluster = clusters.find(c => c.id === clusterId);
     if (cluster) {
       setBindTicketModal({ id: clusterId, size: cluster.size });
     }
-  }, [filteredClusters]);
+  }, [clusters]);
 
   const handleViewDetails = useCallback((clusterId: string) => {
-    const cluster = filteredClusters.find(c => c.id === clusterId);
+    const cluster = clusters.find(c => c.id === clusterId);
     if (cluster) {
       setSelectedCluster({ id: clusterId, size: cluster.size });
     }
-  }, [filteredClusters]);
+  }, [clusters]);
 
   if (clustersLoading) {
     return (
@@ -188,7 +172,7 @@ const ClusteringPage = memo(() => {
               </div>
               <div>
                 <p className="text-muted-foreground">Total Clusters</p>
-                <p className="font-medium">{filteredClusters.length}</p>
+                <p className="font-medium">{totalClusters}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Noise Alerts</p>
@@ -215,13 +199,19 @@ const ClusteringPage = memo(() => {
                 <Input
                   placeholder="Search clusters by alert data or keywords..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1); // Reset to first page when searching
+                  }}
                   className="pl-10"
                 />
               </div>
             </div>
             <div className="w-full md:w-48">
-              <Select value={minClusterSize} onValueChange={setMinClusterSize}>
+              <Select value={minClusterSize} onValueChange={(value) => {
+                setMinClusterSize(value);
+                setCurrentPage(1); // Reset to first page when changing filter
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Min cluster size" />
                 </SelectTrigger>

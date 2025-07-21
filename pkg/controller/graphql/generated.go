@@ -114,6 +114,7 @@ type ComplexityRoot struct {
 		ComputedAt  func(childComplexity int) int
 		NoiseAlerts func(childComplexity int) int
 		Parameters  func(childComplexity int) int
+		TotalCount  func(childComplexity int) int
 	}
 
 	Comment struct {
@@ -163,7 +164,7 @@ type ComplexityRoot struct {
 	Query struct {
 		Activities             func(childComplexity int, offset *int, limit *int) int
 		Alert                  func(childComplexity int, id string) int
-		AlertClusters          func(childComplexity int, limit *int, offset *int, minClusterSize *int, eps *float64, minSamples *int) int
+		AlertClusters          func(childComplexity int, limit *int, offset *int, minClusterSize *int, eps *float64, minSamples *int, keyword *string) int
 		Alerts                 func(childComplexity int, offset *int, limit *int) int
 		ClusterAlerts          func(childComplexity int, clusterID string, keyword *string, limit *int, offset *int) int
 		Dashboard              func(childComplexity int) int
@@ -253,7 +254,7 @@ type QueryResolver interface {
 	UnboundAlerts(ctx context.Context, threshold *float64, keyword *string, ticketID *string, offset *int, limit *int) (*graphql1.AlertsResponse, error)
 	Dashboard(ctx context.Context) (*graphql1.DashboardStats, error)
 	Activities(ctx context.Context, offset *int, limit *int) (*graphql1.ActivitiesResponse, error)
-	AlertClusters(ctx context.Context, limit *int, offset *int, minClusterSize *int, eps *float64, minSamples *int) (*graphql1.ClusteringSummary, error)
+	AlertClusters(ctx context.Context, limit *int, offset *int, minClusterSize *int, eps *float64, minSamples *int, keyword *string) (*graphql1.ClusteringSummary, error)
 	ClusterAlerts(ctx context.Context, clusterID string, keyword *string, limit *int, offset *int) (*graphql1.AlertsConnection, error)
 }
 type TicketResolver interface {
@@ -565,6 +566,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.ClusteringSummary.Parameters(childComplexity), true
 
+	case "ClusteringSummary.totalCount":
+		if e.complexity.ClusteringSummary.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.ClusteringSummary.TotalCount(childComplexity), true
+
 	case "Comment.content":
 		if e.complexity.Comment.Content == nil {
 			break
@@ -826,7 +834,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.AlertClusters(childComplexity, args["limit"].(*int), args["offset"].(*int), args["minClusterSize"].(*int), args["eps"].(*float64), args["minSamples"].(*int)), true
+		return e.complexity.Query.AlertClusters(childComplexity, args["limit"].(*int), args["offset"].(*int), args["minClusterSize"].(*int), args["eps"].(*float64), args["minSamples"].(*int), args["keyword"].(*string)), true
 
 	case "Query.alerts":
 		if e.complexity.Query.Alerts == nil {
@@ -1308,6 +1316,7 @@ type ClusteringSummary {
   noiseAlerts: [Alert!]!
   parameters: DBSCANParameters!
   computedAt: String!
+  totalCount: Int!
 }
 
 type DBSCANParameters {
@@ -1331,7 +1340,7 @@ type Query {
   unboundAlerts(threshold: Float, keyword: String, ticketId: ID, offset: Int, limit: Int): AlertsResponse!
   dashboard: DashboardStats!
   activities(offset: Int, limit: Int): ActivitiesResponse!
-  alertClusters(limit: Int, offset: Int, minClusterSize: Int, eps: Float, minSamples: Int): ClusteringSummary!
+  alertClusters(limit: Int, offset: Int, minClusterSize: Int, eps: Float, minSamples: Int, keyword: String): ClusteringSummary!
   clusterAlerts(clusterID: ID!, keyword: String, limit: Int, offset: Int): AlertsConnection!
 }
 
@@ -2040,6 +2049,11 @@ func (ec *executionContext) field_Query_alertClusters_args(ctx context.Context, 
 		return nil, err
 	}
 	args["minSamples"] = arg4
+	arg5, err := ec.field_Query_alertClusters_argsKeyword(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["keyword"] = arg5
 	return args, nil
 }
 func (ec *executionContext) field_Query_alertClusters_argsLimit(
@@ -2129,6 +2143,24 @@ func (ec *executionContext) field_Query_alertClusters_argsMinSamples(
 	}
 
 	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_alertClusters_argsKeyword(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*string, error) {
+	if _, ok := rawArgs["keyword"]; !ok {
+		var zeroVal *string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("keyword"))
+	if tmp, ok := rawArgs["keyword"]; ok {
+		return ec.unmarshalOString2ᚖstring(ctx, tmp)
+	}
+
+	var zeroVal *string
 	return zeroVal, nil
 }
 
@@ -4893,6 +4925,50 @@ func (ec *executionContext) fieldContext_ClusteringSummary_computedAt(_ context.
 	return fc, nil
 }
 
+func (ec *executionContext) _ClusteringSummary_totalCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.ClusteringSummary) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ClusteringSummary_totalCount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TotalCount, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ClusteringSummary_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ClusteringSummary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Comment_id(ctx context.Context, field graphql.CollectedField, obj *ticket.Comment) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Comment_id(ctx, field)
 	if err != nil {
@@ -7204,7 +7280,7 @@ func (ec *executionContext) _Query_alertClusters(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().AlertClusters(rctx, fc.Args["limit"].(*int), fc.Args["offset"].(*int), fc.Args["minClusterSize"].(*int), fc.Args["eps"].(*float64), fc.Args["minSamples"].(*int))
+		return ec.resolvers.Query().AlertClusters(rctx, fc.Args["limit"].(*int), fc.Args["offset"].(*int), fc.Args["minClusterSize"].(*int), fc.Args["eps"].(*float64), fc.Args["minSamples"].(*int), fc.Args["keyword"].(*string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7237,6 +7313,8 @@ func (ec *executionContext) fieldContext_Query_alertClusters(ctx context.Context
 				return ec.fieldContext_ClusteringSummary_parameters(ctx, field)
 			case "computedAt":
 				return ec.fieldContext_ClusteringSummary_computedAt(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_ClusteringSummary_totalCount(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ClusteringSummary", field.Name)
 		},
@@ -11144,6 +11222,11 @@ func (ec *executionContext) _ClusteringSummary(ctx context.Context, sel ast.Sele
 			}
 		case "computedAt":
 			out.Values[i] = ec._ClusteringSummary_computedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._ClusteringSummary_totalCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

@@ -112,6 +112,7 @@ type ClusteringSummary {
   noiseAlerts: [Alert!]!
   parameters: DBSCANParameters!
   computedAt: String!
+  totalCount: Int!
 }
 
 type DBSCANParameters {
@@ -135,7 +136,7 @@ type Query {
   unboundAlerts(threshold: Float, keyword: String, ticketId: ID, offset: Int, limit: Int): AlertsResponse!
   dashboard: DashboardStats!
   activities(offset: Int, limit: Int): ActivitiesResponse!
-  alertClusters(limit: Int, offset: Int, minClusterSize: Int, eps: Float, minSamples: Int): ClusteringSummary!
+  alertClusters(limit: Int, offset: Int, minClusterSize: Int, eps: Float, minSamples: Int, keyword: String): ClusteringSummary!
   clusterAlerts(clusterID: ID!, keyword: String, limit: Int, offset: Int): AlertsConnection!
 }
 

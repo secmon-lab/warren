@@ -35,6 +35,7 @@ type GetClustersParams struct {
 	MinClusterSize int
 	Limit          int
 	Offset         int
+	Keyword        string
 	DBSCANParams   clustering.DBSCANParams
 }
 
@@ -44,6 +45,7 @@ type ClusteringSummary struct {
 	NoiseAlertIDs []types.AlertID
 	Parameters    clustering.DBSCANParams
 	ComputedAt    time.Time
+	TotalCount    int
 }
 
 // GetAlertClusters retrieves alert clusters with caching
@@ -53,7 +55,7 @@ func (uc *ClusteringUseCase) GetAlertClusters(ctx context.Context, params GetClu
 
 	// Try to get from cache
 	if cached := uc.cache.get(cacheKey); cached != nil {
-		return uc.filterAndPaginateClusters(cached, params), nil
+		return uc.filterAndPaginateClusters(ctx, cached, params)
 	}
 
 	// Get unbound alerts with embeddings
@@ -88,7 +90,7 @@ func (uc *ClusteringUseCase) GetAlertClusters(ctx context.Context, params GetClu
 	uc.cache.set(cacheKey, summary)
 
 	// Filter and paginate
-	return uc.filterAndPaginateClusters(summary, params), nil
+	return uc.filterAndPaginateClusters(ctx, summary, params)
 }
 
 // GetClusterAlerts retrieves alerts in a specific cluster with filtering
@@ -172,14 +174,45 @@ func (uc *ClusteringUseCase) generateCacheKey(params clustering.DBSCANParams) st
 	return "clustering:" + string(data)
 }
 
-func (uc *ClusteringUseCase) filterAndPaginateClusters(summary *ClusteringSummary, params GetClustersParams) *ClusteringSummary {
-	// Filter by minimum cluster size
+func (uc *ClusteringUseCase) filterAndPaginateClusters(ctx context.Context, summary *ClusteringSummary, params GetClustersParams) (*ClusteringSummary, error) {
+	// Filter by minimum cluster size and keyword
 	filteredClusters := make([]*clustering.AlertCluster, 0, len(summary.Clusters))
 	for _, cluster := range summary.Clusters {
-		if cluster.Size >= params.MinClusterSize {
-			filteredClusters = append(filteredClusters, cluster)
+		if cluster.Size < params.MinClusterSize {
+			continue
 		}
+
+		// If keyword is provided, check if cluster matches
+		if params.Keyword != "" {
+			// Get center alert to check its data
+			centerAlert, err := uc.repo.GetAlert(ctx, cluster.CenterAlertID)
+			if err != nil {
+				return nil, goerr.Wrap(err, "failed to get center alert for keyword search")
+			}
+
+			// Check if keyword exists in center alert's data
+			dataBytes, _ := json.Marshal(centerAlert.Data)
+			dataStr := string(dataBytes)
+			if !strings.Contains(strings.ToLower(dataStr), strings.ToLower(params.Keyword)) {
+				// Also check keywords if they exist
+				keywordFound := false
+				for _, kw := range cluster.Keywords {
+					if strings.Contains(strings.ToLower(kw), strings.ToLower(params.Keyword)) {
+						keywordFound = true
+						break
+					}
+				}
+				if !keywordFound {
+					continue
+				}
+			}
+		}
+
+		filteredClusters = append(filteredClusters, cluster)
 	}
+
+	// Calculate total count after filtering
+	totalCount := len(filteredClusters)
 
 	// Apply pagination
 	start := params.Offset
@@ -189,7 +222,8 @@ func (uc *ClusteringUseCase) filterAndPaginateClusters(summary *ClusteringSummar
 			NoiseAlertIDs: summary.NoiseAlertIDs,
 			Parameters:    summary.Parameters,
 			ComputedAt:    summary.ComputedAt,
-		}
+			TotalCount:    totalCount,
+		}, nil
 	}
 
 	end := len(filteredClusters)
@@ -205,7 +239,8 @@ func (uc *ClusteringUseCase) filterAndPaginateClusters(summary *ClusteringSummar
 		NoiseAlertIDs: summary.NoiseAlertIDs,
 		Parameters:    summary.Parameters,
 		ComputedAt:    summary.ComputedAt,
-	}
+		TotalCount:    totalCount,
+	}, nil
 }
 
 // Simple in-memory cache for clustering results

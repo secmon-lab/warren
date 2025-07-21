@@ -761,7 +761,7 @@ func (r *queryResolver) Activities(ctx context.Context, offset *int, limit *int)
 }
 
 // AlertClusters is the resolver for the alertClusters field.
-func (r *queryResolver) AlertClusters(ctx context.Context, limit *int, offset *int, minClusterSize *int, eps *float64, minSamples *int) (*graphql1.ClusteringSummary, error) {
+func (r *queryResolver) AlertClusters(ctx context.Context, limit *int, offset *int, minClusterSize *int, eps *float64, minSamples *int, keyword *string) (*graphql1.ClusteringSummary, error) {
 	// Authentication check
 	token, err := auth.TokenFromContext(ctx)
 	if err != nil {
@@ -793,11 +793,18 @@ func (r *queryResolver) AlertClusters(ctx context.Context, limit *int, offset *i
 		minSamplesVal = *minSamples
 	}
 
+	// Get keyword if provided
+	kw := ""
+	if keyword != nil {
+		kw = *keyword
+	}
+
 	// Call clustering use case
 	params := usecase.GetClustersParams{
 		MinClusterSize: mcs,
 		Limit:          l,
 		Offset:         o,
+		Keyword:        kw,
 		DBSCANParams: clustering.DBSCANParams{
 			Eps:        epsVal,
 			MinSamples: minSamplesVal,

@@ -40,6 +40,7 @@ func (r *queryResolver) convertToGraphQLClusteringSummary(ctx context.Context, s
 			MinSamples: summary.Parameters.MinSamples,
 		},
 		ComputedAt: summary.ComputedAt.Format("2006-01-02T15:04:05Z07:00"),
+		TotalCount: summary.TotalCount,
 	}, nil
 }
 
