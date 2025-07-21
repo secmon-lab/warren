@@ -27,6 +27,9 @@ type UseCases struct {
 
 	tools []gollem.ToolSet
 
+	// use cases
+	ClusteringUC *ClusteringUseCase
+
 	// configs
 	timeSpan      time.Duration
 	actionLimit   int
@@ -130,6 +133,9 @@ func New(opts ...Option) *UseCases {
 	for _, opt := range opts {
 		opt(u)
 	}
+
+	// Initialize clustering use case
+	u.ClusteringUC = NewClusteringUseCase(u.repository)
 
 	return u
 }

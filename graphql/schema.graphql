@@ -98,6 +98,33 @@ type DashboardStats {
   unboundAlerts: [Alert!]!
 }
 
+type AlertCluster {
+  id: ID!
+  centerAlert: Alert!
+  alerts: [Alert!]!
+  size: Int!
+  keywords: [String!]
+  createdAt: String!
+}
+
+type ClusteringSummary {
+  clusters: [AlertCluster!]!
+  noiseAlerts: [Alert!]!
+  parameters: DBSCANParameters!
+  computedAt: String!
+  totalCount: Int!
+}
+
+type DBSCANParameters {
+  eps: Float!
+  minSamples: Int!
+}
+
+type AlertsConnection {
+  alerts: [Alert!]!
+  totalCount: Int!
+}
+
 type Query {
   ticket(id: ID!): Ticket
   tickets(statuses: [String!], offset: Int, limit: Int): TicketsResponse!
@@ -109,6 +136,8 @@ type Query {
   unboundAlerts(threshold: Float, keyword: String, ticketId: ID, offset: Int, limit: Int): AlertsResponse!
   dashboard: DashboardStats!
   activities(offset: Int, limit: Int): ActivitiesResponse!
+  alertClusters(limit: Int, offset: Int, minClusterSize: Int, eps: Float, minSamples: Int, keyword: String): ClusteringSummary!
+  clusterAlerts(clusterID: ID!, keyword: String, limit: Int, offset: Int): AlertsConnection!
 }
 
 type Mutation {
@@ -117,7 +146,7 @@ type Mutation {
   updateTicketConclusion(id: ID!, conclusion: String!, reason: String!): Ticket!
   updateTicket(id: ID!, title: String!, description: String): Ticket!
   createTicket(title: String!, description: String!, isTest: Boolean): Ticket!
-  createTicketFromAlerts(alertIds: [ID!]!): Ticket!
+  createTicketFromAlerts(alertIds: [ID!]!, title: String, description: String): Ticket!
   bindAlertsToTicket(ticketId: ID!, alertIds: [ID!]!): Ticket!
 }
 

@@ -435,8 +435,8 @@ export const BIND_ALERTS_TO_TICKET = gql`
 `;
 
 export const CREATE_TICKET_FROM_ALERTS = gql`
-  mutation CreateTicketFromAlerts($alertIds: [ID!]!) {
-    createTicketFromAlerts(alertIds: $alertIds) {
+  mutation CreateTicketFromAlerts($alertIds: [ID!]!, $title: String, $description: String) {
+    createTicketFromAlerts(alertIds: $alertIds, title: $title, description: $description) {
       id
       status
       title
@@ -455,6 +455,61 @@ export const CREATE_TICKET_FROM_ALERTS = gql`
         title
         description
       }
+    }
+  }
+`;
+
+export const GET_ALERT_CLUSTERS = gql`
+  query AlertClusters($limit: Int, $offset: Int, $minClusterSize: Int, $eps: Float, $minSamples: Int, $keyword: String) {
+    alertClusters(limit: $limit, offset: $offset, minClusterSize: $minClusterSize, eps: $eps, minSamples: $minSamples, keyword: $keyword) {
+      clusters {
+        id
+        size
+        keywords
+        createdAt
+        centerAlert {
+          id
+          title
+          description
+          schema
+          data
+          createdAt
+        }
+      }
+      noiseAlerts {
+        id
+        title
+        description
+        schema
+        createdAt
+      }
+      parameters {
+        eps
+        minSamples
+      }
+      computedAt
+      totalCount
+    }
+  }
+`;
+
+export const GET_CLUSTER_ALERTS = gql`
+  query ClusterAlerts($clusterID: ID!, $keyword: String, $limit: Int, $offset: Int) {
+    clusterAlerts(clusterID: $clusterID, keyword: $keyword, limit: $limit, offset: $offset) {
+      alerts {
+        id
+        title
+        description
+        schema
+        data
+        createdAt
+        ticket {
+          id
+          title
+          status
+        }
+      }
+      totalCount
     }
   }
 `;

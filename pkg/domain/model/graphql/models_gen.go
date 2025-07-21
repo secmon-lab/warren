@@ -33,14 +33,41 @@ type AlertAttribute struct {
 	Auto  bool    `json:"auto"`
 }
 
+type AlertCluster struct {
+	ID          string         `json:"id"`
+	CenterAlert *alert.Alert   `json:"centerAlert"`
+	Alerts      []*alert.Alert `json:"alerts"`
+	Size        int            `json:"size"`
+	Keywords    []string       `json:"keywords,omitempty"`
+	CreatedAt   string         `json:"createdAt"`
+}
+
+type AlertsConnection struct {
+	Alerts     []*alert.Alert `json:"alerts"`
+	TotalCount int            `json:"totalCount"`
+}
+
 type AlertsResponse struct {
 	Alerts     []*alert.Alert `json:"alerts"`
 	TotalCount int            `json:"totalCount"`
 }
 
+type ClusteringSummary struct {
+	Clusters    []*AlertCluster   `json:"clusters"`
+	NoiseAlerts []*alert.Alert    `json:"noiseAlerts"`
+	Parameters  *DBSCANParameters `json:"parameters"`
+	ComputedAt  string            `json:"computedAt"`
+	TotalCount  int               `json:"totalCount"`
+}
+
 type CommentsResponse struct {
 	Comments   []*ticket.Comment `json:"comments"`
 	TotalCount int               `json:"totalCount"`
+}
+
+type DBSCANParameters struct {
+	Eps        float64 `json:"eps"`
+	MinSamples int     `json:"minSamples"`
 }
 
 type DashboardStats struct {

@@ -70,6 +70,14 @@ The application follows Domain-Driven Design (DDD) with clean architecture:
 - In-memory storage for testing/development
 - `pkg/repository/` - Repository pattern implementations
 
+#### Alert Clustering
+- `pkg/domain/service/clustering/` - DBSCAN clustering algorithm implementation
+- `pkg/usecase/clustering.go` - Clustering use case with caching
+- Uses cosine distance on alert embeddings for similarity
+- Configurable DBSCAN parameters (eps, minSamples)
+- WebUI at `/clusters` for visualizing and managing alert clusters
+- Supports creating tickets from clusters and binding clusters to existing tickets
+
 ### Application Modes
 - `serve` - HTTP server mode with Slack integration, GraphQL API
 - `run` - CLI mode for processing individual alerts
@@ -83,6 +91,7 @@ The application follows Domain-Driven Design (DDD) with clean architecture:
 - `interfaces.SlackClient` - Slack API client abstraction
 - `interfaces.PolicyClient` - Policy evaluation using OPA
 - `interfaces.StorageClient` - Cloud storage abstraction
+- `clustering.Service` - Alert clustering service interface
 
 ### Tools Integration
 External security tools integrated via `pkg/tool/`:
