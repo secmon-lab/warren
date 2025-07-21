@@ -14,7 +14,7 @@ import (
 func (r *queryResolver) convertToGraphQLClusteringSummary(ctx context.Context, summary *usecase.ClusteringSummary) (*graphql1.ClusteringSummary, error) {
 	clusters := make([]*graphql1.AlertCluster, len(summary.Clusters))
 	for i, cluster := range summary.Clusters {
-		graphqlCluster, err := r.convertToGraphQLAlertCluster(ctx, cluster)
+		graphqlCluster, err := r.convertToGraphQLAlertCluster(ctx, cluster, summary.ComputedAt)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to convert alert cluster")
 		}
@@ -40,7 +40,7 @@ func (r *queryResolver) convertToGraphQLClusteringSummary(ctx context.Context, s
 }
 
 // convertToGraphQLAlertCluster converts clustering service alert cluster to GraphQL model
-func (r *queryResolver) convertToGraphQLAlertCluster(ctx context.Context, cluster *clustering.AlertCluster) (*graphql1.AlertCluster, error) {
+func (r *queryResolver) convertToGraphQLAlertCluster(ctx context.Context, cluster *clustering.AlertCluster, computedAt time.Time) (*graphql1.AlertCluster, error) {
 	// Fetch center alert
 	centerAlert, err := r.repo.GetAlert(ctx, cluster.CenterAlertID)
 	if err != nil {
@@ -59,6 +59,6 @@ func (r *queryResolver) convertToGraphQLAlertCluster(ctx context.Context, cluste
 		Alerts:      alerts,
 		Size:        cluster.Size,
 		Keywords:    cluster.Keywords,
-		CreatedAt:   time.Now().Format("2006-01-02T15:04:05Z07:00"), // Use current time as creation time
+		CreatedAt:   computedAt.Format("2006-01-02T15:04:05Z07:00"), // Use computation time
 	}, nil
 }

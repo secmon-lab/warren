@@ -67,6 +67,7 @@ const BindClusterToTicketModal = memo(({
     data: ticketsData,
     loading: ticketsLoading,
     error: ticketsError,
+    refetch: refetchTickets,
   } = useGetTicketsQuery({
     variables: {
       offset: (ticketPage - 1) * ITEMS_PER_PAGE,
@@ -275,7 +276,7 @@ const BindClusterToTicketModal = memo(({
             ) : ticketsError ? (
               <div className="text-center py-8">
                 <p className="text-red-600 mb-4">Failed to load tickets: {ticketsError.message}</p>
-                <Button onClick={() => window.location.reload()} variant="outline">
+                <Button onClick={() => refetchTickets()} variant="outline">
                   Retry
                 </Button>
               </div>

@@ -155,7 +155,6 @@ func (uc *ClusteringUseCase) GetClusterAlerts(ctx context.Context, clusterID str
 	return filteredAlerts[start:end], totalCount, nil
 }
 
-
 // Helper methods
 
 func (uc *ClusteringUseCase) generateCacheKey(params clustering.DBSCANParams) string {
