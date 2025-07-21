@@ -5,7 +5,6 @@ import (
 	"time"
 
 	goerr "github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
 	"github.com/secmon-lab/warren/pkg/service/clustering"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -22,14 +21,10 @@ func (r *queryResolver) convertToGraphQLClusteringSummary(ctx context.Context, s
 		clusters[i] = graphqlCluster
 	}
 
-	// Fetch noise alerts
-	noiseAlerts := make([]*alert.Alert, len(summary.NoiseAlertIDs))
-	for i, alertID := range summary.NoiseAlertIDs {
-		alertData, err := r.repo.GetAlert(ctx, alertID)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get noise alert", goerr.V("alertID", alertID))
-		}
-		noiseAlerts[i] = alertData
+	// Fetch noise alerts in batch to avoid N+1 query problem
+	noiseAlerts, err := r.repo.BatchGetAlerts(ctx, summary.NoiseAlertIDs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get noise alerts")
 	}
 
 	return &graphql1.ClusteringSummary{
@@ -52,14 +47,10 @@ func (r *queryResolver) convertToGraphQLAlertCluster(ctx context.Context, cluste
 		return nil, goerr.Wrap(err, "failed to get center alert", goerr.V("centerAlertID", cluster.CenterAlertID))
 	}
 
-	// Fetch all alerts in the cluster
-	alerts := make([]*alert.Alert, len(cluster.AlertIDs))
-	for i, alertID := range cluster.AlertIDs {
-		alertData, err := r.repo.GetAlert(ctx, alertID)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get cluster alert", goerr.V("alertID", alertID))
-		}
-		alerts[i] = alertData
+	// Fetch all alerts in the cluster in batch to avoid N+1 query problem
+	alerts, err := r.repo.BatchGetAlerts(ctx, cluster.AlertIDs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get cluster alerts")
 	}
 
 	return &graphql1.AlertCluster{
