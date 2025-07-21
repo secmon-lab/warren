@@ -39,7 +39,7 @@ func TestWarren_UpdateFinding(t *testing.T) {
 	gt.NoError(t, repo.PutTicket(ctx, testTicket))
 
 	// Create Warren tool
-	warren := base.New(repo, nil, testTicket.ID)
+	warren := base.New(repo, testTicket.ID)
 
 	t.Run("successful finding update", func(t *testing.T) {
 		args := map[string]any{
@@ -127,7 +127,7 @@ func TestWarren_UpdateFindingWithSlackCallback(t *testing.T) {
 	}
 
 	// Create Warren tool with Slack callback
-	warren := base.New(repo, nil, testTicket.ID, base.WithSlackUpdate(slackUpdateFunc))
+	warren := base.New(repo, testTicket.ID, base.WithSlackUpdate(slackUpdateFunc))
 
 	t.Run("slack update callback called", func(t *testing.T) {
 		args := map[string]any{
@@ -151,7 +151,7 @@ func TestWarren_Specs(t *testing.T) {
 	ctx := context.Background()
 
 	// Create Warren tool
-	warren := base.New(repo, nil, types.NewTicketID())
+	warren := base.New(repo, types.NewTicketID())
 
 	specs, err := warren.Specs(ctx)
 	gt.NoError(t, err)
@@ -161,9 +161,6 @@ func TestWarren_Specs(t *testing.T) {
 		"warren_get_alerts",
 		"warren_find_nearest_ticket",
 		"warren_search_tickets_by_words",
-		"warren_list_policies",
-		"warren_get_policy",
-		"warren_exec_policy",
 		"warren_update_finding",
 		"warren_get_ticket_comments",
 	}
@@ -232,7 +229,6 @@ func TestWarren_UpdateFindingDryRun(t *testing.T) {
 		return func(t *testing.T) {
 			// Setup mock repository
 			mockRepo := &mock.RepositoryMock{}
-			mockPolicy := &mock.PolicyClientMock{}
 
 			ticketID := types.TicketID("test-ticket-id")
 
@@ -271,7 +267,7 @@ func TestWarren_UpdateFindingDryRun(t *testing.T) {
 			}
 
 			// Create Warren tool with slack update callback
-			warren := base.New(mockRepo, mockPolicy, ticketID, base.WithSlackUpdate(slackUpdateFunc))
+			warren := base.New(mockRepo, ticketID, base.WithSlackUpdate(slackUpdateFunc))
 
 			// Create context with dry-run setting
 			ctx := context.Background()
@@ -359,7 +355,7 @@ func TestWarren_GetTicketComments(t *testing.T) {
 	gt.NoError(t, repo.PutTicketComment(ctx, comment3))
 
 	// Create Warren tool
-	warren := base.New(repo, nil, testTicket.ID)
+	warren := base.New(repo, testTicket.ID)
 
 	t.Run("get all comments with default pagination", func(t *testing.T) {
 		args := map[string]any{}
@@ -446,7 +442,7 @@ func TestWarren_GetTicketComments(t *testing.T) {
 		}
 		gt.NoError(t, repo.PutTicket(ctx, emptyTicket))
 
-		warren := base.New(repo, nil, emptyTicket.ID)
+		warren := base.New(repo, emptyTicket.ID)
 		args := map[string]any{}
 
 		result, err := warren.Run(ctx, "warren_get_ticket_comments", args)
@@ -511,7 +507,7 @@ func TestWarren_SearchTicketsByWords(t *testing.T) {
 		return [][]float64{queryEmbedding}, nil
 	}
 
-	warren := base.New(repo, nil, testTicket.ID, base.WithLLMClient(mockLLM))
+	warren := base.New(repo, testTicket.ID, base.WithLLMClient(mockLLM))
 
 	t.Run("search with query", func(t *testing.T) {
 		// Use actual JSON unmarshalling to simulate real usage
@@ -553,7 +549,7 @@ func TestWarren_SearchTicketsByWords(t *testing.T) {
 	})
 
 	t.Run("no LLM client configured", func(t *testing.T) {
-		warrenWithoutLLM := base.New(repo, nil, testTicket.ID)
+		warrenWithoutLLM := base.New(repo, testTicket.ID)
 		jsonData := `{
 			"query": "test query"
 		}`
