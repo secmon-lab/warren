@@ -25,3 +25,7 @@ func (c *CompositeLLMClient) NewSession(ctx context.Context, options ...gollem.S
 func (c *CompositeLLMClient) GenerateEmbedding(ctx context.Context, dimension int, input []string) ([][]float64, error) {
 	return c.embeddingClient.GenerateEmbedding(ctx, dimension, input)
 }
+
+func (c *CompositeLLMClient) CountTokens(ctx context.Context, history *gollem.History) (int, error) {
+	return c.contentClient.CountTokens(ctx, history)
+}
