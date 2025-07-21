@@ -53,26 +53,3 @@ query ClusterAlerts($clusterID: ID!, $keyword: String, $limit: Int, $offset: Int
   }
 }
 
-# Mutation to create a ticket from cluster
-mutation CreateTicketFromCluster($clusterID: ID!, $alertIDs: [ID!]!, $title: String, $description: String) {
-  createTicketFromCluster(clusterID: $clusterID, alertIDs: $alertIDs, title: $title, description: $description) {
-    id
-    title
-    description
-    status
-    createdAt
-    alertsCount
-  }
-}
-
-# Mutation to bind cluster to existing ticket
-mutation BindClusterToTicket($clusterID: ID!, $ticketID: ID!, $alertIDs: [ID!]!) {
-  bindClusterToTicket(clusterID: $clusterID, ticketID: $ticketID, alertIDs: $alertIDs) {
-    id
-    title
-    description
-    status
-    updatedAt
-    alertsCount
-  }
-}

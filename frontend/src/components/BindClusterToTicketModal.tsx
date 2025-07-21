@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/pagination";
 import { 
   useClusterAlertsQuery, 
-  useBindClusterToTicketMutation,
+  useBindAlertsToTicketMutation,
   useGetTicketsQuery 
 } from "@/lib/graphql/generated";
 import { useToast } from "@/hooks/use-toast";
@@ -91,11 +91,11 @@ const BindClusterToTicketModal = memo(({
     skip: !open || step !== 'select-alerts',
   });
 
-  const [bindClusterToTicket, { loading: bindingToTicket }] = useBindClusterToTicketMutation({
+  const [bindAlertsToTicket, { loading: bindingToTicket }] = useBindAlertsToTicketMutation({
     onCompleted: (data) => {
       toast({
         title: "Alerts Bound to Ticket",
-        description: `Successfully bound ${selectedAlerts.size} alerts to ticket "${data.bindClusterToTicket.title}"`,
+        description: `Successfully bound ${selectedAlerts.size} alerts to ticket "${data.bindAlertsToTicket.title}"`,
       });
       onSuccess?.();
       handleClose();
@@ -174,17 +174,16 @@ const BindClusterToTicketModal = memo(({
     }
 
     try {
-      await bindClusterToTicket({
+      await bindAlertsToTicket({
         variables: {
-          clusterID: clusterId,
-          ticketID: selectedTicketId,
-          alertIDs: Array.from(selectedAlerts),
+          ticketId: selectedTicketId,
+          alertIds: Array.from(selectedAlerts),
         },
       });
     } catch (error) {
       // Error handling is done in onError callback
     }
-  }, [selectedAlerts, selectedTicketId, bindClusterToTicket, clusterId, toast]);
+  }, [selectedAlerts, selectedTicketId, bindAlertsToTicket, toast]);
 
   const handleClose = useCallback(() => {
     setStep('select-ticket');

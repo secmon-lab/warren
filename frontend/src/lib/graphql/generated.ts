@@ -129,10 +129,8 @@ export type Finding = {
 export type Mutation = {
   __typename?: 'Mutation';
   bindAlertsToTicket: Ticket;
-  bindClusterToTicket: Ticket;
   createTicket: Ticket;
   createTicketFromAlerts: Ticket;
-  createTicketFromCluster: Ticket;
   updateMultipleTicketsStatus: Array<Ticket>;
   updateTicket: Ticket;
   updateTicketConclusion: Ticket;
@@ -146,13 +144,6 @@ export type MutationBindAlertsToTicketArgs = {
 };
 
 
-export type MutationBindClusterToTicketArgs = {
-  alertIDs?: InputMaybe<Array<Scalars['ID']['input']>>;
-  clusterID: Scalars['ID']['input'];
-  ticketID: Scalars['ID']['input'];
-};
-
-
 export type MutationCreateTicketArgs = {
   description: Scalars['String']['input'];
   isTest?: InputMaybe<Scalars['Boolean']['input']>;
@@ -162,12 +153,6 @@ export type MutationCreateTicketArgs = {
 
 export type MutationCreateTicketFromAlertsArgs = {
   alertIds: Array<Scalars['ID']['input']>;
-};
-
-
-export type MutationCreateTicketFromClusterArgs = {
-  alertIDs?: InputMaybe<Array<Scalars['ID']['input']>>;
-  clusterID: Scalars['ID']['input'];
   description?: InputMaybe<Scalars['String']['input']>;
   title?: InputMaybe<Scalars['String']['input']>;
 };
@@ -355,25 +340,6 @@ export type ClusterAlertsQueryVariables = Exact<{
 
 export type ClusterAlertsQuery = { __typename?: 'Query', clusterAlerts: { __typename?: 'AlertsConnection', totalCount: number, alerts: Array<{ __typename?: 'Alert', id: string, title: string, description?: string | null, schema: string, data: string, createdAt: string, ticket?: { __typename?: 'Ticket', id: string, title: string, status: string } | null }> } };
 
-export type CreateTicketFromClusterMutationVariables = Exact<{
-  clusterID: Scalars['ID']['input'];
-  alertIDs: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
-  title?: InputMaybe<Scalars['String']['input']>;
-  description?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type CreateTicketFromClusterMutation = { __typename?: 'Mutation', createTicketFromCluster: { __typename?: 'Ticket', id: string, title: string, description: string, status: string, createdAt: string, alertsCount: number } };
-
-export type BindClusterToTicketMutationVariables = Exact<{
-  clusterID: Scalars['ID']['input'];
-  ticketID: Scalars['ID']['input'];
-  alertIDs: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
-}>;
-
-
-export type BindClusterToTicketMutation = { __typename?: 'Mutation', bindClusterToTicket: { __typename?: 'Ticket', id: string, title: string, description: string, status: string, updatedAt: string, alertsCount: number } };
-
 export type GetTicketsQueryVariables = Exact<{
   statuses?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -520,6 +486,8 @@ export type BindAlertsToTicketMutation = { __typename?: 'Mutation', bindAlertsTo
 
 export type CreateTicketFromAlertsMutationVariables = Exact<{
   alertIds: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
+  title?: InputMaybe<Scalars['String']['input']>;
+  description?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
@@ -602,65 +570,6 @@ export type ClusterAlertsQueryHookResult = ReturnType<typeof useClusterAlertsQue
 export type ClusterAlertsLazyQueryHookResult = ReturnType<typeof useClusterAlertsLazyQuery>;
 export type ClusterAlertsSuspenseQueryHookResult = ReturnType<typeof useClusterAlertsSuspenseQuery>;
 export type ClusterAlertsQueryResult = Apollo.QueryResult<ClusterAlertsQuery, ClusterAlertsQueryVariables>;
-export const CreateTicketFromClusterDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateTicketFromCluster"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"clusterID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"alertIDs"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"title"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"description"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createTicketFromCluster"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"clusterID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"clusterID"}}},{"kind":"Argument","name":{"kind":"Name","value":"alertIDs"},"value":{"kind":"Variable","name":{"kind":"Name","value":"alertIDs"}}},{"kind":"Argument","name":{"kind":"Name","value":"title"},"value":{"kind":"Variable","name":{"kind":"Name","value":"title"}}},{"kind":"Argument","name":{"kind":"Name","value":"description"},"value":{"kind":"Variable","name":{"kind":"Name","value":"description"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}}]}}]}}]} as unknown as DocumentNode;
-export type CreateTicketFromClusterMutationFn = Apollo.MutationFunction<CreateTicketFromClusterMutation, CreateTicketFromClusterMutationVariables>;
-
-/**
- * __useCreateTicketFromClusterMutation__
- *
- * To run a mutation, you first call `useCreateTicketFromClusterMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useCreateTicketFromClusterMutation` returns a tuple that includes:
- * - A mutate function that you can call at any time to execute the mutation
- * - An object with fields that represent the current status of the mutation's execution
- *
- * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
- *
- * @example
- * const [createTicketFromClusterMutation, { data, loading, error }] = useCreateTicketFromClusterMutation({
- *   variables: {
- *      clusterID: // value for 'clusterID'
- *      alertIDs: // value for 'alertIDs'
- *      title: // value for 'title'
- *      description: // value for 'description'
- *   },
- * });
- */
-export function useCreateTicketFromClusterMutation(baseOptions?: Apollo.MutationHookOptions<CreateTicketFromClusterMutation, CreateTicketFromClusterMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<CreateTicketFromClusterMutation, CreateTicketFromClusterMutationVariables>(CreateTicketFromClusterDocument, options);
-      }
-export type CreateTicketFromClusterMutationHookResult = ReturnType<typeof useCreateTicketFromClusterMutation>;
-export type CreateTicketFromClusterMutationResult = Apollo.MutationResult<CreateTicketFromClusterMutation>;
-export type CreateTicketFromClusterMutationOptions = Apollo.BaseMutationOptions<CreateTicketFromClusterMutation, CreateTicketFromClusterMutationVariables>;
-export const BindClusterToTicketDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"BindClusterToTicket"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"clusterID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ticketID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"alertIDs"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"bindClusterToTicket"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"clusterID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"clusterID"}}},{"kind":"Argument","name":{"kind":"Name","value":"ticketID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ticketID"}}},{"kind":"Argument","name":{"kind":"Name","value":"alertIDs"},"value":{"kind":"Variable","name":{"kind":"Name","value":"alertIDs"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}}]}}]}}]} as unknown as DocumentNode;
-export type BindClusterToTicketMutationFn = Apollo.MutationFunction<BindClusterToTicketMutation, BindClusterToTicketMutationVariables>;
-
-/**
- * __useBindClusterToTicketMutation__
- *
- * To run a mutation, you first call `useBindClusterToTicketMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useBindClusterToTicketMutation` returns a tuple that includes:
- * - A mutate function that you can call at any time to execute the mutation
- * - An object with fields that represent the current status of the mutation's execution
- *
- * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
- *
- * @example
- * const [bindClusterToTicketMutation, { data, loading, error }] = useBindClusterToTicketMutation({
- *   variables: {
- *      clusterID: // value for 'clusterID'
- *      ticketID: // value for 'ticketID'
- *      alertIDs: // value for 'alertIDs'
- *   },
- * });
- */
-export function useBindClusterToTicketMutation(baseOptions?: Apollo.MutationHookOptions<BindClusterToTicketMutation, BindClusterToTicketMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<BindClusterToTicketMutation, BindClusterToTicketMutationVariables>(BindClusterToTicketDocument, options);
-      }
-export type BindClusterToTicketMutationHookResult = ReturnType<typeof useBindClusterToTicketMutation>;
-export type BindClusterToTicketMutationResult = Apollo.MutationResult<BindClusterToTicketMutation>;
-export type BindClusterToTicketMutationOptions = Apollo.BaseMutationOptions<BindClusterToTicketMutation, BindClusterToTicketMutationVariables>;
 export const GetTicketsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTickets"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"statuses"},"value":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"commentsCount"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
 
 /**
@@ -1223,7 +1132,7 @@ export function useBindAlertsToTicketMutation(baseOptions?: Apollo.MutationHookO
 export type BindAlertsToTicketMutationHookResult = ReturnType<typeof useBindAlertsToTicketMutation>;
 export type BindAlertsToTicketMutationResult = Apollo.MutationResult<BindAlertsToTicketMutation>;
 export type BindAlertsToTicketMutationOptions = Apollo.BaseMutationOptions<BindAlertsToTicketMutation, BindAlertsToTicketMutationVariables>;
-export const CreateTicketFromAlertsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateTicketFromAlerts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"alertIds"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createTicketFromAlerts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"alertIds"},"value":{"kind":"Variable","name":{"kind":"Name","value":"alertIds"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"alerts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}}]}}]}}]}}]} as unknown as DocumentNode;
+export const CreateTicketFromAlertsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateTicketFromAlerts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"alertIds"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"title"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"description"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createTicketFromAlerts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"alertIds"},"value":{"kind":"Variable","name":{"kind":"Name","value":"alertIds"}}},{"kind":"Argument","name":{"kind":"Name","value":"title"},"value":{"kind":"Variable","name":{"kind":"Name","value":"title"}}},{"kind":"Argument","name":{"kind":"Name","value":"description"},"value":{"kind":"Variable","name":{"kind":"Name","value":"description"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"alerts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}}]}}]}}]}}]} as unknown as DocumentNode;
 export type CreateTicketFromAlertsMutationFn = Apollo.MutationFunction<CreateTicketFromAlertsMutation, CreateTicketFromAlertsMutationVariables>;
 
 /**
@@ -1240,6 +1149,8 @@ export type CreateTicketFromAlertsMutationFn = Apollo.MutationFunction<CreateTic
  * const [createTicketFromAlertsMutation, { data, loading, error }] = useCreateTicketFromAlertsMutation({
  *   variables: {
  *      alertIds: // value for 'alertIds'
+ *      title: // value for 'title'
+ *      description: // value for 'description'
  *   },
  * });
  */

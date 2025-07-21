@@ -21,7 +21,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { useClusterAlertsQuery, useCreateTicketFromClusterMutation } from "@/lib/graphql/generated";
+import { useClusterAlertsQuery, useCreateTicketFromAlertsMutation } from "@/lib/graphql/generated";
 import { useToast } from "@/hooks/use-toast";
 import { 
   AlertTriangle, 
@@ -71,11 +71,11 @@ const CreateTicketFromClusterModal = memo(({
     skip: !open,
   });
 
-  const [createTicketFromCluster, { loading: creatingTicket }] = useCreateTicketFromClusterMutation({
+  const [createTicketFromAlerts, { loading: creatingTicket }] = useCreateTicketFromAlertsMutation({
     onCompleted: (data) => {
       toast({
         title: "Ticket Created",
-        description: `Successfully created ticket "${data.createTicketFromCluster.title}"`,
+        description: `Successfully created ticket "${data.createTicketFromAlerts.title}"`,
       });
       onSuccess?.();
       handleClose();
@@ -138,10 +138,9 @@ const CreateTicketFromClusterModal = memo(({
     // Title is optional - will be auto-generated if not provided
 
     try {
-      await createTicketFromCluster({
+      await createTicketFromAlerts({
         variables: {
-          clusterID: clusterId,
-          alertIDs: Array.from(selectedAlerts),
+          alertIds: Array.from(selectedAlerts),
           title: ticketTitle.trim() || undefined, // Send undefined if empty
           description: ticketDescription.trim() || undefined,
         },
@@ -149,7 +148,7 @@ const CreateTicketFromClusterModal = memo(({
     } catch (error) {
       // Error handling is done in onError callback
     }
-  }, [selectedAlerts, ticketTitle, ticketDescription, createTicketFromCluster, clusterId, toast]);
+  }, [selectedAlerts, ticketTitle, ticketDescription, createTicketFromAlerts, toast]);
 
   const handleClose = useCallback(() => {
     setCurrentPage(1);

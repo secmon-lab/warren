@@ -146,10 +146,8 @@ type Mutation {
   updateTicketConclusion(id: ID!, conclusion: String!, reason: String!): Ticket!
   updateTicket(id: ID!, title: String!, description: String): Ticket!
   createTicket(title: String!, description: String!, isTest: Boolean): Ticket!
-  createTicketFromAlerts(alertIds: [ID!]!): Ticket!
+  createTicketFromAlerts(alertIds: [ID!]!, title: String, description: String): Ticket!
   bindAlertsToTicket(ticketId: ID!, alertIds: [ID!]!): Ticket!
-  createTicketFromCluster(clusterID: ID!, alertIDs: [ID!], title: String, description: String): Ticket!
-  bindClusterToTicket(clusterID: ID!, ticketID: ID!, alertIDs: [ID!]): Ticket!
 }
 
 schema {

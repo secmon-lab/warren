@@ -264,7 +264,7 @@ func (r *mutationResolver) CreateTicket(ctx context.Context, title string, descr
 }
 
 // CreateTicketFromAlerts is the resolver for the createTicketFromAlerts field.
-func (r *mutationResolver) CreateTicketFromAlerts(ctx context.Context, alertIds []string) (*ticket.Ticket, error) {
+func (r *mutationResolver) CreateTicketFromAlerts(ctx context.Context, alertIds []string, title *string, description *string) (*ticket.Ticket, error) {
 	// Extract user information from authentication context
 	token, err := auth.TokenFromContext(ctx)
 	if err != nil {
@@ -283,58 +283,6 @@ func (r *mutationResolver) CreateTicketFromAlerts(ctx context.Context, alertIds 
 		alertIDsTyped[i] = types.AlertID(id)
 	}
 
-	// Call the use case to create ticket from alerts (no Slack thread for Web UI)
-	newTicket, err := r.uc.CreateTicketFromAlerts(ctx, alertIDsTyped, user, nil)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create ticket from alerts")
-	}
-
-	return newTicket, nil
-}
-
-// BindAlertsToTicket is the resolver for the bindAlertsToTicket field.
-func (r *mutationResolver) BindAlertsToTicket(ctx context.Context, ticketID string, alertIds []string) (*ticket.Ticket, error) {
-	// Convert string IDs to typed IDs
-	alertIDsTyped := make([]types.AlertID, len(alertIds))
-	for i, id := range alertIds {
-		alertIDsTyped[i] = types.AlertID(id)
-	}
-
-	// Bind alerts to ticket using UseCase
-	err := r.uc.BindAlertsToTicket(ctx, types.TicketID(ticketID), alertIDsTyped)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to bind alerts to ticket")
-	}
-
-	// Get updated ticket
-	updatedTicket, err := r.repo.GetTicket(ctx, types.TicketID(ticketID))
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get updated ticket")
-	}
-
-	return updatedTicket, nil
-}
-
-// CreateTicketFromCluster is the resolver for the createTicketFromCluster field.
-func (r *mutationResolver) CreateTicketFromCluster(ctx context.Context, clusterID string, alertIDs []string, title *string, description *string) (*ticket.Ticket, error) {
-	// Authentication check
-	token, err := auth.TokenFromContext(ctx)
-	if err != nil {
-		return nil, goerr.Wrap(err, "authentication required")
-	}
-
-	// Create user from authentication token
-	user := &slack.User{
-		ID:   token.Sub,
-		Name: token.Name,
-	}
-
-	// Convert string alert IDs to types.AlertID
-	alertIDsTyped := make([]types.AlertID, len(alertIDs))
-	for i, id := range alertIDs {
-		alertIDsTyped[i] = types.AlertID(id)
-	}
-
 	// Prepare title and description
 	titleStr := ""
 	if title != nil {
@@ -345,11 +293,11 @@ func (r *mutationResolver) CreateTicketFromCluster(ctx context.Context, clusterI
 		descStr = *description
 	}
 
-	// For now, use CreateTicketFromAlerts when title is empty for auto-generation
+	// For auto-generation when title is empty
 	if titleStr == "" {
 		createdTicket, err := r.uc.CreateTicketFromAlerts(ctx, alertIDsTyped, user, nil)
 		if err != nil {
-			return nil, goerr.Wrap(err, "failed to create ticket from cluster")
+			return nil, goerr.Wrap(err, "failed to create ticket from alerts")
 		}
 		return createdTicket, nil
 	}
@@ -376,30 +324,22 @@ func (r *mutationResolver) CreateTicketFromCluster(ctx context.Context, clusterI
 	return updatedTicket, nil
 }
 
-// BindClusterToTicket is the resolver for the bindClusterToTicket field.
-func (r *mutationResolver) BindClusterToTicket(ctx context.Context, clusterID string, ticketID string, alertIDs []string) (*ticket.Ticket, error) {
-	// Authentication check
-	token, err := auth.TokenFromContext(ctx)
-	if err != nil {
-		return nil, goerr.Wrap(err, "authentication required")
-	}
-	_ = token // For now, just check authentication
-
+// BindAlertsToTicket is the resolver for the bindAlertsToTicket field.
+func (r *mutationResolver) BindAlertsToTicket(ctx context.Context, ticketID string, alertIds []string) (*ticket.Ticket, error) {
 	// Convert string IDs to typed IDs
-	ticketIDTyped := types.TicketID(ticketID)
-	alertIDsTyped := make([]types.AlertID, len(alertIDs))
-	for i, id := range alertIDs {
+	alertIDsTyped := make([]types.AlertID, len(alertIds))
+	for i, id := range alertIds {
 		alertIDsTyped[i] = types.AlertID(id)
 	}
 
-	// Use existing BindAlertsToTicket method (which returns error only)
-	err = r.uc.BindAlertsToTicket(ctx, ticketIDTyped, alertIDsTyped)
+	// Bind alerts to ticket using UseCase
+	err := r.uc.BindAlertsToTicket(ctx, types.TicketID(ticketID), alertIDsTyped)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to bind cluster to ticket")
+		return nil, goerr.Wrap(err, "failed to bind alerts to ticket")
 	}
 
-	// Get the updated ticket
-	updatedTicket, err := r.repo.GetTicket(ctx, ticketIDTyped)
+	// Get updated ticket
+	updatedTicket, err := r.repo.GetTicket(ctx, types.TicketID(ticketID))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get updated ticket")
 	}
@@ -1015,3 +955,4 @@ type findingResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }
+

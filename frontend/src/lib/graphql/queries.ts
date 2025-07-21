@@ -435,8 +435,8 @@ export const BIND_ALERTS_TO_TICKET = gql`
 `;
 
 export const CREATE_TICKET_FROM_ALERTS = gql`
-  mutation CreateTicketFromAlerts($alertIds: [ID!]!) {
-    createTicketFromAlerts(alertIds: $alertIds) {
+  mutation CreateTicketFromAlerts($alertIds: [ID!]!, $title: String, $description: String) {
+    createTicketFromAlerts(alertIds: $alertIds, title: $title, description: $description) {
       id
       status
       title

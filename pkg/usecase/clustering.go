@@ -155,17 +155,6 @@ func (uc *ClusteringUseCase) GetClusterAlerts(ctx context.Context, clusterID str
 	return filteredAlerts[start:end], totalCount, nil
 }
 
-// CreateTicketFromCluster creates a ticket from selected alerts in a cluster
-func (uc *ClusteringUseCase) CreateTicketFromCluster(ctx context.Context, clusterID string, alertIDs []string) error {
-	// This will be implemented in the GraphQL resolver by calling existing CreateTicketFromAlerts
-	return goerr.New("not implemented")
-}
-
-// BindClusterToTicket binds selected alerts from a cluster to an existing ticket
-func (uc *ClusteringUseCase) BindClusterToTicket(ctx context.Context, clusterID string, ticketID string, alertIDs []string) error {
-	// This will be implemented in the GraphQL resolver by calling existing BindAlertsToTicket
-	return goerr.New("not implemented")
-}
 
 // Helper methods
 

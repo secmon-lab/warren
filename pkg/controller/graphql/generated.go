@@ -151,10 +151,8 @@ type ComplexityRoot struct {
 
 	Mutation struct {
 		BindAlertsToTicket          func(childComplexity int, ticketID string, alertIds []string) int
-		BindClusterToTicket         func(childComplexity int, clusterID string, ticketID string, alertIDs []string) int
 		CreateTicket                func(childComplexity int, title string, description string, isTest *bool) int
-		CreateTicketFromAlerts      func(childComplexity int, alertIds []string) int
-		CreateTicketFromCluster     func(childComplexity int, clusterID string, alertIDs []string, title *string, description *string) int
+		CreateTicketFromAlerts      func(childComplexity int, alertIds []string, title *string, description *string) int
 		UpdateMultipleTicketsStatus func(childComplexity int, ids []string, status string) int
 		UpdateTicket                func(childComplexity int, id string, title string, description *string) int
 		UpdateTicketConclusion      func(childComplexity int, id string, conclusion string, reason string) int
@@ -238,10 +236,8 @@ type MutationResolver interface {
 	UpdateTicketConclusion(ctx context.Context, id string, conclusion string, reason string) (*ticket.Ticket, error)
 	UpdateTicket(ctx context.Context, id string, title string, description *string) (*ticket.Ticket, error)
 	CreateTicket(ctx context.Context, title string, description string, isTest *bool) (*ticket.Ticket, error)
-	CreateTicketFromAlerts(ctx context.Context, alertIds []string) (*ticket.Ticket, error)
+	CreateTicketFromAlerts(ctx context.Context, alertIds []string, title *string, description *string) (*ticket.Ticket, error)
 	BindAlertsToTicket(ctx context.Context, ticketID string, alertIds []string) (*ticket.Ticket, error)
-	CreateTicketFromCluster(ctx context.Context, clusterID string, alertIDs []string, title *string, description *string) (*ticket.Ticket, error)
-	BindClusterToTicket(ctx context.Context, clusterID string, ticketID string, alertIDs []string) (*ticket.Ticket, error)
 }
 type QueryResolver interface {
 	Ticket(ctx context.Context, id string) (*ticket.Ticket, error)
@@ -704,18 +700,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Mutation.BindAlertsToTicket(childComplexity, args["ticketId"].(string), args["alertIds"].([]string)), true
 
-	case "Mutation.bindClusterToTicket":
-		if e.complexity.Mutation.BindClusterToTicket == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_bindClusterToTicket_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.BindClusterToTicket(childComplexity, args["clusterID"].(string), args["ticketID"].(string), args["alertIDs"].([]string)), true
-
 	case "Mutation.createTicket":
 		if e.complexity.Mutation.CreateTicket == nil {
 			break
@@ -738,19 +722,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateTicketFromAlerts(childComplexity, args["alertIds"].([]string)), true
-
-	case "Mutation.createTicketFromCluster":
-		if e.complexity.Mutation.CreateTicketFromCluster == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_createTicketFromCluster_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.CreateTicketFromCluster(childComplexity, args["clusterID"].(string), args["alertIDs"].([]string), args["title"].(*string), args["description"].(*string)), true
+		return e.complexity.Mutation.CreateTicketFromAlerts(childComplexity, args["alertIds"].([]string), args["title"].(*string), args["description"].(*string)), true
 
 	case "Mutation.updateMultipleTicketsStatus":
 		if e.complexity.Mutation.UpdateMultipleTicketsStatus == nil {
@@ -1350,10 +1322,8 @@ type Mutation {
   updateTicketConclusion(id: ID!, conclusion: String!, reason: String!): Ticket!
   updateTicket(id: ID!, title: String!, description: String): Ticket!
   createTicket(title: String!, description: String!, isTest: Boolean): Ticket!
-  createTicketFromAlerts(alertIds: [ID!]!): Ticket!
+  createTicketFromAlerts(alertIds: [ID!]!, title: String, description: String): Ticket!
   bindAlertsToTicket(ticketId: ID!, alertIds: [ID!]!): Ticket!
-  createTicketFromCluster(clusterID: ID!, alertIDs: [ID!], title: String, description: String): Ticket!
-  bindClusterToTicket(clusterID: ID!, ticketID: ID!, alertIDs: [ID!]): Ticket!
 }
 
 schema {
@@ -1419,80 +1389,6 @@ func (ec *executionContext) field_Mutation_bindAlertsToTicket_argsAlertIds(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Mutation_bindClusterToTicket_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := ec.field_Mutation_bindClusterToTicket_argsClusterID(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["clusterID"] = arg0
-	arg1, err := ec.field_Mutation_bindClusterToTicket_argsTicketID(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["ticketID"] = arg1
-	arg2, err := ec.field_Mutation_bindClusterToTicket_argsAlertIDs(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["alertIDs"] = arg2
-	return args, nil
-}
-func (ec *executionContext) field_Mutation_bindClusterToTicket_argsClusterID(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (string, error) {
-	if _, ok := rawArgs["clusterID"]; !ok {
-		var zeroVal string
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("clusterID"))
-	if tmp, ok := rawArgs["clusterID"]; ok {
-		return ec.unmarshalNID2string(ctx, tmp)
-	}
-
-	var zeroVal string
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Mutation_bindClusterToTicket_argsTicketID(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (string, error) {
-	if _, ok := rawArgs["ticketID"]; !ok {
-		var zeroVal string
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("ticketID"))
-	if tmp, ok := rawArgs["ticketID"]; ok {
-		return ec.unmarshalNID2string(ctx, tmp)
-	}
-
-	var zeroVal string
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Mutation_bindClusterToTicket_argsAlertIDs(
-	ctx context.Context,
-	rawArgs map[string]any,
-) ([]string, error) {
-	if _, ok := rawArgs["alertIDs"]; !ok {
-		var zeroVal []string
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("alertIDs"))
-	if tmp, ok := rawArgs["alertIDs"]; ok {
-		return ec.unmarshalOID2ᚕstringᚄ(ctx, tmp)
-	}
-
-	var zeroVal []string
-	return zeroVal, nil
-}
-
 func (ec *executionContext) field_Mutation_createTicketFromAlerts_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1501,6 +1397,16 @@ func (ec *executionContext) field_Mutation_createTicketFromAlerts_args(ctx conte
 		return nil, err
 	}
 	args["alertIds"] = arg0
+	arg1, err := ec.field_Mutation_createTicketFromAlerts_argsTitle(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["title"] = arg1
+	arg2, err := ec.field_Mutation_createTicketFromAlerts_argsDescription(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["description"] = arg2
 	return args, nil
 }
 func (ec *executionContext) field_Mutation_createTicketFromAlerts_argsAlertIds(
@@ -1521,68 +1427,7 @@ func (ec *executionContext) field_Mutation_createTicketFromAlerts_argsAlertIds(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Mutation_createTicketFromCluster_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := ec.field_Mutation_createTicketFromCluster_argsClusterID(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["clusterID"] = arg0
-	arg1, err := ec.field_Mutation_createTicketFromCluster_argsAlertIDs(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["alertIDs"] = arg1
-	arg2, err := ec.field_Mutation_createTicketFromCluster_argsTitle(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["title"] = arg2
-	arg3, err := ec.field_Mutation_createTicketFromCluster_argsDescription(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["description"] = arg3
-	return args, nil
-}
-func (ec *executionContext) field_Mutation_createTicketFromCluster_argsClusterID(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (string, error) {
-	if _, ok := rawArgs["clusterID"]; !ok {
-		var zeroVal string
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("clusterID"))
-	if tmp, ok := rawArgs["clusterID"]; ok {
-		return ec.unmarshalNID2string(ctx, tmp)
-	}
-
-	var zeroVal string
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Mutation_createTicketFromCluster_argsAlertIDs(
-	ctx context.Context,
-	rawArgs map[string]any,
-) ([]string, error) {
-	if _, ok := rawArgs["alertIDs"]; !ok {
-		var zeroVal []string
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("alertIDs"))
-	if tmp, ok := rawArgs["alertIDs"]; ok {
-		return ec.unmarshalOID2ᚕstringᚄ(ctx, tmp)
-	}
-
-	var zeroVal []string
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Mutation_createTicketFromCluster_argsTitle(
+func (ec *executionContext) field_Mutation_createTicketFromAlerts_argsTitle(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (*string, error) {
@@ -1600,7 +1445,7 @@ func (ec *executionContext) field_Mutation_createTicketFromCluster_argsTitle(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Mutation_createTicketFromCluster_argsDescription(
+func (ec *executionContext) field_Mutation_createTicketFromAlerts_argsDescription(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (*string, error) {
@@ -6267,7 +6112,7 @@ func (ec *executionContext) _Mutation_createTicketFromAlerts(ctx context.Context
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().CreateTicketFromAlerts(rctx, fc.Args["alertIds"].([]string))
+		return ec.resolvers.Mutation().CreateTicketFromAlerts(rctx, fc.Args["alertIds"].([]string), fc.Args["title"].(*string), fc.Args["description"].(*string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6433,192 +6278,6 @@ func (ec *executionContext) fieldContext_Mutation_bindAlertsToTicket(ctx context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_bindAlertsToTicket_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_createTicketFromCluster(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_createTicketFromCluster(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().CreateTicketFromCluster(rctx, fc.Args["clusterID"].(string), fc.Args["alertIDs"].([]string), fc.Args["title"].(*string), fc.Args["description"].(*string))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*ticket.Ticket)
-	fc.Result = res
-	return ec.marshalNTicket2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐTicket(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Mutation_createTicketFromCluster(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Ticket_id(ctx, field)
-			case "status":
-				return ec.fieldContext_Ticket_status(ctx, field)
-			case "title":
-				return ec.fieldContext_Ticket_title(ctx, field)
-			case "description":
-				return ec.fieldContext_Ticket_description(ctx, field)
-			case "summary":
-				return ec.fieldContext_Ticket_summary(ctx, field)
-			case "assignee":
-				return ec.fieldContext_Ticket_assignee(ctx, field)
-			case "alerts":
-				return ec.fieldContext_Ticket_alerts(ctx, field)
-			case "alertsPaginated":
-				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
-			case "alertsCount":
-				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
-			case "conclusion":
-				return ec.fieldContext_Ticket_conclusion(ctx, field)
-			case "reason":
-				return ec.fieldContext_Ticket_reason(ctx, field)
-			case "finding":
-				return ec.fieldContext_Ticket_finding(ctx, field)
-			case "slackLink":
-				return ec.fieldContext_Ticket_slackLink(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Ticket_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Ticket_updatedAt(ctx, field)
-			case "isTest":
-				return ec.fieldContext_Ticket_isTest(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_createTicketFromCluster_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_bindClusterToTicket(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_bindClusterToTicket(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().BindClusterToTicket(rctx, fc.Args["clusterID"].(string), fc.Args["ticketID"].(string), fc.Args["alertIDs"].([]string))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*ticket.Ticket)
-	fc.Result = res
-	return ec.marshalNTicket2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐTicket(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Mutation_bindClusterToTicket(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Ticket_id(ctx, field)
-			case "status":
-				return ec.fieldContext_Ticket_status(ctx, field)
-			case "title":
-				return ec.fieldContext_Ticket_title(ctx, field)
-			case "description":
-				return ec.fieldContext_Ticket_description(ctx, field)
-			case "summary":
-				return ec.fieldContext_Ticket_summary(ctx, field)
-			case "assignee":
-				return ec.fieldContext_Ticket_assignee(ctx, field)
-			case "alerts":
-				return ec.fieldContext_Ticket_alerts(ctx, field)
-			case "alertsPaginated":
-				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
-			case "alertsCount":
-				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
-			case "conclusion":
-				return ec.fieldContext_Ticket_conclusion(ctx, field)
-			case "reason":
-				return ec.fieldContext_Ticket_reason(ctx, field)
-			case "finding":
-				return ec.fieldContext_Ticket_finding(ctx, field)
-			case "slackLink":
-				return ec.fieldContext_Ticket_slackLink(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Ticket_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Ticket_updatedAt(ctx, field)
-			case "isTest":
-				return ec.fieldContext_Ticket_isTest(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_bindClusterToTicket_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -11759,20 +11418,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "createTicketFromCluster":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_createTicketFromCluster(ctx, field)
-			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "bindClusterToTicket":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_bindClusterToTicket(ctx, field)
-			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -13867,42 +13512,6 @@ func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel as
 	_ = ctx
 	res := graphql.MarshalFloat(*v)
 	return res
-}
-
-func (ec *executionContext) unmarshalOID2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
-	if v == nil {
-		return nil, nil
-	}
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
-	var err error
-	res := make([]string, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNID2string(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) marshalOID2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	for i := range v {
-		ret[i] = ec.marshalNID2string(ctx, sel, v[i])
-	}
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
 }
 
 func (ec *executionContext) unmarshalOID2ᚖstring(ctx context.Context, v any) (*string, error) {
