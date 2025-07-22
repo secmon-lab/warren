@@ -3,8 +3,8 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	goerr "github.com/m-mizutani/goerr/v2"
@@ -18,7 +18,6 @@ import (
 type ClusteringUseCase struct {
 	repo              interfaces.Repository
 	clusteringService clustering.Service
-	cache             *clusteringCache
 }
 
 // NewClusteringUseCase creates a new clustering use case instance
@@ -26,7 +25,6 @@ func NewClusteringUseCase(repo interfaces.Repository) *ClusteringUseCase {
 	return &ClusteringUseCase{
 		repo:              repo,
 		clusteringService: clustering.NewService(),
-		cache:             newClusteringCache(),
 	}
 }
 
@@ -48,14 +46,14 @@ type ClusteringSummary struct {
 	TotalCount    int
 }
 
-// GetAlertClusters retrieves alert clusters with caching
+// GetAlertClusters retrieves alert clusters
 func (uc *ClusteringUseCase) GetAlertClusters(ctx context.Context, params GetClustersParams) (*ClusteringSummary, error) {
-	// Generate cache key
-	cacheKey := uc.generateCacheKey(params.DBSCANParams)
-
-	// Try to get from cache
-	if cached := uc.cache.get(cacheKey); cached != nil {
-		return uc.filterAndPaginateClusters(ctx, cached, params)
+	// Set default DBSCAN parameters if not provided
+	if params.DBSCANParams.Eps == 0 && params.DBSCANParams.MinSamples == 0 {
+		params.DBSCANParams = clustering.DBSCANParams{
+			Eps:        0.3, // Default epsilon
+			MinSamples: 2,   // Default minimum samples
+		}
 	}
 
 	// Get unbound alerts with embeddings
@@ -86,33 +84,58 @@ func (uc *ClusteringUseCase) GetAlertClusters(ctx context.Context, params GetClu
 		ComputedAt:    time.Now(),
 	}
 
-	// Cache the result
-	uc.cache.set(cacheKey, summary)
-
 	// Filter and paginate
 	return uc.filterAndPaginateClusters(ctx, summary, params)
 }
 
 // GetClusterAlerts retrieves alerts in a specific cluster with filtering
+// Since we no longer cache clusters, this method now requires re-clustering to find the specific cluster
 func (uc *ClusteringUseCase) GetClusterAlerts(ctx context.Context, clusterID string, keyword string, limit, offset int) ([]*alert.Alert, int, error) {
-	// Get cached clustering result
-	// Note: In a real implementation, we might want to store cluster-alert mappings separately
-	// For now, we'll iterate through cached results to find the cluster
+	return uc.GetClusterAlertsWithParams(ctx, clusterID, keyword, limit, offset, clustering.DBSCANParams{})
+}
 
-	var targetCluster *clustering.AlertCluster
-	uc.cache.mu.RLock()
-	for _, item := range uc.cache.items {
-		for _, cluster := range item.summary.Clusters {
-			if cluster.ID == clusterID {
-				targetCluster = cluster
-				break
-			}
+// GetClusterAlertsWithParams retrieves alerts in a specific cluster with filtering using specific DBSCAN parameters
+func (uc *ClusteringUseCase) GetClusterAlertsWithParams(ctx context.Context, clusterID string, keyword string, limit, offset int, params clustering.DBSCANParams) ([]*alert.Alert, int, error) {
+	// Since we don't cache clusters anymore, we need to re-cluster to find the target cluster
+	// This is less efficient but ensures we get current data
+
+	// Get all unbound alerts with embeddings
+	unboundAlerts, err := uc.repo.GetAlertWithoutTicket(ctx, 0, 0)
+	if err != nil {
+		return nil, 0, goerr.Wrap(err, "failed to get unbound alerts")
+	}
+
+	// Filter alerts with embeddings
+	alertsWithEmbedding := make([]*alert.Alert, 0, len(unboundAlerts))
+	for _, a := range unboundAlerts {
+		if len(a.Embedding) > 0 {
+			alertsWithEmbedding = append(alertsWithEmbedding, a)
 		}
-		if targetCluster != nil {
+	}
+
+	// Use provided DBSCAN parameters, or defaults if not specified
+	if params.Eps == 0 && params.MinSamples == 0 {
+		// Use same default parameters as GetAlertClusters
+		params = clustering.DBSCANParams{
+			Eps:        0.3, // Default epsilon
+			MinSamples: 2,   // Default minimum samples
+		}
+	}
+
+	// Perform clustering
+	result, err := uc.clusteringService.ClusterAlerts(ctx, alertsWithEmbedding, params)
+	if err != nil {
+		return nil, 0, goerr.Wrap(err, "failed to cluster alerts")
+	}
+
+	// Find the target cluster
+	var targetCluster *clustering.AlertCluster
+	for _, cluster := range result.Clusters {
+		if cluster.ID == clusterID {
+			targetCluster = cluster
 			break
 		}
 	}
-	uc.cache.mu.RUnlock()
 
 	if targetCluster == nil {
 		return nil, 0, goerr.New("cluster not found", goerr.V("clusterID", clusterID))
@@ -123,6 +146,11 @@ func (uc *ClusteringUseCase) GetClusterAlerts(ctx context.Context, clusterID str
 	if err != nil {
 		return nil, 0, goerr.Wrap(err, "failed to get cluster alerts")
 	}
+
+	// Sort alerts by ID to ensure consistent pagination
+	sort.Slice(alerts, func(i, j int) bool {
+		return string(alerts[i].ID) < string(alerts[j].ID)
+	})
 
 	// Filter by keyword if provided
 	filteredAlerts := alerts
@@ -156,11 +184,6 @@ func (uc *ClusteringUseCase) GetClusterAlerts(ctx context.Context, clusterID str
 }
 
 // Helper methods
-
-func (uc *ClusteringUseCase) generateCacheKey(params clustering.DBSCANParams) string {
-	data, _ := json.Marshal(params)
-	return "clustering:" + string(data)
-}
 
 func (uc *ClusteringUseCase) filterAndPaginateClusters(ctx context.Context, summary *ClusteringSummary, params GetClustersParams) (*ClusteringSummary, error) {
 	// Filter by minimum cluster size and keyword
@@ -229,64 +252,4 @@ func (uc *ClusteringUseCase) filterAndPaginateClusters(ctx context.Context, summ
 		ComputedAt:    summary.ComputedAt,
 		TotalCount:    totalCount,
 	}, nil
-}
-
-// Simple in-memory cache for clustering results
-type clusteringCache struct {
-	mu    sync.RWMutex
-	items map[string]*cacheItem
-}
-
-type cacheItem struct {
-	summary   *ClusteringSummary
-	expiresAt time.Time
-}
-
-func newClusteringCache() *clusteringCache {
-	cache := &clusteringCache{
-		items: make(map[string]*cacheItem),
-	}
-
-	// Start cleanup goroutine
-	go cache.cleanup()
-
-	return cache
-}
-
-func (c *clusteringCache) get(key string) *ClusteringSummary {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	item, exists := c.items[key]
-	if !exists || time.Now().After(item.expiresAt) {
-		return nil
-	}
-
-	return item.summary
-}
-
-func (c *clusteringCache) set(key string, summary *ClusteringSummary) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.items[key] = &cacheItem{
-		summary:   summary,
-		expiresAt: time.Now().Add(1 * time.Hour), // 1 hour TTL
-	}
-}
-
-func (c *clusteringCache) cleanup() {
-	ticker := time.NewTicker(10 * time.Minute)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		c.mu.Lock()
-		now := time.Now()
-		for key, item := range c.items {
-			if now.After(item.expiresAt) {
-				delete(c.items, key)
-			}
-		}
-		c.mu.Unlock()
-	}
 }

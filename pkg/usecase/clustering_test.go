@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/gt"
@@ -140,42 +139,6 @@ func TestClusteringUseCase_GetAlertClusters(t *testing.T) {
 		// Should only return the large cluster
 		gt.Equal(t, len(summary.Clusters), 1)
 		gt.True(t, summary.Clusters[0].Size >= 3)
-	})
-
-	t.Run("caching", func(t *testing.T) {
-		repo := repository.NewMemory()
-		uc := usecase.NewClusteringUseCase(repo)
-
-		// Create test alerts
-		alerts := []alert.Alert{
-			{ID: types.AlertID("alert1"), Embedding: firestore.Vector32{1.0, 0.0, 0.0}, TicketID: types.EmptyTicketID},
-			{ID: types.AlertID("alert2"), Embedding: firestore.Vector32{0.9, 0.1, 0.0}, TicketID: types.EmptyTicketID},
-		}
-
-		for _, a := range alerts {
-			alertCopy := a
-			gt.NoError(t, repo.PutAlert(ctx, alertCopy))
-		}
-
-		params := usecase.GetClustersParams{
-			DBSCANParams: clustering.DBSCANParams{
-				Eps:        0.15,
-				MinSamples: 2,
-			},
-		}
-
-		// First call - computes clustering
-		summary1, err := uc.GetAlertClusters(ctx, params)
-		gt.NoError(t, err)
-		computedAt1 := summary1.ComputedAt
-
-		// Small delay
-		time.Sleep(10 * time.Millisecond)
-
-		// Second call - should return cached result
-		summary2, err := uc.GetAlertClusters(ctx, params)
-		gt.NoError(t, err)
-		gt.Equal(t, summary2.ComputedAt, computedAt1) // Same timestamp means cached
 	})
 }
 
