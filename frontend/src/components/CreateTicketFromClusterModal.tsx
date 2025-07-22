@@ -125,13 +125,25 @@ const CreateTicketFromClusterModal = memo(({
     }
   }, [clusterAlertsData?.clusterAlerts?.alerts]);
 
+  const totalCount = clusterAlertsData?.clusterAlerts?.totalCount || 0;
+  const alerts = clusterAlertsData?.clusterAlerts?.alerts || [];
+
   const handleSelectAllInCluster = useCallback(async () => {
     try {
+      // Determine the actual number of alerts to fetch
+      // Use totalCount if searching, otherwise use clusterSize
+      const actualTotalCount = searchKeyword.trim() ? totalCount : clusterSize;
+      
+      if (actualTotalCount === 0) {
+        setSelectedAlerts(new Set());
+        return;
+      }
+
       // Fetch all alerts in the cluster without pagination
       const allAlertsResult = await refetch({
         clusterID: clusterId,
         keyword: searchKeyword.trim() || undefined,
-        limit: 10000, // High limit to get all alerts
+        limit: actualTotalCount, // Use actual count instead of hardcoded limit
         offset: 0,
       });
       
@@ -141,8 +153,13 @@ const CreateTicketFromClusterModal = memo(({
       }
     } catch (error) {
       console.error('Failed to fetch all cluster alerts:', error);
+      toast({
+        variant: "destructive",
+        title: "Failed to Select All",
+        description: "Could not fetch all alerts in the cluster. Please try again.",
+      });
     }
-  }, [clusterId, searchKeyword, refetch]);
+  }, [clusterId, searchKeyword, refetch, totalCount, clusterSize, toast]);
 
   const handleCreateTicket = useCallback(async () => {
     if (selectedAlerts.size === 0) {
@@ -179,9 +196,7 @@ const CreateTicketFromClusterModal = memo(({
   }, [onOpenChange]);
 
 
-  const totalCount = clusterAlertsData?.clusterAlerts?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
-  const alerts = clusterAlertsData?.clusterAlerts?.alerts || [];
   const currentPageAlerts = alerts.map(alert => alert.id);
   const allCurrentPageSelected = currentPageAlerts.length > 0 && 
     currentPageAlerts.every(id => selectedAlerts.has(id));
