@@ -207,8 +207,9 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	}
 
 	if len(execResp) > 0 {
-		logging.From(ctx).Debug("message notify", "from", "ExecResponse", "message", execResp)
-		postWarrenMessage(ctx, message)
+		postWarrenMessage(ctx, execResp)
+	} else {
+		msg.Notify(ctx, "✅ All task has been done")
 	}
 
 	// Count completed tasks
