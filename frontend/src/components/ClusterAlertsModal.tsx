@@ -27,6 +27,7 @@ import {
   Link2,
   FileText
 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface ClusterAlertsModalProps {
   open: boolean;
@@ -193,46 +194,52 @@ const ClusterAlertsModal = memo(({
           ) : (
             <div className="space-y-3">
               {alerts.map((alert) => (
-                <div key={alert.id} className="flex items-start gap-3 p-4 border rounded hover:bg-muted/50 transition-colors">
-                  <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-1" />
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-sm mb-1 line-clamp-1">
-                          {alert.title}
-                        </h4>
-                        {alert.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                            {alert.description}
-                          </p>
-                        )}
+                <Link 
+                  key={alert.id} 
+                  to={`/alerts/${alert.id}`}
+                  className="block"
+                >
+                  <div className="flex items-start gap-3 p-4 border rounded hover:bg-muted/50 transition-colors cursor-pointer">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-1" />
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-sm mb-1 line-clamp-1 hover:text-blue-600 transition-colors">
+                            {alert.title}
+                          </h4>
+                          {alert.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                              {alert.description}
+                            </p>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Badge 
+                            variant="secondary" 
+                            className={`text-xs ${getSeverityColor(alert.schema)}`}
+                          >
+                            {alert.schema}
+                          </Badge>
+                          {alert.ticket && (
+                            <Badge variant="outline" className="text-xs">
+                              Ticket #{alert.ticket.id}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                       
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Badge 
-                          variant="secondary" 
-                          className={`text-xs ${getSeverityColor(alert.schema)}`}
-                        >
-                          {alert.schema}
-                        </Badge>
-                        {alert.ticket && (
-                          <Badge variant="outline" className="text-xs">
-                            Ticket #{alert.ticket.id}
-                          </Badge>
-                        )}
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          <span>{formatTimeAgo(alert.createdAt)}</span>
+                        </div>
+                        <span className="truncate">ID: {alert.id}</span>
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        <span>{formatTimeAgo(alert.createdAt)}</span>
-                      </div>
-                      <span className="truncate">ID: {alert.id}</span>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}

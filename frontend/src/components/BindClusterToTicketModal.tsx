@@ -181,7 +181,7 @@ const BindClusterToTicketModal = memo(({
           alertIds: Array.from(selectedAlerts),
         },
       });
-    } catch (error) {
+    } catch {
       // Error handling is done in onError callback
     }
   }, [selectedAlerts, selectedTicketId, bindAlertsToTicket, toast]);

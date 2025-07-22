@@ -125,6 +125,42 @@ const CreateTicketFromClusterModal = memo(({
     }
   }, [clusterAlertsData?.clusterAlerts?.alerts]);
 
+  const totalCount = clusterAlertsData?.clusterAlerts?.totalCount || 0;
+  const alerts = clusterAlertsData?.clusterAlerts?.alerts || [];
+
+  const handleSelectAllInCluster = useCallback(async () => {
+    try {
+      // Determine the actual number of alerts to fetch
+      // Use totalCount if searching, otherwise use clusterSize
+      const actualTotalCount = searchKeyword.trim() ? totalCount : clusterSize;
+      
+      if (actualTotalCount === 0) {
+        setSelectedAlerts(new Set());
+        return;
+      }
+
+      // Fetch all alerts in the cluster without pagination
+      const allAlertsResult = await refetch({
+        clusterID: clusterId,
+        keyword: searchKeyword.trim() || undefined,
+        limit: actualTotalCount, // Use actual count instead of hardcoded limit
+        offset: 0,
+      });
+      
+      if (allAlertsResult.data?.clusterAlerts?.alerts) {
+        const allAlertIds = new Set(allAlertsResult.data.clusterAlerts.alerts.map(alert => alert.id));
+        setSelectedAlerts(allAlertIds);
+      }
+    } catch (error) {
+      console.error('Failed to fetch all cluster alerts:', error);
+      toast({
+        variant: "destructive",
+        title: "Failed to Select All",
+        description: "Could not fetch all alerts in the cluster. Please try again.",
+      });
+    }
+  }, [clusterId, searchKeyword, refetch, totalCount, clusterSize, toast]);
+
   const handleCreateTicket = useCallback(async () => {
     if (selectedAlerts.size === 0) {
       toast({
@@ -145,7 +181,7 @@ const CreateTicketFromClusterModal = memo(({
           description: ticketDescription.trim() || undefined,
         },
       });
-    } catch (error) {
+    } catch {
       // Error handling is done in onError callback
     }
   }, [selectedAlerts, ticketTitle, ticketDescription, createTicketFromAlerts, toast]);
@@ -160,9 +196,7 @@ const CreateTicketFromClusterModal = memo(({
   }, [onOpenChange]);
 
 
-  const totalCount = clusterAlertsData?.clusterAlerts?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
-  const alerts = clusterAlertsData?.clusterAlerts?.alerts || [];
   const currentPageAlerts = alerts.map(alert => alert.id);
   const allCurrentPageSelected = currentPageAlerts.length > 0 && 
     currentPageAlerts.every(id => selectedAlerts.has(id));
@@ -238,15 +272,25 @@ const CreateTicketFromClusterModal = memo(({
                 {searchKeyword ? `${totalCount} matching alerts` : `${clusterSize} total alerts`}
               </div>
               {alerts.length > 0 && (
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="select-all"
-                    checked={allCurrentPageSelected}
-                    onCheckedChange={handleSelectAll}
-                  />
-                  <Label htmlFor="select-all" className="text-sm">
-                    Select all on this page
-                  </Label>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="select-all-page"
+                      checked={allCurrentPageSelected}
+                      onCheckedChange={handleSelectAll}
+                    />
+                    <Label htmlFor="select-all-page" className="text-sm">
+                      Select all on this page
+                    </Label>
+                  </div>
+                  <Button
+                    onClick={handleSelectAllInCluster}
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                  >
+                    Select all in cluster
+                  </Button>
                 </div>
               )}
             </div>
