@@ -85,7 +85,11 @@ func Ask[T any](ctx context.Context, llm gollem.LLMClient, prompt string, opts .
 
 		if config.validate != nil {
 			if err := config.validate(result); err != nil {
-				ctx = msg.Trace(ctx, "💥 failed to validate response from LLM, retry (%d/%d)", i+1, config.maxRetry)
+				ctx = msg.Trace(ctx, "💥 invalid response from LLM, retry (%d/%d)", i+1, config.maxRetry)
+				logger.Debug("invalid response from LLM",
+					"result", result,
+					"text", string(text),
+				)
 				prompt = config.retryPrompt(ctx, err)
 				continue
 			}
