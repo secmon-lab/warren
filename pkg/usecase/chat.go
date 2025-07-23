@@ -176,6 +176,9 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	plan, err := agent.Plan(ctx, message,
 		gollem.WithPlanLanguage(lang.From(ctx).Name()),
 		gollem.WithPlanSystemPrompt(systemPrompt),
+		gollem.WithPlanPhaseSystemPrompt(func(_ context.Context, _ gollem.PlanPhaseType, _ *gollem.Plan) string {
+			return "Use Slack style markdown format in message if you need to decorate text"
+		}),
 		gollem.WithPlanCreatedHook(func(ctx context.Context, plan *gollem.Plan) error {
 			return updatePlanProgress(progressUpdate, plan, "Plan created")
 		}),
