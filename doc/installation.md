@@ -206,13 +206,13 @@ Comprehensive Google Cloud configuration:
 - Secret Manager setup
 - Cloud Run deployment
 
-### 🛠️ [Advanced Configuration](./installation_advanced.md)
-Additional configuration options:
-- Custom Docker image creation
-- Policy configuration and testing
-- External tool integration (VirusTotal, OTX, etc.)
-- BigQuery setup for analytics
-- Monitoring and logging
+### 🛠️ Advanced Configuration
+Additional configuration options are covered in these guides:
+- **Custom Docker image creation** - See [Google Cloud Setup](./installation_gcp.md#42-build-and-push-image)
+- **Policy configuration and testing** - See [Policy Guide](./policy.md)
+- **External tool integration** - See [Integration Guide](./integration.md#external-tool-integration)
+- **BigQuery setup** - See [Google Cloud Setup](./installation_gcp.md#10-optional-bigquery-setup)
+- **Monitoring and logging** - See [Google Cloud Setup](./installation_gcp.md#11-monitoring-and-logging)
 
 ## Verification
 

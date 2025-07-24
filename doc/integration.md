@@ -12,15 +12,31 @@ Warren acts as a central hub for security alert management with:
 
 ## Webhook Endpoints
 
-All webhook endpoints use policy-based authorization through the `auth` package. Ensure your policies allow access to these endpoints.
+### Purpose and Architecture
+
+Webhook endpoints are Warren's primary mechanism for receiving security alerts from external systems. They serve as the entry point for the entire alert processing pipeline:
+
+1. **Alert Collection**: Gather security events from diverse sources (cloud providers, SIEMs, monitoring tools)
+2. **Normalization**: Transform various alert formats into Warren's standardized model
+3. **Policy Evaluation**: Apply Rego policies to determine if events qualify as alerts
+4. **Enrichment**: Enhance alerts with AI-generated metadata and threat intelligence
+5. **Distribution**: Route alerts to Slack and create tickets for investigation
+
+All webhook endpoints use policy-based authorization through the `auth` package, providing flexible access control. This ensures that only authorized systems can submit alerts while maintaining security.
 
 ### Alert Ingestion Endpoints
 
-Warren provides three types of webhook endpoints for receiving alerts:
+Warren provides three types of webhook endpoints, each designed for specific integration patterns:
 
 #### 1. Raw Alert Endpoint
 
-Direct JSON alert submission:
+**Purpose**: Direct integration with security tools that can send HTTP requests. This is the simplest integration method for custom tools, scripts, or systems that can format their alerts as JSON.
+
+**Use Cases**:
+- Custom security scripts and tools
+- Direct integration from security appliances
+- Development and testing
+- Simple one-off integrations
 
 **Endpoint**: `/hooks/alert/raw/{schema}`  
 **Method**: `POST`  
@@ -56,7 +72,20 @@ The `{schema}` parameter determines which policy will process the alert. Common 
 
 #### 2. Google Pub/Sub Endpoint
 
-For Google Cloud Pub/Sub push subscriptions:
+**Purpose**: Asynchronous, reliable alert delivery from Google Cloud services. Pub/Sub provides guaranteed delivery, automatic retries, and decoupling between alert producers and Warren.
+
+**Use Cases**:
+- Google Cloud Security Command Center alerts
+- Cloud Logging export for security events
+- Integration with Google Cloud security tools
+- High-volume alert processing with buffering
+- Multi-region alert collection
+
+**Benefits**:
+- Automatic retry and dead-letter handling
+- Scalable message buffering
+- Decoupled architecture
+- Built-in authentication via Google ID tokens
 
 **Endpoint**: `/hooks/alert/pubsub/{schema}`  
 **Method**: `POST`  
@@ -92,16 +121,38 @@ gcloud pubsub subscriptions create warren-alerts-sub \
 
 #### 3. AWS SNS Endpoint
 
-For AWS SNS notifications:
+**Purpose**: Native integration with AWS security services and event-driven architectures. SNS provides fan-out capabilities, allowing multiple systems to receive the same alerts while Warren processes them for investigation.
+
+**Use Cases**:
+- AWS GuardDuty findings
+- AWS Security Hub alerts
+- CloudWatch alarms for security events
+- AWS Config compliance violations
+- Custom AWS Lambda security functions
+- Multi-account security event aggregation
+
+**Benefits**:
+- Native AWS service integration
+- Cross-region event delivery
+- Multiple subscriber support (Warren + other tools)
+- Built-in message verification
+- Automatic subscription confirmation
+
+**Security Features**:
+- Cryptographic signature verification
+- Certificate validation
+- Message integrity checking
+- Replay attack prevention
 
 **Endpoint**: `/hooks/alert/sns/{schema}`  
 **Method**: `POST`  
 **Authentication**: SNS signature verification
 
 Warren automatically:
-- Verifies SNS message signatures
-- Handles subscription confirmations
-- Extracts and processes alert data
+- Verifies SNS message signatures for security
+- Handles subscription confirmations transparently
+- Extracts and processes alert data from SNS envelope
+- Validates message timestamps to prevent replay attacks
 
 SNS topic configuration:
 1. Create SNS topic in AWS
@@ -122,9 +173,36 @@ Example SNS message:
 }
 ```
 
+### How Webhook Processing Works
+
+When an alert arrives at any webhook endpoint:
+
+1. **Authentication & Authorization**
+   - Verify request authenticity (signatures, tokens)
+   - Check authorization policies
+   
+2. **Schema Resolution**
+   - The `{schema}` parameter determines which Rego policy to use
+   - Example: `/hooks/alert/raw/guardduty` uses `alert.guardduty` policy
+
+3. **Policy Evaluation**
+   - Raw data is passed to the Rego policy as `input`
+   - Policy decides if the event should create an alert
+   - Policy extracts and formats metadata
+
+4. **Alert Creation**
+   - If policy returns alert data, Warren creates an Alert entity
+   - AI generates embeddings for similarity analysis
+   - Alert is stored in Firestore
+
+5. **Notification & Clustering**
+   - Alert posted to Slack if unbound
+   - Clustering algorithms group similar alerts
+   - Analysts can create tickets from alerts
+
 ### Custom Alert Schemas
 
-Define custom schemas using Rego policies:
+Define custom schemas using Rego policies to handle any alert format:
 
 1. Create policy file: `policies/alert/myservice.rego`
 ```rego
