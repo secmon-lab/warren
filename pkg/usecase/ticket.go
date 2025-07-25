@@ -67,7 +67,7 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 		}
 
 		// For single alert with no explicit slackThread, use the alert's Slack thread if available
-		if len(alerts) == 1 && opts.SlackThread == nil && alerts[0].HasSlackThread() && uc.IsSlackEnabled() {
+if len(alerts) == 1 && opts.SlackThread == nil && alerts[0].HasSlackThread() && uc.IsSlackEnabled() {
 			opts.SlackThread = alerts[0].SlackThread
 		}
 	}
