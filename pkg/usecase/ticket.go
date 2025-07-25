@@ -67,7 +67,7 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 		}
 
 		// For single alert with no explicit slackThread, use the alert's Slack thread if available
-		if len(alerts) == 1 && opts.SlackThread == nil && alerts[0].SlackThread != nil && uc.slackService != nil {
+		if len(alerts) == 1 && opts.SlackThread == nil && alerts[0].HasSlackThread() && uc.IsSlackEnabled() {
 			opts.SlackThread = alerts[0].SlackThread
 		}
 	}
@@ -147,7 +147,7 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 	}
 
 	// Post to Slack if SlackThread is provided
-	if opts.SlackThread != nil && uc.slackService != nil {
+	if opts.SlackThread != nil && uc.IsSlackEnabled() {
 		messageID, err := uc.postTicketToSlack(ctx, newTicketPtr, *opts.SlackThread, alerts)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to post ticket to slack")
@@ -161,10 +161,10 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 	}
 
 	// Update individual alerts' Slack display if alerts exist and slack service is available
-	if uc.slackService != nil && len(alerts) > 0 {
+	if uc.IsSlackEnabled() && len(alerts) > 0 {
 		for _, alert := range alerts {
-			if alert.SlackThread != nil {
-				st := uc.slackService.NewThread(*alert.SlackThread)
+			if alert.HasSlackThread() {
+				st := uc.slackNotifier.NewThread(*alert.SlackThread)
 				if err := st.UpdateAlert(ctx, *alert); err != nil {
 					// Log error but don't fail the main operation
 					_ = msg.Trace(ctx, "💥 Failed to update alert in Slack: %s", err.Error())
@@ -186,7 +186,7 @@ func (uc *UseCases) postTicketToSlack(ctx context.Context, newTicket *ticket.Tic
 	// Check if ThreadID is empty, indicating we should create a new thread
 	if slackThread.ThreadID == "" {
 		// Create new thread by posting ticket to service directly
-		newThreadSvc, ts, err := uc.slackService.PostTicket(ctx, *newTicket, alerts)
+		newThreadSvc, ts, err := uc.slackNotifier.PostTicket(ctx, newTicket, alerts)
 		if err != nil {
 			return "", goerr.Wrap(err, "failed to post ticket to new thread")
 		}
@@ -200,7 +200,7 @@ func (uc *UseCases) postTicketToSlack(ctx context.Context, newTicket *ticket.Tic
 		}
 	} else {
 		// Use existing thread
-		st := uc.slackService.NewThread(slackThread)
+		st := uc.slackNotifier.NewThread(slackThread)
 
 		// Check if there are multiple alert lists in the thread (only for alert-based tickets)
 		if len(alerts) > 0 {
@@ -211,7 +211,7 @@ func (uc *UseCases) postTicketToSlack(ctx context.Context, newTicket *ticket.Tic
 
 			if len(alertLists) > 1 {
 				// Multiple alert lists exist, post ticket to new thread
-				newThreadSvc, ts, err := uc.slackService.PostTicket(ctx, *newTicket, alerts)
+				newThreadSvc, ts, err := uc.slackNotifier.PostTicket(ctx, newTicket, alerts)
 				if err != nil {
 					return "", goerr.Wrap(err, "failed to post ticket to new thread")
 				}
@@ -225,13 +225,13 @@ func (uc *UseCases) postTicketToSlack(ctx context.Context, newTicket *ticket.Tic
 				}
 
 				// Post link to the new ticket in the original thread
-				ticketURL := uc.slackService.ToMsgURL(newThreadSvc.ChannelID(), newThreadSvc.ThreadID())
+				ticketURL := uc.slackNotifier.ToMsgURL(newThreadSvc.ChannelID(), newThreadSvc.ThreadID())
 				if err := st.PostLinkToTicket(ctx, ticketURL, newTicket.Metadata.Title); err != nil {
 					return "", goerr.Wrap(err, "failed to post link to ticket")
 				}
 			} else {
 				// Single or no alert list - post ticket in the current thread
-				ts, err := st.PostTicket(ctx, *newTicket, alerts)
+				ts, err := st.PostTicket(ctx, newTicket, alerts)
 				if err != nil {
 					return "", goerr.Wrap(err, "failed to post ticket")
 				}
@@ -247,7 +247,7 @@ func (uc *UseCases) postTicketToSlack(ctx context.Context, newTicket *ticket.Tic
 
 			if existingTicket != nil {
 				// Ticket already exists in this thread, post new ticket to separate thread
-				newThreadSvc, ts, err := uc.slackService.PostTicket(ctx, *newTicket, alerts)
+				newThreadSvc, ts, err := uc.slackNotifier.PostTicket(ctx, newTicket, alerts)
 				if err != nil {
 					return "", goerr.Wrap(err, "failed to post ticket to new thread")
 				}
@@ -261,13 +261,13 @@ func (uc *UseCases) postTicketToSlack(ctx context.Context, newTicket *ticket.Tic
 				}
 
 				// Post link to the new ticket in the original thread
-				ticketURL := uc.slackService.ToMsgURL(newThreadSvc.ChannelID(), newThreadSvc.ThreadID())
+				ticketURL := uc.slackNotifier.ToMsgURL(newThreadSvc.ChannelID(), newThreadSvc.ThreadID())
 				if err := st.PostLinkToTicket(ctx, ticketURL, newTicket.Metadata.Title); err != nil {
 					return "", goerr.Wrap(err, "failed to post link to ticket")
 				}
 			} else {
 				// No existing ticket - post ticket in the current thread
-				ts, err := st.PostTicket(ctx, *newTicket, alerts)
+				ts, err := st.PostTicket(ctx, newTicket, alerts)
 				if err != nil {
 					return "", goerr.Wrap(err, "failed to post ticket")
 				}
@@ -306,10 +306,10 @@ func (uc *UseCases) CreateManualTicketWithTest(ctx context.Context, title, descr
 
 	var slackThread *slack.Thread
 	// If Slack service is available, post to default channel
-	if uc.slackService != nil {
+	if uc.IsSlackEnabled() {
 		// Use a placeholder thread that will trigger posting to new thread
 		slackThread = &slack.Thread{
-			ChannelID: uc.slackService.DefaultChannelID(),
+			ChannelID: uc.slackNotifier.DefaultChannelID(),
 			ThreadID:  "", // Empty thread ID will create a new thread
 		}
 	}
@@ -368,7 +368,7 @@ func (uc *UseCases) updateTicketWithSlackSync(ctx context.Context, ticketID type
 
 // syncTicketToSlack syncs a single ticket to Slack
 func (uc *UseCases) syncTicketToSlack(ctx context.Context, ticket *ticket.Ticket) error {
-	if ticket.SlackThread == nil || uc.slackService == nil {
+	if !ticket.HasSlackThread() || !uc.IsSlackEnabled() {
 		return nil // No Slack thread or service, skip sync
 	}
 
@@ -378,8 +378,8 @@ func (uc *UseCases) syncTicketToSlack(ctx context.Context, ticket *ticket.Ticket
 		return goerr.Wrap(err, "failed to get alerts for Slack update")
 	}
 
-	st := uc.slackService.NewThread(*ticket.SlackThread)
-	if _, err := st.PostTicket(ctx, *ticket, alerts); err != nil {
+	st := uc.slackNotifier.NewThread(*ticket.SlackThread)
+	if _, err := st.PostTicket(ctx, ticket, alerts); err != nil {
 		return goerr.Wrap(err, "failed to update Slack post")
 	}
 

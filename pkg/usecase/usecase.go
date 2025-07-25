@@ -18,7 +18,7 @@ var (
 
 type UseCases struct {
 	// services and adapters
-	slackService    *slack.Service
+	slackNotifier   SlackNotifier
 	llmClient       gollem.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
@@ -50,9 +50,16 @@ func WithLLMClient(llmClient gollem.LLMClient) Option {
 	}
 }
 
+func WithSlackNotifier(slackNotifier SlackNotifier) Option {
+	return func(u *UseCases) {
+		u.slackNotifier = slackNotifier
+	}
+}
+
+// Deprecated: Use WithSlackNotifier instead
 func WithSlackService(slackService *slack.Service) Option {
 	return func(u *UseCases) {
-		u.slackService = slackService
+		u.slackNotifier = NewSlackNotifier(slackService)
 	}
 }
 
@@ -123,11 +130,12 @@ func (c *dummyPolicyClient) Sources() map[string]string {
 
 func New(opts ...Option) *UseCases {
 	u := &UseCases{
-		repository:   repository.NewMemory(),
-		policyClient: &dummyPolicyClient{},
-		timeSpan:     24 * time.Hour,
-		actionLimit:  10,
-		findingLimit: 3,
+		repository:    repository.NewMemory(),
+		policyClient:  &dummyPolicyClient{},
+		slackNotifier: NewDiscardSlackNotifier(), // Default to discard implementation
+		timeSpan:      24 * time.Hour,
+		actionLimit:   10,
+		findingLimit:  3,
 	}
 
 	for _, opt := range opts {
@@ -138,4 +146,9 @@ func New(opts ...Option) *UseCases {
 	u.ClusteringUC = NewClusteringUseCase(u.repository)
 
 	return u
+}
+
+// IsSlackEnabled returns whether Slack functionality is enabled
+func (u *UseCases) IsSlackEnabled() bool {
+	return u.slackNotifier.IsEnabled()
 }

@@ -17,7 +17,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 	logger := logging.From(ctx)
 	logger.Debug("slack app mention event", "mention", slackMsg.Mention(), "slack_thread", slackMsg.Thread())
 
-	threadSvc := uc.slackService.NewThread(slackMsg.Thread())
+	threadSvc := uc.slackNotifier.NewThread(slackMsg.Thread())
 	ctx = msg.WithUpdatable(ctx, threadSvc.Reply, threadSvc.NewStateFunc, threadSvc.NewUpdatableMessage)
 	if slackMsg.User() != nil {
 		ctx = user.WithUserID(ctx, slackMsg.User().ID)
@@ -25,7 +25,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 
 	// Nothing to do
 	for i, mention := range slackMsg.Mention() {
-		if !uc.slackService.IsBotUser(mention.UserID) {
+		if !uc.slackNotifier.IsBotUser(mention.UserID) {
 			continue
 		}
 
@@ -33,15 +33,22 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 
 		// Try to parse message as command when it's first mention.
 		if i == 0 && len(mention.Message) > 0 {
-			cmdSvc := command.New(uc.repository, uc.llmClient, threadSvc)
-			if err := cmdSvc.Execute(ctx, &slackMsg, mention.Message); err != nil {
-				// If errUnknownCommand, it will be falled thorugh.
-				if !errors.Is(err, command.ErrUnknownCommand) {
-					return goerr.Wrap(err, "failed to handle slack root command")
+			// Only execute commands if Slack is enabled (commands require real Slack service)
+			if uc.IsSlackEnabled() {
+				// Cast to concrete type for command service (commands require real Slack functionality)
+				if adapter, ok := uc.slackNotifier.(*slackNotifierAdapter); ok {
+					concreteThreadSvc := adapter.service.NewThread(slackMsg.Thread())
+					cmdSvc := command.New(uc.repository, uc.llmClient, concreteThreadSvc)
+					if err := cmdSvc.Execute(ctx, &slackMsg, mention.Message); err != nil {
+						// If errUnknownCommand, it will be falled thorugh.
+						if !errors.Is(err, command.ErrUnknownCommand) {
+							return goerr.Wrap(err, "failed to handle slack root command")
+						}
+					} else {
+						// If no error in command processor, the mention has been proceeded.
+						continue
+					}
 				}
-			} else {
-				// If no error in command processor, the mention has been proceeded.
-				continue
 			}
 		}
 
