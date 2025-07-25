@@ -6,7 +6,10 @@ import (
 
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/opaq"
-	"github.com/slack-go/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+	slackSDK "github.com/slack-go/slack"
 )
 
 type EmbeddingClient interface {
@@ -25,23 +28,89 @@ type StorageClient interface {
 }
 
 type SlackClient interface {
-	PostMessageContext(ctx context.Context, channelID string, options ...slack.MsgOption) (string, string, error)
-	UpdateMessageContext(ctx context.Context, channelID, timestamp string, options ...slack.MsgOption) (string, string, string, error)
-	AuthTest() (*slack.AuthTestResponse, error)
-	GetTeamInfo() (*slack.TeamInfo, error)
-	OpenView(triggerID string, view slack.ModalViewRequest) (*slack.ViewResponse, error)
-	UpdateView(view slack.ModalViewRequest, externalID, hash, viewID string) (*slack.ViewResponse, error)
-	UploadFileV2Context(ctx context.Context, params slack.UploadFileV2Parameters) (*slack.FileSummary, error)
-	GetUserInfo(userID string) (*slack.User, error)
-	GetUsersInfo(users ...string) (*[]slack.User, error)
-	GetConversationInfo(input *slack.GetConversationInfoInput) (*slack.Channel, error)
-	GetUserGroups(options ...slack.GetUserGroupsOption) ([]slack.UserGroup, error)
-	GetBotInfoContext(ctx context.Context, parameters slack.GetBotInfoParameters) (*slack.Bot, error)
+	PostMessageContext(ctx context.Context, channelID string, options ...slackSDK.MsgOption) (string, string, error)
+	UpdateMessageContext(ctx context.Context, channelID, timestamp string, options ...slackSDK.MsgOption) (string, string, string, error)
+	AuthTest() (*slackSDK.AuthTestResponse, error)
+	GetTeamInfo() (*slackSDK.TeamInfo, error)
+	OpenView(triggerID string, view slackSDK.ModalViewRequest) (*slackSDK.ViewResponse, error)
+	UpdateView(view slackSDK.ModalViewRequest, externalID, hash, viewID string) (*slackSDK.ViewResponse, error)
+	UploadFileV2Context(ctx context.Context, params slackSDK.UploadFileV2Parameters) (*slackSDK.FileSummary, error)
+	GetUserInfo(userID string) (*slackSDK.User, error)
+	GetUsersInfo(users ...string) (*[]slackSDK.User, error)
+	GetConversationInfo(input *slackSDK.GetConversationInfoInput) (*slackSDK.Channel, error)
+	GetUserGroups(options ...slackSDK.GetUserGroupsOption) ([]slackSDK.UserGroup, error)
+	GetBotInfoContext(ctx context.Context, parameters slackSDK.GetBotInfoParameters) (*slackSDK.Bot, error)
 }
 
 type SlackThreadService interface {
+	// Thread information
+	ChannelID() string
+	ThreadID() string
+	Entity() *slack.Thread
+
+	// Posting operations
+	PostAlert(ctx context.Context, alert *alert.Alert) error
+	PostComment(ctx context.Context, comment string) error
+	PostCommentWithMessageID(ctx context.Context, comment string) (string, error)
+	PostTicket(ctx context.Context, ticket *ticket.Ticket, alerts alert.Alerts) (string, error)
+	PostLinkToTicket(ctx context.Context, ticketURL, ticketTitle string) error
+	PostFinding(ctx context.Context, finding *ticket.Finding) error
+
+	// Update operations
+	UpdateAlert(ctx context.Context, alert alert.Alert) error
+	UpdateAlertList(ctx context.Context, list *alert.List, status string) error
+
+	// List operations
+	PostAlerts(ctx context.Context, alerts alert.Alerts) error
+	PostAlertList(ctx context.Context, list *alert.List) (string, error)
+	PostAlertLists(ctx context.Context, clusters []*alert.List) error
+	PostTicketList(ctx context.Context, tickets []*ticket.Ticket) error
+
+	// Interactive operations
 	Reply(ctx context.Context, message string)
 	NewStateFunc(ctx context.Context, message string) func(ctx context.Context, msg string)
+	NewUpdatableMessage(ctx context.Context, initialMessage string) func(ctx context.Context, newMsg string)
+
+	// File operations
+	AttachFile(ctx context.Context, title, fileName string, data []byte) error
+}
+
+// SlackNotifier defines the interface for Slack notification operations
+type SlackNotifier interface {
+	// IsEnabled returns whether Slack functionality is enabled
+	IsEnabled() bool
+
+	// Alert operations
+	PostAlert(ctx context.Context, alert *alert.Alert) (SlackThreadService, error)
+
+	// Thread operations
+	NewThread(thread slack.Thread) SlackThreadService
+
+	// Ticket operations
+	PostTicket(ctx context.Context, ticket *ticket.Ticket, alerts alert.Alerts) (SlackThreadService, string, error)
+
+	// User operations
+	GetUserIcon(ctx context.Context, userID string) ([]byte, string, error)
+	GetUserProfile(ctx context.Context, userID string) (string, error)
+
+	// Utility operations
+	IsBotUser(userID string) bool
+	BotID() string
+	DefaultChannelID() string
+	ToMsgURL(channelID, threadID string) string
+
+	// Modal operations
+	ShowBindToTicketModal(ctx context.Context, callbackID slack.CallbackID, tickets []*ticket.Ticket, triggerID string, metadata string) error
+	ShowResolveTicketModal(ctx context.Context, ticket *ticket.Ticket, triggerID string) error
+	ShowSalvageModal(ctx context.Context, ticket *ticket.Ticket, unboundAlerts alert.Alerts, triggerID string) error
+	UpdateSalvageModal(ctx context.Context, ticket *ticket.Ticket, unboundAlerts alert.Alerts, viewID string, threshold float64, keyword string) error
+
+	// Commands will be handled separately to avoid circular dependencies
+}
+
+// CommandExecutor defines the interface for executing Slack commands
+type CommandExecutor interface {
+	Execute(ctx context.Context, slackMsg *slack.Message, thread slack.Thread, command string) error
 }
 
 type LLMClient interface {

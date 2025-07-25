@@ -191,7 +191,7 @@ func (x *Service) ToExternalMsgURL(channelID, threadID string) string {
 	return x.slackMetadata.ToExternalMsgURL(channelID, threadID, "")
 }
 
-func (x *Service) NewThread(thread model.Thread) *ThreadService {
+func (x *Service) NewThread(thread model.Thread) interfaces.SlackThreadService {
 	return &ThreadService{
 		slackMetadata:      x.slackMetadata,
 		channelID:          thread.ChannelID,
@@ -209,14 +209,15 @@ func (x *Service) PostMessage(ctx context.Context, message string) (*ThreadServi
 		return nil, err
 	}
 
-	return x.NewThread(model.Thread{
+	threadSvc := x.NewThread(model.Thread{
 		ChannelID: ch,
 		ThreadID:  thread,
-	}), nil
+	}).(*ThreadService)
+	return threadSvc, nil
 }
 
-func (x *Service) PostAlert(ctx context.Context, alert alert.Alert) (*ThreadService, error) {
-	blocks := buildAlertBlocks(alert)
+func (x *Service) PostAlert(ctx context.Context, alert *alert.Alert) (interfaces.SlackThreadService, error) {
+	blocks := buildAlertBlocks(*alert)
 
 	channelID, timestamp, err := x.client.PostMessageContext(
 		ctx,
@@ -258,8 +259,8 @@ func (x *Service) UpdateAlerts(ctx context.Context, alerts alert.Alerts) {
 }
 
 // PostTicket posts a ticket to a new thread and returns the thread service
-func (x *Service) PostTicket(ctx context.Context, ticket ticket.Ticket, alerts alert.Alerts) (*ThreadService, string, error) {
-	blocks := buildTicketBlocks(ticket, alerts, x.slackMetadata, x.frontendURL)
+func (x *Service) PostTicket(ctx context.Context, ticket *ticket.Ticket, alerts alert.Alerts) (interfaces.SlackThreadService, string, error) {
+	blocks := buildTicketBlocks(*ticket, alerts, x.slackMetadata, x.frontendURL)
 
 	channelID, ts, err := x.client.PostMessageContext(
 		ctx,
@@ -312,8 +313,8 @@ func (x *ThreadService) UpdateAlert(ctx context.Context, alert alert.Alert) erro
 	return nil // Return immediately, processing is done asynchronously
 }
 
-func (x *ThreadService) PostTicket(ctx context.Context, ticket ticket.Ticket, alerts alert.Alerts) (string, error) {
-	blocks := buildTicketBlocks(ticket, alerts, x.slackMetadata, x.frontendURL)
+func (x *ThreadService) PostTicket(ctx context.Context, ticket *ticket.Ticket, alerts alert.Alerts) (string, error) {
+	blocks := buildTicketBlocks(*ticket, alerts, x.slackMetadata, x.frontendURL)
 
 	if ticket.SlackMessageID == "" {
 		_, ts, err := x.client.PostMessageContext(
@@ -496,8 +497,8 @@ func (x *ThreadService) updateMessage(ctx context.Context, msgID string, blocks 
 	}
 }
 
-func (x *ThreadService) PostFinding(ctx context.Context, finding ticket.Finding) error {
-	blocks := buildFindingBlocks(finding)
+func (x *ThreadService) PostFinding(ctx context.Context, finding *ticket.Finding) error {
+	blocks := buildFindingBlocks(*finding)
 
 	_, _, err := x.client.PostMessageContext(
 		ctx,
@@ -699,8 +700,8 @@ func (x *Service) UpdateSalvageModal(ctx context.Context, ticket *ticket.Ticket,
 	return nil
 }
 
-func (x *ThreadService) PostAlert(ctx context.Context, alert alert.Alert) error {
-	blocks := buildAlertBlocks(alert)
+func (x *ThreadService) PostAlert(ctx context.Context, alert *alert.Alert) error {
+	blocks := buildAlertBlocks(*alert)
 	_, _, err := x.client.PostMessageContext(
 		ctx,
 		x.channelID,
@@ -1022,3 +1023,12 @@ func (x *Service) ToTicketURL(ticketID string) string {
 	}
 	return fmt.Sprintf("%s/tickets/%s", x.frontendURL, ticketID)
 }
+
+// Implement SlackNotifier interface
+
+// IsEnabled returns whether Slack functionality is enabled (always true for real Service)
+func (x *Service) IsEnabled() bool {
+	return true
+}
+
+// Command execution is handled separately to avoid circular dependencies

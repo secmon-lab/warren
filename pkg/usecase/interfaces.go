@@ -17,7 +17,7 @@ type SlackNotifier interface {
 
 	// Alert operations
 	PostAlert(ctx context.Context, alert *alert.Alert) (SlackThreadService, error)
-	
+
 	// Thread operations
 	NewThread(thread slack.Thread) SlackThreadService
 

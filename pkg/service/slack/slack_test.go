@@ -32,7 +32,7 @@ func newSlackService(t *testing.T) *slack.Service {
 func TestSlackPostAlert(t *testing.T) {
 	svc := newSlackService(t)
 
-	_, err := svc.PostAlert(context.Background(), alert.Alert{
+	_, err := svc.PostAlert(context.Background(), &alert.Alert{
 		ID: "1234567890",
 		Metadata: alert.Metadata{
 			Title:       "Test Alert Title",
@@ -63,7 +63,7 @@ func TestSlackUpdateAlert(t *testing.T) {
 
 	dummy := genDummyAlert()
 
-	thread, err := svc.PostAlert(context.Background(), dummy)
+	thread, err := svc.PostAlert(context.Background(), &dummy)
 	gt.NoError(t, err).Required()
 	dummy.SlackThread = &model.Thread{
 		ChannelID: thread.ChannelID(),
@@ -80,7 +80,7 @@ func TestSlackUpdateTicket(t *testing.T) {
 	ctx := t.Context()
 	dummy := genDummyAlert()
 
-	thread, err := svc.PostAlert(context.Background(), dummy)
+	thread, err := svc.PostAlert(context.Background(), &dummy)
 	gt.NoError(t, err).Required()
 	dummy.SlackThread = &model.Thread{
 		ChannelID: thread.ChannelID(),
@@ -97,12 +97,12 @@ func TestSlackUpdateTicket(t *testing.T) {
 	ticketData.Status = types.TicketStatusOpen
 	ticketData.Reason = "Test Ticket Reason"
 
-	ts, err := thread.PostTicket(ctx, ticketData, alert.Alerts{&dummy})
+	ts, err := thread.PostTicket(ctx, &ticketData, alert.Alerts{&dummy})
 	gt.NoError(t, err)
 	ticketData.SlackMessageID = ts
 	ticketData.Reason = "Updated reason"
 
-	_, err = thread.PostTicket(ctx, ticketData, alert.Alerts{&dummy})
+	_, err = thread.PostTicket(ctx, &ticketData, alert.Alerts{&dummy})
 	gt.NoError(t, err)
 }
 
@@ -135,7 +135,7 @@ func TestAttachFile(t *testing.T) {
 
 	alert := genDummyAlert()
 
-	thread, err := svc.PostAlert(context.Background(), alert)
+	thread, err := svc.PostAlert(context.Background(), &alert)
 	gt.NoError(t, err)
 	alert.SlackThread = &model.Thread{
 		ChannelID: thread.ChannelID(),

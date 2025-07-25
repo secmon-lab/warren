@@ -33,15 +33,22 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 
 		// Try to parse message as command when it's first mention.
 		if i == 0 && len(mention.Message) > 0 {
-			// Try to execute command through SlackNotifier interface
-			if err := uc.slackNotifier.ExecuteCommand(ctx, &slackMsg, slackMsg.Thread(), mention.Message, uc.repository, uc.llmClient); err != nil {
-				// If errUnknownCommand, it will be fallen through.
-				if !errors.Is(err, command.ErrUnknownCommand) {
-					return goerr.Wrap(err, "failed to handle slack root command")
+			// Only execute commands if Slack is enabled
+			if uc.IsSlackEnabled() {
+				// Create command service using SlackThreadService
+				threadSvc := uc.slackNotifier.NewThread(slackMsg.Thread())
+
+				// We need to get access to concrete ThreadService for command package
+				// This is the only remaining coupling point
+				if err := uc.executeSlackCommand(ctx, &slackMsg, threadSvc, mention.Message); err != nil {
+					// If errUnknownCommand, it will be fallen through.
+					if !errors.Is(err, command.ErrUnknownCommand) {
+						return goerr.Wrap(err, "failed to handle slack root command")
+					}
+				} else {
+					// If no error in command processor, the mention has been proceeded.
+					continue
 				}
-			} else {
-				// If no error in command processor, the mention has been proceeded.
-				continue
 			}
 		}
 

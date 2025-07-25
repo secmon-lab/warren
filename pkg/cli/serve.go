@@ -12,6 +12,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -148,9 +149,9 @@ func cmdServe() *cli.Command {
 			}
 
 			// Configure SlackNotifier based on whether Slack service is available
-			var slackNotifier usecase.SlackNotifier
+			var slackNotifier interfaces.SlackNotifier
 			if slackSvc != nil {
-				slackNotifier = usecase.NewSlackNotifier(slackSvc)
+				slackNotifier = slackSvc // slack.Service implements interfaces.SlackNotifier directly
 			} else {
 				slackNotifier = usecase.NewDiscardSlackNotifier()
 			}
@@ -173,7 +174,7 @@ func cmdServe() *cli.Command {
 
 			// Add Slack-related options only if Slack is configured
 			if slackSvc != nil {
-				serverOptions = append(serverOptions, 
+				serverOptions = append(serverOptions,
 					server.WithSlackService(slackSvc),
 					server.WithSlackVerifier(slackCfg.Verifier()),
 				)

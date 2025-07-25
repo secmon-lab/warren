@@ -8,8 +8,10 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/service/command"
+	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 )
 
 var (
@@ -18,7 +20,8 @@ var (
 
 type UseCases struct {
 	// services and adapters
-	slackNotifier   SlackNotifier
+	slackNotifier   interfaces.SlackNotifier
+	slackService    *slackService.Service // Keep concrete service for command execution
 	llmClient       gollem.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
@@ -50,16 +53,17 @@ func WithLLMClient(llmClient gollem.LLMClient) Option {
 	}
 }
 
-func WithSlackNotifier(slackNotifier SlackNotifier) Option {
+func WithSlackNotifier(slackNotifier interfaces.SlackNotifier) Option {
 	return func(u *UseCases) {
 		u.slackNotifier = slackNotifier
 	}
 }
 
 // Deprecated: Use WithSlackNotifier instead
-func WithSlackService(slackService *slack.Service) Option {
+func WithSlackService(slackService *slackService.Service) Option {
 	return func(u *UseCases) {
-		u.slackNotifier = NewSlackNotifier(slackService)
+		u.slackNotifier = NewDiscardSlackNotifier() // Temporary - will be replaced
+		u.slackService = slackService               // Keep concrete service for commands
 	}
 }
 
@@ -151,4 +155,25 @@ func New(opts ...Option) *UseCases {
 // IsSlackEnabled returns whether Slack functionality is enabled
 func (u *UseCases) IsSlackEnabled() bool {
 	return u.slackNotifier.IsEnabled()
+}
+
+// executeSlackCommand executes a Slack command using the concrete slack service
+func (uc *UseCases) executeSlackCommand(ctx context.Context, slackMsg *slack.Message, threadSvc interfaces.SlackThreadService, commandStr string) error {
+	// Commands require concrete slack service
+	if uc.slackService == nil {
+		return command.ErrUnknownCommand
+	}
+
+	// Create thread service from thread info
+	thread := slack.Thread{
+		ChannelID: threadSvc.ChannelID(),
+		ThreadID:  threadSvc.ThreadID(),
+	}
+
+	// Use concrete slack service to create ThreadService through interface
+	// Now that command package accepts interfaces.SlackThreadService, we can pass the interface directly
+	threadService := uc.slackService.NewThread(thread)
+
+	cmdSvc := command.New(uc.repository, uc.llmClient, threadService)
+	return cmdSvc.Execute(ctx, slackMsg, commandStr)
 }

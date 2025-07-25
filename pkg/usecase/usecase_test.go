@@ -44,8 +44,8 @@ func TestUseCases_GetUserIcon(t *testing.T) {
 	slackService, err := slack.New(slackMock, "C123456")
 	gt.NoError(t, err)
 
-	// Create use case with slack service
-	uc := New(WithSlackService(slackService))
+	// Create use case with slack notifier
+	uc := New(WithSlackNotifier(slackService))
 
 	// Test GetUserIcon
 	_, _, err = uc.GetUserIcon(ctx, "U123456")
@@ -103,8 +103,8 @@ func TestUseCases_GetUserProfile(t *testing.T) {
 	slackService, err := slack.New(slackMock, "C123456")
 	gt.NoError(t, err)
 
-	// Create use case with slack service
-	uc := New(WithSlackService(slackService))
+	// Create use case with slack notifier
+	uc := New(WithSlackNotifier(slackService))
 
 	// Test GetUserProfile
 	name, err := uc.GetUserProfile(ctx, "U123456")

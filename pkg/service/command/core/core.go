@@ -10,17 +10,16 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
 type Clients struct {
 	repo   interfaces.Repository
 	llm    gollem.LLMClient
-	thread *slack_svc.ThreadService
+	thread interfaces.SlackThreadService
 }
 
-func NewClients(repo interfaces.Repository, llm gollem.LLMClient, thread *slack_svc.ThreadService) *Clients {
+func NewClients(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService) *Clients {
 	return &Clients{
 		repo:   repo,
 		llm:    llm,
@@ -36,7 +35,7 @@ func (s *Clients) LLM() gollem.LLMClient {
 	return s.llm
 }
 
-func (s *Clients) Thread() *slack_svc.ThreadService {
+func (s *Clients) Thread() interfaces.SlackThreadService {
 	return s.thread
 }
 

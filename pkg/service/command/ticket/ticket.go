@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/command/core"
-	slacksvc "github.com/secmon-lab/warren/pkg/service/slack"
 )
 
 //go:embed ticket.help.md
@@ -110,7 +110,7 @@ func Create(ctx context.Context, clients *core.Clients, msg *slack.Message, inpu
 	}
 }
 
-func handleUnresolvedTickets(ctx context.Context, clients *core.Clients, th *slacksvc.ThreadService) error {
+func handleUnresolvedTickets(ctx context.Context, clients *core.Clients, th interfaces.SlackThreadService) error {
 	tickets, err := clients.Repo().GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 0)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get tickets by status")
@@ -122,7 +122,7 @@ func handleUnresolvedTickets(ctx context.Context, clients *core.Clients, th *sla
 	return nil
 }
 
-func handleTicketsBySpan(ctx context.Context, clients *core.Clients, th *slacksvc.ThreadService, begin, end time.Time) error {
+func handleTicketsBySpan(ctx context.Context, clients *core.Clients, th interfaces.SlackThreadService, begin, end time.Time) error {
 	tickets, err := clients.Repo().GetTicketsBySpan(ctx, begin, end)
 	if err != nil {
 		return goerr.Wrap(err, "failed to get tickets by span")

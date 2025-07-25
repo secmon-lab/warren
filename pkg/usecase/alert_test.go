@@ -85,7 +85,7 @@ func TestHandleAlert_NoSimilarAlert(t *testing.T) {
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackService(slackSvc),
+		usecase.WithSlackNotifier(slackSvc),
 		usecase.WithLLMClient(llmMock),
 		usecase.WithPolicyClient(policyMock),
 	)
@@ -191,7 +191,7 @@ func TestHandleAlert_SimilarAlertFound(t *testing.T) {
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackService(slackSvc),
+		usecase.WithSlackNotifier(slackSvc),
 		usecase.WithLLMClient(llmMock),
 		usecase.WithPolicyClient(policyMock),
 	)
@@ -291,7 +291,7 @@ func TestHandleAlert_SimilarAlertBoundToTicket(t *testing.T) {
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackService(slackSvc),
+		usecase.WithSlackNotifier(slackSvc),
 		usecase.WithLLMClient(llmMock),
 		usecase.WithPolicyClient(policyMock),
 	)
@@ -387,7 +387,7 @@ func TestHandleAlert_LowSimilarity(t *testing.T) {
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackService(slackSvc),
+		usecase.WithSlackNotifier(slackSvc),
 		usecase.WithLLMClient(llmMock),
 		usecase.WithPolicyClient(policyMock),
 	)
@@ -821,7 +821,7 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackService(slackSvc),
+		usecase.WithSlackNotifier(slackSvc),
 		usecase.WithLLMClient(llmMock),
 	)
 

@@ -9,7 +9,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/service/command/core"
-	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
 
 	"github.com/secmon-lab/warren/pkg/service/command/aggregate"
 	"github.com/secmon-lab/warren/pkg/service/command/list"
@@ -21,7 +20,7 @@ type Service struct {
 	clients *core.Clients
 }
 
-func New(repo interfaces.Repository, llm gollem.LLMClient, thread *slack_svc.ThreadService) *Service {
+func New(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService) *Service {
 	return &Service{
 		clients: core.NewClients(repo, llm, thread),
 	}
