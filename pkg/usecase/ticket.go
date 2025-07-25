@@ -368,7 +368,7 @@ func (uc *UseCases) updateTicketWithSlackSync(ctx context.Context, ticketID type
 
 // syncTicketToSlack syncs a single ticket to Slack
 func (uc *UseCases) syncTicketToSlack(ctx context.Context, ticket *ticket.Ticket) error {
-	if !ticket.HasSlackThread() || !uc.IsSlackEnabled() {
+if !ticket.HasSlackThread() || !uc.IsSlackEnabled() {
 		return nil // No Slack thread or service, skip sync
 	}
 
