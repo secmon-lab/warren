@@ -389,6 +389,8 @@ bq add-iam-policy-binding \
 > 2. Define appropriate schemas for your data
 > 3. Set up data ingestion pipelines (e.g., from Cloud Logging, external SIEM)
 > 4. Write SQL queries that the AI agent can use for investigations
+>
+> Example: To analyze AWS CloudTrail events, you would need to export CloudTrail logs to BigQuery and create appropriate views for the AI agent to query.
 
 ### 10.2. Update Cloud Run Configuration
 
@@ -428,8 +430,12 @@ gcloud alpha monitoring policies create \
 
 ## 12. Cost Optimization
 
+### Development/Testing Configuration
+
+For minimal costs during development:
+
 ```bash
-# Minimal settings for development/testing
+# Scale down to zero when not in use
 gcloud run services update warren \
     --region=$REGION \
     --min-instances=0 \
@@ -438,11 +444,18 @@ gcloud run services update warren \
     --memory=512Mi
 ```
 
+### Cost Tips
+
+- Use `min-instances=0` to avoid charges when idle
+- Firestore free tier includes 50,000 reads/20,000 writes per day
+- Vertex AI charges per request - monitor usage
+- Cloud Storage has minimal costs for small amounts of data
+
 ## Verification
 
 1. **Check Service Status**:
    ```bash
-   # Warren doesn't have a /health endpoint, check GraphQL endpoint instead
+   # Use GraphQL endpoint to verify service is running
    curl -X POST $SERVICE_URL/graphql \
      -H "Content-Type: application/json" \
      -d '{"query": "{ __typename }"}'

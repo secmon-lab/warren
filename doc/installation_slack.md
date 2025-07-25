@@ -131,10 +131,10 @@ This enables Warren's interactive buttons and modal dialogs.
    - Can be public or private based on your security requirements
 
 2. Add Warren bot to the channel:
-   - Click on the channel name at the top
-   - Select "Integrations" or "Settings" → "Add apps"
-   - Search for your Warren app and add it
-   - Or use the app's home page to join channels
+   - In the channel, type `/apps` to open the apps directory
+   - Search for your Warren app name (e.g., "Warren Security Bot")
+   - Click "Add" to add the bot to the channel
+   - Alternatively, from the channel details, go to "Integrations" → "Add apps"
 
 3. Note the channel name (without #) for Warren configuration
    - This will be `WARREN_SLACK_CHANNEL_NAME`
@@ -217,6 +217,23 @@ In **"App Home"**:
 
 ## 10. Troubleshooting
 
+### Testing Your Integration
+
+1. **Verify Bot Presence**:
+   - Check that the bot appears in the channel's member list
+   - The bot should show as "Active" or online
+
+2. **Send Test Alert**:
+   ```bash
+   curl -X POST https://YOUR-WARREN-URL/hooks/alert/raw/test \
+     -H "Content-Type: application/json" \
+     -d '{"title": "Test Alert", "description": "Testing Slack integration", "severity": "low"}'
+   ```
+
+3. **Check Alert Appears**:
+   - Alert should appear in your configured Slack channel
+   - Interactive buttons should be visible
+
 ### Common Issues
 
 1. **"Request URL verification failed"**
@@ -238,15 +255,17 @@ In **"App Home"**:
    - Confirm redirect URL exactly matches configuration
    - Include https:// and full path
 
-### Troubleshooting Commands
+### Legacy Slack Commands
 
-For debugging purposes, Warren supports these Slack commands when mentioned:
+> **Note**: Slack commands are no longer the primary way to interact with Warren. Use the Web UI for normal operations.
+
+For troubleshooting or special cases, these commands are still available when mentioning @warren:
 - `@warren list` (or `l`, `ls`) - List current alerts
 - `@warren aggregate` (or `a`, `aggr`) - Group related alerts  
 - `@warren ticket` (or `t`) - Manage tickets
 - `@warren repair` - Repair functionality
 
-These commands are primarily for troubleshooting. Normal operation is through the Web UI and interactive buttons in Slack messages.
+These commands should only be used for debugging or when the Web UI is unavailable.
 
 ### Debug Checklist
 
