@@ -216,7 +216,6 @@ export WARREN_GEMINI_LOCATION=us-central1
 export WARREN_SLACK_OAUTH_TOKEN="xoxb-your-token"
 export WARREN_SLACK_SIGNING_SECRET="your-signing-secret"
 export WARREN_SLACK_CHANNEL_NAME="test-alerts"
-export WARREN_DEV_USER=test@example.com
 export WARREN_LOG_LEVEL=debug
 
 go run main.go serve --addr=:8080
@@ -228,7 +227,7 @@ This gives you:
 - ✅ AI-powered alert enrichment
 - ✅ Persistent storage
 - ✅ Basic Slack integration (required)
-- ❌ No authentication (dev mode)
+- ✅ Slack OAuth authentication
 - ❌ No external tool integrations (optional)
 
 ### Option 3: Minimal Cloud Run Deployment
@@ -245,8 +244,7 @@ echo -n "your-signing-secret" | gcloud secrets create slack-signing-secret --dat
 gcloud run deploy warren \
   --image=ghcr.io/secmon-lab/warren:latest \
   --region=us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars="WARREN_DEV_USER=test@example.com,WARREN_FIRESTORE_PROJECT_ID=$PROJECT_ID,WARREN_GEMINI_PROJECT_ID=$PROJECT_ID,WARREN_SLACK_CHANNEL_NAME=test-alerts" \
+  --set-env-vars="WARREN_FIRESTORE_PROJECT_ID=$PROJECT_ID,WARREN_GEMINI_PROJECT_ID=$PROJECT_ID,WARREN_SLACK_CHANNEL_NAME=test-alerts" \
   --set-secrets="WARREN_SLACK_OAUTH_TOKEN=slack-oauth-token:latest,WARREN_SLACK_SIGNING_SECRET=slack-signing-secret:latest"
 ```
 
@@ -256,7 +254,7 @@ After deployment:
 - ✅ AI-powered features
 - ✅ Slack integration
 - ✅ Scalable and managed
-- ❌ No authentication (dev mode + allow-unauthenticated)
+- ⚠️ Requires authentication - Configure IAP or use Slack OAuth
 
 ### Testing Your Minimal Setup
 
@@ -289,7 +287,7 @@ When ready for production features:
 
 1. **Add Slack Integration**: Follow [Slack Configuration Guide](./installation_slack.md)
 2. **Enable AI Features**: Set up Vertex AI per [Google Cloud Setup](./installation_gcp.md#7-vertex-ai-setup)
-3. **Add Authentication**: Remove `WARREN_DEV_USER` and configure OAuth
+3. **Configure Authentication**: Set up proper OAuth with Slack or Google IAP
 4. **Configure External Tools**: Add API keys for threat intelligence
 
 ## Prerequisites

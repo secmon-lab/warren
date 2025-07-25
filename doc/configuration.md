@@ -23,7 +23,6 @@ Warren uses the following precedence for configuration (highest to lowest):
 | `WARREN_LOG_QUIET` | `--log-quiet` | `false` | Quiet mode (suppress non-error logs) |
 | `WARREN_LOG_STACKTRACE` | `--log-stacktrace` | `true` | Show stacktrace in error logs |
 | `WARREN_LOG_OUTPUT` | `--log-output` | `stderr` | Log output destination |
-| `WARREN_DEV_USER` | `--dev-user` | - | Development mode user (bypasses auth) |
 
 ### Google Cloud Settings
 
@@ -52,8 +51,7 @@ Warren uses the following precedence for configuration (highest to lowest):
 
 | Environment Variable | CLI Flag | Default | Description |
 |---------------------|----------|---------|-------------|
-| `WARREN_SERVICE_ACCOUNT` | `--service-account` | - | Expected service account email |
-| `WARREN_DEV_USER` | `--dev-user` | - | Development mode user |
+| `WARREN_SERVICE_ACCOUNT` | - | - | Expected service account email (used in policy evaluation via `input.env.WARREN_SERVICE_ACCOUNT`) |
 
 ## External Tool Integration
 
@@ -189,15 +187,16 @@ export WARREN_FRONTEND_URL="https://${SERVICE_NAME}-${PROJECT_ID}.a.run.app"
 
 ## Development Mode
 
-For local development, you must still provide Google Cloud services:
+For local development, you must provide Google Cloud services and Slack credentials:
 
 ```bash
 # Minimal required settings
-export WARREN_DEV_USER=developer@example.com
 export WARREN_LOG_LEVEL=debug
 export WARREN_LOG_FORMAT=console
 export WARREN_FIRESTORE_PROJECT_ID=your-project
 export WARREN_GEMINI_PROJECT_ID=your-project
+export WARREN_SLACK_OAUTH_TOKEN=xoxb-your-token
+export WARREN_SLACK_SIGNING_SECRET=your-secret
 export WARREN_POLICY=./policies
 
 warren serve
