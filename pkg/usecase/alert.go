@@ -85,7 +85,7 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 		}
 	}
 
-	if existingAlert != nil && existingAlert.HasSlackThread() {
+if existingAlert != nil && existingAlert.HasSlackThread() {
 		// Post to existing thread
 		thread := uc.slackNotifier.NewThread(*existingAlert.SlackThread)
 		if err := thread.PostAlert(ctx, &newAlert); err != nil {
