@@ -1,6 +1,13 @@
 name: Unit test
 
-on: push
+on:
+  push:
+    paths:
+      - 'pkg/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Taskfile.yml'
+      - 'graph/**'
 
 jobs:
   testing:
