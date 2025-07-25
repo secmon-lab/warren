@@ -62,8 +62,8 @@ func WithSlackNotifier(slackNotifier interfaces.SlackNotifier) Option {
 // Deprecated: Use WithSlackNotifier instead
 func WithSlackService(slackService *slackService.Service) Option {
 	return func(u *UseCases) {
-		u.slackNotifier = NewDiscardSlackNotifier() // Temporary - will be replaced
-		u.slackService = slackService               // Keep concrete service for commands
+		u.slackNotifier = slackService // Set the service as notifier to avoid breaking changes
+		u.slackService = slackService  // Keep concrete service for commands
 	}
 }
 
