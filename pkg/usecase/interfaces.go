@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 
+	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -37,6 +39,9 @@ type SlackNotifier interface {
 	ShowResolveTicketModal(ctx context.Context, ticket *ticket.Ticket, triggerID string) error
 	ShowSalvageModal(ctx context.Context, ticket *ticket.Ticket, unboundAlerts alert.Alerts, triggerID string) error
 	UpdateSalvageModal(ctx context.Context, ticket *ticket.Ticket, unboundAlerts alert.Alerts, viewID string, threshold float64, keyword string) error
+
+	// Command operations - inject dependencies needed for command execution
+	ExecuteCommand(ctx context.Context, slackMsg *slack.Message, thread slack.Thread, command string, repository interfaces.Repository, llmClient gollem.LLMClient) error
 }
 
 // SlackThreadService defines the interface for Slack thread operations

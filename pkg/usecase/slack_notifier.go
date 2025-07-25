@@ -3,9 +3,12 @@ package usecase
 import (
 	"context"
 
+	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+	"github.com/secmon-lab/warren/pkg/service/command"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 )
 
@@ -82,6 +85,12 @@ func (s *slackNotifierAdapter) ShowSalvageModal(ctx context.Context, ticket *tic
 
 func (s *slackNotifierAdapter) UpdateSalvageModal(ctx context.Context, ticket *ticket.Ticket, unboundAlerts alert.Alerts, viewID string, threshold float64, keyword string) error {
 	return s.service.UpdateSalvageModal(ctx, ticket, unboundAlerts, viewID, threshold, keyword)
+}
+
+func (s *slackNotifierAdapter) ExecuteCommand(ctx context.Context, slackMsg *slack.Message, thread slack.Thread, commandStr string, repository interfaces.Repository, llmClient gollem.LLMClient) error {
+	concreteThreadSvc := s.service.NewThread(thread)
+	cmdSvc := command.New(repository, llmClient, concreteThreadSvc)
+	return cmdSvc.Execute(ctx, slackMsg, commandStr)
 }
 
 // slackThreadServiceAdapter adapts slack.ThreadService to SlackThreadService interface
@@ -229,6 +238,10 @@ func (d *discardSlackNotifier) ShowSalvageModal(ctx context.Context, ticket *tic
 
 func (d *discardSlackNotifier) UpdateSalvageModal(ctx context.Context, ticket *ticket.Ticket, unboundAlerts alert.Alerts, viewID string, threshold float64, keyword string) error {
 	return ErrSlackServiceNotConfigured
+}
+
+func (d *discardSlackNotifier) ExecuteCommand(ctx context.Context, slackMsg *slack.Message, thread slack.Thread, commandStr string, repository interfaces.Repository, llmClient gollem.LLMClient) error {
+	return command.ErrUnknownCommand // Commands are not available when Slack is disabled
 }
 
 // discardSlackThreadService is a no-op implementation of SlackThreadService

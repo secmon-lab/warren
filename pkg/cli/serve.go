@@ -103,11 +103,13 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			slackSvc, err := slackCfg.ConfigureWithFrontendURL(webUICfg.GetFrontendURL())
+			slackSvc, err := slackCfg.ConfigureOptionalWithFrontendURL(webUICfg.GetFrontendURL())
 			if err != nil {
 				return err
 			}
-			defer slackSvc.Stop()
+			if slackSvc != nil {
+				defer slackSvc.Stop()
+			}
 
 			firestore, err := firestoreCfg.Configure(ctx)
 			if err != nil {
@@ -145,11 +147,19 @@ func cmdServe() *cli.Command {
 					"count", len(mcpToolSets))
 			}
 
+			// Configure SlackNotifier based on whether Slack service is available
+			var slackNotifier usecase.SlackNotifier
+			if slackSvc != nil {
+				slackNotifier = usecase.NewSlackNotifier(slackSvc)
+			} else {
+				slackNotifier = usecase.NewDiscardSlackNotifier()
+			}
+
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(firestore),
-				usecase.WithSlackNotifier(usecase.NewSlackNotifier(slackSvc)),
+				usecase.WithSlackNotifier(slackNotifier),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(toolSets),
 			}
@@ -158,9 +168,15 @@ func cmdServe() *cli.Command {
 
 			// Build HTTP server options
 			serverOptions := []server.Options{
-				server.WithSlackVerifier(slackCfg.Verifier()),
 				server.WithPolicy(policyClient),
-				server.WithSlackService(slackSvc),
+			}
+
+			// Add Slack-related options only if Slack is configured
+			if slackSvc != nil {
+				serverOptions = append(serverOptions, 
+					server.WithSlackService(slackSvc),
+					server.WithSlackVerifier(slackCfg.Verifier()),
+				)
 			}
 
 			// Add repository when GraphQL is enabled

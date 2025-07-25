@@ -83,3 +83,24 @@ func (x *Slack) Verifier() model.PayloadVerifier {
 
 	return model.NewPayloadVerifier(x.signingSecret)
 }
+
+// IsConfigured checks if Slack configuration is complete
+func (x *Slack) IsConfigured() bool {
+	return x.oauthToken != ""
+}
+
+// ConfigureOptional returns a Slack service if configured, or nil if not configured
+func (x *Slack) ConfigureOptional() (*slack.Service, error) {
+	if !x.IsConfigured() {
+		return nil, nil // Return nil service when not configured (not an error)
+	}
+	return x.Configure()
+}
+
+// ConfigureOptionalWithFrontendURL returns a Slack service if configured, or nil if not configured
+func (x *Slack) ConfigureOptionalWithFrontendURL(frontendURL string) (*slack.Service, error) {
+	if !x.IsConfigured() {
+		return nil, nil // Return nil service when not configured (not an error)
+	}
+	return x.ConfigureWithFrontendURL(frontendURL)
+}
