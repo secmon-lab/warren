@@ -149,7 +149,7 @@ func cmdServe() *cli.Command {
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(firestore),
-				usecase.WithSlackService(slackSvc),
+				usecase.WithSlackNotifier(usecase.NewSlackNotifier(slackSvc)),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(toolSets),
 			}
