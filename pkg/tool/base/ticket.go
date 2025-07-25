@@ -180,7 +180,7 @@ func (x *Warren) updateFinding(ctx context.Context, args map[string]any) (map[st
 
 	// Update Slack message if callback is provided and ticket has Slack thread (skip if dry-run)
 	slackUpdated := false
-	if !isDryRun && x.slackUpdate != nil && currentTicket.SlackThread != nil {
+	if !isDryRun && x.slackUpdate != nil && currentTicket.HasSlackThread() {
 		if err := x.slackUpdate(ctx, &updatedTicket); err != nil {
 			// Don't fail the entire operation if Slack update fails
 			// Just log the error and continue
@@ -216,7 +216,7 @@ func (x *Warren) updateFinding(ctx context.Context, args map[string]any) (map[st
 		"dry_run":        isDryRun,
 	}
 
-	if !isDryRun && !slackUpdated && currentTicket.SlackThread != nil {
+	if !isDryRun && !slackUpdated && currentTicket.HasSlackThread() {
 		response["slack_update_required"] = true
 		response["message"] = "Finding updated successfully. Slack message update may be needed."
 	}
