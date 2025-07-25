@@ -157,14 +157,47 @@ cd warren
 # Create test data structure
 mkdir -p test-data/guardduty
 echo '{
-  "source": "aws.guardduty",
-  "detail": {
-    "type": "Recon:EC2/PortProbeUnprotectedPort",
-    "severity": 5.0,
-    "accountId": "123456789012",
-    "region": "us-east-1"
-  }
+  "Findings": [{
+    "Title": "EC2 instance has an unprotected port which is being probed",
+    "Description": "EC2 instance i-1234567890abcdef0 has an unprotected port 22 which is being probed by a known malicious host",
+    "Severity": 5.0,
+    "Type": "Recon:EC2/PortProbeUnprotectedPort",
+    "AccountId": "123456789012",
+    "Region": "us-east-1",
+    "Resource": {
+      "Type": "Instance",
+      "InstanceDetails": {
+        "InstanceId": "i-1234567890abcdef0"
+      }
+    }
+  }]
 }' > test-data/guardduty/sample.json
+
+# Create a simple test policy
+mkdir -p policies/alert
+cat > policies/alert/guardduty.rego << 'EOF'
+package alert.guardduty
+
+alert contains {
+    "title": f.Title,
+    "description": f.Description,
+    "attrs": [
+        {
+            "key": "severity",
+            "value": sprintf("%v", [f.Severity]),
+            "link": ""
+        },
+        {
+            "key": "type",
+            "value": f.Type,
+            "link": ""
+        }
+    ]
+} if {
+    f := input.Findings[_]
+    f.Severity >= 4
+}
+EOF
 
 # Test the policy
 go run main.go test \

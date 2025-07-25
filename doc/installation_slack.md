@@ -130,10 +130,11 @@ This enables Warren's interactive buttons and modal dialogs.
    - Suggested name: `#security-alerts` or `#warren-alerts`
    - Can be public or private based on your security requirements
 
-2. Invite Warren bot to the channel:
-   ```
-   /invite @warren
-   ```
+2. Add Warren bot to the channel:
+   - Click on the channel name at the top
+   - Select "Integrations" or "Settings" → "Add apps"
+   - Search for your Warren app and add it
+   - Or use the app's home page to join channels
 
 3. Note the channel name (without #) for Warren configuration
    - This will be `WARREN_SLACK_CHANNEL_NAME`
@@ -169,14 +170,14 @@ gcloud run services update warren \
 
 ## 8. Test Slack Integration
 
-### 8.1. Basic Bot Test
+### 8.1. Basic Integration Test
 
-1. In your Slack channel, mention Warren:
-   ```
-   @warren hello
-   ```
+1. Send a test alert to your Warren webhook endpoint (see Integration Guide)
 
-2. Warren should respond (the actual response depends on implementation)
+2. Verify that the alert appears in your configured Slack channel with:
+   - Alert title and description
+   - Interactive buttons (Acknowledge, Bind to ticket)
+   - Proper formatting
 
 ### 8.2. Verify Event Handling
 
@@ -228,14 +229,24 @@ In **"App Home"**:
    - No extra spaces or newlines in the secret
 
 3. **Bot not responding**
-   - Verify bot is in the channel (`/invite @warren`)
+   - Verify bot is in the channel (check channel integrations)
    - Check OAuth token is valid
    - Review permission scopes
+   - Ensure bot has been added to the channel through Slack UI
 
 4. **OAuth redirect fails**
    - Confirm redirect URL exactly matches configuration
    - Include https:// and full path
-   - No trailing slashes
+
+### Troubleshooting Commands
+
+For debugging purposes, Warren supports these Slack commands when mentioned:
+- `@warren list` (or `l`, `ls`) - List current alerts
+- `@warren aggregate` (or `a`, `aggr`) - Group related alerts  
+- `@warren ticket` (or `t`) - Manage tickets
+- `@warren repair` - Repair functionality
+
+These commands are primarily for troubleshooting. Normal operation is through the Web UI and interactive buttons in Slack messages.
 
 ### Debug Checklist
 

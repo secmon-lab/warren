@@ -384,6 +384,12 @@ bq add-iam-policy-binding \
     ${PROJECT_ID}:warren_analytics
 ```
 
+> **Important**: BigQuery integration requires you to populate your own security data. Warren does not automatically create or populate BigQuery tables. You'll need to:
+> 1. Create your own tables with security log data
+> 2. Define appropriate schemas for your data
+> 3. Set up data ingestion pipelines (e.g., from Cloud Logging, external SIEM)
+> 4. Write SQL queries that the AI agent can use for investigations
+
 ### 10.2. Update Cloud Run Configuration
 
 ```bash
@@ -422,32 +428,24 @@ gcloud alpha monitoring policies create \
 
 ## 12. Cost Optimization
 
-### 12.1. Cloud Run Settings
-
 ```bash
-# Reduce costs for development/testing
+# Minimal settings for development/testing
 gcloud run services update warren \
     --region=$REGION \
     --min-instances=0 \
-    --max-instances=3 \
-    --concurrency=20
-```
-
-### 12.2. Review Quotas
-
-```bash
-# Check Vertex AI quotas
-gcloud compute project-info describe --project=$PROJECT_ID
-
-# Monitor usage
-gcloud billing accounts get-iam-policy BILLING_ACCOUNT_ID
+    --max-instances=2 \
+    --cpu=1 \
+    --memory=512Mi
 ```
 
 ## Verification
 
-1. **Check Service Health**:
+1. **Check Service Status**:
    ```bash
-   curl $SERVICE_URL/health
+   # Warren doesn't have a /health endpoint, check GraphQL endpoint instead
+   curl -X POST $SERVICE_URL/graphql \
+     -H "Content-Type: application/json" \
+     -d '{"query": "{ __typename }"}'
    ```
 
 2. **Verify Firestore Connection**:
