@@ -1,14 +1,24 @@
 # Warren AI Agent Guide
 
-Warren's AI Agent provides an intelligent chat interface for investigating security incidents using natural language. The agent can automatically execute various security tools, analyze data, and provide actionable insights.
+Warren's AI Agent provides an intelligent command-line interface for investigating security incidents using natural language. The agent analyzes alerts within the context of a specific ticket, executing various security tools and providing actionable insights.
 
 ## Overview
 
 The AI Agent serves as your security analysis assistant, capable of:
-- Analyzing alerts and tickets using multiple threat intelligence sources
-- Executing complex investigations through simple commands
+- Analyzing alerts bound to a specific ticket using threat intelligence sources
+- Executing complex investigations through natural language commands
 - Finding patterns and similar incidents in historical data
-- Updating ticket findings based on analysis results
+- Updating the ticket's findings based on analysis results
+
+### Important Concept: Ticket Context
+
+The AI Agent always operates within the context of a specific ticket. When you use the chat command, you must provide a ticket ID. The agent will:
+- Access all alerts associated with that ticket
+- Read the ticket's metadata and current findings
+- Update the ticket's findings when requested
+- Search for similar tickets based on the current ticket's content
+
+This ticket-centric approach ensures that all AI analysis is properly tracked and associated with your investigation workflow.
 
 ### Architecture
 
@@ -35,37 +45,36 @@ graph TD
     M --> N[User Response]
 ```
 
-## Accessing the Chat Interface
+## Using the Chat Interface
 
-### Web UI
-
-1. Navigate to a ticket's detail page
-2. Click the **"Chat with Agent"** button
-3. Enter your query in the chat interface
-4. View responses and tool executions in real-time
+The AI Agent is accessed through the command-line interface. There is no Web UI integration at this time.
 
 ### Command Line Interface
 
-Interactive mode:
+#### Interactive mode:
 ```bash
 warren chat --ticket-id ticket-12345678-abcd-efgh-ijkl-123456789012
 ```
 
-Single query mode:
+This starts an interactive session where you can have a conversation with the agent about the specified ticket.
+
+#### Single query mode:
 ```bash
 warren chat --ticket-id ticket-12345678-abcd-efgh-ijkl-123456789012 \
   --query "Analyze all IPs in this ticket"
 ```
 
-### Options
+This executes a single query and exits, useful for automation or quick checks.
 
-- `--ticket-id`: Required. The ticket to analyze
-- `--query`: Single query to execute (non-interactive)
-- `--list`: Show previous chat sessions
-- `--session-id`: Continue a specific session
-- `--slack`: Post responses to Slack thread
-- `--dry-run`: Test without making changes
-- `--lang`: Response language (en, ja, etc.)
+### Required Option
+
+- `--ticket-id` or `-t`: The ticket ID to analyze (required)
+
+### Optional Options
+
+- `--query` or `-q`: Single query to execute (if not provided, starts interactive mode)
+
+Additionally, all standard Warren configuration options are available (Firestore, LLM, Policy, Storage, MCP settings). See the [Configuration Reference](./configuration.md) for details.
 
 ## Tool Configuration
 
@@ -126,41 +135,45 @@ When tools are not configured, they simply won't appear in the agent's available
 
 ### Warren Base Tools
 
-These tools integrate directly with Warren's data:
+These tools integrate directly with Warren's data and operate within the context of your current ticket:
 
 #### `warren_get_alerts`
-Retrieves alerts associated with the current ticket.
+Retrieves all alerts that are bound to the current ticket.
 ```
 "Show me all alerts in this ticket"
-"Get the latest 5 alerts"
+"What alerts are we investigating?"
 ```
 
 #### `warren_find_nearest_ticket`
-Finds similar tickets based on AI embeddings.
+Finds similar tickets based on AI embeddings of the current ticket.
 ```
 "Find similar incidents"
 "Show me tickets like this one"
+"Are there any related investigations?"
 ```
 
 #### `warren_search_tickets_by_words`
-Searches tickets using keywords or natural language.
+Searches all tickets using keywords or natural language.
 ```
 "Search for tickets mentioning ransomware"
 "Find all tickets with IP 192.168.1.100"
+"Show me other tickets from the same user"
 ```
 
 #### `warren_update_finding`
-Updates the ticket's finding with analysis results.
+Updates the current ticket's finding field with your analysis results.
 ```
 "Update finding with critical severity"
 "Set this as a true positive incident"
+"Add investigation summary to findings"
 ```
 
 #### `warren_get_ticket_comments`
-Retrieves comments from the ticket's Slack thread.
+Retrieves comments from the current ticket's Slack thread.
 ```
 "Show me all comments on this ticket"
-"Get the latest discussion from Slack"
+"What has the team discussed about this?"
+"Get the latest Slack discussion"
 ```
 
 ### Security Intelligence Tools
@@ -319,22 +332,32 @@ warren chat --ticket-id TICKET_ID --mcp-config mcp-config.yaml
 
 ## Using the Chat Interface
 
+### Understanding Ticket Context
+
+Before using commands, remember that the agent always works within the context of your specified ticket:
+- All alerts referenced are those bound to the ticket
+- Findings updates modify the current ticket
+- Similarity searches compare against the current ticket
+- The agent cannot access alerts or data from other tickets unless explicitly searching
+
 ### Basic Commands
 
-Simple questions about the ticket:
+Simple questions about the current ticket:
 ```
 "Summarize this incident"
 "What's the severity of these alerts?"
 "When did this attack start?"
+"How many alerts are in this ticket?"
 ```
 
 ### Investigation Commands
 
-Comprehensive analysis:
+Comprehensive analysis of the ticket's alerts:
 ```
 "Analyze all IPs and domains in this ticket"
 "Check if any indicators are malicious"
-"Find the attack pattern"
+"Find the attack pattern in these alerts"
+"What services are affected?"
 ```
 
 ### Complex Investigations
@@ -348,13 +371,14 @@ Multi-step analysis with plan mode:
 4. Summarize findings and recommend actions"
 ```
 
-### Updating Tickets
+### Updating the Current Ticket
 
-Modify ticket information:
+Modify the ticket's finding field:
 ```
 "Update the finding with high severity"
 "Mark this as a false positive with explanation"
 "Add recommendation to block these IPs"
+"Summarize the investigation results in the finding"
 ```
 
 ## Plan Mode
@@ -434,19 +458,12 @@ identify common patterns"
 
 ## Slack Integration
 
-When using `--slack` flag, the agent posts to the ticket's Slack thread:
+The chat command itself does not post to Slack. However, when you update the ticket's findings using the agent, those updates will be reflected in:
+- The ticket's finding field in the database
+- The Web UI when viewing the ticket
+- Any subsequent Slack messages about the ticket will show the updated findings
 
-```
-💬 Agent: Starting investigation of suspicious IPs...
-
-⚡ Executing: vt_ip
-✅ IP 192.168.1.100 - Clean (0/87 detections)
-
-⚡ Executing: shodan_host
-✅ Found open ports: 22, 80, 443
-
-💬 Agent: Investigation complete. The IP appears to be a legitimate web server with standard ports.
-```
+To share your agent analysis with the team, use the `warren_update_finding` tool to save your conclusions to the ticket.
 
 ## Best Practices
 
@@ -509,11 +526,11 @@ Let the agent handle routine checks:
 ```
 User: Check if any IPs in this ticket are malicious
 
-Agent: I'll check all IPs in this ticket against threat intelligence sources.
+Agent: I'll analyze all IPs found in the alerts bound to ticket ticket-12345...
 
 [Executes vt_ip, otx_ipv4, ipdb_check for each IP]
 
-Found 3 IPs in the alerts:
+Found 3 IPs in this ticket's alerts:
 - 192.168.1.100: Clean across all sources
 - 10.0.0.50: Internal IP, skipped
 - 185.220.100.240: MALICIOUS - Listed in 45/87 VT engines, 
@@ -540,44 +557,37 @@ Found 7 similar incidents:
 ```
 User: Summarize this incident and update the finding
 
-Agent: I'll analyze all alerts and create a comprehensive summary.
+Agent: I'll analyze all alerts in this ticket and create a comprehensive summary.
 
-[Analyzes alerts, checks indicators, reviews patterns]
+[Analyzes ticket's alerts, checks indicators, reviews patterns]
 
-Summary: Coordinated brute force attack against SSH services across 
-15 servers. Attack originated from known botnet IPs. No successful 
-logins detected.
+Based on the 23 alerts in this ticket:
+- Attack type: Coordinated brute force against SSH services
+- Affected systems: 15 servers in production environment
+- Attack source: Known botnet IPs (confirmed via threat intel)
+- Impact: No successful logins detected in logs
 
 [Executes warren_update_finding]
 
-✅ Updated ticket finding with High severity and summary.
+✅ Updated ticket's finding field with High severity classification and investigation summary.
 ```
 
 ## Language Support
 
-The agent responds in your configured language:
+The agent responds in the language configured at the global level:
 
 ```bash
-# Japanese responses
-warren chat --ticket-id TICKET_ID --lang ja
+# Set language globally (affects all content generation)
+# You can use any word to specify language
+export WARREN_LANG=ja  # Japanese
+export WARREN_LANG=日本語 # Japanese
+export WARREN_LANG=es  # Spanish
+export WARREN_LANG=en  # English (default)
 
-# Spanish responses  
-warren chat --ticket-id TICKET_ID --lang es
+warren chat --ticket-id TICKET_ID
 ```
 
-Supported languages depend on the underlying LLM model.
-
-## Token Usage
-
-Monitor LLM token consumption:
-
-```bash
-# Dry run shows token estimates
-warren chat --ticket-id TICKET_ID --dry-run
-
-# Session info includes token counts
-warren chat --list --ticket-id TICKET_ID
-```
+Supported languages depend on the underlying LLM model (Gemini or Claude).
 
 ## Next Steps
 
