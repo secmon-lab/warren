@@ -40,6 +40,11 @@ type Ticket struct {
 	Embedding firestore.Vector32 `json:"-"`
 }
 
+// HasSlackThread returns true if the ticket has a valid Slack thread
+func (t *Ticket) HasSlackThread() bool {
+	return t.SlackThread != nil && t.SlackThread.ThreadID != ""
+}
+
 func (x *Ticket) Validate() error {
 	if err := x.ID.Validate(); err != nil {
 		return goerr.Wrap(err, "invalid ticket ID")

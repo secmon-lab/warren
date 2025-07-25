@@ -12,6 +12,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -103,11 +104,13 @@ func cmdServe() *cli.Command {
 				return err
 			}
 
-			slackSvc, err := slackCfg.ConfigureWithFrontendURL(webUICfg.GetFrontendURL())
+			slackSvc, err := slackCfg.ConfigureOptionalWithFrontendURL(webUICfg.GetFrontendURL())
 			if err != nil {
 				return err
 			}
-			defer slackSvc.Stop()
+			if slackSvc != nil {
+				defer slackSvc.Stop()
+			}
 
 			firestore, err := firestoreCfg.Configure(ctx)
 			if err != nil {
@@ -145,11 +148,19 @@ func cmdServe() *cli.Command {
 					"count", len(mcpToolSets))
 			}
 
+			// Configure SlackNotifier based on whether Slack service is available
+			var slackNotifier interfaces.SlackNotifier
+			if slackSvc != nil {
+				slackNotifier = slackSvc // slack.Service implements interfaces.SlackNotifier directly
+			} else {
+				slackNotifier = usecase.NewDiscardSlackNotifier()
+			}
+
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(firestore),
-				usecase.WithSlackService(slackSvc),
+				usecase.WithSlackNotifier(slackNotifier),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(toolSets),
 			}
@@ -158,9 +169,15 @@ func cmdServe() *cli.Command {
 
 			// Build HTTP server options
 			serverOptions := []server.Options{
-				server.WithSlackVerifier(slackCfg.Verifier()),
 				server.WithPolicy(policyClient),
-				server.WithSlackService(slackSvc),
+			}
+
+			// Add Slack-related options only if Slack is configured
+			if slackSvc != nil {
+				serverOptions = append(serverOptions,
+					server.WithSlackService(slackSvc),
+					server.WithSlackVerifier(slackCfg.Verifier()),
+				)
 			}
 
 			// Add repository when GraphQL is enabled

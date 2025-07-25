@@ -29,11 +29,11 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	logger := logging.From(ctx)
 
 	slackUpdateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
-		if x.slackService == nil {
+		if !x.IsSlackEnabled() {
 			return nil // Skip if Slack service is not configured
 		}
 
-		if ticket.SlackThread == nil {
+		if !ticket.HasSlackThread() {
 			return nil // Skip if ticket has no Slack thread
 		}
 
@@ -41,8 +41,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			return nil // Skip if ticket has no finding
 		}
 
-		threadSvc := x.slackService.NewThread(*ticket.SlackThread)
-		return threadSvc.PostFinding(ctx, *ticket.Finding)
+		threadSvc := x.slackNotifier.NewThread(*ticket.SlackThread)
+		return threadSvc.PostFinding(ctx, ticket.Finding)
 	}
 
 	baseAction := base.New(x.repository, target.ID, base.WithSlackUpdate(slackUpdateFunc), base.WithLLMClient(x.llmClient))
@@ -95,7 +95,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	}
 
 	postWarrenMessage := func(ctx context.Context, message string) {
-		if x.slackService == nil || target.SlackThread == nil {
+if !x.IsSlackEnabled() || !target.HasSlackThread() {
 			return
 		}
 		if strings.TrimSpace(message) == "" {
@@ -103,17 +103,17 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		}
 
 		// Set agent context for agent messages
-		agentCtx := user.WithAgent(user.WithUserID(ctx, x.slackService.BotID()))
+		agentCtx := user.WithAgent(user.WithUserID(ctx, x.slackNotifier.BotID()))
 
 		// Record agent message as TicketComment
 		// Create bot user for agent messages
 		botUser := &slack.User{
-			ID:   x.slackService.BotID(),
+			ID:   x.slackNotifier.BotID(),
 			Name: "Warren",
 		}
 
 		// Post agent message to Slack and get message ID
-		threadSvc := x.slackService.NewThread(*target.SlackThread)
+		threadSvc := x.slackNotifier.NewThread(*target.SlackThread)
 		logging.From(ctx).Debug("message notify", "from", "MessageHook", "msg", message)
 		ts, err := threadSvc.PostCommentWithMessageID(ctx, "💬 "+message)
 		if err != nil {

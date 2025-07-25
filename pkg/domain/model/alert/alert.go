@@ -38,6 +38,11 @@ type Alert struct {
 	Embedding   firestore.Vector32 `json:"-"`
 }
 
+// HasSlackThread returns true if the alert has a valid Slack thread
+func (a *Alert) HasSlackThread() bool {
+	return a.SlackThread != nil && a.SlackThread.ThreadID != ""
+}
+
 type Alerts []*Alert
 
 type QueryOutput struct {

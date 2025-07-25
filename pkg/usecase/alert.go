@@ -85,21 +85,23 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 		}
 	}
 
-	if existingAlert != nil && existingAlert.SlackThread != nil {
+if existingAlert != nil && existingAlert.HasSlackThread() {
 		// Post to existing thread
-		thread := uc.slackService.NewThread(*existingAlert.SlackThread)
-		if err := thread.PostAlert(ctx, newAlert); err != nil {
+		thread := uc.slackNotifier.NewThread(*existingAlert.SlackThread)
+		if err := thread.PostAlert(ctx, &newAlert); err != nil {
 			return nil, goerr.Wrap(err, "failed to post alert to existing thread", goerr.V("alert", newAlert), goerr.V("existing_alert", existingAlert))
 		}
 		newAlert.SlackThread = existingAlert.SlackThread
 		logger.Info("alert posted to existing thread", "alert", newAlert, "existing_alert", existingAlert, "similarity", bestSimilarity)
 	} else {
 		// Post to new thread (normal posting)
-		newThread, err := uc.slackService.PostAlert(ctx, newAlert)
+		newThread, err := uc.slackNotifier.PostAlert(ctx, &newAlert)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to post alert", goerr.V("alert", newAlert))
 		}
-		newAlert.SlackThread = newThread.Entity()
+		if newThread != nil {
+			newAlert.SlackThread = newThread.Entity()
+		}
 		logger.Info("alert posted to new thread", "alert", newAlert)
 	}
 
@@ -227,34 +229,32 @@ func (uc *UseCases) BindAlertsToTicket(ctx context.Context, ticketID types.Ticke
 	}
 
 	// Update Slack display for both ticket and individual alerts (using updated metadata)
-	if uc.slackService != nil {
-		// Update ticket display if it has a Slack thread
-		if ticket.SlackThread != nil {
-			// Get all alerts bound to the ticket for display
-			alerts, err := uc.repository.BatchGetAlerts(ctx, ticket.AlertIDs)
-			if err != nil {
-				logging.From(ctx).Warn("failed to get alerts for Slack update", "error", err, "ticket_id", ticketID)
-			} else {
-				thread := uc.slackService.NewThread(*ticket.SlackThread)
-				if _, err := thread.PostTicket(ctx, *ticket, alerts); err != nil {
-					// Log error but don't fail the operation
-					logging.From(ctx).Warn("failed to update Slack thread after binding alerts", "error", err, "ticket_id", ticketID)
-				}
+	// Update ticket display if it has a Slack thread
+	if ticket.HasSlackThread() {
+		// Get all alerts bound to the ticket for display
+		alerts, err := uc.repository.BatchGetAlerts(ctx, ticket.AlertIDs)
+		if err != nil {
+			logging.From(ctx).Warn("failed to get alerts for Slack update", "error", err, "ticket_id", ticketID)
+		} else {
+			thread := uc.slackNotifier.NewThread(*ticket.SlackThread)
+			if _, err := thread.PostTicket(ctx, ticket, alerts); err != nil {
+				// Log error but don't fail the operation
+				logging.From(ctx).Warn("failed to update Slack thread after binding alerts", "error", err, "ticket_id", ticketID)
 			}
 		}
+	}
 
-		// Update individual alert displays in their respective threads
-		boundAlerts, err := uc.repository.BatchGetAlerts(ctx, alertIDs)
-		if err != nil {
-			logging.From(ctx).Warn("failed to get bound alerts for individual Slack updates", "error", err, "alert_ids", alertIDs)
-		} else {
-			for _, alert := range boundAlerts {
-				if alert.SlackThread != nil {
-					alertThread := uc.slackService.NewThread(*alert.SlackThread)
-					if err := alertThread.UpdateAlert(ctx, *alert); err != nil {
-						// Log error but don't fail the operation
-						logging.From(ctx).Warn("failed to update alert Slack display", "error", err, "alert_id", alert.ID)
-					}
+	// Update individual alert displays in their respective threads
+	boundAlerts, err := uc.repository.BatchGetAlerts(ctx, alertIDs)
+	if err != nil {
+		logging.From(ctx).Warn("failed to get bound alerts for individual Slack updates", "error", err, "alert_ids", alertIDs)
+	} else {
+		for _, alert := range boundAlerts {
+			if alert.HasSlackThread() {
+				alertThread := uc.slackNotifier.NewThread(*alert.SlackThread)
+				if err := alertThread.UpdateAlert(ctx, *alert); err != nil {
+					// Log error but don't fail the operation
+					logging.From(ctx).Warn("failed to update alert Slack display", "error", err, "alert_id", alert.ID)
 				}
 			}
 		}
