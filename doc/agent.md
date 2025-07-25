@@ -67,6 +67,61 @@ warren chat --ticket-id ticket-12345678-abcd-efgh-ijkl-123456789012 \
 - `--dry-run`: Test without making changes
 - `--lang`: Response language (en, ja, etc.)
 
+## Tool Configuration
+
+### Setting Up External Tool API Keys
+
+Before using the security intelligence tools, you need to configure their API keys. Warren will gracefully skip tools without configured API keys and inform you when a tool is unavailable.
+
+#### Configuration Methods
+
+1. **Environment Variables** (Recommended for production):
+```bash
+export WARREN_VT_API_KEY="your-virustotal-api-key"
+export WARREN_OTX_API_KEY="your-alienault-otx-key"
+export WARREN_URLSCAN_API_KEY="your-urlscan-api-key"
+export WARREN_SHODAN_API_KEY="your-shodan-api-key"
+export WARREN_IPDB_API_KEY="your-abuseipdb-key"
+export WARREN_ABUSECH_API_KEY="your-abusech-key"
+```
+
+2. **Command-line Flags** (For testing):
+```bash
+warren serve \
+  --vt-api-key="your-virustotal-api-key" \
+  --otx-api-key="your-otx-api-key" \
+  --urlscan-api-key="your-urlscan-api-key" \
+  --shodan-api-key="your-shodan-api-key" \
+  --ipdb-api-key="your-abuseipdb-key" \
+  --abusech-api-key="your-abusech-key"
+```
+
+3. **Google Secret Manager** (For Google Cloud deployments):
+```bash
+# Create secrets
+echo -n "your-api-key" | gcloud secrets create vt-api-key --data-file=-
+
+# Use in Cloud Run
+gcloud run services update warren \
+  --set-secrets="WARREN_VT_API_KEY=vt-api-key:latest"
+```
+
+#### Obtaining API Keys
+
+- **VirusTotal**: Sign up at [virustotal.com](https://www.virustotal.com), go to API Key section
+- **OTX**: Register at [otx.alienvault.com](https://otx.alienvault.com), find API key in settings
+- **URLScan**: Create account at [urlscan.io](https://urlscan.io), API key in profile
+- **Shodan**: Sign up at [shodan.io](https://www.shodan.io), API key in account settings
+- **AbuseIPDB**: Register at [abuseipdb.com](https://www.abuseipdb.com), generate key in account
+
+#### Default Behavior
+
+- **Missing API Keys**: Tools without configured keys are automatically excluded from the available tool list
+- **Failed API Calls**: Agent reports the error and continues with other tools
+- **Rate Limits**: Agent respects rate limits and reports when limits are hit
+
+When tools are not configured, they simply won't appear in the agent's available tools. The agent will use whatever tools are available to complete the requested analysis.
+
 ## Available Tools
 
 ### Warren Base Tools
@@ -101,13 +156,20 @@ Updates the ticket's finding with analysis results.
 "Set this as a true positive incident"
 ```
 
+#### `warren_get_ticket_comments`
+Retrieves comments from the ticket's Slack thread.
+```
+"Show me all comments on this ticket"
+"Get the latest discussion from Slack"
+```
+
 ### Security Intelligence Tools
 
 #### VirusTotal Integration
-- `vt_ip_lookup`: Check IP reputation
-- `vt_domain_lookup`: Analyze domains
-- `vt_hash_lookup`: Check file hashes
-- `vt_url_lookup`: Scan URLs
+- `vt_ip`: Check IP reputation
+- `vt_domain`: Analyze domains
+- `vt_file_hash`: Check file hashes
+- `vt_url`: Scan URLs
 
 Example:
 ```
@@ -115,43 +177,51 @@ Example:
 "Analyze the domain suspicious-site.com"
 ```
 
-#### AbuseIPDB & Abuse.ch
-- `abusech_ip_lookup`: Check IP abuse reports
-- `abusech_domain_lookup`: Domain abuse database
-- `abuseipdb_check`: IP reputation scoring
+#### AbuseIPDB
+- `ipdb_check`: IP reputation scoring and abuse reports
 
 Example:
 ```
 "Is this IP reported for abuse?"
-"Check abuse history for these domains"
+"Check the reputation of 192.168.1.100"
+```
+
+#### Abuse.ch
+- `abusech.bazaar.query`: Query malware samples and IoCs
+
+Example:
+```
+"Search for this file hash in malware databases"
+"Check if this hash is known malware"
 ```
 
 #### Shodan
-- `shodan_host_lookup`: Internet device information
-- `shodan_search`: Search exposed services
+- `shodan_host`: Internet device information for specific IP
+- `shodan_domain`: Search devices associated with a domain
+- `shodan_search`: Search exposed services with queries
 
 Example:
 ```
 "What services are running on this IP?"
-"Search for similar exposed systems"
+"Search for exposed MongoDB instances"
+"Find all devices for example.com domain"
 ```
 
 #### URLScan
-- `urlscan_search`: Search URL scan results
-- `urlscan_submit`: Submit URL for scanning
+- `urlscan_scan`: Submit and scan a URL
 
 Example:
 ```
 "Scan this suspicious URL"
-"Find previous scans of this domain"
+"Analyze https://suspicious-site.com"
 ```
 
 #### OTX (Open Threat Exchange)
-- `otx_ip_lookup`: IP threat intelligence
-- `otx_domain_lookup`: Domain intelligence
-- `otx_hostname_lookup`: Hostname analysis
-- `otx_file_lookup`: File hash intelligence
-- `otx_url_lookup`: URL threat data
+- `otx_ipv4`: IPv4 address threat intelligence
+- `otx_ipv6`: IPv6 address threat intelligence
+- `otx_domain`: Domain threat intelligence
+- `otx_hostname`: Hostname analysis
+- `otx_file_hash`: File hash intelligence
 
 Example:
 ```
@@ -170,18 +240,32 @@ Execute SQL queries on your security data.
 "Show me all events from this user yesterday"
 ```
 
-#### `bigquery_list_datasets`
+#### `bigquery_list_dataset`
 List available BigQuery datasets.
 ```
 "What datasets are available?"
 "Show me the security log tables"
 ```
 
-#### `bigquery_query_by_runbook`
-Execute predefined SQL templates.
+#### `bigquery_result`
+Get results of a previously executed query.
 ```
-"Run the suspicious login detection query"
-"Execute the data exfiltration runbook"
+"Show the results of query job-123"
+"Get the output from the last query"
+```
+
+#### `bigquery_schema`
+Get schema information for a table.
+```
+"Show me the schema for the events table"
+"What columns are in the security_logs table?"
+```
+
+#### `bigquery_table_summary`
+Get summary information about a table.
+```
+"Summarize the security_events table"
+"How many rows are in the logs table?"
 ```
 
 ## MCP (Model Context Protocol) Integration
@@ -355,10 +439,10 @@ When using `--slack` flag, the agent posts to the ticket's Slack thread:
 ```
 💬 Agent: Starting investigation of suspicious IPs...
 
-⚡ Executing: vt_ip_lookup
+⚡ Executing: vt_ip
 ✅ IP 192.168.1.100 - Clean (0/87 detections)
 
-⚡ Executing: shodan_host_lookup  
+⚡ Executing: shodan_host
 ✅ Found open ports: 22, 80, 443
 
 💬 Agent: Investigation complete. The IP appears to be a legitimate web server with standard ports.
@@ -427,7 +511,7 @@ User: Check if any IPs in this ticket are malicious
 
 Agent: I'll check all IPs in this ticket against threat intelligence sources.
 
-[Executes vt_ip_lookup, otx_ip_lookup, abuseipdb_check for each IP]
+[Executes vt_ip, otx_ipv4, ipdb_check for each IP]
 
 Found 3 IPs in the alerts:
 - 192.168.1.100: Clean across all sources

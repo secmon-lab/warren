@@ -202,6 +202,11 @@ Now that you understand the basics:
 3. **Leverage AI Analysis**: Explore the [AI Agent Guide](./agent.md) for powerful investigations
 4. **Customize Your Setup**: Ask your admin about custom policies and integrations
 
+### For System Administrators
+- **Configure Warren**: See the [Configuration Reference](./configuration.md) for all settings
+- **Deploy Warren**: Follow the [Installation Guide](./installation.md)
+- **Write Policies**: Learn [Policy Development](./policy.md)
+
 ## Tips for Success
 
 - **Don't Ignore Clusters**: Similar alerts often indicate campaigns or systemic issues

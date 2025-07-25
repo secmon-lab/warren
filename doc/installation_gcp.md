@@ -286,6 +286,8 @@ gcloud auth configure-docker ${REGION}-docker.pkg.dev
 
 ## 8. Deploy Warren to Cloud Run
 
+> **Configuration Note**: For a complete list of all available environment variables and configuration options, see the [Configuration Reference](./configuration.md).
+
 ### 8.1. Using Pre-built Image
 
 For quick deployment using the official Warren image:

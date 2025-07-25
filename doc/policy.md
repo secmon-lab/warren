@@ -504,6 +504,417 @@ alert contains {
 }
 ```
 
+## Real-World Policy Examples
+
+### AWS GuardDuty Policy
+
+A production-ready policy for AWS GuardDuty findings:
+
+```rego
+package alert.guardduty
+
+import rego.v1
+
+# Main alert rule for GuardDuty findings
+alert contains {
+    "title": title,
+    "description": description,
+    "attrs": array.concat([
+        {
+            "key": "severity",
+            "value": severity_label,
+            "link": ""
+        },
+        {
+            "key": "type",
+            "value": input.detail.type,
+            "link": aws_doc_link
+        },
+        {
+            "key": "account",
+            "value": input.detail.accountId,
+            "link": ""
+        },
+        {
+            "key": "region",
+            "value": input.detail.region,
+            "link": ""
+        }
+    ], resource_attrs)
+} if {
+    # Only process GuardDuty findings
+    input.source == "aws.guardduty"
+    input.detail.type
+    
+    # Skip informational findings unless critical
+    not ignore
+}
+
+# Generate human-readable title
+title := sprintf("%s in %s", [
+    finding_title[input.detail.type],
+    input.detail.region
+]) if {
+    finding_title[input.detail.type]
+} else := input.detail.type
+
+# Title mappings for common GuardDuty findings
+finding_title := {
+    "Recon:EC2/PortProbeUnprotectedPort": "Port Scan Detected",
+    "UnauthorizedAccess:EC2/SSHBruteForce": "SSH Brute Force Attack",
+    "Trojan:EC2/BlackholeTraffic": "EC2 Instance Communicating with Known Malicious IP",
+    "CryptoCurrency:EC2/BitcoinTool.B!DNS": "Cryptocurrency Mining Activity",
+    "UnauthorizedAccess:IAMUser/InstanceCredentialExfiltration": "AWS Credentials Compromised",
+    "Policy:IAMUser/RootCredentialUsage": "Root Account Activity Detected",
+    "Stealth:IAMUser/LoggingConfigurationModified": "CloudTrail Logging Disabled"
+}
+
+# Generate detailed description
+description := sprintf("%s. Finding ID: %s", [
+    input.detail.description,
+    input.detail.id
+]) if {
+    input.detail.description
+} else := sprintf("GuardDuty detected suspicious activity: %s", [input.detail.type])
+
+# Convert numeric severity to label
+severity_label := "critical" if { input.detail.severity >= 8.0 }
+else := "high" if { input.detail.severity >= 6.0 }
+else := "medium" if { input.detail.severity >= 4.0 }
+else := "low"
+
+# AWS documentation link for finding type
+aws_doc_link := sprintf(
+    "https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-ec2.html#%s",
+    [lower(replace(input.detail.type, ":", ""))]
+)
+
+# Extract resource-specific attributes
+resource_attrs contains attr if {
+    input.detail.resource.instanceDetails.instanceId
+    attr := {
+        "key": "instance_id",
+        "value": input.detail.resource.instanceDetails.instanceId,
+        "link": sprintf("https://console.aws.amazon.com/ec2/v2/home?region=%s#Instances:instanceId=%s", [
+            input.detail.region,
+            input.detail.resource.instanceDetails.instanceId
+        ])
+    }
+}
+
+resource_attrs contains attr if {
+    some i
+    ip := input.detail.resource.instanceDetails.networkInterfaces[i].privateIpAddress
+    attr := {
+        "key": sprintf("private_ip_%d", [i]),
+        "value": ip,
+        "link": ""
+    }
+}
+
+resource_attrs contains attr if {
+    input.detail.service.action.networkConnectionAction.remoteIpDetails.ipAddressV4
+    attr := {
+        "key": "remote_ip",
+        "value": input.detail.service.action.networkConnectionAction.remoteIpDetails.ipAddressV4,
+        "link": sprintf("https://www.abuseipdb.com/check/%s", [
+            input.detail.service.action.networkConnectionAction.remoteIpDetails.ipAddressV4
+        ])
+    }
+}
+
+# Ignore rules
+ignore if {
+    # Ignore low severity findings in development accounts
+    input.detail.accountId in ["123456789012", "098765432109"]  # Dev accounts
+    input.detail.severity < 4.0
+}
+
+ignore if {
+    # Ignore expected scanning from security tools
+    input.detail.type == "Recon:EC2/PortProbeUnprotectedPort"
+    input.detail.service.action.networkConnectionAction.remoteIpDetails.ipAddressV4 in [
+        "10.0.0.10",  # Internal security scanner
+        "10.0.0.11"   # Vulnerability assessment tool
+    ]
+}
+
+# Test data for policy testing
+test_guardduty_critical if {
+    alert[_] with input as {
+        "source": "aws.guardduty",
+        "detail": {
+            "type": "Trojan:EC2/BlackholeTraffic",
+            "severity": 8.5,
+            "id": "test-finding-123",
+            "description": "EC2 instance i-1234567890abcdef0 is communicating with a known malicious IP",
+            "accountId": "111111111111",
+            "region": "us-east-1",
+            "resource": {
+                "instanceDetails": {
+                    "instanceId": "i-1234567890abcdef0",
+                    "networkInterfaces": [{
+                        "privateIpAddress": "10.0.1.50"
+                    }]
+                }
+            },
+            "service": {
+                "action": {
+                    "networkConnectionAction": {
+                        "remoteIpDetails": {
+                            "ipAddressV4": "192.168.100.200"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+### Suricata IDS Policy
+
+A comprehensive policy for Suricata intrusion detection alerts:
+
+```rego
+package alert.suricata
+
+import rego.v1
+
+# Main alert rule for Suricata events
+alert contains {
+    "title": title,
+    "description": description,
+    "attrs": array.concat(base_attrs, flow_attrs)
+} if {
+    # Process EVE JSON format
+    input.event_type == "alert"
+    
+    # Must have signature info
+    input.alert.signature
+    input.alert.signature_id
+    
+    # Apply filtering
+    not ignore
+}
+
+# Generate title from signature and category
+title := sprintf("[%s] %s", [
+    strings.trim_space(input.alert.category),
+    input.alert.signature
+])
+
+# Create detailed description
+description := sprintf(
+    "Signature ID %d triggered. Flow: %s:%d -> %s:%d using %s",
+    [
+        input.alert.signature_id,
+        input.src_ip,
+        input.src_port,
+        input.dest_ip,
+        input.dest_port,
+        input.proto
+    ]
+)
+
+# Base attributes for all alerts
+base_attrs := [
+    {
+        "key": "severity",
+        "value": severity_mapping[input.alert.severity],
+        "link": ""
+    },
+    {
+        "key": "signature_id", 
+        "value": sprintf("%d", [input.alert.signature_id]),
+        "link": sprintf("https://docs.suricata.io/en/latest/rules/intro.html#sid-signature-id-%d", [
+            input.alert.signature_id
+        ])
+    },
+    {
+        "key": "category",
+        "value": input.alert.category,
+        "link": ""
+    },
+    {
+        "key": "protocol",
+        "value": input.proto,
+        "link": ""
+    }
+]
+
+# Flow-specific attributes
+flow_attrs contains attr if {
+    input.src_ip
+    attr := {
+        "key": "source_ip",
+        "value": input.src_ip,
+        "link": threat_intel_link(input.src_ip)
+    }
+}
+
+flow_attrs contains attr if {
+    input.dest_ip
+    attr := {
+        "key": "destination_ip", 
+        "value": input.dest_ip,
+        "link": threat_intel_link(input.dest_ip)
+    }
+}
+
+flow_attrs contains attr if {
+    input.src_port
+    attr := {
+        "key": "source_port",
+        "value": sprintf("%d", [input.src_port]),
+        "link": ""
+    }
+}
+
+flow_attrs contains attr if {
+    input.dest_port
+    attr := {
+        "key": "destination_port",
+        "value": sprintf("%d", [input.dest_port]), 
+        "link": service_link(input.dest_port)
+    }
+}
+
+flow_attrs contains attr if {
+    input.http.hostname
+    attr := {
+        "key": "hostname",
+        "value": input.http.hostname,
+        "link": sprintf("https://urlscan.io/search/#%s", [input.http.hostname])
+    }
+}
+
+flow_attrs contains attr if {
+    input.http.url
+    attr := {
+        "key": "url",
+        "value": input.http.url,
+        "link": ""
+    }
+}
+
+flow_attrs contains attr if {
+    input.dns.query[0].rrname
+    attr := {
+        "key": "dns_query",
+        "value": input.dns.query[0].rrname,
+        "link": sprintf("https://www.virustotal.com/gui/domain/%s", [
+            strings.trim_suffix(input.dns.query[0].rrname, ".")
+        ])
+    }
+}
+
+# Severity mapping (Suricata uses 1-3, we use low/medium/high/critical)
+severity_mapping := {
+    1: "high",
+    2: "medium", 
+    3: "low"
+}
+
+# Generate threat intelligence links based on IP type
+threat_intel_link(ip) := link if {
+    # Skip private IPs
+    net.cidr_contains("10.0.0.0/8", ip)
+    link := ""
+} else := link if {
+    net.cidr_contains("172.16.0.0/12", ip)
+    link := ""
+} else := link if {
+    net.cidr_contains("192.168.0.0/16", ip)
+    link := ""
+} else := sprintf("https://www.abuseipdb.com/check/%s", [ip])
+
+# Service documentation links for common ports
+service_link(port) := "https://attack.mitre.org/techniques/T1021/001/" if { port == 22 }  # SSH
+else := "https://attack.mitre.org/techniques/T1021/002/" if { port == 445 }  # SMB
+else := "https://attack.mitre.org/techniques/T1021/001/" if { port == 3389 } # RDP
+else := ""
+
+# Ignore rules for false positive reduction
+ignore if {
+    # Ignore DNS queries to internal DNS servers
+    input.alert.category == "DNS"
+    input.dest_ip in ["10.0.0.53", "10.0.0.54"]  # Internal DNS servers
+}
+
+ignore if {
+    # Ignore vulnerability scans from authorized scanners
+    input.alert.signature contains "GPL SCAN"
+    input.src_ip in [
+        "10.10.10.100",  # Nessus scanner
+        "10.10.10.101"   # OpenVAS scanner
+    ]
+}
+
+ignore if {
+    # Ignore low severity alerts from monitoring subnets
+    severity_mapping[input.alert.severity] == "low"
+    net.cidr_contains("10.99.0.0/16", input.src_ip)  # Monitoring subnet
+}
+
+ignore if {
+    # Ignore specific noisy signatures
+    input.alert.signature_id in [
+        2013504,  # ET POLICY GNU/Linux APT User-Agent Outbound likely related to package management
+        2013505,  # ET POLICY curl User-Agent Outbound
+        2019401   # ET POLICY Spotify P2P Client
+    ]
+}
+
+# Test cases
+test_suricata_malware if {
+    result := alert[_] with input as {
+        "event_type": "alert",
+        "src_ip": "192.168.1.100",
+        "src_port": 54321,
+        "dest_ip": "185.220.101.45",
+        "dest_port": 443,
+        "proto": "TCP",
+        "alert": {
+            "signature": "ET MALWARE Cobalt Strike Beacon Observed",
+            "signature_id": 2027067,
+            "category": "A Network Trojan was detected",
+            "severity": 1
+        }
+    }
+    
+    result.title == "[A Network Trojan was detected] ET MALWARE Cobalt Strike Beacon Observed"
+    result.attrs[_].key == "severity"
+    result.attrs[_].value == "high"
+}
+
+test_ignore_internal_dns if {
+    count(alert) == 0 with input as {
+        "event_type": "alert",
+        "src_ip": "10.0.1.50",
+        "dest_ip": "10.0.0.53",
+        "proto": "UDP",
+        "alert": {
+            "signature": "ET DNS Query to a Suspicious Domain",
+            "signature_id": 2020000,
+            "category": "DNS",
+            "severity": 2
+        }
+    }
+}
+```
+
+### Policy Writing Best Practices
+
+When creating policies for your security tools:
+
+1. **Start with the Tool's Output Format**: Understand the exact JSON structure your tool produces
+2. **Focus on High-Value Alerts**: Filter out noise early with `ignore` rules
+3. **Enrich with Context**: Add links to threat intelligence and documentation
+4. **Test Thoroughly**: Include test cases for both positive and negative scenarios
+5. **Document Assumptions**: Comment on why certain decisions were made
+6. **Version Control**: Track changes and test in staging before production
+
 ## Debugging
 
 ### Print Statements

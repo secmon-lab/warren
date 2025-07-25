@@ -57,13 +57,7 @@ curl -X POST https://your-warren-instance/hooks/alert/raw/custom \
   }'
 ```
 
-**Response**:
-```json
-{
-  "alert_id": "alert-12345678-abcd-efgh-ijkl-123456789012",
-  "status": "created"
-}
-```
+**Response**: HTTP 200 OK (empty body on success)
 
 The `{schema}` parameter determines which policy will process the alert. Common schemas:
 - `guardduty` - AWS GuardDuty alerts

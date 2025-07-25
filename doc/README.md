@@ -12,6 +12,7 @@ Warren is an AI-powered security alert management platform that streamlines inci
 | [Installation Overview](./installation.md) | Deployment options and setup overview | System administrators |
 | [Installation - Google Cloud](./installation_gcp.md) | Detailed Google Cloud setup | System administrators |
 | [Installation - Slack](./installation_slack.md) | Slack integration configuration | System administrators |
+| [Configuration Reference](./configuration.md) | Complete reference for all environment variables and CLI flags | System administrators |
 | [Data Models](./model.md) | Understanding Alerts, Tickets, and core concepts | All users |
 | [User Guide](./user_guide.md) | Daily operations and workflow management | Security analysts |
 | [AI Agent Guide](./agent.md) | Using Chat features and AI-powered analysis | Security analysts |
@@ -30,8 +31,9 @@ Warren is an AI-powered security alert management platform that streamlines inci
 1. **[Getting Started](./getting_started.md)** - Overview of Warren's architecture
 2. **[Installation Overview](./installation.md)** - Choose deployment method
 3. **[Google Cloud Setup](./installation_gcp.md)** + **[Slack Setup](./installation_slack.md)** - Configure infrastructure
-4. **[Policy Guide](./policy.md)** - Customize alert detection
-5. **[Integration Guide](./integration.md)** - Connect external systems
+4. **[Configuration Reference](./configuration.md)** - Configure Warren's settings
+5. **[Policy Guide](./policy.md)** - Customize alert detection
+6. **[Integration Guide](./integration.md)** - Connect external systems
 
 ## Key Concepts
 

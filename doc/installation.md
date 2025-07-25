@@ -139,6 +139,159 @@ Warren can be deployed in several ways:
 - Suitable for organizations with existing K8s infrastructure
 - Helm charts available in the repository
 
+## Minimal Viable Setup
+
+For users who want to quickly try Warren, this section provides the minimum configuration needed to get started.
+
+> **Important Note**: Warren is designed as a cloud-native application and requires both Google Cloud services (Firestore and Vertex AI) and Slack integration to run the `serve` command. The full server cannot run without these dependencies.
+
+### Option 1: Policy Testing Only (No External Services Required)
+
+If you only want to test alert detection policies without running the full server:
+
+```bash
+# Clone the repository
+git clone https://github.com/secmon-lab/warren.git
+cd warren
+
+# Create test data structure
+mkdir -p test-data/guardduty
+echo '{
+  "source": "aws.guardduty",
+  "detail": {
+    "type": "Recon:EC2/PortProbeUnprotectedPort",
+    "severity": 5.0,
+    "accountId": "123456789012",
+    "region": "us-east-1"
+  }
+}' > test-data/guardduty/sample.json
+
+# Test the policy
+go run main.go test \
+  --policy ./policies \
+  --test-detect-data ./test-data
+```
+
+This allows you to:
+- ✅ Test and develop Rego policies locally
+- ✅ Validate alert detection logic
+- ✅ No external services required
+- ✅ CI/CD friendly for policy validation
+- ❌ No web UI or API access
+- ❌ No alert processing pipeline
+- ❌ No Slack notifications
+
+### Option 2: Minimal Setup with Google Cloud and Slack
+
+Warren requires both Google Cloud services and Slack integration to run. Here's the minimal setup:
+
+```bash
+# 1. Create a new project
+export PROJECT_ID=warren-test-$(date +%s)
+gcloud projects create $PROJECT_ID
+gcloud config set project $PROJECT_ID
+
+# 2. Enable billing (required for Firestore and Vertex AI)
+# Visit: https://console.cloud.google.com/billing
+
+# 3. Enable required APIs
+gcloud services enable \
+  firestore.googleapis.com \
+  aiplatform.googleapis.com
+
+# 4. Create Firestore database
+gcloud firestore databases create \
+  --location=us-central1 \
+  --type=firestore-native
+
+# 5. Create a minimal Slack app
+# Follow the Quick Setup section in installation_slack.md to get:
+# - WARREN_SLACK_OAUTH_TOKEN (xoxb-...)
+# - WARREN_SLACK_SIGNING_SECRET
+
+# 6. Run Warren locally
+export WARREN_FIRESTORE_PROJECT_ID=$PROJECT_ID
+export WARREN_GEMINI_PROJECT_ID=$PROJECT_ID
+export WARREN_GEMINI_LOCATION=us-central1
+export WARREN_SLACK_OAUTH_TOKEN="xoxb-your-token"
+export WARREN_SLACK_SIGNING_SECRET="your-signing-secret"
+export WARREN_SLACK_CHANNEL_NAME="test-alerts"
+export WARREN_DEV_USER=test@example.com
+export WARREN_LOG_LEVEL=debug
+
+go run main.go serve --addr=:8080
+```
+
+This gives you:
+- ✅ Web UI access at http://localhost:8080
+- ✅ Alert processing pipeline  
+- ✅ AI-powered alert enrichment
+- ✅ Persistent storage
+- ✅ Basic Slack integration (required)
+- ❌ No authentication (dev mode)
+- ❌ No external tool integrations (optional)
+
+### Option 3: Minimal Cloud Run Deployment
+
+Deploy Warren on Cloud Run with minimal configuration:
+
+```bash
+# Use the project from Option 2
+# First, store Slack credentials in Secret Manager
+echo -n "xoxb-your-token" | gcloud secrets create slack-oauth-token --data-file=-
+echo -n "your-signing-secret" | gcloud secrets create slack-signing-secret --data-file=-
+
+# Deploy Warren
+gcloud run deploy warren \
+  --image=ghcr.io/secmon-lab/warren:latest \
+  --region=us-central1 \
+  --allow-unauthenticated \
+  --set-env-vars="WARREN_DEV_USER=test@example.com,WARREN_FIRESTORE_PROJECT_ID=$PROJECT_ID,WARREN_GEMINI_PROJECT_ID=$PROJECT_ID,WARREN_SLACK_CHANNEL_NAME=test-alerts" \
+  --set-secrets="WARREN_SLACK_OAUTH_TOKEN=slack-oauth-token:latest,WARREN_SLACK_SIGNING_SECRET=slack-signing-secret:latest"
+```
+
+After deployment:
+- ✅ Public URL for web access
+- ✅ Full alert processing pipeline
+- ✅ AI-powered features
+- ✅ Slack integration
+- ✅ Scalable and managed
+- ❌ No authentication (dev mode + allow-unauthenticated)
+
+### Testing Your Minimal Setup
+
+1. **Send a test alert**:
+```bash
+curl -X POST http://localhost:8080/hooks/alert/raw/test \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Test Security Alert",
+    "description": "This is a test alert",
+    "severity": "medium"
+  }'
+```
+
+2. **Access the Web UI**:
+- Navigate to http://localhost:8080
+- You'll be automatically logged in as the dev user
+- View alerts and create tickets
+
+3. **Test GraphQL API**:
+```bash
+curl -X POST http://localhost:8080/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ unboundAlerts(limit: 10) { alerts { id title } } }"}'
+```
+
+### Upgrading to Full Setup
+
+When ready for production features:
+
+1. **Add Slack Integration**: Follow [Slack Configuration Guide](./installation_slack.md)
+2. **Enable AI Features**: Set up Vertex AI per [Google Cloud Setup](./installation_gcp.md#7-vertex-ai-setup)
+3. **Add Authentication**: Remove `WARREN_DEV_USER` and configure OAuth
+4. **Configure External Tools**: Add API keys for threat intelligence
+
 ## Prerequisites
 
 Before starting the installation, ensure you have:
@@ -156,7 +309,9 @@ Before starting the installation, ensure you have:
 
 ## Quick Start
 
-For a minimal Cloud Run deployment:
+> **Looking for the simplest setup?** Jump to [Minimal Viable Setup](#minimal-viable-setup) for local development options.
+
+For a production Cloud Run deployment:
 
 1. **Set up Slack Integration**
    ```bash
@@ -208,6 +363,7 @@ Comprehensive Google Cloud configuration:
 
 ### 🛠️ Advanced Configuration
 Additional configuration options are covered in these guides:
+- **All configuration options** - See [Configuration Reference](./configuration.md) for complete list
 - **Custom Docker image creation** - See [Google Cloud Setup](./installation_gcp.md#42-build-and-push-image)
 - **Policy configuration and testing** - See [Policy Guide](./policy.md)
 - **External tool integration** - See [Integration Guide](./integration.md#external-tool-integration)
