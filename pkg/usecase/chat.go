@@ -349,7 +349,7 @@ func (x *UseCases) generateInitialTicketComment(ctx context.Context, ticketData 
 func updatePlanProgress(updateFunc func(ctx context.Context, msg string), plan *gollem.Plan, action string) error {
 	todos := plan.GetToDos()
 	if len(todos) == 0 {
-		updateFunc(context.Background(), fmt.Sprintf("🤖 **%s** (no tasks yet)", action))
+		updateFunc(context.Background(), fmt.Sprintf("🤖 *%s* (no tasks yet)", action))
 		return nil
 	}
 
@@ -363,8 +363,8 @@ func updatePlanProgress(updateFunc func(ctx context.Context, msg string), plan *
 
 	// Build complete message with all task details
 	var messageBuilder strings.Builder
-	messageBuilder.WriteString(fmt.Sprintf("🤖 **%s**\n\n", action))
-	messageBuilder.WriteString(fmt.Sprintf("**Progress: %d/%d tasks completed**\n\n", completedCount, len(todos)))
+	messageBuilder.WriteString(fmt.Sprintf("🤖 *%s*\n\n", action))
+	messageBuilder.WriteString(fmt.Sprintf("*Progress: %d/%d tasks completed*\n\n", completedCount, len(todos)))
 
 	// Add task list with status indicators
 	for _, todo := range todos {
