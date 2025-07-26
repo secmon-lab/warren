@@ -13,7 +13,7 @@ type WebUI struct {
 	clientID         string
 	clientSecret     string
 	frontendURL      string
-	noAuthentication bool // TODO: Rename to noAuthn after authorization mode is added
+	noAuthentication bool
 }
 
 func (x *WebUI) Flags() []cli.Flag {
