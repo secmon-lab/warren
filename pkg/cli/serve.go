@@ -22,20 +22,23 @@ import (
 
 // generateFrontendURL generates a frontend URL from the server address
 func generateFrontendURL(addr string) string {
-	// Handle special cases
-	if strings.HasPrefix(addr, ":") {
-		// Port only format (e.g., ":8080")
-		return fmt.Sprintf("http://localhost%s", addr)
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		// This could be an address without a port, or just a port like ":8080".
+		if strings.HasPrefix(addr, ":") {
+			// Port only format (e.g., ":8080")
+			return fmt.Sprintf("http://localhost%s", addr)
+		}
+		// For other malformed addresses, just prepend http://
+		return fmt.Sprintf("http://%s", addr)
 	}
 
-	// Check if it's 0.0.0.0
-	if strings.HasPrefix(addr, "0.0.0.0:") {
-		port := strings.TrimPrefix(addr, "0.0.0.0:")
-		return fmt.Sprintf("http://localhost:%s", port)
+	// If host is empty (e.g. from ":8080"), "0.0.0.0", or "::" (unspecified IPv6), replace with localhost.
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "localhost"
 	}
 
-	// For other addresses, use as-is
-	return fmt.Sprintf("http://%s", addr)
+	return fmt.Sprintf("http://%s", net.JoinHostPort(host, port))
 }
 
 func cmdServe() *cli.Command {
