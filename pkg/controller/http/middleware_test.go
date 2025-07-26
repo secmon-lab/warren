@@ -2,6 +2,7 @@ package http_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -21,6 +22,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/harlog"
+	"github.com/m-mizutani/opaq"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
@@ -413,5 +415,178 @@ func TestValidateGoogleIAPToken(t *testing.T) {
 
 		gt.Value(t, called).Equal(true)
 		gt.Value(t, w.Code).Equal(http.StatusOK)
+	})
+}
+
+// mockPolicyClient is a test implementation of PolicyClient
+type mockPolicyClient struct {
+	QueryFunc func(ctx context.Context, path string, input any, output any) error
+}
+
+func (m *mockPolicyClient) Query(ctx context.Context, path string, input any, output any, opts ...opaq.QueryOption) error {
+	if m.QueryFunc != nil {
+		return m.QueryFunc(ctx, path, input, output)
+	}
+	return nil
+}
+
+func (m *mockPolicyClient) Sources() map[string]string {
+	return make(map[string]string)
+}
+
+func TestAuthorizeWithPolicyNoAuthorization(t *testing.T) {
+	// Setup a test handler that sets a flag when called
+	handlerCalled := false
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	t.Run("bypass authorization when noAuthorization is true", func(t *testing.T) {
+		handlerCalled = false
+
+		// Create a policy that would normally deny
+		policy := &mockPolicyClient{
+			QueryFunc: func(ctx context.Context, path string, input any, output any) error {
+				// This should not be called when noAuthorization=true
+				t.Error("Policy query should not be called when noAuthorization=true")
+				return nil
+			},
+		}
+
+		// Create middleware with noAuthorization=true
+		middleware := server.AuthorizeWithPolicyForTest(policy, true)
+		handler := middleware(testHandler)
+
+		// Create test request
+		req := httptest.NewRequest("GET", "/test", nil)
+		req = req.WithContext(auth.ContextWithToken(req.Context(), &auth.Token{
+			Sub:   "test-user",
+			Email: "test@example.com",
+			Name:  "Test User",
+		}))
+		w := httptest.NewRecorder()
+
+		// Execute request
+		handler.ServeHTTP(w, req)
+
+		// Verify handler was called and request succeeded
+		gt.Value(t, handlerCalled).Equal(true)
+		gt.Value(t, w.Code).Equal(http.StatusOK)
+	})
+
+	t.Run("normal authorization when noAuthorization is false", func(t *testing.T) {
+		handlerCalled = false
+
+		// Create a policy that allows requests
+		policy := &mockPolicyClient{
+			QueryFunc: func(ctx context.Context, path string, input any, output any) error {
+				// Set allow: true in the output
+				type allowResult struct {
+					Allow bool `json:"allow"`
+				}
+				if result, ok := output.(*allowResult); ok {
+					result.Allow = true
+					return nil
+				}
+				// Also try the anonymous struct pattern used in the actual code
+				if result, ok := output.(*struct {
+					Allow bool `json:"allow"`
+				}); ok {
+					result.Allow = true
+					return nil
+				}
+				t.Logf("Unexpected output type: %T", output)
+				return nil
+			},
+		}
+
+		// Create middleware with noAuthorization=false
+		middleware := server.AuthorizeWithPolicyForTest(policy, false)
+		handler := middleware(testHandler)
+
+		// Create test request with proper HTTP request context
+		req := httptest.NewRequest("GET", "/test", nil)
+		token := &auth.Token{
+			Sub:   "test-user",
+			Email: "test@example.com",
+			Name:  "Test User",
+		}
+		ctx := auth.ContextWithToken(req.Context(), token)
+
+		// Also add HTTP request context for auth.BuildContext
+		httpReq := &auth.HTTPRequest{
+			Method: "GET",
+			Path:   "/test",
+			Body:   "",
+			Header: make(map[string][]string),
+		}
+		ctx = auth.WithHTTPRequest(ctx, httpReq)
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
+
+		// Execute request
+		handler.ServeHTTP(w, req)
+
+		// Verify handler was called and request succeeded
+		gt.Value(t, handlerCalled).Equal(true)
+		gt.Value(t, w.Code).Equal(http.StatusOK)
+	})
+
+	t.Run("authorization denial when noAuthorization is false", func(t *testing.T) {
+		handlerCalled = false
+
+		// Create a policy that denies requests
+		policy := &mockPolicyClient{
+			QueryFunc: func(ctx context.Context, path string, input any, output any) error {
+				// Set allow: false in the output
+				type allowResult struct {
+					Allow bool `json:"allow"`
+				}
+				if result, ok := output.(*allowResult); ok {
+					result.Allow = false
+					return nil
+				}
+				// Also try the anonymous struct pattern used in the actual code
+				if result, ok := output.(*struct {
+					Allow bool `json:"allow"`
+				}); ok {
+					result.Allow = false
+					return nil
+				}
+				return nil
+			},
+		}
+
+		// Create middleware with noAuthorization=false
+		middleware := server.AuthorizeWithPolicyForTest(policy, false)
+		handler := middleware(testHandler)
+
+		// Create test request with proper HTTP request context
+		req := httptest.NewRequest("GET", "/test", nil)
+		token := &auth.Token{
+			Sub:   "test-user",
+			Email: "test@example.com",
+			Name:  "Test User",
+		}
+		ctx := auth.ContextWithToken(req.Context(), token)
+
+		// Also add HTTP request context for auth.BuildContext
+		httpReq := &auth.HTTPRequest{
+			Method: "GET",
+			Path:   "/test",
+			Body:   "",
+			Header: make(map[string][]string),
+		}
+		ctx = auth.WithHTTPRequest(ctx, httpReq)
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
+
+		// Execute request
+		handler.ServeHTTP(w, req)
+
+		// Verify handler was NOT called and request was denied
+		gt.Value(t, handlerCalled).Equal(false)
+		gt.Value(t, w.Code).Equal(http.StatusForbidden)
 	})
 }

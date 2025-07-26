@@ -20,17 +20,18 @@ import (
 
 func cmdServe() *cli.Command {
 	var (
-		addr           string
-		enableGraphQL  bool
-		enableGraphiQL bool
-		webUICfg       config.WebUI
-		policyCfg      config.Policy
-		sentryCfg      config.Sentry
-		slackCfg       config.Slack
-		llmCfg         config.LLMCfg
-		firestoreCfg   config.Firestore
-		storageCfg     config.Storage
-		mcpCfg         config.MCPConfig
+		addr            string
+		enableGraphQL   bool
+		enableGraphiQL  bool
+		noAuthorization bool
+		webUICfg        config.WebUI
+		policyCfg       config.Policy
+		sentryCfg       config.Sentry
+		slackCfg        config.Slack
+		llmCfg          config.LLMCfg
+		firestoreCfg    config.Firestore
+		storageCfg      config.Storage
+		mcpCfg          config.MCPConfig
 	)
 
 	flags := joinFlags(
@@ -57,6 +58,14 @@ func cmdServe() *cli.Command {
 				Sources:     cli.EnvVars("WARREN_ENABLE_GRAPHIQL"),
 				Destination: &enableGraphiQL,
 			},
+			&cli.BoolFlag{
+				Name:        "no-authorization",
+				Aliases:     []string{"no-authz"},
+				Usage:       "Disable policy-based authorization checks (development only)",
+				Category:    "Security",
+				Sources:     cli.EnvVars("WARREN_NO_AUTHORIZATION"),
+				Destination: &noAuthorization,
+			},
 		},
 		webUICfg.Flags(),
 		policyCfg.Flags(),
@@ -79,6 +88,7 @@ func cmdServe() *cli.Command {
 				"addr", addr,
 				"enableGraphQL", enableGraphQL,
 				"enableGraphiQL", enableGraphiQL,
+				"noAuthorization", noAuthorization,
 				"web-ui", webUICfg,
 				"policy", policyCfg,
 				"sentry", sentryCfg,
@@ -170,6 +180,14 @@ func cmdServe() *cli.Command {
 			// Build HTTP server options
 			serverOptions := []server.Options{
 				server.WithPolicy(policyClient),
+			}
+
+			// Add no-authorization option if specified
+			if noAuthorization {
+				logging.From(ctx).Warn("⚠️  SECURITY WARNING: Authorization checks are DISABLED",
+					"flag", "--no-authorization",
+					"recommendation", "This should only be used in development environments")
+				serverOptions = append(serverOptions, server.WithNoAuthorization(true))
 			}
 
 			// Add Slack-related options only if Slack is configured

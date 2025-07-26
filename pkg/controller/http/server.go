@@ -23,14 +23,15 @@ import (
 )
 
 type Server struct {
-	router         *chi.Mux
-	slackCtrl      *slack_controller.Controller
-	policy         interfaces.PolicyClient
-	verifier       slack_model.PayloadVerifier
-	repo           interfaces.Repository // for GraphQL
-	slackService   *slack.Service        // for GraphQL resolver
-	authUC         AuthUseCase           // for authentication
-	enableGraphiQL bool                  // GraphiQL enable flag
+	router          *chi.Mux
+	slackCtrl       *slack_controller.Controller
+	policy          interfaces.PolicyClient
+	verifier        slack_model.PayloadVerifier
+	repo            interfaces.Repository // for GraphQL
+	slackService    *slack.Service        // for GraphQL resolver
+	authUC          AuthUseCase           // for authentication
+	enableGraphiQL  bool                  // GraphiQL enable flag
+	noAuthorization bool                  // no-authorization flag
 }
 
 type Options func(*Server)
@@ -68,6 +69,12 @@ func WithAuthUseCase(authUC AuthUseCase) Options {
 func WithPolicy(policy interfaces.PolicyClient) Options {
 	return func(s *Server) {
 		s.policy = policy
+	}
+}
+
+func WithNoAuthorization(disabled bool) Options {
+	return func(s *Server) {
+		s.noAuthorization = disabled
 	}
 }
 
@@ -109,17 +116,17 @@ func New(uc UseCase, opts ...Options) *Server {
 	r.Route("/hooks", func(r chi.Router) {
 		r.Route("/alert", func(r chi.Router) {
 			r.Route("/raw", func(r chi.Router) {
-				r.Use(authorizeWithPolicy(s.policy))
+				r.Use(authorizeWithPolicy(s.policy, s.noAuthorization))
 				r.Post("/{schema}", alertRawHandler(uc))
 			})
 			r.Route("/pubsub", func(r chi.Router) {
 				r.Use(validateGoogleIDToken)
-				r.Use(authorizeWithPolicy(s.policy))
+				r.Use(authorizeWithPolicy(s.policy, s.noAuthorization))
 				r.Post("/{schema}", alertPubSubHandler(uc))
 			})
 			r.Route("/sns", func(r chi.Router) {
 				r.Use(verifySNSRequest)
-				r.Use(authorizeWithPolicy(s.policy))
+				r.Use(authorizeWithPolicy(s.policy, s.noAuthorization))
 				r.Post("/{schema}", alertSNSHandler(uc))
 			})
 		})
@@ -141,7 +148,7 @@ func New(uc UseCase, opts ...Options) *Server {
 				r.Use(authMiddleware(s.authUC))
 			}
 
-			r.Use(authorizeWithPolicy(s.policy))
+			r.Use(authorizeWithPolicy(s.policy, s.noAuthorization))
 			r.Handle("/", graphqlHandler)
 		})
 
@@ -151,7 +158,7 @@ func New(uc UseCase, opts ...Options) *Server {
 				if s.authUC != nil {
 					r.Use(authMiddleware(s.authUC))
 				}
-				r.Use(authorizeWithPolicy(s.policy))
+				r.Use(authorizeWithPolicy(s.policy, s.noAuthorization))
 				r.Handle("/", playground.Handler("GraphQL playground", "/graphql"))
 			})
 		}
@@ -160,7 +167,7 @@ func New(uc UseCase, opts ...Options) *Server {
 	// Authentication endpoints
 	if s.authUC != nil {
 		r.Route("/api", func(r chi.Router) {
-			r.Use(authorizeWithPolicy(s.policy))
+			r.Use(authorizeWithPolicy(s.policy, s.noAuthorization))
 			r.Route("/auth", func(r chi.Router) {
 				r.Get("/login", authLoginHandler(s.authUC))
 				r.Get("/callback", authCallbackHandler(s.authUC))
