@@ -216,7 +216,7 @@ func (x *Warren) updateFinding(ctx context.Context, args map[string]any) (map[st
 		"dry_run":        isDryRun,
 	}
 
-if !isDryRun && !slackUpdated && currentTicket.HasSlackThread() {
+	if !isDryRun && !slackUpdated && currentTicket.HasSlackThread() {
 		response["slack_update_required"] = true
 		response["message"] = "Finding updated successfully. Slack message update may be needed."
 	}

@@ -67,7 +67,7 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 		}
 
 		// For single alert with no explicit slackThread, use the alert's Slack thread if available
-if len(alerts) == 1 && opts.SlackThread == nil && alerts[0].HasSlackThread() && uc.IsSlackEnabled() {
+		if len(alerts) == 1 && opts.SlackThread == nil && alerts[0].HasSlackThread() && uc.IsSlackEnabled() {
 			opts.SlackThread = alerts[0].SlackThread
 		}
 	}
@@ -368,7 +368,7 @@ func (uc *UseCases) updateTicketWithSlackSync(ctx context.Context, ticketID type
 
 // syncTicketToSlack syncs a single ticket to Slack
 func (uc *UseCases) syncTicketToSlack(ctx context.Context, ticket *ticket.Ticket) error {
-if !ticket.HasSlackThread() || !uc.IsSlackEnabled() {
+	if !ticket.HasSlackThread() || !uc.IsSlackEnabled() {
 		return nil // No Slack thread or service, skip sync
 	}
 

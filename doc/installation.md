@@ -304,7 +304,7 @@ curl -X POST http://localhost:8080/hooks/alert/raw/test \
 
 2. **Access the Web UI**:
 - Navigate to http://localhost:8080
-- You'll be automatically logged in as the dev user
+- Configure Slack OAuth to log in (see Full Setup section)
 - View alerts and create tickets
 
 3. **Test GraphQL API**:

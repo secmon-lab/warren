@@ -129,4 +129,4 @@ Test files follow Go conventions (`*_test.go`). The codebase includes:
 - All comment and character literal in source code must be in English
 - Test files should have `package {name}_test`. Do not use same package name
 - Test must be included in same name test file. (e.g. test for `abc.go` must be in `abc_test.go`)
-- Do not create binary. If you need to run, use `go run` command instead
+- Do not build binary. If you need to run, use `go run` command instead
