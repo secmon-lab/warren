@@ -166,6 +166,15 @@ func authLogoutHandler(authUC AuthUseCase) http.HandlerFunc {
 // authMeHandler returns current user information
 func authMeHandler(authUC AuthUseCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// For NoAuthn mode, always return anonymous user
+		if authUC.IsNoAuthn() {
+			token := auth.NewAnonymousUser()
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			userInfo := `{"sub": "` + token.Sub + `", "email": "` + token.Email + `", "name": "` + token.Name + `"}`
+			safe.Write(r.Context(), w, []byte(userInfo))
+			return
+		}
 		// Get tokens from cookies
 		tokenIDCookie, err := r.Cookie("token_id")
 		if err != nil {

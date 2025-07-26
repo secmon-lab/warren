@@ -342,6 +342,14 @@ func withHTTPClient(ctx context.Context, client httpClient) context.Context {
 func authMiddleware(authUC AuthUseCase) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// For NoAuthn mode, always use anonymous user
+			if authUC.IsNoAuthn() {
+				token := auth.NewAnonymousUser()
+				ctx := auth.ContextWithToken(r.Context(), token)
+				ctx = user.WithUserID(ctx, token.Sub)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
 
 			// Get tokens from cookies
 			tokenIDCookie, err := r.Cookie("token_id")

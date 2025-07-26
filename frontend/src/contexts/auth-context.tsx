@@ -5,6 +5,7 @@ import {
   useEffect,
   ReactNode,
 } from "react";
+import { ANONYMOUS_USER_ID } from "../constants/auth";
 
 interface User {
   sub: string;
@@ -36,6 +37,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const userData = await response.json();
         setUser(userData);
+        
+        // 匿名ユーザーの場合もログイン済みとして扱う
+        if (userData.sub === ANONYMOUS_USER_ID) {
+          console.info('Running in anonymous mode');
+        }
       } else {
         setUser(null);
       }

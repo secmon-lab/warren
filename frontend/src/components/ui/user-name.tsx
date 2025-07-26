@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { userProfileCache } from "@/lib/user-profile-cache";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ANONYMOUS_USER_ID, ANONYMOUS_USER_NAME } from "@/constants/auth";
+import { UserIcon } from "lucide-react";
 
 interface UserNameProps {
   userID: string;
@@ -20,6 +22,14 @@ export function UserName({ userID, className = "", fallback }: UserNameProps) {
       try {
         setIsLoading(true);
         setError(null);
+
+        // 匿名ユーザーの場合は固定の名前を使用
+        if (userID === ANONYMOUS_USER_ID) {
+          if (mounted) {
+            setName(ANONYMOUS_USER_NAME);
+          }
+          return;
+        }
 
         const profile = await userProfileCache.getUserProfile(userID);
 
@@ -87,6 +97,14 @@ export function useUserName(userID: string): {
       try {
         setIsLoading(true);
         setError(null);
+
+        // 匿名ユーザーの場合は固定の名前を使用
+        if (userID === ANONYMOUS_USER_ID) {
+          if (mounted) {
+            setName(ANONYMOUS_USER_NAME);
+          }
+          return;
+        }
 
         const profile = await userProfileCache.getUserProfile(userID);
 
@@ -162,10 +180,18 @@ export function UserWithAvatar({
       <div className={`flex items-center gap-1 ${className}`} title={error}>
         {showAvatar && (
           <Avatar className={avatarSizeClasses[avatarSize]}>
-            <AvatarImage src={`/api/user/${userID}/icon`} alt={displayName} />
-            <AvatarFallback className="text-xs leading-none">
-              {displayName.charAt(0).toUpperCase()}
-            </AvatarFallback>
+            {userID !== ANONYMOUS_USER_ID ? (
+              <>
+                <AvatarImage src={`/api/user/${userID}/icon`} alt={displayName} />
+                <AvatarFallback className="text-xs leading-none">
+                  {displayName.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </>
+            ) : (
+              <AvatarFallback className="text-xs leading-none">
+                <UserIcon className="h-3 w-3" />
+              </AvatarFallback>
+            )}
           </Avatar>
         )}
         <span className="text-muted-foreground">{displayName}</span>
@@ -177,10 +203,18 @@ export function UserWithAvatar({
     <div className={`flex items-center gap-1 ${className}`}>
       {showAvatar && (
         <Avatar className={avatarSizeClasses[avatarSize]}>
-          <AvatarImage src={`/api/user/${userID}/icon`} alt={displayName} />
-          <AvatarFallback className="text-xs leading-none">
-            {displayName.charAt(0).toUpperCase()}
-          </AvatarFallback>
+          {userID !== ANONYMOUS_USER_ID ? (
+            <>
+              <AvatarImage src={`/api/user/${userID}/icon`} alt={displayName} />
+              <AvatarFallback className="text-xs leading-none">
+                {displayName.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </>
+          ) : (
+            <AvatarFallback className="text-xs leading-none">
+              <UserIcon className="h-3 w-3" />
+            </AvatarFallback>
+          )}
         </Avatar>
       )}
       <span>{displayName}</span>

@@ -292,7 +292,6 @@ func spaHandler(staticFS fs.FS) http.HandlerFunc {
 		// Try to open the file to check if it exists
 		if file, err := staticFS.Open(urlPath); err != nil {
 			// File not found
-			file = nil
 
 			// For SPA routes (not assets), serve index.html for client-side routing
 			// But first check if this looks like an asset request
@@ -319,7 +318,7 @@ func spaHandler(staticFS fs.FS) http.HandlerFunc {
 
 			// For SPA routes, serve index.html
 			if indexFile, err := staticFS.Open("index.html"); err == nil {
-				defer indexFile.Close()
+				defer safe.Close(r.Context(), indexFile)
 				w.Header().Set("Content-Type", "text/html")
 				safe.Copy(r.Context(), w, indexFile)
 				return
@@ -330,7 +329,7 @@ func spaHandler(staticFS fs.FS) http.HandlerFunc {
 			return
 		} else {
 			// File exists, close it and let fileServer handle it
-			file.Close()
+			safe.Close(r.Context(), file)
 		}
 
 		// Set appropriate Content-Type for favicon files

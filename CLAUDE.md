@@ -117,16 +117,30 @@ Test files follow Go conventions (`*_test.go`). The codebase includes:
 
 ## Restrictions and Rules
 
-- In principle, do not trust developers who use this library from outside
-  - Do not export unnecessary methods, structs, and variables
-  - Assume that exposed items will be changed. Never expose fields that would be problematic if changed
-  - Use `export_test.go` for items that need to be exposed for testing purposes
-- When making changes, before finishing the task, always:
-  - Run `go vet ./...`, `go fmt ./...` to format the code
-  - Run `golangci-lint run ./...` to check lint error
-  - Run `gosec -quiet ./...` to check security issue
-  - Run tests to ensure no impact on other code
-- All comment and character literal in source code must be in English
+### Exposure policy
+
+In principle, do not trust developers who use this library from outside
+
+- Do not export unnecessary methods, structs, and variables
+- Assume that exposed items will be changed. Never expose fields that would be problematic if changed
+- Use `export_test.go` for items that need to be exposed for testing purposes
+
+### Check
+
+When making changes, before finishing the task, always:
+- Run `go vet ./...`, `go fmt ./...` to format the code
+- Run `golangci-lint run ./...` to check lint error
+- Run `gosec -quiet ./...` to check security issue
+- Run tests to ensure no impact on other code
+
+### Language
+
+All comment and character literal in source code must be in English
+
+### Testing
+
 - Test files should have `package {name}_test`. Do not use same package name
-- Test must be included in same name test file. (e.g. test for `abc.go` must be in `abc_test.go`)
+- Test MUST be included in same name test file. (e.g. test for `abc.go` must be in `abc_test.go`)
 - Do not build binary. If you need to run, use `go run` command instead
+- Extend timeout duration if the test fails with time out
+- DO NOT use `-short`

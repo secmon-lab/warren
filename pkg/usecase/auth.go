@@ -63,9 +63,16 @@ func (uc *AuthUseCase) GetAuthURL(state string) string {
 	params.Set("redirect_uri", uc.callbackURL)
 	params.Set("response_type", "code")
 	params.Set("state", state)
-	params.Set("team", uc.slackSvc.TeamID())
+	if uc.slackSvc != nil {
+		params.Set("team", uc.slackSvc.TeamID())
+	}
 
 	return "https://slack.com/openid/connect/authorize?" + params.Encode()
+}
+
+// IsNoAuthn returns false for regular AuthUseCase
+func (uc *AuthUseCase) IsNoAuthn() bool {
+	return false
 }
 
 // SlackTokenResponse represents the response from Slack token exchange
