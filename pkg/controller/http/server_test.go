@@ -333,3 +333,179 @@ func TestGraphQLHandler(t *testing.T) {
 		gt.Value(t, alert["title"]).Equal("Test Alert")
 	})
 }
+
+func TestServerWithNoAuthorization(t *testing.T) {
+	t.Run("WithNoAuthorization option sets server field", func(t *testing.T) {
+		repo := repository.NewMemory()
+		uc := usecase.New(usecase.WithRepository(repo))
+
+		// Create a policy that would normally deny the request
+		denyingPolicy := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, path string, input any, output any, opts ...opaq.QueryOption) error {
+				// Always deny
+				if result, ok := output.(*struct {
+					Allow bool `json:"allow"`
+				}); ok {
+					result.Allow = false
+				}
+				return nil
+			},
+		}
+
+		// Create server with both policy and no-authorization
+		srvWithPolicy := server.New(uc,
+			server.WithPolicy(denyingPolicy),
+			server.WithNoAuthorization(true),
+		)
+
+		// Test that request succeeds despite denying policy
+		testData := `{"test": "data"}`
+		req := httptest.NewRequest("POST", "/hooks/alert/raw/test", strings.NewReader(testData))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		srvWithPolicy.ServeHTTP(w, req)
+
+		// Should succeed because authorization is bypassed
+		// The endpoint will return 200 or another success code when processing the alert
+		gt.Value(t, w.Code).Equal(http.StatusOK)
+	})
+
+	t.Run("Without NoAuthorization option authorization is enforced", func(t *testing.T) {
+		repo := repository.NewMemory()
+		uc := usecase.New(usecase.WithRepository(repo))
+
+		// Create a policy that denies the request
+		denyingPolicy := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, path string, input any, output any, opts ...opaq.QueryOption) error {
+				// Always deny
+				if result, ok := output.(*struct {
+					Allow bool `json:"allow"`
+				}); ok {
+					result.Allow = false
+				}
+				return nil
+			},
+		}
+
+		// Create server WITHOUT no-authorization
+		srv := server.New(uc, server.WithPolicy(denyingPolicy))
+
+		// Test that request is denied
+		testData := `{"test": "data"}`
+		req := httptest.NewRequest("POST", "/hooks/alert/raw/test", strings.NewReader(testData))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		srv.ServeHTTP(w, req)
+
+		// Should be forbidden because authorization is enforced
+		gt.Value(t, w.Code).Equal(http.StatusForbidden)
+	})
+
+	t.Run("E2E flow with no-authorization flag", func(t *testing.T) {
+		// Setup
+		repo := repository.NewMemory()
+		uc := usecase.New(usecase.WithRepository(repo))
+
+		// Create a policy that would normally deny all requests
+		denyAllPolicy := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, path string, input any, output any, opts ...opaq.QueryOption) error {
+				if result, ok := output.(*struct {
+					Allow bool `json:"allow"`
+				}); ok {
+					result.Allow = false
+				}
+				return nil
+			},
+		}
+
+		// Create server with no-authorization flag
+		srv := server.New(uc,
+			server.WithPolicy(denyAllPolicy),
+			server.WithNoAuthorization(true), // This should bypass the policy
+		)
+
+		// Test various endpoints
+		testCases := []struct {
+			name     string
+			method   string
+			path     string
+			body     string
+			wantCode int
+		}{
+			{
+				name:     "alert endpoint accessible",
+				method:   "POST",
+				path:     "/hooks/alert/raw/test",
+				body:     `{"test": "data"}`,
+				wantCode: http.StatusOK,
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				var body io.Reader
+				if tc.body != "" {
+					body = strings.NewReader(tc.body)
+				}
+				req := httptest.NewRequest(tc.method, tc.path, body)
+				if tc.body != "" {
+					req.Header.Set("Content-Type", "application/json")
+				}
+				// Add minimal auth context
+				ctx := auth.WithHTTPRequest(req.Context(), &auth.HTTPRequest{
+					Method: tc.method,
+					Path:   tc.path,
+					Body:   tc.body,
+					Header: req.Header,
+				})
+				req = req.WithContext(ctx)
+
+				w := httptest.NewRecorder()
+				srv.ServeHTTP(w, req)
+
+				gt.Value(t, w.Code).Equal(tc.wantCode)
+			})
+		}
+	})
+
+	t.Run("E2E flow with authorization enforced", func(t *testing.T) {
+		// Setup
+		repo := repository.NewMemory()
+		uc := usecase.New(usecase.WithRepository(repo))
+
+		// Create a policy that denies all requests
+		denyAllPolicy := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, path string, input any, output any, opts ...opaq.QueryOption) error {
+				if result, ok := output.(*struct {
+					Allow bool `json:"allow"`
+				}); ok {
+					result.Allow = false
+				}
+				return nil
+			},
+		}
+
+		// Create server WITHOUT no-authorization flag
+		srv := server.New(uc, server.WithPolicy(denyAllPolicy))
+
+		// Test that requests are denied
+		testData := `{"test": "data"}`
+		req := httptest.NewRequest("POST", "/hooks/alert/raw/test", strings.NewReader(testData))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := auth.WithHTTPRequest(req.Context(), &auth.HTTPRequest{
+			Method: "POST",
+			Path:   "/hooks/alert/raw/test",
+			Body:   testData,
+			Header: req.Header,
+		})
+		req = req.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		srv.ServeHTTP(w, req)
+
+		// Should be forbidden
+		gt.Value(t, w.Code).Equal(http.StatusForbidden)
+	})
+}
