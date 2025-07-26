@@ -489,7 +489,7 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 
 	// Ensure output directory exists
 	outputDir := filepath.Dir(outputPath)
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0750); err != nil {
 		return goerr.Wrap(err, "failed to create output directory", goerr.V("dir", outputDir))
 	}
 
@@ -662,11 +662,13 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 			}
 			return nil, goerr.Wrap(err, "failed to dry run query")
 		}
-		if job.LastStatus().Statistics.TotalBytesProcessed < 0 {
+		totalBytes := job.LastStatus().Statistics.TotalBytesProcessed
+		if totalBytes < 0 {
 			return nil, goerr.New("invalid negative bytes processed",
-				goerr.V("bytes_processed", job.LastStatus().Statistics.TotalBytesProcessed))
+				goerr.V("bytes_processed", totalBytes))
 		}
-		if uint64(job.LastStatus().Statistics.TotalBytesProcessed) > x.scanLimit {
+		// Safe conversion after negative check
+		if totalBytes > 0 && uint64(totalBytes) > x.scanLimit {
 			return nil, goerr.New("query scan size exceeds limit",
 				goerr.V("scan_size", job.LastStatus().Statistics.TotalBytesProcessed),
 				goerr.V("scan_limit", x.scanLimit))

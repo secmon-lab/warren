@@ -10,9 +10,10 @@ import (
 )
 
 type WebUI struct {
-	clientID     string
-	clientSecret string
-	frontendURL  string
+	clientID         string
+	clientSecret     string
+	frontendURL      string
+	noAuthentication bool // TODO: Rename to noAuthn after authorization mode is added
 }
 
 func (x *WebUI) Flags() []cli.Flag {
@@ -38,6 +39,14 @@ func (x *WebUI) Flags() []cli.Flag {
 			Sources:     cli.EnvVars("WARREN_FRONTEND_URL"),
 			Destination: &x.frontendURL,
 		},
+		&cli.BoolFlag{
+			Name:        "no-authentication",
+			Usage:       "Disable authentication (for local development only)",
+			Category:    "Web UI",
+			Sources:     cli.EnvVars("WARREN_NO_AUTHENTICATION"),
+			Destination: &x.noAuthentication,
+			Aliases:     []string{"no-authn"}, // Short alias
+		},
 	}
 }
 
@@ -46,11 +55,12 @@ func (x WebUI) LogValue() slog.Value {
 		slog.String("client-id.len", x.clientID),
 		slog.Int("client-secret.len", len(x.clientSecret)),
 		slog.String("frontend-url", x.frontendURL),
+		slog.Bool("no-authn", x.noAuthentication),
 	)
 }
 
 func (x *WebUI) IsConfigured() bool {
-	return x.clientID != "" && x.clientSecret != "" && x.frontendURL != ""
+	return (x.clientID != "" && x.clientSecret != "" && x.frontendURL != "") || x.noAuthentication
 }
 
 func (x *WebUI) GetCallbackURL() string {
@@ -65,10 +75,18 @@ func (x *WebUI) GetFrontendURL() string {
 }
 
 func (x *WebUI) Configure(repo interfaces.Repository, slackSvc *slack.Service) (usecase.AuthUseCaseInterface, error) {
-	if !x.IsConfigured() {
-		return nil, nil // Return nil if not configured (authentication is optional)
+	// Check if Slack authentication is configured
+	if x.clientID != "" && x.clientSecret != "" {
+		if x.noAuthentication {
+			slog.Warn("--no-authentication flag is ignored because Slack authentication is configured")
+		}
+		callbackURL := x.GetCallbackURL()
+		return usecase.NewAuthUseCase(repo, slackSvc, x.clientID, x.clientSecret, callbackURL), nil
+	} else if x.noAuthentication {
+		slog.Warn("Authentication is disabled. This mode is for local development only.")
+		return usecase.NewNoAuthnUseCase(repo), nil
 	}
 
-	callbackURL := x.GetCallbackURL()
-	return usecase.NewAuthUseCase(repo, slackSvc, x.clientID, x.clientSecret, callbackURL), nil
+	// No authentication configured
+	return nil, nil
 }

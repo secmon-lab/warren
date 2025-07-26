@@ -330,7 +330,7 @@ func spaHandler(staticFS fs.FS) http.HandlerFunc {
 			return
 		} else {
 			// File exists, close it and let fileServer handle it
-			file.Close()
+			_ = file.Close()
 		}
 
 		// Set appropriate Content-Type for favicon files
