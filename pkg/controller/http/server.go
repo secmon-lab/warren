@@ -292,7 +292,6 @@ func spaHandler(staticFS fs.FS) http.HandlerFunc {
 		// Try to open the file to check if it exists
 		if file, err := staticFS.Open(urlPath); err != nil {
 			// File not found
-			file = nil
 
 			// For SPA routes (not assets), serve index.html for client-side routing
 			// But first check if this looks like an asset request
