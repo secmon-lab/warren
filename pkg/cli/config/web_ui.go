@@ -18,6 +18,11 @@ type WebUI struct {
 	noAuthentication bool
 }
 
+// SetFrontendURL sets the frontend URL
+func (x *WebUI) SetFrontendURL(url string) {
+	x.frontendURL = url
+}
+
 func (x *WebUI) Flags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
