@@ -672,7 +672,7 @@ func (x *generateConfigTool) Run(ctx context.Context, name string, args map[stri
 				goerr.V("bytes_processed", totalBytes))
 		}
 		// Safe conversion after negative check
-		if totalBytes > 0 && uint64(totalBytes) > x.scanLimit {
+	if totalBytes > 0 && uint64(totalBytes) > x.scanLimit {
 			return nil, goerr.New("query scan size exceeds limit",
 				goerr.V("scan_size", job.LastStatus().Statistics.TotalBytesProcessed),
 				goerr.V("scan_limit", x.scanLimit))
