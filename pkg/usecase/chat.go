@@ -95,7 +95,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	}
 
 	postWarrenMessage := func(ctx context.Context, message string) {
-if !x.IsSlackEnabled() || !target.HasSlackThread() {
+		if !x.IsSlackEnabled() || !target.HasSlackThread() {
 			return
 		}
 		if strings.TrimSpace(message) == "" {

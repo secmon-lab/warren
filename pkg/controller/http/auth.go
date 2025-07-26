@@ -26,48 +26,6 @@ func generateState() (string, error) {
 // authLoginHandler handles the OAuth login initiation
 func authLoginHandler(authUC AuthUseCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Check if this is dev mode (by checking if authUC is AuthUseCaseForDev)
-		logging.Default().Info("login as dev user")
-
-		if devAuthUC, ok := authUC.(*usecase.AuthUseCaseForDev); ok {
-			// Dev mode: create token directly and set cookies
-			token, err := devAuthUC.DevModeAuth(r.Context())
-			if err != nil {
-				logging.From(r.Context()).Error("Dev mode auth failed", logging.ErrAttr(err))
-				http.Error(w, "Dev authentication failed", http.StatusInternalServerError)
-				return
-			}
-
-			// Set authentication cookies
-			tokenIDCookie := &http.Cookie{
-				Name:     "token_id",
-				Value:    token.ID.String(),
-				Path:     "/",
-				HttpOnly: true,
-				Secure:   r.TLS != nil,
-				SameSite: http.SameSiteLaxMode,
-				Expires:  token.ExpiresAt,
-			}
-
-			tokenSecretCookie := &http.Cookie{
-				Name:     "token_secret",
-				Value:    token.Secret.String(),
-				Path:     "/",
-				HttpOnly: true,
-				Secure:   r.TLS != nil,
-				SameSite: http.SameSiteLaxMode,
-				Expires:  token.ExpiresAt,
-			}
-
-			http.SetCookie(w, tokenIDCookie)
-			http.SetCookie(w, tokenSecretCookie)
-
-			// Redirect to dashboard
-			http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-			return
-		}
-
-		// Normal OAuth flow for production
 		// Generate state parameter to prevent CSRF
 		state, err := generateState()
 		if err != nil {
