@@ -504,7 +504,11 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 	if err != nil {
 		return err
 	}
-	defer bqClient.Close()
+	defer func() {
+		if err := bqClient.Close(); err != nil {
+			logger.Error("failed to close BigQuery client", logging.ErrAttr(err))
+		}
+	}()
 
 	llmClient, err := gemini.New(ctx, cfg.geminiProjectID, cfg.geminiLocation)
 	if err != nil {

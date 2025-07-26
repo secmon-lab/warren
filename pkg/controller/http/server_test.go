@@ -49,16 +49,16 @@ var snsPem []byte
 
 func TestValidateGoogleIDToken(t *testing.T) {
 	vars := test.NewEnvVars(t, "TEST_GOOGLE_ID_TOKEN", "TEST_GOOGLE_ID_TOKEN_EMAIL")
-	
+
 	// Check if the token is expired
 	tokenString := vars.Get("TEST_GOOGLE_ID_TOKEN")
-	
+
 	// Parse JWT without verification to check expiration
 	token, err := jwt.ParseInsecure([]byte(tokenString))
 	if err != nil {
 		t.Skipf("Failed to parse JWT token: %v", err)
 	}
-	
+
 	// Check expiration
 	if token.Expiration().Before(time.Now()) {
 		t.Skipf("Google ID token has expired at %v, skipping test", token.Expiration())
