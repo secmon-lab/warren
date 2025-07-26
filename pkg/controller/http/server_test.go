@@ -368,7 +368,7 @@ func TestServerWithNoAuthorization(t *testing.T) {
 
 		// Should succeed because authorization is bypassed
 		// The endpoint will return 200 or another success code when processing the alert
-		gt.Value(t, w.Code).NotEqual(http.StatusForbidden)
+		gt.Value(t, w.Code).Equal(http.StatusOK)
 	})
 
 	t.Run("Without NoAuthorization option authorization is enforced", func(t *testing.T) {
