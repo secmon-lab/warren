@@ -140,7 +140,25 @@ All comment and character literal in source code must be in English
 ### Testing
 
 - Test files should have `package {name}_test`. Do not use same package name
-- Test MUST be included in same name test file. (e.g. test for `abc.go` must be in `abc_test.go`)
+- **🚨 CRITICAL RULE: Test MUST be included in same name test file. (e.g. test for `abc.go` must be in `abc_test.go`) 🚨**
+  - **NEVER create test files like:**
+    - ❌ `e2e_test.go`
+    - ❌ `integration_test.go`
+    - ❌ `feature_xyz_test.go`
+    - ❌ `log_test.go` (unless there's a `log.go`)
+  - **ALWAYS match the source file name:**
+    - ✅ `server.go` → `server_test.go`
+    - ✅ `middleware.go` → `middleware_test.go`
+    - ✅ `alert.go` → `alert_test.go`
+  - **Before creating ANY test, ask: "Which source file does this test belong to?"**
+  - **If testing multiple files' interaction, put the test in the primary file's test**
 - Do not build binary. If you need to run, use `go run` command instead
 - Extend timeout duration if the test fails with time out
 - DO NOT use `-short`
+
+### Test File Checklist (Use this EVERY time)
+Before creating or modifying tests:
+1. ✓ Is there a corresponding source file for this test file?
+2. ✓ Does the test file name match exactly? (`xyz.go` → `xyz_test.go`)
+3. ✓ Are all tests for a source file in ONE test file?
+4. ✓ No standalone feature/e2e/integration test files?
