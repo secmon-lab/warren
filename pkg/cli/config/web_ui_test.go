@@ -69,7 +69,7 @@ func TestWebUIConfig(t *testing.T) {
 		app := &cli.Command{
 			Flags: cfg.Flags(),
 			Action: func(ctx context.Context, c *cli.Command) error {
-				authUC, err := cfg.Configure(repo, nil)
+				authUC, err := cfg.Configure(t.Context(), repo, nil)
 				gt.NoError(t, err)
 				gt.NotNil(t, authUC)
 
@@ -98,7 +98,7 @@ func TestWebUIConfig(t *testing.T) {
 		app := &cli.Command{
 			Flags: cfg.Flags(),
 			Action: func(ctx context.Context, c *cli.Command) error {
-				authUC, err := cfg.Configure(repo, nil)
+				authUC, err := cfg.Configure(t.Context(), repo, nil)
 				gt.NoError(t, err)
 				gt.NotNil(t, authUC)
 
@@ -118,7 +118,7 @@ func TestWebUIConfig(t *testing.T) {
 		cfg := &config.WebUI{}
 		repo := repository.NewMemory()
 
-		authUC, err := cfg.Configure(repo, nil)
+		authUC, err := cfg.Configure(t.Context(), repo, nil)
 		gt.NoError(t, err)
 		gt.Nil(t, authUC)
 	})

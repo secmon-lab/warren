@@ -1,11 +1,13 @@
 package config
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/usecase"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
 
@@ -74,7 +76,7 @@ func (x *WebUI) GetFrontendURL() string {
 	return x.frontendURL
 }
 
-func (x *WebUI) Configure(repo interfaces.Repository, slackSvc *slack.Service) (usecase.AuthUseCaseInterface, error) {
+func (x *WebUI) Configure(ctx context.Context, repo interfaces.Repository, slackSvc *slack.Service) (usecase.AuthUseCaseInterface, error) {
 	// Check if Slack authentication is configured
 	if x.clientID != "" && x.clientSecret != "" {
 		if x.noAuthentication {
@@ -83,7 +85,7 @@ func (x *WebUI) Configure(repo interfaces.Repository, slackSvc *slack.Service) (
 		callbackURL := x.GetCallbackURL()
 		return usecase.NewAuthUseCase(repo, slackSvc, x.clientID, x.clientSecret, callbackURL), nil
 	} else if x.noAuthentication {
-		slog.Warn("Authentication is disabled. This mode is for local development only.")
+		logging.From(ctx).Warn("Authentication is disabled. This mode is for local development only.")
 		return usecase.NewNoAuthnUseCase(repo), nil
 	}
 

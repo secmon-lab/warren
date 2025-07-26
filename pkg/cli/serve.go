@@ -194,7 +194,7 @@ func cmdServe() *cli.Command {
 			}
 
 			// Add AuthUseCase if authentication options are provided
-			authUC, err := webUICfg.Configure(firestore, slackSvc)
+			authUC, err := webUICfg.Configure(ctx, firestore, slackSvc)
 			if err != nil {
 				return err
 			}
