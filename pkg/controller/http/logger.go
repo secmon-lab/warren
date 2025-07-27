@@ -1,9 +1,12 @@
 package http
 
 import (
+	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -18,6 +21,15 @@ type statusResponseWriter struct {
 func (w *statusResponseWriter) WriteHeader(code int) {
 	w.status = code
 	w.ResponseWriter.WriteHeader(code)
+}
+
+// Hijack implements the http.Hijacker interface for WebSocket support
+func (w *statusResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("response writer does not support hijacking")
+	}
+	return hijacker.Hijack()
 }
 
 func loggingMiddleware(next http.Handler) http.Handler {

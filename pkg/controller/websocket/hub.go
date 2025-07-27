@@ -124,6 +124,22 @@ func (h *Hub) registerClient(client *Client) {
 
 	// Check if ticket already has too many clients
 	if clients, exists := h.tickets[client.ticketID]; exists {
+		// Remove existing connections from the same user
+		for existingClient := range clients {
+			if existingClient.userID == client.userID {
+				logger.Info("Replacing existing connection for user",
+					"ticket_id", client.ticketID,
+					"user_id", client.userID)
+				delete(clients, existingClient)
+				existingClient.mu.Lock()
+				if existingClient.send != nil {
+					close(existingClient.send)
+					existingClient.send = nil
+				}
+				existingClient.mu.Unlock()
+			}
+		}
+		
 		if len(clients) >= maxClientsPerTicket {
 			logger.Warn("Maximum clients reached for ticket",
 				"ticket_id", client.ticketID,

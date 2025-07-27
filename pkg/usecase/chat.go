@@ -60,7 +60,19 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	if historyRecord != nil {
 		history, err = storageSvc.GetHistory(ctx, target.ID, historyRecord.ID)
 		if err != nil {
-			return goerr.Wrap(err, "failed to get history data")
+			logger.Warn("failed to get history data, starting with new history", "error", err)
+			history = nil // Start with new history
+		} else {
+			// Test if history is compatible with current gollem version
+			if history != nil {
+				// Try to validate history by attempting conversion
+				if _, err := history.ToGemini(); err != nil {
+					logger.Warn("history version incompatible, starting with new history", 
+						"error", err,
+						"history_id", historyRecord.ID)
+					history = nil // Start with new history
+				}
+			}
 		}
 	}
 
@@ -294,18 +306,19 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	if newHistory == nil {
 		return goerr.New("failed to get history from plan session")
 	}
+	if newHistory.Version > 0 {
+		newRecord := ticket.NewHistory(ctx, target.ID)
 
-	newRecord := ticket.NewHistory(ctx, target.ID)
+		if err := storageSvc.PutHistory(ctx, target.ID, newRecord.ID, newHistory); err != nil {
+			return goerr.Wrap(err, "failed to put history")
+		}
 
-	if err := storageSvc.PutHistory(ctx, target.ID, newRecord.ID, newHistory); err != nil {
-		return goerr.Wrap(err, "failed to put history")
+		if err := x.repository.PutHistory(ctx, target.ID, &newRecord); err != nil {
+			return goerr.Wrap(err, "failed to put history")
+		}
+
+		logger.Debug("history saved", "history_id", newRecord.ID, "ticket_id", target.ID)
 	}
-
-	if err := x.repository.PutHistory(ctx, target.ID, &newRecord); err != nil {
-		return goerr.Wrap(err, "failed to put history")
-	}
-
-	logger.Debug("history saved", "history_id", newRecord.ID, "ticket_id", target.ID)
 
 	return nil
 }

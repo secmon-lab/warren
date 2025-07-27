@@ -198,9 +198,7 @@ func New(uc UseCase, opts ...Options) *Server {
 	if s.websocketCtrl != nil {
 		r.Route("/ws", func(r chi.Router) {
 			// Apply authentication middleware to WebSocket endpoints
-			if s.authUC != nil {
-				r.Use(authMiddleware(s.authUC))
-			}
+			r.Use(authMiddleware(s.authUC))
 			r.Use(authorizeWithPolicy(s.policy, s.noAuthorization))
 
 			r.Route("/chat", func(r chi.Router) {
