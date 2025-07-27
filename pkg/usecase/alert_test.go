@@ -932,3 +932,199 @@ func TestBindAlertsToTicket_MetadataUpdateBasic(t *testing.T) {
 	gt.Value(t, updatedTicket.Metadata.Title).Equal("Updated with New Alert Info")
 	gt.Value(t, updatedTicket.Metadata.Description).Equal("Updated description")
 }
+
+
+func TestHandleAlert_DefaultPolicyMode(t *testing.T) {
+	// Test case: No policy package exists, default mode (strictAlert=false)
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			return "test-channel", "test-thread", nil
+		},
+		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			return &slack_sdk.FileSummary{}, nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
+	}
+
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+	gt.NoError(t, err)
+
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{
+							`{"title": "Test Alert", "description": "Test Description"}`,
+						},
+					}, nil
+				},
+			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
+			return [][]float64{{0.1, 0.2, 0.3}}, nil
+		},
+	}
+
+	// PolicyClient that returns ErrNoEvalResult (package not found)
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			// Return ErrNoEvalResult to simulate missing package
+			return opaq.ErrNoEvalResult
+		},
+	}
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithLLMClient(llmMock),
+		usecase.WithPolicyClient(policyMock),
+		usecase.WithStrictAlert(false), // Default mode
+	)
+
+	// Call HandleAlert with a schema that doesn't have a policy
+	alerts, err := uc.HandleAlert(ctx, "nonexistent-schema", map[string]any{
+		"test": "data",
+	})
+
+	// Should not error in default mode
+	gt.NoError(t, err)
+	gt.V(t, len(alerts)).Equal(1)
+
+	// Check that the alert was created with default handling
+	createdAlert := alerts[0]
+	gt.V(t, createdAlert.Schema).Equal(types.AlertSchema("nonexistent-schema"))
+	gt.V(t, createdAlert.Metadata.Title).Equal("Test Alert")
+	gt.V(t, createdAlert.Metadata.Description).Equal("Test Description")
+	gt.V(t, createdAlert.Data).Equal(map[string]any{"test": "data"})
+}
+
+func TestHandleAlert_StrictMode(t *testing.T) {
+	// Test case: No policy package exists, strict mode (strictAlert=true)
+	ctx := context.Background()
+
+	// PolicyClient that returns ErrNoEvalResult (package not found)
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			// Return ErrNoEvalResult to simulate missing package
+			return opaq.ErrNoEvalResult
+		},
+	}
+
+	uc := usecase.New(
+		usecase.WithRepository(repository.NewMemory()),
+		usecase.WithSlackNotifier(usecase.NewDiscardSlackNotifier()),
+		usecase.WithLLMClient(&gollem_mock.LLMClientMock{}),
+		usecase.WithPolicyClient(policyMock),
+		usecase.WithStrictAlert(true), // Strict mode
+	)
+
+	// Call HandleAlert with a schema that doesn't have a policy
+	alerts, err := uc.HandleAlert(ctx, "nonexistent-schema", map[string]any{
+		"test": "data",
+	})
+
+	// Should error in strict mode
+	gt.Error(t, err)
+	gt.V(t, alerts).Nil()
+	gt.S(t, err.Error()).Contains("no policy package found")
+}
+
+func TestHandleAlert_ExistingPolicyUnchanged(t *testing.T) {
+	// Test case: Policy package exists, behavior should be unchanged
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			return "test-channel", "test-thread", nil
+		},
+		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			return &slack_sdk.FileSummary{}, nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
+	}
+
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+	gt.NoError(t, err)
+
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{
+							`{"title": "Policy Alert", "description": "Policy Description"}`,
+						},
+					}, nil
+				},
+			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
+			return [][]float64{{0.1, 0.2, 0.3}}, nil
+		},
+	}
+
+	// PolicyClient that returns success (package exists)
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			if queryResult, ok := result.(*alert.QueryOutput); ok {
+				queryResult.Alert = []alert.Metadata{
+					{
+						Title:       "Policy Title",
+						Description: "Policy Description",
+					},
+				}
+			}
+			return nil
+		},
+	}
+
+	// Test both modes - behavior should be the same when policy exists
+	for _, strictMode := range []bool{true, false} {
+		name := "strictAlert=false"
+		if strictMode {
+			name = "strictAlert=true"
+		}
+		t.Run(name, func(t *testing.T) {
+			uc := usecase.New(
+				usecase.WithRepository(repo),
+				usecase.WithSlackNotifier(slackSvc),
+				usecase.WithLLMClient(llmMock),
+				usecase.WithPolicyClient(policyMock),
+				usecase.WithStrictAlert(strictMode),
+			)
+
+			alerts, err := uc.HandleAlert(ctx, "existing-schema", map[string]any{
+				"test": "data",
+			})
+
+			// Should succeed regardless of strict mode when policy exists
+			gt.NoError(t, err)
+			gt.V(t, len(alerts)).Equal(1)
+
+			// Check that the alert was created from policy
+			createdAlert := alerts[0]
+			gt.V(t, createdAlert.Schema).Equal(types.AlertSchema("existing-schema"))
+			// Title should come from policy (not overwritten by LLM in this case)
+			gt.V(t, createdAlert.Metadata.Title).Equal("Policy Title")
+		})
+	}
+}

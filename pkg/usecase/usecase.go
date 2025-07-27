@@ -38,6 +38,7 @@ type UseCases struct {
 	actionLimit   int
 	findingLimit  int
 	storagePrefix string
+	strictAlert   bool
 }
 
 var _ interfaces.AlertUsecases = &UseCases{}
@@ -119,6 +120,12 @@ func WithFindingLimit(findingLimit int) Option {
 func WithStoragePrefix(storagePrefix string) Option {
 	return func(u *UseCases) {
 		u.storagePrefix = storagePrefix
+	}
+}
+
+func WithStrictAlert(strict bool) Option {
+	return func(u *UseCases) {
+		u.strictAlert = strict
 	}
 }
 

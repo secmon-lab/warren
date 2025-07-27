@@ -39,3 +39,7 @@ func (x *Policy) Configure() (*opaq.Client, error) {
 
 	return client, nil
 }
+
+func (x *Policy) HasPolicies() bool {
+	return len(x.filePaths) > 0
+}
