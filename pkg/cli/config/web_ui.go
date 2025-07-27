@@ -18,6 +18,11 @@ type WebUI struct {
 	noAuthentication bool
 }
 
+// SetFrontendURL sets the frontend URL
+func (x *WebUI) SetFrontendURL(url string) {
+	x.frontendURL = url
+}
+
 func (x *WebUI) Flags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
@@ -85,7 +90,9 @@ func (x *WebUI) Configure(ctx context.Context, repo interfaces.Repository, slack
 		callbackURL := x.GetCallbackURL()
 		return usecase.NewAuthUseCase(repo, slackSvc, x.clientID, x.clientSecret, callbackURL), nil
 	} else if x.noAuthentication {
-		logging.From(ctx).Warn("Authentication is disabled. This mode is for local development only.")
+		logging.From(ctx).Warn("⚠️  Authentication is disabled",
+			"mode", "--no-authentication",
+			"recommendation", "This mode is for local development only")
 		return usecase.NewNoAuthnUseCase(repo), nil
 	}
 

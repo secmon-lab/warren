@@ -385,7 +385,7 @@ func authMiddleware(authUC AuthUseCase) func(http.Handler) http.Handler {
 func authorizeWithPolicy(policy interfaces.PolicyClient, noAuthorization bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// Bypass authorization check if --no-authorization flag is set
+			// Bypass authorization check if --no-authorization flag is set
 			if noAuthorization {
 				logging.From(r.Context()).Debug("authorization check bypassed due to --no-authorization flag")
 				next.ServeHTTP(w, r)

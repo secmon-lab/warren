@@ -2,10 +2,12 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -17,6 +19,27 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
+
+// generateFrontendURL generates a frontend URL from the server address
+func generateFrontendURL(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		// This could be an address without a port, or just a port like ":8080".
+		if strings.HasPrefix(addr, ":") {
+			// Port only format (e.g., ":8080")
+			return fmt.Sprintf("http://localhost%s", addr)
+		}
+		// For other malformed addresses, just prepend http://
+		return fmt.Sprintf("http://%s", addr)
+	}
+
+	// If host is empty (e.g. from ":8080"), "0.0.0.0", or "::" (unspecified IPv6), replace with localhost.
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "localhost"
+	}
+
+	return fmt.Sprintf("http://%s", net.JoinHostPort(host, port))
+}
 
 func cmdServe() *cli.Command {
 	var (
@@ -49,6 +72,7 @@ func cmdServe() *cli.Command {
 				Usage:       "Enable GraphQL endpoint",
 				Category:    "GraphQL",
 				Sources:     cli.EnvVars("WARREN_ENABLE_GRAPHQL"),
+				Value:       true,
 				Destination: &enableGraphQL,
 			},
 			&cli.BoolFlag{
@@ -84,6 +108,15 @@ func cmdServe() *cli.Command {
 		Usage:   "Run server",
 		Flags:   flags,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
+			// Auto-generate frontend URL if not set
+			if webUICfg.GetFrontendURL() == "" {
+				generatedURL := generateFrontendURL(addr)
+				webUICfg.SetFrontendURL(generatedURL)
+				logging.Default().Warn("⚠️  Frontend URL is automatically set",
+					"auto-generated-url", generatedURL,
+					"recommendation", "For production use, please explicitly set --frontend-url")
+			}
+
 			logging.Default().Info("starting server",
 				"addr", addr,
 				"enableGraphQL", enableGraphQL,
@@ -219,7 +252,8 @@ func cmdServe() *cli.Command {
 			if authUC != nil {
 				serverOptions = append(serverOptions, server.WithAuthUseCase(authUC))
 			} else {
-				logging.From(ctx).Warn("Authentication is not configured, Web UI will not work.")
+				// Authentication is required for WebUI
+				return goerr.New("WebUI requires authentication configuration. Please set either --slack-client-id/--slack-client-secret or --no-authentication flag")
 			}
 
 			httpServer := http.Server{
