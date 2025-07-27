@@ -242,3 +242,78 @@ func TestHub_ContextCancellation(t *testing.T) {
 	// (no panic expected)
 	gt.Value(t, true).Equal(true) // Test passes if no panic occurs
 }
+
+func TestHub_ErrorHandling_Creation(t *testing.T) {
+	// Test that Hub can be created and closed without errors
+	ctx := context.Background()
+
+	hub := websocket_ctrl.NewHub(ctx)
+	gt.Value(t, hub).NotNil()
+
+	go hub.Run()
+
+	// Close should not cause any errors
+	err := hub.Close()
+	gt.NoError(t, err)
+}
+
+func TestHub_ErrorHandling_Operations(t *testing.T) {
+	// Test Hub operations and error scenarios
+	ctx := context.Background()
+
+	hub := websocket_ctrl.NewHub(ctx)
+	go hub.Run()
+	defer hub.Close()
+
+	// Try to get client count for non-existent ticket
+	count := hub.GetClientCount(types.TicketID("non-existent"))
+	gt.Value(t, count).Equal(0) // Should return 0 for non-existent tickets
+
+	// Try to broadcast to non-existent ticket
+	// This should not cause a panic
+	hub.BroadcastToTicket(types.TicketID("non-existent"), []byte("test message"))
+}
+
+func TestHub_ConcurrentOperations(t *testing.T) {
+	// Test concurrent operations on Hub
+	ctx := context.Background()
+
+	hub := websocket_ctrl.NewHub(ctx)
+	go hub.Run()
+	defer hub.Close()
+
+	// Start multiple goroutines doing operations concurrently
+	done := make(chan bool, 3)
+
+	// Goroutine 1: Try to get client counts
+	go func() {
+		for i := 0; i < 10; i++ {
+			hub.GetClientCount(types.TicketID("test-ticket"))
+		}
+		done <- true
+	}()
+
+	// Goroutine 2: Try to broadcast
+	go func() {
+		for i := 0; i < 10; i++ {
+			hub.BroadcastToTicket(types.TicketID("test-ticket"), []byte("test message"))
+		}
+		done <- true
+	}()
+
+	// Goroutine 3: Try to send status messages
+	go func() {
+		for i := 0; i < 10; i++ {
+			_ = hub.SendStatusToTicket(types.TicketID("test-ticket"), "test status")
+		}
+		done <- true
+	}()
+
+	// Wait for all goroutines to complete
+	for i := 0; i < 3; i++ {
+		<-done
+	}
+
+	// Hub should still be functional
+	gt.Value(t, hub).NotNil()
+}

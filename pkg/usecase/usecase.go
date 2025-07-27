@@ -27,7 +27,6 @@ type UseCases struct {
 	repository      interfaces.Repository
 	storageClient   interfaces.StorageClient
 	policyClient    interfaces.PolicyClient
-	chatNotifier    interfaces.ChatNotifier // Add chat notifier for WebSocket support
 
 	tools []gollem.ToolSet
 
@@ -127,12 +126,6 @@ func WithStoragePrefix(storagePrefix string) Option {
 func WithStrictAlert(strict bool) Option {
 	return func(u *UseCases) {
 		u.strictAlert = strict
-	}
-}
-
-func WithChatNotifier(notifier interfaces.ChatNotifier) Option {
-	return func(u *UseCases) {
-		u.chatNotifier = notifier
 	}
 }
 

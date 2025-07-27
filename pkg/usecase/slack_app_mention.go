@@ -12,6 +12,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
+// Note: slackResponder has been removed in favor of using msg.With context-based approach
+
 // HandleSlackAppMention handles a slack app mention event. It will dispatch a slack action to the alert.
 func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Message) error {
 	logger := logging.From(ctx)
@@ -65,6 +67,26 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 			msg.Notify(ctx, "😣 Please create a ticket first. I will not work without a ticket.")
 			return nil
 		}
+
+		// Setup Slack-specific message handlers using msg.With
+		threadSvc := uc.slackNotifier.NewThread(slackMsg.Thread())
+
+		notifyFunc := func(ctx context.Context, message string) {
+			if err := threadSvc.PostComment(ctx, message); err != nil {
+				logging.From(ctx).Error("failed to post message to slack", "error", err)
+			}
+		}
+
+		traceFunc := func(ctx context.Context, message string) func(context.Context, string) {
+			return func(ctx context.Context, traceMsg string) {
+				if err := threadSvc.PostComment(ctx, traceMsg); err != nil {
+					logging.From(ctx).Error("failed to post trace to slack", "error", err)
+				}
+			}
+		}
+
+		// Setup context with Slack-specific message handlers
+		ctx = msg.With(ctx, notifyFunc, traceFunc)
 
 		// Pass user-enriched context to chat function
 		return uc.Chat(ctx, ticket, mention.Message)

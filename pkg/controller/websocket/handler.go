@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -14,33 +15,69 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
+// Note: webSocketResponder has been removed in favor of using msg.With context-based approach
+
 // Handler handles WebSocket connections for chat functionality
 type Handler struct {
-	hub        *Hub
-	repository interfaces.Repository
-	useCases   *usecase.UseCases
-	upgrader   websocket.Upgrader
+	hub         *Hub
+	repository  interfaces.Repository
+	useCases    *usecase.UseCases
+	upgrader    websocket.Upgrader
+	frontendURL string
 }
 
 // NewHandler creates a new WebSocket handler
 func NewHandler(hub *Hub, repository interfaces.Repository, useCases *usecase.UseCases) *Handler {
-	return &Handler{
+	h := &Handler{
 		hub:        hub,
 		repository: repository,
 		useCases:   useCases,
-		upgrader: websocket.Upgrader{
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
-			CheckOrigin: func(r *http.Request) bool {
-				// In production, implement proper origin checking
-				// For now, allow all origins for development
-				return true
-			},
-		},
 	}
+	h.setupUpgrader()
+	return h
+}
+
+// WithFrontendURL sets the frontend URL for origin checking
+func (h *Handler) WithFrontendURL(url string) *Handler {
+	h.frontendURL = url
+	h.setupUpgrader()
+	return h
+}
+
+// setupUpgrader configures the WebSocket upgrader with appropriate origin checking
+func (h *Handler) setupUpgrader() {
+	h.upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     h.checkOrigin,
+	}
+}
+
+// checkOrigin validates the request origin for CSWH protection
+func (h *Handler) checkOrigin(r *http.Request) bool {
+	// If no frontend URL is configured, deny all connections for security
+	if h.frontendURL == "" {
+		return false
+	}
+
+	// Parse the configured frontend URL
+	frontendOrigin := h.frontendURL
+	// Remove trailing slash if present
+	frontendOrigin = strings.TrimSuffix(frontendOrigin, "/")
+
+	// Get the request origin
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		// No origin header means same-origin request, which should be allowed
+		return true
+	}
+
+	// Check if the origin matches the configured frontend URL
+	return origin == frontendOrigin
 }
 
 const (
@@ -311,8 +348,7 @@ func (h *Handler) handleChatMessage(client *Client, message *websocket_model.Cha
 		return goerr.Wrap(err, "failed to broadcast message")
 	}
 
-	// Process the message with Chat UseCase for AI response
-	// This will trigger AI processing and responses will be sent via ChatNotifier
+	// Process the message with Chat UseCase for AI response using msg context
 	if h.useCases != nil {
 		go func() {
 			// Use a new context for the async operation
@@ -321,19 +357,46 @@ func (h *Handler) handleChatMessage(client *Client, message *websocket_model.Cha
 			logger.Debug("Starting chat processing",
 				"ticket_id", client.ticketID,
 				"user_id", client.userID,
+				"client_id", client.clientID,
 				"message", message.Content)
+
+			// Create Warren user for agent messages
+			warrenUser := &websocket_model.User{
+				ID:   "warren",
+				Name: "Warren",
+			}
+
+			// Setup notification functions for WebSocket
+			notifyFunc := func(ctx context.Context, message string) {
+				if err := h.hub.SendMessageToClient(client.clientID, message, warrenUser); err != nil {
+					logger.Error("failed to send message to client", "error", err, "client_id", client.clientID)
+				}
+			}
+
+			traceFunc := func(ctx context.Context, message string) func(context.Context, string) {
+				return func(ctx context.Context, traceMsg string) {
+					if err := h.hub.SendTraceToClient(client.clientID, traceMsg, warrenUser); err != nil {
+						logger.Error("failed to send trace to client", "error", err, "client_id", client.clientID)
+					}
+				}
+			}
+
+			// Setup context with WebSocket-specific message handlers
+			asyncCtx = msg.With(asyncCtx, notifyFunc, traceFunc)
 
 			if err := h.useCases.Chat(asyncCtx, ticket, message.Content); err != nil {
 				logger.Error("failed to process chat message",
 					"error", err,
 					"ticket_id", client.ticketID,
 					"user_id", client.userID,
+					"client_id", client.clientID,
 					"message", message.Content)
 				h.sendErrorToClient(client, "Failed to process message")
 			} else {
 				logger.Debug("Chat processing completed successfully",
 					"ticket_id", client.ticketID,
-					"user_id", client.userID)
+					"user_id", client.userID,
+					"client_id", client.clientID)
 			}
 		}()
 	} else {

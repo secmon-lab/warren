@@ -13,18 +13,18 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
-	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
-	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 //go:embed prompt/chat_system_prompt.md
 var chatSystemPromptTemplate string
 
+// Chat processes a chat message for the specified ticket
+// Message routing is handled via msg.Notify and msg.Trace functions in the context
 func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message string) error {
 	logger := logging.From(ctx)
 
@@ -112,40 +112,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			return
 		}
 
-		// Use ChatNotifier if available
-		if x.chatNotifier != nil {
-			if err := x.chatNotifier.NotifyMessage(ctx, target.ID, "💬 "+message); err != nil {
-				errs.Handle(ctx, goerr.Wrap(err, "failed to send message via ChatNotifier"))
-			}
-		}
-
-		// For Slack-specific comment recording
-		if x.IsSlackEnabled() && target.HasSlackThread() {
-			// Set agent context for agent messages
-			agentCtx := user.WithAgent(user.WithUserID(ctx, x.slackNotifier.BotID()))
-
-			// Create bot user for agent messages
-			botUser := &slack.User{
-				ID:   x.slackNotifier.BotID(),
-				Name: "Warren",
-			}
-
-			// Post agent message to Slack and get message ID
-			threadSvc := x.slackNotifier.NewThread(*target.SlackThread)
-			logging.From(ctx).Debug("message notify", "from", "MessageHook", "msg", message)
-			ts, err := threadSvc.PostCommentWithMessageID(ctx, "💬 "+message)
-			if err != nil {
-				errs.Handle(ctx, goerr.Wrap(err, "failed to post agent message to slack"))
-				return
-			}
-
-			comment := target.NewComment(agentCtx, message, botUser, ts)
-
-			if err := x.repository.PutTicketComment(agentCtx, comment); err != nil {
-				logger.Error("failed to record agent message as comment", "error", err)
-				// Continue execution even if comment recording fails
-			}
-		}
+		// Send message via context-based notification
+		msg.Notify(ctx, "💬 %s", message)
 	}
 
 	agent := gollem.New(x.llmClient,
@@ -154,11 +122,13 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
-			msg.Trace(ctx, "💭 %s", message)
+			traceMsg := "💭 " + message
+			msg.Trace(ctx, "%s", traceMsg)
 			return nil
 		}),
 		gollem.WithToolErrorHook(func(ctx context.Context, err error, call gollem.FunctionCall) error {
-			msg.Trace(ctx, "❌ Error: %s", err.Error())
+			traceMsg := "❌ Error: " + err.Error()
+			msg.Trace(ctx, "%s", traceMsg)
 			logger.Error("tool error", "error", err, "call", call)
 			return nil
 		}),
@@ -168,7 +138,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			}
 
 			message := toolCallToText(ctx, x.llmClient, findTool(ctx, tools, call.Name), &call)
-			msg.Trace(ctx, "🤖 %s", message)
+			traceMsg := "🤖 " + message
+			msg.Trace(ctx, "%s", traceMsg)
 			logger.Debug("execute tool", "tool", call.Name, "args", call.Arguments)
 			return nil
 		}),
@@ -202,7 +173,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			return updatePlanProgress(progressUpdate, plan, "Plan created")
 		}),
 		gollem.WithPlanToDoStartHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
-			msg.Trace(ctx, "🚀 Starting: %s", todo.Description)
+			traceMsg := "🚀 Starting: " + todo.Description
+			msg.Trace(ctx, "%s", traceMsg)
 			return nil
 		}),
 		gollem.WithPlanToDoCompletedHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
@@ -213,7 +185,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 				return nil
 			}
 
-			msg.Trace(ctx, "📝 Plan updated (%d todos)", len(changes))
+			traceMsg := fmt.Sprintf("📝 Plan updated (%d todos)", len(changes))
+			msg.Trace(ctx, "%s", traceMsg)
 			return nil
 		}),
 	)
@@ -221,7 +194,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		return goerr.Wrap(err, "failed to create plan")
 	}
 
-	ctx = msg.NewTrace(ctx, "🚀 Executing plan...")
+	execStartMsg := "🚀 Executing plan..."
+	ctx = msg.NewTrace(ctx, "%s", execStartMsg)
 
 	execResp, err := plan.Execute(ctx)
 	if err != nil {
@@ -231,7 +205,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	if len(execResp) > 0 {
 		postWarrenMessage(ctx, execResp)
 	} else {
-		msg.Notify(ctx, "✅ All task has been done")
+		completionMsg := "✅ All task has been done"
+		msg.Notify(ctx, "%s", completionMsg)
 	}
 
 	// Count completed tasks
@@ -243,7 +218,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		}
 	}
 
-	ctx = msg.Trace(ctx, "✅ Plan execution completed (%d/%d tasks)", completedCount, len(todos))
+	execCompleteMsg := fmt.Sprintf("✅ Plan execution completed (%d/%d tasks)", completedCount, len(todos))
+	ctx = msg.Trace(ctx, "%s", execCompleteMsg)
 
 	// Get the updated history from the plan's session
 	session := plan.Session()
@@ -365,6 +341,8 @@ func (x *UseCases) generateInitialTicketComment(ctx context.Context, ticketData 
 
 	return response.Texts[0], nil
 }
+
+// Note: updatePlanProgressWithResponder has been removed in favor of using updatePlanProgress with msg context
 
 // updatePlanProgress formats and updates the plan progress message using an updatable message function
 func updatePlanProgress(updateFunc func(ctx context.Context, msg string), plan *gollem.Plan, action string) error {

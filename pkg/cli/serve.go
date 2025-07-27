@@ -16,7 +16,6 @@ import (
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/service/chat"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -219,21 +218,6 @@ func cmdServe() *cli.Command {
 			wsHub := websocket_controller.NewHub(ctx)
 			go wsHub.Run() // Start the hub in a goroutine
 
-			// Create ChatNotifier based on configuration
-			var chatNotifier interfaces.ChatNotifier
-			if slackSvc != nil {
-				// Create a MultiNotifier that sends to both Slack and WebSocket
-				slackChatNotifier := chat.NewSlackNotifier()
-				multiNotifier := chat.NewMultiNotifier(
-					slackChatNotifier,
-					chat.NewWebSocketNotifier(wsHub),
-				)
-				chatNotifier = multiNotifier
-			} else {
-				// If no Slack, use WebSocket only
-				chatNotifier = chat.NewWebSocketNotifier(wsHub)
-			}
-
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
@@ -242,7 +226,6 @@ func cmdServe() *cli.Command {
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(toolSets),
 				usecase.WithStrictAlert(strictAlert),
-				usecase.WithChatNotifier(chatNotifier),
 			}
 
 			uc := usecase.New(ucOptions...)
@@ -293,8 +276,11 @@ func cmdServe() *cli.Command {
 				return goerr.New("WebUI requires authentication configuration. Please set either --slack-client-id/--slack-client-secret or --no-authentication flag")
 			}
 
-			// Create and add WebSocket handler
+			// Create and add WebSocket handler with frontend URL for origin checking
 			wsHandler := websocket_controller.NewHandler(wsHub, firestore, uc)
+			if webUICfg.GetFrontendURL() != "" {
+				wsHandler = wsHandler.WithFrontendURL(webUICfg.GetFrontendURL())
+			}
 			serverOptions = append(serverOptions, server.WithWebSocketHandler(wsHandler))
 
 			httpServer := http.Server{

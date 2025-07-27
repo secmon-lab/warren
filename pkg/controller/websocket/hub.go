@@ -2,7 +2,11 @@ package websocket
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/m-mizutani/goerr/v2"
@@ -16,6 +20,9 @@ type Hub struct {
 	// Registered clients grouped by ticket ID
 	tickets map[types.TicketID]map[*Client]bool
 
+	// Registered clients indexed by client ID for direct access
+	clients map[string]*Client
+
 	// Register requests from the clients
 	register chan *Client
 
@@ -25,7 +32,7 @@ type Hub struct {
 	// Broadcast message to clients of a specific ticket
 	broadcast chan *BroadcastMessage
 
-	// Mutex to protect concurrent access to tickets map
+	// Mutex to protect concurrent access to tickets and clients maps
 	mu sync.RWMutex
 
 	// Context for graceful shutdown
@@ -48,6 +55,9 @@ type Client struct {
 
 	// User ID of the connected user
 	userID string
+
+	// Unique client ID for this connection
+	clientID string
 
 	// Context for this client
 	ctx    context.Context
@@ -79,6 +89,7 @@ func NewHub(ctx context.Context) *Hub {
 	ctx, cancel := context.WithCancel(ctx)
 	return &Hub{
 		tickets:    make(map[types.TicketID]map[*Client]bool),
+		clients:    make(map[string]*Client),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		broadcast:  make(chan *BroadcastMessage),
@@ -157,10 +168,12 @@ func (h *Hub) registerClient(client *Client) {
 	}
 
 	h.tickets[client.ticketID][client] = true
+	h.clients[client.clientID] = client
 
 	logger.Info("Client registered",
 		"ticket_id", client.ticketID,
 		"user_id", client.userID,
+		"client_id", client.clientID,
 		"total_clients", len(h.tickets[client.ticketID]))
 
 	// Send welcome message
@@ -202,6 +215,7 @@ func (h *Hub) unregisterClient(client *Client) {
 			logger.Info("Client unregistered",
 				"ticket_id", client.ticketID,
 				"user_id", client.userID,
+				"client_id", client.clientID,
 				"remaining_clients", len(clients))
 
 			// Remove ticket entry if no clients remain
@@ -211,6 +225,9 @@ func (h *Hub) unregisterClient(client *Client) {
 			}
 		}
 	}
+
+	// Remove from clients map
+	delete(h.clients, client.clientID)
 
 	// Cancel client context
 	client.cancel()
@@ -293,12 +310,16 @@ func (h *Hub) GetActiveTickets() []types.TicketID {
 func (h *Hub) NewClient(conn *websocket.Conn, ticketID types.TicketID, userID string) *Client {
 	ctx, cancel := context.WithCancel(h.ctx)
 
+	// Generate unique client ID
+	clientID := generateClientID(ticketID, userID)
+
 	return &Client{
 		hub:      h,
 		conn:     conn,
 		send:     make(chan []byte, clientSendBufferSize),
 		ticketID: ticketID,
 		userID:   userID,
+		clientID: clientID,
 		ctx:      ctx,
 		cancel:   cancel,
 	}
@@ -373,4 +394,59 @@ func (h *Hub) SendStatusToTicket(ticketID types.TicketID, content string) error 
 func (h *Hub) SendErrorToTicket(ticketID types.TicketID, content string) error {
 	response := websocket_model.NewErrorResponse(content)
 	return h.SendToTicket(ticketID, response)
+}
+
+// generateClientID generates a unique client ID
+func generateClientID(ticketID types.TicketID, userID string) string {
+	// Create a unique ID using timestamp and random bytes
+	timestamp := time.Now().Unix()
+	randomBytes := make([]byte, 8)
+	if _, err := rand.Read(randomBytes); err != nil {
+		// Fallback to timestamp-based ID if random generation fails
+		return fmt.Sprintf("client_%s_%s_%d", ticketID, userID, timestamp)
+	}
+	randomHex := hex.EncodeToString(randomBytes)
+	return fmt.Sprintf("client_%s_%s_%d_%s", ticketID, userID, timestamp, randomHex)
+}
+
+// SendToClient sends a message to a specific client by client ID
+func (h *Hub) SendToClient(clientID string, response *websocket_model.ChatResponse) error {
+	h.mu.RLock()
+	client, exists := h.clients[clientID]
+	h.mu.RUnlock()
+
+	if !exists {
+		return goerr.New("client not found", goerr.V("client_id", clientID))
+	}
+
+	data, err := response.ToBytes()
+	if err != nil {
+		return goerr.Wrap(err, "failed to marshal response")
+	}
+
+	select {
+	case client.send <- data:
+		return nil
+	default:
+		// Client's send channel is full, unregister the client
+		h.Unregister(client)
+		return goerr.New("client send channel full, client unregistered", goerr.V("client_id", clientID))
+	}
+}
+
+// SendMessageToClient sends a chat message to a specific client
+func (h *Hub) SendMessageToClient(clientID string, content string, user *websocket_model.User) error {
+	response := websocket_model.NewMessageResponse(content, user)
+	return h.SendToClient(clientID, response)
+}
+
+// SendTraceToClient sends a trace message to a specific client
+func (h *Hub) SendTraceToClient(clientID string, content string, user *websocket_model.User) error {
+	response := websocket_model.NewTraceResponse(content, user)
+	return h.SendToClient(clientID, response)
+}
+
+// GetClientID returns the client ID for a client
+func (c *Client) GetClientID() string {
+	return c.clientID
 }

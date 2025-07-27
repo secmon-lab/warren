@@ -70,6 +70,13 @@ func NewPongResponse() *ChatResponse {
 	return NewChatResponse("pong", "")
 }
 
+// NewTraceResponse creates a trace message response
+func NewTraceResponse(content string, user *User) *ChatResponse {
+	resp := NewChatResponse("trace", content)
+	resp.User = user
+	return resp
+}
+
 // UserFromSlackUser converts slack.User to websocket.User
 func UserFromSlackUser(slackUser *slack.User) *User {
 	if slackUser == nil {
