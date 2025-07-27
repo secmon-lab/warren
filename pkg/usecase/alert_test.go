@@ -933,7 +933,6 @@ func TestBindAlertsToTicket_MetadataUpdateBasic(t *testing.T) {
 	gt.Value(t, updatedTicket.Metadata.Description).Equal("Updated description")
 }
 
-
 func TestHandleAlert_DefaultPolicyMode(t *testing.T) {
 	// Test case: No policy package exists, default mode (strictAlert=false)
 	ctx := context.Background()

@@ -1,0 +1,241 @@
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { TicketChat } from './TicketChat';
+import { AuthProvider } from '@/contexts/auth-context';
+import { vi } from 'vitest';
+
+// Mock the useWebSocket hook
+const mockSendMessage = vi.fn();
+const mockMessages: any[] = [];
+let mockStatus = 'connected';
+
+vi.mock('@/hooks/useWebSocket', () => ({
+  useWebSocket: () => ({
+    status: mockStatus,
+    messages: mockMessages,
+    sendMessage: mockSendMessage,
+  }),
+}));
+
+// Mock auth context
+const mockAuthContext = {
+  user: { id: 'test-user', email: 'test@example.com' },
+  token: 'test-token',
+  isAuthenticated: true,
+  login: vi.fn(),
+  logout: vi.fn(),
+  loading: false,
+};
+
+vi.mock('@/contexts/auth-context', () => ({
+  useAuth: () => mockAuthContext,
+}));
+
+// Mock UserName component
+vi.mock('@/components/ui/user-name', () => ({
+  UserName: ({ userId, className }: any) => (
+    <span className={className}>{userId}</span>
+  ),
+}));
+
+describe('TicketChat', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockMessages.length = 0;
+    mockStatus = 'connected';
+    mockSendMessage.mockReturnValue(true);
+  });
+
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AuthProvider>{children}</AuthProvider>
+  );
+
+  it('should render empty chat state', () => {
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    
+    expect(screen.getByText('Chat')).toBeInTheDocument();
+    expect(screen.getByText('No messages yet. Start a conversation!')).toBeInTheDocument();
+    expect(screen.getByText('Connected')).toBeInTheDocument();
+  });
+
+  it('should display connection status', () => {
+    mockStatus = 'connecting';
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    expect(screen.getByText('Connecting...')).toBeInTheDocument();
+
+    mockStatus = 'disconnected';
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    expect(screen.getByText('Disconnected')).toBeInTheDocument();
+
+    mockStatus = 'error';
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    expect(screen.getByText('Error')).toBeInTheDocument();
+  });
+
+  it('should render messages', () => {
+    mockMessages.push(
+      {
+        type: 'message',
+        content: 'Hello from user',
+        user: { id: 'test-user', name: 'Test User' },
+        timestamp: Date.now(),
+      },
+      {
+        type: 'message',
+        content: 'Hello from AI',
+        user: { id: 'warren-ai', name: 'Warren' },
+        timestamp: Date.now(),
+      }
+    );
+
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    
+    expect(screen.getByText('Hello from user')).toBeInTheDocument();
+    expect(screen.getByText('Hello from AI')).toBeInTheDocument();
+  });
+
+  it('should render trace messages', () => {
+    mockMessages.push({
+      type: 'trace',
+      content: '💭 Thinking...',
+      timestamp: Date.now(),
+    });
+
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    
+    expect(screen.getByText('💭 Thinking...')).toBeInTheDocument();
+  });
+
+  it('should render error messages', () => {
+    mockMessages.push({
+      type: 'error',
+      content: 'Something went wrong',
+      timestamp: Date.now(),
+    });
+
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    
+    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+  });
+
+  it('should render status messages', () => {
+    mockMessages.push({
+      type: 'status',
+      content: 'User joined',
+      timestamp: Date.now(),
+    });
+
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    
+    expect(screen.getByText('User joined')).toBeInTheDocument();
+  });
+
+  it('should send message on submit', async () => {
+    const user = userEvent.setup();
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    
+    const textarea = screen.getByPlaceholderText(/Type a message/);
+    const sendButton = screen.getByRole('button', { name: /send/i });
+
+    await user.type(textarea, 'Test message');
+    await user.click(sendButton);
+
+    expect(mockSendMessage).toHaveBeenCalledWith('Test message');
+    expect(textarea).toHaveValue('');
+  });
+
+  it('should send message on Enter key', async () => {
+    const user = userEvent.setup();
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    
+    const textarea = screen.getByPlaceholderText(/Type a message/);
+
+    await user.type(textarea, 'Test message');
+    await user.keyboard('{Enter}');
+
+    expect(mockSendMessage).toHaveBeenCalledWith('Test message');
+    expect(textarea).toHaveValue('');
+  });
+
+  it('should not send message on Shift+Enter', async () => {
+    const user = userEvent.setup();
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    
+    const textarea = screen.getByPlaceholderText(/Type a message/);
+
+    await user.type(textarea, 'Test message');
+    await user.keyboard('{Shift>}{Enter}{/Shift}');
+
+    expect(mockSendMessage).not.toHaveBeenCalled();
+    expect(textarea).toHaveValue('Test message\n');
+  });
+
+  it('should disable input when disconnected', () => {
+    mockStatus = 'disconnected';
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    
+    const textarea = screen.getByPlaceholderText(/Connecting to chat/);
+    const sendButton = screen.getByRole('button', { name: /send/i });
+
+    expect(textarea).toBeDisabled();
+    expect(sendButton).toBeDisabled();
+  });
+
+  it('should not send empty messages', async () => {
+    const user = userEvent.setup();
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    
+    const textarea = screen.getByPlaceholderText(/Type a message/);
+    const sendButton = screen.getByRole('button', { name: /send/i });
+
+    // Try to send empty message
+    await user.click(sendButton);
+    expect(mockSendMessage).not.toHaveBeenCalled();
+
+    // Try to send whitespace only
+    await user.type(textarea, '   ');
+    await user.click(sendButton);
+    expect(mockSendMessage).not.toHaveBeenCalled();
+  });
+
+  it('should handle send failure', async () => {
+    mockSendMessage.mockReturnValue(false);
+    const user = userEvent.setup();
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    
+    const textarea = screen.getByPlaceholderText(/Type a message/);
+
+    await user.type(textarea, 'Test message');
+    await user.keyboard('{Enter}');
+
+    // Message should not be cleared on failure
+    expect(textarea).toHaveValue('Test message');
+  });
+
+  it('should style own messages differently', () => {
+    mockMessages.push(
+      {
+        type: 'message',
+        content: 'My message',
+        user: { id: 'test-user', name: 'Me' },
+        timestamp: Date.now(),
+      },
+      {
+        type: 'message',
+        content: 'Other message',
+        user: { id: 'other-user', name: 'Other' },
+        timestamp: Date.now(),
+      }
+    );
+
+    render(<TicketChat ticketId="test-ticket" />, { wrapper });
+    
+    // Check for different styling classes
+    const myMessage = screen.getByText('My message').parentElement;
+    const otherMessage = screen.getByText('Other message').parentElement;
+
+    expect(myMessage).toHaveClass('bg-primary');
+    expect(otherMessage).toHaveClass('bg-muted');
+  });
+});

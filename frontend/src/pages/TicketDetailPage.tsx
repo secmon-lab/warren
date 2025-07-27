@@ -71,6 +71,8 @@ import { EditTicketModal } from "@/components/EditTicketModal";
 import { SimilarTickets } from "@/components/SimilarTickets";
 import { TicketComments } from "@/components/TicketComments";
 import { SalvageModal } from "@/components/SalvageModal";
+import { TicketChat } from "@/components/TicketChat";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ALERTS_PER_PAGE = 5;
 
@@ -453,8 +455,19 @@ export default function TicketDetailPage() {
             onEditConclusion={handleEditConclusion}
           />
 
-          {/* Comments Section */}
-          <TicketComments ticketId={ticket.id} />
+          {/* Comments & Chat Tabs */}
+          <Tabs defaultValue="comments" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="comments">Comments</TabsTrigger>
+              <TabsTrigger value="chat">Chat</TabsTrigger>
+            </TabsList>
+            <TabsContent value="comments" className="mt-4">
+              <TicketComments ticketId={ticket.id} />
+            </TabsContent>
+            <TabsContent value="chat" className="mt-4">
+              <TicketChat ticketId={ticket.id} />
+            </TabsContent>
+          </Tabs>
 
           {/* Alerts Section with Pagination */}
           <Card>

@@ -14,6 +14,7 @@ import (
 	"github.com/secmon-lab/warren/frontend"
 	"github.com/secmon-lab/warren/pkg/controller/graphql"
 	slack_controller "github.com/secmon-lab/warren/pkg/controller/slack"
+	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -25,6 +26,7 @@ import (
 type Server struct {
 	router          *chi.Mux
 	slackCtrl       *slack_controller.Controller
+	websocketCtrl   *websocket_controller.Handler // for WebSocket chat
 	policy          interfaces.PolicyClient
 	verifier        slack_model.PayloadVerifier
 	repo            interfaces.Repository // for GraphQL
@@ -75,6 +77,12 @@ func WithPolicy(policy interfaces.PolicyClient) Options {
 func WithNoAuthorization(disabled bool) Options {
 	return func(s *Server) {
 		s.noAuthorization = disabled
+	}
+}
+
+func WithWebSocketHandler(handler *websocket_controller.Handler) Options {
+	return func(s *Server) {
+		s.websocketCtrl = handler
 	}
 }
 
@@ -182,6 +190,21 @@ func New(uc UseCase, opts ...Options) *Server {
 			r.Route("/tickets", func(r chi.Router) {
 				r.Use(authMiddleware(s.authUC))
 				r.Get("/{ticketID}/alerts/download", ticketAlertsDownloadHandler(uc))
+			})
+		})
+	}
+
+	// WebSocket endpoints
+	if s.websocketCtrl != nil {
+		r.Route("/ws", func(r chi.Router) {
+			// Apply authentication middleware to WebSocket endpoints
+			if s.authUC != nil {
+				r.Use(authMiddleware(s.authUC))
+			}
+			r.Use(authorizeWithPolicy(s.policy, s.noAuthorization))
+
+			r.Route("/chat", func(r chi.Router) {
+				r.Get("/ticket/{ticketID}", s.websocketCtrl.HandleTicketChat)
 			})
 		})
 	}

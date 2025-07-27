@@ -14,7 +14,9 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
+	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/service/chat"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -213,6 +215,25 @@ func cmdServe() *cli.Command {
 				slackNotifier = usecase.NewDiscardSlackNotifier()
 			}
 
+			// Create WebSocket hub and handler
+			wsHub := websocket_controller.NewHub(ctx)
+			go wsHub.Run() // Start the hub in a goroutine
+
+			// Create ChatNotifier based on configuration
+			var chatNotifier interfaces.ChatNotifier
+			if slackSvc != nil {
+				// Create a MultiNotifier that sends to both Slack and WebSocket
+				slackChatNotifier := chat.NewSlackNotifier()
+				multiNotifier := chat.NewMultiNotifier(
+					slackChatNotifier,
+					chat.NewWebSocketNotifier(wsHub),
+				)
+				chatNotifier = multiNotifier
+			} else {
+				// If no Slack, use WebSocket only
+				chatNotifier = chat.NewWebSocketNotifier(wsHub)
+			}
+
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
@@ -221,6 +242,7 @@ func cmdServe() *cli.Command {
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(toolSets),
 				usecase.WithStrictAlert(strictAlert),
+				usecase.WithChatNotifier(chatNotifier),
 			}
 
 			uc := usecase.New(ucOptions...)
@@ -271,6 +293,10 @@ func cmdServe() *cli.Command {
 				return goerr.New("WebUI requires authentication configuration. Please set either --slack-client-id/--slack-client-secret or --no-authentication flag")
 			}
 
+			// Create and add WebSocket handler
+			wsHandler := websocket_controller.NewHandler(wsHub, firestore, uc)
+			serverOptions = append(serverOptions, server.WithWebSocketHandler(wsHandler))
+
 			httpServer := http.Server{
 				Addr:              addr,
 				Handler:           server.New(uc, serverOptions...),
@@ -296,6 +322,11 @@ func cmdServe() *cli.Command {
 			case err := <-errCh:
 				return err
 			case <-sigCh:
+				// Close WebSocket hub
+				if err := wsHub.Close(); err != nil {
+					logging.From(ctx).Error("failed to close WebSocket hub", "error", err)
+				}
+
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
 				return httpServer.Shutdown(ctx)
