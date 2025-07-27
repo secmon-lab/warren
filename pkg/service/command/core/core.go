@@ -1,16 +1,12 @@
 package core
 
 import (
-	"context"
 	"strconv"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
 type Clients struct {
@@ -37,22 +33,6 @@ func (s *Clients) LLM() gollem.LLMClient {
 
 func (s *Clients) Thread() interfaces.SlackThreadService {
 	return s.thread
-}
-
-func (x *Clients) CreateList(ctx context.Context, thread slack.Thread, user *slack.User, alerts alert.Alerts) (*alert.List, error) {
-	ctx = msg.Trace(ctx, "🤖 Creating alert list...")
-	list := alert.NewList(ctx, thread, user, alerts)
-
-	if err := list.FillMetadata(ctx, x.llm); err != nil {
-		return nil, goerr.Wrap(err, "failed to fill metadata")
-	}
-
-	// Register the list to the repository
-	if err := x.repo.PutAlertList(ctx, list); err != nil {
-		return nil, goerr.Wrap(err, "failed to put alert list")
-	}
-
-	return list, nil
 }
 
 func ParseTime(timeStr string) (time.Time, error) {

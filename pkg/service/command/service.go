@@ -10,8 +10,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/service/command/core"
 
-	"github.com/secmon-lab/warren/pkg/service/command/aggregate"
-	"github.com/secmon-lab/warren/pkg/service/command/list"
 	"github.com/secmon-lab/warren/pkg/service/command/repair"
 	"github.com/secmon-lab/warren/pkg/service/command/ticket"
 )
@@ -34,15 +32,9 @@ type Command func(ctx context.Context, clients *core.Clients, msg *slack.Message
 
 func (x *Service) Execute(ctx context.Context, msg *slack.Message, input string) error {
 	commands := map[string]Command{
-		"l":         list.Create,
-		"ls":        list.Create,
-		"list":      list.Create,
-		"a":         aggregate.Create,
-		"aggr":      aggregate.Create,
-		"aggregate": aggregate.Create,
-		"t":         ticket.Create,
-		"ticket":    ticket.Create,
-		"repair":    repair.Run,
+		"t":      ticket.Create,
+		"ticket": ticket.Create,
+		"repair": repair.Run,
 	}
 
 	cmd, remaining := messageToArgs(input)
