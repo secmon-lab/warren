@@ -29,19 +29,7 @@ export function TicketChat({ ticketId }: TicketChatProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { status, messages, sendMessage } = useWebSocket(ticketId, {
-    onMessage: (_message) => {
-      // Scroll to bottom on new message
-      setTimeout(() => {
-        if (scrollAreaRef.current) {
-          const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-          if (scrollContainer) {
-            scrollContainer.scrollTop = scrollContainer.scrollHeight;
-          }
-        }
-      }, 100);
-    },
-  });
+  const { status, messages, sendMessage } = useWebSocket(ticketId);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
