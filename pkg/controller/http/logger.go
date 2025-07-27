@@ -44,7 +44,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		// Basic attributes for INFO level
 		infoAttrs := []any{
 			slog.String("method", r.Method),
-			slog.String("url", r.URL.Path),
+			slog.String("path", r.URL.Path),
 			slog.String("remote", r.RemoteAddr),
 			slog.String("user_agent", r.UserAgent()),
 			slog.Int("status", sw.status),
@@ -57,7 +57,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		if logger.Enabled(r.Context(), slog.LevelDebug) {
 			debugAttrs = []any{
 				slog.String("method", r.Method),
-				slog.String("url", r.URL.Path),
+				slog.String("path", r.URL.Path),
 				slog.String("remote", r.RemoteAddr),
 				slog.Int("status", sw.status),
 				slog.Any("query", r.URL.Query()),
