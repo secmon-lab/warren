@@ -42,7 +42,8 @@ func (x Sentry) LogValue() slog.Value {
 
 func (x *Sentry) Configure() error {
 	if x.dsn == "" {
-		logging.Default().Warn("Sentry is not configured")
+		logging.Default().Warn("⚠️  Sentry is not configured",
+			"recommendation", "Set WARREN_SENTRY_DSN for error tracking in production")
 		return nil
 	}
 

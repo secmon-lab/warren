@@ -112,8 +112,9 @@ func cmdServe() *cli.Command {
 			if webUICfg.GetFrontendURL() == "" {
 				generatedURL := generateFrontendURL(addr)
 				webUICfg.SetFrontendURL(generatedURL)
-				logging.Default().Warn("Frontend URL is automatically set. For production use, please explicitly set --frontend-url",
-					"auto-generated-url", generatedURL)
+				logging.Default().Warn("⚠️  Frontend URL is automatically set",
+					"auto-generated-url", generatedURL,
+					"recommendation", "For production use, please explicitly set --frontend-url")
 			}
 
 			logging.Default().Info("starting server",
