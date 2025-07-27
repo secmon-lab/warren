@@ -154,23 +154,10 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
-			// Use ChatNotifier for trace messages if available
-			if x.chatNotifier != nil {
-				if err := x.chatNotifier.NotifyTrace(ctx, target.ID, "💭 "+message); err != nil {
-					logger.Error("failed to notify trace", "error", err)
-				}
-			}
-			// Also use msg.Trace for backward compatibility
 			msg.Trace(ctx, "💭 %s", message)
 			return nil
 		}),
 		gollem.WithToolErrorHook(func(ctx context.Context, err error, call gollem.FunctionCall) error {
-			// Use ChatNotifier for error traces if available
-			if x.chatNotifier != nil {
-				if notifyErr := x.chatNotifier.NotifyTrace(ctx, target.ID, fmt.Sprintf("❌ Error: %s", err.Error())); notifyErr != nil {
-					logger.Error("failed to notify error trace", "error", notifyErr)
-				}
-			}
 			msg.Trace(ctx, "❌ Error: %s", err.Error())
 			logger.Error("tool error", "error", err, "call", call)
 			return nil
@@ -181,12 +168,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			}
 
 			message := toolCallToText(ctx, x.llmClient, findTool(ctx, tools, call.Name), &call)
-			// Use ChatNotifier for tool traces if available
-			if x.chatNotifier != nil {
-				if err := x.chatNotifier.NotifyTrace(ctx, target.ID, "🤖 "+message); err != nil {
-					logger.Error("failed to notify assistant trace", "error", err)
-				}
-			}
 			msg.Trace(ctx, "🤖 %s", message)
 			logger.Debug("execute tool", "tool", call.Name, "args", call.Arguments)
 			return nil
@@ -221,12 +202,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			return updatePlanProgress(progressUpdate, plan, "Plan created")
 		}),
 		gollem.WithPlanToDoStartHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
-			// Use ChatNotifier for task start traces if available
-			if x.chatNotifier != nil {
-				if err := x.chatNotifier.NotifyTrace(ctx, target.ID, fmt.Sprintf("🚀 Starting: %s", todo.Description)); err != nil {
-					logger.Error("failed to notify task start trace", "error", err)
-				}
-			}
 			msg.Trace(ctx, "🚀 Starting: %s", todo.Description)
 			return nil
 		}),
@@ -238,12 +213,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 				return nil
 			}
 
-			// Use ChatNotifier for plan update traces if available
-			if x.chatNotifier != nil {
-				if err := x.chatNotifier.NotifyTrace(ctx, target.ID, fmt.Sprintf("📝 Plan updated (%d todos)", len(changes))); err != nil {
-					logger.Error("failed to notify plan update trace", "error", err)
-				}
-			}
 			msg.Trace(ctx, "📝 Plan updated (%d todos)", len(changes))
 			return nil
 		}),
@@ -252,12 +221,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		return goerr.Wrap(err, "failed to create plan")
 	}
 
-	// Use ChatNotifier for execution start trace if available
-	if x.chatNotifier != nil {
-		if err := x.chatNotifier.NotifyTrace(ctx, target.ID, "🚀 Executing plan..."); err != nil {
-			logger.Error("failed to notify execution start trace", "error", err)
-		}
-	}
 	ctx = msg.NewTrace(ctx, "🚀 Executing plan...")
 
 	execResp, err := plan.Execute(ctx)
@@ -268,12 +231,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	if len(execResp) > 0 {
 		postWarrenMessage(ctx, execResp)
 	} else {
-		// Use ChatNotifier for completion message if available
-		if x.chatNotifier != nil {
-			if err := x.chatNotifier.NotifyMessage(ctx, target.ID, "✅ All task has been done"); err != nil {
-				logger.Error("failed to notify completion message", "error", err)
-			}
-		}
 		msg.Notify(ctx, "✅ All task has been done")
 	}
 
@@ -286,12 +243,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		}
 	}
 
-	// Use ChatNotifier for completion trace if available
-	if x.chatNotifier != nil {
-		if err := x.chatNotifier.NotifyTrace(ctx, target.ID, fmt.Sprintf("✅ Plan execution completed (%d/%d tasks)", completedCount, len(todos))); err != nil {
-			logger.Error("failed to notify plan completion trace", "error", err)
-		}
-	}
 	ctx = msg.Trace(ctx, "✅ Plan execution completed (%d/%d tasks)", completedCount, len(todos))
 
 	// Get the updated history from the plan's session
