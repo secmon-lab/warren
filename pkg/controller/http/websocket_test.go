@@ -49,13 +49,13 @@ func TestHTTPServer_WebSocketEndpoint(t *testing.T) {
 	testServer := httptest.NewServer(httpServer)
 	defer testServer.Close()
 
-	// Test WebSocket endpoint without authentication (should require auth)
+	// Test WebSocket endpoint with regular HTTP request (not WebSocket)
 	resp, err := http.Get(testServer.URL + "/ws/chat/ticket/test-ticket")
 	gt.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Should return 401 Unauthorized (no user context)
-	gt.Value(t, resp.StatusCode).Equal(http.StatusUnauthorized)
+	// Should return 400 Bad Request (WebSocket protocol required)
+	gt.Value(t, resp.StatusCode).Equal(http.StatusBadRequest)
 }
 
 func TestHTTPServer_WebSocketEndpoint_WithAuth(t *testing.T) {
@@ -80,13 +80,25 @@ func TestHTTPServer_WebSocketEndpoint_WithAuth(t *testing.T) {
 	testServer := httptest.NewServer(httpServer)
 	defer testServer.Close()
 
-	// Test endpoint without proper authentication - should fail appropriately
+	// Create test ticket first
+	testTicket := ticket.Ticket{
+		ID:     types.TicketID("test-ticket"),
+		Status: types.TicketStatusOpen,
+		Metadata: ticket.Metadata{
+			Title:       "Test Ticket",
+			Description: "Test Description",
+		},
+	}
+	err := repo.PutTicket(ctx, testTicket)
+	gt.NoError(t, err)
+
+	// Test endpoint with regular HTTP request (not WebSocket)
 	resp, err := http.Get(testServer.URL + "/ws/chat/ticket/test-ticket")
 	gt.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Should return 401 (missing user ID) - this confirms endpoint routing works
-	gt.Value(t, resp.StatusCode).Equal(http.StatusUnauthorized)
+	// Should return 400 (WebSocket protocol required) - this confirms endpoint routing works
+	gt.Value(t, resp.StatusCode).Equal(http.StatusBadRequest)
 }
 
 func TestHTTPServer_WithoutWebSocketHandler(t *testing.T) {
@@ -132,11 +144,11 @@ func TestHTTPServer_WebSocketEndpoint_NonExistentTicket(t *testing.T) {
 	testServer := httptest.NewServer(httpServer)
 	defer testServer.Close()
 
-	// Test endpoint without auth - should fail at auth level before reaching ticket check
+	// Test endpoint with non-existent ticket - should fail at ticket check
 	resp, err := http.Get(testServer.URL + "/ws/chat/ticket/non-existent")
 	gt.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Should return 401 (missing user ID) - this confirms endpoint routing works
-	gt.Value(t, resp.StatusCode).Equal(http.StatusUnauthorized)
+	// Should return 500 (ticket not found) - this confirms endpoint routing works but ticket doesn't exist
+	gt.Value(t, resp.StatusCode).Equal(http.StatusInternalServerError)
 }

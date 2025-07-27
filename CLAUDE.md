@@ -117,6 +117,10 @@ Test files follow Go conventions (`*_test.go`). The codebase includes:
 
 ## Restrictions and Rules
 
+### Directory
+
+- When you are mentioned about `tmp` directory, you SHOULD NOT see `/tmp`. You need to check `./tmp` directory from root of the repository.
+
 ### Exposure policy
 
 In principle, do not trust developers who use this library from outside

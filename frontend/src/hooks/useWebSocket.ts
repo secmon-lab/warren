@@ -23,8 +23,8 @@ export function useWebSocket(
   const {
     onMessage,
     onStatusChange,
-    reconnectInterval = 5000, // Increased from 1000ms to 5000ms
-    maxReconnectAttempts = 3, // Reduced from 5 to 3
+    reconnectInterval = 8000, // Increased to 8 seconds to reduce frequency
+    maxReconnectAttempts = 3, // Limited to 3 attempts
   } = options;
 
   const { user } = useAuth();
@@ -51,10 +51,20 @@ export function useWebSocket(
   }, []);
 
   const connect = useCallback(() => {
-    if (!user?.sub || !ticketId) return;
+    if (!user?.sub || !ticketId) {
+      console.log('Skipping connection - missing user or ticketId', { user: user?.sub, ticketId });
+      return;
+    }
+
+    // Prevent multiple simultaneous connections
+    if (wsRef.current?.readyState === WebSocket.CONNECTING) {
+      console.log('Already connecting, skipping...');
+      return;
+    }
 
     // Clean up existing connection
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('Closing existing connection for reconnect');
       wsRef.current.close();
     }
 
@@ -78,10 +88,17 @@ export function useWebSocket(
       // Start ping interval to keep connection alive
       pingIntervalRef.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
-          const pingMessage = createPingMessage();
-          ws.send(JSON.stringify(pingMessage));
+          try {
+            const pingMessage = createPingMessage();
+            ws.send(JSON.stringify(pingMessage));
+            console.debug('Sent ping to keep connection alive');
+          } catch (error) {
+            console.warn('Failed to send ping:', error);
+          }
+        } else {
+          console.debug('Skipping ping - WebSocket not open:', ws.readyState);
         }
-      }, 30000); // Send ping every 30 seconds
+      }, 25000); // Send ping every 25 seconds (more frequent than server timeout)
     };
 
     ws.onmessage = (event) => {
@@ -132,13 +149,17 @@ export function useWebSocket(
         return;
       }
 
-      // Special handling for abnormal closure (1006)
+      // Calculate exponential backoff delay
       let delay = reconnectInterval * Math.pow(2, reconnectCountRef.current);
-      if (event.code === 1006) {
-        // For abnormal closures, wait longer
-        delay = Math.max(delay, 10000); // At least 10 seconds
-        console.warn('Abnormal WebSocket closure detected. Waiting longer before retry.');
+      
+      // Special handling for abnormal closure (1006) or any close - wait longer
+      if (event.code === 1006 || event.code === 1005 || event.code === 1000) {
+        delay = Math.max(delay, 12000); // At least 12 seconds for any close
+        console.warn('WebSocket closed, waiting longer before retry.', { code: event.code, reason: event.reason });
       }
+
+      // Minimum 8 second delay for all reconnections
+      delay = Math.max(delay, 8000);
 
       console.log(`Reconnecting in ${delay}ms... (attempt ${reconnectCountRef.current + 1}/${maxReconnectAttempts})`);
       
@@ -150,7 +171,7 @@ export function useWebSocket(
 
     // Add authorization header via subprotocol (if needed)
     // Note: WebSocket doesn't support custom headers, so auth is handled by cookies
-  }, [user?.sub, ticketId, reconnectInterval, maxReconnectAttempts]);
+  }, [user?.sub, ticketId, updateStatus]);
 
   const disconnect = useCallback(() => {
     // Clear reconnect timeout
@@ -193,12 +214,18 @@ export function useWebSocket(
 
   // Connect on mount and disconnect on unmount
   useEffect(() => {
-    connect();
+    // Only connect if we have both ticketId and user, and not already connected/connecting
+    if (ticketId && user?.sub && status === 'disconnected') {
+      connect();
+    }
 
     return () => {
-      disconnect();
+      // Only disconnect if we're actually connected
+      if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
+        disconnect();
+      }
     };
-  }, [ticketId, user?.sub]); // Only reconnect when ticketId or user changes
+  }, [ticketId, user?.sub]); // Reconnect when ticketId or user actually changes
 
   const stopReconnecting = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -208,6 +235,32 @@ export function useWebSocket(
     reconnectCountRef.current = maxReconnectAttempts; // Prevent further attempts
     console.log('Reconnection stopped manually');
   }, [maxReconnectAttempts]);
+
+  // Prevent disconnection on page visibility change or network change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      // Don't disconnect when page becomes hidden
+      if (document.visibilityState === 'visible' && status === 'disconnected' && ticketId && user?.sub) {
+        console.log('Page became visible, reconnecting if needed');
+        connect();
+      }
+    };
+
+    const handleOnline = () => {
+      if (status === 'disconnected' && ticketId && user?.sub) {
+        console.log('Network came back online, reconnecting');
+        connect();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [status, ticketId, user?.sub, connect]);
 
   return {
     status,
