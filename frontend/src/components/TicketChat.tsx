@@ -41,7 +41,7 @@ export function TicketChat({ ticketId }: TicketChatProps) {
     }
   }, [messages]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     const trimmedMessage = message.trim();
