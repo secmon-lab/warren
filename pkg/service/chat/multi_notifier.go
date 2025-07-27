@@ -2,6 +2,7 @@ package chat
 
 import (
 	"context"
+	"errors"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
@@ -31,7 +32,7 @@ func (m *MultiNotifier) NotifyMessage(ctx context.Context, ticketID types.Ticket
 	}
 
 	if len(errs) > 0 {
-		return goerr.Wrap(errs[0], "failed to send message via one or more notifiers", goerr.V("total_errors", len(errs)))
+		return goerr.Wrap(errors.Join(errs...), "failed to send message via one or more notifiers", goerr.V("total_errors", len(errs)))
 	}
 
 	return nil
@@ -48,7 +49,7 @@ func (m *MultiNotifier) NotifyTrace(ctx context.Context, ticketID types.TicketID
 	}
 
 	if len(errs) > 0 {
-		return goerr.Wrap(errs[0], "failed to send trace message via one or more notifiers", goerr.V("total_errors", len(errs)))
+		return goerr.Wrap(errors.Join(errs...), "failed to send trace message via one or more notifiers", goerr.V("total_errors", len(errs)))
 	}
 
 	return nil

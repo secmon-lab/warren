@@ -2,6 +2,7 @@ package chat_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -102,6 +103,35 @@ func TestMultiNotifier_NotifyTrace_Success(t *testing.T) {
 	gt.Value(t, slack.tracesSent[0]).Equal(message)
 	gt.Value(t, len(websocket.tracesSent)).Equal(1)
 	gt.Value(t, websocket.tracesSent[0]).Equal(message)
+}
+
+func TestMultiNotifier_NotifyMessage_MultipleFailures(t *testing.T) {
+	ctx := context.Background()
+	ticketID := types.TicketID("test-ticket")
+	message := "Test message"
+
+	// Create mock notifiers - multiple will fail
+	slack := &MockNotifier{name: "slack", shouldFail: true}
+	websocket := &MockNotifier{name: "websocket", shouldFail: true}
+	email := &MockNotifier{name: "email", shouldFail: true}
+
+	// Create MultiNotifier
+	multiNotifier := chat.NewMultiNotifier(slack, websocket, email)
+
+	// Send message
+	err := multiNotifier.NotifyMessage(ctx, ticketID, message)
+	gt.Error(t, err)
+
+	// Verify all errors are included in the returned error
+	errorMsg := err.Error()
+	
+	// Check that we have multiple "mock notifier failed" errors (one for each notifier)
+	// This confirms that errors.Join is working and all errors are preserved
+	failureCount := strings.Count(errorMsg, "mock notifier failed")
+	gt.Value(t, failureCount).Equal(3)
+
+	// Verify it contains our wrapper message
+	gt.Value(t, strings.Contains(errorMsg, "failed to send message via one or more notifiers")).Equal(true)
 }
 
 func TestMultiNotifier_Empty(t *testing.T) {
