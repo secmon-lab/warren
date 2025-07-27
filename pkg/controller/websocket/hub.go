@@ -139,7 +139,7 @@ func (h *Hub) registerClient(client *Client) {
 				existingClient.mu.Unlock()
 			}
 		}
-		
+
 		if len(clients) >= maxClientsPerTicket {
 			logger.Warn("Maximum clients reached for ticket",
 				"ticket_id", client.ticketID,

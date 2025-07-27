@@ -67,7 +67,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			if history != nil {
 				// Try to validate history by attempting conversion
 				if _, err := history.ToGemini(); err != nil {
-					logger.Warn("history version incompatible, starting with new history", 
+					logger.Warn("history version incompatible, starting with new history",
 						"error", err,
 						"history_id", historyRecord.ID)
 					history = nil // Start with new history

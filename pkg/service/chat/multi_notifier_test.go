@@ -124,7 +124,7 @@ func TestMultiNotifier_NotifyMessage_MultipleFailures(t *testing.T) {
 
 	// Verify all errors are included in the returned error
 	errorMsg := err.Error()
-	
+
 	// Check that we have multiple "mock notifier failed" errors (one for each notifier)
 	// This confirms that errors.Join is working and all errors are preserved
 	failureCount := strings.Count(errorMsg, "mock notifier failed")

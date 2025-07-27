@@ -72,13 +72,13 @@ func (h *Handler) HandleTicketChat(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context (set by authentication middleware)
 	userID := user.FromContext(ctx)
 	if userID == "" {
-		logger.Warn("missing user ID in WebSocket request", 
+		logger.Warn("missing user ID in WebSocket request",
 			"headers", r.Header)
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
 	}
-	
-	logger.Debug("WebSocket authentication successful", 
+
+	logger.Debug("WebSocket authentication successful",
 		"user_id", userID,
 		"ticket_id", ticketID)
 
@@ -102,7 +102,7 @@ func (h *Handler) HandleTicketChat(w http.ResponseWriter, r *http.Request) {
 	// Upgrade HTTP connection to WebSocket
 	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		logger.Error("failed to upgrade connection", 
+		logger.Error("failed to upgrade connection",
 			"error", err,
 			"error_type", fmt.Sprintf("%T", err),
 			"error_string", err.Error(),
@@ -129,7 +129,7 @@ func (h *Handler) HandleTicketChat(w http.ResponseWriter, r *http.Request) {
 	// Start client goroutines
 	go h.writePump(client)
 	go h.readPump(client)
-	
+
 	logger.Info("WebSocket client setup completed",
 		"ticket_id", ticketID,
 		"user_id", userID)
@@ -138,7 +138,7 @@ func (h *Handler) HandleTicketChat(w http.ResponseWriter, r *http.Request) {
 // readPump pumps messages from the websocket connection to the hub
 func (h *Handler) readPump(client *Client) {
 	logger := logging.From(client.ctx)
-	
+
 	logger.Debug("ReadPump started",
 		"ticket_id", client.ticketID,
 		"user_id", client.userID)
@@ -218,11 +218,11 @@ func (h *Handler) readPump(client *Client) {
 // writePump pumps messages from the hub to the websocket connection
 func (h *Handler) writePump(client *Client) {
 	logger := logging.From(client.ctx)
-	
+
 	logger.Debug("WritePump started",
 		"ticket_id", client.ticketID,
 		"user_id", client.userID)
-		
+
 	ticker := time.NewTicker(pingPeriod)
 
 	defer func() {
@@ -324,7 +324,7 @@ func (h *Handler) handleChatMessage(client *Client, message *websocket_model.Cha
 				"message", message.Content)
 
 			if err := h.useCases.Chat(asyncCtx, ticket, message.Content); err != nil {
-				logger.Error("failed to process chat message", 
+				logger.Error("failed to process chat message",
 					"error", err,
 					"ticket_id", client.ticketID,
 					"user_id", client.userID,

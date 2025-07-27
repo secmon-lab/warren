@@ -72,7 +72,6 @@ import { SimilarTickets } from "@/components/SimilarTickets";
 import { TicketComments } from "@/components/TicketComments";
 import { SalvageModal } from "@/components/SalvageModal";
 import { TicketChat } from "@/components/TicketChat";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ALERTS_PER_PAGE = 5;
 
@@ -87,6 +86,7 @@ export default function TicketDetailPage() {
   const [isEditConclusionModalOpen, setIsEditConclusionModalOpen] =
     useState(false);
   const [isSalvageModalOpen, setIsSalvageModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("comments");
 
   const errorToast = useErrorToast();
   const successToast = useSuccessToast();
@@ -456,18 +456,36 @@ export default function TicketDetailPage() {
           />
 
           {/* Comments & Chat Tabs */}
-          <Tabs defaultValue="comments" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="comments">Comments</TabsTrigger>
-              <TabsTrigger value="chat">Chat</TabsTrigger>
-            </TabsList>
-            <TabsContent value="comments" className="mt-4">
-              <TicketComments ticketId={ticket.id} />
-            </TabsContent>
-            <TabsContent value="chat" className="mt-4">
-              <TicketChat ticketId={ticket.id} />
-            </TabsContent>
-          </Tabs>
+          <div className="w-full">
+            <div className="grid w-full grid-cols-2 h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+              <button
+                onClick={() => setActiveTab("comments")}
+                className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
+                  activeTab === "comments"
+                    ? "bg-background text-foreground shadow-sm"
+                    : ""
+                }`}>
+                Comments
+              </button>
+              <button
+                onClick={() => setActiveTab("chat")}
+                className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
+                  activeTab === "chat"
+                    ? "bg-background text-foreground shadow-sm"
+                    : ""
+                }`}>
+                Chat
+              </button>
+            </div>
+            <div className="mt-4">
+              <div style={{ display: activeTab === "comments" ? "block" : "none" }}>
+                <TicketComments ticketId={ticket.id} />
+              </div>
+              <div style={{ display: activeTab === "chat" ? "block" : "none" }}>
+                <TicketChat ticketId={ticket.id} />
+              </div>
+            </div>
+          </div>
 
           {/* Alerts Section with Pagination */}
           <Card>
