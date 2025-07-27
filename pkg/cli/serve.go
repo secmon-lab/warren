@@ -47,6 +47,7 @@ func cmdServe() *cli.Command {
 		enableGraphQL   bool
 		enableGraphiQL  bool
 		noAuthorization bool
+		strictAlert     bool
 		webUICfg        config.WebUI
 		policyCfg       config.Policy
 		sentryCfg       config.Sentry
@@ -89,6 +90,14 @@ func cmdServe() *cli.Command {
 				Category:    "Security",
 				Sources:     cli.EnvVars("WARREN_NO_AUTHORIZATION"),
 				Destination: &noAuthorization,
+			},
+			&cli.BoolFlag{
+				Name:        "strict-alert",
+				Usage:       "Reject alerts without corresponding policy package",
+				Category:    "Policy",
+				Sources:     cli.EnvVars("WARREN_STRICT_ALERT"),
+				Destination: &strictAlert,
+				Value:       false,
 			},
 		},
 		webUICfg.Flags(),
@@ -135,6 +144,11 @@ func cmdServe() *cli.Command {
 			policyClient, err := policyCfg.Configure()
 			if err != nil {
 				return err
+			}
+
+			// Validate strict-alert with policy configuration
+			if !policyCfg.HasPolicies() && strictAlert {
+				return goerr.New("--strict-alert requires at least one policy file to be specified")
 			}
 
 			// Configure LLM client (automatically selects Claude if available, otherwise Gemini)
@@ -206,6 +220,7 @@ func cmdServe() *cli.Command {
 				usecase.WithSlackNotifier(slackNotifier),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(toolSets),
+				usecase.WithStrictAlert(strictAlert),
 			}
 
 			uc := usecase.New(ucOptions...)
