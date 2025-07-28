@@ -418,11 +418,15 @@ Authorization policies receive rich context:
       "X-Forwarded-For": ["192.168.1.1"]
     }
   },
-  "env": {           // Environment variables (all WARREN_* variables)
+  "env": {           // ALL environment variables (not just WARREN_*)
     "WARREN_ENV": "production",
     "WARREN_WEBHOOK_TOKEN": "secret-token",
-    "WARREN_SLACK_CHANNEL_NAME": "security-alerts"
-    // ... other WARREN_* environment variables
+    "WARREN_SLACK_CHANNEL_NAME": "security-alerts",
+    "PATH": "/usr/local/bin:/usr/bin:/bin",
+    "HOME": "/home/nonroot",
+    "USER": "nonroot",
+    "HOSTNAME": "warren-abc123"
+    // ... ALL environment variables from the system
   }
 }
 ```
