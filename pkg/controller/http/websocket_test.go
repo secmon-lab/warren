@@ -129,7 +129,7 @@ func TestHTTPServer_WithoutWebSocketHandler(t *testing.T) {
 	body, err := io.ReadAll(resp.Body)
 	gt.NoError(t, err)
 	bodyStr := string(body)
-	
+
 	// Log the response for debugging if it's not HTML
 	if !strings.Contains(bodyStr, "<!DOCTYPE html>") {
 		maxLen := 500
@@ -138,7 +138,7 @@ func TestHTTPServer_WithoutWebSocketHandler(t *testing.T) {
 		}
 		t.Logf("Unexpected response body (first %d chars): %s", maxLen, bodyStr[:maxLen])
 	}
-	
+
 	gt.True(t, strings.Contains(bodyStr, "<!DOCTYPE html>"))
 	gt.True(t, strings.Contains(bodyStr, "<title>Warren Security Monitor</title>"))
 }

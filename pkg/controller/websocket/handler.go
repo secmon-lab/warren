@@ -23,11 +23,12 @@ import (
 
 // Handler handles WebSocket connections for chat functionality
 type Handler struct {
-	hub         *Hub
-	repository  interfaces.Repository
-	useCases    *usecase.UseCases
-	upgrader    websocket.Upgrader
-	frontendURL string
+	hub            *Hub
+	repository     interfaces.Repository
+	useCases       *usecase.UseCases
+	upgrader       websocket.Upgrader
+	frontendURL    string
+	allowedOrigins []string // Additional allowed origins for development
 }
 
 // NewHandler creates a new WebSocket handler
@@ -48,6 +49,13 @@ func (h *Handler) WithFrontendURL(url string) *Handler {
 	return h
 }
 
+// WithAllowedOrigins sets additional allowed origins (useful for development)
+func (h *Handler) WithAllowedOrigins(origins []string) *Handler {
+	h.allowedOrigins = origins
+	h.setupUpgrader()
+	return h
+}
+
 // setupUpgrader configures the WebSocket upgrader with appropriate origin checking
 func (h *Handler) setupUpgrader() {
 	h.upgrader = websocket.Upgrader{
@@ -59,25 +67,56 @@ func (h *Handler) setupUpgrader() {
 
 // checkOrigin validates the request origin for CSWH protection
 func (h *Handler) checkOrigin(r *http.Request) bool {
+	logger := logging.From(r.Context())
+
 	// If no frontend URL is configured, deny all connections for security
-	if h.frontendURL == "" {
+	if h.frontendURL == "" && len(h.allowedOrigins) == 0 {
+		logger.Warn("Origin check failed: no frontend URL or allowed origins configured")
 		return false
 	}
 
-	// Parse the configured frontend URL
-	frontendOrigin := h.frontendURL
-	// Remove trailing slash if present
-	frontendOrigin = strings.TrimSuffix(frontendOrigin, "/")
-
 	// Get the request origin
 	origin := r.Header.Get("Origin")
+
 	if origin == "" {
 		// No origin header means same-origin request, which should be allowed
+		logger.Debug("Origin check passed: no origin header (same-origin request)")
 		return true
 	}
 
-	// Check if the origin matches the configured frontend URL
-	return origin == frontendOrigin
+	// Build list of allowed origins
+	allowedOrigins := []string{}
+
+	// Add frontend URL as allowed origin
+	if h.frontendURL != "" {
+		frontendOrigin := strings.TrimSuffix(h.frontendURL, "/")
+		allowedOrigins = append(allowedOrigins, frontendOrigin)
+	}
+
+	// Add additional allowed origins
+	for _, allowed := range h.allowedOrigins {
+		allowedOrigins = append(allowedOrigins, strings.TrimSuffix(allowed, "/"))
+	}
+
+	logger.Debug("WebSocket origin check",
+		"origin", origin,
+		"allowed_origins", allowedOrigins,
+		"frontend_url", h.frontendURL)
+
+	// Check if the origin matches any allowed origin
+	for _, allowed := range allowedOrigins {
+		if origin == allowed {
+			logger.Debug("Origin check passed: origin matches allowed origin",
+				"origin", origin,
+				"matched", allowed)
+			return true
+		}
+	}
+
+	logger.Warn("Origin check failed: origin not in allowed list",
+		"origin", origin,
+		"allowed_origins", allowedOrigins)
+	return false
 }
 
 const (
@@ -181,6 +220,10 @@ func (h *Handler) readPump(client *Client) {
 		"user_id", client.userID)
 
 	defer func() {
+		logger.Debug("ReadPump ending, unregistering client",
+			"ticket_id", client.ticketID,
+			"user_id", client.userID,
+			"client_id", client.clientID)
 		h.hub.Unregister(client)
 		if err := client.conn.Close(); err != nil {
 			logger.Debug("failed to close connection in readPump", "error", err)
@@ -214,6 +257,8 @@ func (h *Handler) readPump(client *Client) {
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				logger.Error("unexpected WebSocket close", "error", err)
+			} else {
+				logger.Debug("WebSocket read error", "error", err)
 			}
 			break
 		}
@@ -369,14 +414,24 @@ func (h *Handler) handleChatMessage(client *Client, message *websocket_model.Cha
 			// Setup notification functions for WebSocket
 			notifyFunc := func(ctx context.Context, message string) {
 				if err := h.hub.SendMessageToClient(client.clientID, message, warrenUser); err != nil {
-					logger.Error("failed to send message to client", "error", err, "client_id", client.clientID)
+					// Check if the error is due to client disconnection
+					if err.Error() == "client not found" {
+						logger.Debug("client disconnected, skipping message", "client_id", client.clientID)
+					} else {
+						logger.Error("failed to send message to client", "error", err, "client_id", client.clientID)
+					}
 				}
 			}
 
 			traceFunc := func(ctx context.Context, message string) func(context.Context, string) {
 				return func(ctx context.Context, traceMsg string) {
 					if err := h.hub.SendTraceToClient(client.clientID, traceMsg, warrenUser); err != nil {
-						logger.Error("failed to send trace to client", "error", err, "client_id", client.clientID)
+						// Check if the error is due to client disconnection
+						if err.Error() == "client not found" {
+							logger.Debug("client disconnected, skipping trace", "client_id", client.clientID)
+						} else {
+							logger.Error("failed to send trace to client", "error", err, "client_id", client.clientID)
+						}
 					}
 				}
 			}

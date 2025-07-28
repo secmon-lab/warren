@@ -76,6 +76,8 @@ export function useWebSocket(
 
     console.log('Attempting WebSocket connection to:', url);
     console.log('User:', user);
+    console.log('Connection timestamp:', new Date().toISOString());
+    console.log('Current WebSocket state:', wsRef.current?.readyState);
     
     const ws = new WebSocket(url);
     wsRef.current = ws;
@@ -130,6 +132,7 @@ export function useWebSocket(
       console.error('WebSocket error:', error);
       console.error('WebSocket readyState:', ws.readyState);
       console.error('WebSocket URL:', url);
+      console.error('Error timestamp:', new Date().toISOString());
       updateStatus('error');
     };
 
@@ -141,6 +144,12 @@ export function useWebSocket(
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current);
         pingIntervalRef.current = null;
+      }
+
+      // Don't reconnect for normal closure (1000) or going away (1001)
+      if (event.code === 1000 || event.code === 1001) {
+        console.log('WebSocket closed normally, not reconnecting');
+        return;
       }
 
       // Don't reconnect if we've reached max attempts
@@ -186,9 +195,12 @@ export function useWebSocket(
       pingIntervalRef.current = null;
     }
 
-    // Close WebSocket connection
+    // Reset reconnection counter to prevent immediate reconnection
+    reconnectCountRef.current = 0;
+
+    // Close WebSocket connection with normal closure code
     if (wsRef.current) {
-      wsRef.current.close();
+      wsRef.current.close(1000, "Client closing connection");
       wsRef.current = null;
     }
 
@@ -214,18 +226,30 @@ export function useWebSocket(
 
   // Connect on mount and disconnect on unmount
   useEffect(() => {
-    // Only connect if we have both ticketId and user, and not already connected/connecting
-    if (ticketId && user?.sub && status === 'disconnected') {
+    // Skip if no ticketId or user
+    if (!ticketId || !user?.sub) {
+      return;
+    }
+
+    // Connect if not already connected/connecting
+    if (wsRef.current?.readyState !== WebSocket.OPEN && 
+        wsRef.current?.readyState !== WebSocket.CONNECTING) {
       connect();
     }
 
     return () => {
+      // Clear any pending reconnect timeouts
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      
       // Only disconnect if we're actually connected
       if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
         disconnect();
       }
     };
-  }, [ticketId, user?.sub, status, connect, disconnect]); // Reconnect when ticketId, user, or status changes
+  }, [ticketId, user?.sub]); // Only reconnect when ticketId or user changes
 
   const stopReconnecting = useCallback(() => {
     if (reconnectTimeoutRef.current) {

@@ -32,6 +32,12 @@ export default defineConfig({
     proxy: {
       "/graphql": "http://localhost:8080",
       "/api": "http://localhost:8080",
+      "/ws": {
+        target: "http://localhost:8080",
+        ws: true,
+        changeOrigin: true,
+        rewrite: (path) => path,
+      },
     },
   },
   build: {

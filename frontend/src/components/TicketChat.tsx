@@ -200,8 +200,8 @@ export function TicketChat({ ticketId }: TicketChatProps) {
                   : "Connecting to chat..."
               }
               disabled={status !== 'connected'}
-              className="min-h-[60px] resize-none"
-              rows={2}
+              className="min-h-[40px] resize-none"
+              rows={1}
             />
             <Button
               type="submit"

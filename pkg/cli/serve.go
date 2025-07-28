@@ -44,19 +44,20 @@ func generateFrontendURL(addr string) string {
 
 func cmdServe() *cli.Command {
 	var (
-		addr            string
-		enableGraphQL   bool
-		enableGraphiQL  bool
-		noAuthorization bool
-		strictAlert     bool
-		webUICfg        config.WebUI
-		policyCfg       config.Policy
-		sentryCfg       config.Sentry
-		slackCfg        config.Slack
-		llmCfg          config.LLMCfg
-		firestoreCfg    config.Firestore
-		storageCfg      config.Storage
-		mcpCfg          config.MCPConfig
+		addr             string
+		enableGraphQL    bool
+		enableGraphiQL   bool
+		noAuthorization  bool
+		strictAlert      bool
+		wsAllowedOrigins []string
+		webUICfg         config.WebUI
+		policyCfg        config.Policy
+		sentryCfg        config.Sentry
+		slackCfg         config.Slack
+		llmCfg           config.LLMCfg
+		firestoreCfg     config.Firestore
+		storageCfg       config.Storage
+		mcpCfg           config.MCPConfig
 	)
 
 	flags := joinFlags(
@@ -99,6 +100,13 @@ func cmdServe() *cli.Command {
 				Sources:     cli.EnvVars("WARREN_STRICT_ALERT"),
 				Destination: &strictAlert,
 				Value:       false,
+			},
+			&cli.StringSliceFlag{
+				Name:        "ws-allowed-origins",
+				Usage:       "Additional allowed origins for WebSocket connections (e.g., http://localhost:5173)",
+				Category:    "WebSocket",
+				Sources:     cli.EnvVars("WARREN_WS_ALLOWED_ORIGINS"),
+				Destination: &wsAllowedOrigins,
 			},
 		},
 		webUICfg.Flags(),
@@ -281,6 +289,14 @@ func cmdServe() *cli.Command {
 			if webUICfg.GetFrontendURL() != "" {
 				wsHandler = wsHandler.WithFrontendURL(webUICfg.GetFrontendURL())
 			}
+
+			// Add explicitly configured allowed origins for WebSocket
+			if len(wsAllowedOrigins) > 0 {
+				wsHandler = wsHandler.WithAllowedOrigins(wsAllowedOrigins)
+				logging.From(ctx).Info("WebSocket: Configured additional allowed origins",
+					"origins", wsAllowedOrigins)
+			}
+
 			serverOptions = append(serverOptions, server.WithWebSocketHandler(wsHandler))
 
 			httpServer := http.Server{

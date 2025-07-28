@@ -260,6 +260,41 @@ func TestHandler_SecurityCheckOrigin(t *testing.T) {
 		// Note: Same-origin requests (no Origin header) should be allowed
 		t.Log("Requests with no Origin header should be allowed as same-origin requests")
 	})
+
+	t.Run("Additional allowed origins for development", func(t *testing.T) {
+		handler := websocket_ctrl.NewHandler(nil, nil, nil).
+			WithFrontendURL("http://localhost:8080").
+			WithAllowedOrigins([]string{"http://localhost:5173", "http://localhost:3000"})
+		gt.Value(t, handler).NotNil()
+
+		testCases := []struct {
+			origin   string
+			expected string
+		}{
+			{"http://localhost:8080", "allowed"}, // Frontend URL
+			{"http://localhost:5173", "allowed"}, // Vite dev server
+			{"http://localhost:3000", "allowed"}, // Additional dev server
+			{"http://localhost:4000", "blocked"}, // Not in allowed list
+			{"http://evil.com", "blocked"},       // External origin
+		}
+
+		for _, tc := range testCases {
+			req := httptest.NewRequest("GET", "/", nil)
+			req.Header.Set("Origin", tc.origin)
+			allowed := handler.CheckOriginExported(req)
+			if tc.expected == "allowed" {
+				gt.True(t, allowed)
+				if !allowed {
+					t.Logf("Origin %s should be allowed", tc.origin)
+				}
+			} else {
+				gt.False(t, allowed)
+				if allowed {
+					t.Logf("Origin %s should be blocked", tc.origin)
+				}
+			}
+		}
+	})
 }
 
 // Integration tests for WebSocket handler
