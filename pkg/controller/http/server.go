@@ -210,13 +210,16 @@ func New(uc UseCase, opts ...Options) *Server {
 	// Static file serving for SPA
 	staticFS, err := fs.Sub(frontend.StaticFiles, "dist")
 	if err == nil {
-		// Dedicated favicon handlers for better reliability
-		r.Get("/favicon.ico", faviconHandler(staticFS, "favicon.ico", "image/x-icon"))
-		r.Get("/favicon-192x192.png", faviconHandler(staticFS, "favicon-192x192.png", "image/png"))
-		r.Get("/favicon-512x512.png", faviconHandler(staticFS, "favicon-512x512.png", "image/png"))
+		// Check if index.html exists
+		if _, err := staticFS.Open("index.html"); err == nil {
+			// Dedicated favicon handlers for better reliability
+			r.Get("/favicon.ico", faviconHandler(staticFS, "favicon.ico", "image/x-icon"))
+			r.Get("/favicon-192x192.png", faviconHandler(staticFS, "favicon-192x192.png", "image/png"))
+			r.Get("/favicon-512x512.png", faviconHandler(staticFS, "favicon-512x512.png", "image/png"))
 
-		// Serve static files and handle SPA routing
-		r.HandleFunc("/*", spaHandler(staticFS))
+			// Serve static files and handle SPA routing
+			r.HandleFunc("/*", spaHandler(staticFS))
+		}
 	}
 
 	return s
