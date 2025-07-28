@@ -51,6 +51,9 @@ WARREN_GEMINI_LOCATION=us-central1
 WARREN_NO_AUTHENTICATION=true
 WARREN_NO_AUTHORIZATION=true
 
+# Bind to all interfaces (required for Docker)
+WARREN_ADDR=0.0.0.0:8080
+
 # Optional: External Tool API Keys
 # Get a free API key from https://otx.alienvault.com
 # WARREN_OTX_API_KEY=your-otx-api-key
@@ -138,19 +141,19 @@ Try these actions:
 
 1. **View Alert Details**: Click on any alert to see its full information
 
-2. **AI Analysis**: Click the "Chat" button and try:
+2. **Create a Ticket**: Select one or more alerts and click "Create Ticket" to group them for investigation
+
+3. **AI Analysis**: After creating a ticket, navigate to the ticket details and click the "Chat" button to analyze the alert:
    ```
    Analyze IP 45.227.255.182 using available tools
    ```
    If you added an OTX API key, you'll see real threat intelligence data!
 
-3. **Create a Ticket**: Select one or more alerts and click "Create Ticket" to group them for investigation
+![Warren Dashboard](./images/dashboard.png)
+*Warren dashboard showing the "Malicious IP Communication Detected" alert*
 
-`TODO: Screenshot of Warren dashboard showing the alerts list with "Malicious IP Communication Detected" alert visible. The left navigation and main alert grid should be clearly visible.`
-
-`TODO: Screenshot of the Chat interface showing the AI agent analyzing IP 45.227.255.182, with tool execution results visible (especially if OTX integration is configured).`
-
-`TODO: (Optional) If multiple alerts were sent: Screenshot of the Clusters page showing how similar C2 communication alerts are grouped together.`
+![Chat Interface](./images/chat.png)
+*AI agent analyzing IP 45.227.255.182 with threat intelligence results*
 
 ## What's Next?
 

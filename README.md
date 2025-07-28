@@ -78,6 +78,7 @@ docker run -d \
   -e WARREN_GEMINI_PROJECT_ID=$PROJECT_ID \
   -e WARREN_NO_AUTHENTICATION=true \
   -e WARREN_NO_AUTHORIZATION=true \
+  -e WARREN_ADDR=0.0.0.0:8080 \
   ghcr.io/secmon-lab/warren:latest serve
 
 # Or build locally if the image is not available:

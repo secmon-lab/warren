@@ -169,6 +169,7 @@ Follow our [Getting Started Guide](./getting_started.md) to have Warren running 
 
 **What you get** (everything from Level 1 plus):
 - ✅ Persistent data storage (Firestore)
+- ✅ Cloud Storage for attachments (required with Firestore)
 - ✅ Slack integration for team notifications
 - ✅ User authentication via Slack OAuth
 - ✅ Basic security controls
@@ -176,29 +177,17 @@ Follow our [Getting Started Guide](./getting_started.md) to have Warren running 
 **Additional Requirements**:
 - Slack workspace with admin access
 - Firestore database setup
+- Cloud Storage bucket (automatically used when Firestore is enabled)
+- Basic authorization policy (Rego file)
 
-**Upgrade from Level 1**:
-1. Create a Slack app (see [Slack Configuration Guide](./installation_slack.md))
-2. Enable Firestore in your Google Cloud project
-3. Add these environment variables:
-   ```bash
-   WARREN_SLACK_OAUTH_TOKEN=xoxb-your-token
-   WARREN_SLACK_SIGNING_SECRET=your-secret
-   WARREN_SLACK_CLIENT_ID=your-client-id
-   WARREN_SLACK_CLIENT_SECRET=your-client-secret
-   WARREN_SLACK_CHANNEL_NAME=security-alerts
-   WARREN_FIRESTORE_PROJECT_ID=$PROJECT_ID
-   # Remove the no-auth flags
-   # WARREN_NO_AUTHENTICATION=true  # Remove this
-   # WARREN_NO_AUTHORIZATION=true   # Remove this
-   ```
+**Quick Setup**:
+See [Starting with Level 2](#starting-with-level-2) for detailed upgrade instructions.
 
 ### Level 3: Production Ready
 
 **Perfect for**: Production deployments, enterprise environments
 
 **What you get** (everything from Level 2 plus):
-- ✅ Cloud Storage for file attachments
 - ✅ Secret Manager for secure credential storage
 - ✅ Cloud Run deployment with auto-scaling
 - ✅ Identity-Aware Proxy for additional security
@@ -231,12 +220,13 @@ Use this checklist to track your configuration progress:
 - [ ] Slack app created
 - [ ] OAuth tokens and secrets configured
 - [ ] Firestore database created
+- [ ] Cloud Storage bucket created
+- [ ] Authorization policy created (basic.rego)
 - [ ] Slack channel configured
 - [ ] Team members invited to Slack channel
 
 ### Level 3: Production Ready
 - [ ] All Level 2 requirements
-- [ ] Cloud Storage bucket created
 - [ ] Secret Manager configured
 - [ ] Cloud Run service deployed
 - [ ] Custom domain configured (optional)
@@ -266,6 +256,7 @@ docker run -d \
   -e WARREN_GEMINI_PROJECT_ID=$PROJECT_ID \
   -e WARREN_NO_AUTHENTICATION=true \
   -e WARREN_NO_AUTHORIZATION=true \
+  -e WARREN_ADDR=0.0.0.0:8080 \
   ghcr.io/secmon-lab/warren:latest serve
 
 # Note: If the image is not available, build locally:
@@ -285,17 +276,41 @@ To upgrade from Level 1 to Level 2:
 # Follow: https://github.com/secmon-lab/warren/blob/main/doc/installation_slack.md
 # Get your OAuth token and signing secret
 
-# 2. Enable Firestore
-gcloud services enable firestore.googleapis.com
+# 2. Enable Firestore and Cloud Storage
+gcloud services enable firestore.googleapis.com storage.googleapis.com
 gcloud firestore databases create \
   --location=us-central1 \
   --type=firestore-native
 
-# 3. Update your Docker command
+# Create Cloud Storage bucket
+gsutil mb gs://warren-storage-$PROJECT_ID
+
+# 3. Create authorization policy (required when removing WARREN_NO_AUTHORIZATION)
+mkdir -p policies/auth
+cat > policies/auth/basic.rego << 'EOF'
+package auth
+
+default allow = false
+
+# Allow all requests for now (basic setup)
+# In production, implement proper authorization logic based on:
+# - input.google (Google OAuth claims)
+# - input.iap (Google IAP claims)
+# - input.req (HTTP request details)
+# - input.env (environment variables)
+allow = true
+EOF
+
+# For production policies, see: https://github.com/secmon-lab/warren/blob/main/doc/policy.md
+
+# 4. Update your Docker command (now with policy mount)
 docker run -d \
   --name warren \
   -p 8080:8080 \
   -v ~/.config/gcloud:/home/nonroot/.config/gcloud:ro \
+  -v $(pwd)/policies:/policies:ro \
+  -e WARREN_ADDR=0.0.0.0:8080 \
+  -e WARREN_POLICY=/policies \
   -e WARREN_GEMINI_PROJECT_ID=$PROJECT_ID \
   -e WARREN_FIRESTORE_PROJECT_ID=$PROJECT_ID \
   -e WARREN_SLACK_OAUTH_TOKEN="xoxb-your-token" \
@@ -303,6 +318,7 @@ docker run -d \
   -e WARREN_SLACK_CLIENT_ID="your-client-id" \
   -e WARREN_SLACK_CLIENT_SECRET="your-client-secret" \
   -e WARREN_SLACK_CHANNEL_NAME="security-alerts" \
+  -e WARREN_STORAGE_BUCKET="warren-storage-$PROJECT_ID" \
   ghcr.io/secmon-lab/warren:latest serve
 ```
 
