@@ -18,6 +18,47 @@ Key concepts:
 
 Alert policies transform incoming events into Warren alerts with structured metadata.
 
+### When to Use Alert Policies
+
+While Warren automatically enriches alerts with AI-generated titles, descriptions, and attributes, you should create custom policies when you need:
+
+1. **Deterministic Processing**: Apply predefined rules for consistent alert formatting
+2. **Conditional Filtering**: Ignore alerts based on specific criteria (e.g., known false positives)
+3. **Alert Multiplication**: Generate multiple alerts from a single event
+4. **Custom Enrichment**: Add specific attributes or links before AI processing
+5. **Compliance Requirements**: Ensure specific fields are always present for audit purposes
+
+### Policy Evaluation Flow
+
+```mermaid
+flowchart TD
+    A[Incoming Event] --> B{Policy Exists?}
+    B -->|Yes| C[Policy Evaluation]
+    B -->|No| D[Direct to AI Enrichment]
+    
+    C --> E{Alert Generated?}
+    E -->|Yes| F[Policy-defined Alert]
+    E -->|No/Ignored| G[Event Dropped]
+    
+    F --> H{Has title/description?}
+    H -->|Yes| I[Send to Warren]
+    H -->|No| J[AI Enrichment]
+    
+    D --> J
+    J --> K[AI-generated title/description/attrs]
+    K --> I
+    
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style I fill:#9f9,stroke:#333,stroke-width:2px
+    style G fill:#faa,stroke:#333,stroke-width:2px
+```
+
+**Key Points:**
+- If a policy exists for the webhook path, it's evaluated first
+- Policy can filter (ignore) events before they reach AI
+- Policy-generated alerts can skip AI enrichment if complete
+- Events without policies go directly to AI enrichment
+
 ### Structure
 
 Alert policies follow this pattern:
@@ -53,6 +94,34 @@ ignore if {
 The package name determines the webhook endpoint:
 - Package: `alert.guardduty`
 - Endpoint: `/hooks/alert/raw/guardduty`
+
+### Webhook Endpoint Examples
+
+**Important**: Warren doesn't have predefined webhook endpoints. You create endpoints by defining policy packages. The package name determines the webhook URL.
+
+Here are some **example patterns** you might use:
+
+| Example Use Case | Package Name | Resulting Webhook Endpoint |
+|-----------------|--------------|----------------------------|
+| AWS GuardDuty | `alert.guardduty` | `/hooks/alert/raw/guardduty` |
+| Custom monitoring | `alert.monitoring` | `/hooks/alert/raw/monitoring` |
+| Security scanner | `alert.scanner` | `/hooks/alert/raw/scanner` |
+| Your app alerts | `alert.myapp` | `/hooks/alert/raw/myapp` |
+
+**How it works**:
+1. You create a policy file with package name (e.g., `package alert.myapp`)
+2. Warren automatically creates the webhook endpoint
+3. Send your tool's webhooks to that endpoint
+4. Your policy processes the incoming data
+
+**Special Integration Patterns**:
+
+| Integration Type | Endpoint Pattern | Use Case |
+|-----------------|------------------|----------|
+| AWS SNS | `/hooks/alert/sns/{name}` | For AWS services via SNS topics |
+| Google Pub/Sub | `/hooks/alert/pubsub/{name}` | For GCP services via Pub/Sub |
+
+**Remember**: These are just examples. You can name your packages anything that makes sense for your security tools and workflows.
 
 ### Input Data
 
@@ -223,26 +292,159 @@ ignore if {
 
 Authorization policies control access to Warren's APIs.
 
+### Understanding Warren's Authorization Flow
+
+When `WARREN_NO_AUTHORIZATION` flag is removed (Level 2 and above), every API request goes through policy evaluation:
+
+1. HTTP request is received
+2. Context is built from request data, authentication tokens, and environment
+3. Policy engine evaluates `data.auth` with the context
+4. Request is allowed only if `allow = true`
+
+### Authorization Flow Sequence
+
+The following sequence diagram shows how Warren processes authorization for API requests:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Warren HTTP Server
+    participant Auth Middleware
+    participant Policy Engine
+    participant Request Handler
+    
+    Client->>Warren HTTP Server: HTTP Request
+    Note over Client: Headers, Body, etc.
+    
+    Warren HTTP Server->>Auth Middleware: Process Request
+    
+    Auth Middleware->>Auth Middleware: Extract Auth Context
+    Note over Auth Middleware: Google IAP JWT<br/>Google ID Token<br/>SNS Message<br/>HTTP Request
+    
+    Auth Middleware->>Auth Middleware: Build Context
+    Note over Auth Middleware: Context includes:<br/>- google: {}<br/>- iap: {}<br/>- sns: {}<br/>- req: {}<br/>- env: {}
+    
+    Auth Middleware->>Policy Engine: Query("data.auth", context)
+    
+    Policy Engine->>Policy Engine: Evaluate auth.rego
+    Note over Policy Engine: Check rules against<br/>provided context
+    
+    alt Authorization Allowed
+        Policy Engine-->>Auth Middleware: {allow: true}
+        Auth Middleware->>Request Handler: Continue Request
+        Request Handler-->>Client: HTTP Response (2xx)
+    else Authorization Denied
+        Policy Engine-->>Auth Middleware: {allow: false}
+        Auth Middleware-->>Client: HTTP 403 Forbidden
+        Note over Client: "Authorization failed.<br/>Check your policy."
+    else Policy Error
+        Policy Engine-->>Auth Middleware: Error
+        Auth Middleware-->>Client: HTTP 500 Error
+    end
+```
+
+**Key Points:**
+
+1. **Context Building**: The middleware automatically extracts authentication information from various sources
+2. **Policy Query**: The entire context is passed to the policy engine as `input`
+3. **Binary Decision**: The policy must return `allow = true` for the request to proceed
+4. **Error Handling**: Both policy errors and denials are handled appropriately
+
 ### Context Structure
 
 Authorization policies receive rich context:
 
 ```json
 {
-  "google": {},      // Google ID token claims
-  "iap": {},         // Google IAP JWT claims
-  "sns": {},         // AWS SNS message data
-  "req": {           // HTTP request
+  "google": {         // Google ID token claims (when present)
+    "iss": "https://accounts.google.com",
+    "sub": "1234567890",                    // User's unique ID
+    "aud": "client-12345.apps.googleusercontent.com",
+    "exp": 1311281970,                      // Expiration timestamp
+    "iat": 1311280970,                      // Issued at timestamp
+    "email": "user@example.com",
+    "email_verified": true,
+    "name": "Jane Doe",
+    "given_name": "Jane",
+    "family_name": "Doe",
+    "picture": "https://lh3.googleusercontent.com/...",
+    "locale": "en",
+    "hd": "example.com",                    // Hosted domain (G Suite/Workspace)
+    "nonce": "...",                         // If nonce was provided
+    "auth_time": 1311280970                 // Authentication time
+  },
+  "iap": {            // Google IAP JWT claims (when present)
+    "iss": "https://cloud.google.com/iap",
+    "sub": "accounts.google.com:1234567890", // User's unique ID
+    "aud": "/projects/123456/apps/warren",   // Your app's audience
+    "exp": 1311281970,                       // Expiration timestamp
+    "iat": 1311280970,                       // Issued at timestamp
+    "email": "user@example.com",
+    "email_verified": true,
+    "gcip": {                                // External identity provider data (if used)
+      "auth_time": 1553219869,
+      "email": "user@example.com",
+      "email_verified": false,
+      "firebase": {
+        "identities": {},
+        "sign_in_provider": "password"
+      },
+      "name": "User Name",
+      "picture": "https://...",
+      "sub": "..."
+    }
+  },
+  "sns": {            // AWS SNS message data (when present)
+    "Type": "Notification",                  // or "SubscriptionConfirmation"
+    "MessageId": "22b80b92-fdea-4c2c-8f9d-bdfb0c7bf324",
+    "Token": "...",                         // For subscription confirmation
+    "TopicArn": "arn:aws:sns:us-east-1:123456789012:MyTopic",
+    "Subject": "My Subject",                // Optional
+    "Message": "{\"default\":\"Hello\"}",  // The actual message content
+    "Timestamp": "2023-01-01T12:00:00.000Z",
+    "SignatureVersion": "1",                // or "2"
+    "Signature": "...",                     // Message signature
+    "SigningCertURL": "https://sns.us-east-1.amazonaws.com/...",
+    "SubscribeURL": "https://sns.us-east-1.amazonaws.com/..."  // For confirmations
+  },
+  "req": {           // HTTP request details
     "method": "POST",
     "path": "/api/tickets",
-    "body": "...",
-    "header": {}
+    "body": "{\"title\":\"Test\"}",         // Request body as string
+    "header": {
+      "Content-Type": ["application/json"],
+      "Authorization": ["Bearer ..."],
+      "X-User-Email": ["user@example.com"],  // Custom headers
+      "X-Forwarded-For": ["192.168.1.1"]
+    }
   },
-  "env": {}          // Environment variables (WARREN_*)
+  "env": {           // Environment variables (all WARREN_* variables)
+    "WARREN_ENV": "production",
+    "WARREN_WEBHOOK_TOKEN": "secret-token",
+    "WARREN_SLACK_CHANNEL_NAME": "security-alerts"
+    // ... other WARREN_* environment variables
+  }
 }
 ```
 
 ### Common Patterns
+
+#### Basic Setup (Getting Started)
+
+For initial setup when transitioning from Level 1 to Level 2:
+
+```rego
+package auth
+
+default allow = false
+
+# WARNING: This allows all requests - only for initial setup!
+# Replace with proper rules before production use
+allow = true
+
+# TODO: Implement proper authorization based on your requirements
+# Examples below show common patterns
+```
 
 #### Allow Authenticated Users
 
@@ -251,7 +453,7 @@ package auth
 
 default allow = false
 
-# Allow any authenticated user
+# Allow any authenticated user via Google IAP
 allow = true if {
     input.iap.email
 }
@@ -261,7 +463,96 @@ allow = true if {
     input.iap.email
     endswith(input.iap.email, "@example.com")
 }
+
+# Allow Slack-authenticated users
+allow = true if {
+    input.req.header["X-User-Email"][0]
+    endswith(input.req.header["X-User-Email"][0], "@yourcompany.com")
+}
 ```
+
+#### Combining Multiple Authentication Methods
+
+```rego
+package auth
+
+import rego.v1
+
+default allow = false
+
+# Allow Google IAP authenticated users from specific domain
+allow if {
+    input.iap.email
+    endswith(input.iap.email, "@example.com")
+}
+
+# Allow specific service accounts via Google ID token
+allow if {
+    input.google.email
+    input.google.email in [
+        "monitoring-service@project.iam.gserviceaccount.com",
+        "alerting-service@project.iam.gserviceaccount.com"
+    ]
+}
+
+# Allow webhook requests with valid token
+allow if {
+    startswith(input.req.path, "/hooks/alert/")
+    input.req.header.Authorization[0] == sprintf("Bearer %s", [input.env.WARREN_WEBHOOK_TOKEN])
+}
+
+# Allow AWS SNS requests (already verified by middleware)
+allow if {
+    startswith(input.req.path, "/hooks/alert/sns/")
+    input.sns.Type in ["Notification", "SubscriptionConfirmation"]
+}
+
+# Allow Slack OAuth authenticated users with admin role
+allow if {
+    # Check for Slack user header (set by Warren after OAuth)
+    input.req.header["X-User-Email"][0]
+    input.req.header["X-User-Role"][0] == "admin"
+}
+
+# Conditional access based on time and user
+allow if {
+    # During business hours, allow any authenticated user
+    current_hour := time.clock(time.now_ns())[0]
+    current_hour >= 9
+    current_hour < 17
+    input.iap.email  # Any IAP authenticated user
+}
+
+allow if {
+    # After hours, only allow on-call team
+    current_hour := time.clock(time.now_ns())[0]
+    outside_business_hours := current_hour < 9 or current_hour >= 17
+    outside_business_hours
+    input.iap.email in [
+        "oncall1@example.com",
+        "oncall2@example.com",
+        "security-lead@example.com"
+    ]
+}
+
+# Debug rule - logs authentication attempts (remove in production)
+debug_auth[msg] if {
+    msg := sprintf("Auth attempt: path=%s, has_iap=%v, has_google=%v, has_sns=%v", [
+        input.req.path,
+        input.iap != null,
+        input.google != null,
+        input.sns != null
+    ])
+}
+```
+
+**Best Practices for Combined Authentication:**
+
+1. **Order Rules by Specificity**: Place more specific rules first
+2. **Use Clear Comments**: Document what each rule allows and why
+3. **Test Thoroughly**: Ensure no unintended access paths
+4. **Log for Debugging**: Use debug rules during development (remove in production)
+5. **Fail Secure**: Default to `allow = false`
 
 #### Service Account Access
 
@@ -307,17 +598,125 @@ Warren includes a policy testing framework.
 
 ### Test Structure
 
-Create test directories:
+Create test directories matching your policy structure:
+
 ```
 policies/
 ├── alert/
 │   └── myservice.rego
+├── auth/
+│   └── auth.rego           # Your authorization policy
 └── test/
-    └── myservice/
-        ├── detect/
-        │   └── test1.json
-        └── ignore/
-            └── test2.json
+    ├── myservice/          # Tests for alert policies
+    │   ├── detect/
+    │   │   └── test1.json  # Should trigger alerts
+    │   └── ignore/
+    │       └── test2.json  # Should be ignored
+    └── auth/               # Tests for auth policies
+        ├── allow/
+        │   └── admin.json  # Should be allowed
+        └── deny/
+            └── anonymous.json  # Should be denied
+```
+
+### Authorization Policy Test Examples
+
+**Allow test** (`test/auth/allow/admin.json`):
+```json
+{
+  "iap": {
+    "email": "admin@example.com",
+    "sub": "1234567890",
+    "aud": ["/projects/123456/apps/warren"]
+  },
+  "req": {
+    "method": "POST",
+    "path": "/api/tickets",
+    "header": {
+      "Content-Type": ["application/json"]
+    }
+  },
+  "env": {
+    "WARREN_ENV": "production"
+  }
+}
+```
+
+**Allow test** (`test/auth/allow/service_account.json`):
+```json
+{
+  "google": {
+    "email": "monitoring-service@project.iam.gserviceaccount.com",
+    "sub": "service-account-id",
+    "iss": "https://accounts.google.com"
+  },
+  "req": {
+    "method": "POST",
+    "path": "/hooks/alert/raw/monitoring",
+    "header": {
+      "Authorization": ["Bearer ya29.xxx"]
+    }
+  }
+}
+```
+
+**Allow test** (`test/auth/allow/webhook.json`):
+```json
+{
+  "req": {
+    "method": "POST",
+    "path": "/hooks/alert/raw/custom",
+    "header": {
+      "Authorization": ["Bearer secret-webhook-token-123"],
+      "Content-Type": ["application/json"]
+    },
+    "body": "{\"alert\": \"test\"}"
+  },
+  "env": {
+    "WARREN_WEBHOOK_TOKEN": "secret-webhook-token-123"
+  }
+}
+```
+
+**Deny test** (`test/auth/deny/anonymous.json`):
+```json
+{
+  "req": {
+    "method": "GET",
+    "path": "/api/tickets",
+    "header": {}
+  }
+}
+```
+
+**Deny test** (`test/auth/deny/wrong_domain.json`):
+```json
+{
+  "iap": {
+    "email": "user@wrongdomain.com",
+    "sub": "9876543210"
+  },
+  "req": {
+    "method": "GET",
+    "path": "/api/tickets"
+  }
+}
+```
+
+**Deny test** (`test/auth/deny/invalid_webhook_token.json`):
+```json
+{
+  "req": {
+    "method": "POST",
+    "path": "/hooks/alert/raw/custom",
+    "header": {
+      "Authorization": ["Bearer wrong-token"]
+    }
+  },
+  "env": {
+    "WARREN_WEBHOOK_TOKEN": "correct-token"
+  }
+}
 ```
 
 ### Running Tests
@@ -1033,6 +1432,14 @@ policies/
    - Invalid data types
    - Extreme values
 
+6. **Security Considerations**
+   - Never log sensitive data in policies
+   - Validate all external inputs
+   - Use allowlists over denylists when possible
+   - Regularly review and update ignore rules
+
+`TODO: Add a troubleshooting section for common policy errors`
+
 ## Advanced Topics
 
 ### Dynamic Attributes
@@ -1119,6 +1526,137 @@ alert contains {...} if {
 }
 ```
 
+## Troubleshooting Common Issues
+
+### Authorization Policy Not Working
+
+If your authorization policy isn't being evaluated:
+
+1. **Check Package Name**: Must be `package auth` (not `auth.something`)
+2. **Verify Policy Mount**: Ensure `-v $(pwd)/policies:/policies:ro` in Docker command
+3. **Set WARREN_POLICY**: Environment variable must point to policy directory
+4. **Remove NO_AUTHORIZATION**: Ensure flag is not set
+5. **Check Logs**: Look for policy evaluation results in debug logs
+
+### Alert Policy Not Triggering
+
+1. **Verify Endpoint**: Package name must match webhook path
+2. **Check Input Structure**: Use `print()` to debug input data
+3. **Test Conditions**: Ensure your conditions can be satisfied
+4. **Review Ignore Rules**: Check if alerts are being filtered
+
+### Additional Troubleshooting Scenarios
+
+#### Policy Not Loading
+
+**Symptoms**: Warren starts but policies don't seem to be evaluated
+
+**Checks**:
+1. Verify `WARREN_POLICY` environment variable is set correctly
+2. Check file permissions on policy directory (must be readable)
+3. Look for policy loading errors in startup logs
+4. Ensure `.rego` files have correct syntax
+
+**Solution**:
+```bash
+# Test policy syntax
+opa fmt --list policies/
+opa test policies/
+
+# Check Warren logs
+docker logs warren | grep -i policy
+```
+
+#### Intermittent Authorization Failures
+
+**Symptoms**: Same request sometimes works, sometimes fails
+
+**Common Causes**:
+1. **Time-based rules**: Check if policies have time conditions
+2. **Token expiration**: IAP/OAuth tokens may expire during testing
+3. **Race conditions**: Context building might be incomplete
+
+**Debug Steps**:
+```rego
+# Add debug logging to your policy
+allow if {
+    print("Current time:", time.now_ns())
+    print("Input context:", input)
+    # ... your rules ...
+}
+```
+
+#### Missing Context Data
+
+**Symptoms**: `input.google` or `input.iap` is empty when expected
+
+**Checks**:
+1. Verify authentication headers are being sent
+2. Check middleware ordering in server configuration
+3. Ensure tokens are valid and not expired
+
+**Debug with curl**:
+```bash
+# Test with Google ID token
+curl -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     https://your-warren/api/tickets
+
+# Test with IAP header
+curl -H "x-goog-iap-jwt-assertion: $IAP_JWT" \
+     https://your-warren/api/tickets
+```
+
+#### Policy Changes Not Taking Effect
+
+**Symptoms**: Modified policy file but behavior doesn't change
+
+**Solutions**:
+1. **Docker volume mount**: Ensure you're editing the mounted file
+2. **Hot reload**: Warren doesn't auto-reload policies - restart the container
+3. **Cache issues**: Clear browser cache if testing via UI
+
+```bash
+# Restart Warren to reload policies
+docker restart warren
+
+# Or use --watch flag (if implemented)
+warren serve --policy ./policies --watch
+```
+
+#### Webhook Authorization Failures
+
+**Symptoms**: External tools can't send alerts, getting 403 errors
+
+**Common Issues**:
+1. **Wrong token format**: Ensure "Bearer " prefix is included
+2. **Environment variable mismatch**: Check `WARREN_WEBHOOK_TOKEN` value
+3. **Path matching**: Verify webhook path in policy matches actual endpoint
+
+**Test webhook auth**:
+```bash
+# Test with correct token
+curl -X POST \
+  -H "Authorization: Bearer $WARREN_WEBHOOK_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"test": "alert"}' \
+  http://localhost:8080/hooks/alert/raw/test
+```
+
+#### Debugging Complex Policies
+
+**Use OPA's built-in tools**:
+```bash
+# Evaluate policy with specific input
+opa eval -d policies/auth/auth.rego \
+         -i test/auth/allow/admin.json \
+         "data.auth.allow"
+
+# Run REPL for interactive testing
+opa run policies/
+> data.auth.allow with input as {"iap": {"email": "test@example.com"}}
+```
+
 ## Next Steps
 
 1. Start with simple policies and iterate
@@ -1126,3 +1664,53 @@ alert contains {...} if {
 3. Monitor policy performance
 4. Share patterns with your team
 5. Contribute improvements back to Warren
+
+## Additional Resources
+
+- [Open Policy Agent Documentation](https://www.openpolicyagent.org/docs/latest/)
+- [Rego Playground](https://play.openpolicyagent.org/) - Test policies online
+- [Warren Examples Repository](https://github.com/secmon-lab/warren/tree/main/examples/policies) - Community contributed policies
+
+## Examples Directory
+
+For ready-to-use policy examples, check the [examples/policies](https://github.com/secmon-lab/warren/tree/main/examples/policies) directory in the Warren repository. It includes:
+
+### Alert Detection Policies
+- **AWS Services**: GuardDuty, CloudTrail, Security Hub
+- **Network Security**: Suricata, Snort, Zeek
+- **Host Security**: OSSEC, Wazuh, Falco
+- **Cloud Platforms**: GCP Security Command Center, Azure Sentinel
+- **SIEM Integration**: Splunk, Elastic, Datadog
+
+### Authorization Policies
+- **Basic Setup**: Simple allow-all for getting started
+- **Domain-based**: Allow users from specific email domains
+- **Role-based**: Different access levels based on user roles
+- **Time-based**: Business hours vs after-hours access
+- **Service Accounts**: Allow specific automation accounts
+
+### Testing Examples
+- Complete test suites for each policy
+- Input data samples from real security tools
+- Performance testing scenarios
+
+### Custom Templates
+- Webhook receiver template
+- Multi-source aggregation template
+- Enrichment pipeline template
+
+To use these examples:
+
+```bash
+# Clone the repository
+git clone https://github.com/secmon-lab/warren.git
+cd warren
+
+# Copy example policies
+cp -r examples/policies/* /path/to/your/policies/
+
+# Customize for your environment
+vi /path/to/your/policies/auth/auth.rego
+```
+
+**Contributing**: If you've created policies for security tools not yet covered, please consider submitting a pull request to share with the community!

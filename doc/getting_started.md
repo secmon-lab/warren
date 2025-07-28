@@ -1,218 +1,224 @@
-# Getting Started with Warren
+# Getting Started with Warren in 5 Minutes
 
-## What is Warren?
-
-Warren is an AI-powered security alert management platform designed to transform how security teams handle and respond to alerts. By combining intelligent alert processing, collaborative workflows, and powerful AI analysis, Warren helps security teams:
-
-- **Reduce Alert Fatigue**: Automatically group similar alerts and filter noise using customizable policies
-- **Accelerate Investigation**: AI-powered analysis provides instant context and threat intelligence
-- **Improve Collaboration**: Native Slack integration enables team-wide visibility and communication
-- **Maintain Knowledge**: Every investigation is tracked, creating a searchable knowledge base
-
-### Core Architecture
-
-```mermaid
-graph LR
-    A[Security Tools] -->|Alerts| B[Warren]
-    B --> C[AI Processing]
-    C --> D[Alert Clustering]
-    D --> E[Ticket Creation]
-    E --> F[Slack Notifications]
-    E --> G[Web UI]
-    
-    H[Security Analyst] --> F
-    H --> G
-    
-    style B fill:#51cf66
-    style C fill:#4285f4
-    style F fill:#4a154b
-```
+Welcome to Warren! This guide will help you get Warren up and running in just 5 minutes using Docker. You'll be able to process security alerts, analyze them with AI, and explore the web interface without any complex setup.
 
 ## Prerequisites
 
-Before using Warren, ensure you have:
+Before you begin, ensure you have:
 
-- **Access Requirements**:
-  - Warren Web UI URL (provided by your administrator)
-  - Slack workspace with Warren bot installed
-  - Login credentials (typically your Slack account)
+- **Docker**: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac) or Docker Engine (Linux)
+- **Google Cloud Account**: [Create a free account](https://cloud.google.com/free) if you do not have one
+- **gcloud CLI**: [Installation guide](https://cloud.google.com/sdk/docs/install)
 
-- **Basic Understanding**:
-  - Security alert concepts
-  - Incident response workflows
-  - Basic Slack usage
+## Quick Start
 
-## Your First Alert
+### Step 1: Google Cloud Setup (2 minutes)
 
-Let's walk through processing your first security alert in Warren.
+First, set up Google Cloud authentication and enable the Vertex AI API for Warren's AI capabilities:
 
-### Step 1: Receive an Alert
+```bash
+# Set your Google Cloud project ID
+export PROJECT_ID="your-project-id"
 
-When a security event is detected, Warren automatically:
-1. Receives the alert from your security tools
-2. Evaluates it against configured policies
-3. Enriches it with AI-generated metadata
-4. Posts it to your designated Slack channel
+# Authenticate with Google Cloud
+gcloud auth application-default login
 
-You'll see something like this in Slack:
-
-```
-❗ Suspicious Login Activity Detected
-Multiple failed login attempts from unusual location
-————————————————
-*ID:* `alert-12345678-abcd-efgh-ijkl-123456789012`
-*Schema:* `guardduty`
-*Ack:* ⏳
-————————————————
-*severity:* medium
-*source_ip:* 192.168.1.100
-*region:* us-east-1
-
-[Acknowledge] [Bind to ticket]
+# Enable Vertex AI API
+gcloud services enable aiplatform.googleapis.com --project=$PROJECT_ID
 ```
 
-### Step 2: Review the Alert
+> **Note**: The `gcloud auth application-default login` command will open a browser window for authentication. This creates credentials that Warren will use to access Vertex AI.
 
-The alert message shows:
-- Alert title and description (AI-enhanced)
-- Unique alert ID and schema type
-- Acknowledgment status (⏳ for unbound, ✅ for bound)
-- Key attributes extracted from the alert
-- Action buttons for processing
+### Step 2: Run Warren with Docker (1 minute)
 
-### Step 3: Create a Ticket
+Create an environment file with your configuration:
 
-If the alert requires investigation:
+```bash
+# Create your configuration file
+cat > warren.env << EOF
+# Warren Quick Start Environment Variables
 
-1. Click **[Acknowledge]** button to create a ticket immediately
-   - This creates a ticket with AI-generated title and description
-   - The alert status changes from ⏳ to ✅
+# Required: Google Cloud Project ID for Vertex AI (Gemini)
+# You can find this in your Google Cloud Console
+WARREN_GEMINI_PROJECT_ID=your-project-id
 
-2. Or click **[Bind to ticket]** to add to an existing ticket:
-   - A modal appears showing recent tickets
-   - Select from dropdown or enter ticket ID manually
-   - Click **Bind** to associate the alert
+# Google Cloud location for Vertex AI
+# Available regions: https://cloud.google.com/vertex-ai/docs/general/locations
+WARREN_GEMINI_LOCATION=us-central1
 
-### Step 4: Investigate
+# Disable authentication for local development
+# WARNING: Only use these in development environments
+WARREN_NO_AUTHENTICATION=true
+WARREN_NO_AUTHORIZATION=true
 
-After ticket creation, you'll see a ticket message in Slack:
+# Bind to all interfaces (required for Docker)
+WARREN_ADDR=0.0.0.0:8080
 
-```
-🎫 Suspicious Login Activity Investigation
-*ID:* `ticket-87654321-dcba-hgfe-lkji-210987654321` | 🔗 View Details
-Multiple failed login attempts detected from unusual location requiring investigation
+# Optional: External Tool API Keys
+# Get a free API key from https://otx.alienvault.com
+# WARREN_OTX_API_KEY=your-otx-api-key
 
-*Status:*
-🔍 Open
-*Assignee:*
-👤 Not assigned
-————————————————
-🔔 Related Alerts
-• Suspicious Login Activity Detected
-————————————————
+# Optional: Additional threat intelligence services
+# WARREN_VIRUSTOTAL_API_KEY=your-virustotal-key
+# WARREN_URLSCAN_API_KEY=your-urlscan-key
+# WARREN_SHODAN_API_KEY=your-shodan-key
+# WARREN_ABUSEIPDB_API_KEY=your-abuseipdb-key
 
-[Resolve] [Salvage]
-```
+# Optional: Set log level for debugging
+# WARREN_LOG_LEVEL=debug
+EOF
 
-You can now:
-- Click **🔗 View Details** to open in Web UI
-- Collaborate in the Slack thread
-- Click **[Resolve]** to close with conclusion
-- Click **[Salvage]** to find similar unbound alerts
+# Update the PROJECT_ID in the file
+sed -i.bak "s/your-project-id/$PROJECT_ID/g" warren.env && rm warren.env.bak
 
-## Creating Your First Ticket
+# Run Warren with Docker
+docker run -d \
+  --name warren \
+  -p 8080:8080 \
+  -v ~/.config/gcloud:/home/nonroot/.config/gcloud:ro \
+  --env-file warren.env \
+  ghcr.io/secmon-lab/warren:latest serve
 
-### From Multiple Alerts
-
-Warren excels at handling alert storms:
-
-1. **In the Web UI**:
-   - Navigate to the Alerts page
-   - Select multiple related alerts using checkboxes
-   - Click "Create Ticket from Selected"
-   - Review and confirm the combined ticket
-
-2. **Using Alert Clustering**:
-   - Go to the Clusters view
-   - Warren automatically groups similar alerts
-   - Click "Create Ticket" on any cluster
-   - All alerts in that cluster are bound to the new ticket
-
-### Manual Ticket Creation
-
-For proactive investigations:
-
-1. Navigate to Tickets page in Web UI
-2. Click "New Ticket"
-3. Fill in:
-   - Title (what you're investigating)
-   - Description (why and initial findings)
-   - Select "Test" flag for practice tickets
-4. Create and start adding relevant alerts
-
-**Test Tickets**: When the test flag is selected, tickets display with:
-- 🧪 [TEST] prefix in the title
-- Special test indicator in Slack messages
-- Same functionality but clearly marked for practice/testing
-
-## Common Use Cases
-
-### 1. Investigating Suspicious IPs
-
-```
-1. Alert arrives about suspicious IP activity
-2. Click [Acknowledge] to create ticket
-3. In Web UI (via 🔗 View Details), click "Chat with Agent"
-4. Ask: "Analyze IP 192.168.1.100 using available tools"
-5. AI Agent automatically queries VirusTotal, AbuseIPDB, etc.
-6. Return to Slack and click [Resolve] to close ticket
+# Check the logs
+docker logs warren
 ```
 
-### 2. Handling Alert Storms
+> **Note**: If the Docker image is not available, you can build it locally:
+> ```bash
+> git clone https://github.com/secmon-lab/warren.git
+> cd warren
+> docker build -t warren:local .
+> # Then use warren:local instead of ghcr.io/secmon-lab/warren:latest
+> ```
 
+Warren should now be running at http://localhost:8080!
+
+### Step 3: Send Your First Alert (1 minute)
+
+Let's send a test security alert to Warren:
+
+```bash
+# Send a single alert about a known malicious IP
+curl -X POST http://localhost:8080/hooks/alert/raw/test \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Malicious IP Communication Detected",
+    "description": "Outbound connection to known C2 server detected",
+    "severity": "critical",
+    "source_ip": "45.227.255.182",
+    "destination_ip": "10.0.1.100",
+    "note": "This IP is associated with Cobalt Strike C2 infrastructure"
+  }'
+
+# Optional: Send multiple alerts to try the clustering feature
+for i in {1..5}; do
+  curl -X POST http://localhost:8080/hooks/alert/raw/test \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"title\": \"Suspicious C2 Communication #$i\",
+      \"description\": \"Connection to potential C2 infrastructure detected\",
+      \"severity\": \"high\",
+      \"source_ip\": \"45.227.255.$((180 + i))\",
+      \"destination_ip\": \"10.0.1.$((100 + i))\",
+      \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+    }"
+  sleep 1
+done
 ```
-1. Multiple similar alerts flood in
-2. Go to Clusters view in Web UI
-3. Adjust clustering parameters if needed
-4. Create ticket from largest cluster
-5. All related alerts are now tracked together
+
+> **Note**: The IP addresses used (45.227.255.x) are real examples of IPs reported as malicious, used here for educational purposes.
+
+### Step 4: Explore the Web UI (1 minute)
+
+Open your browser and navigate to http://localhost:8080
+
+You'll see the Warren dashboard with:
+- **Alerts**: View the security alerts you just sent
+- **Chat**: Interact with the AI agent for analysis
+- **Clusters**: See how similar alerts are grouped (if you sent multiple alerts)
+
+Try these actions:
+
+1. **View Alert Details**: Click on any alert to see its full information
+
+2. **Create a Ticket**: Select one or more alerts and click "Create Ticket" to group them for investigation
+
+3. **AI Analysis**: After creating a ticket, navigate to the ticket details and click the "Chat" button to analyze the alert:
+   ```
+   Analyze IP 45.227.255.182 using available tools
+   ```
+   If you added an OTX API key, you'll see real threat intelligence data!
+
+![Warren Dashboard](./images/dashboard.png)
+*Warren dashboard showing the "Malicious IP Communication Detected" alert*
+
+![Chat Interface](./images/chat.png)
+*AI agent analyzing IP 45.227.255.182 with threat intelligence results*
+
+## What's Next?
+
+Congratulations! You've successfully:
+- ✅ Set up Warren with minimal configuration
+- ✅ Sent and viewed security alerts
+- ✅ Used AI to analyze threats
+- ✅ Explored the web interface
+
+### Next Steps
+
+1. **Add Real Security Data**: Connect your security tools to send alerts to Warren
+2. **Enable Persistence**: Add Firestore to save your alerts and investigations
+3. **Set Up Team Collaboration**: Add Slack integration for team notifications
+4. **Configure Security**: Enable authentication and authorization for production use
+
+Ready to move beyond the quick start? Check out the [Installation Guide](./installation.md) to upgrade your setup!
+
+## Troubleshooting
+
+### Common Issues
+
+**Docker container exits immediately**
+```bash
+# Check the logs for errors
+docker logs warren
+
+# Common fix: Ensure gcloud is authenticated
+gcloud auth application-default login
 ```
 
-### 3. Collaborative Investigation
+**"Project not found" error**
+```bash
+# Verify your project ID is correct
+gcloud config get-value project
 
-```
-1. Ticket appears in Slack with 🎫 emoji
-2. Team members discuss in thread
-3. Use @mentions for specific expertise
-4. All comments sync between Slack and Web UI
-5. Click [Resolve] button and select conclusion:
-   - 👍 Intended - Expected behavior
-   - 🛡️ Unaffected - No impact
-   - 🚫 False Positive - Incorrect alert
-   - 🚨 True Positive - Real incident
-   - ⬆️ Escalated - Needs escalation
+# Set the correct project
+gcloud config set project YOUR_PROJECT_ID
 ```
 
-## Next Steps
+**API not enabled error**
+```bash
+# Enable the required APIs
+gcloud services enable aiplatform.googleapis.com
+```
 
-Now that you understand the basics:
+### Getting Help
 
-1. **Learn the Data Model**: Understand how [Alerts and Tickets](./model.md) work in Warren
-2. **Master Daily Operations**: Read the [User Guide](./user_guide.md) for advanced workflows
-3. **Leverage AI Analysis**: Explore the [AI Agent Guide](./agent.md) for powerful investigations
-4. **Customize Your Setup**: Ask your admin about custom policies and integrations
+- **Documentation**: [Warren Docs](https://github.com/secmon-lab/warren/tree/main/doc)
+- **Issues**: [GitHub Issues](https://github.com/secmon-lab/warren/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/secmon-lab/warren/discussions)
 
-### For System Administrators
-- **Configure Warren**: See the [Configuration Reference](./configuration.md) for all settings
-- **Deploy Warren**: Follow the [Installation Guide](./installation.md)
-- **Write Policies**: Learn [Policy Development](./policy.md)
+## Clean Up
 
-## Tips for Success
+When you're done experimenting:
 
-- **Don't Ignore Clusters**: Similar alerts often indicate campaigns or systemic issues
-- **Use AI Analysis**: The Agent can save hours of manual investigation
-- **Document Findings**: Good ticket notes help future investigations
-- **Collaborate Early**: Tag teammates when you need specific expertise
-- **Test Safely**: Use the "Test" flag when practicing or testing workflows
+```bash
+# Stop and remove the container
+docker stop warren
+docker rm warren
 
-Remember: Warren is designed to augment your security expertise, not replace it. Use its AI capabilities to handle routine tasks while you focus on critical decisions.
+# Remove the environment file (optional)
+rm warren.env
+```
+
+---
+
+*Warren uses Go 1.24+ and integrates with Google Cloud Vertex AI for intelligent security analysis.*
