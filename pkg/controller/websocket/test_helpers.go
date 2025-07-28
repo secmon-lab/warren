@@ -21,4 +21,3 @@ func NewTestHandler(hub *Hub, repository interfaces.Repository, useCases *usecas
 
 	return handler, server
 }
-

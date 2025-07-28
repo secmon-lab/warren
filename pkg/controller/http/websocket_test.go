@@ -2,8 +2,10 @@ package http_test
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/m-mizutani/gt"
@@ -122,6 +124,23 @@ func TestHTTPServer_WithoutWebSocketHandler(t *testing.T) {
 	// In this case, the request falls through to the SPA handler which returns index.html
 	// So we get 200 OK instead of 404. This is correct behavior.
 	gt.Value(t, resp.StatusCode).Equal(http.StatusOK)
+
+	// Verify that the response is actually the index.html content
+	body, err := io.ReadAll(resp.Body)
+	gt.NoError(t, err)
+	bodyStr := string(body)
+	
+	// Log the response for debugging if it's not HTML
+	if !strings.Contains(bodyStr, "<!DOCTYPE html>") {
+		maxLen := 500
+		if len(bodyStr) < maxLen {
+			maxLen = len(bodyStr)
+		}
+		t.Logf("Unexpected response body (first %d chars): %s", maxLen, bodyStr[:maxLen])
+	}
+	
+	gt.True(t, strings.Contains(bodyStr, "<!DOCTYPE html>"))
+	gt.True(t, strings.Contains(bodyStr, "<title>Warren Security Monitor</title>"))
 }
 
 func TestHTTPServer_WebSocketEndpoint_NonExistentTicket(t *testing.T) {
