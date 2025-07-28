@@ -412,7 +412,6 @@ func (h *Hub) SendErrorToTicket(ticketID types.TicketID, content string) error {
 	return h.SendToTicket(ticketID, response)
 }
 
-
 // generateClientIDWithTab generates a unique client ID including tab ID
 func generateClientIDWithTab(ticketID types.TicketID, userID string, tabID string) string {
 	// Create a unique ID using timestamp and random bytes
