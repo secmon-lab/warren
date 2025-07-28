@@ -93,14 +93,17 @@ ignore if {
 ## Quick Start
 
 ```bash
-# Minimal setup - in-memory storage, no auth
+# Prerequisites
 export PROJECT_ID=your-gcp-project
 gcloud auth application-default login
+gcloud services enable aiplatform.googleapis.com --project=$PROJECT_ID
 
+# Run Warren (in-memory storage, no auth)
 docker run -d -p 8080:8080 \
   -v ~/.config/gcloud:/home/nonroot/.config/gcloud:ro \
   -e WARREN_GEMINI_PROJECT_ID=$PROJECT_ID \
   -e WARREN_NO_AUTHENTICATION=true \
+  -e WARREN_NO_AUTHORIZATION=true \
   -e WARREN_ADDR=0.0.0.0:8080 \
   ghcr.io/secmon-lab/warren:latest serve
 
