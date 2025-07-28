@@ -145,6 +145,13 @@ func (h *Handler) HandleTicketChat(w http.ResponseWriter, r *http.Request) {
 
 	ticketID := types.TicketID(ticketIDStr)
 
+	// Extract tab ID from query parameter (for distinguishing multiple connections from same user)
+	tabID := r.URL.Query().Get("tab")
+	if tabID == "" {
+		// Generate a fallback tab ID if not provided (for backward compatibility)
+		tabID = "default"
+	}
+
 	// Get user ID from context (set by authentication middleware)
 	userID := user.FromContext(ctx)
 	if userID == "" {
@@ -156,7 +163,8 @@ func (h *Handler) HandleTicketChat(w http.ResponseWriter, r *http.Request) {
 
 	logger.Debug("WebSocket authentication successful",
 		"user_id", userID,
-		"ticket_id", ticketID)
+		"ticket_id", ticketID,
+		"tab_id", tabID)
 
 	// Verify ticket exists and user has access
 	ticket, err := h.repository.GetTicket(ctx, ticketID)
@@ -173,7 +181,8 @@ func (h *Handler) HandleTicketChat(w http.ResponseWriter, r *http.Request) {
 
 	logger.Debug("Ticket validation successful, attempting WebSocket upgrade",
 		"ticket_id", ticketID,
-		"user_id", userID)
+		"user_id", userID,
+		"tab_id", tabID)
 
 	// Upgrade HTTP connection to WebSocket
 	conn, err := h.upgrader.Upgrade(w, r, nil)
@@ -192,15 +201,18 @@ func (h *Handler) HandleTicketChat(w http.ResponseWriter, r *http.Request) {
 
 	logger.Info("WebSocket connection established",
 		"ticket_id", ticketID,
-		"user_id", userID)
+		"user_id", userID,
+		"tab_id", tabID)
 
-	// Create client and register with hub
-	client := h.hub.NewClient(conn, ticketID, userID)
+	// Create client and register with hub (with tab ID for unique identification)
+	client := h.hub.NewClientWithTabID(conn, ticketID, userID, tabID)
 	h.hub.Register(client)
 
 	logger.Debug("Starting WebSocket client goroutines",
 		"ticket_id", ticketID,
-		"user_id", userID)
+		"user_id", userID,
+		"tab_id", tabID,
+		"client_id", client.clientID)
 
 	// Start client goroutines
 	go h.writePump(client)
@@ -256,9 +268,17 @@ func (h *Handler) readPump(client *Client) {
 		_, messageBytes, err := client.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				logger.Error("unexpected WebSocket close", "error", err)
+				logger.Error("unexpected WebSocket close",
+					"error", err,
+					"ticket_id", client.ticketID,
+					"user_id", client.userID,
+					"client_id", client.clientID)
 			} else {
-				logger.Debug("WebSocket read error", "error", err)
+				logger.Debug("WebSocket read error",
+					"error", err,
+					"ticket_id", client.ticketID,
+					"user_id", client.userID,
+					"client_id", client.clientID)
 			}
 			break
 		}

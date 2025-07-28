@@ -56,6 +56,9 @@ type Client struct {
 	// User ID of the connected user
 	userID string
 
+	// Tab ID to distinguish multiple connections from same user
+	tabID string
+
 	// Unique client ID for this connection
 	clientID string
 
@@ -135,12 +138,17 @@ func (h *Hub) registerClient(client *Client) {
 
 	// Check if ticket already has too many clients
 	if clients, exists := h.tickets[client.ticketID]; exists {
-		// Remove existing connections from the same user
+		// Remove existing connections from the same user AND tab
+		// This allows multiple tabs from the same user while preventing duplicate connections
+		// from the same tab (e.g., during reconnection)
 		for existingClient := range clients {
-			if existingClient.userID == client.userID {
-				logger.Info("Replacing existing connection for user",
+			if existingClient.userID == client.userID && existingClient.tabID == client.tabID {
+				logger.Info("Replacing existing connection for user/tab",
 					"ticket_id", client.ticketID,
-					"user_id", client.userID)
+					"user_id", client.userID,
+					"tab_id", client.tabID,
+					"old_client_id", existingClient.clientID,
+					"new_client_id", client.clientID)
 				delete(clients, existingClient)
 				existingClient.mu.Lock()
 				if existingClient.send != nil {
@@ -173,6 +181,7 @@ func (h *Hub) registerClient(client *Client) {
 	logger.Info("Client registered",
 		"ticket_id", client.ticketID,
 		"user_id", client.userID,
+		"tab_id", client.tabID,
 		"client_id", client.clientID,
 		"total_clients", len(h.tickets[client.ticketID]))
 
@@ -215,6 +224,7 @@ func (h *Hub) unregisterClient(client *Client) {
 			logger.Info("Client unregistered",
 				"ticket_id", client.ticketID,
 				"user_id", client.userID,
+				"tab_id", client.tabID,
 				"client_id", client.clientID,
 				"remaining_clients", len(clients))
 
@@ -306,12 +316,17 @@ func (h *Hub) GetActiveTickets() []types.TicketID {
 	return tickets
 }
 
-// NewClient creates a new client
+// NewClient creates a new client (for backward compatibility)
 func (h *Hub) NewClient(conn *websocket.Conn, ticketID types.TicketID, userID string) *Client {
+	return h.NewClientWithTabID(conn, ticketID, userID, "default")
+}
+
+// NewClientWithTabID creates a new client with a specific tab ID
+func (h *Hub) NewClientWithTabID(conn *websocket.Conn, ticketID types.TicketID, userID string, tabID string) *Client {
 	ctx, cancel := context.WithCancel(h.ctx)
 
-	// Generate unique client ID
-	clientID := generateClientID(ticketID, userID)
+	// Generate unique client ID including tab ID
+	clientID := generateClientIDWithTab(ticketID, userID, tabID)
 
 	return &Client{
 		hub:      h,
@@ -319,6 +334,7 @@ func (h *Hub) NewClient(conn *websocket.Conn, ticketID types.TicketID, userID st
 		send:     make(chan []byte, clientSendBufferSize),
 		ticketID: ticketID,
 		userID:   userID,
+		tabID:    tabID,
 		clientID: clientID,
 		ctx:      ctx,
 		cancel:   cancel,
@@ -396,17 +412,18 @@ func (h *Hub) SendErrorToTicket(ticketID types.TicketID, content string) error {
 	return h.SendToTicket(ticketID, response)
 }
 
-// generateClientID generates a unique client ID
-func generateClientID(ticketID types.TicketID, userID string) string {
+
+// generateClientIDWithTab generates a unique client ID including tab ID
+func generateClientIDWithTab(ticketID types.TicketID, userID string, tabID string) string {
 	// Create a unique ID using timestamp and random bytes
 	timestamp := time.Now().Unix()
 	randomBytes := make([]byte, 8)
 	if _, err := rand.Read(randomBytes); err != nil {
 		// Fallback to timestamp-based ID if random generation fails
-		return fmt.Sprintf("client_%s_%s_%d", ticketID, userID, timestamp)
+		return fmt.Sprintf("client_%s_%s_%s_%d", ticketID, userID, tabID, timestamp)
 	}
 	randomHex := hex.EncodeToString(randomBytes)
-	return fmt.Sprintf("client_%s_%s_%d_%s", ticketID, userID, timestamp, randomHex)
+	return fmt.Sprintf("client_%s_%s_%s_%d_%s", ticketID, userID, tabID, timestamp, randomHex)
 }
 
 // SendToClient sends a message to a specific client by client ID

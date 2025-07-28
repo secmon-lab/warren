@@ -27,17 +27,25 @@ export function TicketChat({ ticketId }: TicketChatProps) {
   const [message, setMessage] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Debug mount/unmount
+  useEffect(() => {
+    console.log('[TicketChat] Component mounted', { ticketId, timestamp: new Date().toISOString() });
+    return () => {
+      console.log('[TicketChat] Component unmounted', { ticketId, timestamp: new Date().toISOString() });
+    };
+  }, [ticketId]);
 
   const { status, messages, sendMessage } = useWebSocket(ticketId);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
-      }
-    }
+    // Scroll to the bottom element
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    console.log('[TicketChat] Scrolling to bottom after messages update', {
+      messageCount: messages.length
+    });
   }, [messages]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -51,7 +59,11 @@ export function TicketChat({ ticketId }: TicketChatProps) {
     if (success) {
       setMessage('');
       // Refocus textarea after clearing
-      setTimeout(() => textareaRef.current?.focus(), 0);
+      setTimeout(() => {
+        textareaRef.current?.focus();
+        // Scroll to bottom after sending message
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 0);
     }
   };
 
@@ -107,7 +119,7 @@ export function TicketChat({ ticketId }: TicketChatProps) {
             "flex max-w-[70%] gap-3",
             isCurrentUser ? "flex-row-reverse" : "flex-row"
           )}>
-            {msg.user && (
+            {msg.user && !isCurrentUser && (
               <div className="flex-shrink-0">
                 <UserName userID={msg.user.id} className="text-sm font-medium" />
               </div>
@@ -167,16 +179,16 @@ export function TicketChat({ ticketId }: TicketChatProps) {
   };
 
   return (
-    <Card className="flex flex-col h-full">
-      <CardHeader className="pb-3">
+    <Card className="h-[400px] flex flex-col">
+      <CardHeader className="flex-none">
         <div className="flex items-center justify-between">
           <CardTitle>Chat</CardTitle>
           {getStatusBadge()}
         </div>
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col min-h-0 p-0">
-        <ScrollArea ref={scrollAreaRef} className="flex-1 px-4">
-          <div className="py-4">
+      <CardContent className="flex-1 min-h-0 p-0 flex flex-col">
+        <ScrollArea ref={scrollAreaRef} className="flex-1">
+          <div className="px-4 py-4">
             {messages.length === 0 ? (
               <div className="text-center text-muted-foreground text-sm py-8">
                 No messages yet. Start a conversation!
@@ -184,11 +196,13 @@ export function TicketChat({ ticketId }: TicketChatProps) {
             ) : (
               messages.map((msg, index) => renderMessage(msg, index))
             )}
+            {/* Invisible div to help with scrolling */}
+            <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
         
-        <form onSubmit={handleSubmit} className="p-4 border-t">
-          <div className="flex gap-2">
+        <div className="border-t p-4">
+          <form onSubmit={handleSubmit} className="flex items-end gap-2">
             <Textarea
               ref={textareaRef}
               value={message}
@@ -200,19 +214,18 @@ export function TicketChat({ ticketId }: TicketChatProps) {
                   : "Connecting to chat..."
               }
               disabled={status !== 'connected'}
-              className="min-h-[40px] resize-none"
+              className="flex-1 min-h-[40px] resize-none"
               rows={1}
             />
             <Button
               type="submit"
               size="icon"
               disabled={!message.trim() || status !== 'connected'}
-              className="self-end"
             >
               <Send className="h-4 w-4" />
             </Button>
-          </div>
-        </form>
+          </form>
+        </div>
       </CardContent>
     </Card>
   );

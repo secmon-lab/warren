@@ -291,10 +291,22 @@ func cmdServe() *cli.Command {
 			}
 
 			// Add explicitly configured allowed origins for WebSocket
-			if len(wsAllowedOrigins) > 0 {
-				wsHandler = wsHandler.WithAllowedOrigins(wsAllowedOrigins)
+			additionalOrigins := append([]string{}, wsAllowedOrigins...)
+
+			// If frontend URL is 127.0.0.1, also allow localhost (and vice versa)
+			frontendURL := webUICfg.GetFrontendURL()
+			if strings.Contains(frontendURL, "://127.0.0.1:") {
+				localhostURL := strings.Replace(frontendURL, "://127.0.0.1:", "://localhost:", 1)
+				additionalOrigins = append(additionalOrigins, localhostURL)
+			} else if strings.Contains(frontendURL, "://localhost:") {
+				loopbackURL := strings.Replace(frontendURL, "://localhost:", "://127.0.0.1:", 1)
+				additionalOrigins = append(additionalOrigins, loopbackURL)
+			}
+
+			if len(additionalOrigins) > 0 {
+				wsHandler = wsHandler.WithAllowedOrigins(additionalOrigins)
 				logging.From(ctx).Info("WebSocket: Configured additional allowed origins",
-					"origins", wsAllowedOrigins)
+					"origins", additionalOrigins)
 			}
 
 			serverOptions = append(serverOptions, server.WithWebSocketHandler(wsHandler))

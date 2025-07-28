@@ -86,11 +86,25 @@ export default function TicketDetailPage() {
   const [isEditConclusionModalOpen, setIsEditConclusionModalOpen] =
     useState(false);
   const [isSalvageModalOpen, setIsSalvageModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("comments");
+  
+  // Initialize chat open state from localStorage
+  const [isChatOpen, setIsChatOpen] = useState(() => {
+    if (!id) return false;
+    const saved = localStorage.getItem(`ticket-chat-open-${id}`);
+    return saved === 'true';
+  });
 
   const errorToast = useErrorToast();
   const successToast = useSuccessToast();
   const confirm = useConfirm();
+
+  // Handle opening chat and persisting state
+  const handleStartChat = () => {
+    setIsChatOpen(true);
+    if (id) {
+      localStorage.setItem(`ticket-chat-open-${id}`, 'true');
+    }
+  };
 
   const formatAbsoluteTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -455,33 +469,35 @@ export default function TicketDetailPage() {
             onEditConclusion={handleEditConclusion}
           />
 
-          {/* Comments & Chat Tabs */}
-          <div className="w-full">
-            <div className="grid w-full grid-cols-2 h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
-              <button
-                onClick={() => setActiveTab("comments")}
-                className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
-                  activeTab === "comments"
-                    ? "bg-background text-foreground shadow-sm"
-                    : ""
-                }`}>
-                Comments
-              </button>
-              <button
-                onClick={() => setActiveTab("chat")}
-                className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
-                  activeTab === "chat"
-                    ? "bg-background text-foreground shadow-sm"
-                    : ""
-                }`}>
-                Chat
-              </button>
-            </div>
-            <div className="mt-4">
-              {activeTab === "comments" && <TicketComments ticketId={ticket.id} />}
-              {activeTab === "chat" && <TicketChat ticketId={ticket.id} />}
-            </div>
-          </div>
+          {/* Comments Section */}
+          <TicketComments ticketId={ticket.id} />
+
+          {/* Chat Section */}
+          {!isChatOpen ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    AI Chat Assistant
+                  </div>
+                  <Button
+                    onClick={handleStartChat}
+                    className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Start Chat
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Click "Start Chat" to begin a conversation with the AI assistant about this ticket.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <TicketChat ticketId={ticket.id} />
+          )}
 
           {/* Alerts Section with Pagination */}
           <Card>
