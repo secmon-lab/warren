@@ -1,106 +1,136 @@
-# warren
-AI agent and Slack based security alert management tool
+# Warren
+
+AI-powered security alert management that reduces noise and accelerates response time
 
 <p align="center">
   <img src="./doc/images/logo2.png" height="128" />
 </p>
 
-## Concept
+## What is Warren?
 
-Warren is a security alert management platform that combines AI-powered analysis with collaborative incident response. It processes security alerts from various sources, evaluates them using policy-driven detection rules, and facilitates team collaboration through integrated Slack workflows and a modern web interface.
+Warren is an open-source security alert management system that automates the tedious parts of alert triage. It ingests alerts from your existing tools, enriches them with AI and threat intelligence, and helps you focus on actual incidents instead of noise.
 
-The platform addresses key challenges in security operations:
-- **Alert Fatigue**: Reduces noise by grouping similar alerts and using AI to prioritize based on context
-- **Manual Triage**: Automates initial analysis using external threat intelligence sources
-- **Knowledge Silos**: Centralizes alert investigation and maintains institutional knowledge
-- **Response Coordination**: Streamlines team communication through native Slack integration
+**Key technical features:**
+- **Webhook-based ingestion**: Simple HTTP endpoints for any alert source (no agents required)
+- **Policy-driven processing**: Write Rego policies to filter and transform alerts before they hit your queue
+- **Vector similarity clustering**: Automatically groups related alerts using embeddings
+- **LLM-powered analysis**: Uses LLM (Large Language Model) to generate human-readable summaries and extract IOCs
+- **API-first design**: GraphQL API for custom integrations, Slack bot for notifications
+- **Flexible deployment**: Runs anywhere from local Docker to Kubernetes, with optional cloud services
 
-Warren operates on a ticket-based workflow where security alerts are grouped into manageable tickets, analyzed using AI agents, and tracked through resolution.
-
-## How it works
+## Key Features
 
 ### Alert Processing Pipeline
+- **Parallel enrichment** queries multiple threat intel APIs (OTX, VirusTotal, AbuseIPDB, etc.)
+- **Structured extraction** - LLM extracts IOCs, TTPs, and risk indicators into queryable fields
+- **React-based Web UI** - real-time dashboard, ticket management, and WebSocket-based AI chat
+- **DBSCAN clustering** with cosine similarity on Gemini embeddings (256-dim vectors)
 
-1. **Alert Ingestion**: Security alerts arrive via HTTP endpoints from sources like AWS GuardDuty, SIEM systems, or Pub/Sub messaging
-2. **Policy Evaluation**: Incoming data is processed through Rego policies that determine whether events qualify as security alerts
-3. **Alert Grouping**: Similar alerts are automatically clustered using semantic similarity to reduce duplicate work
-4. **Ticket Creation**: Alert groups are organized into tickets for structured investigation and tracking
+<p align="center">
+  <img src="./doc/images/dashboard2.png" width="600" alt="Warren Dashboard showing clustered alerts" />
+  <br>
+  <em>Dashboard view: Similar alerts are automatically grouped using DBSCAN clustering on embedding vectors</em>
+</p>
 
-### AI-Powered Analysis
+The Web UI provides:
+- **Alert timeline view** with clustering visualization
+- **Ticket workflow** - create, assign, and track incident tickets
+- **Interactive AI chat** - ask questions about specific alerts in natural language
+- **Export capabilities** - download alert data as JSONL for further analysis
 
-Warren integrates with Google Vertex AI (Gemini) to provide intelligent analysis capabilities:
-- **Metadata Extraction**: Automatically generates titles, descriptions, and key attributes from raw alert data
-- **Threat Intelligence**: Queries external services (OTX, VirusTotal, URLScan, Shodan, AbuseIPDB) for indicators of compromise
-- **Security Analysis**: Provides context-aware analysis and recommendations based on alert patterns and historical data
-- **Interactive Chat**: Enables conversational analysis where security analysts can ask questions about specific tickets
+### Integration Architecture
+- **Webhook receivers** at `/hooks/alert/{raw,sns,pubsub}/{schema}` for any alert format
+- **Slack bot** with interactive components (buttons, modals) for ticket management
+- **GraphQL API** with DataLoader for efficient queries and real-time subscriptions
 
-### Collaborative Workflow
+<p align="center">
+  <img src="./doc/images/slack.png" width="600" alt="Slack notification with interactive buttons" />
+  <br>
+  <em>Slack integration: Alerts arrive with threat intel enrichment and one-click ticket creation</em>
+</p>
 
-- **Slack Integration**: Native bot integration for real-time notifications, interactive buttons, and team discussions
-- **Web Dashboard**: React-based interface for ticket management, alert browsing, and investigation tracking
-- **GraphQL API**: Flexible API for custom integrations and automation workflows
-- **Policy Management**: Version-controlled Rego policies for customizable alert detection rules
+### Policy Engine
+- **Rego-based alert policies** - transform, filter, or multiply alerts before processing
+- **Authorization policies** - fine-grained access control with environment context
+- **Test framework** - validate policies with sample inputs before deployment
 
-### External Integrations
+Example policy to filter and enrich alerts:
+```rego
+package alert.cloudtrail
 
-Warren connects to multiple security intelligence sources:
-- **Threat Intelligence**: AlienVault OTX, VirusTotal
-- **URL Analysis**: URLScan.io
-- **IP Reputation**: AbuseIPDB, Shodan
-- **Malware Analysis**: abuse.ch MalwareBazaar
-- **Security Analytics**: Google BigQuery for data analysis and pattern detection
+alert contains {
+    "title": sprintf("Suspicious AWS Activity: %s", [event.eventName]),
+    "description": sprintf("%s in %s by %s", [
+        event.eventName,
+        event.awsRegion,
+        event.userIdentity.userName
+    ]),
+    "attrs": [
+        {
+            "key": "event_name",
+            "value": event.eventName,
+            "link": ""
+        },
+        {
+            "key": "source_ip",
+            "value": event.sourceIPAddress,
+            "link": sprintf("https://www.abuseipdb.com/check/%s", [event.sourceIPAddress])
+        }
+    ]
+} if {
+    event := input.Records[_]
+    event.eventName in ["DeleteBucket", "StopLogging", "DeleteTrail"]
+    not ignore
+}
 
-### Architecture
-
-The system follows clean architecture principles with clear separation between:
-- **Domain Layer**: Core business logic for alerts, tickets, and policies
-- **Service Layer**: Application services coordinating business operations
-- **Interface Layer**: HTTP/GraphQL APIs and Slack integration
-- **Infrastructure Layer**: Database (Firestore), storage (Cloud Storage), and external service adapters
-
-This design ensures maintainability, testability, and flexibility for different deployment environments.
+# Ignore events from trusted IPs
+ignore if {
+    event := input.Records[_]
+    event.sourceIPAddress in ["10.0.0.1", "192.168.1.100"]
+}
+```
 
 ## Quick Start
 
-Get Warren running in 5 minutes with Docker:
-
 ```bash
-# Set up Google Cloud authentication
-export PROJECT_ID="your-gcp-project"
+# Minimal setup - in-memory storage, no auth
+export PROJECT_ID=your-gcp-project
 gcloud auth application-default login
-gcloud services enable aiplatform.googleapis.com --project=$PROJECT_ID
 
-# Run Warren with Docker
-docker run -d \
-  --name warren \
-  -p 8080:8080 \
+docker run -d -p 8080:8080 \
   -v ~/.config/gcloud:/home/nonroot/.config/gcloud:ro \
   -e WARREN_GEMINI_PROJECT_ID=$PROJECT_ID \
   -e WARREN_NO_AUTHENTICATION=true \
-  -e WARREN_NO_AUTHORIZATION=true \
   -e WARREN_ADDR=0.0.0.0:8080 \
   ghcr.io/secmon-lab/warren:latest serve
 
-# Or build locally if the image is not available:
-# git clone https://github.com/secmon-lab/warren.git && cd warren
-# docker build -t warren:local .
-# Then use warren:local instead
-
-# Send a test alert
+# Send test alert
 curl -X POST http://localhost:8080/hooks/alert/raw/test \
   -H "Content-Type: application/json" \
-  -d '{"title": "Test Alert", "description": "Testing Warren", "severity": "high"}'
+  -d '{"title": "SSH brute force", "source_ip": "45.227.255.100"}'
 ```
 
-Visit http://localhost:8080 to see your alerts!
+Visit http://localhost:8080 to access the dashboard.
+
+[Full Getting Started Guide →](./doc/getting_started.md)
+
+## Integrations
+
+- **Alert Sources**: AWS GuardDuty, Suricata, SIEM webhooks, Custom apps
+- **Threat Intel**: VirusTotal, AlienVault OTX, URLScan, Shodan, AbuseIPDB
+- **Collaboration**: Slack (native bot), GraphQL API, REST webhooks
+- **Infrastructure**: Google Cloud (Vertex AI, Firestore), Docker, Kubernetes
 
 ## Documentation
 
-- [Getting Started Guide](./doc/getting_started.md) - 5-minute quick start with Docker
-- [Installation Guide](./doc/installation.md) - From local development to production deployment
-- [User Guide](./doc/user_guide.md) - How to use Warren effectively
-- [Configuration Reference](./doc/configuration.md) - All configuration options
-- [Policy Guide](./doc/policy.md) - Writing alert detection policies
+- [Getting Started](./doc/getting_started.md) - Your first alert in 5 minutes
+- [User Guide](./doc/user_guide.md) - Day-to-day operations
+- [Policy Guide](./doc/policy.md) - Custom detection rules
+- [Architecture](./doc/model.md) - Technical deep dive
+
+## Contributing
+
+We welcome contributions! See [Contributing Guide](./doc/contributing.md)
 
 ## License
 
