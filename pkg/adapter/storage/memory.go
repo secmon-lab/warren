@@ -76,11 +76,13 @@ func (w *memoryWriter) Close() error {
 
 	data := w.buffer.Bytes()
 
+	// Lock client mutex without defer to control unlock order
 	w.client.mu.Lock()
-	defer w.client.mu.Unlock()
-
 	// Store the new object
 	w.client.objects[w.object] = data
+	// Unlock client mutex before setting closed flag
+	w.client.mu.Unlock()
+
 	w.closed = true
 
 	return nil

@@ -182,8 +182,8 @@ func cmdServe() *cli.Command {
 
 			// Configure repository with fallback
 			var repo interfaces.Repository
-			if firestoreCfg.ProjectID() == "" {
-				logging.From(ctx).Warn("🔄 Using in-memory repository (Firestore not configured)",
+			if !firestoreCfg.IsConfigured() {
+				logging.From(ctx).Warn("⚠️  Using in-memory repository (Firestore not configured)",
 					"recommendation", "For production, configure Firestore with --firestore-project-id")
 				repo = repository.NewMemory()
 			} else {
@@ -196,8 +196,8 @@ func cmdServe() *cli.Command {
 
 			// Configure storage with fallback
 			var storageClient interfaces.StorageClient
-			if storageCfg.Bucket() == "" {
-				logging.From(ctx).Warn("🔄 Using in-memory storage (Cloud Storage not configured)",
+			if !storageCfg.IsConfigured() {
+				logging.From(ctx).Warn("⚠️  Using in-memory storage (Cloud Storage not configured)",
 					"recommendation", "For production, configure Cloud Storage with --storage-bucket")
 				storageClient = storage.NewMemoryClient()
 			} else {

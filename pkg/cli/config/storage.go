@@ -73,3 +73,8 @@ func (x *Storage) Configure(ctx context.Context) (*storage.Client, error) {
 func (x *Storage) Bucket() string {
 	return x.bucket
 }
+
+// IsConfigured returns true if Storage is configured
+func (x *Storage) IsConfigured() bool {
+	return x.bucket != ""
+}

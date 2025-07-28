@@ -15,6 +15,13 @@ func TestStorage_Bucket(t *testing.T) {
 	})
 }
 
+func TestStorage_IsConfigured(t *testing.T) {
+	t.Run("returns false when bucket is empty", func(t *testing.T) {
+		cfg := &config.Storage{}
+		gt.Equal(t, false, cfg.IsConfigured())
+	})
+}
+
 func TestStorage_Configure(t *testing.T) {
 	t.Run("returns error when bucket is empty", func(t *testing.T) {
 		cfg := &config.Storage{}

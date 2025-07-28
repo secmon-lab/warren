@@ -49,3 +49,8 @@ func (c *Firestore) Configure(ctx context.Context) (*repository.Firestore, error
 func (c *Firestore) ProjectID() string {
 	return c.projectID
 }
+
+// IsConfigured returns true if Firestore is configured
+func (c *Firestore) IsConfigured() bool {
+	return c.projectID != ""
+}

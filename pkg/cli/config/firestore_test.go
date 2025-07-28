@@ -15,6 +15,13 @@ func TestFirestore_ProjectID(t *testing.T) {
 	})
 }
 
+func TestFirestore_IsConfigured(t *testing.T) {
+	t.Run("returns false when project ID is empty", func(t *testing.T) {
+		cfg := &config.Firestore{}
+		gt.Equal(t, false, cfg.IsConfigured())
+	})
+}
+
 func TestFirestore_Configure(t *testing.T) {
 	t.Run("returns error when project ID is empty", func(t *testing.T) {
 		cfg := &config.Firestore{}
