@@ -70,35 +70,121 @@ gcloud firestore databases create \
 
 ### 2.2. Configure Firestore Indexes
 
-Warren requires specific indexes for efficient queries. Create `firestore.indexes.json`:
+Warren requires specific indexes for vector search and query performance. These indexes are essential for:
+- Alert clustering using embedding vectors (256-dimensional)
+- Efficient ticket and alert queries
+- Status-based ticket filtering
 
-```json
+#### Option 1: Using the Firestore Index Tool (Recommended)
+
+```bash
+# Install the Warren Firestore index tool
+go install github.com/secmon-lab/warren/resources/firestore_index@latest
+
+# Verify installation
+which firestore_index || echo "Add $(go env GOPATH)/bin to your PATH"
+
+# Dry run to see what indexes will be created
+firestore_index create --dry-run \
+  --project=$PROJECT_ID \
+  --database="(default)"
+
+# Create all required indexes
+firestore_index create \
+  --project=$PROJECT_ID \
+  --database="(default)"
+```
+
+#### Option 2: Manual Index Creation
+
+If you prefer to create indexes manually:
+
+```bash
+# Create comprehensive index configuration file
+cat > firestore.indexes.json << 'EOF'
 {
   "indexes": [
     {
       "collectionGroup": "alerts",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "ticket_id", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
+        {"fieldPath": "Embedding", "vectorConfig": {"dimension": 256, "flat": {}}}
+      ]
+    },
+    {
+      "collectionGroup": "alerts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "CreatedAt", "order": "DESCENDING"},
+        {"fieldPath": "Embedding", "vectorConfig": {"dimension": 256, "flat": {}}}
       ]
     },
     {
       "collectionGroup": "tickets",
-      "queryScope": "COLLECTION",  
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
+        {"fieldPath": "Embedding", "vectorConfig": {"dimension": 256, "flat": {}}}
+      ]
+    },
+    {
+      "collectionGroup": "tickets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "CreatedAt", "order": "DESCENDING"},
+        {"fieldPath": "Embedding", "vectorConfig": {"dimension": 256, "flat": {}}}
+      ]
+    },
+    {
+      "collectionGroup": "tickets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "Status", "order": "ASCENDING"},
+        {"fieldPath": "CreatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "lists",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "Embedding", "vectorConfig": {"dimension": 256, "flat": {}}}
+      ]
+    },
+    {
+      "collectionGroup": "lists",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "CreatedAt", "order": "DESCENDING"},
+        {"fieldPath": "Embedding", "vectorConfig": {"dimension": 256, "flat": {}}}
       ]
     }
   ]
 }
-```
+EOF
 
-Deploy indexes:
-```bash
+# Apply all indexes
 gcloud firestore indexes create --file=firestore.indexes.json
 ```
+
+#### Index Details
+
+The following indexes are created:
+
+| Collection | Index Type | Fields | Purpose |
+|------------|------------|--------|---------|  
+| alerts, tickets, lists | Vector | Embedding (256d) | Alert clustering & similarity search |
+| alerts, tickets, lists | Composite | CreatedAt DESC + Embedding | Time-based vector searches |
+| tickets | Composite | Status ASC + CreatedAt DESC | Dashboard filtering |
+
+> **Note**: 
+> - Index creation may take 5-10 minutes
+> - Monitor progress: [Firestore Console](https://console.cloud.google.com/firestore/databases/-default-/indexes)
+> - Vector indexes require Firestore in Native mode (not Datastore mode)
+
+#### Troubleshooting
+
+- **Permission errors**: Ensure `roles/datastore.indexAdmin` role
+- **Tool not found**: Add `$(go env GOPATH)/bin` to PATH
+- **Index already exists**: Safe to ignore, or check console first
 
 ## 3. Cloud Storage Setup
 
