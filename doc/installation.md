@@ -1,6 +1,6 @@
-# Warren Installation Overview
+# Warren Installation Guide
 
-Warren is an AI-powered security alert management tool that integrates with Slack and Google Cloud services. This guide provides an overview of the installation process with links to detailed guides for each component.
+This guide helps you install and configure Warren for different environments, from local development to production deployment. Warren can be configured at different levels depending on your needs.
 
 ## Architecture
 
@@ -139,241 +139,291 @@ Warren can be deployed in several ways:
 - Suitable for organizations with existing K8s infrastructure
 - Helm charts available in the repository
 
-## Minimal Viable Setup
+## Configuration Levels
 
-For users who want to quickly try Warren, this section provides the minimum configuration needed to get started.
+Warren supports three configuration levels, allowing you to start simple and add features as needed:
 
-> **Important Note**: Warren is designed as a cloud-native application and requires both Google Cloud services (Firestore and Vertex AI) and Slack integration to run the `serve` command. The full server cannot run without these dependencies.
+### Level 1: Local Development (Quick Start)
 
-### Option 1: Policy Testing Only (No External Services Required)
+**Perfect for**: First-time users, demos, local development
 
-If you only want to test alert detection policies without running the full server:
+**What you get**:
+- ✅ Full web UI access
+- ✅ AI-powered alert analysis
+- ✅ Alert processing pipeline
+- ✅ Chat interface with AI agent
+- ❌ No data persistence (in-memory only)
+- ❌ No team collaboration features
+
+**Requirements**:
+- Docker
+- Google Cloud account (for Vertex AI)
+- No Slack setup required
+
+**Quick Setup**:
+Follow our [Getting Started Guide](./getting_started.md) to have Warren running in 5 minutes!
+
+### Level 2: Team Trial
+
+**Perfect for**: Team evaluation, proof of concept
+
+**What you get** (everything from Level 1 plus):
+- ✅ Persistent data storage (Firestore)
+- ✅ Slack integration for team notifications
+- ✅ User authentication via Slack OAuth
+- ✅ Basic security controls
+
+**Additional Requirements**:
+- Slack workspace with admin access
+- Firestore database setup
+
+**Upgrade from Level 1**:
+1. Create a Slack app (see [Slack Configuration Guide](./installation_slack.md))
+2. Enable Firestore in your Google Cloud project
+3. Add these environment variables:
+   ```bash
+   WARREN_SLACK_OAUTH_TOKEN=xoxb-your-token
+   WARREN_SLACK_SIGNING_SECRET=your-secret
+   WARREN_SLACK_CLIENT_ID=your-client-id
+   WARREN_SLACK_CLIENT_SECRET=your-client-secret
+   WARREN_SLACK_CHANNEL_NAME=security-alerts
+   WARREN_FIRESTORE_PROJECT_ID=$PROJECT_ID
+   # Remove the no-auth flags
+   # WARREN_NO_AUTHENTICATION=true  # Remove this
+   # WARREN_NO_AUTHORIZATION=true   # Remove this
+   ```
+
+### Level 3: Production Ready
+
+**Perfect for**: Production deployments, enterprise environments
+
+**What you get** (everything from Level 2 plus):
+- ✅ Cloud Storage for file attachments
+- ✅ Secret Manager for secure credential storage
+- ✅ Cloud Run deployment with auto-scaling
+- ✅ Identity-Aware Proxy for additional security
+- ✅ Comprehensive monitoring and logging
+- ✅ Policy-based authorization
+- ✅ External tool integrations
+
+**Additional Requirements**:
+- Cloud Run setup
+- IAM configuration
+- Production Slack app
+- Security policies
+
+**Upgrade from Level 2**:
+See [Google Cloud Setup Guide](./installation_gcp.md) for complete production deployment.
+
+## Configuration Checklist
+
+Use this checklist to track your configuration progress:
+
+### Level 1: Local Development
+- [ ] Google Cloud account created
+- [ ] gcloud CLI installed and authenticated
+- [ ] Vertex AI API enabled
+- [ ] Docker installed
+- [ ] Environment variables configured (WARREN_GEMINI_PROJECT_ID)
+
+### Level 2: Team Trial
+- [ ] All Level 1 requirements
+- [ ] Slack app created
+- [ ] OAuth tokens and secrets configured
+- [ ] Firestore database created
+- [ ] Slack channel configured
+- [ ] Team members invited to Slack channel
+
+### Level 3: Production Ready
+- [ ] All Level 2 requirements
+- [ ] Cloud Storage bucket created
+- [ ] Secret Manager configured
+- [ ] Cloud Run service deployed
+- [ ] Custom domain configured (optional)
+- [ ] IAP configured (optional)
+- [ ] Monitoring alerts set up
+- [ ] Backup strategy implemented
+- [ ] Security policies defined
+- [ ] External tool API keys configured
+
+## Quick Start for Each Level
+
+### Starting with Level 1
+
+The fastest way to get started:
 
 ```bash
-# Clone the repository
-git clone https://github.com/secmon-lab/warren.git
-cd warren
+# 1. Set up Google Cloud (if not already done)
+export PROJECT_ID="your-project-id"
+gcloud auth application-default login
+gcloud services enable aiplatform.googleapis.com --project=$PROJECT_ID
 
-# Create test data structure
-mkdir -p test-data/guardduty
-echo '{
-  "Findings": [{
-    "Title": "EC2 instance has an unprotected port which is being probed",
-    "Description": "EC2 instance i-1234567890abcdef0 has an unprotected port 22 which is being probed by a known malicious host",
-    "Severity": 5.0,
-    "Type": "Recon:EC2/PortProbeUnprotectedPort",
-    "AccountId": "123456789012",
-    "Region": "us-east-1",
-    "Resource": {
-      "Type": "Instance",
-      "InstanceDetails": {
-        "InstanceId": "i-1234567890abcdef0"
-      }
-    }
-  }]
-}' > test-data/guardduty/sample.json
+# 2. Run with Docker
+docker run -d \
+  --name warren \
+  -p 8080:8080 \
+  -v ~/.config/gcloud:/home/nonroot/.config/gcloud:ro \
+  -e WARREN_GEMINI_PROJECT_ID=$PROJECT_ID \
+  -e WARREN_NO_AUTHENTICATION=true \
+  -e WARREN_NO_AUTHORIZATION=true \
+  ghcr.io/secmon-lab/warren:latest serve
 
-# Create a simple test policy
-mkdir -p policies/alert
-cat > policies/alert/guardduty.rego << 'EOF'
-package alert.guardduty
-
-alert contains {
-    "title": f.Title,
-    "description": f.Description,
-    "attrs": [
-        {
-            "key": "severity",
-            "value": sprintf("%v", [f.Severity]),
-            "link": ""
-        },
-        {
-            "key": "type",
-            "value": f.Type,
-            "link": ""
-        }
-    ]
-} if {
-    f := input.Findings[_]
-    f.Severity >= 4
-}
-EOF
-
-# Test the policy
-go run main.go test \
-  --policy ./policies \
-  --test-detect-data ./test-data
+# Note: If the image is not available, build locally:
+# git clone https://github.com/secmon-lab/warren.git && cd warren
+# docker build -t warren:local .
+# Then use warren:local instead of ghcr.io/secmon-lab/warren:latest
 ```
 
-This allows you to:
-- ✅ Test and develop Rego policies locally
-- ✅ Validate alert detection logic
-- ✅ No external services required
-- ✅ CI/CD friendly for policy validation
-- ❌ No web UI or API access
-- ❌ No alert processing pipeline
-- ❌ No Slack notifications
+See our [Getting Started Guide](./getting_started.md) for the complete walkthrough.
 
-### Option 2: Minimal Setup with Google Cloud and Slack
+### Starting with Level 2
 
-Warren requires both Google Cloud services and Slack integration to run. Here's the minimal setup:
+To upgrade from Level 1 to Level 2:
 
 ```bash
-# 1. Create a new project
-export PROJECT_ID=warren-test-$(date +%s)
-gcloud projects create $PROJECT_ID
-gcloud config set project $PROJECT_ID
+# 1. Create Slack App
+# Follow: https://github.com/secmon-lab/warren/blob/main/doc/installation_slack.md
+# Get your OAuth token and signing secret
 
-# 2. Enable billing (required for Firestore and Vertex AI)
-# Visit: https://console.cloud.google.com/billing
-
-# 3. Enable required APIs
-gcloud services enable \
-  firestore.googleapis.com \
-  aiplatform.googleapis.com
-
-# 4. Create Firestore database
+# 2. Enable Firestore
+gcloud services enable firestore.googleapis.com
 gcloud firestore databases create \
   --location=us-central1 \
   --type=firestore-native
 
-# 5. Create a minimal Slack app
-# Follow the Quick Setup section in installation_slack.md to get:
-# - WARREN_SLACK_OAUTH_TOKEN (xoxb-...)
-# - WARREN_SLACK_SIGNING_SECRET
-
-# 6. Run Warren locally
-export WARREN_FIRESTORE_PROJECT_ID=$PROJECT_ID
-export WARREN_GEMINI_PROJECT_ID=$PROJECT_ID
-export WARREN_GEMINI_LOCATION=us-central1
-export WARREN_SLACK_OAUTH_TOKEN="xoxb-your-token"
-export WARREN_SLACK_SIGNING_SECRET="your-signing-secret"
-export WARREN_SLACK_CHANNEL_NAME="test-alerts"
-export WARREN_LOG_LEVEL=debug
-
-go run main.go serve --addr=:8080
+# 3. Update your Docker command
+docker run -d \
+  --name warren \
+  -p 8080:8080 \
+  -v ~/.config/gcloud:/home/nonroot/.config/gcloud:ro \
+  -e WARREN_GEMINI_PROJECT_ID=$PROJECT_ID \
+  -e WARREN_FIRESTORE_PROJECT_ID=$PROJECT_ID \
+  -e WARREN_SLACK_OAUTH_TOKEN="xoxb-your-token" \
+  -e WARREN_SLACK_SIGNING_SECRET="your-secret" \
+  -e WARREN_SLACK_CLIENT_ID="your-client-id" \
+  -e WARREN_SLACK_CLIENT_SECRET="your-client-secret" \
+  -e WARREN_SLACK_CHANNEL_NAME="security-alerts" \
+  ghcr.io/secmon-lab/warren:latest serve
 ```
 
-This gives you:
-- ✅ Web UI access at http://localhost:8080
-- ✅ Alert processing pipeline  
-- ✅ AI-powered alert enrichment
-- ✅ Persistent storage
-- ✅ Basic Slack integration (required)
-- ✅ Slack OAuth authentication
-- ❌ No external tool integrations (optional)
+### Starting with Level 3
 
-### Option 3: Minimal Cloud Run Deployment
-
-Deploy Warren on Cloud Run with minimal configuration:
+For production deployment on Cloud Run:
 
 ```bash
-# Use the project from Option 2
-# First, store Slack credentials in Secret Manager
+# 1. Store secrets securely
 echo -n "xoxb-your-token" | gcloud secrets create slack-oauth-token --data-file=-
 echo -n "your-signing-secret" | gcloud secrets create slack-signing-secret --data-file=-
 
-# Deploy Warren
+# 2. Create Cloud Storage bucket
+gsutil mb gs://warren-storage-$PROJECT_ID
+
+# 3. Deploy to Cloud Run
 gcloud run deploy warren \
   --image=ghcr.io/secmon-lab/warren:latest \
   --region=us-central1 \
-  --set-env-vars="WARREN_FIRESTORE_PROJECT_ID=$PROJECT_ID,WARREN_GEMINI_PROJECT_ID=$PROJECT_ID,WARREN_SLACK_CHANNEL_NAME=test-alerts" \
+  --set-env-vars="WARREN_FIRESTORE_PROJECT_ID=$PROJECT_ID,WARREN_GEMINI_PROJECT_ID=$PROJECT_ID,WARREN_STORAGE_BUCKET=warren-storage-$PROJECT_ID" \
   --set-secrets="WARREN_SLACK_OAUTH_TOKEN=slack-oauth-token:latest,WARREN_SLACK_SIGNING_SECRET=slack-signing-secret:latest"
 ```
 
-After deployment:
-- ✅ Public URL for web access
-- ✅ Full alert processing pipeline
-- ✅ AI-powered features
-- ✅ Slack integration
-- ✅ Scalable and managed
-- ⚠️ Requires authentication - Configure IAP or use Slack OAuth
+See [Google Cloud Setup Guide](./installation_gcp.md) for complete production deployment including:
+- IAM configuration
+- Identity-Aware Proxy setup
+- Monitoring and alerting
+- Custom domain configuration
 
-### Testing Your Minimal Setup
+## Migration Paths
 
-1. **Send a test alert**:
+### Level 1 → Level 2 Migration
+
+1. **Create Slack App**:
+   - Go to [api.slack.com/apps](https://api.slack.com/apps)
+   - Create new app from manifest
+   - Configure OAuth scopes and permissions
+   - Install to your workspace
+
+2. **Enable Data Persistence**:
+   ```bash
+   # Enable Firestore
+   gcloud services enable firestore.googleapis.com
+   gcloud firestore databases create --location=us-central1
+   ```
+
+3. **Update Configuration**:
+   - Remove `WARREN_NO_AUTHENTICATION` and `WARREN_NO_AUTHORIZATION`
+   - Add Slack credentials
+   - Add `WARREN_FIRESTORE_PROJECT_ID`
+
+### Level 2 → Level 3 Migration
+
+1. **Set Up Cloud Infrastructure**:
+   - Create Cloud Storage bucket
+   - Configure Secret Manager
+   - Set up Cloud Run service
+
+2. **Enhance Security**:
+   - Configure IAM roles
+   - Set up Identity-Aware Proxy
+   - Define security policies
+
+3. **Add Production Features**:
+   - Configure monitoring
+   - Set up backups
+   - Add external tool integrations
+
+## Common Configuration Options
+
+### Environment Variables Reference
+
 ```bash
-curl -X POST http://localhost:8080/hooks/alert/raw/test \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Test Security Alert",
-    "description": "This is a test alert",
-    "severity": "medium"
-  }'
+# Core Configuration
+WARREN_GEMINI_PROJECT_ID      # Required: GCP project for Vertex AI
+WARREN_GEMINI_LOCATION        # Default: us-central1
+
+# Authentication (Level 1: disable, Level 2+: configure)
+WARREN_NO_AUTHENTICATION      # Set to true for Level 1 only
+WARREN_NO_AUTHORIZATION       # Set to true for Level 1 only
+
+# Slack Integration (Level 2+)
+WARREN_SLACK_OAUTH_TOKEN      # Bot user OAuth token (xoxb-...)
+WARREN_SLACK_SIGNING_SECRET   # For request verification
+WARREN_SLACK_CLIENT_ID        # For OAuth flow
+WARREN_SLACK_CLIENT_SECRET    # For OAuth flow
+WARREN_SLACK_CHANNEL_NAME     # Target channel for alerts
+
+# Storage (Level 2+)
+WARREN_FIRESTORE_PROJECT_ID   # For persistent storage
+WARREN_STORAGE_BUCKET         # Level 3: For file attachments
+
+# External Tools (Optional)
+WARREN_OTX_API_KEY            # AlienVault OTX
+WARREN_VIRUSTOTAL_API_KEY     # VirusTotal
+WARREN_URLSCAN_API_KEY        # URLScan.io
+WARREN_SHODAN_API_KEY         # Shodan
+WARREN_ABUSEIPDB_API_KEY      # AbuseIPDB
 ```
 
-2. **Access the Web UI**:
-- Navigate to http://localhost:8080
-- Configure Slack OAuth to log in (see Full Setup section)
-- View alerts and create tickets
+## Prerequisites by Level
 
-3. **Test GraphQL API**:
-```bash
-curl -X POST http://localhost:8080/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query": "{ unboundAlerts(limit: 10) { alerts { id title } } }"}'
-```
+### All Levels
+- Docker or Docker Desktop
+- Google Cloud account
+- gcloud CLI installed
 
-### Upgrading to Full Setup
+### Level 2 Additional
+- Slack workspace with admin access
+- Ability to create Slack apps
 
-When ready for production features:
+### Level 3 Additional
+- Google Cloud billing enabled
+- Domain for custom URL (optional)
+- SSL certificate (optional)
 
-1. **Add Slack Integration**: Follow [Slack Configuration Guide](./installation_slack.md)
-2. **Enable AI Features**: Set up Vertex AI per [Google Cloud Setup](./installation_gcp.md#7-vertex-ai-setup)
-3. **Configure Authentication**: Set up proper OAuth with Slack or Google IAP
-4. **Configure External Tools**: Add API keys for threat intelligence
+## Next Steps
 
-## Prerequisites
-
-Before starting the installation, ensure you have:
-
-- **Development Tools**:
-  - Go 1.23.4 or later (for local development)
-  - Docker 25.0.6 or later (for building images)
-  - Google Cloud SDK 464.0.0 or later
-  - Google Cloud CLI 464.0.0 or later
-
-- **Access Requirements**:
-  - Google Cloud Project with billing enabled
-  - Slack workspace with admin permissions
-  - GitHub account (for accessing Warren repository)
-
-## Quick Start
-
-> **Looking for the simplest setup?** Jump to [Minimal Viable Setup](#minimal-viable-setup) for local development options.
-
-For a production Cloud Run deployment:
-
-1. **Set up Slack Integration**
-   ```bash
-   # Follow the Slack setup guide to create your Slack app
-   # and collect required credentials
-   ```
-   → See [Slack Configuration Guide](./installation_slack.md)
-
-2. **Configure Google Cloud**
-   ```bash
-   # Set project and enable APIs
-   export PROJECT_ID="your-project-id"
-   gcloud config set project $PROJECT_ID
-   
-   # Enable essential services
-   gcloud services enable \
-     run.googleapis.com \
-     firestore.googleapis.com \
-     aiplatform.googleapis.com
-   ```
-   → See [Google Cloud Setup Guide](./installation_gcp.md) for complete setup
-
-3. **Deploy Warren**
-   ```bash
-   # Deploy using pre-built image
-   gcloud run deploy warren \
-     --image=ghcr.io/secmon-lab/warren:latest \
-     --region=us-central1 \
-     --set-env-vars="WARREN_SLACK_CHANNEL_NAME=security-alerts" \
-     --set-secrets="WARREN_SLACK_OAUTH_TOKEN=slack-token:latest"
-   ```
+- **New to Warren?** Start with our [Getting Started Guide](./getting_started.md) (Level 1)
+- **Ready for team use?** Follow the [Slack Configuration Guide](./installation_slack.md) (Level 2)
+- **Deploying to production?** See the [Google Cloud Setup Guide](./installation_gcp.md) (Level 3)
 
 ## Detailed Installation Guides
 
@@ -447,3 +497,7 @@ gcloud logs read "resource.type=cloud_run_revision AND resource.labels.service_n
 - **Documentation**: You're reading it! Check other guides for specific topics
 - **Issues**: [GitHub Issues](https://github.com/secmon-lab/warren/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/secmon-lab/warren/discussions)
+
+---
+
+*Warren requires Go 1.24+, Docker 25.0.6+, and Google Cloud SDK 464.0.0+ for development.*

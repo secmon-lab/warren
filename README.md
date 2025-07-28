@@ -60,10 +60,46 @@ The system follows clean architecture principles with clear separation between:
 
 This design ensures maintainability, testability, and flexibility for different deployment environments.
 
+## Quick Start
+
+Get Warren running in 5 minutes with Docker:
+
+```bash
+# Set up Google Cloud authentication
+export PROJECT_ID="your-gcp-project"
+gcloud auth application-default login
+gcloud services enable aiplatform.googleapis.com --project=$PROJECT_ID
+
+# Run Warren with Docker
+docker run -d \
+  --name warren \
+  -p 8080:8080 \
+  -v ~/.config/gcloud:/home/nonroot/.config/gcloud:ro \
+  -e WARREN_GEMINI_PROJECT_ID=$PROJECT_ID \
+  -e WARREN_NO_AUTHENTICATION=true \
+  -e WARREN_NO_AUTHORIZATION=true \
+  ghcr.io/secmon-lab/warren:latest serve
+
+# Or build locally if the image is not available:
+# git clone https://github.com/secmon-lab/warren.git && cd warren
+# docker build -t warren:local .
+# Then use warren:local instead
+
+# Send a test alert
+curl -X POST http://localhost:8080/hooks/alert/raw/test \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Test Alert", "description": "Testing Warren", "severity": "high"}'
+```
+
+Visit http://localhost:8080 to see your alerts!
+
 ## Documentation
 
-- [Installation](./doc/installation.md)
-- [Getting Started](./doc/getting_started.md)
+- [Getting Started Guide](./doc/getting_started.md) - 5-minute quick start with Docker
+- [Installation Guide](./doc/installation.md) - From local development to production deployment
+- [User Guide](./doc/user_guide.md) - How to use Warren effectively
+- [Configuration Reference](./doc/configuration.md) - All configuration options
+- [Policy Guide](./doc/policy.md) - Writing alert detection policies
 
 ## License
 
