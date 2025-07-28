@@ -71,6 +71,7 @@ import { EditTicketModal } from "@/components/EditTicketModal";
 import { SimilarTickets } from "@/components/SimilarTickets";
 import { TicketComments } from "@/components/TicketComments";
 import { SalvageModal } from "@/components/SalvageModal";
+import { TicketChat } from "@/components/TicketChat";
 
 const ALERTS_PER_PAGE = 5;
 
@@ -85,10 +86,25 @@ export default function TicketDetailPage() {
   const [isEditConclusionModalOpen, setIsEditConclusionModalOpen] =
     useState(false);
   const [isSalvageModalOpen, setIsSalvageModalOpen] = useState(false);
+  
+  // Initialize chat open state from localStorage
+  const [isChatOpen, setIsChatOpen] = useState(() => {
+    if (!id) return false;
+    const saved = localStorage.getItem(`ticket-chat-open-${id}`);
+    return saved === 'true';
+  });
 
   const errorToast = useErrorToast();
   const successToast = useSuccessToast();
   const confirm = useConfirm();
+
+  // Handle opening chat and persisting state
+  const handleStartChat = () => {
+    setIsChatOpen(true);
+    if (id) {
+      localStorage.setItem(`ticket-chat-open-${id}`, 'true');
+    }
+  };
 
   const formatAbsoluteTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -455,6 +471,33 @@ export default function TicketDetailPage() {
 
           {/* Comments Section */}
           <TicketComments ticketId={ticket.id} />
+
+          {/* Chat Section */}
+          {!isChatOpen ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    AI Chat Assistant
+                  </div>
+                  <Button
+                    onClick={handleStartChat}
+                    className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Start Chat
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Click "Start Chat" to begin a conversation with the AI assistant about this ticket.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <TicketChat ticketId={ticket.id} />
+          )}
 
           {/* Alerts Section with Pagination */}
           <Card>

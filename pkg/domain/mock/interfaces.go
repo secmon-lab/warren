@@ -2466,6 +2466,142 @@ func (mock *SlackNotifierMock) UpdateSalvageModalCalls() []struct {
 	return calls
 }
 
+// ChatNotifierMock is a mock implementation of interfaces.ChatNotifier.
+//
+//	func TestSomethingThatUsesChatNotifier(t *testing.T) {
+//
+//		// make and configure a mocked interfaces.ChatNotifier
+//		mockedChatNotifier := &ChatNotifierMock{
+//			NotifyMessageFunc: func(ctx context.Context, ticketID types.TicketID, message string) error {
+//				panic("mock out the NotifyMessage method")
+//			},
+//			NotifyTraceFunc: func(ctx context.Context, ticketID types.TicketID, message string) error {
+//				panic("mock out the NotifyTrace method")
+//			},
+//		}
+//
+//		// use mockedChatNotifier in code that requires interfaces.ChatNotifier
+//		// and then make assertions.
+//
+//	}
+type ChatNotifierMock struct {
+	// NotifyMessageFunc mocks the NotifyMessage method.
+	NotifyMessageFunc func(ctx context.Context, ticketID types.TicketID, message string) error
+
+	// NotifyTraceFunc mocks the NotifyTrace method.
+	NotifyTraceFunc func(ctx context.Context, ticketID types.TicketID, message string) error
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// NotifyMessage holds details about calls to the NotifyMessage method.
+		NotifyMessage []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TicketID is the ticketID argument value.
+			TicketID types.TicketID
+			// Message is the message argument value.
+			Message string
+		}
+		// NotifyTrace holds details about calls to the NotifyTrace method.
+		NotifyTrace []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TicketID is the ticketID argument value.
+			TicketID types.TicketID
+			// Message is the message argument value.
+			Message string
+		}
+	}
+	lockNotifyMessage sync.RWMutex
+	lockNotifyTrace   sync.RWMutex
+}
+
+// NotifyMessage calls NotifyMessageFunc.
+func (mock *ChatNotifierMock) NotifyMessage(ctx context.Context, ticketID types.TicketID, message string) error {
+	callInfo := struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+		Message  string
+	}{
+		Ctx:      ctx,
+		TicketID: ticketID,
+		Message:  message,
+	}
+	mock.lockNotifyMessage.Lock()
+	mock.calls.NotifyMessage = append(mock.calls.NotifyMessage, callInfo)
+	mock.lockNotifyMessage.Unlock()
+	if mock.NotifyMessageFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.NotifyMessageFunc(ctx, ticketID, message)
+}
+
+// NotifyMessageCalls gets all the calls that were made to NotifyMessage.
+// Check the length with:
+//
+//	len(mockedChatNotifier.NotifyMessageCalls())
+func (mock *ChatNotifierMock) NotifyMessageCalls() []struct {
+	Ctx      context.Context
+	TicketID types.TicketID
+	Message  string
+} {
+	var calls []struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+		Message  string
+	}
+	mock.lockNotifyMessage.RLock()
+	calls = mock.calls.NotifyMessage
+	mock.lockNotifyMessage.RUnlock()
+	return calls
+}
+
+// NotifyTrace calls NotifyTraceFunc.
+func (mock *ChatNotifierMock) NotifyTrace(ctx context.Context, ticketID types.TicketID, message string) error {
+	callInfo := struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+		Message  string
+	}{
+		Ctx:      ctx,
+		TicketID: ticketID,
+		Message:  message,
+	}
+	mock.lockNotifyTrace.Lock()
+	mock.calls.NotifyTrace = append(mock.calls.NotifyTrace, callInfo)
+	mock.lockNotifyTrace.Unlock()
+	if mock.NotifyTraceFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.NotifyTraceFunc(ctx, ticketID, message)
+}
+
+// NotifyTraceCalls gets all the calls that were made to NotifyTrace.
+// Check the length with:
+//
+//	len(mockedChatNotifier.NotifyTraceCalls())
+func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
+	Ctx      context.Context
+	TicketID types.TicketID
+	Message  string
+} {
+	var calls []struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+		Message  string
+	}
+	mock.lockNotifyTrace.RLock()
+	calls = mock.calls.NotifyTrace
+	mock.lockNotifyTrace.RUnlock()
+	return calls
+}
+
 // RepositoryMock is a mock implementation of interfaces.Repository.
 //
 //	func TestSomethingThatUsesRepository(t *testing.T) {

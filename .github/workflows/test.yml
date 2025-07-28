@@ -8,6 +8,8 @@ on:
       - 'go.sum'
       - 'Taskfile.yml'
       - 'graph/**'
+      - 'frontend/**'
+      - '.github/workflows/test.yml'
 
 jobs:
   testing:
@@ -27,6 +29,12 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
       # Explicitly restore Go module cache (supplement when using go-version-file)
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -37,6 +45,27 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+
+      # Cache frontend build
+      - name: Cache frontend dist
+        uses: actions/cache@v4
+        with:
+          path: frontend/dist
+          key: ${{ runner.os }}-frontend-dist-${{ hashFiles('frontend/package-lock.json', 'frontend/src/**', 'frontend/index.html', 'frontend/vite.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-frontend-dist-
+
+      # Build frontend if not cached
+      - name: Build frontend
+        run: |
+          if [ ! -d "frontend/dist" ] || [ ! -f "frontend/dist/index.html" ]; then
+            echo "Building frontend..."
+            cd frontend
+            npm ci
+            npm run build
+          else
+            echo "Using cached frontend build"
+          fi
 
       # Generate mock and GraphQL code (accelerated with cache)
       - name: Generate code

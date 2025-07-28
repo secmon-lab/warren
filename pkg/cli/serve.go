@@ -14,6 +14,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
+	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -43,19 +44,20 @@ func generateFrontendURL(addr string) string {
 
 func cmdServe() *cli.Command {
 	var (
-		addr            string
-		enableGraphQL   bool
-		enableGraphiQL  bool
-		noAuthorization bool
-		strictAlert     bool
-		webUICfg        config.WebUI
-		policyCfg       config.Policy
-		sentryCfg       config.Sentry
-		slackCfg        config.Slack
-		llmCfg          config.LLMCfg
-		firestoreCfg    config.Firestore
-		storageCfg      config.Storage
-		mcpCfg          config.MCPConfig
+		addr             string
+		enableGraphQL    bool
+		enableGraphiQL   bool
+		noAuthorization  bool
+		strictAlert      bool
+		wsAllowedOrigins []string
+		webUICfg         config.WebUI
+		policyCfg        config.Policy
+		sentryCfg        config.Sentry
+		slackCfg         config.Slack
+		llmCfg           config.LLMCfg
+		firestoreCfg     config.Firestore
+		storageCfg       config.Storage
+		mcpCfg           config.MCPConfig
 	)
 
 	flags := joinFlags(
@@ -98,6 +100,13 @@ func cmdServe() *cli.Command {
 				Sources:     cli.EnvVars("WARREN_STRICT_ALERT"),
 				Destination: &strictAlert,
 				Value:       false,
+			},
+			&cli.StringSliceFlag{
+				Name:        "ws-allowed-origins",
+				Usage:       "Additional allowed origins for WebSocket connections (e.g., http://localhost:5173)",
+				Category:    "WebSocket",
+				Sources:     cli.EnvVars("WARREN_WS_ALLOWED_ORIGINS"),
+				Destination: &wsAllowedOrigins,
 			},
 		},
 		webUICfg.Flags(),
@@ -213,6 +222,10 @@ func cmdServe() *cli.Command {
 				slackNotifier = usecase.NewDiscardSlackNotifier()
 			}
 
+			// Create WebSocket hub and handler
+			wsHub := websocket_controller.NewHub(ctx)
+			go wsHub.Run() // Start the hub in a goroutine
+
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
@@ -271,6 +284,33 @@ func cmdServe() *cli.Command {
 				return goerr.New("WebUI requires authentication configuration. Please set either --slack-client-id/--slack-client-secret or --no-authentication flag")
 			}
 
+			// Create and add WebSocket handler with frontend URL for origin checking
+			wsHandler := websocket_controller.NewHandler(wsHub, firestore, uc)
+			if webUICfg.GetFrontendURL() != "" {
+				wsHandler = wsHandler.WithFrontendURL(webUICfg.GetFrontendURL())
+			}
+
+			// Add explicitly configured allowed origins for WebSocket
+			additionalOrigins := append([]string{}, wsAllowedOrigins...)
+
+			// If frontend URL is 127.0.0.1, also allow localhost (and vice versa)
+			frontendURL := webUICfg.GetFrontendURL()
+			if strings.Contains(frontendURL, "://127.0.0.1:") {
+				localhostURL := strings.Replace(frontendURL, "://127.0.0.1:", "://localhost:", 1)
+				additionalOrigins = append(additionalOrigins, localhostURL)
+			} else if strings.Contains(frontendURL, "://localhost:") {
+				loopbackURL := strings.Replace(frontendURL, "://localhost:", "://127.0.0.1:", 1)
+				additionalOrigins = append(additionalOrigins, loopbackURL)
+			}
+
+			if len(additionalOrigins) > 0 {
+				wsHandler = wsHandler.WithAllowedOrigins(additionalOrigins)
+				logging.From(ctx).Info("WebSocket: Configured additional allowed origins",
+					"origins", additionalOrigins)
+			}
+
+			serverOptions = append(serverOptions, server.WithWebSocketHandler(wsHandler))
+
 			httpServer := http.Server{
 				Addr:              addr,
 				Handler:           server.New(uc, serverOptions...),
@@ -296,6 +336,11 @@ func cmdServe() *cli.Command {
 			case err := <-errCh:
 				return err
 			case <-sigCh:
+				// Close WebSocket hub
+				if err := wsHub.Close(); err != nil {
+					logging.From(ctx).Error("failed to close WebSocket hub", "error", err)
+				}
+
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
 				return httpServer.Shutdown(ctx)
