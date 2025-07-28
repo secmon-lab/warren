@@ -725,17 +725,57 @@ policies/
 
 ### Running Tests
 
-```bash
-# Test all policies
-warren test --policy ./policies
+The `warren test` command validates your policies against test data:
 
-# Test specific policy
-warren test --policy ./policies --filter myservice
+```bash
+# Basic usage
+warren test \
+  --policy ./policies \
+  --test-detect-data ./test/myservice/detect \
+  --test-ignore-data ./test/myservice/ignore
+
+# Using aliases
+warren test \
+  -p ./policies \
+  -d ./test/myservice/detect \
+  -i ./test/myservice/ignore
+
+# Using environment variables
+export WARREN_POLICY=./policies
+export WARREN_TEST_DETECT_DATA=./test/myservice/detect
+export WARREN_TEST_IGNORE_DATA=./test/myservice/ignore
+warren test
 ```
+
+#### Command Options
+
+- `-p, --policy`: Path to policy directory or file (required)
+- `-d, --test-detect-data`: Path to test data that should trigger alerts
+- `-i, --test-ignore-data`: Path to test data that should be ignored
+
+#### How It Works
+
+1. **Directory Structure**: Test files are organized by schema name
+   - First directory under the test path becomes the schema name
+   - Example: `test/myservice/detect/alert1.json` → schema: `myservice`
+
+2. **File Formats**: Supports `.json` and `.jsonl` files
+   - `.json`: Single JSON object per file
+   - `.jsonl`: Multiple JSON objects (one per line)
+
+3. **Test Execution**:
+   - For "detect" data: Test passes if policy generates at least one alert
+   - For "ignore" data: Test passes if policy generates no alerts
+
+4. **Output**:
+   - ✅ PASS: Expected behavior matches actual behavior
+   - ❌ FAIL: Mismatch with details (schema, filename, reason)
 
 ### Test Data Format
 
-Detection test (`test/myservice/detect/test1.json`):
+Test data should match the actual input your webhook receives:
+
+#### Detection test (`test/myservice/detect/test1.json`):
 ```json
 {
   "alert_title": "Suspicious Activity",
@@ -745,9 +785,9 @@ Detection test (`test/myservice/detect/test1.json`):
 }
 ```
 
-This should be detected by the policy and create an alert.
+This should trigger your policy to create an alert.
 
-Ignore test (`test/myservice/ignore/test2.json`):
+#### Ignore test (`test/myservice/ignore/test2.json`):
 ```json
 {
   "alert_title": "Normal Activity",
@@ -757,7 +797,16 @@ Ignore test (`test/myservice/ignore/test2.json`):
 }
 ```
 
-This should be ignored by the policy.
+This should be filtered out by your policy's ignore rules.
+
+#### Multi-object test (`test/myservice/detect/batch.jsonl`):
+```json
+{"event": "login_failed", "user": "admin", "ip": "45.227.255.100"}
+{"event": "privilege_escalation", "user": "guest", "ip": "192.168.1.50"}
+{"event": "data_exfiltration", "size": "10GB", "destination": "unknown.host"}
+```
+
+Each line is tested independently against your policy.
 
 ## Examples
 
