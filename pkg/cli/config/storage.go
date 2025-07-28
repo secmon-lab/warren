@@ -68,3 +68,8 @@ func (x *Storage) Configure(ctx context.Context) (*storage.Client, error) {
 
 	return client, nil
 }
+
+// Bucket returns the bucket name (exported for serve command)
+func (x *Storage) Bucket() string {
+	return x.bucket
+}

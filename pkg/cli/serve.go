@@ -12,10 +12,12 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/adapter/storage"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -178,14 +180,32 @@ func cmdServe() *cli.Command {
 				defer slackSvc.Stop()
 			}
 
-			firestore, err := firestoreCfg.Configure(ctx)
-			if err != nil {
-				return err
+			// Configure repository with fallback
+			var repo interfaces.Repository
+			if firestoreCfg.ProjectID() == "" {
+				logging.From(ctx).Warn("🔄 Using in-memory repository (Firestore not configured)",
+					"recommendation", "For production, configure Firestore with --firestore-project-id")
+				repo = repository.NewMemory()
+			} else {
+				firestore, err := firestoreCfg.Configure(ctx)
+				if err != nil {
+					return err
+				}
+				repo = firestore
 			}
 
-			storageClient, err := storageCfg.Configure(ctx)
-			if err != nil {
-				return err
+			// Configure storage with fallback
+			var storageClient interfaces.StorageClient
+			if storageCfg.Bucket() == "" {
+				logging.From(ctx).Warn("🔄 Using in-memory storage (Cloud Storage not configured)",
+					"recommendation", "For production, configure Cloud Storage with --storage-bucket")
+				storageClient = storage.NewMemoryClient()
+			} else {
+				client, err := storageCfg.Configure(ctx)
+				if err != nil {
+					return err
+				}
+				storageClient = client
 			}
 
 			// Create embedding client using unified LLM configuration
@@ -195,7 +215,7 @@ func cmdServe() *cli.Command {
 			}
 
 			// Inject dependencies into tools that support them
-			tools.InjectDependencies(firestore, embeddingAdapter)
+			tools.InjectDependencies(repo, embeddingAdapter)
 
 			toolSets, err := tools.ToolSets(ctx)
 			if err != nil {
@@ -229,7 +249,7 @@ func cmdServe() *cli.Command {
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
-				usecase.WithRepository(firestore),
+				usecase.WithRepository(repo),
 				usecase.WithSlackNotifier(slackNotifier),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(toolSets),
@@ -261,7 +281,7 @@ func cmdServe() *cli.Command {
 
 			// Add repository when GraphQL is enabled
 			if enableGraphQL {
-				serverOptions = append(serverOptions, server.WithGraphQLRepo(firestore))
+				serverOptions = append(serverOptions, server.WithGraphQLRepo(repo))
 			}
 
 			// Add GraphiQL option when GraphiQL is enabled
@@ -273,7 +293,7 @@ func cmdServe() *cli.Command {
 			}
 
 			// Add AuthUseCase if authentication options are provided
-			authUC, err := webUICfg.Configure(ctx, firestore, slackSvc)
+			authUC, err := webUICfg.Configure(ctx, repo, slackSvc)
 			if err != nil {
 				return err
 			}
@@ -285,7 +305,7 @@ func cmdServe() *cli.Command {
 			}
 
 			// Create and add WebSocket handler with frontend URL for origin checking
-			wsHandler := websocket_controller.NewHandler(wsHub, firestore, uc)
+			wsHandler := websocket_controller.NewHandler(wsHub, repo, uc)
 			if webUICfg.GetFrontendURL() != "" {
 				wsHandler = wsHandler.WithFrontendURL(webUICfg.GetFrontendURL())
 			}

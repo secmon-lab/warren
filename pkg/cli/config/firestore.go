@@ -18,7 +18,7 @@ func (c *Firestore) Flags() []cli.Flag {
 		&cli.StringFlag{
 			Name:        "firestore-project-id",
 			Usage:       "Firestore project ID",
-			Required:    true,
+			Required:    false,
 			Destination: &c.projectID,
 			Category:    "Firestore",
 			Sources:     cli.EnvVars("WARREN_FIRESTORE_PROJECT_ID"),
@@ -43,4 +43,9 @@ func (c Firestore) LogValue() slog.Value {
 
 func (c *Firestore) Configure(ctx context.Context) (*repository.Firestore, error) {
 	return repository.NewFirestore(ctx, c.projectID, c.databaseID)
+}
+
+// ProjectID returns the project ID (exported for serve command)
+func (c *Firestore) ProjectID() string {
+	return c.projectID
 }
