@@ -1,20 +1,15 @@
-name: publish
+name: release
 
 on:
   push:
-    branches:
-      - '**'
-    tags-ignore:
-      - '**'
+    tags:
+      - 'v*'
 
 env:
-  TAG_NAME: warren:${{ github.sha }}
-  BUILD_VERSION: ${{ github.sha }}
   GITHUB_IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/warren
-  GITHUB_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/warren:${{ github.sha }}
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -25,6 +20,8 @@ jobs:
       - name: checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3.0.0
       - name: Set up Docker buildx
         uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
       - name: Login to GitHub Container Registry
@@ -34,35 +31,26 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get the tag or commit id
-        id: version
+      - name: extract tag
+        id: tag
         run: |
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            # If a tag is present, strip the 'refs/tags/' prefix
-            TAG_OR_COMMIT=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
-            echo "This is a tag: $TAG_OR_COMMIT"
-          else
-            # If no tag is present, use the commit SHA
-            TAG_OR_COMMIT=$(echo $GITHUB_SHA)
-            echo "This is a commit SHA: $TAG_OR_COMMIT"
-          fi
-          # Set the variable for use in other steps
-          echo "TAG_OR_COMMIT=$TAG_OR_COMMIT" >> $GITHUB_OUTPUT
-        shell: bash
+          TAG=$(echo ${{ github.ref }} | sed -e "s#refs/tags/##g")
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Build and push
         uses: docker/build-push-action@4a13e500e55cf31b7a5d59a38ab2040ab0f42f56 # v5.1.0
         with:
           context: .
           push: true
-          tags: ${{ env.GITHUB_IMAGE_NAME }}
+          tags: |
+            ${{ env.GITHUB_IMAGE_REPO }}:${{ steps.tag.outputs.tag }}
+            ${{ env.GITHUB_IMAGE_REPO }}:latest
           build-args: |
-            BUILD_VERSION=${{ steps.version.outputs.TAG_OR_COMMIT }}
+            BUILD_VERSION=${{ steps.tag.outputs.tag }}
           cache-from: |
             type=gha
             type=registry,ref=${{ env.GITHUB_IMAGE_REPO }}:buildcache
           cache-to: |
             type=gha,mode=max
             type=registry,ref=${{ env.GITHUB_IMAGE_REPO }}:buildcache,mode=max
-          platforms: linux/amd64
-
+          platforms: linux/amd64,linux/arm64
