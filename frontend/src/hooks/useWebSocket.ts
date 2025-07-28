@@ -152,10 +152,10 @@ export function useWebSocket(
       // Calculate exponential backoff delay
       let delay = reconnectInterval * Math.pow(2, reconnectCountRef.current);
       
-      // Special handling for abnormal closure (1006) or any close - wait longer
-      if (event.code === 1006 || event.code === 1005 || event.code === 1000) {
-        delay = Math.max(delay, 12000); // At least 12 seconds for any close
-        console.warn('WebSocket closed, waiting longer before retry.', { code: event.code, reason: event.reason });
+      // Special handling for abnormal closure (1006) or no status code (1005) - wait longer
+      if (event.code === 1006 || event.code === 1005) {
+        delay = Math.max(delay, 12000); // At least 12 seconds for abnormal close
+        console.warn('WebSocket closed abnormally, waiting longer before retry.', { code: event.code, reason: event.reason });
       }
 
       // Minimum 8 second delay for all reconnections
@@ -225,7 +225,7 @@ export function useWebSocket(
         disconnect();
       }
     };
-  }, [ticketId, user?.sub]); // Reconnect when ticketId or user actually changes
+  }, [ticketId, user?.sub, status, connect, disconnect]); // Reconnect when ticketId, user, or status changes
 
   const stopReconnecting = useCallback(() => {
     if (reconnectTimeoutRef.current) {
