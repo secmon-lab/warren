@@ -25,7 +25,6 @@ interface TicketChatProps {
 export function TicketChat({ ticketId }: TicketChatProps) {
   const { user } = useAuth();
   const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -45,9 +44,8 @@ export function TicketChat({ ticketId }: TicketChatProps) {
     e.preventDefault();
     
     const trimmedMessage = message.trim();
-    if (!trimmedMessage || isSubmitting || status !== 'connected') return;
+    if (!trimmedMessage || status !== 'connected') return;
 
-    setIsSubmitting(true);
     const success = sendMessage(trimmedMessage);
     
     if (success) {
@@ -55,8 +53,6 @@ export function TicketChat({ ticketId }: TicketChatProps) {
       // Refocus textarea after clearing
       setTimeout(() => textareaRef.current?.focus(), 0);
     }
-    
-    setIsSubmitting(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -126,7 +122,7 @@ export function TicketChat({ ticketId }: TicketChatProps) {
             >
               <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
               <p className="text-xs opacity-70 mt-1">
-                {new Date(msg.timestamp).toLocaleTimeString()}
+                {new Date(msg.timestamp * 1000).toLocaleTimeString()}
               </p>
             </div>
           </div>
@@ -203,21 +199,17 @@ export function TicketChat({ ticketId }: TicketChatProps) {
                   ? "Type a message... (Shift+Enter for new line)" 
                   : "Connecting to chat..."
               }
-              disabled={status !== 'connected' || isSubmitting}
+              disabled={status !== 'connected'}
               className="min-h-[60px] resize-none"
               rows={2}
             />
             <Button
               type="submit"
               size="icon"
-              disabled={!message.trim() || status !== 'connected' || isSubmitting}
+              disabled={!message.trim() || status !== 'connected'}
               className="self-end"
             >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
+              <Send className="h-4 w-4" />
             </Button>
           </div>
         </form>

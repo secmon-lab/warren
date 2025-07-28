@@ -478,12 +478,8 @@ export default function TicketDetailPage() {
               </button>
             </div>
             <div className="mt-4">
-              <div style={{ display: activeTab === "comments" ? "block" : "none" }}>
-                <TicketComments ticketId={ticket.id} />
-              </div>
-              <div style={{ display: activeTab === "chat" ? "block" : "none" }}>
-                <TicketChat ticketId={ticket.id} />
-              </div>
+              {activeTab === "comments" && <TicketComments ticketId={ticket.id} />}
+              {activeTab === "chat" && <TicketChat ticketId={ticket.id} />}
             </div>
           </div>
 
