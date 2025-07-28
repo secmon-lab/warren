@@ -46,6 +46,10 @@ func (s *Service) PutHistory(ctx context.Context, ticketID types.TicketID, histo
 
 	w := s.storageClient.PutObject(ctx, path)
 
+	if err := json.NewEncoder(w).Encode(history); err != nil {
+		return goerr.Wrap(err, "failed to save history")
+	}
+
 	if err := w.Close(); err != nil {
 		return goerr.Wrap(err, "failed to close history")
 	}
