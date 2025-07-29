@@ -1,4 +1,4 @@
-package slack_test
+package slack
 
 import (
 	"testing"
@@ -10,34 +10,22 @@ import (
 func TestBuildTraceMessageBlocks(t *testing.T) {
 	// Test building trace message blocks (context blocks)
 	message := "Test trace message"
-	
-	// Use the exported test function or access through testing interface
-	// Since buildTraceMessageBlocks is not exported, we'll test it indirectly
-	// by using the slack service's NewTraceMessage method which uses it
-	
-	// For now, let's test that context blocks can be created properly
-	// This verifies the block structure that our trace messages should use
-	
-	blocks := []slack_sdk.Block{
-		slack_sdk.NewContextBlock(
-			"trace_context",
-			slack_sdk.NewTextBlockObject(slack_sdk.MarkdownType, message, false, false),
-		),
-	}
-	
+
+	blocks := buildTraceMessageBlocks(message)
+
 	gt.V(t, len(blocks)).Equal(1)
-	
+
 	// Verify it's a context block
 	contextBlock, ok := blocks[0].(*slack_sdk.ContextBlock)
 	gt.V(t, ok).Equal(true)
 	gt.V(t, contextBlock != nil).Equal(true)
-	
+
 	// Verify the block ID
 	gt.V(t, contextBlock.BlockID).Equal("trace_context")
-	
+
 	// Verify the elements
 	gt.V(t, len(contextBlock.ContextElements.Elements)).Equal(1)
-	
+
 	// Verify the text content
 	textElement, ok := contextBlock.ContextElements.Elements[0].(*slack_sdk.TextBlockObject)
 	gt.V(t, ok).Equal(true)
@@ -47,22 +35,7 @@ func TestBuildTraceMessageBlocks(t *testing.T) {
 
 func TestBuildTraceMessageBlocks_Empty(t *testing.T) {
 	// Test with empty message - should return empty blocks
-	// This simulates what buildTraceMessageBlocks("") should do
-	
-	message := ""
-	
-	// Empty message should result in no blocks
-	// This is what our buildTraceMessageBlocks function does
-	var blocks []slack_sdk.Block
-	if message != "" {
-		blocks = []slack_sdk.Block{
-			slack_sdk.NewContextBlock(
-				"trace_context",
-				slack_sdk.NewTextBlockObject(slack_sdk.MarkdownType, message, false, false),
-			),
-		}
-	}
-	
+	blocks := buildTraceMessageBlocks("")
 	gt.V(t, len(blocks)).Equal(0)
 }
 
