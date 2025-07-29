@@ -67,10 +67,11 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			// Test if history is compatible with current gollem version
 			if history != nil {
 				// Try to validate history by attempting conversion
-				if _, err := history.ToGemini(); err != nil {
-					msg.Notify(ctx, "⚠️ Chat history incompatible, starting fresh: %s", err.Error())
+				if history.Version <= 0 || history.ToCount() <= 0 {
+					msg.Notify(ctx, "⚠️ Chat history incompatible, starting fresh")
 					logger.Warn("history version incompatible, starting with new history",
 						"error", err,
+						"version", history.Version,
 						"history_id", historyRecord.ID)
 					history = nil // Start with new history
 				}
