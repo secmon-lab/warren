@@ -687,6 +687,9 @@ func (mock *SlackClientMock) UploadFileV2ContextCalls() []struct {
 //			NewStateFuncFunc: func(ctx context.Context, message string) func(ctx context.Context, msg string) {
 //				panic("mock out the NewStateFunc method")
 //			},
+//			NewTraceMessageFunc: func(ctx context.Context, initialMessage string) func(ctx context.Context, traceMsg string) {
+//				panic("mock out the NewTraceMessage method")
+//			},
 //			NewUpdatableMessageFunc: func(ctx context.Context, initialMessage string) func(ctx context.Context, newMsg string) {
 //				panic("mock out the NewUpdatableMessage method")
 //			},
@@ -750,6 +753,9 @@ type SlackThreadServiceMock struct {
 
 	// NewStateFuncFunc mocks the NewStateFunc method.
 	NewStateFuncFunc func(ctx context.Context, message string) func(ctx context.Context, msg string)
+
+	// NewTraceMessageFunc mocks the NewTraceMessage method.
+	NewTraceMessageFunc func(ctx context.Context, initialMessage string) func(ctx context.Context, traceMsg string)
 
 	// NewUpdatableMessageFunc mocks the NewUpdatableMessage method.
 	NewUpdatableMessageFunc func(ctx context.Context, initialMessage string) func(ctx context.Context, newMsg string)
@@ -821,6 +827,13 @@ type SlackThreadServiceMock struct {
 			Ctx context.Context
 			// Message is the message argument value.
 			Message string
+		}
+		// NewTraceMessage holds details about calls to the NewTraceMessage method.
+		NewTraceMessage []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// InitialMessage is the initialMessage argument value.
+			InitialMessage string
 		}
 		// NewUpdatableMessage holds details about calls to the NewUpdatableMessage method.
 		NewUpdatableMessage []struct {
@@ -934,6 +947,7 @@ type SlackThreadServiceMock struct {
 	lockChannelID                sync.RWMutex
 	lockEntity                   sync.RWMutex
 	lockNewStateFunc             sync.RWMutex
+	lockNewTraceMessage          sync.RWMutex
 	lockNewUpdatableMessage      sync.RWMutex
 	lockPostAlert                sync.RWMutex
 	lockPostAlertList            sync.RWMutex
@@ -1094,6 +1108,45 @@ func (mock *SlackThreadServiceMock) NewStateFuncCalls() []struct {
 	mock.lockNewStateFunc.RLock()
 	calls = mock.calls.NewStateFunc
 	mock.lockNewStateFunc.RUnlock()
+	return calls
+}
+
+// NewTraceMessage calls NewTraceMessageFunc.
+func (mock *SlackThreadServiceMock) NewTraceMessage(ctx context.Context, initialMessage string) func(ctx context.Context, traceMsg string) {
+	callInfo := struct {
+		Ctx            context.Context
+		InitialMessage string
+	}{
+		Ctx:            ctx,
+		InitialMessage: initialMessage,
+	}
+	mock.lockNewTraceMessage.Lock()
+	mock.calls.NewTraceMessage = append(mock.calls.NewTraceMessage, callInfo)
+	mock.lockNewTraceMessage.Unlock()
+	if mock.NewTraceMessageFunc == nil {
+		var (
+			fnOut func(ctx context.Context, traceMsg string)
+		)
+		return fnOut
+	}
+	return mock.NewTraceMessageFunc(ctx, initialMessage)
+}
+
+// NewTraceMessageCalls gets all the calls that were made to NewTraceMessage.
+// Check the length with:
+//
+//	len(mockedSlackThreadService.NewTraceMessageCalls())
+func (mock *SlackThreadServiceMock) NewTraceMessageCalls() []struct {
+	Ctx            context.Context
+	InitialMessage string
+} {
+	var calls []struct {
+		Ctx            context.Context
+		InitialMessage string
+	}
+	mock.lockNewTraceMessage.RLock()
+	calls = mock.calls.NewTraceMessage
+	mock.lockNewTraceMessage.RUnlock()
 	return calls
 }
 

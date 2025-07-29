@@ -14,7 +14,7 @@ import (
 func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg slack.Message) error {
 	logger := logging.From(ctx)
 	th := uc.slackNotifier.NewThread(slackMsg.Thread())
-	ctx = msg.With(ctx, th.Reply, th.NewStateFunc)
+	ctx = msg.With(ctx, th.Reply, th.NewTraceMessage)
 
 	// Skip if the message is from the bot
 	if uc.slackNotifier.IsBotUser(slackMsg.User().ID) {

@@ -158,6 +158,12 @@ func (d *discardSlackThreadService) NewUpdatableMessage(ctx context.Context, ini
 	}
 }
 
+func (d *discardSlackThreadService) NewTraceMessage(ctx context.Context, initialMessage string) func(ctx context.Context, traceMsg string) {
+	return func(ctx context.Context, traceMsg string) {
+		// Silent no-op
+	}
+}
+
 func (d *discardSlackThreadService) AttachFile(ctx context.Context, title, fileName string, data []byte) error {
 	return nil // Silent no-op
 }

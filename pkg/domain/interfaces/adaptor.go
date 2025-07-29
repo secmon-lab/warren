@@ -70,6 +70,7 @@ type SlackThreadService interface {
 	Reply(ctx context.Context, message string)
 	NewStateFunc(ctx context.Context, message string) func(ctx context.Context, msg string)
 	NewUpdatableMessage(ctx context.Context, initialMessage string) func(ctx context.Context, newMsg string)
+	NewTraceMessage(ctx context.Context, initialMessage string) func(ctx context.Context, traceMsg string)
 
 	// File operations
 	AttachFile(ctx context.Context, title, fileName string, data []byte) error

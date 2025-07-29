@@ -15,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/dryrun"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/urfave/cli/v3"
 )
 
@@ -153,6 +154,9 @@ func runSingleQuery(ctx context.Context, uc *usecase.UseCases, ticket *ticket.Ti
 	logger := logging.From(ctx)
 	logger.Info("Running single query", "query", query)
 
+	// Setup message handlers for CLI output
+	ctx = setupCLIMessageHandlers(ctx)
+
 	if err := uc.Chat(ctx, ticket, query); err != nil {
 		return goerr.Wrap(err, "failed to process query")
 	}
@@ -171,6 +175,9 @@ func runInteractiveMode(ctx context.Context, uc *usecase.UseCases, ticket *ticke
 		fmt.Println("🔒 Dry-run mode: Commands that modify the database will be simulated.")
 	}
 	fmt.Println()
+
+	// Setup message handlers for CLI output
+	ctx = setupCLIMessageHandlers(ctx)
 
 	reader := bufio.NewReader(os.Stdin)
 
@@ -205,4 +212,25 @@ func runInteractiveMode(ctx context.Context, uc *usecase.UseCases, ticket *ticke
 	}
 
 	return nil
+}
+
+// setupCLIMessageHandlers sets up proper message and trace handlers for CLI output
+func setupCLIMessageHandlers(ctx context.Context) context.Context {
+	// Handle regular messages - these are Warren's responses
+	notifyFunc := func(ctx context.Context, message string) {
+		fmt.Printf("%s\n", message)
+	}
+
+	// Handle trace messages - these are context blocks/updates  
+	traceFunc := func(ctx context.Context, message string) func(context.Context, string) {
+		// For CLI, we want to show trace messages differently than regular messages
+		// Trace messages are status updates, not final responses
+		fmt.Printf("🔄 %s\n", message)
+		
+		return func(ctx context.Context, traceMsg string) {
+			fmt.Printf("🔄 %s\n", traceMsg)
+		}
+	}
+
+	return msg.With(ctx, notifyFunc, traceFunc)
 }
