@@ -221,12 +221,12 @@ func setupCLIMessageHandlers(ctx context.Context) context.Context {
 		fmt.Printf("%s\n", message)
 	}
 
-	// Handle trace messages - these are context blocks/updates  
+	// Handle trace messages - these are context blocks/updates
 	traceFunc := func(ctx context.Context, message string) func(context.Context, string) {
 		// For CLI, we want to show trace messages differently than regular messages
 		// Trace messages are status updates, not final responses
 		fmt.Printf("🔄 %s\n", message)
-		
+
 		return func(ctx context.Context, traceMsg string) {
 			fmt.Printf("🔄 %s\n", traceMsg)
 		}
