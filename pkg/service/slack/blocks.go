@@ -715,6 +715,22 @@ func buildStateMessageBlocks(messages []string) []slack.Block {
 	return blocks
 }
 
+// buildTraceMessageBlocks builds context blocks for trace messages (status updates)
+func buildTraceMessageBlocks(message string) []slack.Block {
+	if message == "" {
+		return []slack.Block{}
+	}
+
+	blocks := []slack.Block{
+		slack.NewContextBlock(
+			"trace_context",
+			slack.NewTextBlockObject(slack.MarkdownType, message, false, false),
+		),
+	}
+
+	return blocks
+}
+
 func buildTicketListBlocks(ctx context.Context, tickets []*ticket.Ticket, metadata slackMetadata) []slack.Block {
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(

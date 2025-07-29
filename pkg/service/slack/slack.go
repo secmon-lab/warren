@@ -462,6 +462,36 @@ func (x *ThreadService) NewUpdatableMessage(ctx context.Context, initialMessage 
 	}
 }
 
+// NewTraceMessage creates a new trace message function that posts context blocks for trace updates
+func (x *ThreadService) NewTraceMessage(ctx context.Context, initialMessage string) func(ctx context.Context, traceMsg string) {
+	var msgID string
+	var mutex sync.Mutex
+
+	// Post the initial message immediately
+	blocks := buildTraceMessageBlocks(initialMessage)
+	if len(blocks) > 0 {
+		msgID = x.postInitialMessage(ctx, blocks)
+	}
+
+	return func(ctx context.Context, traceMsg string) {
+		mutex.Lock()
+		defer mutex.Unlock()
+
+		// Build context blocks for trace messages instead of regular message blocks
+		blocks := buildTraceMessageBlocks(traceMsg)
+		if len(blocks) == 0 {
+			return
+		}
+
+		if msgID == "" {
+			msgID = x.postInitialMessage(ctx, blocks)
+			return
+		}
+
+		x.updateMessage(ctx, msgID, blocks)
+	}
+}
+
 func (x *ThreadService) postInitialMessage(ctx context.Context, blocks []slack.Block) string {
 	_, ts, err := x.client.PostMessageContext(ctx,
 		x.channelID,
