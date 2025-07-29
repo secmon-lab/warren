@@ -21,7 +21,7 @@ var (
 type UseCases struct {
 	// services and adapters
 	slackNotifier   interfaces.SlackNotifier
-	slackService    *slackService.Service // Keep concrete service for command execution
+	slackService    *slackService.Service // Keep concrete service for additional functionality
 	llmClient       gollem.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
@@ -178,7 +178,6 @@ func (uc *UseCases) executeSlackCommand(ctx context.Context, slackMsg *slack.Mes
 	}
 
 	// Use concrete slack service to create ThreadService through interface
-	// Now that command package accepts interfaces.SlackThreadService, we can pass the interface directly
 	threadService := uc.slackService.NewThread(thread)
 
 	cmdSvc := command.New(uc.repository, uc.llmClient, threadService)

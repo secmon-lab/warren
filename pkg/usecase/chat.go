@@ -13,11 +13,13 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 //go:embed prompt/chat_system_prompt.md
@@ -111,15 +113,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
 	}
 
-	postWarrenMessage := func(ctx context.Context, message string) {
-		if strings.TrimSpace(message) == "" {
-			return
-		}
-
-		// Send message via context-based notification
-		msg.Notify(ctx, "💬 %s", message)
-	}
-
 	agent := gollem.New(x.llmClient,
 		gollem.WithHistory(history),
 		gollem.WithToolSets(tools...),
@@ -202,11 +195,43 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		return goerr.Wrap(err, "failed to execute plan")
 	}
 
-	if len(execResp) > 0 {
-		postWarrenMessage(ctx, execResp)
+	// Prepare Warren's final response message
+	var warrenResponse string
+	if len(strings.TrimSpace(execResp)) > 0 {
+		warrenResponse = fmt.Sprintf("💬 %s", strings.TrimSpace(execResp))
+
+		if x.slackService != nil && target.SlackThread != nil {
+			// Set agent context for agent messages
+			agentCtx := user.WithAgent(user.WithUserID(ctx, x.slackService.BotID()))
+
+			// Record agent message as TicketComment
+			// Create bot user for agent messages
+			botUser := &slack.User{
+				ID:   x.slackService.BotID(),
+				Name: "Warren",
+			}
+
+			// Post agent message to Slack and get message ID
+			threadSvc := x.slackService.NewThread(*target.SlackThread)
+			logging.From(ctx).Debug("message notify", "from", "MessageHook", "msg", message)
+			ts, err := threadSvc.PostCommentWithMessageID(ctx, "💬 "+message)
+			if err != nil {
+				errs.Handle(ctx, goerr.Wrap(err, "failed to post agent message to slack"))
+			} else {
+				comment := target.NewComment(agentCtx, message, botUser, ts)
+
+				if err := x.repository.PutTicketComment(agentCtx, comment); err != nil {
+					errs.Handle(ctx, goerr.Wrap(err, "failed to save ticket comment"))
+				}
+			}
+
+		} else {
+			msg.Notify(ctx, "💬 %s", execResp)
+		}
+
 	} else {
-		completionMsg := "✅ All task has been done"
-		msg.Notify(ctx, "%s", completionMsg)
+		warrenResponse = "✅ All task has been done"
+		msg.Notify(ctx, "%s", warrenResponse)
 	}
 
 	// Count completed tasks
@@ -218,8 +243,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		}
 	}
 
-	execCompleteMsg := fmt.Sprintf("✅ Plan execution completed (%d/%d tasks)", completedCount, len(todos))
-	ctx = msg.Trace(ctx, "%s", execCompleteMsg)
+	ctx = msg.Trace(ctx, "✅ Plan execution completed (%d/%d tasks)", completedCount, len(todos))
 
 	// Get the updated history from the plan's session
 	session := plan.Session()
@@ -233,6 +257,12 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	if newHistory == nil {
 		return goerr.New("failed to get history from plan session")
 	}
+
+	// Warren's response is automatically included in the plan session history
+	// The execResp is the final response from the plan execution and will be saved
+	logger.Debug("saving chat history with Warren's response",
+		"warren_response", warrenResponse,
+		"history_version", newHistory.Version)
 	if newHistory.Version > 0 {
 		newRecord := ticket.NewHistory(ctx, target.ID)
 
