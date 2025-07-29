@@ -62,17 +62,17 @@ func TestSlackService_NewTraceMessage(t *testing.T) {
 	// This test verifies that our actual slack service implementation
 	// has the NewTraceMessage method and it creates proper context blocks
 	
-	var postCalled bool
-	var updateCalled bool
+	var postCallCount int
+	var updateCallCount int
 	
 	// Create a mock Slack client
 	mockClient := &mock.SlackClientMock{
 		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
-			postCalled = true
+			postCallCount++
 			return channelID, "1234567890.123456", nil
 		},
 		UpdateMessageContextFunc: func(ctx context.Context, channelID, timestamp string, options ...slack_sdk.MsgOption) (string, string, string, error) {
-			updateCalled = true
+			updateCallCount++
 			return channelID, timestamp, "1234567890.123457", nil
 		},
 		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
@@ -102,23 +102,94 @@ func TestSlackService_NewTraceMessage(t *testing.T) {
 
 	// Test that NewTraceMessage method exists and works
 	ctx := context.Background()
-	traceFunc := thread.NewTraceMessage(ctx, "Test trace message")
 	
-	// Call the trace function - this should create context blocks
+	// CRITICAL: The initial message should be posted immediately when NewTraceMessage is called
+	traceFunc := thread.NewTraceMessage(ctx, "Initial trace message")
+	
+	// Verify that the initial message was posted immediately (this was the bug - it wasn't being posted)
+	gt.V(t, postCallCount).Equal(1) // Should be 1 after NewTraceMessage call
+	gt.V(t, updateCallCount).Equal(0) // Should still be 0
+	
+	// Call the trace function - this should update the existing message
 	traceFunc(ctx, "Context update message")
 	
-	// Verify that the Slack client was called to post the initial message
-	gt.V(t, postCalled).Equal(true)
+	// Verify that the message was updated (not posted again)
+	gt.V(t, postCallCount).Equal(1) // Should still be 1
+	gt.V(t, updateCallCount).Equal(1) // Should now be 1
 	
-	// Call the trace function again to test updates
+	// Call the trace function again to test more updates
 	traceFunc(ctx, "Another context update")
 	
-	// Verify that the Slack client was called to update the message
-	gt.V(t, updateCalled).Equal(true)
+	// Verify that the message was updated again
+	gt.V(t, postCallCount).Equal(1) // Should still be 1 
+	gt.V(t, updateCallCount).Equal(2) // Should now be 2
 	
-	// The key thing we've verified is:
-	// 1. NewTraceMessage method exists on the interface
-	// 2. It returns a function that can be called multiple times
-	// 3. The implementation calls Slack API to post/update messages
-	// 4. This is different from Reply which is for regular messages
+	// The key behavior we've verified is:
+	// 1. Initial message is posted immediately when NewTraceMessage is called
+	// 2. Subsequent calls to the returned function update the existing message
+	// 3. This matches the behavior of NewStateFunc and ensures no messages are lost
+}
+
+// TestSlackService_NewTraceMessage_EmptyInitial tests behavior with empty initial message
+func TestSlackService_NewTraceMessage_EmptyInitial(t *testing.T) {
+	var postCallCount int
+	var updateCallCount int
+	
+	// Create a mock Slack client
+	mockClient := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			postCallCount++
+			return channelID, "1234567890.123456", nil
+		},
+		UpdateMessageContextFunc: func(ctx context.Context, channelID, timestamp string, options ...slack_sdk.MsgOption) (string, string, string, error) {
+			updateCallCount++
+			return channelID, timestamp, "1234567890.123457", nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				TeamID: "T123456",
+				Team:   "test-team",
+				UserID: "U123456",
+				BotID:  "B123456",
+			}, nil
+		},
+		GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
+			return &slack_sdk.TeamInfo{
+				Domain: "test-workspace",
+			}, nil
+		},
+	}
+
+	// Create real slack service to test actual implementation
+	slackSvc, err := slack_svc.New(mockClient, "C123456")
+	gt.NoError(t, err)
+
+	thread := slackSvc.NewThread(slack.Thread{
+		ChannelID: "C123456",
+		ThreadID:  "1234567890.123456", 
+		TeamID:    "T123456",
+	})
+
+	ctx := context.Background()
+	
+	// Test with empty initial message - should not post anything initially
+	traceFunc := thread.NewTraceMessage(ctx, "")
+	
+	// Verify that no message was posted for empty initial message
+	gt.V(t, postCallCount).Equal(0)
+	gt.V(t, updateCallCount).Equal(0)
+	
+	// Call the trace function with actual content - this should post the first message
+	traceFunc(ctx, "First actual message")
+	
+	// Verify that the message was posted (since there was no initial message)
+	gt.V(t, postCallCount).Equal(1)
+	gt.V(t, updateCallCount).Equal(0)
+	
+	// Call the trace function again - this should update the existing message
+	traceFunc(ctx, "Update message")
+	
+	// Verify that the message was updated
+	gt.V(t, postCallCount).Equal(1)
+	gt.V(t, updateCallCount).Equal(1)
 }

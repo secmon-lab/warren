@@ -467,6 +467,12 @@ func (x *ThreadService) NewTraceMessage(ctx context.Context, initialMessage stri
 	var msgID string
 	var mutex sync.Mutex
 
+	// Post the initial message immediately
+	blocks := buildTraceMessageBlocks(initialMessage)
+	if len(blocks) > 0 {
+		msgID = x.postInitialMessage(ctx, blocks)
+	}
+
 	return func(ctx context.Context, traceMsg string) {
 		mutex.Lock()
 		defer mutex.Unlock()
