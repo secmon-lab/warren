@@ -731,6 +731,23 @@ func buildTraceMessageBlocks(message string) []slack.Block {
 	return blocks
 }
 
+// buildAccumulatedTraceMessageBlocks builds a single context block for trace messages
+// Since NewTraceMessage now handles byte limits by creating new messages,
+// this function only needs to create a single context block
+func buildAccumulatedTraceMessageBlocks(messages []string) []slack.Block {
+	if len(messages) == 0 {
+		return []slack.Block{}
+	}
+
+	combinedText := strings.Join(messages, "\n")
+	return []slack.Block{
+		slack.NewContextBlock(
+			"trace_context",
+			slack.NewTextBlockObject(slack.MarkdownType, combinedText, false, false),
+		),
+	}
+}
+
 func buildTicketListBlocks(ctx context.Context, tickets []*ticket.Ticket, metadata slackMetadata) []slack.Block {
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(

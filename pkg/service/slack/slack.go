@@ -462,33 +462,66 @@ func (x *ThreadService) NewUpdatableMessage(ctx context.Context, initialMessage 
 	}
 }
 
-// NewTraceMessage creates a new trace message function that posts context blocks for trace updates
+// NewTraceMessage creates a new trace message function that posts new context blocks
+// when byte limits are exceeded instead of updating existing ones
 func (x *ThreadService) NewTraceMessage(ctx context.Context, initialMessage string) func(ctx context.Context, traceMsg string) {
-	var msgID string
+	var currentMsgID string
 	var mutex sync.Mutex
+	var currentMessages []string
+	var currentBytes int
 
-	// Post the initial message immediately
-	blocks := buildTraceMessageBlocks(initialMessage)
-	if len(blocks) > 0 {
-		msgID = x.postInitialMessage(ctx, blocks)
+	const maxBlockBytes = 1900 // Leave some buffer for safety (Slack limit is 2000 bytes)
+
+	// Add initial message if provided
+	if initialMessage != "" {
+		currentMessages = append(currentMessages, initialMessage)
+		currentBytes = len([]byte(initialMessage))
+		blocks := buildAccumulatedTraceMessageBlocks(currentMessages)
+		if len(blocks) > 0 {
+			currentMsgID = x.postInitialMessage(ctx, blocks)
+		}
 	}
 
 	return func(ctx context.Context, traceMsg string) {
 		mutex.Lock()
 		defer mutex.Unlock()
 
-		// Build context blocks for trace messages instead of regular message blocks
-		blocks := buildTraceMessageBlocks(traceMsg)
-		if len(blocks) == 0 {
+		if traceMsg == "" {
 			return
 		}
 
-		if msgID == "" {
-			msgID = x.postInitialMessage(ctx, blocks)
-			return
+		msgBytes := len([]byte(traceMsg))
+		separatorBytes := 0
+		if len(currentMessages) > 0 {
+			separatorBytes = 1 // newline separator
 		}
 
-		x.updateMessage(ctx, msgID, blocks)
+		// If adding this message would exceed the byte limit, create a new context block
+		if currentBytes+msgBytes+separatorBytes > maxBlockBytes && len(currentMessages) > 0 {
+			// Post new message with just the new trace message
+			currentMessages = []string{traceMsg}
+			currentBytes = msgBytes
+			blocks := buildAccumulatedTraceMessageBlocks(currentMessages)
+			if len(blocks) > 0 {
+				currentMsgID = x.postInitialMessage(ctx, blocks)
+			}
+		} else {
+			// Add to current messages and update existing message
+			currentMessages = append(currentMessages, traceMsg)
+			currentBytes += msgBytes + separatorBytes
+
+			blocks := buildAccumulatedTraceMessageBlocks(currentMessages)
+			if len(blocks) == 0 {
+				return
+			}
+
+			if currentMsgID == "" {
+				currentMsgID = x.postInitialMessage(ctx, blocks)
+				return
+			}
+
+			x.updateMessage(ctx, currentMsgID, blocks)
+		}
 	}
 }
 
