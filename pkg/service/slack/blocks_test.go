@@ -42,26 +42,26 @@ func TestBuildTraceMessageBlocks_Empty(t *testing.T) {
 func TestContextBlockVsRegularMessage(t *testing.T) {
 	// This test demonstrates the difference between context blocks (for traces)
 	// and regular section blocks (for normal messages)
-	
+
 	message := "Test message"
-	
+
 	// Context block (what we use for trace messages)
 	contextBlock := slack_sdk.NewContextBlock(
 		"trace_context",
 		slack_sdk.NewTextBlockObject(slack_sdk.MarkdownType, message, false, false),
 	)
-	
-	// Section block (what we use for regular messages)  
+
+	// Section block (what we use for regular messages)
 	sectionBlock := slack_sdk.NewSectionBlock(
 		slack_sdk.NewTextBlockObject(slack_sdk.MarkdownType, message, false, false),
 		nil,
 		nil,
 	)
-	
+
 	// Verify they are different types
 	gt.V(t, contextBlock.BlockType()).Equal(slack_sdk.MBTContext)
 	gt.V(t, sectionBlock.BlockType()).Equal(slack_sdk.MBTSection)
-	
+
 	// This difference is crucial - context blocks appear differently in Slack
 	// (as smaller, grayed-out context information) vs section blocks
 	// (as regular message content)

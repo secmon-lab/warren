@@ -60,6 +60,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	if historyRecord != nil {
 		history, err = storageSvc.GetHistory(ctx, target.ID, historyRecord.ID)
 		if err != nil {
+			msg.Notify(ctx, "⚠️ Failed to load chat history, starting fresh: %s", err.Error())
 			logger.Warn("failed to get history data, starting with new history", "error", err)
 			history = nil // Start with new history
 		} else {
@@ -67,6 +68,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			if history != nil {
 				// Try to validate history by attempting conversion
 				if _, err := history.ToGemini(); err != nil {
+					msg.Notify(ctx, "⚠️ Chat history incompatible, starting fresh: %s", err.Error())
 					logger.Warn("history version incompatible, starting with new history",
 						"error", err,
 						"history_id", historyRecord.ID)
@@ -92,6 +94,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		if tool, ok := toolSet.(interfaces.Tool); ok {
 			additionalPrompt, err := tool.Prompt(ctx)
 			if err != nil {
+				msg.Notify(ctx, "⚠️ Tool initialization warning: %s", err.Error())
 				logger.Warn("failed to get prompt from tool", "tool", tool, "error", err)
 				continue
 			}
@@ -199,6 +202,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 
 	execResp, err := plan.Execute(ctx)
 	if err != nil {
+		msg.Notify(ctx, "💥 Plan execution failed: %s", err.Error())
 		return goerr.Wrap(err, "failed to execute plan")
 	}
 
@@ -237,10 +241,12 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		newRecord := ticket.NewHistory(ctx, target.ID)
 
 		if err := storageSvc.PutHistory(ctx, target.ID, newRecord.ID, newHistory); err != nil {
+			msg.Notify(ctx, "💥 Failed to save chat history: %s", err.Error())
 			return goerr.Wrap(err, "failed to put history")
 		}
 
 		if err := x.repository.PutHistory(ctx, target.ID, &newRecord); err != nil {
+			msg.Notify(ctx, "💥 Failed to save chat record: %s", err.Error())
 			return goerr.Wrap(err, "failed to put history")
 		}
 
