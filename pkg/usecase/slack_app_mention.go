@@ -78,11 +78,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 		}
 
 		traceFunc := func(ctx context.Context, message string) func(context.Context, string) {
-			return func(ctx context.Context, traceMsg string) {
-				if err := threadSvc.PostComment(ctx, traceMsg); err != nil {
-					logging.From(ctx).Error("failed to post trace to slack", "error", err)
-				}
-			}
+			return threadSvc.NewTraceMessage(ctx, message)
 		}
 
 		// Setup context with Slack-specific message handlers

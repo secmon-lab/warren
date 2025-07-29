@@ -126,13 +126,13 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
-			traceMsg := "💭 " + message
-			msg.Trace(ctx, "%s", traceMsg)
+			// Use main context which has proper msg configuration
+			msg.Trace(ctx, "💭 %s", message)
 			return nil
 		}),
 		gollem.WithToolErrorHook(func(ctx context.Context, err error, call gollem.FunctionCall) error {
-			traceMsg := "❌ Error: " + err.Error()
-			msg.Trace(ctx, "%s", traceMsg)
+			// Use main context which has proper msg configuration
+			msg.Trace(ctx, "❌ Error: %s", err.Error())
 			logger.Error("tool error", "error", err, "call", call)
 			return nil
 		}),
@@ -176,30 +176,25 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithPlanCreatedHook(func(ctx context.Context, plan *gollem.Plan) error {
 			return updatePlanProgress(progressUpdate, plan, "Plan created")
 		}),
-		gollem.WithPlanToDoStartHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
-			traceMsg := "🚀 Starting: " + todo.Description
-			msg.Trace(ctx, "%s", traceMsg)
+		gollem.WithPlanToDoStartHook(func(hookCtx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
+			msg.Trace(ctx, "🚀 Starting: %s", todo.Description)
 			return nil
 		}),
 		gollem.WithPlanToDoCompletedHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
 			return updatePlanProgress(progressUpdate, plan, fmt.Sprintf("Completed: %s", todo.Description))
 		}),
-		gollem.WithPlanToDoUpdatedHook(func(ctx context.Context, plan *gollem.Plan, changes []gollem.PlanToDoChange) error {
+		gollem.WithPlanToDoUpdatedHook(func(hookCtx context.Context, plan *gollem.Plan, changes []gollem.PlanToDoChange) error {
 			if len(changes) == 0 {
 				return nil
 			}
 
-			traceMsg := fmt.Sprintf("📝 Plan updated (%d todos)", len(changes))
-			msg.Trace(ctx, "%s", traceMsg)
+			msg.Trace(ctx, "📝 Plan updated (%d todos)", len(changes))
 			return nil
 		}),
 	)
 	if err != nil {
 		return goerr.Wrap(err, "failed to create plan")
 	}
-
-	execStartMsg := "🚀 Executing plan..."
-	ctx = msg.NewTrace(ctx, "%s", execStartMsg)
 
 	execResp, err := plan.Execute(ctx)
 	if err != nil {
