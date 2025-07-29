@@ -64,7 +64,6 @@ func TestSlackService_NewTraceMessage(t *testing.T) {
 
 	var postCallCount int
 	var updateCallCount int
-
 	// Create a mock Slack client
 	mockClient := &mock.SlackClientMock{
 		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
@@ -123,7 +122,6 @@ func TestSlackService_NewTraceMessage(t *testing.T) {
 	// Verify that the message was updated again
 	gt.V(t, postCallCount).Equal(1)   // Should still be 1
 	gt.V(t, updateCallCount).Equal(2) // Should now be 2
-
 	// The key behavior we've verified is:
 	// 1. Initial message is posted immediately when NewTraceMessage is called
 	// 2. Subsequent calls to the returned function update the existing message
@@ -134,7 +132,6 @@ func TestSlackService_NewTraceMessage(t *testing.T) {
 func TestSlackService_NewTraceMessage_EmptyInitial(t *testing.T) {
 	var postCallCount int
 	var updateCallCount int
-
 	// Create a mock Slack client
 	mockClient := &mock.SlackClientMock{
 		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
