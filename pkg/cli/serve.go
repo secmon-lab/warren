@@ -234,14 +234,6 @@ func cmdServe() *cli.Command {
 					"count", len(mcpToolSets))
 			}
 
-			// Configure SlackNotifier based on whether Slack service is available
-			var slackNotifier interfaces.SlackNotifier
-			if slackSvc != nil {
-				slackNotifier = slackSvc // slack.Service implements interfaces.SlackNotifier directly
-			} else {
-				slackNotifier = usecase.NewDiscardSlackNotifier()
-			}
-
 			// Create WebSocket hub and handler
 			wsHub := websocket_controller.NewHub(ctx)
 			go wsHub.Run() // Start the hub in a goroutine
@@ -250,10 +242,14 @@ func cmdServe() *cli.Command {
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(repo),
-				usecase.WithSlackNotifier(slackNotifier),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(toolSets),
 				usecase.WithStrictAlert(strictAlert),
+			}
+
+			// Add Slack service if available
+			if slackSvc != nil {
+				ucOptions = append(ucOptions, usecase.WithSlackService(slackSvc))
 			}
 
 			uc := usecase.New(ucOptions...)

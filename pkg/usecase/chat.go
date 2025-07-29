@@ -44,8 +44,11 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			return nil // Skip if ticket has no finding
 		}
 
-		threadSvc := x.slackNotifier.NewThread(*ticket.SlackThread)
-		return threadSvc.PostFinding(ctx, ticket.Finding)
+		if x.slackService != nil {
+			threadSvc := x.slackService.NewThread(*ticket.SlackThread)
+			return threadSvc.PostFinding(ctx, ticket.Finding)
+		}
+		return nil // No slack service available
 	}
 
 	baseAction := base.New(x.repository, target.ID, base.WithSlackUpdate(slackUpdateFunc), base.WithLLMClient(x.llmClient))

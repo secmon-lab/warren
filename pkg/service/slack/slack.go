@@ -1087,11 +1087,3 @@ func (x *Service) ToTicketURL(ticketID string) string {
 	return fmt.Sprintf("%s/tickets/%s", x.frontendURL, ticketID)
 }
 
-// Implement SlackNotifier interface
-
-// IsEnabled returns whether Slack functionality is enabled (always true for real Service)
-func (x *Service) IsEnabled() bool {
-	return true
-}
-
-// Command execution is handled separately to avoid circular dependencies

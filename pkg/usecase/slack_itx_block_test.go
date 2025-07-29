@@ -110,7 +110,7 @@ func TestSlackActionAckAlert(t *testing.T) {
 	// Create usecase instance
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
 	)
 
@@ -286,7 +286,7 @@ func TestSlackActionAckList(t *testing.T) {
 	// Create usecase instance
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
 	)
 
@@ -400,7 +400,7 @@ func TestSlackActionBindAlert(t *testing.T) {
 	// Create usecase instance
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 	)
 
 	// Execute test
@@ -496,7 +496,7 @@ func TestSlackActionBindList(t *testing.T) {
 	// Create usecase instance
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 	)
 
 	// Execute test
@@ -556,7 +556,7 @@ func TestSlackActionResolveTicket(t *testing.T) {
 	// Create usecase instance
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 	)
 
 	// Test data
@@ -703,7 +703,7 @@ func TestSlackActionAckAlert_MultipleAlertLists(t *testing.T) {
 	// Create usecase instance
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
 	)
 
@@ -852,7 +852,7 @@ func TestSlackActionAckAlert_SingleAlertList(t *testing.T) {
 	// Create usecase instance
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
 	)
 
@@ -998,7 +998,7 @@ func TestSlackActionAckAlert_UpdatesAlertList(t *testing.T) {
 	// Create usecase instance
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
 	)
 

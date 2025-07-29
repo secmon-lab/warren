@@ -105,7 +105,10 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindAlert(ctx context.Co
 		return goerr.Wrap(err, "alert not found", goerr.V("alert_id", alertID))
 	}
 
-	st := uc.slackNotifier.NewThread(*alert.SlackThread)
+	if uc.slackService == nil {
+		return goerr.New("slack service not configured")
+	}
+	st := uc.slackService.NewThread(*alert.SlackThread)
 	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
 
 	ticketID, err := getTicketID(values)
@@ -134,7 +137,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Con
 		return goerr.Wrap(err, "alert list not found", goerr.V("list_id", listID))
 	}
 
-	st := uc.slackNotifier.NewThread(*list.SlackThread)
+	st := uc.slackService.NewThread(*list.SlackThread)
 	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
 
 	ticketID, err := getTicketID(values)
@@ -259,7 +262,10 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 		return nil
 	}
 
-	st := uc.slackNotifier.NewThread(*target.SlackThread)
+	if uc.slackService == nil {
+		return goerr.New("slack service not configured")
+	}
+	st := uc.slackService.NewThread(*target.SlackThread)
 	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
 
 	conclusion, ok := getSlackSelectValue[types.AlertConclusion](values,
@@ -316,7 +322,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionSalvage(ctx context.Cont
 		return nil
 	}
 
-	st := uc.slackNotifier.NewThread(*target.SlackThread)
+	st := uc.slackService.NewThread(*target.SlackThread)
 	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
 
 	// Get threshold and keyword from form values

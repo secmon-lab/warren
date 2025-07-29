@@ -13,11 +13,14 @@ import (
 // HandleSlackMessage handles a message from a slack user. It saves the message as an alert comment if the message is in the Alert thread.
 func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg slack.Message) error {
 	logger := logging.From(ctx)
-	th := uc.slackNotifier.NewThread(slackMsg.Thread())
+	if uc.slackService == nil {
+		return goerr.New("slack service not configured")
+	}
+	th := uc.slackService.NewThread(slackMsg.Thread())
 	ctx = msg.With(ctx, th.Reply, th.NewTraceMessage)
 
 	// Skip if the message is from the bot
-	if uc.slackNotifier.IsBotUser(slackMsg.User().ID) {
+	if uc.slackService.IsBotUser(slackMsg.User().ID) {
 		return nil
 	}
 
