@@ -89,11 +89,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		return goerr.Wrap(err, "failed to get alerts")
 	}
 
-	showAlerts := alerts[:]
-	if len(showAlerts) > 3 {
-		showAlerts = showAlerts[:3]
-	}
-
 	// Collect additional prompts from tools
 	var toolPrompts []string
 	for _, toolSet := range tools {
@@ -149,7 +144,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 
 	systemPrompt, err := prompt.Generate(ctx, chatSystemPromptTemplate, map[string]any{
 		"ticket":                  target,
-		"alerts":                  showAlerts,
 		"total":                   len(alerts),
 		"additional_instructions": additionalInstructions,
 		"lang":                    lang.From(ctx),
@@ -158,8 +152,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	if err != nil {
 		return goerr.Wrap(err, "failed to build system prompt")
 	}
-
-	// logger.Debug("run prompt", "prompt", message, "history", history, "ticket", target, "history_record", historyRecord)
 
 	// Create updatable message function for plan progress tracking
 	progressUpdate := msg.NewUpdatable(ctx, "Initializing AI plan...")
