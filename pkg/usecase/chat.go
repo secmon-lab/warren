@@ -116,6 +116,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
 	}
 
+	ctx = msg.NewTrace(ctx, "🚀 Starting...")
+
 	agent := gollem.New(x.llmClient,
 		gollem.WithHistory(history),
 		gollem.WithToolSets(tools...),
@@ -172,14 +174,14 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithPlanCreatedHook(func(ctx context.Context, plan *gollem.Plan) error {
 			return updatePlanProgress(progressUpdate, plan, "Plan created")
 		}),
-		gollem.WithPlanToDoStartHook(func(hookCtx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
+		gollem.WithPlanToDoStartHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
 			msg.Trace(ctx, "🚀 Starting: %s", todo.Description)
 			return nil
 		}),
 		gollem.WithPlanToDoCompletedHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
 			return updatePlanProgress(progressUpdate, plan, fmt.Sprintf("Completed: %s", todo.Description))
 		}),
-		gollem.WithPlanToDoUpdatedHook(func(hookCtx context.Context, plan *gollem.Plan, changes []gollem.PlanToDoChange) error {
+		gollem.WithPlanToDoUpdatedHook(func(ctx context.Context, plan *gollem.Plan, changes []gollem.PlanToDoChange) error {
 			if len(changes) == 0 {
 				return nil
 			}
@@ -216,8 +218,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 
 			// Post agent message to Slack and get message ID
 			threadSvc := x.slackService.NewThread(*target.SlackThread)
-			logging.From(ctx).Debug("message notify", "from", "MessageHook", "msg", message)
-			ts, err := threadSvc.PostCommentWithMessageID(ctx, "💬 "+message)
+			logging.From(ctx).Debug("message notify", "from", "MessageHook", "msg", warrenResponse)
+			ts, err := threadSvc.PostCommentWithMessageID(ctx, warrenResponse)
 			if err != nil {
 				errs.Handle(ctx, goerr.Wrap(err, "failed to post agent message to slack"))
 			} else {
