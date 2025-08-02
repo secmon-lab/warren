@@ -1,7 +1,6 @@
 package tag
 
 import (
-	"crypto/md5" // #nosec G501 - MD5 is used only for color generation, not for security
 	"time"
 )
 
@@ -104,10 +103,13 @@ var chipColors = []string{
 }
 
 // GenerateColor generates a deterministic color for a tag name
-// Uses MD5 hash to ensure same tag names always get the same color
+// Uses FNV-1a hash to ensure same tag names always get the same color
 func GenerateColor(tagName string) string {
-	hash := md5.Sum([]byte(tagName)) // #nosec G401 - MD5 is used only for deterministic color selection, not for cryptographic purposes
-	// Use first byte of hash to select color
-	colorIndex := int(hash[0]) % len(chipColors)
+	h := uint32(2166136261)
+	for i := 0; i < len(tagName); i++ {
+		h ^= uint32(tagName[i])
+		h *= 16777619
+	}
+	colorIndex := int(h) % len(chipColors)
 	return chipColors[colorIndex]
 }
