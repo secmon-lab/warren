@@ -75,7 +75,7 @@ export function TagSelector({
       e.preventDefault();
       if (filteredTags.length > 0) {
         handleAddTag(filteredTags[0].name);
-      } else if (searchValue.trim() && isCreating) {
+      } else if (showCreateOption) {
         handleCreateTag();
       }
     }
