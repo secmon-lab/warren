@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, List, Kanban, AlertTriangle, GitBranch } from "lucide-react";
+import { Home, List, Kanban, AlertTriangle, GitBranch, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -28,6 +28,11 @@ const navigation = [
     name: "Board",
     href: "/board",
     icon: Kanban,
+  },
+  {
+    name: "Settings",
+    href: "/settings",
+    icon: Settings,
   },
 ];
 

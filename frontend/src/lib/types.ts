@@ -16,6 +16,7 @@ export interface Ticket {
   createdAt: string;
   updatedAt: string;
   isTest: boolean;
+  tags?: string[];
 }
 
 export interface Comment {
@@ -40,6 +41,7 @@ export interface Alert {
   attributes: AlertAttribute[];
   createdAt: string;
   ticket?: Ticket;
+  tags?: string[];
 }
 
 export interface AlertAttribute {
@@ -101,3 +103,10 @@ export const ALERT_CONCLUSION_DESCRIPTIONS: Record<AlertConclusion, string> = {
   true_positive: "The alert has actual impact on the system.",
   escalated: "The alert has been escalated to external management.",
 };
+
+export interface TagMetadata {
+  name: string;
+  color: string;
+  createdAt: string;
+  updatedAt: string;
+}

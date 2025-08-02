@@ -124,6 +124,7 @@ type DBSCANParameters {
 
 type TagMetadata {
   name: String!
+  color: String!
   createdAt: String!
   updatedAt: String!
 }

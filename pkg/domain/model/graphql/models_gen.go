@@ -85,6 +85,7 @@ type Query struct {
 
 type TagMetadata struct {
 	Name      string `json:"name"`
+	Color     string `json:"color"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
 }

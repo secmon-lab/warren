@@ -2439,7 +2439,6 @@ func TestTagOperations(t *testing.T) {
 	})
 }
 
-
 func TestAlertAndTicketTags(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()

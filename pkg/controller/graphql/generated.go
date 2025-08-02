@@ -181,6 +181,7 @@ type ComplexityRoot struct {
 	}
 
 	TagMetadata struct {
+		Color     func(childComplexity int) int
 		CreatedAt func(childComplexity int) int
 		Name      func(childComplexity int) int
 		UpdatedAt func(childComplexity int) int
@@ -994,6 +995,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Query.UnboundAlerts(childComplexity, args["threshold"].(*float64), args["keyword"].(*string), args["ticketId"].(*string), args["offset"].(*int), args["limit"].(*int)), true
 
+	case "TagMetadata.color":
+		if e.complexity.TagMetadata.Color == nil {
+			break
+		}
+
+		return e.complexity.TagMetadata.Color(childComplexity), true
+
 	case "TagMetadata.createdAt":
 		if e.complexity.TagMetadata.CreatedAt == nil {
 			break
@@ -1411,6 +1419,7 @@ type DBSCANParameters {
 
 type TagMetadata {
   name: String!
+  color: String!
   createdAt: String!
   updatedAt: String!
 }
@@ -6855,6 +6864,8 @@ func (ec *executionContext) fieldContext_Mutation_createTag(ctx context.Context,
 			switch field.Name {
 			case "name":
 				return ec.fieldContext_TagMetadata_name(ctx, field)
+			case "color":
+				return ec.fieldContext_TagMetadata_color(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_TagMetadata_createdAt(ctx, field)
 			case "updatedAt":
@@ -7746,6 +7757,8 @@ func (ec *executionContext) fieldContext_Query_tags(_ context.Context, field gra
 			switch field.Name {
 			case "name":
 				return ec.fieldContext_TagMetadata_name(ctx, field)
+			case "color":
+				return ec.fieldContext_TagMetadata_color(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_TagMetadata_createdAt(ctx, field)
 			case "updatedAt":
@@ -7920,6 +7933,50 @@ func (ec *executionContext) _TagMetadata_name(ctx context.Context, field graphql
 }
 
 func (ec *executionContext) fieldContext_TagMetadata_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TagMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TagMetadata_color(ctx context.Context, field graphql.CollectedField, obj *graphql1.TagMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TagMetadata_color(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Color, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TagMetadata_color(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "TagMetadata",
 		Field:      field,
@@ -12732,6 +12789,11 @@ func (ec *executionContext) _TagMetadata(ctx context.Context, sel ast.SelectionS
 			out.Values[i] = graphql.MarshalString("TagMetadata")
 		case "name":
 			out.Values[i] = ec._TagMetadata_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "color":
+			out.Values[i] = ec._TagMetadata_color(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

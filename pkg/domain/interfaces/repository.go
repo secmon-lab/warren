@@ -77,4 +77,6 @@ type Repository interface {
 	CreateTag(ctx context.Context, tag *tag.Metadata) error
 	DeleteTag(ctx context.Context, name tag.Tag) error
 	GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, error)
+	RemoveTagFromAllAlerts(ctx context.Context, name tag.Tag) error
+	RemoveTagFromAllTickets(ctx context.Context, name tag.Tag) error
 }

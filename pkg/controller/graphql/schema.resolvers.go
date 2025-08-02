@@ -393,6 +393,7 @@ func (r *mutationResolver) CreateTag(ctx context.Context, name string) (*graphql
 
 	return &graphql1.TagMetadata{
 		Name:      string(tag.Name),
+		Color:     tag.Color,
 		CreatedAt: tag.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt: tag.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}, nil
@@ -879,6 +880,7 @@ func (r *queryResolver) Tags(ctx context.Context) ([]*graphql1.TagMetadata, erro
 	for i, tag := range tags {
 		result[i] = &graphql1.TagMetadata{
 			Name:      string(tag.Name),
+			Color:     tag.Color,
 			CreatedAt: tag.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			UpdatedAt: tag.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}

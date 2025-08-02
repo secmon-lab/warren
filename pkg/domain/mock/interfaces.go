@@ -2021,6 +2021,12 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			PutTokenFunc: func(ctx context.Context, token *auth.Token) error {
 //				panic("mock out the PutToken method")
 //			},
+//			RemoveTagFromAllAlertsFunc: func(ctx context.Context, name tag.Tag) error {
+//				panic("mock out the RemoveTagFromAllAlerts method")
+//			},
+//			RemoveTagFromAllTicketsFunc: func(ctx context.Context, name tag.Tag) error {
+//				panic("mock out the RemoveTagFromAllTickets method")
+//			},
 //			SearchAlertsFunc: func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
 //				panic("mock out the SearchAlerts method")
 //			},
@@ -2174,6 +2180,12 @@ type RepositoryMock struct {
 
 	// PutTokenFunc mocks the PutToken method.
 	PutTokenFunc func(ctx context.Context, token *auth.Token) error
+
+	// RemoveTagFromAllAlertsFunc mocks the RemoveTagFromAllAlerts method.
+	RemoveTagFromAllAlertsFunc func(ctx context.Context, name tag.Tag) error
+
+	// RemoveTagFromAllTicketsFunc mocks the RemoveTagFromAllTickets method.
+	RemoveTagFromAllTicketsFunc func(ctx context.Context, name tag.Tag) error
 
 	// SearchAlertsFunc mocks the SearchAlerts method.
 	SearchAlertsFunc func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error)
@@ -2538,6 +2550,20 @@ type RepositoryMock struct {
 			// Token is the token argument value.
 			Token *auth.Token
 		}
+		// RemoveTagFromAllAlerts holds details about calls to the RemoveTagFromAllAlerts method.
+		RemoveTagFromAllAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name tag.Tag
+		}
+		// RemoveTagFromAllTickets holds details about calls to the RemoveTagFromAllTickets method.
+		RemoveTagFromAllTickets []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name tag.Tag
+		}
 		// SearchAlerts holds details about calls to the SearchAlerts method.
 		SearchAlerts []struct {
 			// Ctx is the ctx argument value.
@@ -2606,6 +2632,8 @@ type RepositoryMock struct {
 	lockPutTicketComment               sync.RWMutex
 	lockPutTicketCommentsPrompted      sync.RWMutex
 	lockPutToken                       sync.RWMutex
+	lockRemoveTagFromAllAlerts         sync.RWMutex
+	lockRemoveTagFromAllTickets        sync.RWMutex
 	lockSearchAlerts                   sync.RWMutex
 	lockUnbindAlertFromTicket          sync.RWMutex
 }
@@ -4525,6 +4553,84 @@ func (mock *RepositoryMock) PutTokenCalls() []struct {
 	mock.lockPutToken.RLock()
 	calls = mock.calls.PutToken
 	mock.lockPutToken.RUnlock()
+	return calls
+}
+
+// RemoveTagFromAllAlerts calls RemoveTagFromAllAlertsFunc.
+func (mock *RepositoryMock) RemoveTagFromAllAlerts(ctx context.Context, name tag.Tag) error {
+	callInfo := struct {
+		Ctx  context.Context
+		Name tag.Tag
+	}{
+		Ctx:  ctx,
+		Name: name,
+	}
+	mock.lockRemoveTagFromAllAlerts.Lock()
+	mock.calls.RemoveTagFromAllAlerts = append(mock.calls.RemoveTagFromAllAlerts, callInfo)
+	mock.lockRemoveTagFromAllAlerts.Unlock()
+	if mock.RemoveTagFromAllAlertsFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.RemoveTagFromAllAlertsFunc(ctx, name)
+}
+
+// RemoveTagFromAllAlertsCalls gets all the calls that were made to RemoveTagFromAllAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.RemoveTagFromAllAlertsCalls())
+func (mock *RepositoryMock) RemoveTagFromAllAlertsCalls() []struct {
+	Ctx  context.Context
+	Name tag.Tag
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Name tag.Tag
+	}
+	mock.lockRemoveTagFromAllAlerts.RLock()
+	calls = mock.calls.RemoveTagFromAllAlerts
+	mock.lockRemoveTagFromAllAlerts.RUnlock()
+	return calls
+}
+
+// RemoveTagFromAllTickets calls RemoveTagFromAllTicketsFunc.
+func (mock *RepositoryMock) RemoveTagFromAllTickets(ctx context.Context, name tag.Tag) error {
+	callInfo := struct {
+		Ctx  context.Context
+		Name tag.Tag
+	}{
+		Ctx:  ctx,
+		Name: name,
+	}
+	mock.lockRemoveTagFromAllTickets.Lock()
+	mock.calls.RemoveTagFromAllTickets = append(mock.calls.RemoveTagFromAllTickets, callInfo)
+	mock.lockRemoveTagFromAllTickets.Unlock()
+	if mock.RemoveTagFromAllTicketsFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.RemoveTagFromAllTicketsFunc(ctx, name)
+}
+
+// RemoveTagFromAllTicketsCalls gets all the calls that were made to RemoveTagFromAllTickets.
+// Check the length with:
+//
+//	len(mockedRepository.RemoveTagFromAllTicketsCalls())
+func (mock *RepositoryMock) RemoveTagFromAllTicketsCalls() []struct {
+	Ctx  context.Context
+	Name tag.Tag
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Name tag.Tag
+	}
+	mock.lockRemoveTagFromAllTickets.RLock()
+	calls = mock.calls.RemoveTagFromAllTickets
+	mock.lockRemoveTagFromAllTickets.RUnlock()
 	return calls
 }
 

@@ -38,11 +38,12 @@ func (s *Service) CreateTag(ctx context.Context, name tag.Tag) error {
 		return goerr.New("tag name cannot be empty")
 	}
 
-	tag := &tag.Metadata{
-		Name: name,
+	tagMeta := &tag.Metadata{
+		Name:  name,
+		Color: tag.GenerateColor(string(name)),
 	}
 
-	if err := s.repo.CreateTag(ctx, tag); err != nil {
+	if err := s.repo.CreateTag(ctx, tagMeta); err != nil {
 		return goerr.Wrap(err, "failed to create tag")
 	}
 
@@ -51,14 +52,20 @@ func (s *Service) CreateTag(ctx context.Context, name tag.Tag) error {
 
 // DeleteTag deletes a tag and removes it from all alerts and tickets
 func (s *Service) DeleteTag(ctx context.Context, name tag.Tag) error {
-	// First, delete the tag metadata
+	// First, remove the tag from all alerts
+	if err := s.repo.RemoveTagFromAllAlerts(ctx, name); err != nil {
+		return goerr.Wrap(err, "failed to remove tag from alerts")
+	}
+
+	// Then, remove the tag from all tickets
+	if err := s.repo.RemoveTagFromAllTickets(ctx, name); err != nil {
+		return goerr.Wrap(err, "failed to remove tag from tickets")
+	}
+
+	// Finally, delete the tag metadata
 	if err := s.repo.DeleteTag(ctx, name); err != nil {
 		return goerr.Wrap(err, "failed to delete tag")
 	}
-
-	// TODO: Implement batch operations to remove tag from all alerts and tickets
-	// This would require additional repository methods for efficient batch updates
-	// For now, this is handled at the application level when needed
 
 	return nil
 }
@@ -71,7 +78,7 @@ func (s *Service) EnsureTagsExist(ctx context.Context, tags []string) error {
 		}
 
 		tag := tag.Tag(tagName)
-		
+
 		// Check if tag exists
 		existingTag, err := s.repo.GetTag(ctx, tag)
 		if err != nil {

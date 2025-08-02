@@ -172,7 +172,22 @@ func (uc *UseCases) showResolveTicketModal(ctx context.Context, _ slack.User, _ 
 		return goerr.New("ticket not found", goerr.V("ticket_id", targetTicketID))
 	}
 
-	if err := uc.slackService.ShowResolveTicketModal(ctx, ticket, triggerID); err != nil {
+	// Fetch available tags
+	var availableTags []string
+	if uc.tagService != nil {
+		tags, err := uc.tagService.ListTags(ctx)
+		if err != nil {
+			// Log error but continue without tags
+			logging.From(ctx).Warn("failed to list tags for resolve modal", "error", err)
+		} else {
+			availableTags = make([]string, 0, len(tags))
+			for _, tag := range tags {
+				availableTags = append(availableTags, string(tag.Name))
+			}
+		}
+	}
+
+	if err := uc.slackService.ShowResolveTicketModal(ctx, ticket, triggerID, availableTags); err != nil {
 		return goerr.Wrap(err, "failed to show resolve ticket modal")
 	}
 

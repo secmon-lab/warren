@@ -1015,67 +1015,95 @@ func (r *Memory) CountActivities(ctx context.Context) (int, error) {
 func (r *Memory) ListTags(ctx context.Context) ([]*tag.Metadata, error) {
 	r.tagMu.RLock()
 	defer r.tagMu.RUnlock()
-	
+
 	tags := make([]*tag.Metadata, 0, len(r.tags))
 	for _, tag := range r.tags {
 		// Create a copy to prevent external modification
 		tagCopy := *tag
 		tags = append(tags, &tagCopy)
 	}
-	
+
 	return tags, nil
 }
 
 func (r *Memory) CreateTag(ctx context.Context, tag *tag.Metadata) error {
 	r.tagMu.Lock()
 	defer r.tagMu.Unlock()
-	
+
 	// Normalize tag name to lowercase for case-insensitive comparison
 	normalizedName := strings.ToLower(string(tag.Name))
-	
+
 	// Check if tag already exists
 	if _, exists := r.tags[normalizedName]; exists {
 		// Tag already exists, no need to create
 		return nil
 	}
-	
+
 	// Set timestamps
 	now := time.Now()
 	tag.CreatedAt = now
 	tag.UpdatedAt = now
-	
+
 	// Create a copy to prevent external modification
 	tagCopy := *tag
 	r.tags[normalizedName] = &tagCopy
-	
+
 	return nil
 }
 
 func (r *Memory) DeleteTag(ctx context.Context, name tag.Tag) error {
 	r.tagMu.Lock()
 	defer r.tagMu.Unlock()
-	
+
 	// Normalize tag name to lowercase
 	normalizedName := strings.ToLower(string(name))
-	
+
 	delete(r.tags, normalizedName)
-	
+
 	return nil
 }
 
 func (r *Memory) GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, error) {
 	r.tagMu.RLock()
 	defer r.tagMu.RUnlock()
-	
+
 	// Normalize tag name to lowercase
 	normalizedName := strings.ToLower(string(name))
-	
+
 	tag, exists := r.tags[normalizedName]
 	if !exists {
 		return nil, nil
 	}
-	
+
 	// Create a copy to prevent external modification
 	tagCopy := *tag
 	return &tagCopy, nil
+}
+
+func (r *Memory) RemoveTagFromAllAlerts(ctx context.Context, name tag.Tag) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Iterate through all alerts and remove the tag
+	for _, alert := range r.alerts {
+		if alert.Tags != nil {
+			delete(alert.Tags, name)
+		}
+	}
+
+	return nil
+}
+
+func (r *Memory) RemoveTagFromAllTickets(ctx context.Context, name tag.Tag) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Iterate through all tickets and remove the tag
+	for _, ticket := range r.tickets {
+		if ticket.Tags != nil {
+			delete(ticket.Tags, name)
+		}
+	}
+
+	return nil
 }

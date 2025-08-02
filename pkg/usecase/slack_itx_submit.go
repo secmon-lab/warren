@@ -288,6 +288,25 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 	target.Reason = reason
 	target.Status = types.TicketStatusResolved
 
+	// Handle tag selection if available
+	if block, ok := values[slack.BlockIDTicketTags.String()]; ok {
+		if action, ok := block[slack.BlockActionIDTicketTags.String()]; ok && action.SelectedOptions != nil {
+			// Extract selected tag names
+			selectedTags := make([]string, 0, len(action.SelectedOptions))
+			for _, option := range action.SelectedOptions {
+				selectedTags = append(selectedTags, option.Value)
+			}
+
+			// Update ticket tags
+			if uc.tagService != nil {
+				if _, err := uc.tagService.UpdateTicketTags(ctx, ticketID, selectedTags); err != nil {
+					logger.Warn("failed to update ticket tags", "error", err)
+					// Continue with resolve even if tag update fails
+				}
+			}
+		}
+	}
+
 	if err := uc.repository.PutTicket(ctx, *target); err != nil {
 		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID))
 	}
