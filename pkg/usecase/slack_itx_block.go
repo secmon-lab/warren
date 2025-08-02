@@ -26,7 +26,10 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, slac
 	logger := logging.From(ctx)
 	logger.Info("HandleSlackInteractionBlockActions", "action_id", actionID, "value", value, "user", slackUser.ID)
 
-	threadSvc := uc.slackNotifier.NewThread(slackThread)
+	if uc.slackService == nil {
+		return goerr.New("slack service not configured")
+	}
+	threadSvc := uc.slackService.NewThread(slackThread)
 	ctx = msg.With(ctx, threadSvc.Reply, threadSvc.NewStateFunc)
 
 	switch actionID {
@@ -110,7 +113,7 @@ func (uc *UseCases) slackActionAckList(ctx context.Context, user slack.User, sla
 	}
 
 	// Update the alert list message to show acknowledged status
-	st := uc.slackNotifier.NewThread(slackThread)
+	st := uc.slackService.NewThread(slackThread)
 	if list.SlackMessageID != "" {
 		if err := st.UpdateAlertList(ctx, list, "acknowledged"); err != nil {
 			logger.Warn("failed to update alert list", "error", err)
@@ -133,7 +136,7 @@ func (uc *UseCases) slackActionBindAlert(ctx context.Context, targetAlertID type
 		return goerr.Wrap(err, "failed to find similar tickets")
 	}
 
-	if err := uc.slackNotifier.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindAlert, nearestTickets, triggerID, targetAlertID.String()); err != nil {
+	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindAlert, nearestTickets, triggerID, targetAlertID.String()); err != nil {
 		return goerr.Wrap(err, "failed to show bind alert modal")
 	}
 
@@ -154,7 +157,7 @@ func (uc *UseCases) slackActionBindList(ctx context.Context, _ slack.User, _ sla
 		return goerr.Wrap(err, "failed to find similar tickets")
 	}
 
-	if err := uc.slackNotifier.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindList, nearestTickets, triggerID, targetListID.String()); err != nil {
+	if err := uc.slackService.ShowBindToTicketModal(ctx, slack.CallbackSubmitBindList, nearestTickets, triggerID, targetListID.String()); err != nil {
 		return goerr.Wrap(err, "failed to show bind list modal")
 	}
 
@@ -169,7 +172,7 @@ func (uc *UseCases) showResolveTicketModal(ctx context.Context, _ slack.User, _ 
 		return goerr.New("ticket not found", goerr.V("ticket_id", targetTicketID))
 	}
 
-	if err := uc.slackNotifier.ShowResolveTicketModal(ctx, ticket, triggerID); err != nil {
+	if err := uc.slackService.ShowResolveTicketModal(ctx, ticket, triggerID); err != nil {
 		return goerr.Wrap(err, "failed to show resolve ticket modal")
 	}
 
@@ -190,7 +193,7 @@ func (uc *UseCases) showSalvageModal(ctx context.Context, _ slack.User, _ slack.
 		return goerr.Wrap(err, "failed to get salvageable alerts")
 	}
 
-	if err := uc.slackNotifier.ShowSalvageModal(ctx, ticket, unboundAlerts, triggerID); err != nil {
+	if err := uc.slackService.ShowSalvageModal(ctx, ticket, unboundAlerts, triggerID); err != nil {
 		return goerr.Wrap(err, "failed to show salvage modal")
 	}
 
@@ -301,7 +304,7 @@ func (uc *UseCases) HandleSalvageRefresh(ctx context.Context, user slack.User, m
 	}
 
 	// Update the modal view with refreshed alert list
-	if err := uc.slackNotifier.UpdateSalvageModal(ctx, target, unboundAlerts, viewID, threshold, keyword); err != nil {
+	if err := uc.slackService.UpdateSalvageModal(ctx, target, unboundAlerts, viewID, threshold, keyword); err != nil {
 		return goerr.Wrap(err, "failed to update salvage modal")
 	}
 

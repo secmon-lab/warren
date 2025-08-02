@@ -258,7 +258,7 @@ func TestHandleSlackInteractionViewSubmissionSalvage(t *testing.T) {
 	uc := New(
 		WithLLMClient(llmMock),
 		WithRepository(repo),
-		WithSlackNotifier(slackSvc),
+		WithSlackService(slackSvc),
 	)
 
 	// Prepare test input values for salvage with low threshold to include both alerts

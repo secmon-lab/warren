@@ -115,17 +115,17 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 		}
 	}
 
-	if existingAlert != nil && existingAlert.HasSlackThread() {
+	if existingAlert != nil && existingAlert.HasSlackThread() && uc.slackService != nil {
 		// Post to existing thread
-		thread := uc.slackNotifier.NewThread(*existingAlert.SlackThread)
+		thread := uc.slackService.NewThread(*existingAlert.SlackThread)
 		if err := thread.PostAlert(ctx, &newAlert); err != nil {
 			return nil, goerr.Wrap(err, "failed to post alert to existing thread", goerr.V("alert", newAlert), goerr.V("existing_alert", existingAlert))
 		}
 		newAlert.SlackThread = existingAlert.SlackThread
 		logger.Info("alert posted to existing thread", "alert", newAlert, "existing_alert", existingAlert, "similarity", bestSimilarity)
-	} else {
+	} else if uc.slackService != nil {
 		// Post to new thread (normal posting)
-		newThread, err := uc.slackNotifier.PostAlert(ctx, &newAlert)
+		newThread, err := uc.slackService.PostAlert(ctx, &newAlert)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to post alert", goerr.V("alert", newAlert))
 		}
@@ -265,8 +265,8 @@ func (uc *UseCases) BindAlertsToTicket(ctx context.Context, ticketID types.Ticke
 		alerts, err := uc.repository.BatchGetAlerts(ctx, ticket.AlertIDs)
 		if err != nil {
 			logging.From(ctx).Warn("failed to get alerts for Slack update", "error", err, "ticket_id", ticketID)
-		} else {
-			thread := uc.slackNotifier.NewThread(*ticket.SlackThread)
+		} else if uc.slackService != nil {
+			thread := uc.slackService.NewThread(*ticket.SlackThread)
 			if _, err := thread.PostTicket(ctx, ticket, alerts); err != nil {
 				// Log error but don't fail the operation
 				logging.From(ctx).Warn("failed to update Slack thread after binding alerts", "error", err, "ticket_id", ticketID)
@@ -280,8 +280,8 @@ func (uc *UseCases) BindAlertsToTicket(ctx context.Context, ticketID types.Ticke
 		logging.From(ctx).Warn("failed to get bound alerts for individual Slack updates", "error", err, "alert_ids", alertIDs)
 	} else {
 		for _, alert := range boundAlerts {
-			if alert.HasSlackThread() {
-				alertThread := uc.slackNotifier.NewThread(*alert.SlackThread)
+			if alert.HasSlackThread() && uc.slackService != nil {
+				alertThread := uc.slackService.NewThread(*alert.SlackThread)
 				if err := alertThread.UpdateAlert(ctx, *alert); err != nil {
 					// Log error but don't fail the operation
 					logging.From(ctx).Warn("failed to update alert Slack display", "error", err, "alert_id", alert.ID)

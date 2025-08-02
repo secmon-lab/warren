@@ -19,7 +19,10 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 	logger := logging.From(ctx)
 	logger.Debug("slack app mention event", "mention", slackMsg.Mention(), "slack_thread", slackMsg.Thread())
 
-	threadSvc := uc.slackNotifier.NewThread(slackMsg.Thread())
+	if uc.slackService == nil {
+		return goerr.New("slack service not configured")
+	}
+	threadSvc := uc.slackService.NewThread(slackMsg.Thread())
 	ctx = msg.WithUpdatable(ctx, threadSvc.Reply, threadSvc.NewStateFunc, threadSvc.NewUpdatableMessage)
 	if slackMsg.User() != nil {
 		ctx = user.WithUserID(ctx, slackMsg.User().ID)
@@ -27,7 +30,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 
 	// Nothing to do
 	for i, mention := range slackMsg.Mention() {
-		if !uc.slackNotifier.IsBotUser(mention.UserID) {
+		if !uc.slackService.IsBotUser(mention.UserID) {
 			continue
 		}
 
@@ -38,7 +41,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 			// Only execute commands if Slack is enabled
 			if uc.IsSlackEnabled() {
 				// Create command service using SlackThreadService
-				threadSvc := uc.slackNotifier.NewThread(slackMsg.Thread())
+				threadSvc := uc.slackService.NewThread(slackMsg.Thread())
 
 				// We need to get access to concrete ThreadService for command package
 				// This is the only remaining coupling point
@@ -69,7 +72,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 		}
 
 		// Setup Slack-specific message handlers using msg.With
-		threadSvc := uc.slackNotifier.NewThread(slackMsg.Thread())
+		threadSvc := uc.slackService.NewThread(slackMsg.Thread())
 
 		notifyFunc := func(ctx context.Context, message string) {
 			if err := threadSvc.PostComment(ctx, message); err != nil {
@@ -78,11 +81,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 		}
 
 		traceFunc := func(ctx context.Context, message string) func(context.Context, string) {
-			return func(ctx context.Context, traceMsg string) {
-				if err := threadSvc.PostComment(ctx, traceMsg); err != nil {
-					logging.From(ctx).Error("failed to post trace to slack", "error", err)
-				}
-			}
+			return threadSvc.NewTraceMessage(ctx, message)
 		}
 
 		// Setup context with Slack-specific message handlers

@@ -45,7 +45,6 @@ tasks:
         pkg/domain/interfaces
         SlackClient
         SlackThreadService
-        SlackNotifier
         ChatNotifier
         Repository
         PolicyClient

@@ -3,6 +3,8 @@ package msg
 import (
 	"context"
 	"fmt"
+
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 type NotifyFunc func(ctx context.Context, msg string)
@@ -37,12 +39,14 @@ func Notify(ctx context.Context, format string, args ...any) {
 }
 
 func NewTrace(ctx context.Context, format string, args ...any) context.Context {
+	msg := fmt.Sprintf(format, args...)
 	if v := ctx.Value(ctxNewTraceFuncKey{}); v != nil {
 		if fn, ok := v.(NewTraceFunc); ok && fn != nil {
-			TraceMsg := fn(ctx, fmt.Sprintf(format, args...))
+			TraceMsg := fn(ctx, msg)
 			return context.WithValue(ctx, ctxTraceFuncKey{}, TraceMsg)
 		}
 	}
+	logging.From(ctx).Debug("failed to propagate trace func", "message", msg)
 	return context.WithValue(ctx, ctxTraceFuncKey{}, func(ctx context.Context, msg string) {})
 }
 

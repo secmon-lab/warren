@@ -126,7 +126,7 @@ func TestTicketCreation_NewThread_WithInitialComment(t *testing.T) {
 	// Create usecase instance
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
 	)
 

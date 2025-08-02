@@ -20,8 +20,7 @@ var (
 
 type UseCases struct {
 	// services and adapters
-	slackNotifier   interfaces.SlackNotifier
-	slackService    *slackService.Service // Keep concrete service for command execution
+	slackService    *slackService.Service
 	llmClient       gollem.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
@@ -54,17 +53,9 @@ func WithLLMClient(llmClient gollem.LLMClient) Option {
 	}
 }
 
-func WithSlackNotifier(slackNotifier interfaces.SlackNotifier) Option {
-	return func(u *UseCases) {
-		u.slackNotifier = slackNotifier
-	}
-}
-
-// Deprecated: Use WithSlackNotifier instead
 func WithSlackService(slackService *slackService.Service) Option {
 	return func(u *UseCases) {
-		u.slackNotifier = slackService // Set the service as notifier to avoid breaking changes
-		u.slackService = slackService  // Keep concrete service for commands
+		u.slackService = slackService
 	}
 }
 
@@ -141,12 +132,11 @@ func (c *dummyPolicyClient) Sources() map[string]string {
 
 func New(opts ...Option) *UseCases {
 	u := &UseCases{
-		repository:    repository.NewMemory(),
-		policyClient:  &dummyPolicyClient{},
-		slackNotifier: NewDiscardSlackNotifier(), // Default to discard implementation
-		timeSpan:      24 * time.Hour,
-		actionLimit:   10,
-		findingLimit:  3,
+		repository:   repository.NewMemory(),
+		policyClient: &dummyPolicyClient{},
+		timeSpan:     24 * time.Hour,
+		actionLimit:  10,
+		findingLimit: 3,
 	}
 
 	for _, opt := range opts {
@@ -161,7 +151,7 @@ func New(opts ...Option) *UseCases {
 
 // IsSlackEnabled returns whether Slack functionality is enabled
 func (u *UseCases) IsSlackEnabled() bool {
-	return u.slackNotifier.IsEnabled()
+	return u.slackService != nil
 }
 
 // executeSlackCommand executes a Slack command using the concrete slack service
@@ -178,7 +168,6 @@ func (uc *UseCases) executeSlackCommand(ctx context.Context, slackMsg *slack.Mes
 	}
 
 	// Use concrete slack service to create ThreadService through interface
-	// Now that command package accepts interfaces.SlackThreadService, we can pass the interface directly
 	threadService := uc.slackService.NewThread(thread)
 
 	cmdSvc := command.New(uc.repository, uc.llmClient, threadService)

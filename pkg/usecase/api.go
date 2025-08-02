@@ -11,12 +11,18 @@ import (
 
 // GetUserIcon returns the user's icon image data and content type
 func (u *UseCases) GetUserIcon(ctx context.Context, userID string) ([]byte, string, error) {
-	return u.slackNotifier.GetUserIcon(ctx, userID)
+	if u.slackService == nil {
+		return nil, "", goerr.New("slack service not configured")
+	}
+	return u.slackService.GetUserIcon(ctx, userID)
 }
 
 // GetUserProfile returns the user's profile name via Slack service
 func (u *UseCases) GetUserProfile(ctx context.Context, userID string) (string, error) {
-	return u.slackNotifier.GetUserProfile(ctx, userID)
+	if u.slackService == nil {
+		return "", goerr.New("slack service not configured")
+	}
+	return u.slackService.GetUserProfile(ctx, userID)
 }
 
 // GenerateTicketAlertsJSONL generates JSONL data for alerts associated with a ticket

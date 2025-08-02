@@ -76,38 +76,6 @@ type SlackThreadService interface {
 	AttachFile(ctx context.Context, title, fileName string, data []byte) error
 }
 
-// SlackNotifier defines the interface for Slack notification operations
-type SlackNotifier interface {
-	// IsEnabled returns whether Slack functionality is enabled
-	IsEnabled() bool
-
-	// Alert operations
-	PostAlert(ctx context.Context, alert *alert.Alert) (SlackThreadService, error)
-
-	// Thread operations
-	NewThread(thread slack.Thread) SlackThreadService
-
-	// Ticket operations
-	PostTicket(ctx context.Context, ticket *ticket.Ticket, alerts alert.Alerts) (SlackThreadService, string, error)
-
-	// User operations
-	GetUserIcon(ctx context.Context, userID string) ([]byte, string, error)
-	GetUserProfile(ctx context.Context, userID string) (string, error)
-
-	// Utility operations
-	IsBotUser(userID string) bool
-	BotID() string
-	DefaultChannelID() string
-	ToMsgURL(channelID, threadID string) string
-
-	// Modal operations
-	ShowBindToTicketModal(ctx context.Context, callbackID slack.CallbackID, tickets []*ticket.Ticket, triggerID string, metadata string) error
-	ShowResolveTicketModal(ctx context.Context, ticket *ticket.Ticket, triggerID string) error
-	ShowSalvageModal(ctx context.Context, ticket *ticket.Ticket, unboundAlerts alert.Alerts, triggerID string) error
-	UpdateSalvageModal(ctx context.Context, ticket *ticket.Ticket, unboundAlerts alert.Alerts, viewID string, threshold float64, keyword string) error
-
-	// Commands will be handled separately to avoid circular dependencies
-}
 
 // CommandExecutor defines the interface for executing Slack commands
 type CommandExecutor interface {

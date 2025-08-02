@@ -85,7 +85,7 @@ func TestHandleAlert_NoSimilarAlert(t *testing.T) {
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
 		usecase.WithPolicyClient(policyMock),
 	)
@@ -191,7 +191,7 @@ func TestHandleAlert_SimilarAlertFound(t *testing.T) {
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
 		usecase.WithPolicyClient(policyMock),
 	)
@@ -291,7 +291,7 @@ func TestHandleAlert_SimilarAlertBoundToTicket(t *testing.T) {
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
 		usecase.WithPolicyClient(policyMock),
 	)
@@ -387,7 +387,7 @@ func TestHandleAlert_LowSimilarity(t *testing.T) {
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
 		usecase.WithPolicyClient(policyMock),
 	)
@@ -821,7 +821,7 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
 	)
 
@@ -985,7 +985,7 @@ func TestHandleAlert_DefaultPolicyMode(t *testing.T) {
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithSlackNotifier(slackSvc),
+		usecase.WithSlackService(slackSvc),
 		usecase.WithLLMClient(llmMock),
 		usecase.WithPolicyClient(policyMock),
 		usecase.WithStrictAlert(false), // Default mode
@@ -1022,7 +1022,6 @@ func TestHandleAlert_StrictMode(t *testing.T) {
 
 	uc := usecase.New(
 		usecase.WithRepository(repository.NewMemory()),
-		usecase.WithSlackNotifier(usecase.NewDiscardSlackNotifier()),
 		usecase.WithLLMClient(&gollem_mock.LLMClientMock{}),
 		usecase.WithPolicyClient(policyMock),
 		usecase.WithStrictAlert(true), // Strict mode
@@ -1105,7 +1104,7 @@ func TestHandleAlert_ExistingPolicyUnchanged(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			uc := usecase.New(
 				usecase.WithRepository(repo),
-				usecase.WithSlackNotifier(slackSvc),
+				usecase.WithSlackService(slackSvc),
 				usecase.WithLLMClient(llmMock),
 				usecase.WithPolicyClient(policyMock),
 				usecase.WithStrictAlert(strictMode),
