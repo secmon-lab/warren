@@ -7,6 +7,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -76,6 +77,17 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 	newTicket := ticket.New(ctx, opts.AlertIDs, opts.SlackThread)
 	newTicket.Assignee = opts.Assignee
 	newTicket.IsTest = opts.IsTest
+
+	// Inherit tags from alerts
+	if len(alerts) > 0 {
+		inheritedTags := make(tag.Set)
+		for _, alert := range alerts {
+			for tag := range alert.Tags {
+				inheritedTags[tag] = true
+			}
+		}
+		newTicket.Tags = inheritedTags
+	}
 
 	// Handle metadata setting with auto-inheritance logic
 	shouldInherit := opts.AutoInheritFromAlert && len(alerts) == 1 && opts.Title == "" && opts.Description == ""

@@ -15,9 +15,10 @@ import {
 } from "@/components/ui/pagination";
 import { UserWithAvatar } from "@/components/ui/user-name";
 import { CreateTicketModal } from "@/components/CreateTicketModal";
-import { GET_TICKETS } from "@/lib/graphql/queries";
-import { Ticket, TicketStatus, TICKET_STATUS_LABELS } from "@/lib/types";
-import { AlertCircle, MessageSquare, User, Plus } from "lucide-react";
+import { GET_TICKETS, GET_TAGS } from "@/lib/graphql/queries";
+import { Ticket, TicketStatus, TICKET_STATUS_LABELS, TagMetadata } from "@/lib/types";
+import { AlertCircle, MessageSquare, User, Plus, Tag } from "lucide-react";
+import { generateTagColor } from "@/lib/tag-colors";
 
 const ITEMS_PER_PAGE = 10;
 const ALL_STATUSES: TicketStatus[] = [
@@ -64,6 +65,9 @@ export default function TicketsPage() {
       limit: ITEMS_PER_PAGE,
     },
   });
+
+  const { data: tagsData } = useQuery(GET_TAGS);
+  const tagsByName = new Map((tagsData?.tags || []).map((t: TagMetadata) => [t.name, t]));
 
   // Backend already sorts by createdAt DESC, no need to sort again
   const tickets: Ticket[] = ticketsData?.tickets?.tickets || [];
@@ -201,6 +205,26 @@ export default function TicketsPage() {
                             {ticket.isTest && "🧪 [TEST] "}
                             {ticket.title}
                           </CardTitle>
+                          
+                          {/* Tags */}
+                          {ticket.tags && ticket.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {ticket.tags.map((tag, index) => {
+                                const tagData = tagsByName.get(tag) as TagMetadata | undefined;
+                                const colorClass = tagData?.color || generateTagColor(tag);
+                                return (
+                                  <Badge 
+                                    key={`tag-${index}`}
+                                    variant="secondary"
+                                    className={`text-xs ${colorClass}`}
+                                  >
+                                    <Tag className="h-3 w-3 mr-1" />
+                                    {tag}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 ml-4 flex-shrink-0">
                           {ticket.alertsCount > 0 && (

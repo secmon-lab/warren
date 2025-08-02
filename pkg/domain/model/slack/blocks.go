@@ -41,6 +41,7 @@ const (
 	BlockIDTicketID         BlockID = "ticket_id_block"
 	BlockIDTicketConclusion BlockID = "ticket_conclusion_block"
 	BlockIDTicketComment    BlockID = "ticket_comment_block"
+	BlockIDTicketTags       BlockID = "ticket_tags_block"
 	BlockIDSalvageThreshold BlockID = "salvage_threshold_block"
 	BlockIDSalvageKeyword   BlockID = "salvage_keyword_block"
 )
@@ -57,6 +58,7 @@ const (
 	BlockActionIDTicketID         BlockActionID = "ticket_id_input"
 	BlockActionIDTicketComment    BlockActionID = "ticket_comment_input"
 	BlockActionIDTicketConclusion BlockActionID = "ticket_conclusion_input"
+	BlockActionIDTicketTags       BlockActionID = "ticket_tags_input"
 	BlockActionIDSalvageThreshold BlockActionID = "salvage_threshold_input"
 	BlockActionIDSalvageKeyword   BlockActionID = "salvage_keyword_input"
 	BlockActionIDSalvageRefresh   BlockActionID = "salvage_refresh_button"

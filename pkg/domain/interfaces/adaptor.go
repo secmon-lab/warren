@@ -76,7 +76,6 @@ type SlackThreadService interface {
 	AttachFile(ctx context.Context, title, fileName string, data []byte) error
 }
 
-
 // CommandExecutor defines the interface for executing Slack commands
 type CommandExecutor interface {
 	Execute(ctx context.Context, slackMsg *slack.Message, thread slack.Thread, command string) error

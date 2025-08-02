@@ -34,10 +34,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useErrorToast, useSuccessToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/hooks/use-confirm";
+import { TagSelector } from "@/components/ui/tag-selector";
 import {
   GET_TICKET,
   GET_TICKET_ALERTS,
   UPDATE_TICKET_STATUS,
+  UPDATE_TICKET_TAGS,
 } from "@/lib/graphql/queries";
 import {
   Ticket,
@@ -65,6 +67,7 @@ import {
   ArchiveRestore,
   Copy,
   Pencil,
+  Tag,
 } from "lucide-react";
 import { EditConclusionModal } from "@/components/ui/edit-conclusion-modal";
 import { EditTicketModal } from "@/components/EditTicketModal";
@@ -86,6 +89,7 @@ export default function TicketDetailPage() {
   const [isEditConclusionModalOpen, setIsEditConclusionModalOpen] =
     useState(false);
   const [isSalvageModalOpen, setIsSalvageModalOpen] = useState(false);
+  const [tags, setTags] = useState<string[]>([]);
   
   // Initialize chat open state from localStorage
   const [isChatOpen, setIsChatOpen] = useState(() => {
@@ -141,6 +145,15 @@ export default function TicketDetailPage() {
     refetchQueries: [{ query: GET_TICKET, variables: { id } }],
   });
 
+  const [updateTicketTags] = useMutation(UPDATE_TICKET_TAGS, {
+    onCompleted: () => {
+      successToast("Tags updated successfully");
+    },
+    onError: (error) => {
+      errorToast(`Failed to update tags: ${error.message}`);
+    },
+  });
+
   const {
     data: ticketData,
     loading: ticketLoading,
@@ -161,6 +174,29 @@ export default function TicketDetailPage() {
 
   const ticket: Ticket = ticketData?.ticket;
   const alertsResponse = alertsData?.ticket?.alertsPaginated;
+
+  // Set initial tags when ticket data loads
+  useEffect(() => {
+    if (ticket?.tags) {
+      setTags(ticket.tags);
+    }
+  }, [ticket?.tags]);
+
+  const handleTagsChange = async (newTags: string[]) => {
+    if (!ticket?.id) return;
+    
+    setTags(newTags);
+    try {
+      await updateTicketTags({
+        variables: {
+          ticketId: ticket.id,
+          tags: newTags,
+        },
+      });
+    } catch (error) {
+      console.error("Error updating tags:", error);
+    }
+  };
 
   const handleBackToList = () => {
     navigate("/tickets");
@@ -842,6 +878,23 @@ export default function TicketDetailPage() {
                   </Button>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Tags */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Tag className="h-4 w-4" />
+                Tags
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TagSelector
+                selectedTags={tags}
+                onTagsChange={handleTagsChange}
+                disabled={false}
+              />
             </CardContent>
           </Card>
 

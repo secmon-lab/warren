@@ -12,6 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -36,6 +37,7 @@ type Alert struct {
 	CreatedAt   time.Time          `json:"created_at"`
 	SlackThread *slack.Thread      `json:"slack_thread"`
 	Embedding   firestore.Vector32 `json:"-"`
+	Tags        tag.Set            `json:"tags" firestore:"tags"`
 }
 
 // HasSlackThread returns true if the alert has a valid Slack thread
@@ -55,6 +57,7 @@ type Metadata struct {
 	Attributes        []Attribute  `json:"attributes"`
 	TitleSource       types.Source `json:"title_source"`
 	DescriptionSource types.Source `json:"description_source"`
+	Tags              []string     `json:"tags,omitempty"`
 }
 
 func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metadata) Alert {
@@ -65,6 +68,7 @@ func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metad
 		CreatedAt: clock.Now(ctx),
 		Metadata:  metadata,
 		Data:      data,
+		Tags:      tag.NewSet(metadata.Tags),
 	}
 
 	if newAlert.Metadata.Title == "" {

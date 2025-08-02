@@ -12,6 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/command"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/service/tag"
 )
 
 var (
@@ -21,6 +22,7 @@ var (
 type UseCases struct {
 	// services and adapters
 	slackService    *slackService.Service
+	tagService      *tag.Service
 	llmClient       gollem.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
@@ -31,6 +33,7 @@ type UseCases struct {
 
 	// use cases
 	ClusteringUC *ClusteringUseCase
+	TagUC        *TagUseCase
 
 	// configs
 	timeSpan      time.Duration
@@ -56,6 +59,12 @@ func WithLLMClient(llmClient gollem.LLMClient) Option {
 func WithSlackService(slackService *slackService.Service) Option {
 	return func(u *UseCases) {
 		u.slackService = slackService
+	}
+}
+
+func WithTagService(tagService *tag.Service) Option {
+	return func(u *UseCases) {
+		u.tagService = tagService
 	}
 }
 
@@ -145,6 +154,11 @@ func New(opts ...Option) *UseCases {
 
 	// Initialize clustering use case
 	u.ClusteringUC = NewClusteringUseCase(u.repository)
+
+	// Initialize tag use case if tag service is available
+	if u.tagService != nil {
+		u.TagUC = NewTagUseCase(u.tagService)
+	}
 
 	return u
 }

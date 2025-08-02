@@ -343,7 +343,7 @@ func buildBindToTicketModalViewRequest(ctx context.Context, callbackID model.Cal
 	}
 }
 
-func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *ticket.Ticket) slack.ModalViewRequest {
+func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *ticket.Ticket, availableTags []string) slack.ModalViewRequest {
 	conclusionOptions := []struct {
 		Conclusion  types.AlertConclusion
 		Label       string
@@ -387,6 +387,78 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 		)
 	}
 
+	// Build tag options if available
+	blockSet := []slack.Block{
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.PlainTextType, "Please input the conclusion and comment.", false, false),
+			nil,
+			nil,
+		),
+		slack.NewInputBlock(
+			model.BlockIDTicketConclusion.String(),
+			slack.NewTextBlockObject(slack.PlainTextType, "Conclusion", false, false),
+			slack.NewTextBlockObject(slack.PlainTextType, "Select the conclusion", false, false),
+			slack.NewOptionsSelectBlockElement(
+				slack.OptTypeStatic,
+				slack.NewTextBlockObject(slack.PlainTextType, "Select a conclusion", false, false),
+				model.BlockActionIDTicketConclusion.String(),
+				conclusionOptionBlocks...,
+			),
+		),
+		slack.NewInputBlock(
+			model.BlockIDTicketComment.String(),
+			slack.NewTextBlockObject(slack.PlainTextType, "Comment", false, false),
+			slack.NewTextBlockObject(slack.PlainTextType, "Add any reason, context, or information.", false, false),
+			slack.NewPlainTextInputBlockElement(
+				slack.NewTextBlockObject(slack.PlainTextType, "Enter comment", false, false),
+				model.BlockActionIDTicketComment.String(),
+			),
+		).WithOptional(true),
+	}
+
+	// Add tag selection if tags are available
+	if len(availableTags) > 0 {
+		tagOptions := make([]*slack.OptionBlockObject, 0, len(availableTags))
+
+		// Get current tags from ticket
+		currentTags := make(map[string]bool)
+		for tag := range ticket.Tags {
+			currentTags[string(tag)] = true
+		}
+
+		// Create tag options
+		for _, tag := range availableTags {
+			tagOptions = append(tagOptions,
+				slack.NewOptionBlockObject(
+					tag,
+					slack.NewTextBlockObject(slack.PlainTextType, tag, false, false),
+					nil,
+				),
+			)
+		}
+
+		// Create initial options with current tags
+		var initialOptions []*slack.OptionBlockObject
+		for _, opt := range tagOptions {
+			if currentTags[opt.Value] {
+				initialOptions = append(initialOptions, opt)
+			}
+		}
+
+		// Add multi-select for tags
+		blockSet = append(blockSet, slack.NewInputBlock(
+			model.BlockIDTicketTags.String(),
+			slack.NewTextBlockObject(slack.PlainTextType, "Tags", false, false),
+			slack.NewTextBlockObject(slack.PlainTextType, "Select tags for this ticket", false, false),
+			slack.NewOptionsMultiSelectBlockElement(
+				slack.OptTypeStatic,
+				slack.NewTextBlockObject(slack.PlainTextType, "Select tags", false, false),
+				model.BlockActionIDTicketTags.String(),
+				tagOptions...,
+			).WithInitialOptions(initialOptions...),
+		).WithOptional(true))
+	}
+
 	return slack.ModalViewRequest{
 		Type: slack.VTModal,
 		Title: &slack.TextBlockObject{
@@ -394,33 +466,7 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 			Text: "Resolve Ticket",
 		},
 		Blocks: slack.Blocks{
-			BlockSet: []slack.Block{
-				slack.NewSectionBlock(
-					slack.NewTextBlockObject(slack.PlainTextType, "Please input the conclusion and comment.", false, false),
-					nil,
-					nil,
-				),
-				slack.NewInputBlock(
-					model.BlockIDTicketConclusion.String(),
-					slack.NewTextBlockObject(slack.PlainTextType, "Conclusion", false, false),
-					slack.NewTextBlockObject(slack.PlainTextType, "Select the conclusion", false, false),
-					slack.NewOptionsSelectBlockElement(
-						slack.OptTypeStatic,
-						slack.NewTextBlockObject(slack.PlainTextType, "Select a conclusion", false, false),
-						model.BlockActionIDTicketConclusion.String(),
-						conclusionOptionBlocks...,
-					),
-				),
-				slack.NewInputBlock(
-					model.BlockIDTicketComment.String(),
-					slack.NewTextBlockObject(slack.PlainTextType, "Comment", false, false),
-					slack.NewTextBlockObject(slack.PlainTextType, "Add any reason, context, or information.", false, false),
-					slack.NewPlainTextInputBlockElement(
-						slack.NewTextBlockObject(slack.PlainTextType, "Enter comment", false, false),
-						model.BlockActionIDTicketComment.String(),
-					),
-				).WithOptional(true),
-			},
+			BlockSet: blockSet,
 		},
 		CallbackID:      callbackID.String(),
 		PrivateMetadata: ticket.ID.String(),

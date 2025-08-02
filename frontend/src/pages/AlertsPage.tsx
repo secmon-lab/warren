@@ -11,9 +11,10 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { GET_ALERTS } from "@/lib/graphql/queries";
-import { Alert } from "@/lib/types";
-import { AlertTriangle } from "lucide-react";
+import { GET_ALERTS, GET_TAGS } from "@/lib/graphql/queries";
+import { Alert, TagMetadata } from "@/lib/types";
+import { AlertTriangle, Tag } from "lucide-react";
+import { generateTagColor } from "@/lib/tag-colors";
 
 interface AlertsData {
   alerts: {
@@ -37,6 +38,9 @@ export default function AlertsPage() {
       limit: ITEMS_PER_PAGE,
     },
   });
+
+  const { data: tagsData } = useQuery(GET_TAGS);
+  const tagsByName = new Map((tagsData?.tags || []).map((t: TagMetadata) => [t.name, t]));
 
   // Sort alerts by createdAt in descending order (newest first)
   const sortedAlerts: Alert[] = useMemo(() => {
@@ -161,6 +165,28 @@ export default function AlertsPage() {
                         </p>
                       )}
                       
+                      {/* Alert Tags and Attributes */}
+                      <div className="flex flex-wrap gap-1 max-w-full mb-1">
+                        {alert.tags && alert.tags.length > 0 && (
+                          <>
+                            {alert.tags.map((tag, index) => {
+                              const tagData = tagsByName.get(tag) as TagMetadata | undefined;
+                              const colorClass = tagData?.color || generateTagColor(tag);
+                              return (
+                                <Badge 
+                                  key={`tag-${index}`}
+                                  variant="secondary"
+                                  className={`text-xs ${colorClass}`}
+                                >
+                                  <Tag className="h-3 w-3 mr-1" />
+                                  {tag}
+                                </Badge>
+                              );
+                            })}
+                          </>
+                        )}
+                      </div>
+                      
                       {/* Alert Attributes */}
                       <div className="flex flex-wrap gap-1 max-w-full">
                         {alert.attributes && alert.attributes.length > 0 && (
@@ -173,7 +199,7 @@ export default function AlertsPage() {
                               return (
                                 <Badge 
                                   key={index} 
-                                  variant={attr.auto ? "secondary" : "default"}
+                                  variant={attr.auto ? "outline" : "default"}
                                   className="text-xs max-w-[280px] truncate inline-block"
                                   title={displayText}
                                 >

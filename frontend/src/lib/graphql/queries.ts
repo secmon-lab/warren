@@ -50,6 +50,7 @@ export const GET_TICKET = gql`
       createdAt
       updatedAt
       alertsCount
+      tags
       comments {
         id
         content
@@ -82,6 +83,7 @@ export const GET_TICKET_ALERTS = gql`
             auto
           }
           createdAt
+          tags
         }
         totalCount
       }
@@ -104,6 +106,7 @@ export const GET_ALERT = gql`
         auto
       }
       createdAt
+      tags
       ticket {
         id
         status
@@ -130,6 +133,7 @@ export const GET_ALERTS = gql`
           auto
         }
         createdAt
+        tags
         ticket {
           id
           status
@@ -305,6 +309,7 @@ export const UPDATE_TICKET = gql`
       slackLink
       createdAt
       updatedAt
+      tags
       alerts {
         id
         title
@@ -318,6 +323,7 @@ export const UPDATE_TICKET = gql`
           auto
         }
         createdAt
+        tags
       }
       comments {
         id
@@ -510,6 +516,54 @@ export const GET_CLUSTER_ALERTS = gql`
         }
       }
       totalCount
+    }
+  }
+`;
+
+export const GET_TAGS = gql`
+  query GetTags {
+    tags {
+      name
+      color
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const CREATE_TAG = gql`
+  mutation CreateTag($name: String!) {
+    createTag(name: $name) {
+      name
+      color
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const DELETE_TAG = gql`
+  mutation DeleteTag($name: String!) {
+    deleteTag(name: $name)
+  }
+`;
+
+export const UPDATE_ALERT_TAGS = gql`
+  mutation UpdateAlertTags($alertId: ID!, $tags: [String!]!) {
+    updateAlertTags(alertId: $alertId, tags: $tags) {
+      id
+      title
+      tags
+    }
+  }
+`;
+
+export const UPDATE_TICKET_TAGS = gql`
+  mutation UpdateTicketTags($ticketId: ID!, $tags: [String!]!) {
+    updateTicketTags(ticketId: $ticketId, tags: $tags) {
+      id
+      title
+      tags
     }
   }
 `;

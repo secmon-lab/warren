@@ -731,8 +731,8 @@ func (x *Service) ShowBindToTicketModal(ctx context.Context, callbackID model.Ca
 	return nil
 }
 
-func (x *Service) ShowResolveTicketModal(ctx context.Context, ticket *ticket.Ticket, triggerID string) error {
-	req := buildResolveTicketModalViewRequest(model.CallbackSubmitResolveTicket, ticket)
+func (x *Service) ShowResolveTicketModal(ctx context.Context, ticket *ticket.Ticket, triggerID string, availableTags []string) error {
+	req := buildResolveTicketModalViewRequest(model.CallbackSubmitResolveTicket, ticket, availableTags)
 	if _, err := x.client.OpenView(triggerID, req); err != nil {
 		return goerr.Wrap(err, "failed to open view",
 			goerr.V("callback_id", req.CallbackID),
@@ -1086,4 +1086,3 @@ func (x *Service) ToTicketURL(ticketID string) string {
 	}
 	return fmt.Sprintf("%s/tickets/%s", x.frontendURL, ticketID)
 }
-
