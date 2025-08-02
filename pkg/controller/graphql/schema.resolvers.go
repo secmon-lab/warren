@@ -104,6 +104,11 @@ func (r *alertResolver) Ticket(ctx context.Context, obj *alert.Alert) (*ticket.T
 	return r.repo.GetTicket(ctx, obj.TicketID)
 }
 
+// Tags is the resolver for the tags field.
+func (r *alertResolver) Tags(ctx context.Context, obj *alert.Alert) ([]string, error) {
+	return obj.Tags.ToSlice(), nil
+}
+
 // ID is the resolver for the id field.
 func (r *commentResolver) ID(ctx context.Context, obj *ticket.Comment) (string, error) {
 	return string(obj.ID), nil
@@ -345,6 +350,66 @@ func (r *mutationResolver) BindAlertsToTicket(ctx context.Context, ticketID stri
 	}
 
 	return updatedTicket, nil
+}
+
+// UpdateAlertTags is the resolver for the updateAlertTags field.
+func (r *mutationResolver) UpdateAlertTags(ctx context.Context, alertID string, tags []string) (*alert.Alert, error) {
+	if r.uc.TagUC == nil {
+		return nil, goerr.New("tag service not configured")
+	}
+
+	a, err := r.uc.TagUC.UpdateAlertTags(ctx, types.AlertID(alertID), tags)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to update alert tags")
+	}
+
+	return a, nil
+}
+
+// UpdateTicketTags is the resolver for the updateTicketTags field.
+func (r *mutationResolver) UpdateTicketTags(ctx context.Context, ticketID string, tags []string) (*ticket.Ticket, error) {
+	if r.uc.TagUC == nil {
+		return nil, goerr.New("tag service not configured")
+	}
+
+	t, err := r.uc.TagUC.UpdateTicketTags(ctx, types.TicketID(ticketID), tags)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to update ticket tags")
+	}
+
+	return t, nil
+}
+
+// CreateTag is the resolver for the createTag field.
+func (r *mutationResolver) CreateTag(ctx context.Context, name string) (*graphql1.TagMetadata, error) {
+	if r.uc.TagUC == nil {
+		return nil, goerr.New("tag service not configured")
+	}
+
+	tag, err := r.uc.TagUC.CreateTag(ctx, name)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to create tag")
+	}
+
+	return &graphql1.TagMetadata{
+		Name:      string(tag.Name),
+		CreatedAt: tag.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt: tag.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}, nil
+}
+
+// DeleteTag is the resolver for the deleteTag field.
+func (r *mutationResolver) DeleteTag(ctx context.Context, name string) (bool, error) {
+	if r.uc.TagUC == nil {
+		return false, goerr.New("tag service not configured")
+	}
+
+	err := r.uc.TagUC.DeleteTag(ctx, name)
+	if err != nil {
+		return false, goerr.Wrap(err, "failed to delete tag")
+	}
+
+	return true, nil
 }
 
 // Ticket is the resolver for the ticket field.
@@ -799,6 +864,29 @@ func (r *queryResolver) ClusterAlerts(ctx context.Context, clusterID string, key
 	}, nil
 }
 
+// Tags is the resolver for the tags field.
+func (r *queryResolver) Tags(ctx context.Context) ([]*graphql1.TagMetadata, error) {
+	if r.uc.TagUC == nil {
+		return nil, goerr.New("tag service not configured")
+	}
+
+	tags, err := r.uc.TagUC.ListTags(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to list tags")
+	}
+
+	result := make([]*graphql1.TagMetadata, len(tags))
+	for i, tag := range tags {
+		result[i] = &graphql1.TagMetadata{
+			Name:      string(tag.Name),
+			CreatedAt: tag.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			UpdatedAt: tag.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+	}
+
+	return result, nil
+}
+
 // ID is the resolver for the id field.
 func (r *ticketResolver) ID(ctx context.Context, obj *ticket.Ticket) (string, error) {
 	return string(obj.ID), nil
@@ -925,6 +1013,11 @@ func (r *ticketResolver) CreatedAt(ctx context.Context, obj *ticket.Ticket) (str
 // UpdatedAt is the resolver for the updatedAt field.
 func (r *ticketResolver) UpdatedAt(ctx context.Context, obj *ticket.Ticket) (string, error) {
 	return obj.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
+}
+
+// Tags is the resolver for the tags field.
+func (r *ticketResolver) Tags(ctx context.Context, obj *ticket.Ticket) ([]string, error) {
+	return obj.Tags.ToSlice(), nil
 }
 
 // Activity returns ActivityResolver implementation.

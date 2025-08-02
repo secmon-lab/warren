@@ -5,6 +5,7 @@ import (
 	"math"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/user"
@@ -22,6 +24,7 @@ import (
 type Memory struct {
 	mu         sync.RWMutex
 	activityMu sync.RWMutex
+	tagMu      sync.RWMutex
 
 	alerts         map[types.AlertID]*alert.Alert
 	lists          map[types.AlertListID]*alert.List
@@ -30,6 +33,7 @@ type Memory struct {
 	ticketComments map[types.TicketID][]ticket.Comment
 	tokens         map[auth.TokenID]*auth.Token
 	activities     map[types.ActivityID]*activity.Activity
+	tags           map[string]*tag.Metadata
 
 	// Call counter for tracking method invocations
 	callCounts map[string]int
@@ -47,6 +51,7 @@ func NewMemory() *Memory {
 		ticketComments: make(map[types.TicketID][]ticket.Comment),
 		tokens:         make(map[auth.TokenID]*auth.Token),
 		activities:     make(map[types.ActivityID]*activity.Activity),
+		tags:           make(map[string]*tag.Metadata),
 		callCounts:     make(map[string]int),
 	}
 }
@@ -1003,4 +1008,74 @@ func (r *Memory) CountActivities(ctx context.Context) (int, error) {
 	defer r.activityMu.RUnlock()
 
 	return len(r.activities), nil
+}
+
+// Tag management methods
+
+func (r *Memory) ListTags(ctx context.Context) ([]*tag.Metadata, error) {
+	r.tagMu.RLock()
+	defer r.tagMu.RUnlock()
+	
+	tags := make([]*tag.Metadata, 0, len(r.tags))
+	for _, tag := range r.tags {
+		// Create a copy to prevent external modification
+		tagCopy := *tag
+		tags = append(tags, &tagCopy)
+	}
+	
+	return tags, nil
+}
+
+func (r *Memory) CreateTag(ctx context.Context, tag *tag.Metadata) error {
+	r.tagMu.Lock()
+	defer r.tagMu.Unlock()
+	
+	// Normalize tag name to lowercase for case-insensitive comparison
+	normalizedName := strings.ToLower(string(tag.Name))
+	
+	// Check if tag already exists
+	if _, exists := r.tags[normalizedName]; exists {
+		// Tag already exists, no need to create
+		return nil
+	}
+	
+	// Set timestamps
+	now := time.Now()
+	tag.CreatedAt = now
+	tag.UpdatedAt = now
+	
+	// Create a copy to prevent external modification
+	tagCopy := *tag
+	r.tags[normalizedName] = &tagCopy
+	
+	return nil
+}
+
+func (r *Memory) DeleteTag(ctx context.Context, name tag.Tag) error {
+	r.tagMu.Lock()
+	defer r.tagMu.Unlock()
+	
+	// Normalize tag name to lowercase
+	normalizedName := strings.ToLower(string(name))
+	
+	delete(r.tags, normalizedName)
+	
+	return nil
+}
+
+func (r *Memory) GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, error) {
+	r.tagMu.RLock()
+	defer r.tagMu.RUnlock()
+	
+	// Normalize tag name to lowercase
+	normalizedName := strings.ToLower(string(name))
+	
+	tag, exists := r.tags[normalizedName]
+	if !exists {
+		return nil, nil
+	}
+	
+	// Create a copy to prevent external modification
+	tagCopy := *tag
+	return &tagCopy, nil
 }

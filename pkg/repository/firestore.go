@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -14,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/user"
@@ -55,6 +57,7 @@ const (
 	collectionComments    = "comments"
 	collectionTokens      = "tokens"
 	collectionActivities  = "activities"
+	collectionTags        = "tags"
 )
 
 // extractCountFromAggregationResult extracts an integer count from a Firestore aggregation result.
@@ -1337,4 +1340,94 @@ func alertIDsToInterface(alertIDs []types.AlertID) []any {
 		interfaces[i] = id.String()
 	}
 	return interfaces
+}
+
+// Tag management methods
+
+func (r *Firestore) ListTags(ctx context.Context) ([]*tag.Metadata, error) {
+	var tags []*tag.Metadata
+	
+	iter := r.db.Collection(collectionTags).Documents(ctx)
+	defer iter.Stop()
+	
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to iterate tags")
+		}
+		
+		var tag tag.Metadata
+		if err := doc.DataTo(&tag); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert tag data")
+		}
+		tags = append(tags, &tag)
+	}
+	
+	return tags, nil
+}
+
+func (r *Firestore) CreateTag(ctx context.Context, tag *tag.Metadata) error {
+	// Normalize tag name to lowercase for case-insensitive comparison
+	normalizedName := strings.ToLower(string(tag.Name))
+	docRef := r.db.Collection(collectionTags).Doc(normalizedName)
+	
+	// Check if tag already exists
+	_, err := docRef.Get(ctx)
+	if err == nil {
+		// Tag already exists, no need to create
+		return nil
+	}
+	if status.Code(err) != codes.NotFound {
+		return goerr.Wrap(err, "failed to check tag existence")
+	}
+	
+	// Set timestamps
+	now := time.Now()
+	tag.CreatedAt = now
+	tag.UpdatedAt = now
+	
+	// Create new tag
+	if _, err := docRef.Set(ctx, tag); err != nil {
+		return goerr.Wrap(err, "failed to create tag")
+	}
+	
+	return nil
+}
+
+func (r *Firestore) DeleteTag(ctx context.Context, name tag.Tag) error {
+	// Normalize tag name to lowercase
+	normalizedName := strings.ToLower(string(name))
+	
+	// Delete the tag document
+	if _, err := r.db.Collection(collectionTags).Doc(normalizedName).Delete(ctx); err != nil {
+		return goerr.Wrap(err, "failed to delete tag")
+	}
+	
+	// TODO: Consider batch operation to remove this tag from all alerts and tickets
+	// This might be better handled at the service layer
+	
+	return nil
+}
+
+func (r *Firestore) GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, error) {
+	// Normalize tag name to lowercase
+	normalizedName := strings.ToLower(string(name))
+	
+	doc, err := r.db.Collection(collectionTags).Doc(normalizedName).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
+		return nil, goerr.Wrap(err, "failed to get tag")
+	}
+	
+	var tag tag.Metadata
+	if err := doc.DataTo(&tag); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert tag data")
+	}
+	
+	return &tag, nil
 }

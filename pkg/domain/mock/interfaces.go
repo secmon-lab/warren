@@ -11,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	slackSDK "github.com/slack-go/slack"
@@ -1906,6 +1907,12 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			CountTicketsByStatusFunc: func(ctx context.Context, statuses []types.TicketStatus) (int, error) {
 //				panic("mock out the CountTicketsByStatus method")
 //			},
+//			CreateTagFunc: func(ctx context.Context, tagMoqParam *tag.Metadata) error {
+//				panic("mock out the CreateTag method")
+//			},
+//			DeleteTagFunc: func(ctx context.Context, name tag.Tag) error {
+//				panic("mock out the DeleteTag method")
+//			},
 //			DeleteTokenFunc: func(ctx context.Context, tokenID auth.TokenID) error {
 //				panic("mock out the DeleteToken method")
 //			},
@@ -1954,6 +1961,9 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			GetLatestHistoryFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
 //				panic("mock out the GetLatestHistory method")
 //			},
+//			GetTagFunc: func(ctx context.Context, name tag.Tag) (*tag.Metadata, error) {
+//				panic("mock out the GetTag method")
+//			},
 //			GetTicketFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
 //				panic("mock out the GetTicket method")
 //			},
@@ -1983,6 +1993,9 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			},
 //			GetTokenFunc: func(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error) {
 //				panic("mock out the GetToken method")
+//			},
+//			ListTagsFunc: func(ctx context.Context) ([]*tag.Metadata, error) {
+//				panic("mock out the ListTags method")
 //			},
 //			PutActivityFunc: func(ctx context.Context, activityMoqParam *activity.Activity) error {
 //				panic("mock out the PutActivity method")
@@ -2048,6 +2061,12 @@ type RepositoryMock struct {
 	// CountTicketsByStatusFunc mocks the CountTicketsByStatus method.
 	CountTicketsByStatusFunc func(ctx context.Context, statuses []types.TicketStatus) (int, error)
 
+	// CreateTagFunc mocks the CreateTag method.
+	CreateTagFunc func(ctx context.Context, tagMoqParam *tag.Metadata) error
+
+	// DeleteTagFunc mocks the DeleteTag method.
+	DeleteTagFunc func(ctx context.Context, name tag.Tag) error
+
 	// DeleteTokenFunc mocks the DeleteToken method.
 	DeleteTokenFunc func(ctx context.Context, tokenID auth.TokenID) error
 
@@ -2096,6 +2115,9 @@ type RepositoryMock struct {
 	// GetLatestHistoryFunc mocks the GetLatestHistory method.
 	GetLatestHistoryFunc func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error)
 
+	// GetTagFunc mocks the GetTag method.
+	GetTagFunc func(ctx context.Context, name tag.Tag) (*tag.Metadata, error)
+
 	// GetTicketFunc mocks the GetTicket method.
 	GetTicketFunc func(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error)
 
@@ -2125,6 +2147,9 @@ type RepositoryMock struct {
 
 	// GetTokenFunc mocks the GetToken method.
 	GetTokenFunc func(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error)
+
+	// ListTagsFunc mocks the ListTags method.
+	ListTagsFunc func(ctx context.Context) ([]*tag.Metadata, error)
 
 	// PutActivityFunc mocks the PutActivity method.
 	PutActivityFunc func(ctx context.Context, activityMoqParam *activity.Activity) error
@@ -2220,6 +2245,20 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Statuses is the statuses argument value.
 			Statuses []types.TicketStatus
+		}
+		// CreateTag holds details about calls to the CreateTag method.
+		CreateTag []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TagMoqParam is the tagMoqParam argument value.
+			TagMoqParam *tag.Metadata
+		}
+		// DeleteTag holds details about calls to the DeleteTag method.
+		DeleteTag []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name tag.Tag
 		}
 		// DeleteToken holds details about calls to the DeleteToken method.
 		DeleteToken []struct {
@@ -2345,6 +2384,13 @@ type RepositoryMock struct {
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
 		}
+		// GetTag holds details about calls to the GetTag method.
+		GetTag []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name tag.Tag
+		}
 		// GetTicket holds details about calls to the GetTicket method.
 		GetTicket []struct {
 			// Ctx is the ctx argument value.
@@ -2426,6 +2472,11 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// TokenID is the tokenID argument value.
 			TokenID auth.TokenID
+		}
+		// ListTags holds details about calls to the ListTags method.
+		ListTags []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
 		}
 		// PutActivity holds details about calls to the PutActivity method.
 		PutActivity []struct {
@@ -2517,6 +2568,8 @@ type RepositoryMock struct {
 	lockCountAlertsWithoutTicket       sync.RWMutex
 	lockCountTicketComments            sync.RWMutex
 	lockCountTicketsByStatus           sync.RWMutex
+	lockCreateTag                      sync.RWMutex
+	lockDeleteTag                      sync.RWMutex
 	lockDeleteToken                    sync.RWMutex
 	lockFindNearestAlerts              sync.RWMutex
 	lockFindNearestTickets             sync.RWMutex
@@ -2533,6 +2586,7 @@ type RepositoryMock struct {
 	lockGetLatestAlertByThread         sync.RWMutex
 	lockGetLatestAlertListInThread     sync.RWMutex
 	lockGetLatestHistory               sync.RWMutex
+	lockGetTag                         sync.RWMutex
 	lockGetTicket                      sync.RWMutex
 	lockGetTicketByThread              sync.RWMutex
 	lockGetTicketComments              sync.RWMutex
@@ -2543,6 +2597,7 @@ type RepositoryMock struct {
 	lockGetTicketsByStatusAndSpan      sync.RWMutex
 	lockGetTicketsWithInvalidEmbedding sync.RWMutex
 	lockGetToken                       sync.RWMutex
+	lockListTags                       sync.RWMutex
 	lockPutActivity                    sync.RWMutex
 	lockPutAlert                       sync.RWMutex
 	lockPutAlertList                   sync.RWMutex
@@ -2909,6 +2964,84 @@ func (mock *RepositoryMock) CountTicketsByStatusCalls() []struct {
 	mock.lockCountTicketsByStatus.RLock()
 	calls = mock.calls.CountTicketsByStatus
 	mock.lockCountTicketsByStatus.RUnlock()
+	return calls
+}
+
+// CreateTag calls CreateTagFunc.
+func (mock *RepositoryMock) CreateTag(ctx context.Context, tagMoqParam *tag.Metadata) error {
+	callInfo := struct {
+		Ctx         context.Context
+		TagMoqParam *tag.Metadata
+	}{
+		Ctx:         ctx,
+		TagMoqParam: tagMoqParam,
+	}
+	mock.lockCreateTag.Lock()
+	mock.calls.CreateTag = append(mock.calls.CreateTag, callInfo)
+	mock.lockCreateTag.Unlock()
+	if mock.CreateTagFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.CreateTagFunc(ctx, tagMoqParam)
+}
+
+// CreateTagCalls gets all the calls that were made to CreateTag.
+// Check the length with:
+//
+//	len(mockedRepository.CreateTagCalls())
+func (mock *RepositoryMock) CreateTagCalls() []struct {
+	Ctx         context.Context
+	TagMoqParam *tag.Metadata
+} {
+	var calls []struct {
+		Ctx         context.Context
+		TagMoqParam *tag.Metadata
+	}
+	mock.lockCreateTag.RLock()
+	calls = mock.calls.CreateTag
+	mock.lockCreateTag.RUnlock()
+	return calls
+}
+
+// DeleteTag calls DeleteTagFunc.
+func (mock *RepositoryMock) DeleteTag(ctx context.Context, name tag.Tag) error {
+	callInfo := struct {
+		Ctx  context.Context
+		Name tag.Tag
+	}{
+		Ctx:  ctx,
+		Name: name,
+	}
+	mock.lockDeleteTag.Lock()
+	mock.calls.DeleteTag = append(mock.calls.DeleteTag, callInfo)
+	mock.lockDeleteTag.Unlock()
+	if mock.DeleteTagFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.DeleteTagFunc(ctx, name)
+}
+
+// DeleteTagCalls gets all the calls that were made to DeleteTag.
+// Check the length with:
+//
+//	len(mockedRepository.DeleteTagCalls())
+func (mock *RepositoryMock) DeleteTagCalls() []struct {
+	Ctx  context.Context
+	Name tag.Tag
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Name tag.Tag
+	}
+	mock.lockDeleteTag.RLock()
+	calls = mock.calls.DeleteTag
+	mock.lockDeleteTag.RUnlock()
 	return calls
 }
 
@@ -3575,6 +3708,46 @@ func (mock *RepositoryMock) GetLatestHistoryCalls() []struct {
 	return calls
 }
 
+// GetTag calls GetTagFunc.
+func (mock *RepositoryMock) GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, error) {
+	callInfo := struct {
+		Ctx  context.Context
+		Name tag.Tag
+	}{
+		Ctx:  ctx,
+		Name: name,
+	}
+	mock.lockGetTag.Lock()
+	mock.calls.GetTag = append(mock.calls.GetTag, callInfo)
+	mock.lockGetTag.Unlock()
+	if mock.GetTagFunc == nil {
+		var (
+			metadataOut *tag.Metadata
+			errOut      error
+		)
+		return metadataOut, errOut
+	}
+	return mock.GetTagFunc(ctx, name)
+}
+
+// GetTagCalls gets all the calls that were made to GetTag.
+// Check the length with:
+//
+//	len(mockedRepository.GetTagCalls())
+func (mock *RepositoryMock) GetTagCalls() []struct {
+	Ctx  context.Context
+	Name tag.Tag
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Name tag.Tag
+	}
+	mock.lockGetTag.RLock()
+	calls = mock.calls.GetTag
+	mock.lockGetTag.RUnlock()
+	return calls
+}
+
 // GetTicket calls GetTicketFunc.
 func (mock *RepositoryMock) GetTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
 	callInfo := struct {
@@ -3996,6 +4169,42 @@ func (mock *RepositoryMock) GetTokenCalls() []struct {
 	mock.lockGetToken.RLock()
 	calls = mock.calls.GetToken
 	mock.lockGetToken.RUnlock()
+	return calls
+}
+
+// ListTags calls ListTagsFunc.
+func (mock *RepositoryMock) ListTags(ctx context.Context) ([]*tag.Metadata, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockListTags.Lock()
+	mock.calls.ListTags = append(mock.calls.ListTags, callInfo)
+	mock.lockListTags.Unlock()
+	if mock.ListTagsFunc == nil {
+		var (
+			metadatasOut []*tag.Metadata
+			errOut       error
+		)
+		return metadatasOut, errOut
+	}
+	return mock.ListTagsFunc(ctx)
+}
+
+// ListTagsCalls gets all the calls that were made to ListTags.
+// Check the length with:
+//
+//	len(mockedRepository.ListTagsCalls())
+func (mock *RepositoryMock) ListTagsCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockListTags.RLock()
+	calls = mock.calls.ListTags
+	mock.lockListTags.RUnlock()
 	return calls
 }
 

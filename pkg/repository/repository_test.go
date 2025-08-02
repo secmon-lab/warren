@@ -15,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	ticketmodel "github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
@@ -2291,4 +2292,260 @@ func TestGetAlertWithoutTicketPagination(t *testing.T) {
 	t.Run("Memory", runTest(repository.NewMemory()))
 
 	t.Run("Firestore", runTest(newFirestoreClient(t)))
+}
+
+func TestTagOperations(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+
+		t.Run("Create and list tags", func(t *testing.T) {
+			// Initially no tags
+			tags, err := repo.ListTags(ctx)
+			gt.NoError(t, err)
+			gt.Array(t, tags).Length(0)
+
+			// Create tags
+			tag1 := &tag.Metadata{Name: "security"}
+			gt.NoError(t, repo.CreateTag(ctx, tag1))
+
+			tag2 := &tag.Metadata{Name: "incident"}
+			gt.NoError(t, repo.CreateTag(ctx, tag2))
+
+			tag3 := &tag.Metadata{Name: "phishing"}
+			gt.NoError(t, repo.CreateTag(ctx, tag3))
+
+			// List tags
+			tags, err = repo.ListTags(ctx)
+			gt.NoError(t, err)
+			gt.Array(t, tags).Length(3)
+
+			// Verify tag names
+			tagNames := make(map[tag.Tag]bool)
+			for _, tag := range tags {
+				tagNames[tag.Name] = true
+			}
+			gt.True(t, tagNames["security"])
+			gt.True(t, tagNames["incident"])
+			gt.True(t, tagNames["phishing"])
+		})
+
+		t.Run("Create duplicate tag", func(t *testing.T) {
+			// Create a tag
+			tag := &tag.Metadata{Name: "duplicate"}
+			gt.NoError(t, repo.CreateTag(ctx, tag))
+
+			// Try to create the same tag again (should not error)
+			gt.NoError(t, repo.CreateTag(ctx, tag))
+
+			// Verify only one tag exists
+			tags, err := repo.ListTags(ctx)
+			gt.NoError(t, err)
+			count := 0
+			for _, t := range tags {
+				if t.Name == "duplicate" {
+					count++
+				}
+			}
+			gt.Number(t, count).Equal(1)
+		})
+
+		t.Run("Case insensitive tags", func(t *testing.T) {
+			// Create tags with different cases
+			tag1 := &tag.Metadata{Name: "CaseSensitive"}
+			gt.NoError(t, repo.CreateTag(ctx, tag1))
+
+			tag2 := &tag.Metadata{Name: "casesensitive"}
+			gt.NoError(t, repo.CreateTag(ctx, tag2))
+
+			tag3 := &tag.Metadata{Name: "CASESENSITIVE"}
+			gt.NoError(t, repo.CreateTag(ctx, tag3))
+
+			// Should only have one tag (normalized to lowercase)
+			existingTag, err := repo.GetTag(ctx, "casesensitive")
+			gt.NoError(t, err)
+			gt.NotNil(t, existingTag)
+			gt.V(t, existingTag.Name).Equal(tag.Tag("CaseSensitive")) // First one created
+		})
+
+		t.Run("Get tag", func(t *testing.T) {
+			// Create a tag
+			testTag := &tag.Metadata{Name: "gettag"}
+			gt.NoError(t, repo.CreateTag(ctx, testTag))
+
+			// Get existing tag
+			retrievedTag, err := repo.GetTag(ctx, "gettag")
+			gt.NoError(t, err)
+			gt.NotNil(t, retrievedTag)
+			gt.V(t, retrievedTag.Name).Equal(tag.Tag("gettag"))
+
+			// Get non-existent tag
+			nonExistent, err := repo.GetTag(ctx, "nonexistent")
+			gt.NoError(t, err)
+			gt.Nil(t, nonExistent)
+		})
+
+		t.Run("Delete tag", func(t *testing.T) {
+			// Create tags
+			tag1 := &tag.Metadata{Name: "delete1"}
+			tag2 := &tag.Metadata{Name: "delete2"}
+			gt.NoError(t, repo.CreateTag(ctx, tag1))
+			gt.NoError(t, repo.CreateTag(ctx, tag2))
+
+			// Delete one tag
+			gt.NoError(t, repo.DeleteTag(ctx, "delete1"))
+
+			// Verify it's deleted
+			deletedTag, err := repo.GetTag(ctx, "delete1")
+			gt.NoError(t, err)
+			gt.Nil(t, deletedTag)
+
+			// Other tag should still exist
+			remainingTag, err := repo.GetTag(ctx, "delete2")
+			gt.NoError(t, err)
+			gt.NotNil(t, remainingTag)
+		})
+
+		t.Run("Tag timestamps", func(t *testing.T) {
+			// Create a tag
+			before := time.Now()
+			testTag := &tag.Metadata{Name: "timestamped"}
+			gt.NoError(t, repo.CreateTag(ctx, testTag))
+			after := time.Now()
+
+			// Get the tag
+			retrievedTag, err := repo.GetTag(ctx, "timestamped")
+			gt.NoError(t, err)
+			gt.NotNil(t, retrievedTag)
+
+			// Verify timestamps are set
+			gt.True(t, !retrievedTag.CreatedAt.IsZero())
+			gt.True(t, !retrievedTag.UpdatedAt.IsZero())
+			gt.True(t, retrievedTag.CreatedAt.Equal(retrievedTag.UpdatedAt))
+
+			// Verify timestamps are within expected range
+			gt.True(t, retrievedTag.CreatedAt.After(before.Add(-time.Second)))
+			gt.True(t, retrievedTag.CreatedAt.Before(after.Add(time.Second)))
+		})
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+
+func TestAlertAndTicketTags(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+
+		t.Run("Alert with tags", func(t *testing.T) {
+			// Create an alert with tags
+			a := alert.New(ctx, "test", map[string]string{"test": "data"}, alert.Metadata{
+				Title:       "Test Alert",
+				Description: "Test Description",
+			})
+			a.Tags = tag.NewSet([]string{"security", "incident", "critical"})
+
+			// Save the alert
+			gt.NoError(t, repo.PutAlert(ctx, a))
+
+			// Retrieve the alert
+			retrievedAlert, err := repo.GetAlert(ctx, a.ID)
+			gt.NoError(t, err)
+			gt.NotNil(t, retrievedAlert)
+
+			// Verify tags are preserved
+			gt.Number(t, len(retrievedAlert.Tags)).Equal(3)
+			gt.True(t, retrievedAlert.Tags.Has("security"))
+			gt.True(t, retrievedAlert.Tags.Has("incident"))
+			gt.True(t, retrievedAlert.Tags.Has("critical"))
+		})
+
+		t.Run("Ticket with tags", func(t *testing.T) {
+			// Create a ticket with tags
+			tk := ticketmodel.New(ctx, []types.AlertID{}, nil)
+			tk.Metadata.Title = "Test Ticket"
+			tk.Tags = tag.NewSet([]string{"resolved", "false-positive"})
+
+			// Save the ticket
+			gt.NoError(t, repo.PutTicket(ctx, tk))
+
+			// Retrieve the ticket
+			retrievedTicket, err := repo.GetTicket(ctx, tk.ID)
+			gt.NoError(t, err)
+			gt.NotNil(t, retrievedTicket)
+
+			// Verify tags are preserved
+			gt.Number(t, len(retrievedTicket.Tags)).Equal(2)
+			gt.True(t, retrievedTicket.Tags.Has("resolved"))
+			gt.True(t, retrievedTicket.Tags.Has("false-positive"))
+		})
+
+		t.Run("Empty tags", func(t *testing.T) {
+			// Create alert without tags
+			a := alert.New(ctx, "test", map[string]string{"test": "data"}, alert.Metadata{
+				Title:       "No Tags Alert",
+				Description: "Test Description",
+			})
+			// a.Tags should be nil by default
+
+			gt.NoError(t, repo.PutAlert(ctx, a))
+
+			// Retrieve and verify
+			retrievedAlert, err := repo.GetAlert(ctx, a.ID)
+			gt.NoError(t, err)
+			gt.NotNil(t, retrievedAlert)
+			// Tags should be nil or empty
+			if retrievedAlert.Tags != nil {
+				gt.Number(t, len(retrievedAlert.Tags)).Equal(0)
+			}
+		})
+
+		t.Run("Tag persistence in batch operations", func(t *testing.T) {
+			// Create multiple alerts with tags
+			alerts := make(alert.Alerts, 3)
+			for i := 0; i < 3; i++ {
+				a := alert.New(ctx, "test", map[string]string{"index": fmt.Sprintf("%d", i)}, alert.Metadata{
+					Title:       fmt.Sprintf("Batch Alert %d", i),
+					Description: "Test Description",
+				})
+				a.Tags = tag.NewSet([]string{fmt.Sprintf("tag%d", i), "common"})
+				alerts[i] = &a
+			}
+
+			// Batch save
+			gt.NoError(t, repo.BatchPutAlerts(ctx, alerts))
+
+			// Batch retrieve
+			alertIDs := make([]types.AlertID, len(alerts))
+			for i, a := range alerts {
+				alertIDs[i] = a.ID
+			}
+			retrievedAlerts, err := repo.BatchGetAlerts(ctx, alertIDs)
+			gt.NoError(t, err)
+			gt.Array(t, retrievedAlerts).Length(3)
+
+			// Verify tags
+			for i, a := range retrievedAlerts {
+				gt.True(t, a.Tags.Has(tag.Tag(fmt.Sprintf("tag%d", i))))
+				gt.True(t, a.Tags.Has("common"))
+			}
+		})
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
 }

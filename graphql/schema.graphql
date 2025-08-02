@@ -17,6 +17,7 @@ type Ticket {
   createdAt: String!
   updatedAt: String!
   isTest: Boolean!
+  tags: [String!]!
 }
 
 type User {
@@ -41,6 +42,7 @@ type Alert {
   attributes: [AlertAttribute!]!
   createdAt: String!
   ticket: Ticket
+  tags: [String!]!
 }
 
 type AlertAttribute {
@@ -120,6 +122,12 @@ type DBSCANParameters {
   minSamples: Int!
 }
 
+type TagMetadata {
+  name: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
 type AlertsConnection {
   alerts: [Alert!]!
   totalCount: Int!
@@ -138,6 +146,7 @@ type Query {
   activities(offset: Int, limit: Int): ActivitiesResponse!
   alertClusters(limit: Int, offset: Int, minClusterSize: Int, eps: Float, minSamples: Int, keyword: String): ClusteringSummary!
   clusterAlerts(clusterID: ID!, keyword: String, limit: Int, offset: Int): AlertsConnection!
+  tags: [TagMetadata!]!
 }
 
 type Mutation {
@@ -148,6 +157,10 @@ type Mutation {
   createTicket(title: String!, description: String!, isTest: Boolean): Ticket!
   createTicketFromAlerts(alertIds: [ID!]!, title: String, description: String): Ticket!
   bindAlertsToTicket(ticketId: ID!, alertIds: [ID!]!): Ticket!
+  updateAlertTags(alertId: ID!, tags: [String!]!): Alert!
+  updateTicketTags(ticketId: ID!, tags: [String!]!): Ticket!
+  createTag(name: String!): TagMetadata!
+  deleteTag(name: String!): Boolean!
 }
 
 schema {

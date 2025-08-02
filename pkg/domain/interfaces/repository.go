@@ -8,6 +8,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
@@ -70,4 +71,10 @@ type Repository interface {
 	PutActivity(ctx context.Context, activity *activity.Activity) error
 	GetActivities(ctx context.Context, offset, limit int) ([]*activity.Activity, error)
 	CountActivities(ctx context.Context) (int, error)
+
+	// For tag management
+	ListTags(ctx context.Context) ([]*tag.Metadata, error)
+	CreateTag(ctx context.Context, tag *tag.Metadata) error
+	DeleteTag(ctx context.Context, name tag.Tag) error
+	GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, error)
 }

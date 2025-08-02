@@ -83,6 +83,12 @@ type Mutation struct {
 type Query struct {
 }
 
+type TagMetadata struct {
+	Name      string `json:"name"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
 type TicketsResponse struct {
 	Tickets    []*ticket.Ticket `json:"tickets"`
 	TotalCount int              `json:"totalCount"`
