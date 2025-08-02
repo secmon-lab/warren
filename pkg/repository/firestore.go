@@ -1502,8 +1502,8 @@ func (r *Firestore) GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, er
 }
 
 func (r *Firestore) RemoveTagFromAllAlerts(ctx context.Context, name tag.Tag) error {
-	// Use Firestore's batch operations to remove the tag from all alerts
-	const batchSize = 500 // Firestore batch limit
+	// Use Firestore's transaction operations to remove the tag from all alerts
+	const batchSize = 500 // Firestore transaction document limit
 
 	// Query all alerts that have this tag
 	query := r.db.Collection(collectionAlerts).Where(fmt.Sprintf("tags.%s", name), "==", true)
@@ -1518,22 +1518,24 @@ func (r *Firestore) RemoveTagFromAllAlerts(ctx context.Context, name tag.Tag) er
 			break
 		}
 
-		// Create batch for updates
-		batch := r.db.Batch()
-
-		for _, doc := range docs {
-			// Use Firestore's FieldDelete to remove the specific tag key
-			batch.Update(doc.Ref, []firestore.Update{
-				{
-					Path:  fmt.Sprintf("tags.%s", name),
-					Value: firestore.Delete,
-				},
-			})
-		}
-
-		// Commit the batch
-		if _, err := batch.Commit(ctx); err != nil {
-			return goerr.Wrap(err, "failed to commit batch update")
+		// Use transaction for atomic updates
+		err = r.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+			for _, doc := range docs {
+				// Use Firestore's FieldDelete to remove the specific tag key
+				err := tx.Update(doc.Ref, []firestore.Update{
+					{
+						Path:  fmt.Sprintf("tags.%s", name),
+						Value: firestore.Delete,
+					},
+				})
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to remove tag from alerts")
 		}
 
 		// If we got less than batchSize documents, we're done
@@ -1546,8 +1548,8 @@ func (r *Firestore) RemoveTagFromAllAlerts(ctx context.Context, name tag.Tag) er
 }
 
 func (r *Firestore) RemoveTagFromAllTickets(ctx context.Context, name tag.Tag) error {
-	// Use Firestore's batch operations to remove the tag from all tickets
-	const batchSize = 500 // Firestore batch limit
+	// Use Firestore's transaction operations to remove the tag from all tickets
+	const batchSize = 500 // Firestore transaction document limit
 
 	// Query all tickets that have this tag
 	query := r.db.Collection(collectionTickets).Where(fmt.Sprintf("tags.%s", name), "==", true)
@@ -1562,22 +1564,24 @@ func (r *Firestore) RemoveTagFromAllTickets(ctx context.Context, name tag.Tag) e
 			break
 		}
 
-		// Create batch for updates
-		batch := r.db.Batch()
-
-		for _, doc := range docs {
-			// Use Firestore's FieldDelete to remove the specific tag key
-			batch.Update(doc.Ref, []firestore.Update{
-				{
-					Path:  fmt.Sprintf("tags.%s", name),
-					Value: firestore.Delete,
-				},
-			})
-		}
-
-		// Commit the batch
-		if _, err := batch.Commit(ctx); err != nil {
-			return goerr.Wrap(err, "failed to commit batch update")
+		// Use transaction for atomic updates
+		err = r.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+			for _, doc := range docs {
+				// Use Firestore's FieldDelete to remove the specific tag key
+				err := tx.Update(doc.Ref, []firestore.Update{
+					{
+						Path:  fmt.Sprintf("tags.%s", name),
+						Value: firestore.Delete,
+					},
+				})
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to remove tag from tickets")
 		}
 
 		// If we got less than batchSize documents, we're done
