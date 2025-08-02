@@ -32,6 +32,15 @@ func (s *Service) ListTags(ctx context.Context) ([]*tag.Metadata, error) {
 	return tags, nil
 }
 
+// GetTag returns a tag by name
+func (s *Service) GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, error) {
+	tag, err := s.repo.GetTag(ctx, name)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get tag")
+	}
+	return tag, nil
+}
+
 // CreateTag creates a new tag
 func (s *Service) CreateTag(ctx context.Context, name tag.Tag) error {
 	if name == "" {

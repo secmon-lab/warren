@@ -43,20 +43,17 @@ func (u *TagUseCase) CreateTag(ctx context.Context, name string) (*tagmodel.Meta
 		return nil, goerr.Wrap(err, "failed to create tag")
 	}
 
-	// Return the created tag metadata
-	// Since CreateTag is idempotent, we can safely get the tag
-	tags, err := u.tagService.ListTags(ctx)
+	// Return the created tag metadata by fetching it directly
+	// This is more efficient and handles case-insensitivity correctly
+	tag, err := u.tagService.GetTag(ctx, tagName)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get created tag")
 	}
-
-	for _, tag := range tags {
-		if tag.Name == tagName {
-			return tag, nil
-		}
+	if tag == nil {
+		return nil, goerr.New("created tag not found")
 	}
 
-	return nil, goerr.New("created tag not found")
+	return tag, nil
 }
 
 // DeleteTag deletes a tag
