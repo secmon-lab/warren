@@ -28,7 +28,6 @@ export function TagSelector({
 }: TagSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: tagsData, refetch: refetchTags } = useQuery(GET_TAGS);
@@ -49,7 +48,6 @@ export function TagSelector({
       onTagsChange([...selectedTags, tag]);
     }
     setSearchValue("");
-    setIsCreating(false);
   };
 
   const handleRemoveTag = (tag: string) => {
@@ -129,10 +127,7 @@ export function TagSelector({
                   ref={inputRef}
                   placeholder="Search or create tag..."
                   value={searchValue}
-                  onChange={(e) => {
-                    setSearchValue(e.target.value);
-                    setIsCreating(false);
-                  }}
+                  onChange={(e) => setSearchValue(e.target.value)}
                   onKeyDown={handleKeyDown}
                   className="h-8"
                 />
@@ -152,10 +147,7 @@ export function TagSelector({
                   )}
                   {showCreateOption && (
                     <button
-                      onClick={() => {
-                        setIsCreating(true);
-                        handleCreateTag();
-                      }}
+                      onClick={handleCreateTag}
                       disabled={createLoading}
                       className="w-full text-left px-2 py-1 text-sm hover:bg-accent rounded text-muted-foreground"
                     >
