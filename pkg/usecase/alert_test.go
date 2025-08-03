@@ -23,6 +23,9 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 
 	slack_sdk "github.com/slack-go/slack"
+	
+	tagmodel "github.com/secmon-lab/warren/pkg/domain/model/tag"
+	tagservice "github.com/secmon-lab/warren/pkg/service/tag"
 )
 
 func TestHandleAlert_NoSimilarAlert(t *testing.T) {
@@ -1125,4 +1128,227 @@ func TestHandleAlert_ExistingPolicyUnchanged(t *testing.T) {
 			gt.V(t, createdAlert.Metadata.Title).Equal("Policy Title")
 		})
 	}
+}
+
+func TestHandleAlert_PolicyWithTags(t *testing.T) {
+	// Test case: Alert policy returns tags, should create tags and assign to alert
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			return "test-channel", "test-thread", nil
+		},
+		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			return &slack_sdk.FileSummary{}, nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
+	}
+
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{
+							`{"title": "test title", "description": "test description"}`,
+						},
+					}, nil
+				},
+			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
+			return [][]float64{{0.1, 0.2, 0.3}}, nil
+		},
+	}
+
+	// Policy returns alert with tags
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			if queryResult, ok := result.(*alert.QueryOutput); ok {
+				// Return tags as string slice (for alert.Metadata)
+				queryResult.Alert = []alert.Metadata{
+					{
+						Title:       "Security Alert",
+						Description: "Network security incident detected",
+						Tags:        []string{"security", "high-priority", "network"},
+					},
+				}
+			}
+			return nil
+		},
+	}
+
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+	gt.NoError(t, err)
+
+	// Create TagService
+	tagSvc := tagservice.New(repo)
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackService(slackSvc),
+		usecase.WithLLMClient(llmMock),
+		usecase.WithPolicyClient(policyMock),
+		usecase.WithTagService(tagSvc),
+	)
+
+	// Execute
+	result, err := uc.HandleAlert(ctx, types.AlertSchema("test"), map[string]interface{}{"key": "value"})
+
+	// Verify alert creation
+	gt.NoError(t, err)
+	gt.Array(t, result).Length(1).Required()
+	
+	createdAlert := result[0]
+	gt.Value(t, createdAlert.Metadata.Title).Equal("Security Alert")
+	gt.Value(t, len(createdAlert.Tags)).Equal(3)
+
+	// Verify tags are assigned to alert
+	expectedTags := []string{"security", "high-priority", "network"}
+	for _, expectedTag := range expectedTags {
+		gt.Value(t, createdAlert.Tags[expectedTag]).Equal(true)
+	}
+
+	// Verify tags were created in repository
+	tags, err := repo.ListTags(ctx)
+	gt.NoError(t, err)
+	gt.Array(t, tags).Length(3)
+
+	// Verify all expected tags exist
+	tagNames := make([]string, len(tags))
+	for i, tag := range tags {
+		tagNames[i] = string(tag.Name)
+	}
+	
+	for _, expectedTag := range expectedTags {
+		gt.Value(t, containsString(tagNames, string(expectedTag))).Equal(true)
+	}
+
+	// Verify tag metadata has colors
+	for _, tag := range tags {
+		gt.Value(t, tag.Color).NotEqual("")
+	}
+}
+
+func TestHandleAlert_PolicyWithNewAndExistingTags(t *testing.T) {
+	// Test case: Policy returns mix of new and existing tags
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	// Create existing tag
+	existingTag := &tagmodel.Metadata{
+		Name:      "existing-tag",
+		Color:     "bg-blue-100 text-blue-800",
+		CreatedAt: now.Add(-1 * time.Hour),
+		UpdatedAt: now.Add(-1 * time.Hour),
+	}
+	gt.NoError(t, repo.CreateTag(ctx, existingTag))
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			return "test-channel", "test-thread", nil
+		},
+		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			return &slack_sdk.FileSummary{}, nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
+	}
+
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{
+							`{"title": "test title", "description": "test description"}`,
+						},
+					}, nil
+				},
+			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
+			return [][]float64{{0.1, 0.2, 0.3}}, nil
+		},
+	}
+
+	// Policy returns alert with mix of new and existing tags
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			if queryResult, ok := result.(*alert.QueryOutput); ok {
+				queryResult.Alert = []alert.Metadata{
+					{
+						Title:       "Mixed Tags Alert",
+						Description: "Alert with existing and new tags",
+						Tags:        []string{"existing-tag", "new-tag-1", "new-tag-2"},
+					},
+				}
+			}
+			return nil
+		},
+	}
+
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+	gt.NoError(t, err)
+
+	tagSvc := tagservice.New(repo)
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackService(slackSvc),
+		usecase.WithLLMClient(llmMock),
+		usecase.WithPolicyClient(policyMock),
+		usecase.WithTagService(tagSvc),
+	)
+
+	// Execute
+	result, err := uc.HandleAlert(ctx, types.AlertSchema("test"), map[string]interface{}{"key": "value"})
+
+	// Verify
+	gt.NoError(t, err)
+	gt.Array(t, result).Length(1)
+	
+	createdAlert := result[0]
+	gt.Value(t, len(createdAlert.Tags)).Equal(3)
+
+	// Verify all tags are assigned to alert
+	expectedTags := []string{"existing-tag", "new-tag-1", "new-tag-2"}
+	for _, expectedTag := range expectedTags {
+		gt.Value(t, createdAlert.Tags[expectedTag]).Equal(true)
+	}
+
+	// Verify total tags in repository (1 existing + 2 new = 3)
+	tags, err := repo.ListTags(ctx)
+	gt.NoError(t, err)
+	gt.Array(t, tags).Length(3)
+
+	// Verify existing tag unchanged
+	existingTagAfter, err := repo.GetTag(ctx, "existing-tag")
+	gt.NoError(t, err)
+	gt.Value(t, existingTagAfter.CreatedAt).Equal(existingTag.CreatedAt)
+	gt.Value(t, existingTagAfter.Color).Equal(existingTag.Color)
+}
+
+// Helper function to check if a string slice contains a specific string
+func containsString(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }

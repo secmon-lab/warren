@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@apollo/client";
 import { useParams, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,9 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { useToast } from "@/hooks/use-toast";
+import { TagSelector } from "@/components/ui/tag-selector";
 
-import { GET_ALERT, CREATE_TICKET_FROM_ALERTS, GET_SIMILAR_TICKETS_FOR_ALERT, BIND_ALERTS_TO_TICKET } from "@/lib/graphql/queries";
+import { GET_ALERT, CREATE_TICKET_FROM_ALERTS, GET_SIMILAR_TICKETS_FOR_ALERT, BIND_ALERTS_TO_TICKET, UPDATE_ALERT_TAGS } from "@/lib/graphql/queries";
 import { Alert, Ticket, TICKET_STATUS_COLORS, TICKET_STATUS_LABELS, TicketStatus } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
 import {
@@ -43,6 +44,7 @@ export default function AlertDetailPage() {
   const [similarTicketsThreshold, setSimilarTicketsThreshold] = useState([0.95]);
   const [similarTicketsCommittedThreshold, setSimilarTicketsCommittedThreshold] = useState([0.95]);
   const [similarTicketsCurrentPage, setSimilarTicketsCurrentPage] = useState(1);
+  const [tags, setTags] = useState<string[]>([]);
 
   const ITEMS_PER_PAGE = 5;
   const similarTicketsOffset = (similarTicketsCurrentPage - 1) * ITEMS_PER_PAGE;
@@ -57,6 +59,45 @@ export default function AlertDetailPage() {
   });
 
   const alert: Alert = alertData?.alert;
+
+  // Set initial tags when alert data loads
+  useEffect(() => {
+    if (alert?.tags) {
+      setTags(alert.tags);
+    }
+  }, [alert?.tags]);
+
+  const [updateAlertTags] = useMutation(UPDATE_ALERT_TAGS, {
+    onCompleted: () => {
+      toast({
+        title: "Tags Updated",
+        description: "Alert tags have been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to update tags: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleTagsChange = async (newTags: string[]) => {
+    if (!alert?.id) return;
+    
+    setTags(newTags);
+    try {
+      await updateAlertTags({
+        variables: {
+          alertId: alert.id,
+          tags: newTags,
+        },
+      });
+    } catch (error) {
+      console.error("Error updating tags:", error);
+    }
+  };
 
   const {
     data: similarTicketsData,
@@ -435,6 +476,23 @@ export default function AlertDetailPage() {
                   </Button>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Alert Tags */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Tag className="h-4 w-4" />
+                Tags
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TagSelector
+                selectedTags={tags}
+                onTagsChange={handleTagsChange}
+                disabled={false}
+              />
             </CardContent>
           </Card>
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -14,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/user"
@@ -55,6 +57,7 @@ const (
 	collectionComments    = "comments"
 	collectionTokens      = "tokens"
 	collectionActivities  = "activities"
+	collectionTags        = "tags"
 )
 
 // extractCountFromAggregationResult extracts an integer count from a Firestore aggregation result.
@@ -83,11 +86,11 @@ func extractCountFromAggregationResult(result firestore.AggregationResult, alias
 	}
 }
 
-func (r *Firestore) PutAlert(ctx context.Context, alert alert.Alert) error {
+func (r *Firestore) PutAlert(ctx context.Context, a alert.Alert) error {
 	// Check if embedding is zero vector and skip it to prevent Firestore vector search errors
-	if len(alert.Embedding) > 0 {
+	if len(a.Embedding) > 0 {
 		isZeroVector := true
-		for _, v := range alert.Embedding {
+		for _, v := range a.Embedding {
 			if v != 0 {
 				isZeroVector = false
 				break
@@ -95,12 +98,28 @@ func (r *Firestore) PutAlert(ctx context.Context, alert alert.Alert) error {
 		}
 		if isZeroVector {
 			// Clear the embedding if it's a zero vector
-			alert.Embedding = nil
+			a.Embedding = nil
 		}
 	}
 
-	alertDoc := r.db.Collection(collectionAlerts).Doc(alert.ID.String())
-	_, err := alertDoc.Set(ctx, alert)
+	// Create a Firestore-compatible struct
+	type firestoreAlert struct {
+		alert.Alert
+		Tags map[string]bool `firestore:"tags"`
+	}
+	
+	fa := firestoreAlert{
+		Alert: a,
+		Tags:  make(map[string]bool),
+	}
+	
+	// Convert tag.Set to map[string]bool
+	for tag := range a.Tags {
+		fa.Tags[string(tag)] = true
+	}
+	
+	alertDoc := r.db.Collection(collectionAlerts).Doc(a.ID.String())
+	_, err := alertDoc.Set(ctx, fa)
 	if err != nil {
 		return goerr.Wrap(err, "failed to put alert")
 	}
@@ -117,12 +136,25 @@ func (r *Firestore) GetAlert(ctx context.Context, alertID types.AlertID) (*alert
 		return nil, goerr.Wrap(err, "failed to get alert", goerr.V("alert_id", alertID))
 	}
 
-	var alert alert.Alert
-	if err := doc.DataTo(&alert); err != nil {
+	// Read from Firestore format first
+	type firestoreAlert struct {
+		alert.Alert
+		Tags map[string]bool `firestore:"tags"`
+	}
+	
+	var fa firestoreAlert
+	if err := doc.DataTo(&fa); err != nil {
 		return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("alert_id", alertID))
 	}
 
-	return &alert, nil
+	// Convert map[string]bool back to tag.Set
+	a := fa.Alert
+	a.Tags = make(tag.Set)
+	for tagStr := range fa.Tags {
+		a.Tags[tagStr] = true
+	}
+
+	return &a, nil
 }
 
 func (r *Firestore) GetAlertListByThread(ctx context.Context, thread slack.Thread) (*alert.List, error) {
@@ -356,9 +388,22 @@ func (r *Firestore) GetTicket(ctx context.Context, ticketID types.TicketID) (*ti
 		return nil, goerr.Wrap(err, "failed to get ticket", goerr.V("ticket_id", ticketID))
 	}
 
-	var t ticket.Ticket
-	if err := doc.DataTo(&t); err != nil {
+	// Read from Firestore format first
+	type firestoreTicket struct {
+		ticket.Ticket
+		Tags map[string]bool `firestore:"tags"`
+	}
+	
+	var ft firestoreTicket
+	if err := doc.DataTo(&ft); err != nil {
 		return nil, goerr.Wrap(err, "failed to convert data to ticket", goerr.V("ticket_id", ticketID))
+	}
+
+	// Convert map[string]bool back to tag.Set
+	t := ft.Ticket
+	t.Tags = make(tag.Set)
+	for tagStr := range ft.Tags {
+		t.Tags[tagStr] = true
 	}
 
 	return &t, nil
@@ -369,7 +414,23 @@ func (r *Firestore) PutTicket(ctx context.Context, t ticket.Ticket) error {
 	existingTicket, err := r.GetTicket(ctx, t.ID)
 	isUpdate := err == nil && existingTicket != nil
 
-	_, err = r.db.Collection(collectionTickets).Doc(t.ID.String()).Set(ctx, t)
+	// Create a Firestore-compatible struct
+	type firestoreTicket struct {
+		ticket.Ticket
+		Tags map[string]bool `firestore:"tags"`
+	}
+	
+	ft := firestoreTicket{
+		Ticket: t,
+		Tags:   make(map[string]bool),
+	}
+	
+	// Convert tag.Set to map[string]bool
+	for tag := range t.Tags {
+		ft.Tags[string(tag)] = true
+	}
+
+	_, err = r.db.Collection(collectionTickets).Doc(t.ID.String()).Set(ctx, ft)
 	if err != nil {
 		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", t.ID))
 	}
@@ -829,14 +890,28 @@ func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32,
 			return nil, goerr.Wrap(err, "failed to get next ticket")
 		}
 
-		var t ticket.Ticket
-		if err := doc.DataTo(&t); err != nil {
+		// Use firestoreTicket wrapper for proper tag conversion
+		type firestoreTicket struct {
+			ticket.Ticket
+			Tags map[string]bool `firestore:"tags"`
+		}
+		
+		var ft firestoreTicket
+		if err := doc.DataTo(&ft); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
 		}
 
+		// Convert map[string]bool back to tag.Set
+		if ft.Tags != nil {
+			ft.Ticket.Tags = make(tag.Set)
+			for k, v := range ft.Tags {
+				ft.Ticket.Tags[k] = v
+			}
+		}
+
 		// Only add tickets that have embeddings
-		if len(t.Embedding) > 0 {
-			tickets = append(tickets, &t)
+		if len(ft.Ticket.Embedding) > 0 {
+			tickets = append(tickets, &ft.Ticket)
 		}
 	}
 
@@ -1337,4 +1412,183 @@ func alertIDsToInterface(alertIDs []types.AlertID) []any {
 		interfaces[i] = id.String()
 	}
 	return interfaces
+}
+
+// Tag management methods
+
+func (r *Firestore) ListTags(ctx context.Context) ([]*tag.Metadata, error) {
+	var tags []*tag.Metadata
+
+	iter := r.db.Collection(collectionTags).Documents(ctx)
+	defer iter.Stop()
+
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to iterate tags")
+		}
+
+		var tag tag.Metadata
+		if err := doc.DataTo(&tag); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert tag data")
+		}
+		tags = append(tags, &tag)
+	}
+
+	return tags, nil
+}
+
+func (r *Firestore) CreateTag(ctx context.Context, tag *tag.Metadata) error {
+	// Normalize tag name to lowercase for case-insensitive comparison
+	normalizedName := strings.ToLower(string(tag.Name))
+	docRef := r.db.Collection(collectionTags).Doc(normalizedName)
+
+	// Check if tag already exists
+	_, err := docRef.Get(ctx)
+	if err == nil {
+		// Tag already exists, no need to create
+		return nil
+	}
+	if status.Code(err) != codes.NotFound {
+		return goerr.Wrap(err, "failed to check tag existence")
+	}
+
+	// Set timestamps
+	now := time.Now()
+	tag.CreatedAt = now
+	tag.UpdatedAt = now
+
+	// Create new tag
+	if _, err := docRef.Set(ctx, tag); err != nil {
+		return goerr.Wrap(err, "failed to create tag")
+	}
+
+	return nil
+}
+
+func (r *Firestore) DeleteTag(ctx context.Context, name string) error {
+	// Normalize tag name to lowercase
+	normalizedName := strings.ToLower(string(name))
+
+	// Delete the tag document
+	if _, err := r.db.Collection(collectionTags).Doc(normalizedName).Delete(ctx); err != nil {
+		return goerr.Wrap(err, "failed to delete tag")
+	}
+
+	return nil
+}
+
+func (r *Firestore) GetTag(ctx context.Context, name string) (*tag.Metadata, error) {
+	// Normalize tag name to lowercase
+	normalizedName := strings.ToLower(string(name))
+
+	doc, err := r.db.Collection(collectionTags).Doc(normalizedName).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
+		return nil, goerr.Wrap(err, "failed to get tag")
+	}
+
+	var tag tag.Metadata
+	if err := doc.DataTo(&tag); err != nil {
+		return nil, goerr.Wrap(err, "failed to convert tag data")
+	}
+
+	return &tag, nil
+}
+
+func (r *Firestore) RemoveTagFromAllAlerts(ctx context.Context, name string) error {
+	// Use Firestore's transaction operations to remove the tag from all alerts
+	const batchSize = 500 // Firestore transaction document limit
+
+	// Query all alerts that have this tag
+	query := r.db.Collection(collectionAlerts).Where(fmt.Sprintf("tags.%s", name), "==", true)
+
+	for {
+		docs, err := query.Limit(batchSize).Documents(ctx).GetAll()
+		if err != nil {
+			return goerr.Wrap(err, "failed to query alerts with tag")
+		}
+
+		if len(docs) == 0 {
+			break
+		}
+
+		// Use transaction for atomic updates
+		err = r.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+			for _, doc := range docs {
+				// Use Firestore's FieldDelete to remove the specific tag key
+				err := tx.Update(doc.Ref, []firestore.Update{
+					{
+						Path:  fmt.Sprintf("tags.%s", name),
+						Value: firestore.Delete,
+					},
+				})
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to remove tag from alerts")
+		}
+
+		// If we got less than batchSize documents, we're done
+		if len(docs) < batchSize {
+			break
+		}
+	}
+
+	return nil
+}
+
+func (r *Firestore) RemoveTagFromAllTickets(ctx context.Context, name string) error {
+	// Use Firestore's transaction operations to remove the tag from all tickets
+	const batchSize = 500 // Firestore transaction document limit
+
+	// Query all tickets that have this tag
+	query := r.db.Collection(collectionTickets).Where(fmt.Sprintf("tags.%s", name), "==", true)
+
+	for {
+		docs, err := query.Limit(batchSize).Documents(ctx).GetAll()
+		if err != nil {
+			return goerr.Wrap(err, "failed to query tickets with tag")
+		}
+
+		if len(docs) == 0 {
+			break
+		}
+
+		// Use transaction for atomic updates
+		err = r.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+			for _, doc := range docs {
+				// Use Firestore's FieldDelete to remove the specific tag key
+				err := tx.Update(doc.Ref, []firestore.Update{
+					{
+						Path:  fmt.Sprintf("tags.%s", name),
+						Value: firestore.Delete,
+					},
+				})
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to remove tag from tickets")
+		}
+
+		// If we got less than batchSize documents, we're done
+		if len(docs) < batchSize {
+			break
+		}
+	}
+
+	return nil
 }

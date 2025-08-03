@@ -13,9 +13,11 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+	tagmodel "github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	slackservice "github.com/secmon-lab/warren/pkg/service/slack"
+	tagservice "github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	slackSDK "github.com/slack-go/slack"
 )
@@ -297,4 +299,264 @@ func TestHandleSlackInteractionViewSubmissionSalvage(t *testing.T) {
 	// 1. Alerts are properly salvaged and bound to the ticket
 	// 2. The salvage operation calls UpdateAlerts (which happens in slack_itx_submit.go:430)
 	// 3. UpdateAlerts triggers the rate-limited updater to update individual alert Slack posts
+}
+
+func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T) {
+	// Test case: Resolve ticket with tag selection, should create tags and assign to ticket
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	// Create test ticket
+	testTicket := &ticket.Ticket{
+		ID:       types.NewTicketID(),
+		Status:   types.TicketStatusOpen,
+		AlertIDs: []types.AlertID{},
+		SlackThread: &slack.Thread{
+			ChannelID: "C123456",
+			ThreadID:  "1234567890.123456",
+		},
+		Metadata: ticket.Metadata{
+			Title:       "Security Incident",
+			Description: "Network security incident requiring investigation",
+		},
+	}
+	gt.NoError(t, repo.PutTicket(ctx, *testTicket))
+
+	// Create existing tag
+	existingTag := &tagmodel.Metadata{
+		Name:      "existing-tag",
+		Color:     "bg-blue-100 text-blue-800", 
+		CreatedAt: now.Add(-1 * time.Hour),
+		UpdatedAt: now.Add(-1 * time.Hour),
+	}
+	gt.NoError(t, repo.CreateTag(ctx, existingTag))
+
+	// Setup Slack client mock
+	slackClientMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slackSDK.MsgOption) (string, string, error) {
+			return channelID, "1234567890.123456", nil
+		},
+		AuthTestFunc: func() (*slackSDK.AuthTestResponse, error) {
+			return &slackSDK.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
+	}
+
+	// Setup LLM mock for resolve message generation
+	llmMock := &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &mock.LLMSessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{"🎉 Great work resolving this incident!"},
+					}, nil
+				},
+			}, nil
+		},
+	}
+
+	// Create slack service
+	slackSvc, err := slackservice.New(slackClientMock, "C123456")
+	gt.NoError(t, err)
+
+	// Create tag service
+	tagSvc := tagservice.New(repo)
+
+	// Create usecase
+	uc := New(
+		WithRepository(repo),
+		WithSlackService(slackSvc),
+		WithLLMClient(llmMock),
+		WithTagService(tagSvc),
+	)
+
+	// Prepare test input values for resolve with tag selection
+	values := slack.StateValue{
+		string(slack.BlockIDTicketConclusion): map[string]slack.BlockAction{
+			string(slack.BlockActionIDTicketConclusion): {
+				SelectedOption: slackSDK.OptionBlockObject{Value: string(types.AlertConclusionFalsePositive)},
+			},
+		},
+		string(slack.BlockIDTicketComment): map[string]slack.BlockAction{
+			string(slack.BlockActionIDTicketComment): {Value: "Investigation completed - false positive"},
+		},
+		string(slack.BlockIDTicketTags): map[string]slack.BlockAction{
+			string(slack.BlockActionIDTicketTags): {
+				SelectedOptions: []slackSDK.OptionBlockObject{
+					{Value: "existing-tag"},     // Already exists
+					{Value: "false-positive"},   // New tag
+					{Value: "investigation"},    // New tag
+				},
+			},
+		},
+	}
+
+	user := slack.User{
+		ID:   "U123456",
+		Name: "test_user",
+	}
+
+	// Execute resolve operation
+	err = uc.handleSlackInteractionViewSubmissionResolveTicket(ctx, user, string(testTicket.ID), values)
+	gt.NoError(t, err)
+
+	// Verify ticket was resolved with correct conclusion and reason
+	updatedTicket, err := repo.GetTicket(ctx, testTicket.ID)
+	gt.NoError(t, err)
+	gt.Value(t, updatedTicket.Status).Equal(types.TicketStatusResolved)
+	gt.Value(t, updatedTicket.Conclusion).Equal(types.AlertConclusionFalsePositive)
+	gt.Value(t, updatedTicket.Reason).Equal("Investigation completed - false positive")
+
+	// Verify tags were assigned to ticket
+	gt.Value(t, len(updatedTicket.Tags)).Equal(3)
+	expectedTags := []string{"existing-tag", "false-positive", "investigation"}
+	for _, expectedTag := range expectedTags {
+		gt.Value(t, updatedTicket.Tags[expectedTag]).Equal(true)
+	}
+
+	// Verify tags were created in repository (1 existing + 2 new = 3)
+	tags, err := repo.ListTags(ctx)
+	gt.NoError(t, err)
+	gt.Array(t, tags).Length(3)
+
+	// Verify all expected tags exist
+	tagNames := make([]string, len(tags))
+	for i, tag := range tags {
+		tagNames[i] = string(tag.Name)
+	}
+	
+	for _, expectedTag := range expectedTags {
+		gt.Value(t, containsString(tagNames, string(expectedTag))).Equal(true)
+	}
+
+	// Verify existing tag unchanged
+	existingTagAfter, err := repo.GetTag(ctx, "existing-tag")
+	gt.NoError(t, err)
+	gt.Value(t, existingTagAfter.CreatedAt).Equal(existingTag.CreatedAt)
+	gt.Value(t, existingTagAfter.Color).Equal(existingTag.Color)
+
+	// Verify new tags have colors assigned
+	falsePositiveTag, err := repo.GetTag(ctx, "false-positive")
+	gt.NoError(t, err)
+	gt.Value(t, falsePositiveTag.Color).NotEqual("")
+
+	investigationTag, err := repo.GetTag(ctx, "investigation")
+	gt.NoError(t, err)
+	gt.Value(t, investigationTag.Color).NotEqual("")
+}
+
+func TestHandleSlackInteractionViewSubmissionResolveTicket_WithoutTags(t *testing.T) {
+	// Test case: Resolve ticket without tag selection, should still work
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	// Create test ticket
+	testTicket := &ticket.Ticket{
+		ID:       types.NewTicketID(),
+		Status:   types.TicketStatusOpen,
+		AlertIDs: []types.AlertID{},
+		SlackThread: &slack.Thread{
+			ChannelID: "C123456",
+			ThreadID:  "1234567890.123456",
+		},
+		Metadata: ticket.Metadata{
+			Title:       "Test Incident",
+			Description: "Test incident for resolution",
+		},
+	}
+	gt.NoError(t, repo.PutTicket(ctx, *testTicket))
+
+	// Setup Slack client mock
+	slackClientMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slackSDK.MsgOption) (string, string, error) {
+			return channelID, "1234567890.123456", nil
+		},
+		AuthTestFunc: func() (*slackSDK.AuthTestResponse, error) {
+			return &slackSDK.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
+	}
+
+	// Setup LLM mock
+	llmMock := &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &mock.LLMSessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{"🎉 Resolution complete!"},
+					}, nil
+				},
+			}, nil
+		},
+	}
+
+	// Create slack service
+	slackSvc, err := slackservice.New(slackClientMock, "C123456")
+	gt.NoError(t, err)
+
+	// Create tag service
+	tagSvc := tagservice.New(repo)
+
+	// Create usecase
+	uc := New(
+		WithRepository(repo),
+		WithSlackService(slackSvc),
+		WithLLMClient(llmMock),
+		WithTagService(tagSvc),
+	)
+
+	// Prepare test input values for resolve without tags
+	values := slack.StateValue{
+		string(slack.BlockIDTicketConclusion): map[string]slack.BlockAction{
+			string(slack.BlockActionIDTicketConclusion): {
+				SelectedOption: slackSDK.OptionBlockObject{Value: string(types.AlertConclusionIntended)},
+			},
+		},
+		string(slack.BlockIDTicketComment): map[string]slack.BlockAction{
+			string(slack.BlockActionIDTicketComment): {Value: "Working as intended"},
+		},
+		// No tag selection block
+	}
+
+	user := slack.User{
+		ID:   "U123456",
+		Name: "test_user",
+	}
+
+	// Execute resolve operation
+	err = uc.handleSlackInteractionViewSubmissionResolveTicket(ctx, user, string(testTicket.ID), values)
+	gt.NoError(t, err)
+
+	// Verify ticket was resolved
+	updatedTicket, err := repo.GetTicket(ctx, testTicket.ID)
+	gt.NoError(t, err)
+	gt.Value(t, updatedTicket.Status).Equal(types.TicketStatusResolved)
+	gt.Value(t, updatedTicket.Conclusion).Equal(types.AlertConclusionIntended)
+	gt.Value(t, updatedTicket.Reason).Equal("Working as intended")
+
+	// Verify no tags were assigned (ticket should have empty tags)
+	gt.Value(t, len(updatedTicket.Tags)).Equal(0)
+
+	// Verify no tags were created in repository
+	tags, err := repo.ListTags(ctx)
+	gt.NoError(t, err)
+	gt.Array(t, tags).Length(0)
+}
+
+// Helper function to check if a string slice contains a specific string
+func containsString(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }

@@ -79,6 +79,7 @@ type ComplexityRoot struct {
 		Description func(childComplexity int) int
 		ID          func(childComplexity int) int
 		Schema      func(childComplexity int) int
+		Tags        func(childComplexity int) int
 		Ticket      func(childComplexity int) int
 		Title       func(childComplexity int) int
 	}
@@ -151,12 +152,16 @@ type ComplexityRoot struct {
 
 	Mutation struct {
 		BindAlertsToTicket          func(childComplexity int, ticketID string, alertIds []string) int
+		CreateTag                   func(childComplexity int, name string) int
 		CreateTicket                func(childComplexity int, title string, description string, isTest *bool) int
 		CreateTicketFromAlerts      func(childComplexity int, alertIds []string, title *string, description *string) int
+		DeleteTag                   func(childComplexity int, name string) int
+		UpdateAlertTags             func(childComplexity int, alertID string, tags []string) int
 		UpdateMultipleTicketsStatus func(childComplexity int, ids []string, status string) int
 		UpdateTicket                func(childComplexity int, id string, title string, description *string) int
 		UpdateTicketConclusion      func(childComplexity int, id string, conclusion string, reason string) int
 		UpdateTicketStatus          func(childComplexity int, id string, status string) int
+		UpdateTicketTags            func(childComplexity int, ticketID string, tags []string) int
 	}
 
 	Query struct {
@@ -168,10 +173,18 @@ type ComplexityRoot struct {
 		Dashboard              func(childComplexity int) int
 		SimilarTickets         func(childComplexity int, ticketID string, threshold float64, offset *int, limit *int) int
 		SimilarTicketsForAlert func(childComplexity int, alertID string, threshold float64, offset *int, limit *int) int
+		Tags                   func(childComplexity int) int
 		Ticket                 func(childComplexity int, id string) int
 		TicketComments         func(childComplexity int, ticketID string, offset *int, limit *int) int
 		Tickets                func(childComplexity int, statuses []string, offset *int, limit *int) int
 		UnboundAlerts          func(childComplexity int, threshold *float64, keyword *string, ticketID *string, offset *int, limit *int) int
+	}
+
+	TagMetadata struct {
+		Color     func(childComplexity int) int
+		CreatedAt func(childComplexity int) int
+		Name      func(childComplexity int) int
+		UpdatedAt func(childComplexity int) int
 	}
 
 	Ticket struct {
@@ -191,6 +204,7 @@ type ComplexityRoot struct {
 		SlackLink       func(childComplexity int) int
 		Status          func(childComplexity int) int
 		Summary         func(childComplexity int) int
+		Tags            func(childComplexity int) int
 		Title           func(childComplexity int) int
 		UpdatedAt       func(childComplexity int) int
 	}
@@ -219,6 +233,7 @@ type AlertResolver interface {
 	Attributes(ctx context.Context, obj *alert.Alert) ([]*graphql1.AlertAttribute, error)
 	CreatedAt(ctx context.Context, obj *alert.Alert) (string, error)
 	Ticket(ctx context.Context, obj *alert.Alert) (*ticket.Ticket, error)
+	Tags(ctx context.Context, obj *alert.Alert) ([]string, error)
 }
 type CommentResolver interface {
 	ID(ctx context.Context, obj *ticket.Comment) (string, error)
@@ -238,6 +253,10 @@ type MutationResolver interface {
 	CreateTicket(ctx context.Context, title string, description string, isTest *bool) (*ticket.Ticket, error)
 	CreateTicketFromAlerts(ctx context.Context, alertIds []string, title *string, description *string) (*ticket.Ticket, error)
 	BindAlertsToTicket(ctx context.Context, ticketID string, alertIds []string) (*ticket.Ticket, error)
+	UpdateAlertTags(ctx context.Context, alertID string, tags []string) (*alert.Alert, error)
+	UpdateTicketTags(ctx context.Context, ticketID string, tags []string) (*ticket.Ticket, error)
+	CreateTag(ctx context.Context, name string) (*graphql1.TagMetadata, error)
+	DeleteTag(ctx context.Context, name string) (bool, error)
 }
 type QueryResolver interface {
 	Ticket(ctx context.Context, id string) (*ticket.Ticket, error)
@@ -252,6 +271,7 @@ type QueryResolver interface {
 	Activities(ctx context.Context, offset *int, limit *int) (*graphql1.ActivitiesResponse, error)
 	AlertClusters(ctx context.Context, limit *int, offset *int, minClusterSize *int, eps *float64, minSamples *int, keyword *string) (*graphql1.ClusteringSummary, error)
 	ClusterAlerts(ctx context.Context, clusterID string, keyword *string, limit *int, offset *int) (*graphql1.AlertsConnection, error)
+	Tags(ctx context.Context) ([]*graphql1.TagMetadata, error)
 }
 type TicketResolver interface {
 	ID(ctx context.Context, obj *ticket.Ticket) (string, error)
@@ -268,6 +288,8 @@ type TicketResolver interface {
 	SlackLink(ctx context.Context, obj *ticket.Ticket) (*string, error)
 	CreatedAt(ctx context.Context, obj *ticket.Ticket) (string, error)
 	UpdatedAt(ctx context.Context, obj *ticket.Ticket) (string, error)
+
+	Tags(ctx context.Context, obj *ticket.Ticket) ([]string, error)
 }
 
 type executableSchema struct {
@@ -421,6 +443,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Alert.Schema(childComplexity), true
+
+	case "Alert.tags":
+		if e.complexity.Alert.Tags == nil {
+			break
+		}
+
+		return e.complexity.Alert.Tags(childComplexity), true
 
 	case "Alert.ticket":
 		if e.complexity.Alert.Ticket == nil {
@@ -700,6 +729,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Mutation.BindAlertsToTicket(childComplexity, args["ticketId"].(string), args["alertIds"].([]string)), true
 
+	case "Mutation.createTag":
+		if e.complexity.Mutation.CreateTag == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createTag_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CreateTag(childComplexity, args["name"].(string)), true
+
 	case "Mutation.createTicket":
 		if e.complexity.Mutation.CreateTicket == nil {
 			break
@@ -723,6 +764,30 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.CreateTicketFromAlerts(childComplexity, args["alertIds"].([]string), args["title"].(*string), args["description"].(*string)), true
+
+	case "Mutation.deleteTag":
+		if e.complexity.Mutation.DeleteTag == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteTag_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeleteTag(childComplexity, args["name"].(string)), true
+
+	case "Mutation.updateAlertTags":
+		if e.complexity.Mutation.UpdateAlertTags == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateAlertTags_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateAlertTags(childComplexity, args["alertId"].(string), args["tags"].([]string)), true
 
 	case "Mutation.updateMultipleTicketsStatus":
 		if e.complexity.Mutation.UpdateMultipleTicketsStatus == nil {
@@ -771,6 +836,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.UpdateTicketStatus(childComplexity, args["id"].(string), args["status"].(string)), true
+
+	case "Mutation.updateTicketTags":
+		if e.complexity.Mutation.UpdateTicketTags == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateTicketTags_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateTicketTags(childComplexity, args["ticketId"].(string), args["tags"].([]string)), true
 
 	case "Query.activities":
 		if e.complexity.Query.Activities == nil {
@@ -863,6 +940,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Query.SimilarTicketsForAlert(childComplexity, args["alertId"].(string), args["threshold"].(float64), args["offset"].(*int), args["limit"].(*int)), true
 
+	case "Query.tags":
+		if e.complexity.Query.Tags == nil {
+			break
+		}
+
+		return e.complexity.Query.Tags(childComplexity), true
+
 	case "Query.ticket":
 		if e.complexity.Query.Ticket == nil {
 			break
@@ -910,6 +994,34 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.UnboundAlerts(childComplexity, args["threshold"].(*float64), args["keyword"].(*string), args["ticketId"].(*string), args["offset"].(*int), args["limit"].(*int)), true
+
+	case "TagMetadata.color":
+		if e.complexity.TagMetadata.Color == nil {
+			break
+		}
+
+		return e.complexity.TagMetadata.Color(childComplexity), true
+
+	case "TagMetadata.createdAt":
+		if e.complexity.TagMetadata.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.TagMetadata.CreatedAt(childComplexity), true
+
+	case "TagMetadata.name":
+		if e.complexity.TagMetadata.Name == nil {
+			break
+		}
+
+		return e.complexity.TagMetadata.Name(childComplexity), true
+
+	case "TagMetadata.updatedAt":
+		if e.complexity.TagMetadata.UpdatedAt == nil {
+			break
+		}
+
+		return e.complexity.TagMetadata.UpdatedAt(childComplexity), true
 
 	case "Ticket.alerts":
 		if e.complexity.Ticket.Alerts == nil {
@@ -1027,6 +1139,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Ticket.Summary(childComplexity), true
+
+	case "Ticket.tags":
+		if e.complexity.Ticket.Tags == nil {
+			break
+		}
+
+		return e.complexity.Ticket.Tags(childComplexity), true
 
 	case "Ticket.title":
 		if e.complexity.Ticket.Title == nil {
@@ -1193,6 +1312,7 @@ var sources = []*ast.Source{
   createdAt: String!
   updatedAt: String!
   isTest: Boolean!
+  tags: [String!]!
 }
 
 type User {
@@ -1217,6 +1337,7 @@ type Alert {
   attributes: [AlertAttribute!]!
   createdAt: String!
   ticket: Ticket
+  tags: [String!]!
 }
 
 type AlertAttribute {
@@ -1296,6 +1417,13 @@ type DBSCANParameters {
   minSamples: Int!
 }
 
+type TagMetadata {
+  name: String!
+  color: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
 type AlertsConnection {
   alerts: [Alert!]!
   totalCount: Int!
@@ -1314,6 +1442,7 @@ type Query {
   activities(offset: Int, limit: Int): ActivitiesResponse!
   alertClusters(limit: Int, offset: Int, minClusterSize: Int, eps: Float, minSamples: Int, keyword: String): ClusteringSummary!
   clusterAlerts(clusterID: ID!, keyword: String, limit: Int, offset: Int): AlertsConnection!
+  tags: [TagMetadata!]!
 }
 
 type Mutation {
@@ -1324,6 +1453,10 @@ type Mutation {
   createTicket(title: String!, description: String!, isTest: Boolean): Ticket!
   createTicketFromAlerts(alertIds: [ID!]!, title: String, description: String): Ticket!
   bindAlertsToTicket(ticketId: ID!, alertIds: [ID!]!): Ticket!
+  updateAlertTags(alertId: ID!, tags: [String!]!): Alert!
+  updateTicketTags(ticketId: ID!, tags: [String!]!): Ticket!
+  createTag(name: String!): TagMetadata!
+  deleteTag(name: String!): Boolean!
 }
 
 schema {
@@ -1386,6 +1519,34 @@ func (ec *executionContext) field_Mutation_bindAlertsToTicket_argsAlertIds(
 	}
 
 	var zeroVal []string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_createTag_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_createTag_argsName(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["name"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_createTag_argsName(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["name"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+	if tmp, ok := rawArgs["name"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
 	return zeroVal, nil
 }
 
@@ -1534,6 +1695,85 @@ func (ec *executionContext) field_Mutation_createTicket_argsIsTest(
 	}
 
 	var zeroVal *bool
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_deleteTag_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_deleteTag_argsName(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["name"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_deleteTag_argsName(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["name"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+	if tmp, ok := rawArgs["name"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_updateAlertTags_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_updateAlertTags_argsAlertID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["alertId"] = arg0
+	arg1, err := ec.field_Mutation_updateAlertTags_argsTags(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["tags"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_updateAlertTags_argsAlertID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["alertId"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("alertId"))
+	if tmp, ok := rawArgs["alertId"]; ok {
+		return ec.unmarshalNID2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_updateAlertTags_argsTags(
+	ctx context.Context,
+	rawArgs map[string]any,
+) ([]string, error) {
+	if _, ok := rawArgs["tags"]; !ok {
+		var zeroVal []string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("tags"))
+	if tmp, ok := rawArgs["tags"]; ok {
+		return ec.unmarshalNString2ᚕstringᚄ(ctx, tmp)
+	}
+
+	var zeroVal []string
 	return zeroVal, nil
 }
 
@@ -1710,6 +1950,57 @@ func (ec *executionContext) field_Mutation_updateTicketStatus_argsStatus(
 	}
 
 	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_updateTicketTags_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_updateTicketTags_argsTicketID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["ticketId"] = arg0
+	arg1, err := ec.field_Mutation_updateTicketTags_argsTags(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["tags"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_updateTicketTags_argsTicketID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["ticketId"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("ticketId"))
+	if tmp, ok := rawArgs["ticketId"]; ok {
+		return ec.unmarshalNID2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_updateTicketTags_argsTags(
+	ctx context.Context,
+	rawArgs map[string]any,
+) ([]string, error) {
+	if _, ok := rawArgs["tags"]; !ok {
+		var zeroVal []string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("tags"))
+	if tmp, ok := rawArgs["tags"]; ok {
+		return ec.unmarshalNString2ᚕstringᚄ(ctx, tmp)
+	}
+
+	var zeroVal []string
 	return zeroVal, nil
 }
 
@@ -3394,6 +3685,8 @@ func (ec *executionContext) fieldContext_Activity_alert(_ context.Context, field
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
 				return ec.fieldContext_Alert_ticket(ctx, field)
+			case "tags":
+				return ec.fieldContext_Alert_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Alert", field.Name)
 		},
@@ -3473,6 +3766,8 @@ func (ec *executionContext) fieldContext_Activity_ticket(_ context.Context, fiel
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
 		},
@@ -3867,8 +4162,54 @@ func (ec *executionContext) fieldContext_Alert_ticket(_ context.Context, field g
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Alert_tags(ctx context.Context, field graphql.CollectedField, obj *alert.Alert) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Alert_tags(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Alert().Tags(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]string)
+	fc.Result = res
+	return ec.marshalNString2ᚕstringᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Alert_tags(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Alert",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -4146,6 +4487,8 @@ func (ec *executionContext) fieldContext_AlertCluster_centerAlert(_ context.Cont
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
 				return ec.fieldContext_Alert_ticket(ctx, field)
+			case "tags":
+				return ec.fieldContext_Alert_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Alert", field.Name)
 		},
@@ -4208,6 +4551,8 @@ func (ec *executionContext) fieldContext_AlertCluster_alerts(_ context.Context, 
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
 				return ec.fieldContext_Alert_ticket(ctx, field)
+			case "tags":
+				return ec.fieldContext_Alert_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Alert", field.Name)
 		},
@@ -4399,6 +4744,8 @@ func (ec *executionContext) fieldContext_AlertsConnection_alerts(_ context.Conte
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
 				return ec.fieldContext_Alert_ticket(ctx, field)
+			case "tags":
+				return ec.fieldContext_Alert_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Alert", field.Name)
 		},
@@ -4505,6 +4852,8 @@ func (ec *executionContext) fieldContext_AlertsResponse_alerts(_ context.Context
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
 				return ec.fieldContext_Alert_ticket(ctx, field)
+			case "tags":
+				return ec.fieldContext_Alert_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Alert", field.Name)
 		},
@@ -4669,6 +5018,8 @@ func (ec *executionContext) fieldContext_ClusteringSummary_noiseAlerts(_ context
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
 				return ec.fieldContext_Alert_ticket(ctx, field)
+			case "tags":
+				return ec.fieldContext_Alert_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Alert", field.Name)
 		},
@@ -5388,6 +5739,8 @@ func (ec *executionContext) fieldContext_DashboardStats_openTickets(_ context.Co
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
 		},
@@ -5450,6 +5803,8 @@ func (ec *executionContext) fieldContext_DashboardStats_unboundAlerts(_ context.
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
 				return ec.fieldContext_Alert_ticket(ctx, field)
+			case "tags":
+				return ec.fieldContext_Alert_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Alert", field.Name)
 		},
@@ -5708,6 +6063,8 @@ func (ec *executionContext) fieldContext_Mutation_updateTicketStatus(ctx context
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
 		},
@@ -5801,6 +6158,8 @@ func (ec *executionContext) fieldContext_Mutation_updateMultipleTicketsStatus(ct
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
 		},
@@ -5894,6 +6253,8 @@ func (ec *executionContext) fieldContext_Mutation_updateTicketConclusion(ctx con
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
 		},
@@ -5987,6 +6348,8 @@ func (ec *executionContext) fieldContext_Mutation_updateTicket(ctx context.Conte
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
 		},
@@ -6080,6 +6443,8 @@ func (ec *executionContext) fieldContext_Mutation_createTicket(ctx context.Conte
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
 		},
@@ -6173,6 +6538,8 @@ func (ec *executionContext) fieldContext_Mutation_createTicketFromAlerts(ctx con
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
 		},
@@ -6266,6 +6633,8 @@ func (ec *executionContext) fieldContext_Mutation_bindAlertsToTicket(ctx context
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
 		},
@@ -6278,6 +6647,296 @@ func (ec *executionContext) fieldContext_Mutation_bindAlertsToTicket(ctx context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_bindAlertsToTicket_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateAlertTags(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_updateAlertTags(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().UpdateAlertTags(rctx, fc.Args["alertId"].(string), fc.Args["tags"].([]string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*alert.Alert)
+	fc.Result = res
+	return ec.marshalNAlert2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐAlert(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateAlertTags(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Alert_id(ctx, field)
+			case "title":
+				return ec.fieldContext_Alert_title(ctx, field)
+			case "description":
+				return ec.fieldContext_Alert_description(ctx, field)
+			case "schema":
+				return ec.fieldContext_Alert_schema(ctx, field)
+			case "data":
+				return ec.fieldContext_Alert_data(ctx, field)
+			case "attributes":
+				return ec.fieldContext_Alert_attributes(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Alert_createdAt(ctx, field)
+			case "ticket":
+				return ec.fieldContext_Alert_ticket(ctx, field)
+			case "tags":
+				return ec.fieldContext_Alert_tags(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Alert", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateAlertTags_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateTicketTags(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_updateTicketTags(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().UpdateTicketTags(rctx, fc.Args["ticketId"].(string), fc.Args["tags"].([]string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*ticket.Ticket)
+	fc.Result = res
+	return ec.marshalNTicket2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐTicket(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateTicketTags(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Ticket_id(ctx, field)
+			case "status":
+				return ec.fieldContext_Ticket_status(ctx, field)
+			case "title":
+				return ec.fieldContext_Ticket_title(ctx, field)
+			case "description":
+				return ec.fieldContext_Ticket_description(ctx, field)
+			case "summary":
+				return ec.fieldContext_Ticket_summary(ctx, field)
+			case "assignee":
+				return ec.fieldContext_Ticket_assignee(ctx, field)
+			case "alerts":
+				return ec.fieldContext_Ticket_alerts(ctx, field)
+			case "alertsPaginated":
+				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
+			case "comments":
+				return ec.fieldContext_Ticket_comments(ctx, field)
+			case "alertsCount":
+				return ec.fieldContext_Ticket_alertsCount(ctx, field)
+			case "commentsCount":
+				return ec.fieldContext_Ticket_commentsCount(ctx, field)
+			case "conclusion":
+				return ec.fieldContext_Ticket_conclusion(ctx, field)
+			case "reason":
+				return ec.fieldContext_Ticket_reason(ctx, field)
+			case "finding":
+				return ec.fieldContext_Ticket_finding(ctx, field)
+			case "slackLink":
+				return ec.fieldContext_Ticket_slackLink(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Ticket_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "isTest":
+				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateTicketTags_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createTag(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_createTag(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().CreateTag(rctx, fc.Args["name"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*graphql1.TagMetadata)
+	fc.Result = res
+	return ec.marshalNTagMetadata2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐTagMetadata(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_createTag(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "name":
+				return ec.fieldContext_TagMetadata_name(ctx, field)
+			case "color":
+				return ec.fieldContext_TagMetadata_color(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TagMetadata_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_TagMetadata_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TagMetadata", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createTag_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteTag(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_deleteTag(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().DeleteTag(rctx, fc.Args["name"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deleteTag(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteTag_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -6356,6 +7015,8 @@ func (ec *executionContext) fieldContext_Query_ticket(ctx context.Context, field
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
 		},
@@ -6670,6 +7331,8 @@ func (ec *executionContext) fieldContext_Query_alert(ctx context.Context, field 
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
 				return ec.fieldContext_Alert_ticket(ctx, field)
+			case "tags":
+				return ec.fieldContext_Alert_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Alert", field.Name)
 		},
@@ -7053,6 +7716,60 @@ func (ec *executionContext) fieldContext_Query_clusterAlerts(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_tags(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_tags(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Tags(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*graphql1.TagMetadata)
+	fc.Result = res
+	return ec.marshalNTagMetadata2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐTagMetadataᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_tags(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "name":
+				return ec.fieldContext_TagMetadata_name(ctx, field)
+			case "color":
+				return ec.fieldContext_TagMetadata_color(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TagMetadata_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_TagMetadata_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TagMetadata", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query___type(ctx, field)
 	if err != nil {
@@ -7179,6 +7896,182 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 				return ec.fieldContext___Schema_directives(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type __Schema", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TagMetadata_name(ctx context.Context, field graphql.CollectedField, obj *graphql1.TagMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TagMetadata_name(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TagMetadata_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TagMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TagMetadata_color(ctx context.Context, field graphql.CollectedField, obj *graphql1.TagMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TagMetadata_color(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Color, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TagMetadata_color(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TagMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TagMetadata_createdAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.TagMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TagMetadata_createdAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TagMetadata_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TagMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TagMetadata_updatedAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.TagMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TagMetadata_updatedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TagMetadata_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TagMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -7506,6 +8399,8 @@ func (ec *executionContext) fieldContext_Ticket_alerts(_ context.Context, field 
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
 				return ec.fieldContext_Alert_ticket(ctx, field)
+			case "tags":
+				return ec.fieldContext_Alert_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Alert", field.Name)
 		},
@@ -8024,6 +8919,50 @@ func (ec *executionContext) fieldContext_Ticket_isTest(_ context.Context, field 
 	return fc, nil
 }
 
+func (ec *executionContext) _Ticket_tags(ctx context.Context, field graphql.CollectedField, obj *ticket.Ticket) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Ticket_tags(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Ticket().Tags(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]string)
+	fc.Result = res
+	return ec.marshalNString2ᚕstringᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Ticket_tags(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Ticket",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _TicketsResponse_tickets(ctx context.Context, field graphql.CollectedField, obj *graphql1.TicketsResponse) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_TicketsResponse_tickets(ctx, field)
 	if err != nil {
@@ -8099,6 +9038,8 @@ func (ec *executionContext) fieldContext_TicketsResponse_tickets(_ context.Conte
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
 		},
@@ -10630,6 +11571,42 @@ func (ec *executionContext) _Alert(ctx context.Context, sel ast.SelectionSet, ob
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "tags":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Alert_tags(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -11418,6 +12395,34 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "updateAlertTags":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateAlertTags(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateTicketTags":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateTicketTags(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createTag":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createTag(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteTag":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteTag(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -11718,6 +12723,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "tags":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_tags(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -11726,6 +12753,60 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___schema(ctx, field)
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var tagMetadataImplementors = []string{"TagMetadata"}
+
+func (ec *executionContext) _TagMetadata(ctx context.Context, sel ast.SelectionSet, obj *graphql1.TagMetadata) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tagMetadataImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TagMetadata")
+		case "name":
+			out.Values[i] = ec._TagMetadata_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "color":
+			out.Values[i] = ec._TagMetadata_color(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._TagMetadata_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._TagMetadata_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12207,6 +13288,42 @@ func (ec *executionContext) _Ticket(ctx context.Context, sel ast.SelectionSet, o
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "tags":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Ticket_tags(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12721,6 +13838,10 @@ func (ec *executionContext) marshalNActivity2ᚖgithubᚗcomᚋsecmonᚑlabᚋwa
 	return ec._Activity(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNAlert2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐAlert(ctx context.Context, sel ast.SelectionSet, v alert.Alert) graphql.Marshaler {
+	return ec._Alert(ctx, sel, &v)
+}
+
 func (ec *executionContext) marshalNAlert2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐAlertᚄ(ctx context.Context, sel ast.SelectionSet, v []*alert.Alert) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -13125,6 +14246,94 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]string, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNString2string(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNTagMetadata2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐTagMetadata(ctx context.Context, sel ast.SelectionSet, v graphql1.TagMetadata) graphql.Marshaler {
+	return ec._TagMetadata(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNTagMetadata2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐTagMetadataᚄ(ctx context.Context, sel ast.SelectionSet, v []*graphql1.TagMetadata) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNTagMetadata2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐTagMetadata(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNTagMetadata2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐTagMetadata(ctx context.Context, sel ast.SelectionSet, v *graphql1.TagMetadata) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TagMetadata(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNTicket2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐTicket(ctx context.Context, sel ast.SelectionSet, v ticket.Ticket) graphql.Marshaler {

@@ -134,7 +134,7 @@ In principle, do not trust developers who use this library from outside
 When making changes, before finishing the task, always:
 - Run `go vet ./...`, `go fmt ./...` to format the code
 - Run `golangci-lint run ./...` to check lint error
-- Run `gosec -quiet ./...` to check security issue
+- Run `gosec -conf .gosec.yaml -quiet ./...` to check security issue
 - Run tests to ensure no impact on other code
 
 ### Language

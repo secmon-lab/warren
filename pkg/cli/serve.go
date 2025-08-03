@@ -18,6 +18,7 @@ import (
 	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -238,6 +239,9 @@ func cmdServe() *cli.Command {
 			wsHub := websocket_controller.NewHub(ctx)
 			go wsHub.Run() // Start the hub in a goroutine
 
+			// Create tag service
+			tagService := tag.New(repo)
+
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
@@ -245,6 +249,7 @@ func cmdServe() *cli.Command {
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(toolSets),
 				usecase.WithStrictAlert(strictAlert),
+				usecase.WithTagService(tagService),
 			}
 
 			// Add Slack service if available
