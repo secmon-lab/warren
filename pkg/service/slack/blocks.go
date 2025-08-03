@@ -420,12 +420,6 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 	if len(availableTags) > 0 {
 		tagOptions := make([]*slack.OptionBlockObject, 0, len(availableTags))
 
-		// Get current tags from ticket
-		currentTags := make(map[string]bool)
-		for tag := range ticket.Tags {
-			currentTags[tag] = true
-		}
-
 		// Create tag options
 		for _, tag := range availableTags {
 			tagOptions = append(tagOptions,
@@ -437,15 +431,8 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 			)
 		}
 
-		// Create initial options with current tags
-		var initialOptions []*slack.OptionBlockObject
-		for _, opt := range tagOptions {
-			if currentTags[opt.Value] {
-				initialOptions = append(initialOptions, opt)
-			}
-		}
-
 		// Add multi-select for tags
+		// Note: initial_options is not supported in modal views for multi_select elements
 		blockSet = append(blockSet, slack.NewInputBlock(
 			model.BlockIDTicketTags.String(),
 			slack.NewTextBlockObject(slack.PlainTextType, "Tags", false, false),
@@ -455,7 +442,7 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 				slack.NewTextBlockObject(slack.PlainTextType, "Select tags", false, false),
 				model.BlockActionIDTicketTags.String(),
 				tagOptions...,
-			).WithInitialOptions(initialOptions...),
+			),
 		).WithOptional(true))
 	}
 
