@@ -725,7 +725,11 @@ func (x *ThreadService) PostTicketList(ctx context.Context, tickets []*ticket.Ti
 func (x *Service) ShowBindToTicketModal(ctx context.Context, callbackID model.CallbackID, tickets []*ticket.Ticket, triggerID string, metadata string) error {
 	req := buildBindToTicketModalViewRequest(ctx, callbackID, tickets, metadata)
 	if _, err := x.client.OpenView(triggerID, req); err != nil {
-		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
+		return goerr.Wrap(err, "failed to open view",
+			goerr.V("trigger_id", triggerID),
+			goerr.V("callback_id", callbackID),
+			goerr.V("metadata", metadata),
+			goerr.V("request", req))
 	}
 
 	return nil
@@ -736,7 +740,9 @@ func (x *Service) ShowResolveTicketModal(ctx context.Context, ticket *ticket.Tic
 	if _, err := x.client.OpenView(triggerID, req); err != nil {
 		return goerr.Wrap(err, "failed to open view",
 			goerr.V("callback_id", req.CallbackID),
-			goerr.V("ticket_id", ticket.ID.String()))
+			goerr.V("ticket_id", ticket.ID.String()),
+			goerr.V("trigger_id", triggerID),
+			goerr.V("request", req))
 	}
 
 	return nil
@@ -746,7 +752,10 @@ func (x *Service) ShowSalvageModal(ctx context.Context, ticket *ticket.Ticket, u
 	// Use threshold 0.9 for initial display
 	req := buildSalvageModalViewRequest(model.CallbackSubmitSalvage, ticket, unboundAlerts, 0.9, "")
 	if _, err := x.client.OpenView(triggerID, req); err != nil {
-		return goerr.Wrap(err, "failed to open view", goerr.V("req", req))
+		return goerr.Wrap(err, "failed to open view",
+			goerr.V("trigger_id", triggerID),
+			goerr.V("ticket_id", ticket.ID.String()),
+			goerr.V("request", req))
 	}
 
 	return nil
@@ -757,7 +766,12 @@ func (x *Service) UpdateSalvageModal(ctx context.Context, ticket *ticket.Ticket,
 
 	// Update the view using the correct parameters
 	if _, err := x.client.UpdateView(req, "", "", viewID); err != nil {
-		return goerr.Wrap(err, "failed to update view", goerr.V("req", req), goerr.V("viewID", viewID))
+		return goerr.Wrap(err, "failed to update view",
+			goerr.V("view_id", viewID),
+			goerr.V("ticket_id", ticket.ID.String()),
+			goerr.V("threshold", threshold),
+			goerr.V("keyword", keyword),
+			goerr.V("request", req))
 	}
 
 	return nil

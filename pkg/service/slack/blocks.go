@@ -423,7 +423,7 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 		// Get current tags from ticket
 		currentTags := make(map[string]bool)
 		for tag := range ticket.Tags {
-			currentTags[string(tag)] = true
+			currentTags[tag] = true
 		}
 
 		// Create tag options
