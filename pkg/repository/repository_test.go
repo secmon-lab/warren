@@ -2320,7 +2320,7 @@ func TestTagOperations(t *testing.T) {
 			gt.Array(t, tags).Length(3)
 
 			// Verify tag names
-			tagNames := make(map[tag.Tag]bool)
+			tagNames := make(map[string]bool)
 			for _, tag := range tags {
 				tagNames[tag.Name] = true
 			}
@@ -2364,7 +2364,7 @@ func TestTagOperations(t *testing.T) {
 			existingTag, err := repo.GetTag(ctx, "casesensitive")
 			gt.NoError(t, err)
 			gt.NotNil(t, existingTag)
-			gt.V(t, existingTag.Name).Equal(tag.Tag("CaseSensitive")) // First one created
+			gt.V(t, existingTag.Name).Equal("CaseSensitive") // First one created
 		})
 
 		t.Run("Get tag", func(t *testing.T) {
@@ -2376,7 +2376,7 @@ func TestTagOperations(t *testing.T) {
 			retrievedTag, err := repo.GetTag(ctx, "gettag")
 			gt.NoError(t, err)
 			gt.NotNil(t, retrievedTag)
-			gt.V(t, retrievedTag.Name).Equal(tag.Tag("gettag"))
+			gt.V(t, retrievedTag.Name).Equal("gettag")
 
 			// Get non-existent tag
 			nonExistent, err := repo.GetTag(ctx, "nonexistent")
@@ -2532,7 +2532,7 @@ func TestAlertAndTicketTags(t *testing.T) {
 
 			// Verify tags
 			for i, a := range retrievedAlerts {
-				gt.True(t, a.Tags.Has(tag.Tag(fmt.Sprintf("tag%d", i))))
+				gt.True(t, a.Tags.Has(fmt.Sprintf("tag%d", i)))
 				gt.True(t, a.Tags.Has("common"))
 			}
 		})

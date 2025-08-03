@@ -33,7 +33,7 @@ func (s *Service) ListTags(ctx context.Context) ([]*tag.Metadata, error) {
 }
 
 // GetTag returns a tag by name
-func (s *Service) GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, error) {
+func (s *Service) GetTag(ctx context.Context, name string) (*tag.Metadata, error) {
 	tag, err := s.repo.GetTag(ctx, name)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get tag")
@@ -42,14 +42,14 @@ func (s *Service) GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, erro
 }
 
 // CreateTag creates a new tag
-func (s *Service) CreateTag(ctx context.Context, name tag.Tag) error {
+func (s *Service) CreateTag(ctx context.Context, name string) error {
 	if name == "" {
 		return goerr.New("tag name cannot be empty")
 	}
 
 	tagMeta := &tag.Metadata{
 		Name:  name,
-		Color: tag.GenerateColor(string(name)),
+		Color: tag.GenerateColor(name),
 	}
 
 	if err := s.repo.CreateTag(ctx, tagMeta); err != nil {
@@ -60,7 +60,7 @@ func (s *Service) CreateTag(ctx context.Context, name tag.Tag) error {
 }
 
 // DeleteTag deletes a tag and removes it from all alerts and tickets
-func (s *Service) DeleteTag(ctx context.Context, name tag.Tag) error {
+func (s *Service) DeleteTag(ctx context.Context, name string) error {
 	// First, remove the tag from all alerts
 	if err := s.repo.RemoveTagFromAllAlerts(ctx, name); err != nil {
 		return goerr.Wrap(err, "failed to remove tag from alerts")
@@ -86,17 +86,15 @@ func (s *Service) EnsureTagsExist(ctx context.Context, tags []string) error {
 			continue
 		}
 
-		tag := tag.Tag(tagName)
-
 		// Check if tag exists
-		existingTag, err := s.repo.GetTag(ctx, tag)
+		existingTag, err := s.repo.GetTag(ctx, tagName)
 		if err != nil {
 			return goerr.Wrap(err, "failed to check tag existence", goerr.V("tag", tagName))
 		}
 
 		// Create tag if it doesn't exist
 		if existingTag == nil {
-			if err := s.CreateTag(ctx, tag); err != nil {
+			if err := s.CreateTag(ctx, tagName); err != nil {
 				return goerr.Wrap(err, "failed to create tag", goerr.V("tag", tagName))
 			}
 		}

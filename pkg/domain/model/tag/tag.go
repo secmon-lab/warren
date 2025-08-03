@@ -4,15 +4,12 @@ import (
 	"time"
 )
 
-// Tag represents a tag name
-type Tag string
-
 // Set represents a set of tags using map for O(1) operations
-type Set map[Tag]bool
+type Set map[string]bool
 
 // Metadata represents metadata about a tag
 type Metadata struct {
-	Name      Tag       `json:"name" firestore:"name"`
+	Name      string    `json:"name" firestore:"name"`
 	Color     string    `json:"color" firestore:"color"`
 	CreatedAt time.Time `json:"created_at" firestore:"createdAt"`
 	UpdatedAt time.Time `json:"updated_at" firestore:"updatedAt"`
@@ -22,7 +19,7 @@ type Metadata struct {
 func NewSet(tags []string) Set {
 	ts := make(Set)
 	for _, tag := range tags {
-		ts[Tag(tag)] = true
+		ts[tag] = true
 	}
 	return ts
 }
@@ -37,17 +34,17 @@ func (ts Set) ToSlice() []string {
 }
 
 // Add adds a tag to the set
-func (ts Set) Add(tag Tag) {
+func (ts Set) Add(tag string) {
 	ts[tag] = true
 }
 
 // Remove removes a tag from the set
-func (ts Set) Remove(tag Tag) {
+func (ts Set) Remove(tag string) {
 	delete(ts, tag)
 }
 
 // Has checks if a tag exists in the set
-func (ts Set) Has(tag Tag) bool {
+func (ts Set) Has(tag string) bool {
 	return ts[tag]
 }
 
@@ -60,23 +57,6 @@ func (ts Set) Copy() Set {
 	return copied
 }
 
-// FirestoreValue converts Set to map[string]bool for Firestore compatibility
-func (ts Set) FirestoreValue() map[string]bool {
-	result := make(map[string]bool)
-	for tag := range ts {
-		result[string(tag)] = true
-	}
-	return result
-}
-
-// FromFirestoreValue creates Set from map[string]bool from Firestore
-func FromFirestoreValue(m map[string]bool) Set {
-	result := make(Set)
-	for tag := range m {
-		result[Tag(tag)] = true
-	}
-	return result
-}
 
 // chipColors contains predefined colors suitable for chips/badges
 var chipColors = []string{

@@ -1051,24 +1051,24 @@ func (r *Memory) CreateTag(ctx context.Context, tag *tag.Metadata) error {
 	return nil
 }
 
-func (r *Memory) DeleteTag(ctx context.Context, name tag.Tag) error {
+func (r *Memory) DeleteTag(ctx context.Context, name string) error {
 	r.tagMu.Lock()
 	defer r.tagMu.Unlock()
 
 	// Normalize tag name to lowercase
-	normalizedName := strings.ToLower(string(name))
+	normalizedName := strings.ToLower(name)
 
 	delete(r.tags, normalizedName)
 
 	return nil
 }
 
-func (r *Memory) GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, error) {
+func (r *Memory) GetTag(ctx context.Context, name string) (*tag.Metadata, error) {
 	r.tagMu.RLock()
 	defer r.tagMu.RUnlock()
 
 	// Normalize tag name to lowercase
-	normalizedName := strings.ToLower(string(name))
+	normalizedName := strings.ToLower(name)
 
 	tag, exists := r.tags[normalizedName]
 	if !exists {
@@ -1080,7 +1080,7 @@ func (r *Memory) GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, error
 	return &tagCopy, nil
 }
 
-func (r *Memory) RemoveTagFromAllAlerts(ctx context.Context, name tag.Tag) error {
+func (r *Memory) RemoveTagFromAllAlerts(ctx context.Context, name string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -1094,7 +1094,7 @@ func (r *Memory) RemoveTagFromAllAlerts(ctx context.Context, name tag.Tag) error
 	return nil
 }
 
-func (r *Memory) RemoveTagFromAllTickets(ctx context.Context, name tag.Tag) error {
+func (r *Memory) RemoveTagFromAllTickets(ctx context.Context, name string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

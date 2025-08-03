@@ -75,8 +75,8 @@ type Repository interface {
 	// For tag management
 	ListTags(ctx context.Context) ([]*tag.Metadata, error)
 	CreateTag(ctx context.Context, tag *tag.Metadata) error
-	DeleteTag(ctx context.Context, name tag.Tag) error
-	GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, error)
-	RemoveTagFromAllAlerts(ctx context.Context, name tag.Tag) error
-	RemoveTagFromAllTickets(ctx context.Context, name tag.Tag) error
+	DeleteTag(ctx context.Context, name string) error
+	GetTag(ctx context.Context, name string) (*tag.Metadata, error)
+	RemoveTagFromAllAlerts(ctx context.Context, name string) error
+	RemoveTagFromAllTickets(ctx context.Context, name string) error
 }

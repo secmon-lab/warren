@@ -327,7 +327,7 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 
 	// Create existing tag
 	existingTag := &tagmodel.Metadata{
-		Name:      tagmodel.Tag("existing-tag"),
+		Name:      "existing-tag",
 		Color:     "bg-blue-100 text-blue-800", 
 		CreatedAt: now.Add(-1 * time.Hour),
 		UpdatedAt: now.Add(-1 * time.Hour),
@@ -413,7 +413,7 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 
 	// Verify tags were assigned to ticket
 	gt.Value(t, len(updatedTicket.Tags)).Equal(3)
-	expectedTags := []tagmodel.Tag{"existing-tag", "false-positive", "investigation"}
+	expectedTags := []string{"existing-tag", "false-positive", "investigation"}
 	for _, expectedTag := range expectedTags {
 		gt.Value(t, updatedTicket.Tags[expectedTag]).Equal(true)
 	}
@@ -434,17 +434,17 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 	}
 
 	// Verify existing tag unchanged
-	existingTagAfter, err := repo.GetTag(ctx, tagmodel.Tag("existing-tag"))
+	existingTagAfter, err := repo.GetTag(ctx, "existing-tag")
 	gt.NoError(t, err)
 	gt.Value(t, existingTagAfter.CreatedAt).Equal(existingTag.CreatedAt)
 	gt.Value(t, existingTagAfter.Color).Equal(existingTag.Color)
 
 	// Verify new tags have colors assigned
-	falsePositiveTag, err := repo.GetTag(ctx, tagmodel.Tag("false-positive"))
+	falsePositiveTag, err := repo.GetTag(ctx, "false-positive")
 	gt.NoError(t, err)
 	gt.Value(t, falsePositiveTag.Color).NotEqual("")
 
-	investigationTag, err := repo.GetTag(ctx, tagmodel.Tag("investigation"))
+	investigationTag, err := repo.GetTag(ctx, "investigation")
 	gt.NoError(t, err)
 	gt.Value(t, investigationTag.Color).NotEqual("")
 }

@@ -1212,7 +1212,7 @@ func TestHandleAlert_PolicyWithTags(t *testing.T) {
 	gt.Value(t, len(createdAlert.Tags)).Equal(3)
 
 	// Verify tags are assigned to alert
-	expectedTags := []tagmodel.Tag{"security", "high-priority", "network"}
+	expectedTags := []string{"security", "high-priority", "network"}
 	for _, expectedTag := range expectedTags {
 		gt.Value(t, createdAlert.Tags[expectedTag]).Equal(true)
 	}
@@ -1248,7 +1248,7 @@ func TestHandleAlert_PolicyWithNewAndExistingTags(t *testing.T) {
 
 	// Create existing tag
 	existingTag := &tagmodel.Metadata{
-		Name:      tagmodel.Tag("existing-tag"),
+		Name:      "existing-tag",
 		Color:     "bg-blue-100 text-blue-800",
 		CreatedAt: now.Add(-1 * time.Hour),
 		UpdatedAt: now.Add(-1 * time.Hour),
@@ -1326,7 +1326,7 @@ func TestHandleAlert_PolicyWithNewAndExistingTags(t *testing.T) {
 	gt.Value(t, len(createdAlert.Tags)).Equal(3)
 
 	// Verify all tags are assigned to alert
-	expectedTags := []tagmodel.Tag{"existing-tag", "new-tag-1", "new-tag-2"}
+	expectedTags := []string{"existing-tag", "new-tag-1", "new-tag-2"}
 	for _, expectedTag := range expectedTags {
 		gt.Value(t, createdAlert.Tags[expectedTag]).Equal(true)
 	}
@@ -1337,7 +1337,7 @@ func TestHandleAlert_PolicyWithNewAndExistingTags(t *testing.T) {
 	gt.Array(t, tags).Length(3)
 
 	// Verify existing tag unchanged
-	existingTagAfter, err := repo.GetTag(ctx, tagmodel.Tag("existing-tag"))
+	existingTagAfter, err := repo.GetTag(ctx, "existing-tag")
 	gt.NoError(t, err)
 	gt.Value(t, existingTagAfter.CreatedAt).Equal(existingTag.CreatedAt)
 	gt.Value(t, existingTagAfter.Color).Equal(existingTag.Color)

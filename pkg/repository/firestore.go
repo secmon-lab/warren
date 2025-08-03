@@ -151,7 +151,7 @@ func (r *Firestore) GetAlert(ctx context.Context, alertID types.AlertID) (*alert
 	a := fa.Alert
 	a.Tags = make(tag.Set)
 	for tagStr := range fa.Tags {
-		a.Tags[tag.Tag(tagStr)] = true
+		a.Tags[tagStr] = true
 	}
 
 	return &a, nil
@@ -403,7 +403,7 @@ func (r *Firestore) GetTicket(ctx context.Context, ticketID types.TicketID) (*ti
 	t := ft.Ticket
 	t.Tags = make(tag.Set)
 	for tagStr := range ft.Tags {
-		t.Tags[tag.Tag(tagStr)] = true
+		t.Tags[tagStr] = true
 	}
 
 	return &t, nil
@@ -905,7 +905,7 @@ func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32,
 		if ft.Tags != nil {
 			ft.Ticket.Tags = make(tag.Set)
 			for k, v := range ft.Tags {
-				ft.Ticket.Tags[tag.Tag(k)] = v
+				ft.Ticket.Tags[k] = v
 			}
 		}
 
@@ -1469,7 +1469,7 @@ func (r *Firestore) CreateTag(ctx context.Context, tag *tag.Metadata) error {
 	return nil
 }
 
-func (r *Firestore) DeleteTag(ctx context.Context, name tag.Tag) error {
+func (r *Firestore) DeleteTag(ctx context.Context, name string) error {
 	// Normalize tag name to lowercase
 	normalizedName := strings.ToLower(string(name))
 
@@ -1481,7 +1481,7 @@ func (r *Firestore) DeleteTag(ctx context.Context, name tag.Tag) error {
 	return nil
 }
 
-func (r *Firestore) GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, error) {
+func (r *Firestore) GetTag(ctx context.Context, name string) (*tag.Metadata, error) {
 	// Normalize tag name to lowercase
 	normalizedName := strings.ToLower(string(name))
 
@@ -1501,7 +1501,7 @@ func (r *Firestore) GetTag(ctx context.Context, name tag.Tag) (*tag.Metadata, er
 	return &tag, nil
 }
 
-func (r *Firestore) RemoveTagFromAllAlerts(ctx context.Context, name tag.Tag) error {
+func (r *Firestore) RemoveTagFromAllAlerts(ctx context.Context, name string) error {
 	// Use Firestore's transaction operations to remove the tag from all alerts
 	const batchSize = 500 // Firestore transaction document limit
 
@@ -1547,7 +1547,7 @@ func (r *Firestore) RemoveTagFromAllAlerts(ctx context.Context, name tag.Tag) er
 	return nil
 }
 
-func (r *Firestore) RemoveTagFromAllTickets(ctx context.Context, name tag.Tag) error {
+func (r *Firestore) RemoveTagFromAllTickets(ctx context.Context, name string) error {
 	// Use Firestore's transaction operations to remove the tag from all tickets
 	const batchSize = 500 // Firestore transaction document limit
 

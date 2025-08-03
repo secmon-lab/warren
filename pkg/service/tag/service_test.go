@@ -6,7 +6,6 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	tagmodel "github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
@@ -71,7 +70,7 @@ func TestTagService_DeleteTag(t *testing.T) {
 	tags, err := service.ListTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(1)
-	gt.V(t, tags[0].Name).Equal(tagmodel.Tag("incident"))
+	gt.V(t, tags[0].Name).Equal("incident")
 }
 
 func TestTagService_EnsureTagsExist(t *testing.T) {

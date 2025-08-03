@@ -6,7 +6,6 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	tagmodel "github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -22,7 +21,7 @@ func TestTagUseCase_Operations(t *testing.T) {
 	tag1, err := tagUC.CreateTag(ctx, "security")
 	gt.NoError(t, err)
 	gt.NotNil(t, tag1)
-	gt.V(t, tag1.Name).Equal(tagmodel.Tag("security"))
+	gt.V(t, tag1.Name).Equal("security")
 
 	tag2, err := tagUC.CreateTag(ctx, "incident")
 	gt.NoError(t, err)
