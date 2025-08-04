@@ -34,6 +34,7 @@ type Memory struct {
 	tokens         map[auth.TokenID]*auth.Token
 	activities     map[types.ActivityID]*activity.Activity
 	tags           map[string]*tag.Metadata
+	tagsV2         map[types.TagID]*tag.Tag // New ID-based tags
 
 	// Call counter for tracking method invocations
 	callCounts map[string]int
@@ -52,6 +53,7 @@ func NewMemory() *Memory {
 		tokens:         make(map[auth.TokenID]*auth.Token),
 		activities:     make(map[types.ActivityID]*activity.Activity),
 		tags:           make(map[string]*tag.Metadata),
+		tagsV2:         make(map[types.TagID]*tag.Tag),
 		callCounts:     make(map[string]int),
 	}
 }
@@ -1087,7 +1089,7 @@ func (r *Memory) RemoveTagFromAllAlerts(ctx context.Context, name string) error 
 	// Iterate through all alerts and remove the tag
 	for _, alert := range r.alerts {
 		if alert.Tags != nil {
-			delete(alert.Tags, name)
+			delete(alert.Tags, types.TagID(name))
 		}
 	}
 
@@ -1101,9 +1103,138 @@ func (r *Memory) RemoveTagFromAllTickets(ctx context.Context, name string) error
 	// Iterate through all tickets and remove the tag
 	for _, ticket := range r.tickets {
 		if ticket.Tags != nil {
-			delete(ticket.Tags, name)
+			delete(ticket.Tags, types.TagID(name))
 		}
 	}
 
 	return nil
+}
+
+// New ID-based tag management methods
+
+func (r *Memory) GetTagByID(ctx context.Context, tagID types.TagID) (*tag.Tag, error) {
+	r.tagMu.RLock()
+	defer r.tagMu.RUnlock()
+
+	if tagData, exists := r.tagsV2[tagID]; exists {
+		// Return a copy to prevent external modification
+		tagCopy := *tagData
+		return &tagCopy, nil
+	}
+
+	return nil, nil
+}
+
+func (r *Memory) GetTagsByIDs(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error) {
+	r.tagMu.RLock()
+	defer r.tagMu.RUnlock()
+
+	tags := make([]*tag.Tag, 0, len(tagIDs))
+	for _, tagID := range tagIDs {
+		if tagData, exists := r.tagsV2[tagID]; exists {
+			// Return a copy to prevent external modification
+			tagCopy := *tagData
+			tags = append(tags, &tagCopy)
+		}
+	}
+
+	return tags, nil
+}
+
+func (r *Memory) CreateTagWithID(ctx context.Context, tag *tag.Tag) error {
+	r.tagMu.Lock()
+	defer r.tagMu.Unlock()
+
+	if tag.ID == types.EmptyTagID {
+		return goerr.New("tag ID is required")
+	}
+
+	if _, exists := r.tagsV2[tag.ID]; exists {
+		return goerr.New("tag ID already exists", goerr.V("tagID", tag.ID))
+	}
+
+	// Store a copy to prevent external modification
+	tagCopy := *tag
+	r.tagsV2[tag.ID] = &tagCopy
+
+	return nil
+}
+
+func (r *Memory) UpdateTag(ctx context.Context, tag *tag.Tag) error {
+	r.tagMu.Lock()
+	defer r.tagMu.Unlock()
+
+	if tag.ID == types.EmptyTagID {
+		return goerr.New("tag ID is required")
+	}
+
+	// Store a copy to prevent external modification
+	tagCopy := *tag
+	r.tagsV2[tag.ID] = &tagCopy
+
+	return nil
+}
+
+func (r *Memory) DeleteTagByID(ctx context.Context, tagID types.TagID) error {
+	r.tagMu.Lock()
+	defer r.tagMu.Unlock()
+
+	delete(r.tagsV2, tagID)
+	return nil
+}
+
+func (r *Memory) RemoveTagIDFromAllAlerts(ctx context.Context, tagID types.TagID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Iterate through all alerts and remove the tag
+	for _, alert := range r.alerts {
+		if alert.Tags != nil {
+			delete(alert.Tags, tagID)
+		}
+	}
+
+	return nil
+}
+
+func (r *Memory) RemoveTagIDFromAllTickets(ctx context.Context, tagID types.TagID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Iterate through all tickets and remove the tag
+	for _, ticket := range r.tickets {
+		if ticket.Tags != nil {
+			delete(ticket.Tags, tagID)
+		}
+	}
+
+	return nil
+}
+
+func (r *Memory) GetTagByName(ctx context.Context, name string) (*tag.Tag, error) {
+	r.tagMu.RLock()
+	defer r.tagMu.RUnlock()
+
+	for _, tagData := range r.tagsV2 {
+		if tagData.Name == name {
+			// Return a copy to prevent external modification
+			tagCopy := *tagData
+			return &tagCopy, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func (r *Memory) IsTagNameExists(ctx context.Context, name string) (bool, error) {
+	r.tagMu.RLock()
+	defer r.tagMu.RUnlock()
+
+	for _, tagData := range r.tagsV2 {
+		if tagData.Name == name {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

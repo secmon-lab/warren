@@ -37,12 +37,33 @@ type Alert struct {
 	CreatedAt   time.Time          `json:"created_at"`
 	SlackThread *slack.Thread      `json:"slack_thread"`
 	Embedding   firestore.Vector32 `json:"-"`
-	Tags        tag.Set            `json:"tags" firestore:"tags"`
+	Tags        tag.IDSet          `json:"tag_ids" firestore:"tagIds"`
 }
 
 // HasSlackThread returns true if the alert has a valid Slack thread
 func (a *Alert) HasSlackThread() bool {
 	return a.SlackThread != nil && a.SlackThread.ThreadID != ""
+}
+
+// GetTagNames returns tag names for external API compatibility
+// This method requires a tag service to resolve tag IDs to names
+func (a *Alert) GetTagNames(ctx context.Context, tagGetter func(context.Context, []types.TagID) ([]*tag.Tag, error)) ([]string, error) {
+	if len(a.Tags) == 0 {
+		return []string{}, nil
+	}
+
+	tagIDs := a.Tags.ToSlice()
+	tags, err := tagGetter(ctx, tagIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, len(tags))
+	for i, t := range tags {
+		names[i] = t.Name
+	}
+
+	return names, nil
 }
 
 type Alerts []*Alert
@@ -68,7 +89,7 @@ func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metad
 		CreatedAt: clock.Now(ctx),
 		Metadata:  metadata,
 		Data:      data,
-		Tags:      tag.NewSet(metadata.Tags),
+		Tags:      make(tag.IDSet),
 	}
 
 	if newAlert.Metadata.Title == "" {

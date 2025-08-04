@@ -414,8 +414,21 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 	// Verify tags were assigned to ticket
 	gt.Value(t, len(updatedTicket.Tags)).Equal(3)
 	expectedTags := []string{"existing-tag", "false-positive", "investigation"}
+
+	// Get actual tag names from ticket using compatibility method
+	actualTagNames, err := updatedTicket.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+		return repo.GetTagsByIDs(ctx, tagIDs)
+	})
+	gt.NoError(t, err)
+	gt.Equal(t, len(actualTagNames), 3)
+
+	// Verify all expected tags are present
+	actualTagMap := make(map[string]bool)
+	for _, name := range actualTagNames {
+		actualTagMap[name] = true
+	}
 	for _, expectedTag := range expectedTags {
-		gt.Value(t, updatedTicket.Tags[expectedTag]).Equal(true)
+		gt.Value(t, actualTagMap[expectedTag]).Equal(true)
 	}
 
 	// Verify tags were created in repository (1 existing + 2 new = 3)

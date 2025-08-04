@@ -18,6 +18,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
@@ -149,9 +150,9 @@ func (r *Firestore) GetAlert(ctx context.Context, alertID types.AlertID) (*alert
 
 	// Convert map[string]bool back to tag.Set
 	a := fa.Alert
-	a.Tags = make(tag.Set)
+	a.Tags = make(tag.IDSet)
 	for tagStr := range fa.Tags {
-		a.Tags[tagStr] = true
+		a.Tags[types.TagID(tagStr)] = true
 	}
 
 	return &a, nil
@@ -401,9 +402,9 @@ func (r *Firestore) GetTicket(ctx context.Context, ticketID types.TicketID) (*ti
 
 	// Convert map[string]bool back to tag.Set
 	t := ft.Ticket
-	t.Tags = make(tag.Set)
+	t.Tags = make(tag.IDSet)
 	for tagStr := range ft.Tags {
-		t.Tags[tagStr] = true
+		t.Tags[types.TagID(tagStr)] = true
 	}
 
 	return &t, nil
@@ -903,9 +904,9 @@ func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32,
 
 		// Convert map[string]bool back to tag.Set
 		if ft.Tags != nil {
-			ft.Ticket.Tags = make(tag.Set)
+			ft.Ticket.Tags = make(tag.IDSet)
 			for k, v := range ft.Tags {
-				ft.Ticket.Tags[k] = v
+				ft.Ticket.Tags[types.TagID(k)] = v
 			}
 		}
 
@@ -1591,4 +1592,234 @@ func (r *Firestore) RemoveTagFromAllTickets(ctx context.Context, name string) er
 	}
 
 	return nil
+}
+
+// New ID-based tag management methods
+
+func (r *Firestore) GetTagByID(ctx context.Context, tagID types.TagID) (*tag.Tag, error) {
+	doc, err := r.db.Collection("tags").Doc(tagID.String()).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
+		return nil, goerr.Wrap(err, "failed to get tag by ID", goerr.V("tagID", tagID))
+	}
+
+	var tagData tag.Tag
+	if err := doc.DataTo(&tagData); err != nil {
+		return nil, goerr.Wrap(err, "failed to decode tag data", goerr.V("tagID", tagID))
+	}
+
+	return &tagData, nil
+}
+
+func (r *Firestore) GetTagsByIDs(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error) {
+	if len(tagIDs) == 0 {
+		return []*tag.Tag{}, nil
+	}
+
+	// Convert TagIDs to document references
+	refs := make([]*firestore.DocumentRef, len(tagIDs))
+	for i, tagID := range tagIDs {
+		refs[i] = r.db.Collection("tags").Doc(tagID.String())
+	}
+
+	// Batch get documents
+	docs, err := r.db.GetAll(ctx, refs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to batch get tags", goerr.V("tagIDs", tagIDs))
+	}
+
+	// Convert to tag structs
+	tags := make([]*tag.Tag, 0, len(docs))
+	for i, doc := range docs {
+		if !doc.Exists() {
+			// Skip non-existent tags (they may have been deleted)
+			continue
+		}
+
+		var tagData tag.Tag
+		if err := doc.DataTo(&tagData); err != nil {
+			return nil, goerr.Wrap(err, "failed to decode tag data", goerr.V("tagID", tagIDs[i]))
+		}
+		tags = append(tags, &tagData)
+	}
+
+	return tags, nil
+}
+
+func (r *Firestore) CreateTagWithID(ctx context.Context, tag *tag.Tag) error {
+	if tag.ID == types.EmptyTagID {
+		return goerr.New("tag ID is required")
+	}
+
+	// Check if tag already exists
+	existing, err := r.GetTagByID(ctx, tag.ID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to check existing tag")
+	}
+	if existing != nil {
+		return goerr.New("tag ID already exists", goerr.V("tagID", tag.ID))
+	}
+
+	// Set timestamps
+	now := clock.Now(ctx)
+	tag.CreatedAt = now
+	tag.UpdatedAt = now
+
+	// Create the tag document
+	_, err = r.db.Collection("tags").Doc(tag.ID.String()).Set(ctx, tag)
+	if err != nil {
+		return goerr.Wrap(err, "failed to create tag", goerr.V("tagID", tag.ID))
+	}
+
+	return nil
+}
+
+func (r *Firestore) UpdateTag(ctx context.Context, tag *tag.Tag) error {
+	if tag.ID == types.EmptyTagID {
+		return goerr.New("tag ID is required")
+	}
+
+	// Set update timestamp
+	tag.UpdatedAt = clock.Now(ctx)
+
+	// Update the tag document
+	_, err := r.db.Collection("tags").Doc(tag.ID.String()).Set(ctx, tag)
+	if err != nil {
+		return goerr.Wrap(err, "failed to update tag", goerr.V("tagID", tag.ID))
+	}
+
+	return nil
+}
+
+func (r *Firestore) DeleteTagByID(ctx context.Context, tagID types.TagID) error {
+	// Delete the tag document
+	_, err := r.db.Collection("tags").Doc(tagID.String()).Delete(ctx)
+	if err != nil {
+		return goerr.Wrap(err, "failed to delete tag", goerr.V("tagID", tagID))
+	}
+
+	return nil
+}
+
+func (r *Firestore) RemoveTagIDFromAllAlerts(ctx context.Context, tagID types.TagID) error {
+	// Query all alerts that have this tag ID
+	iter := r.db.Collection("alerts").Where("tagIds."+tagID.String(), "==", true).Documents(ctx)
+	defer iter.Stop()
+
+	batch := r.db.Batch()
+	batchSize := 0
+
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return goerr.Wrap(err, "failed to iterate alerts")
+		}
+
+		// Remove the tag ID from the document
+		batch.Update(doc.Ref, []firestore.Update{
+			{Path: "tagIds." + tagID.String(), Value: firestore.Delete},
+		})
+		batchSize++
+
+		// Firestore batch has a limit of 500 operations
+		if batchSize >= 450 {
+			if _, err := batch.Commit(ctx); err != nil {
+				return goerr.Wrap(err, "failed to commit batch update")
+			}
+			batch = r.db.Batch()
+			batchSize = 0
+		}
+	}
+
+	// Commit remaining operations
+	if batchSize > 0 {
+		if _, err := batch.Commit(ctx); err != nil {
+			return goerr.Wrap(err, "failed to commit final batch update")
+		}
+	}
+
+	return nil
+}
+
+func (r *Firestore) RemoveTagIDFromAllTickets(ctx context.Context, tagID types.TagID) error {
+	// Query all tickets that have this tag ID
+	iter := r.db.Collection("tickets").Where("tagIds."+tagID.String(), "==", true).Documents(ctx)
+	defer iter.Stop()
+
+	batch := r.db.Batch()
+	batchSize := 0
+
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return goerr.Wrap(err, "failed to iterate tickets")
+		}
+
+		// Remove the tag ID from the document
+		batch.Update(doc.Ref, []firestore.Update{
+			{Path: "tagIds." + tagID.String(), Value: firestore.Delete},
+		})
+		batchSize++
+
+		// Firestore batch has a limit of 500 operations
+		if batchSize >= 450 {
+			if _, err := batch.Commit(ctx); err != nil {
+				return goerr.Wrap(err, "failed to commit batch update")
+			}
+			batch = r.db.Batch()
+			batchSize = 0
+		}
+	}
+
+	// Commit remaining operations
+	if batchSize > 0 {
+		if _, err := batch.Commit(ctx); err != nil {
+			return goerr.Wrap(err, "failed to commit final batch update")
+		}
+	}
+
+	return nil
+}
+
+func (r *Firestore) GetTagByName(ctx context.Context, name string) (*tag.Tag, error) {
+	iter := r.db.Collection("tags").Where("name", "==", name).Limit(1).Documents(ctx)
+	defer iter.Stop()
+
+	doc, err := iter.Next()
+	if err == iterator.Done {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to query tag by name", goerr.V("name", name))
+	}
+
+	var tagData tag.Tag
+	if err := doc.DataTo(&tagData); err != nil {
+		return nil, goerr.Wrap(err, "failed to decode tag data", goerr.V("name", name))
+	}
+
+	return &tagData, nil
+}
+
+func (r *Firestore) IsTagNameExists(ctx context.Context, name string) (bool, error) {
+	iter := r.db.Collection("tags").Where("name", "==", name).Limit(1).Documents(ctx)
+	defer iter.Stop()
+
+	_, err := iter.Next()
+	if err == iterator.Done {
+		return false, nil
+	}
+	if err != nil {
+		return false, goerr.Wrap(err, "failed to check tag name existence", goerr.V("name", name))
+	}
+
+	return true, nil
 }

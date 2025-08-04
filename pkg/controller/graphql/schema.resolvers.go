@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/clustering"
@@ -106,7 +107,20 @@ func (r *alertResolver) Ticket(ctx context.Context, obj *alert.Alert) (*ticket.T
 
 // Tags is the resolver for the tags field.
 func (r *alertResolver) Tags(ctx context.Context, obj *alert.Alert) ([]string, error) {
-	return obj.Tags.ToSlice(), nil
+	if r.uc == nil || len(obj.Tags) == 0 {
+		return []string{}, nil
+	}
+
+	// Use the compatibility method to get tag names
+	tagGetter := func(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error) {
+		tagService := r.uc.GetTagService()
+		if tagService == nil {
+			return nil, goerr.New("tag service not available")
+		}
+		return tagService.GetTagsByIDs(ctx, tagIDs)
+	}
+
+	return obj.GetTagNames(ctx, tagGetter)
 }
 
 // ID is the resolver for the id field.
@@ -1019,7 +1033,20 @@ func (r *ticketResolver) UpdatedAt(ctx context.Context, obj *ticket.Ticket) (str
 
 // Tags is the resolver for the tags field.
 func (r *ticketResolver) Tags(ctx context.Context, obj *ticket.Ticket) ([]string, error) {
-	return obj.Tags.ToSlice(), nil
+	if r.uc == nil || len(obj.Tags) == 0 {
+		return []string{}, nil
+	}
+
+	// Use the compatibility method to get tag names
+	tagGetter := func(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error) {
+		tagService := r.uc.GetTagService()
+		if tagService == nil {
+			return nil, goerr.New("tag service not available")
+		}
+		return tagService.GetTagsByIDs(ctx, tagIDs)
+	}
+
+	return obj.GetTagNames(ctx, tagGetter)
 }
 
 // Activity returns ActivityResolver implementation.

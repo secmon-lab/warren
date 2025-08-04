@@ -2444,12 +2444,31 @@ func TestAlertAndTicketTags(t *testing.T) {
 		ctx := t.Context()
 
 		t.Run("Alert with tags", func(t *testing.T) {
+			// Create tags first in the new system
+			securityTag := &tag.Tag{
+				ID:   types.NewTagID(),
+				Name: "security",
+			}
+			incidentTag := &tag.Tag{
+				ID:   types.NewTagID(),
+				Name: "incident",
+			}
+			criticalTag := &tag.Tag{
+				ID:   types.NewTagID(),
+				Name: "critical",
+			}
+
+			// Store tags in repository
+			gt.NoError(t, repo.CreateTagWithID(ctx, securityTag))
+			gt.NoError(t, repo.CreateTagWithID(ctx, incidentTag))
+			gt.NoError(t, repo.CreateTagWithID(ctx, criticalTag))
+
 			// Create an alert with tags
 			a := alert.New(ctx, "test", map[string]string{"test": "data"}, alert.Metadata{
 				Title:       "Test Alert",
 				Description: "Test Description",
 			})
-			a.Tags = tag.NewSet([]string{"security", "incident", "critical"})
+			a.Tags = tag.NewIDSet([]types.TagID{securityTag.ID, incidentTag.ID, criticalTag.ID})
 
 			// Save the alert
 			gt.NoError(t, repo.PutAlert(ctx, a))
@@ -2461,16 +2480,30 @@ func TestAlertAndTicketTags(t *testing.T) {
 
 			// Verify tags are preserved
 			gt.Number(t, len(retrievedAlert.Tags)).Equal(3)
-			gt.True(t, retrievedAlert.Tags.Has("security"))
-			gt.True(t, retrievedAlert.Tags.Has("incident"))
-			gt.True(t, retrievedAlert.Tags.Has("critical"))
+			gt.True(t, retrievedAlert.Tags.Has(securityTag.ID))
+			gt.True(t, retrievedAlert.Tags.Has(incidentTag.ID))
+			gt.True(t, retrievedAlert.Tags.Has(criticalTag.ID))
 		})
 
 		t.Run("Ticket with tags", func(t *testing.T) {
+			// Create tags first
+			resolvedTag := &tag.Tag{
+				ID:   types.NewTagID(),
+				Name: "resolved",
+			}
+			fpTag := &tag.Tag{
+				ID:   types.NewTagID(),
+				Name: "false-positive",
+			}
+
+			// Store tags in repository
+			gt.NoError(t, repo.CreateTagWithID(ctx, resolvedTag))
+			gt.NoError(t, repo.CreateTagWithID(ctx, fpTag))
+
 			// Create a ticket with tags
 			tk := ticketmodel.New(ctx, []types.AlertID{}, nil)
 			tk.Metadata.Title = "Test Ticket"
-			tk.Tags = tag.NewSet([]string{"resolved", "false-positive"})
+			tk.Tags = tag.NewIDSet([]types.TagID{resolvedTag.ID, fpTag.ID})
 
 			// Save the ticket
 			gt.NoError(t, repo.PutTicket(ctx, tk))
@@ -2482,8 +2515,8 @@ func TestAlertAndTicketTags(t *testing.T) {
 
 			// Verify tags are preserved
 			gt.Number(t, len(retrievedTicket.Tags)).Equal(2)
-			gt.True(t, retrievedTicket.Tags.Has("resolved"))
-			gt.True(t, retrievedTicket.Tags.Has("false-positive"))
+			gt.True(t, retrievedTicket.Tags.Has(resolvedTag.ID))
+			gt.True(t, retrievedTicket.Tags.Has(fpTag.ID))
 		})
 
 		t.Run("Empty tags", func(t *testing.T) {
@@ -2507,6 +2540,23 @@ func TestAlertAndTicketTags(t *testing.T) {
 		})
 
 		t.Run("Tag persistence in batch operations", func(t *testing.T) {
+			// Create common tag and individual tags
+			commonTag := &tag.Tag{
+				ID:   types.NewTagID(),
+				Name: "common",
+			}
+			gt.NoError(t, repo.CreateTagWithID(ctx, commonTag))
+
+			var individualTags []*tag.Tag
+			for i := 0; i < 3; i++ {
+				individualTag := &tag.Tag{
+					ID:   types.NewTagID(),
+					Name: fmt.Sprintf("tag%d", i),
+				}
+				gt.NoError(t, repo.CreateTagWithID(ctx, individualTag))
+				individualTags = append(individualTags, individualTag)
+			}
+
 			// Create multiple alerts with tags
 			alerts := make(alert.Alerts, 3)
 			for i := 0; i < 3; i++ {
@@ -2514,7 +2564,7 @@ func TestAlertAndTicketTags(t *testing.T) {
 					Title:       fmt.Sprintf("Batch Alert %d", i),
 					Description: "Test Description",
 				})
-				a.Tags = tag.NewSet([]string{fmt.Sprintf("tag%d", i), "common"})
+				a.Tags = tag.NewIDSet([]types.TagID{individualTags[i].ID, commonTag.ID})
 				alerts[i] = &a
 			}
 
@@ -2532,8 +2582,8 @@ func TestAlertAndTicketTags(t *testing.T) {
 
 			// Verify tags
 			for i, a := range retrievedAlerts {
-				gt.True(t, a.Tags.Has(fmt.Sprintf("tag%d", i)))
-				gt.True(t, a.Tags.Has("common"))
+				gt.True(t, a.Tags.Has(individualTags[i].ID))
+				gt.True(t, a.Tags.Has(commonTag.ID))
 			}
 		})
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	tagmodel "github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
@@ -112,8 +113,21 @@ func TestTagService_UpdateAlertTags(t *testing.T) {
 	gt.NoError(t, err)
 	gt.NotNil(t, updatedAlert)
 	gt.N(t, len(updatedAlert.Tags)).Equal(2)
-	gt.True(t, updatedAlert.Tags.Has("security"))
-	gt.True(t, updatedAlert.Tags.Has("incident"))
+
+	// Get actual tag names to verify
+	tagNames, err := updatedAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+		return service.GetTagsByIDs(ctx, tagIDs)
+	})
+	gt.NoError(t, err)
+	gt.N(t, len(tagNames)).Equal(2)
+
+	// Check that the expected tags are present
+	tagMap := make(map[string]bool)
+	for _, name := range tagNames {
+		tagMap[name] = true
+	}
+	gt.True(t, tagMap["security"])
+	gt.True(t, tagMap["incident"])
 
 	// Verify tags were created
 	tags, err := service.ListTags(ctx)
@@ -136,8 +150,21 @@ func TestTagService_UpdateTicketTags(t *testing.T) {
 	gt.NoError(t, err)
 	gt.NotNil(t, updatedTicket)
 	gt.N(t, len(updatedTicket.Tags)).Equal(2)
-	gt.True(t, updatedTicket.Tags.Has("resolved"))
-	gt.True(t, updatedTicket.Tags.Has("false-positive"))
+
+	// Get actual tag names to verify
+	tagNames, err := updatedTicket.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+		return service.GetTagsByIDs(ctx, tagIDs)
+	})
+	gt.NoError(t, err)
+	gt.N(t, len(tagNames)).Equal(2)
+
+	// Check that the expected tags are present
+	tagMap := make(map[string]bool)
+	for _, name := range tagNames {
+		tagMap[name] = true
+	}
+	gt.True(t, tagMap["resolved"])
+	gt.True(t, tagMap["false-positive"])
 
 	// Verify tags were created
 	tags, err := service.ListTags(ctx)
