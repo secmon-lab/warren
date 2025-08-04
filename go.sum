@@ -242,10 +242,12 @@ github.com/lestrrat-go/option v1.0.1 h1:oAzP2fvZGQKWkvHa1/SAcFolBEca1oN+mQ7eooNB
 github.com/lestrrat-go/option v1.0.1/go.mod h1:5ZHFbivi4xwXxhxY9XHDe2FHo6/Z7WWmtT7T5nBBp3I=
 github.com/m-mizutani/clog v0.0.8 h1:keZtDEAtBmLc2HEF1z0CVeSYn+7VQ74UQC4BYeBKgK8=
 github.com/m-mizutani/clog v0.0.8/go.mod h1:f3mNeMaSkE0SIQG/dR1xDu2hAfbptqdvI5CIRbzG34A=
+github.com/m-mizutani/ctxlog v0.2.0 h1:9uS18pV/mb/90mc/DJp8no67pdOIlCai+L5hv/MkCso=
+github.com/m-mizutani/ctxlog v0.2.0/go.mod h1:BTVGSqZO4JJgKBUJWBNo+Yy2j2xTGCYeEQ65h2VBMXE=
 github.com/m-mizutani/goerr/v2 v2.0.0-beta.2 h1:3aA8RKFlWS6kX99+AJohdgIxiE5+Qwv6aIUD1QQXS2E=
 github.com/m-mizutani/goerr/v2 v2.0.0-beta.2/go.mod h1:K9+tBb0+0681yHpyHYqJmoijxn9qJf5grjRb9nMXevc=
-github.com/m-mizutani/gollem v0.9.0 h1:ksDIMjOS9cgFv82timJRl4WOfVJiiRnleYP9wV/agJA=
-github.com/m-mizutani/gollem v0.9.0/go.mod h1:BYWn8Oo34jM89TpOb1vpVegk1LRsvDXwHFrV6ZaN6aM=
+github.com/m-mizutani/gollem v0.9.1-0.20250804004847-7db5ec4f09ec h1:CttDKWkdn6q2qn0BPCRWoT1JdpWJtlsjIVdJ3FwqDI4=
+github.com/m-mizutani/gollem v0.9.1-0.20250804004847-7db5ec4f09ec/go.mod h1:SizC92f6sIGUzOudT3Kt1/94Pe4HUiLcKCcNbp5c95g=
 github.com/m-mizutani/gt v0.0.16 h1:bhJqMeqxojsgVBo9wqjPHk4s6o7mkaQLCcOus1hp1Vs=
 github.com/m-mizutani/gt v0.0.16/go.mod h1:0MPYSfGBLmYjTduzADVmIqD58ELQ5IfBFiK/f0FmB3k=
 github.com/m-mizutani/harlog v0.0.3 h1:bL3i/xM3wWPsvoOOsuu/a4eaz+1yj1UyO7OPUzkWPyU=

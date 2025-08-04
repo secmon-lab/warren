@@ -1,6 +1,8 @@
 module github.com/secmon-lab/warren
 
-go 1.24.0
+go 1.24.2
+
+toolchain go1.24.3
 
 require (
 	cloud.google.com/go/bigquery v1.69.0
@@ -18,7 +20,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/m-mizutani/clog v0.0.8
 	github.com/m-mizutani/goerr/v2 v2.0.0-beta.2
-	github.com/m-mizutani/gollem v0.9.0
+	github.com/m-mizutani/gollem v0.9.1-0.20250804004847-7db5ec4f09ec
 	github.com/m-mizutani/gt v0.0.16
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.1.11
@@ -103,6 +105,7 @@ require (
 	github.com/lestrrat-go/httprc v1.0.6 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
+	github.com/m-mizutani/ctxlog v0.2.0 // indirect
 	github.com/matryer/moq v0.5.3 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
