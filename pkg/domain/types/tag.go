@@ -18,7 +18,7 @@ func (x TagID) Validate() error {
 		return goerr.New("empty tag ID")
 	}
 
-	// 8文字、[a-zA-Z0-9]のバリデーション
+	// Validate 8 characters of [a-zA-Z0-9]
 	matched, err := regexp.MatchString(`^[a-zA-Z0-9]{8}$`, string(x))
 	if err != nil {
 		return goerr.Wrap(err, "failed to validate tag ID format")
@@ -33,22 +33,16 @@ func (x TagID) Validate() error {
 func NewTagID() TagID {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	const idLength = 8
-	const maxRetries = 10
 
-	for i := 0; i < maxRetries; i++ {
-		id := generateRandomString(charset, idLength)
-		// 基本的な衝突回避として、連続生成での重複を防ぐ
-		// 実際の衝突チェックはリポジトリ層で行う
-		return TagID(id)
-	}
-	panic("failed to generate tag ID after retries")
+	id := generateRandomString(charset, idLength)
+	return TagID(id)
 }
 
 func generateRandomString(charset string, length int) string {
 	b := make([]byte, length)
 	charsetLen := len(charset)
 
-	// crypto/randを使用してセキュアなランダム生成
+	// Use crypto/rand for secure random generation
 	randBytes := make([]byte, length)
 	if _, err := rand.Read(randBytes); err != nil {
 		panic("failed to generate random bytes: " + err.Error())

@@ -24,8 +24,8 @@ func NewTagUseCase(tagService *tag.Service) *TagUseCase {
 }
 
 // ListTags returns all tags in the system
-func (u *TagUseCase) ListTags(ctx context.Context) ([]*tagmodel.Metadata, error) {
-	tags, err := u.tagService.ListTags(ctx)
+func (u *TagUseCase) ListTags(ctx context.Context) ([]*tagmodel.Tag, error) {
+	tags, err := u.tagService.ListAllTags(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list tags")
 	}
@@ -33,23 +33,14 @@ func (u *TagUseCase) ListTags(ctx context.Context) ([]*tagmodel.Metadata, error)
 }
 
 // CreateTag creates a new tag
-func (u *TagUseCase) CreateTag(ctx context.Context, name string) (*tagmodel.Metadata, error) {
+func (u *TagUseCase) CreateTag(ctx context.Context, name string) (*tagmodel.Tag, error) {
 	if name == "" {
 		return nil, goerr.New("tag name cannot be empty")
 	}
 
-	if err := u.tagService.CreateTag(ctx, name); err != nil {
-		return nil, goerr.Wrap(err, "failed to create tag")
-	}
-
-	// Return the created tag metadata by fetching it directly
-	// This is more efficient and handles case-insensitivity correctly
-	tag, err := u.tagService.GetTag(ctx, name)
+	tag, err := u.tagService.CreateTagWithCustomColor(ctx, name, "", "", "")
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get created tag")
-	}
-	if tag == nil {
-		return nil, goerr.New("created tag not found")
+		return nil, goerr.Wrap(err, "failed to create tag")
 	}
 
 	return tag, nil

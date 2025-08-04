@@ -12,7 +12,7 @@ import (
 
 // Anonymous user constants
 const (
-	// SlackのユーザーIDは必ず U で始まるため、"anonymous" で衝突の心配はない
+	// Slack user IDs always start with "U", so "anonymous" won't conflict
 	AnonymousUserID    = "anonymous"
 	AnonymousUserName  = "Anonymous"
 	AnonymousUserEmail = "anonymous@localhost"

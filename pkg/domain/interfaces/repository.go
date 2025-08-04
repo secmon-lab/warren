@@ -72,17 +72,14 @@ type Repository interface {
 	GetActivities(ctx context.Context, offset, limit int) ([]*activity.Activity, error)
 	CountActivities(ctx context.Context) (int, error)
 
-	// For tag management (legacy - deprecated)
-	ListTags(ctx context.Context) ([]*tag.Metadata, error)
-	CreateTag(ctx context.Context, tag *tag.Metadata) error
-	DeleteTag(ctx context.Context, name string) error
-	GetTag(ctx context.Context, name string) (*tag.Metadata, error)
+	// For tag management (legacy - deprecated, kept for external compatibility)
 	RemoveTagFromAllAlerts(ctx context.Context, name string) error
 	RemoveTagFromAllTickets(ctx context.Context, name string) error
 
 	// For new tag management (ID-based)
 	GetTagByID(ctx context.Context, tagID types.TagID) (*tag.Tag, error)
 	GetTagsByIDs(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error)
+	ListAllTags(ctx context.Context) ([]*tag.Tag, error)
 	CreateTagWithID(ctx context.Context, tag *tag.Tag) error
 	UpdateTag(ctx context.Context, tag *tag.Tag) error
 	DeleteTagByID(ctx context.Context, tagID types.TagID) error

@@ -1503,95 +1503,33 @@ func (r *Firestore) GetTag(ctx context.Context, name string) (*tag.Metadata, err
 }
 
 func (r *Firestore) RemoveTagFromAllAlerts(ctx context.Context, name string) error {
-	// Use Firestore's transaction operations to remove the tag from all alerts
-	const batchSize = 500 // Firestore transaction document limit
-
-	// Query all alerts that have this tag
-	query := r.db.Collection(collectionAlerts).Where(fmt.Sprintf("tags.%s", name), "==", true)
-
-	for {
-		docs, err := query.Limit(batchSize).Documents(ctx).GetAll()
-		if err != nil {
-			return goerr.Wrap(err, "failed to query alerts with tag")
-		}
-
-		if len(docs) == 0 {
-			break
-		}
-
-		// Use transaction for atomic updates
-		err = r.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
-			for _, doc := range docs {
-				// Use Firestore's FieldDelete to remove the specific tag key
-				err := tx.Update(doc.Ref, []firestore.Update{
-					{
-						Path:  fmt.Sprintf("tags.%s", name),
-						Value: firestore.Delete,
-					},
-				})
-				if err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			return goerr.Wrap(err, "failed to remove tag from alerts")
-		}
-
-		// If we got less than batchSize documents, we're done
-		if len(docs) < batchSize {
-			break
-		}
+	// First, look up the tag by name to get its ID
+	tag, err := r.GetTagByName(ctx, name)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get tag by name")
+	}
+	if tag == nil {
+		// Tag doesn't exist, nothing to remove
+		return nil
 	}
 
-	return nil
+	// Use the new ID-based removal method
+	return r.RemoveTagIDFromAllAlerts(ctx, tag.ID)
 }
 
 func (r *Firestore) RemoveTagFromAllTickets(ctx context.Context, name string) error {
-	// Use Firestore's transaction operations to remove the tag from all tickets
-	const batchSize = 500 // Firestore transaction document limit
-
-	// Query all tickets that have this tag
-	query := r.db.Collection(collectionTickets).Where(fmt.Sprintf("tags.%s", name), "==", true)
-
-	for {
-		docs, err := query.Limit(batchSize).Documents(ctx).GetAll()
-		if err != nil {
-			return goerr.Wrap(err, "failed to query tickets with tag")
-		}
-
-		if len(docs) == 0 {
-			break
-		}
-
-		// Use transaction for atomic updates
-		err = r.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
-			for _, doc := range docs {
-				// Use Firestore's FieldDelete to remove the specific tag key
-				err := tx.Update(doc.Ref, []firestore.Update{
-					{
-						Path:  fmt.Sprintf("tags.%s", name),
-						Value: firestore.Delete,
-					},
-				})
-				if err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			return goerr.Wrap(err, "failed to remove tag from tickets")
-		}
-
-		// If we got less than batchSize documents, we're done
-		if len(docs) < batchSize {
-			break
-		}
+	// First, look up the tag by name to get its ID
+	tag, err := r.GetTagByName(ctx, name)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get tag by name")
+	}
+	if tag == nil {
+		// Tag doesn't exist, nothing to remove
+		return nil
 	}
 
-	return nil
+	// Use the new ID-based removal method
+	return r.RemoveTagIDFromAllTickets(ctx, tag.ID)
 }
 
 // New ID-based tag management methods
@@ -1708,8 +1646,8 @@ func (r *Firestore) RemoveTagIDFromAllAlerts(ctx context.Context, tagID types.Ta
 	iter := r.db.Collection("alerts").Where("tagIds."+tagID.String(), "==", true).Documents(ctx)
 	defer iter.Stop()
 
-	batch := r.db.Batch()
-	batchSize := 0
+	bw := r.db.BulkWriter(ctx)
+	var jobs []*firestore.BulkWriterJob
 
 	for {
 		doc, err := iter.Next()
@@ -1721,25 +1659,21 @@ func (r *Firestore) RemoveTagIDFromAllAlerts(ctx context.Context, tagID types.Ta
 		}
 
 		// Remove the tag ID from the document
-		batch.Update(doc.Ref, []firestore.Update{
+		job, err := bw.Update(doc.Ref, []firestore.Update{
 			{Path: "tagIds." + tagID.String(), Value: firestore.Delete},
 		})
-		batchSize++
-
-		// Firestore batch has a limit of 500 operations
-		if batchSize >= 450 {
-			if _, err := batch.Commit(ctx); err != nil {
-				return goerr.Wrap(err, "failed to commit batch update")
-			}
-			batch = r.db.Batch()
-			batchSize = 0
+		if err != nil {
+			return goerr.Wrap(err, "failed to update alert", goerr.V("alertID", doc.Ref.ID))
 		}
+		jobs = append(jobs, job)
 	}
 
-	// Commit remaining operations
-	if batchSize > 0 {
-		if _, err := batch.Commit(ctx); err != nil {
-			return goerr.Wrap(err, "failed to commit final batch update")
+	bw.End()
+
+	// Wait for all jobs to complete
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil {
+			return goerr.Wrap(err, "failed to commit bulk writer job")
 		}
 	}
 
@@ -1751,8 +1685,8 @@ func (r *Firestore) RemoveTagIDFromAllTickets(ctx context.Context, tagID types.T
 	iter := r.db.Collection("tickets").Where("tagIds."+tagID.String(), "==", true).Documents(ctx)
 	defer iter.Stop()
 
-	batch := r.db.Batch()
-	batchSize := 0
+	bw := r.db.BulkWriter(ctx)
+	var jobs []*firestore.BulkWriterJob
 
 	for {
 		doc, err := iter.Next()
@@ -1764,25 +1698,21 @@ func (r *Firestore) RemoveTagIDFromAllTickets(ctx context.Context, tagID types.T
 		}
 
 		// Remove the tag ID from the document
-		batch.Update(doc.Ref, []firestore.Update{
+		job, err := bw.Update(doc.Ref, []firestore.Update{
 			{Path: "tagIds." + tagID.String(), Value: firestore.Delete},
 		})
-		batchSize++
-
-		// Firestore batch has a limit of 500 operations
-		if batchSize >= 450 {
-			if _, err := batch.Commit(ctx); err != nil {
-				return goerr.Wrap(err, "failed to commit batch update")
-			}
-			batch = r.db.Batch()
-			batchSize = 0
+		if err != nil {
+			return goerr.Wrap(err, "failed to update ticket", goerr.V("ticketID", doc.Ref.ID))
 		}
+		jobs = append(jobs, job)
 	}
 
-	// Commit remaining operations
-	if batchSize > 0 {
-		if _, err := batch.Commit(ctx); err != nil {
-			return goerr.Wrap(err, "failed to commit final batch update")
+	bw.End()
+
+	// Wait for all jobs to complete
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil {
+			return goerr.Wrap(err, "failed to commit bulk writer job")
 		}
 	}
 
@@ -1822,4 +1752,28 @@ func (r *Firestore) IsTagNameExists(ctx context.Context, name string) (bool, err
 	}
 
 	return true, nil
+}
+
+func (r *Firestore) ListAllTags(ctx context.Context) ([]*tag.Tag, error) {
+	iter := r.db.Collection("tags").Documents(ctx)
+	defer iter.Stop()
+
+	var tags []*tag.Tag
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to iterate tags")
+		}
+
+		var tagData tag.Tag
+		if err := doc.DataTo(&tagData); err != nil {
+			return nil, goerr.Wrap(err, "failed to decode tag data", goerr.V("docID", doc.Ref.ID))
+		}
+		tags = append(tags, &tagData)
+	}
+
+	return tags, nil
 }

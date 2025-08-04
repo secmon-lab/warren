@@ -13,7 +13,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/clustering"
@@ -112,15 +111,7 @@ func (r *alertResolver) Tags(ctx context.Context, obj *alert.Alert) ([]string, e
 	}
 
 	// Use the compatibility method to get tag names
-	tagGetter := func(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error) {
-		tagService := r.uc.GetTagService()
-		if tagService == nil {
-			return nil, goerr.New("tag service not available")
-		}
-		return tagService.GetTagsByIDs(ctx, tagIDs)
-	}
-
-	return obj.GetTagNames(ctx, tagGetter)
+	return obj.GetTagNames(ctx, r.createTagGetter())
 }
 
 // ID is the resolver for the id field.
@@ -1038,15 +1029,7 @@ func (r *ticketResolver) Tags(ctx context.Context, obj *ticket.Ticket) ([]string
 	}
 
 	// Use the compatibility method to get tag names
-	tagGetter := func(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error) {
-		tagService := r.uc.GetTagService()
-		if tagService == nil {
-			return nil, goerr.New("tag service not available")
-		}
-		return tagService.GetTagsByIDs(ctx, tagIDs)
-	}
-
-	return obj.GetTagNames(ctx, tagGetter)
+	return obj.GetTagNames(ctx, r.createTagGetter())
 }
 
 // Activity returns ActivityResolver implementation.

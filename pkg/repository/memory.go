@@ -1083,31 +1083,33 @@ func (r *Memory) GetTag(ctx context.Context, name string) (*tag.Metadata, error)
 }
 
 func (r *Memory) RemoveTagFromAllAlerts(ctx context.Context, name string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	// Iterate through all alerts and remove the tag
-	for _, alert := range r.alerts {
-		if alert.Tags != nil {
-			delete(alert.Tags, types.TagID(name))
-		}
+	// First, look up the tag by name to get its ID
+	tag, err := r.GetTagByName(ctx, name)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get tag by name")
+	}
+	if tag == nil {
+		// Tag doesn't exist, nothing to remove
+		return nil
 	}
 
-	return nil
+	// Use the new ID-based removal method
+	return r.RemoveTagIDFromAllAlerts(ctx, tag.ID)
 }
 
 func (r *Memory) RemoveTagFromAllTickets(ctx context.Context, name string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	// Iterate through all tickets and remove the tag
-	for _, ticket := range r.tickets {
-		if ticket.Tags != nil {
-			delete(ticket.Tags, types.TagID(name))
-		}
+	// First, look up the tag by name to get its ID
+	tag, err := r.GetTagByName(ctx, name)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get tag by name")
+	}
+	if tag == nil {
+		// Tag doesn't exist, nothing to remove
+		return nil
 	}
 
-	return nil
+	// Use the new ID-based removal method
+	return r.RemoveTagIDFromAllTickets(ctx, tag.ID)
 }
 
 // New ID-based tag management methods
@@ -1237,4 +1239,18 @@ func (r *Memory) IsTagNameExists(ctx context.Context, name string) (bool, error)
 	}
 
 	return false, nil
+}
+
+func (r *Memory) ListAllTags(ctx context.Context) ([]*tag.Tag, error) {
+	r.tagMu.RLock()
+	defer r.tagMu.RUnlock()
+
+	tags := make([]*tag.Tag, 0, len(r.tagsV2))
+	for _, tagData := range r.tagsV2 {
+		// Return a copy to prevent external modification
+		tagCopy := *tagData
+		tags = append(tags, &tagCopy)
+	}
+
+	return tags, nil
 }
