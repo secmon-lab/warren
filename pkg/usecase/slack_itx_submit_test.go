@@ -12,8 +12,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	tagmodel "github.com/secmon-lab/warren/pkg/domain/model/tag"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	slackservice "github.com/secmon-lab/warren/pkg/service/slack"
@@ -328,7 +328,7 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 	// Create existing tag
 	existingTag := &tagmodel.Metadata{
 		Name:      "existing-tag",
-		Color:     "bg-blue-100 text-blue-800", 
+		Color:     "bg-blue-100 text-blue-800",
 		CreatedAt: now.Add(-1 * time.Hour),
 		UpdatedAt: now.Add(-1 * time.Hour),
 	}
@@ -387,9 +387,9 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 		string(slack.BlockIDTicketTags): map[string]slack.BlockAction{
 			string(slack.BlockActionIDTicketTags): {
 				SelectedOptions: []slackSDK.OptionBlockObject{
-					{Value: "existing-tag"},     // Already exists
-					{Value: "false-positive"},   // New tag
-					{Value: "investigation"},    // New tag
+					{Value: "existing-tag"},   // Already exists
+					{Value: "false-positive"}, // New tag
+					{Value: "investigation"},  // New tag
 				},
 			},
 		},
@@ -428,7 +428,7 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 	for i, tag := range tags {
 		tagNames[i] = string(tag.Name)
 	}
-	
+
 	for _, expectedTag := range expectedTags {
 		gt.Value(t, containsString(tagNames, string(expectedTag))).Equal(true)
 	}

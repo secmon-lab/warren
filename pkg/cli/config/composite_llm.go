@@ -29,3 +29,7 @@ func (c *CompositeLLMClient) GenerateEmbedding(ctx context.Context, dimension in
 func (c *CompositeLLMClient) CountTokens(ctx context.Context, history *gollem.History) (int, error) {
 	return c.contentClient.CountTokens(ctx, history)
 }
+
+func (c *CompositeLLMClient) IsCompatibleHistory(ctx context.Context, history *gollem.History) error {
+	return c.contentClient.IsCompatibleHistory(ctx, history)
+}

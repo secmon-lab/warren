@@ -23,7 +23,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 
 	slack_sdk "github.com/slack-go/slack"
-	
+
 	tagmodel "github.com/secmon-lab/warren/pkg/domain/model/tag"
 	tagservice "github.com/secmon-lab/warren/pkg/service/tag"
 )
@@ -1206,7 +1206,7 @@ func TestHandleAlert_PolicyWithTags(t *testing.T) {
 	// Verify alert creation
 	gt.NoError(t, err)
 	gt.Array(t, result).Length(1).Required()
-	
+
 	createdAlert := result[0]
 	gt.Value(t, createdAlert.Metadata.Title).Equal("Security Alert")
 	gt.Value(t, len(createdAlert.Tags)).Equal(3)
@@ -1227,7 +1227,7 @@ func TestHandleAlert_PolicyWithTags(t *testing.T) {
 	for i, tag := range tags {
 		tagNames[i] = string(tag.Name)
 	}
-	
+
 	for _, expectedTag := range expectedTags {
 		gt.Value(t, containsString(tagNames, string(expectedTag))).Equal(true)
 	}
@@ -1321,7 +1321,7 @@ func TestHandleAlert_PolicyWithNewAndExistingTags(t *testing.T) {
 	// Verify
 	gt.NoError(t, err)
 	gt.Array(t, result).Length(1)
-	
+
 	createdAlert := result[0]
 	gt.Value(t, len(createdAlert.Tags)).Equal(3)
 

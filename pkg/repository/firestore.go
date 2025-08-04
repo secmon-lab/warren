@@ -107,17 +107,17 @@ func (r *Firestore) PutAlert(ctx context.Context, a alert.Alert) error {
 		alert.Alert
 		Tags map[string]bool `firestore:"tags"`
 	}
-	
+
 	fa := firestoreAlert{
 		Alert: a,
 		Tags:  make(map[string]bool),
 	}
-	
+
 	// Convert tag.Set to map[string]bool
 	for tag := range a.Tags {
 		fa.Tags[string(tag)] = true
 	}
-	
+
 	alertDoc := r.db.Collection(collectionAlerts).Doc(a.ID.String())
 	_, err := alertDoc.Set(ctx, fa)
 	if err != nil {
@@ -141,7 +141,7 @@ func (r *Firestore) GetAlert(ctx context.Context, alertID types.AlertID) (*alert
 		alert.Alert
 		Tags map[string]bool `firestore:"tags"`
 	}
-	
+
 	var fa firestoreAlert
 	if err := doc.DataTo(&fa); err != nil {
 		return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("alert_id", alertID))
@@ -393,7 +393,7 @@ func (r *Firestore) GetTicket(ctx context.Context, ticketID types.TicketID) (*ti
 		ticket.Ticket
 		Tags map[string]bool `firestore:"tags"`
 	}
-	
+
 	var ft firestoreTicket
 	if err := doc.DataTo(&ft); err != nil {
 		return nil, goerr.Wrap(err, "failed to convert data to ticket", goerr.V("ticket_id", ticketID))
@@ -419,12 +419,12 @@ func (r *Firestore) PutTicket(ctx context.Context, t ticket.Ticket) error {
 		ticket.Ticket
 		Tags map[string]bool `firestore:"tags"`
 	}
-	
+
 	ft := firestoreTicket{
 		Ticket: t,
 		Tags:   make(map[string]bool),
 	}
-	
+
 	// Convert tag.Set to map[string]bool
 	for tag := range t.Tags {
 		ft.Tags[string(tag)] = true
@@ -895,7 +895,7 @@ func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32,
 			ticket.Ticket
 			Tags map[string]bool `firestore:"tags"`
 		}
-		
+
 		var ft firestoreTicket
 		if err := doc.DataTo(&ft); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")

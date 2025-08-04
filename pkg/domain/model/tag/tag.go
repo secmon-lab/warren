@@ -57,11 +57,10 @@ func (ts Set) Copy() Set {
 	return copied
 }
 
-
 // chipColors contains predefined colors suitable for chips/badges
 var chipColors = []string{
 	"bg-red-100 text-red-800",
-	"bg-orange-100 text-orange-800", 
+	"bg-orange-100 text-orange-800",
 	"bg-amber-100 text-amber-800",
 	"bg-yellow-100 text-yellow-800",
 	"bg-lime-100 text-lime-800",
