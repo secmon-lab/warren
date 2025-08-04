@@ -24,14 +24,14 @@ func TestTagService_CreateAndListTags(t *testing.T) {
 	gt.NoError(t, service.CreateTag(ctx, "phishing"))
 
 	// List tags
-	tags, err := service.ListTags(ctx)
+	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(3)
 
 	// Verify tag names
 	tagNames := make(map[string]bool)
 	for _, tag := range tags {
-		tagNames[string(tag.Name)] = true
+		tagNames[tag.Name] = true
 	}
 	gt.True(t, tagNames["security"])
 	gt.True(t, tagNames["incident"])
@@ -50,7 +50,7 @@ func TestTagService_CreateDuplicateTag(t *testing.T) {
 	gt.NoError(t, service.CreateTag(ctx, "security"))
 
 	// List tags - should still have only one
-	tags, err := service.ListTags(ctx)
+	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(1)
 }
@@ -68,7 +68,7 @@ func TestTagService_DeleteTag(t *testing.T) {
 	gt.NoError(t, service.DeleteTag(ctx, "security"))
 
 	// List tags - should have only one
-	tags, err := service.ListTags(ctx)
+	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(1)
 	gt.V(t, tags[0].Name).Equal("incident")
@@ -83,7 +83,7 @@ func TestTagService_EnsureTagsExist(t *testing.T) {
 	gt.NoError(t, service.EnsureTagsExist(ctx, []string{"tag1", "tag2", "tag3"}))
 
 	// List tags
-	tags, err := service.ListTags(ctx)
+	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(3)
 
@@ -91,7 +91,7 @@ func TestTagService_EnsureTagsExist(t *testing.T) {
 	gt.NoError(t, service.EnsureTagsExist(ctx, []string{"tag1", "tag2", "tag4"}))
 
 	// List tags - should have 4 now
-	tags, err = service.ListTags(ctx)
+	tags, err = service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(4)
 }
@@ -130,7 +130,7 @@ func TestTagService_UpdateAlertTags(t *testing.T) {
 	gt.True(t, tagMap["incident"])
 
 	// Verify tags were created
-	tags, err := service.ListTags(ctx)
+	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(2)
 }
@@ -167,7 +167,7 @@ func TestTagService_UpdateTicketTags(t *testing.T) {
 	gt.True(t, tagMap["false-positive"])
 
 	// Verify tags were created
-	tags, err := service.ListTags(ctx)
+	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(2)
 }
@@ -185,7 +185,7 @@ func TestTagService_EmptyTagHandling(t *testing.T) {
 	gt.NoError(t, service.EnsureTagsExist(ctx, []string{"valid", "", "tag"}))
 
 	// Should only create valid tags
-	tags, err := service.ListTags(ctx)
+	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(2)
 }

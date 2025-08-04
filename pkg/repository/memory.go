@@ -5,7 +5,6 @@ import (
 	"math"
 	"reflect"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -33,7 +32,6 @@ type Memory struct {
 	ticketComments map[types.TicketID][]ticket.Comment
 	tokens         map[auth.TokenID]*auth.Token
 	activities     map[types.ActivityID]*activity.Activity
-	tags           map[string]*tag.Metadata
 	tagsV2         map[types.TagID]*tag.Tag // New ID-based tags
 
 	// Call counter for tracking method invocations
@@ -52,7 +50,6 @@ func NewMemory() *Memory {
 		ticketComments: make(map[types.TicketID][]ticket.Comment),
 		tokens:         make(map[auth.TokenID]*auth.Token),
 		activities:     make(map[types.ActivityID]*activity.Activity),
-		tags:           make(map[string]*tag.Metadata),
 		tagsV2:         make(map[types.TagID]*tag.Tag),
 		callCounts:     make(map[string]int),
 	}
@@ -1014,73 +1011,9 @@ func (r *Memory) CountActivities(ctx context.Context) (int, error) {
 
 // Tag management methods
 
-func (r *Memory) ListTags(ctx context.Context) ([]*tag.Metadata, error) {
-	r.tagMu.RLock()
-	defer r.tagMu.RUnlock()
 
-	tags := make([]*tag.Metadata, 0, len(r.tags))
-	for _, tag := range r.tags {
-		// Create a copy to prevent external modification
-		tagCopy := *tag
-		tags = append(tags, &tagCopy)
-	}
 
-	return tags, nil
-}
 
-func (r *Memory) CreateTag(ctx context.Context, tag *tag.Metadata) error {
-	r.tagMu.Lock()
-	defer r.tagMu.Unlock()
-
-	// Normalize tag name to lowercase for case-insensitive comparison
-	normalizedName := strings.ToLower(string(tag.Name))
-
-	// Check if tag already exists
-	if _, exists := r.tags[normalizedName]; exists {
-		// Tag already exists, no need to create
-		return nil
-	}
-
-	// Set timestamps
-	now := time.Now()
-	tag.CreatedAt = now
-	tag.UpdatedAt = now
-
-	// Create a copy to prevent external modification
-	tagCopy := *tag
-	r.tags[normalizedName] = &tagCopy
-
-	return nil
-}
-
-func (r *Memory) DeleteTag(ctx context.Context, name string) error {
-	r.tagMu.Lock()
-	defer r.tagMu.Unlock()
-
-	// Normalize tag name to lowercase
-	normalizedName := strings.ToLower(name)
-
-	delete(r.tags, normalizedName)
-
-	return nil
-}
-
-func (r *Memory) GetTag(ctx context.Context, name string) (*tag.Metadata, error) {
-	r.tagMu.RLock()
-	defer r.tagMu.RUnlock()
-
-	// Normalize tag name to lowercase
-	normalizedName := strings.ToLower(name)
-
-	tag, exists := r.tags[normalizedName]
-	if !exists {
-		return nil, nil
-	}
-
-	// Create a copy to prevent external modification
-	tagCopy := *tag
-	return &tagCopy, nil
-}
 
 func (r *Memory) RemoveTagFromAllAlerts(ctx context.Context, name string) error {
 	// First, look up the tag by name to get its ID
@@ -1155,8 +1088,16 @@ func (r *Memory) CreateTagWithID(ctx context.Context, tag *tag.Tag) error {
 		return goerr.New("tag ID already exists", goerr.V("tagID", tag.ID))
 	}
 
-	// Store a copy to prevent external modification
+	// Set timestamps if not already set
+	now := time.Now()
 	tagCopy := *tag
+	if tagCopy.CreatedAt.IsZero() {
+		tagCopy.CreatedAt = now
+	}
+	if tagCopy.UpdatedAt.IsZero() {
+		tagCopy.UpdatedAt = now
+	}
+
 	r.tagsV2[tag.ID] = &tagCopy
 
 	return nil
@@ -1170,8 +1111,9 @@ func (r *Memory) UpdateTag(ctx context.Context, tag *tag.Tag) error {
 		return goerr.New("tag ID is required")
 	}
 
-	// Store a copy to prevent external modification
+	// Set UpdatedAt timestamp
 	tagCopy := *tag
+	tagCopy.UpdatedAt = time.Now()
 	r.tagsV2[tag.ID] = &tagCopy
 
 	return nil

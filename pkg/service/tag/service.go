@@ -23,45 +23,7 @@ func New(repo interfaces.Repository) *Service {
 	}
 }
 
-// ListTags returns all tags in the system (deprecated - use ListAllTags)
-func (s *Service) ListTags(ctx context.Context) ([]*tag.Metadata, error) {
-	// Convert new tags to old format for compatibility
-	newTags, err := s.repo.ListAllTags(ctx)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to list tags")
-	}
 
-	// Convert to old format
-	oldTags := make([]*tag.Metadata, len(newTags))
-	for i, newTag := range newTags {
-		oldTags[i] = &tag.Metadata{
-			Name:      newTag.Name,
-			Color:     newTag.Color,
-			CreatedAt: newTag.CreatedAt,
-			UpdatedAt: newTag.UpdatedAt,
-		}
-	}
-	return oldTags, nil
-}
-
-// GetTag returns a tag by name (deprecated - use GetTagByName)
-func (s *Service) GetTag(ctx context.Context, name string) (*tag.Metadata, error) {
-	newTag, err := s.repo.GetTagByName(ctx, name)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get tag")
-	}
-	if newTag == nil {
-		return nil, nil
-	}
-
-	// Convert to old format
-	return &tag.Metadata{
-		Name:      newTag.Name,
-		Color:     newTag.Color,
-		CreatedAt: newTag.CreatedAt,
-		UpdatedAt: newTag.UpdatedAt,
-	}, nil
-}
 
 // CreateTag creates a new tag (deprecated - use CreateTagWithCustomColor)
 func (s *Service) CreateTag(ctx context.Context, name string) error {

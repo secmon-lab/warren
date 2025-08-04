@@ -325,14 +325,17 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 	}
 	gt.NoError(t, repo.PutTicket(ctx, *testTicket))
 
-	// Create existing tag
-	existingTag := &tagmodel.Metadata{
-		Name:      "existing-tag",
-		Color:     "bg-blue-100 text-blue-800",
-		CreatedAt: now.Add(-1 * time.Hour),
-		UpdatedAt: now.Add(-1 * time.Hour),
+	// Create existing tag using new API
+	existingTag := &tagmodel.Tag{
+		ID:          types.NewTagID(),
+		Name:        "existing-tag",
+		Color:       "bg-blue-100 text-blue-800",
+		Description: "",
+		CreatedAt:   now.Add(-1 * time.Hour),
+		UpdatedAt:   now.Add(-1 * time.Hour),
+		CreatedBy:   "test",
 	}
-	gt.NoError(t, repo.CreateTag(ctx, existingTag))
+	gt.NoError(t, repo.CreateTagWithID(ctx, existingTag))
 
 	// Setup Slack client mock
 	slackClientMock := &mock.SlackClientMock{
@@ -432,14 +435,14 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 	}
 
 	// Verify tags were created in repository (1 existing + 2 new = 3)
-	tags, err := repo.ListTags(ctx)
+	tags, err := repo.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.Array(t, tags).Length(3)
 
 	// Verify all expected tags exist
 	tagNames := make([]string, len(tags))
 	for i, tag := range tags {
-		tagNames[i] = string(tag.Name)
+		tagNames[i] = tag.Name
 	}
 
 	for _, expectedTag := range expectedTags {
@@ -447,18 +450,21 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 	}
 
 	// Verify existing tag unchanged
-	existingTagAfter, err := repo.GetTag(ctx, "existing-tag")
+	existingTagAfter, err := repo.GetTagByName(ctx, "existing-tag")
 	gt.NoError(t, err)
+	gt.NotNil(t, existingTagAfter)
 	gt.Value(t, existingTagAfter.CreatedAt).Equal(existingTag.CreatedAt)
 	gt.Value(t, existingTagAfter.Color).Equal(existingTag.Color)
 
 	// Verify new tags have colors assigned
-	falsePositiveTag, err := repo.GetTag(ctx, "false-positive")
+	falsePositiveTag, err := repo.GetTagByName(ctx, "false-positive")
 	gt.NoError(t, err)
+	gt.NotNil(t, falsePositiveTag)
 	gt.Value(t, falsePositiveTag.Color).NotEqual("")
 
-	investigationTag, err := repo.GetTag(ctx, "investigation")
+	investigationTag, err := repo.GetTagByName(ctx, "investigation")
 	gt.NoError(t, err)
+	gt.NotNil(t, investigationTag)
 	gt.Value(t, investigationTag.Color).NotEqual("")
 }
 
@@ -559,7 +565,7 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithoutTags(t *testin
 	gt.Value(t, len(updatedTicket.Tags)).Equal(0)
 
 	// Verify no tags were created in repository
-	tags, err := repo.ListTags(ctx)
+	tags, err := repo.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.Array(t, tags).Length(0)
 }
