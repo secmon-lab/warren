@@ -288,17 +288,17 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 	target.Reason = reason
 	target.Status = types.TicketStatusResolved
 
-	// Handle tag selection if available
+	// Handle tag selection if available (supports both checkbox and multi-select)
 	if block, ok := values[slack.BlockIDTicketTags.String()]; ok {
 		if action, ok := block[slack.BlockActionIDTicketTags.String()]; ok && action.SelectedOptions != nil {
-			// Extract selected tag names
+			// Extract selected tag names (works for both checkbox and multi-select)
 			selectedTags := make([]string, 0, len(action.SelectedOptions))
 			for _, option := range action.SelectedOptions {
 				selectedTags = append(selectedTags, option.Value)
 			}
 
 			// Update ticket tags
-			if uc.tagService != nil {
+			if len(selectedTags) > 0 && uc.tagService != nil {
 				if _, err := uc.tagService.UpdateTicketTags(ctx, ticketID, selectedTags); err != nil {
 					logger.Warn("failed to update ticket tags", "error", err)
 					// Continue with resolve even if tag update fails
