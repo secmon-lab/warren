@@ -61,7 +61,14 @@ func (u *TagUseCase) DeleteTag(ctx context.Context, name string) error {
 
 // UpdateAlertTags updates tags for an alert
 func (u *TagUseCase) UpdateAlertTags(ctx context.Context, alertID types.AlertID, tags []string) (*alert.Alert, error) {
-	a, err := u.tagService.UpdateAlertTags(ctx, alertID, tags)
+	// Convert tag names to IDs
+	tagIDs, err := u.tagService.ConvertNamesToIDs(ctx, tags)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
+	}
+
+	// Use ID-based method
+	a, err := u.tagService.UpdateAlertTagsByID(ctx, alertID, tagIDs)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update alert tags")
 	}
@@ -70,7 +77,14 @@ func (u *TagUseCase) UpdateAlertTags(ctx context.Context, alertID types.AlertID,
 
 // UpdateTicketTags updates tags for a ticket
 func (u *TagUseCase) UpdateTicketTags(ctx context.Context, ticketID types.TicketID, tags []string) (*ticket.Ticket, error) {
-	t, err := u.tagService.UpdateTicketTags(ctx, ticketID, tags)
+	// Convert tag names to IDs
+	tagIDs, err := u.tagService.ConvertNamesToIDs(ctx, tags)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
+	}
+
+	// Use ID-based method
+	t, err := u.tagService.UpdateTicketTagsByID(ctx, ticketID, tagIDs)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update ticket tags")
 	}

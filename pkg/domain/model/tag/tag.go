@@ -41,7 +41,6 @@ func (ts IDSet) ToSlice() []types.TagID {
 	return result
 }
 
-
 // Add adds a tag ID to the set
 func (ts IDSet) Add(tagID types.TagID) {
 	ts[tagID] = true

@@ -96,7 +96,7 @@ func TestTagService_EnsureTagsExist(t *testing.T) {
 	gt.N(t, len(tags)).Equal(4)
 }
 
-func TestTagService_UpdateAlertTags(t *testing.T) {
+func TestTagService_UpdateAlertTagsByName(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
 	service := tag.New(repo)
@@ -108,8 +108,8 @@ func TestTagService_UpdateAlertTags(t *testing.T) {
 	})
 	gt.NoError(t, repo.PutAlert(ctx, a))
 
-	// Update alert tags
-	updatedAlert, err := service.UpdateAlertTags(ctx, a.ID, []string{"security", "incident"})
+	// Update alert tags using name-based method
+	updatedAlert, err := service.UpdateAlertTagsByName(ctx, a.ID, []string{"security", "incident"})
 	gt.NoError(t, err)
 	gt.NotNil(t, updatedAlert)
 	gt.N(t, len(updatedAlert.Tags)).Equal(2)
@@ -135,7 +135,7 @@ func TestTagService_UpdateAlertTags(t *testing.T) {
 	gt.N(t, len(tags)).Equal(2)
 }
 
-func TestTagService_UpdateTicketTags(t *testing.T) {
+func TestTagService_UpdateTicketTagsByName(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
 	service := tag.New(repo)
@@ -145,8 +145,8 @@ func TestTagService_UpdateTicketTags(t *testing.T) {
 	tk.Metadata.Title = "Test Ticket"
 	gt.NoError(t, repo.PutTicket(ctx, tk))
 
-	// Update ticket tags
-	updatedTicket, err := service.UpdateTicketTags(ctx, tk.ID, []string{"resolved", "false-positive"})
+	// Update ticket tags using name-based method
+	updatedTicket, err := service.UpdateTicketTagsByName(ctx, tk.ID, []string{"resolved", "false-positive"})
 	gt.NoError(t, err)
 	gt.NotNil(t, updatedTicket)
 	gt.N(t, len(updatedTicket.Tags)).Equal(2)

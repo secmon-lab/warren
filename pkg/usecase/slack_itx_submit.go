@@ -313,16 +313,30 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 
 			logger.Debug("extracted tag names", "tags", selectedTags)
 
-			// Update ticket tags
+			// Convert tag names to IDs and update ticket tags
+			logger.Debug("checking tag service", "tagService", uc.tagService != nil, "selectedTagsCount", len(selectedTags))
 			if len(selectedTags) > 0 && uc.tagService != nil {
-				if _, err := uc.tagService.UpdateTicketTags(ctx, ticketID, selectedTags); err != nil {
-					logger.Warn("failed to update ticket tags", "error", err)
-					// Continue with resolve even if tag update fails
+				logger.Debug("converting tag names to IDs", "tags", selectedTags)
+				tagIDs, err := uc.tagService.ConvertNamesToIDs(ctx, selectedTags)
+				if err != nil {
+					logger.Warn("failed to convert tag names to IDs", "error", err, "tags", selectedTags)
+					// Continue with resolve even if tag conversion fails
+				} else {
+					logger.Debug("successfully converted tag names to IDs", "tagIDs", tagIDs)
+					// Merge existing tags with new tags
+					existingTags := target.Tags
+					logger.Debug("existing tags", "existingTags", existingTags)
+
+					target.Tags = mergeTagIDs(existingTags, tagIDs)
+					logger.Debug("target ticket updated with merged tags", "target.Tags", target.Tags)
 				}
+			} else {
+				logger.Debug("skipping tag update", "hasSelectedTags", len(selectedTags) > 0, "hasTagService", uc.tagService != nil)
 			}
 		}
 	}
 
+	logger.Debug("saving ticket to repository", "ticketID", target.ID, "target.Tags", target.Tags, "target.Status", target.Status)
 	if err := uc.repository.PutTicket(ctx, *target); err != nil {
 		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID))
 	}
@@ -413,4 +427,28 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionSalvage(ctx context.Cont
 	msg.Notify(ctx, "🎉 Salvaged %d alerts to ticket %s", len(unboundAlerts), target.Metadata.Title)
 
 	return nil
+}
+
+// mergeTagIDs merges existing tags with new tags, avoiding duplicates
+func mergeTagIDs(existingTags, newTags []types.TagID) []types.TagID {
+	// Create a map to avoid duplicates
+	tagMap := make(map[types.TagID]bool)
+
+	// Add existing tags
+	for _, tagID := range existingTags {
+		tagMap[tagID] = true
+	}
+
+	// Add new tags
+	for _, tagID := range newTags {
+		tagMap[tagID] = true
+	}
+
+	// Convert back to slice
+	mergedTags := make([]types.TagID, 0, len(tagMap))
+	for tagID := range tagMap {
+		mergedTags = append(mergedTags, tagID)
+	}
+
+	return mergedTags
 }

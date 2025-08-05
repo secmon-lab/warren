@@ -68,72 +68,6 @@ func (s *Service) EnsureTagsExist(ctx context.Context, tags []string) error {
 	return err
 }
 
-// UpdateAlertTags updates tags for an alert
-func (s *Service) UpdateAlertTags(ctx context.Context, alertID types.AlertID, tags []string) (*alert.Alert, error) {
-	// Ensure all tags exist
-	if err := s.EnsureTagsExist(ctx, tags); err != nil {
-		return nil, goerr.Wrap(err, "failed to ensure tags exist")
-	}
-
-	// Get the alert
-	a, err := s.repo.GetAlert(ctx, alertID)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get alert")
-	}
-	if a == nil {
-		return nil, goerr.New("alert not found", goerr.V("alert_id", alertID))
-	}
-
-	// Convert tag names to IDs
-	tagIDs, err := s.ConvertNamesToIDs(ctx, tags)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
-	}
-
-	// Update tags
-	a.Tags = tagIDs
-
-	// Save the alert
-	if err := s.repo.PutAlert(ctx, *a); err != nil {
-		return nil, goerr.Wrap(err, "failed to update alert")
-	}
-
-	return a, nil
-}
-
-// UpdateTicketTags updates tags for a ticket
-func (s *Service) UpdateTicketTags(ctx context.Context, ticketID types.TicketID, tags []string) (*ticket.Ticket, error) {
-	// Ensure all tags exist
-	if err := s.EnsureTagsExist(ctx, tags); err != nil {
-		return nil, goerr.Wrap(err, "failed to ensure tags exist")
-	}
-
-	// Get the ticket
-	t, err := s.repo.GetTicket(ctx, ticketID)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get ticket")
-	}
-	if t == nil {
-		return nil, goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
-	}
-
-	// Convert tag names to IDs
-	tagIDs, err := s.ConvertNamesToIDs(ctx, tags)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
-	}
-
-	// Update tags
-	t.Tags = tagIDs
-
-	// Save the ticket
-	if err := s.repo.PutTicket(ctx, *t); err != nil {
-		return nil, goerr.Wrap(err, "failed to update ticket")
-	}
-
-	return t, nil
-}
-
 // New ID-based tag management methods
 
 func (s *Service) GetTagByID(ctx context.Context, tagID types.TagID) (*tag.Tag, error) {
@@ -281,8 +215,8 @@ func (s *Service) UpdateAlertTagsByID(ctx context.Context, alertID types.AlertID
 		return nil, goerr.New("alert not found", goerr.V("alert_id", alertID))
 	}
 
-	// Update tags
-	a.Tags = tagIDs
+	// Merge existing tags with new tags
+	a.Tags = mergeTagIDs(a.Tags, tagIDs)
 
 	// Save the alert
 	if err := s.repo.PutAlert(ctx, *a); err != nil {
@@ -313,8 +247,8 @@ func (s *Service) UpdateTicketTagsByID(ctx context.Context, ticketID types.Ticke
 		return nil, goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
 	}
 
-	// Update tags
-	t.Tags = tagIDs
+	// Merge existing tags with new tags
+	t.Tags = mergeTagIDs(t.Tags, tagIDs)
 
 	// Save the ticket
 	if err := s.repo.PutTicket(ctx, *t); err != nil {
@@ -392,4 +326,28 @@ func (s *Service) ListAllTags(ctx context.Context) ([]*tag.Tag, error) {
 		return nil, goerr.Wrap(err, "failed to list all tags")
 	}
 	return tags, nil
+}
+
+// mergeTagIDs merges existing tags with new tags, avoiding duplicates
+func mergeTagIDs(existingTags, newTags []types.TagID) []types.TagID {
+	// Create a map to avoid duplicates
+	tagMap := make(map[types.TagID]bool)
+
+	// Add existing tags
+	for _, tagID := range existingTags {
+		tagMap[tagID] = true
+	}
+
+	// Add new tags
+	for _, tagID := range newTags {
+		tagMap[tagID] = true
+	}
+
+	// Convert back to slice
+	mergedTags := make([]types.TagID, 0, len(tagMap))
+	for tagID := range tagMap {
+		mergedTags = append(mergedTags, tagID)
+	}
+
+	return mergedTags
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	slackservice "github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/service/tag"
 	tagservice "github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	slackSDK "github.com/slack-go/slack"
@@ -578,4 +579,202 @@ func containsString(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func TestMergeTagIDs(t *testing.T) {
+	tests := []struct {
+		name         string
+		existingTags []types.TagID
+		newTags      []types.TagID
+		expected     []types.TagID
+	}{
+		{
+			name:         "Empty existing and new tags",
+			existingTags: []types.TagID{},
+			newTags:      []types.TagID{},
+			expected:     []types.TagID{},
+		},
+		{
+			name:         "Empty existing tags, add new tags",
+			existingTags: []types.TagID{},
+			newTags:      []types.TagID{"tag1", "tag2"},
+			expected:     []types.TagID{"tag1", "tag2"},
+		},
+		{
+			name:         "Existing tags, empty new tags",
+			existingTags: []types.TagID{"tag1", "tag2"},
+			newTags:      []types.TagID{},
+			expected:     []types.TagID{"tag1", "tag2"},
+		},
+		{
+			name:         "No duplicate tags",
+			existingTags: []types.TagID{"tag1", "tag2"},
+			newTags:      []types.TagID{"tag3", "tag4"},
+			expected:     []types.TagID{"tag1", "tag2", "tag3", "tag4"},
+		},
+		{
+			name:         "With duplicate tags",
+			existingTags: []types.TagID{"tag1", "tag2"},
+			newTags:      []types.TagID{"tag2", "tag3"},
+			expected:     []types.TagID{"tag1", "tag2", "tag3"},
+		},
+		{
+			name:         "All duplicate tags",
+			existingTags: []types.TagID{"tag1", "tag2"},
+			newTags:      []types.TagID{"tag1", "tag2"},
+			expected:     []types.TagID{"tag1", "tag2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := mergeTagIDs(tt.existingTags, tt.newTags)
+
+			// Check length
+			if len(result) != len(tt.expected) {
+				t.Errorf("mergeTagIDs() = %v, expected length %d, got length %d", result, len(tt.expected), len(result))
+				return
+			}
+
+			// Check all expected tags are present (order doesn't matter)
+			resultMap := make(map[types.TagID]bool)
+			for _, tag := range result {
+				resultMap[tag] = true
+			}
+
+			for _, expectedTag := range tt.expected {
+				if !resultMap[expectedTag] {
+					t.Errorf("mergeTagIDs() = %v, missing expected tag %v", result, expectedTag)
+				}
+			}
+
+			// Check no unexpected tags are present
+			expectedMap := make(map[types.TagID]bool)
+			for _, tag := range tt.expected {
+				expectedMap[tag] = true
+			}
+
+			for _, resultTag := range result {
+				if !expectedMap[resultTag] {
+					t.Errorf("mergeTagIDs() = %v, unexpected tag %v", result, resultTag)
+				}
+			}
+		})
+	}
+}
+
+func TestSlackInteractionViewSubmissionResolveTicket_TagMerging(t *testing.T) {
+	ctx := context.Background()
+
+	// Setup repository and services
+	repo := repository.NewMemory()
+	llmMock := &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &mock.LLMSessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{"🎉 Great work resolving this ticket!"},
+					}, nil
+				},
+			}, nil
+		},
+	}
+	// Setup Slack client mock for this test
+	slackClientMock := &mock.SlackClientMock{
+		AuthTestFunc: func() (*slackSDK.AuthTestResponse, error) {
+			return &slackSDK.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
+		GetTeamInfoFunc: func() (*slackSDK.TeamInfo, error) {
+			return &slackSDK.TeamInfo{
+				Domain: "test-domain",
+			}, nil
+		},
+	}
+	slackSvc, err := slackservice.New(slackClientMock, "test-channel")
+	gt.NoError(t, err)
+	tagSvc := tag.New(repo)
+
+	// Create test ticket with existing tags
+	initialTags := []types.TagID{"existing-tag-1", "existing-tag-2"}
+	testTicket := ticket.New(ctx, []types.AlertID{}, &slack.Thread{
+		ChannelID: "test-channel",
+		ThreadID:  "test-thread",
+	})
+	testTicket.Tags = initialTags
+	gt.NoError(t, repo.PutTicket(ctx, testTicket))
+
+	// Create tags to ensure they exist
+	existingTag1 := &tagmodel.Tag{ID: "existing-tag-1", Name: "existing1", Color: "color1"}
+	existingTag2 := &tagmodel.Tag{ID: "existing-tag-2", Name: "existing2", Color: "color2"}
+	newTag1 := &tagmodel.Tag{ID: "new-tag-1", Name: "newtag1", Color: "color3"}
+	newTag2 := &tagmodel.Tag{ID: "new-tag-2", Name: "newtag2", Color: "color4"}
+
+	gt.NoError(t, repo.CreateTagWithID(ctx, existingTag1))
+	gt.NoError(t, repo.CreateTagWithID(ctx, existingTag2))
+	gt.NoError(t, repo.CreateTagWithID(ctx, newTag1))
+	gt.NoError(t, repo.CreateTagWithID(ctx, newTag2))
+
+	// Setup use case
+	uc := New(
+		WithRepository(repo),
+		WithSlackService(slackSvc),
+		WithLLMClient(llmMock),
+		WithTagService(tagSvc),
+	)
+
+	// Prepare test input values for resolve with tag selection
+	values := slack.StateValue{
+		string(slack.BlockIDTicketConclusion): map[string]slack.BlockAction{
+			string(slack.BlockActionIDTicketConclusion): {
+				SelectedOption: slackSDK.OptionBlockObject{
+					Value: "intended",
+				},
+			},
+		},
+		string(slack.BlockIDTicketTags): map[string]slack.BlockAction{
+			string(slack.BlockActionIDTicketTags): {
+				Type: "checkboxes",
+				SelectedOptions: []slackSDK.OptionBlockObject{
+					{Value: "newtag1"},
+					{Value: "existing1"}, // This should not create duplicates
+				},
+			},
+		},
+	}
+
+	// Execute
+	err = uc.HandleSlackInteractionViewSubmission(
+		ctx,
+		slack.User{ID: "test-user", Name: "test-user"},
+		"submit_resolve_ticket",
+		testTicket.ID.String(),
+		values,
+	)
+
+	// Verify
+	gt.NoError(t, err)
+
+	// Get updated ticket
+	updatedTicket, err := repo.GetTicket(ctx, testTicket.ID)
+	gt.NoError(t, err)
+	gt.NotNil(t, updatedTicket)
+
+	// Verify ticket is resolved
+	gt.Equal(t, updatedTicket.Status, types.TicketStatusResolved)
+
+	// Verify tags are merged correctly (should have 3 unique tags)
+	gt.Number(t, len(updatedTicket.Tags)).Equal(3)
+
+	// Check that all expected tags are present
+	tagMap := make(map[types.TagID]bool)
+	for _, tag := range updatedTicket.Tags {
+		tagMap[tag] = true
+	}
+
+	expectedTags := []types.TagID{"existing-tag-1", "existing-tag-2", "new-tag-1"}
+	for _, expectedTag := range expectedTags {
+		gt.Value(t, tagMap[expectedTag]).Equal(true)
+	}
 }
