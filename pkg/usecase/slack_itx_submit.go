@@ -252,6 +252,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 	)
 
 	ticketID := types.TicketID(metadata)
+	logger.Debug("getting ticket", "ticket_id", ticketID)
 	target, err := uc.repository.GetTicket(ctx, ticketID)
 	if err != nil {
 		_ = msg.Trace(ctx, "💥 Failed to get ticket\n> %s", err.Error())
@@ -281,7 +282,9 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 		slack.BlockActionIDTicketComment,
 	)
 	if !ok {
-		return goerr.New("reason not found")
+		// Comment is optional, set empty string if not provided
+		reason = ""
+		logger.Debug("comment field not provided, using empty string")
 	}
 
 	target.Conclusion = conclusion
@@ -290,12 +293,25 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 
 	// Handle tag selection if available (supports both checkbox and multi-select)
 	if block, ok := values[slack.BlockIDTicketTags.String()]; ok {
-		if action, ok := block[slack.BlockActionIDTicketTags.String()]; ok && action.SelectedOptions != nil {
-			// Extract selected tag names (works for both checkbox and multi-select)
-			selectedTags := make([]string, 0, len(action.SelectedOptions))
-			for _, option := range action.SelectedOptions {
-				selectedTags = append(selectedTags, option.Value)
+		if action, ok := block[slack.BlockActionIDTicketTags.String()]; ok {
+			logger.Debug("processing tag selection",
+				"action", action,
+				"selected_options", action.SelectedOptions,
+				"selected_option", action.SelectedOption,
+			)
+
+			var selectedTags []string
+
+			// Handle checkbox and multi-select formats
+			if len(action.SelectedOptions) > 0 {
+				// Multi-select or checkbox with multiple selections
+				selectedTags = make([]string, 0, len(action.SelectedOptions))
+				for _, option := range action.SelectedOptions {
+					selectedTags = append(selectedTags, option.Value)
+				}
 			}
+
+			logger.Debug("extracted tag names", "tags", selectedTags)
 
 			// Update ticket tags
 			if len(selectedTags) > 0 && uc.tagService != nil {

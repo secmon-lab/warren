@@ -91,7 +91,7 @@ func (s *Service) UpdateAlertTags(ctx context.Context, alertID types.AlertID, ta
 	}
 
 	// Update tags
-	a.Tags = tag.NewIDSet(tagIDs)
+	a.Tags = tagIDs
 
 	// Save the alert
 	if err := s.repo.PutAlert(ctx, *a); err != nil {
@@ -124,7 +124,7 @@ func (s *Service) UpdateTicketTags(ctx context.Context, ticketID types.TicketID,
 	}
 
 	// Update tags
-	t.Tags = tag.NewIDSet(tagIDs)
+	t.Tags = tagIDs
 
 	// Save the ticket
 	if err := s.repo.PutTicket(ctx, *t); err != nil {
@@ -282,7 +282,7 @@ func (s *Service) UpdateAlertTagsByID(ctx context.Context, alertID types.AlertID
 	}
 
 	// Update tags
-	a.Tags = tag.NewIDSet(tagIDs)
+	a.Tags = tagIDs
 
 	// Save the alert
 	if err := s.repo.PutAlert(ctx, *a); err != nil {
@@ -314,7 +314,7 @@ func (s *Service) UpdateTicketTagsByID(ctx context.Context, ticketID types.Ticke
 	}
 
 	// Update tags
-	t.Tags = tag.NewIDSet(tagIDs)
+	t.Tags = tagIDs
 
 	// Save the ticket
 	if err := s.repo.PutTicket(ctx, *t); err != nil {

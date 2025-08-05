@@ -10,7 +10,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -87,7 +86,7 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
 		}
-		newAlert.Tags = tag.NewIDSet(tagIDs)
+		newAlert.Tags = tagIDs
 	}
 
 	if err := newAlert.FillMetadata(ctx, uc.llmClient); err != nil {

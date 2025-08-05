@@ -113,8 +113,8 @@ func (r *Firestore) PutAlert(ctx context.Context, a alert.Alert) error {
 		Tags:  make(map[string]bool),
 	}
 
-	// Convert tag.Set to map[string]bool
-	for tag := range a.Tags {
+	// Convert []types.TagID to map[string]bool
+	for _, tag := range a.Tags {
 		fa.Tags[string(tag)] = true
 	}
 
@@ -147,11 +147,11 @@ func (r *Firestore) GetAlert(ctx context.Context, alertID types.AlertID) (*alert
 		return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("alert_id", alertID))
 	}
 
-	// Convert map[string]bool back to tag.Set
+	// Convert map[string]bool back to tag slice
 	a := fa.Alert
-	a.Tags = make(tag.IDSet)
+	a.Tags = make([]types.TagID, 0, len(fa.Tags))
 	for tagStr := range fa.Tags {
-		a.Tags[types.TagID(tagStr)] = true
+		a.Tags = append(a.Tags, types.TagID(tagStr))
 	}
 
 	return &a, nil
@@ -399,11 +399,11 @@ func (r *Firestore) GetTicket(ctx context.Context, ticketID types.TicketID) (*ti
 		return nil, goerr.Wrap(err, "failed to convert data to ticket", goerr.V("ticket_id", ticketID))
 	}
 
-	// Convert map[string]bool back to tag.Set
+	// Convert map[string]bool back to tag slice
 	t := ft.Ticket
-	t.Tags = make(tag.IDSet)
+	t.Tags = make([]types.TagID, 0, len(ft.Tags))
 	for tagStr := range ft.Tags {
-		t.Tags[types.TagID(tagStr)] = true
+		t.Tags = append(t.Tags, types.TagID(tagStr))
 	}
 
 	return &t, nil
@@ -425,8 +425,8 @@ func (r *Firestore) PutTicket(ctx context.Context, t ticket.Ticket) error {
 		Tags:   make(map[string]bool),
 	}
 
-	// Convert tag.Set to map[string]bool
-	for tag := range t.Tags {
+	// Convert []types.TagID to map[string]bool
+	for _, tag := range t.Tags {
 		ft.Tags[string(tag)] = true
 	}
 
@@ -901,11 +901,11 @@ func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32,
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
 		}
 
-		// Convert map[string]bool back to tag.Set
+		// Convert map[string]bool back to tag slice
 		if ft.Tags != nil {
-			ft.Ticket.Tags = make(tag.IDSet)
-			for k, v := range ft.Tags {
-				ft.Ticket.Tags[types.TagID(k)] = v
+			ft.Ticket.Tags = make([]types.TagID, 0, len(ft.Tags))
+			for tagStr := range ft.Tags {
+				ft.Ticket.Tags = append(ft.Ticket.Tags, types.TagID(tagStr))
 			}
 		}
 

@@ -1130,7 +1130,13 @@ func (r *Memory) RemoveTagIDFromAllAlerts(ctx context.Context, tagID types.TagID
 	// Iterate through all alerts and remove the tag
 	for _, alert := range r.alerts {
 		if alert.Tags != nil {
-			delete(alert.Tags, tagID)
+			// Remove tagID from slice
+			for i, tag := range alert.Tags {
+				if tag == tagID {
+					alert.Tags = append(alert.Tags[:i], alert.Tags[i+1:]...)
+					break
+				}
+			}
 		}
 	}
 
@@ -1144,7 +1150,13 @@ func (r *Memory) RemoveTagIDFromAllTickets(ctx context.Context, tagID types.TagI
 	// Iterate through all tickets and remove the tag
 	for _, ticket := range r.tickets {
 		if ticket.Tags != nil {
-			delete(ticket.Tags, tagID)
+			// Remove tagID from slice
+			for i, tag := range ticket.Tags {
+				if tag == tagID {
+					ticket.Tags = append(ticket.Tags[:i], ticket.Tags[i+1:]...)
+					break
+				}
+			}
 		}
 	}
 

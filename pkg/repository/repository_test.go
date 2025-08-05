@@ -25,6 +25,16 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+// Helper function to check if a tag ID exists in a slice
+func containsTag(tags []types.TagID, target types.TagID) bool {
+	for _, tag := range tags {
+		if tag == target {
+			return true
+		}
+	}
+	return false
+}
+
 func newFirestoreClient(t *testing.T) *repository.Firestore {
 	vars := test.NewEnvVars(t, "TEST_FIRESTORE_PROJECT_ID", "TEST_FIRESTORE_DATABASE_ID")
 	client, err := repository.NewFirestore(t.Context(),
@@ -2470,7 +2480,7 @@ func TestAlertAndTicketTags(t *testing.T) {
 				Title:       "Test Alert",
 				Description: "Test Description",
 			})
-			a.Tags = tag.NewIDSet([]types.TagID{securityTag.ID, incidentTag.ID, criticalTag.ID})
+			a.Tags = []types.TagID{securityTag.ID, incidentTag.ID, criticalTag.ID}
 
 			// Save the alert
 			gt.NoError(t, repo.PutAlert(ctx, a))
@@ -2482,9 +2492,10 @@ func TestAlertAndTicketTags(t *testing.T) {
 
 			// Verify tags are preserved
 			gt.Number(t, len(retrievedAlert.Tags)).Equal(3)
-			gt.True(t, retrievedAlert.Tags.Has(securityTag.ID))
-			gt.True(t, retrievedAlert.Tags.Has(incidentTag.ID))
-			gt.True(t, retrievedAlert.Tags.Has(criticalTag.ID))
+			// Check tags are present in slice
+			gt.True(t, containsTag(retrievedAlert.Tags, securityTag.ID))
+			gt.True(t, containsTag(retrievedAlert.Tags, incidentTag.ID))
+			gt.True(t, containsTag(retrievedAlert.Tags, criticalTag.ID))
 		})
 
 		t.Run("Ticket with tags", func(t *testing.T) {
@@ -2505,7 +2516,7 @@ func TestAlertAndTicketTags(t *testing.T) {
 			// Create a ticket with tags
 			tk := ticketmodel.New(ctx, []types.AlertID{}, nil)
 			tk.Metadata.Title = "Test Ticket"
-			tk.Tags = tag.NewIDSet([]types.TagID{resolvedTag.ID, fpTag.ID})
+			tk.Tags = []types.TagID{resolvedTag.ID, fpTag.ID}
 
 			// Save the ticket
 			gt.NoError(t, repo.PutTicket(ctx, tk))
@@ -2517,8 +2528,8 @@ func TestAlertAndTicketTags(t *testing.T) {
 
 			// Verify tags are preserved
 			gt.Number(t, len(retrievedTicket.Tags)).Equal(2)
-			gt.True(t, retrievedTicket.Tags.Has(resolvedTag.ID))
-			gt.True(t, retrievedTicket.Tags.Has(fpTag.ID))
+			gt.True(t, containsTag(retrievedTicket.Tags, resolvedTag.ID))
+			gt.True(t, containsTag(retrievedTicket.Tags, fpTag.ID))
 		})
 
 		t.Run("Empty tags", func(t *testing.T) {
@@ -2566,7 +2577,7 @@ func TestAlertAndTicketTags(t *testing.T) {
 					Title:       fmt.Sprintf("Batch Alert %d", i),
 					Description: "Test Description",
 				})
-				a.Tags = tag.NewIDSet([]types.TagID{individualTags[i].ID, commonTag.ID})
+				a.Tags = []types.TagID{individualTags[i].ID, commonTag.ID}
 				alerts[i] = &a
 			}
 
@@ -2584,8 +2595,8 @@ func TestAlertAndTicketTags(t *testing.T) {
 
 			// Verify tags
 			for i, a := range retrievedAlerts {
-				gt.True(t, a.Tags.Has(individualTags[i].ID))
-				gt.True(t, a.Tags.Has(commonTag.ID))
+				gt.True(t, containsTag(a.Tags, individualTags[i].ID))
+				gt.True(t, containsTag(a.Tags, commonTag.ID))
 			}
 		})
 	}

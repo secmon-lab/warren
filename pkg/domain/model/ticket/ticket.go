@@ -39,7 +39,7 @@ type Ticket struct {
 	IsTest bool `json:"is_test"`
 
 	Embedding firestore.Vector32 `json:"-"`
-	Tags      tag.IDSet          `json:"tag_ids" firestore:"tagIds"`
+	Tags      []types.TagID      `json:"tag_ids"`
 }
 
 // HasSlackThread returns true if the ticket has a valid Slack thread
@@ -54,7 +54,7 @@ func (t *Ticket) GetTagNames(ctx context.Context, tagGetter func(context.Context
 		return []string{}, nil
 	}
 
-	tagIDs := t.Tags.ToSlice()
+	tagIDs := t.Tags
 	tags, err := tagGetter(ctx, tagIDs)
 	if err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func New(ctx context.Context, alertIDs []types.AlertID, slackThread *slack.Threa
 			TitleSource:       types.SourceAI, // Default to AI source
 			DescriptionSource: types.SourceAI, // Default to AI source
 		},
-		Tags: make(tag.IDSet),
+		Tags: []types.TagID{},
 	}
 }
 

@@ -42,11 +42,6 @@ func dispatch(ctx context.Context, handler func(ctx context.Context) error) {
 		defer func() {
 			if r := recover(); r != nil {
 				stack := debug.Stack()
-				logger := logging.From(newCtx)
-				logger.Error("panic recovered in background goroutine",
-					"error", r,
-					"stack", string(stack),
-				)
 				errs.Handle(newCtx, goerr.New("panic recovered in background goroutine",
 					goerr.V("recover", r),
 					goerr.V("stack", string(stack))))
