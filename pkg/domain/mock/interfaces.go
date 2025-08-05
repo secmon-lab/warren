@@ -1907,11 +1907,11 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			CountTicketsByStatusFunc: func(ctx context.Context, statuses []types.TicketStatus) (int, error) {
 //				panic("mock out the CountTicketsByStatus method")
 //			},
-//			CreateTagFunc: func(ctx context.Context, tagMoqParam *tag.Metadata) error {
-//				panic("mock out the CreateTag method")
+//			CreateTagWithIDFunc: func(ctx context.Context, tagMoqParam *tag.Tag) error {
+//				panic("mock out the CreateTagWithID method")
 //			},
-//			DeleteTagFunc: func(ctx context.Context, name string) error {
-//				panic("mock out the DeleteTag method")
+//			DeleteTagByIDFunc: func(ctx context.Context, tagID types.TagID) error {
+//				panic("mock out the DeleteTagByID method")
 //			},
 //			DeleteTokenFunc: func(ctx context.Context, tokenID auth.TokenID) error {
 //				panic("mock out the DeleteToken method")
@@ -1961,8 +1961,14 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			GetLatestHistoryFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
 //				panic("mock out the GetLatestHistory method")
 //			},
-//			GetTagFunc: func(ctx context.Context, name string) (*tag.Metadata, error) {
-//				panic("mock out the GetTag method")
+//			GetTagByIDFunc: func(ctx context.Context, tagID types.TagID) (*tag.Tag, error) {
+//				panic("mock out the GetTagByID method")
+//			},
+//			GetTagByNameFunc: func(ctx context.Context, name string) (*tag.Tag, error) {
+//				panic("mock out the GetTagByName method")
+//			},
+//			GetTagsByIDsFunc: func(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error) {
+//				panic("mock out the GetTagsByIDs method")
 //			},
 //			GetTicketFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
 //				panic("mock out the GetTicket method")
@@ -1994,8 +2000,11 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			GetTokenFunc: func(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error) {
 //				panic("mock out the GetToken method")
 //			},
-//			ListTagsFunc: func(ctx context.Context) ([]*tag.Metadata, error) {
-//				panic("mock out the ListTags method")
+//			IsTagNameExistsFunc: func(ctx context.Context, name string) (bool, error) {
+//				panic("mock out the IsTagNameExists method")
+//			},
+//			ListAllTagsFunc: func(ctx context.Context) ([]*tag.Tag, error) {
+//				panic("mock out the ListAllTags method")
 //			},
 //			PutActivityFunc: func(ctx context.Context, activityMoqParam *activity.Activity) error {
 //				panic("mock out the PutActivity method")
@@ -2027,11 +2036,20 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			RemoveTagFromAllTicketsFunc: func(ctx context.Context, name string) error {
 //				panic("mock out the RemoveTagFromAllTickets method")
 //			},
+//			RemoveTagIDFromAllAlertsFunc: func(ctx context.Context, tagID types.TagID) error {
+//				panic("mock out the RemoveTagIDFromAllAlerts method")
+//			},
+//			RemoveTagIDFromAllTicketsFunc: func(ctx context.Context, tagID types.TagID) error {
+//				panic("mock out the RemoveTagIDFromAllTickets method")
+//			},
 //			SearchAlertsFunc: func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
 //				panic("mock out the SearchAlerts method")
 //			},
 //			UnbindAlertFromTicketFunc: func(ctx context.Context, alertID types.AlertID) error {
 //				panic("mock out the UnbindAlertFromTicket method")
+//			},
+//			UpdateTagFunc: func(ctx context.Context, tagMoqParam *tag.Tag) error {
+//				panic("mock out the UpdateTag method")
 //			},
 //		}
 //
@@ -2067,11 +2085,11 @@ type RepositoryMock struct {
 	// CountTicketsByStatusFunc mocks the CountTicketsByStatus method.
 	CountTicketsByStatusFunc func(ctx context.Context, statuses []types.TicketStatus) (int, error)
 
-	// CreateTagFunc mocks the CreateTag method.
-	CreateTagFunc func(ctx context.Context, tagMoqParam *tag.Metadata) error
+	// CreateTagWithIDFunc mocks the CreateTagWithID method.
+	CreateTagWithIDFunc func(ctx context.Context, tagMoqParam *tag.Tag) error
 
-	// DeleteTagFunc mocks the DeleteTag method.
-	DeleteTagFunc func(ctx context.Context, name string) error
+	// DeleteTagByIDFunc mocks the DeleteTagByID method.
+	DeleteTagByIDFunc func(ctx context.Context, tagID types.TagID) error
 
 	// DeleteTokenFunc mocks the DeleteToken method.
 	DeleteTokenFunc func(ctx context.Context, tokenID auth.TokenID) error
@@ -2121,8 +2139,14 @@ type RepositoryMock struct {
 	// GetLatestHistoryFunc mocks the GetLatestHistory method.
 	GetLatestHistoryFunc func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error)
 
-	// GetTagFunc mocks the GetTag method.
-	GetTagFunc func(ctx context.Context, name string) (*tag.Metadata, error)
+	// GetTagByIDFunc mocks the GetTagByID method.
+	GetTagByIDFunc func(ctx context.Context, tagID types.TagID) (*tag.Tag, error)
+
+	// GetTagByNameFunc mocks the GetTagByName method.
+	GetTagByNameFunc func(ctx context.Context, name string) (*tag.Tag, error)
+
+	// GetTagsByIDsFunc mocks the GetTagsByIDs method.
+	GetTagsByIDsFunc func(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error)
 
 	// GetTicketFunc mocks the GetTicket method.
 	GetTicketFunc func(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error)
@@ -2154,8 +2178,11 @@ type RepositoryMock struct {
 	// GetTokenFunc mocks the GetToken method.
 	GetTokenFunc func(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error)
 
-	// ListTagsFunc mocks the ListTags method.
-	ListTagsFunc func(ctx context.Context) ([]*tag.Metadata, error)
+	// IsTagNameExistsFunc mocks the IsTagNameExists method.
+	IsTagNameExistsFunc func(ctx context.Context, name string) (bool, error)
+
+	// ListAllTagsFunc mocks the ListAllTags method.
+	ListAllTagsFunc func(ctx context.Context) ([]*tag.Tag, error)
 
 	// PutActivityFunc mocks the PutActivity method.
 	PutActivityFunc func(ctx context.Context, activityMoqParam *activity.Activity) error
@@ -2187,11 +2214,20 @@ type RepositoryMock struct {
 	// RemoveTagFromAllTicketsFunc mocks the RemoveTagFromAllTickets method.
 	RemoveTagFromAllTicketsFunc func(ctx context.Context, name string) error
 
+	// RemoveTagIDFromAllAlertsFunc mocks the RemoveTagIDFromAllAlerts method.
+	RemoveTagIDFromAllAlertsFunc func(ctx context.Context, tagID types.TagID) error
+
+	// RemoveTagIDFromAllTicketsFunc mocks the RemoveTagIDFromAllTickets method.
+	RemoveTagIDFromAllTicketsFunc func(ctx context.Context, tagID types.TagID) error
+
 	// SearchAlertsFunc mocks the SearchAlerts method.
 	SearchAlertsFunc func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error)
 
 	// UnbindAlertFromTicketFunc mocks the UnbindAlertFromTicket method.
 	UnbindAlertFromTicketFunc func(ctx context.Context, alertID types.AlertID) error
+
+	// UpdateTagFunc mocks the UpdateTag method.
+	UpdateTagFunc func(ctx context.Context, tagMoqParam *tag.Tag) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -2258,19 +2294,19 @@ type RepositoryMock struct {
 			// Statuses is the statuses argument value.
 			Statuses []types.TicketStatus
 		}
-		// CreateTag holds details about calls to the CreateTag method.
-		CreateTag []struct {
+		// CreateTagWithID holds details about calls to the CreateTagWithID method.
+		CreateTagWithID []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// TagMoqParam is the tagMoqParam argument value.
-			TagMoqParam *tag.Metadata
+			TagMoqParam *tag.Tag
 		}
-		// DeleteTag holds details about calls to the DeleteTag method.
-		DeleteTag []struct {
+		// DeleteTagByID holds details about calls to the DeleteTagByID method.
+		DeleteTagByID []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Name is the name argument value.
-			Name string
+			// TagID is the tagID argument value.
+			TagID types.TagID
 		}
 		// DeleteToken holds details about calls to the DeleteToken method.
 		DeleteToken []struct {
@@ -2396,12 +2432,26 @@ type RepositoryMock struct {
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
 		}
-		// GetTag holds details about calls to the GetTag method.
-		GetTag []struct {
+		// GetTagByID holds details about calls to the GetTagByID method.
+		GetTagByID []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TagID is the tagID argument value.
+			TagID types.TagID
+		}
+		// GetTagByName holds details about calls to the GetTagByName method.
+		GetTagByName []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Name is the name argument value.
 			Name string
+		}
+		// GetTagsByIDs holds details about calls to the GetTagsByIDs method.
+		GetTagsByIDs []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TagIDs is the tagIDs argument value.
+			TagIDs []types.TagID
 		}
 		// GetTicket holds details about calls to the GetTicket method.
 		GetTicket []struct {
@@ -2485,8 +2535,15 @@ type RepositoryMock struct {
 			// TokenID is the tokenID argument value.
 			TokenID auth.TokenID
 		}
-		// ListTags holds details about calls to the ListTags method.
-		ListTags []struct {
+		// IsTagNameExists holds details about calls to the IsTagNameExists method.
+		IsTagNameExists []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+		}
+		// ListAllTags holds details about calls to the ListAllTags method.
+		ListAllTags []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
@@ -2564,6 +2621,20 @@ type RepositoryMock struct {
 			// Name is the name argument value.
 			Name string
 		}
+		// RemoveTagIDFromAllAlerts holds details about calls to the RemoveTagIDFromAllAlerts method.
+		RemoveTagIDFromAllAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TagID is the tagID argument value.
+			TagID types.TagID
+		}
+		// RemoveTagIDFromAllTickets holds details about calls to the RemoveTagIDFromAllTickets method.
+		RemoveTagIDFromAllTickets []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TagID is the tagID argument value.
+			TagID types.TagID
+		}
 		// SearchAlerts holds details about calls to the SearchAlerts method.
 		SearchAlerts []struct {
 			// Ctx is the ctx argument value.
@@ -2584,6 +2655,13 @@ type RepositoryMock struct {
 			// AlertID is the alertID argument value.
 			AlertID types.AlertID
 		}
+		// UpdateTag holds details about calls to the UpdateTag method.
+		UpdateTag []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TagMoqParam is the tagMoqParam argument value.
+			TagMoqParam *tag.Tag
+		}
 	}
 	lockBatchGetAlerts                 sync.RWMutex
 	lockBatchGetTickets                sync.RWMutex
@@ -2594,8 +2672,8 @@ type RepositoryMock struct {
 	lockCountAlertsWithoutTicket       sync.RWMutex
 	lockCountTicketComments            sync.RWMutex
 	lockCountTicketsByStatus           sync.RWMutex
-	lockCreateTag                      sync.RWMutex
-	lockDeleteTag                      sync.RWMutex
+	lockCreateTagWithID                sync.RWMutex
+	lockDeleteTagByID                  sync.RWMutex
 	lockDeleteToken                    sync.RWMutex
 	lockFindNearestAlerts              sync.RWMutex
 	lockFindNearestTickets             sync.RWMutex
@@ -2612,7 +2690,9 @@ type RepositoryMock struct {
 	lockGetLatestAlertByThread         sync.RWMutex
 	lockGetLatestAlertListInThread     sync.RWMutex
 	lockGetLatestHistory               sync.RWMutex
-	lockGetTag                         sync.RWMutex
+	lockGetTagByID                     sync.RWMutex
+	lockGetTagByName                   sync.RWMutex
+	lockGetTagsByIDs                   sync.RWMutex
 	lockGetTicket                      sync.RWMutex
 	lockGetTicketByThread              sync.RWMutex
 	lockGetTicketComments              sync.RWMutex
@@ -2623,7 +2703,8 @@ type RepositoryMock struct {
 	lockGetTicketsByStatusAndSpan      sync.RWMutex
 	lockGetTicketsWithInvalidEmbedding sync.RWMutex
 	lockGetToken                       sync.RWMutex
-	lockListTags                       sync.RWMutex
+	lockIsTagNameExists                sync.RWMutex
+	lockListAllTags                    sync.RWMutex
 	lockPutActivity                    sync.RWMutex
 	lockPutAlert                       sync.RWMutex
 	lockPutAlertList                   sync.RWMutex
@@ -2634,8 +2715,11 @@ type RepositoryMock struct {
 	lockPutToken                       sync.RWMutex
 	lockRemoveTagFromAllAlerts         sync.RWMutex
 	lockRemoveTagFromAllTickets        sync.RWMutex
+	lockRemoveTagIDFromAllAlerts       sync.RWMutex
+	lockRemoveTagIDFromAllTickets      sync.RWMutex
 	lockSearchAlerts                   sync.RWMutex
 	lockUnbindAlertFromTicket          sync.RWMutex
+	lockUpdateTag                      sync.RWMutex
 }
 
 // BatchGetAlerts calls BatchGetAlertsFunc.
@@ -2995,81 +3079,81 @@ func (mock *RepositoryMock) CountTicketsByStatusCalls() []struct {
 	return calls
 }
 
-// CreateTag calls CreateTagFunc.
-func (mock *RepositoryMock) CreateTag(ctx context.Context, tagMoqParam *tag.Metadata) error {
+// CreateTagWithID calls CreateTagWithIDFunc.
+func (mock *RepositoryMock) CreateTagWithID(ctx context.Context, tagMoqParam *tag.Tag) error {
 	callInfo := struct {
 		Ctx         context.Context
-		TagMoqParam *tag.Metadata
+		TagMoqParam *tag.Tag
 	}{
 		Ctx:         ctx,
 		TagMoqParam: tagMoqParam,
 	}
-	mock.lockCreateTag.Lock()
-	mock.calls.CreateTag = append(mock.calls.CreateTag, callInfo)
-	mock.lockCreateTag.Unlock()
-	if mock.CreateTagFunc == nil {
+	mock.lockCreateTagWithID.Lock()
+	mock.calls.CreateTagWithID = append(mock.calls.CreateTagWithID, callInfo)
+	mock.lockCreateTagWithID.Unlock()
+	if mock.CreateTagWithIDFunc == nil {
 		var (
 			errOut error
 		)
 		return errOut
 	}
-	return mock.CreateTagFunc(ctx, tagMoqParam)
+	return mock.CreateTagWithIDFunc(ctx, tagMoqParam)
 }
 
-// CreateTagCalls gets all the calls that were made to CreateTag.
+// CreateTagWithIDCalls gets all the calls that were made to CreateTagWithID.
 // Check the length with:
 //
-//	len(mockedRepository.CreateTagCalls())
-func (mock *RepositoryMock) CreateTagCalls() []struct {
+//	len(mockedRepository.CreateTagWithIDCalls())
+func (mock *RepositoryMock) CreateTagWithIDCalls() []struct {
 	Ctx         context.Context
-	TagMoqParam *tag.Metadata
+	TagMoqParam *tag.Tag
 } {
 	var calls []struct {
 		Ctx         context.Context
-		TagMoqParam *tag.Metadata
+		TagMoqParam *tag.Tag
 	}
-	mock.lockCreateTag.RLock()
-	calls = mock.calls.CreateTag
-	mock.lockCreateTag.RUnlock()
+	mock.lockCreateTagWithID.RLock()
+	calls = mock.calls.CreateTagWithID
+	mock.lockCreateTagWithID.RUnlock()
 	return calls
 }
 
-// DeleteTag calls DeleteTagFunc.
-func (mock *RepositoryMock) DeleteTag(ctx context.Context, name string) error {
+// DeleteTagByID calls DeleteTagByIDFunc.
+func (mock *RepositoryMock) DeleteTagByID(ctx context.Context, tagID types.TagID) error {
 	callInfo := struct {
-		Ctx  context.Context
-		Name string
+		Ctx   context.Context
+		TagID types.TagID
 	}{
-		Ctx:  ctx,
-		Name: name,
+		Ctx:   ctx,
+		TagID: tagID,
 	}
-	mock.lockDeleteTag.Lock()
-	mock.calls.DeleteTag = append(mock.calls.DeleteTag, callInfo)
-	mock.lockDeleteTag.Unlock()
-	if mock.DeleteTagFunc == nil {
+	mock.lockDeleteTagByID.Lock()
+	mock.calls.DeleteTagByID = append(mock.calls.DeleteTagByID, callInfo)
+	mock.lockDeleteTagByID.Unlock()
+	if mock.DeleteTagByIDFunc == nil {
 		var (
 			errOut error
 		)
 		return errOut
 	}
-	return mock.DeleteTagFunc(ctx, name)
+	return mock.DeleteTagByIDFunc(ctx, tagID)
 }
 
-// DeleteTagCalls gets all the calls that were made to DeleteTag.
+// DeleteTagByIDCalls gets all the calls that were made to DeleteTagByID.
 // Check the length with:
 //
-//	len(mockedRepository.DeleteTagCalls())
-func (mock *RepositoryMock) DeleteTagCalls() []struct {
-	Ctx  context.Context
-	Name string
+//	len(mockedRepository.DeleteTagByIDCalls())
+func (mock *RepositoryMock) DeleteTagByIDCalls() []struct {
+	Ctx   context.Context
+	TagID types.TagID
 } {
 	var calls []struct {
-		Ctx  context.Context
-		Name string
+		Ctx   context.Context
+		TagID types.TagID
 	}
-	mock.lockDeleteTag.RLock()
-	calls = mock.calls.DeleteTag
-	mock.lockDeleteTag.RUnlock()
+	mock.lockDeleteTagByID.RLock()
+	calls = mock.calls.DeleteTagByID
+	mock.lockDeleteTagByID.RUnlock()
 	return calls
 }
 
@@ -3736,8 +3820,48 @@ func (mock *RepositoryMock) GetLatestHistoryCalls() []struct {
 	return calls
 }
 
-// GetTag calls GetTagFunc.
-func (mock *RepositoryMock) GetTag(ctx context.Context, name string) (*tag.Metadata, error) {
+// GetTagByID calls GetTagByIDFunc.
+func (mock *RepositoryMock) GetTagByID(ctx context.Context, tagID types.TagID) (*tag.Tag, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		TagID types.TagID
+	}{
+		Ctx:   ctx,
+		TagID: tagID,
+	}
+	mock.lockGetTagByID.Lock()
+	mock.calls.GetTagByID = append(mock.calls.GetTagByID, callInfo)
+	mock.lockGetTagByID.Unlock()
+	if mock.GetTagByIDFunc == nil {
+		var (
+			tagOut *tag.Tag
+			errOut error
+		)
+		return tagOut, errOut
+	}
+	return mock.GetTagByIDFunc(ctx, tagID)
+}
+
+// GetTagByIDCalls gets all the calls that were made to GetTagByID.
+// Check the length with:
+//
+//	len(mockedRepository.GetTagByIDCalls())
+func (mock *RepositoryMock) GetTagByIDCalls() []struct {
+	Ctx   context.Context
+	TagID types.TagID
+} {
+	var calls []struct {
+		Ctx   context.Context
+		TagID types.TagID
+	}
+	mock.lockGetTagByID.RLock()
+	calls = mock.calls.GetTagByID
+	mock.lockGetTagByID.RUnlock()
+	return calls
+}
+
+// GetTagByName calls GetTagByNameFunc.
+func (mock *RepositoryMock) GetTagByName(ctx context.Context, name string) (*tag.Tag, error) {
 	callInfo := struct {
 		Ctx  context.Context
 		Name string
@@ -3745,24 +3869,24 @@ func (mock *RepositoryMock) GetTag(ctx context.Context, name string) (*tag.Metad
 		Ctx:  ctx,
 		Name: name,
 	}
-	mock.lockGetTag.Lock()
-	mock.calls.GetTag = append(mock.calls.GetTag, callInfo)
-	mock.lockGetTag.Unlock()
-	if mock.GetTagFunc == nil {
+	mock.lockGetTagByName.Lock()
+	mock.calls.GetTagByName = append(mock.calls.GetTagByName, callInfo)
+	mock.lockGetTagByName.Unlock()
+	if mock.GetTagByNameFunc == nil {
 		var (
-			metadataOut *tag.Metadata
-			errOut      error
+			tagOut *tag.Tag
+			errOut error
 		)
-		return metadataOut, errOut
+		return tagOut, errOut
 	}
-	return mock.GetTagFunc(ctx, name)
+	return mock.GetTagByNameFunc(ctx, name)
 }
 
-// GetTagCalls gets all the calls that were made to GetTag.
+// GetTagByNameCalls gets all the calls that were made to GetTagByName.
 // Check the length with:
 //
-//	len(mockedRepository.GetTagCalls())
-func (mock *RepositoryMock) GetTagCalls() []struct {
+//	len(mockedRepository.GetTagByNameCalls())
+func (mock *RepositoryMock) GetTagByNameCalls() []struct {
 	Ctx  context.Context
 	Name string
 } {
@@ -3770,9 +3894,49 @@ func (mock *RepositoryMock) GetTagCalls() []struct {
 		Ctx  context.Context
 		Name string
 	}
-	mock.lockGetTag.RLock()
-	calls = mock.calls.GetTag
-	mock.lockGetTag.RUnlock()
+	mock.lockGetTagByName.RLock()
+	calls = mock.calls.GetTagByName
+	mock.lockGetTagByName.RUnlock()
+	return calls
+}
+
+// GetTagsByIDs calls GetTagsByIDsFunc.
+func (mock *RepositoryMock) GetTagsByIDs(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		TagIDs []types.TagID
+	}{
+		Ctx:    ctx,
+		TagIDs: tagIDs,
+	}
+	mock.lockGetTagsByIDs.Lock()
+	mock.calls.GetTagsByIDs = append(mock.calls.GetTagsByIDs, callInfo)
+	mock.lockGetTagsByIDs.Unlock()
+	if mock.GetTagsByIDsFunc == nil {
+		var (
+			tagsOut []*tag.Tag
+			errOut  error
+		)
+		return tagsOut, errOut
+	}
+	return mock.GetTagsByIDsFunc(ctx, tagIDs)
+}
+
+// GetTagsByIDsCalls gets all the calls that were made to GetTagsByIDs.
+// Check the length with:
+//
+//	len(mockedRepository.GetTagsByIDsCalls())
+func (mock *RepositoryMock) GetTagsByIDsCalls() []struct {
+	Ctx    context.Context
+	TagIDs []types.TagID
+} {
+	var calls []struct {
+		Ctx    context.Context
+		TagIDs []types.TagID
+	}
+	mock.lockGetTagsByIDs.RLock()
+	calls = mock.calls.GetTagsByIDs
+	mock.lockGetTagsByIDs.RUnlock()
 	return calls
 }
 
@@ -4200,39 +4364,79 @@ func (mock *RepositoryMock) GetTokenCalls() []struct {
 	return calls
 }
 
-// ListTags calls ListTagsFunc.
-func (mock *RepositoryMock) ListTags(ctx context.Context) ([]*tag.Metadata, error) {
+// IsTagNameExists calls IsTagNameExistsFunc.
+func (mock *RepositoryMock) IsTagNameExists(ctx context.Context, name string) (bool, error) {
+	callInfo := struct {
+		Ctx  context.Context
+		Name string
+	}{
+		Ctx:  ctx,
+		Name: name,
+	}
+	mock.lockIsTagNameExists.Lock()
+	mock.calls.IsTagNameExists = append(mock.calls.IsTagNameExists, callInfo)
+	mock.lockIsTagNameExists.Unlock()
+	if mock.IsTagNameExistsFunc == nil {
+		var (
+			bOut   bool
+			errOut error
+		)
+		return bOut, errOut
+	}
+	return mock.IsTagNameExistsFunc(ctx, name)
+}
+
+// IsTagNameExistsCalls gets all the calls that were made to IsTagNameExists.
+// Check the length with:
+//
+//	len(mockedRepository.IsTagNameExistsCalls())
+func (mock *RepositoryMock) IsTagNameExistsCalls() []struct {
+	Ctx  context.Context
+	Name string
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Name string
+	}
+	mock.lockIsTagNameExists.RLock()
+	calls = mock.calls.IsTagNameExists
+	mock.lockIsTagNameExists.RUnlock()
+	return calls
+}
+
+// ListAllTags calls ListAllTagsFunc.
+func (mock *RepositoryMock) ListAllTags(ctx context.Context) ([]*tag.Tag, error) {
 	callInfo := struct {
 		Ctx context.Context
 	}{
 		Ctx: ctx,
 	}
-	mock.lockListTags.Lock()
-	mock.calls.ListTags = append(mock.calls.ListTags, callInfo)
-	mock.lockListTags.Unlock()
-	if mock.ListTagsFunc == nil {
+	mock.lockListAllTags.Lock()
+	mock.calls.ListAllTags = append(mock.calls.ListAllTags, callInfo)
+	mock.lockListAllTags.Unlock()
+	if mock.ListAllTagsFunc == nil {
 		var (
-			metadatasOut []*tag.Metadata
-			errOut       error
+			tagsOut []*tag.Tag
+			errOut  error
 		)
-		return metadatasOut, errOut
+		return tagsOut, errOut
 	}
-	return mock.ListTagsFunc(ctx)
+	return mock.ListAllTagsFunc(ctx)
 }
 
-// ListTagsCalls gets all the calls that were made to ListTags.
+// ListAllTagsCalls gets all the calls that were made to ListAllTags.
 // Check the length with:
 //
-//	len(mockedRepository.ListTagsCalls())
-func (mock *RepositoryMock) ListTagsCalls() []struct {
+//	len(mockedRepository.ListAllTagsCalls())
+func (mock *RepositoryMock) ListAllTagsCalls() []struct {
 	Ctx context.Context
 } {
 	var calls []struct {
 		Ctx context.Context
 	}
-	mock.lockListTags.RLock()
-	calls = mock.calls.ListTags
-	mock.lockListTags.RUnlock()
+	mock.lockListAllTags.RLock()
+	calls = mock.calls.ListAllTags
+	mock.lockListAllTags.RUnlock()
 	return calls
 }
 
@@ -4634,6 +4838,84 @@ func (mock *RepositoryMock) RemoveTagFromAllTicketsCalls() []struct {
 	return calls
 }
 
+// RemoveTagIDFromAllAlerts calls RemoveTagIDFromAllAlertsFunc.
+func (mock *RepositoryMock) RemoveTagIDFromAllAlerts(ctx context.Context, tagID types.TagID) error {
+	callInfo := struct {
+		Ctx   context.Context
+		TagID types.TagID
+	}{
+		Ctx:   ctx,
+		TagID: tagID,
+	}
+	mock.lockRemoveTagIDFromAllAlerts.Lock()
+	mock.calls.RemoveTagIDFromAllAlerts = append(mock.calls.RemoveTagIDFromAllAlerts, callInfo)
+	mock.lockRemoveTagIDFromAllAlerts.Unlock()
+	if mock.RemoveTagIDFromAllAlertsFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.RemoveTagIDFromAllAlertsFunc(ctx, tagID)
+}
+
+// RemoveTagIDFromAllAlertsCalls gets all the calls that were made to RemoveTagIDFromAllAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.RemoveTagIDFromAllAlertsCalls())
+func (mock *RepositoryMock) RemoveTagIDFromAllAlertsCalls() []struct {
+	Ctx   context.Context
+	TagID types.TagID
+} {
+	var calls []struct {
+		Ctx   context.Context
+		TagID types.TagID
+	}
+	mock.lockRemoveTagIDFromAllAlerts.RLock()
+	calls = mock.calls.RemoveTagIDFromAllAlerts
+	mock.lockRemoveTagIDFromAllAlerts.RUnlock()
+	return calls
+}
+
+// RemoveTagIDFromAllTickets calls RemoveTagIDFromAllTicketsFunc.
+func (mock *RepositoryMock) RemoveTagIDFromAllTickets(ctx context.Context, tagID types.TagID) error {
+	callInfo := struct {
+		Ctx   context.Context
+		TagID types.TagID
+	}{
+		Ctx:   ctx,
+		TagID: tagID,
+	}
+	mock.lockRemoveTagIDFromAllTickets.Lock()
+	mock.calls.RemoveTagIDFromAllTickets = append(mock.calls.RemoveTagIDFromAllTickets, callInfo)
+	mock.lockRemoveTagIDFromAllTickets.Unlock()
+	if mock.RemoveTagIDFromAllTicketsFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.RemoveTagIDFromAllTicketsFunc(ctx, tagID)
+}
+
+// RemoveTagIDFromAllTicketsCalls gets all the calls that were made to RemoveTagIDFromAllTickets.
+// Check the length with:
+//
+//	len(mockedRepository.RemoveTagIDFromAllTicketsCalls())
+func (mock *RepositoryMock) RemoveTagIDFromAllTicketsCalls() []struct {
+	Ctx   context.Context
+	TagID types.TagID
+} {
+	var calls []struct {
+		Ctx   context.Context
+		TagID types.TagID
+	}
+	mock.lockRemoveTagIDFromAllTickets.RLock()
+	calls = mock.calls.RemoveTagIDFromAllTickets
+	mock.lockRemoveTagIDFromAllTickets.RUnlock()
+	return calls
+}
+
 // SearchAlerts calls SearchAlertsFunc.
 func (mock *RepositoryMock) SearchAlerts(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
 	callInfo := struct {
@@ -4722,6 +5004,45 @@ func (mock *RepositoryMock) UnbindAlertFromTicketCalls() []struct {
 	mock.lockUnbindAlertFromTicket.RLock()
 	calls = mock.calls.UnbindAlertFromTicket
 	mock.lockUnbindAlertFromTicket.RUnlock()
+	return calls
+}
+
+// UpdateTag calls UpdateTagFunc.
+func (mock *RepositoryMock) UpdateTag(ctx context.Context, tagMoqParam *tag.Tag) error {
+	callInfo := struct {
+		Ctx         context.Context
+		TagMoqParam *tag.Tag
+	}{
+		Ctx:         ctx,
+		TagMoqParam: tagMoqParam,
+	}
+	mock.lockUpdateTag.Lock()
+	mock.calls.UpdateTag = append(mock.calls.UpdateTag, callInfo)
+	mock.lockUpdateTag.Unlock()
+	if mock.UpdateTagFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.UpdateTagFunc(ctx, tagMoqParam)
+}
+
+// UpdateTagCalls gets all the calls that were made to UpdateTag.
+// Check the length with:
+//
+//	len(mockedRepository.UpdateTagCalls())
+func (mock *RepositoryMock) UpdateTagCalls() []struct {
+	Ctx         context.Context
+	TagMoqParam *tag.Tag
+} {
+	var calls []struct {
+		Ctx         context.Context
+		TagMoqParam *tag.Tag
+	}
+	mock.lockUpdateTag.RLock()
+	calls = mock.calls.UpdateTag
+	mock.lockUpdateTag.RUnlock()
 	return calls
 }
 

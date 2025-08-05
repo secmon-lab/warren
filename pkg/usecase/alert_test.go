@@ -1213,28 +1213,31 @@ func TestHandleAlert_PolicyWithTags(t *testing.T) {
 
 	// Verify tags are assigned to alert
 	expectedTags := []string{"security", "high-priority", "network"}
-	for _, expectedTag := range expectedTags {
-		gt.Value(t, createdAlert.Tags[expectedTag]).Equal(true)
-	}
 
-	// Verify tags were created in repository
-	tags, err := repo.ListTags(ctx)
+	// Get actual tag names from alert using compatibility method
+	actualTagNames, err := createdAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+		return repo.GetTagsByIDs(ctx, tagIDs)
+	})
 	gt.NoError(t, err)
-	gt.Array(t, tags).Length(3)
+	gt.Equal(t, len(actualTagNames), 3)
 
-	// Verify all expected tags exist
-	tagNames := make([]string, len(tags))
-	for i, tag := range tags {
-		tagNames[i] = string(tag.Name)
+	// Verify all expected tags are present
+	actualTagMap := make(map[string]bool)
+	for _, name := range actualTagNames {
+		actualTagMap[name] = true
 	}
-
 	for _, expectedTag := range expectedTags {
-		gt.Value(t, containsString(tagNames, string(expectedTag))).Equal(true)
+		gt.Value(t, actualTagMap[expectedTag]).Equal(true)
 	}
 
-	// Verify tag metadata has colors
-	for _, tag := range tags {
-		gt.Value(t, tag.Color).NotEqual("")
+	// Verify tags were created in repository by checking each tag individually
+	// Since we moved to ID-based tags, we verify by looking up each expected tag
+	for _, expectedTag := range expectedTags {
+		tag, err := repo.GetTagByName(ctx, expectedTag)
+		gt.NoError(t, err)
+		gt.NotNil(t, tag)
+		gt.Value(t, tag.Name).Equal(expectedTag)
+		gt.Value(t, tag.Color).NotEqual("") // Verify tag has a color
 	}
 }
 
@@ -1246,14 +1249,18 @@ func TestHandleAlert_PolicyWithNewAndExistingTags(t *testing.T) {
 
 	repo := repository.NewMemory()
 
-	// Create existing tag
-	existingTag := &tagmodel.Metadata{
-		Name:      "existing-tag",
-		Color:     "bg-blue-100 text-blue-800",
-		CreatedAt: now.Add(-1 * time.Hour),
-		UpdatedAt: now.Add(-1 * time.Hour),
-	}
-	gt.NoError(t, repo.CreateTag(ctx, existingTag))
+	// Create TagService first
+	tagSvc := tagservice.New(repo)
+
+	// Create existing tag using new system
+	createdTag, err := tagSvc.CreateTagWithCustomColor(ctx, "existing-tag", "Existing tag", "#0066cc", "test")
+	gt.NoError(t, err)
+	gt.NotNil(t, createdTag)
+
+	// Get the tag from repository to ensure we have correct timestamps
+	existingTag, err := repo.GetTagByName(ctx, "existing-tag")
+	gt.NoError(t, err)
+	gt.NotNil(t, existingTag)
 
 	slackMock := &mock.SlackClientMock{
 		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
@@ -1305,7 +1312,7 @@ func TestHandleAlert_PolicyWithNewAndExistingTags(t *testing.T) {
 	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
 	gt.NoError(t, err)
 
-	tagSvc := tagservice.New(repo)
+	// TagService already created above
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
@@ -1327,28 +1334,37 @@ func TestHandleAlert_PolicyWithNewAndExistingTags(t *testing.T) {
 
 	// Verify all tags are assigned to alert
 	expectedTags := []string{"existing-tag", "new-tag-1", "new-tag-2"}
+
+	// Get actual tag names from alert using compatibility method
+	actualTagNames, err := createdAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+		return repo.GetTagsByIDs(ctx, tagIDs)
+	})
+	gt.NoError(t, err)
+	gt.Equal(t, len(actualTagNames), 3)
+
+	// Verify all expected tags are present
+	actualTagMap := make(map[string]bool)
+	for _, name := range actualTagNames {
+		actualTagMap[name] = true
+	}
 	for _, expectedTag := range expectedTags {
-		gt.Value(t, createdAlert.Tags[expectedTag]).Equal(true)
+		gt.Value(t, actualTagMap[expectedTag]).Equal(true)
 	}
 
-	// Verify total tags in repository (1 existing + 2 new = 3)
-	tags, err := repo.ListTags(ctx)
-	gt.NoError(t, err)
-	gt.Array(t, tags).Length(3)
+	// Verify individual tags exist in repository
+	allExpectedTags := []string{"existing-tag", "new-tag-1", "new-tag-2"}
+	for _, expectedTag := range allExpectedTags {
+		tag, err := repo.GetTagByName(ctx, expectedTag)
+		gt.NoError(t, err)
+		gt.NotNil(t, tag)
+		gt.Value(t, tag.Name).Equal(expectedTag)
+		gt.Value(t, tag.Color).NotEqual("") // Verify tag has a color
+	}
 
 	// Verify existing tag unchanged
-	existingTagAfter, err := repo.GetTag(ctx, "existing-tag")
+	existingTagAfter, err := repo.GetTagByName(ctx, "existing-tag")
 	gt.NoError(t, err)
+	gt.NotNil(t, existingTagAfter)
+	gt.Value(t, existingTagAfter.ID).Equal(existingTag.ID)
 	gt.Value(t, existingTagAfter.CreatedAt).Equal(existingTag.CreatedAt)
-	gt.Value(t, existingTagAfter.Color).Equal(existingTag.Color)
-}
-
-// Helper function to check if a string slice contains a specific string
-func containsString(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }

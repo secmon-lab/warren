@@ -25,6 +25,16 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+// Helper function to check if a tag ID exists in a slice
+func containsTag(tags []types.TagID, target types.TagID) bool {
+	for _, tag := range tags {
+		if tag == target {
+			return true
+		}
+	}
+	return false
+}
+
 func newFirestoreClient(t *testing.T) *repository.Firestore {
 	vars := test.NewEnvVars(t, "TEST_FIRESTORE_PROJECT_ID", "TEST_FIRESTORE_DATABASE_ID")
 	client, err := repository.NewFirestore(t.Context(),
@@ -2300,22 +2310,22 @@ func TestTagOperations(t *testing.T) {
 
 		t.Run("Create and list tags", func(t *testing.T) {
 			// Initially no tags
-			tags, err := repo.ListTags(ctx)
+			tags, err := repo.ListAllTags(ctx)
 			gt.NoError(t, err)
 			gt.Array(t, tags).Length(0)
 
 			// Create tags
-			tag1 := &tag.Metadata{Name: "security"}
-			gt.NoError(t, repo.CreateTag(ctx, tag1))
+			tag1 := &tag.Tag{ID: types.NewTagID(), Name: "security", Color: "#ff0000"}
+			gt.NoError(t, repo.CreateTagWithID(ctx, tag1))
 
-			tag2 := &tag.Metadata{Name: "incident"}
-			gt.NoError(t, repo.CreateTag(ctx, tag2))
+			tag2 := &tag.Tag{ID: types.NewTagID(), Name: "incident", Color: "#00ff00"}
+			gt.NoError(t, repo.CreateTagWithID(ctx, tag2))
 
-			tag3 := &tag.Metadata{Name: "phishing"}
-			gt.NoError(t, repo.CreateTag(ctx, tag3))
+			tag3 := &tag.Tag{ID: types.NewTagID(), Name: "phishing", Color: "#0000ff"}
+			gt.NoError(t, repo.CreateTagWithID(ctx, tag3))
 
 			// List tags
-			tags, err = repo.ListTags(ctx)
+			tags, err = repo.ListAllTags(ctx)
 			gt.NoError(t, err)
 			gt.Array(t, tags).Length(3)
 
@@ -2331,14 +2341,15 @@ func TestTagOperations(t *testing.T) {
 
 		t.Run("Create duplicate tag", func(t *testing.T) {
 			// Create a tag
-			tag := &tag.Metadata{Name: "duplicate"}
-			gt.NoError(t, repo.CreateTag(ctx, tag))
+			tag1 := &tag.Tag{ID: types.NewTagID(), Name: "duplicate", Color: "#ff0000"}
+			gt.NoError(t, repo.CreateTagWithID(ctx, tag1))
 
-			// Try to create the same tag again (should not error)
-			gt.NoError(t, repo.CreateTag(ctx, tag))
+			// Try to create a different tag with same name (should succeed with different ID)
+			tag2 := &tag.Tag{ID: types.NewTagID(), Name: "duplicate", Color: "#00ff00"}
+			gt.NoError(t, repo.CreateTagWithID(ctx, tag2))
 
-			// Verify only one tag exists
-			tags, err := repo.ListTags(ctx)
+			// Verify both tags exist
+			tags, err := repo.ListAllTags(ctx)
 			gt.NoError(t, err)
 			count := 0
 			for _, t := range tags {
@@ -2346,61 +2357,62 @@ func TestTagOperations(t *testing.T) {
 					count++
 				}
 			}
-			gt.Number(t, count).Equal(1)
+			gt.Number(t, count).Equal(2) // Now expects 2 since they have different IDs
 		})
 
-		t.Run("Case insensitive tags", func(t *testing.T) {
-			// Create tags with different cases
-			tag1 := &tag.Metadata{Name: "CaseSensitive"}
-			gt.NoError(t, repo.CreateTag(ctx, tag1))
-
-			tag2 := &tag.Metadata{Name: "casesensitive"}
-			gt.NoError(t, repo.CreateTag(ctx, tag2))
-
-			tag3 := &tag.Metadata{Name: "CASESENSITIVE"}
-			gt.NoError(t, repo.CreateTag(ctx, tag3))
-
-			// Should only have one tag (normalized to lowercase)
-			existingTag, err := repo.GetTag(ctx, "casesensitive")
-			gt.NoError(t, err)
-			gt.NotNil(t, existingTag)
-			gt.V(t, existingTag.Name).Equal("CaseSensitive") // First one created
-		})
-
-		t.Run("Get tag", func(t *testing.T) {
+		t.Run("Get tag by ID", func(t *testing.T) {
 			// Create a tag
-			testTag := &tag.Metadata{Name: "gettag"}
-			gt.NoError(t, repo.CreateTag(ctx, testTag))
+			testTag := &tag.Tag{ID: types.NewTagID(), Name: "gettag", Color: "#ff0000"}
+			gt.NoError(t, repo.CreateTagWithID(ctx, testTag))
 
-			// Get existing tag
-			retrievedTag, err := repo.GetTag(ctx, "gettag")
+			// Get existing tag by ID
+			retrievedTag, err := repo.GetTagByID(ctx, testTag.ID)
 			gt.NoError(t, err)
 			gt.NotNil(t, retrievedTag)
 			gt.V(t, retrievedTag.Name).Equal("gettag")
+			gt.V(t, retrievedTag.ID).Equal(testTag.ID)
 
 			// Get non-existent tag
-			nonExistent, err := repo.GetTag(ctx, "nonexistent")
+			nonExistent, err := repo.GetTagByID(ctx, types.NewTagID())
 			gt.NoError(t, err)
 			gt.Nil(t, nonExistent)
 		})
 
-		t.Run("Delete tag", func(t *testing.T) {
-			// Create tags
-			tag1 := &tag.Metadata{Name: "delete1"}
-			tag2 := &tag.Metadata{Name: "delete2"}
-			gt.NoError(t, repo.CreateTag(ctx, tag1))
-			gt.NoError(t, repo.CreateTag(ctx, tag2))
+		t.Run("Get tag by name", func(t *testing.T) {
+			// Create a tag
+			testTag := &tag.Tag{ID: types.NewTagID(), Name: "nametest", Color: "#00ff00"}
+			gt.NoError(t, repo.CreateTagWithID(ctx, testTag))
 
-			// Delete one tag
-			gt.NoError(t, repo.DeleteTag(ctx, "delete1"))
+			// Get existing tag by name
+			retrievedTag, err := repo.GetTagByName(ctx, "nametest")
+			gt.NoError(t, err)
+			gt.NotNil(t, retrievedTag)
+			gt.V(t, retrievedTag.Name).Equal("nametest")
+			gt.V(t, retrievedTag.ID).Equal(testTag.ID)
+
+			// Get non-existent tag
+			nonExistent, err := repo.GetTagByName(ctx, "nonexistent")
+			gt.NoError(t, err)
+			gt.Nil(t, nonExistent)
+		})
+
+		t.Run("Delete tag by ID", func(t *testing.T) {
+			// Create tags
+			tag1 := &tag.Tag{ID: types.NewTagID(), Name: "delete1", Color: "#ff0000"}
+			tag2 := &tag.Tag{ID: types.NewTagID(), Name: "delete2", Color: "#00ff00"}
+			gt.NoError(t, repo.CreateTagWithID(ctx, tag1))
+			gt.NoError(t, repo.CreateTagWithID(ctx, tag2))
+
+			// Delete one tag by ID
+			gt.NoError(t, repo.DeleteTagByID(ctx, tag1.ID))
 
 			// Verify it's deleted
-			deletedTag, err := repo.GetTag(ctx, "delete1")
+			deletedTag, err := repo.GetTagByID(ctx, tag1.ID)
 			gt.NoError(t, err)
 			gt.Nil(t, deletedTag)
 
 			// Other tag should still exist
-			remainingTag, err := repo.GetTag(ctx, "delete2")
+			remainingTag, err := repo.GetTagByID(ctx, tag2.ID)
 			gt.NoError(t, err)
 			gt.NotNil(t, remainingTag)
 		})
@@ -2408,12 +2420,12 @@ func TestTagOperations(t *testing.T) {
 		t.Run("Tag timestamps", func(t *testing.T) {
 			// Create a tag
 			before := time.Now()
-			testTag := &tag.Metadata{Name: "timestamped"}
-			gt.NoError(t, repo.CreateTag(ctx, testTag))
+			testTag := &tag.Tag{ID: types.NewTagID(), Name: "timestamped", Color: "#0000ff"}
+			gt.NoError(t, repo.CreateTagWithID(ctx, testTag))
 			after := time.Now()
 
 			// Get the tag
-			retrievedTag, err := repo.GetTag(ctx, "timestamped")
+			retrievedTag, err := repo.GetTagByID(ctx, testTag.ID)
 			gt.NoError(t, err)
 			gt.NotNil(t, retrievedTag)
 
@@ -2444,12 +2456,31 @@ func TestAlertAndTicketTags(t *testing.T) {
 		ctx := t.Context()
 
 		t.Run("Alert with tags", func(t *testing.T) {
+			// Create tags first in the new system
+			securityTag := &tag.Tag{
+				ID:   types.NewTagID(),
+				Name: "security",
+			}
+			incidentTag := &tag.Tag{
+				ID:   types.NewTagID(),
+				Name: "incident",
+			}
+			criticalTag := &tag.Tag{
+				ID:   types.NewTagID(),
+				Name: "critical",
+			}
+
+			// Store tags in repository
+			gt.NoError(t, repo.CreateTagWithID(ctx, securityTag))
+			gt.NoError(t, repo.CreateTagWithID(ctx, incidentTag))
+			gt.NoError(t, repo.CreateTagWithID(ctx, criticalTag))
+
 			// Create an alert with tags
 			a := alert.New(ctx, "test", map[string]string{"test": "data"}, alert.Metadata{
 				Title:       "Test Alert",
 				Description: "Test Description",
 			})
-			a.Tags = tag.NewSet([]string{"security", "incident", "critical"})
+			a.Tags = []types.TagID{securityTag.ID, incidentTag.ID, criticalTag.ID}
 
 			// Save the alert
 			gt.NoError(t, repo.PutAlert(ctx, a))
@@ -2461,16 +2492,31 @@ func TestAlertAndTicketTags(t *testing.T) {
 
 			// Verify tags are preserved
 			gt.Number(t, len(retrievedAlert.Tags)).Equal(3)
-			gt.True(t, retrievedAlert.Tags.Has("security"))
-			gt.True(t, retrievedAlert.Tags.Has("incident"))
-			gt.True(t, retrievedAlert.Tags.Has("critical"))
+			// Check tags are present in slice
+			gt.True(t, containsTag(retrievedAlert.Tags, securityTag.ID))
+			gt.True(t, containsTag(retrievedAlert.Tags, incidentTag.ID))
+			gt.True(t, containsTag(retrievedAlert.Tags, criticalTag.ID))
 		})
 
 		t.Run("Ticket with tags", func(t *testing.T) {
+			// Create tags first
+			resolvedTag := &tag.Tag{
+				ID:   types.NewTagID(),
+				Name: "resolved",
+			}
+			fpTag := &tag.Tag{
+				ID:   types.NewTagID(),
+				Name: "false-positive",
+			}
+
+			// Store tags in repository
+			gt.NoError(t, repo.CreateTagWithID(ctx, resolvedTag))
+			gt.NoError(t, repo.CreateTagWithID(ctx, fpTag))
+
 			// Create a ticket with tags
 			tk := ticketmodel.New(ctx, []types.AlertID{}, nil)
 			tk.Metadata.Title = "Test Ticket"
-			tk.Tags = tag.NewSet([]string{"resolved", "false-positive"})
+			tk.Tags = []types.TagID{resolvedTag.ID, fpTag.ID}
 
 			// Save the ticket
 			gt.NoError(t, repo.PutTicket(ctx, tk))
@@ -2482,8 +2528,8 @@ func TestAlertAndTicketTags(t *testing.T) {
 
 			// Verify tags are preserved
 			gt.Number(t, len(retrievedTicket.Tags)).Equal(2)
-			gt.True(t, retrievedTicket.Tags.Has("resolved"))
-			gt.True(t, retrievedTicket.Tags.Has("false-positive"))
+			gt.True(t, containsTag(retrievedTicket.Tags, resolvedTag.ID))
+			gt.True(t, containsTag(retrievedTicket.Tags, fpTag.ID))
 		})
 
 		t.Run("Empty tags", func(t *testing.T) {
@@ -2507,6 +2553,23 @@ func TestAlertAndTicketTags(t *testing.T) {
 		})
 
 		t.Run("Tag persistence in batch operations", func(t *testing.T) {
+			// Create common tag and individual tags
+			commonTag := &tag.Tag{
+				ID:   types.NewTagID(),
+				Name: "common",
+			}
+			gt.NoError(t, repo.CreateTagWithID(ctx, commonTag))
+
+			var individualTags []*tag.Tag
+			for i := 0; i < 3; i++ {
+				individualTag := &tag.Tag{
+					ID:   types.NewTagID(),
+					Name: fmt.Sprintf("tag%d", i),
+				}
+				gt.NoError(t, repo.CreateTagWithID(ctx, individualTag))
+				individualTags = append(individualTags, individualTag)
+			}
+
 			// Create multiple alerts with tags
 			alerts := make(alert.Alerts, 3)
 			for i := 0; i < 3; i++ {
@@ -2514,7 +2577,7 @@ func TestAlertAndTicketTags(t *testing.T) {
 					Title:       fmt.Sprintf("Batch Alert %d", i),
 					Description: "Test Description",
 				})
-				a.Tags = tag.NewSet([]string{fmt.Sprintf("tag%d", i), "common"})
+				a.Tags = []types.TagID{individualTags[i].ID, commonTag.ID}
 				alerts[i] = &a
 			}
 
@@ -2532,8 +2595,8 @@ func TestAlertAndTicketTags(t *testing.T) {
 
 			// Verify tags
 			for i, a := range retrievedAlerts {
-				gt.True(t, a.Tags.Has(fmt.Sprintf("tag%d", i)))
-				gt.True(t, a.Tags.Has("common"))
+				gt.True(t, containsTag(a.Tags, individualTags[i].ID))
+				gt.True(t, containsTag(a.Tags, commonTag.ID))
 			}
 		})
 	}

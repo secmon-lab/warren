@@ -2,7 +2,9 @@ package errs
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/m-mizutani/goerr/v2"
@@ -10,6 +12,14 @@ import (
 )
 
 func Handle(ctx context.Context, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			// Ultimate fallback to stderr if slog crashes
+			fmt.Fprintf(os.Stderr, "[CRITICAL] slog crashed during error handling: original_error=%s, slog_panic=%v\n",
+				err.Error(), r)
+		}
+	}()
+
 	logAttrs := []any{slog.Any("error", err)}
 	logger := logging.From(ctx)
 

@@ -52,6 +52,7 @@ An Alert represents a single security event with the following key components:
 | `title` | string | Human-readable title (default: "(no title)") |
 | `description` | string | Detailed description (default: "(no description)") |
 | `attributes` | []Attribute | Key-value pairs |
+| `tags` | []string | Classification tags (e.g., "security", "critical") |
 | `title_source` | types.Source | Origin: Human (default), AI, or Inherited |
 | `description_source` | types.Source | Origin: Human (default), AI, or Inherited |
 
@@ -131,6 +132,7 @@ A Ticket represents an investigation container with the following structure:
 | `title` | string | Human-readable title (required) |
 | `description` | string | Detailed description (optional) |
 | `summary` | string | AI analysis summary (optional) |
+| `tags` | []string | Classification tags inherited from alerts |
 | `title_source` | types.Source | Origin: AI (default), Human, or Inherited |
 | `description_source` | types.Source | Origin: AI (default), Human, or Inherited |
 
@@ -310,3 +312,26 @@ Embeddings enable semantic understanding of alerts and tickets:
 1. **Tune Parameters**: Adjust eps and minSamples for your environment
 2. **Regular Review**: Check clusters for patterns and policy improvements
 3. **Act on Clusters**: Don't let large clusters accumulate without investigation
+
+## Tags
+
+Tags provide classification for alerts and tickets using string labels (e.g., "security", "critical").
+
+### Tag Properties
+
+- **Name**: String identifier
+- **Description**: Optional detailed explanation
+- **Color**: Hex color for visual organization
+- **Auto-creation**: Tags are created automatically when first referenced
+
+### Tag Assignment
+
+- **Alerts**: Assigned via policies or manual operations
+- **Tickets**: Inherit tags from bound alerts, can be modified manually
+- **Persistence**: Tag assignments survive tag renaming and metadata changes
+
+### Tag Operations
+
+- **Rename**: Updates name everywhere without breaking associations
+- **Delete**: Removes tag from all alerts and tickets
+- **Filtering**: Query alerts/tickets by tag presence

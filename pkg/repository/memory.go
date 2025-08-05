@@ -5,7 +5,6 @@ import (
 	"math"
 	"reflect"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -33,7 +32,7 @@ type Memory struct {
 	ticketComments map[types.TicketID][]ticket.Comment
 	tokens         map[auth.TokenID]*auth.Token
 	activities     map[types.ActivityID]*activity.Activity
-	tags           map[string]*tag.Metadata
+	tagsV2         map[types.TagID]*tag.Tag // New ID-based tags
 
 	// Call counter for tracking method invocations
 	callCounts map[string]int
@@ -51,7 +50,7 @@ func NewMemory() *Memory {
 		ticketComments: make(map[types.TicketID][]ticket.Comment),
 		tokens:         make(map[auth.TokenID]*auth.Token),
 		activities:     make(map[types.ActivityID]*activity.Activity),
-		tags:           make(map[string]*tag.Metadata),
+		tagsV2:         make(map[types.TagID]*tag.Tag),
 		callCounts:     make(map[string]int),
 	}
 }
@@ -1012,98 +1011,196 @@ func (r *Memory) CountActivities(ctx context.Context) (int, error) {
 
 // Tag management methods
 
-func (r *Memory) ListTags(ctx context.Context) ([]*tag.Metadata, error) {
+func (r *Memory) RemoveTagFromAllAlerts(ctx context.Context, name string) error {
+	// First, look up the tag by name to get its ID
+	tag, err := r.GetTagByName(ctx, name)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get tag by name")
+	}
+	if tag == nil {
+		// Tag doesn't exist, nothing to remove
+		return nil
+	}
+
+	// Use the new ID-based removal method
+	return r.RemoveTagIDFromAllAlerts(ctx, tag.ID)
+}
+
+func (r *Memory) RemoveTagFromAllTickets(ctx context.Context, name string) error {
+	// First, look up the tag by name to get its ID
+	tag, err := r.GetTagByName(ctx, name)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get tag by name")
+	}
+	if tag == nil {
+		// Tag doesn't exist, nothing to remove
+		return nil
+	}
+
+	// Use the new ID-based removal method
+	return r.RemoveTagIDFromAllTickets(ctx, tag.ID)
+}
+
+// New ID-based tag management methods
+
+func (r *Memory) GetTagByID(ctx context.Context, tagID types.TagID) (*tag.Tag, error) {
 	r.tagMu.RLock()
 	defer r.tagMu.RUnlock()
 
-	tags := make([]*tag.Metadata, 0, len(r.tags))
-	for _, tag := range r.tags {
-		// Create a copy to prevent external modification
-		tagCopy := *tag
-		tags = append(tags, &tagCopy)
+	if tagData, exists := r.tagsV2[tagID]; exists {
+		// Return a copy to prevent external modification
+		tagCopy := *tagData
+		return &tagCopy, nil
+	}
+
+	return nil, nil
+}
+
+func (r *Memory) GetTagsByIDs(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error) {
+	r.tagMu.RLock()
+	defer r.tagMu.RUnlock()
+
+	tags := make([]*tag.Tag, 0, len(tagIDs))
+	for _, tagID := range tagIDs {
+		if tagData, exists := r.tagsV2[tagID]; exists {
+			// Return a copy to prevent external modification
+			tagCopy := *tagData
+			tags = append(tags, &tagCopy)
+		}
 	}
 
 	return tags, nil
 }
 
-func (r *Memory) CreateTag(ctx context.Context, tag *tag.Metadata) error {
+func (r *Memory) CreateTagWithID(ctx context.Context, tag *tag.Tag) error {
 	r.tagMu.Lock()
 	defer r.tagMu.Unlock()
 
-	// Normalize tag name to lowercase for case-insensitive comparison
-	normalizedName := strings.ToLower(string(tag.Name))
-
-	// Check if tag already exists
-	if _, exists := r.tags[normalizedName]; exists {
-		// Tag already exists, no need to create
-		return nil
+	if tag.ID == types.EmptyTagID {
+		return goerr.New("tag ID is required")
 	}
 
-	// Set timestamps
+	if _, exists := r.tagsV2[tag.ID]; exists {
+		return goerr.New("tag ID already exists", goerr.V("tagID", tag.ID))
+	}
+
+	// Set timestamps if not already set
 	now := time.Now()
-	tag.CreatedAt = now
-	tag.UpdatedAt = now
-
-	// Create a copy to prevent external modification
 	tagCopy := *tag
-	r.tags[normalizedName] = &tagCopy
+	if tagCopy.CreatedAt.IsZero() {
+		tagCopy.CreatedAt = now
+	}
+	if tagCopy.UpdatedAt.IsZero() {
+		tagCopy.UpdatedAt = now
+	}
+
+	r.tagsV2[tag.ID] = &tagCopy
 
 	return nil
 }
 
-func (r *Memory) DeleteTag(ctx context.Context, name string) error {
+func (r *Memory) UpdateTag(ctx context.Context, tag *tag.Tag) error {
 	r.tagMu.Lock()
 	defer r.tagMu.Unlock()
 
-	// Normalize tag name to lowercase
-	normalizedName := strings.ToLower(name)
+	if tag.ID == types.EmptyTagID {
+		return goerr.New("tag ID is required")
+	}
 
-	delete(r.tags, normalizedName)
+	// Set UpdatedAt timestamp
+	tagCopy := *tag
+	tagCopy.UpdatedAt = time.Now()
+	r.tagsV2[tag.ID] = &tagCopy
 
 	return nil
 }
 
-func (r *Memory) GetTag(ctx context.Context, name string) (*tag.Metadata, error) {
-	r.tagMu.RLock()
-	defer r.tagMu.RUnlock()
+func (r *Memory) DeleteTagByID(ctx context.Context, tagID types.TagID) error {
+	r.tagMu.Lock()
+	defer r.tagMu.Unlock()
 
-	// Normalize tag name to lowercase
-	normalizedName := strings.ToLower(name)
-
-	tag, exists := r.tags[normalizedName]
-	if !exists {
-		return nil, nil
-	}
-
-	// Create a copy to prevent external modification
-	tagCopy := *tag
-	return &tagCopy, nil
+	delete(r.tagsV2, tagID)
+	return nil
 }
 
-func (r *Memory) RemoveTagFromAllAlerts(ctx context.Context, name string) error {
+func (r *Memory) RemoveTagIDFromAllAlerts(ctx context.Context, tagID types.TagID) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	// Iterate through all alerts and remove the tag
 	for _, alert := range r.alerts {
 		if alert.Tags != nil {
-			delete(alert.Tags, name)
+			// Remove tagID from slice
+			for i, tag := range alert.Tags {
+				if tag == tagID {
+					alert.Tags = append(alert.Tags[:i], alert.Tags[i+1:]...)
+					break
+				}
+			}
 		}
 	}
 
 	return nil
 }
 
-func (r *Memory) RemoveTagFromAllTickets(ctx context.Context, name string) error {
+func (r *Memory) RemoveTagIDFromAllTickets(ctx context.Context, tagID types.TagID) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	// Iterate through all tickets and remove the tag
 	for _, ticket := range r.tickets {
 		if ticket.Tags != nil {
-			delete(ticket.Tags, name)
+			// Remove tagID from slice
+			for i, tag := range ticket.Tags {
+				if tag == tagID {
+					ticket.Tags = append(ticket.Tags[:i], ticket.Tags[i+1:]...)
+					break
+				}
+			}
 		}
 	}
 
 	return nil
+}
+
+func (r *Memory) GetTagByName(ctx context.Context, name string) (*tag.Tag, error) {
+	r.tagMu.RLock()
+	defer r.tagMu.RUnlock()
+
+	for _, tagData := range r.tagsV2 {
+		if tagData.Name == name {
+			// Return a copy to prevent external modification
+			tagCopy := *tagData
+			return &tagCopy, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func (r *Memory) IsTagNameExists(ctx context.Context, name string) (bool, error) {
+	r.tagMu.RLock()
+	defer r.tagMu.RUnlock()
+
+	for _, tagData := range r.tagsV2 {
+		if tagData.Name == name {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (r *Memory) ListAllTags(ctx context.Context) ([]*tag.Tag, error) {
+	r.tagMu.RLock()
+	defer r.tagMu.RUnlock()
+
+	tags := make([]*tag.Tag, 0, len(r.tagsV2))
+	for _, tagData := range r.tagsV2 {
+		// Return a copy to prevent external modification
+		tagCopy := *tagData
+		tags = append(tags, &tagCopy)
+	}
+
+	return tags, nil
 }

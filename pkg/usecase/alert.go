@@ -79,12 +79,14 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, a
 func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*alert.Alert, error) {
 	logger := logging.From(ctx)
 
-	// Ensure tags exist if provided through policy
-	if len(newAlert.Tags) > 0 && uc.tagService != nil {
-		tags := newAlert.Tags.ToSlice()
-		if err := uc.tagService.EnsureTagsExist(ctx, tags); err != nil {
-			return nil, goerr.Wrap(err, "failed to ensure tags exist")
+	// Convert metadata tags (string names) to tag IDs and store in Alert.Tags
+	if len(newAlert.Metadata.Tags) > 0 && uc.tagService != nil {
+		// Use the tag service to convert names to IDs (creates tags if they don't exist)
+		tagIDs, err := uc.tagService.ConvertNamesToIDs(ctx, newAlert.Metadata.Tags)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
 		}
+		newAlert.Tags = tagIDs
 	}
 
 	if err := newAlert.FillMetadata(ctx, uc.llmClient); err != nil {

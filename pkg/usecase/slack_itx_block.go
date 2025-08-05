@@ -175,7 +175,7 @@ func (uc *UseCases) showResolveTicketModal(ctx context.Context, _ slack.User, _ 
 	// Fetch available tags
 	var availableTags []string
 	if uc.tagService != nil {
-		tags, err := uc.tagService.ListTags(ctx)
+		tags, err := uc.tagService.ListAllTags(ctx)
 		if err != nil {
 			// Log error but continue without tags
 			logging.From(ctx).Warn("failed to list tags for resolve modal", "error", err)

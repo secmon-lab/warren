@@ -6,6 +6,7 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	tagmodel "github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
@@ -23,14 +24,14 @@ func TestTagService_CreateAndListTags(t *testing.T) {
 	gt.NoError(t, service.CreateTag(ctx, "phishing"))
 
 	// List tags
-	tags, err := service.ListTags(ctx)
+	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(3)
 
 	// Verify tag names
 	tagNames := make(map[string]bool)
 	for _, tag := range tags {
-		tagNames[string(tag.Name)] = true
+		tagNames[tag.Name] = true
 	}
 	gt.True(t, tagNames["security"])
 	gt.True(t, tagNames["incident"])
@@ -49,7 +50,7 @@ func TestTagService_CreateDuplicateTag(t *testing.T) {
 	gt.NoError(t, service.CreateTag(ctx, "security"))
 
 	// List tags - should still have only one
-	tags, err := service.ListTags(ctx)
+	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(1)
 }
@@ -67,7 +68,7 @@ func TestTagService_DeleteTag(t *testing.T) {
 	gt.NoError(t, service.DeleteTag(ctx, "security"))
 
 	// List tags - should have only one
-	tags, err := service.ListTags(ctx)
+	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(1)
 	gt.V(t, tags[0].Name).Equal("incident")
@@ -82,7 +83,7 @@ func TestTagService_EnsureTagsExist(t *testing.T) {
 	gt.NoError(t, service.EnsureTagsExist(ctx, []string{"tag1", "tag2", "tag3"}))
 
 	// List tags
-	tags, err := service.ListTags(ctx)
+	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(3)
 
@@ -90,12 +91,12 @@ func TestTagService_EnsureTagsExist(t *testing.T) {
 	gt.NoError(t, service.EnsureTagsExist(ctx, []string{"tag1", "tag2", "tag4"}))
 
 	// List tags - should have 4 now
-	tags, err = service.ListTags(ctx)
+	tags, err = service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(4)
 }
 
-func TestTagService_UpdateAlertTags(t *testing.T) {
+func TestTagService_UpdateAlertTagsByName(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
 	service := tag.New(repo)
@@ -107,21 +108,34 @@ func TestTagService_UpdateAlertTags(t *testing.T) {
 	})
 	gt.NoError(t, repo.PutAlert(ctx, a))
 
-	// Update alert tags
-	updatedAlert, err := service.UpdateAlertTags(ctx, a.ID, []string{"security", "incident"})
+	// Update alert tags using name-based method
+	updatedAlert, err := service.UpdateAlertTagsByName(ctx, a.ID, []string{"security", "incident"})
 	gt.NoError(t, err)
 	gt.NotNil(t, updatedAlert)
 	gt.N(t, len(updatedAlert.Tags)).Equal(2)
-	gt.True(t, updatedAlert.Tags.Has("security"))
-	gt.True(t, updatedAlert.Tags.Has("incident"))
+
+	// Get actual tag names to verify
+	tagNames, err := updatedAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+		return service.GetTagsByIDs(ctx, tagIDs)
+	})
+	gt.NoError(t, err)
+	gt.N(t, len(tagNames)).Equal(2)
+
+	// Check that the expected tags are present
+	tagMap := make(map[string]bool)
+	for _, name := range tagNames {
+		tagMap[name] = true
+	}
+	gt.True(t, tagMap["security"])
+	gt.True(t, tagMap["incident"])
 
 	// Verify tags were created
-	tags, err := service.ListTags(ctx)
+	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(2)
 }
 
-func TestTagService_UpdateTicketTags(t *testing.T) {
+func TestTagService_UpdateTicketTagsByName(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
 	service := tag.New(repo)
@@ -131,16 +145,29 @@ func TestTagService_UpdateTicketTags(t *testing.T) {
 	tk.Metadata.Title = "Test Ticket"
 	gt.NoError(t, repo.PutTicket(ctx, tk))
 
-	// Update ticket tags
-	updatedTicket, err := service.UpdateTicketTags(ctx, tk.ID, []string{"resolved", "false-positive"})
+	// Update ticket tags using name-based method
+	updatedTicket, err := service.UpdateTicketTagsByName(ctx, tk.ID, []string{"resolved", "false-positive"})
 	gt.NoError(t, err)
 	gt.NotNil(t, updatedTicket)
 	gt.N(t, len(updatedTicket.Tags)).Equal(2)
-	gt.True(t, updatedTicket.Tags.Has("resolved"))
-	gt.True(t, updatedTicket.Tags.Has("false-positive"))
+
+	// Get actual tag names to verify
+	tagNames, err := updatedTicket.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+		return service.GetTagsByIDs(ctx, tagIDs)
+	})
+	gt.NoError(t, err)
+	gt.N(t, len(tagNames)).Equal(2)
+
+	// Check that the expected tags are present
+	tagMap := make(map[string]bool)
+	for _, name := range tagNames {
+		tagMap[name] = true
+	}
+	gt.True(t, tagMap["resolved"])
+	gt.True(t, tagMap["false-positive"])
 
 	// Verify tags were created
-	tags, err := service.ListTags(ctx)
+	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(2)
 }
@@ -158,7 +185,7 @@ func TestTagService_EmptyTagHandling(t *testing.T) {
 	gt.NoError(t, service.EnsureTagsExist(ctx, []string{"valid", "", "tag"}))
 
 	// Should only create valid tags
-	tags, err := service.ListTags(ctx)
+	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(2)
 }

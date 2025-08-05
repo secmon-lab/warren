@@ -106,7 +106,12 @@ func (r *alertResolver) Ticket(ctx context.Context, obj *alert.Alert) (*ticket.T
 
 // Tags is the resolver for the tags field.
 func (r *alertResolver) Tags(ctx context.Context, obj *alert.Alert) ([]string, error) {
-	return obj.Tags.ToSlice(), nil
+	if r.uc == nil || len(obj.Tags) == 0 {
+		return []string{}, nil
+	}
+
+	// Use the compatibility method to get tag names
+	return obj.GetTagNames(ctx, r.createTagGetter())
 }
 
 // ID is the resolver for the id field.
@@ -1019,7 +1024,12 @@ func (r *ticketResolver) UpdatedAt(ctx context.Context, obj *ticket.Ticket) (str
 
 // Tags is the resolver for the tags field.
 func (r *ticketResolver) Tags(ctx context.Context, obj *ticket.Ticket) ([]string, error) {
-	return obj.Tags.ToSlice(), nil
+	if r.uc == nil || len(obj.Tags) == 0 {
+		return []string{}, nil
+	}
+
+	// Use the compatibility method to get tag names
+	return obj.GetTagNames(ctx, r.createTagGetter())
 }
 
 // Activity returns ActivityResolver implementation.

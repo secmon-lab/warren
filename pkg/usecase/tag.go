@@ -24,8 +24,8 @@ func NewTagUseCase(tagService *tag.Service) *TagUseCase {
 }
 
 // ListTags returns all tags in the system
-func (u *TagUseCase) ListTags(ctx context.Context) ([]*tagmodel.Metadata, error) {
-	tags, err := u.tagService.ListTags(ctx)
+func (u *TagUseCase) ListTags(ctx context.Context) ([]*tagmodel.Tag, error) {
+	tags, err := u.tagService.ListAllTags(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list tags")
 	}
@@ -33,23 +33,14 @@ func (u *TagUseCase) ListTags(ctx context.Context) ([]*tagmodel.Metadata, error)
 }
 
 // CreateTag creates a new tag
-func (u *TagUseCase) CreateTag(ctx context.Context, name string) (*tagmodel.Metadata, error) {
+func (u *TagUseCase) CreateTag(ctx context.Context, name string) (*tagmodel.Tag, error) {
 	if name == "" {
 		return nil, goerr.New("tag name cannot be empty")
 	}
 
-	if err := u.tagService.CreateTag(ctx, name); err != nil {
-		return nil, goerr.Wrap(err, "failed to create tag")
-	}
-
-	// Return the created tag metadata by fetching it directly
-	// This is more efficient and handles case-insensitivity correctly
-	tag, err := u.tagService.GetTag(ctx, name)
+	tag, err := u.tagService.CreateTagWithCustomColor(ctx, name, "", "", "")
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get created tag")
-	}
-	if tag == nil {
-		return nil, goerr.New("created tag not found")
+		return nil, goerr.Wrap(err, "failed to create tag")
 	}
 
 	return tag, nil
@@ -70,7 +61,14 @@ func (u *TagUseCase) DeleteTag(ctx context.Context, name string) error {
 
 // UpdateAlertTags updates tags for an alert
 func (u *TagUseCase) UpdateAlertTags(ctx context.Context, alertID types.AlertID, tags []string) (*alert.Alert, error) {
-	a, err := u.tagService.UpdateAlertTags(ctx, alertID, tags)
+	// Convert tag names to IDs
+	tagIDs, err := u.tagService.ConvertNamesToIDs(ctx, tags)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
+	}
+
+	// Use ID-based method
+	a, err := u.tagService.UpdateAlertTagsByID(ctx, alertID, tagIDs)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update alert tags")
 	}
@@ -79,7 +77,14 @@ func (u *TagUseCase) UpdateAlertTags(ctx context.Context, alertID types.AlertID,
 
 // UpdateTicketTags updates tags for a ticket
 func (u *TagUseCase) UpdateTicketTags(ctx context.Context, ticketID types.TicketID, tags []string) (*ticket.Ticket, error) {
-	t, err := u.tagService.UpdateTicketTags(ctx, ticketID, tags)
+	// Convert tag names to IDs
+	tagIDs, err := u.tagService.ConvertNamesToIDs(ctx, tags)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
+	}
+
+	// Use ID-based method
+	t, err := u.tagService.UpdateTicketTagsByID(ctx, ticketID, tagIDs)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update ticket tags")
 	}

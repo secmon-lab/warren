@@ -7,7 +7,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -80,11 +79,16 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 
 	// Inherit tags from alerts
 	if len(alerts) > 0 {
-		inheritedTags := make(tag.Set)
+		tagIDMap := make(map[types.TagID]bool)
 		for _, alert := range alerts {
-			for tag := range alert.Tags {
-				inheritedTags[tag] = true
+			for _, tagID := range alert.Tags {
+				tagIDMap[tagID] = true
 			}
+		}
+		// Convert map to slice
+		inheritedTags := make([]types.TagID, 0, len(tagIDMap))
+		for tagID := range tagIDMap {
+			inheritedTags = append(inheritedTags, tagID)
 		}
 		newTicket.Tags = inheritedTags
 	}

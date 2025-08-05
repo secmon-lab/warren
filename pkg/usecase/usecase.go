@@ -168,6 +168,11 @@ func (u *UseCases) IsSlackEnabled() bool {
 	return u.slackService != nil
 }
 
+// GetTagService returns the tag service if available
+func (u *UseCases) GetTagService() *tag.Service {
+	return u.tagService
+}
+
 // executeSlackCommand executes a Slack command using the concrete slack service
 func (uc *UseCases) executeSlackCommand(ctx context.Context, slackMsg *slack.Message, threadSvc interfaces.SlackThreadService, commandStr string) error {
 	// Commands require concrete slack service

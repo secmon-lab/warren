@@ -6,6 +6,8 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	tagmodel "github.com/secmon-lab/warren/pkg/domain/model/tag"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -43,8 +45,21 @@ func TestTagUseCase_Operations(t *testing.T) {
 	gt.NoError(t, err)
 	gt.NotNil(t, updatedAlert)
 	gt.N(t, len(updatedAlert.Tags)).Equal(2)
-	gt.True(t, updatedAlert.Tags.Has("security"))
-	gt.True(t, updatedAlert.Tags.Has("critical"))
+
+	// Get actual tag names to verify
+	tagNames, err := updatedAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+		return tagService.GetTagsByIDs(ctx, tagIDs)
+	})
+	gt.NoError(t, err)
+	gt.N(t, len(tagNames)).Equal(2)
+
+	// Check that the expected tags are present
+	tagMap := make(map[string]bool)
+	for _, name := range tagNames {
+		tagMap[name] = true
+	}
+	gt.True(t, tagMap["security"])
+	gt.True(t, tagMap["critical"])
 
 	// Verify new tag was created
 	tags, err = tagUC.ListTags(ctx)

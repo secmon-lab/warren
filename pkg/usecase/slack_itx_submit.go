@@ -11,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -252,6 +253,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 	)
 
 	ticketID := types.TicketID(metadata)
+	logger.Debug("getting ticket", "ticket_id", ticketID)
 	target, err := uc.repository.GetTicket(ctx, ticketID)
 	if err != nil {
 		_ = msg.Trace(ctx, "💥 Failed to get ticket\n> %s", err.Error())
@@ -281,32 +283,61 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 		slack.BlockActionIDTicketComment,
 	)
 	if !ok {
-		return goerr.New("reason not found")
+		// Comment is optional, set empty string if not provided
+		reason = ""
+		logger.Debug("comment field not provided, using empty string")
 	}
 
 	target.Conclusion = conclusion
 	target.Reason = reason
 	target.Status = types.TicketStatusResolved
 
-	// Handle tag selection if available
+	// Handle tag selection if available (supports both checkbox and multi-select)
 	if block, ok := values[slack.BlockIDTicketTags.String()]; ok {
-		if action, ok := block[slack.BlockActionIDTicketTags.String()]; ok && action.SelectedOptions != nil {
-			// Extract selected tag names
-			selectedTags := make([]string, 0, len(action.SelectedOptions))
-			for _, option := range action.SelectedOptions {
-				selectedTags = append(selectedTags, option.Value)
+		if action, ok := block[slack.BlockActionIDTicketTags.String()]; ok {
+			logger.Debug("processing tag selection",
+				"action", action,
+				"selected_options", action.SelectedOptions,
+				"selected_option", action.SelectedOption,
+			)
+
+			var selectedTags []string
+
+			// Handle checkbox and multi-select formats
+			if len(action.SelectedOptions) > 0 {
+				// Multi-select or checkbox with multiple selections
+				selectedTags = make([]string, 0, len(action.SelectedOptions))
+				for _, option := range action.SelectedOptions {
+					selectedTags = append(selectedTags, option.Value)
+				}
 			}
 
-			// Update ticket tags
-			if uc.tagService != nil {
-				if _, err := uc.tagService.UpdateTicketTags(ctx, ticketID, selectedTags); err != nil {
-					logger.Warn("failed to update ticket tags", "error", err)
-					// Continue with resolve even if tag update fails
+			logger.Debug("extracted tag names", "tags", selectedTags)
+
+			// Convert tag names to IDs and update ticket tags
+			logger.Debug("checking tag service", "tagService", uc.tagService != nil, "selectedTagsCount", len(selectedTags))
+			if len(selectedTags) > 0 && uc.tagService != nil {
+				logger.Debug("converting tag names to IDs", "tags", selectedTags)
+				tagIDs, err := uc.tagService.ConvertNamesToIDs(ctx, selectedTags)
+				if err != nil {
+					logger.Warn("failed to convert tag names to IDs", "error", err, "tags", selectedTags)
+					// Continue with resolve even if tag conversion fails
+				} else {
+					logger.Debug("successfully converted tag names to IDs", "tagIDs", tagIDs)
+					// Merge existing tags with new tags
+					existingTags := target.Tags
+					logger.Debug("existing tags", "existingTags", existingTags)
+
+					target.Tags = tag.MergeTagIDs(existingTags, tagIDs)
+					logger.Debug("target ticket updated with merged tags", "target.Tags", target.Tags)
 				}
+			} else {
+				logger.Debug("skipping tag update", "hasSelectedTags", len(selectedTags) > 0, "hasTagService", uc.tagService != nil)
 			}
 		}
 	}
 
+	logger.Debug("saving ticket to repository", "ticketID", target.ID, "target.Tags", target.Tags, "target.Status", target.Status)
 	if err := uc.repository.PutTicket(ctx, *target); err != nil {
 		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID))
 	}

@@ -418,32 +418,59 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 
 	// Add tag selection if tags are available
 	if len(availableTags) > 0 {
-		tagOptions := make([]*slack.OptionBlockObject, 0, len(availableTags))
+		// Use checkboxes if 10 or fewer tags, otherwise use multi-select dropdown
+		if len(availableTags) <= 10 {
+			// Create checkbox options for tags
+			checkboxOptions := make([]*slack.OptionBlockObject, 0, len(availableTags))
+			for _, tag := range availableTags {
+				checkboxOptions = append(checkboxOptions,
+					slack.NewOptionBlockObject(
+						tag,
+						slack.NewTextBlockObject(slack.PlainTextType, tag, false, false),
+						nil,
+					),
+				)
+			}
 
-		// Create tag options
-		for _, tag := range availableTags {
-			tagOptions = append(tagOptions,
-				slack.NewOptionBlockObject(
-					tag,
-					slack.NewTextBlockObject(slack.PlainTextType, tag, false, false),
-					nil,
+			// Add checkboxes for tags
+			blockSet = append(blockSet, slack.NewInputBlock(
+				model.BlockIDTicketTags.String(),
+				slack.NewTextBlockObject(slack.PlainTextType, "Tags", false, false),
+				slack.NewTextBlockObject(slack.PlainTextType, "Select tags for this ticket", false, false),
+				slack.NewCheckboxGroupsBlockElement(
+					model.BlockActionIDTicketTags.String(),
+					checkboxOptions...,
 				),
-			)
-		}
+			).WithOptional(true))
+		} else {
+			// Use multi-select dropdown for more than 10 tags
+			tagOptions := make([]*slack.OptionBlockObject, 0, len(availableTags))
 
-		// Add multi-select for tags
-		// Note: initial_options is not supported in modal views for multi_select elements
-		blockSet = append(blockSet, slack.NewInputBlock(
-			model.BlockIDTicketTags.String(),
-			slack.NewTextBlockObject(slack.PlainTextType, "Tags", false, false),
-			slack.NewTextBlockObject(slack.PlainTextType, "Select tags for this ticket", false, false),
-			slack.NewOptionsMultiSelectBlockElement(
-				slack.OptTypeStatic,
-				slack.NewTextBlockObject(slack.PlainTextType, "Select tags", false, false),
-				model.BlockActionIDTicketTags.String(),
-				tagOptions...,
-			),
-		).WithOptional(true))
+			// Create tag options
+			for _, tag := range availableTags {
+				tagOptions = append(tagOptions,
+					slack.NewOptionBlockObject(
+						tag,
+						slack.NewTextBlockObject(slack.PlainTextType, tag, false, false),
+						nil,
+					),
+				)
+			}
+
+			// Add multi-select for tags
+			// Note: initial_options is not supported in modal views for multi_select elements
+			blockSet = append(blockSet, slack.NewInputBlock(
+				model.BlockIDTicketTags.String(),
+				slack.NewTextBlockObject(slack.PlainTextType, "Tags", false, false),
+				slack.NewTextBlockObject(slack.PlainTextType, "Select tags for this ticket", false, false),
+				slack.NewOptionsMultiSelectBlockElement(
+					slack.OptTypeStatic,
+					slack.NewTextBlockObject(slack.PlainTextType, "Select tags", false, false),
+					model.BlockActionIDTicketTags.String(),
+					tagOptions...,
+				),
+			).WithOptional(true))
+		}
 	}
 
 	return slack.ModalViewRequest{
