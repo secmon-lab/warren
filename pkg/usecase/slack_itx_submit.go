@@ -11,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -327,7 +328,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 					existingTags := target.Tags
 					logger.Debug("existing tags", "existingTags", existingTags)
 
-					target.Tags = mergeTagIDs(existingTags, tagIDs)
+					target.Tags = tag.MergeTagIDs(existingTags, tagIDs)
 					logger.Debug("target ticket updated with merged tags", "target.Tags", target.Tags)
 				}
 			} else {
@@ -427,28 +428,4 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionSalvage(ctx context.Cont
 	msg.Notify(ctx, "🎉 Salvaged %d alerts to ticket %s", len(unboundAlerts), target.Metadata.Title)
 
 	return nil
-}
-
-// mergeTagIDs merges existing tags with new tags, avoiding duplicates
-func mergeTagIDs(existingTags, newTags []types.TagID) []types.TagID {
-	// Create a map to avoid duplicates
-	tagMap := make(map[types.TagID]bool)
-
-	// Add existing tags
-	for _, tagID := range existingTags {
-		tagMap[tagID] = true
-	}
-
-	// Add new tags
-	for _, tagID := range newTags {
-		tagMap[tagID] = true
-	}
-
-	// Convert back to slice
-	mergedTags := make([]types.TagID, 0, len(tagMap))
-	for tagID := range tagMap {
-		mergedTags = append(mergedTags, tagID)
-	}
-
-	return mergedTags
 }

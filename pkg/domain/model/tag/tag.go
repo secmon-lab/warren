@@ -152,3 +152,27 @@ func GenerateColor(tagName string) string {
 	colorIndex := int(h) % len(chipColors)
 	return chipColors[colorIndex]
 }
+
+// MergeTagIDs merges two slices of tag IDs, removing duplicates
+func MergeTagIDs(existingTags, newTags []types.TagID) []types.TagID {
+	// Create a map to avoid duplicates
+	tagMap := make(map[types.TagID]bool)
+
+	// Add existing tags
+	for _, tagID := range existingTags {
+		tagMap[tagID] = true
+	}
+
+	// Add new tags
+	for _, tagID := range newTags {
+		tagMap[tagID] = true
+	}
+
+	// Convert back to slice
+	mergedTags := make([]types.TagID, 0, len(tagMap))
+	for tagID := range tagMap {
+		mergedTags = append(mergedTags, tagID)
+	}
+
+	return mergedTags
+}

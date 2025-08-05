@@ -42,14 +42,25 @@ func generateRandomString(charset string, length int) string {
 	b := make([]byte, length)
 	charsetLen := len(charset)
 
-	// Use crypto/rand for secure random generation
-	randBytes := make([]byte, length)
-	if _, err := rand.Read(randBytes); err != nil {
-		panic("failed to generate random bytes: " + err.Error())
-	}
+	// Calculate the maximum index that can be uniformly distributed
+	// to avoid modulo bias
+	maxUniform := 256 - (256 % charsetLen)
 
 	for i := 0; i < length; i++ {
-		b[i] = charset[int(randBytes[i])%charsetLen]
+		// Use rejection sampling to ensure uniform distribution
+		for {
+			var randomByte [1]byte
+			if _, err := rand.Read(randomByte[:]); err != nil {
+				panic("failed to generate random byte: " + err.Error())
+			}
+
+			// Reject values that would cause modulo bias
+			if int(randomByte[0]) < maxUniform {
+				b[i] = charset[int(randomByte[0])%charsetLen]
+				break
+			}
+			// Loop again if the value would cause bias
+		}
 	}
 
 	return string(b)

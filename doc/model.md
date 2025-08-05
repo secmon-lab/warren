@@ -320,7 +320,7 @@ Tags provide classification for alerts and tickets using string labels (e.g., "s
 ### Tag Properties
 
 - **Name**: String identifier
-- **Description**: Optional detailed explanation  
+- **Description**: Optional detailed explanation
 - **Color**: Hex color for visual organization
 - **Auto-creation**: Tags are created automatically when first referenced
 

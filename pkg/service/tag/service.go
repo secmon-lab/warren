@@ -216,7 +216,7 @@ func (s *Service) UpdateAlertTagsByID(ctx context.Context, alertID types.AlertID
 	}
 
 	// Merge existing tags with new tags
-	a.Tags = mergeTagIDs(a.Tags, tagIDs)
+	a.Tags = tag.MergeTagIDs(a.Tags, tagIDs)
 
 	// Save the alert
 	if err := s.repo.PutAlert(ctx, *a); err != nil {
@@ -248,7 +248,7 @@ func (s *Service) UpdateTicketTagsByID(ctx context.Context, ticketID types.Ticke
 	}
 
 	// Merge existing tags with new tags
-	t.Tags = mergeTagIDs(t.Tags, tagIDs)
+	t.Tags = tag.MergeTagIDs(t.Tags, tagIDs)
 
 	// Save the ticket
 	if err := s.repo.PutTicket(ctx, *t); err != nil {
@@ -326,28 +326,4 @@ func (s *Service) ListAllTags(ctx context.Context) ([]*tag.Tag, error) {
 		return nil, goerr.Wrap(err, "failed to list all tags")
 	}
 	return tags, nil
-}
-
-// mergeTagIDs merges existing tags with new tags, avoiding duplicates
-func mergeTagIDs(existingTags, newTags []types.TagID) []types.TagID {
-	// Create a map to avoid duplicates
-	tagMap := make(map[types.TagID]bool)
-
-	// Add existing tags
-	for _, tagID := range existingTags {
-		tagMap[tagID] = true
-	}
-
-	// Add new tags
-	for _, tagID := range newTags {
-		tagMap[tagID] = true
-	}
-
-	// Convert back to slice
-	mergedTags := make([]types.TagID, 0, len(tagMap))
-	for tagID := range tagMap {
-		mergedTags = append(mergedTags, tagID)
-	}
-
-	return mergedTags
 }
