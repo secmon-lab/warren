@@ -1416,10 +1416,6 @@ func alertIDsToInterface(alertIDs []types.AlertID) []any {
 
 // Tag management methods
 
-
-
-
-
 func (r *Firestore) RemoveTagFromAllAlerts(ctx context.Context, name string) error {
 	// First, look up the tag by name to get its ID
 	tag, err := r.GetTagByName(ctx, name)

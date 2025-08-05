@@ -1256,7 +1256,7 @@ func TestHandleAlert_PolicyWithNewAndExistingTags(t *testing.T) {
 	createdTag, err := tagSvc.CreateTagWithCustomColor(ctx, "existing-tag", "Existing tag", "#0066cc", "test")
 	gt.NoError(t, err)
 	gt.NotNil(t, createdTag)
-	
+
 	// Get the tag from repository to ensure we have correct timestamps
 	existingTag, err := repo.GetTagByName(ctx, "existing-tag")
 	gt.NoError(t, err)

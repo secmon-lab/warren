@@ -23,8 +23,6 @@ func New(repo interfaces.Repository) *Service {
 	}
 }
 
-
-
 // CreateTag creates a new tag (deprecated - use CreateTagWithCustomColor)
 func (s *Service) CreateTag(ctx context.Context, name string) error {
 	if name == "" {

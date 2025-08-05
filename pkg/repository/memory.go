@@ -1011,10 +1011,6 @@ func (r *Memory) CountActivities(ctx context.Context) (int, error) {
 
 // Tag management methods
 
-
-
-
-
 func (r *Memory) RemoveTagFromAllAlerts(ctx context.Context, name string) error {
 	// First, look up the tag by name to get its ID
 	tag, err := r.GetTagByName(ctx, name)
