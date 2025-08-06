@@ -120,24 +120,9 @@ func (r *Firestore) GetAlert(ctx context.Context, alertID types.AlertID) (*alert
 		return nil, goerr.Wrap(err, "failed to get alert", goerr.V("alert_id", alertID))
 	}
 
-	// Use firestore compatibility wrapper to handle old tag format
-	type firestoreAlert struct {
-		alert.Alert
-		Tags map[string]bool `firestore:"tags,omitempty"`
-	}
-
-	var fa firestoreAlert
-	if err := doc.DataTo(&fa); err != nil {
+	var a alert.Alert
+	if err := doc.DataTo(&a); err != nil {
 		return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("alert_id", alertID))
-	}
-
-	a := fa.Alert
-	// Convert old tag format to new format if needed
-	if len(a.Tags) == 0 && len(fa.Tags) > 0 {
-		a.Tags = make([]string, 0, len(fa.Tags))
-		for tagName := range fa.Tags {
-			a.Tags = append(a.Tags, tagName)
-		}
 	}
 
 	return &a, nil
@@ -203,24 +188,9 @@ func (r *Firestore) GetAlertsBySpan(ctx context.Context, begin, end time.Time) (
 			return nil, goerr.Wrap(err, "failed to get next alert")
 		}
 
-		// Use firestore compatibility wrapper to handle old tag format
-		type firestoreAlert struct {
-			alert.Alert
-			Tags map[string]bool `firestore:"tags,omitempty"`
-		}
-
-		var fa firestoreAlert
-		if err := doc.DataTo(&fa); err != nil {
+		var alertData alert.Alert
+		if err := doc.DataTo(&alertData); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to alert")
-		}
-
-		alertData := fa.Alert
-		// Convert old tag format to new format if needed
-		if len(alertData.Tags) == 0 && len(fa.Tags) > 0 {
-			alertData.Tags = make([]string, 0, len(fa.Tags))
-			for tagName := range fa.Tags {
-				alertData.Tags = append(alertData.Tags, tagName)
-			}
 		}
 		alerts = append(alerts, &alertData)
 	}
@@ -313,24 +283,9 @@ func (r *Firestore) GetLatestAlertByThread(ctx context.Context, thread slack.Thr
 			return nil, goerr.Wrap(err, "failed to get alert by thread", goerr.V("thread", thread))
 		}
 
-		// Use firestore compatibility wrapper to handle old tag format
-		type firestoreAlert struct {
-			alert.Alert
-			Tags map[string]bool `firestore:"tags,omitempty"`
-		}
-
-		var fa firestoreAlert
-		if err := doc.DataTo(&fa); err != nil {
+		var v alert.Alert
+		if err := doc.DataTo(&v); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to alert")
-		}
-
-		v := fa.Alert
-		// Convert old tag format to new format if needed
-		if len(v.Tags) == 0 && len(fa.Tags) > 0 {
-			v.Tags = make([]string, 0, len(fa.Tags))
-			for tagName := range fa.Tags {
-				v.Tags = append(v.Tags, tagName)
-			}
 		}
 		if resp == nil {
 			resp = &v
@@ -382,24 +337,9 @@ func (r *Firestore) SearchAlerts(ctx context.Context, path, op string, value any
 			return nil, goerr.Wrap(err, "failed to get next alert")
 		}
 
-		// Use firestore compatibility wrapper to handle old tag format
-		type firestoreAlert struct {
-			alert.Alert
-			Tags map[string]bool `firestore:"tags,omitempty"`
-		}
-
-		var fa firestoreAlert
-		if err := doc.DataTo(&fa); err != nil {
+		var alertData alert.Alert
+		if err := doc.DataTo(&alertData); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to alert")
-		}
-
-		alertData := fa.Alert
-		// Convert old tag format to new format if needed
-		if len(alertData.Tags) == 0 && len(fa.Tags) > 0 {
-			alertData.Tags = make([]string, 0, len(fa.Tags))
-			for tagName := range fa.Tags {
-				alertData.Tags = append(alertData.Tags, tagName)
-			}
 		}
 		alerts = append(alerts, &alertData)
 	}
@@ -417,24 +357,9 @@ func (r *Firestore) GetTicket(ctx context.Context, ticketID types.TicketID) (*ti
 		return nil, goerr.Wrap(err, "failed to get ticket", goerr.V("ticket_id", ticketID))
 	}
 
-	// Use firestore compatibility wrapper to handle old tag format
-	type firestoreTicket struct {
-		ticket.Ticket
-		Tags map[string]bool `firestore:"tags,omitempty"`
-	}
-
-	var ft firestoreTicket
-	if err := doc.DataTo(&ft); err != nil {
+	var t ticket.Ticket
+	if err := doc.DataTo(&t); err != nil {
 		return nil, goerr.Wrap(err, "failed to convert data to ticket", goerr.V("ticket_id", ticketID))
-	}
-
-	t := ft.Ticket
-	// Convert old tag format to new format if needed
-	if len(t.Tags) == 0 && len(ft.Tags) > 0 {
-		t.Tags = make([]string, 0, len(ft.Tags))
-		for tagName := range ft.Tags {
-			t.Tags = append(t.Tags, tagName)
-		}
 	}
 
 	return &t, nil
@@ -732,24 +657,9 @@ func (r *Firestore) GetAlertWithoutTicket(ctx context.Context, offset, limit int
 			return nil, goerr.Wrap(err, "failed to get next alert")
 		}
 
-		// Use firestore compatibility wrapper to handle old tag format
-		type firestoreAlert struct {
-			alert.Alert
-			Tags map[string]bool `firestore:"tags,omitempty"`
-		}
-
-		var fa firestoreAlert
-		if err := doc.DataTo(&fa); err != nil {
+		var v alert.Alert
+		if err := doc.DataTo(&v); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to alert")
-		}
-
-		v := fa.Alert
-		// Convert old tag format to new format if needed
-		if len(v.Tags) == 0 && len(fa.Tags) > 0 {
-			v.Tags = make([]string, 0, len(fa.Tags))
-			for tagName := range fa.Tags {
-				v.Tags = append(v.Tags, tagName)
-			}
 		}
 		alerts = append(alerts, &v)
 	}
@@ -786,24 +696,9 @@ func (r *Firestore) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID
 			continue
 		}
 
-		// Use firestore compatibility wrapper to handle old tag format
-		type firestoreAlert struct {
-			alert.Alert
-			Tags map[string]bool `firestore:"tags,omitempty"`
-		}
-
-		var fa firestoreAlert
-		if err := doc.DataTo(&fa); err != nil {
+		var alertData alert.Alert
+		if err := doc.DataTo(&alertData); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("doc.ref.id", doc.Ref.ID))
-		}
-
-		alertData := fa.Alert
-		// Convert old tag format to new format if needed
-		if len(alertData.Tags) == 0 && len(fa.Tags) > 0 {
-			alertData.Tags = make([]string, 0, len(fa.Tags))
-			for tagName := range fa.Tags {
-				alertData.Tags = append(alertData.Tags, tagName)
-			}
 		}
 		alerts = append(alerts, &alertData)
 	}
@@ -832,18 +727,10 @@ func (r *Firestore) FindSimilarAlerts(ctx context.Context, target alert.Alert, l
 			return nil, goerr.Wrap(err, "failed to get next alert")
 		}
 
-		// Read from Firestore format first
-		type firestoreAlert struct {
-			alert.Alert
-			Tags map[string]bool
-		}
-
-		var fa firestoreAlert
-		if err := doc.DataTo(&fa); err != nil {
+		var a alert.Alert
+		if err := doc.DataTo(&a); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to alert")
 		}
-
-		a := fa.Alert
 		// Exclude the same alert
 		if a.ID == target.ID {
 			continue
@@ -991,24 +878,9 @@ func (r *Firestore) FindNearestAlerts(ctx context.Context, embedding []float32, 
 			return nil, goerr.Wrap(err, "failed to get next alert")
 		}
 
-		// Use firestore compatibility wrapper to handle old tag format
-		type firestoreAlert struct {
-			alert.Alert
-			Tags map[string]bool `firestore:"tags,omitempty"`
-		}
-
-		var fa firestoreAlert
-		if err := doc.DataTo(&fa); err != nil {
+		var a alert.Alert
+		if err := doc.DataTo(&a); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to alert")
-		}
-
-		a := fa.Alert
-		// Convert old tag format to new format if needed
-		if len(a.Tags) == 0 && len(fa.Tags) > 0 {
-			a.Tags = make([]string, 0, len(fa.Tags))
-			for tagName := range fa.Tags {
-				a.Tags = append(a.Tags, tagName)
-			}
 		}
 
 		// Only add alerts that have embeddings
@@ -1162,24 +1034,9 @@ func (r *Firestore) GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts,
 			return nil, goerr.Wrap(err, "failed to get next alert")
 		}
 
-		// Use firestore compatibility wrapper to handle old tag format
-		type firestoreAlert struct {
-			alert.Alert
-			Tags map[string]bool `firestore:"tags,omitempty"`
-		}
-
-		var fa firestoreAlert
-		if err := doc.DataTo(&fa); err != nil {
+		var v alert.Alert
+		if err := doc.DataTo(&v); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to alert")
-		}
-
-		v := fa.Alert
-		// Convert old tag format to new format if needed
-		if len(v.Tags) == 0 && len(fa.Tags) > 0 {
-			v.Tags = make([]string, 0, len(fa.Tags))
-			for tagName := range fa.Tags {
-				v.Tags = append(v.Tags, tagName)
-			}
 		}
 		if len(v.Embedding) == 0 {
 			alerts = append(alerts, &v)

@@ -44,6 +44,19 @@ const getStatusBadgeVariant = (status: TicketStatus) => {
   }
 };
 
+// Helper function for conclusion badge
+const getConclusionBadge = (conclusion: string) => {
+  const conclusionMap: Record<string, { label: string; emoji: string; className: string }> = {
+    'intended': { label: 'Intended', emoji: '👍', className: 'bg-green-100 text-green-800 border-green-200' },
+    'unaffected': { label: 'Unaffected', emoji: '🛡️', className: 'bg-blue-100 text-blue-800 border-blue-200' },
+    'false_positive': { label: 'False Positive', emoji: '🚫', className: 'bg-gray-100 text-gray-800 border-gray-200' },
+    'true_positive': { label: 'True Positive', emoji: '🚨', className: 'bg-red-100 text-red-800 border-red-200' },
+    'escalated': { label: 'Escalated', emoji: '⬆️', className: 'bg-orange-100 text-orange-800 border-orange-200' }
+  };
+  
+  return conclusionMap[conclusion.toLowerCase()] || null;
+};
+
 export default function TicketsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState<"all" | TicketStatus>("open");
@@ -206,6 +219,35 @@ export default function TicketsPage() {
                             {ticket.title}
                           </CardTitle>
                           
+                          {/* Conclusion and Reason for Resolved tickets */}
+                          {ticket.status === 'resolved' && ticket.conclusion && (
+                            <div className="mt-2 p-2 bg-gray-50 rounded-md border border-gray-200">
+                              <div className="flex items-start gap-2">
+                                {(() => {
+                                  const badge = getConclusionBadge(ticket.conclusion);
+                                  if (badge) {
+                                    return (
+                                      <Badge className={`${badge.className} flex-shrink-0`}>
+                                        <span>{badge.emoji}</span>
+                                        <span>{badge.label}</span>
+                                      </Badge>
+                                    );
+                                  }
+                                  return (
+                                    <Badge className="bg-gray-100 text-gray-800 flex-shrink-0">
+                                      {ticket.conclusion}
+                                    </Badge>
+                                  );
+                                })()}
+                                {ticket.reason && (
+                                  <p className="text-sm text-gray-700 flex-1">
+                                    {ticket.reason}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
                           {/* Tags */}
                           {ticket.tags && ticket.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-2">
@@ -215,7 +257,6 @@ export default function TicketsPage() {
                                 return (
                                   <Badge 
                                     key={`tag-${index}`}
-                                    variant="secondary"
                                     className={`text-xs ${colorClass}`}
                                   >
                                     <Tag className="h-3 w-3 mr-1" />

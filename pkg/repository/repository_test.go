@@ -2637,3 +2637,4 @@ func TestAlertAndTicketTags(t *testing.T) {
 		testFn(t, repo)
 	})
 }
+
