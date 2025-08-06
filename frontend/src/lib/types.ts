@@ -105,7 +105,9 @@ export const ALERT_CONCLUSION_DESCRIPTIONS: Record<AlertConclusion, string> = {
 };
 
 export interface TagMetadata {
+  id: string;
   name: string;
+  description?: string;
   color: string;
   createdAt: string;
   updatedAt: string;

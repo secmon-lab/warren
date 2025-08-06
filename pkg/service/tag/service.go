@@ -2,6 +2,7 @@ package tag
 
 import (
 	"context"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
@@ -158,13 +159,21 @@ func (s *Service) UpdateTagMetadata(ctx context.Context, tagID types.TagID, name
 		}
 	}
 
+	// Validate and convert color
+	colorClass, valid := s.validateAndNormalizeColor(color)
+	if !valid {
+		return nil, goerr.New("invalid color", goerr.V("color", color))
+	}
+
 	// Update the tag
+	now := time.Now()
 	updatedTag := &tag.Tag{
 		ID:          existingTag.ID,
 		Name:        name,
 		Description: description,
-		Color:       color,
+		Color:       colorClass,
 		CreatedAt:   existingTag.CreatedAt,
+		UpdatedAt:   now,
 		CreatedBy:   existingTag.CreatedBy,
 	}
 
@@ -326,4 +335,59 @@ func (s *Service) ListAllTags(ctx context.Context) ([]*tag.Tag, error) {
 		return nil, goerr.Wrap(err, "failed to list all tags")
 	}
 	return tags, nil
+}
+
+// GetAvailableColors returns the list of available tag colors (Tailwind classes)
+func (s *Service) GetAvailableColors() []string {
+	// Create a copy of ChipColors to prevent external modification
+	colors := make([]string, len(tag.ChipColors))
+	copy(colors, tag.ChipColors)
+	return colors
+}
+
+// GetAvailableColorNames returns user-friendly color names
+func (s *Service) GetAvailableColorNames() []string {
+	// Create a copy of ColorNames to prevent external modification
+	names := make([]string, len(tag.ColorNames))
+	copy(names, tag.ColorNames)
+	return names
+}
+
+// isValidColor checks if the given color is in the predefined color list
+func (s *Service) isValidColor(color string) bool {
+	for _, c := range tag.ChipColors {
+		if c == color {
+			return true
+		}
+	}
+	return false
+}
+
+// validateAndNormalizeColor validates color and converts to Tailwind class
+func (s *Service) validateAndNormalizeColor(color string) (string, bool) {
+	// If it's already a valid Tailwind class, return as is
+	if s.isValidColor(color) {
+		return color, true
+	}
+	
+	// Check if it's a valid color name
+	for i, name := range tag.ColorNames {
+		if name == color {
+			return tag.ChipColors[i], true
+		}
+	}
+	
+	// Invalid color
+	return "", false
+}
+
+// normalizeColor converts color name to Tailwind class, or returns the class if already valid
+func (s *Service) normalizeColor(color string) string {
+	// If it's already a valid Tailwind class, return as is
+	if s.isValidColor(color) {
+		return color
+	}
+	
+	// Try to convert from color name to class
+	return tag.ColorNameToClass(color)
 }

@@ -123,7 +123,9 @@ type DBSCANParameters {
 }
 
 type TagMetadata {
+  id: ID!
   name: String!
+  description: String
   color: String!
   createdAt: String!
   updatedAt: String!
@@ -148,6 +150,8 @@ type Query {
   alertClusters(limit: Int, offset: Int, minClusterSize: Int, eps: Float, minSamples: Int, keyword: String): ClusteringSummary!
   clusterAlerts(clusterID: ID!, keyword: String, limit: Int, offset: Int): AlertsConnection!
   tags: [TagMetadata!]!
+  availableTagColors: [String!]!
+  availableTagColorNames: [String!]!
 }
 
 type Mutation {
@@ -162,6 +166,14 @@ type Mutation {
   updateTicketTags(ticketId: ID!, tags: [String!]!): Ticket!
   createTag(name: String!): TagMetadata!
   deleteTag(name: String!): Boolean!
+  updateTag(input: UpdateTagInput!): TagMetadata!
+}
+
+input UpdateTagInput {
+  id: ID!
+  name: String!
+  color: String!
+  description: String
 }
 
 schema {

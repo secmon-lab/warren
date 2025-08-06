@@ -117,8 +117,8 @@ func (ts Set) Copy() Set {
 	return copied
 }
 
-// chipColors contains predefined colors suitable for chips/badges
-var chipColors = []string{
+// ChipColors contains predefined colors suitable for chips/badges
+var ChipColors = []string{
 	"bg-red-100 text-red-800",
 	"bg-orange-100 text-orange-800",
 	"bg-amber-100 text-amber-800",
@@ -141,6 +141,50 @@ var chipColors = []string{
 	"bg-zinc-100 text-zinc-800",
 }
 
+// ColorNames provides user-friendly color names corresponding to ChipColors
+var ColorNames = []string{
+	"red",
+	"orange", 
+	"amber",
+	"yellow",
+	"lime",
+	"green",
+	"emerald",
+	"teal",
+	"cyan",
+	"sky",
+	"blue",
+	"indigo",
+	"violet",
+	"purple",
+	"fuchsia",
+	"pink",
+	"rose",
+	"slate",
+	"gray",
+	"zinc",
+}
+
+// ColorClassToName converts a Tailwind color class to a user-friendly name
+func ColorClassToName(colorClass string) string {
+	for i, class := range ChipColors {
+		if class == colorClass {
+			return ColorNames[i]
+		}
+	}
+	return "gray" // fallback
+}
+
+// ColorNameToClass converts a user-friendly color name to a Tailwind color class
+func ColorNameToClass(colorName string) string {
+	for i, name := range ColorNames {
+		if name == colorName {
+			return ChipColors[i]
+		}
+	}
+	return ChipColors[17] // fallback to gray
+}
+
 // GenerateColor generates a deterministic color for a tag name
 // Uses FNV-1a hash to ensure same tag names always get the same color
 func GenerateColor(tagName string) string {
@@ -149,8 +193,8 @@ func GenerateColor(tagName string) string {
 		h ^= uint32(tagName[i])
 		h *= 16777619
 	}
-	colorIndex := int(h) % len(chipColors)
-	return chipColors[colorIndex]
+	colorIndex := int(h) % len(ChipColors)
+	return ChipColors[colorIndex]
 }
 
 // MergeTagIDs merges two slices of tag IDs, removing duplicates

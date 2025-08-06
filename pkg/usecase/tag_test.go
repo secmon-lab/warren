@@ -74,6 +74,93 @@ func TestTagUseCase_Operations(t *testing.T) {
 	gt.N(t, len(tags)).Equal(2) // security, critical
 }
 
+func TestTagUseCase_UpdateTag(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewMemory()
+	tagService := tag.New(repo)
+	tagUC := usecase.NewTagUseCase(tagService)
+
+	// Create a tag first
+	originalTag, err := tagUC.CreateTag(ctx, "test-tag")
+	gt.NoError(t, err)
+	gt.NotNil(t, originalTag)
+
+	// Test successful update
+	updatedTag, err := tagUC.UpdateTag(ctx, originalTag.ID.String(), "updated-tag", "bg-blue-100 text-blue-800", "updated description")
+	gt.NoError(t, err)
+	gt.NotNil(t, updatedTag)
+	gt.V(t, updatedTag.Name).Equal("updated-tag")
+	gt.V(t, updatedTag.Description).Equal("updated description")
+	gt.V(t, updatedTag.Color).Equal("bg-blue-100 text-blue-800")
+	gt.V(t, updatedTag.ID).Equal(originalTag.ID)
+
+	// Test validation errors
+	tests := []struct {
+		name        string
+		tagID       string
+		tagName     string
+		color       string
+		description string
+		expectError bool
+	}{
+		{
+			name:        "empty tag name",
+			tagID:       originalTag.ID.String(),
+			tagName:     "",
+			color:       "bg-red-100 text-red-800",
+			description: "test",
+			expectError: true,
+		},
+		{
+			name:        "invalid color",
+			tagID:       originalTag.ID.String(),
+			tagName:     "valid-name",
+			color:       "invalid-color",
+			description: "test",
+			expectError: true,
+		},
+		{
+			name:        "non-existent tag ID",
+			tagID:       types.NewTagID().String(),
+			tagName:     "valid-name",
+			color:       "bg-red-100 text-red-800",
+			description: "test",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tagUC.UpdateTag(ctx, tt.tagID, tt.tagName, tt.color, tt.description)
+			if tt.expectError {
+				gt.Error(t, err)
+			} else {
+				gt.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestTagUseCase_GetAvailableColors(t *testing.T) {
+	repo := repository.NewMemory()
+	tagService := tag.New(repo)
+	tagUC := usecase.NewTagUseCase(tagService)
+
+	colors, err := tagUC.GetAvailableColors(context.Background())
+	gt.NoError(t, err)
+	gt.True(t, len(colors) > 0)
+
+	// Check that it contains expected color format
+	hasRedColor := false
+	for _, color := range colors {
+		if color == "bg-red-100 text-red-800" {
+			hasRedColor = true
+			break
+		}
+	}
+	gt.True(t, hasRedColor)
+}
+
 // Note: TestAlertHandling_WithTags would require mocking the policy client
 // to return metadata with tags. This would be done in integration tests.
 

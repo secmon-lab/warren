@@ -84,15 +84,24 @@ type Query struct {
 }
 
 type TagMetadata struct {
-	Name      string `json:"name"`
-	Color     string `json:"color"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	Color       string  `json:"color"`
+	CreatedAt   string  `json:"createdAt"`
+	UpdatedAt   string  `json:"updatedAt"`
 }
 
 type TicketsResponse struct {
 	Tickets    []*ticket.Ticket `json:"tickets"`
 	TotalCount int              `json:"totalCount"`
+}
+
+type UpdateTagInput struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Color       string  `json:"color"`
+	Description *string `json:"description,omitempty"`
 }
 
 type User struct {

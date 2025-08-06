@@ -523,7 +523,9 @@ export const GET_CLUSTER_ALERTS = gql`
 export const GET_TAGS = gql`
   query GetTags {
     tags {
+      id
       name
+      description
       color
       createdAt
       updatedAt
@@ -534,7 +536,9 @@ export const GET_TAGS = gql`
 export const CREATE_TAG = gql`
   mutation CreateTag($name: String!) {
     createTag(name: $name) {
+      id
       name
+      description
       color
       createdAt
       updatedAt
@@ -545,6 +549,31 @@ export const CREATE_TAG = gql`
 export const DELETE_TAG = gql`
   mutation DeleteTag($name: String!) {
     deleteTag(name: $name)
+  }
+`;
+
+export const UPDATE_TAG = gql`
+  mutation UpdateTag($input: UpdateTagInput!) {
+    updateTag(input: $input) {
+      id
+      name
+      description
+      color
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const GET_AVAILABLE_TAG_COLORS = gql`
+  query GetAvailableTagColors {
+    availableTagColors
+  }
+`;
+
+export const GET_AVAILABLE_TAG_COLOR_NAMES = gql`
+  query GetAvailableTagColorNames {
+    availableTagColorNames
   }
 `;
 
