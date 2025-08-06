@@ -79,28 +79,20 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 
 	// Inherit tags from alerts
 	if len(alerts) > 0 {
-		tagMap := make(map[string]bool)
+		// Collect all unique tag IDs from alerts
+		inheritedTagIDs := make(map[string]bool)
 		for _, alert := range alerts {
-			for _, tag := range alert.Tags {
-				tagMap[tag] = true
+			for tagID := range alert.TagIDs {
+				inheritedTagIDs[tagID] = true
 			}
-		}
-		// Convert map to slice
-		inheritedTags := make([]string, 0, len(tagMap))
-		for tag := range tagMap {
-			inheritedTags = append(inheritedTags, tag)
 		}
 		
-		// Convert tag names to tag IDs
-		if len(inheritedTags) > 0 && uc.tagService != nil {
-			tagIDs, err := uc.tagService.ConvertNamesToTags(ctx, inheritedTags)
-			if err != nil {
-				return nil, goerr.Wrap(err, "failed to convert inherited tag names to IDs")
-			}
+		// Set inherited tag IDs directly
+		if len(inheritedTagIDs) > 0 {
 			if newTicket.TagIDs == nil {
 				newTicket.TagIDs = make(map[string]bool)
 			}
-			for _, tagID := range tagIDs {
+			for tagID := range inheritedTagIDs {
 				newTicket.TagIDs[tagID] = true
 			}
 		}

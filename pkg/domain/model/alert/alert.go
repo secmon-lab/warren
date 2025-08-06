@@ -62,6 +62,8 @@ type Metadata struct {
 	Attributes        []Attribute  `json:"attributes"`
 	TitleSource       types.Source `json:"title_source"`
 	DescriptionSource types.Source `json:"description_source"`
+	// Tags field is used temporarily during policy processing to pass tag names
+	// These are converted to TagIDs and not persisted in this field
 	Tags              []string     `json:"tags,omitempty"`
 }
 

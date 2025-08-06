@@ -104,6 +104,16 @@ func (r *alertResolver) Ticket(ctx context.Context, obj *alert.Alert) (*ticket.T
 	return r.repo.GetTicket(ctx, obj.TicketID)
 }
 
+// Tags is the resolver for the tags field.
+func (r *alertResolver) Tags(ctx context.Context, obj *alert.Alert) ([]string, error) {
+	if r.uc == nil || len(obj.TagIDs) == 0 {
+		return []string{}, nil
+	}
+
+	// Use the compatibility method to get tag names
+	return obj.GetTagNames(ctx, r.createTagGetter())
+}
+
 // TagObjects is the resolver for the tagObjects field.
 func (r *alertResolver) TagObjects(ctx context.Context, obj *alert.Alert) ([]*graphql1.TagObject, error) {
 	if r.uc == nil || len(obj.TagIDs) == 0 {
@@ -1183,3 +1193,4 @@ type findingResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }
+
