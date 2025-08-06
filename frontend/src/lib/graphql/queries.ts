@@ -19,6 +19,7 @@ export const GET_TICKETS = gql`
         updatedAt
         alertsCount
         commentsCount
+        tags
       }
       totalCount
     }

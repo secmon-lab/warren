@@ -877,9 +877,24 @@ func (r *Firestore) GetTicketByThread(ctx context.Context, thread slack.Thread) 
 		return nil, goerr.Wrap(err, "failed to get ticket by thread", goerr.V("slack_thread", thread))
 	}
 
-	var t ticket.Ticket
-	if err := doc.DataTo(&t); err != nil {
+	// Use firestore compatibility wrapper to handle old tag format
+	type firestoreTicket struct {
+		ticket.Ticket
+		Tags map[string]bool `firestore:"tags,omitempty"`
+	}
+
+	var ft firestoreTicket
+	if err := doc.DataTo(&ft); err != nil {
 		return nil, goerr.Wrap(err, "failed to convert data to ticket")
+	}
+
+	t := ft.Ticket
+	// Convert old tag format to new format if needed
+	if len(t.Tags) == 0 && len(ft.Tags) > 0 {
+		t.Tags = make([]string, 0, len(ft.Tags))
+		for tagName := range ft.Tags {
+			t.Tags = append(t.Tags, tagName)
+		}
 	}
 
 	return &t, nil
@@ -904,9 +919,24 @@ func (r *Firestore) BatchGetTickets(ctx context.Context, ticketIDs []types.Ticke
 			continue
 		}
 
-		var t ticket.Ticket
-		if err := doc.DataTo(&t); err != nil {
+		// Use firestore compatibility wrapper to handle old tag format
+		type firestoreTicket struct {
+			ticket.Ticket
+			Tags map[string]bool `firestore:"tags,omitempty"`
+		}
+
+		var ft firestoreTicket
+		if err := doc.DataTo(&ft); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to ticket", goerr.V("doc.ref.id", doc.Ref.ID))
+		}
+
+		t := ft.Ticket
+		// Convert old tag format to new format if needed
+		if len(t.Tags) == 0 && len(ft.Tags) > 0 {
+			t.Tags = make([]string, 0, len(ft.Tags))
+			for tagName := range ft.Tags {
+				t.Tags = append(t.Tags, tagName)
+			}
 		}
 
 		tickets = append(tickets, &t)
@@ -940,9 +970,24 @@ func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32,
 			return nil, goerr.Wrap(err, "failed to get next ticket")
 		}
 
-		var t ticket.Ticket
-		if err := doc.DataTo(&t); err != nil {
+		// Use firestore compatibility wrapper to handle old tag format
+		type firestoreTicket struct {
+			ticket.Ticket
+			Tags map[string]bool `firestore:"tags,omitempty"`
+		}
+
+		var ft firestoreTicket
+		if err := doc.DataTo(&ft); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		t := ft.Ticket
+		// Convert old tag format to new format if needed
+		if len(t.Tags) == 0 && len(ft.Tags) > 0 {
+			t.Tags = make([]string, 0, len(ft.Tags))
+			for tagName := range ft.Tags {
+				t.Tags = append(t.Tags, tagName)
+			}
 		}
 
 		// Only add tickets that have embeddings
@@ -1090,9 +1135,24 @@ func (r *Firestore) GetTicketsByStatus(ctx context.Context, statuses []types.Tic
 			return nil, goerr.Wrap(err, "failed to get offset documents")
 		}
 
-		var t ticket.Ticket
-		if err := doc.DataTo(&t); err != nil {
+		// Use firestore compatibility wrapper to handle old tag format
+		type firestoreTicket struct {
+			ticket.Ticket
+			Tags map[string]bool `firestore:"tags,omitempty"`
+		}
+
+		var ft firestoreTicket
+		if err := doc.DataTo(&ft); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		t := ft.Ticket
+		// Convert old tag format to new format if needed
+		if len(t.Tags) == 0 && len(ft.Tags) > 0 {
+			t.Tags = make([]string, 0, len(ft.Tags))
+			for tagName := range ft.Tags {
+				t.Tags = append(t.Tags, tagName)
+			}
 		}
 
 		tickets = append(tickets, &t)
@@ -1138,9 +1198,24 @@ func (r *Firestore) GetTicketsBySpan(ctx context.Context, begin, end time.Time) 
 			return nil, goerr.Wrap(err, "failed to get next ticket")
 		}
 
-		var t ticket.Ticket
-		if err := doc.DataTo(&t); err != nil {
+		// Use firestore compatibility wrapper to handle old tag format
+		type firestoreTicket struct {
+			ticket.Ticket
+			Tags map[string]bool `firestore:"tags,omitempty"`
+		}
+
+		var ft firestoreTicket
+		if err := doc.DataTo(&ft); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		t := ft.Ticket
+		// Convert old tag format to new format if needed
+		if len(t.Tags) == 0 && len(ft.Tags) > 0 {
+			t.Tags = make([]string, 0, len(ft.Tags))
+			for tagName := range ft.Tags {
+				t.Tags = append(t.Tags, tagName)
+			}
 		}
 
 		tickets = append(tickets, &t)
@@ -1231,9 +1306,24 @@ func (r *Firestore) GetTicketsWithInvalidEmbedding(ctx context.Context) ([]*tick
 			return nil, goerr.Wrap(err, "failed to get next ticket")
 		}
 
-		var t ticket.Ticket
-		if err := doc.DataTo(&t); err != nil {
+		// Use firestore compatibility wrapper to handle old tag format
+		type firestoreTicket struct {
+			ticket.Ticket
+			Tags map[string]bool `firestore:"tags,omitempty"`
+		}
+
+		var ft firestoreTicket
+		if err := doc.DataTo(&ft); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		t := ft.Ticket
+		// Convert old tag format to new format if needed
+		if len(t.Tags) == 0 && len(ft.Tags) > 0 {
+			t.Tags = make([]string, 0, len(ft.Tags))
+			for tagName := range ft.Tags {
+				t.Tags = append(t.Tags, tagName)
+			}
 		}
 
 		// Check if embedding is invalid (nil, empty, or zero vector)
@@ -1283,9 +1373,24 @@ func (r *Firestore) FindNearestTicketsWithSpan(ctx context.Context, embedding []
 			return nil, goerr.Wrap(err, "failed to get next ticket")
 		}
 
-		var t ticket.Ticket
-		if err := doc.DataTo(&t); err != nil {
+		// Use firestore compatibility wrapper to handle old tag format
+		type firestoreTicket struct {
+			ticket.Ticket
+			Tags map[string]bool `firestore:"tags,omitempty"`
+		}
+
+		var ft firestoreTicket
+		if err := doc.DataTo(&ft); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		t := ft.Ticket
+		// Convert old tag format to new format if needed
+		if len(t.Tags) == 0 && len(ft.Tags) > 0 {
+			t.Tags = make([]string, 0, len(ft.Tags))
+			for tagName := range ft.Tags {
+				t.Tags = append(t.Tags, tagName)
+			}
 		}
 
 		tickets = append(tickets, &t)
@@ -1320,9 +1425,24 @@ func (r *Firestore) GetTicketsByStatusAndSpan(ctx context.Context, status types.
 			return nil, goerr.Wrap(err, "failed to get next ticket")
 		}
 
-		var t ticket.Ticket
-		if err := doc.DataTo(&t); err != nil {
+		// Use firestore compatibility wrapper to handle old tag format
+		type firestoreTicket struct {
+			ticket.Ticket
+			Tags map[string]bool `firestore:"tags,omitempty"`
+		}
+
+		var ft firestoreTicket
+		if err := doc.DataTo(&ft); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+
+		t := ft.Ticket
+		// Convert old tag format to new format if needed
+		if len(t.Tags) == 0 && len(ft.Tags) > 0 {
+			t.Tags = make([]string, 0, len(ft.Tags))
+			for tagName := range ft.Tags {
+				t.Tags = append(t.Tags, tagName)
+			}
 		}
 
 		tickets = append(tickets, &t)

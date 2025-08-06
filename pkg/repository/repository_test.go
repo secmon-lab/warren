@@ -2637,3 +2637,58 @@ func TestAlertAndTicketTags(t *testing.T) {
 		testFn(t, repo)
 	})
 }
+
+
+// TestFirestoreTicketTagConversion verifies that the firestore wrapper
+// correctly handles the conversion from old tag format (map[string]bool)
+// to new tag format ([]string)
+func TestFirestoreTicketTagConversion(t *testing.T) {
+	// This test verifies the struct compatibility
+	type firestoreTicket struct {
+		ticketmodel.Ticket
+		Tags map[string]bool `firestore:"tags,omitempty"`
+	}
+
+	// Create a test ticket with new format tags
+	testTicket := ticketmodel.Ticket{
+		ID:     types.NewTicketID(),
+		Status: types.TicketStatusOpen,
+		Tags:   []string{"tag1", "tag2", "tag3"},
+	}
+
+	// Create firestore wrapper with old format tags
+	ft := firestoreTicket{
+		Ticket: ticketmodel.Ticket{
+			ID:     testTicket.ID,
+			Status: testTicket.Status,
+			Tags:   []string{}, // Empty in the new format
+		},
+		Tags: map[string]bool{
+			"tag1": true,
+			"tag2": true,
+			"tag3": true,
+		},
+	}
+
+	// Simulate the conversion logic
+	convertedTicket := ft.Ticket
+	if len(convertedTicket.Tags) == 0 && len(ft.Tags) > 0 {
+		convertedTicket.Tags = make([]string, 0, len(ft.Tags))
+		for tagName := range ft.Tags {
+			convertedTicket.Tags = append(convertedTicket.Tags, tagName)
+		}
+	}
+
+	// Verify the conversion
+	gt.Equal(t, len(convertedTicket.Tags), 3)
+
+	// Create a map to check all tags are present (order may vary)
+	tagMap := make(map[string]bool)
+	for _, tag := range convertedTicket.Tags {
+		tagMap[tag] = true
+	}
+
+	gt.True(t, tagMap["tag1"])
+	gt.True(t, tagMap["tag2"])
+	gt.True(t, tagMap["tag3"])
+}

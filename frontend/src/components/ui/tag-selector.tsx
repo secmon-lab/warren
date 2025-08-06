@@ -96,7 +96,7 @@ export function TagSelector({
           const tagData = tagsByName.get(tag);
           const colorClass = tagData?.color || "bg-gray-100 text-gray-800";
           return (
-            <Badge key={tag} variant="secondary" className={`text-sm ${colorClass}`}>
+            <Badge key={tag} className={`text-sm ${colorClass}`}>
               {tag}
               {!disabled && (
                 <button
