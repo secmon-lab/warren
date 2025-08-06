@@ -61,14 +61,14 @@ func (u *TagUseCase) DeleteTag(ctx context.Context, name string) error {
 
 // UpdateAlertTags updates tags for an alert
 func (u *TagUseCase) UpdateAlertTags(ctx context.Context, alertID types.AlertID, tags []string) (*alert.Alert, error) {
-	// Convert tag names to IDs
-	tagIDs, err := u.tagService.ConvertNamesToIDs(ctx, tags)
+	// Convert tag names to tags (creates tags if they don't exist)
+	tags, err := u.tagService.ConvertNamesToTags(ctx, tags)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
+		return nil, goerr.Wrap(err, "failed to convert tag names")
 	}
 
-	// Use ID-based method
-	a, err := u.tagService.UpdateAlertTagsByID(ctx, alertID, tagIDs)
+	// Use tag-based method
+	a, err := u.tagService.UpdateAlertTagsByID(ctx, alertID, tags)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update alert tags")
 	}
@@ -77,16 +77,37 @@ func (u *TagUseCase) UpdateAlertTags(ctx context.Context, alertID types.AlertID,
 
 // UpdateTicketTags updates tags for a ticket
 func (u *TagUseCase) UpdateTicketTags(ctx context.Context, ticketID types.TicketID, tags []string) (*ticket.Ticket, error) {
-	// Convert tag names to IDs
-	tagIDs, err := u.tagService.ConvertNamesToIDs(ctx, tags)
+	// Convert tag names to tags (creates tags if they don't exist)
+	tags, err := u.tagService.ConvertNamesToTags(ctx, tags)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
+		return nil, goerr.Wrap(err, "failed to convert tag names")
 	}
 
-	// Use ID-based method
-	t, err := u.tagService.UpdateTicketTagsByID(ctx, ticketID, tagIDs)
+	// Use tag-based method
+	t, err := u.tagService.UpdateTicketTagsByID(ctx, ticketID, tags)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update ticket tags")
 	}
 	return t, nil
+}
+
+// UpdateTag updates tag metadata (name, color, description)
+func (u *TagUseCase) UpdateTag(ctx context.Context, tagID string, name, color, description string) (*tagmodel.Tag, error) {
+	// Call service layer (validation is handled there)
+	tag, err := u.tagService.UpdateTagMetadata(ctx, tagID, name, description, color)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to update tag")
+	}
+
+	return tag, nil
+}
+
+// GetAvailableColors returns available color options for tags (Tailwind classes)
+func (u *TagUseCase) GetAvailableColors() ([]string, error) {
+	return u.tagService.GetAvailableColors(), nil
+}
+
+// GetAvailableColorNames returns user-friendly color names for tags
+func (u *TagUseCase) GetAvailableColorNames() ([]string, error) {
+	return u.tagService.GetAvailableColorNames(), nil
 }

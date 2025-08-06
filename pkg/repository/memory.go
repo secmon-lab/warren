@@ -32,7 +32,7 @@ type Memory struct {
 	ticketComments map[types.TicketID][]ticket.Comment
 	tokens         map[auth.TokenID]*auth.Token
 	activities     map[types.ActivityID]*activity.Activity
-	tagsV2         map[types.TagID]*tag.Tag // New ID-based tags
+	tagsV2         map[string]*tag.Tag // New ID-based tags
 
 	// Call counter for tracking method invocations
 	callCounts map[string]int
@@ -50,7 +50,7 @@ func NewMemory() *Memory {
 		ticketComments: make(map[types.TicketID][]ticket.Comment),
 		tokens:         make(map[auth.TokenID]*auth.Token),
 		activities:     make(map[types.ActivityID]*activity.Activity),
-		tagsV2:         make(map[types.TagID]*tag.Tag),
+		tagsV2:         make(map[string]*tag.Tag),
 		callCounts:     make(map[string]int),
 	}
 }
@@ -1043,7 +1043,7 @@ func (r *Memory) RemoveTagFromAllTickets(ctx context.Context, name string) error
 
 // New ID-based tag management methods
 
-func (r *Memory) GetTagByID(ctx context.Context, tagID types.TagID) (*tag.Tag, error) {
+func (r *Memory) GetTagByID(ctx context.Context, tagID string) (*tag.Tag, error) {
 	r.tagMu.RLock()
 	defer r.tagMu.RUnlock()
 
@@ -1056,7 +1056,7 @@ func (r *Memory) GetTagByID(ctx context.Context, tagID types.TagID) (*tag.Tag, e
 	return nil, nil
 }
 
-func (r *Memory) GetTagsByIDs(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error) {
+func (r *Memory) GetTagsByIDs(ctx context.Context, tagIDs []string) ([]*tag.Tag, error) {
 	r.tagMu.RLock()
 	defer r.tagMu.RUnlock()
 
@@ -1076,7 +1076,7 @@ func (r *Memory) CreateTagWithID(ctx context.Context, tag *tag.Tag) error {
 	r.tagMu.Lock()
 	defer r.tagMu.Unlock()
 
-	if tag.ID == types.EmptyTagID {
+	if tag.ID == "" {
 		return goerr.New("tag ID is required")
 	}
 
@@ -1103,7 +1103,7 @@ func (r *Memory) UpdateTag(ctx context.Context, tag *tag.Tag) error {
 	r.tagMu.Lock()
 	defer r.tagMu.Unlock()
 
-	if tag.ID == types.EmptyTagID {
+	if tag.ID == "" {
 		return goerr.New("tag ID is required")
 	}
 
@@ -1115,7 +1115,7 @@ func (r *Memory) UpdateTag(ctx context.Context, tag *tag.Tag) error {
 	return nil
 }
 
-func (r *Memory) DeleteTagByID(ctx context.Context, tagID types.TagID) error {
+func (r *Memory) DeleteTagByID(ctx context.Context, tagID string) error {
 	r.tagMu.Lock()
 	defer r.tagMu.Unlock()
 
@@ -1123,7 +1123,7 @@ func (r *Memory) DeleteTagByID(ctx context.Context, tagID types.TagID) error {
 	return nil
 }
 
-func (r *Memory) RemoveTagIDFromAllAlerts(ctx context.Context, tagID types.TagID) error {
+func (r *Memory) RemoveTagIDFromAllAlerts(ctx context.Context, tagName string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -1132,7 +1132,7 @@ func (r *Memory) RemoveTagIDFromAllAlerts(ctx context.Context, tagID types.TagID
 		if alert.Tags != nil {
 			// Remove tagID from slice
 			for i, tag := range alert.Tags {
-				if tag == tagID {
+				if tag == tagName {
 					alert.Tags = append(alert.Tags[:i], alert.Tags[i+1:]...)
 					break
 				}
@@ -1143,7 +1143,7 @@ func (r *Memory) RemoveTagIDFromAllAlerts(ctx context.Context, tagID types.TagID
 	return nil
 }
 
-func (r *Memory) RemoveTagIDFromAllTickets(ctx context.Context, tagID types.TagID) error {
+func (r *Memory) RemoveTagIDFromAllTickets(ctx context.Context, tagName string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -1152,7 +1152,7 @@ func (r *Memory) RemoveTagIDFromAllTickets(ctx context.Context, tagID types.TagI
 		if ticket.Tags != nil {
 			// Remove tagID from slice
 			for i, tag := range ticket.Tags {
-				if tag == tagID {
+				if tag == tagName {
 					ticket.Tags = append(ticket.Tags[:i], ticket.Tags[i+1:]...)
 					break
 				}

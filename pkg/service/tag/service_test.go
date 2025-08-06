@@ -115,7 +115,7 @@ func TestTagService_UpdateAlertTagsByName(t *testing.T) {
 	gt.N(t, len(updatedAlert.Tags)).Equal(2)
 
 	// Get actual tag names to verify
-	tagNames, err := updatedAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+	tagNames, err := updatedAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []string) ([]*tagmodel.Tag, error) {
 		return service.GetTagsByIDs(ctx, tagIDs)
 	})
 	gt.NoError(t, err)
@@ -152,7 +152,7 @@ func TestTagService_UpdateTicketTagsByName(t *testing.T) {
 	gt.N(t, len(updatedTicket.Tags)).Equal(2)
 
 	// Get actual tag names to verify
-	tagNames, err := updatedTicket.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+	tagNames, err := updatedTicket.GetTagNames(ctx, func(ctx context.Context, tagIDs []string) ([]*tagmodel.Tag, error) {
 		return service.GetTagsByIDs(ctx, tagIDs)
 	})
 	gt.NoError(t, err)
@@ -188,4 +188,98 @@ func TestTagService_EmptyTagHandling(t *testing.T) {
 	tags, err := service.ListAllTags(ctx)
 	gt.NoError(t, err)
 	gt.N(t, len(tags)).Equal(2)
+}
+
+func TestTagService_GetAvailableColors(t *testing.T) {
+	repo := repository.NewMemory()
+	service := tag.New(repo)
+
+	colors := service.GetAvailableColors()
+	gt.True(t, len(colors) > 0)
+
+	// Check that it contains expected color format
+	hasRedColor := false
+	for _, color := range colors {
+		if color == "bg-red-100 text-red-800" {
+			hasRedColor = true
+			break
+		}
+	}
+	gt.True(t, hasRedColor)
+
+	// Verify returned slice is a copy (modifying it shouldn't affect original)
+	originalLen := len(colors)
+	_ = append(colors, "test-color") // Intentionally modify the copy
+	newColors := service.GetAvailableColors()
+	gt.N(t, len(newColors)).Equal(originalLen)
+}
+
+func TestTagService_GetAvailableColorNames(t *testing.T) {
+	repo := repository.NewMemory()
+	service := tag.New(repo)
+
+	colorNames := service.GetAvailableColorNames()
+	gt.True(t, len(colorNames) > 0)
+
+	// Check that it contains expected color names
+	hasRedColor := false
+	for _, colorName := range colorNames {
+		if colorName == "red" {
+			hasRedColor = true
+			break
+		}
+	}
+	gt.True(t, hasRedColor)
+
+	// Verify returned slice is a copy
+	originalLen := len(colorNames)
+	_ = append(colorNames, "test-color") // Intentionally modify the copy
+	newColorNames := service.GetAvailableColorNames()
+	gt.N(t, len(newColorNames)).Equal(originalLen)
+}
+
+func TestTagService_UpdateTagMetadata(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewMemory()
+	service := tag.New(repo)
+
+	// Create a tag first
+	originalTag, err := service.CreateTagWithCustomColor(ctx, "test-tag", "original description", "bg-red-100 text-red-800", "test-user")
+	gt.NoError(t, err)
+	gt.NotNil(t, originalTag)
+
+	// Test successful update
+	updatedTag, err := service.UpdateTagMetadata(ctx, originalTag.ID, "updated-tag", "updated description", "bg-blue-100 text-blue-800")
+	gt.NoError(t, err)
+	gt.NotNil(t, updatedTag)
+	gt.V(t, updatedTag.Name).Equal("updated-tag")
+	gt.V(t, updatedTag.Description).Equal("updated description")
+	gt.V(t, updatedTag.Color).Equal("bg-blue-100 text-blue-800")
+	gt.V(t, updatedTag.ID).Equal(originalTag.ID)
+	gt.V(t, updatedTag.CreatedBy).Equal(originalTag.CreatedBy)
+	gt.True(t, updatedTag.UpdatedAt.After(updatedTag.CreatedAt))
+
+	// Test updating with invalid color
+	_, err = service.UpdateTagMetadata(ctx, originalTag.ID, "test-tag-2", "desc", "completely-invalid-color-name")
+	gt.Error(t, err)
+
+	// Create another tag to test name collision
+	_, err = service.CreateTagWithCustomColor(ctx, "another-tag", "", "bg-green-100 text-green-800", "")
+	gt.NoError(t, err)
+
+	// Test name collision (try to update first tag to use name of second tag)
+	_, err = service.UpdateTagMetadata(ctx, originalTag.ID, "another-tag", "desc", "bg-red-100 text-red-800")
+	gt.Error(t, err)
+
+	// Test updating non-existent tag
+	nonExistentID := tagmodel.NewID()
+	_, err = service.UpdateTagMetadata(ctx, nonExistentID, "test", "desc", "bg-red-100 text-red-800")
+	gt.Error(t, err)
+
+	// Test updating with color name (should work)
+	updatedTag2, err := service.UpdateTagMetadata(ctx, originalTag.ID, "test-tag-color-name", "desc with color name", "blue")
+	gt.NoError(t, err)
+	gt.NotNil(t, updatedTag2)
+	gt.V(t, updatedTag2.Name).Equal("test-tag-color-name")
+	gt.V(t, updatedTag2.Color).Equal("bg-blue-100 text-blue-800") // Should be converted to Tailwind class
 }

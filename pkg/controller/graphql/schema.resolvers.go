@@ -396,11 +396,18 @@ func (r *mutationResolver) CreateTag(ctx context.Context, name string) (*graphql
 		return nil, goerr.Wrap(err, "failed to create tag")
 	}
 
+	var desc *string
+	if tag.Description != "" {
+		desc = &tag.Description
+	}
+
 	return &graphql1.TagMetadata{
-		Name:      string(tag.Name),
-		Color:     tag.Color,
-		CreatedAt: tag.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: tag.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:          tag.ID,
+		Name:        string(tag.Name),
+		Description: desc,
+		Color:       tag.Color,
+		CreatedAt:   tag.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:   tag.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}, nil
 }
 
@@ -416,6 +423,37 @@ func (r *mutationResolver) DeleteTag(ctx context.Context, name string) (bool, er
 	}
 
 	return true, nil
+}
+
+// UpdateTag is the resolver for the updateTag field.
+func (r *mutationResolver) UpdateTag(ctx context.Context, input graphql1.UpdateTagInput) (*graphql1.TagMetadata, error) {
+	if r.uc.TagUC == nil {
+		return nil, goerr.New("tag service not configured")
+	}
+
+	description := ""
+	if input.Description != nil {
+		description = *input.Description
+	}
+
+	tag, err := r.uc.TagUC.UpdateTag(ctx, input.ID, input.Name, input.Color, description)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to update tag")
+	}
+
+	var desc *string
+	if tag.Description != "" {
+		desc = &tag.Description
+	}
+
+	return &graphql1.TagMetadata{
+		ID:          tag.ID,
+		Name:        tag.Name,
+		Description: desc,
+		Color:       tag.Color,
+		CreatedAt:   tag.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:   tag.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}, nil
 }
 
 // Ticket is the resolver for the ticket field.
@@ -883,15 +921,50 @@ func (r *queryResolver) Tags(ctx context.Context) ([]*graphql1.TagMetadata, erro
 
 	result := make([]*graphql1.TagMetadata, len(tags))
 	for i, tag := range tags {
+		var desc *string
+		if tag.Description != "" {
+			desc = &tag.Description
+		}
+
 		result[i] = &graphql1.TagMetadata{
-			Name:      string(tag.Name),
-			Color:     tag.Color,
-			CreatedAt: tag.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt: tag.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			ID:          tag.ID,
+			Name:        string(tag.Name),
+			Description: desc,
+			Color:       tag.Color,
+			CreatedAt:   tag.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			UpdatedAt:   tag.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 	}
 
 	return result, nil
+}
+
+// AvailableTagColors is the resolver for the availableTagColors field.
+func (r *queryResolver) AvailableTagColors(ctx context.Context) ([]string, error) {
+	if r.uc.TagUC == nil {
+		return nil, goerr.New("tag service not configured")
+	}
+
+	colors, err := r.uc.TagUC.GetAvailableColors()
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get available colors")
+	}
+
+	return colors, nil
+}
+
+// AvailableTagColorNames is the resolver for the availableTagColorNames field.
+func (r *queryResolver) AvailableTagColorNames(ctx context.Context) ([]string, error) {
+	if r.uc.TagUC == nil {
+		return nil, goerr.New("tag service not configured")
+	}
+
+	names, err := r.uc.TagUC.GetAvailableColorNames()
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get available color names")
+	}
+
+	return names, nil
 }
 
 // ID is the resolver for the id field.

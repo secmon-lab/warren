@@ -19,14 +19,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Settings, Tag, Trash2, Plus, Clock, Calendar } from "lucide-react";
+import { Settings, Tag, Trash2, Plus, Clock, Calendar, Edit } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils-extended";
+import EditTagModal from "@/components/EditTagModal";
 
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const [newTagName, setNewTagName] = useState("");
   const [tagToDelete, setTagToDelete] = useState<string | null>(null);
+  const [tagToEdit, setTagToEdit] = useState<TagMetadata | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const { data: tagsData, loading: tagsLoading, refetch: refetchTags } = useQuery(GET_TAGS);
   
@@ -88,6 +91,20 @@ export default function SettingsPage() {
     } catch (error) {
       console.error("Error deleting tag:", error);
     }
+  };
+
+  const handleEditTag = (tag: TagMetadata) => {
+    setTagToEdit(tag);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditModalClose = () => {
+    setIsEditModalOpen(false);
+    setTagToEdit(null);
+  };
+
+  const handleEditSuccess = () => {
+    refetchTags();
   };
 
   const tags: TagMetadata[] = tagsData?.tags || [];
@@ -160,37 +177,54 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   {tags.map((tag) => (
                     <div
-                      key={tag.name}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                      key={tag.id}
+                      className="flex items-start justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                     >
-                      <div className="flex items-center gap-3">
-                        <Badge 
-                          variant="secondary" 
-                          className={`text-sm ${tag.color || generateTagColor(tag.name)}`}
-                        >
-                          {tag.name}
-                        </Badge>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            Created {formatRelativeTime(tag.createdAt)}
-                          </span>
-                          {tag.updatedAt !== tag.createdAt && (
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-3">
+                          <Badge 
+                            variant="secondary" 
+                            className={`text-sm ${tag.color || generateTagColor(tag.name)}`}
+                          >
+                            {tag.name}
+                          </Badge>
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              Updated {formatRelativeTime(tag.updatedAt)}
+                              <Calendar className="h-3 w-3" />
+                              Created {formatRelativeTime(tag.createdAt)}
                             </span>
-                          )}
+                            {tag.updatedAt !== tag.createdAt && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                Updated {formatRelativeTime(tag.updatedAt)}
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        {tag.description && (
+                          <p className="text-sm text-muted-foreground ml-1">
+                            {tag.description}
+                          </p>
+                        )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setTagToDelete(tag.name)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditTag(tag)}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setTagToDelete(tag.name)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -225,6 +259,14 @@ export default function SettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit tag modal */}
+      <EditTagModal
+        tag={tagToEdit}
+        isOpen={isEditModalOpen}
+        onClose={handleEditModalClose}
+        onSuccess={handleEditSuccess}
+      />
     </div>
   );
 }

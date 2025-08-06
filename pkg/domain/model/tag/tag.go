@@ -1,9 +1,9 @@
 package tag
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"time"
-
-	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 // Set represents a set of tags using map for O(1) operations
@@ -11,20 +11,30 @@ type Set map[string]bool
 
 // Tag represents a tag entity with ID-based management
 type Tag struct {
-	ID          types.TagID `json:"id" firestore:"id"`
-	Name        string      `json:"name" firestore:"name"`
-	Description string      `json:"description,omitempty" firestore:"description,omitempty"`
-	Color       string      `json:"color" firestore:"color"`
-	CreatedAt   time.Time   `json:"created_at" firestore:"createdAt"`
-	UpdatedAt   time.Time   `json:"updated_at" firestore:"updatedAt"`
-	CreatedBy   string      `json:"created_by,omitempty" firestore:"createdBy,omitempty"`
+	ID          string    `json:"id" firestore:"id"`
+	Name        string    `json:"name" firestore:"name"`
+	Description string    `json:"description,omitempty" firestore:"description,omitempty"`
+	Color       string    `json:"color" firestore:"color"`
+	CreatedAt   time.Time `json:"created_at" firestore:"createdAt"`
+	UpdatedAt   time.Time `json:"updated_at" firestore:"updatedAt"`
+	CreatedBy   string    `json:"created_by,omitempty" firestore:"createdBy,omitempty"`
+}
+
+// NewID generates a new unique tag ID
+func NewID() string {
+	bytes := make([]byte, 8)
+	if _, err := rand.Read(bytes); err != nil {
+		// Fallback to timestamp-based ID if crypto/rand fails
+		return "tag_" + hex.EncodeToString([]byte{byte(time.Now().UnixNano())})
+	}
+	return "tag_" + hex.EncodeToString(bytes)
 }
 
 // IDSet represents a set of tag IDs using map for O(1) operations
-type IDSet map[types.TagID]bool
+type IDSet map[string]bool
 
 // NewIDSet creates a new IDSet from a slice of TagIDs
-func NewIDSet(tagIDs []types.TagID) IDSet {
+func NewIDSet(tagIDs []string) IDSet {
 	ts := make(IDSet)
 	for _, tagID := range tagIDs {
 		ts[tagID] = true
@@ -33,8 +43,8 @@ func NewIDSet(tagIDs []types.TagID) IDSet {
 }
 
 // ToSlice converts IDSet to a slice of TagIDs
-func (ts IDSet) ToSlice() []types.TagID {
-	result := make([]types.TagID, 0, len(ts))
+func (ts IDSet) ToSlice() []string {
+	result := make([]string, 0, len(ts))
 	for tagID := range ts {
 		result = append(result, tagID)
 	}
@@ -42,17 +52,17 @@ func (ts IDSet) ToSlice() []types.TagID {
 }
 
 // Add adds a tag ID to the set
-func (ts IDSet) Add(tagID types.TagID) {
+func (ts IDSet) Add(tagID string) {
 	ts[tagID] = true
 }
 
 // Remove removes a tag ID from the set
-func (ts IDSet) Remove(tagID types.TagID) {
+func (ts IDSet) Remove(tagID string) {
 	delete(ts, tagID)
 }
 
 // Has checks if a tag ID exists in the set
-func (ts IDSet) Has(tagID types.TagID) bool {
+func (ts IDSet) Has(tagID string) bool {
 	return ts[tagID]
 }
 
@@ -117,8 +127,8 @@ func (ts Set) Copy() Set {
 	return copied
 }
 
-// chipColors contains predefined colors suitable for chips/badges
-var chipColors = []string{
+// ChipColors contains predefined colors suitable for chips/badges
+var ChipColors = []string{
 	"bg-red-100 text-red-800",
 	"bg-orange-100 text-orange-800",
 	"bg-amber-100 text-amber-800",
@@ -141,6 +151,50 @@ var chipColors = []string{
 	"bg-zinc-100 text-zinc-800",
 }
 
+// ColorNames provides user-friendly color names corresponding to ChipColors
+var ColorNames = []string{
+	"red",
+	"orange",
+	"amber",
+	"yellow",
+	"lime",
+	"green",
+	"emerald",
+	"teal",
+	"cyan",
+	"sky",
+	"blue",
+	"indigo",
+	"violet",
+	"purple",
+	"fuchsia",
+	"pink",
+	"rose",
+	"slate",
+	"gray",
+	"zinc",
+}
+
+// ColorClassToName converts a Tailwind color class to a user-friendly name
+func ColorClassToName(colorClass string) string {
+	for i, class := range ChipColors {
+		if class == colorClass {
+			return ColorNames[i]
+		}
+	}
+	return "gray" // fallback
+}
+
+// ColorNameToClass converts a user-friendly color name to a Tailwind color class
+func ColorNameToClass(colorName string) string {
+	for i, name := range ColorNames {
+		if name == colorName {
+			return ChipColors[i]
+		}
+	}
+	return ChipColors[18] // fallback to gray
+}
+
 // GenerateColor generates a deterministic color for a tag name
 // Uses FNV-1a hash to ensure same tag names always get the same color
 func GenerateColor(tagName string) string {
@@ -149,14 +203,14 @@ func GenerateColor(tagName string) string {
 		h ^= uint32(tagName[i])
 		h *= 16777619
 	}
-	colorIndex := int(h) % len(chipColors)
-	return chipColors[colorIndex]
+	colorIndex := int(h) % len(ChipColors)
+	return ChipColors[colorIndex]
 }
 
 // MergeTagIDs merges two slices of tag IDs, removing duplicates
-func MergeTagIDs(existingTags, newTags []types.TagID) []types.TagID {
+func MergeTagIDs(existingTags, newTags []string) []string {
 	// Create a map to avoid duplicates
-	tagMap := make(map[types.TagID]bool)
+	tagMap := make(map[string]bool)
 
 	// Add existing tags
 	for _, tagID := range existingTags {
@@ -169,9 +223,33 @@ func MergeTagIDs(existingTags, newTags []types.TagID) []types.TagID {
 	}
 
 	// Convert back to slice
-	mergedTags := make([]types.TagID, 0, len(tagMap))
+	mergedTags := make([]string, 0, len(tagMap))
 	for tagID := range tagMap {
 		mergedTags = append(mergedTags, tagID)
+	}
+
+	return mergedTags
+}
+
+// MergeTags merges two slices of tag strings, removing duplicates
+func MergeTags(existingTags, newTags []string) []string {
+	// Create a map to avoid duplicates
+	tagMap := make(map[string]bool)
+
+	// Add existing tags
+	for _, tag := range existingTags {
+		tagMap[tag] = true
+	}
+
+	// Add new tags
+	for _, tag := range newTags {
+		tagMap[tag] = true
+	}
+
+	// Convert back to slice
+	mergedTags := make([]string, 0, len(tagMap))
+	for tag := range tagMap {
+		mergedTags = append(mergedTags, tag)
 	}
 
 	return mergedTags

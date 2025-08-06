@@ -2,6 +2,7 @@ package tag
 
 import (
 	"context"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
@@ -64,13 +65,13 @@ func (s *Service) DeleteTag(ctx context.Context, name string) error {
 
 // EnsureTagsExist checks if tags exist and creates them if they don't (deprecated - use ConvertNamesToIDs)
 func (s *Service) EnsureTagsExist(ctx context.Context, tags []string) error {
-	_, err := s.ConvertNamesToIDs(ctx, tags)
+	_, err := s.ConvertNamesToTags(ctx, tags)
 	return err
 }
 
 // New ID-based tag management methods
 
-func (s *Service) GetTagByID(ctx context.Context, tagID types.TagID) (*tag.Tag, error) {
+func (s *Service) GetTagByID(ctx context.Context, tagID string) (*tag.Tag, error) {
 	tagData, err := s.repo.GetTagByID(ctx, tagID)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get tag by ID")
@@ -78,7 +79,7 @@ func (s *Service) GetTagByID(ctx context.Context, tagID types.TagID) (*tag.Tag, 
 	return tagData, nil
 }
 
-func (s *Service) GetTagsByIDs(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error) {
+func (s *Service) GetTagsByIDs(ctx context.Context, tagIDs []string) ([]*tag.Tag, error) {
 	tags, err := s.repo.GetTagsByIDs(ctx, tagIDs)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get tags by IDs")
@@ -101,10 +102,10 @@ func (s *Service) CreateTagWithCustomColor(ctx context.Context, name, descriptio
 	}
 
 	// Generate ID with collision retry
-	var tagID types.TagID
+	var tagID string
 	maxRetries := 10
 	for i := 0; i < maxRetries; i++ {
-		tagID = types.NewTagID()
+		tagID = tag.NewID()
 		existing, err := s.repo.GetTagByID(ctx, tagID)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to check tag ID collision")
@@ -137,7 +138,12 @@ func (s *Service) CreateTagWithCustomColor(ctx context.Context, name, descriptio
 	return newTag, nil
 }
 
-func (s *Service) UpdateTagMetadata(ctx context.Context, tagID types.TagID, name, description, color string) (*tag.Tag, error) {
+func (s *Service) UpdateTagMetadata(ctx context.Context, tagID string, name, description, color string) (*tag.Tag, error) {
+	// Validate input
+	if name == "" {
+		return nil, goerr.New("tag name cannot be empty")
+	}
+
 	// Get existing tag
 	existingTag, err := s.repo.GetTagByID(ctx, tagID)
 	if err != nil {
@@ -158,13 +164,21 @@ func (s *Service) UpdateTagMetadata(ctx context.Context, tagID types.TagID, name
 		}
 	}
 
+	// Validate and convert color
+	colorClass, valid := s.validateAndNormalizeColor(color)
+	if !valid {
+		return nil, goerr.New("invalid color", goerr.V("color", color))
+	}
+
 	// Update the tag
+	now := time.Now()
 	updatedTag := &tag.Tag{
 		ID:          existingTag.ID,
 		Name:        name,
 		Description: description,
-		Color:       color,
+		Color:       colorClass,
 		CreatedAt:   existingTag.CreatedAt,
+		UpdatedAt:   now,
 		CreatedBy:   existingTag.CreatedBy,
 	}
 
@@ -175,7 +189,7 @@ func (s *Service) UpdateTagMetadata(ctx context.Context, tagID types.TagID, name
 	return updatedTag, nil
 }
 
-func (s *Service) DeleteTagByID(ctx context.Context, tagID types.TagID) error {
+func (s *Service) DeleteTagByID(ctx context.Context, tagID string) error {
 	// First, remove the tag from all alerts
 	if err := s.repo.RemoveTagIDFromAllAlerts(ctx, tagID); err != nil {
 		return goerr.Wrap(err, "failed to remove tag from alerts")
@@ -194,17 +208,8 @@ func (s *Service) DeleteTagByID(ctx context.Context, tagID types.TagID) error {
 	return nil
 }
 
-func (s *Service) UpdateAlertTagsByID(ctx context.Context, alertID types.AlertID, tagIDs []types.TagID) (*alert.Alert, error) {
-	// Ensure all tags exist
-	for _, tagID := range tagIDs {
-		existing, err := s.repo.GetTagByID(ctx, tagID)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to check tag existence", goerr.V("tagID", tagID))
-		}
-		if existing == nil {
-			return nil, goerr.New("tag not found", goerr.V("tagID", tagID))
-		}
-	}
+func (s *Service) UpdateAlertTagsByID(ctx context.Context, alertID types.AlertID, tags []string) (*alert.Alert, error) {
+	// Tags are now stored as names directly, no validation needed
 
 	// Get the alert
 	a, err := s.repo.GetAlert(ctx, alertID)
@@ -216,7 +221,7 @@ func (s *Service) UpdateAlertTagsByID(ctx context.Context, alertID types.AlertID
 	}
 
 	// Merge existing tags with new tags
-	a.Tags = tag.MergeTagIDs(a.Tags, tagIDs)
+	a.Tags = tag.MergeTags(a.Tags, tags)
 
 	// Save the alert
 	if err := s.repo.PutAlert(ctx, *a); err != nil {
@@ -226,17 +231,8 @@ func (s *Service) UpdateAlertTagsByID(ctx context.Context, alertID types.AlertID
 	return a, nil
 }
 
-func (s *Service) UpdateTicketTagsByID(ctx context.Context, ticketID types.TicketID, tagIDs []types.TagID) (*ticket.Ticket, error) {
-	// Ensure all tags exist
-	for _, tagID := range tagIDs {
-		existing, err := s.repo.GetTagByID(ctx, tagID)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to check tag existence", goerr.V("tagID", tagID))
-		}
-		if existing == nil {
-			return nil, goerr.New("tag not found", goerr.V("tagID", tagID))
-		}
-	}
+func (s *Service) UpdateTicketTagsByID(ctx context.Context, ticketID types.TicketID, tags []string) (*ticket.Ticket, error) {
+	// Tags are now stored as names directly, no validation needed
 
 	// Get the ticket
 	t, err := s.repo.GetTicket(ctx, ticketID)
@@ -248,7 +244,7 @@ func (s *Service) UpdateTicketTagsByID(ctx context.Context, ticketID types.Ticke
 	}
 
 	// Merge existing tags with new tags
-	t.Tags = tag.MergeTagIDs(t.Tags, tagIDs)
+	t.Tags = tag.MergeTags(t.Tags, tags)
 
 	// Save the ticket
 	if err := s.repo.PutTicket(ctx, *t); err != nil {
@@ -260,13 +256,13 @@ func (s *Service) UpdateTicketTagsByID(ctx context.Context, ticketID types.Ticke
 
 // Helper methods for tag name ↔ ID conversion
 
-// ConvertNamesToIDs converts tag names to tag IDs, creating tags if they don't exist
-func (s *Service) ConvertNamesToIDs(ctx context.Context, tagNames []string) ([]types.TagID, error) {
+// ConvertNamesToTags converts tag names to tag strings, creating tags if they don't exist
+func (s *Service) ConvertNamesToTags(ctx context.Context, tagNames []string) ([]string, error) {
 	if len(tagNames) == 0 {
-		return []types.TagID{}, nil
+		return []string{}, nil
 	}
 
-	tagIDs := make([]types.TagID, 0, len(tagNames))
+	result := make([]string, 0, len(tagNames))
 
 	for _, name := range tagNames {
 		if name == "" {
@@ -279,26 +275,25 @@ func (s *Service) ConvertNamesToIDs(ctx context.Context, tagNames []string) ([]t
 			return nil, goerr.Wrap(err, "failed to check existing tag", goerr.V("name", name))
 		}
 
-		if existingTag != nil {
-			// Tag exists, use its ID
-			tagIDs = append(tagIDs, existingTag.ID)
-		} else {
+		if existingTag == nil {
 			// Tag doesn't exist, create it
-			newTag, err := s.CreateTagWithCustomColor(ctx, name, "", "", "")
+			_, err := s.CreateTagWithCustomColor(ctx, name, "", "", "")
 			if err != nil {
 				return nil, goerr.Wrap(err, "failed to create new tag", goerr.V("name", name))
 			}
-			tagIDs = append(tagIDs, newTag.ID)
 		}
+
+		// Add the tag name to result
+		result = append(result, name)
 	}
 
-	return tagIDs, nil
+	return result, nil
 }
 
 // UpdateAlertTagsByName provides compatibility for name-based tag updates
 func (s *Service) UpdateAlertTagsByName(ctx context.Context, alertID types.AlertID, tagNames []string) (*alert.Alert, error) {
 	// Convert names to IDs
-	tagIDs, err := s.ConvertNamesToIDs(ctx, tagNames)
+	tagIDs, err := s.ConvertNamesToTags(ctx, tagNames)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
 	}
@@ -310,7 +305,7 @@ func (s *Service) UpdateAlertTagsByName(ctx context.Context, alertID types.Alert
 // UpdateTicketTagsByName provides compatibility for name-based tag updates
 func (s *Service) UpdateTicketTagsByName(ctx context.Context, ticketID types.TicketID, tagNames []string) (*ticket.Ticket, error) {
 	// Convert names to IDs
-	tagIDs, err := s.ConvertNamesToIDs(ctx, tagNames)
+	tagIDs, err := s.ConvertNamesToTags(ctx, tagNames)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
 	}
@@ -326,4 +321,48 @@ func (s *Service) ListAllTags(ctx context.Context) ([]*tag.Tag, error) {
 		return nil, goerr.Wrap(err, "failed to list all tags")
 	}
 	return tags, nil
+}
+
+// GetAvailableColors returns the list of available tag colors (Tailwind classes)
+func (s *Service) GetAvailableColors() []string {
+	// Create a copy of ChipColors to prevent external modification
+	colors := make([]string, len(tag.ChipColors))
+	copy(colors, tag.ChipColors)
+	return colors
+}
+
+// GetAvailableColorNames returns user-friendly color names
+func (s *Service) GetAvailableColorNames() []string {
+	// Create a copy of ColorNames to prevent external modification
+	names := make([]string, len(tag.ColorNames))
+	copy(names, tag.ColorNames)
+	return names
+}
+
+// isValidColor checks if the given color is in the predefined color list
+func (s *Service) isValidColor(color string) bool {
+	for _, c := range tag.ChipColors {
+		if c == color {
+			return true
+		}
+	}
+	return false
+}
+
+// validateAndNormalizeColor validates color and converts to Tailwind class
+func (s *Service) validateAndNormalizeColor(color string) (string, bool) {
+	// If it's already a valid Tailwind class, return as is
+	if s.isValidColor(color) {
+		return color, true
+	}
+
+	// Check if it's a valid color name
+	for i, name := range tag.ColorNames {
+		if name == color {
+			return tag.ChipColors[i], true
+		}
+	}
+
+	// Invalid color
+	return "", false
 }

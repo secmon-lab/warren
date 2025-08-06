@@ -1910,7 +1910,7 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			CreateTagWithIDFunc: func(ctx context.Context, tagMoqParam *tag.Tag) error {
 //				panic("mock out the CreateTagWithID method")
 //			},
-//			DeleteTagByIDFunc: func(ctx context.Context, tagID types.TagID) error {
+//			DeleteTagByIDFunc: func(ctx context.Context, tagID string) error {
 //				panic("mock out the DeleteTagByID method")
 //			},
 //			DeleteTokenFunc: func(ctx context.Context, tokenID auth.TokenID) error {
@@ -1961,13 +1961,13 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			GetLatestHistoryFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
 //				panic("mock out the GetLatestHistory method")
 //			},
-//			GetTagByIDFunc: func(ctx context.Context, tagID types.TagID) (*tag.Tag, error) {
+//			GetTagByIDFunc: func(ctx context.Context, tagID string) (*tag.Tag, error) {
 //				panic("mock out the GetTagByID method")
 //			},
 //			GetTagByNameFunc: func(ctx context.Context, name string) (*tag.Tag, error) {
 //				panic("mock out the GetTagByName method")
 //			},
-//			GetTagsByIDsFunc: func(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error) {
+//			GetTagsByIDsFunc: func(ctx context.Context, tagIDs []string) ([]*tag.Tag, error) {
 //				panic("mock out the GetTagsByIDs method")
 //			},
 //			GetTicketFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
@@ -2036,10 +2036,10 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			RemoveTagFromAllTicketsFunc: func(ctx context.Context, name string) error {
 //				panic("mock out the RemoveTagFromAllTickets method")
 //			},
-//			RemoveTagIDFromAllAlertsFunc: func(ctx context.Context, tagID types.TagID) error {
+//			RemoveTagIDFromAllAlertsFunc: func(ctx context.Context, tagID string) error {
 //				panic("mock out the RemoveTagIDFromAllAlerts method")
 //			},
-//			RemoveTagIDFromAllTicketsFunc: func(ctx context.Context, tagID types.TagID) error {
+//			RemoveTagIDFromAllTicketsFunc: func(ctx context.Context, tagID string) error {
 //				panic("mock out the RemoveTagIDFromAllTickets method")
 //			},
 //			SearchAlertsFunc: func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
@@ -2089,7 +2089,7 @@ type RepositoryMock struct {
 	CreateTagWithIDFunc func(ctx context.Context, tagMoqParam *tag.Tag) error
 
 	// DeleteTagByIDFunc mocks the DeleteTagByID method.
-	DeleteTagByIDFunc func(ctx context.Context, tagID types.TagID) error
+	DeleteTagByIDFunc func(ctx context.Context, tagID string) error
 
 	// DeleteTokenFunc mocks the DeleteToken method.
 	DeleteTokenFunc func(ctx context.Context, tokenID auth.TokenID) error
@@ -2140,13 +2140,13 @@ type RepositoryMock struct {
 	GetLatestHistoryFunc func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error)
 
 	// GetTagByIDFunc mocks the GetTagByID method.
-	GetTagByIDFunc func(ctx context.Context, tagID types.TagID) (*tag.Tag, error)
+	GetTagByIDFunc func(ctx context.Context, tagID string) (*tag.Tag, error)
 
 	// GetTagByNameFunc mocks the GetTagByName method.
 	GetTagByNameFunc func(ctx context.Context, name string) (*tag.Tag, error)
 
 	// GetTagsByIDsFunc mocks the GetTagsByIDs method.
-	GetTagsByIDsFunc func(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error)
+	GetTagsByIDsFunc func(ctx context.Context, tagIDs []string) ([]*tag.Tag, error)
 
 	// GetTicketFunc mocks the GetTicket method.
 	GetTicketFunc func(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error)
@@ -2215,10 +2215,10 @@ type RepositoryMock struct {
 	RemoveTagFromAllTicketsFunc func(ctx context.Context, name string) error
 
 	// RemoveTagIDFromAllAlertsFunc mocks the RemoveTagIDFromAllAlerts method.
-	RemoveTagIDFromAllAlertsFunc func(ctx context.Context, tagID types.TagID) error
+	RemoveTagIDFromAllAlertsFunc func(ctx context.Context, tagID string) error
 
 	// RemoveTagIDFromAllTicketsFunc mocks the RemoveTagIDFromAllTickets method.
-	RemoveTagIDFromAllTicketsFunc func(ctx context.Context, tagID types.TagID) error
+	RemoveTagIDFromAllTicketsFunc func(ctx context.Context, tagID string) error
 
 	// SearchAlertsFunc mocks the SearchAlerts method.
 	SearchAlertsFunc func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error)
@@ -2306,7 +2306,7 @@ type RepositoryMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// TagID is the tagID argument value.
-			TagID types.TagID
+			TagID string
 		}
 		// DeleteToken holds details about calls to the DeleteToken method.
 		DeleteToken []struct {
@@ -2437,7 +2437,7 @@ type RepositoryMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// TagID is the tagID argument value.
-			TagID types.TagID
+			TagID string
 		}
 		// GetTagByName holds details about calls to the GetTagByName method.
 		GetTagByName []struct {
@@ -2451,7 +2451,7 @@ type RepositoryMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// TagIDs is the tagIDs argument value.
-			TagIDs []types.TagID
+			TagIDs []string
 		}
 		// GetTicket holds details about calls to the GetTicket method.
 		GetTicket []struct {
@@ -2626,14 +2626,14 @@ type RepositoryMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// TagID is the tagID argument value.
-			TagID types.TagID
+			TagID string
 		}
 		// RemoveTagIDFromAllTickets holds details about calls to the RemoveTagIDFromAllTickets method.
 		RemoveTagIDFromAllTickets []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// TagID is the tagID argument value.
-			TagID types.TagID
+			TagID string
 		}
 		// SearchAlerts holds details about calls to the SearchAlerts method.
 		SearchAlerts []struct {
@@ -3119,10 +3119,10 @@ func (mock *RepositoryMock) CreateTagWithIDCalls() []struct {
 }
 
 // DeleteTagByID calls DeleteTagByIDFunc.
-func (mock *RepositoryMock) DeleteTagByID(ctx context.Context, tagID types.TagID) error {
+func (mock *RepositoryMock) DeleteTagByID(ctx context.Context, tagID string) error {
 	callInfo := struct {
 		Ctx   context.Context
-		TagID types.TagID
+		TagID string
 	}{
 		Ctx:   ctx,
 		TagID: tagID,
@@ -3145,11 +3145,11 @@ func (mock *RepositoryMock) DeleteTagByID(ctx context.Context, tagID types.TagID
 //	len(mockedRepository.DeleteTagByIDCalls())
 func (mock *RepositoryMock) DeleteTagByIDCalls() []struct {
 	Ctx   context.Context
-	TagID types.TagID
+	TagID string
 } {
 	var calls []struct {
 		Ctx   context.Context
-		TagID types.TagID
+		TagID string
 	}
 	mock.lockDeleteTagByID.RLock()
 	calls = mock.calls.DeleteTagByID
@@ -3821,10 +3821,10 @@ func (mock *RepositoryMock) GetLatestHistoryCalls() []struct {
 }
 
 // GetTagByID calls GetTagByIDFunc.
-func (mock *RepositoryMock) GetTagByID(ctx context.Context, tagID types.TagID) (*tag.Tag, error) {
+func (mock *RepositoryMock) GetTagByID(ctx context.Context, tagID string) (*tag.Tag, error) {
 	callInfo := struct {
 		Ctx   context.Context
-		TagID types.TagID
+		TagID string
 	}{
 		Ctx:   ctx,
 		TagID: tagID,
@@ -3848,11 +3848,11 @@ func (mock *RepositoryMock) GetTagByID(ctx context.Context, tagID types.TagID) (
 //	len(mockedRepository.GetTagByIDCalls())
 func (mock *RepositoryMock) GetTagByIDCalls() []struct {
 	Ctx   context.Context
-	TagID types.TagID
+	TagID string
 } {
 	var calls []struct {
 		Ctx   context.Context
-		TagID types.TagID
+		TagID string
 	}
 	mock.lockGetTagByID.RLock()
 	calls = mock.calls.GetTagByID
@@ -3901,10 +3901,10 @@ func (mock *RepositoryMock) GetTagByNameCalls() []struct {
 }
 
 // GetTagsByIDs calls GetTagsByIDsFunc.
-func (mock *RepositoryMock) GetTagsByIDs(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error) {
+func (mock *RepositoryMock) GetTagsByIDs(ctx context.Context, tagIDs []string) ([]*tag.Tag, error) {
 	callInfo := struct {
 		Ctx    context.Context
-		TagIDs []types.TagID
+		TagIDs []string
 	}{
 		Ctx:    ctx,
 		TagIDs: tagIDs,
@@ -3928,11 +3928,11 @@ func (mock *RepositoryMock) GetTagsByIDs(ctx context.Context, tagIDs []types.Tag
 //	len(mockedRepository.GetTagsByIDsCalls())
 func (mock *RepositoryMock) GetTagsByIDsCalls() []struct {
 	Ctx    context.Context
-	TagIDs []types.TagID
+	TagIDs []string
 } {
 	var calls []struct {
 		Ctx    context.Context
-		TagIDs []types.TagID
+		TagIDs []string
 	}
 	mock.lockGetTagsByIDs.RLock()
 	calls = mock.calls.GetTagsByIDs
@@ -4839,10 +4839,10 @@ func (mock *RepositoryMock) RemoveTagFromAllTicketsCalls() []struct {
 }
 
 // RemoveTagIDFromAllAlerts calls RemoveTagIDFromAllAlertsFunc.
-func (mock *RepositoryMock) RemoveTagIDFromAllAlerts(ctx context.Context, tagID types.TagID) error {
+func (mock *RepositoryMock) RemoveTagIDFromAllAlerts(ctx context.Context, tagID string) error {
 	callInfo := struct {
 		Ctx   context.Context
-		TagID types.TagID
+		TagID string
 	}{
 		Ctx:   ctx,
 		TagID: tagID,
@@ -4865,11 +4865,11 @@ func (mock *RepositoryMock) RemoveTagIDFromAllAlerts(ctx context.Context, tagID 
 //	len(mockedRepository.RemoveTagIDFromAllAlertsCalls())
 func (mock *RepositoryMock) RemoveTagIDFromAllAlertsCalls() []struct {
 	Ctx   context.Context
-	TagID types.TagID
+	TagID string
 } {
 	var calls []struct {
 		Ctx   context.Context
-		TagID types.TagID
+		TagID string
 	}
 	mock.lockRemoveTagIDFromAllAlerts.RLock()
 	calls = mock.calls.RemoveTagIDFromAllAlerts
@@ -4878,10 +4878,10 @@ func (mock *RepositoryMock) RemoveTagIDFromAllAlertsCalls() []struct {
 }
 
 // RemoveTagIDFromAllTickets calls RemoveTagIDFromAllTicketsFunc.
-func (mock *RepositoryMock) RemoveTagIDFromAllTickets(ctx context.Context, tagID types.TagID) error {
+func (mock *RepositoryMock) RemoveTagIDFromAllTickets(ctx context.Context, tagID string) error {
 	callInfo := struct {
 		Ctx   context.Context
-		TagID types.TagID
+		TagID string
 	}{
 		Ctx:   ctx,
 		TagID: tagID,
@@ -4904,11 +4904,11 @@ func (mock *RepositoryMock) RemoveTagIDFromAllTickets(ctx context.Context, tagID
 //	len(mockedRepository.RemoveTagIDFromAllTicketsCalls())
 func (mock *RepositoryMock) RemoveTagIDFromAllTicketsCalls() []struct {
 	Ctx   context.Context
-	TagID types.TagID
+	TagID string
 } {
 	var calls []struct {
 		Ctx   context.Context
-		TagID types.TagID
+		TagID string
 	}
 	mock.lockRemoveTagIDFromAllTickets.RLock()
 	calls = mock.calls.RemoveTagIDFromAllTickets
