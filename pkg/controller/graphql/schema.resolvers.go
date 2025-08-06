@@ -930,7 +930,7 @@ func (r *queryResolver) AvailableTagColors(ctx context.Context) ([]string, error
 		return nil, goerr.New("tag service not configured")
 	}
 
-	colors, err := r.uc.TagUC.GetAvailableColors(ctx)
+	colors, err := r.uc.TagUC.GetAvailableColors()
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get available colors")
 	}
@@ -944,7 +944,7 @@ func (r *queryResolver) AvailableTagColorNames(ctx context.Context) ([]string, e
 		return nil, goerr.New("tag service not configured")
 	}
 
-	names, err := r.uc.TagUC.GetAvailableColorNames(ctx)
+	names, err := r.uc.TagUC.GetAvailableColorNames()
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get available color names")
 	}

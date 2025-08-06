@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { UPDATE_TAG, GET_AVAILABLE_TAG_COLOR_NAMES } from "@/lib/graphql/queries";
 import { TagMetadata } from "@/lib/types";
+import { colorClassToName, colorNameToClass } from "@/lib/tag-colors";
 
 interface EditTagModalProps {
   tag: TagMetadata | null;
@@ -52,60 +53,6 @@ export default function EditTagModal({ tag, isOpen, onClose, onSuccess }: EditTa
     },
   });
 
-  // Helper function to convert Tailwind class to color name
-  const colorClassToName = (colorClass: string): string => {
-    const colorMap: Record<string, string> = {
-      "bg-red-100 text-red-800": "red",
-      "bg-orange-100 text-orange-800": "orange",
-      "bg-amber-100 text-amber-800": "amber",
-      "bg-yellow-100 text-yellow-800": "yellow",
-      "bg-lime-100 text-lime-800": "lime",
-      "bg-green-100 text-green-800": "green",
-      "bg-emerald-100 text-emerald-800": "emerald",
-      "bg-teal-100 text-teal-800": "teal",
-      "bg-cyan-100 text-cyan-800": "cyan",
-      "bg-sky-100 text-sky-800": "sky",
-      "bg-blue-100 text-blue-800": "blue",
-      "bg-indigo-100 text-indigo-800": "indigo",
-      "bg-violet-100 text-violet-800": "violet",
-      "bg-purple-100 text-purple-800": "purple",
-      "bg-fuchsia-100 text-fuchsia-800": "fuchsia",
-      "bg-pink-100 text-pink-800": "pink",
-      "bg-rose-100 text-rose-800": "rose",
-      "bg-slate-100 text-slate-800": "slate",
-      "bg-gray-100 text-gray-800": "gray",
-      "bg-zinc-100 text-zinc-800": "zinc",
-    };
-    return colorMap[colorClass] || "gray";
-  };
-
-  // Helper function to convert color name to Tailwind class
-  const colorNameToClass = (colorName: string): string => {
-    const classMap: Record<string, string> = {
-      red: "bg-red-100 text-red-800",
-      orange: "bg-orange-100 text-orange-800",
-      amber: "bg-amber-100 text-amber-800",
-      yellow: "bg-yellow-100 text-yellow-800",
-      lime: "bg-lime-100 text-lime-800",
-      green: "bg-green-100 text-green-800",
-      emerald: "bg-emerald-100 text-emerald-800",
-      teal: "bg-teal-100 text-teal-800",
-      cyan: "bg-cyan-100 text-cyan-800",
-      sky: "bg-sky-100 text-sky-800",
-      blue: "bg-blue-100 text-blue-800",
-      indigo: "bg-indigo-100 text-indigo-800",
-      violet: "bg-violet-100 text-violet-800",
-      purple: "bg-purple-100 text-purple-800",
-      fuchsia: "bg-fuchsia-100 text-fuchsia-800",
-      pink: "bg-pink-100 text-pink-800",
-      rose: "bg-rose-100 text-rose-800",
-      slate: "bg-slate-100 text-slate-800",
-      gray: "bg-gray-100 text-gray-800",
-      zinc: "bg-zinc-100 text-zinc-800",
-    };
-    return classMap[colorName] || "bg-gray-100 text-gray-800";
-  };
-
   useEffect(() => {
     if (tag && isOpen) {
       setName(tag.name);
@@ -118,20 +65,16 @@ export default function EditTagModal({ tag, isOpen, onClose, onSuccess }: EditTa
     e.preventDefault();
     if (!tag || !name.trim() || !color) return;
 
-    try {
-      await updateTag({
-        variables: {
-          input: {
-            id: tag.id,
-            name: name.trim(),
-            color, // Send color name to backend
-            description: description.trim() || undefined,
-          },
+    await updateTag({
+      variables: {
+        input: {
+          id: tag.id,
+          name: name.trim(),
+          color, // Send color name to backend
+          description: description.trim() || undefined,
         },
-      });
-    } catch (error) {
-      console.error("Error updating tag:", error);
-    }
+      },
+    });
   };
 
   const handleClose = () => {

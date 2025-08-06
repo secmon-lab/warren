@@ -381,13 +381,3 @@ func (s *Service) validateAndNormalizeColor(color string) (string, bool) {
 	return "", false
 }
 
-// normalizeColor converts color name to Tailwind class, or returns the class if already valid
-func (s *Service) normalizeColor(color string) string {
-	// If it's already a valid Tailwind class, return as is
-	if s.isValidColor(color) {
-		return color
-	}
-	
-	// Try to convert from color name to class
-	return tag.ColorNameToClass(color)
-}

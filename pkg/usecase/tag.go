@@ -110,12 +110,12 @@ func (u *TagUseCase) UpdateTag(ctx context.Context, tagID string, name, color, d
 }
 
 // GetAvailableColors returns available color options for tags (Tailwind classes)
-func (u *TagUseCase) GetAvailableColors(ctx context.Context) ([]string, error) {
+func (u *TagUseCase) GetAvailableColors() ([]string, error) {
 	return u.tagService.GetAvailableColors(), nil
 }
 
 // GetAvailableColorNames returns user-friendly color names for tags
-func (u *TagUseCase) GetAvailableColorNames(ctx context.Context) ([]string, error) {
+func (u *TagUseCase) GetAvailableColorNames() ([]string, error) {
 	return u.tagService.GetAvailableColorNames(), nil
 }
 

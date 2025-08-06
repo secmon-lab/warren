@@ -209,7 +209,7 @@ func TestTagService_GetAvailableColors(t *testing.T) {
 
 	// Verify returned slice is a copy (modifying it shouldn't affect original)
 	originalLen := len(colors)
-	colors = append(colors, "test-color")
+	_ = append(colors, "test-color") // Intentionally modify the copy
 	newColors := service.GetAvailableColors()
 	gt.N(t, len(newColors)).Equal(originalLen)
 }
@@ -233,7 +233,7 @@ func TestTagService_GetAvailableColorNames(t *testing.T) {
 
 	// Verify returned slice is a copy
 	originalLen := len(colorNames)
-	colorNames = append(colorNames, "test-color")
+	_ = append(colorNames, "test-color") // Intentionally modify the copy
 	newColorNames := service.GetAvailableColorNames()
 	gt.N(t, len(newColorNames)).Equal(originalLen)
 }

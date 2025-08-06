@@ -146,7 +146,7 @@ func TestTagUseCase_GetAvailableColors(t *testing.T) {
 	tagService := tag.New(repo)
 	tagUC := usecase.NewTagUseCase(tagService)
 
-	colors, err := tagUC.GetAvailableColors(context.Background())
+	colors, err := tagUC.GetAvailableColors()
 	gt.NoError(t, err)
 	gt.True(t, len(colors) > 0)
 
