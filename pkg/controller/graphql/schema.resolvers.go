@@ -378,12 +378,12 @@ func (r *mutationResolver) BindAlertsToTicket(ctx context.Context, ticketID stri
 }
 
 // UpdateAlertTags is the resolver for the updateAlertTags field.
-func (r *mutationResolver) UpdateAlertTags(ctx context.Context, alertID string, tags []string) (*alert.Alert, error) {
+func (r *mutationResolver) UpdateAlertTags(ctx context.Context, alertID string, tagIds []string) (*alert.Alert, error) {
 	if r.uc.TagUC == nil {
 		return nil, goerr.New("tag service not configured")
 	}
 
-	a, err := r.uc.TagUC.UpdateAlertTags(ctx, types.AlertID(alertID), tags)
+	a, err := r.uc.TagUC.UpdateAlertTagsByID(ctx, types.AlertID(alertID), tagIds)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update alert tags")
 	}
@@ -392,12 +392,12 @@ func (r *mutationResolver) UpdateAlertTags(ctx context.Context, alertID string, 
 }
 
 // UpdateTicketTags is the resolver for the updateTicketTags field.
-func (r *mutationResolver) UpdateTicketTags(ctx context.Context, ticketID string, tags []string) (*ticket.Ticket, error) {
+func (r *mutationResolver) UpdateTicketTags(ctx context.Context, ticketID string, tagIds []string) (*ticket.Ticket, error) {
 	if r.uc.TagUC == nil {
 		return nil, goerr.New("tag service not configured")
 	}
 
-	t, err := r.uc.TagUC.UpdateTicketTags(ctx, types.TicketID(ticketID), tags)
+	t, err := r.uc.TagUC.UpdateTicketTagsByID(ctx, types.TicketID(ticketID), tagIds)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update ticket tags")
 	}
@@ -1183,20 +1183,3 @@ type findingResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-/*
-	func (r *alertResolver) Tags(ctx context.Context, obj *alert.Alert) ([]string, error) {
-	if r.uc == nil || len(obj.TagIDs) == 0 {
-		return []string{}, nil
-	}
-
-	// Use the compatibility method to get tag names
-	return obj.GetTagNames(ctx, r.createTagGetter())
-}
-*/

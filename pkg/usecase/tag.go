@@ -59,7 +59,7 @@ func (u *TagUseCase) DeleteTag(ctx context.Context, name string) error {
 	return nil
 }
 
-// UpdateAlertTags updates tags for an alert
+// UpdateAlertTags updates tags for an alert (legacy name-based method)
 func (u *TagUseCase) UpdateAlertTags(ctx context.Context, alertID types.AlertID, tags []string) (*alert.Alert, error) {
 	// Convert tag names to tags (creates tags if they don't exist)
 	tags, err := u.tagService.ConvertNamesToTags(ctx, tags)
@@ -75,7 +75,17 @@ func (u *TagUseCase) UpdateAlertTags(ctx context.Context, alertID types.AlertID,
 	return a, nil
 }
 
-// UpdateTicketTags updates tags for a ticket
+// UpdateAlertTagsByID updates tags for an alert using tag IDs directly
+func (u *TagUseCase) UpdateAlertTagsByID(ctx context.Context, alertID types.AlertID, tagIDs []string) (*alert.Alert, error) {
+	// Use tag ID-based method directly (no conversion needed)
+	a, err := u.tagService.UpdateAlertTagsByID(ctx, alertID, tagIDs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to update alert tags")
+	}
+	return a, nil
+}
+
+// UpdateTicketTags updates tags for a ticket (legacy name-based method)
 func (u *TagUseCase) UpdateTicketTags(ctx context.Context, ticketID types.TicketID, tags []string) (*ticket.Ticket, error) {
 	// Convert tag names to tags (creates tags if they don't exist)
 	tags, err := u.tagService.ConvertNamesToTags(ctx, tags)
@@ -85,6 +95,16 @@ func (u *TagUseCase) UpdateTicketTags(ctx context.Context, ticketID types.Ticket
 
 	// Use tag-based method
 	t, err := u.tagService.UpdateTicketTagsByID(ctx, ticketID, tags)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to update ticket tags")
+	}
+	return t, nil
+}
+
+// UpdateTicketTagsByID updates tags for a ticket using tag IDs directly
+func (u *TagUseCase) UpdateTicketTagsByID(ctx context.Context, ticketID types.TicketID, tagIDs []string) (*ticket.Ticket, error) {
+	// Use tag ID-based method directly (no conversion needed)
+	t, err := u.tagService.UpdateTicketTagsByID(ctx, ticketID, tagIDs)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update ticket tags")
 	}

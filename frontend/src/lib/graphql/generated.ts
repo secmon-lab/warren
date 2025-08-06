@@ -177,7 +177,7 @@ export type MutationDeleteTagArgs = {
 
 export type MutationUpdateAlertTagsArgs = {
   alertId: Scalars['ID']['input'];
-  tags: Array<Scalars['String']['input']>;
+  tagIds: Array<Scalars['ID']['input']>;
 };
 
 
@@ -213,7 +213,7 @@ export type MutationUpdateTicketStatusArgs = {
 
 
 export type MutationUpdateTicketTagsArgs = {
-  tags: Array<Scalars['String']['input']>;
+  tagIds: Array<Scalars['ID']['input']>;
   ticketId: Scalars['ID']['input'];
 };
 
@@ -593,7 +593,7 @@ export type GetAvailableTagColorNamesQuery = { __typename?: 'Query', availableTa
 
 export type UpdateAlertTagsMutationVariables = Exact<{
   alertId: Scalars['ID']['input'];
-  tags: Array<Scalars['String']['input']> | Scalars['String']['input'];
+  tagIds: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
 }>;
 
 
@@ -601,7 +601,7 @@ export type UpdateAlertTagsMutation = { __typename?: 'Mutation', updateAlertTags
 
 export type UpdateTicketTagsMutationVariables = Exact<{
   ticketId: Scalars['ID']['input'];
-  tags: Array<Scalars['String']['input']> | Scalars['String']['input'];
+  tagIds: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
 }>;
 
 
@@ -1455,7 +1455,7 @@ export type GetAvailableTagColorNamesQueryHookResult = ReturnType<typeof useGetA
 export type GetAvailableTagColorNamesLazyQueryHookResult = ReturnType<typeof useGetAvailableTagColorNamesLazyQuery>;
 export type GetAvailableTagColorNamesSuspenseQueryHookResult = ReturnType<typeof useGetAvailableTagColorNamesSuspenseQuery>;
 export type GetAvailableTagColorNamesQueryResult = Apollo.QueryResult<GetAvailableTagColorNamesQuery, GetAvailableTagColorNamesQueryVariables>;
-export const UpdateAlertTagsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateAlertTags"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"alertId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"tags"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateAlertTags"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"alertId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"alertId"}}},{"kind":"Argument","name":{"kind":"Name","value":"tags"},"value":{"kind":"Variable","name":{"kind":"Name","value":"tags"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode;
+export const UpdateAlertTagsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateAlertTags"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"alertId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"tagIds"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateAlertTags"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"alertId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"alertId"}}},{"kind":"Argument","name":{"kind":"Name","value":"tagIds"},"value":{"kind":"Variable","name":{"kind":"Name","value":"tagIds"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode;
 export type UpdateAlertTagsMutationFn = Apollo.MutationFunction<UpdateAlertTagsMutation, UpdateAlertTagsMutationVariables>;
 
 /**
@@ -1472,7 +1472,7 @@ export type UpdateAlertTagsMutationFn = Apollo.MutationFunction<UpdateAlertTagsM
  * const [updateAlertTagsMutation, { data, loading, error }] = useUpdateAlertTagsMutation({
  *   variables: {
  *      alertId: // value for 'alertId'
- *      tags: // value for 'tags'
+ *      tagIds: // value for 'tagIds'
  *   },
  * });
  */
@@ -1483,7 +1483,7 @@ export function useUpdateAlertTagsMutation(baseOptions?: Apollo.MutationHookOpti
 export type UpdateAlertTagsMutationHookResult = ReturnType<typeof useUpdateAlertTagsMutation>;
 export type UpdateAlertTagsMutationResult = Apollo.MutationResult<UpdateAlertTagsMutation>;
 export type UpdateAlertTagsMutationOptions = Apollo.BaseMutationOptions<UpdateAlertTagsMutation, UpdateAlertTagsMutationVariables>;
-export const UpdateTicketTagsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateTicketTags"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"tags"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateTicketTags"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ticketId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}}},{"kind":"Argument","name":{"kind":"Name","value":"tags"},"value":{"kind":"Variable","name":{"kind":"Name","value":"tags"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode;
+export const UpdateTicketTagsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateTicketTags"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"tagIds"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateTicketTags"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ticketId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}}},{"kind":"Argument","name":{"kind":"Name","value":"tagIds"},"value":{"kind":"Variable","name":{"kind":"Name","value":"tagIds"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode;
 export type UpdateTicketTagsMutationFn = Apollo.MutationFunction<UpdateTicketTagsMutation, UpdateTicketTagsMutationVariables>;
 
 /**
@@ -1500,7 +1500,7 @@ export type UpdateTicketTagsMutationFn = Apollo.MutationFunction<UpdateTicketTag
  * const [updateTicketTagsMutation, { data, loading, error }] = useUpdateTicketTagsMutation({
  *   variables: {
  *      ticketId: // value for 'ticketId'
- *      tags: // value for 'tags'
+ *      tagIds: // value for 'tagIds'
  *   },
  * });
  */

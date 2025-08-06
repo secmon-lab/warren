@@ -275,22 +275,10 @@ func (s *Service) ConvertNamesToTags(ctx context.Context, tagNames []string) ([]
 			continue
 		}
 
-		// Try to get existing tag by name
-		existingTag, err := s.repo.GetTagByName(ctx, name)
+		// Use retry logic to handle race conditions during tag creation
+		tagID, err := s.getOrCreateTagByName(ctx, name)
 		if err != nil {
-			return nil, goerr.Wrap(err, "failed to check existing tag", goerr.V("name", name))
-		}
-
-		var tagID string
-		if existingTag == nil {
-			// Tag doesn't exist, create it
-			newTag, err := s.CreateTagWithCustomColor(ctx, name, "", "", "")
-			if err != nil {
-				return nil, goerr.Wrap(err, "failed to create new tag", goerr.V("name", name))
-			}
-			tagID = newTag.ID
-		} else {
-			tagID = existingTag.ID
+			return nil, goerr.Wrap(err, "failed to get or create tag", goerr.V("name", name))
 		}
 
 		// Add the tag ID to result
@@ -298,6 +286,18 @@ func (s *Service) ConvertNamesToTags(ctx context.Context, tagNames []string) ([]
 	}
 
 	return result, nil
+}
+
+// getOrCreateTagByName atomically gets an existing tag or creates a new one
+// This method handles race conditions where multiple goroutines try to create the same tag
+func (s *Service) getOrCreateTagByName(ctx context.Context, name string) (string, error) {
+	// Use the repository's atomic get-or-create method
+	tag, err := s.repo.GetOrCreateTagByName(ctx, name, "", "", "")
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to get or create tag", goerr.V("name", name))
+	}
+
+	return tag.ID, nil
 }
 
 // UpdateAlertTagsByName provides compatibility for name-based tag updates

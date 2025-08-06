@@ -86,7 +86,7 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 				inheritedTagIDs[tagID] = true
 			}
 		}
-		
+
 		// Set inherited tag IDs directly
 		if len(inheritedTagIDs) > 0 {
 			if newTicket.TagIDs == nil {

@@ -1961,6 +1961,9 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			GetLatestHistoryFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
 //				panic("mock out the GetLatestHistory method")
 //			},
+//			GetOrCreateTagByNameFunc: func(ctx context.Context, name string, description string, color string, createdBy string) (*tag.Tag, error) {
+//				panic("mock out the GetOrCreateTagByName method")
+//			},
 //			GetTagByIDFunc: func(ctx context.Context, tagID string) (*tag.Tag, error) {
 //				panic("mock out the GetTagByID method")
 //			},
@@ -2138,6 +2141,9 @@ type RepositoryMock struct {
 
 	// GetLatestHistoryFunc mocks the GetLatestHistory method.
 	GetLatestHistoryFunc func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error)
+
+	// GetOrCreateTagByNameFunc mocks the GetOrCreateTagByName method.
+	GetOrCreateTagByNameFunc func(ctx context.Context, name string, description string, color string, createdBy string) (*tag.Tag, error)
 
 	// GetTagByIDFunc mocks the GetTagByID method.
 	GetTagByIDFunc func(ctx context.Context, tagID string) (*tag.Tag, error)
@@ -2432,6 +2438,19 @@ type RepositoryMock struct {
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
 		}
+		// GetOrCreateTagByName holds details about calls to the GetOrCreateTagByName method.
+		GetOrCreateTagByName []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// Description is the description argument value.
+			Description string
+			// Color is the color argument value.
+			Color string
+			// CreatedBy is the createdBy argument value.
+			CreatedBy string
+		}
 		// GetTagByID holds details about calls to the GetTagByID method.
 		GetTagByID []struct {
 			// Ctx is the ctx argument value.
@@ -2690,6 +2709,7 @@ type RepositoryMock struct {
 	lockGetLatestAlertByThread         sync.RWMutex
 	lockGetLatestAlertListInThread     sync.RWMutex
 	lockGetLatestHistory               sync.RWMutex
+	lockGetOrCreateTagByName           sync.RWMutex
 	lockGetTagByID                     sync.RWMutex
 	lockGetTagByName                   sync.RWMutex
 	lockGetTagsByIDs                   sync.RWMutex
@@ -3817,6 +3837,58 @@ func (mock *RepositoryMock) GetLatestHistoryCalls() []struct {
 	mock.lockGetLatestHistory.RLock()
 	calls = mock.calls.GetLatestHistory
 	mock.lockGetLatestHistory.RUnlock()
+	return calls
+}
+
+// GetOrCreateTagByName calls GetOrCreateTagByNameFunc.
+func (mock *RepositoryMock) GetOrCreateTagByName(ctx context.Context, name string, description string, color string, createdBy string) (*tag.Tag, error) {
+	callInfo := struct {
+		Ctx         context.Context
+		Name        string
+		Description string
+		Color       string
+		CreatedBy   string
+	}{
+		Ctx:         ctx,
+		Name:        name,
+		Description: description,
+		Color:       color,
+		CreatedBy:   createdBy,
+	}
+	mock.lockGetOrCreateTagByName.Lock()
+	mock.calls.GetOrCreateTagByName = append(mock.calls.GetOrCreateTagByName, callInfo)
+	mock.lockGetOrCreateTagByName.Unlock()
+	if mock.GetOrCreateTagByNameFunc == nil {
+		var (
+			tagOut *tag.Tag
+			errOut error
+		)
+		return tagOut, errOut
+	}
+	return mock.GetOrCreateTagByNameFunc(ctx, name, description, color, createdBy)
+}
+
+// GetOrCreateTagByNameCalls gets all the calls that were made to GetOrCreateTagByName.
+// Check the length with:
+//
+//	len(mockedRepository.GetOrCreateTagByNameCalls())
+func (mock *RepositoryMock) GetOrCreateTagByNameCalls() []struct {
+	Ctx         context.Context
+	Name        string
+	Description string
+	Color       string
+	CreatedBy   string
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Name        string
+		Description string
+		Color       string
+		CreatedBy   string
+	}
+	mock.lockGetOrCreateTagByName.RLock()
+	calls = mock.calls.GetOrCreateTagByName
+	mock.lockGetOrCreateTagByName.RUnlock()
 	return calls
 }
 

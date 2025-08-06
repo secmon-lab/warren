@@ -283,3 +283,64 @@ func TestTagService_UpdateTagMetadata(t *testing.T) {
 	gt.V(t, updatedTag2.Name).Equal("test-tag-color-name")
 	gt.V(t, updatedTag2.Color).Equal("bg-blue-100 text-blue-800") // Should be converted to Tailwind class
 }
+
+func TestTagService_ConvertNamesToTags_ConcurrentAccess(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewMemory()
+	service := tag.New(repo)
+
+	// Test concurrent access to ConvertNamesToTags to ensure no duplicate tags are created
+	tagName := "concurrent-test-tag"
+	numGoroutines := 10
+
+	// Channel to collect results from goroutines
+	results := make(chan []string, numGoroutines)
+	errors := make(chan error, numGoroutines)
+
+	// Launch multiple goroutines that try to convert the same tag name simultaneously
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			tagIDs, err := service.ConvertNamesToTags(ctx, []string{tagName})
+			if err != nil {
+				errors <- err
+				return
+			}
+			results <- tagIDs
+		}()
+	}
+
+	// Collect all results
+	var allTagIDs []string
+	for i := 0; i < numGoroutines; i++ {
+		select {
+		case tagIDs := <-results:
+			allTagIDs = append(allTagIDs, tagIDs...)
+		case err := <-errors:
+			t.Fatalf("ConvertNamesToTags failed: %v", err)
+		}
+	}
+
+	// Verify all goroutines got the same tag ID (no duplicates created)
+	gt.N(t, len(allTagIDs)).Equal(numGoroutines)
+
+	firstTagID := allTagIDs[0]
+	for i, tagID := range allTagIDs {
+		if tagID != firstTagID {
+			t.Errorf("goroutine %d got different tag ID: expected %s, got %s", i, firstTagID, tagID)
+		}
+	}
+
+	// Verify only one tag was actually created in the repository
+	allTags, err := service.ListAllTags(ctx)
+	gt.NoError(t, err)
+
+	tagsWithName := 0
+	for _, tag := range allTags {
+		if tag.Name == tagName {
+			tagsWithName++
+		}
+	}
+	if tagsWithName != 1 {
+		t.Errorf("expected exactly 1 tag with name %s, but found %d", tagName, tagsWithName)
+	}
+}

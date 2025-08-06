@@ -157,13 +157,13 @@ type ComplexityRoot struct {
 		CreateTicket                func(childComplexity int, title string, description string, isTest *bool) int
 		CreateTicketFromAlerts      func(childComplexity int, alertIds []string, title *string, description *string) int
 		DeleteTag                   func(childComplexity int, name string) int
-		UpdateAlertTags             func(childComplexity int, alertID string, tags []string) int
+		UpdateAlertTags             func(childComplexity int, alertID string, tagIds []string) int
 		UpdateMultipleTicketsStatus func(childComplexity int, ids []string, status string) int
 		UpdateTag                   func(childComplexity int, input graphql1.UpdateTagInput) int
 		UpdateTicket                func(childComplexity int, id string, title string, description *string) int
 		UpdateTicketConclusion      func(childComplexity int, id string, conclusion string, reason string) int
 		UpdateTicketStatus          func(childComplexity int, id string, status string) int
-		UpdateTicketTags            func(childComplexity int, ticketID string, tags []string) int
+		UpdateTicketTags            func(childComplexity int, ticketID string, tagIds []string) int
 	}
 
 	Query struct {
@@ -266,8 +266,8 @@ type MutationResolver interface {
 	CreateTicket(ctx context.Context, title string, description string, isTest *bool) (*ticket.Ticket, error)
 	CreateTicketFromAlerts(ctx context.Context, alertIds []string, title *string, description *string) (*ticket.Ticket, error)
 	BindAlertsToTicket(ctx context.Context, ticketID string, alertIds []string) (*ticket.Ticket, error)
-	UpdateAlertTags(ctx context.Context, alertID string, tags []string) (*alert.Alert, error)
-	UpdateTicketTags(ctx context.Context, ticketID string, tags []string) (*ticket.Ticket, error)
+	UpdateAlertTags(ctx context.Context, alertID string, tagIds []string) (*alert.Alert, error)
+	UpdateTicketTags(ctx context.Context, ticketID string, tagIds []string) (*ticket.Ticket, error)
 	CreateTag(ctx context.Context, name string) (*graphql1.TagMetadata, error)
 	DeleteTag(ctx context.Context, name string) (bool, error)
 	UpdateTag(ctx context.Context, input graphql1.UpdateTagInput) (*graphql1.TagMetadata, error)
@@ -811,7 +811,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateAlertTags(childComplexity, args["alertId"].(string), args["tags"].([]string)), true
+		return e.complexity.Mutation.UpdateAlertTags(childComplexity, args["alertId"].(string), args["tagIds"].([]string)), true
 
 	case "Mutation.updateMultipleTicketsStatus":
 		if e.complexity.Mutation.UpdateMultipleTicketsStatus == nil {
@@ -883,7 +883,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateTicketTags(childComplexity, args["ticketId"].(string), args["tags"].([]string)), true
+		return e.complexity.Mutation.UpdateTicketTags(childComplexity, args["ticketId"].(string), args["tagIds"].([]string)), true
 
 	case "Query.activities":
 		if e.complexity.Query.Activities == nil {
@@ -1551,8 +1551,8 @@ type Mutation {
   createTicket(title: String!, description: String!, isTest: Boolean): Ticket!
   createTicketFromAlerts(alertIds: [ID!]!, title: String, description: String): Ticket!
   bindAlertsToTicket(ticketId: ID!, alertIds: [ID!]!): Ticket!
-  updateAlertTags(alertId: ID!, tags: [String!]!): Alert!
-  updateTicketTags(ticketId: ID!, tags: [String!]!): Ticket!
+  updateAlertTags(alertId: ID!, tagIds: [ID!]!): Alert!
+  updateTicketTags(ticketId: ID!, tagIds: [ID!]!): Ticket!
   createTag(name: String!): TagMetadata!
   deleteTag(name: String!): Boolean!
   updateTag(input: UpdateTagInput!): TagMetadata!
@@ -1840,11 +1840,11 @@ func (ec *executionContext) field_Mutation_updateAlertTags_args(ctx context.Cont
 		return nil, err
 	}
 	args["alertId"] = arg0
-	arg1, err := ec.field_Mutation_updateAlertTags_argsTags(ctx, rawArgs)
+	arg1, err := ec.field_Mutation_updateAlertTags_argsTagIds(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
-	args["tags"] = arg1
+	args["tagIds"] = arg1
 	return args, nil
 }
 func (ec *executionContext) field_Mutation_updateAlertTags_argsAlertID(
@@ -1865,18 +1865,18 @@ func (ec *executionContext) field_Mutation_updateAlertTags_argsAlertID(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Mutation_updateAlertTags_argsTags(
+func (ec *executionContext) field_Mutation_updateAlertTags_argsTagIds(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) ([]string, error) {
-	if _, ok := rawArgs["tags"]; !ok {
+	if _, ok := rawArgs["tagIds"]; !ok {
 		var zeroVal []string
 		return zeroVal, nil
 	}
 
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("tags"))
-	if tmp, ok := rawArgs["tags"]; ok {
-		return ec.unmarshalNString2ᚕstringᚄ(ctx, tmp)
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("tagIds"))
+	if tmp, ok := rawArgs["tagIds"]; ok {
+		return ec.unmarshalNID2ᚕstringᚄ(ctx, tmp)
 	}
 
 	var zeroVal []string
@@ -2095,11 +2095,11 @@ func (ec *executionContext) field_Mutation_updateTicketTags_args(ctx context.Con
 		return nil, err
 	}
 	args["ticketId"] = arg0
-	arg1, err := ec.field_Mutation_updateTicketTags_argsTags(ctx, rawArgs)
+	arg1, err := ec.field_Mutation_updateTicketTags_argsTagIds(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
-	args["tags"] = arg1
+	args["tagIds"] = arg1
 	return args, nil
 }
 func (ec *executionContext) field_Mutation_updateTicketTags_argsTicketID(
@@ -2120,18 +2120,18 @@ func (ec *executionContext) field_Mutation_updateTicketTags_argsTicketID(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Mutation_updateTicketTags_argsTags(
+func (ec *executionContext) field_Mutation_updateTicketTags_argsTagIds(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) ([]string, error) {
-	if _, ok := rawArgs["tags"]; !ok {
+	if _, ok := rawArgs["tagIds"]; !ok {
 		var zeroVal []string
 		return zeroVal, nil
 	}
 
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("tags"))
-	if tmp, ok := rawArgs["tags"]; ok {
-		return ec.unmarshalNString2ᚕstringᚄ(ctx, tmp)
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("tagIds"))
+	if tmp, ok := rawArgs["tagIds"]; ok {
+		return ec.unmarshalNID2ᚕstringᚄ(ctx, tmp)
 	}
 
 	var zeroVal []string
@@ -6885,7 +6885,7 @@ func (ec *executionContext) _Mutation_updateAlertTags(ctx context.Context, field
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().UpdateAlertTags(rctx, fc.Args["alertId"].(string), fc.Args["tags"].([]string))
+		return ec.resolvers.Mutation().UpdateAlertTags(rctx, fc.Args["alertId"].(string), fc.Args["tagIds"].([]string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6962,7 +6962,7 @@ func (ec *executionContext) _Mutation_updateTicketTags(ctx context.Context, fiel
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().UpdateTicketTags(rctx, fc.Args["ticketId"].(string), fc.Args["tags"].([]string))
+		return ec.resolvers.Mutation().UpdateTicketTags(rctx, fc.Args["ticketId"].(string), fc.Args["tagIds"].([]string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

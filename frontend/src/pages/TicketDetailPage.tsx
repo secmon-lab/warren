@@ -40,6 +40,7 @@ import {
   GET_TICKET_ALERTS,
   UPDATE_TICKET_STATUS,
   UPDATE_TICKET_TAGS,
+  GET_TAGS,
 } from "@/lib/graphql/queries";
 import {
   Ticket,
@@ -47,6 +48,7 @@ import {
   TICKET_STATUS_LABELS,
   TICKET_STATUS_COLORS,
   Alert,
+  TagMetadata,
 } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
 import {
@@ -163,6 +165,9 @@ export default function TicketDetailPage() {
     skip: !id,
   });
 
+  const { data: tagsData } = useQuery(GET_TAGS);
+  const allTags: TagMetadata[] = tagsData?.tags || [];
+
   const { data: alertsData } = useQuery(GET_TICKET_ALERTS, {
     variables: {
       id,
@@ -186,11 +191,21 @@ export default function TicketDetailPage() {
     if (!ticket?.id) return;
     
     setTags(newTags);
+    
+    // Convert tag names to tag IDs
+    const tagIds: string[] = [];
+    for (const tagName of newTags) {
+      const tag = allTags.find(t => t.name === tagName);
+      if (tag) {
+        tagIds.push(tag.id);
+      }
+    }
+    
     try {
       await updateTicketTags({
         variables: {
           ticketId: ticket.id,
-          tags: newTags,
+          tagIds: tagIds,
         },
       });
     } catch (error) {

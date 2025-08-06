@@ -64,7 +64,7 @@ type Metadata struct {
 	DescriptionSource types.Source `json:"description_source"`
 	// Tags field is used temporarily during policy processing to pass tag names
 	// These are converted to TagIDs and not persisted in this field
-	Tags              []string     `json:"tags,omitempty"`
+	Tags []string `json:"tags,omitempty"`
 }
 
 func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metadata) Alert {

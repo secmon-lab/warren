@@ -241,7 +241,7 @@ export function useWebSocket(
 
     // Add authorization header via subprotocol (if needed)
     // Note: WebSocket doesn't support custom headers, so auth is handled by cookies
-  }, [user?.sub, ticketId, updateStatus]);
+  }, [user, ticketId, updateStatus, maxReconnectAttempts, reconnectInterval]);
 
   const disconnect = useCallback(() => {
     // Clear reconnect timeout
@@ -315,7 +315,7 @@ export function useWebSocket(
       // This allows the connection to stay alive when switching tabs
       // The WebSocketManager will handle connection lifecycle
     };
-  }, [ticketId, user?.sub]); // Only reconnect when ticketId or user changes
+  }, [ticketId, user?.sub, connect]); // Only reconnect when ticketId or user changes
 
   // Check for existing connection on mount
   useEffect(() => {

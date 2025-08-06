@@ -24,7 +24,7 @@ export interface User {
 // Helper type guards
 export function isChatMessage(data: unknown): data is ChatMessage {
   if (typeof data !== 'object' || data === null) return false;
-  const msg = data as any;
+  const msg = data as Record<string, unknown>;
   return (
     (msg.type === 'message' || msg.type === 'ping') &&
     typeof msg.content === 'string' &&
@@ -34,10 +34,10 @@ export function isChatMessage(data: unknown): data is ChatMessage {
 
 export function isChatResponse(data: unknown): data is ChatResponse {
   if (typeof data !== 'object' || data === null) return false;
-  const msg = data as any;
+  const msg = data as Record<string, unknown>;
   const validTypes = ['message', 'history', 'status', 'error', 'pong', 'trace'];
   return (
-    validTypes.includes(msg.type) &&
+    validTypes.includes(msg.type as string) &&
     typeof msg.content === 'string' &&
     typeof msg.timestamp === 'number'
   );

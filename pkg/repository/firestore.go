@@ -1589,6 +1589,84 @@ func (r *Firestore) IsTagNameExists(ctx context.Context, name string) (bool, err
 	return true, nil
 }
 
+// GetOrCreateTagByName atomically gets an existing tag or creates a new one
+func (r *Firestore) GetOrCreateTagByName(ctx context.Context, name, description, color, createdBy string) (*tag.Tag, error) {
+	// First, try to get existing tag by name
+	existingTag, err := r.GetTagByName(ctx, name)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to check for existing tag", goerr.V("name", name))
+	}
+	if existingTag != nil {
+		return existingTag, nil
+	}
+
+	// Tag doesn't exist, create it
+	// Generate unique ID with collision retry
+	var tagID string
+	maxRetries := 10
+	for i := 0; i < maxRetries; i++ {
+		tagID = tag.NewID()
+		existing, err := r.GetTagByID(ctx, tagID)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to check tag ID collision")
+		}
+		if existing == nil {
+			break // No collision
+		}
+		if i == maxRetries-1 {
+			return nil, goerr.New("failed to generate unique tag ID after retries")
+		}
+	}
+
+	// Use provided color or generate one
+	if color == "" {
+		color = tag.GenerateColor(name)
+	}
+
+	// Create the new tag
+	now := time.Now()
+	newTag := &tag.Tag{
+		ID:          tagID,
+		Name:        name,
+		Description: description,
+		Color:       color,
+		CreatedBy:   createdBy,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	// Use Firestore transaction to handle concurrent creation attempts
+	err = r.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		// Check again if tag exists (within transaction)
+		iter := r.db.Collection("tags").Where("name", "==", name).Limit(1).Documents(ctx)
+		defer iter.Stop()
+
+		doc, err := iter.Next()
+		if err != iterator.Done {
+			if err != nil {
+				return goerr.Wrap(err, "failed to check tag existence in transaction")
+			}
+			// Tag already exists, read it
+			var existingData tag.Tag
+			if err := doc.DataTo(&existingData); err != nil {
+				return goerr.Wrap(err, "failed to parse existing tag data")
+			}
+			*newTag = existingData // Update newTag with existing data
+			return nil
+		}
+
+		// Tag still doesn't exist, create it
+		docRef := r.db.Collection("tags").Doc(tagID)
+		return tx.Set(docRef, newTag)
+	})
+
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to create tag", goerr.V("name", name))
+	}
+
+	return newTag, nil
+}
+
 func (r *Firestore) ListAllTags(ctx context.Context) ([]*tag.Tag, error) {
 	iter := r.db.Collection("tags").Documents(ctx)
 	defer iter.Stop()

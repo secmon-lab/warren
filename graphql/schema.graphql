@@ -169,8 +169,8 @@ type Mutation {
   createTicket(title: String!, description: String!, isTest: Boolean): Ticket!
   createTicketFromAlerts(alertIds: [ID!]!, title: String, description: String): Ticket!
   bindAlertsToTicket(ticketId: ID!, alertIds: [ID!]!): Ticket!
-  updateAlertTags(alertId: ID!, tags: [String!]!): Alert!
-  updateTicketTags(ticketId: ID!, tags: [String!]!): Ticket!
+  updateAlertTags(alertId: ID!, tagIds: [ID!]!): Alert!
+  updateTicketTags(ticketId: ID!, tagIds: [ID!]!): Ticket!
   createTag(name: String!): TagMetadata!
   deleteTag(name: String!): Boolean!
   updateTag(input: UpdateTagInput!): TagMetadata!

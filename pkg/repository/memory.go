@@ -1181,6 +1181,55 @@ func (r *Memory) IsTagNameExists(ctx context.Context, name string) (bool, error)
 	return false, nil
 }
 
+// GetOrCreateTagByName atomically gets an existing tag or creates a new one
+func (r *Memory) GetOrCreateTagByName(ctx context.Context, name, description, color, createdBy string) (*tag.Tag, error) {
+	r.tagMu.Lock()
+	defer r.tagMu.Unlock()
+
+	// First check if tag already exists by name
+	for _, tagData := range r.tagsV2 {
+		if tagData.Name == name {
+			return tagData, nil
+		}
+	}
+
+	// Tag doesn't exist, create it
+	// Generate unique ID with collision retry
+	var tagID string
+	maxRetries := 10
+	for i := 0; i < maxRetries; i++ {
+		tagID = tag.NewID()
+		if _, exists := r.tagsV2[tagID]; !exists {
+			break // No collision
+		}
+		if i == maxRetries-1 {
+			return nil, goerr.New("failed to generate unique tag ID after retries")
+		}
+	}
+
+	// Use provided color or generate one
+	if color == "" {
+		color = tag.GenerateColor(name)
+	}
+
+	// Create the new tag
+	now := time.Now()
+	newTag := &tag.Tag{
+		ID:          tagID,
+		Name:        name,
+		Description: description,
+		Color:       color,
+		CreatedBy:   createdBy,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	// Store the tag
+	r.tagsV2[tagID] = newTag
+
+	return newTag, nil
+}
+
 func (r *Memory) ListAllTags(ctx context.Context) ([]*tag.Tag, error) {
 	r.tagMu.RLock()
 	defer r.tagMu.RUnlock()

@@ -607,8 +607,8 @@ export const GET_AVAILABLE_TAG_COLOR_NAMES = gql`
 `;
 
 export const UPDATE_ALERT_TAGS = gql`
-  mutation UpdateAlertTags($alertId: ID!, $tags: [String!]!) {
-    updateAlertTags(alertId: $alertId, tags: $tags) {
+  mutation UpdateAlertTags($alertId: ID!, $tagIds: [ID!]!) {
+    updateAlertTags(alertId: $alertId, tagIds: $tagIds) {
       id
       title
       tags
@@ -621,8 +621,8 @@ export const UPDATE_ALERT_TAGS = gql`
 `;
 
 export const UPDATE_TICKET_TAGS = gql`
-  mutation UpdateTicketTags($ticketId: ID!, $tags: [String!]!) {
-    updateTicketTags(ticketId: $ticketId, tags: $tags) {
+  mutation UpdateTicketTags($ticketId: ID!, $tagIds: [ID!]!) {
+    updateTicketTags(ticketId: $ticketId, tagIds: $tagIds) {
       id
       title
       tags
