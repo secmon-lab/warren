@@ -116,32 +116,7 @@ func (r *alertResolver) Tags(ctx context.Context, obj *alert.Alert) ([]string, e
 
 // TagObjects is the resolver for the tagObjects field.
 func (r *alertResolver) TagObjects(ctx context.Context, obj *alert.Alert) ([]*graphql1.TagObject, error) {
-	if r.uc == nil || len(obj.TagIDs) == 0 {
-		return []*graphql1.TagObject{}, nil
-	}
-
-	// Get tag IDs as slice
-	tagIDs := make([]string, 0, len(obj.TagIDs))
-	for tagID := range obj.TagIDs {
-		tagIDs = append(tagIDs, tagID)
-	}
-
-	// Get tag metadata using tag getter
-	tags, err := r.createTagGetter()(ctx, tagIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert to GraphQL TagObject
-	tagObjects := make([]*graphql1.TagObject, 0, len(tags))
-	for _, tag := range tags {
-		tagObjects = append(tagObjects, &graphql1.TagObject{
-			ID:   tag.ID,
-			Name: tag.Name,
-		})
-	}
-
-	return tagObjects, nil
+	return r.resolveTagObjects(ctx, obj.TagIDs)
 }
 
 // ID is the resolver for the id field.
@@ -1137,18 +1112,24 @@ func (r *ticketResolver) Tags(ctx context.Context, obj *ticket.Ticket) ([]string
 
 // TagObjects is the resolver for the tagObjects field.
 func (r *ticketResolver) TagObjects(ctx context.Context, obj *ticket.Ticket) ([]*graphql1.TagObject, error) {
-	if r.uc == nil || len(obj.TagIDs) == 0 {
+	return r.resolveTagObjects(ctx, obj.TagIDs)
+}
+
+// resolveTagObjects is a helper method to convert TagIDs map to GraphQL TagObject slice
+// This eliminates code duplication between ticket and alert TagObjects resolvers
+func (r *Resolver) resolveTagObjects(ctx context.Context, tagIDs map[string]bool) ([]*graphql1.TagObject, error) {
+	if r.uc == nil || len(tagIDs) == 0 {
 		return []*graphql1.TagObject{}, nil
 	}
 
 	// Get tag IDs as slice
-	tagIDs := make([]string, 0, len(obj.TagIDs))
-	for tagID := range obj.TagIDs {
-		tagIDs = append(tagIDs, tagID)
+	tagIDSlice := make([]string, 0, len(tagIDs))
+	for tagID := range tagIDs {
+		tagIDSlice = append(tagIDSlice, tagID)
 	}
 
 	// Get tag metadata using tag getter
-	tags, err := r.createTagGetter()(ctx, tagIDs)
+	tags, err := r.createTagGetter()(ctx, tagIDSlice)
 	if err != nil {
 		return nil, err
 	}
