@@ -11,13 +11,13 @@ type Set map[string]bool
 
 // Tag represents a tag entity with ID-based management
 type Tag struct {
-	ID          string    `json:"id" firestore:"id"`
-	Name        string    `json:"name" firestore:"name"`
-	Description string    `json:"description,omitempty" firestore:"description,omitempty"`
-	Color       string    `json:"color" firestore:"color"`
-	CreatedAt   time.Time `json:"created_at" firestore:"createdAt"`
-	UpdatedAt   time.Time `json:"updated_at" firestore:"updatedAt"`
-	CreatedBy   string    `json:"created_by,omitempty" firestore:"createdBy,omitempty"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description,omitempty"`
+	Color       string    `json:"color"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	CreatedBy   string    `json:"created_by,omitempty"`
 }
 
 // NewID generates a new unique tag ID
@@ -79,10 +79,10 @@ func (ts IDSet) Copy() IDSet {
 //
 // Deprecated: Use Tag struct instead for new implementations
 type Metadata struct {
-	Name      string    `json:"name" firestore:"name"`
-	Color     string    `json:"color" firestore:"color"`
-	CreatedAt time.Time `json:"created_at" firestore:"createdAt"`
-	UpdatedAt time.Time `json:"updated_at" firestore:"updatedAt"`
+	Name      string    `json:"name"`
+	Color     string    `json:"color"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // NewSet creates a new Set from a slice of strings

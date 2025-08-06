@@ -20,6 +20,10 @@ export const GET_TICKETS = gql`
         alertsCount
         commentsCount
         tags
+        tagObjects {
+          id
+          name
+        }
       }
       totalCount
     }
@@ -52,6 +56,10 @@ export const GET_TICKET = gql`
       updatedAt
       alertsCount
       tags
+      tagObjects {
+        id
+        name
+      }
       comments {
         id
         content
@@ -85,6 +93,10 @@ export const GET_TICKET_ALERTS = gql`
           }
           createdAt
           tags
+          tagObjects {
+            id
+            name
+          }
         }
         totalCount
       }
@@ -108,6 +120,10 @@ export const GET_ALERT = gql`
       }
       createdAt
       tags
+      tagObjects {
+        id
+        name
+      }
       ticket {
         id
         status
@@ -135,6 +151,10 @@ export const GET_ALERTS = gql`
         }
         createdAt
         tags
+        tagObjects {
+          id
+          name
+        }
         ticket {
           id
           status
@@ -311,6 +331,10 @@ export const UPDATE_TICKET = gql`
       createdAt
       updatedAt
       tags
+      tagObjects {
+        id
+        name
+      }
       alerts {
         id
         title
@@ -325,6 +349,10 @@ export const UPDATE_TICKET = gql`
         }
         createdAt
         tags
+        tagObjects {
+          id
+          name
+        }
       }
       comments {
         id
@@ -584,6 +612,10 @@ export const UPDATE_ALERT_TAGS = gql`
       id
       title
       tags
+      tagObjects {
+        id
+        name
+      }
     }
   }
 `;
@@ -594,6 +626,10 @@ export const UPDATE_TICKET_TAGS = gql`
       id
       title
       tags
+      tagObjects {
+        id
+        name
+      }
     }
   }
 `;

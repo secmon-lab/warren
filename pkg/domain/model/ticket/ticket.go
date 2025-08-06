@@ -39,7 +39,7 @@ type Ticket struct {
 	IsTest bool `json:"is_test"`
 
 	Embedding firestore.Vector32 `json:"-"`
-	TagIDs    map[string]bool    `json:"tag_ids" firestore:"TagIDs"`
+	TagIDs    map[string]bool    `json:"tag_ids"`
 }
 
 // HasSlackThread returns true if the ticket has a valid Slack thread
