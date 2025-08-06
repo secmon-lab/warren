@@ -318,17 +318,18 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 			logger.Debug("checking tag service", "tagService", uc.tagService != nil, "selectedTagsCount", len(selectedTags))
 			if len(selectedTags) > 0 && uc.tagService != nil {
 				logger.Debug("converting tag names to IDs", "tags", selectedTags)
-				tagIDs, err := uc.tagService.ConvertNamesToIDs(ctx, selectedTags)
+				tags, err := uc.tagService.ConvertNamesToTags(ctx, selectedTags)
 				if err != nil {
 					logger.Warn("failed to convert tag names to IDs", "error", err, "tags", selectedTags)
 					// Continue with resolve even if tag conversion fails
 				} else {
-					logger.Debug("successfully converted tag names to IDs", "tagIDs", tagIDs)
+					logger.Debug("successfully converted tag names to IDs", "tags", tags)
 					// Merge existing tags with new tags
 					existingTags := target.Tags
 					logger.Debug("existing tags", "existingTags", existingTags)
 
-					target.Tags = tag.MergeTagIDs(existingTags, tagIDs)
+					// Merge existing tags with new tags (tags are already strings)
+					target.Tags = tag.MergeTags(existingTags, tags)
 					logger.Debug("target ticket updated with merged tags", "target.Tags", target.Tags)
 				}
 			} else {

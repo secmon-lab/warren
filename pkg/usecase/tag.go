@@ -61,14 +61,14 @@ func (u *TagUseCase) DeleteTag(ctx context.Context, name string) error {
 
 // UpdateAlertTags updates tags for an alert
 func (u *TagUseCase) UpdateAlertTags(ctx context.Context, alertID types.AlertID, tags []string) (*alert.Alert, error) {
-	// Convert tag names to IDs
-	tagIDs, err := u.tagService.ConvertNamesToIDs(ctx, tags)
+	// Convert tag names to tags (creates tags if they don't exist)
+	tags, err := u.tagService.ConvertNamesToTags(ctx, tags)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
+		return nil, goerr.Wrap(err, "failed to convert tag names")
 	}
 
-	// Use ID-based method
-	a, err := u.tagService.UpdateAlertTagsByID(ctx, alertID, tagIDs)
+	// Use tag-based method
+	a, err := u.tagService.UpdateAlertTagsByID(ctx, alertID, tags)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update alert tags")
 	}
@@ -77,14 +77,14 @@ func (u *TagUseCase) UpdateAlertTags(ctx context.Context, alertID types.AlertID,
 
 // UpdateTicketTags updates tags for a ticket
 func (u *TagUseCase) UpdateTicketTags(ctx context.Context, ticketID types.TicketID, tags []string) (*ticket.Ticket, error) {
-	// Convert tag names to IDs
-	tagIDs, err := u.tagService.ConvertNamesToIDs(ctx, tags)
+	// Convert tag names to tags (creates tags if they don't exist)
+	tags, err := u.tagService.ConvertNamesToTags(ctx, tags)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
+		return nil, goerr.Wrap(err, "failed to convert tag names")
 	}
 
-	// Use ID-based method
-	t, err := u.tagService.UpdateTicketTagsByID(ctx, ticketID, tagIDs)
+	// Use tag-based method
+	t, err := u.tagService.UpdateTicketTagsByID(ctx, ticketID, tags)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update ticket tags")
 	}
@@ -93,15 +93,13 @@ func (u *TagUseCase) UpdateTicketTags(ctx context.Context, ticketID types.Ticket
 
 // UpdateTag updates tag metadata (name, color, description)
 func (u *TagUseCase) UpdateTag(ctx context.Context, tagID string, name, color, description string) (*tagmodel.Tag, error) {
-	id := types.TagID(tagID)
-
 	// Validate input
 	if err := u.validateUpdateTagInput(name, color); err != nil {
 		return nil, err
 	}
 
 	// Call service layer
-	tag, err := u.tagService.UpdateTagMetadata(ctx, id, name, description, color)
+	tag, err := u.tagService.UpdateTagMetadata(ctx, tagID, name, description, color)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update tag")
 	}
@@ -128,7 +126,7 @@ func (u *TagUseCase) validateUpdateTagInput(name, color string) error {
 	// Validate color (support both color names and Tailwind classes)
 	availableColors := u.tagService.GetAvailableColors()
 	availableNames := u.tagService.GetAvailableColorNames()
-	
+
 	colorValid := false
 	// Check if it's a valid Tailwind class
 	for _, c := range availableColors {
@@ -146,7 +144,7 @@ func (u *TagUseCase) validateUpdateTagInput(name, color string) error {
 			}
 		}
 	}
-	
+
 	if !colorValid {
 		return goerr.New("invalid color selection", goerr.V("color", color))
 	}

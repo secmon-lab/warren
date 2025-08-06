@@ -1215,7 +1215,7 @@ func TestHandleAlert_PolicyWithTags(t *testing.T) {
 	expectedTags := []string{"security", "high-priority", "network"}
 
 	// Get actual tag names from alert using compatibility method
-	actualTagNames, err := createdAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+	actualTagNames, err := createdAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []string) ([]*tagmodel.Tag, error) {
 		return repo.GetTagsByIDs(ctx, tagIDs)
 	})
 	gt.NoError(t, err)
@@ -1336,7 +1336,7 @@ func TestHandleAlert_PolicyWithNewAndExistingTags(t *testing.T) {
 	expectedTags := []string{"existing-tag", "new-tag-1", "new-tag-2"}
 
 	// Get actual tag names from alert using compatibility method
-	actualTagNames, err := createdAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+	actualTagNames, err := createdAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []string) ([]*tagmodel.Tag, error) {
 		return repo.GetTagsByIDs(ctx, tagIDs)
 	})
 	gt.NoError(t, err)

@@ -6,7 +6,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
-	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/mrkdwn"
@@ -40,8 +39,8 @@ func NewResolver(repo interfaces.Repository, slackService *slack.Service, uc *us
 }
 
 // createTagGetter creates a common tag getter function for resolving tag names
-func (r *Resolver) createTagGetter() func(context.Context, []types.TagID) ([]*tag.Tag, error) {
-	return func(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error) {
+func (r *Resolver) createTagGetter() func(context.Context, []string) ([]*tag.Tag, error) {
+	return func(ctx context.Context, tagIDs []string) ([]*tag.Tag, error) {
 		tagService := r.uc.GetTagService()
 		if tagService == nil {
 			return nil, goerr.New("tag service not available")

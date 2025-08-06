@@ -328,7 +328,7 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 
 	// Create existing tag using new API
 	existingTag := &tagmodel.Tag{
-		ID:          types.NewTagID(),
+		ID:          tagmodel.NewID(),
 		Name:        "existing-tag",
 		Color:       "bg-blue-100 text-blue-800",
 		Description: "",
@@ -420,7 +420,7 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 	expectedTags := []string{"existing-tag", "false-positive", "investigation"}
 
 	// Get actual tag names from ticket using compatibility method
-	actualTagNames, err := updatedTicket.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+	actualTagNames, err := updatedTicket.GetTagNames(ctx, func(ctx context.Context, tagIDs []string) ([]*tagmodel.Tag, error) {
 		return repo.GetTagsByIDs(ctx, tagIDs)
 	})
 	gt.NoError(t, err)
@@ -584,45 +584,45 @@ func containsString(slice []string, item string) bool {
 func TestMergeTagIDs(t *testing.T) {
 	tests := []struct {
 		name         string
-		existingTags []types.TagID
-		newTags      []types.TagID
-		expected     []types.TagID
+		existingTags []string
+		newTags      []string
+		expected     []string
 	}{
 		{
 			name:         "Empty existing and new tags",
-			existingTags: []types.TagID{},
-			newTags:      []types.TagID{},
-			expected:     []types.TagID{},
+			existingTags: []string{},
+			newTags:      []string{},
+			expected:     []string{},
 		},
 		{
 			name:         "Empty existing tags, add new tags",
-			existingTags: []types.TagID{},
-			newTags:      []types.TagID{"tag1", "tag2"},
-			expected:     []types.TagID{"tag1", "tag2"},
+			existingTags: []string{},
+			newTags:      []string{"tag1", "tag2"},
+			expected:     []string{"tag1", "tag2"},
 		},
 		{
 			name:         "Existing tags, empty new tags",
-			existingTags: []types.TagID{"tag1", "tag2"},
-			newTags:      []types.TagID{},
-			expected:     []types.TagID{"tag1", "tag2"},
+			existingTags: []string{"tag1", "tag2"},
+			newTags:      []string{},
+			expected:     []string{"tag1", "tag2"},
 		},
 		{
 			name:         "No duplicate tags",
-			existingTags: []types.TagID{"tag1", "tag2"},
-			newTags:      []types.TagID{"tag3", "tag4"},
-			expected:     []types.TagID{"tag1", "tag2", "tag3", "tag4"},
+			existingTags: []string{"tag1", "tag2"},
+			newTags:      []string{"tag3", "tag4"},
+			expected:     []string{"tag1", "tag2", "tag3", "tag4"},
 		},
 		{
 			name:         "With duplicate tags",
-			existingTags: []types.TagID{"tag1", "tag2"},
-			newTags:      []types.TagID{"tag2", "tag3"},
-			expected:     []types.TagID{"tag1", "tag2", "tag3"},
+			existingTags: []string{"tag1", "tag2"},
+			newTags:      []string{"tag2", "tag3"},
+			expected:     []string{"tag1", "tag2", "tag3"},
 		},
 		{
 			name:         "All duplicate tags",
-			existingTags: []types.TagID{"tag1", "tag2"},
-			newTags:      []types.TagID{"tag1", "tag2"},
-			expected:     []types.TagID{"tag1", "tag2"},
+			existingTags: []string{"tag1", "tag2"},
+			newTags:      []string{"tag1", "tag2"},
+			expected:     []string{"tag1", "tag2"},
 		},
 	}
 
@@ -637,7 +637,7 @@ func TestMergeTagIDs(t *testing.T) {
 			}
 
 			// Check all expected tags are present (order doesn't matter)
-			resultMap := make(map[types.TagID]bool)
+			resultMap := make(map[string]bool)
 			for _, tag := range result {
 				resultMap[tag] = true
 			}
@@ -649,7 +649,7 @@ func TestMergeTagIDs(t *testing.T) {
 			}
 
 			// Check no unexpected tags are present
-			expectedMap := make(map[types.TagID]bool)
+			expectedMap := make(map[string]bool)
 			for _, tag := range tt.expected {
 				expectedMap[tag] = true
 			}
@@ -696,8 +696,8 @@ func TestSlackInteractionViewSubmissionResolveTicket_TagMerging(t *testing.T) {
 	gt.NoError(t, err)
 	tagSvc := tag.New(repo)
 
-	// Create test ticket with existing tags
-	initialTags := []types.TagID{"existing-tag-1", "existing-tag-2"}
+	// Create test ticket with existing tags (using tag names, not IDs)
+	initialTags := []string{"existing1", "existing2"}
 	testTicket := ticket.New(ctx, []types.AlertID{}, &slack.Thread{
 		ChannelID: "test-channel",
 		ThreadID:  "test-thread",
@@ -768,12 +768,12 @@ func TestSlackInteractionViewSubmissionResolveTicket_TagMerging(t *testing.T) {
 	gt.Number(t, len(updatedTicket.Tags)).Equal(3)
 
 	// Check that all expected tags are present
-	tagMap := make(map[types.TagID]bool)
+	tagMap := make(map[string]bool)
 	for _, tag := range updatedTicket.Tags {
 		tagMap[tag] = true
 	}
 
-	expectedTags := []types.TagID{"existing-tag-1", "existing-tag-2", "new-tag-1"}
+	expectedTags := []string{"existing1", "existing2", "newtag1"}
 	for _, expectedTag := range expectedTags {
 		gt.Value(t, tagMap[expectedTag]).Equal(true)
 	}

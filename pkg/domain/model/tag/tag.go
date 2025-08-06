@@ -1,9 +1,9 @@
 package tag
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"time"
-
-	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 // Set represents a set of tags using map for O(1) operations
@@ -11,20 +11,27 @@ type Set map[string]bool
 
 // Tag represents a tag entity with ID-based management
 type Tag struct {
-	ID          types.TagID `json:"id" firestore:"id"`
-	Name        string      `json:"name" firestore:"name"`
-	Description string      `json:"description,omitempty" firestore:"description,omitempty"`
-	Color       string      `json:"color" firestore:"color"`
-	CreatedAt   time.Time   `json:"created_at" firestore:"createdAt"`
-	UpdatedAt   time.Time   `json:"updated_at" firestore:"updatedAt"`
-	CreatedBy   string      `json:"created_by,omitempty" firestore:"createdBy,omitempty"`
+	ID          string    `json:"id" firestore:"id"`
+	Name        string    `json:"name" firestore:"name"`
+	Description string    `json:"description,omitempty" firestore:"description,omitempty"`
+	Color       string    `json:"color" firestore:"color"`
+	CreatedAt   time.Time `json:"created_at" firestore:"createdAt"`
+	UpdatedAt   time.Time `json:"updated_at" firestore:"updatedAt"`
+	CreatedBy   string    `json:"created_by,omitempty" firestore:"createdBy,omitempty"`
+}
+
+// NewID generates a new unique tag ID
+func NewID() string {
+	bytes := make([]byte, 8)
+	rand.Read(bytes)
+	return "tag_" + hex.EncodeToString(bytes)
 }
 
 // IDSet represents a set of tag IDs using map for O(1) operations
-type IDSet map[types.TagID]bool
+type IDSet map[string]bool
 
 // NewIDSet creates a new IDSet from a slice of TagIDs
-func NewIDSet(tagIDs []types.TagID) IDSet {
+func NewIDSet(tagIDs []string) IDSet {
 	ts := make(IDSet)
 	for _, tagID := range tagIDs {
 		ts[tagID] = true
@@ -33,8 +40,8 @@ func NewIDSet(tagIDs []types.TagID) IDSet {
 }
 
 // ToSlice converts IDSet to a slice of TagIDs
-func (ts IDSet) ToSlice() []types.TagID {
-	result := make([]types.TagID, 0, len(ts))
+func (ts IDSet) ToSlice() []string {
+	result := make([]string, 0, len(ts))
 	for tagID := range ts {
 		result = append(result, tagID)
 	}
@@ -42,17 +49,17 @@ func (ts IDSet) ToSlice() []types.TagID {
 }
 
 // Add adds a tag ID to the set
-func (ts IDSet) Add(tagID types.TagID) {
+func (ts IDSet) Add(tagID string) {
 	ts[tagID] = true
 }
 
 // Remove removes a tag ID from the set
-func (ts IDSet) Remove(tagID types.TagID) {
+func (ts IDSet) Remove(tagID string) {
 	delete(ts, tagID)
 }
 
 // Has checks if a tag ID exists in the set
-func (ts IDSet) Has(tagID types.TagID) bool {
+func (ts IDSet) Has(tagID string) bool {
 	return ts[tagID]
 }
 
@@ -144,7 +151,7 @@ var ChipColors = []string{
 // ColorNames provides user-friendly color names corresponding to ChipColors
 var ColorNames = []string{
 	"red",
-	"orange", 
+	"orange",
 	"amber",
 	"yellow",
 	"lime",
@@ -198,9 +205,9 @@ func GenerateColor(tagName string) string {
 }
 
 // MergeTagIDs merges two slices of tag IDs, removing duplicates
-func MergeTagIDs(existingTags, newTags []types.TagID) []types.TagID {
+func MergeTagIDs(existingTags, newTags []string) []string {
 	// Create a map to avoid duplicates
-	tagMap := make(map[types.TagID]bool)
+	tagMap := make(map[string]bool)
 
 	// Add existing tags
 	for _, tagID := range existingTags {
@@ -213,9 +220,33 @@ func MergeTagIDs(existingTags, newTags []types.TagID) []types.TagID {
 	}
 
 	// Convert back to slice
-	mergedTags := make([]types.TagID, 0, len(tagMap))
+	mergedTags := make([]string, 0, len(tagMap))
 	for tagID := range tagMap {
 		mergedTags = append(mergedTags, tagID)
+	}
+
+	return mergedTags
+}
+
+// MergeTags merges two slices of tag strings, removing duplicates
+func MergeTags(existingTags, newTags []string) []string {
+	// Create a map to avoid duplicates
+	tagMap := make(map[string]bool)
+
+	// Add existing tags
+	for _, tag := range existingTags {
+		tagMap[tag] = true
+	}
+
+	// Add new tags
+	for _, tag := range newTags {
+		tagMap[tag] = true
+	}
+
+	// Convert back to slice
+	mergedTags := make([]string, 0, len(tagMap))
+	for tag := range tagMap {
+		mergedTags = append(mergedTags, tag)
 	}
 
 	return mergedTags

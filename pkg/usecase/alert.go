@@ -82,11 +82,11 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 	// Convert metadata tags (string names) to tag IDs and store in Alert.Tags
 	if len(newAlert.Metadata.Tags) > 0 && uc.tagService != nil {
 		// Use the tag service to convert names to IDs (creates tags if they don't exist)
-		tagIDs, err := uc.tagService.ConvertNamesToIDs(ctx, newAlert.Metadata.Tags)
+		tags, err := uc.tagService.ConvertNamesToTags(ctx, newAlert.Metadata.Tags)
 		if err != nil {
-			return nil, goerr.Wrap(err, "failed to convert tag names to IDs")
+			return nil, goerr.Wrap(err, "failed to convert tag names")
 		}
-		newAlert.Tags = tagIDs
+		newAlert.Tags = tags
 	}
 
 	if err := newAlert.FillMetadata(ctx, uc.llmClient); err != nil {

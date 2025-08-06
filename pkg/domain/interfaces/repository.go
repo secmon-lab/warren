@@ -77,14 +77,14 @@ type Repository interface {
 	RemoveTagFromAllTickets(ctx context.Context, name string) error
 
 	// For new tag management (ID-based)
-	GetTagByID(ctx context.Context, tagID types.TagID) (*tag.Tag, error)
-	GetTagsByIDs(ctx context.Context, tagIDs []types.TagID) ([]*tag.Tag, error)
+	GetTagByID(ctx context.Context, tagID string) (*tag.Tag, error)
+	GetTagsByIDs(ctx context.Context, tagIDs []string) ([]*tag.Tag, error)
 	ListAllTags(ctx context.Context) ([]*tag.Tag, error)
 	CreateTagWithID(ctx context.Context, tag *tag.Tag) error
 	UpdateTag(ctx context.Context, tag *tag.Tag) error
-	DeleteTagByID(ctx context.Context, tagID types.TagID) error
-	RemoveTagIDFromAllAlerts(ctx context.Context, tagID types.TagID) error
-	RemoveTagIDFromAllTickets(ctx context.Context, tagID types.TagID) error
+	DeleteTagByID(ctx context.Context, tagID string) error
+	RemoveTagIDFromAllAlerts(ctx context.Context, tagID string) error
+	RemoveTagIDFromAllTickets(ctx context.Context, tagID string) error
 
 	// For tag name lookup (compatibility)
 	GetTagByName(ctx context.Context, name string) (*tag.Tag, error)

@@ -115,7 +115,7 @@ func TestTagService_UpdateAlertTagsByName(t *testing.T) {
 	gt.N(t, len(updatedAlert.Tags)).Equal(2)
 
 	// Get actual tag names to verify
-	tagNames, err := updatedAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+	tagNames, err := updatedAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []string) ([]*tagmodel.Tag, error) {
 		return service.GetTagsByIDs(ctx, tagIDs)
 	})
 	gt.NoError(t, err)
@@ -152,7 +152,7 @@ func TestTagService_UpdateTicketTagsByName(t *testing.T) {
 	gt.N(t, len(updatedTicket.Tags)).Equal(2)
 
 	// Get actual tag names to verify
-	tagNames, err := updatedTicket.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+	tagNames, err := updatedTicket.GetTagNames(ctx, func(ctx context.Context, tagIDs []string) ([]*tagmodel.Tag, error) {
 		return service.GetTagsByIDs(ctx, tagIDs)
 	})
 	gt.NoError(t, err)
@@ -272,7 +272,7 @@ func TestTagService_UpdateTagMetadata(t *testing.T) {
 	gt.Error(t, err)
 
 	// Test updating non-existent tag
-	nonExistentID := types.NewTagID()
+	nonExistentID := tagmodel.NewID()
 	_, err = service.UpdateTagMetadata(ctx, nonExistentID, "test", "desc", "bg-red-100 text-red-800")
 	gt.Error(t, err)
 

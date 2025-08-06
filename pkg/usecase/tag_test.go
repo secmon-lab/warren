@@ -7,7 +7,6 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	tagmodel "github.com/secmon-lab/warren/pkg/domain/model/tag"
-	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -47,7 +46,7 @@ func TestTagUseCase_Operations(t *testing.T) {
 	gt.N(t, len(updatedAlert.Tags)).Equal(2)
 
 	// Get actual tag names to verify
-	tagNames, err := updatedAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []types.TagID) ([]*tagmodel.Tag, error) {
+	tagNames, err := updatedAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []string) ([]*tagmodel.Tag, error) {
 		return tagService.GetTagsByIDs(ctx, tagIDs)
 	})
 	gt.NoError(t, err)
@@ -86,7 +85,7 @@ func TestTagUseCase_UpdateTag(t *testing.T) {
 	gt.NotNil(t, originalTag)
 
 	// Test successful update
-	updatedTag, err := tagUC.UpdateTag(ctx, originalTag.ID.String(), "updated-tag", "bg-blue-100 text-blue-800", "updated description")
+	updatedTag, err := tagUC.UpdateTag(ctx, originalTag.ID, "updated-tag", "bg-blue-100 text-blue-800", "updated description")
 	gt.NoError(t, err)
 	gt.NotNil(t, updatedTag)
 	gt.V(t, updatedTag.Name).Equal("updated-tag")
@@ -105,7 +104,7 @@ func TestTagUseCase_UpdateTag(t *testing.T) {
 	}{
 		{
 			name:        "empty tag name",
-			tagID:       originalTag.ID.String(),
+			tagID:       originalTag.ID,
 			tagName:     "",
 			color:       "bg-red-100 text-red-800",
 			description: "test",
@@ -113,7 +112,7 @@ func TestTagUseCase_UpdateTag(t *testing.T) {
 		},
 		{
 			name:        "invalid color",
-			tagID:       originalTag.ID.String(),
+			tagID:       originalTag.ID,
 			tagName:     "valid-name",
 			color:       "invalid-color",
 			description: "test",
@@ -121,7 +120,7 @@ func TestTagUseCase_UpdateTag(t *testing.T) {
 		},
 		{
 			name:        "non-existent tag ID",
-			tagID:       types.NewTagID().String(),
+			tagID:       tagmodel.NewID(),
 			tagName:     "valid-name",
 			color:       "bg-red-100 text-red-800",
 			description: "test",

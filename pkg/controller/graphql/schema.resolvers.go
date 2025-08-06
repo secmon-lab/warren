@@ -397,7 +397,7 @@ func (r *mutationResolver) CreateTag(ctx context.Context, name string) (*graphql
 	}
 
 	return &graphql1.TagMetadata{
-		ID:          tag.ID.String(),
+		ID:          tag.ID,
 		Name:        string(tag.Name),
 		Description: &tag.Description,
 		Color:       tag.Color,
@@ -437,7 +437,7 @@ func (r *mutationResolver) UpdateTag(ctx context.Context, input graphql1.UpdateT
 	}
 
 	return &graphql1.TagMetadata{
-		ID:          tag.ID.String(),
+		ID:          tag.ID,
 		Name:        tag.Name,
 		Description: &tag.Description,
 		Color:       tag.Color,
@@ -912,7 +912,7 @@ func (r *queryResolver) Tags(ctx context.Context) ([]*graphql1.TagMetadata, erro
 	result := make([]*graphql1.TagMetadata, len(tags))
 	for i, tag := range tags {
 		result[i] = &graphql1.TagMetadata{
-			ID:          tag.ID.String(),
+			ID:          tag.ID,
 			Name:        string(tag.Name),
 			Description: &tag.Description,
 			Color:       tag.Color,

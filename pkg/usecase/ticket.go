@@ -79,16 +79,16 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 
 	// Inherit tags from alerts
 	if len(alerts) > 0 {
-		tagIDMap := make(map[types.TagID]bool)
+		tagMap := make(map[string]bool)
 		for _, alert := range alerts {
-			for _, tagID := range alert.Tags {
-				tagIDMap[tagID] = true
+			for _, tag := range alert.Tags {
+				tagMap[tag] = true
 			}
 		}
 		// Convert map to slice
-		inheritedTags := make([]types.TagID, 0, len(tagIDMap))
-		for tagID := range tagIDMap {
-			inheritedTags = append(inheritedTags, tagID)
+		inheritedTags := make([]string, 0, len(tagMap))
+		for tag := range tagMap {
+			inheritedTags = append(inheritedTags, tag)
 		}
 		newTicket.Tags = inheritedTags
 	}
