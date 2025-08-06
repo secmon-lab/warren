@@ -396,10 +396,15 @@ func (r *mutationResolver) CreateTag(ctx context.Context, name string) (*graphql
 		return nil, goerr.Wrap(err, "failed to create tag")
 	}
 
+	var desc *string
+	if tag.Description != "" {
+		desc = &tag.Description
+	}
+
 	return &graphql1.TagMetadata{
 		ID:          tag.ID,
 		Name:        string(tag.Name),
-		Description: &tag.Description,
+		Description: desc,
 		Color:       tag.Color,
 		CreatedAt:   tag.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:   tag.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
@@ -436,10 +441,15 @@ func (r *mutationResolver) UpdateTag(ctx context.Context, input graphql1.UpdateT
 		return nil, goerr.Wrap(err, "failed to update tag")
 	}
 
+	var desc *string
+	if tag.Description != "" {
+		desc = &tag.Description
+	}
+
 	return &graphql1.TagMetadata{
 		ID:          tag.ID,
 		Name:        tag.Name,
-		Description: &tag.Description,
+		Description: desc,
 		Color:       tag.Color,
 		CreatedAt:   tag.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:   tag.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
@@ -911,10 +921,15 @@ func (r *queryResolver) Tags(ctx context.Context) ([]*graphql1.TagMetadata, erro
 
 	result := make([]*graphql1.TagMetadata, len(tags))
 	for i, tag := range tags {
+		var desc *string
+		if tag.Description != "" {
+			desc = &tag.Description
+		}
+
 		result[i] = &graphql1.TagMetadata{
 			ID:          tag.ID,
 			Name:        string(tag.Name),
-			Description: &tag.Description,
+			Description: desc,
 			Color:       tag.Color,
 			CreatedAt:   tag.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			UpdatedAt:   tag.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
