@@ -89,8 +89,8 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 		if newAlert.TagIDs == nil {
 			newAlert.TagIDs = make(map[string]bool)
 		}
-		for _, tagName := range tags {
-			newAlert.TagIDs[tagName] = true
+		for _, tagID := range tags {
+			newAlert.TagIDs[tagID] = true
 		}
 	}
 

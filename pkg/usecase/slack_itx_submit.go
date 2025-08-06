@@ -329,8 +329,8 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 					}
 
 					// Add new tags to TagIDs
-					for _, tagName := range tags {
-						target.TagIDs[tagName] = true
+					for _, tagID := range tags {
+						target.TagIDs[tagID] = true
 					}
 					logger.Debug("target ticket updated with merged tags", "TagIDs", target.TagIDs)
 				}
