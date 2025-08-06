@@ -39,7 +39,7 @@ type Ticket struct {
 	IsTest bool `json:"is_test"`
 
 	Embedding firestore.Vector32 `json:"-"`
-	Tags      []string           `json:"tag_ids"`
+	TagIDs    map[string]bool    `json:"tag_ids" firestore:"TagIDs"`
 }
 
 // HasSlackThread returns true if the ticket has a valid Slack thread
@@ -49,8 +49,7 @@ func (t *Ticket) HasSlackThread() bool {
 
 // GetTagNames returns tag names for external API compatibility
 func (t *Ticket) GetTagNames(ctx context.Context, tagGetter func(context.Context, []string) ([]*tag.Tag, error)) ([]string, error) {
-	// Tags are now stored as strings directly, no conversion needed
-	return t.Tags, nil
+	return tag.ConvertIDsToNames(ctx, t.TagIDs, tagGetter)
 }
 
 func (x *Ticket) Validate() error {
@@ -120,7 +119,7 @@ func New(ctx context.Context, alertIDs []types.AlertID, slackThread *slack.Threa
 			TitleSource:       types.SourceAI, // Default to AI source
 			DescriptionSource: types.SourceAI, // Default to AI source
 		},
-		Tags: []string{},
+		TagIDs: make(map[string]bool),
 	}
 }
 

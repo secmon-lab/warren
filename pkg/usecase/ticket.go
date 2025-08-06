@@ -90,7 +90,12 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 		for tag := range tagMap {
 			inheritedTags = append(inheritedTags, tag)
 		}
-		newTicket.Tags = inheritedTags
+		if newTicket.TagIDs == nil {
+			newTicket.TagIDs = make(map[string]bool)
+		}
+		for _, tagName := range inheritedTags {
+			newTicket.TagIDs[tagName] = true
+		}
 	}
 
 	// Handle metadata setting with auto-inheritance logic

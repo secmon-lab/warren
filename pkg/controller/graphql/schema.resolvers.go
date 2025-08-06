@@ -104,14 +104,34 @@ func (r *alertResolver) Ticket(ctx context.Context, obj *alert.Alert) (*ticket.T
 	return r.repo.GetTicket(ctx, obj.TicketID)
 }
 
-// Tags is the resolver for the tags field.
-func (r *alertResolver) Tags(ctx context.Context, obj *alert.Alert) ([]string, error) {
-	if r.uc == nil || len(obj.Tags) == 0 {
-		return []string{}, nil
+// TagObjects is the resolver for the tagObjects field.
+func (r *alertResolver) TagObjects(ctx context.Context, obj *alert.Alert) ([]*graphql1.TagObject, error) {
+	if r.uc == nil || len(obj.TagIDs) == 0 {
+		return []*graphql1.TagObject{}, nil
 	}
 
-	// Use the compatibility method to get tag names
-	return obj.GetTagNames(ctx, r.createTagGetter())
+	// Get tag IDs as slice
+	tagIDs := make([]string, 0, len(obj.TagIDs))
+	for tagID := range obj.TagIDs {
+		tagIDs = append(tagIDs, tagID)
+	}
+
+	// Get tag metadata using tag getter
+	tags, err := r.createTagGetter()(ctx, tagIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to GraphQL TagObject
+	tagObjects := make([]*graphql1.TagObject, 0, len(tags))
+	for _, tag := range tags {
+		tagObjects = append(tagObjects, &graphql1.TagObject{
+			ID:   tag.ID,
+			Name: tag.Name,
+		})
+	}
+
+	return tagObjects, nil
 }
 
 // ID is the resolver for the id field.
@@ -1097,12 +1117,42 @@ func (r *ticketResolver) UpdatedAt(ctx context.Context, obj *ticket.Ticket) (str
 
 // Tags is the resolver for the tags field.
 func (r *ticketResolver) Tags(ctx context.Context, obj *ticket.Ticket) ([]string, error) {
-	if r.uc == nil || len(obj.Tags) == 0 {
+	if r.uc == nil || len(obj.TagIDs) == 0 {
 		return []string{}, nil
 	}
 
 	// Use the compatibility method to get tag names
 	return obj.GetTagNames(ctx, r.createTagGetter())
+}
+
+// TagObjects is the resolver for the tagObjects field.
+func (r *ticketResolver) TagObjects(ctx context.Context, obj *ticket.Ticket) ([]*graphql1.TagObject, error) {
+	if r.uc == nil || len(obj.TagIDs) == 0 {
+		return []*graphql1.TagObject{}, nil
+	}
+
+	// Get tag IDs as slice
+	tagIDs := make([]string, 0, len(obj.TagIDs))
+	for tagID := range obj.TagIDs {
+		tagIDs = append(tagIDs, tagID)
+	}
+
+	// Get tag metadata using tag getter
+	tags, err := r.createTagGetter()(ctx, tagIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to GraphQL TagObject
+	tagObjects := make([]*graphql1.TagObject, 0, len(tags))
+	for _, tag := range tags {
+		tagObjects = append(tagObjects, &graphql1.TagObject{
+			ID:   tag.ID,
+			Name: tag.Name,
+		})
+	}
+
+	return tagObjects, nil
 }
 
 // Activity returns ActivityResolver implementation.

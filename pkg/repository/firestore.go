@@ -1478,7 +1478,7 @@ func (r *Firestore) DeleteTagByID(ctx context.Context, tagID string) error {
 
 func (r *Firestore) RemoveTagIDFromAllAlerts(ctx context.Context, tagID string) error {
 	// Query all alerts that have this tag ID
-	iter := r.db.Collection("alerts").Where("tags."+tagID, "==", true).Documents(ctx)
+	iter := r.db.Collection("alerts").Where("TagIDs."+tagID, "==", true).Documents(ctx)
 	defer iter.Stop()
 
 	bw := r.db.BulkWriter(ctx)
@@ -1495,7 +1495,7 @@ func (r *Firestore) RemoveTagIDFromAllAlerts(ctx context.Context, tagID string) 
 
 		// Remove the tag ID from the document
 		job, err := bw.Update(doc.Ref, []firestore.Update{
-			{Path: "tags." + tagID, Value: firestore.Delete},
+			{Path: "TagIDs." + tagID, Value: firestore.Delete},
 		})
 		if err != nil {
 			return goerr.Wrap(err, "failed to update alert", goerr.V("alertID", doc.Ref.ID))
@@ -1517,7 +1517,7 @@ func (r *Firestore) RemoveTagIDFromAllAlerts(ctx context.Context, tagID string) 
 
 func (r *Firestore) RemoveTagIDFromAllTickets(ctx context.Context, tagID string) error {
 	// Query all tickets that have this tag ID
-	iter := r.db.Collection("tickets").Where("tags."+tagID, "==", true).Documents(ctx)
+	iter := r.db.Collection("tickets").Where("TagIDs."+tagID, "==", true).Documents(ctx)
 	defer iter.Stop()
 
 	bw := r.db.BulkWriter(ctx)
@@ -1534,7 +1534,7 @@ func (r *Firestore) RemoveTagIDFromAllTickets(ctx context.Context, tagID string)
 
 		// Remove the tag ID from the document
 		job, err := bw.Update(doc.Ref, []firestore.Update{
-			{Path: "tags." + tagID, Value: firestore.Delete},
+			{Path: "TagIDs." + tagID, Value: firestore.Delete},
 		})
 		if err != nil {
 			return goerr.Wrap(err, "failed to update ticket", goerr.V("ticketID", doc.Ref.ID))

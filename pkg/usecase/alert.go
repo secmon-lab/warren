@@ -86,7 +86,12 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to convert tag names")
 		}
-		newAlert.Tags = tags
+		if newAlert.TagIDs == nil {
+			newAlert.TagIDs = make(map[string]bool)
+		}
+		for _, tagName := range tags {
+			newAlert.TagIDs[tagName] = true
+		}
 	}
 
 	if err := newAlert.FillMetadata(ctx, uc.llmClient); err != nil {

@@ -43,7 +43,7 @@ func TestTagUseCase_Operations(t *testing.T) {
 	updatedAlert, err := tagUC.UpdateAlertTags(ctx, a.ID, []string{"security", "critical"})
 	gt.NoError(t, err)
 	gt.NotNil(t, updatedAlert)
-	gt.N(t, len(updatedAlert.Tags)).Equal(2)
+	gt.N(t, len(updatedAlert.TagIDs)).Equal(2)
 
 	// Get actual tag names to verify
 	tagNames, err := updatedAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []string) ([]*tagmodel.Tag, error) {

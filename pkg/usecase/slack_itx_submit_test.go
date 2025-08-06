@@ -416,7 +416,7 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 	gt.Value(t, updatedTicket.Reason).Equal("Investigation completed - false positive")
 
 	// Verify tags were assigned to ticket
-	gt.Value(t, len(updatedTicket.Tags)).Equal(3)
+	gt.Value(t, len(updatedTicket.TagIDs)).Equal(3)
 	expectedTags := []string{"existing-tag", "false-positive", "investigation"}
 
 	// Get actual tag names from ticket using compatibility method
@@ -563,7 +563,7 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithoutTags(t *testin
 	gt.Value(t, updatedTicket.Reason).Equal("Working as intended")
 
 	// Verify no tags were assigned (ticket should have empty tags)
-	gt.Value(t, len(updatedTicket.Tags)).Equal(0)
+	gt.Value(t, len(updatedTicket.TagIDs)).Equal(0)
 
 	// Verify no tags were created in repository
 	tags, err := repo.ListAllTags(ctx)
@@ -696,16 +696,7 @@ func TestSlackInteractionViewSubmissionResolveTicket_TagMerging(t *testing.T) {
 	gt.NoError(t, err)
 	tagSvc := tag.New(repo)
 
-	// Create test ticket with existing tags (using tag names, not IDs)
-	initialTags := []string{"existing1", "existing2"}
-	testTicket := ticket.New(ctx, []types.AlertID{}, &slack.Thread{
-		ChannelID: "test-channel",
-		ThreadID:  "test-thread",
-	})
-	testTicket.Tags = initialTags
-	gt.NoError(t, repo.PutTicket(ctx, testTicket))
-
-	// Create tags to ensure they exist
+	// Create tags first to ensure they exist
 	existingTag1 := &tagmodel.Tag{ID: "existing-tag-1", Name: "existing1", Color: "color1"}
 	existingTag2 := &tagmodel.Tag{ID: "existing-tag-2", Name: "existing2", Color: "color2"}
 	newTag1 := &tagmodel.Tag{ID: "new-tag-1", Name: "newtag1", Color: "color3"}
@@ -715,6 +706,18 @@ func TestSlackInteractionViewSubmissionResolveTicket_TagMerging(t *testing.T) {
 	gt.NoError(t, repo.CreateTagWithID(ctx, existingTag2))
 	gt.NoError(t, repo.CreateTagWithID(ctx, newTag1))
 	gt.NoError(t, repo.CreateTagWithID(ctx, newTag2))
+
+	// Create test ticket with existing tag IDs
+	testTicket := ticket.New(ctx, []types.AlertID{}, &slack.Thread{
+		ChannelID: "test-channel",
+		ThreadID:  "test-thread",
+	})
+	if testTicket.TagIDs == nil {
+		testTicket.TagIDs = make(map[string]bool)
+	}
+	testTicket.TagIDs[existingTag1.ID] = true
+	testTicket.TagIDs[existingTag2.ID] = true
+	gt.NoError(t, repo.PutTicket(ctx, testTicket))
 
 	// Setup use case
 	uc := New(
@@ -765,16 +768,16 @@ func TestSlackInteractionViewSubmissionResolveTicket_TagMerging(t *testing.T) {
 	gt.Equal(t, updatedTicket.Status, types.TicketStatusResolved)
 
 	// Verify tags are merged correctly (should have 3 unique tags)
-	gt.Number(t, len(updatedTicket.Tags)).Equal(3)
+	gt.Number(t, len(updatedTicket.TagIDs)).Equal(3)
 
 	// Check that all expected tags are present
 	tagMap := make(map[string]bool)
-	for _, tag := range updatedTicket.Tags {
-		tagMap[tag] = true
+	for tagID := range updatedTicket.TagIDs {
+		tagMap[tagID] = true
 	}
 
-	expectedTags := []string{"existing1", "existing2", "newtag1"}
-	for _, expectedTag := range expectedTags {
-		gt.Value(t, tagMap[expectedTag]).Equal(true)
+	expectedTagIDs := []string{existingTag1.ID, existingTag2.ID, newTag1.ID}
+	for _, expectedTagID := range expectedTagIDs {
+		gt.Value(t, tagMap[expectedTagID]).Equal(true)
 	}
 }

@@ -92,6 +92,11 @@ type TagMetadata struct {
 	UpdatedAt   string  `json:"updatedAt"`
 }
 
+type TagObject struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type TicketsResponse struct {
 	Tickets    []*ticket.Ticket `json:"tickets"`
 	TotalCount int              `json:"totalCount"`

@@ -112,7 +112,7 @@ func TestTagService_UpdateAlertTagsByName(t *testing.T) {
 	updatedAlert, err := service.UpdateAlertTagsByName(ctx, a.ID, []string{"security", "incident"})
 	gt.NoError(t, err)
 	gt.NotNil(t, updatedAlert)
-	gt.N(t, len(updatedAlert.Tags)).Equal(2)
+	gt.N(t, len(updatedAlert.TagIDs)).Equal(2)
 
 	// Get actual tag names to verify
 	tagNames, err := updatedAlert.GetTagNames(ctx, func(ctx context.Context, tagIDs []string) ([]*tagmodel.Tag, error) {
@@ -149,7 +149,7 @@ func TestTagService_UpdateTicketTagsByName(t *testing.T) {
 	updatedTicket, err := service.UpdateTicketTagsByName(ctx, tk.ID, []string{"resolved", "false-positive"})
 	gt.NoError(t, err)
 	gt.NotNil(t, updatedTicket)
-	gt.N(t, len(updatedTicket.Tags)).Equal(2)
+	gt.N(t, len(updatedTicket.TagIDs)).Equal(2)
 
 	// Get actual tag names to verify
 	tagNames, err := updatedTicket.GetTagNames(ctx, func(ctx context.Context, tagIDs []string) ([]*tagmodel.Tag, error) {

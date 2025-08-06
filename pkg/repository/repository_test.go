@@ -24,16 +24,6 @@ import (
 	"github.com/slack-go/slack/slackevents"
 )
 
-// Helper function to check if a tag ID exists in a slice
-func containsTag(tags []string, target string) bool {
-	for _, tag := range tags {
-		if tag == target {
-			return true
-		}
-	}
-	return false
-}
-
 func newFirestoreClient(t *testing.T) *repository.Firestore {
 	vars := test.NewEnvVars(t, "TEST_FIRESTORE_PROJECT_ID", "TEST_FIRESTORE_DATABASE_ID")
 	client, err := repository.NewFirestore(t.Context(),
@@ -2506,7 +2496,12 @@ func TestAlertAndTicketTags(t *testing.T) {
 				Title:       "Test Alert",
 				Description: "Test Description",
 			})
-			a.Tags = []string{securityTag.ID, incidentTag.ID, criticalTag.ID}
+			if a.TagIDs == nil {
+				a.TagIDs = make(map[string]bool)
+			}
+			a.TagIDs[securityTag.ID] = true
+			a.TagIDs[incidentTag.ID] = true
+			a.TagIDs[criticalTag.ID] = true
 
 			// Save the alert
 			gt.NoError(t, repo.PutAlert(ctx, a))
@@ -2517,11 +2512,11 @@ func TestAlertAndTicketTags(t *testing.T) {
 			gt.NotNil(t, retrievedAlert)
 
 			// Verify tags are preserved
-			gt.Number(t, len(retrievedAlert.Tags)).Equal(3)
-			// Check tags are present in slice
-			gt.True(t, containsTag(retrievedAlert.Tags, securityTag.ID))
-			gt.True(t, containsTag(retrievedAlert.Tags, incidentTag.ID))
-			gt.True(t, containsTag(retrievedAlert.Tags, criticalTag.ID))
+			gt.Number(t, len(retrievedAlert.TagIDs)).Equal(3)
+			// Check tags are present in map
+			gt.True(t, retrievedAlert.TagIDs[securityTag.ID])
+			gt.True(t, retrievedAlert.TagIDs[incidentTag.ID])
+			gt.True(t, retrievedAlert.TagIDs[criticalTag.ID])
 		})
 
 		t.Run("Ticket with tags", func(t *testing.T) {
@@ -2542,7 +2537,11 @@ func TestAlertAndTicketTags(t *testing.T) {
 			// Create a ticket with tags
 			tk := ticketmodel.New(ctx, []types.AlertID{}, nil)
 			tk.Metadata.Title = "Test Ticket"
-			tk.Tags = []string{resolvedTag.ID, fpTag.ID}
+			if tk.TagIDs == nil {
+				tk.TagIDs = make(map[string]bool)
+			}
+			tk.TagIDs[resolvedTag.ID] = true
+			tk.TagIDs[fpTag.ID] = true
 
 			// Save the ticket
 			gt.NoError(t, repo.PutTicket(ctx, tk))
@@ -2553,9 +2552,9 @@ func TestAlertAndTicketTags(t *testing.T) {
 			gt.NotNil(t, retrievedTicket)
 
 			// Verify tags are preserved
-			gt.Number(t, len(retrievedTicket.Tags)).Equal(2)
-			gt.True(t, containsTag(retrievedTicket.Tags, resolvedTag.ID))
-			gt.True(t, containsTag(retrievedTicket.Tags, fpTag.ID))
+			gt.Number(t, len(retrievedTicket.TagIDs)).Equal(2)
+			gt.True(t, retrievedTicket.TagIDs[resolvedTag.ID])
+			gt.True(t, retrievedTicket.TagIDs[fpTag.ID])
 		})
 
 		t.Run("Empty tags", func(t *testing.T) {
@@ -2572,9 +2571,9 @@ func TestAlertAndTicketTags(t *testing.T) {
 			retrievedAlert, err := repo.GetAlert(ctx, a.ID)
 			gt.NoError(t, err)
 			gt.NotNil(t, retrievedAlert)
-			// Tags should be nil or empty
-			if retrievedAlert.Tags != nil {
-				gt.Number(t, len(retrievedAlert.Tags)).Equal(0)
+			// TagIDs should be nil or empty
+			if retrievedAlert.TagIDs != nil {
+				gt.Number(t, len(retrievedAlert.TagIDs)).Equal(0)
 			}
 		})
 
@@ -2603,7 +2602,11 @@ func TestAlertAndTicketTags(t *testing.T) {
 					Title:       fmt.Sprintf("Batch Alert %d", i),
 					Description: "Test Description",
 				})
-				a.Tags = []string{individualTags[i].ID, commonTag.ID}
+				if a.TagIDs == nil {
+					a.TagIDs = make(map[string]bool)
+				}
+				a.TagIDs[individualTags[i].ID] = true
+				a.TagIDs[commonTag.ID] = true
 				alerts[i] = &a
 			}
 
@@ -2621,8 +2624,8 @@ func TestAlertAndTicketTags(t *testing.T) {
 
 			// Verify tags
 			for i, a := range retrievedAlerts {
-				gt.True(t, containsTag(a.Tags, individualTags[i].ID))
-				gt.True(t, containsTag(a.Tags, commonTag.ID))
+				gt.True(t, a.TagIDs[individualTags[i].ID])
+				gt.True(t, a.TagIDs[commonTag.ID])
 			}
 		})
 	}
@@ -2637,4 +2640,3 @@ func TestAlertAndTicketTags(t *testing.T) {
 		testFn(t, repo)
 	})
 }
-

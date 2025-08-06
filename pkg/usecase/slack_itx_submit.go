@@ -11,7 +11,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -324,13 +323,16 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 					// Continue with resolve even if tag conversion fails
 				} else {
 					logger.Debug("successfully converted tag names to IDs", "tags", tags)
-					// Merge existing tags with new tags
-					existingTags := target.Tags
-					logger.Debug("existing tags", "existingTags", existingTags)
+					// Initialize TagIDs if needed
+					if target.TagIDs == nil {
+						target.TagIDs = make(map[string]bool)
+					}
 
-					// Merge existing tags with new tags (tags are already strings)
-					target.Tags = tag.MergeTags(existingTags, tags)
-					logger.Debug("target ticket updated with merged tags", "target.Tags", target.Tags)
+					// Add new tags to TagIDs
+					for _, tagName := range tags {
+						target.TagIDs[tagName] = true
+					}
+					logger.Debug("target ticket updated with merged tags", "TagIDs", target.TagIDs)
 				}
 			} else {
 				logger.Debug("skipping tag update", "hasSelectedTags", len(selectedTags) > 0, "hasTagService", uc.tagService != nil)
@@ -338,7 +340,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 		}
 	}
 
-	logger.Debug("saving ticket to repository", "ticketID", target.ID, "target.Tags", target.Tags, "target.Status", target.Status)
+	logger.Debug("saving ticket to repository", "ticketID", target.ID, "TagIDs", target.TagIDs, "target.Status", target.Status)
 	if err := uc.repository.PutTicket(ctx, *target); err != nil {
 		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID))
 	}

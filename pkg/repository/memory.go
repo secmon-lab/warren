@@ -1123,40 +1123,30 @@ func (r *Memory) DeleteTagByID(ctx context.Context, tagID string) error {
 	return nil
 }
 
-func (r *Memory) RemoveTagIDFromAllAlerts(ctx context.Context, tagName string) error {
+func (r *Memory) RemoveTagIDFromAllAlerts(ctx context.Context, tagID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// Iterate through all alerts and remove the tag
+	// Iterate through all alerts and remove the tag ID
 	for _, alert := range r.alerts {
-		if alert.Tags != nil {
-			// Remove tagID from slice
-			for i, tag := range alert.Tags {
-				if tag == tagName {
-					alert.Tags = append(alert.Tags[:i], alert.Tags[i+1:]...)
-					break
-				}
-			}
+		if alert.TagIDs != nil {
+			// Remove tagID from map
+			delete(alert.TagIDs, tagID)
 		}
 	}
 
 	return nil
 }
 
-func (r *Memory) RemoveTagIDFromAllTickets(ctx context.Context, tagName string) error {
+func (r *Memory) RemoveTagIDFromAllTickets(ctx context.Context, tagID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// Iterate through all tickets and remove the tag
+	// Iterate through all tickets and remove the tag ID
 	for _, ticket := range r.tickets {
-		if ticket.Tags != nil {
-			// Remove tagID from slice
-			for i, tag := range ticket.Tags {
-				if tag == tagName {
-					ticket.Tags = append(ticket.Tags[:i], ticket.Tags[i+1:]...)
-					break
-				}
-			}
+		if ticket.TagIDs != nil {
+			// Remove tagID from map
+			delete(ticket.TagIDs, tagID)
 		}
 	}
 
