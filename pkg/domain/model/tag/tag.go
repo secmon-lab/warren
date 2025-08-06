@@ -182,7 +182,7 @@ func ColorNameToClass(colorName string) string {
 			return ChipColors[i]
 		}
 	}
-	return ChipColors[17] // fallback to gray
+	return ChipColors[18] // fallback to gray
 }
 
 // GenerateColor generates a deterministic color for a tag name
