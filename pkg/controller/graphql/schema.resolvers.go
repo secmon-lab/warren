@@ -104,19 +104,34 @@ func (r *alertResolver) Ticket(ctx context.Context, obj *alert.Alert) (*ticket.T
 	return r.repo.GetTicket(ctx, obj.TicketID)
 }
 
-// Tags is the resolver for the tags field.
-func (r *alertResolver) Tags(ctx context.Context, obj *alert.Alert) ([]string, error) {
-	if r.uc == nil || len(obj.TagIDs) == 0 {
-		return []string{}, nil
-	}
-
-	// Use the compatibility method to get tag names
-	return obj.GetTagNames(ctx, r.createTagGetter())
-}
-
 // TagObjects is the resolver for the tagObjects field.
 func (r *alertResolver) TagObjects(ctx context.Context, obj *alert.Alert) ([]*graphql1.TagObject, error) {
-	return r.resolveTagObjects(ctx, obj.TagIDs)
+	if r.uc == nil || len(obj.TagIDs) == 0 {
+		return []*graphql1.TagObject{}, nil
+	}
+
+	// Get tag IDs as slice
+	tagIDSlice := make([]string, 0, len(obj.TagIDs))
+	for tagID := range obj.TagIDs {
+		tagIDSlice = append(tagIDSlice, tagID)
+	}
+
+	// Get tag metadata using tag getter
+	tags, err := r.createTagGetter()(ctx, tagIDSlice)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to GraphQL TagObject
+	tagObjects := make([]*graphql1.TagObject, 0, len(tags))
+	for _, tag := range tags {
+		tagObjects = append(tagObjects, &graphql1.TagObject{
+			ID:   tag.ID,
+			Name: tag.Name,
+		})
+	}
+
+	return tagObjects, nil
 }
 
 // ID is the resolver for the id field.
@@ -1112,19 +1127,13 @@ func (r *ticketResolver) Tags(ctx context.Context, obj *ticket.Ticket) ([]string
 
 // TagObjects is the resolver for the tagObjects field.
 func (r *ticketResolver) TagObjects(ctx context.Context, obj *ticket.Ticket) ([]*graphql1.TagObject, error) {
-	return r.resolveTagObjects(ctx, obj.TagIDs)
-}
-
-// resolveTagObjects is a helper method to convert TagIDs map to GraphQL TagObject slice
-// This eliminates code duplication between ticket and alert TagObjects resolvers
-func (r *Resolver) resolveTagObjects(ctx context.Context, tagIDs map[string]bool) ([]*graphql1.TagObject, error) {
-	if r.uc == nil || len(tagIDs) == 0 {
+	if r.uc == nil || len(obj.TagIDs) == 0 {
 		return []*graphql1.TagObject{}, nil
 	}
 
 	// Get tag IDs as slice
-	tagIDSlice := make([]string, 0, len(tagIDs))
-	for tagID := range tagIDs {
+	tagIDSlice := make([]string, 0, len(obj.TagIDs))
+	for tagID := range obj.TagIDs {
 		tagIDSlice = append(tagIDSlice, tagID)
 	}
 
@@ -1175,3 +1184,19 @@ type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }
 
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
+	func (r *alertResolver) Tags(ctx context.Context, obj *alert.Alert) ([]string, error) {
+	if r.uc == nil || len(obj.TagIDs) == 0 {
+		return []string{}, nil
+	}
+
+	// Use the compatibility method to get tag names
+	return obj.GetTagNames(ctx, r.createTagGetter())
+}
+*/
