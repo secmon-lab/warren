@@ -44,7 +44,6 @@ func newFirestoreClient(t *testing.T) *repository.Firestore {
 	return client
 }
 
-
 func newTestThread() slack.Thread {
 	return slack.Thread{
 		ChannelID: "test-channel",
@@ -528,7 +527,6 @@ func TestFindSimilarTickets(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
 
-
 		// Track created tickets for cleanup
 		var createdTickets []*ticketmodel.Ticket
 
@@ -577,7 +575,7 @@ func TestFindSimilarTickets(t *testing.T) {
 		gt.NoError(t, repo.PutTicket(ctx, target))
 		got, err := repo.FindNearestTickets(ctx, target.Embedding, 3)
 		if err != nil {
-			// For Firestore, if there are zero-vector embeddings in existing data, 
+			// For Firestore, if there are zero-vector embeddings in existing data,
 			// vector search might fail. In that case, just skip the test.
 			if _, ok := repo.(*repository.Firestore); ok {
 				t.Skipf("Firestore vector search failed due to existing zero vectors: %v", err)
@@ -585,7 +583,7 @@ func TestFindSimilarTickets(t *testing.T) {
 			}
 			gt.NoError(t, err)
 		}
-		
+
 		// For Memory repo, expect exact results
 		if _, ok := repo.(*repository.Firestore); !ok {
 			gt.Array(t, got).Longer(0).Required().Any(func(v *ticketmodel.Ticket) bool {
@@ -611,7 +609,6 @@ func TestFindSimilarTickets(t *testing.T) {
 func TestFindNearestTickets(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
-
 
 		// Track created tickets for cleanup
 		var createdTickets []*ticketmodel.Ticket
@@ -656,7 +653,7 @@ func TestFindNearestTickets(t *testing.T) {
 		// Test FindNearestTickets
 		got, err := repo.FindNearestTickets(ctx, targetEmbedding, 3)
 		if err != nil {
-			// For Firestore, if there are zero-vector embeddings in existing data, 
+			// For Firestore, if there are zero-vector embeddings in existing data,
 			// vector search might fail. In that case, just skip the test.
 			if _, ok := repo.(*repository.Firestore); ok {
 				t.Skipf("Firestore vector search failed due to existing zero vectors: %v", err)
@@ -664,7 +661,7 @@ func TestFindNearestTickets(t *testing.T) {
 			}
 			gt.NoError(t, err)
 		}
-		
+
 		// For Memory repo, expect exact results
 		if _, ok := repo.(*repository.Firestore); !ok {
 			gt.Array(t, got).Longer(0).Required()
@@ -689,7 +686,6 @@ func TestFindNearestTickets(t *testing.T) {
 func TestFindNearestAlerts(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
-
 
 		alerts := alert.Alerts{}
 		for i := 0; i < 10; i++ {
@@ -737,7 +733,6 @@ func TestFindNearestAlerts(t *testing.T) {
 func TestGetAlertsWithInvalidEmbedding(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
-
 
 		// Track created alerts for cleanup
 		var createdAlerts []*alert.Alert
@@ -843,7 +838,6 @@ func TestGetAlertsWithInvalidEmbedding(t *testing.T) {
 func TestGetTicketsWithInvalidEmbedding(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
-
 
 		// Track created tickets for cleanup
 		var createdTickets []*ticketmodel.Ticket
@@ -1356,7 +1350,6 @@ func TestFindNearestTicketsWithSpan(t *testing.T) {
 		ctx := t.Context()
 		now := time.Now()
 
-
 		// Track created tickets for cleanup
 		var createdTickets []*ticketmodel.Ticket
 
@@ -1416,7 +1409,7 @@ func TestFindNearestTicketsWithSpan(t *testing.T) {
 
 		results, err := repo.FindNearestTicketsWithSpan(ctx, queryEmbedding, begin, end, 2)
 		if err != nil {
-			// For Firestore, if there are zero-vector embeddings in existing data, 
+			// For Firestore, if there are zero-vector embeddings in existing data,
 			// vector search might fail. In that case, just skip the test.
 			if _, ok := repo.(*repository.Firestore); ok {
 				t.Skipf("Firestore vector search failed due to existing zero vectors: %v", err)
@@ -2327,7 +2320,7 @@ func TestTagOperations(t *testing.T) {
 			tag1Name := fmt.Sprintf("security_%d", timestamp)
 			tag2Name := fmt.Sprintf("incident_%d", timestamp)
 			tag3Name := fmt.Sprintf("phishing_%d", timestamp)
-			
+
 			tag1 := &tag.Tag{ID: tag.NewID(), Name: tag1Name, Color: "#ff0000"}
 			gt.NoError(t, repo.CreateTagWithID(ctx, tag1))
 
@@ -2355,7 +2348,7 @@ func TestTagOperations(t *testing.T) {
 		t.Run("Create duplicate tag", func(t *testing.T) {
 			// Use unique name to avoid conflicts with existing data
 			uniqueName := fmt.Sprintf("duplicate_%d", time.Now().UnixNano())
-			
+
 			// Get initial count of tags with this unique name
 			initialTags, err := repo.ListAllTags(ctx)
 			gt.NoError(t, err)
@@ -2429,7 +2422,7 @@ func TestTagOperations(t *testing.T) {
 			timestamp := time.Now().UnixNano()
 			tag1Name := fmt.Sprintf("delete1_%d", timestamp)
 			tag2Name := fmt.Sprintf("delete2_%d", timestamp)
-			
+
 			tag1 := &tag.Tag{ID: tag.NewID(), Name: tag1Name, Color: "#ff0000"}
 			tag2 := &tag.Tag{ID: tag.NewID(), Name: tag2Name, Color: "#00ff00"}
 			gt.NoError(t, repo.CreateTagWithID(ctx, tag1))

@@ -23,7 +23,10 @@ type Tag struct {
 // NewID generates a new unique tag ID
 func NewID() string {
 	bytes := make([]byte, 8)
-	rand.Read(bytes)
+	if _, err := rand.Read(bytes); err != nil {
+		// Fallback to timestamp-based ID if crypto/rand fails
+		return "tag_" + hex.EncodeToString([]byte{byte(time.Now().UnixNano())})
+	}
 	return "tag_" + hex.EncodeToString(bytes)
 }
 

@@ -139,6 +139,11 @@ func (s *Service) CreateTagWithCustomColor(ctx context.Context, name, descriptio
 }
 
 func (s *Service) UpdateTagMetadata(ctx context.Context, tagID string, name, description, color string) (*tag.Tag, error) {
+	// Validate input
+	if name == "" {
+		return nil, goerr.New("tag name cannot be empty")
+	}
+
 	// Get existing tag
 	existingTag, err := s.repo.GetTagByID(ctx, tagID)
 	if err != nil {

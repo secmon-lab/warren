@@ -93,12 +93,7 @@ func (u *TagUseCase) UpdateTicketTags(ctx context.Context, ticketID types.Ticket
 
 // UpdateTag updates tag metadata (name, color, description)
 func (u *TagUseCase) UpdateTag(ctx context.Context, tagID string, name, color, description string) (*tagmodel.Tag, error) {
-	// Validate input
-	if err := u.validateUpdateTagInput(name, color); err != nil {
-		return nil, err
-	}
-
-	// Call service layer
+	// Call service layer (validation is handled there)
 	tag, err := u.tagService.UpdateTagMetadata(ctx, tagID, name, description, color)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update tag")
@@ -115,39 +110,4 @@ func (u *TagUseCase) GetAvailableColors() ([]string, error) {
 // GetAvailableColorNames returns user-friendly color names for tags
 func (u *TagUseCase) GetAvailableColorNames() ([]string, error) {
 	return u.tagService.GetAvailableColorNames(), nil
-}
-
-// validateUpdateTagInput validates input parameters for tag updates
-func (u *TagUseCase) validateUpdateTagInput(name, color string) error {
-	if name == "" {
-		return goerr.New("tag name cannot be empty")
-	}
-
-	// Validate color (support both color names and Tailwind classes)
-	availableColors := u.tagService.GetAvailableColors()
-	availableNames := u.tagService.GetAvailableColorNames()
-
-	colorValid := false
-	// Check if it's a valid Tailwind class
-	for _, c := range availableColors {
-		if c == color {
-			colorValid = true
-			break
-		}
-	}
-	// Check if it's a valid color name
-	if !colorValid {
-		for _, n := range availableNames {
-			if n == color {
-				colorValid = true
-				break
-			}
-		}
-	}
-
-	if !colorValid {
-		return goerr.New("invalid color selection", goerr.V("color", color))
-	}
-
-	return nil
 }
