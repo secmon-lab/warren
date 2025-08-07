@@ -17,6 +17,7 @@ export interface Ticket {
   updatedAt: string;
   isTest: boolean;
   tags?: string[];
+  tagObjects?: { id: string; name: string }[];
 }
 
 export interface Comment {
@@ -42,6 +43,7 @@ export interface Alert {
   createdAt: string;
   ticket?: Ticket;
   tags?: string[];
+  tagObjects?: { id: string; name: string }[];
 }
 
 export interface AlertAttribute {

@@ -12,10 +12,13 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { TagMetadata } from "@/lib/types";
+import { TagObject } from "@/lib/graphql/generated";
 
 interface TagSelectorProps {
   selectedTags: string[];
   onTagsChange: (tags: string[]) => void;
+  // Optional prop to pass existing tagObjects for efficiency
+  existingTagObjects?: TagObject[];
   disabled?: boolean;
   className?: string;
 }
@@ -36,15 +39,16 @@ export function TagSelector({
   const allTags: TagMetadata[] = tagsData?.tags || [];
   const tagsByName = new Map(allTags.map((t: TagMetadata) => [t.name, t]));
 
-  // Filter tags based on search
+  // Filter tags based on search - optimized with Set for O(1) lookup
+  const selectedTagsSet = new Set(selectedTags);
   const filteredTags = allTags.filter(
     (tag: TagMetadata) =>
       tag.name.toLowerCase().includes(searchValue.toLowerCase()) &&
-      !selectedTags.includes(tag.name)
+      !selectedTagsSet.has(tag.name)
   );
 
   const handleAddTag = (tag: string) => {
-    if (!selectedTags.includes(tag)) {
+    if (!selectedTagsSet.has(tag)) {
       onTagsChange([...selectedTags, tag]);
     }
     setSearchValue("");
@@ -93,7 +97,10 @@ export function TagSelector({
     <div className={cn("space-y-2", className)}>
       <div className="flex flex-wrap gap-2">
         {selectedTags.map((tag) => {
+          // Try to get tag data from TagMetadata first (which has color)
           const tagData = tagsByName.get(tag);
+          
+          // Use color from full tag metadata if available, otherwise use default
           const colorClass = tagData?.color || "bg-gray-100 text-gray-800";
           return (
             <Badge key={tag} className={`text-sm ${colorClass}`}>

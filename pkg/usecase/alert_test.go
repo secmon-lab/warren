@@ -1368,3 +1368,179 @@ func TestHandleAlert_PolicyWithNewAndExistingTags(t *testing.T) {
 	gt.Value(t, existingTagAfter.ID).Equal(existingTag.ID)
 	gt.Value(t, existingTagAfter.CreatedAt).Equal(existingTag.CreatedAt)
 }
+
+func TestHandleAlert_PolicyTagDuplicationPrevention(t *testing.T) {
+	// This test specifically verifies that policy-based tag generation doesn't create duplicate tags
+	// when the same tags are specified in multiple alerts processed consecutively
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	// Generate random tag names to avoid conflicts with other tests
+	randomSuffix := now.UnixNano()
+	commonTag := fmt.Sprintf("security-%d", randomSuffix)
+	alertSpecificTag1 := fmt.Sprintf("alert1-tag-%d", randomSuffix)
+	alertSpecificTag2 := fmt.Sprintf("alert2-tag-%d", randomSuffix)
+
+	// Create TagService
+	tagSvc := tagservice.New(repo)
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			return "test-channel", "test-thread", nil
+		},
+		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			return &slack_sdk.FileSummary{}, nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
+	}
+
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{
+							`{"title": "test title", "description": "test description"}`,
+						},
+					}, nil
+				},
+			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
+			return [][]float64{{0.1, 0.2, 0.3}}, nil
+		},
+	}
+
+	// Policy mock that returns alerts with overlapping tags
+	callCount := 0
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			if queryResult, ok := result.(*alert.QueryOutput); ok {
+				callCount++
+				if callCount == 1 {
+					// First alert: common tag + specific tag
+					queryResult.Alert = []alert.Metadata{
+						{
+							Title:       "First Security Alert",
+							Description: "First security incident",
+							Tags:        []string{commonTag, alertSpecificTag1},
+						},
+					}
+				} else {
+					// Second alert: same common tag + different specific tag
+					queryResult.Alert = []alert.Metadata{
+						{
+							Title:       "Second Security Alert",
+							Description: "Second security incident",
+							Tags:        []string{commonTag, alertSpecificTag2}, // commonTag appears again
+						},
+					}
+				}
+			}
+			return nil
+		},
+	}
+
+	slackSvc, err := slack_svc.New(slackMock, "test-channel")
+	gt.NoError(t, err)
+
+	// Create usecase
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackService(slackSvc),
+		usecase.WithLLMClient(llmMock),
+		usecase.WithPolicyClient(policyMock),
+		usecase.WithTagService(tagSvc),
+	)
+
+	// Count tags before processing any alerts
+	tagsBefore, err := repo.ListAllTags(ctx)
+	gt.NoError(t, err)
+	initialTagCount := len(tagsBefore)
+
+	// Process first alert
+	alerts1, err := uc.HandleAlert(ctx, "test", map[string]any{"type": "security", "alert": 1})
+	gt.NoError(t, err)
+	gt.Array(t, alerts1).Length(1)
+
+	// Count tags after first alert
+	tagsAfterFirst, err := repo.ListAllTags(ctx)
+	gt.NoError(t, err)
+	expectedAfterFirst := initialTagCount + 2 // commonTag + alertSpecificTag1
+	gt.Array(t, tagsAfterFirst).Length(expectedAfterFirst)
+
+	// Process second alert with overlapping tag names
+	alerts2, err := uc.HandleAlert(ctx, "test", map[string]any{"type": "security", "alert": 2})
+	gt.NoError(t, err)
+	gt.Array(t, alerts2).Length(1)
+
+	// CRITICAL: Verify no duplicate tags were created
+	tagsAfterSecond, err := repo.ListAllTags(ctx)
+	gt.NoError(t, err)
+	expectedAfterSecond := initialTagCount + 3 // commonTag (reused) + alertSpecificTag1 + alertSpecificTag2
+	gt.Array(t, tagsAfterSecond).Length(expectedAfterSecond)
+
+	// Verify both alerts have the common tag assigned
+	alert1 := alerts1[0]
+	alert2 := alerts2[0]
+
+	// Both alerts should have 2 tags each
+	gt.Number(t, len(alert1.TagIDs)).Equal(2)
+	gt.Number(t, len(alert2.TagIDs)).Equal(2)
+
+	// Get the common tag to verify it's shared
+	commonTagObj, err := repo.GetTagByName(ctx, commonTag)
+	gt.NoError(t, err)
+	gt.NotNil(t, commonTagObj)
+
+	// Both alerts should reference the same common tag ID
+	gt.Value(t, alert1.TagIDs[commonTagObj.ID]).Equal(true)
+	gt.Value(t, alert2.TagIDs[commonTagObj.ID]).Equal(true)
+
+	// Verify specific tags exist and are correctly assigned
+	tag1Obj, err := repo.GetTagByName(ctx, alertSpecificTag1)
+	gt.NoError(t, err)
+	gt.NotNil(t, tag1Obj)
+	gt.Value(t, alert1.TagIDs[tag1Obj.ID]).Equal(true)
+	gt.Value(t, alert2.TagIDs[tag1Obj.ID]).Equal(false) // Should not be in alert2
+
+	tag2Obj, err := repo.GetTagByName(ctx, alertSpecificTag2)
+	gt.NoError(t, err)
+	gt.NotNil(t, tag2Obj)
+	gt.Value(t, alert2.TagIDs[tag2Obj.ID]).Equal(true)
+	gt.Value(t, alert1.TagIDs[tag2Obj.ID]).Equal(false) // Should not be in alert1
+
+	// Verify tag names in repository
+	finalTags, err := repo.ListAllTags(ctx)
+	gt.NoError(t, err)
+	tagNames := make([]string, len(finalTags))
+	for i, tag := range finalTags {
+		tagNames[i] = tag.Name
+	}
+
+	// Verify all expected tags exist exactly once
+	commonTagCount := 0
+	tag1Count := 0
+	tag2Count := 0
+	for _, name := range tagNames {
+		if name == commonTag {
+			commonTagCount++
+		} else if name == alertSpecificTag1 {
+			tag1Count++
+		} else if name == alertSpecificTag2 {
+			tag2Count++
+		}
+	}
+
+	// Each tag should appear exactly once in the repository
+	gt.Number(t, commonTagCount).Equal(1)
+	gt.Number(t, tag1Count).Equal(1)
+	gt.Number(t, tag2Count).Equal(1)
+}

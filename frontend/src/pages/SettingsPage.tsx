@@ -27,7 +27,7 @@ import EditTagModal from "@/components/EditTagModal";
 export default function SettingsPage() {
   const { toast } = useToast();
   const [newTagName, setNewTagName] = useState("");
-  const [tagToDelete, setTagToDelete] = useState<string | null>(null);
+  const [tagToDelete, setTagToDelete] = useState<TagMetadata | null>(null);
   const [tagToEdit, setTagToEdit] = useState<TagMetadata | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
@@ -85,7 +85,7 @@ export default function SettingsPage() {
 
     try {
       await deleteTag({
-        variables: { name: tagToDelete },
+        variables: { id: tagToDelete.id },
       });
       setTagToDelete(null);
     } catch (error) {
@@ -219,7 +219,7 @@ export default function SettingsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setTagToDelete(tag.name)}
+                          onClick={() => setTagToDelete(tag)}
                           className="text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -243,7 +243,7 @@ export default function SettingsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Tag</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the tag "{tagToDelete}"? This action
+              Are you sure you want to delete the tag "{tagToDelete?.name}"? This action
               cannot be undone. The tag will be removed from all alerts and tickets.
             </AlertDialogDescription>
           </AlertDialogHeader>

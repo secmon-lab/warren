@@ -20,6 +20,10 @@ export const GET_TICKETS = gql`
         alertsCount
         commentsCount
         tags
+        tagObjects {
+          id
+          name
+        }
       }
       totalCount
     }
@@ -52,6 +56,10 @@ export const GET_TICKET = gql`
       updatedAt
       alertsCount
       tags
+      tagObjects {
+        id
+        name
+      }
       comments {
         id
         content
@@ -85,6 +93,10 @@ export const GET_TICKET_ALERTS = gql`
           }
           createdAt
           tags
+          tagObjects {
+            id
+            name
+          }
         }
         totalCount
       }
@@ -108,6 +120,10 @@ export const GET_ALERT = gql`
       }
       createdAt
       tags
+      tagObjects {
+        id
+        name
+      }
       ticket {
         id
         status
@@ -135,6 +151,10 @@ export const GET_ALERTS = gql`
         }
         createdAt
         tags
+        tagObjects {
+          id
+          name
+        }
         ticket {
           id
           status
@@ -311,6 +331,10 @@ export const UPDATE_TICKET = gql`
       createdAt
       updatedAt
       tags
+      tagObjects {
+        id
+        name
+      }
       alerts {
         id
         title
@@ -325,6 +349,10 @@ export const UPDATE_TICKET = gql`
         }
         createdAt
         tags
+        tagObjects {
+          id
+          name
+        }
       }
       comments {
         id
@@ -548,8 +576,8 @@ export const CREATE_TAG = gql`
 `;
 
 export const DELETE_TAG = gql`
-  mutation DeleteTag($name: String!) {
-    deleteTag(name: $name)
+  mutation DeleteTag($id: ID!) {
+    deleteTag(id: $id)
   }
 `;
 
@@ -579,21 +607,29 @@ export const GET_AVAILABLE_TAG_COLOR_NAMES = gql`
 `;
 
 export const UPDATE_ALERT_TAGS = gql`
-  mutation UpdateAlertTags($alertId: ID!, $tags: [String!]!) {
-    updateAlertTags(alertId: $alertId, tags: $tags) {
+  mutation UpdateAlertTags($alertId: ID!, $tagIds: [ID!]!) {
+    updateAlertTags(alertId: $alertId, tagIds: $tagIds) {
       id
       title
       tags
+      tagObjects {
+        id
+        name
+      }
     }
   }
 `;
 
 export const UPDATE_TICKET_TAGS = gql`
-  mutation UpdateTicketTags($ticketId: ID!, $tags: [String!]!) {
-    updateTicketTags(ticketId: $ticketId, tags: $tags) {
+  mutation UpdateTicketTags($ticketId: ID!, $tagIds: [ID!]!) {
+    updateTicketTags(ticketId: $ticketId, tagIds: $tagIds) {
       id
       title
       tags
+      tagObjects {
+        id
+        name
+      }
     }
   }
 `;

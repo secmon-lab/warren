@@ -11,6 +11,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -173,17 +174,14 @@ func (uc *UseCases) showResolveTicketModal(ctx context.Context, _ slack.User, _ 
 	}
 
 	// Fetch available tags
-	var availableTags []string
+	var availableTags []*tag.Tag
 	if uc.tagService != nil {
 		tags, err := uc.tagService.ListAllTags(ctx)
 		if err != nil {
 			// Log error but continue without tags
 			logging.From(ctx).Warn("failed to list tags for resolve modal", "error", err)
 		} else {
-			availableTags = make([]string, 0, len(tags))
-			for _, tag := range tags {
-				availableTags = append(availableTags, string(tag.Name))
-			}
+			availableTags = tags
 		}
 	}
 

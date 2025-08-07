@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -391,9 +392,9 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 		string(slack.BlockIDTicketTags): map[string]slack.BlockAction{
 			string(slack.BlockActionIDTicketTags): {
 				SelectedOptions: []slackSDK.OptionBlockObject{
-					{Value: "existing-tag"},   // Already exists
-					{Value: "false-positive"}, // New tag
-					{Value: "investigation"},  // New tag
+					{Value: existingTag.ID},   // Use existing tag ID, not name
+					{Value: "false-positive"}, // This name will be converted to ID via tag service
+					{Value: "investigation"},  // This name will be converted to ID via tag service
 				},
 			},
 		},
@@ -416,7 +417,7 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 	gt.Value(t, updatedTicket.Reason).Equal("Investigation completed - false positive")
 
 	// Verify tags were assigned to ticket
-	gt.Value(t, len(updatedTicket.Tags)).Equal(3)
+	gt.Value(t, len(updatedTicket.TagIDs)).Equal(3)
 	expectedTags := []string{"existing-tag", "false-positive", "investigation"}
 
 	// Get actual tag names from ticket using compatibility method
@@ -563,7 +564,7 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithoutTags(t *testin
 	gt.Value(t, updatedTicket.Reason).Equal("Working as intended")
 
 	// Verify no tags were assigned (ticket should have empty tags)
-	gt.Value(t, len(updatedTicket.Tags)).Equal(0)
+	gt.Value(t, len(updatedTicket.TagIDs)).Equal(0)
 
 	// Verify no tags were created in repository
 	tags, err := repo.ListAllTags(ctx)
@@ -696,16 +697,7 @@ func TestSlackInteractionViewSubmissionResolveTicket_TagMerging(t *testing.T) {
 	gt.NoError(t, err)
 	tagSvc := tag.New(repo)
 
-	// Create test ticket with existing tags (using tag names, not IDs)
-	initialTags := []string{"existing1", "existing2"}
-	testTicket := ticket.New(ctx, []types.AlertID{}, &slack.Thread{
-		ChannelID: "test-channel",
-		ThreadID:  "test-thread",
-	})
-	testTicket.Tags = initialTags
-	gt.NoError(t, repo.PutTicket(ctx, testTicket))
-
-	// Create tags to ensure they exist
+	// Create tags first to ensure they exist
 	existingTag1 := &tagmodel.Tag{ID: "existing-tag-1", Name: "existing1", Color: "color1"}
 	existingTag2 := &tagmodel.Tag{ID: "existing-tag-2", Name: "existing2", Color: "color2"}
 	newTag1 := &tagmodel.Tag{ID: "new-tag-1", Name: "newtag1", Color: "color3"}
@@ -715,6 +707,18 @@ func TestSlackInteractionViewSubmissionResolveTicket_TagMerging(t *testing.T) {
 	gt.NoError(t, repo.CreateTagWithID(ctx, existingTag2))
 	gt.NoError(t, repo.CreateTagWithID(ctx, newTag1))
 	gt.NoError(t, repo.CreateTagWithID(ctx, newTag2))
+
+	// Create test ticket with existing tag IDs
+	testTicket := ticket.New(ctx, []types.AlertID{}, &slack.Thread{
+		ChannelID: "test-channel",
+		ThreadID:  "test-thread",
+	})
+	if testTicket.TagIDs == nil {
+		testTicket.TagIDs = make(map[string]bool)
+	}
+	testTicket.TagIDs[existingTag1.ID] = true
+	testTicket.TagIDs[existingTag2.ID] = true
+	gt.NoError(t, repo.PutTicket(ctx, testTicket))
 
 	// Setup use case
 	uc := New(
@@ -737,8 +741,8 @@ func TestSlackInteractionViewSubmissionResolveTicket_TagMerging(t *testing.T) {
 			string(slack.BlockActionIDTicketTags): {
 				Type: "checkboxes",
 				SelectedOptions: []slackSDK.OptionBlockObject{
-					{Value: "newtag1"},
-					{Value: "existing1"}, // This should not create duplicates
+					{Value: newTag1.ID},      // Using tag ID instead of name
+					{Value: existingTag1.ID}, // This should not create duplicates
 				},
 			},
 		},
@@ -765,16 +769,174 @@ func TestSlackInteractionViewSubmissionResolveTicket_TagMerging(t *testing.T) {
 	gt.Equal(t, updatedTicket.Status, types.TicketStatusResolved)
 
 	// Verify tags are merged correctly (should have 3 unique tags)
-	gt.Number(t, len(updatedTicket.Tags)).Equal(3)
+	gt.Number(t, len(updatedTicket.TagIDs)).Equal(3)
 
 	// Check that all expected tags are present
 	tagMap := make(map[string]bool)
-	for _, tag := range updatedTicket.Tags {
-		tagMap[tag] = true
+	for tagID := range updatedTicket.TagIDs {
+		tagMap[tagID] = true
 	}
 
-	expectedTags := []string{"existing1", "existing2", "newtag1"}
-	for _, expectedTag := range expectedTags {
-		gt.Value(t, tagMap[expectedTag]).Equal(true)
+	expectedTagIDs := []string{existingTag1.ID, existingTag2.ID, newTag1.ID}
+	for _, expectedTagID := range expectedTagIDs {
+		gt.Value(t, tagMap[expectedTagID]).Equal(true)
 	}
+}
+
+func TestSlackInteractionViewSubmissionResolveTicket_TagDuplicationFix(t *testing.T) {
+	// This test specifically verifies the tag duplication bug fix
+	// It tests that when modal sends tag IDs and existing tags are selected,
+	// no duplicate tags are created in the repository
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	// Setup LLM mock
+	llmMock := &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &mock.LLMSessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{"🎉 Bug fix verified!"},
+					}, nil
+				},
+			}, nil
+		},
+	}
+
+	// Setup Slack client mock
+	slackClientMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slackSDK.MsgOption) (string, string, error) {
+			return channelID, "1234567890.123456", nil
+		},
+		AuthTestFunc: func() (*slackSDK.AuthTestResponse, error) {
+			return &slackSDK.AuthTestResponse{
+				UserID: "test-user",
+			}, nil
+		},
+	}
+
+	// Generate random tag IDs and names to avoid conflicts with other tests
+	randomSuffix := now.UnixNano()
+	existingTag1 := &tagmodel.Tag{
+		ID:          fmt.Sprintf("tag-id-1-%d", randomSuffix),
+		Name:        fmt.Sprintf("security-%d", randomSuffix),
+		Color:       "bg-red-100 text-red-800",
+		Description: "",
+		CreatedAt:   now.Add(-1 * time.Hour),
+		UpdatedAt:   now.Add(-1 * time.Hour),
+		CreatedBy:   "test",
+	}
+	existingTag2 := &tagmodel.Tag{
+		ID:          fmt.Sprintf("tag-id-2-%d", randomSuffix),
+		Name:        fmt.Sprintf("investigation-%d", randomSuffix),
+		Color:       "bg-blue-100 text-blue-800",
+		Description: "",
+		CreatedAt:   now.Add(-1 * time.Hour),
+		UpdatedAt:   now.Add(-1 * time.Hour),
+		CreatedBy:   "test",
+	}
+	gt.NoError(t, repo.CreateTagWithID(ctx, existingTag1))
+	gt.NoError(t, repo.CreateTagWithID(ctx, existingTag2))
+
+	// Create test ticket
+	testTicket := &ticket.Ticket{
+		ID:       types.NewTicketID(),
+		Status:   types.TicketStatusOpen,
+		AlertIDs: []types.AlertID{},
+		SlackThread: &slack.Thread{
+			ChannelID: "C123456",
+			ThreadID:  "1234567890.123456",
+		},
+		Metadata: ticket.Metadata{
+			Title:       "Security Incident",
+			Description: "Test ticket for tag duplication fix",
+		},
+	}
+	gt.NoError(t, repo.PutTicket(ctx, *testTicket))
+
+	// Create slack service and tag service
+	slackSvc, err := slackservice.New(slackClientMock, "C123456")
+	gt.NoError(t, err)
+	tagSvc := tagservice.New(repo)
+
+	// Create usecase
+	uc := New(
+		WithRepository(repo),
+		WithSlackService(slackSvc),
+		WithLLMClient(llmMock),
+		WithTagService(tagSvc),
+	)
+
+	// Count tags before resolve operation
+	tagsBefore, err := repo.ListAllTags(ctx)
+	gt.NoError(t, err)
+	gt.Array(t, tagsBefore).Length(2) // Should have exactly 2 tags
+
+	// Prepare test input values - modal sends tag IDs, not names
+	values := slack.StateValue{
+		string(slack.BlockIDTicketConclusion): map[string]slack.BlockAction{
+			string(slack.BlockActionIDTicketConclusion): {
+				SelectedOption: slackSDK.OptionBlockObject{Value: string(types.AlertConclusionFalsePositive)},
+			},
+		},
+		string(slack.BlockIDTicketComment): map[string]slack.BlockAction{
+			string(slack.BlockActionIDTicketComment): {Value: "Investigation completed - tag duplication test"},
+		},
+		string(slack.BlockIDTicketTags): map[string]slack.BlockAction{
+			string(slack.BlockActionIDTicketTags): {
+				SelectedOptions: []slackSDK.OptionBlockObject{
+					{Value: existingTag1.ID}, // Modal now sends tag ID, not name
+					{Value: existingTag2.ID}, // Modal now sends tag ID, not name
+				},
+			},
+		},
+	}
+
+	user := slack.User{
+		ID:   "U123456",
+		Name: "test_user",
+	}
+
+	// Execute resolve operation
+	err = uc.handleSlackInteractionViewSubmissionResolveTicket(ctx, user, string(testTicket.ID), values)
+	gt.NoError(t, err)
+
+	// Verify ticket was resolved
+	updatedTicket, err := repo.GetTicket(ctx, testTicket.ID)
+	gt.NoError(t, err)
+	gt.Value(t, updatedTicket.Status).Equal(types.TicketStatusResolved)
+
+	// Verify tags were assigned to ticket correctly
+	gt.Value(t, len(updatedTicket.TagIDs)).Equal(2)
+	gt.Value(t, updatedTicket.TagIDs[existingTag1.ID]).Equal(true)
+	gt.Value(t, updatedTicket.TagIDs[existingTag2.ID]).Equal(true)
+
+	// CRITICAL: Verify no duplicate tags were created in repository
+	tagsAfter, err := repo.ListAllTags(ctx)
+	gt.NoError(t, err)
+	gt.Array(t, tagsAfter).Length(2) // Should still have exactly 2 tags, no duplicates
+
+	// Verify the existing tags are unchanged
+	tag1After, err := repo.GetTagByID(ctx, existingTag1.ID)
+	gt.NoError(t, err)
+	gt.NotNil(t, tag1After)
+	gt.Value(t, tag1After.Name).Equal(existingTag1.Name)
+	gt.Value(t, tag1After.CreatedAt).Equal(existingTag1.CreatedAt)
+
+	tag2After, err := repo.GetTagByID(ctx, existingTag2.ID)
+	gt.NoError(t, err)
+	gt.NotNil(t, tag2After)
+	gt.Value(t, tag2After.Name).Equal(existingTag2.Name)
+	gt.Value(t, tag2After.CreatedAt).Equal(existingTag2.CreatedAt)
+
+	// Verify tag names are preserved
+	tagNames := make([]string, len(tagsAfter))
+	for i, tag := range tagsAfter {
+		tagNames[i] = tag.Name
+	}
+	gt.Value(t, containsString(tagNames, existingTag1.Name)).Equal(true)
+	gt.Value(t, containsString(tagNames, existingTag2.Name)).Equal(true)
 }

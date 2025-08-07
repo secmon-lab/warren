@@ -18,8 +18,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { TagSelector } from "@/components/ui/tag-selector";
 
-import { GET_ALERT, CREATE_TICKET_FROM_ALERTS, GET_SIMILAR_TICKETS_FOR_ALERT, BIND_ALERTS_TO_TICKET, UPDATE_ALERT_TAGS } from "@/lib/graphql/queries";
-import { Alert, Ticket, TICKET_STATUS_COLORS, TICKET_STATUS_LABELS, TicketStatus } from "@/lib/types";
+import { GET_ALERT, CREATE_TICKET_FROM_ALERTS, GET_SIMILAR_TICKETS_FOR_ALERT, BIND_ALERTS_TO_TICKET, UPDATE_ALERT_TAGS, GET_TAGS } from "@/lib/graphql/queries";
+import { Alert, Ticket, TICKET_STATUS_COLORS, TICKET_STATUS_LABELS, TicketStatus, TagMetadata } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
 import {
   ChevronLeft,
@@ -60,6 +60,9 @@ export default function AlertDetailPage() {
 
   const alert: Alert = alertData?.alert;
 
+  const { data: tagsData } = useQuery(GET_TAGS);
+  const allTags: TagMetadata[] = tagsData?.tags || [];
+
   // Set initial tags when alert data loads
   useEffect(() => {
     if (alert?.tags) {
@@ -87,11 +90,21 @@ export default function AlertDetailPage() {
     if (!alert?.id) return;
     
     setTags(newTags);
+    
+    // Convert tag names to tag IDs
+    const tagIds: string[] = [];
+    for (const tagName of newTags) {
+      const tag = allTags.find(t => t.name === tagName);
+      if (tag) {
+        tagIds.push(tag.id);
+      }
+    }
+    
     try {
       await updateAlertTags({
         variables: {
           alertId: alert.id,
-          tags: newTags,
+          tagIds: tagIds,
         },
       });
     } catch (error) {

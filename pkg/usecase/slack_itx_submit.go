@@ -11,7 +11,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -301,44 +300,55 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 				"selected_option", action.SelectedOption,
 			)
 
-			var selectedTags []string
+			var selectedTagIDs []string
 
 			// Handle checkbox and multi-select formats
 			if len(action.SelectedOptions) > 0 {
 				// Multi-select or checkbox with multiple selections
-				selectedTags = make([]string, 0, len(action.SelectedOptions))
+				selectedTagIDs = make([]string, 0, len(action.SelectedOptions))
 				for _, option := range action.SelectedOptions {
-					selectedTags = append(selectedTags, option.Value)
+					selectedTagIDs = append(selectedTagIDs, option.Value)
 				}
 			}
 
-			logger.Debug("extracted tag names", "tags", selectedTags)
+			logger.Debug("extracted values from modal", "values", selectedTagIDs)
 
-			// Convert tag names to IDs and update ticket tags
-			logger.Debug("checking tag service", "tagService", uc.tagService != nil, "selectedTagsCount", len(selectedTags))
-			if len(selectedTags) > 0 && uc.tagService != nil {
-				logger.Debug("converting tag names to IDs", "tags", selectedTags)
-				tags, err := uc.tagService.ConvertNamesToTags(ctx, selectedTags)
-				if err != nil {
-					logger.Warn("failed to convert tag names to IDs", "error", err, "tags", selectedTags)
-					// Continue with resolve even if tag conversion fails
-				} else {
-					logger.Debug("successfully converted tag names to IDs", "tags", tags)
-					// Merge existing tags with new tags
-					existingTags := target.Tags
-					logger.Debug("existing tags", "existingTags", existingTags)
+			// Process values - could be tag IDs (existing tags) or tag names (new tags to create)
+			if len(selectedTagIDs) > 0 && uc.tagService != nil {
+				logger.Debug("processing tag values", "values", selectedTagIDs)
 
-					// Merge existing tags with new tags (tags are already strings)
-					target.Tags = tag.MergeTags(existingTags, tags)
-					logger.Debug("target ticket updated with merged tags", "target.Tags", target.Tags)
+				// Initialize TagIDs if needed
+				if target.TagIDs == nil {
+					target.TagIDs = make(map[string]bool)
 				}
+
+				// For each value, check if it's a valid tag ID first, then try as tag name
+				for _, value := range selectedTagIDs {
+					// First try to find by ID (for existing tags sent as IDs)
+					if tag, err := uc.repository.GetTagByID(ctx, value); err == nil && tag != nil {
+						target.TagIDs[tag.ID] = true
+						logger.Debug("found existing tag by ID", "tag_id", tag.ID, "tag_name", tag.Name)
+					} else {
+						// If not found by ID, try to convert as tag name (for new tags or legacy names)
+						logger.Debug("value not found as tag ID, trying as tag name", "value", value)
+						tags, err := uc.tagService.ConvertNamesToTags(ctx, []string{value})
+						if err != nil {
+							logger.Warn("failed to convert tag name to ID", "error", err, "tag_name", value)
+							// Continue with other tags even if one fails
+						} else if len(tags) > 0 {
+							target.TagIDs[tags[0]] = true
+							logger.Debug("successfully converted tag name to ID", "tag_name", value, "tag_id", tags[0])
+						}
+					}
+				}
+				logger.Debug("target ticket updated with tag IDs", "TagIDs", target.TagIDs)
 			} else {
-				logger.Debug("skipping tag update", "hasSelectedTags", len(selectedTags) > 0, "hasTagService", uc.tagService != nil)
+				logger.Debug("no tag values selected or tag service unavailable")
 			}
 		}
 	}
 
-	logger.Debug("saving ticket to repository", "ticketID", target.ID, "target.Tags", target.Tags, "target.Status", target.Status)
+	logger.Debug("saving ticket to repository", "ticketID", target.ID, "TagIDs", target.TagIDs, "target.Status", target.Status)
 	if err := uc.repository.PutTicket(ctx, *target); err != nil {
 		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID))
 	}

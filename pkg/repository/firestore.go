@@ -1370,7 +1370,7 @@ func (r *Firestore) RemoveTagFromAllTickets(ctx context.Context, name string) er
 // New ID-based tag management methods
 
 func (r *Firestore) GetTagByID(ctx context.Context, tagID string) (*tag.Tag, error) {
-	doc, err := r.db.Collection("tags").Doc(tagID).Get(ctx)
+	doc, err := r.db.Collection(collectionTags).Doc(tagID).Get(ctx)
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
 			return nil, nil
@@ -1394,7 +1394,7 @@ func (r *Firestore) GetTagsByIDs(ctx context.Context, tagIDs []string) ([]*tag.T
 	// Convert tag IDs to document references
 	refs := make([]*firestore.DocumentRef, len(tagIDs))
 	for i, tagID := range tagIDs {
-		refs[i] = r.db.Collection("tags").Doc(tagID)
+		refs[i] = r.db.Collection(collectionTags).Doc(tagID)
 	}
 
 	// Batch get documents
@@ -1441,7 +1441,7 @@ func (r *Firestore) CreateTagWithID(ctx context.Context, tag *tag.Tag) error {
 	tag.UpdatedAt = now
 
 	// Create the tag document
-	_, err = r.db.Collection("tags").Doc(tag.ID).Set(ctx, tag)
+	_, err = r.db.Collection(collectionTags).Doc(tag.ID).Set(ctx, tag)
 	if err != nil {
 		return goerr.Wrap(err, "failed to create tag", goerr.V("tagID", tag.ID))
 	}
@@ -1458,7 +1458,7 @@ func (r *Firestore) UpdateTag(ctx context.Context, tag *tag.Tag) error {
 	tag.UpdatedAt = clock.Now(ctx)
 
 	// Update the tag document
-	_, err := r.db.Collection("tags").Doc(tag.ID).Set(ctx, tag)
+	_, err := r.db.Collection(collectionTags).Doc(tag.ID).Set(ctx, tag)
 	if err != nil {
 		return goerr.Wrap(err, "failed to update tag", goerr.V("tagID", tag.ID))
 	}
@@ -1468,7 +1468,7 @@ func (r *Firestore) UpdateTag(ctx context.Context, tag *tag.Tag) error {
 
 func (r *Firestore) DeleteTagByID(ctx context.Context, tagID string) error {
 	// Delete the tag document
-	_, err := r.db.Collection("tags").Doc(tagID).Delete(ctx)
+	_, err := r.db.Collection(collectionTags).Doc(tagID).Delete(ctx)
 	if err != nil {
 		return goerr.Wrap(err, "failed to delete tag", goerr.V("tagID", tagID))
 	}
@@ -1477,8 +1477,8 @@ func (r *Firestore) DeleteTagByID(ctx context.Context, tagID string) error {
 }
 
 func (r *Firestore) RemoveTagIDFromAllAlerts(ctx context.Context, tagID string) error {
-	// Query all alerts that have this tag ID
-	iter := r.db.Collection("alerts").Where("tags."+tagID, "==", true).Documents(ctx)
+	// Get all alerts and filter in memory (more reliable than nested map queries)
+	iter := r.db.Collection(collectionAlerts).Documents(ctx)
 	defer iter.Stop()
 
 	bw := r.db.BulkWriter(ctx)
@@ -1493,14 +1493,25 @@ func (r *Firestore) RemoveTagIDFromAllAlerts(ctx context.Context, tagID string) 
 			return goerr.Wrap(err, "failed to iterate alerts")
 		}
 
-		// Remove the tag ID from the document
-		job, err := bw.Update(doc.Ref, []firestore.Update{
-			{Path: "tags." + tagID, Value: firestore.Delete},
-		})
-		if err != nil {
-			return goerr.Wrap(err, "failed to update alert", goerr.V("alertID", doc.Ref.ID))
+		// Parse the alert document to check if it has the tag
+		var alertData map[string]interface{}
+		if err := doc.DataTo(&alertData); err != nil {
+			return goerr.Wrap(err, "failed to parse alert document", goerr.V("alertID", doc.Ref.ID))
 		}
-		jobs = append(jobs, job)
+
+		// Check if this alert has the tag ID
+		if tagIDs, ok := alertData["TagIDs"].(map[string]interface{}); ok {
+			if _, hasTag := tagIDs[tagID]; hasTag {
+				// Remove the tag ID from the document
+				job, err := bw.Update(doc.Ref, []firestore.Update{
+					{Path: "TagIDs." + tagID, Value: firestore.Delete},
+				})
+				if err != nil {
+					return goerr.Wrap(err, "failed to update alert", goerr.V("alertID", doc.Ref.ID))
+				}
+				jobs = append(jobs, job)
+			}
+		}
 	}
 
 	bw.End()
@@ -1516,8 +1527,8 @@ func (r *Firestore) RemoveTagIDFromAllAlerts(ctx context.Context, tagID string) 
 }
 
 func (r *Firestore) RemoveTagIDFromAllTickets(ctx context.Context, tagID string) error {
-	// Query all tickets that have this tag ID
-	iter := r.db.Collection("tickets").Where("tags."+tagID, "==", true).Documents(ctx)
+	// Get all tickets and filter in memory (more reliable than nested map queries)
+	iter := r.db.Collection(collectionTickets).Documents(ctx)
 	defer iter.Stop()
 
 	bw := r.db.BulkWriter(ctx)
@@ -1532,14 +1543,25 @@ func (r *Firestore) RemoveTagIDFromAllTickets(ctx context.Context, tagID string)
 			return goerr.Wrap(err, "failed to iterate tickets")
 		}
 
-		// Remove the tag ID from the document
-		job, err := bw.Update(doc.Ref, []firestore.Update{
-			{Path: "tags." + tagID, Value: firestore.Delete},
-		})
-		if err != nil {
-			return goerr.Wrap(err, "failed to update ticket", goerr.V("ticketID", doc.Ref.ID))
+		// Parse the ticket document to check if it has the tag
+		var ticketData map[string]interface{}
+		if err := doc.DataTo(&ticketData); err != nil {
+			return goerr.Wrap(err, "failed to parse ticket document", goerr.V("ticketID", doc.Ref.ID))
 		}
-		jobs = append(jobs, job)
+
+		// Check if this ticket has the tag ID
+		if tagIDs, ok := ticketData["TagIDs"].(map[string]interface{}); ok {
+			if _, hasTag := tagIDs[tagID]; hasTag {
+				// Remove the tag ID from the document
+				job, err := bw.Update(doc.Ref, []firestore.Update{
+					{Path: "TagIDs." + tagID, Value: firestore.Delete},
+				})
+				if err != nil {
+					return goerr.Wrap(err, "failed to update ticket", goerr.V("ticketID", doc.Ref.ID))
+				}
+				jobs = append(jobs, job)
+			}
+		}
 	}
 
 	bw.End()
@@ -1555,7 +1577,7 @@ func (r *Firestore) RemoveTagIDFromAllTickets(ctx context.Context, tagID string)
 }
 
 func (r *Firestore) GetTagByName(ctx context.Context, name string) (*tag.Tag, error) {
-	iter := r.db.Collection("tags").Where("name", "==", name).Limit(1).Documents(ctx)
+	iter := r.db.Collection(collectionTags).Where("name", "==", name).Limit(1).Documents(ctx)
 	defer iter.Stop()
 
 	doc, err := iter.Next()
@@ -1575,7 +1597,7 @@ func (r *Firestore) GetTagByName(ctx context.Context, name string) (*tag.Tag, er
 }
 
 func (r *Firestore) IsTagNameExists(ctx context.Context, name string) (bool, error) {
-	iter := r.db.Collection("tags").Where("name", "==", name).Limit(1).Documents(ctx)
+	iter := r.db.Collection(collectionTags).Where("name", "==", name).Limit(1).Documents(ctx)
 	defer iter.Stop()
 
 	_, err := iter.Next()
@@ -1589,8 +1611,86 @@ func (r *Firestore) IsTagNameExists(ctx context.Context, name string) (bool, err
 	return true, nil
 }
 
+// GetOrCreateTagByName atomically gets an existing tag or creates a new one
+func (r *Firestore) GetOrCreateTagByName(ctx context.Context, name, description, color, createdBy string) (*tag.Tag, error) {
+	// First, try to get existing tag by name
+	existingTag, err := r.GetTagByName(ctx, name)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to check for existing tag", goerr.V("name", name))
+	}
+	if existingTag != nil {
+		return existingTag, nil
+	}
+
+	// Tag doesn't exist, create it
+	// Generate unique ID with collision retry
+	var tagID string
+	maxRetries := 10
+	for i := 0; i < maxRetries; i++ {
+		tagID = tag.NewID()
+		existing, err := r.GetTagByID(ctx, tagID)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to check tag ID collision")
+		}
+		if existing == nil {
+			break // No collision
+		}
+		if i == maxRetries-1 {
+			return nil, goerr.New("failed to generate unique tag ID after retries")
+		}
+	}
+
+	// Use provided color or generate one
+	if color == "" {
+		color = tag.GenerateColor(name)
+	}
+
+	// Create the new tag
+	now := time.Now()
+	newTag := &tag.Tag{
+		ID:          tagID,
+		Name:        name,
+		Description: description,
+		Color:       color,
+		CreatedBy:   createdBy,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	// Use Firestore transaction to handle concurrent creation attempts
+	err = r.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		// Check again if tag exists (within transaction)
+		iter := r.db.Collection(collectionTags).Where("name", "==", name).Limit(1).Documents(ctx)
+		defer iter.Stop()
+
+		doc, err := iter.Next()
+		if err != iterator.Done {
+			if err != nil {
+				return goerr.Wrap(err, "failed to check tag existence in transaction")
+			}
+			// Tag already exists, read it
+			var existingData tag.Tag
+			if err := doc.DataTo(&existingData); err != nil {
+				return goerr.Wrap(err, "failed to parse existing tag data")
+			}
+			*newTag = existingData // Update newTag with existing data
+			return nil
+		}
+
+		// Tag still doesn't exist, create it
+		docRef := r.db.Collection(collectionTags).Doc(tagID)
+		return tx.Set(docRef, newTag)
+	})
+
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to create tag", goerr.V("name", name))
+	}
+
+	return newTag, nil
+}
+
 func (r *Firestore) ListAllTags(ctx context.Context) ([]*tag.Tag, error) {
-	iter := r.db.Collection("tags").Documents(ctx)
+	iter := r.db.Collection(collectionTags).Documents(ctx)
 	defer iter.Stop()
 
 	var tags []*tag.Tag

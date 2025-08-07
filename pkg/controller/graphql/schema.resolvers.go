@@ -104,14 +104,34 @@ func (r *alertResolver) Ticket(ctx context.Context, obj *alert.Alert) (*ticket.T
 	return r.repo.GetTicket(ctx, obj.TicketID)
 }
 
-// Tags is the resolver for the tags field.
-func (r *alertResolver) Tags(ctx context.Context, obj *alert.Alert) ([]string, error) {
-	if r.uc == nil || len(obj.Tags) == 0 {
-		return []string{}, nil
+// TagObjects is the resolver for the tagObjects field.
+func (r *alertResolver) TagObjects(ctx context.Context, obj *alert.Alert) ([]*graphql1.TagObject, error) {
+	if r.uc == nil || len(obj.TagIDs) == 0 {
+		return []*graphql1.TagObject{}, nil
 	}
 
-	// Use the compatibility method to get tag names
-	return obj.GetTagNames(ctx, r.createTagGetter())
+	// Get tag IDs as slice
+	tagIDSlice := make([]string, 0, len(obj.TagIDs))
+	for tagID := range obj.TagIDs {
+		tagIDSlice = append(tagIDSlice, tagID)
+	}
+
+	// Get tag metadata using tag getter
+	tags, err := r.createTagGetter()(ctx, tagIDSlice)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to GraphQL TagObject
+	tagObjects := make([]*graphql1.TagObject, 0, len(tags))
+	for _, tag := range tags {
+		tagObjects = append(tagObjects, &graphql1.TagObject{
+			ID:   tag.ID,
+			Name: tag.Name,
+		})
+	}
+
+	return tagObjects, nil
 }
 
 // ID is the resolver for the id field.
@@ -358,12 +378,12 @@ func (r *mutationResolver) BindAlertsToTicket(ctx context.Context, ticketID stri
 }
 
 // UpdateAlertTags is the resolver for the updateAlertTags field.
-func (r *mutationResolver) UpdateAlertTags(ctx context.Context, alertID string, tags []string) (*alert.Alert, error) {
+func (r *mutationResolver) UpdateAlertTags(ctx context.Context, alertID string, tagIds []string) (*alert.Alert, error) {
 	if r.uc.TagUC == nil {
 		return nil, goerr.New("tag service not configured")
 	}
 
-	a, err := r.uc.TagUC.UpdateAlertTags(ctx, types.AlertID(alertID), tags)
+	a, err := r.uc.TagUC.UpdateAlertTagsByID(ctx, types.AlertID(alertID), tagIds)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update alert tags")
 	}
@@ -372,12 +392,12 @@ func (r *mutationResolver) UpdateAlertTags(ctx context.Context, alertID string, 
 }
 
 // UpdateTicketTags is the resolver for the updateTicketTags field.
-func (r *mutationResolver) UpdateTicketTags(ctx context.Context, ticketID string, tags []string) (*ticket.Ticket, error) {
+func (r *mutationResolver) UpdateTicketTags(ctx context.Context, ticketID string, tagIds []string) (*ticket.Ticket, error) {
 	if r.uc.TagUC == nil {
 		return nil, goerr.New("tag service not configured")
 	}
 
-	t, err := r.uc.TagUC.UpdateTicketTags(ctx, types.TicketID(ticketID), tags)
+	t, err := r.uc.TagUC.UpdateTicketTagsByID(ctx, types.TicketID(ticketID), tagIds)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to update ticket tags")
 	}
@@ -412,12 +432,12 @@ func (r *mutationResolver) CreateTag(ctx context.Context, name string) (*graphql
 }
 
 // DeleteTag is the resolver for the deleteTag field.
-func (r *mutationResolver) DeleteTag(ctx context.Context, name string) (bool, error) {
+func (r *mutationResolver) DeleteTag(ctx context.Context, id string) (bool, error) {
 	if r.uc.TagUC == nil {
 		return false, goerr.New("tag service not configured")
 	}
 
-	err := r.uc.TagUC.DeleteTag(ctx, name)
+	err := r.uc.TagUC.DeleteTagByID(ctx, id)
 	if err != nil {
 		return false, goerr.Wrap(err, "failed to delete tag")
 	}
@@ -1097,12 +1117,42 @@ func (r *ticketResolver) UpdatedAt(ctx context.Context, obj *ticket.Ticket) (str
 
 // Tags is the resolver for the tags field.
 func (r *ticketResolver) Tags(ctx context.Context, obj *ticket.Ticket) ([]string, error) {
-	if r.uc == nil || len(obj.Tags) == 0 {
+	if r.uc == nil || len(obj.TagIDs) == 0 {
 		return []string{}, nil
 	}
 
 	// Use the compatibility method to get tag names
 	return obj.GetTagNames(ctx, r.createTagGetter())
+}
+
+// TagObjects is the resolver for the tagObjects field.
+func (r *ticketResolver) TagObjects(ctx context.Context, obj *ticket.Ticket) ([]*graphql1.TagObject, error) {
+	if r.uc == nil || len(obj.TagIDs) == 0 {
+		return []*graphql1.TagObject{}, nil
+	}
+
+	// Get tag IDs as slice
+	tagIDSlice := make([]string, 0, len(obj.TagIDs))
+	for tagID := range obj.TagIDs {
+		tagIDSlice = append(tagIDSlice, tagID)
+	}
+
+	// Get tag metadata using tag getter
+	tags, err := r.createTagGetter()(ctx, tagIDSlice)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to GraphQL TagObject
+	tagObjects := make([]*graphql1.TagObject, 0, len(tags))
+	for _, tag := range tags {
+		tagObjects = append(tagObjects, &graphql1.TagObject{
+			ID:   tag.ID,
+			Name: tag.Name,
+		})
+	}
+
+	return tagObjects, nil
 }
 
 // Activity returns ActivityResolver implementation.

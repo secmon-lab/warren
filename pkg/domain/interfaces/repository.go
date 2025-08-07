@@ -89,4 +89,5 @@ type Repository interface {
 	// For tag name lookup (compatibility)
 	GetTagByName(ctx context.Context, name string) (*tag.Tag, error)
 	IsTagNameExists(ctx context.Context, name string) (bool, error)
+	GetOrCreateTagByName(ctx context.Context, name, description, color, createdBy string) (*tag.Tag, error)
 }

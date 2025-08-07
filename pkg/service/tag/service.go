@@ -208,9 +208,7 @@ func (s *Service) DeleteTagByID(ctx context.Context, tagID string) error {
 	return nil
 }
 
-func (s *Service) UpdateAlertTagsByID(ctx context.Context, alertID types.AlertID, tags []string) (*alert.Alert, error) {
-	// Tags are now stored as names directly, no validation needed
-
+func (s *Service) UpdateAlertTagsByID(ctx context.Context, alertID types.AlertID, tagIDs []string) (*alert.Alert, error) {
 	// Get the alert
 	a, err := s.repo.GetAlert(ctx, alertID)
 	if err != nil {
@@ -220,8 +218,13 @@ func (s *Service) UpdateAlertTagsByID(ctx context.Context, alertID types.AlertID
 		return nil, goerr.New("alert not found", goerr.V("alert_id", alertID))
 	}
 
-	// Merge existing tags with new tags
-	a.Tags = tag.MergeTags(a.Tags, tags)
+	// Replace existing tag IDs with new ones
+	a.TagIDs = make(map[string]bool)
+	for _, tagID := range tagIDs {
+		if tagID != "" {
+			a.TagIDs[tagID] = true
+		}
+	}
 
 	// Save the alert
 	if err := s.repo.PutAlert(ctx, *a); err != nil {
@@ -231,9 +234,7 @@ func (s *Service) UpdateAlertTagsByID(ctx context.Context, alertID types.AlertID
 	return a, nil
 }
 
-func (s *Service) UpdateTicketTagsByID(ctx context.Context, ticketID types.TicketID, tags []string) (*ticket.Ticket, error) {
-	// Tags are now stored as names directly, no validation needed
-
+func (s *Service) UpdateTicketTagsByID(ctx context.Context, ticketID types.TicketID, tagIDs []string) (*ticket.Ticket, error) {
 	// Get the ticket
 	t, err := s.repo.GetTicket(ctx, ticketID)
 	if err != nil {
@@ -243,8 +244,13 @@ func (s *Service) UpdateTicketTagsByID(ctx context.Context, ticketID types.Ticke
 		return nil, goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
 	}
 
-	// Merge existing tags with new tags
-	t.Tags = tag.MergeTags(t.Tags, tags)
+	// Replace existing tag IDs with new ones
+	t.TagIDs = make(map[string]bool)
+	for _, tagID := range tagIDs {
+		if tagID != "" {
+			t.TagIDs[tagID] = true
+		}
+	}
 
 	// Save the ticket
 	if err := s.repo.PutTicket(ctx, *t); err != nil {
@@ -256,7 +262,7 @@ func (s *Service) UpdateTicketTagsByID(ctx context.Context, ticketID types.Ticke
 
 // Helper methods for tag name ↔ ID conversion
 
-// ConvertNamesToTags converts tag names to tag strings, creating tags if they don't exist
+// ConvertNamesToTags converts tag names to tag IDs, creating tags if they don't exist
 func (s *Service) ConvertNamesToTags(ctx context.Context, tagNames []string) ([]string, error) {
 	if len(tagNames) == 0 {
 		return []string{}, nil
@@ -269,25 +275,29 @@ func (s *Service) ConvertNamesToTags(ctx context.Context, tagNames []string) ([]
 			continue
 		}
 
-		// Try to get existing tag by name
-		existingTag, err := s.repo.GetTagByName(ctx, name)
+		// Use retry logic to handle race conditions during tag creation
+		tagID, err := s.getOrCreateTagByName(ctx, name)
 		if err != nil {
-			return nil, goerr.Wrap(err, "failed to check existing tag", goerr.V("name", name))
+			return nil, goerr.Wrap(err, "failed to get or create tag", goerr.V("name", name))
 		}
 
-		if existingTag == nil {
-			// Tag doesn't exist, create it
-			_, err := s.CreateTagWithCustomColor(ctx, name, "", "", "")
-			if err != nil {
-				return nil, goerr.Wrap(err, "failed to create new tag", goerr.V("name", name))
-			}
-		}
-
-		// Add the tag name to result
-		result = append(result, name)
+		// Add the tag ID to result
+		result = append(result, tagID)
 	}
 
 	return result, nil
+}
+
+// getOrCreateTagByName atomically gets an existing tag or creates a new one
+// This method handles race conditions where multiple goroutines try to create the same tag
+func (s *Service) getOrCreateTagByName(ctx context.Context, name string) (string, error) {
+	// Use the repository's atomic get-or-create method
+	tag, err := s.repo.GetOrCreateTagByName(ctx, name, "", "", "")
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to get or create tag", goerr.V("name", name))
+	}
+
+	return tag.ID, nil
 }
 
 // UpdateAlertTagsByName provides compatibility for name-based tag updates
