@@ -172,7 +172,7 @@ type Mutation {
   updateAlertTags(alertId: ID!, tagIds: [ID!]!): Alert!
   updateTicketTags(ticketId: ID!, tagIds: [ID!]!): Ticket!
   createTag(name: String!): TagMetadata!
-  deleteTag(name: String!): Boolean!
+  deleteTag(id: ID!): Boolean!
   updateTag(input: UpdateTagInput!): TagMetadata!
 }
 

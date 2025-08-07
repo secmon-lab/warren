@@ -46,13 +46,26 @@ func (u *TagUseCase) CreateTag(ctx context.Context, name string) (*tagmodel.Tag,
 	return tag, nil
 }
 
-// DeleteTag deletes a tag
+// DeleteTag deletes a tag by name (deprecated, use DeleteTagByID)
 func (u *TagUseCase) DeleteTag(ctx context.Context, name string) error {
 	if name == "" {
 		return goerr.New("tag name cannot be empty")
 	}
 
 	if err := u.tagService.DeleteTag(ctx, name); err != nil {
+		return goerr.Wrap(err, "failed to delete tag")
+	}
+
+	return nil
+}
+
+// DeleteTagByID deletes a tag by ID
+func (u *TagUseCase) DeleteTagByID(ctx context.Context, tagID string) error {
+	if tagID == "" {
+		return goerr.New("tag ID cannot be empty")
+	}
+
+	if err := u.tagService.DeleteTagByID(ctx, tagID); err != nil {
 		return goerr.Wrap(err, "failed to delete tag")
 	}
 

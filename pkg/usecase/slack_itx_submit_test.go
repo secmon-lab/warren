@@ -392,7 +392,7 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 		string(slack.BlockIDTicketTags): map[string]slack.BlockAction{
 			string(slack.BlockActionIDTicketTags): {
 				SelectedOptions: []slackSDK.OptionBlockObject{
-					{Value: existingTag.ID}, // Use existing tag ID, not name
+					{Value: existingTag.ID},   // Use existing tag ID, not name
 					{Value: "false-positive"}, // This name will be converted to ID via tag service
 					{Value: "investigation"},  // This name will be converted to ID via tag service
 				},
@@ -741,7 +741,7 @@ func TestSlackInteractionViewSubmissionResolveTicket_TagMerging(t *testing.T) {
 			string(slack.BlockActionIDTicketTags): {
 				Type: "checkboxes",
 				SelectedOptions: []slackSDK.OptionBlockObject{
-					{Value: newTag1.ID},        // Using tag ID instead of name
+					{Value: newTag1.ID},      // Using tag ID instead of name
 					{Value: existingTag1.ID}, // This should not create duplicates
 				},
 			},

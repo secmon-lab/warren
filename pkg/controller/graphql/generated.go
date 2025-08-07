@@ -156,7 +156,7 @@ type ComplexityRoot struct {
 		CreateTag                   func(childComplexity int, name string) int
 		CreateTicket                func(childComplexity int, title string, description string, isTest *bool) int
 		CreateTicketFromAlerts      func(childComplexity int, alertIds []string, title *string, description *string) int
-		DeleteTag                   func(childComplexity int, name string) int
+		DeleteTag                   func(childComplexity int, id string) int
 		UpdateAlertTags             func(childComplexity int, alertID string, tagIds []string) int
 		UpdateMultipleTicketsStatus func(childComplexity int, ids []string, status string) int
 		UpdateTag                   func(childComplexity int, input graphql1.UpdateTagInput) int
@@ -269,7 +269,7 @@ type MutationResolver interface {
 	UpdateAlertTags(ctx context.Context, alertID string, tagIds []string) (*alert.Alert, error)
 	UpdateTicketTags(ctx context.Context, ticketID string, tagIds []string) (*ticket.Ticket, error)
 	CreateTag(ctx context.Context, name string) (*graphql1.TagMetadata, error)
-	DeleteTag(ctx context.Context, name string) (bool, error)
+	DeleteTag(ctx context.Context, id string) (bool, error)
 	UpdateTag(ctx context.Context, input graphql1.UpdateTagInput) (*graphql1.TagMetadata, error)
 }
 type QueryResolver interface {
@@ -799,7 +799,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.DeleteTag(childComplexity, args["name"].(string)), true
+		return e.complexity.Mutation.DeleteTag(childComplexity, args["id"].(string)), true
 
 	case "Mutation.updateAlertTags":
 		if e.complexity.Mutation.UpdateAlertTags == nil {
@@ -1554,7 +1554,7 @@ type Mutation {
   updateAlertTags(alertId: ID!, tagIds: [ID!]!): Alert!
   updateTicketTags(ticketId: ID!, tagIds: [ID!]!): Ticket!
   createTag(name: String!): TagMetadata!
-  deleteTag(name: String!): Boolean!
+  deleteTag(id: ID!): Boolean!
   updateTag(input: UpdateTagInput!): TagMetadata!
 }
 
@@ -1807,25 +1807,25 @@ func (ec *executionContext) field_Mutation_createTicket_argsIsTest(
 func (ec *executionContext) field_Mutation_deleteTag_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Mutation_deleteTag_argsName(ctx, rawArgs)
+	arg0, err := ec.field_Mutation_deleteTag_argsID(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
-	args["name"] = arg0
+	args["id"] = arg0
 	return args, nil
 }
-func (ec *executionContext) field_Mutation_deleteTag_argsName(
+func (ec *executionContext) field_Mutation_deleteTag_argsID(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (string, error) {
-	if _, ok := rawArgs["name"]; !ok {
+	if _, ok := rawArgs["id"]; !ok {
 		var zeroVal string
 		return zeroVal, nil
 	}
 
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
-	if tmp, ok := rawArgs["name"]; ok {
-		return ec.unmarshalNString2string(ctx, tmp)
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+	if tmp, ok := rawArgs["id"]; ok {
+		return ec.unmarshalNID2string(ctx, tmp)
 	}
 
 	var zeroVal string
@@ -7128,7 +7128,7 @@ func (ec *executionContext) _Mutation_deleteTag(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().DeleteTag(rctx, fc.Args["name"].(string))
+		return ec.resolvers.Mutation().DeleteTag(rctx, fc.Args["id"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

@@ -426,7 +426,7 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 			for _, tag := range availableTags {
 				checkboxOptions = append(checkboxOptions,
 					slack.NewOptionBlockObject(
-						tag.ID,   // Use Tag ID as value
+						tag.ID, // Use Tag ID as value
 						slack.NewTextBlockObject(slack.PlainTextType, tag.Name, false, false), // Use Tag name for display
 						nil,
 					),
@@ -451,7 +451,7 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 			for _, tag := range availableTags {
 				tagOptions = append(tagOptions,
 					slack.NewOptionBlockObject(
-						tag.ID,   // Use Tag ID as value
+						tag.ID, // Use Tag ID as value
 						slack.NewTextBlockObject(slack.PlainTextType, tag.Name, false, false), // Use Tag name for display
 						nil,
 					),

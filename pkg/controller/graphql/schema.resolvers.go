@@ -432,12 +432,12 @@ func (r *mutationResolver) CreateTag(ctx context.Context, name string) (*graphql
 }
 
 // DeleteTag is the resolver for the deleteTag field.
-func (r *mutationResolver) DeleteTag(ctx context.Context, name string) (bool, error) {
+func (r *mutationResolver) DeleteTag(ctx context.Context, id string) (bool, error) {
 	if r.uc.TagUC == nil {
 		return false, goerr.New("tag service not configured")
 	}
 
-	err := r.uc.TagUC.DeleteTag(ctx, name)
+	err := r.uc.TagUC.DeleteTagByID(ctx, id)
 	if err != nil {
 		return false, goerr.Wrap(err, "failed to delete tag")
 	}

@@ -316,7 +316,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 			// Process values - could be tag IDs (existing tags) or tag names (new tags to create)
 			if len(selectedTagIDs) > 0 && uc.tagService != nil {
 				logger.Debug("processing tag values", "values", selectedTagIDs)
-				
+
 				// Initialize TagIDs if needed
 				if target.TagIDs == nil {
 					target.TagIDs = make(map[string]bool)

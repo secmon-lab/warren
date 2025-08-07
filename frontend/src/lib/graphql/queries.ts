@@ -576,8 +576,8 @@ export const CREATE_TAG = gql`
 `;
 
 export const DELETE_TAG = gql`
-  mutation DeleteTag($name: String!) {
-    deleteTag(name: $name)
+  mutation DeleteTag($id: ID!) {
+    deleteTag(id: $id)
   }
 `;
 

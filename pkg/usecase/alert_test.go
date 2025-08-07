@@ -1437,7 +1437,7 @@ func TestHandleAlert_PolicyTagDuplicationPrevention(t *testing.T) {
 					// Second alert: same common tag + different specific tag
 					queryResult.Alert = []alert.Metadata{
 						{
-							Title:       "Second Security Alert", 
+							Title:       "Second Security Alert",
 							Description: "Second security incident",
 							Tags:        []string{commonTag, alertSpecificTag2}, // commonTag appears again
 						},
