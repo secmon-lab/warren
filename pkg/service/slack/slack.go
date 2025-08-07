@@ -18,6 +18,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/test"
@@ -735,7 +736,7 @@ func (x *Service) ShowBindToTicketModal(ctx context.Context, callbackID model.Ca
 	return nil
 }
 
-func (x *Service) ShowResolveTicketModal(ctx context.Context, ticket *ticket.Ticket, triggerID string, availableTags []string) error {
+func (x *Service) ShowResolveTicketModal(ctx context.Context, ticket *ticket.Ticket, triggerID string, availableTags []*tag.Tag) error {
 	req := buildResolveTicketModalViewRequest(model.CallbackSubmitResolveTicket, ticket, availableTags)
 	if _, err := x.client.OpenView(triggerID, req); err != nil {
 		return goerr.Wrap(err, "failed to open view",

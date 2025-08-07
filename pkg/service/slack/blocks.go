@@ -10,6 +10,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -343,7 +344,7 @@ func buildBindToTicketModalViewRequest(ctx context.Context, callbackID model.Cal
 	}
 }
 
-func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *ticket.Ticket, availableTags []string) slack.ModalViewRequest {
+func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *ticket.Ticket, availableTags []*tag.Tag) slack.ModalViewRequest {
 	conclusionOptions := []struct {
 		Conclusion  types.AlertConclusion
 		Label       string
@@ -425,8 +426,8 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 			for _, tag := range availableTags {
 				checkboxOptions = append(checkboxOptions,
 					slack.NewOptionBlockObject(
-						tag,
-						slack.NewTextBlockObject(slack.PlainTextType, tag, false, false),
+						tag.ID,   // Use Tag ID as value
+						slack.NewTextBlockObject(slack.PlainTextType, tag.Name, false, false), // Use Tag name for display
 						nil,
 					),
 				)
@@ -450,8 +451,8 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 			for _, tag := range availableTags {
 				tagOptions = append(tagOptions,
 					slack.NewOptionBlockObject(
-						tag,
-						slack.NewTextBlockObject(slack.PlainTextType, tag, false, false),
+						tag.ID,   // Use Tag ID as value
+						slack.NewTextBlockObject(slack.PlainTextType, tag.Name, false, false), // Use Tag name for display
 						nil,
 					),
 				)
