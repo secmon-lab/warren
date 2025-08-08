@@ -61,6 +61,7 @@ func cmdServe() *cli.Command {
 		firestoreCfg     config.Firestore
 		storageCfg       config.Storage
 		mcpCfg           config.MCPConfig
+		asyncCfg         config.AsyncAlertHook
 	)
 
 	flags := joinFlags(
@@ -121,6 +122,7 @@ func cmdServe() *cli.Command {
 		tools.Flags(),
 		storageCfg.Flags(),
 		mcpCfg.Flags(),
+		asyncCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -129,6 +131,11 @@ func cmdServe() *cli.Command {
 		Usage:   "Run server",
 		Flags:   flags,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
+			// Parse async configuration
+			if err := asyncCfg.Parse(cmd); err != nil {
+				return err
+			}
+
 			// Auto-generate frontend URL if not set
 			if webUICfg.GetFrontendURL() == "" {
 				generatedURL := generateFrontendURL(addr)
@@ -151,6 +158,7 @@ func cmdServe() *cli.Command {
 				"firestore", firestoreCfg,
 				"storage", storageCfg,
 				"mcp", mcpCfg,
+				"async", asyncCfg,
 			)
 
 			policyClient, err := policyCfg.Configure()
@@ -331,6 +339,13 @@ func cmdServe() *cli.Command {
 			}
 
 			serverOptions = append(serverOptions, server.WithWebSocketHandler(wsHandler))
+
+			// Add async configuration to server options
+			serverOptions = append(serverOptions, server.WithAsyncAlertHook(&server.AsyncAlertHookConfig{
+				Raw:    asyncCfg.Raw,
+				PubSub: asyncCfg.PubSub,
+				SNS:    asyncCfg.SNS,
+			}))
 
 			httpServer := http.Server{
 				Addr:              addr,

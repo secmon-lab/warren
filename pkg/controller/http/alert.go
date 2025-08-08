@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/async"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
@@ -42,6 +44,20 @@ func alertPubSubHandler(uc useCase) http.HandlerFunc {
 			return
 		}
 
+		// Check async mode
+		if cfg := async.GetAsyncMode(r.Context()); cfg != nil && cfg.PubSub {
+			// Return 200 immediately
+			w.WriteHeader(http.StatusOK)
+
+			// Process in background
+			async.Dispatch(r.Context(), func(ctx context.Context) error {
+				_, err := uc.HandleAlert(ctx, types.AlertSchema(schema), alertData)
+				return err
+			})
+			return
+		}
+
+		// Synchronous processing
 		if _, err := uc.HandleAlert(r.Context(), types.AlertSchema(schema), alertData); err != nil {
 			handleError(w, r, err)
 			return
@@ -71,6 +87,20 @@ func alertRawHandler(uc useCase) http.HandlerFunc {
 			return
 		}
 
+		// Check async mode
+		if cfg := async.GetAsyncMode(r.Context()); cfg != nil && cfg.Raw {
+			// Return 200 immediately
+			w.WriteHeader(http.StatusOK)
+
+			// Process in background
+			async.Dispatch(r.Context(), func(ctx context.Context) error {
+				_, err := uc.HandleAlert(ctx, types.AlertSchema(schema), alertData)
+				return err
+			})
+			return
+		}
+
+		// Synchronous processing
 		if _, err := uc.HandleAlert(r.Context(), types.AlertSchema(schema), alertData); err != nil {
 			handleError(w, r, err)
 			return
@@ -112,7 +142,24 @@ func alertSNSHandler(uc useCase) http.HandlerFunc {
 
 		schema := chi.URLParam(r, "schema")
 
-		// Handle alert
+		// Check async mode
+		if cfg := async.GetAsyncMode(r.Context()); cfg != nil && cfg.SNS {
+			// Return 200 immediately
+			w.WriteHeader(http.StatusOK)
+
+			// Process in background
+			async.Dispatch(r.Context(), func(ctx context.Context) error {
+				alerts, err := uc.HandleAlert(ctx, types.AlertSchema(schema), alertData)
+				if err != nil {
+					return err
+				}
+				logging.From(ctx).Info("alert handled", "alerts", alerts)
+				return nil
+			})
+			return
+		}
+
+		// Synchronous processing
 		alerts, err := uc.HandleAlert(ctx, types.AlertSchema(schema), alertData)
 		if err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to handle alert"))
