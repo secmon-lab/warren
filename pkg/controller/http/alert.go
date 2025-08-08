@@ -15,6 +15,63 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
+// hookEndpointType represents the type of alert hook endpoint
+type hookEndpointType string
+
+const (
+	hookEndpointRaw    hookEndpointType = "raw"
+	hookEndpointPubSub hookEndpointType = "pubsub"
+	hookEndpointSNS    hookEndpointType = "sns"
+)
+
+// handleAlertWithAsync processes an alert either synchronously or asynchronously based on the configuration
+func handleAlertWithAsync(w http.ResponseWriter, r *http.Request, uc useCase, schema string, alertData any, endpointType hookEndpointType) {
+	cfg := async.GetAsyncMode(r.Context())
+	
+	// Check if async mode is enabled for this endpoint type
+	isAsync := false
+	if cfg != nil {
+		switch endpointType {
+		case hookEndpointRaw:
+			isAsync = cfg.Raw
+		case hookEndpointPubSub:
+			isAsync = cfg.PubSub
+		case hookEndpointSNS:
+			isAsync = cfg.SNS
+		}
+	}
+
+	if isAsync {
+		// Return 200 immediately
+		w.WriteHeader(http.StatusOK)
+		
+		// Process in background
+		async.Dispatch(r.Context(), func(ctx context.Context) error {
+			alerts, err := uc.HandleAlert(ctx, types.AlertSchema(schema), alertData)
+			if err != nil {
+				return err
+			}
+			if endpointType == hookEndpointSNS {
+				logging.From(ctx).Info("alert handled", "alerts", alerts)
+			}
+			return nil
+		})
+		return
+	}
+
+	// Synchronous processing
+	alerts, err := uc.HandleAlert(r.Context(), types.AlertSchema(schema), alertData)
+	if err != nil {
+		handleError(w, r, err)
+		return
+	}
+
+	if endpointType == hookEndpointSNS {
+		logging.From(r.Context()).Info("alert handled", "alerts", alerts)
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func alertPubSubHandler(uc useCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		schema := chi.URLParam(r, "schema")
@@ -44,26 +101,7 @@ func alertPubSubHandler(uc useCase) http.HandlerFunc {
 			return
 		}
 
-		// Check async mode
-		if cfg := async.GetAsyncMode(r.Context()); cfg != nil && cfg.PubSub {
-			// Return 200 immediately
-			w.WriteHeader(http.StatusOK)
-
-			// Process in background
-			async.Dispatch(r.Context(), func(ctx context.Context) error {
-				_, err := uc.HandleAlert(ctx, types.AlertSchema(schema), alertData)
-				return err
-			})
-			return
-		}
-
-		// Synchronous processing
-		if _, err := uc.HandleAlert(r.Context(), types.AlertSchema(schema), alertData); err != nil {
-			handleError(w, r, err)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
+		handleAlertWithAsync(w, r, uc, schema, alertData, hookEndpointPubSub)
 	}
 }
 
@@ -87,34 +125,12 @@ func alertRawHandler(uc useCase) http.HandlerFunc {
 			return
 		}
 
-		// Check async mode
-		if cfg := async.GetAsyncMode(r.Context()); cfg != nil && cfg.Raw {
-			// Return 200 immediately
-			w.WriteHeader(http.StatusOK)
-
-			// Process in background
-			async.Dispatch(r.Context(), func(ctx context.Context) error {
-				_, err := uc.HandleAlert(ctx, types.AlertSchema(schema), alertData)
-				return err
-			})
-			return
-		}
-
-		// Synchronous processing
-		if _, err := uc.HandleAlert(r.Context(), types.AlertSchema(schema), alertData); err != nil {
-			handleError(w, r, err)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
+		handleAlertWithAsync(w, r, uc, schema, alertData, hookEndpointRaw)
 	}
 }
 
 func alertSNSHandler(uc useCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		logger := logging.From(ctx)
-
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to read body"))
@@ -141,32 +157,6 @@ func alertSNSHandler(uc useCase) http.HandlerFunc {
 		}
 
 		schema := chi.URLParam(r, "schema")
-
-		// Check async mode
-		if cfg := async.GetAsyncMode(r.Context()); cfg != nil && cfg.SNS {
-			// Return 200 immediately
-			w.WriteHeader(http.StatusOK)
-
-			// Process in background
-			async.Dispatch(r.Context(), func(ctx context.Context) error {
-				alerts, err := uc.HandleAlert(ctx, types.AlertSchema(schema), alertData)
-				if err != nil {
-					return err
-				}
-				logging.From(ctx).Info("alert handled", "alerts", alerts)
-				return nil
-			})
-			return
-		}
-
-		// Synchronous processing
-		alerts, err := uc.HandleAlert(ctx, types.AlertSchema(schema), alertData)
-		if err != nil {
-			handleError(w, r, goerr.Wrap(err, "failed to handle alert"))
-			return
-		}
-
-		logger.Info("alert handled", "alerts", alerts)
-		w.WriteHeader(http.StatusOK)
+		handleAlertWithAsync(w, r, uc, schema, alertData, hookEndpointSNS)
 	}
 }
