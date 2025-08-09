@@ -29,6 +29,7 @@ type Action struct {
 	oauthToken string
 	client     interfaces.SlackClient // for future extensions
 	baseURL    string                  // for testing
+	httpClient *http.Client            // HTTP client for API calls
 }
 
 var _ interfaces.Tool = &Action{}
@@ -83,6 +84,10 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Type:        gollem.TypeNumber,
 					Description: "Page number for pagination (default: 1)",
 				},
+				"highlight": {
+					Type:        gollem.TypeBoolean,
+					Description: "Enable highlighting of search terms in results",
+				},
 			},
 			Required: []string{"query"},
 		},
@@ -119,6 +124,9 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	}
 	if page, ok := args["page"].(float64); ok {
 		opts.Page = int(page)
+	}
+	if highlight, ok := args["highlight"].(bool); ok {
+		opts.Highlight = highlight
 	}
 
 	// Execute search
@@ -183,6 +191,13 @@ func (x *Action) searchMessages(ctx context.Context, opts *SearchOptions) (*Sear
 	// Prepare request with retries
 	var resp *SearchResponse
 	var lastErr error
+	
+	// Use the configured HTTP client
+	client := x.httpClient
+	if client == nil {
+		// Fallback if Configure wasn't called
+		client = &http.Client{Timeout: defaultTimeout}
+	}
 
 	for i := range maxRetries {
 		select {
@@ -207,7 +222,6 @@ func (x *Action) searchMessages(ctx context.Context, opts *SearchOptions) (*Sear
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		// Execute request
-		client := &http.Client{Timeout: defaultTimeout}
 		httpResp, err := client.Do(req)
 		if err != nil {
 			lastErr = goerr.Wrap(err, "failed to execute request")
@@ -293,6 +307,19 @@ func (x *Action) Configure(ctx context.Context) error {
 	if x.oauthToken == "" {
 		return errs.ErrActionUnavailable
 	}
+	
+	// Initialize HTTP client if not already set
+	if x.httpClient == nil {
+		x.httpClient = &http.Client{
+			Timeout: defaultTimeout,
+			Transport: &http.Transport{
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 10,
+				IdleConnTimeout:     90 * time.Second,
+			},
+		}
+	}
+	
 	return nil
 }
 
