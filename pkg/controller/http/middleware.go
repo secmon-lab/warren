@@ -432,6 +432,7 @@ func AuthorizeWithPolicyForTest(policy interfaces.PolicyClient, noAuthorization 
 func withAsyncConfig(cfg *AsyncAlertHookConfig) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
 			if cfg != nil {
 				// Convert http.AsyncAlertHookConfig to domain model
 				asyncConfig := &asyncModel.Config{
@@ -439,11 +440,9 @@ func withAsyncConfig(cfg *AsyncAlertHookConfig) func(http.Handler) http.Handler 
 					PubSub: cfg.PubSub,
 					SNS:    cfg.SNS,
 				}
-				ctx := async.WithAsyncMode(r.Context(), asyncConfig)
-				next.ServeHTTP(w, r.WithContext(ctx))
-			} else {
-				next.ServeHTTP(w, r)
+				ctx = async.WithAsyncMode(ctx, asyncConfig)
 			}
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
