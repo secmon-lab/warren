@@ -519,6 +519,7 @@ Search for messages in your Slack workspace to find related discussions, previou
 - `sort_dir`: Sort direction - "asc" or "desc"
 - `count`: Number of results to return (default: 20, max: 100)
 - `page`: Page number for pagination (default: 1)
+- `highlight`: Enable highlighting of search terms in results (boolean)
 
 **Example Queries:**
 ```

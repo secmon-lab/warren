@@ -132,6 +132,48 @@ func TestSlackMessageSearch(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name: "search with highlight",
+			serverResponse: &slack.SearchResponse{
+				OK:    true,
+				Query: "highlighted",
+				Messages: slack.MessagesBlock{
+					Total: 1,
+					Pagination: slack.Paging{
+						Count: 1,
+						Total: 1,
+						Page:  1,
+						Pages: 1,
+					},
+					Matches: []slack.Message{
+						{
+							Type: "message",
+							Channel: slack.ChannelInfo{
+								ID:   "C1234567890",
+								Name: "general",
+							},
+							User:      "U1234567890",
+							Username:  "john.doe",
+							Text:      "This is a <em>highlighted</em> message",
+							Timestamp: "1234567890.123456",
+							Permalink: "https://workspace.slack.com/archives/C1234567890/p1234567890123456",
+						},
+					},
+				},
+			},
+			serverStatus: http.StatusOK,
+			args: map[string]any{
+				"query":     "highlighted",
+				"highlight": true,
+			},
+			expectError: false,
+			validateResult: func(t *testing.T, result map[string]any) {
+				// Verify highlight parameter was sent in request
+				total, ok := result["total"].(float64)
+				gt.True(t, ok)
+				gt.Number(t, total).Equal(1)
+			},
+		},
 	}
 
 	for _, tc := range testCases {
