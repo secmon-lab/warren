@@ -16,10 +16,12 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	asyncModel "github.com/secmon-lab/warren/pkg/domain/model/async"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/utils/async"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/secmon-lab/warren/pkg/utils/user"
@@ -424,4 +426,23 @@ func authorizeWithPolicy(policy interfaces.PolicyClient, noAuthorization bool) f
 // AuthorizeWithPolicyForTest is exported for testing purposes
 func AuthorizeWithPolicyForTest(policy interfaces.PolicyClient, noAuthorization bool) func(http.Handler) http.Handler {
 	return authorizeWithPolicy(policy, noAuthorization)
+}
+
+// withAsyncConfig injects async configuration into the request context
+func withAsyncConfig(cfg *AsyncAlertHookConfig) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			if cfg != nil {
+				// Convert http.AsyncAlertHookConfig to domain model
+				asyncConfig := &asyncModel.Config{
+					Raw:    cfg.Raw,
+					PubSub: cfg.PubSub,
+					SNS:    cfg.SNS,
+				}
+				ctx = async.WithAsyncMode(ctx, asyncConfig)
+			}
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }

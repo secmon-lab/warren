@@ -23,6 +23,13 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
+// AsyncAlertHookConfig represents configuration for asynchronous alert hooks
+type AsyncAlertHookConfig struct {
+	Raw    bool
+	PubSub bool
+	SNS    bool
+}
+
 type Server struct {
 	router          *chi.Mux
 	slackCtrl       *slack_controller.Controller
@@ -34,6 +41,7 @@ type Server struct {
 	authUC          AuthUseCase           // for authentication
 	enableGraphiQL  bool                  // GraphiQL enable flag
 	noAuthorization bool                  // no-authorization flag
+	asyncAlertHook  *AsyncAlertHookConfig // async alert hook configuration
 }
 
 type Options func(*Server)
@@ -86,6 +94,12 @@ func WithWebSocketHandler(handler *websocket_controller.Handler) Options {
 	}
 }
 
+func WithAsyncAlertHook(cfg *AsyncAlertHookConfig) Options {
+	return func(s *Server) {
+		s.asyncAlertHook = cfg
+	}
+}
+
 type UseCase interface {
 	interfaces.AlertUsecases
 	interfaces.SlackEventUsecases
@@ -119,6 +133,7 @@ func New(uc UseCase, opts ...Options) *Server {
 	r.Use(panicRecoveryMiddleware)
 	r.Use(withAuthHTTPRequest)
 	r.Use(validateGoogleIAPToken)
+	r.Use(withAsyncConfig(s.asyncAlertHook))
 
 	// Migration to /hooks
 	r.Route("/hooks", func(r chi.Router) {

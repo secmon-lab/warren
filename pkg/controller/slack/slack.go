@@ -2,56 +2,27 @@ package slack
 
 import (
 	"context"
-	"runtime/debug"
 
-	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
-	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/utils/async"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
-	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 )
 
-func newBackgroundContext(ctx context.Context) context.Context {
-	newCtx := context.Background()
-	newCtx = logging.With(newCtx, logging.From(ctx))
-	newCtx = msg.WithContext(newCtx)
-	newCtx = lang.With(newCtx, lang.From(ctx))
-	// Preserve user context if available
-	if userID := user.FromContext(ctx); userID != "" {
-		newCtx = user.WithUserID(newCtx, userID)
-	}
-	return newCtx
-}
-
 func dispatch(ctx context.Context, handler func(ctx context.Context) error) {
-	newCtx := newBackgroundContext(ctx)
-
 	if IsSync(ctx) {
-		if err := handler(newCtx); err != nil {
-			errs.Handle(newCtx, err)
+		if err := handler(ctx); err != nil {
+			errs.Handle(ctx, err)
 		}
 		return
 	}
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				stack := debug.Stack()
-				errs.Handle(newCtx, goerr.New("panic recovered in background goroutine",
-					goerr.V("recover", r),
-					goerr.V("stack", string(stack))))
-			}
-		}()
-
-		if err := handler(newCtx); err != nil {
-			errs.Handle(newCtx, err)
-		}
-	}()
+	// Use common async dispatch
+	async.Dispatch(ctx, handler)
 }
 
 type Controller struct {

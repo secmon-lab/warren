@@ -40,6 +40,7 @@ The Web UI provides:
 
 ### Integration Architecture
 - **Webhook receivers** at `/hooks/alert/{raw,sns,pubsub}/{schema}` for any alert format
+  - **Asynchronous processing support** - Return HTTP 200 immediately while processing alerts in background
 - **Slack bot** with interactive components (buttons, modals) for ticket management
 - **GraphQL API** with DataLoader for efficient queries and real-time subscriptions
 
