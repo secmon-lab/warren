@@ -23,6 +23,7 @@ Warren uses the following precedence for configuration (highest to lowest):
 | `WARREN_LOG_QUIET` | `--log-quiet` | `false` | Quiet mode (suppress non-error logs) |
 | `WARREN_LOG_STACKTRACE` | `--log-stacktrace` | `true` | Show stacktrace in error logs |
 | `WARREN_LOG_OUTPUT` | `--log-output` | `stderr` | Log output destination |
+| `WARREN_ASYNC_ALERT_HOOK` | `--async-alert-hook` | - | Enable async webhook processing (raw, pubsub, sns, all) |
 
 ### Google Cloud Settings
 
@@ -113,6 +114,7 @@ warren serve \
 Additional serve options:
 - `--enable-graphql` - Enable GraphQL API endpoint
 - `--enable-graphiql` - Enable GraphiQL playground UI
+- `--async-alert-hook` - Enable asynchronous processing for alert webhooks (values: raw, pubsub, sns, all)
 
 ### `warren chat`
 
@@ -248,6 +250,48 @@ Note: The `--show-config` flag is not implemented.
    - Check file permissions
    - Policy paths can be directories or individual files
 
+## Asynchronous Alert Processing
+
+Warren supports asynchronous processing for alert webhooks, allowing the server to return HTTP 200 immediately while processing alerts in the background. This is useful for:
+
+- **High-volume alert sources** that require fast response times
+- **Webhook providers** with strict timeout requirements (e.g., AWS SNS, Google Pub/Sub)
+- **Preventing webhook retries** due to processing delays
+
+### Configuration
+
+Enable async processing for specific webhook types:
+
+```bash
+# Enable async for raw webhooks only
+warren serve --async-alert-hook raw
+
+# Enable async for multiple webhook types
+warren serve --async-alert-hook raw --async-alert-hook pubsub
+
+# Enable async for all webhook types
+warren serve --async-alert-hook all
+
+# Using environment variable (comma-separated)
+export WARREN_ASYNC_ALERT_HOOK="raw,pubsub,sns"
+warren serve
+```
+
+### Behavior
+
+When async mode is enabled for a webhook type:
+
+1. **Immediate response**: Returns HTTP 200 as soon as the request is validated
+2. **Background processing**: Alert enrichment, LLM analysis, and storage happen asynchronously
+3. **Error handling**: Processing errors are logged and sent to Sentry (if configured)
+4. **Context preservation**: User context, logging, and language settings are maintained
+
+### Considerations
+
+- **No error feedback**: Clients won't know if processing fails after the 200 response
+- **Monitoring required**: Use logs and Sentry to track async processing errors
+- **Order not guaranteed**: Alerts may be processed out of order when async is enabled
+
 ## Configuration Best Practices
 
 1. **Use Secret Manager** for sensitive values (API keys, tokens)
@@ -255,3 +299,4 @@ Note: The `--show-config` flag is not implemented.
 3. **Use configuration files** for complex structures (MCP, BigQuery)
 4. **Document custom configurations** in your deployment scripts
 5. **Validate configurations** before deployment using `--dry-run`
+6. **Enable async webhooks** for high-volume sources to improve reliability
