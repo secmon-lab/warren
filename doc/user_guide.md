@@ -502,3 +502,61 @@ In Web UI search:
    - Policy questions
    - Access issues
    - Feature requests
+
+## Available Tools
+
+Warren includes several built-in tools that can be used during alert investigation and analysis. These tools are accessible through the chat interface.
+
+### Slack Message Search
+
+Search for messages in your Slack workspace to find related discussions, previous incidents, or context around alerts.
+
+**Tool Name:** `slack_message_search`
+
+**Parameters:**
+- `query` (required): The search query using Slack's search operators
+- `sort`: Sort order - "score" (relevance) or "timestamp" (newest first)
+- `sort_dir`: Sort direction - "asc" or "desc"
+- `count`: Number of results to return (default: 20, max: 100)
+- `page`: Page number for pagination (default: 1)
+
+**Example Queries:**
+```
+// Search for messages from a specific user
+query: "from:@security-bot"
+
+// Search in a specific channel
+query: "in:security-alerts error"
+
+// Search for messages with attachments
+query: "has:file malware"
+
+// Complex query with multiple operators
+query: "from:@john in:incidents after:2024-01-01"
+```
+
+**Configuration:**
+To use the Slack Message Search tool, set the following environment variable:
+- `WARREN_SLACK_TOOL_USER_TOKEN`: Slack User token with `search:read` permission
+
+**Important:** This tool requires a **User OAuth token**, not a Bot token. The search.messages API only works with User tokens. To obtain a User token:
+1. Create a Slack App with OAuth scopes
+2. Install the app to your workspace
+3. Use the User OAuth Token (starts with `xoxp-`), not the Bot User OAuth Token
+
+**Required Slack App Permissions:**
+- `search:read` - Search messages and files in the workspace
+- Additional permissions may be required depending on search scope:
+  - `channels:history` - Search public channels
+  - `groups:history` - Search private channels
+  - `im:history` - Search direct messages
+  - `mpim:history` - Search group direct messages
+
+### Other Available Tools
+
+- **OTX (AlienVault Open Threat Exchange)**: Threat intelligence lookup
+- **VirusTotal**: File and URL reputation checking
+- **URLScan**: URL analysis and screenshots
+- **Shodan**: Internet-wide device search
+- **AbuseIPDB**: IP address reputation
+- **BigQuery**: Custom data analysis

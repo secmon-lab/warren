@@ -122,6 +122,7 @@ Visit http://localhost:8080 to access the dashboard.
 
 - **Alert Sources**: AWS GuardDuty, Suricata, SIEM webhooks, Custom apps
 - **Threat Intel**: VirusTotal, AlienVault OTX, URLScan, Shodan, AbuseIPDB
+- **Tools**: BigQuery, Slack Message Search
 - **Collaboration**: Slack (native bot), GraphQL API, REST webhooks
 - **Infrastructure**: Google Cloud (Vertex AI, Firestore), Docker, Kubernetes
 

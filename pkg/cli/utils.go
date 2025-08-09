@@ -12,6 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/tool/ipdb"
 	"github.com/secmon-lab/warren/pkg/tool/otx"
 	"github.com/secmon-lab/warren/pkg/tool/shodan"
+	"github.com/secmon-lab/warren/pkg/tool/slack"
 	"github.com/secmon-lab/warren/pkg/tool/urlscan"
 	"github.com/secmon-lab/warren/pkg/tool/vt"
 	"github.com/urfave/cli/v3"
@@ -36,6 +37,7 @@ var tools = toolList{
 	&abusech.Action{},
 	&ipdb.Action{},
 	&bigquery.Action{},
+	&slack.Action{},
 }
 
 // InjectDependencies injects repository and embedding client into tools that support them
@@ -50,6 +52,16 @@ func (x toolList) InjectDependencies(repo interfaces.Repository, embeddingClient
 			SetEmbeddingClient(interfaces.EmbeddingClient)
 		}); ok {
 			embeddingSetter.SetEmbeddingClient(embeddingClient)
+		}
+	}
+}
+
+// InjectSlackClient injects slack client into tools that support it
+func (x toolList) InjectSlackClient(slackClient interfaces.SlackClient) {
+	for _, tool := range x {
+		// Check if tool supports slack client injection
+		if slackSetter, ok := tool.(interface{ SetSlackClient(interfaces.SlackClient) }); ok {
+			slackSetter.SetSlackClient(slackClient)
 		}
 	}
 }
