@@ -1,8 +1,8 @@
 module github.com/secmon-lab/warren
 
-go 1.24.2
+go 1.24.4
 
-toolchain go1.24.3
+toolchain go1.24.6
 
 require (
 	cloud.google.com/go/bigquery v1.69.0
@@ -10,10 +10,12 @@ require (
 	cloud.google.com/go/storage v1.55.0
 	cloud.google.com/go/vertexai v0.15.0
 	github.com/99designs/gqlgen v0.17.73
+	github.com/bradleyfalzon/ghinstallation/v2 v2.16.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.18.0
 	github.com/getsentry/sentry-go v0.32.0
 	github.com/go-chi/chi/v5 v5.2.2
+	github.com/google/go-github/v74 v74.0.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/graph-gophers/dataloader/v7 v7.1.0
@@ -25,6 +27,7 @@ require (
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.1.12-0.20250806003019-f30e7de4dc21
 	github.com/m-mizutani/opaq v0.3.0
+	github.com/migueleliasweb/go-github-mock v1.4.0
 	github.com/newmo-oss/go-caller v0.1.0
 	github.com/slack-go/slack v0.16.0
 	github.com/stretchr/testify v1.10.0
@@ -86,9 +89,13 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/go-github/v72 v72.0.0 // indirect
+	github.com/google/go-github/v73 v73.0.0 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect

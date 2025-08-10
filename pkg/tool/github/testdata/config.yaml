@@ -1,0 +1,13 @@
+repositories:
+  - owner: "secmon-lab"
+    repository: "warren"
+    description: "AI agent and Slack-based security alert management tool"
+    default_branch: "main"
+  
+  - owner: "test-org"
+    repository: "test-repo"
+    description: "Test repository for unit tests"
+    
+  - owner: "example-org"
+    repository: "security-tools"
+    description: "Collection of security tools and scripts"
