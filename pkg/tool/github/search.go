@@ -15,10 +15,14 @@ func (x *Action) runCodeSearch(ctx context.Context, args map[string]any) (map[st
 		return nil, goerr.New("query is required")
 	}
 
-	// Get repository filter if specified
-	repoFilterPattern := ""
-	if rf, ok := args["repo_filter"].(string); ok && rf != "" {
-		repoFilterPattern = strings.ToLower(rf)
+	// Build search query
+	searchQuery := x.buildCodeSearchQuery(query, args)
+	if searchQuery == "" {
+		// No repositories matched the filter, return empty result
+		return map[string]any{
+			"results": []CodeSearchResult{},
+			"total":   0,
+		}, nil
 	}
 
 	// Search options
@@ -28,68 +32,79 @@ func (x *Action) runCodeSearch(ctx context.Context, args map[string]any) (map[st
 		},
 	}
 
-	// Collect all results
+	// Execute search
+	result, _, err := x.githubClient.Search.Code(ctx, searchQuery, opts)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to search code", goerr.V("query", searchQuery))
+	}
+
+	// Process results
 	var allResults []CodeSearchResult
-
-	// Search in each configured repository separately
-	for _, config := range x.configs {
-		fullName := fmt.Sprintf("%s/%s", config.Owner, config.Repository)
-		
-		// Apply repo filter if specified
-		if repoFilterPattern != "" && !strings.Contains(strings.ToLower(fullName), repoFilterPattern) {
+	for _, item := range result.CodeResults {
+		if item.Repository == nil || item.Repository.FullName == nil || item.Path == nil {
 			continue
 		}
 
-		// Build query for this specific repository
-		searchQuery := x.buildCodeSearchQueryForRepo(query, args, fullName)
-
-		// Execute search
-		result, _, err := x.githubClient.Search.Code(ctx, searchQuery, opts)
-		if err != nil {
-			// Continue with next repository on error
-			continue
+		csr := CodeSearchResult{
+			Repository: *item.Repository.FullName,
+			Path:       *item.Path,
 		}
 
-		// Process results
-		for _, item := range result.CodeResults {
-			if item.Repository == nil || item.Repository.FullName == nil || item.Path == nil {
-				continue
-			}
+		if item.HTMLURL != nil {
+			csr.HTMLURL = *item.HTMLURL
+		}
 
-			csr := CodeSearchResult{
-				Repository: *item.Repository.FullName,
-				Path:       *item.Path,
-			}
-
-			if item.HTMLURL != nil {
-				csr.HTMLURL = *item.HTMLURL
-			}
-
-			// Extract text matches
-			if len(item.TextMatches) > 0 {
-				for _, tm := range item.TextMatches {
-					if tm.Fragment != nil {
-						csr.Matches = append(csr.Matches, *tm.Fragment)
-					}
+		// Extract text matches
+		if len(item.TextMatches) > 0 {
+			for _, tm := range item.TextMatches {
+				if tm.Fragment != nil {
+					csr.Matches = append(csr.Matches, *tm.Fragment)
 				}
 			}
-
-			allResults = append(allResults, csr)
 		}
+
+		allResults = append(allResults, csr)
+	}
+
+	// Use the total from the API response
+	total := 0
+	if result.Total != nil {
+		total = *result.Total
 	}
 
 	return map[string]any{
 		"results": allResults,
-		"total":   len(allResults),
+		"total":   total,
 	}, nil
 }
 
-func (x *Action) buildCodeSearchQueryForRepo(baseQuery string, args map[string]any, repo string) string {
+func (x *Action) buildCodeSearchQuery(baseQuery string, args map[string]any) string {
 	var queryParts []string
 	queryParts = append(queryParts, baseQuery)
 
-	// Add specific repository filter
-	queryParts = append(queryParts, fmt.Sprintf("repo:%s", repo))
+	// Get repository filter if specified
+	repoFilterPattern := ""
+	if rf, ok := args["repo_filter"].(string); ok && rf != "" {
+		repoFilterPattern = strings.ToLower(rf)
+	}
+
+	// Add repository filter for configured repos
+	var repoFilters []string
+	for _, config := range x.configs {
+		fullName := fmt.Sprintf("%s/%s", config.Owner, config.Repository)
+		if repoFilterPattern != "" && !strings.Contains(strings.ToLower(fullName), repoFilterPattern) {
+			continue
+		}
+		repoFilters = append(repoFilters, fmt.Sprintf("repo:%s", fullName))
+	}
+
+	if len(repoFilters) == 0 {
+		// No repositories matched the filter
+		return ""
+	}
+	
+	// Add all repo filters to the query
+	queryParts = append(queryParts, strings.Join(repoFilters, " "))
 
 	// Add optional filters
 	if lang, ok := args["language"].(string); ok && lang != "" {
@@ -115,6 +130,13 @@ func (x *Action) runIssueSearch(ctx context.Context, args map[string]any) (map[s
 
 	// Build search query
 	searchQuery := x.buildIssueSearchQuery(query, args)
+	if searchQuery == "" {
+		// No repositories matched the filter, return empty result
+		return map[string]any{
+			"results": []IssueSearchResult{},
+			"total":   0,
+		}, nil
+	}
 
 	// Search options
 	opts := &github.SearchOptions{
@@ -126,7 +148,7 @@ func (x *Action) runIssueSearch(ctx context.Context, args map[string]any) (map[s
 	// Execute search
 	result, _, err := x.githubClient.Search.Issues(ctx, searchQuery, opts)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to search issues")
+		return nil, goerr.Wrap(err, "failed to search issues", goerr.V("query", searchQuery))
 	}
 
 	// Format results
@@ -190,9 +212,15 @@ func (x *Action) runIssueSearch(ctx context.Context, args map[string]any) (map[s
 		results = append(results, isr)
 	}
 
+	// Use the total from the API response
+	total := 0
+	if result.Total != nil {
+		total = *result.Total
+	}
+
 	return map[string]any{
 		"results": results,
-		"total":   len(results),
+		"total":   total,
 	}, nil
 }
 
@@ -200,16 +228,29 @@ func (x *Action) buildIssueSearchQuery(baseQuery string, args map[string]any) st
 	var queryParts []string
 	queryParts = append(queryParts, baseQuery)
 
+	// Get repository filter if specified
+	repoFilterPattern := ""
+	if rf, ok := args["repo_filter"].(string); ok && rf != "" {
+		repoFilterPattern = strings.ToLower(rf)
+	}
+
 	// Add repository filter for configured repos
 	var repoFilters []string
 	for _, config := range x.configs {
-		repoFilters = append(repoFilters, fmt.Sprintf("repo:%s/%s", config.Owner, config.Repository))
+		fullName := fmt.Sprintf("%s/%s", config.Owner, config.Repository)
+		if repoFilterPattern != "" && !strings.Contains(strings.ToLower(fullName), repoFilterPattern) {
+			continue
+		}
+		repoFilters = append(repoFilters, fmt.Sprintf("repo:%s", fullName))
 	}
 
-	if len(repoFilters) > 0 {
-		// GitHub issue search supports OR for repository filters
-		queryParts = append(queryParts, strings.Join(repoFilters, " "))
+	if len(repoFilters) == 0 {
+		// No repositories matched the filter
+		return ""
 	}
+	
+	// Add all repo filters to the query
+	queryParts = append(queryParts, strings.Join(repoFilters, " "))
 
 	// Add optional filters
 	if state, ok := args["state"].(string); ok && state != "" && state != "all" {
