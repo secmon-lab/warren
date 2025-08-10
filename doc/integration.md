@@ -567,6 +567,10 @@ export WARREN_OTX_API_KEY="your-otx-key"
 export WARREN_URLSCAN_API_KEY="your-urlscan-key"
 export WARREN_SHODAN_API_KEY="your-shodan-key"
 export WARREN_ABUSEIPDB_API_KEY="your-abuseipdb-key"
+export WARREN_GITHUB_APP_ID="your-github-app-id"
+export WARREN_GITHUB_INSTALLATION_ID="your-installation-id"
+export WARREN_GITHUB_PRIVATE_KEY="your-private-key-pem-content"
+export WARREN_GITHUB_CONFIG="path/to/repos.yaml"
 ```
 
 Or use command-line flags:
@@ -574,10 +578,20 @@ Or use command-line flags:
 warren serve \
   --vt-api-key="your-virustotal-key" \
   --otx-api-key="your-otx-key" \
-  --urlscan-api-key="your-urlscan-key"
+  --urlscan-api-key="your-urlscan-key" \
+  --github-app-id="12345" \
+  --github-installation-id="67890" \
+  --github-private-key="$(<private-key.pem)" \
+  --github-config="github-repos.yaml"
 ```
 
 ### Available Integrations
+
+#### GitHub
+- Code search across repositories
+- Issue and pull request search
+- File content retrieval
+- Repository browsing
 
 #### VirusTotal
 - IP reputation checks
@@ -609,6 +623,69 @@ warren serve \
 - Attack categories
 - Geographic data
 
+### GitHub App Integration
+
+Warren integrates with GitHub repositories using GitHub App authentication, providing code search, issue tracking, and repository content access.
+
+#### Configuration
+
+1. **Create a GitHub App**
+   - Go to Settings > Developer settings > GitHub Apps
+   - Create new GitHub App with these permissions:
+     - Repository permissions:
+       - Contents: Read
+       - Issues: Read
+       - Pull requests: Read
+     - Install the app to your organization
+
+2. **Set Environment Variables**
+   ```bash
+   export WARREN_GITHUB_APP_ID="12345"
+   export WARREN_GITHUB_INSTALLATION_ID="67890"
+   export WARREN_GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----
+   MIIEpAIBAAKCAQEA...
+   -----END RSA PRIVATE KEY-----"
+   export WARREN_GITHUB_CONFIG="/path/to/repos.yaml"
+   ```
+
+3. **Create Repository Configuration**
+   ```yaml
+   # repos.yaml
+   repositories:
+     - owner: "your-org"
+       repository: "main-app"
+       description: "Main application codebase"
+       default_branch: "main"
+     
+     - owner: "your-org"
+       repository: "security-tools"
+       description: "Security tooling and scripts"
+       default_branch: "develop"
+   ```
+
+#### Available Functions
+
+- **`github_code_search`**: Search code across configured repositories
+  - Supports GitHub code search syntax
+  - Examples: `"function login"`, `"language:go error handling"`, `"path:src/ extension:py"`
+  
+- **`github_issue_search`**: Search issues and pull requests
+  - Examples: `"label:security state:open"`, `"author:octocat type:pr"`
+  
+- **`github_get_content`**: Retrieve file contents from repositories
+  - Specify branch, tag, or commit SHA
+  - Returns decoded file content
+
+#### Usage Examples
+
+```bash
+# In chat interface
+> Search for SQL injection vulnerabilities in our codebase
+> Find all open security-related issues
+> Show me the authentication middleware code from main branch
+> Look for hardcoded credentials in configuration files
+```
+
 ### Using Tools via Chat
 
 Tools are automatically available in the AI Agent chat:
@@ -618,6 +695,9 @@ warren chat --ticket-id TICKET_ID
 > Check IP 192.168.1.100 with VirusTotal
 > Analyze domain example.com using OTX
 > Search Shodan for vulnerable services on this IP
+> Search for authentication bypass vulnerabilities in GitHub
+> Show me the auth.go file from the main branch
+> Find security-related issues in our repositories
 ```
 
 ## Authentication Methods

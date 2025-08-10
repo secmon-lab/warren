@@ -27,7 +27,8 @@ export default defineConfig({
   },
   server: {
     allowedHosts: [
-      ".ngrok-free.app"
+      ".ngrok-free.app",
+      ".ts.net"
     ],
     proxy: {
       "/graphql": "http://localhost:8080",
