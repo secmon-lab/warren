@@ -206,23 +206,26 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			Parameters: map[string]*gollem.Parameter{
 				"query": {
 					Type:        gollem.TypeString,
-					Description: "Search query (GitHub code search syntax)",
+					Description: "Search query using GitHub code search syntax. Supports operators like AND, OR, NOT",
+					MinLength:   github.Ptr(1),
 				},
 				"language": {
 					Type:        gollem.TypeString,
-					Description: "Filter by programming language",
+					Description: "Filter by programming language (e.g., 'go', 'python', 'javascript')",
+					Pattern:     "^[a-zA-Z0-9+#-]+$",
 				},
 				"path": {
 					Type:        gollem.TypeString,
-					Description: "Filter by file path pattern",
+					Description: "Filter by file path pattern (e.g., 'src/', 'test/', '*.go')",
 				},
 				"filename": {
 					Type:        gollem.TypeString,
-					Description: "Filter by filename",
+					Description: "Filter by filename (e.g., 'config.yaml', 'main.go')",
+					Pattern:     "^[^/]+$",
 				},
 				"repo_filter": {
 					Type:        gollem.TypeString,
-					Description: "Filter by repository name pattern",
+					Description: "Filter repositories by name pattern (case-insensitive substring match)",
 				},
 			},
 			Required: []string{"query"},
@@ -233,46 +236,66 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			Parameters: map[string]*gollem.Parameter{
 				"query": {
 					Type:        gollem.TypeString,
-					Description: "Search query (GitHub issue search syntax)",
+					Description: "Search query using GitHub issue search syntax. Supports operators like in:title, in:body",
+					MinLength:   github.Ptr(1),
 				},
 				"state": {
 					Type:        gollem.TypeString,
 					Description: "Filter by state: 'open', 'closed', or 'all'",
+					Enum:        []string{"open", "closed", "all"},
+					Default:     "all",
 				},
 				"labels": {
 					Type:        gollem.TypeString,
-					Description: "Filter by labels (comma-separated)",
+					Description: "Filter by labels (comma-separated list, e.g., 'bug,help wanted')",
+					Pattern:     "^[a-zA-Z0-9-_,\\s]+$",
 				},
 				"author": {
 					Type:        gollem.TypeString,
-					Description: "Filter by author username",
+					Description: "Filter by author username (GitHub username)",
+					Pattern:     "^[a-zA-Z0-9][a-zA-Z0-9-]*$",
+					MaxLength:   github.Ptr(39),
 				},
 				"type": {
 					Type:        gollem.TypeString,
-					Description: "Filter by type: 'issue', 'pr', or 'all'",
+					Description: "Filter by type: 'issue' for issues only, 'pr' for pull requests only, or 'all' for both",
+					Enum:        []string{"issue", "pr", "all"},
+					Default:     "all",
+				},
+				"repo_filter": {
+					Type:        gollem.TypeString,
+					Description: "Filter repositories by name pattern (case-insensitive substring match)",
 				},
 			},
 			Required: []string{"query"},
 		},
 		{
 			Name:        "github_get_content",
-			Description: "Get file content from a specific GitHub repository",
+			Description: "Get file content from a specific GitHub repository. Returns the decoded content of the file.",
 			Parameters: map[string]*gollem.Parameter{
 				"owner": {
 					Type:        gollem.TypeString,
-					Description: "Repository owner",
+					Description: "Repository owner (organization or username)",
+					Pattern:     "^[a-zA-Z0-9][a-zA-Z0-9-]*$",
+					MinLength:   github.Ptr(1),
+					MaxLength:   github.Ptr(39),
 				},
 				"repo": {
 					Type:        gollem.TypeString,
 					Description: "Repository name",
+					Pattern:     "^[a-zA-Z0-9_.-]+$",
+					MinLength:   github.Ptr(1),
+					MaxLength:   github.Ptr(100),
 				},
 				"path": {
 					Type:        gollem.TypeString,
-					Description: "File path in the repository",
+					Description: "File path in the repository (e.g., 'src/main.go', 'README.md')",
+					MinLength:   github.Ptr(1),
 				},
 				"ref": {
 					Type:        gollem.TypeString,
-					Description: "Git reference (branch, tag, or commit SHA)",
+					Description: "Git reference: branch name (e.g., 'main'), tag (e.g., 'v1.0.0'), or commit SHA. Defaults to the default branch if not specified.",
+					Pattern:     "^[a-zA-Z0-9/_.-]+$",
 				},
 			},
 			Required: []string{"owner", "repo", "path"},
