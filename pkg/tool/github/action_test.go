@@ -243,7 +243,7 @@ func TestLoadConfig(t *testing.T) {
     repository: "another-repo"
     description: "Another test repository"`
 
-	tmpFile, err := os.CreateTemp("", "github-config-*.yaml")
+	tmpFile, err := os.CreateTemp("", "github-app-config-*.yaml")
 	gt.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 

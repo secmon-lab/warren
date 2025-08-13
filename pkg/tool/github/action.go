@@ -51,25 +51,25 @@ func (x *Action) Flags() []cli.Flag {
 			Sources:     cli.EnvVars("WARREN_GITHUB_APP_ID"),
 		},
 		&cli.Int64Flag{
-			Name:        "github-installation-id",
+			Name:        "github-app-installation-id",
 			Usage:       "GitHub App Installation ID",
 			Destination: &x.installationID,
 			Category:    "Tool",
-			Sources:     cli.EnvVars("WARREN_GITHUB_INSTALLATION_ID"),
+			Sources:     cli.EnvVars("WARREN_GITHUB_APP_INSTALLATION_ID"),
 		},
 		&cli.StringFlag{
-			Name:        "github-private-key",
+			Name:        "github-app-private-key",
 			Usage:       "GitHub App private key (PEM format)",
 			Destination: &x.privateKey,
 			Category:    "Tool",
-			Sources:     cli.EnvVars("WARREN_GITHUB_PRIVATE_KEY"),
+			Sources:     cli.EnvVars("WARREN_GITHUB_APP_PRIVATE_KEY"),
 		},
 		&cli.StringSliceFlag{
-			Name:        "github-config",
+			Name:        "github-app-config",
 			Usage:       "Path to GitHub repository configuration YAML file(s)",
 			Destination: &x.configFiles,
 			Category:    "Tool",
-			Sources:     cli.EnvVars("WARREN_GITHUB_CONFIG"),
+			Sources:     cli.EnvVars("WARREN_GITHUB_APP_CONFIG"),
 		},
 	}
 }

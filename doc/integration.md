@@ -568,9 +568,9 @@ export WARREN_URLSCAN_API_KEY="your-urlscan-key"
 export WARREN_SHODAN_API_KEY="your-shodan-key"
 export WARREN_ABUSEIPDB_API_KEY="your-abuseipdb-key"
 export WARREN_GITHUB_APP_ID="your-github-app-id"
-export WARREN_GITHUB_INSTALLATION_ID="your-installation-id"
-export WARREN_GITHUB_PRIVATE_KEY="your-private-key-pem-content"
-export WARREN_GITHUB_CONFIG="path/to/repos.yaml"
+export WARREN_GITHUB_APP_INSTALLATION_ID="your-installation-id"
+export WARREN_GITHUB_APP_PRIVATE_KEY="your-private-key-pem-content"
+export WARREN_GITHUB_APP_CONFIG="path/to/repos.yaml"
 ```
 
 Or use command-line flags:
@@ -580,9 +580,9 @@ warren serve \
   --otx-api-key="your-otx-key" \
   --urlscan-api-key="your-urlscan-key" \
   --github-app-id="12345" \
-  --github-installation-id="67890" \
-  --github-private-key="$(<private-key.pem)" \
-  --github-config="github-repos.yaml"
+  --github-app-installation-id="67890" \
+  --github-app-private-key="$(<private-key.pem)" \
+  --github-app-config="github-repos.yaml"
 ```
 
 ### Available Integrations
@@ -641,11 +641,11 @@ Warren integrates with GitHub repositories using GitHub App authentication, prov
 2. **Set Environment Variables**
    ```bash
    export WARREN_GITHUB_APP_ID="12345"
-   export WARREN_GITHUB_INSTALLATION_ID="67890"
-   export WARREN_GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----
+   export WARREN_GITHUB_APP_INSTALLATION_ID="67890"
+   export WARREN_GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----
    MIIEpAIBAAKCAQEA...
    -----END RSA PRIVATE KEY-----"
-   export WARREN_GITHUB_CONFIG="/path/to/repos.yaml"
+   export WARREN_GITHUB_APP_CONFIG="/path/to/repos.yaml"
    ```
 
 3. **Create Repository Configuration**
