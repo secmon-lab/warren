@@ -27,7 +27,7 @@ const (
 // handleAlertWithAsync processes an alert either synchronously or asynchronously based on the configuration
 func handleAlertWithAsync(w http.ResponseWriter, r *http.Request, uc useCase, schema string, alertData any, endpointType hookEndpointType) {
 	cfg := async.GetAsyncMode(r.Context())
-	
+
 	// Check if async mode is enabled for this endpoint type
 	isAsync := false
 	if cfg != nil {
@@ -44,7 +44,7 @@ func handleAlertWithAsync(w http.ResponseWriter, r *http.Request, uc useCase, sc
 	if isAsync {
 		// Return 200 immediately
 		w.WriteHeader(http.StatusOK)
-		
+
 		// Process in background
 		async.Dispatch(r.Context(), func(ctx context.Context) error {
 			alerts, err := uc.HandleAlert(ctx, types.AlertSchema(schema), alertData)

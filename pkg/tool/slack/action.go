@@ -28,8 +28,8 @@ const (
 type Action struct {
 	oauthToken string
 	client     interfaces.SlackClient // for future extensions
-	baseURL    string                  // for testing
-	httpClient *http.Client            // HTTP client for API calls
+	baseURL    string                 // for testing
+	httpClient *http.Client           // HTTP client for API calls
 }
 
 var _ interfaces.Tool = &Action{}
@@ -144,15 +144,15 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 		messages[i] = map[string]any{
 			"channel":        msg.Channel,
 			"channel_name":   msg.ChannelName,
-			"user":          msg.User,
-			"user_name":     msg.UserName,
-			"text":          msg.Text,
-			"timestamp":     msg.Timestamp,
-			"permalink":     msg.Permalink,
+			"user":           msg.User,
+			"user_name":      msg.UserName,
+			"text":           msg.Text,
+			"timestamp":      msg.Timestamp,
+			"permalink":      msg.Permalink,
 			"formatted_time": msg.FormattedTime,
 		}
 	}
-	
+
 	result := map[string]any{
 		"total":    float64(output.Total),
 		"messages": messages,
@@ -214,7 +214,7 @@ func (x *Action) searchMessages(ctx context.Context, opts *SearchOptions) (*Sear
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", x.oauthToken))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		// Execute request  
+		// Execute request
 		client := x.httpClient
 		if client == nil {
 			// Fallback if Configure wasn't called
@@ -305,7 +305,7 @@ func (x *Action) Configure(ctx context.Context) error {
 	if x.oauthToken == "" {
 		return errs.ErrActionUnavailable
 	}
-	
+
 	// Initialize HTTP client if not already set
 	if x.httpClient == nil {
 		x.httpClient = &http.Client{
@@ -317,7 +317,7 @@ func (x *Action) Configure(ctx context.Context) error {
 			},
 		}
 	}
-	
+
 	return nil
 }
 

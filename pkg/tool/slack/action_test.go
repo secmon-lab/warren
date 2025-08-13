@@ -243,14 +243,14 @@ func TestSlackMessageSearchIntegration(t *testing.T) {
 	}
 
 	result, err := action.Run(ctx, "slack_message_search", args)
-	
+
 	// Note: search.messages API requires User OAuth token, not Bot token
 	// If you get "not_allowed_token_type" error, you need to use a User token
 	if err != nil {
 		t.Logf("Search failed: %v", err)
 		t.Skip("Skipping due to API error - ensure TEST_SLACK_USER_TOKEN is a User OAuth token with search:read scope")
 	}
-	
+
 	gt.NoError(t, err)
 	gt.NotNil(t, result)
 

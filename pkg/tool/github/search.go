@@ -102,7 +102,7 @@ func (x *Action) buildCodeSearchQuery(baseQuery string, args map[string]any) str
 		// No repositories matched the filter
 		return ""
 	}
-	
+
 	// Add all repo filters to the query
 	queryParts = append(queryParts, strings.Join(repoFilters, " "))
 
@@ -248,7 +248,7 @@ func (x *Action) buildIssueSearchQuery(baseQuery string, args map[string]any) st
 		// No repositories matched the filter
 		return ""
 	}
-	
+
 	// Add all repo filters to the query
 	queryParts = append(queryParts, strings.Join(repoFilters, " "))
 
