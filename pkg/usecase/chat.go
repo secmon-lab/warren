@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -120,22 +119,11 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithMessageHook(func(ctx context.Context, message string) error {
-			// Use main context which has proper msg configuration
 			msg.Trace(ctx, "💭 %s", message)
 			return nil
 		}),
 		gollem.WithToolErrorHook(func(ctx context.Context, err error, call gollem.FunctionCall) error {
-			// Use main context which has proper msg configuration
 			msg.Trace(ctx, "❌ Error: %s", err.Error())
-
-			// [tmp] debugging for masq. It will be deleted
-			if rawErr, mErr := json.Marshal(err); mErr == nil {
-				logger.Debug("[DEBUG] raw error message", "raw", string(rawErr))
-			}
-			if rawCall, mErr := json.Marshal(call); mErr == nil {
-				logger.Debug("[Debug] raw call message", "call", string(rawCall))
-			}
-
 			logger.Error("tool error", "error", err, "call", call)
 			return nil
 		}),
