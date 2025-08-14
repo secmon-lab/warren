@@ -406,13 +406,13 @@ func updatePlanProgress(updateFunc func(ctx context.Context, msg string), plan *
 			icon = "⟳"
 		case "Completed":
 			// Strike-through for completed tasks
-			status = fmt.Sprintf("~~%s~~", todo.Description)
+			status = fmt.Sprintf("%s~", todo.Description)
 			icon = "✅"
 		case "Failed":
 			status = fmt.Sprintf("%s (FAILED)", todo.Description)
 			icon = "❌"
 		case "Skipped":
-			status = fmt.Sprintf("~~%s~~ (skipped)", todo.Description)
+			status = fmt.Sprintf("~%s~ (skipped)", todo.Description)
 			icon = "⏭"
 		default:
 			status = todo.Description
