@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -15,27 +16,35 @@ import (
 func (x *Warren) findNearestTicket(ctx context.Context, args map[string]any) (map[string]any, error) {
 	limit, err := getArg[int64](args, "limit")
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get limit")
+		return nil, goerr.Wrap(err, "failed to get limit",
+			goerr.TV(errs.ParameterKey, "limit"),
+			goerr.T(errs.TagValidation))
 	}
 
 	duration, err := getArg[int64](args, "duration")
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get duration")
+		return nil, goerr.Wrap(err, "failed to get duration",
+			goerr.TV(errs.ParameterKey, "duration"),
+			goerr.T(errs.TagValidation))
 	}
 
 	// Get current ticket
 	currentTicket, err := x.repo.GetTicket(ctx, x.ticketID)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get current ticket")
+		return nil, goerr.Wrap(err, "failed to get current ticket",
+			goerr.TV(errs.TicketIDKey, x.ticketID))
 	}
 	if currentTicket == nil {
-		return nil, goerr.New("ticket not found", goerr.V("ticket_id", x.ticketID))
+		return nil, goerr.New("ticket not found",
+			goerr.TV(errs.TicketIDKey, x.ticketID),
+			goerr.T(errs.TagNotFound))
 	}
 
 	now := clock.Now(ctx)
 	nearestTickets, err := x.repo.FindNearestTicketsWithSpan(ctx, currentTicket.Embedding, now.AddDate(0, 0, -int(duration)), now, int(limit)+1)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to find nearest tickets")
+		return nil, goerr.Wrap(err, "failed to find nearest tickets",
+			goerr.TV(errs.TicketIDKey, x.ticketID))
 	}
 
 	var results []any
@@ -58,20 +67,27 @@ func (x *Warren) findNearestTicket(ctx context.Context, args map[string]any) (ma
 func (x *Warren) searchTicketsByWords(ctx context.Context, args map[string]any) (map[string]any, error) {
 	query, err := getArg[string](args, "query")
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get query")
+		return nil, goerr.Wrap(err, "failed to get query",
+			goerr.TV(errs.ParameterKey, "query"),
+			goerr.T(errs.TagValidation))
 	}
 	if query == "" {
-		return nil, goerr.New("query is required")
+		return nil, goerr.New("query is required",
+			goerr.TV(errs.ParameterKey, "query"),
+			goerr.T(errs.TagValidation))
 	}
 
 	// Check if LLM client is available
 	if x.llmClient == nil {
-		return nil, goerr.New("LLM client is not configured for word-based search")
+		return nil, goerr.New("LLM client is not configured for word-based search",
+			goerr.T(errs.TagInternal))
 	}
 
 	limit, err := getArg[int64](args, "limit")
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get limit")
+		return nil, goerr.Wrap(err, "failed to get limit",
+			goerr.TV(errs.ParameterKey, "limit"),
+			goerr.T(errs.TagValidation))
 	}
 	if limit <= 0 {
 		limit = DefaultSearchTicketsLimit
@@ -79,7 +95,9 @@ func (x *Warren) searchTicketsByWords(ctx context.Context, args map[string]any) 
 
 	duration, err := getArg[int64](args, "duration")
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get duration")
+		return nil, goerr.Wrap(err, "failed to get duration",
+			goerr.TV(errs.ParameterKey, "duration"),
+			goerr.T(errs.TagValidation))
 	}
 	if duration <= 0 {
 		duration = DefaultSearchTicketsDuration
@@ -88,13 +106,16 @@ func (x *Warren) searchTicketsByWords(ctx context.Context, args map[string]any) 
 	// Generate embedding from the search query
 	queryEmbedding, err := embedding.Generate(ctx, x.llmClient, query)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to generate embedding for query")
+		return nil, goerr.Wrap(err, "failed to generate embedding for query",
+			goerr.TV(errs.QueryKey, query),
+			goerr.T(errs.TagLLMError))
 	}
 
 	now := clock.Now(ctx)
 	nearestTickets, err := x.repo.FindNearestTicketsWithSpan(ctx, queryEmbedding, now.AddDate(0, 0, -int(duration)), now, int(limit))
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to find nearest tickets")
+		return nil, goerr.Wrap(err, "failed to find nearest tickets",
+			goerr.TV(errs.TicketIDKey, x.ticketID))
 	}
 
 	// Convert tickets to result format
@@ -113,49 +134,70 @@ func (x *Warren) searchTicketsByWords(ctx context.Context, args map[string]any) 
 func (x *Warren) updateFinding(ctx context.Context, args map[string]any) (map[string]any, error) {
 	summary, err := getArg[string](args, "summary")
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get summary")
+		return nil, goerr.Wrap(err, "failed to get summary",
+			goerr.TV(errs.ParameterKey, "summary"),
+			goerr.T(errs.TagValidation))
 	}
 	if summary == "" {
-		return nil, goerr.New("summary is required")
+		return nil, goerr.New("summary is required",
+			goerr.TV(errs.ParameterKey, "summary"),
+			goerr.T(errs.TagValidation))
 	}
 
 	severityStr, err := getArg[string](args, "severity")
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get severity")
+		return nil, goerr.Wrap(err, "failed to get severity",
+			goerr.TV(errs.ParameterKey, "severity"),
+			goerr.T(errs.TagValidation))
 	}
 	if severityStr == "" {
-		return nil, goerr.New("severity is required")
+		return nil, goerr.New("severity is required",
+			goerr.TV(errs.ParameterKey, "severity"),
+			goerr.T(errs.TagValidation))
 	}
 
 	reason, err := getArg[string](args, "reason")
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get reason")
+		return nil, goerr.Wrap(err, "failed to get reason",
+			goerr.TV(errs.ParameterKey, "reason"),
+			goerr.T(errs.TagValidation))
 	}
 	if reason == "" {
-		return nil, goerr.New("reason is required")
+		return nil, goerr.New("reason is required",
+			goerr.TV(errs.ParameterKey, "reason"),
+			goerr.T(errs.TagValidation))
 	}
 
 	recommendation, err := getArg[string](args, "recommendation")
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get recommendation")
+		return nil, goerr.Wrap(err, "failed to get recommendation",
+			goerr.TV(errs.ParameterKey, "recommendation"),
+			goerr.T(errs.TagValidation))
 	}
 	if recommendation == "" {
-		return nil, goerr.New("recommendation is required")
+		return nil, goerr.New("recommendation is required",
+			goerr.TV(errs.ParameterKey, "recommendation"),
+			goerr.T(errs.TagValidation))
 	}
 
 	// Validate severity
 	severity := types.AlertSeverity(severityStr)
 	if err := severity.Validate(); err != nil {
-		return nil, goerr.Wrap(err, "invalid severity value", goerr.V("severity", severity))
+		return nil, goerr.Wrap(err, "invalid severity value",
+			goerr.TV(errs.SeverityKey, string(severity)),
+			goerr.T(errs.TagValidation))
 	}
 
 	// Get current ticket
 	currentTicket, err := x.repo.GetTicket(ctx, x.ticketID)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get current ticket")
+		return nil, goerr.Wrap(err, "failed to get current ticket",
+			goerr.TV(errs.TicketIDKey, x.ticketID))
 	}
 	if currentTicket == nil {
-		return nil, goerr.New("ticket not found", goerr.V("ticket_id", x.ticketID))
+		return nil, goerr.New("ticket not found",
+			goerr.TV(errs.TicketIDKey, x.ticketID),
+			goerr.T(errs.TagNotFound))
 	}
 
 	// Check if dry-run mode is enabled
@@ -228,7 +270,9 @@ func (x *Warren) getTicketComments(ctx context.Context, args map[string]any) (ma
 	// Get optional pagination parameters
 	limitVal, err := getArg[int64](args, "limit")
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get limit")
+		return nil, goerr.Wrap(err, "failed to get limit",
+			goerr.TV(errs.ParameterKey, "limit"),
+			goerr.T(errs.TagValidation))
 	}
 
 	offsetVal, err := getArg[int64](args, "offset")
