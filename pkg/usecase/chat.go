@@ -213,7 +213,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			if err != nil {
 				errs.Handle(ctx, goerr.Wrap(err, "failed to post agent message to slack"))
 			} else {
-				comment := target.NewComment(agentCtx, message, botUser, ts)
+				comment := target.NewComment(agentCtx, warrenResponse, botUser, ts)
 
 				if err := x.repository.PutTicketComment(agentCtx, comment); err != nil {
 					errs.Handle(ctx, goerr.Wrap(err, "failed to save ticket comment"))
