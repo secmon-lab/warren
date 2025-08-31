@@ -6,13 +6,15 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 // GetUserIcon returns the user's icon image data and content type
 func (u *UseCases) GetUserIcon(ctx context.Context, userID string) ([]byte, string, error) {
 	if u.slackService == nil {
-		return nil, "", goerr.New("slack service not configured")
+		return nil, "", goerr.New("slack service not configured",
+			goerr.T(errs.TagInternal))
 	}
 	return u.slackService.GetUserIcon(ctx, userID)
 }
@@ -20,7 +22,8 @@ func (u *UseCases) GetUserIcon(ctx context.Context, userID string) ([]byte, stri
 // GetUserProfile returns the user's profile name via Slack service
 func (u *UseCases) GetUserProfile(ctx context.Context, userID string) (string, error) {
 	if u.slackService == nil {
-		return "", goerr.New("slack service not configured")
+		return "", goerr.New("slack service not configured",
+			goerr.T(errs.TagInternal))
 	}
 	return u.slackService.GetUserProfile(ctx, userID)
 }
@@ -30,10 +33,13 @@ func (u *UseCases) GenerateTicketAlertsJSONL(ctx context.Context, ticketID types
 	// Get ticket
 	ticket, err := u.repository.GetTicket(ctx, ticketID)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get ticket", goerr.V("ticket_id", ticketID))
+		return nil, goerr.Wrap(err, "failed to get ticket",
+			goerr.TV(errs.TicketIDKey, ticketID))
 	}
 	if ticket == nil {
-		return nil, goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+		return nil, goerr.New("ticket not found",
+			goerr.TV(errs.TicketIDKey, ticketID),
+			goerr.T(errs.TagNotFound))
 	}
 
 	// Get alerts for the ticket
@@ -41,7 +47,8 @@ func (u *UseCases) GenerateTicketAlertsJSONL(ctx context.Context, ticketID types
 	if len(ticket.AlertIDs) > 0 {
 		alerts, err = u.repository.BatchGetAlerts(ctx, ticket.AlertIDs)
 		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get alerts", goerr.V("ticket_id", ticketID))
+			return nil, goerr.Wrap(err, "failed to get alerts",
+				goerr.TV(errs.TicketIDKey, ticketID))
 		}
 	}
 
