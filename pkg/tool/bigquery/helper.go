@@ -555,6 +555,7 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 	agent := gollem.New(llmClient,
 		gollem.WithSystemPrompt(queryPrompt),
 		gollem.WithLoopLimit(20), // Increase to 20 iterations to handle complex schemas and validation retries
+		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithMessageHook(func(ctx context.Context, msg string) error {
 			println("💬", msg)
 			return nil
