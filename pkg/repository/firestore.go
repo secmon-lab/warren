@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -26,6 +27,7 @@ import (
 
 type Firestore struct {
 	db *firestore.Client
+	eb *goerr.Builder
 }
 
 var _ interfaces.Repository = &Firestore{}
@@ -38,6 +40,11 @@ func NewFirestore(ctx context.Context, projectID, databaseID string) (*Firestore
 
 	return &Firestore{
 		db: db,
+		eb: goerr.NewBuilder(
+			goerr.TV(errs.RepositoryKey, "firestore"),
+			goerr.V("project_id", projectID),
+			goerr.V("database_id", databaseID),
+		),
 	}, nil
 }
 
@@ -65,7 +72,9 @@ const (
 func extractCountFromAggregationResult(result firestore.AggregationResult, alias string) (int, error) {
 	countVal, ok := result[alias]
 	if !ok {
-		return 0, goerr.New("count alias not found in aggregation result", goerr.V("alias", alias))
+		return 0, goerr.New("count alias not found in aggregation result",
+			goerr.V("alias", alias),
+			goerr.T(errs.TagInternal))
 	}
 
 	switch v := countVal.(type) {
@@ -77,12 +86,19 @@ func extractCountFromAggregationResult(result firestore.AggregationResult, alias
 				return int(v.GetIntegerValue()), nil
 			}
 			return 0, goerr.New("firestorepb.Value from count is not an integer type",
-				goerr.V("value_type", fmt.Sprintf("%T", v.ValueType)), goerr.V("alias", alias))
+				goerr.V("value_type", fmt.Sprintf("%T", v.ValueType)),
+				goerr.V("alias", alias),
+				goerr.T(errs.TagInternal))
 		}
-		return 0, goerr.New("count value is a nil or invalid *firestorepb.Value", goerr.V("alias", alias))
+		return 0, goerr.New("count value is a nil or invalid *firestorepb.Value",
+			goerr.V("alias", alias),
+			goerr.T(errs.TagInternal))
 	default:
 		return 0, goerr.New("unexpected count value type from Firestore aggregation",
-			goerr.V("type", fmt.Sprintf("%T", v)), goerr.V("value", v), goerr.V("alias", alias))
+			goerr.V("type", fmt.Sprintf("%T", v)),
+			goerr.V("value", v),
+			goerr.V("alias", alias),
+			goerr.T(errs.TagInternal))
 	}
 }
 
@@ -105,7 +121,9 @@ func (r *Firestore) PutAlert(ctx context.Context, a alert.Alert) error {
 	alertDoc := r.db.Collection(collectionAlerts).Doc(a.ID.String())
 	_, err := alertDoc.Set(ctx, a)
 	if err != nil {
-		return goerr.Wrap(err, "failed to put alert")
+		return r.eb.Wrap(err, "failed to put alert",
+			goerr.TV(errs.AlertIDKey, a.ID),
+			goerr.T(errs.TagDatabase))
 	}
 	return nil
 }
@@ -115,14 +133,20 @@ func (r *Firestore) GetAlert(ctx context.Context, alertID types.AlertID) (*alert
 	doc, err := alertDoc.Get(ctx)
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
-			return nil, goerr.New("alert not found", goerr.V("alert_id", alertID))
+			return nil, goerr.New("alert not found",
+				goerr.TV(errs.AlertIDKey, alertID),
+				goerr.T(errs.TagNotFound))
 		}
-		return nil, goerr.Wrap(err, "failed to get alert", goerr.V("alert_id", alertID))
+		return nil, r.eb.Wrap(err, "failed to get alert",
+			goerr.TV(errs.AlertIDKey, alertID),
+			goerr.T(errs.TagDatabase))
 	}
 
 	var a alert.Alert
 	if err := doc.DataTo(&a); err != nil {
-		return nil, goerr.Wrap(err, "failed to convert data to alert", goerr.V("alert_id", alertID))
+		return nil, goerr.Wrap(err, "failed to convert data to alert",
+			goerr.TV(errs.AlertIDKey, alertID),
+			goerr.T(errs.TagInternal))
 	}
 
 	return &a, nil
@@ -352,14 +376,20 @@ func (r *Firestore) GetTicket(ctx context.Context, ticketID types.TicketID) (*ti
 	doc, err := r.db.Collection(collectionTickets).Doc(ticketID.String()).Get(ctx)
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
-			return nil, goerr.New("ticket not found", goerr.V("ticket_id", ticketID))
+			return nil, goerr.New("ticket not found",
+				goerr.TV(errs.TicketIDKey, ticketID),
+				goerr.T(errs.TagNotFound))
 		}
-		return nil, goerr.Wrap(err, "failed to get ticket", goerr.V("ticket_id", ticketID))
+		return nil, r.eb.Wrap(err, "failed to get ticket",
+			goerr.TV(errs.TicketIDKey, ticketID),
+			goerr.T(errs.TagDatabase))
 	}
 
 	var t ticket.Ticket
 	if err := doc.DataTo(&t); err != nil {
-		return nil, goerr.Wrap(err, "failed to convert data to ticket", goerr.V("ticket_id", ticketID))
+		return nil, goerr.Wrap(err, "failed to convert data to ticket",
+			goerr.TV(errs.TicketIDKey, ticketID),
+			goerr.T(errs.TagInternal))
 	}
 
 	return &t, nil
@@ -372,7 +402,9 @@ func (r *Firestore) PutTicket(ctx context.Context, t ticket.Ticket) error {
 
 	_, err = r.db.Collection(collectionTickets).Doc(t.ID.String()).Set(ctx, t)
 	if err != nil {
-		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", t.ID))
+		return r.eb.Wrap(err, "failed to put ticket",
+			goerr.TV(errs.TicketIDKey, t.ID),
+			goerr.T(errs.TagDatabase))
 	}
 
 	// Create activity for ticket creation or update (except when called from agent)

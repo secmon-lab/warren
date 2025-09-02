@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -37,6 +38,8 @@ type Memory struct {
 	// Call counter for tracking method invocations
 	callCounts map[string]int
 	callMu     sync.RWMutex
+
+	eb *goerr.Builder
 }
 
 var _ interfaces.Repository = &Memory{}
@@ -52,6 +55,7 @@ func NewMemory() *Memory {
 		activities:     make(map[types.ActivityID]*activity.Activity),
 		tagsV2:         make(map[string]*tag.Tag),
 		callCounts:     make(map[string]int),
+		eb:             goerr.NewBuilder(goerr.TV(errs.RepositoryKey, "memory")),
 	}
 }
 
