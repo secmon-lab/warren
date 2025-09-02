@@ -22,7 +22,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/m-mizutani/clog v0.0.8
 	github.com/m-mizutani/goerr/v2 v2.0.0-beta.2.0.20250814024355-0ccee1a1b3d1
-	github.com/m-mizutani/gollem v0.11.1-0.20250820085943-ff82b45dc9c3
+	github.com/m-mizutani/gollem v0.12.0
 	github.com/m-mizutani/gt v0.0.16
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.1.12-0.20250818113152-b9316b785b03
@@ -113,6 +113,7 @@ require (
 	github.com/lestrrat-go/iter v1.0.2 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/m-mizutani/ctxlog v0.2.0 // indirect
+	github.com/m-mizutani/jsonex v0.0.1 // indirect
 	github.com/matryer/moq v0.5.3 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
