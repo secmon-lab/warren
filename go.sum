@@ -259,8 +259,8 @@ github.com/m-mizutani/ctxlog v0.2.0 h1:9uS18pV/mb/90mc/DJp8no67pdOIlCai+L5hv/MkC
 github.com/m-mizutani/ctxlog v0.2.0/go.mod h1:BTVGSqZO4JJgKBUJWBNo+Yy2j2xTGCYeEQ65h2VBMXE=
 github.com/m-mizutani/goerr/v2 v2.0.0-beta.3 h1:7rrDbB/o5qYBlEPii4zkB6AddAUAg5EBteSXlIyeH4I=
 github.com/m-mizutani/goerr/v2 v2.0.0-beta.3/go.mod h1:K9+tBb0+0681yHpyHYqJmoijxn9qJf5grjRb9nMXevc=
-github.com/m-mizutani/gollem v0.12.0 h1:eiba26VD2UaydRCvCOJevNPB0IooFLzptXEJVY8Fjkg=
-github.com/m-mizutani/gollem v0.12.0/go.mod h1:Wo1mx6NRK4o6+xUuxYIHWH6V/IlNRwJXzF/AMuThRW4=
+github.com/m-mizutani/gollem v0.12.1-0.20250906062757-15489ae26d6d h1:I4oJsDCL6q5+PWqg9xgHy0iWLBae1dnXgwwbHZUYjok=
+github.com/m-mizutani/gollem v0.12.1-0.20250906062757-15489ae26d6d/go.mod h1:CeDxjBLlRtkpmn9FKcn3sXhqANDWlQG8BbSZDG9UVRk=
 github.com/m-mizutani/gt v0.0.16 h1:bhJqMeqxojsgVBo9wqjPHk4s6o7mkaQLCcOus1hp1Vs=
 github.com/m-mizutani/gt v0.0.16/go.mod h1:0MPYSfGBLmYjTduzADVmIqD58ELQ5IfBFiK/f0FmB3k=
 github.com/m-mizutani/harlog v0.0.3 h1:bL3i/xM3wWPsvoOOsuu/a4eaz+1yj1UyO7OPUzkWPyU=
