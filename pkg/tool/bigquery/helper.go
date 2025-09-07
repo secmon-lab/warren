@@ -510,7 +510,9 @@ func generateConfigWithFactoryInternal(ctx context.Context, cfg generateConfigCo
 		}
 	}()
 
-	llmClient, err := gemini.New(ctx, cfg.geminiProjectID, cfg.geminiLocation)
+	llmClient, err := gemini.New(ctx, cfg.geminiProjectID, cfg.geminiLocation,
+		gemini.WithThinkingBudget(0), // Disable thinking feature
+	)
 	if err != nil {
 		return err
 	}

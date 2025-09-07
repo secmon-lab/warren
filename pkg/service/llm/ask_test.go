@@ -20,7 +20,9 @@ func TestAsk(t *testing.T) {
 	}
 
 	ctx := t.Context()
-	geminiClient, err := gemini.New(ctx, projectID, location)
+	geminiClient, err := gemini.New(ctx, projectID, location,
+		gemini.WithThinkingBudget(0), // Disable thinking feature
+	)
 	gt.NoError(t, err).Required()
 
 	type resp struct {
