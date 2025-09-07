@@ -177,6 +177,7 @@ func (x *LLMCfg) configureClaude(ctx context.Context) (gollem.LLMClient, error) 
 func (x *LLMCfg) configureGemini(ctx context.Context) (gollem.LLMClient, error) {
 	options := []gemini.Option{
 		gemini.WithModel(x.geminiModel),
+		gemini.WithThinkingBudget(0), // Disable thinking feature
 	}
 	if x.geminiEmbeddingModel != "" {
 		options = append(options, gemini.WithEmbeddingModel(x.geminiEmbeddingModel))

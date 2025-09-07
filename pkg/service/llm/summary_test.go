@@ -39,7 +39,9 @@ func TestSummaryWithSchemaData(t *testing.T) {
 		t.Skip("GEMINI_LOCATION is not set")
 	}
 
-	geminiClient, err := gemini.New(ctx, projectID, location)
+	geminiClient, err := gemini.New(ctx, projectID, location,
+		gemini.WithThinkingBudget(0), // Disable thinking feature
+	)
 	gt.NoError(t, err).Required()
 
 	var schema []any

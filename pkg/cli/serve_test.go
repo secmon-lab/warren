@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/m-mizutani/gt"
@@ -11,6 +12,15 @@ import (
 func TestServeCommand_StrictAlertValidation(t *testing.T) {
 	// Test that --strict-alert without policy files returns an error
 	ctx := context.Background()
+
+	// Temporarily unset WARREN_POLICY for this test
+	oldPolicy := os.Getenv("WARREN_POLICY")
+	os.Unsetenv("WARREN_POLICY")
+	defer func() {
+		if oldPolicy != "" {
+			os.Setenv("WARREN_POLICY", oldPolicy)
+		}
+	}()
 
 	// Test with --strict-alert but no policy files
 	// We need to provide minimal required flags to get to our validation

@@ -63,6 +63,7 @@ func (x GeminiCfg) LogValue() slog.Value {
 func (x *GeminiCfg) Configure(ctx context.Context) (*gemini.Client, error) {
 	options := []gemini.Option{
 		gemini.WithModel(x.model),
+		gemini.WithThinkingBudget(0), // Disable thinking feature
 		// Temporarily use default settings like gollem test to isolate the issue
 		// gemini.WithTemperature(0.1),     // Lower temperature for consistency
 		// gemini.WithTopK(40),             // Controlled diversity
