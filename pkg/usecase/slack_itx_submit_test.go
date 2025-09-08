@@ -18,7 +18,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	slackservice "github.com/secmon-lab/warren/pkg/service/slack"
-	"github.com/secmon-lab/warren/pkg/service/tag"
 	tagservice "github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	slackSDK "github.com/slack-go/slack"
@@ -695,7 +694,7 @@ func TestSlackInteractionViewSubmissionResolveTicket_TagMerging(t *testing.T) {
 	}
 	slackSvc, err := slackservice.New(slackClientMock, "test-channel")
 	gt.NoError(t, err)
-	tagSvc := tag.New(repo)
+	tagSvc := tagservice.New(repo)
 
 	// Create tags first to ensure they exist
 	existingTag1 := &tagmodel.Tag{ID: "existing-tag-1", Name: "existing1", Color: "color1"}
