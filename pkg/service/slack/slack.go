@@ -267,7 +267,6 @@ func (x *Service) PostTicket(ctx context.Context, ticket *ticket.Ticket, alerts 
 		ctx,
 		x.channelID,
 		slack.MsgOptionBlocks(blocks...),
-		slack.MsgOptionBroadcast(),
 	)
 	if err != nil {
 		return nil, "", goerr.Wrap(err, "failed to post ticket", goerr.V("channelID", x.channelID), goerr.V("blocks", blocks))
@@ -322,7 +321,6 @@ func (x *ThreadService) PostTicket(ctx context.Context, ticket *ticket.Ticket, a
 			ctx,
 			x.channelID,
 			slack.MsgOptionBlocks(blocks...),
-			slack.MsgOptionBroadcast(),
 			slack.MsgOptionTS(ticket.SlackThread.ThreadID),
 		)
 		if err != nil {
@@ -714,7 +712,6 @@ func (x *ThreadService) PostTicketList(ctx context.Context, tickets []*ticket.Ti
 		x.channelID,
 		slack.MsgOptionBlocks(blocks...),
 		slack.MsgOptionTS(x.threadID),
-		slack.MsgOptionBroadcast(),
 	)
 	if err != nil {
 		return goerr.Wrap(err, "failed to post ticket list to slack", goerr.V("blocks", blocks))
