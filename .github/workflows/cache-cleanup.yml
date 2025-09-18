@@ -1,0 +1,165 @@
+name: Daily Cache Cleanup
+
+on:
+  schedule:
+    # Run daily at 2:00 AM UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Setup environment
+        run: |
+          echo "Starting daily cache cleanup..."
+          echo "Repository: ${{ github.repository }}"
+
+          # Calculate date 7 days ago for age filtering
+          SEVEN_DAYS_AGO=$(date -d '7 days ago' -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "Keeping caches newer than: $SEVEN_DAYS_AGO"
+          echo "SEVEN_DAYS_AGO=$SEVEN_DAYS_AGO" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+
+      - name: Fetch cache list
+        run: |
+          echo "Fetching cache list..."
+          CACHE_LIST=$(gh cache list --limit 1000 --json id,key,createdAt,sizeInBytes --sort created_at --order desc)
+
+          if [ "$CACHE_LIST" = "[]" ] || [ -z "$CACHE_LIST" ]; then
+            echo "No caches found in repository"
+            echo "CACHE_LIST=[]" >> $GITHUB_ENV
+            echo "TOTAL_CACHES=0" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          TOTAL_CACHES=$(echo "$CACHE_LIST" | jq 'length')
+          echo "Total caches found: $TOTAL_CACHES"
+
+          # Save to environment for next steps
+          echo "CACHE_LIST<<EOF" >> $GITHUB_ENV
+          echo "$CACHE_LIST" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          echo "TOTAL_CACHES=$TOTAL_CACHES" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+
+      - name: Determine caches to keep
+        run: |
+          if [ "$TOTAL_CACHES" = "0" ]; then
+            echo "No caches to process"
+            exit 0
+          fi
+
+          # Get latest 10 cache IDs
+          LATEST_10_IDS=$(echo "$CACHE_LIST" | jq -r '.[0:10][].id' | tr '\n' ' ')
+          echo "Latest 10 cache IDs: $LATEST_10_IDS"
+
+          # Get cache IDs within 7 days
+          RECENT_CACHE_IDS=$(echo "$CACHE_LIST" | jq -r --arg seven_days_ago "$SEVEN_DAYS_AGO" '
+            map(select(.createdAt > $seven_days_ago)) | .[].id
+          ' | tr '\n' ' ')
+          echo "Recent cache IDs (within 7 days): $RECENT_CACHE_IDS"
+
+          # Combine and deduplicate
+          KEEP_IDS=$(echo "$LATEST_10_IDS $RECENT_CACHE_IDS" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+          echo "Combined cache IDs to keep: $KEEP_IDS"
+
+          # Calculate delete IDs
+          DELETE_IDS=$(echo "$CACHE_LIST" | jq -r --arg keep_ids "$KEEP_IDS" '
+            [.[].id] - ($keep_ids | split(" ") | map(select(. != ""))) | .[]
+          ' | tr '\n' ' ')
+
+          # Count results
+          KEEP_COUNT=$(echo "$KEEP_IDS" | tr ' ' '\n' | grep -v '^$' | wc -l)
+          DELETE_COUNT=$(echo "$DELETE_IDS" | tr ' ' '\n' | grep -v '^$' | wc -l)
+
+          echo "Caches to keep: $KEEP_COUNT"
+          echo "Caches to delete: $DELETE_COUNT"
+
+          # Save to environment
+          echo "KEEP_IDS=$KEEP_IDS" >> $GITHUB_ENV
+          echo "DELETE_IDS=$DELETE_IDS" >> $GITHUB_ENV
+          echo "KEEP_COUNT=$KEEP_COUNT" >> $GITHUB_ENV
+          echo "DELETE_COUNT=$DELETE_COUNT" >> $GITHUB_ENV
+
+      - name: Display cache details
+        run: |
+          if [ "$TOTAL_CACHES" = "0" ]; then
+            exit 0
+          fi
+
+          echo ""
+          echo "=== Caches to KEEP ==="
+          for keep_id in $KEEP_IDS; do
+            if [ -n "$keep_id" ]; then
+              echo "$CACHE_LIST" | jq -r --arg id "$keep_id" '
+                map(select(.id == $id))[0] |
+                "ID: " + .id + " | Key: " + .key + " | Created: " + .createdAt + " | Size: " + (.sizeInBytes | @csv) + " bytes"
+              '
+            fi
+          done
+
+          echo ""
+          echo "=== Caches to DELETE ==="
+          for delete_id in $DELETE_IDS; do
+            if [ -n "$delete_id" ]; then
+              echo "$CACHE_LIST" | jq -r --arg id "$delete_id" '
+                map(select(.id == $id))[0] |
+                "ID: " + .id + " | Key: " + .key + " | Created: " + .createdAt + " | Size: " + (.sizeInBytes | @csv) + " bytes"
+              '
+            fi
+          done
+
+      - name: Execute cache deletion
+        run: |
+          if [ "$TOTAL_CACHES" = "0" ] || [ -z "$DELETE_IDS" ] || [ "$(echo "$DELETE_IDS" | tr -d ' ')" = "" ]; then
+            echo "No caches to delete"
+            echo "DELETED_COUNT=0" >> $GITHUB_ENV
+            echo "FAILED_COUNT=0" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          echo "Starting cache deletion..."
+
+          # Don't fail workflow on individual cache deletion failures
+          set +e
+
+          deleted_count=0
+          failed_count=0
+
+          for cache_id in $DELETE_IDS; do
+            if [ -n "$cache_id" ]; then
+              echo "Deleting cache ID: $cache_id"
+              if gh cache delete "$cache_id"; then
+                deleted_count=$((deleted_count + 1))
+                echo "  ✅ Successfully deleted cache: $cache_id"
+              else
+                failed_count=$((failed_count + 1))
+                echo "  ❌ Failed to delete cache: $cache_id"
+              fi
+            fi
+          done
+
+          set -e
+
+          echo "DELETED_COUNT=$deleted_count" >> $GITHUB_ENV
+          echo "FAILED_COUNT=$failed_count" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+
+      - name: Cleanup summary
+        run: |
+          echo ""
+          echo "=== CLEANUP SUMMARY ==="
+          echo "Total caches found: $TOTAL_CACHES"
+          echo "Caches kept: $KEEP_COUNT"
+          echo "Caches successfully deleted: ${DELETED_COUNT:-0}"
+          echo "Cache deletion failures: ${FAILED_COUNT:-0}"
+          echo "Cleanup completed!"
