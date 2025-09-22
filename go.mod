@@ -8,7 +8,6 @@ require (
 	cloud.google.com/go/bigquery v1.69.0
 	cloud.google.com/go/firestore v1.18.0
 	cloud.google.com/go/storage v1.55.0
-	cloud.google.com/go/vertexai v0.15.0
 	github.com/99designs/gqlgen v0.17.73
 	github.com/bradleyfalzon/ghinstallation/v2 v2.16.0
 	github.com/dustin/go-humanize v1.0.1
@@ -34,6 +33,7 @@ require (
 	github.com/urfave/cli/v3 v3.3.2
 	github.com/vektah/gqlparser/v2 v2.5.26
 	google.golang.org/api v0.242.0
+	google.golang.org/genai v1.16.0
 	google.golang.org/grpc v1.73.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -41,7 +41,6 @@ require (
 require (
 	cel.dev/expr v0.24.0 // indirect
 	cloud.google.com/go v0.121.3 // indirect
-	cloud.google.com/go/aiplatform v1.94.0 // indirect
 	cloud.google.com/go/auth v0.16.2 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.7.0 // indirect
@@ -176,7 +175,6 @@ require (
 	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/tools v0.34.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
-	google.golang.org/genai v1.16.0 // indirect
 	google.golang.org/genproto v0.0.0-20250715232539-7130f93afb79 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250715232539-7130f93afb79 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250715232539-7130f93afb79 // indirect
