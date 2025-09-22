@@ -65,6 +65,8 @@ type Metadata struct {
 	// Tags field is used temporarily during policy processing to pass tag names
 	// These are converted to TagIDs and not persisted in this field
 	Tags []string `json:"tags,omitempty"`
+	// Channel field specifies the Slack channel for alert notification
+	Channel string `json:"channel,omitempty"`
 }
 
 func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metadata) Alert {
