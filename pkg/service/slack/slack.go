@@ -217,17 +217,35 @@ func (x *Service) PostMessage(ctx context.Context, message string) (*ThreadServi
 	return threadSvc, nil
 }
 
-func (x *Service) PostAlert(ctx context.Context, alert *alert.Alert) (interfaces.SlackThreadService, error) {
+// resolveChannel determines the target channel for the alert
+func (x *Service) resolveChannel(alert *alert.Alert) string {
+	if alert.Metadata.Channel != "" {
+		return x.normalizeChannel(alert.Metadata.Channel)
+	}
+	return x.channelID
+}
+
+// normalizeChannel removes # prefix and trims whitespace from channel name
+func (x *Service) normalizeChannel(channel string) string {
+	channel = strings.TrimSpace(channel)
+	channel = strings.TrimPrefix(channel, "#")
+	return channel
+}
+
+// postAlertToChannel posts an alert to the specified channel
+func (x *Service) postAlertToChannel(ctx context.Context, targetChannel string, alert *alert.Alert) (interfaces.SlackThreadService, error) {
 	blocks := buildAlertBlocks(*alert)
 
 	channelID, timestamp, err := x.client.PostMessageContext(
 		ctx,
-		x.channelID,
+		targetChannel,
 		slack.MsgOptionBlocks(blocks...),
 	)
 
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to post message to slack", goerr.V("blocks", blocks))
+		return nil, goerr.Wrap(err, "failed to post message to slack",
+			goerr.V("channel", targetChannel),
+			goerr.V("blocks", blocks))
 	}
 
 	thread := &ThreadService{
@@ -251,6 +269,37 @@ func (x *Service) PostAlert(ctx context.Context, alert *alert.Alert) (interfaces
 	}
 
 	return thread, nil
+}
+
+// postAlertWithFallback attempts to post to default channel with a warning after initial failure
+func (x *Service) postAlertWithFallback(ctx context.Context, failedChannel string, alert *alert.Alert, originalErr error) (interfaces.SlackThreadService, error) {
+	logger := logging.From(ctx)
+	logger.Warn("Failed to post alert to channel, falling back to default",
+		"failed_channel", failedChannel,
+		"default_channel", x.channelID,
+		"error", originalErr)
+
+	// Create a copy of the alert with warning message prepended to description
+	fallbackAlert := *alert
+	fallbackAlert.Metadata.Description = fmt.Sprintf("⚠️ Failed to send to <#%s>: %v\nFalling back to default channel.\n\n%s",
+		failedChannel, originalErr, alert.Metadata.Description)
+
+	// Use existing postAlertToChannel method with modified alert
+	return x.postAlertToChannel(ctx, x.channelID, &fallbackAlert)
+}
+
+func (x *Service) PostAlert(ctx context.Context, alert *alert.Alert) (interfaces.SlackThreadService, error) {
+	// Determine target channel based on alert metadata
+	targetChannel := x.resolveChannel(alert)
+
+	// Try to post to the target channel
+	thread, err := x.postAlertToChannel(ctx, targetChannel, alert)
+	if err != nil && targetChannel != x.channelID {
+		// If posting to a policy-specified channel failed, fallback to default
+		return x.postAlertWithFallback(ctx, targetChannel, alert, err)
+	}
+
+	return thread, err
 }
 
 func (x *Service) UpdateAlerts(ctx context.Context, alerts alert.Alerts) {

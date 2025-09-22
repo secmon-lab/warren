@@ -947,7 +947,7 @@ alert contains {
         {
             "key": "malware_family",
             "value": input.malware_name,
-            "link": sprintf("https://malpedia.caad.fkie.fraunhofer.de/search?q=%s", 
+            "link": sprintf("https://malpedia.caad.fkie.fraunhofer.de/search?q=%s",
                 [replace(input.malware_name, " ", "+")])
         }
     ]
@@ -955,6 +955,49 @@ alert contains {
     input.confidence_score > 80
 }
 ```
+
+### Example 5: Channel-Based Alert Routing
+
+You can specify different Slack channels for alerts based on their properties using the `channel` field in alert metadata:
+
+```rego
+package alert.example
+
+alert contains {
+    "title": input.alert_name,
+    "description": input.message,
+    "attributes": [],
+    "channel": "security-critical"  # Route to specific channel
+} if {
+    input.severity == "critical"
+}
+
+alert contains {
+    "title": input.alert_name,
+    "description": input.message,
+    "attributes": [],
+    "channel": input.channel  # Use channel from input
+} if {
+    input.channel != null
+    input.severity != "critical"
+}
+
+alert contains {
+    "title": input.alert_name,
+    "description": input.message,
+    "attributes": []
+    # No channel field = use default channel
+} if {
+    input.channel == null
+    input.severity != "critical"
+}
+```
+
+**Key Points:**
+- **Critical alerts** always go to `#security-critical` channel
+- **Custom channel** from input data takes priority for non-critical alerts
+- **Default channel** is used when no channel is specified
+- **Automatic fallback** if the specified channel fails (bot will retry with default channel)
 
 ## Real-World Policy Examples
 
