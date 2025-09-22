@@ -13,6 +13,11 @@ import (
 	slack_sdk "github.com/slack-go/slack"
 )
 
+// normalizeChannelForTest calls the internal normalizeChannel function for testing
+func normalizeChannelForTest(channel string) string {
+	return slack.NormalizeChannel(channel)
+}
+
 func TestPostAlertWithChannel(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -156,20 +161,7 @@ func TestNormalizeChannel(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mockClient := &mock.SlackClientMock{
-				AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
-					return &slack_sdk.AuthTestResponse{}, nil
-				},
-				GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
-					return &slack_sdk.TeamInfo{}, nil
-				},
-			}
-
-			svc, err := slack.New(mockClient, "default")
-			gt.NoError(t, err)
-
-			// Export the normalizeChannel method for testing
-			result := svc.NormalizeChannel(tc.input)
+			result := normalizeChannelForTest(tc.input)
 			gt.Equal(t, result, tc.expected)
 		})
 	}

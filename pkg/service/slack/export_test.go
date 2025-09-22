@@ -29,7 +29,8 @@ func (x *Service) SetProfileCache(cache map[string]*userProfileCache) {
 	x.profileCache = cache
 }
 
-// NormalizeChannel exports the private normalizeChannel method for testing.
-func (x *Service) NormalizeChannel(channel string) string {
-	return x.normalizeChannel(channel)
+// NormalizeChannel exports the private normalizeChannel function for testing.
+func NormalizeChannel(channel string) string {
+	return normalizeChannel(channel)
 }
+
