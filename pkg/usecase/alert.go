@@ -505,21 +505,14 @@ func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.N
 		return "", goerr.New("slack service not available")
 	}
 
-	// Create simple message with title + description and escalate option
 	alert := &notice.Alert
-	var message string
 
-	// Format with subtle decoration
+	// Create simple message with only title for main channel
+	var mainMessage string
 	if alert.Metadata.Title != "" {
-		message = "🔔 " + alert.Metadata.Title
-	}
-
-	if alert.Metadata.Description != "" {
-		if message != "" {
-			message += "\n\n"
-		}
-		// Add subtle indentation for description
-		message += "> " + alert.Metadata.Description
+		mainMessage = "🔔 " + alert.Metadata.Title
+	} else {
+		mainMessage = "🔔 Security Notice"
 	}
 
 	// Send notice to Slack with escalate button
@@ -531,17 +524,25 @@ func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.N
 
 		var lastTimestamp string
 		for _, channelID := range channels {
-			timestamp, err := slackSvc.PostNotice(ctx, channelID, message, notice.ID)
+			// Post main notice message
+			timestamp, err := slackSvc.PostNotice(ctx, channelID, mainMessage, notice.ID)
 			if err != nil {
 				return "", goerr.Wrap(err, "failed to post notice to Slack", goerr.V("channel", channelID))
 			}
 			lastTimestamp = timestamp
+
+			// Post detailed information in thread
+			if err := slackSvc.PostNoticeThreadDetails(ctx, channelID, timestamp, alert); err != nil {
+				// Log error but don't fail the main operation
+				logging.From(ctx).Warn("failed to post notice thread details", "error", err, "channel", channelID)
+			}
 		}
 		return lastTimestamp, nil
 	}
 
 	return "", nil
 }
+
 
 // EscalateNotice escalates a notice to a full alert
 func (uc *UseCases) EscalateNotice(ctx context.Context, noticeID types.NoticeID) error {

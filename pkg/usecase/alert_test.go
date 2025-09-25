@@ -1805,9 +1805,9 @@ func TestHandleNotice(t *testing.T) {
 		gt.Equal(t, createdNotice.Alert.Metadata.Description, "Test Description")
 		gt.False(t, createdNotice.Escalated)
 
-		// Verify Slack interaction - message was posted
+		// Verify Slack interaction - main notice + 2 thread messages were posted
 		postCalls := slackMock.PostMessageContextCalls()
-		gt.Array(t, postCalls).Length(1)
+		gt.Array(t, postCalls).Length(3)
 		gt.Equal(t, postCalls[0].ChannelID, "test-channel")
 	})
 
@@ -1855,9 +1855,9 @@ func TestHandleNotice(t *testing.T) {
 		err = uc.HandleNotice(ctx, testAlert, []string{})
 		gt.NoError(t, err)
 
-		// Verify Slack was called with default channel (empty string becomes default)
+		// Verify Slack was called with default channel (empty string becomes default) - main notice + 2 thread messages
 		postCalls := slackMock.PostMessageContextCalls()
-		gt.Array(t, postCalls).Length(1)
+		gt.Array(t, postCalls).Length(3)
 		gt.Equal(t, postCalls[0].ChannelID, "#test-channel")
 	})
 
@@ -1909,11 +1909,17 @@ func TestHandleNotice(t *testing.T) {
 		createCalls := repoMock.CreateNoticeCalls()
 		gt.Array(t, createCalls).Length(1)
 
-		// Verify Slack was called for each channel
+		// Verify Slack was called for each channel - 2 channels * 3 messages each = 6 total
 		postCalls := slackMock.PostMessageContextCalls()
-		gt.Array(t, postCalls).Length(2)
+		gt.Array(t, postCalls).Length(6)
+		// First channel: main message + 2 thread messages
 		gt.Equal(t, postCalls[0].ChannelID, "channel-1")
-		gt.Equal(t, postCalls[1].ChannelID, "channel-2")
+		gt.Equal(t, postCalls[1].ChannelID, "channel-1")
+		gt.Equal(t, postCalls[2].ChannelID, "channel-1")
+		// Second channel: main message + 2 thread messages
+		gt.Equal(t, postCalls[3].ChannelID, "channel-2")
+		gt.Equal(t, postCalls[4].ChannelID, "channel-2")
+		gt.Equal(t, postCalls[5].ChannelID, "channel-2")
 	})
 }
 

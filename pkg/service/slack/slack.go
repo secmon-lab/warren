@@ -1180,3 +1180,80 @@ func (x *Service) PostNotice(ctx context.Context, channelID, message string, not
 
 	return timestamp, nil
 }
+
+// PostNoticeThreadDetails posts detailed information about the notice in a thread
+func (x *Service) PostNoticeThreadDetails(ctx context.Context, channelID, threadTS string, alert *alert.Alert) error {
+	// Message 1: Schema, description, and attributes (similar to normal alert format)
+	detailsMessage := x.formatNoticeDetailsMessage(alert)
+	_, _, err := x.client.PostMessageContext(ctx, channelID,
+		slack.MsgOptionText(detailsMessage, false),
+		slack.MsgOptionTS(threadTS),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post notice details message")
+	}
+
+	// Message 2: Original alert data in code format
+	originalDataMessage := formatOriginalDataMessage(alert)
+	_, _, err = x.client.PostMessageContext(ctx, channelID,
+		slack.MsgOptionText(originalDataMessage, false),
+		slack.MsgOptionTS(threadTS),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post original data message")
+	}
+
+	return nil
+}
+
+// formatNoticeDetailsMessage formats the notice details (title, schema, description, attributes)
+func (x *Service) formatNoticeDetailsMessage(alert *alert.Alert) string {
+	var details []string
+
+	// Add title
+	if alert.Metadata.Title != "" {
+		details = append(details, fmt.Sprintf("*Title:* %s", alert.Metadata.Title))
+	}
+
+	// Add schema
+	if alert.Schema != "" {
+		details = append(details, fmt.Sprintf("*Schema:* `%s`", alert.Schema))
+	}
+
+	// Add description
+	if alert.Metadata.Description != "" {
+		details = append(details, fmt.Sprintf("*Description:* %s", alert.Metadata.Description))
+	}
+
+	// Add attributes
+	if len(alert.Metadata.Attributes) > 0 {
+		details = append(details, "*Attributes:*")
+		for _, attr := range alert.Metadata.Attributes {
+			if attr.Link != "" {
+				details = append(details, fmt.Sprintf("• *%s:* <%s|%s>", attr.Key, attr.Link, attr.Value))
+			} else {
+				details = append(details, fmt.Sprintf("• *%s:* %s", attr.Key, attr.Value))
+			}
+		}
+	}
+
+	if len(details) == 0 {
+		return "_No additional details available._"
+	}
+
+	return strings.Join(details, "\n")
+}
+
+// formatOriginalDataMessage formats the original alert data as code
+func formatOriginalDataMessage(alert *alert.Alert) string {
+	if alert.Data == nil {
+		return "_No alert data_"
+	}
+
+	dataJSON, err := json.MarshalIndent(alert.Data, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("Error formatting data:\n```%v\n```", err)
+	}
+
+	return fmt.Sprintf("```\n%s\n```", string(dataJSON))
+}
