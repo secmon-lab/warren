@@ -1575,7 +1575,7 @@ func TestProcessGenAI(t *testing.T) {
 				Title: "Test Alert",
 				GenAI: &alert.GenAIConfig{
 					Prompt: "test_prompt.tmpl",
-					Type:   "text",
+					Format:   "text",
 				},
 			},
 		}
@@ -1614,7 +1614,7 @@ func TestProcessGenAI(t *testing.T) {
 				Title: "Test Alert",
 				GenAI: &alert.GenAIConfig{
 					Prompt: "test_prompt.tmpl",
-					Type:   "text",
+					Format:   "text",
 				},
 			},
 		}
@@ -1656,7 +1656,7 @@ func TestProcessGenAI(t *testing.T) {
 				Title: "Test Alert",
 				GenAI: &alert.GenAIConfig{
 					Prompt: "mock_template",
-					Type:   "text",
+					Format:   "text",
 				},
 			},
 		}
@@ -2103,7 +2103,7 @@ func TestHandleAlert_ActionPolicyMetadataUpdates(t *testing.T) {
 							Description: "Original alert description",
 							GenAI: &alert.GenAIConfig{
 								Prompt: "analyze_security.tmpl",
-								Type:   types.GenAIContentTypeJSON,
+								Format: types.GenAIContentFormatJSON,
 							},
 						},
 					}
@@ -2123,8 +2123,8 @@ func TestHandleAlert_ActionPolicyMetadataUpdates(t *testing.T) {
 					policyResult.Title = "High Risk Security Alert"
 					policyResult.Description = "AI analysis indicates high risk security incident requiring immediate attention"
 					policyResult.Attr = map[string]string{
-						"risk_level": "high",
-						"confidence": "95%",
+						"risk_level":  "high",
+						"confidence":  "95%",
 						"ai_analysis": "threat_detected",
 					}
 				}

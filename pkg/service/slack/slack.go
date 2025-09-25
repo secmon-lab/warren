@@ -20,6 +20,7 @@ import (
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 
@@ -218,7 +219,7 @@ func (x *Service) PostMessage(ctx context.Context, message string) (*ThreadServi
 }
 
 // resolveChannel determines the target channel for the alert
-func (x *Service) resolveChannel(alert *alert.Alert) string {
+func (x *Service) resolveChannel(_ *alert.Alert) string {
 	return x.channelID
 }
 
@@ -1182,7 +1183,7 @@ func (x *Service) PostNotice(ctx context.Context, channelID, message string, not
 }
 
 // PostNoticeThreadDetails posts detailed information about the notice in a thread
-func (x *Service) PostNoticeThreadDetails(ctx context.Context, channelID, threadTS string, alert *alert.Alert) error {
+func (x *Service) PostNoticeThreadDetails(ctx context.Context, channelID, threadTS string, alert *alert.Alert, llmResponse *alert.GenAIResponse) error {
 	// Message 1: Schema, description, and attributes (similar to normal alert format)
 	detailsMessage := x.formatNoticeDetailsMessage(alert)
 	_, _, err := x.client.PostMessageContext(ctx, channelID,
@@ -1201,6 +1202,18 @@ func (x *Service) PostNoticeThreadDetails(ctx context.Context, channelID, thread
 	)
 	if err != nil {
 		return goerr.Wrap(err, "failed to post original data message")
+	}
+
+	// Message 3: LLM response if available
+	if llmResponse != nil {
+		llmMessage := formatLLMResponseMessage(llmResponse)
+		_, _, err = x.client.PostMessageContext(ctx, channelID,
+			slack.MsgOptionText(llmMessage, false),
+			slack.MsgOptionTS(threadTS),
+		)
+		if err != nil {
+			return goerr.Wrap(err, "failed to post LLM response message")
+		}
 	}
 
 	return nil
@@ -1256,4 +1269,28 @@ func formatOriginalDataMessage(alert *alert.Alert) string {
 	}
 
 	return fmt.Sprintf("```\n%s\n```", string(dataJSON))
+}
+
+// formatLLMResponseMessage formats the LLM response for display
+func formatLLMResponseMessage(response *alert.GenAIResponse) string {
+	if response == nil || response.Data == nil {
+		return "_No LLM response_"
+	}
+
+	switch response.Format {
+	case types.GenAIContentFormatJSON:
+		// Pretty print JSON
+		if jsonBytes, err := json.MarshalIndent(response.Data, "", "  "); err == nil {
+			return fmt.Sprintf("*LLM Response:*\n```\n%s\n```", string(jsonBytes))
+		} else {
+			// Fallback to string representation
+			return fmt.Sprintf("*LLM Response:*\n```\n%v\n```", response.Data)
+		}
+	case types.GenAIContentFormatText:
+		// Display text as-is in code block
+		return fmt.Sprintf("*LLM Response:*\n```\n%v\n```", response.Data)
+	default:
+		// Default case - display as string in code block
+		return fmt.Sprintf("*LLM Response:*\n```\n%v\n```", response.Data)
+	}
 }

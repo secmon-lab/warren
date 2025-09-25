@@ -71,8 +71,14 @@ type Metadata struct {
 
 // GenAIConfig configures LLM processing for alerts
 type GenAIConfig struct {
-	Prompt string                 `json:"prompt"` // Prompt template file name
-	Type   types.GenAIContentType `json:"type"`   // Response type: "text" | "json" (default: "text")
+	Prompt string                  `json:"prompt"` // Prompt template file name
+	Format types.GenAIContentFormat `json:"format"` // Response format: "text" | "json" (default: "text")
+}
+
+// GenAIResponse represents the LLM response for display purposes
+type GenAIResponse struct {
+	Data   any                      `json:"data"`   // Raw response data
+	Format types.GenAIContentFormat `json:"format"` // Response format for formatting
 }
 
 func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metadata) Alert {

@@ -176,7 +176,11 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 
 			case types.PublishTypeNotice:
 				// Create notice instead of full alert
-				if err := uc.handleNotice(ctx, &newAlert, policyResult.Channel); err != nil {
+				genaiResponse := &alert.GenAIResponse{
+					Data:   llmResponse,
+					Format: newAlert.Metadata.GenAI.Format,
+				}
+				if err := uc.handleNotice(ctx, &newAlert, policyResult.Channel, genaiResponse); err != nil {
 					return nil, goerr.Wrap(err, "failed to handle notice")
 				}
 				logger.Info("alert processed as notice", "alert", newAlert)
@@ -426,7 +430,7 @@ func (uc *UseCases) processGenAI(ctx context.Context, alert *alert.Alert) (any, 
 	}
 
 	var options []gollem.SessionOption
-	if genaiConfig.Type == types.GenAIContentTypeJSON {
+	if genaiConfig.Format == types.GenAIContentFormatJSON {
 		options = append(options, gollem.WithSessionContentType(gollem.ContentTypeJSON))
 	}
 
@@ -449,8 +453,8 @@ func (uc *UseCases) processGenAI(ctx context.Context, alert *alert.Alert) (any, 
 	var responseData any = responseText
 	logger := logging.From(ctx)
 
-	// Parse JSON response if type is JSON
-	if genaiConfig.Type == types.GenAIContentTypeJSON {
+	// Parse JSON response if format is JSON
+	if genaiConfig.Format == types.GenAIContentFormatJSON {
 		var parsedResponse any
 		if err := json.Unmarshal([]byte(responseText), &parsedResponse); err != nil {
 			// If JSON parsing fails, return raw string
@@ -465,7 +469,7 @@ func (uc *UseCases) processGenAI(ctx context.Context, alert *alert.Alert) (any, 
 }
 
 // handleNotice handles notice creation and simple notification
-func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channels []string) error {
+func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channels []string, llmResponse *alert.GenAIResponse) error {
 	logger := logging.From(ctx)
 
 	// Create notice
@@ -483,7 +487,7 @@ func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channe
 
 	// Send simple notification to Slack
 	if uc.slackService != nil {
-		slackTS, err := uc.sendSimpleNotification(ctx, notice, channels)
+		slackTS, err := uc.sendSimpleNotification(ctx, notice, channels, llmResponse)
 		if err != nil {
 			logger.Warn("failed to send simple notification", "error", err, "notice_id", notice.ID)
 		} else {
@@ -500,7 +504,7 @@ func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channe
 }
 
 // sendSimpleNotification sends a simple notification to Slack
-func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.Notice, channels []string) (string, error) {
+func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.Notice, channels []string, llmResponse *alert.GenAIResponse) (string, error) {
 	if uc.slackService == nil {
 		return "", goerr.New("slack service not available")
 	}
@@ -532,7 +536,7 @@ func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.N
 			lastTimestamp = timestamp
 
 			// Post detailed information in thread
-			if err := slackSvc.PostNoticeThreadDetails(ctx, channelID, timestamp, alert); err != nil {
+			if err := slackSvc.PostNoticeThreadDetails(ctx, channelID, timestamp, alert, llmResponse); err != nil {
 				// Log error but don't fail the main operation
 				logging.From(ctx).Warn("failed to post notice thread details", "error", err, "channel", channelID)
 			}
@@ -542,7 +546,6 @@ func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.N
 
 	return "", nil
 }
-
 
 // EscalateNotice escalates a notice to a full alert
 func (uc *UseCases) EscalateNotice(ctx context.Context, noticeID types.NoticeID) error {

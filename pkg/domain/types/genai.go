@@ -2,20 +2,20 @@ package types
 
 import "github.com/m-mizutani/goerr/v2"
 
-type GenAIContentType string
+type GenAIContentFormat string
 
 const (
-	GenAIContentTypeText GenAIContentType = "text"
-	GenAIContentTypeJSON GenAIContentType = "json"
+	GenAIContentFormatText GenAIContentFormat = "text"
+	GenAIContentFormatJSON GenAIContentFormat = "json"
 )
 
-// Validate checks if the GenAIContentType has a valid value
-func (x GenAIContentType) Validate() error {
+// Validate checks if the GenAIContentFormat has a valid value
+func (x GenAIContentFormat) Validate() error {
 	switch x {
-	case GenAIContentTypeText, GenAIContentTypeJSON:
+	case GenAIContentFormatText, GenAIContentFormatJSON:
 		return nil
 	default:
-		return goerr.New("invalid GenAI content type", goerr.V("content_type", string(x)), goerr.V("valid_types", []string{string(GenAIContentTypeText), string(GenAIContentTypeJSON)}))
+		return goerr.New("invalid GenAI content format", goerr.V("content_format", string(x)), goerr.V("valid_formats", []string{string(GenAIContentFormatText), string(GenAIContentFormatJSON)}))
 	}
 }
 
