@@ -40,7 +40,9 @@ func (s *Service) loadTemplates(promptDir string) error {
 		return goerr.New("prompt directory does not exist", goerr.V("prompt_dir", promptDir))
 	}
 
-	return filepath.Walk(promptDir, func(path string, info os.FileInfo, err error) error {
+	var loadedFiles []string
+
+	err := filepath.Walk(promptDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return goerr.Wrap(err, "failed to walk prompt directory", goerr.V("path", path))
 		}
@@ -55,9 +57,8 @@ func (s *Service) loadTemplates(promptDir string) error {
 			return nil
 		}
 
-		// Use filename without extension as template name
+		// Use filename as template name (with extension)
 		name := filepath.Base(path)
-		name = name[:len(name)-len(ext)]
 
 		tmpl, err := template.ParseFiles(path)
 		if err != nil {
@@ -65,8 +66,27 @@ func (s *Service) loadTemplates(promptDir string) error {
 		}
 
 		s.templates[name] = tmpl
+		loadedFiles = append(loadedFiles, filepath.Base(path))
 		return nil
 	})
+
+	if err != nil {
+		return err
+	}
+
+	// Log the loaded prompt files
+	if len(loadedFiles) > 0 {
+		logging.Default().Info("loaded prompt templates",
+			"prompt_dir", promptDir,
+			"files", loadedFiles,
+			"count", len(loadedFiles))
+	} else {
+		logging.Default().Warn("no prompt template files found",
+			"prompt_dir", promptDir,
+			"supported_extensions", []string{".txt", ".tmpl", ".md"})
+	}
+
+	return nil
 }
 
 // GeneratePrompt generates a prompt from template name and alert data

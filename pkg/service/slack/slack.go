@@ -219,17 +219,7 @@ func (x *Service) PostMessage(ctx context.Context, message string) (*ThreadServi
 
 // resolveChannel determines the target channel for the alert
 func (x *Service) resolveChannel(alert *alert.Alert) string {
-	if alert.Metadata.Channel != "" {
-		return normalizeChannel(alert.Metadata.Channel)
-	}
 	return x.channelID
-}
-
-// normalizeChannel removes # prefix and trims whitespace from channel name
-func normalizeChannel(channel string) string {
-	channel = strings.TrimSpace(channel)
-	channel = strings.TrimPrefix(channel, "#")
-	return channel
 }
 
 // postAlertToChannel posts an alert to the specified channel

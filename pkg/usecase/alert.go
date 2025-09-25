@@ -20,16 +20,23 @@ import (
 )
 
 // evaluateAction evaluates an action policy for the given alert and LLM response
-func evaluateAction(ctx context.Context, policyClient interfaces.PolicyClient, alert *alert.Alert, llmResponse string) (*action.PolicyResult, error) {
+func evaluateAction(ctx context.Context, policyClient interfaces.PolicyClient, alert *alert.Alert, llmResponse any) (*action.PolicyResult, error) {
+	// Use the parsed LLM response directly for structured data access in policy
+	genAIData := llmResponse
+
 	queryInput := action.QueryInput{
 		Alert: alert,
-		GenAI: llmResponse,
+		GenAI: genAIData,
 	}
 
 	var result action.PolicyResult
 	query := "data.action"
+	hook := func(ctx context.Context, loc opaq.PrintLocation, msg string) error {
+		logging.From(ctx).Debug("[rego.print] "+msg, "location", loc)
+		return nil
+	}
 
-	err := policyClient.Query(ctx, query, queryInput, &result)
+	err := policyClient.Query(ctx, query, queryInput, &result, opaq.WithPrintHook(hook))
 	if err != nil {
 		if errors.Is(err, opaq.ErrNoEvalResult) {
 			// Default behavior when no action policy is defined: publish as alert
@@ -134,7 +141,7 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 		}
 
 		// Evaluate action policy if LLM response is not empty
-		if llmResponse != "" {
+		if llmResponse != nil {
 			policyResult, err := evaluateAction(ctx, uc.policyClient, &newAlert, llmResponse)
 			if err != nil {
 				return nil, goerr.Wrap(err, "failed to evaluate action policy")
@@ -381,7 +388,7 @@ func containsIgnoreCase(s, substr string) bool {
 }
 
 // processGenAI processes GenAI configuration for the given alert
-func (uc *UseCases) processGenAI(ctx context.Context, alert *alert.Alert) (string, error) {
+func (uc *UseCases) processGenAI(ctx context.Context, alert *alert.Alert) (any, error) {
 	if alert.Metadata.GenAI == nil {
 		return "", nil
 	}
@@ -398,8 +405,13 @@ func (uc *UseCases) processGenAI(ctx context.Context, alert *alert.Alert) (strin
 		return "", goerr.Wrap(err, "failed to generate prompt", goerr.V("prompt", genaiConfig.Prompt))
 	}
 
-	// Query LLM
-	session, err := uc.llmClient.NewSession(ctx)
+	var options []gollem.SessionOption
+	if genaiConfig.Type == types.GenAIContentTypeJSON {
+		options = append(options, gollem.WithSessionContentType(gollem.ContentTypeJSON))
+	}
+
+	// Query LLM with JSON response format
+	session, err := uc.llmClient.NewSession(ctx, options...)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to create LLM session")
 	}
@@ -414,22 +426,22 @@ func (uc *UseCases) processGenAI(ctx context.Context, alert *alert.Alert) (strin
 		responseText = response.Texts[0]
 	}
 
-	// Handle response type
-	responseType := genaiConfig.Type
-	if responseType == "" {
-		responseType = "text"
+	var responseData any = responseText
+	logger := logging.From(ctx)
+
+	// Parse JSON response if type is JSON
+	if genaiConfig.Type == types.GenAIContentTypeJSON {
+		var parsedResponse any
+		if err := json.Unmarshal([]byte(responseText), &parsedResponse); err != nil {
+			// If JSON parsing fails, return raw string
+			logger.Warn("failed to parse LLM response as JSON", "text", responseText)
+		} else {
+			responseData = parsedResponse
+		}
 	}
 
-	switch responseType {
-	case "text":
-		return responseText, nil
-	case "json":
-		// For JSON responses, we still return the raw response
-		// The action policy will handle the JSON parsing
-		return responseText, nil
-	default:
-		return "", goerr.New("unsupported response type", goerr.V("type", responseType))
-	}
+	logger.Info("Got GenAI response", "response", responseData)
+	return responseData, nil
 }
 
 // handleNotice handles notice creation and simple notification
@@ -475,19 +487,20 @@ func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.N
 
 	// Create simple message with title + description and escalate option
 	alert := &notice.Alert
-	message := alert.Metadata.Title
-	if alert.Metadata.Description != "" {
-		message += "\n" + alert.Metadata.Description
+	var message string
+
+	// Format with subtle decoration
+	if alert.Metadata.Title != "" {
+		message = "🔔 " + alert.Metadata.Title
 	}
 
-	// For now, send a simple text message to the default channel
-	// In a full implementation, this would create a proper Slack block message with an escalate button
-	// containing the notice ID as the action value
-
-	// Post to all specified channels
-	// Create simple message with escalate instruction
-	fullMessage := message + "\n\n" +
-		"To escalate this notice to a full alert, use the escalate button or mention @warren with 'escalate " + string(notice.ID) + "'"
+	if alert.Metadata.Description != "" {
+		if message != "" {
+			message += "\n\n"
+		}
+		// Add subtle indentation for description
+		message += "> " + alert.Metadata.Description
+	}
 
 	// Send notice to Slack with escalate button
 	if slackSvc := uc.slackService; slackSvc != nil {
@@ -498,7 +511,7 @@ func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.N
 
 		var lastTimestamp string
 		for _, channelID := range channels {
-			timestamp, err := slackSvc.PostNotice(ctx, channelID, fullMessage, notice.ID)
+			timestamp, err := slackSvc.PostNotice(ctx, channelID, message, notice.ID)
 			if err != nil {
 				return "", goerr.Wrap(err, "failed to post notice to Slack", goerr.V("channel", channelID))
 			}

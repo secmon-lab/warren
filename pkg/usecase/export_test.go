@@ -81,7 +81,7 @@ func (uc *UseCases) GenerateInitialTicketCommentForTest(ctx context.Context, tic
 // GenAI related exports for testing
 
 // ProcessGenAI exports the private processGenAI method for testing
-func (uc *UseCases) ProcessGenAI(ctx context.Context, alert *alert.Alert) (string, error) {
+func (uc *UseCases) ProcessGenAI(ctx context.Context, alert *alert.Alert) (any, error) {
 	return uc.processGenAI(ctx, alert)
 }
 
@@ -91,6 +91,6 @@ func (uc *UseCases) HandleNotice(ctx context.Context, alert *alert.Alert, channe
 }
 
 // EvaluateAction exports the private evaluateAction function for testing
-func EvaluateAction(ctx context.Context, policyClient interfaces.PolicyClient, alert *alert.Alert, llmResponse string) (*action.PolicyResult, error) {
+func EvaluateAction(ctx context.Context, policyClient interfaces.PolicyClient, alert *alert.Alert, llmResponse any) (*action.PolicyResult, error) {
 	return evaluateAction(ctx, policyClient, alert, llmResponse)
 }

@@ -1573,7 +1573,7 @@ func TestProcessGenAI(t *testing.T) {
 			Metadata: alert.Metadata{
 				Title: "Test Alert",
 				GenAI: &alert.GenAIConfig{
-					Prompt: "test_prompt",
+					Prompt: "test_prompt.tmpl",
 					Type:   "text",
 				},
 			},
@@ -1612,7 +1612,7 @@ func TestProcessGenAI(t *testing.T) {
 			Metadata: alert.Metadata{
 				Title: "Test Alert",
 				GenAI: &alert.GenAIConfig{
-					Prompt: "test_prompt",
+					Prompt: "test_prompt.tmpl",
 					Type:   "text",
 				},
 			},
@@ -1711,44 +1711,179 @@ func TestActionEvaluator(t *testing.T) {
 }
 
 func TestHandleNotice(t *testing.T) {
-	repo := repository.NewMemory()
-
-	slackMock := &mock.SlackClientMock{
-		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
-			return "test-channel", "test-timestamp", nil
-		},
-		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
-			return &slack_sdk.AuthTestResponse{
-				UserID: "test-user",
-			}, nil
-		},
-	}
-
-	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
-	gt.NoError(t, err)
-
-	uc := usecase.New(
-		usecase.WithRepository(repo),
-		usecase.WithSlackService(slackSvc),
-	)
-
 	ctx := context.Background()
 
-	t.Run("create notice", func(t *testing.T) {
-		alert := &alert.Alert{
+	t.Run("creates notice and sends Slack notification", func(t *testing.T) {
+		// Create fresh mocks for this test
+		repoMock := &mock.RepositoryMock{
+			CreateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				// Verify the notice structure
+				gt.NotNil(t, notice)
+				gt.NotEqual(t, notice.ID, types.EmptyNoticeID)
+				gt.True(t, !notice.CreatedAt.IsZero())
+				gt.False(t, notice.Escalated)
+				return nil
+			},
+			UpdateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+		}
+
+		slackMock := &mock.SlackClientMock{
+			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+				return channelID, "test-timestamp", nil
+			},
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "test-user",
+				}, nil
+			},
+			GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
+				return &slack_sdk.TeamInfo{
+					Domain: "test-workspace",
+				}, nil
+			},
+		}
+
+		slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithRepository(repoMock),
+			usecase.WithSlackService(slackSvc),
+		)
+		testAlert := &alert.Alert{
 			ID: types.NewAlertID(),
 			Metadata: alert.Metadata{
 				Title:       "Test Alert",
 				Description: "Test Description",
 			},
+			Data:   map[string]interface{}{"test": "data"},
+			Schema: "test.schema",
 		}
 
-		err := uc.HandleNotice(ctx, alert, []string{"test-channel"})
+		err = uc.HandleNotice(ctx, testAlert, []string{"test-channel"})
 		gt.NoError(t, err)
 
-		// Check that notice was created in repository
-		// Note: This would require exposing the notice creation for testing
-		// For now, we just verify no error occurred
+		// Verify repository interaction - notice was created
+		createCalls := repoMock.CreateNoticeCalls()
+		gt.Array(t, createCalls).Length(1)
+
+		createdNotice := createCalls[0].NoticeMoqParam
+		gt.Equal(t, createdNotice.Alert.ID, testAlert.ID)
+		gt.Equal(t, createdNotice.Alert.Metadata.Title, "Test Alert")
+		gt.Equal(t, createdNotice.Alert.Metadata.Description, "Test Description")
+		gt.False(t, createdNotice.Escalated)
+
+		// Verify Slack interaction - message was posted
+		postCalls := slackMock.PostMessageContextCalls()
+		gt.Array(t, postCalls).Length(1)
+		gt.Equal(t, postCalls[0].ChannelID, "test-channel")
+	})
+
+	t.Run("uses default channel when no channels specified", func(t *testing.T) {
+		// Create fresh mocks for this test
+		repoMock := &mock.RepositoryMock{
+			CreateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+			UpdateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+		}
+
+		slackMock := &mock.SlackClientMock{
+			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+				return channelID, "test-timestamp", nil
+			},
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "test-user",
+				}, nil
+			},
+			GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
+				return &slack_sdk.TeamInfo{
+					Domain: "test-workspace",
+				}, nil
+			},
+		}
+
+		slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithRepository(repoMock),
+			usecase.WithSlackService(slackSvc),
+		)
+		testAlert := &alert.Alert{
+			ID: types.NewAlertID(),
+			Metadata: alert.Metadata{
+				Title: "Default Channel Test",
+			},
+		}
+
+		err = uc.HandleNotice(ctx, testAlert, []string{})
+		gt.NoError(t, err)
+
+		// Verify Slack was called with default channel (empty string becomes default)
+		postCalls := slackMock.PostMessageContextCalls()
+		gt.Array(t, postCalls).Length(1)
+		gt.Equal(t, postCalls[0].ChannelID, "#test-channel")
+	})
+
+	t.Run("handles multiple channels", func(t *testing.T) {
+		// Create fresh mocks for this test
+		repoMock := &mock.RepositoryMock{
+			CreateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+			UpdateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+		}
+
+		slackMock := &mock.SlackClientMock{
+			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+				return channelID, "test-timestamp", nil
+			},
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "test-user",
+				}, nil
+			},
+			GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
+				return &slack_sdk.TeamInfo{
+					Domain: "test-workspace",
+				}, nil
+			},
+		}
+
+		slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithRepository(repoMock),
+			usecase.WithSlackService(slackSvc),
+		)
+		testAlert := &alert.Alert{
+			ID: types.NewAlertID(),
+			Metadata: alert.Metadata{
+				Title: "Multi Channel Test",
+			},
+		}
+
+		err = uc.HandleNotice(ctx, testAlert, []string{"channel-1", "channel-2"})
+		gt.NoError(t, err)
+
+		// Verify notice was created once
+		createCalls := repoMock.CreateNoticeCalls()
+		gt.Array(t, createCalls).Length(1)
+
+		// Verify Slack was called for each channel
+		postCalls := slackMock.PostMessageContextCalls()
+		gt.Array(t, postCalls).Length(2)
+		gt.Equal(t, postCalls[0].ChannelID, "channel-1")
+		gt.Equal(t, postCalls[1].ChannelID, "channel-2")
 	})
 }
 

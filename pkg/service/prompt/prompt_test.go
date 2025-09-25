@@ -47,7 +47,7 @@ Please provide a summary of this security alert.`
 			},
 		}
 
-		generatedPrompt, err := service.GeneratePrompt(ctx, "test_template", testAlert)
+		generatedPrompt, err := service.GeneratePrompt(ctx, "test_template.tmpl", testAlert)
 		gt.NoError(t, err)
 		gt.S(t, generatedPrompt).Contains("Test Security Alert")
 		gt.S(t, generatedPrompt).Contains("This is a test security alert description")
@@ -113,12 +113,12 @@ Please provide a summary of this security alert.`
 		}
 
 		// Test .tmpl template
-		tmplPrompt, err := service.GeneratePrompt(ctx, "test_template", testAlert)
+		tmplPrompt, err := service.GeneratePrompt(ctx, "test_template.tmpl", testAlert)
 		gt.NoError(t, err)
 		gt.S(t, tmplPrompt).Contains("Test Alert Title")
 
 		// Test .txt template
-		txtPrompt, err := service.GeneratePrompt(ctx, "simple", testAlert)
+		txtPrompt, err := service.GeneratePrompt(ctx, "simple.txt", testAlert)
 		gt.NoError(t, err)
 		gt.Equal(t, txtPrompt, "Simple text template: Test Alert Title")
 
