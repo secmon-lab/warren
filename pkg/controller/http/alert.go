@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"mime"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -109,7 +110,8 @@ func alertRawHandler(uc useCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		schema := chi.URLParam(r, "schema")
 
-		if r.Header.Get("Content-Type") != "application/json" {
+		contentType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if err != nil || contentType != "application/json" {
 			handleError(w, r, goerr.New("invalid content type",
 				goerr.T(errs.TagInvalidRequest),
 			))

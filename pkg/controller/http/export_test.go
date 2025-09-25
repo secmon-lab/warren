@@ -5,6 +5,7 @@ var (
 	PanicRecoveryMiddleware           = panicRecoveryMiddleware
 	HandleSNSSubscriptionConfirmation = handleSNSSubscriptionConfirmation
 	AlertSNSHandler                   = alertSNSHandler
+	AlertRawHandler                   = alertRawHandler
 	WithHTTPClient                    = withHTTPClient
 	ValidateGoogleIAPToken            = validateGoogleIAPToken
 	ValidateGoogleIAPTokenWithJWKURL  = validateGoogleIAPTokenWithJWKURL
