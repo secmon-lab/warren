@@ -14,6 +14,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -53,18 +54,15 @@ func (r *Firestore) Close() error {
 }
 
 const (
-	collectionAlerts      = "alerts"
-	collectionPolicies    = "policies"
-	collectionPolicyDiffs = "diffs"
-	collectionAlertLists  = "lists"
-	collectionSessions    = "sessions"
-	collectionHistories   = "histories"
-	collectionNotes       = "notes"
-	collectionTickets     = "tickets"
-	collectionComments    = "comments"
-	collectionTokens      = "tokens"
-	collectionActivities  = "activities"
-	collectionTags        = "tags"
+	collectionAlerts     = "alerts"
+	collectionAlertLists = "lists"
+	collectionHistories  = "histories"
+	collectionTickets    = "tickets"
+	collectionComments   = "comments"
+	collectionTokens     = "tokens"
+	collectionActivities = "activities"
+	collectionTags       = "tags"
+	collectionNotices    = "notices"
 )
 
 // extractCountFromAggregationResult extracts an integer count from a Firestore aggregation result.
@@ -1743,4 +1741,78 @@ func (r *Firestore) ListAllTags(ctx context.Context) ([]*tag.Tag, error) {
 	}
 
 	return tags, nil
+}
+
+// Notice management methods
+
+func (r *Firestore) CreateNotice(ctx context.Context, notice *notice.Notice) error {
+	if notice.ID == types.EmptyNoticeID {
+		return r.eb.New("notice ID is empty")
+	}
+
+	docRef := r.db.Collection(collectionNotices).Doc(string(notice.ID))
+
+	// Check if document already exists
+	_, err := docRef.Get(ctx)
+	if status.Code(err) != codes.NotFound {
+		if err == nil {
+			return r.eb.New("notice already exists", goerr.V("notice_id", notice.ID))
+		}
+		return r.eb.Wrap(err, "failed to check notice existence", goerr.V("notice_id", notice.ID))
+	}
+
+	// Create the notice document
+	_, err = docRef.Set(ctx, notice)
+	if err != nil {
+		return r.eb.Wrap(err, "failed to create notice", goerr.V("notice_id", notice.ID))
+	}
+
+	return nil
+}
+
+func (r *Firestore) GetNotice(ctx context.Context, id types.NoticeID) (*notice.Notice, error) {
+	if id == types.EmptyNoticeID {
+		return nil, r.eb.New("notice ID is empty")
+	}
+
+	docRef := r.db.Collection(collectionNotices).Doc(string(id))
+	doc, err := docRef.Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, r.eb.New("notice not found", goerr.V("notice_id", id))
+		}
+		return nil, r.eb.Wrap(err, "failed to get notice", goerr.V("notice_id", id))
+	}
+
+	var notice notice.Notice
+	if err := doc.DataTo(&notice); err != nil {
+		return nil, r.eb.Wrap(err, "failed to decode notice data", goerr.V("notice_id", id))
+	}
+
+	return &notice, nil
+}
+
+func (r *Firestore) UpdateNotice(ctx context.Context, notice *notice.Notice) error {
+	if notice.ID == types.EmptyNoticeID {
+		return r.eb.New("notice ID is empty")
+	}
+
+	docRef := r.db.Collection(collectionNotices).Doc(string(notice.ID))
+
+	// Check if document exists
+	_, err := docRef.Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return r.eb.New("notice not found", goerr.V("notice_id", notice.ID))
+		}
+		return r.eb.Wrap(err, "failed to check notice existence", goerr.V("notice_id", notice.ID))
+	}
+
+	// Update the notice document
+	_, err = docRef.Set(ctx, notice)
+	if err != nil {
+		return r.eb.Wrap(err, "failed to update notice", goerr.V("notice_id", notice.ID))
+	}
+
+	return nil
 }

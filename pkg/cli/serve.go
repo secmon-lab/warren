@@ -18,6 +18,7 @@ import (
 	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/service/prompt"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -55,6 +56,7 @@ func cmdServe() *cli.Command {
 		wsAllowedOrigins []string
 		webUICfg         config.WebUI
 		policyCfg        config.Policy
+		genaiCfg         config.GenAI
 		sentryCfg        config.Sentry
 		slackCfg         config.Slack
 		llmCfg           config.LLMCfg
@@ -115,6 +117,7 @@ func cmdServe() *cli.Command {
 		},
 		webUICfg.Flags(),
 		policyCfg.Flags(),
+		genaiCfg.Flags(),
 		sentryCfg.Flags(),
 		slackCfg.Flags(),
 		llmCfg.Flags(),
@@ -152,6 +155,7 @@ func cmdServe() *cli.Command {
 				"noAuthorization", noAuthorization,
 				"web-ui", webUICfg,
 				"policy", policyCfg,
+				"genai", genaiCfg,
 				"sentry", sentryCfg,
 				"slack", slackCfg,
 				"llm", llmCfg,
@@ -258,6 +262,15 @@ func cmdServe() *cli.Command {
 				usecase.WithTools(toolSets),
 				usecase.WithStrictAlert(strictAlert),
 				usecase.WithTagService(tagService),
+			}
+
+			// Add GenAI configuration if configured
+			if genaiCfg.IsConfigured() {
+				promptService, err := prompt.New(genaiCfg.GetPromptDir())
+				if err != nil {
+					return goerr.Wrap(err, "failed to create prompt service")
+				}
+				ucOptions = append(ucOptions, usecase.WithPromptService(promptService))
 			}
 
 			// Add Slack service if available

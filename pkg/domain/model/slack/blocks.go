@@ -82,6 +82,9 @@ const (
 	// For ticket
 	ActionIDResolveTicket ActionID = "resolve_ticket"
 	ActionIDSalvage       ActionID = "salvage"
+
+	// For notice
+	ActionIDEscalate ActionID = "escalate"
 )
 
 type Mention struct {

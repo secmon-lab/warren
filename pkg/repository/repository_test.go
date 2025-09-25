@@ -14,6 +14,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	ticketmodel "github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -401,7 +402,7 @@ func TestFindSimilarAlerts(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
 		alerts := alert.Alerts{}
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			// Generate random embedding array with 256 dimensions
 			embeddings := make([]float32, 256)
 			for i := range embeddings {
@@ -476,7 +477,7 @@ func TestBatchGetTickets(t *testing.T) {
 		// Create test tickets
 		tickets := make([]*ticketmodel.Ticket, 3)
 		ticketIDs := make([]types.TicketID, 3)
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			ticket := newTestTicket(&thread)
 			ticket.Metadata.Title = fmt.Sprintf("Test Ticket %d", i)
 			gt.NoError(t, repo.PutTicket(ctx, ticket)).Required()
@@ -533,7 +534,7 @@ func TestFindSimilarTickets(t *testing.T) {
 		})
 
 		tickets := make([]*ticketmodel.Ticket, 10)
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			// Generate random embedding array with 256 dimensions
 			embeddings := make([]float32, 256)
 			for i := range embeddings {
@@ -616,7 +617,7 @@ func TestFindNearestTickets(t *testing.T) {
 		})
 
 		tickets := make([]*ticketmodel.Ticket, 10)
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			// Generate random embedding array with 256 dimensions
 			embeddings := make([]float32, 256)
 			for i := range embeddings {
@@ -678,7 +679,7 @@ func TestFindNearestAlerts(t *testing.T) {
 		ctx := t.Context()
 
 		alerts := alert.Alerts{}
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			// Generate random embedding array with 256 dimensions
 			embeddings := make([]float32, 256)
 			for i := range embeddings {
@@ -945,7 +946,7 @@ func TestHistory(t *testing.T) {
 
 		// Create and put multiple histories
 		histories := make([]ticketmodel.History, 3)
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			history := ticketmodel.NewHistory(ctx, ticket.ID)
 			history.CreatedAt = time.Now().Add(time.Duration(i) * time.Hour)
 			gt.NoError(t, repo.PutHistory(ctx, ticket.ID, &history))
@@ -987,7 +988,7 @@ func TestTicketComments(t *testing.T) {
 
 		// Create and put multiple comments
 		comments := make([]ticketmodel.Comment, 3)
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			slackMsg := slack.NewMessage(ctx, &slackevents.EventsAPIEvent{
 				InnerEvent: slackevents.EventsAPIInnerEvent{
 					Data: &slackevents.AppMentionEvent{
@@ -1649,7 +1650,7 @@ func TestTicketCommentsPagination(t *testing.T) {
 		comments := make([]ticketmodel.Comment, 10)
 		baseTime := time.Now().Add(-time.Hour) // Start from 1 hour ago
 
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			slackMsg := slack.NewMessage(ctx, &slackevents.EventsAPIEvent{
 				InnerEvent: slackevents.EventsAPIInnerEvent{
 					Data: &slackevents.AppMentionEvent{
@@ -1896,9 +1897,10 @@ func TestActivityCreation(t *testing.T) {
 				var creationActivity, updateActivity *activity.Activity
 				for _, act := range activities {
 					if act.TicketID == ticket.ID {
-						if act.Type == types.ActivityTypeTicketCreated {
+						switch act.Type {
+						case types.ActivityTypeTicketCreated:
 							creationActivity = act
-						} else if act.Type == types.ActivityTypeTicketUpdated {
+						case types.ActivityTypeTicketUpdated:
 							updateActivity = act
 						}
 					}
@@ -2086,7 +2088,7 @@ func TestActivityCreation(t *testing.T) {
 
 				// Create multiple alerts
 				alertIDs := make([]types.AlertID, 3)
-				for i := 0; i < 3; i++ {
+				for i := range 3 {
 					alert := &alert.Alert{
 						ID: types.NewAlertID(),
 						Metadata: alert.Metadata{
@@ -2184,7 +2186,7 @@ func TestGetAlertWithoutTicketPagination(t *testing.T) {
 			boundAlerts := make([]alert.Alert, 5)
 			unboundAlerts := make([]alert.Alert, 5)
 
-			for i := 0; i < 5; i++ {
+			for i := range 5 {
 				boundAlerts[i] = alert.Alert{
 					ID:       types.AlertID(fmt.Sprintf("bound-alert-%d", i)),
 					TicketID: ticket1.ID,
@@ -2605,7 +2607,7 @@ func TestAlertAndTicketTags(t *testing.T) {
 			gt.NoError(t, repo.CreateTagWithID(ctx, commonTag))
 
 			var individualTags []*tag.Tag
-			for i := 0; i < 3; i++ {
+			for i := range 3 {
 				individualTag := &tag.Tag{
 					ID:   tag.NewID(),
 					Name: fmt.Sprintf("tag%d", i),
@@ -2616,7 +2618,7 @@ func TestAlertAndTicketTags(t *testing.T) {
 
 			// Create multiple alerts with tags
 			alerts := make(alert.Alerts, 3)
-			for i := 0; i < 3; i++ {
+			for i := range 3 {
 				a := alert.New(ctx, "test", map[string]string{"index": fmt.Sprintf("%d", i)}, alert.Metadata{
 					Title:       fmt.Sprintf("Batch Alert %d", i),
 					Description: "Test Description",
@@ -2646,6 +2648,131 @@ func TestAlertAndTicketTags(t *testing.T) {
 				gt.True(t, a.TagIDs[individualTags[i].ID])
 				gt.True(t, a.TagIDs[commonTag.ID])
 			}
+		})
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+func TestNoticeRepository(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := context.Background()
+
+		t.Run("create and get notice", func(t *testing.T) {
+			// Use random ID to avoid test conflicts (CLAUDE.md requirement)
+			noticeID := types.NoticeID(fmt.Sprintf("notice-%d", time.Now().UnixNano()))
+			alertID := types.NewAlertID()
+
+			testNotice := &notice.Notice{
+				ID: noticeID,
+				Alert: alert.Alert{
+					ID: alertID,
+					Metadata: alert.Metadata{
+						Title:       "Test Security Notice",
+						Description: "This is a test notice for repository testing",
+					},
+					Schema: "test.schema",
+					Data: map[string]any{
+						"severity": "medium",
+						"source":   "test-system",
+					},
+				},
+				CreatedAt: time.Now(),
+				Escalated: false,
+			}
+
+			// Create notice
+			err := repo.CreateNotice(ctx, testNotice)
+			gt.NoError(t, err)
+
+			// Get notice and verify ALL fields (CLAUDE.md requirement)
+			retrievedNotice, err := repo.GetNotice(ctx, noticeID)
+			gt.NoError(t, err)
+
+			// Verify all fields match what was saved
+			gt.Equal(t, retrievedNotice.ID, noticeID)
+			gt.Equal(t, retrievedNotice.Alert.ID, alertID)
+			gt.S(t, retrievedNotice.Alert.Metadata.Title).Equal("Test Security Notice")
+			gt.S(t, retrievedNotice.Alert.Metadata.Description).Equal("This is a test notice for repository testing")
+			gt.V(t, retrievedNotice.Alert.Schema).Equal("test.schema")
+			gt.V(t, retrievedNotice.Alert.Data).Equal(testNotice.Alert.Data)
+			gt.False(t, retrievedNotice.Escalated)
+
+			// Verify timestamp with tolerance (CLAUDE.md requirement for timestamp comparisons)
+			timeDiff := retrievedNotice.CreatedAt.Sub(testNotice.CreatedAt)
+			if timeDiff < 0 {
+				timeDiff = -timeDiff
+			}
+			gt.True(t, timeDiff < time.Second)
+		})
+
+		t.Run("update notice escalation status", func(t *testing.T) {
+			// Use random ID to avoid test conflicts
+			noticeID := types.NoticeID(fmt.Sprintf("notice-%d", time.Now().UnixNano()))
+
+			originalNotice := &notice.Notice{
+				ID: noticeID,
+				Alert: alert.Alert{
+					ID: types.NewAlertID(),
+					Metadata: alert.Metadata{
+						Title: "Notice to Escalate",
+					},
+				},
+				CreatedAt: time.Now(),
+				Escalated: false,
+			}
+
+			// Create notice
+			err := repo.CreateNotice(ctx, originalNotice)
+			gt.NoError(t, err)
+
+			// Update escalation status
+			originalNotice.Escalated = true
+			err = repo.UpdateNotice(ctx, originalNotice)
+			gt.NoError(t, err)
+
+			// Verify update
+			updatedNotice, err := repo.GetNotice(ctx, noticeID)
+			gt.NoError(t, err)
+			gt.True(t, updatedNotice.Escalated)
+			gt.Equal(t, updatedNotice.ID, noticeID)
+			gt.S(t, updatedNotice.Alert.Metadata.Title).Equal("Notice to Escalate")
+		})
+
+		t.Run("get nonexistent notice", func(t *testing.T) {
+			// Use random ID that doesn\'t exist
+			nonexistentID := types.NoticeID(fmt.Sprintf("notice-%d", time.Now().UnixNano()))
+
+			_, err := repo.GetNotice(ctx, nonexistentID)
+			gt.Error(t, err)
+			gt.S(t, err.Error()).Contains("notice not found")
+		})
+
+		t.Run("update nonexistent notice", func(t *testing.T) {
+			// Try to update notice that doesn\'t exist
+			nonexistentNotice := &notice.Notice{
+				ID: types.NoticeID(fmt.Sprintf("notice-%d", time.Now().UnixNano())),
+				Alert: alert.Alert{
+					ID: types.NewAlertID(),
+					Metadata: alert.Metadata{
+						Title: "Nonexistent Notice",
+					},
+				},
+				CreatedAt: time.Now(),
+				Escalated: false,
+			}
+
+			err := repo.UpdateNotice(ctx, nonexistentNotice)
+			gt.Error(t, err)
+			gt.S(t, err.Error()).Contains("notice not found")
 		})
 	}
 

@@ -41,6 +41,9 @@ type UseCases struct {
 	findingLimit  int
 	storagePrefix string
 	strictAlert   bool
+
+	// GenAI
+	promptService interfaces.PromptService
 }
 
 var _ interfaces.AlertUsecases = &UseCases{}
@@ -126,6 +129,12 @@ func WithStoragePrefix(storagePrefix string) Option {
 func WithStrictAlert(strict bool) Option {
 	return func(u *UseCases) {
 		u.strictAlert = strict
+	}
+}
+
+func WithPromptService(promptService interfaces.PromptService) Option {
+	return func(u *UseCases) {
+		u.promptService = promptService
 	}
 }
 

@@ -65,8 +65,20 @@ type Metadata struct {
 	// Tags field is used temporarily during policy processing to pass tag names
 	// These are converted to TagIDs and not persisted in this field
 	Tags []string `json:"tags,omitempty"`
-	// Channel field specifies the Slack channel for alert notification
-	Channel string `json:"channel,omitempty"`
+	// GenAI field specifies LLM processing configuration
+	GenAI *GenAIConfig `json:"genai,omitempty"`
+}
+
+// GenAIConfig configures LLM processing for alerts
+type GenAIConfig struct {
+	Prompt string                  `json:"prompt"` // Prompt template file name
+	Format types.GenAIContentFormat `json:"format"` // Response format: "text" | "json" (default: "text")
+}
+
+// GenAIResponse represents the LLM response for display purposes
+type GenAIResponse struct {
+	Data   any                      `json:"data"`   // Raw response data
+	Format types.GenAIContentFormat `json:"format"` // Response format for formatting
 }
 
 func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metadata) Alert {

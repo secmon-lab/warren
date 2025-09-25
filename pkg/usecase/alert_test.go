@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,11 +14,14 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
+	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/service/prompt"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -1543,4 +1547,652 @@ func TestHandleAlert_PolicyTagDuplicationPrevention(t *testing.T) {
 	gt.Number(t, commonTagCount).Equal(1)
 	gt.Number(t, tag1Count).Equal(1)
 	gt.Number(t, tag2Count).Equal(1)
+}
+
+func TestProcessGenAI(t *testing.T) {
+	repo := repository.NewMemory()
+	ctx := context.Background()
+
+	t.Run("no GenAI config", func(t *testing.T) {
+		uc := usecase.New(usecase.WithRepository(repo))
+
+		alert := &alert.Alert{
+			Metadata: alert.Metadata{
+				Title: "Test Alert",
+			},
+		}
+
+		response, err := uc.ProcessGenAI(ctx, alert)
+		gt.NoError(t, err)
+		gt.Equal(t, response, "")
+	})
+
+	t.Run("no prompt service configured", func(t *testing.T) {
+		uc := usecase.New(usecase.WithRepository(repo))
+
+		alert := &alert.Alert{
+			Metadata: alert.Metadata{
+				Title: "Test Alert",
+				GenAI: &alert.GenAIConfig{
+					Prompt: "test_prompt.tmpl",
+					Format:   "text",
+				},
+			},
+		}
+
+		_, err := uc.ProcessGenAI(ctx, alert)
+		gt.Error(t, err)
+		gt.S(t, err.Error()).Contains("prompt service not configured")
+	})
+
+	t.Run("with GenAI config and prompt service", func(t *testing.T) {
+		// Create prompt service with test template
+		promptService, err := prompt.New("testdata/prompts")
+		gt.NoError(t, err)
+
+		// Mock LLM session and response
+		mockLLM := &gollem_mock.LLMClientMock{
+			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+				return &gollem_mock.SessionMock{
+					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+						return &gollem.Response{
+							Texts: []string{"This is a test LLM response"},
+						}, nil
+					},
+				}, nil
+			},
+		}
+
+		uc := usecase.New(
+			usecase.WithRepository(repo),
+			usecase.WithLLMClient(mockLLM),
+			usecase.WithPromptService(promptService),
+		)
+
+		alert := &alert.Alert{
+			Metadata: alert.Metadata{
+				Title: "Test Alert",
+				GenAI: &alert.GenAIConfig{
+					Prompt: "test_prompt.tmpl",
+					Format:   "text",
+				},
+			},
+		}
+
+		response, err := uc.ProcessGenAI(ctx, alert)
+		gt.NoError(t, err)
+		gt.Equal(t, response, "This is a test LLM response")
+	})
+
+	t.Run("with mock prompt service", func(t *testing.T) {
+		// Mock prompt service
+		mockPromptService := &mock.PromptServiceMock{
+			GeneratePromptFunc: func(ctx context.Context, templateName string, alert *alert.Alert) (string, error) {
+				return "Generated prompt for " + templateName, nil
+			},
+		}
+
+		// Mock LLM session and response
+		mockLLM := &gollem_mock.LLMClientMock{
+			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+				return &gollem_mock.SessionMock{
+					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+						return &gollem.Response{
+							Texts: []string{"Mock LLM response"},
+						}, nil
+					},
+				}, nil
+			},
+		}
+
+		uc := usecase.New(
+			usecase.WithRepository(repo),
+			usecase.WithLLMClient(mockLLM),
+			usecase.WithPromptService(mockPromptService),
+		)
+
+		alert := &alert.Alert{
+			Metadata: alert.Metadata{
+				Title: "Test Alert",
+				GenAI: &alert.GenAIConfig{
+					Prompt: "mock_template",
+					Format:   "text",
+				},
+			},
+		}
+
+		response, err := uc.ProcessGenAI(ctx, alert)
+		gt.NoError(t, err)
+		gt.Equal(t, response, "Mock LLM response")
+
+		// Verify prompt service was called correctly
+		calls := mockPromptService.GeneratePromptCalls()
+		gt.Array(t, calls).Length(1)
+		gt.Equal(t, calls[0].TemplateName, "mock_template")
+	})
+}
+
+func TestActionEvaluator(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("default action when no policy", func(t *testing.T) {
+		policyClient := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+				return opaq.ErrNoEvalResult
+			},
+		}
+		alert := &alert.Alert{
+			Metadata: alert.Metadata{Title: "Test"},
+		}
+
+		result, err := usecase.EvaluateAction(ctx, policyClient, alert, "test response")
+		gt.NoError(t, err)
+		gt.Equal(t, result.Publish, types.PublishTypeAlert)
+	})
+
+	t.Run("policy returns notice", func(t *testing.T) {
+		policyClient := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+				if policyResult, ok := result.(*action.PolicyResult); ok {
+					policyResult.Publish = types.PublishTypeNotice
+					policyResult.Channel = []string{"test-channel"}
+				}
+				return nil
+			},
+		}
+		alert := &alert.Alert{
+			Metadata: alert.Metadata{Title: "Test"},
+		}
+
+		result, err := usecase.EvaluateAction(ctx, policyClient, alert, "test response")
+		gt.NoError(t, err)
+		gt.Equal(t, result.Publish, types.PublishTypeNotice)
+		gt.Equal(t, result.Channel, []string{"test-channel"})
+	})
+
+	t.Run("policy returns metadata updates", func(t *testing.T) {
+		policyClient := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+				if policyResult, ok := result.(*action.PolicyResult); ok {
+					policyResult.Publish = types.PublishTypeAlert
+					policyResult.Title = "Policy Updated Title"
+					policyResult.Description = "Policy Updated Description"
+					policyResult.Attr = map[string]string{
+						"severity": "high",
+						"category": "security",
+					}
+				}
+				return nil
+			},
+		}
+		alert := &alert.Alert{
+			Metadata: alert.Metadata{Title: "Original Title"},
+		}
+
+		result, err := usecase.EvaluateAction(ctx, policyClient, alert, map[string]interface{}{"confidence": 0.95})
+		gt.NoError(t, err)
+		gt.Equal(t, result.Publish, types.PublishTypeAlert)
+		gt.Equal(t, result.Title, "Policy Updated Title")
+		gt.Equal(t, result.Description, "Policy Updated Description")
+		gt.Equal(t, len(result.Attr), 2)
+		gt.Equal(t, result.Attr["severity"], "high")
+		gt.Equal(t, result.Attr["category"], "security")
+	})
+}
+
+func TestHandleNotice(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("creates notice and sends Slack notification", func(t *testing.T) {
+		// Create fresh mocks for this test
+		repoMock := &mock.RepositoryMock{
+			CreateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				// Verify the notice structure
+				gt.NotNil(t, notice)
+				gt.NotEqual(t, notice.ID, types.EmptyNoticeID)
+				gt.True(t, !notice.CreatedAt.IsZero())
+				gt.False(t, notice.Escalated)
+				return nil
+			},
+			UpdateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+		}
+
+		slackMock := &mock.SlackClientMock{
+			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+				return channelID, "test-timestamp", nil
+			},
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "test-user",
+				}, nil
+			},
+			GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
+				return &slack_sdk.TeamInfo{
+					Domain: "test-workspace",
+				}, nil
+			},
+		}
+
+		slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithRepository(repoMock),
+			usecase.WithSlackService(slackSvc),
+		)
+		testAlert := &alert.Alert{
+			ID: types.NewAlertID(),
+			Metadata: alert.Metadata{
+				Title:       "Test Alert",
+				Description: "Test Description",
+			},
+			Data:   map[string]interface{}{"test": "data"},
+			Schema: "test.schema",
+		}
+
+		err = uc.HandleNotice(ctx, testAlert, []string{"test-channel"})
+		gt.NoError(t, err)
+
+		// Verify repository interaction - notice was created
+		createCalls := repoMock.CreateNoticeCalls()
+		gt.Array(t, createCalls).Length(1)
+
+		createdNotice := createCalls[0].NoticeMoqParam
+		gt.Equal(t, createdNotice.Alert.ID, testAlert.ID)
+		gt.Equal(t, createdNotice.Alert.Metadata.Title, "Test Alert")
+		gt.Equal(t, createdNotice.Alert.Metadata.Description, "Test Description")
+		gt.False(t, createdNotice.Escalated)
+
+		// Verify Slack interaction - main notice + 2 thread messages were posted
+		postCalls := slackMock.PostMessageContextCalls()
+		gt.Array(t, postCalls).Length(3)
+		gt.Equal(t, postCalls[0].ChannelID, "test-channel")
+	})
+
+	t.Run("uses default channel when no channels specified", func(t *testing.T) {
+		// Create fresh mocks for this test
+		repoMock := &mock.RepositoryMock{
+			CreateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+			UpdateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+		}
+
+		slackMock := &mock.SlackClientMock{
+			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+				return channelID, "test-timestamp", nil
+			},
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "test-user",
+				}, nil
+			},
+			GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
+				return &slack_sdk.TeamInfo{
+					Domain: "test-workspace",
+				}, nil
+			},
+		}
+
+		slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithRepository(repoMock),
+			usecase.WithSlackService(slackSvc),
+		)
+		testAlert := &alert.Alert{
+			ID: types.NewAlertID(),
+			Metadata: alert.Metadata{
+				Title: "Default Channel Test",
+			},
+		}
+
+		err = uc.HandleNotice(ctx, testAlert, []string{})
+		gt.NoError(t, err)
+
+		// Verify Slack was called with default channel (empty string becomes default) - main notice + 2 thread messages
+		postCalls := slackMock.PostMessageContextCalls()
+		gt.Array(t, postCalls).Length(3)
+		gt.Equal(t, postCalls[0].ChannelID, "#test-channel")
+	})
+
+	t.Run("handles multiple channels", func(t *testing.T) {
+		// Create fresh mocks for this test
+		repoMock := &mock.RepositoryMock{
+			CreateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+			UpdateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+		}
+
+		slackMock := &mock.SlackClientMock{
+			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+				return channelID, "test-timestamp", nil
+			},
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "test-user",
+				}, nil
+			},
+			GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
+				return &slack_sdk.TeamInfo{
+					Domain: "test-workspace",
+				}, nil
+			},
+		}
+
+		slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithRepository(repoMock),
+			usecase.WithSlackService(slackSvc),
+		)
+		testAlert := &alert.Alert{
+			ID: types.NewAlertID(),
+			Metadata: alert.Metadata{
+				Title: "Multi Channel Test",
+			},
+		}
+
+		err = uc.HandleNotice(ctx, testAlert, []string{"channel-1", "channel-2"})
+		gt.NoError(t, err)
+
+		// Verify notice was created once
+		createCalls := repoMock.CreateNoticeCalls()
+		gt.Array(t, createCalls).Length(1)
+
+		// Verify Slack was called for each channel - 2 channels * 3 messages each = 6 total
+		postCalls := slackMock.PostMessageContextCalls()
+		gt.Array(t, postCalls).Length(6)
+		// First channel: main message + 2 thread messages
+		gt.Equal(t, postCalls[0].ChannelID, "channel-1")
+		gt.Equal(t, postCalls[1].ChannelID, "channel-1")
+		gt.Equal(t, postCalls[2].ChannelID, "channel-1")
+		// Second channel: main message + 2 thread messages
+		gt.Equal(t, postCalls[3].ChannelID, "channel-2")
+		gt.Equal(t, postCalls[4].ChannelID, "channel-2")
+		gt.Equal(t, postCalls[5].ChannelID, "channel-2")
+	})
+}
+
+func TestEscalateNotice(t *testing.T) {
+	// Helper Driven Testing: Test the complete workflow from notice creation to escalation
+	ctx := context.Background()
+	repo := repository.NewMemory()
+
+	// Setup mocks for LLM and Slack
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{"LLM processed alert"},
+					}, nil
+				},
+			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
+			return [][]float64{{0.1, 0.2, 0.3}}, nil
+		},
+	}
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			return channelID, fmt.Sprintf("msg-%d", time.Now().UnixNano()), nil
+		},
+		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			return &slack_sdk.FileSummary{ID: "file-123"}, nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{UserID: "test-user"}, nil
+		},
+	}
+
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+	gt.NoError(t, err)
+
+	// Create prompt service for GenAI processing
+	promptService, err := prompt.New("testdata/prompts")
+	gt.NoError(t, err)
+
+	// Create policy client that returns "notice" for testing
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			if policyResult, ok := result.(*action.PolicyResult); ok {
+				policyResult.Publish = types.PublishTypeNotice
+				policyResult.Channel = []string{"#alerts"}
+			}
+			return nil
+		},
+	}
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithLLMClient(llmMock),
+		usecase.WithSlackService(slackSvc),
+		usecase.WithPromptService(promptService),
+		usecase.WithPolicyClient(policyMock),
+	)
+
+	t.Run("notice creation and escalation workflow", func(t *testing.T) {
+		// Step 1: Create a notice (simulates what would happen when policy returns "notice")
+		alertData := map[string]interface{}{
+			"severity": "medium",
+			"source":   "test-system",
+			"message":  "Test security event",
+		}
+
+		// Use random ID to avoid test conflicts (CLAUDE.md requirement)
+		noticeID := types.NoticeID(fmt.Sprintf("notice-%d", time.Now().UnixNano()))
+		testNotice := &notice.Notice{
+			ID: noticeID,
+			Alert: alert.Alert{
+				ID: types.NewAlertID(),
+				Metadata: alert.Metadata{
+					Title:       "Security Notice",
+					Description: "This notice needs escalation",
+				},
+				Data:   alertData,
+				Schema: "test.alert",
+			},
+			CreatedAt: time.Now(),
+			Escalated: false,
+		}
+
+		err := repo.CreateNotice(ctx, testNotice)
+		gt.NoError(t, err)
+
+		// Step 2: Execute escalation (simulates Slack button click or mention)
+		err = uc.EscalateNotice(ctx, noticeID)
+		gt.NoError(t, err)
+
+		// Step 3: Verify escalation results
+		// Check that notice is marked as escalated
+		escalatedNotice, err := repo.GetNotice(ctx, noticeID)
+		gt.NoError(t, err)
+		gt.True(t, escalatedNotice.Escalated)
+
+		// Verify that Slack was called to post the escalated alert
+		// The mock should have been called for posting the full alert
+		postCalls := slackMock.PostMessageContextCalls()
+		gt.True(t, len(postCalls) >= 1)
+
+		// Verify the escalated alert contains the original alert data
+		gt.S(t, escalatedNotice.Alert.Metadata.Title).Equal("Security Notice")
+		gt.V(t, escalatedNotice.Alert.Data).Equal(alertData)
+	})
+
+	t.Run("escalate nonexistent notice", func(t *testing.T) {
+		nonexistentID := types.NewNoticeID()
+		err := uc.EscalateNotice(ctx, nonexistentID)
+		gt.Error(t, err)
+		gt.S(t, err.Error()).Contains("failed to get notice")
+	})
+
+	t.Run("escalate already escalated notice", func(t *testing.T) {
+		// Create an already escalated notice
+		noticeID := types.NewNoticeID()
+		alreadyEscalated := &notice.Notice{
+			ID: noticeID,
+			Alert: alert.Alert{
+				ID: types.NewAlertID(),
+				Metadata: alert.Metadata{
+					Title: "Already Escalated Notice",
+				},
+			},
+			CreatedAt: time.Now(),
+			Escalated: true, // Already escalated
+		}
+
+		err := repo.CreateNotice(ctx, alreadyEscalated)
+		gt.NoError(t, err)
+
+		// Try to escalate again - should succeed but not do duplicate work
+		err = uc.EscalateNotice(ctx, noticeID)
+		gt.NoError(t, err)
+
+		// Verify it's still marked as escalated
+		notice, err := repo.GetNotice(ctx, noticeID)
+		gt.NoError(t, err)
+		gt.True(t, notice.Escalated)
+	})
+}
+
+func TestHandleAlert_ActionPolicyMetadataUpdates(t *testing.T) {
+	// Test case: Action policy updates alert metadata (title, description, attributes)
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	// Mock LLM that returns JSON response
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{`{"analysis": "high risk", "confidence": 0.95}`},
+					}, nil
+				},
+			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
+			return [][]float64{{0.1, 0.2, 0.3}}, nil
+		},
+	}
+
+	// Mock policy that returns alert with GenAI and action policy that updates metadata
+	var actionPolicyCalled bool
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			if strings.Contains(query, "data.alert.") {
+				// Alert policy - return alert with GenAI config
+				if queryResult, ok := result.(*alert.QueryOutput); ok {
+					queryResult.Alert = []alert.Metadata{
+						{
+							Title:       "Original Security Alert",
+							Description: "Original alert description",
+							GenAI: &alert.GenAIConfig{
+								Prompt: "analyze_security.tmpl",
+								Format: types.GenAIContentFormatJSON,
+							},
+						},
+					}
+				}
+			} else if strings.Contains(query, "data.action") {
+				// Action policy - update metadata based on GenAI analysis
+				actionPolicyCalled = true
+				if queryInput, ok := data.(action.QueryInput); ok {
+					// Verify we received parsed JSON data
+					if genaiData, ok := queryInput.GenAI.(map[string]interface{}); ok {
+						gt.Equal(t, genaiData["analysis"], "high risk")
+						gt.Equal(t, genaiData["confidence"], 0.95)
+					}
+				}
+				if policyResult, ok := result.(*action.PolicyResult); ok {
+					policyResult.Publish = types.PublishTypeAlert
+					policyResult.Title = "High Risk Security Alert"
+					policyResult.Description = "AI analysis indicates high risk security incident requiring immediate attention"
+					policyResult.Attr = map[string]string{
+						"risk_level":  "high",
+						"confidence":  "95%",
+						"ai_analysis": "threat_detected",
+					}
+				}
+			}
+			return nil
+		},
+	}
+
+	// Mock prompt service
+	promptMock := &mock.PromptServiceMock{
+		GeneratePromptFunc: func(ctx context.Context, templateName string, alert *alert.Alert) (string, error) {
+			return "Analyze this security alert for risk level", nil
+		},
+	}
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			return "test-channel", "test-thread", nil
+		},
+		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			return &slack_sdk.FileSummary{}, nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{UserID: "test-user"}, nil
+		},
+	}
+
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+	gt.NoError(t, err)
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackService(slackSvc),
+		usecase.WithLLMClient(llmMock),
+		usecase.WithPolicyClient(policyMock),
+		usecase.WithPromptService(promptMock),
+	)
+
+	// Execute
+	result, err := uc.HandleAlert(ctx, types.AlertSchema("security"), map[string]interface{}{
+		"event_type": "suspicious_login",
+		"source_ip":  "192.168.1.100",
+	})
+
+	// Verify
+	gt.NoError(t, err)
+	gt.Array(t, result).Length(1)
+	gt.Value(t, actionPolicyCalled).Equal(true)
+
+	createdAlert := result[0]
+
+	// Verify metadata was updated by action policy
+	gt.Value(t, createdAlert.Metadata.Title).Equal("High Risk Security Alert")
+	gt.Value(t, createdAlert.Metadata.Description).Equal("AI analysis indicates high risk security incident requiring immediate attention")
+	gt.Value(t, createdAlert.Metadata.TitleSource).Equal(types.SourcePolicy)
+	gt.Value(t, createdAlert.Metadata.DescriptionSource).Equal(types.SourcePolicy)
+
+	// Verify attributes were added by action policy
+	gt.Array(t, createdAlert.Metadata.Attributes).Length(3)
+	expectedAttrs := map[string]string{
+		"risk_level":  "high",
+		"confidence":  "95%",
+		"ai_analysis": "threat_detected",
+	}
+	for _, attr := range createdAlert.Metadata.Attributes {
+		expectedValue, exists := expectedAttrs[attr.Key]
+		gt.Value(t, exists).Equal(true)
+		gt.Value(t, attr.Value).Equal(expectedValue)
+		gt.Value(t, attr.Auto).Equal(true) // Should be marked as auto-generated
+	}
 }

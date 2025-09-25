@@ -114,3 +114,18 @@ var alertConclusionLabels = map[AlertConclusion]string{
 func (r AlertConclusion) Label() string {
 	return alertConclusionLabels[r]
 }
+
+// NoticeID represents a unique identifier for notice
+type NoticeID string
+
+func (x NoticeID) String() string {
+	return string(x)
+}
+
+func NewNoticeID() NoticeID {
+	return NoticeID(uuid.New().String())
+}
+
+const (
+	EmptyNoticeID NoticeID = ""
+)

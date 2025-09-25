@@ -14,6 +14,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -25,6 +26,7 @@ type Memory struct {
 	mu         sync.RWMutex
 	activityMu sync.RWMutex
 	tagMu      sync.RWMutex
+	noticeMu   sync.RWMutex
 
 	alerts         map[types.AlertID]*alert.Alert
 	lists          map[types.AlertListID]*alert.List
@@ -34,6 +36,7 @@ type Memory struct {
 	tokens         map[auth.TokenID]*auth.Token
 	activities     map[types.ActivityID]*activity.Activity
 	tagsV2         map[string]*tag.Tag // New ID-based tags
+	notices        map[types.NoticeID]*notice.Notice
 
 	// Call counter for tracking method invocations
 	callCounts map[string]int
@@ -54,6 +57,7 @@ func NewMemory() *Memory {
 		tokens:         make(map[auth.TokenID]*auth.Token),
 		activities:     make(map[types.ActivityID]*activity.Activity),
 		tagsV2:         make(map[string]*tag.Tag),
+		notices:        make(map[types.NoticeID]*notice.Notice),
 		callCounts:     make(map[string]int),
 		eb:             goerr.NewBuilder(goerr.TV(errs.RepositoryKey, "memory")),
 	}
@@ -1246,4 +1250,60 @@ func (r *Memory) ListAllTags(ctx context.Context) ([]*tag.Tag, error) {
 	}
 
 	return tags, nil
+}
+
+// Notice management methods
+
+func (r *Memory) CreateNotice(ctx context.Context, notice *notice.Notice) error {
+	r.noticeMu.Lock()
+	defer r.noticeMu.Unlock()
+
+	if notice.ID == types.EmptyNoticeID {
+		return r.eb.New("notice ID is empty")
+	}
+
+	// Check if notice already exists
+	if _, exists := r.notices[notice.ID]; exists {
+		return r.eb.New("notice already exists", goerr.V("notice_id", notice.ID))
+	}
+
+	// Store a copy to prevent external modification
+	noticeCopy := *notice
+	r.notices[notice.ID] = &noticeCopy
+
+	return nil
+}
+
+func (r *Memory) GetNotice(ctx context.Context, id types.NoticeID) (*notice.Notice, error) {
+	r.noticeMu.RLock()
+	defer r.noticeMu.RUnlock()
+
+	notice, exists := r.notices[id]
+	if !exists {
+		return nil, r.eb.New("notice not found", goerr.V("notice_id", id))
+	}
+
+	// Return a copy to prevent external modification
+	noticeCopy := *notice
+	return &noticeCopy, nil
+}
+
+func (r *Memory) UpdateNotice(ctx context.Context, notice *notice.Notice) error {
+	r.noticeMu.Lock()
+	defer r.noticeMu.Unlock()
+
+	if notice.ID == types.EmptyNoticeID {
+		return r.eb.New("notice ID is empty")
+	}
+
+	// Check if notice exists
+	if _, exists := r.notices[notice.ID]; !exists {
+		return r.eb.New("notice not found", goerr.V("notice_id", notice.ID))
+	}
+
+	// Store a copy to prevent external modification
+	noticeCopy := *notice
+	r.notices[notice.ID] = &noticeCopy
+
+	return nil
 }

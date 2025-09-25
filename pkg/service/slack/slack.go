@@ -20,6 +20,7 @@ import (
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 
@@ -218,18 +219,8 @@ func (x *Service) PostMessage(ctx context.Context, message string) (*ThreadServi
 }
 
 // resolveChannel determines the target channel for the alert
-func (x *Service) resolveChannel(alert *alert.Alert) string {
-	if alert.Metadata.Channel != "" {
-		return normalizeChannel(alert.Metadata.Channel)
-	}
+func (x *Service) resolveChannel(_ *alert.Alert) string {
 	return x.channelID
-}
-
-// normalizeChannel removes # prefix and trims whitespace from channel name
-func normalizeChannel(channel string) string {
-	channel = strings.TrimSpace(channel)
-	channel = strings.TrimPrefix(channel, "#")
-	return channel
 }
 
 // postAlertToChannel posts an alert to the specified channel
@@ -1146,4 +1137,160 @@ func (x *Service) ToTicketURL(ticketID string) string {
 		return ""
 	}
 	return fmt.Sprintf("%s/tickets/%s", x.frontendURL, ticketID)
+}
+
+// PostNotice posts a notice message to Slack with an escalate button
+func (x *Service) PostNotice(ctx context.Context, channelID, message string, noticeID fmt.Stringer) (string, error) {
+	// Use default channel if channelID is empty
+	if channelID == "" {
+		channelID = x.channelID
+	}
+	blocks := []slack.Block{
+		&slack.SectionBlock{
+			Type: slack.MBTSection,
+			Text: &slack.TextBlockObject{
+				Type: slack.MarkdownType,
+				Text: message,
+			},
+			Accessory: &slack.Accessory{
+				OverflowElement: &slack.OverflowBlockElement{
+					Type:     slack.METOverflow,
+					ActionID: "notice_actions",
+					Options: []*slack.OptionBlockObject{
+						{
+							Text: &slack.TextBlockObject{
+								Type: slack.PlainTextType,
+								Text: "Escalate to Alert",
+							},
+							Value: fmt.Sprintf("%s:%s", string(model.ActionIDEscalate), noticeID.String()),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, timestamp, err := x.client.PostMessageContext(ctx, channelID,
+		slack.MsgOptionBlocks(blocks...),
+	)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to post notice to Slack",
+			goerr.V("channel", channelID),
+			goerr.V("notice_id", noticeID))
+	}
+
+	return timestamp, nil
+}
+
+// PostNoticeThreadDetails posts detailed information about the notice in a thread
+func (x *Service) PostNoticeThreadDetails(ctx context.Context, channelID, threadTS string, alert *alert.Alert, llmResponse *alert.GenAIResponse) error {
+	// Message 1: Schema, description, and attributes (similar to normal alert format)
+	detailsMessage := x.formatNoticeDetailsMessage(alert)
+	_, _, err := x.client.PostMessageContext(ctx, channelID,
+		slack.MsgOptionText(detailsMessage, false),
+		slack.MsgOptionTS(threadTS),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post notice details message")
+	}
+
+	// Message 2: Original alert data in code format
+	originalDataMessage := formatOriginalDataMessage(alert)
+	_, _, err = x.client.PostMessageContext(ctx, channelID,
+		slack.MsgOptionText(originalDataMessage, false),
+		slack.MsgOptionTS(threadTS),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post original data message")
+	}
+
+	// Message 3: LLM response if available
+	if llmResponse != nil {
+		llmMessage := formatLLMResponseMessage(llmResponse)
+		_, _, err = x.client.PostMessageContext(ctx, channelID,
+			slack.MsgOptionText(llmMessage, false),
+			slack.MsgOptionTS(threadTS),
+		)
+		if err != nil {
+			return goerr.Wrap(err, "failed to post LLM response message")
+		}
+	}
+
+	return nil
+}
+
+// formatNoticeDetailsMessage formats the notice details (title, schema, description, attributes)
+func (x *Service) formatNoticeDetailsMessage(alert *alert.Alert) string {
+	var details []string
+
+	// Add title
+	if alert.Metadata.Title != "" {
+		details = append(details, fmt.Sprintf("*Title:* %s", alert.Metadata.Title))
+	}
+
+	// Add schema
+	if alert.Schema != "" {
+		details = append(details, fmt.Sprintf("*Schema:* `%s`", alert.Schema))
+	}
+
+	// Add description
+	if alert.Metadata.Description != "" {
+		details = append(details, fmt.Sprintf("*Description:* %s", alert.Metadata.Description))
+	}
+
+	// Add attributes
+	if len(alert.Metadata.Attributes) > 0 {
+		details = append(details, "*Attributes:*")
+		for _, attr := range alert.Metadata.Attributes {
+			if attr.Link != "" {
+				details = append(details, fmt.Sprintf("• *%s:* <%s|%s>", attr.Key, attr.Link, attr.Value))
+			} else {
+				details = append(details, fmt.Sprintf("• *%s:* %s", attr.Key, attr.Value))
+			}
+		}
+	}
+
+	if len(details) == 0 {
+		return "_No additional details available._"
+	}
+
+	return strings.Join(details, "\n")
+}
+
+// formatOriginalDataMessage formats the original alert data as code
+func formatOriginalDataMessage(alert *alert.Alert) string {
+	if alert.Data == nil {
+		return "_No alert data_"
+	}
+
+	dataJSON, err := json.MarshalIndent(alert.Data, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("Error formatting data:\n```%v\n```", err)
+	}
+
+	return fmt.Sprintf("```\n%s\n```", string(dataJSON))
+}
+
+// formatLLMResponseMessage formats the LLM response for display
+func formatLLMResponseMessage(response *alert.GenAIResponse) string {
+	if response == nil || response.Data == nil {
+		return "_No LLM response_"
+	}
+
+	switch response.Format {
+	case types.GenAIContentFormatJSON:
+		// Pretty print JSON
+		if jsonBytes, err := json.MarshalIndent(response.Data, "", "  "); err == nil {
+			return fmt.Sprintf("*LLM Response:*\n```\n%s\n```", string(jsonBytes))
+		} else {
+			// Fallback to string representation
+			return fmt.Sprintf("*LLM Response:*\n```\n%v\n```", response.Data)
+		}
+	case types.GenAIContentFormatText:
+		// Display text as-is in code block
+		return fmt.Sprintf("*LLM Response:*\n```\n%v\n```", response.Data)
+	default:
+		// Default case - display as string in code block
+		return fmt.Sprintf("*LLM Response:*\n```\n%v\n```", response.Data)
+	}
 }
