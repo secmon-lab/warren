@@ -1,0 +1,8 @@
+You are a security analyst. Analyze the following alert:
+
+Title: {{.Alert.Metadata.Title}}
+Description: {{.Alert.Metadata.Description}}
+Schema: {{.Alert.Schema}}
+Data: {{.Alert.Data | printf "%v"}}
+
+Please provide a summary of this security alert.

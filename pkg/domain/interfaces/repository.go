@@ -7,6 +7,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -90,4 +91,9 @@ type Repository interface {
 	GetTagByName(ctx context.Context, name string) (*tag.Tag, error)
 	IsTagNameExists(ctx context.Context, name string) (bool, error)
 	GetOrCreateTagByName(ctx context.Context, name, description, color, createdBy string) (*tag.Tag, error)
+
+	// For notice management
+	CreateNotice(ctx context.Context, notice *notice.Notice) error
+	GetNotice(ctx context.Context, id types.NoticeID) (*notice.Notice, error)
+	UpdateNotice(ctx context.Context, notice *notice.Notice) error
 }

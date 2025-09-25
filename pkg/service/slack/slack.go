@@ -1147,3 +1147,46 @@ func (x *Service) ToTicketURL(ticketID string) string {
 	}
 	return fmt.Sprintf("%s/tickets/%s", x.frontendURL, ticketID)
 }
+
+// PostNotice posts a notice message to Slack with an escalate button
+func (x *Service) PostNotice(ctx context.Context, channelID, message string, noticeID fmt.Stringer) (string, error) {
+	// Use default channel if channelID is empty
+	if channelID == "" {
+		channelID = x.channelID
+	}
+	blocks := []slack.Block{
+		&slack.SectionBlock{
+			Type: slack.MBTSection,
+			Text: &slack.TextBlockObject{
+				Type: slack.MarkdownType,
+				Text: message,
+			},
+			Accessory: &slack.Accessory{
+				OverflowElement: &slack.OverflowBlockElement{
+					Type:     slack.METOverflow,
+					ActionID: "notice_actions",
+					Options: []*slack.OptionBlockObject{
+						{
+							Text: &slack.TextBlockObject{
+								Type: slack.PlainTextType,
+								Text: "Escalate to Alert",
+							},
+							Value: fmt.Sprintf("%s:%s", string(model.ActionIDEscalate), noticeID.String()),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, timestamp, err := x.client.PostMessageContext(ctx, channelID,
+		slack.MsgOptionBlocks(blocks...),
+	)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to post notice to Slack",
+			goerr.V("channel", channelID),
+			goerr.V("notice_id", noticeID))
+	}
+
+	return timestamp, nil
+}

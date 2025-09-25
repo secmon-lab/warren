@@ -8,12 +8,40 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/opaq"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
+
+// evaluateAction evaluates an action policy for the given alert and LLM response
+func evaluateAction(ctx context.Context, policyClient interfaces.PolicyClient, alert *alert.Alert, llmResponse string) (*action.PolicyResult, error) {
+	queryInput := action.QueryInput{
+		Alert: alert,
+		GenAI: llmResponse,
+	}
+
+	var result action.PolicyResult
+	query := "data.action"
+
+	err := policyClient.Query(ctx, query, queryInput, &result)
+	if err != nil {
+		if errors.Is(err, opaq.ErrNoEvalResult) {
+			// Default behavior when no action policy is defined: publish as alert
+			return &action.PolicyResult{
+				Publish: action.PublishTypeAlert,
+			}, nil
+		}
+		return nil, goerr.Wrap(err, "failed to evaluate action policy")
+	}
+
+	return &result, nil
+}
 
 func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 	logger := logging.From(ctx)
@@ -96,6 +124,45 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 
 	if err := newAlert.FillMetadata(ctx, uc.llmClient); err != nil {
 		return nil, goerr.Wrap(err, "failed to fill alert metadata")
+	}
+
+	// Process GenAI if configured
+	if newAlert.Metadata.GenAI != nil {
+		llmResponse, err := uc.processGenAI(ctx, &newAlert)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to process GenAI")
+		}
+
+		// Evaluate action policy if LLM response is not empty
+		if llmResponse != "" {
+			policyResult, err := evaluateAction(ctx, uc.policyClient, &newAlert, llmResponse)
+			if err != nil {
+				return nil, goerr.Wrap(err, "failed to evaluate action policy")
+			}
+
+			// Handle publish type from policy result
+			switch policyResult.Publish {
+			case action.PublishTypeDiscard:
+				// Discard alert, just log and return
+				logger.Info("alert discarded by GenAI policy", "alert", newAlert)
+				return &newAlert, nil
+
+			case action.PublishTypeNotice:
+				// Create notice instead of full alert
+				if err := uc.handleNotice(ctx, &newAlert, policyResult.Channel); err != nil {
+					return nil, goerr.Wrap(err, "failed to handle notice")
+				}
+				logger.Info("alert processed as notice", "alert", newAlert)
+				return &newAlert, nil
+
+			case action.PublishTypeAlert, "":
+				// Continue with normal alert processing
+				logger.Info("alert will be processed normally", "alert", newAlert)
+
+			default:
+				logger.Warn("unknown publish type, defaulting to alert", "publish", policyResult.Publish)
+			}
+		}
 	}
 
 	// Get alerts from the last 24 hours and search for those not bound to tickets
@@ -311,4 +378,188 @@ func (uc *UseCases) BindAlertsToTicket(ctx context.Context, ticketID types.Ticke
 // containsIgnoreCase checks if substr exists in s (case insensitive)
 func containsIgnoreCase(s, substr string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
+}
+
+// processGenAI processes GenAI configuration for the given alert
+func (uc *UseCases) processGenAI(ctx context.Context, alert *alert.Alert) (string, error) {
+	if alert.Metadata.GenAI == nil {
+		return "", nil
+	}
+
+	if uc.promptService == nil {
+		return "", goerr.New("prompt service not configured")
+	}
+
+	genaiConfig := alert.Metadata.GenAI
+
+	// Generate prompt using PromptService
+	prompt, err := uc.promptService.GeneratePrompt(ctx, genaiConfig.Prompt, alert)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to generate prompt", goerr.V("prompt", genaiConfig.Prompt))
+	}
+
+	// Query LLM
+	session, err := uc.llmClient.NewSession(ctx)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to create LLM session")
+	}
+
+	response, err := session.GenerateContent(ctx, gollem.Text(prompt))
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to query LLM", goerr.V("prompt", prompt))
+	}
+
+	var responseText string
+	if len(response.Texts) > 0 {
+		responseText = response.Texts[0]
+	}
+
+	// Handle response type
+	responseType := genaiConfig.Type
+	if responseType == "" {
+		responseType = "text"
+	}
+
+	switch responseType {
+	case "text":
+		return responseText, nil
+	case "json":
+		// For JSON responses, we still return the raw response
+		// The action policy will handle the JSON parsing
+		return responseText, nil
+	default:
+		return "", goerr.New("unsupported response type", goerr.V("type", responseType))
+	}
+}
+
+// handleNotice handles notice creation and simple notification
+func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channels []string) error {
+	logger := logging.From(ctx)
+
+	// Create notice
+	notice := &notice.Notice{
+		ID:        types.NewNoticeID(),
+		Alert:     *alert,
+		CreatedAt: clock.Now(ctx),
+		Escalated: false,
+	}
+
+	// Store notice in repository
+	if err := uc.repository.CreateNotice(ctx, notice); err != nil {
+		return goerr.Wrap(err, "failed to create notice")
+	}
+
+	// Send simple notification to Slack
+	if uc.slackService != nil {
+		slackTS, err := uc.sendSimpleNotification(ctx, notice, channels)
+		if err != nil {
+			logger.Warn("failed to send simple notification", "error", err, "notice_id", notice.ID)
+		} else {
+			// Update notice with Slack timestamp
+			notice.SlackTS = slackTS
+			if err := uc.repository.UpdateNotice(ctx, notice); err != nil {
+				logger.Warn("failed to update notice with slack timestamp", "error", err, "notice_id", notice.ID)
+			}
+		}
+	}
+
+	logger.Info("notice created", "notice_id", notice.ID, "alert_id", alert.ID)
+	return nil
+}
+
+// sendSimpleNotification sends a simple notification to Slack
+func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.Notice, channels []string) (string, error) {
+	if uc.slackService == nil {
+		return "", goerr.New("slack service not available")
+	}
+
+	// Create simple message with title + description and escalate option
+	alert := &notice.Alert
+	message := alert.Metadata.Title
+	if alert.Metadata.Description != "" {
+		message += "\n" + alert.Metadata.Description
+	}
+
+	// For now, send a simple text message to the default channel
+	// In a full implementation, this would create a proper Slack block message with an escalate button
+	// containing the notice ID as the action value
+
+	// Post to all specified channels
+	// Create simple message with escalate instruction
+	fullMessage := message + "\n\n" +
+		"To escalate this notice to a full alert, use the escalate button or mention @warren with 'escalate " + string(notice.ID) + "'"
+
+	// Send notice to Slack with escalate button
+	if slackSvc := uc.slackService; slackSvc != nil {
+		// If no channels specified, use empty string (will use default channel)
+		if len(channels) == 0 {
+			channels = []string{""}
+		}
+
+		var lastTimestamp string
+		for _, channelID := range channels {
+			timestamp, err := slackSvc.PostNotice(ctx, channelID, fullMessage, notice.ID)
+			if err != nil {
+				return "", goerr.Wrap(err, "failed to post notice to Slack", goerr.V("channel", channelID))
+			}
+			lastTimestamp = timestamp
+		}
+		return lastTimestamp, nil
+	}
+
+	return "", nil
+}
+
+// EscalateNotice escalates a notice to a full alert
+func (uc *UseCases) EscalateNotice(ctx context.Context, noticeID types.NoticeID) error {
+	logger := logging.From(ctx)
+
+	// Get notice from repository
+	notice, err := uc.repository.GetNotice(ctx, noticeID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get notice", goerr.V("notice_id", noticeID))
+	}
+
+	// Mark notice as escalated
+	notice.Escalated = true
+	if err := uc.repository.UpdateNotice(ctx, notice); err != nil {
+		return goerr.Wrap(err, "failed to update notice", goerr.V("notice_id", noticeID))
+	}
+
+	// Process the alert normally (without GenAI processing to avoid recursion)
+	alert := notice.Alert
+	escalatedAlert, err := uc.handleAlertWithoutGenAI(ctx, alert)
+	if err != nil {
+		return goerr.Wrap(err, "failed to handle escalated alert", goerr.V("notice_id", noticeID))
+	}
+
+	logger.Info("notice escalated to alert", "notice_id", noticeID, "alert_id", escalatedAlert.ID)
+	return nil
+}
+
+// handleAlertWithoutGenAI handles alert without GenAI processing (used for escalation)
+func (uc *UseCases) handleAlertWithoutGenAI(ctx context.Context, alert alert.Alert) (*alert.Alert, error) {
+	// This method processes alerts that have already been through tag processing and metadata filling
+	// Used for escalation from notices to avoid reprocessing
+	logger := logging.From(ctx)
+
+	// Post to Slack
+	if uc.slackService != nil {
+		newThread, err := uc.slackService.PostAlert(ctx, &alert)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to post alert")
+		}
+		if newThread != nil {
+			alert.SlackThread = newThread.Entity()
+		}
+		logger.Info("escalated alert posted to new thread", "alert", alert)
+	}
+
+	// Store alert
+	if err := uc.repository.PutAlert(ctx, alert); err != nil {
+		return nil, goerr.Wrap(err, "failed to put alert")
+	}
+	logger.Info("escalated alert created", "alert", alert)
+
+	return &alert, nil
 }

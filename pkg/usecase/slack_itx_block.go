@@ -51,6 +51,9 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, slac
 
 	case slack.ActionIDSalvage:
 		return uc.showSalvageModal(ctx, slackUser, slackThread, types.TicketID(value), triggerID)
+
+	case slack.ActionIDEscalate:
+		return uc.handleEscalateAction(ctx, slackUser, slackThread, value)
 	}
 
 	return nil
@@ -321,5 +324,30 @@ func (uc *UseCases) HandleSalvageRefresh(ctx context.Context, user slack.User, m
 		return goerr.Wrap(err, "failed to update salvage modal")
 	}
 
+	return nil
+}
+
+// handleEscalateAction handles the escalation of a notice to a full alert
+func (uc *UseCases) handleEscalateAction(ctx context.Context, slackUser slack.User, slackThread slack.Thread, value string) error {
+	logger := logging.From(ctx)
+
+	// Extract notice ID from the value
+	// The value should contain the notice ID
+	noticeID := types.NoticeID(value)
+
+	logger.Info("escalating notice", "notice_id", noticeID, "user", slackUser.ID)
+
+	// Call the EscalateNotice method from alert.go
+	if err := uc.EscalateNotice(ctx, noticeID); err != nil {
+		return goerr.Wrap(err, "failed to escalate notice", goerr.V("notice_id", noticeID))
+	}
+
+	// Send confirmation message
+	if uc.slackService != nil {
+		threadSvc := uc.slackService.NewThread(slackThread)
+		threadSvc.Reply(ctx, "✅ Notice escalated to full alert")
+	}
+
+	logger.Info("notice escalated successfully", "notice_id", noticeID)
 	return nil
 }

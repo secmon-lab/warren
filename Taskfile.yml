@@ -55,6 +55,7 @@ tasks:
         SlackEventUsecases
         SlackInteractionUsecases
         AlertUsecases
+        PromptService
 
   graphql:
     desc: "Generate GraphQL code"

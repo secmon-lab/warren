@@ -144,21 +144,14 @@ All comment and character literal in source code must be in English
 ### Testing
 
 - Test files should have `package {name}_test`. Do not use same package name
-- **🚨 CRITICAL RULE: Test MUST be included in same name test file. (e.g. test for `abc.go` must be in `abc_test.go`) 🚨**
-  - **NEVER create test files like:**
-    - ❌ `e2e_test.go`
-    - ❌ `integration_test.go`
-    - ❌ `feature_xyz_test.go`
-    - ❌ `log_test.go` (unless there's a `log.go`)
-  - **ALWAYS match the source file name:**
-    - ✅ `server.go` → `server_test.go`
-    - ✅ `middleware.go` → `middleware_test.go`
-    - ✅ `alert.go` → `alert_test.go`
-  - **Before creating ANY test, ask: "Which source file does this test belong to?"**
-  - **If testing multiple files' interaction, put the test in the primary file's test**
-- Do not build binary. If you need to run, use `go run` command instead
-- Extend timeout duration if the test fails with time out
-- DO NOT use `-short`
+- Test file name convention is: `xyz.go` → `xyz_test.go`. Other test file names (e.g., `xyz_e2e_test.go`) are not allowed.
+- Repository Tests Best Practices:
+  - Always use random IDs (e.g., using `time.Now().UnixNano()`) to avoid test conflicts
+  - Never use hardcoded IDs like "msg-001", "user-001" as they cause test failures when running in parallel
+  - Always verify ALL fields of returned values, not just checking for nil/existence
+  - Compare expected values properly - don't just check if something exists, verify it matches what was saved
+  - For timestamp comparisons, use tolerance (e.g., `< time.Second`) to account for storage precision
+
 
 ### Test File Checklist (Use this EVERY time)
 Before creating or modifying tests:

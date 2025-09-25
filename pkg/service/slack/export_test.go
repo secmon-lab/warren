@@ -33,4 +33,3 @@ func (x *Service) SetProfileCache(cache map[string]*userProfileCache) {
 func NormalizeChannel(channel string) string {
 	return normalizeChannel(channel)
 }
-

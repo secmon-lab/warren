@@ -10,6 +10,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -1907,6 +1908,9 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			CountTicketsByStatusFunc: func(ctx context.Context, statuses []types.TicketStatus) (int, error) {
 //				panic("mock out the CountTicketsByStatus method")
 //			},
+//			CreateNoticeFunc: func(ctx context.Context, noticeMoqParam *notice.Notice) error {
+//				panic("mock out the CreateNotice method")
+//			},
 //			CreateTagWithIDFunc: func(ctx context.Context, tagMoqParam *tag.Tag) error {
 //				panic("mock out the CreateTagWithID method")
 //			},
@@ -1960,6 +1964,9 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			},
 //			GetLatestHistoryFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
 //				panic("mock out the GetLatestHistory method")
+//			},
+//			GetNoticeFunc: func(ctx context.Context, id types.NoticeID) (*notice.Notice, error) {
+//				panic("mock out the GetNotice method")
 //			},
 //			GetOrCreateTagByNameFunc: func(ctx context.Context, name string, description string, color string, createdBy string) (*tag.Tag, error) {
 //				panic("mock out the GetOrCreateTagByName method")
@@ -2051,6 +2058,9 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			UnbindAlertFromTicketFunc: func(ctx context.Context, alertID types.AlertID) error {
 //				panic("mock out the UnbindAlertFromTicket method")
 //			},
+//			UpdateNoticeFunc: func(ctx context.Context, noticeMoqParam *notice.Notice) error {
+//				panic("mock out the UpdateNotice method")
+//			},
 //			UpdateTagFunc: func(ctx context.Context, tagMoqParam *tag.Tag) error {
 //				panic("mock out the UpdateTag method")
 //			},
@@ -2087,6 +2097,9 @@ type RepositoryMock struct {
 
 	// CountTicketsByStatusFunc mocks the CountTicketsByStatus method.
 	CountTicketsByStatusFunc func(ctx context.Context, statuses []types.TicketStatus) (int, error)
+
+	// CreateNoticeFunc mocks the CreateNotice method.
+	CreateNoticeFunc func(ctx context.Context, noticeMoqParam *notice.Notice) error
 
 	// CreateTagWithIDFunc mocks the CreateTagWithID method.
 	CreateTagWithIDFunc func(ctx context.Context, tagMoqParam *tag.Tag) error
@@ -2141,6 +2154,9 @@ type RepositoryMock struct {
 
 	// GetLatestHistoryFunc mocks the GetLatestHistory method.
 	GetLatestHistoryFunc func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error)
+
+	// GetNoticeFunc mocks the GetNotice method.
+	GetNoticeFunc func(ctx context.Context, id types.NoticeID) (*notice.Notice, error)
 
 	// GetOrCreateTagByNameFunc mocks the GetOrCreateTagByName method.
 	GetOrCreateTagByNameFunc func(ctx context.Context, name string, description string, color string, createdBy string) (*tag.Tag, error)
@@ -2232,6 +2248,9 @@ type RepositoryMock struct {
 	// UnbindAlertFromTicketFunc mocks the UnbindAlertFromTicket method.
 	UnbindAlertFromTicketFunc func(ctx context.Context, alertID types.AlertID) error
 
+	// UpdateNoticeFunc mocks the UpdateNotice method.
+	UpdateNoticeFunc func(ctx context.Context, noticeMoqParam *notice.Notice) error
+
 	// UpdateTagFunc mocks the UpdateTag method.
 	UpdateTagFunc func(ctx context.Context, tagMoqParam *tag.Tag) error
 
@@ -2299,6 +2318,13 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Statuses is the statuses argument value.
 			Statuses []types.TicketStatus
+		}
+		// CreateNotice holds details about calls to the CreateNotice method.
+		CreateNotice []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// NoticeMoqParam is the noticeMoqParam argument value.
+			NoticeMoqParam *notice.Notice
 		}
 		// CreateTagWithID holds details about calls to the CreateTagWithID method.
 		CreateTagWithID []struct {
@@ -2437,6 +2463,13 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
+		}
+		// GetNotice holds details about calls to the GetNotice method.
+		GetNotice []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID types.NoticeID
 		}
 		// GetOrCreateTagByName holds details about calls to the GetOrCreateTagByName method.
 		GetOrCreateTagByName []struct {
@@ -2674,6 +2707,13 @@ type RepositoryMock struct {
 			// AlertID is the alertID argument value.
 			AlertID types.AlertID
 		}
+		// UpdateNotice holds details about calls to the UpdateNotice method.
+		UpdateNotice []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// NoticeMoqParam is the noticeMoqParam argument value.
+			NoticeMoqParam *notice.Notice
+		}
 		// UpdateTag holds details about calls to the UpdateTag method.
 		UpdateTag []struct {
 			// Ctx is the ctx argument value.
@@ -2691,6 +2731,7 @@ type RepositoryMock struct {
 	lockCountAlertsWithoutTicket       sync.RWMutex
 	lockCountTicketComments            sync.RWMutex
 	lockCountTicketsByStatus           sync.RWMutex
+	lockCreateNotice                   sync.RWMutex
 	lockCreateTagWithID                sync.RWMutex
 	lockDeleteTagByID                  sync.RWMutex
 	lockDeleteToken                    sync.RWMutex
@@ -2709,6 +2750,7 @@ type RepositoryMock struct {
 	lockGetLatestAlertByThread         sync.RWMutex
 	lockGetLatestAlertListInThread     sync.RWMutex
 	lockGetLatestHistory               sync.RWMutex
+	lockGetNotice                      sync.RWMutex
 	lockGetOrCreateTagByName           sync.RWMutex
 	lockGetTagByID                     sync.RWMutex
 	lockGetTagByName                   sync.RWMutex
@@ -2739,6 +2781,7 @@ type RepositoryMock struct {
 	lockRemoveTagIDFromAllTickets      sync.RWMutex
 	lockSearchAlerts                   sync.RWMutex
 	lockUnbindAlertFromTicket          sync.RWMutex
+	lockUpdateNotice                   sync.RWMutex
 	lockUpdateTag                      sync.RWMutex
 }
 
@@ -3096,6 +3139,45 @@ func (mock *RepositoryMock) CountTicketsByStatusCalls() []struct {
 	mock.lockCountTicketsByStatus.RLock()
 	calls = mock.calls.CountTicketsByStatus
 	mock.lockCountTicketsByStatus.RUnlock()
+	return calls
+}
+
+// CreateNotice calls CreateNoticeFunc.
+func (mock *RepositoryMock) CreateNotice(ctx context.Context, noticeMoqParam *notice.Notice) error {
+	callInfo := struct {
+		Ctx            context.Context
+		NoticeMoqParam *notice.Notice
+	}{
+		Ctx:            ctx,
+		NoticeMoqParam: noticeMoqParam,
+	}
+	mock.lockCreateNotice.Lock()
+	mock.calls.CreateNotice = append(mock.calls.CreateNotice, callInfo)
+	mock.lockCreateNotice.Unlock()
+	if mock.CreateNoticeFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.CreateNoticeFunc(ctx, noticeMoqParam)
+}
+
+// CreateNoticeCalls gets all the calls that were made to CreateNotice.
+// Check the length with:
+//
+//	len(mockedRepository.CreateNoticeCalls())
+func (mock *RepositoryMock) CreateNoticeCalls() []struct {
+	Ctx            context.Context
+	NoticeMoqParam *notice.Notice
+} {
+	var calls []struct {
+		Ctx            context.Context
+		NoticeMoqParam *notice.Notice
+	}
+	mock.lockCreateNotice.RLock()
+	calls = mock.calls.CreateNotice
+	mock.lockCreateNotice.RUnlock()
 	return calls
 }
 
@@ -3837,6 +3919,46 @@ func (mock *RepositoryMock) GetLatestHistoryCalls() []struct {
 	mock.lockGetLatestHistory.RLock()
 	calls = mock.calls.GetLatestHistory
 	mock.lockGetLatestHistory.RUnlock()
+	return calls
+}
+
+// GetNotice calls GetNoticeFunc.
+func (mock *RepositoryMock) GetNotice(ctx context.Context, id types.NoticeID) (*notice.Notice, error) {
+	callInfo := struct {
+		Ctx context.Context
+		ID  types.NoticeID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockGetNotice.Lock()
+	mock.calls.GetNotice = append(mock.calls.GetNotice, callInfo)
+	mock.lockGetNotice.Unlock()
+	if mock.GetNoticeFunc == nil {
+		var (
+			noticeOut *notice.Notice
+			errOut    error
+		)
+		return noticeOut, errOut
+	}
+	return mock.GetNoticeFunc(ctx, id)
+}
+
+// GetNoticeCalls gets all the calls that were made to GetNotice.
+// Check the length with:
+//
+//	len(mockedRepository.GetNoticeCalls())
+func (mock *RepositoryMock) GetNoticeCalls() []struct {
+	Ctx context.Context
+	ID  types.NoticeID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  types.NoticeID
+	}
+	mock.lockGetNotice.RLock()
+	calls = mock.calls.GetNotice
+	mock.lockGetNotice.RUnlock()
 	return calls
 }
 
@@ -5076,6 +5198,45 @@ func (mock *RepositoryMock) UnbindAlertFromTicketCalls() []struct {
 	mock.lockUnbindAlertFromTicket.RLock()
 	calls = mock.calls.UnbindAlertFromTicket
 	mock.lockUnbindAlertFromTicket.RUnlock()
+	return calls
+}
+
+// UpdateNotice calls UpdateNoticeFunc.
+func (mock *RepositoryMock) UpdateNotice(ctx context.Context, noticeMoqParam *notice.Notice) error {
+	callInfo := struct {
+		Ctx            context.Context
+		NoticeMoqParam *notice.Notice
+	}{
+		Ctx:            ctx,
+		NoticeMoqParam: noticeMoqParam,
+	}
+	mock.lockUpdateNotice.Lock()
+	mock.calls.UpdateNotice = append(mock.calls.UpdateNotice, callInfo)
+	mock.lockUpdateNotice.Unlock()
+	if mock.UpdateNoticeFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.UpdateNoticeFunc(ctx, noticeMoqParam)
+}
+
+// UpdateNoticeCalls gets all the calls that were made to UpdateNotice.
+// Check the length with:
+//
+//	len(mockedRepository.UpdateNoticeCalls())
+func (mock *RepositoryMock) UpdateNoticeCalls() []struct {
+	Ctx            context.Context
+	NoticeMoqParam *notice.Notice
+} {
+	var calls []struct {
+		Ctx            context.Context
+		NoticeMoqParam *notice.Notice
+	}
+	mock.lockUpdateNotice.RLock()
+	calls = mock.calls.UpdateNotice
+	mock.lockUpdateNotice.RUnlock()
 	return calls
 }
 
@@ -6335,5 +6496,83 @@ func (mock *AlertUsecasesMock) HandleAlertCalls() []struct {
 	mock.lockHandleAlert.RLock()
 	calls = mock.calls.HandleAlert
 	mock.lockHandleAlert.RUnlock()
+	return calls
+}
+
+// PromptServiceMock is a mock implementation of interfaces.PromptService.
+//
+//	func TestSomethingThatUsesPromptService(t *testing.T) {
+//
+//		// make and configure a mocked interfaces.PromptService
+//		mockedPromptService := &PromptServiceMock{
+//			GeneratePromptFunc: func(ctx context.Context, templateName string, alertMoqParam *alert.Alert) (string, error) {
+//				panic("mock out the GeneratePrompt method")
+//			},
+//		}
+//
+//		// use mockedPromptService in code that requires interfaces.PromptService
+//		// and then make assertions.
+//
+//	}
+type PromptServiceMock struct {
+	// GeneratePromptFunc mocks the GeneratePrompt method.
+	GeneratePromptFunc func(ctx context.Context, templateName string, alertMoqParam *alert.Alert) (string, error)
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// GeneratePrompt holds details about calls to the GeneratePrompt method.
+		GeneratePrompt []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TemplateName is the templateName argument value.
+			TemplateName string
+			// AlertMoqParam is the alertMoqParam argument value.
+			AlertMoqParam *alert.Alert
+		}
+	}
+	lockGeneratePrompt sync.RWMutex
+}
+
+// GeneratePrompt calls GeneratePromptFunc.
+func (mock *PromptServiceMock) GeneratePrompt(ctx context.Context, templateName string, alertMoqParam *alert.Alert) (string, error) {
+	callInfo := struct {
+		Ctx           context.Context
+		TemplateName  string
+		AlertMoqParam *alert.Alert
+	}{
+		Ctx:           ctx,
+		TemplateName:  templateName,
+		AlertMoqParam: alertMoqParam,
+	}
+	mock.lockGeneratePrompt.Lock()
+	mock.calls.GeneratePrompt = append(mock.calls.GeneratePrompt, callInfo)
+	mock.lockGeneratePrompt.Unlock()
+	if mock.GeneratePromptFunc == nil {
+		var (
+			sOut   string
+			errOut error
+		)
+		return sOut, errOut
+	}
+	return mock.GeneratePromptFunc(ctx, templateName, alertMoqParam)
+}
+
+// GeneratePromptCalls gets all the calls that were made to GeneratePrompt.
+// Check the length with:
+//
+//	len(mockedPromptService.GeneratePromptCalls())
+func (mock *PromptServiceMock) GeneratePromptCalls() []struct {
+	Ctx           context.Context
+	TemplateName  string
+	AlertMoqParam *alert.Alert
+} {
+	var calls []struct {
+		Ctx           context.Context
+		TemplateName  string
+		AlertMoqParam *alert.Alert
+	}
+	mock.lockGeneratePrompt.RLock()
+	calls = mock.calls.GeneratePrompt
+	mock.lockGeneratePrompt.RUnlock()
 	return calls
 }
