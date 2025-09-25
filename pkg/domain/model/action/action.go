@@ -2,19 +2,16 @@ package action
 
 import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-)
-
-const (
-	PublishTypeDiscard = "discard" // Discard the alert
-	PublishTypeNotice  = "notice"  // Send as notice
-	PublishTypeAlert   = "alert"   // Send as full alert (default)
+	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 // PolicyResult represents the result of action policy evaluation
 type PolicyResult struct {
-	Channel []string          `json:"channel,omitempty"` // Slack notification channels
-	Publish string            `json:"publish,omitempty"` // Publication type
-	Attr    map[string]string `json:"attr,omitempty"`    // Additional attributes
+	Channel     []string          `json:"channel,omitempty"`     // Slack notification channels
+	Publish     types.PublishType `json:"publish,omitempty"`     // Publication type
+	Attr        map[string]string `json:"attr,omitempty"`        // Additional attributes
+	Title       string            `json:"title,omitempty"`       // Override alert title
+	Description string            `json:"description,omitempty"` // Override alert description
 }
 
 // QueryInput represents the input for action policy evaluation

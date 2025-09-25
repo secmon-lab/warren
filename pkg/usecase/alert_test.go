@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -1686,14 +1687,14 @@ func TestActionEvaluator(t *testing.T) {
 
 		result, err := usecase.EvaluateAction(ctx, policyClient, alert, "test response")
 		gt.NoError(t, err)
-		gt.Equal(t, result.Publish, action.PublishTypeAlert)
+		gt.Equal(t, result.Publish, types.PublishTypeAlert)
 	})
 
 	t.Run("policy returns notice", func(t *testing.T) {
 		policyClient := &mock.PolicyClientMock{
 			QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
 				if policyResult, ok := result.(*action.PolicyResult); ok {
-					policyResult.Publish = action.PublishTypeNotice
+					policyResult.Publish = types.PublishTypeNotice
 					policyResult.Channel = []string{"test-channel"}
 				}
 				return nil
@@ -1705,8 +1706,37 @@ func TestActionEvaluator(t *testing.T) {
 
 		result, err := usecase.EvaluateAction(ctx, policyClient, alert, "test response")
 		gt.NoError(t, err)
-		gt.Equal(t, result.Publish, action.PublishTypeNotice)
+		gt.Equal(t, result.Publish, types.PublishTypeNotice)
 		gt.Equal(t, result.Channel, []string{"test-channel"})
+	})
+
+	t.Run("policy returns metadata updates", func(t *testing.T) {
+		policyClient := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+				if policyResult, ok := result.(*action.PolicyResult); ok {
+					policyResult.Publish = types.PublishTypeAlert
+					policyResult.Title = "Policy Updated Title"
+					policyResult.Description = "Policy Updated Description"
+					policyResult.Attr = map[string]string{
+						"severity": "high",
+						"category": "security",
+					}
+				}
+				return nil
+			},
+		}
+		alert := &alert.Alert{
+			Metadata: alert.Metadata{Title: "Original Title"},
+		}
+
+		result, err := usecase.EvaluateAction(ctx, policyClient, alert, map[string]interface{}{"confidence": 0.95})
+		gt.NoError(t, err)
+		gt.Equal(t, result.Publish, types.PublishTypeAlert)
+		gt.Equal(t, result.Title, "Policy Updated Title")
+		gt.Equal(t, result.Description, "Policy Updated Description")
+		gt.Equal(t, len(result.Attr), 2)
+		gt.Equal(t, result.Attr["severity"], "high")
+		gt.Equal(t, result.Attr["category"], "security")
 	})
 }
 
@@ -1931,7 +1961,7 @@ func TestEscalateNotice(t *testing.T) {
 	policyMock := &mock.PolicyClientMock{
 		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
 			if policyResult, ok := result.(*action.PolicyResult); ok {
-				policyResult.Publish = action.PublishTypeNotice
+				policyResult.Publish = types.PublishTypeNotice
 				policyResult.Channel = []string{"#alerts"}
 			}
 			return nil
@@ -2028,4 +2058,135 @@ func TestEscalateNotice(t *testing.T) {
 		gt.NoError(t, err)
 		gt.True(t, notice.Escalated)
 	})
+}
+
+func TestHandleAlert_ActionPolicyMetadataUpdates(t *testing.T) {
+	// Test case: Action policy updates alert metadata (title, description, attributes)
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	// Mock LLM that returns JSON response
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{`{"analysis": "high risk", "confidence": 0.95}`},
+					}, nil
+				},
+			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
+			return [][]float64{{0.1, 0.2, 0.3}}, nil
+		},
+	}
+
+	// Mock policy that returns alert with GenAI and action policy that updates metadata
+	var actionPolicyCalled bool
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			if strings.Contains(query, "data.alert.") {
+				// Alert policy - return alert with GenAI config
+				if queryResult, ok := result.(*alert.QueryOutput); ok {
+					queryResult.Alert = []alert.Metadata{
+						{
+							Title:       "Original Security Alert",
+							Description: "Original alert description",
+							GenAI: &alert.GenAIConfig{
+								Prompt: "analyze_security.tmpl",
+								Type:   types.GenAIContentTypeJSON,
+							},
+						},
+					}
+				}
+			} else if strings.Contains(query, "data.action") {
+				// Action policy - update metadata based on GenAI analysis
+				actionPolicyCalled = true
+				if queryInput, ok := data.(action.QueryInput); ok {
+					// Verify we received parsed JSON data
+					if genaiData, ok := queryInput.GenAI.(map[string]interface{}); ok {
+						gt.Equal(t, genaiData["analysis"], "high risk")
+						gt.Equal(t, genaiData["confidence"], 0.95)
+					}
+				}
+				if policyResult, ok := result.(*action.PolicyResult); ok {
+					policyResult.Publish = types.PublishTypeAlert
+					policyResult.Title = "High Risk Security Alert"
+					policyResult.Description = "AI analysis indicates high risk security incident requiring immediate attention"
+					policyResult.Attr = map[string]string{
+						"risk_level": "high",
+						"confidence": "95%",
+						"ai_analysis": "threat_detected",
+					}
+				}
+			}
+			return nil
+		},
+	}
+
+	// Mock prompt service
+	promptMock := &mock.PromptServiceMock{
+		GeneratePromptFunc: func(ctx context.Context, templateName string, alert *alert.Alert) (string, error) {
+			return "Analyze this security alert for risk level", nil
+		},
+	}
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			return "test-channel", "test-thread", nil
+		},
+		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			return &slack_sdk.FileSummary{}, nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{UserID: "test-user"}, nil
+		},
+	}
+
+	slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+	gt.NoError(t, err)
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackService(slackSvc),
+		usecase.WithLLMClient(llmMock),
+		usecase.WithPolicyClient(policyMock),
+		usecase.WithPromptService(promptMock),
+	)
+
+	// Execute
+	result, err := uc.HandleAlert(ctx, types.AlertSchema("security"), map[string]interface{}{
+		"event_type": "suspicious_login",
+		"source_ip":  "192.168.1.100",
+	})
+
+	// Verify
+	gt.NoError(t, err)
+	gt.Array(t, result).Length(1)
+	gt.Value(t, actionPolicyCalled).Equal(true)
+
+	createdAlert := result[0]
+
+	// Verify metadata was updated by action policy
+	gt.Value(t, createdAlert.Metadata.Title).Equal("High Risk Security Alert")
+	gt.Value(t, createdAlert.Metadata.Description).Equal("AI analysis indicates high risk security incident requiring immediate attention")
+	gt.Value(t, createdAlert.Metadata.TitleSource).Equal(types.SourcePolicy)
+	gt.Value(t, createdAlert.Metadata.DescriptionSource).Equal(types.SourcePolicy)
+
+	// Verify attributes were added by action policy
+	gt.Array(t, createdAlert.Metadata.Attributes).Length(3)
+	expectedAttrs := map[string]string{
+		"risk_level":  "high",
+		"confidence":  "95%",
+		"ai_analysis": "threat_detected",
+	}
+	for _, attr := range createdAlert.Metadata.Attributes {
+		expectedValue, exists := expectedAttrs[attr.Key]
+		gt.Value(t, exists).Equal(true)
+		gt.Value(t, attr.Value).Equal(expectedValue)
+		gt.Value(t, attr.Auto).Equal(true) // Should be marked as auto-generated
+	}
 }

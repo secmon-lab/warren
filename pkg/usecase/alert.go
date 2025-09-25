@@ -41,7 +41,7 @@ func evaluateAction(ctx context.Context, policyClient interfaces.PolicyClient, a
 		if errors.Is(err, opaq.ErrNoEvalResult) {
 			// Default behavior when no action policy is defined: publish as alert
 			return &action.PolicyResult{
-				Publish: action.PublishTypeAlert,
+				Publish: types.PublishTypeAlert,
 			}, nil
 		}
 		return nil, goerr.Wrap(err, "failed to evaluate action policy")
@@ -147,14 +147,34 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 				return nil, goerr.Wrap(err, "failed to evaluate action policy")
 			}
 
+			// Apply metadata updates from policy result
+			if policyResult.Title != "" {
+				newAlert.Metadata.Title = policyResult.Title
+				newAlert.Metadata.TitleSource = types.SourcePolicy
+			}
+			if policyResult.Description != "" {
+				newAlert.Metadata.Description = policyResult.Description
+				newAlert.Metadata.DescriptionSource = types.SourcePolicy
+			}
+			// Apply additional attributes
+			if len(policyResult.Attr) > 0 {
+				for key, value := range policyResult.Attr {
+					newAlert.Metadata.Attributes = append(newAlert.Metadata.Attributes, alert.Attribute{
+						Key:   key,
+						Value: value,
+						Auto:  true, // Set by policy, mark as auto-generated
+					})
+				}
+			}
+
 			// Handle publish type from policy result
 			switch policyResult.Publish {
-			case action.PublishTypeDiscard:
+			case types.PublishTypeDiscard:
 				// Discard alert, just log and return
 				logger.Info("alert discarded by GenAI policy", "alert", newAlert)
 				return &newAlert, nil
 
-			case action.PublishTypeNotice:
+			case types.PublishTypeNotice:
 				// Create notice instead of full alert
 				if err := uc.handleNotice(ctx, &newAlert, policyResult.Channel); err != nil {
 					return nil, goerr.Wrap(err, "failed to handle notice")
@@ -162,7 +182,7 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 				logger.Info("alert processed as notice", "alert", newAlert)
 				return &newAlert, nil
 
-			case action.PublishTypeAlert, "":
+			case types.PublishTypeAlert, "":
 				// Continue with normal alert processing
 				logger.Info("alert will be processed normally", "alert", newAlert)
 

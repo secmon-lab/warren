@@ -18,3 +18,11 @@ func (x GenAIContentType) Validate() error {
 		return goerr.New("invalid GenAI content type", goerr.V("content_type", string(x)), goerr.V("valid_types", []string{string(GenAIContentTypeText), string(GenAIContentTypeJSON)}))
 	}
 }
+
+type PublishType string
+
+const (
+	PublishTypeDiscard PublishType = "discard" // Discard the alert
+	PublishTypeNotice  PublishType = "notice"  // Send as notice
+	PublishTypeAlert   PublishType = "alert"   // Send as full alert (default)
+)
