@@ -1873,7 +1873,10 @@ channel := ["security-alerts"] if {
 }
 
 # Low severity as notice only
-publish := "notice"
+publish := "notice" if {
+  input.alert.metadata.severity == "low"
+}
+
 channel := ["security-info"] if {
   input.alert.metadata.severity == "low"
 }
