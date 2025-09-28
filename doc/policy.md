@@ -1802,7 +1802,7 @@ title := "Custom alert title"
 description := "Custom alert description"
 
 # Specify Slack notification channels (optional)
-channel := ["security-alerts", "high-priority"]
+channel contains "security-alerts"
 
 # Add custom attributes (optional)
 attr := {
@@ -1835,7 +1835,7 @@ publish := "discard" if {
 package action
 
 publish := "notice"
-channel := ["info-alerts"]
+channel contains "info-alerts"
 
 # Send low-severity alerts as notices
 publish := "notice" if {
@@ -1853,7 +1853,7 @@ package action
 
 # This is the default behavior if no action policy exists
 publish := "alert"
-channel := ["security-team"]
+channel contains "security-team"
 ```
 
 ### Practical Examples
@@ -1863,12 +1863,12 @@ channel := ["security-team"]
 package action
 
 # High severity to urgent channel
-channel := ["security-urgent"] if {
+channel contains "security-urgent" if {
   input.alert.metadata.severity == "critical"
 }
 
 # Medium severity to normal channel
-channel := ["security-alerts"] if {
+channel contains "security-alerts" if {
   input.alert.metadata.severity == "medium"
 }
 
@@ -1877,7 +1877,7 @@ publish := "notice" if {
   input.alert.metadata.severity == "low"
 }
 
-channel := ["security-info"] if {
+channel contains "security-info" if {
   input.alert.metadata.severity == "low"
 }
 ```
@@ -1922,18 +1922,18 @@ attr := {
 package action
 
 # Route authentication alerts to identity team
-channel := ["identity-alerts"] if {
+channel contains "identity-alerts" if {
   contains(input.alert.metadata.title, "authentication")
 }
 
 # Route network alerts to network team
-channel := ["network-alerts"] if {
+channel contains "network-alerts" if {
   input.alert.schema == "suricata"
   input.alert.metadata.severity != "low"
 }
 
 # Business hours vs after-hours routing
-channel := ["security-urgent"] if {
+channel contains "security-urgent" if {
   input.alert.metadata.severity == "high"
   not business_hours
 }
@@ -1961,7 +1961,7 @@ publish := "notice" if {
 
 # Default to normal alert processing
 publish := "alert"
-channel := ["security-alerts"]
+channel contains "security-alerts"
 ```
 
 #### 2. Preserve Important Alerts
@@ -2011,7 +2011,7 @@ policies/test/action/
 #### Policy Not Executing
 - Verify the package name is exactly `action`
 - Check that required fields in input data exist
-- Test policy with `warren test policy` command
+- Test policy with `warren test` command
 
 #### Unexpected Behavior
 - Use `print()` statements to debug policy evaluation
