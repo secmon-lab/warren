@@ -1753,6 +1753,268 @@ opa run policies/
 > data.auth.allow with input as {"iap": {"email": "test@example.com"}}
 ```
 
+## Action Policies
+
+Action policies control how alerts are processed after AI analysis. They run after the alert has been generated and AI metadata has been added, allowing you to control the final disposition of the alert.
+
+### When Action Policies Run
+
+Action policies execute at this point in the alert processing flow:
+
+1. Event received → Alert Policy evaluation → Alert generated
+2. AI analysis → Title/description/severity generated
+3. **Action Policy evaluation** ← Here
+4. Final alert processing based on action results
+
+### Input Data Available
+
+Action policies receive the following data as `input`:
+
+```json
+{
+  "genai": "AI analysis result (format depends on configuration)",
+  "alert": {
+    "id": "alert-12345",
+    "schema": "guardduty",
+    "data": { /* original event data */ },
+    "metadata": {
+      "title": "AI-generated title",
+      "description": "AI-generated description",
+      "severity": "high",
+      "attributes": []
+    }
+  }
+}
+```
+
+### Output Fields
+
+Action policies control alert processing by setting these top-level fields:
+
+```rego
+package action
+
+# Control what happens to the alert
+publish := "alert"  # Options: "discard", "notice", "alert"
+
+# Override AI-generated metadata (optional)
+title := "Custom alert title"
+description := "Custom alert description"
+
+# Specify Slack notification channels (optional)
+channel := ["security-alerts", "high-priority"]
+
+# Add custom attributes (optional)
+attr := {
+  "priority": "urgent",
+  "assignee": "security-team"
+}
+```
+
+### Publish Types
+
+#### `"discard"` - Discard Alert
+- Alert is discarded with no notifications
+- Logged but no ticket created, no Slack notifications
+- Use for confirmed false positives
+
+```rego
+package action
+
+publish := "discard" if {
+  input.alert.metadata.title contains "Known False Positive"
+}
+```
+
+#### `"notice"` - Simple Notification
+- Sends simple Slack notification only
+- No ticket created, no investigation features available
+- Use for informational alerts
+
+```rego
+package action
+
+publish := "notice"
+channel := ["info-alerts"]
+
+# Send low-severity alerts as notices
+publish := "notice" if {
+  input.alert.metadata.severity == "low"
+}
+```
+
+#### `"alert"` - Full Alert Processing (Default)
+- Normal alert processing with ticket creation
+- Full Slack integration with investigation features
+- Use for alerts requiring investigation
+
+```rego
+package action
+
+# This is the default behavior if no action policy exists
+publish := "alert"
+channel := ["security-team"]
+```
+
+### Practical Examples
+
+#### Route Alerts by Severity
+```rego
+package action
+
+# High severity to urgent channel
+channel := ["security-urgent"] if {
+  input.alert.metadata.severity == "critical"
+}
+
+# Medium severity to normal channel
+channel := ["security-alerts"] if {
+  input.alert.metadata.severity == "medium"
+}
+
+# Low severity as notice only
+publish := "notice"
+channel := ["security-info"] if {
+  input.alert.metadata.severity == "low"
+}
+```
+
+#### Filter Based on AI Analysis
+```rego
+package action
+
+# Discard if AI determines it's a false positive
+publish := "discard" if {
+  contains(input.genai.analysis, "false positive")
+}
+
+# Override title based on AI confidence
+title := sprintf("HIGH CONFIDENCE: %s", [input.alert.metadata.title]) if {
+  input.genai.confidence > 0.9
+}
+```
+
+#### Add Custom Attributes
+```rego
+package action
+
+# Add priority based on source
+attr := {
+  "priority": "high",
+  "source_type": "production"
+} if {
+  input.alert.data.source == "prod-cluster"
+}
+
+# Add assignment based on alert type
+attr := {
+  "assignee": "network-team"
+} if {
+  input.alert.schema == "suricata"
+}
+```
+
+#### Conditional Channel Routing
+```rego
+package action
+
+# Route authentication alerts to identity team
+channel := ["identity-alerts"] if {
+  contains(input.alert.metadata.title, "authentication")
+}
+
+# Route network alerts to network team
+channel := ["network-alerts"] if {
+  input.alert.schema == "suricata"
+  input.alert.metadata.severity != "low"
+}
+
+# Business hours vs after-hours routing
+channel := ["security-urgent"] if {
+  input.alert.metadata.severity == "high"
+  not business_hours
+}
+
+business_hours if {
+  # Define business hours logic
+  hour := time.clock(time.now_ns())[0]
+  hour >= 9
+  hour <= 17
+}
+```
+
+### Best Practices
+
+#### 1. Default to Alert Processing
+Always provide a default case that processes alerts normally:
+
+```rego
+package action
+
+# Specific handling for certain cases
+publish := "notice" if {
+  input.alert.metadata.severity == "info"
+}
+
+# Default to normal alert processing
+publish := "alert"
+channel := ["security-alerts"]
+```
+
+#### 2. Preserve Important Alerts
+Be conservative with `discard` - use it only for confirmed false positives:
+
+```rego
+package action
+
+# Only discard very specific cases
+publish := "discard" if {
+  input.alert.schema == "test"
+  contains(input.alert.data.source, "staging")
+}
+```
+
+#### 3. Use AI Analysis Wisely
+Leverage AI analysis results but don't rely on them completely:
+
+```rego
+package action
+
+# Enhance title with AI insights
+title := sprintf("%s [AI: %s]", [
+  input.alert.metadata.title,
+  input.genai.summary
+]) if {
+  input.genai.summary
+  input.genai.confidence > 0.7
+}
+```
+
+#### 4. Test Action Policies
+Create test cases to verify your action policies work correctly:
+
+```
+policies/test/action/
+├── alert/
+│   └── high_severity.json
+├── notice/
+│   └── low_severity.json
+└── discard/
+    └── false_positive.json
+```
+
+### Troubleshooting
+
+#### Policy Not Executing
+- Verify the package name is exactly `action`
+- Check that required fields in input data exist
+- Test policy with `warren test policy` command
+
+#### Unexpected Behavior
+- Use `print()` statements to debug policy evaluation
+- Check Warren logs for action policy evaluation messages
+- Verify input data structure matches expectations
+
 ## Next Steps
 
 1. Start with simple policies and iterate
