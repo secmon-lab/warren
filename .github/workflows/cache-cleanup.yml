@@ -100,7 +100,7 @@ jobs:
             if [ -n "$keep_id" ]; then
               echo "$CACHE_LIST" | jq -r --arg id "$keep_id" '
                 map(select(.id == $id))[0] |
-                "ID: " + .id + " | Key: " + .key + " | Created: " + .createdAt + " | Size: " + (.sizeInBytes | @csv) + " bytes"
+                "ID: " + .id + " | Key: " + .key + " | Created: " + .createdAt + " | Size: " + (.sizeInBytes | tostring) + " bytes"
               '
             fi
           done
@@ -111,7 +111,7 @@ jobs:
             if [ -n "$delete_id" ]; then
               echo "$CACHE_LIST" | jq -r --arg id "$delete_id" '
                 map(select(.id == $id))[0] |
-                "ID: " + .id + " | Key: " + .key + " | Created: " + .createdAt + " | Size: " + (.sizeInBytes | @csv) + " bytes"
+                "ID: " + .id + " | Key: " + .key + " | Created: " + .createdAt + " | Size: " + (.sizeInBytes | tostring) + " bytes"
               '
             fi
           done
