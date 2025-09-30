@@ -76,8 +76,17 @@ jobs:
           ' | tr '\n' ' ')
 
           # Count results
-          KEEP_COUNT=$(echo "$KEEP_IDS" | tr ' ' '\n' | grep -v '^$' | wc -l)
-          DELETE_COUNT=$(echo "$DELETE_IDS" | tr ' ' '\n' | grep -v '^$' | wc -l)
+          if [ -n "$KEEP_IDS" ] && [ "$(echo "$KEEP_IDS" | tr -d ' ')" != "" ]; then
+            KEEP_COUNT=$(echo "$KEEP_IDS" | tr ' ' '\n' | grep -v '^$' | wc -l)
+          else
+            KEEP_COUNT=0
+          fi
+
+          if [ -n "$DELETE_IDS" ] && [ "$(echo "$DELETE_IDS" | tr -d ' ')" != "" ]; then
+            DELETE_COUNT=$(echo "$DELETE_IDS" | tr ' ' '\n' | grep -v '^$' | wc -l)
+          else
+            DELETE_COUNT=0
+          fi
 
           echo "Caches to keep: $KEEP_COUNT"
           echo "Caches to delete: $DELETE_COUNT"
