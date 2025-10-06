@@ -19,14 +19,12 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg slack.Messa
 	th := uc.slackService.NewThread(slackMsg.Thread())
 	ctx = msg.With(ctx, th.Reply, th.NewTraceMessage)
 
-	// Skip if the message is from the bot
-	if uc.slackService.IsBotUser(slackMsg.User().ID) {
-		return nil
-	}
-
-	// Set user ID in context for activity tracking
+	// Set user ID in context for activity tracking and skip if the message is from the bot
 	if slackMsg.User() != nil {
 		ctx = user.WithUserID(ctx, slackMsg.User().ID)
+		if uc.slackService.IsBotUser(slackMsg.User().ID) {
+			return nil
+		}
 	}
 
 	ticket, err := uc.repository.GetTicketByThread(ctx, slackMsg.Thread())
