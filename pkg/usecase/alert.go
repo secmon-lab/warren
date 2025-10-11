@@ -166,6 +166,10 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 					})
 				}
 			}
+			// Apply channel configuration from policy result
+			if policyResult.Channel != "" {
+				newAlert.Metadata.Channel = policyResult.Channel
+			}
 
 			// Handle publish type from policy result
 			switch policyResult.Publish {
@@ -180,7 +184,12 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 					Data:   llmResponse,
 					Format: newAlert.Metadata.GenAI.Format,
 				}
-				if err := uc.handleNotice(ctx, &newAlert, policyResult.Channel, genaiResponse); err != nil {
+				// Convert single channel to array for notice handling
+				var channels []string
+				if policyResult.Channel != "" {
+					channels = []string{policyResult.Channel}
+				}
+				if err := uc.handleNotice(ctx, &newAlert, channels, genaiResponse); err != nil {
 					return nil, goerr.Wrap(err, "failed to handle notice")
 				}
 				logger.Info("alert processed as notice", "alert", newAlert)
