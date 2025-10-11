@@ -1575,7 +1575,7 @@ func TestProcessGenAI(t *testing.T) {
 				Title: "Test Alert",
 				GenAI: &alert.GenAIConfig{
 					Prompt: "test_prompt.tmpl",
-					Format:   "text",
+					Format: "text",
 				},
 			},
 		}
@@ -1614,7 +1614,7 @@ func TestProcessGenAI(t *testing.T) {
 				Title: "Test Alert",
 				GenAI: &alert.GenAIConfig{
 					Prompt: "test_prompt.tmpl",
-					Format:   "text",
+					Format: "text",
 				},
 			},
 		}
@@ -1656,7 +1656,7 @@ func TestProcessGenAI(t *testing.T) {
 				Title: "Test Alert",
 				GenAI: &alert.GenAIConfig{
 					Prompt: "mock_template",
-					Format:   "text",
+					Format: "text",
 				},
 			},
 		}
@@ -1695,7 +1695,7 @@ func TestActionEvaluator(t *testing.T) {
 			QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
 				if policyResult, ok := result.(*action.PolicyResult); ok {
 					policyResult.Publish = types.PublishTypeNotice
-					policyResult.Channel = []string{"test-channel"}
+					policyResult.Channel = "test-channel"
 				}
 				return nil
 			},
@@ -1707,7 +1707,7 @@ func TestActionEvaluator(t *testing.T) {
 		result, err := usecase.EvaluateAction(ctx, policyClient, alert, "test response")
 		gt.NoError(t, err)
 		gt.Equal(t, result.Publish, types.PublishTypeNotice)
-		gt.Equal(t, result.Channel, []string{"test-channel"})
+		gt.Equal(t, result.Channel, "test-channel")
 	})
 
 	t.Run("policy returns metadata updates", func(t *testing.T) {
@@ -1792,7 +1792,7 @@ func TestHandleNotice(t *testing.T) {
 			Schema: "test.schema",
 		}
 
-		err = uc.HandleNotice(ctx, testAlert, []string{"test-channel"})
+		err = uc.HandleNotice(ctx, testAlert, "test-channel")
 		gt.NoError(t, err)
 
 		// Verify repository interaction - notice was created
@@ -1852,74 +1852,13 @@ func TestHandleNotice(t *testing.T) {
 			},
 		}
 
-		err = uc.HandleNotice(ctx, testAlert, []string{})
+		err = uc.HandleNotice(ctx, testAlert, "")
 		gt.NoError(t, err)
 
 		// Verify Slack was called with default channel (empty string becomes default) - main notice + 2 thread messages
 		postCalls := slackMock.PostMessageContextCalls()
 		gt.Array(t, postCalls).Length(3)
 		gt.Equal(t, postCalls[0].ChannelID, "#test-channel")
-	})
-
-	t.Run("handles multiple channels", func(t *testing.T) {
-		// Create fresh mocks for this test
-		repoMock := &mock.RepositoryMock{
-			CreateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
-				return nil
-			},
-			UpdateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
-				return nil
-			},
-		}
-
-		slackMock := &mock.SlackClientMock{
-			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
-				return channelID, "test-timestamp", nil
-			},
-			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
-				return &slack_sdk.AuthTestResponse{
-					UserID: "test-user",
-				}, nil
-			},
-			GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
-				return &slack_sdk.TeamInfo{
-					Domain: "test-workspace",
-				}, nil
-			},
-		}
-
-		slackSvc, err := slack_svc.New(slackMock, "#test-channel")
-		gt.NoError(t, err)
-
-		uc := usecase.New(
-			usecase.WithRepository(repoMock),
-			usecase.WithSlackService(slackSvc),
-		)
-		testAlert := &alert.Alert{
-			ID: types.NewAlertID(),
-			Metadata: alert.Metadata{
-				Title: "Multi Channel Test",
-			},
-		}
-
-		err = uc.HandleNotice(ctx, testAlert, []string{"channel-1", "channel-2"})
-		gt.NoError(t, err)
-
-		// Verify notice was created once
-		createCalls := repoMock.CreateNoticeCalls()
-		gt.Array(t, createCalls).Length(1)
-
-		// Verify Slack was called for each channel - 2 channels * 3 messages each = 6 total
-		postCalls := slackMock.PostMessageContextCalls()
-		gt.Array(t, postCalls).Length(6)
-		// First channel: main message + 2 thread messages
-		gt.Equal(t, postCalls[0].ChannelID, "channel-1")
-		gt.Equal(t, postCalls[1].ChannelID, "channel-1")
-		gt.Equal(t, postCalls[2].ChannelID, "channel-1")
-		// Second channel: main message + 2 thread messages
-		gt.Equal(t, postCalls[3].ChannelID, "channel-2")
-		gt.Equal(t, postCalls[4].ChannelID, "channel-2")
-		gt.Equal(t, postCalls[5].ChannelID, "channel-2")
 	})
 }
 
@@ -1968,7 +1907,7 @@ func TestEscalateNotice(t *testing.T) {
 		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
 			if policyResult, ok := result.(*action.PolicyResult); ok {
 				policyResult.Publish = types.PublishTypeNotice
-				policyResult.Channel = []string{"#alerts"}
+				policyResult.Channel = "#alerts"
 			}
 			return nil
 		},
@@ -2195,4 +2134,220 @@ func TestHandleAlert_ActionPolicyMetadataUpdates(t *testing.T) {
 		gt.Value(t, attr.Value).Equal(expectedValue)
 		gt.Value(t, attr.Auto).Equal(true) // Should be marked as auto-generated
 	}
+}
+
+func TestHandleAlert_ActionPolicyChannelSpecification(t *testing.T) {
+	// Test case: Action policy specifies target channel for alert
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	// Mock LLM that returns JSON response
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{`{"severity": "high"}`},
+					}, nil
+				},
+			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
+			return [][]float64{{0.1, 0.2, 0.3}}, nil
+		},
+	}
+
+	// Track which channel was used for posting
+	var postedToChannel string
+	var actionPolicyCalled bool
+
+	// Mock policy that returns alert with GenAI and action policy that specifies channel
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			if strings.Contains(query, "data.alert.") {
+				// Alert policy - return alert with GenAI config
+				if queryResult, ok := result.(*alert.QueryOutput); ok {
+					queryResult.Alert = []alert.Metadata{
+						{
+							Title:       "Security Alert",
+							Description: "Alert description",
+							GenAI: &alert.GenAIConfig{
+								Prompt: "analyze.tmpl",
+								Format: types.GenAIContentFormatJSON,
+							},
+						},
+					}
+				}
+			} else if strings.Contains(query, "data.action") {
+				// Action policy - specify custom channel based on severity
+				actionPolicyCalled = true
+				if policyResult, ok := result.(*action.PolicyResult); ok {
+					policyResult.Publish = types.PublishTypeAlert
+					policyResult.Channel = "C12345678" // Single channel
+				}
+			}
+			return nil
+		},
+	}
+
+	// Mock prompt service
+	promptMock := &mock.PromptServiceMock{
+		GeneratePromptFunc: func(ctx context.Context, templateName string, alert *alert.Alert) (string, error) {
+			return "Analyze this alert", nil
+		},
+	}
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			postedToChannel = channelID
+			return channelID, "test-thread", nil
+		},
+		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			return &slack_sdk.FileSummary{}, nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{UserID: "test-user"}, nil
+		},
+		GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
+			return &slack_sdk.TeamInfo{Domain: "test"}, nil
+		},
+	}
+
+	slackSvc, err := slack_svc.New(slackMock, "C99999999") // Default channel
+	gt.NoError(t, err)
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackService(slackSvc),
+		usecase.WithLLMClient(llmMock),
+		usecase.WithPolicyClient(policyMock),
+		usecase.WithPromptService(promptMock),
+	)
+
+	// Execute
+	result, err := uc.HandleAlert(ctx, types.AlertSchema("security"), map[string]interface{}{
+		"event_type": "suspicious_activity",
+	})
+
+	// Verify
+	gt.NoError(t, err)
+	gt.Array(t, result).Length(1)
+	gt.Value(t, actionPolicyCalled).Equal(true)
+
+	createdAlert := result[0]
+
+	// Verify channel was set in metadata
+	gt.Value(t, createdAlert.Metadata.Channel).Equal("C12345678")
+
+	// Verify alert was posted to the specified channel (not default)
+	gt.Value(t, postedToChannel).Equal("C12345678")
+}
+
+func TestHandleAlert_ActionPolicyNoChannel(t *testing.T) {
+	// Test case: Action policy doesn't specify channel, should use default
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	// Mock LLM that returns JSON response
+	llmMock := &gollem_mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			return &gollem_mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{`{"severity": "low"}`},
+					}, nil
+				},
+			}, nil
+		},
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
+			return [][]float64{{0.1, 0.2, 0.3}}, nil
+		},
+	}
+
+	// Track which channel was used for posting
+	var postedToChannel string
+
+	// Mock policy that doesn't specify channel
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			if strings.Contains(query, "data.alert.") {
+				if queryResult, ok := result.(*alert.QueryOutput); ok {
+					queryResult.Alert = []alert.Metadata{
+						{
+							Title:       "Low Priority Alert",
+							Description: "Alert description",
+							GenAI: &alert.GenAIConfig{
+								Prompt: "analyze.tmpl",
+								Format: types.GenAIContentFormatJSON,
+							},
+						},
+					}
+				}
+			} else if strings.Contains(query, "data.action") {
+				if policyResult, ok := result.(*action.PolicyResult); ok {
+					policyResult.Publish = types.PublishTypeAlert
+					// No channel specified - should use default
+				}
+			}
+			return nil
+		},
+	}
+
+	// Mock prompt service
+	promptMock := &mock.PromptServiceMock{
+		GeneratePromptFunc: func(ctx context.Context, templateName string, alert *alert.Alert) (string, error) {
+			return "Analyze this alert", nil
+		},
+	}
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+			postedToChannel = channelID
+			return channelID, "test-thread", nil
+		},
+		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			return &slack_sdk.FileSummary{}, nil
+		},
+		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+			return &slack_sdk.AuthTestResponse{UserID: "test-user"}, nil
+		},
+		GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
+			return &slack_sdk.TeamInfo{Domain: "test"}, nil
+		},
+	}
+
+	defaultChannel := "CDEFAULT99"
+	slackSvc, err := slack_svc.New(slackMock, defaultChannel)
+	gt.NoError(t, err)
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackService(slackSvc),
+		usecase.WithLLMClient(llmMock),
+		usecase.WithPolicyClient(policyMock),
+		usecase.WithPromptService(promptMock),
+	)
+
+	// Execute
+	result, err := uc.HandleAlert(ctx, types.AlertSchema("security"), map[string]interface{}{
+		"event_type": "low_priority_event",
+	})
+
+	// Verify
+	gt.NoError(t, err)
+	gt.Array(t, result).Length(1)
+
+	createdAlert := result[0]
+
+	// Verify no channel was set in metadata
+	gt.Value(t, createdAlert.Metadata.Channel).Equal("")
+
+	// Verify alert was posted to default channel
+	gt.Value(t, postedToChannel).Equal(defaultChannel)
 }

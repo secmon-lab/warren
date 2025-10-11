@@ -67,11 +67,14 @@ type Metadata struct {
 	Tags []string `json:"tags,omitempty"`
 	// GenAI field specifies LLM processing configuration
 	GenAI *GenAIConfig `json:"genai,omitempty"`
+	// Channel field specifies target Slack channel for alert notification
+	// Set by action policy evaluation
+	Channel string `json:"channel,omitempty"`
 }
 
 // GenAIConfig configures LLM processing for alerts
 type GenAIConfig struct {
-	Prompt string                  `json:"prompt"` // Prompt template file name
+	Prompt string                   `json:"prompt"` // Prompt template file name
 	Format types.GenAIContentFormat `json:"format"` // Response format: "text" | "json" (default: "text")
 }
 

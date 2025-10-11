@@ -86,8 +86,8 @@ func (uc *UseCases) ProcessGenAI(ctx context.Context, alert *alert.Alert) (any, 
 }
 
 // HandleNotice exports the private handleNotice method for testing
-func (uc *UseCases) HandleNotice(ctx context.Context, alert *alert.Alert, channels []string) error {
-	return uc.handleNotice(ctx, alert, channels, nil)
+func (uc *UseCases) HandleNotice(ctx context.Context, alert *alert.Alert, channel string) error {
+	return uc.handleNotice(ctx, alert, channel, nil)
 }
 
 // EvaluateAction exports the private evaluateAction function for testing

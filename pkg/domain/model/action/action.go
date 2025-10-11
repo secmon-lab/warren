@@ -7,7 +7,7 @@ import (
 
 // PolicyResult represents the result of action policy evaluation
 type PolicyResult struct {
-	Channel     []string          `json:"channel,omitempty"`     // Slack notification channels
+	Channel     string            `json:"channel,omitempty"`     // Slack notification channel
 	Publish     types.PublishType `json:"publish,omitempty"`     // Publication type
 	Attr        map[string]string `json:"attr,omitempty"`        // Additional attributes
 	Title       string            `json:"title,omitempty"`       // Override alert title

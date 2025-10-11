@@ -218,11 +218,6 @@ func (x *Service) PostMessage(ctx context.Context, message string) (*ThreadServi
 	return threadSvc, nil
 }
 
-// resolveChannel determines the target channel for the alert
-func (x *Service) resolveChannel(_ *alert.Alert) string {
-	return x.channelID
-}
-
 // postAlertToChannel posts an alert to the specified channel
 func (x *Service) postAlertToChannel(ctx context.Context, targetChannel string, alert *alert.Alert) (interfaces.SlackThreadService, error) {
 	blocks := buildAlertBlocks(*alert)
@@ -280,8 +275,12 @@ func (x *Service) postAlertWithFallback(ctx context.Context, failedChannel strin
 }
 
 func (x *Service) PostAlert(ctx context.Context, alert *alert.Alert) (interfaces.SlackThreadService, error) {
-	// Determine target channel based on alert metadata
-	targetChannel := x.resolveChannel(alert)
+	// Determine target channel from alert metadata
+	targetChannel := alert.Metadata.Channel
+	if targetChannel == "" {
+		// No channel specified, use default
+		targetChannel = x.channelID
+	}
 
 	// Try to post to the target channel
 	thread, err := x.postAlertToChannel(ctx, targetChannel, alert)
