@@ -1792,7 +1792,7 @@ func TestHandleNotice(t *testing.T) {
 			Schema: "test.schema",
 		}
 
-		err = uc.HandleNotice(ctx, testAlert, []string{"test-channel"})
+		err = uc.HandleNotice(ctx, testAlert, "test-channel")
 		gt.NoError(t, err)
 
 		// Verify repository interaction - notice was created
@@ -1852,74 +1852,13 @@ func TestHandleNotice(t *testing.T) {
 			},
 		}
 
-		err = uc.HandleNotice(ctx, testAlert, []string{})
+		err = uc.HandleNotice(ctx, testAlert, "")
 		gt.NoError(t, err)
 
 		// Verify Slack was called with default channel (empty string becomes default) - main notice + 2 thread messages
 		postCalls := slackMock.PostMessageContextCalls()
 		gt.Array(t, postCalls).Length(3)
 		gt.Equal(t, postCalls[0].ChannelID, "#test-channel")
-	})
-
-	t.Run("handles multiple channels", func(t *testing.T) {
-		// Create fresh mocks for this test
-		repoMock := &mock.RepositoryMock{
-			CreateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
-				return nil
-			},
-			UpdateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
-				return nil
-			},
-		}
-
-		slackMock := &mock.SlackClientMock{
-			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
-				return channelID, "test-timestamp", nil
-			},
-			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
-				return &slack_sdk.AuthTestResponse{
-					UserID: "test-user",
-				}, nil
-			},
-			GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
-				return &slack_sdk.TeamInfo{
-					Domain: "test-workspace",
-				}, nil
-			},
-		}
-
-		slackSvc, err := slack_svc.New(slackMock, "#test-channel")
-		gt.NoError(t, err)
-
-		uc := usecase.New(
-			usecase.WithRepository(repoMock),
-			usecase.WithSlackService(slackSvc),
-		)
-		testAlert := &alert.Alert{
-			ID: types.NewAlertID(),
-			Metadata: alert.Metadata{
-				Title: "Multi Channel Test",
-			},
-		}
-
-		err = uc.HandleNotice(ctx, testAlert, []string{"channel-1", "channel-2"})
-		gt.NoError(t, err)
-
-		// Verify notice was created once
-		createCalls := repoMock.CreateNoticeCalls()
-		gt.Array(t, createCalls).Length(1)
-
-		// Verify Slack was called for each channel - 2 channels * 3 messages each = 6 total
-		postCalls := slackMock.PostMessageContextCalls()
-		gt.Array(t, postCalls).Length(6)
-		// First channel: main message + 2 thread messages
-		gt.Equal(t, postCalls[0].ChannelID, "channel-1")
-		gt.Equal(t, postCalls[1].ChannelID, "channel-1")
-		gt.Equal(t, postCalls[2].ChannelID, "channel-1")
-		// Second channel: main message + 2 thread messages
-		gt.Equal(t, postCalls[3].ChannelID, "channel-2")
-		gt.Equal(t, postCalls[4].ChannelID, "channel-2")
-		gt.Equal(t, postCalls[5].ChannelID, "channel-2")
 	})
 }
 

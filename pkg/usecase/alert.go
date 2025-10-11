@@ -184,12 +184,7 @@ func (uc *UseCases) handleAlert(ctx context.Context, newAlert alert.Alert) (*ale
 					Data:   llmResponse,
 					Format: newAlert.Metadata.GenAI.Format,
 				}
-				// Convert single channel to array for notice handling
-				var channels []string
-				if policyResult.Channel != "" {
-					channels = []string{policyResult.Channel}
-				}
-				if err := uc.handleNotice(ctx, &newAlert, channels, genaiResponse); err != nil {
+				if err := uc.handleNotice(ctx, &newAlert, policyResult.Channel, genaiResponse); err != nil {
 					return nil, goerr.Wrap(err, "failed to handle notice")
 				}
 				logger.Info("alert processed as notice", "alert", newAlert)
@@ -478,7 +473,7 @@ func (uc *UseCases) processGenAI(ctx context.Context, alert *alert.Alert) (any, 
 }
 
 // handleNotice handles notice creation and simple notification
-func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channels []string, llmResponse *alert.GenAIResponse) error {
+func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channel string, llmResponse *alert.GenAIResponse) error {
 	logger := logging.From(ctx)
 
 	// Create notice
@@ -496,7 +491,7 @@ func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channe
 
 	// Send simple notification to Slack
 	if uc.slackService != nil {
-		slackTS, err := uc.sendSimpleNotification(ctx, notice, channels, llmResponse)
+		slackTS, err := uc.sendSimpleNotification(ctx, notice, channel, llmResponse)
 		if err != nil {
 			logger.Warn("failed to send simple notification", "error", err, "notice_id", notice.ID)
 		} else {
@@ -513,7 +508,7 @@ func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channe
 }
 
 // sendSimpleNotification sends a simple notification to Slack
-func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.Notice, channels []string, llmResponse *alert.GenAIResponse) (string, error) {
+func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.Notice, channel string, llmResponse *alert.GenAIResponse) (string, error) {
 	if uc.slackService == nil {
 		return "", goerr.New("slack service not available")
 	}
@@ -528,32 +523,19 @@ func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.N
 		mainMessage = "🔔 Security Notice"
 	}
 
-	// Send notice to Slack with escalate button
-	if slackSvc := uc.slackService; slackSvc != nil {
-		// If no channels specified, use empty string (will use default channel)
-		if len(channels) == 0 {
-			channels = []string{""}
-		}
-
-		var lastTimestamp string
-		for _, channelID := range channels {
-			// Post main notice message
-			timestamp, err := slackSvc.PostNotice(ctx, channelID, mainMessage, notice.ID)
-			if err != nil {
-				return "", goerr.Wrap(err, "failed to post notice to Slack", goerr.V("channel", channelID))
-			}
-			lastTimestamp = timestamp
-
-			// Post detailed information in thread
-			if err := slackSvc.PostNoticeThreadDetails(ctx, channelID, timestamp, alert, llmResponse); err != nil {
-				// Log error but don't fail the main operation
-				logging.From(ctx).Warn("failed to post notice thread details", "error", err, "channel", channelID)
-			}
-		}
-		return lastTimestamp, nil
+	// Post main notice message
+	timestamp, err := uc.slackService.PostNotice(ctx, channel, mainMessage, notice.ID)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to post notice to Slack", goerr.V("channel", channel))
 	}
 
-	return "", nil
+	// Post detailed information in thread
+	if err := uc.slackService.PostNoticeThreadDetails(ctx, channel, timestamp, alert, llmResponse); err != nil {
+		// Log error but don't fail the main operation
+		logging.From(ctx).Warn("failed to post notice thread details", "error", err, "channel", channel)
+	}
+
+	return timestamp, nil
 }
 
 // EscalateNotice escalates a notice to a full alert
