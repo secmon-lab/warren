@@ -266,11 +266,11 @@ func TestFormatValidationReport(t *testing.T) {
 		}
 		report := formatValidationReport(result)
 
-		gt.Value(t, strings.Contains(report, "❌ SCHEMA VALIDATION FAILED")).Equal(true)
+		gt.Value(t, strings.Contains(report, "❌ Schema validation failed")).Equal(true)
 		gt.Value(t, strings.Contains(report, "Found 2 issue(s)")).Equal(true)
-		gt.Value(t, strings.Contains(report, "🔍 FIELDS NOT FOUND")).Equal(true)
-		gt.Value(t, strings.Contains(report, "🔄 DATA TYPE MISMATCHES")).Equal(true)
-		gt.Value(t, strings.Contains(report, "REQUIRED ACTIONS")).Equal(true)
+		gt.Value(t, strings.Contains(report, "Fields not found")).Equal(true)
+		gt.Value(t, strings.Contains(report, "Type mismatches")).Equal(true)
+		gt.Value(t, strings.Contains(report, "Please fix these issues")).Equal(true)
 		gt.Value(t, strings.Contains(report, "invalid_field")).Equal(true)
 		gt.Value(t, strings.Contains(report, "age")).Equal(true)
 	})

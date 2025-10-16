@@ -11,28 +11,8 @@ type MockBigQueryClient = mockBigQueryClient
 type MockBigQueryClientFactory = mockBigQueryClientFactory
 
 // Test exports for helper functions
-var GenerateConfigWithFactory = generateConfigWithFactoryInternal
+var GenerateConfigWithFactory = generateConfigWithFactory
 var GenerateConfigSchema = generateConfigSchema
-
-// Test exports for security analysis
-var GenerateSecurityPrompt = generateSecurityPrompt
-
-type SecurityField = securityField
-type SecurityFieldCategory = securityFieldCategory
-
-// Test exports for security field categories
-const (
-	CategoryIdentity = categoryIdentity
-	CategoryNetwork  = categoryNetwork
-	CategoryTemporal = categoryTemporal
-	CategoryAuth     = categoryAuth
-	CategoryResource = categoryResource
-	CategoryGeo      = categoryGeo
-	CategoryEvent    = categoryEvent
-	CategoryThreat   = categoryThreat
-	CategoryHash     = categoryHash
-	CategoryMetadata = categoryMetadata
-)
 
 // Export functions for testing
 var (
@@ -40,9 +20,10 @@ var (
 	FormatValidationReport = formatValidationReport
 	LoadBulkConfig         = loadBulkConfig
 	ParseTableID           = parseTableID
+	GenerateOutputPath     = generateOutputPath
 )
 
 // Export types for testing
-type GenerateConfigConfig = generateConfigConfig
-type TestBulkConfigEntry = BulkConfigEntry
-type TestBulkConfig = BulkConfig
+type GenerateConfigInput = generateConfigInput
+type TestBulkConfigEntry = bulkConfigEntry
+type TestBulkConfig = bulkConfig
