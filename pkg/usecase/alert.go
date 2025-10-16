@@ -523,16 +523,22 @@ func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.N
 		mainMessage = "🔔 Security Notice"
 	}
 
+	// Resolve target channel (use default if empty)
+	targetChannel := channel
+	if targetChannel == "" {
+		targetChannel = uc.slackService.DefaultChannelID()
+	}
+
 	// Post main notice message
-	timestamp, err := uc.slackService.PostNotice(ctx, channel, mainMessage, notice.ID)
+	timestamp, err := uc.slackService.PostNotice(ctx, targetChannel, mainMessage, notice.ID)
 	if err != nil {
-		return "", goerr.Wrap(err, "failed to post notice to Slack", goerr.V("channel", channel))
+		return "", goerr.Wrap(err, "failed to post notice to Slack", goerr.V("channel", targetChannel))
 	}
 
 	// Post detailed information in thread
-	if err := uc.slackService.PostNoticeThreadDetails(ctx, channel, timestamp, alert, llmResponse); err != nil {
+	if err := uc.slackService.PostNoticeThreadDetails(ctx, targetChannel, timestamp, alert, llmResponse); err != nil {
 		// Log error but don't fail the main operation
-		logging.From(ctx).Warn("failed to post notice thread details", "error", err, "channel", channel)
+		logging.From(ctx).Warn("failed to post notice thread details", "error", err, "channel", targetChannel)
 	}
 
 	return timestamp, nil
