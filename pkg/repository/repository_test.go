@@ -956,7 +956,7 @@ func TestHistory(t *testing.T) {
 		// Test GetLatestHistory
 		latest, err := repo.GetLatestHistory(ctx, ticket.ID)
 		gt.NoError(t, err).Required()
-		gt.NotNil(t, latest).Required()
+		gt.V(t, latest).NotNil().Required()
 		gt.Value(t, latest.ID).Equal(histories[2].ID) // The last added one is the latest
 
 		// Test with non-existent ticket ID

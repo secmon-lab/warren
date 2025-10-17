@@ -338,7 +338,7 @@ func generateConfigWithFactory(ctx context.Context, cfg generateConfigInput, fac
 		}),
 	)
 
-	if err := agent.Execute(ctx, "Generate configuration"); err != nil {
+	if _, err := agent.Execute(ctx, gollem.Text("Generate configuration")); err != nil {
 		return err
 	}
 

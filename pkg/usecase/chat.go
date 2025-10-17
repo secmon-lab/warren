@@ -8,6 +8,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	"github.com/m-mizutani/gollem/strategy/planexec"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
@@ -111,89 +112,82 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
 	}
 
-	ctx = msg.NewTrace(ctx, "🚀 Starting...")
-
-	agent := gollem.New(x.llmClient,
-		gollem.WithHistory(history),
-		gollem.WithToolSets(tools...),
-		gollem.WithResponseMode(gollem.ResponseModeBlocking),
-		gollem.WithLogger(logging.From(ctx)),
-		gollem.WithMessageHook(func(ctx context.Context, message string) error {
-			msg.Trace(ctx, "💭 %s", message)
-			return nil
-		}),
-		gollem.WithToolErrorHook(func(ctx context.Context, err error, call gollem.FunctionCall) error {
-			msg.Trace(ctx, "❌ Error: %s", err.Error())
-			logger.Error("tool error", "error", err, "call", call)
-			return nil
-		}),
-		gollem.WithToolRequestHook(func(ctx context.Context, call gollem.FunctionCall) error {
-			if base.IgnorableTool(call.Name) {
-				return nil
-			}
-
-			message := toolCallToText(ctx, x.llmClient, findTool(ctx, tools, call.Name), &call)
-			traceMsg := "🤖 " + message
-			msg.Trace(ctx, "%s", traceMsg)
-			logger.Debug("execute tool", "tool", call.Name, "args", call.Arguments)
-			return nil
-		}),
-	)
-
+	// Generate system prompt first (before creating agent)
 	systemPrompt, err := prompt.Generate(ctx, chatSystemPromptTemplate, map[string]any{
 		"ticket":                  target,
 		"total":                   len(alerts),
 		"additional_instructions": additionalInstructions,
 		"lang":                    lang.From(ctx),
-		"exit_tool_name":          agent.Facilitator().Spec().Name,
 	})
 	if err != nil {
 		return goerr.Wrap(err, "failed to build system prompt")
 	}
 
-	// Create updatable message function for plan progress tracking
-	progressUpdate := msg.NewUpdatable(ctx, "Initializing AI plan...")
-
-	// Always use plan mode for comprehensive task handling
-	plan, err := agent.Plan(ctx, message,
-		gollem.WithPlanLanguage(lang.From(ctx).Name()),
-		gollem.WithPlanSystemPrompt(systemPrompt),
-		gollem.WithPlanPhaseSystemPrompt(func(_ context.Context, _ gollem.PlanPhaseType, _ *gollem.Plan) string {
-			return "Use Slack style markdown format in message if you need to decorate text"
-		}),
-		gollem.WithPlanCreatedHook(func(ctx context.Context, plan *gollem.Plan) error {
-			return updatePlanProgress(progressUpdate, plan, "Plan created")
-		}),
-		gollem.WithPlanToDoStartHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
-			msg.Trace(ctx, "🚀 Starting: %s", todo.Description)
-			return nil
-		}),
-		gollem.WithPlanToDoCompletedHook(func(ctx context.Context, plan *gollem.Plan, todo gollem.PlanToDo) error {
-			return updatePlanProgress(progressUpdate, plan, fmt.Sprintf("Completed: %s", todo.Description))
-		}),
-		gollem.WithPlanToDoUpdatedHook(func(ctx context.Context, plan *gollem.Plan, changes []gollem.PlanToDoChange) error {
-			if len(changes) == 0 {
-				return nil
-			}
-
-			msg.Trace(ctx, "📝 Plan updated (%d todos)", len(changes))
-			return nil
-		}),
-	)
-	if err != nil {
-		return goerr.Wrap(err, "failed to create plan")
+	// Create hooks for plan progress tracking
+	hooks := &chatPlanHooks{
+		ctx: ctx,
 	}
 
-	execResp, err := plan.Execute(ctx)
+	// Create Plan & Execute strategy
+	strategy := planexec.New(x.llmClient,
+		planexec.WithHooks(hooks),
+		planexec.WithMaxIterations(30),
+	)
+
+	ctx = msg.NewTrace(ctx, "🚀 Starting...")
+
+	// Create agent with Strategy and Middleware
+	agent := gollem.New(x.llmClient,
+		gollem.WithStrategy(strategy),
+		gollem.WithHistory(history),
+		gollem.WithToolSets(tools...),
+		gollem.WithResponseMode(gollem.ResponseModeBlocking),
+		gollem.WithLogger(logging.From(ctx)),
+		gollem.WithSystemPrompt(systemPrompt),
+		gollem.WithContentBlockMiddleware(func(next gollem.ContentBlockHandler) gollem.ContentBlockHandler {
+			return func(ctx context.Context, req *gollem.ContentRequest) (*gollem.ContentResponse, error) {
+				resp, err := next(ctx, req)
+				if err == nil && len(resp.Texts) > 0 {
+					for _, text := range resp.Texts {
+						msg.Trace(ctx, "💭 %s", text)
+					}
+				}
+				return resp, err
+			}
+		}),
+		gollem.WithToolMiddleware(func(next gollem.ToolHandler) gollem.ToolHandler {
+			return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
+				// Pre-execution: ツール呼び出しのトレース
+				if !base.IgnorableTool(req.Tool.Name) {
+					message := toolCallToText(ctx, x.llmClient, req.ToolSpec, req.Tool)
+					msg.Trace(ctx, "🤖 %s", message)
+					logger.Debug("execute tool", "tool", req.Tool.Name, "args", req.Tool.Arguments)
+				}
+
+				resp, err := next(ctx, req)
+
+				// Post-execution: エラーハンドリング
+				if resp != nil && resp.Error != nil {
+					msg.Trace(ctx, "❌ Error: %s", resp.Error.Error())
+					logger.Error("tool error", "error", resp.Error, "call", req.Tool)
+				}
+
+				return resp, err
+			}
+		}),
+	)
+
+	// Execute with Strategy
+	result, err := agent.Execute(ctx, gollem.Text(message))
 	if err != nil {
-		msg.Notify(ctx, "💥 Plan execution failed: %s", err.Error())
-		return goerr.Wrap(err, "failed to execute plan")
+		msg.Notify(ctx, "💥 Execution failed: %s", err.Error())
+		return goerr.Wrap(err, "failed to execute agent")
 	}
 
 	// Prepare Warren's final response message
 	var warrenResponse string
-	if len(strings.TrimSpace(execResp)) > 0 {
-		warrenResponse = fmt.Sprintf("💬 %s", strings.TrimSpace(execResp))
+	if result != nil && !result.IsEmpty() {
+		warrenResponse = fmt.Sprintf("💬 %s", result.String())
 
 		if x.slackService != nil && target.SlackThread != nil {
 			// Set agent context for agent messages
@@ -208,7 +202,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 
 			// Post agent message to Slack and get message ID
 			threadSvc := x.slackService.NewThread(*target.SlackThread)
-			logging.From(ctx).Debug("message notify", "from", "MessageHook", "msg", warrenResponse)
+			logging.From(ctx).Debug("message notify", "from", "Agent", "msg", warrenResponse)
 			ts, err := threadSvc.PostCommentWithMessageID(ctx, warrenResponse)
 			if err != nil {
 				errs.Handle(ctx, goerr.Wrap(err, "failed to post agent message to slack"))
@@ -221,40 +215,33 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			}
 
 		} else {
-			msg.Notify(ctx, "💬 %s", execResp)
+			msg.Notify(ctx, "%s", warrenResponse)
 		}
 
 	} else {
-		warrenResponse = "✅ All task has been done"
+		warrenResponse = "✅ All tasks have been done"
 		msg.Notify(ctx, "%s", warrenResponse)
 	}
 
-	// Count completed tasks
-	todos := plan.GetToDos()
-	completedCount := 0
-	for _, todo := range todos {
-		if todo.Completed {
-			completedCount++
-		}
-	}
+	ctx = msg.Trace(ctx, "✅ Execution completed")
 
-	ctx = msg.Trace(ctx, "✅ Plan execution completed (%d/%d tasks)", completedCount, len(todos))
-
-	// Get the updated history from the plan's session
-	session := plan.Session()
+	// Get the updated history from the agent's session
+	session := agent.Session()
 	if session == nil {
-		logger.Warn("plan session is nil after execution")
+		logger.Warn("agent session is nil after execution")
 		// Skip history saving when session is unavailable
 		return nil
 	}
 
-	newHistory := session.History()
+	newHistory, err := session.History()
+	if err != nil {
+		return goerr.Wrap(err, "failed to get history from agent session")
+	}
 	if newHistory == nil {
-		return goerr.New("failed to get history from plan session")
+		return goerr.New("history is nil after execution")
 	}
 
-	// Warren's response is automatically included in the plan session history
-	// The execResp is the final response from the plan execution and will be saved
+	// Warren's response is automatically included in the agent session history
 	logger.Debug("saving chat history with Warren's response",
 		"warren_response", warrenResponse,
 		"history_version", newHistory.Version)
@@ -272,23 +259,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		}
 
 		logger.Debug("history saved", "history_id", newRecord.ID, "ticket_id", target.ID)
-	}
-
-	return nil
-}
-
-func findTool(ctx context.Context, toolSets []gollem.ToolSet, name string) *gollem.ToolSpec {
-	for _, toolSet := range toolSets {
-		specs, err := toolSet.Specs(ctx)
-		if err != nil {
-			continue
-		}
-
-		for _, tool := range specs {
-			if tool.Name == name {
-				return &tool
-			}
-		}
 	}
 
 	return nil
@@ -369,59 +339,60 @@ func (x *UseCases) generateInitialTicketComment(ctx context.Context, ticketData 
 	return response.Texts[0], nil
 }
 
-// Note: updatePlanProgressWithResponder has been removed in favor of using updatePlanProgress with msg context
+// chatPlanHooks implements planexec.PlanExecuteHooks for chat progress tracking
+type chatPlanHooks struct {
+	ctx context.Context
+}
 
-// updatePlanProgress formats and updates the plan progress message using an updatable message function
-func updatePlanProgress(updateFunc func(ctx context.Context, msg string), plan *gollem.Plan, action string) error {
-	todos := plan.GetToDos()
-	if len(todos) == 0 {
-		updateFunc(context.Background(), fmt.Sprintf("🤖 *%s* (no tasks yet)", action))
+func (h *chatPlanHooks) OnCreated(ctx context.Context, plan *planexec.Plan) error {
+	return postPlanProgress(h.ctx, plan, "Plan created")
+}
+
+func (h *chatPlanHooks) OnUpdated(ctx context.Context, plan *planexec.Plan) error {
+	msg.Trace(h.ctx, "📝 Plan updated")
+	return postPlanProgress(h.ctx, plan, "Plan updated")
+}
+
+// postPlanProgress posts the plan progress as a new message (not an update)
+func postPlanProgress(ctx context.Context, plan *planexec.Plan, action string) error {
+	if len(plan.Tasks) == 0 {
+		msg.Notify(ctx, "🤖 *%s* (no tasks yet)", action)
 		return nil
 	}
 
-	// Count completed tasks
 	completedCount := 0
-	for _, todo := range todos {
-		if todo.Completed {
+	for _, task := range plan.Tasks {
+		if task.State == planexec.TaskStateCompleted {
 			completedCount++
 		}
 	}
 
-	// Build complete message with all task details
 	var messageBuilder strings.Builder
 	messageBuilder.WriteString(fmt.Sprintf("🤖 *%s*\n\n", action))
-	messageBuilder.WriteString(fmt.Sprintf("*Progress: %d/%d tasks completed*\n\n", completedCount, len(todos)))
+	messageBuilder.WriteString(fmt.Sprintf("*Progress: %d/%d tasks completed*\n\n", completedCount, len(plan.Tasks)))
 
-	// Add task list with status indicators
-	for _, todo := range todos {
-		var status string
+	for _, task := range plan.Tasks {
 		var icon string
+		var status string
 
-		switch todo.Status {
-		case "Pending":
-			status = todo.Description
+		switch task.State {
+		case planexec.TaskStatePending:
 			icon = "☑️"
-		case "Executing":
-			status = todo.Description
+			status = task.Description
+		case planexec.TaskStateInProgress:
 			icon = "⟳"
-		case "Completed":
-			// Strike-through for completed tasks
-			status = fmt.Sprintf("%s~", todo.Description)
+			status = task.Description
+		case planexec.TaskStateCompleted:
 			icon = "✅"
-		case "Failed":
-			status = fmt.Sprintf("%s (FAILED)", todo.Description)
-			icon = "❌"
-		case "Skipped":
-			status = fmt.Sprintf("~%s~ (skipped)", todo.Description)
-			icon = "⏭"
+			status = fmt.Sprintf("~%s~", task.Description)
 		default:
-			status = todo.Description
 			icon = "?"
+			status = task.Description
 		}
 
 		messageBuilder.WriteString(fmt.Sprintf("%s %s\n", icon, status))
 	}
 
-	updateFunc(context.Background(), messageBuilder.String())
+	msg.Notify(ctx, "%s", messageBuilder.String())
 	return nil
 }
