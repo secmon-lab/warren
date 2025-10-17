@@ -9,6 +9,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/secmon-lab/warren/pkg/utils/request_id"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
@@ -40,6 +41,9 @@ func newBackgroundContext(ctx context.Context) context.Context {
 	newCtx = lang.With(newCtx, lang.From(ctx))
 	if userID := user.FromContext(ctx); userID != "" {
 		newCtx = user.WithUserID(newCtx, userID)
+	}
+	if reqID := request_id.FromContext(ctx); reqID != "" {
+		newCtx = request_id.With(newCtx, reqID)
 	}
 	return newCtx
 }
