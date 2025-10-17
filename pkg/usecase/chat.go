@@ -351,13 +351,18 @@ type chatPlanHooks struct {
 	ctx context.Context
 }
 
-func (h *chatPlanHooks) OnCreated(ctx context.Context, plan *planexec.Plan) error {
+var _ planexec.PlanExecuteHooks = &chatPlanHooks{}
+
+func (h *chatPlanHooks) OnPlanCreated(ctx context.Context, plan *planexec.Plan) error {
 	return postPlanProgress(h.ctx, plan, "Plan created")
 }
 
-func (h *chatPlanHooks) OnUpdated(ctx context.Context, plan *planexec.Plan) error {
-	msg.Trace(h.ctx, "📝 Plan updated")
+func (h *chatPlanHooks) OnPlanUpdated(ctx context.Context, plan *planexec.Plan) error {
 	return postPlanProgress(h.ctx, plan, "Plan updated")
+}
+
+func (h *chatPlanHooks) OnTaskDone(ctx context.Context, plan *planexec.Plan, _ *planexec.Task) error {
+	return postPlanProgress(h.ctx, plan, "Task updated")
 }
 
 // postPlanProgress posts the plan progress as a new message (not an update)
