@@ -51,16 +51,7 @@ func NewTrace(ctx context.Context, format string, args ...any) context.Context {
 }
 
 func Trace(ctx context.Context, base string, args ...any) context.Context {
-	msg := fmt.Sprintf(base, args...)
-
-	// If there is already a Trace function, execute it
-	if v := ctx.Value(ctxTraceFuncKey{}); v != nil {
-		if TraceMsg, ok := v.(func(ctx context.Context, msg string)); ok && TraceMsg != nil {
-			TraceMsg(ctx, msg)
-			return ctx
-		}
-	}
-
+	// Always create a new trace message instead of updating an existing one
 	return NewTrace(ctx, base, args...)
 }
 

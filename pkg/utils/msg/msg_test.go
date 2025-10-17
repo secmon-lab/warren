@@ -25,17 +25,21 @@ func TestWithReply(t *testing.T) {
 
 func TestWithNewStateMsg(t *testing.T) {
 	var calledReply bool
-	var calledState bool
-	var gotMsgState string
+	var callCount int
+	var lastMsg string
 	replyFunc := func(ctx context.Context, msg string) {
 		calledReply = true
 	}
-	stateMsgFunc := func(ctx context.Context, msg string) {
-		calledState = true
-		gotMsgState = msg
-	}
 	newStateFunc := func(ctx context.Context, msg string) func(ctx context.Context, msg string) {
-		return stateMsgFunc
+		// NewTraceFunc should post the initial message immediately (like NewTraceMessage does)
+		callCount++
+		lastMsg = msg
+
+		// Return a function for potential updates (though with new behavior, this won't be used)
+		return func(ctx context.Context, updateMsg string) {
+			callCount++
+			lastMsg = updateMsg
+		}
 	}
 
 	ctx := msg.With(context.Background(), replyFunc, newStateFunc)
@@ -43,8 +47,10 @@ func TestWithNewStateMsg(t *testing.T) {
 	msg.Trace(ctx, "test state messsage")
 
 	gt.False(t, calledReply)
-	gt.True(t, calledState)
-	gt.Equal(t, "test state messsage", gotMsgState)
+	// Trace now always creates a new trace, so newStateFunc is called twice:
+	// once for NewTrace("test new state") and once for Trace("test state messsage")
+	gt.Equal(t, callCount, 2)
+	gt.Equal(t, lastMsg, "test state messsage")
 }
 
 func TestNewStateMsg_Nil(t *testing.T) {

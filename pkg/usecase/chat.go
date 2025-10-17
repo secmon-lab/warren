@@ -20,6 +20,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/secmon-lab/warren/pkg/utils/request_id"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
@@ -134,7 +135,13 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		planexec.WithMaxIterations(30),
 	)
 
-	ctx = msg.NewTrace(ctx, "🚀 Starting...")
+	// Get request ID from context
+	requestID := request_id.FromContext(ctx)
+	if requestID == "" {
+		requestID = "unknown"
+	}
+
+	ctx = msg.NewTrace(ctx, "🚀 Starting... (Request ID: %s)", requestID)
 
 	// Create agent with Strategy and Middleware
 	agent := gollem.New(x.llmClient,
@@ -356,7 +363,7 @@ func (h *chatPlanHooks) OnUpdated(ctx context.Context, plan *planexec.Plan) erro
 // postPlanProgress posts the plan progress as a new message (not an update)
 func postPlanProgress(ctx context.Context, plan *planexec.Plan, action string) error {
 	if len(plan.Tasks) == 0 {
-		msg.Notify(ctx, "🤖 *%s* (no tasks yet)", action)
+		msg.Trace(ctx, "🤖 *%s* (no tasks yet)", action)
 		return nil
 	}
 
@@ -393,6 +400,6 @@ func postPlanProgress(ctx context.Context, plan *planexec.Plan, action string) e
 		messageBuilder.WriteString(fmt.Sprintf("%s %s\n", icon, status))
 	}
 
-	msg.Notify(ctx, "%s", messageBuilder.String())
+	msg.Trace(ctx, "%s", messageBuilder.String())
 	return nil
 }

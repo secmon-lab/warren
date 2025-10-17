@@ -9,8 +9,8 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/request_id"
 )
 
 type statusResponseWriter struct {
@@ -34,7 +34,8 @@ func (w *statusResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.From(r.Context()).With("request_id", uuid.New().String())
+		ctx, reqID := request_id.Generate(r.Context())
+		logger := logging.From(ctx).With("request_id", reqID)
 
 		// Prepare debug attributes before handling request
 		var debugAttrs []any
@@ -51,7 +52,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 		// Handle the request
 		sw := &statusResponseWriter{ResponseWriter: w}
-		next.ServeHTTP(sw, r.WithContext(logging.With(r.Context(), logger)))
+		next.ServeHTTP(sw, r.WithContext(logging.With(ctx, logger)))
 
 		// Basic attributes for INFO level
 		infoAttrs := []any{

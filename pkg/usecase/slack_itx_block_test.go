@@ -329,9 +329,10 @@ func TestSlackActionAckList(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify Slack interactions (updated for unified CreateTicketFromAlerts)
-	// Note: 4 PostMessage calls due to ticket creation flow + 3 UpdateMessage (2 alerts + 1 list)
-	gt.Value(t, len(slackMock.PostMessageContextCalls())).Equal(4)
-	gt.Value(t, len(slackMock.UpdateMessageContextCalls())).Equal(3)
+	// Note: 5 PostMessage calls due to ticket creation flow (trace messages now post instead of update) + 2 UpdateMessage (2 alerts)
+	// Changed from 4 PostMessage + 3 UpdateMessage because msg.Trace now always posts new messages
+	gt.Value(t, len(slackMock.PostMessageContextCalls())).Equal(5)
+	gt.Value(t, len(slackMock.UpdateMessageContextCalls())).Equal(2)
 }
 
 func TestSlackActionBindAlert(t *testing.T) {
