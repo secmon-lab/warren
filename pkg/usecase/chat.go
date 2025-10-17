@@ -191,6 +191,10 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		return goerr.Wrap(err, "failed to execute agent")
 	}
 
+	if hooks.planned {
+		ctx = msg.Trace(ctx, "✅ Execution completed")
+	}
+
 	// Prepare Warren's final response message
 	var warrenResponse string
 	if result != nil && !result.IsEmpty() {
@@ -224,13 +228,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		} else {
 			msg.Notify(ctx, "%s", warrenResponse)
 		}
-
-	} else {
-		warrenResponse = "✅ All tasks have been done"
-		msg.Notify(ctx, "%s", warrenResponse)
 	}
-
-	ctx = msg.Trace(ctx, "✅ Execution completed")
 
 	// Get the updated history from the agent's session
 	session := agent.Session()
@@ -348,21 +346,25 @@ func (x *UseCases) generateInitialTicketComment(ctx context.Context, ticketData 
 
 // chatPlanHooks implements planexec.PlanExecuteHooks for chat progress tracking
 type chatPlanHooks struct {
-	ctx context.Context
+	ctx     context.Context
+	planned bool
 }
 
 var _ planexec.PlanExecuteHooks = &chatPlanHooks{}
 
 func (h *chatPlanHooks) OnPlanCreated(ctx context.Context, plan *planexec.Plan) error {
+	h.planned = true
 	return postPlanProgress(h.ctx, plan, "Plan created")
 }
 
 func (h *chatPlanHooks) OnPlanUpdated(ctx context.Context, plan *planexec.Plan) error {
+	h.planned = true
 	return postPlanProgress(h.ctx, plan, "Plan updated")
 }
 
 func (h *chatPlanHooks) OnTaskDone(ctx context.Context, plan *planexec.Plan, _ *planexec.Task) error {
-	return postPlanProgress(h.ctx, plan, "Task updated")
+	h.planned = true
+	return postPlanProgress(h.ctx, plan, "Task done")
 }
 
 // postPlanProgress posts the plan progress as a new message (not an update)
