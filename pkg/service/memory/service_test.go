@@ -2,14 +2,17 @@ package memory_test
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/m-mizutani/gollem"
+	"github.com/m-mizutani/gollem/llm/claude"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	memoryService "github.com/secmon-lab/warren/pkg/service/memory"
@@ -200,4 +203,153 @@ func TestLoadMemoriesForPrompt(t *testing.T) {
 		gt.V(t, loadedTicket).NotNil()
 		gt.V(t, loadedTicket.Insights).Equal("Some insights")
 	})
+}
+
+// TestGenerateExecutionMemoryWithRealLLM tests ExecutionMemory generation with real Claude LLM
+// This test requires the following environment variables:
+// - TEST_CLAUDE_PROJECT_ID: Google Cloud project ID
+// - TEST_CLAUDE_LOCATION: Google Cloud location (e.g., us-central1)
+// - TEST_CLAUDE_MODEL: (optional) Claude model name
+func TestGenerateExecutionMemoryWithRealLLM(t *testing.T) {
+	ctx := context.Background()
+
+	projectID, ok := os.LookupEnv("TEST_CLAUDE_PROJECT_ID")
+	if !ok {
+		t.Skip("TEST_CLAUDE_PROJECT_ID is not set")
+	}
+	location, ok := os.LookupEnv("TEST_CLAUDE_LOCATION")
+	if !ok {
+		t.Skip("TEST_CLAUDE_LOCATION is not set")
+	}
+	model := os.Getenv("TEST_CLAUDE_MODEL")
+	if model == "" {
+		model = "claude-sonnet-4@20250514"
+	}
+
+	// Create real Claude client
+	claudeClient, err := claude.NewWithVertex(ctx, location, projectID,
+		claude.WithVertexModel(model),
+	)
+	gt.NoError(t, err).Required()
+
+	repo := createTestRepository(t)
+	svc := memoryService.New(claudeClient, repo)
+
+	schemaID := types.AlertSchema("test-schema-" + time.Now().Format("20060102150405"))
+
+	// Create a simple history for testing
+	userContent, err := gollem.NewTextContent("Analyze the security alert for suspicious login activity")
+	gt.NoError(t, err).Required()
+	assistantContent, err := gollem.NewTextContent("I checked the IP address and found it's from a known VPN provider. Recommended blocking.")
+	gt.NoError(t, err).Required()
+
+	history := &gollem.History{
+		Messages: []gollem.Message{
+			{
+				Role:     gollem.RoleUser,
+				Contents: []gollem.MessageContent{userContent},
+			},
+			{
+				Role:     gollem.RoleAssistant,
+				Contents: []gollem.MessageContent{assistantContent},
+			},
+		},
+	}
+
+	// Generate execution memory
+	execMem, err := svc.GenerateExecutionMemory(ctx, schemaID, history, nil)
+	gt.NoError(t, err).Required()
+	gt.V(t, execMem).NotNil()
+	gt.V(t, execMem.SchemaID).Equal(schemaID)
+
+	// Verify that at least one field has content (LLM should generate something)
+	hasContent := execMem.Keep != "" || execMem.Change != "" || execMem.Notes != ""
+	if !hasContent {
+		t.Fatal("ExecutionMemory should have at least one field with content")
+	}
+
+	t.Logf("Generated ExecutionMemory:")
+	t.Logf("  Keep: %s", execMem.Keep)
+	t.Logf("  Change: %s", execMem.Change)
+	t.Logf("  Notes: %s", execMem.Notes)
+}
+
+// TestGenerateTicketMemoryWithRealLLM tests TicketMemory generation with real Claude LLM
+func TestGenerateTicketMemoryWithRealLLM(t *testing.T) {
+	ctx := context.Background()
+
+	projectID, ok := os.LookupEnv("TEST_CLAUDE_PROJECT_ID")
+	if !ok {
+		t.Skip("TEST_CLAUDE_PROJECT_ID is not set")
+	}
+	location, ok := os.LookupEnv("TEST_CLAUDE_LOCATION")
+	if !ok {
+		t.Skip("TEST_CLAUDE_LOCATION is not set")
+	}
+	model := os.Getenv("TEST_CLAUDE_MODEL")
+	if model == "" {
+		model = "claude-sonnet-4@20250514"
+	}
+
+	// Create real Claude client
+	claudeClient, err := claude.NewWithVertex(ctx, location, projectID,
+		claude.WithVertexModel(model),
+	)
+	gt.NoError(t, err).Required()
+
+	repo := createTestRepository(t)
+	svc := memoryService.New(claudeClient, repo)
+
+	schemaID := types.AlertSchema("test-schema-" + time.Now().Format("20060102150405"))
+
+	// Create a test ticket with resolution
+	ticketData := &ticket.Ticket{
+		ID:     types.NewTicketID(),
+		Status: types.TicketStatusResolved,
+		Finding: &ticket.Finding{
+			Severity:       types.AlertSeverityHigh,
+			Summary:        "Confirmed credential stuffing attack. User password was compromised.",
+			Recommendation: "Force password reset, enable 2FA, and block attacker IP range",
+		},
+		CreatedAt: time.Now().Add(-2 * time.Hour),
+		UpdatedAt: time.Now(),
+	}
+	ticketData.Metadata.Title = "Suspicious Login from Unknown Location"
+	ticketData.Metadata.Description = "Multiple failed login attempts followed by successful login from new IP address"
+
+	// Create mock comments representing the investigation
+	comments := []ticket.Comment{
+		{
+			ID:        types.CommentID("comment-" + time.Now().Format("20060102150405") + "-1"),
+			TicketID:  ticketData.ID,
+			Comment:   "Investigating the login pattern. Checking if IP is from a known bad actor.",
+			CreatedAt: time.Now().Add(-90 * time.Minute),
+		},
+		{
+			ID:        types.CommentID("comment-" + time.Now().Format("20060102150405") + "-2"),
+			TicketID:  ticketData.ID,
+			Comment:   "IP is from a residential proxy network. Multiple accounts affected. This appears to be credential stuffing.",
+			CreatedAt: time.Now().Add(-60 * time.Minute),
+		},
+		{
+			ID:        types.CommentID("comment-" + time.Now().Format("20060102150405") + "-3"),
+			TicketID:  ticketData.ID,
+			Comment:   "Password reset initiated for affected user. Monitoring for similar patterns from same IP range.",
+			CreatedAt: time.Now().Add(-30 * time.Minute),
+		},
+	}
+
+	// Generate ticket memory
+	ticketMem, err := svc.GenerateTicketMemory(ctx, schemaID, ticketData, comments)
+	gt.NoError(t, err).Required()
+	gt.V(t, ticketMem).NotNil()
+	gt.V(t, ticketMem.SchemaID).Equal(schemaID)
+
+	// Verify insights field has content (required field in schema)
+	if ticketMem.Insights == "" {
+		t.Fatal("TicketMemory insights should not be empty")
+	}
+
+	t.Logf("Generated TicketMemory:")
+	t.Logf("  Insights: %s", ticketMem.Insights)
 }

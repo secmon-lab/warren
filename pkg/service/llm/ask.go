@@ -3,10 +3,12 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
@@ -15,6 +17,7 @@ type askConfig[T any] struct {
 	maxRetry    int
 	retryPrompt func(ctx context.Context, err error) string
 	validate    func(v T) error
+	schema      *gollem.ResponseSchema
 }
 
 type AskOption[T any] func(*askConfig[T])
@@ -37,6 +40,12 @@ func WithValidate[T any](f func(v T) error) AskOption[T] {
 	}
 }
 
+func WithSchema[T any](schema *gollem.ResponseSchema) AskOption[T] {
+	return func(c *askConfig[T]) {
+		c.schema = schema
+	}
+}
+
 func Ask[T any](ctx context.Context, llm gollem.LLMClient, prompt string, opts ...AskOption[T]) (*T, error) {
 	logger := logging.From(ctx)
 
@@ -50,7 +59,23 @@ func Ask[T any](ctx context.Context, llm gollem.LLMClient, prompt string, opts .
 		opt(config)
 	}
 
-	ssn, err := llm.NewSession(ctx, gollem.WithSessionContentType(gollem.ContentTypeJSON))
+	// Create session with JSON content type and schema constraint
+	sessionOpts := []gollem.SessionOption{
+		gollem.WithSessionContentType(gollem.ContentTypeJSON),
+	}
+
+	// Generate schema from generic type T if possible
+	var zero T
+	schema := config.schema
+	if schema == nil {
+		// Try to generate schema from type T
+		schema = tryGenerateSchema(zero)
+	}
+	if schema != nil {
+		sessionOpts = append(sessionOpts, gollem.WithSessionResponseSchema(schema))
+	}
+
+	ssn, err := llm.NewSession(ctx, sessionOpts...)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create session")
 	}
@@ -103,4 +128,23 @@ func Ask[T any](ctx context.Context, llm gollem.LLMClient, prompt string, opts .
 	}
 
 	return response, nil
+}
+
+// tryGenerateSchema attempts to generate a schema from the generic type T
+func tryGenerateSchema[T any](zero T) *gollem.ResponseSchema {
+	t := reflect.TypeOf(zero)
+	if t == nil {
+		return nil
+	}
+
+	// Only generate schema for struct types
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return nil
+	}
+
+	// Use prompt package helper to generate schema
+	return prompt.ToGollemSchema("Response", "Structured response", zero)
 }
