@@ -2,6 +2,7 @@ package prompt
 
 import (
 	"reflect"
+	"strings"
 
 	"github.com/m-mizutani/gollem"
 )
@@ -82,17 +83,10 @@ func structToGollemParameter(t reflect.Type) *gollem.Parameter {
 			continue
 		}
 
-		fieldName := jsonTag
+		tagParts := strings.Split(jsonTag, ",")
+		fieldName := tagParts[0]
 		if fieldName == "" {
 			fieldName = field.Name
-		}
-
-		// Remove omitempty and other options from tag
-		for idx := 0; idx < len(fieldName); idx++ {
-			if fieldName[idx] == ',' {
-				fieldName = fieldName[:idx]
-				break
-			}
 		}
 
 		// Get description from comment or tag
@@ -107,10 +101,9 @@ func structToGollemParameter(t reflect.Type) *gollem.Parameter {
 		param.Properties[fieldName] = fieldParam
 
 		// Check if field is required (no omitempty tag and not a pointer)
-		fullTag := field.Tag.Get("json")
 		isOmitempty := false
-		for j := 0; j < len(fullTag); j++ {
-			if fullTag[j] == ',' && j+9 < len(fullTag) && fullTag[j+1:j+10] == "omitempty" {
+		for _, part := range tagParts[1:] {
+			if part == "omitempty" {
 				isOmitempty = true
 				break
 			}
