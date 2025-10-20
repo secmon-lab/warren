@@ -40,31 +40,59 @@ func (s *Service) GenerateExecutionMemory(
 	history *gollem.History,
 	executionError error,
 ) (*memory.ExecutionMemory, error) {
-	// 1. Create session with history
-	session, err := s.llmClient.NewSession(ctx, gollem.WithSessionHistory(history))
+	// 1. Define response schema for structured output
+	schema := &gollem.ResponseSchema{
+		Name:        "ExecutionMemoryResponse",
+		Description: "Structured execution memory with keep/change/notes format",
+		Schema: &gollem.Parameter{
+			Type: gollem.TypeObject,
+			Properties: map[string]*gollem.Parameter{
+				"keep": {
+					Type:        gollem.TypeString,
+					Description: "Successful patterns and approaches that should be kept",
+				},
+				"change": {
+					Type:        gollem.TypeString,
+					Description: "Areas for improvement and changes needed",
+				},
+				"notes": {
+					Type:        gollem.TypeString,
+					Description: "Other insights and observations",
+				},
+			},
+			Required: []string{}, // All fields are optional
+		},
+	}
+
+	// 2. Create session with history and schema
+	session, err := s.llmClient.NewSession(ctx,
+		gollem.WithSessionHistory(history),
+		gollem.WithSessionContentType(gollem.ContentTypeJSON),
+		gollem.WithSessionResponseSchema(schema),
+	)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create session with history")
 	}
 
-	// 2. Get existing memory
+	// 3. Get existing memory
 	existing, err := s.repository.GetExecutionMemory(ctx, schemaID)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get existing execution memory")
 	}
 
-	// 3. Build prompt
+	// 4. Build prompt
 	promptText, err := s.buildExecutionMemoryPrompt(ctx, existing, executionError)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build execution memory prompt")
 	}
 
-	// 4. Generate content
+	// 5. Generate content
 	response, err := session.GenerateContent(ctx, gollem.Text(promptText))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to generate execution memory")
 	}
 
-	// 5. Parse response
+	// 6. Parse response
 	mem, err := s.parseExecutionMemoryResponse(response, schemaID)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to parse execution memory response")
@@ -80,20 +108,39 @@ func (s *Service) GenerateTicketMemory(
 	ticketData *ticket.Ticket,
 	comments []ticket.Comment,
 ) (*memory.TicketMemory, error) {
-	// 1. Get existing memory
+	// 1. Define response schema for structured output
+	schema := &gollem.ResponseSchema{
+		Name:        "TicketMemoryResponse",
+		Description: "Organizational security knowledge from ticket resolution",
+		Schema: &gollem.Parameter{
+			Type: gollem.TypeObject,
+			Properties: map[string]*gollem.Parameter{
+				"insights": {
+					Type:        gollem.TypeString,
+					Description: "Key security insights and knowledge gained from ticket resolution",
+				},
+			},
+			Required: []string{"insights"},
+		},
+	}
+
+	// 2. Get existing memory
 	existing, err := s.repository.GetTicketMemory(ctx, schemaID)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get existing ticket memory")
 	}
 
-	// 2. Build prompt
+	// 3. Build prompt
 	promptText, err := s.buildTicketMemoryPrompt(ctx, existing, ticketData, comments)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build ticket memory prompt")
 	}
 
-	// 3. Create session and generate content
-	session, err := s.llmClient.NewSession(ctx)
+	// 4. Create session with schema and generate content
+	session, err := s.llmClient.NewSession(ctx,
+		gollem.WithSessionContentType(gollem.ContentTypeJSON),
+		gollem.WithSessionResponseSchema(schema),
+	)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create LLM session")
 	}
@@ -103,7 +150,7 @@ func (s *Service) GenerateTicketMemory(
 		return nil, goerr.Wrap(err, "failed to generate ticket memory")
 	}
 
-	// 4. Parse response
+	// 5. Parse response
 	mem, err := s.parseTicketMemoryResponse(response, schemaID)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to parse ticket memory response")
