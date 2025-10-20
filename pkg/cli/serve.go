@@ -18,6 +18,7 @@ import (
 	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/service/memory"
 	"github.com/secmon-lab/warren/pkg/service/prompt"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -254,6 +255,9 @@ func cmdServe() *cli.Command {
 			// Create tag service
 			tagService := tag.New(repo)
 
+			// Create memory service
+			memoryService := memory.New(llmClient, repo)
+
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
@@ -262,6 +266,7 @@ func cmdServe() *cli.Command {
 				usecase.WithTools(toolSets),
 				usecase.WithStrictAlert(strictAlert),
 				usecase.WithTagService(tagService),
+				usecase.WithMemoryService(memoryService),
 			}
 
 			// Add GenAI configuration if configured

@@ -7,6 +7,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
@@ -96,4 +97,10 @@ type Repository interface {
 	CreateNotice(ctx context.Context, notice *notice.Notice) error
 	GetNotice(ctx context.Context, id types.NoticeID) (*notice.Notice, error)
 	UpdateNotice(ctx context.Context, notice *notice.Notice) error
+
+	// For memory management
+	GetExecutionMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.ExecutionMemory, error)
+	PutExecutionMemory(ctx context.Context, mem *memory.ExecutionMemory) error
+	GetTicketMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.TicketMemory, error)
+	PutTicketMemory(ctx context.Context, mem *memory.TicketMemory) error
 }

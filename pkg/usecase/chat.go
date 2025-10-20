@@ -16,6 +16,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -26,6 +27,65 @@ import (
 
 //go:embed prompt/chat_system_prompt.md
 var chatSystemPromptTemplate string
+
+// determineSchemaID determines the schema ID for the ticket
+func (x *UseCases) determineSchemaID(ctx context.Context, target *ticket.Ticket) types.AlertSchema {
+	logger := logging.From(ctx)
+
+	// Get alerts associated with the ticket
+	if len(target.AlertIDs) == 0 {
+		logger.Debug("no alerts in ticket, using default schema")
+		return types.AlertSchema("")
+	}
+
+	// Get first alert's schema
+	alerts, err := x.repository.BatchGetAlerts(ctx, target.AlertIDs)
+	if err != nil || len(alerts) == 0 {
+		logger.Warn("failed to get alerts for schema determination", "error", err)
+		return types.AlertSchema("")
+	}
+
+	// Use the first alert's schema
+	return alerts[0].Schema
+}
+
+// generateAndSaveExecutionMemory generates and saves execution memory
+func (x *UseCases) generateAndSaveExecutionMemory(
+	ctx context.Context,
+	schemaID types.AlertSchema,
+	history *gollem.History,
+	executionError error,
+) error {
+	logger := logging.From(ctx)
+
+	if schemaID == "" {
+		// Skip memory generation for tickets without schema
+		return nil
+	}
+
+	// Generate new memory
+	newMem, err := x.memoryService.GenerateExecutionMemory(ctx, schemaID, history, executionError)
+	if err != nil {
+		return goerr.Wrap(err, "failed to generate execution memory")
+	}
+
+	// Log generated memory
+	logger.Info("generated execution memory",
+		"schema_id", schemaID,
+		"memory_id", newMem.ID,
+		"has_keep", newMem.Keep != "",
+		"has_change", newMem.Change != "",
+		"has_notes", newMem.Notes != "",
+		"had_error", executionError != nil)
+
+	// Save
+	if err := x.repository.PutExecutionMemory(ctx, newMem); err != nil {
+		return err
+	}
+
+	logger.Info("saved execution memory", "schema_id", schemaID, "memory_id", newMem.ID)
+	return nil
+}
 
 // Chat processes a chat message for the specified ticket
 // Message routing is handled via msg.Notify and msg.Trace functions in the context
@@ -113,11 +173,45 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
 	}
 
+	// Load memories for the schema
+	schemaID := x.determineSchemaID(ctx, target)
+	var memorySection string
+	if x.memoryService != nil && schemaID != "" {
+		execMem, ticketMem, err := x.memoryService.LoadMemoriesForPrompt(ctx, schemaID)
+		if err != nil {
+			logger.Warn("failed to load memories", "error", err)
+		} else {
+			memorySection = x.memoryService.FormatMemoriesForPrompt(execMem, ticketMem)
+
+			// Log loaded memories
+			if execMem != nil {
+				logger.Info("loaded execution memory",
+					"schema_id", schemaID,
+					"memory_id", execMem.ID,
+					"created_at", execMem.CreatedAt,
+					"has_keep", execMem.Keep != "",
+					"has_change", execMem.Change != "",
+					"has_notes", execMem.Notes != "")
+			}
+			if ticketMem != nil {
+				logger.Info("loaded ticket memory",
+					"schema_id", schemaID,
+					"memory_id", ticketMem.ID,
+					"created_at", ticketMem.CreatedAt,
+					"has_insights", ticketMem.Insights != "")
+			}
+			if execMem == nil && ticketMem == nil {
+				logger.Info("no memories found for schema", "schema_id", schemaID)
+			}
+		}
+	}
+
 	// Generate system prompt first (before creating agent)
 	systemPrompt, err := prompt.Generate(ctx, chatSystemPromptTemplate, map[string]any{
 		"ticket":                  target,
 		"total":                   len(alerts),
 		"additional_instructions": additionalInstructions,
+		"memory_section":          memorySection,
 		"lang":                    lang.From(ctx),
 	})
 	if err != nil {
@@ -185,10 +279,10 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	)
 
 	// Execute with Strategy
-	result, err := agent.Execute(ctx, gollem.Text(message))
-	if err != nil {
-		msg.Notify(ctx, "💥 Execution failed: %s", err.Error())
-		return goerr.Wrap(err, "failed to execute agent")
+	result, executionErr := agent.Execute(ctx, gollem.Text(message))
+	if executionErr != nil {
+		msg.Notify(ctx, "💥 Execution failed: %s", executionErr.Error())
+		return goerr.Wrap(executionErr, "failed to execute agent")
 	}
 
 	if hooks.planned {
@@ -264,6 +358,15 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		}
 
 		logger.Debug("history saved", "history_id", newRecord.ID, "ticket_id", target.ID)
+
+		// Generate and save execution memory after history is saved
+		// Chat is already running in a goroutine, so this is synchronous
+		if x.memoryService != nil && schemaID != "" {
+			if memErr := x.generateAndSaveExecutionMemory(ctx, schemaID, newHistory, executionErr); memErr != nil {
+				logger.Warn("failed to generate execution memory", "error", memErr)
+				// Error does not affect main flow
+			}
+		}
 	}
 
 	return nil
