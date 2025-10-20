@@ -33,6 +33,13 @@ func New(llmClient gollem.LLMClient, repo interfaces.Repository) *Service {
 	}
 }
 
+// executionMemoryResponse defines the structure for ExecutionMemory LLM response
+type executionMemoryResponse struct {
+	Keep   string `json:"keep,omitempty" description:"Successful patterns and approaches that should be kept"`
+	Change string `json:"change,omitempty" description:"Areas for improvement and changes needed"`
+	Notes  string `json:"notes,omitempty" description:"Other insights and observations"`
+}
+
 // GenerateExecutionMemory generates memory from execution history
 func (s *Service) GenerateExecutionMemory(
 	ctx context.Context,
@@ -41,28 +48,11 @@ func (s *Service) GenerateExecutionMemory(
 	executionError error,
 ) (*memory.ExecutionMemory, error) {
 	// 1. Define response schema for structured output
-	schema := &gollem.ResponseSchema{
-		Name:        "ExecutionMemoryResponse",
-		Description: "Structured execution memory with keep/change/notes format",
-		Schema: &gollem.Parameter{
-			Type: gollem.TypeObject,
-			Properties: map[string]*gollem.Parameter{
-				"keep": {
-					Type:        gollem.TypeString,
-					Description: "Successful patterns and approaches that should be kept",
-				},
-				"change": {
-					Type:        gollem.TypeString,
-					Description: "Areas for improvement and changes needed",
-				},
-				"notes": {
-					Type:        gollem.TypeString,
-					Description: "Other insights and observations",
-				},
-			},
-			Required: []string{}, // All fields are optional
-		},
-	}
+	schema := prompt.ToGollemSchema(
+		"ExecutionMemoryResponse",
+		"Structured execution memory with keep/change/notes format",
+		executionMemoryResponse{},
+	)
 
 	// 2. Create session with history and schema
 	session, err := s.llmClient.NewSession(ctx,
@@ -101,6 +91,11 @@ func (s *Service) GenerateExecutionMemory(
 	return mem, nil
 }
 
+// ticketMemoryResponse defines the structure for TicketMemory LLM response
+type ticketMemoryResponse struct {
+	Insights string `json:"insights" description:"Key security insights and knowledge gained from ticket resolution"`
+}
+
 // GenerateTicketMemory generates memory from ticket resolution
 func (s *Service) GenerateTicketMemory(
 	ctx context.Context,
@@ -109,20 +104,11 @@ func (s *Service) GenerateTicketMemory(
 	comments []ticket.Comment,
 ) (*memory.TicketMemory, error) {
 	// 1. Define response schema for structured output
-	schema := &gollem.ResponseSchema{
-		Name:        "TicketMemoryResponse",
-		Description: "Organizational security knowledge from ticket resolution",
-		Schema: &gollem.Parameter{
-			Type: gollem.TypeObject,
-			Properties: map[string]*gollem.Parameter{
-				"insights": {
-					Type:        gollem.TypeString,
-					Description: "Key security insights and knowledge gained from ticket resolution",
-				},
-			},
-			Required: []string{"insights"},
-		},
-	}
+	schema := prompt.ToGollemSchema(
+		"TicketMemoryResponse",
+		"Organizational security knowledge from ticket resolution",
+		ticketMemoryResponse{},
+	)
 
 	// 2. Get existing memory
 	existing, err := s.repository.GetTicketMemory(ctx, schemaID)
