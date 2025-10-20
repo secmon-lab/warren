@@ -1822,11 +1822,11 @@ func (r *Firestore) UpdateNotice(ctx context.Context, notice *notice.Notice) err
 
 // Memory related methods
 func (r *Firestore) GetExecutionMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.ExecutionMemory, error) {
-	// Get all memories from sub-collection
-	// UUID v7 IDs are time-ordered, so we sort by ID to find the latest
 	docs, err := r.db.Collection(collectionExecutionMemories).
 		Doc(string(schemaID)).
 		Collection("records").
+		OrderBy("created_at", firestore.Desc).
+		Limit(1).
 		Documents(ctx).GetAll()
 
 	if err != nil {
@@ -1837,16 +1837,8 @@ func (r *Firestore) GetExecutionMemory(ctx context.Context, schemaID types.Alert
 		return nil, nil
 	}
 
-	// Find the document with the highest ID (latest UUID v7)
-	var latestDoc *firestore.DocumentSnapshot
-	for _, doc := range docs {
-		if latestDoc == nil || doc.Ref.ID > latestDoc.Ref.ID {
-			latestDoc = doc
-		}
-	}
-
 	var mem memory.ExecutionMemory
-	if err := latestDoc.DataTo(&mem); err != nil {
+	if err := docs[0].DataTo(&mem); err != nil {
 		return nil, r.eb.Wrap(err, "failed to convert data to execution memory", goerr.V("schema_id", schemaID))
 	}
 
@@ -1873,11 +1865,11 @@ func (r *Firestore) PutExecutionMemory(ctx context.Context, mem *memory.Executio
 }
 
 func (r *Firestore) GetTicketMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.TicketMemory, error) {
-	// Get all memories from sub-collection
-	// UUID v7 IDs are time-ordered, so we sort by ID to find the latest
 	docs, err := r.db.Collection(collectionTicketMemories).
 		Doc(string(schemaID)).
 		Collection("records").
+		OrderBy("created_at", firestore.Desc).
+		Limit(1).
 		Documents(ctx).GetAll()
 
 	if err != nil {
@@ -1888,16 +1880,8 @@ func (r *Firestore) GetTicketMemory(ctx context.Context, schemaID types.AlertSch
 		return nil, nil
 	}
 
-	// Find the document with the highest ID (latest UUID v7)
-	var latestDoc *firestore.DocumentSnapshot
-	for _, doc := range docs {
-		if latestDoc == nil || doc.Ref.ID > latestDoc.Ref.ID {
-			latestDoc = doc
-		}
-	}
-
 	var mem memory.TicketMemory
-	if err := latestDoc.DataTo(&mem); err != nil {
+	if err := docs[0].DataTo(&mem); err != nil {
 		return nil, r.eb.Wrap(err, "failed to convert data to ticket memory", goerr.V("schema_id", schemaID))
 	}
 

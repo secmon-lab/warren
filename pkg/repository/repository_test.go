@@ -2792,9 +2792,9 @@ func TestMemory(t *testing.T) {
 	ctx := context.Background()
 
 	testFn := func(t *testing.T, repo interfaces.Repository) {
-		t.Run("ExecutionMemory round trip", func(t *testing.T) {
-			schemaID := types.AlertSchema(fmt.Sprintf("test-schema-%d", time.Now().UnixNano()))
+		schemaID := types.AlertSchema(fmt.Sprintf("test-schema-%d", time.Now().UnixNano()))
 
+		t.Run("ExecutionMemory round trip", func(t *testing.T) {
 			mem := memory.NewExecutionMemory(schemaID)
 			mem.Keep = "successful patterns"
 			mem.Change = "areas to improve"
@@ -2803,6 +2803,9 @@ func TestMemory(t *testing.T) {
 			// Put
 			err := repo.PutExecutionMemory(ctx, mem)
 			gt.NoError(t, err)
+
+			// Wait for Firestore to propagate (needed for emulator)
+			time.Sleep(100 * time.Millisecond)
 
 			// Get
 			retrieved, err := repo.GetExecutionMemory(ctx, schemaID)
@@ -2816,21 +2819,22 @@ func TestMemory(t *testing.T) {
 		})
 
 		t.Run("ExecutionMemory get nonexistent", func(t *testing.T) {
-			schemaID := types.AlertSchema(fmt.Sprintf("nonexistent-%d", time.Now().UnixNano()))
+			nonexistentID := types.AlertSchema(fmt.Sprintf("nonexistent-%d", time.Now().UnixNano()))
 
-			retrieved, err := repo.GetExecutionMemory(ctx, schemaID)
+			retrieved, err := repo.GetExecutionMemory(ctx, nonexistentID)
 			gt.NoError(t, err)
 			gt.Nil(t, retrieved)
 		})
 
 		t.Run("ExecutionMemory update", func(t *testing.T) {
-			schemaID := types.AlertSchema(fmt.Sprintf("test-schema-%d", time.Now().UnixNano()))
-
 			mem1 := memory.NewExecutionMemory(schemaID)
 			mem1.Keep = "initial keep"
 
 			err := repo.PutExecutionMemory(ctx, mem1)
 			gt.NoError(t, err)
+
+			// Wait for Firestore to propagate
+			time.Sleep(100 * time.Millisecond)
 
 			// Update with new memory
 			mem2 := memory.NewExecutionMemory(schemaID)
@@ -2841,6 +2845,9 @@ func TestMemory(t *testing.T) {
 			err = repo.PutExecutionMemory(ctx, mem2)
 			gt.NoError(t, err)
 
+			// Wait for Firestore to propagate
+			time.Sleep(100 * time.Millisecond)
+
 			// Verify update
 			retrieved, err := repo.GetExecutionMemory(ctx, schemaID)
 			gt.NoError(t, err)
@@ -2850,14 +2857,15 @@ func TestMemory(t *testing.T) {
 		})
 
 		t.Run("TicketMemory round trip", func(t *testing.T) {
-			schemaID := types.AlertSchema(fmt.Sprintf("test-schema-%d", time.Now().UnixNano()))
-
 			mem := memory.NewTicketMemory(schemaID)
 			mem.Insights = "organizational knowledge"
 
 			// Put
 			err := repo.PutTicketMemory(ctx, mem)
 			gt.NoError(t, err)
+
+			// Wait for Firestore to propagate (needed for emulator)
+			time.Sleep(100 * time.Millisecond)
 
 			// Get
 			retrieved, err := repo.GetTicketMemory(ctx, schemaID)
@@ -2869,21 +2877,22 @@ func TestMemory(t *testing.T) {
 		})
 
 		t.Run("TicketMemory get nonexistent", func(t *testing.T) {
-			schemaID := types.AlertSchema(fmt.Sprintf("nonexistent-%d", time.Now().UnixNano()))
+			nonexistentID := types.AlertSchema(fmt.Sprintf("nonexistent-%d", time.Now().UnixNano()))
 
-			retrieved, err := repo.GetTicketMemory(ctx, schemaID)
+			retrieved, err := repo.GetTicketMemory(ctx, nonexistentID)
 			gt.NoError(t, err)
 			gt.Nil(t, retrieved)
 		})
 
 		t.Run("TicketMemory update", func(t *testing.T) {
-			schemaID := types.AlertSchema(fmt.Sprintf("test-schema-%d", time.Now().UnixNano()))
-
 			mem1 := memory.NewTicketMemory(schemaID)
 			mem1.Insights = "initial insights"
 
 			err := repo.PutTicketMemory(ctx, mem1)
 			gt.NoError(t, err)
+
+			// Wait for Firestore to propagate
+			time.Sleep(100 * time.Millisecond)
 
 			// Update with new memory
 			mem2 := memory.NewTicketMemory(schemaID)
@@ -2892,6 +2901,9 @@ func TestMemory(t *testing.T) {
 
 			err = repo.PutTicketMemory(ctx, mem2)
 			gt.NoError(t, err)
+
+			// Wait for Firestore to propagate
+			time.Sleep(100 * time.Millisecond)
 
 			// Verify update
 			retrieved, err := repo.GetTicketMemory(ctx, schemaID)
