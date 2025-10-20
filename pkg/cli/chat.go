@@ -12,6 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/service/memory"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/dryrun"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -130,6 +131,9 @@ func cmdChat() *cli.Command {
 			fmt.Printf("  🔢 Alerts: %d\n", len(alerts))
 			fmt.Printf("\n")
 
+			// Create memory service
+			memoryService := memory.New(llmClient, repo)
+
 			// Create usecase
 			uc := usecase.New(
 				usecase.WithRepository(repo),
@@ -137,6 +141,7 @@ func cmdChat() *cli.Command {
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(allToolSets),
+				usecase.WithMemoryService(memoryService),
 			)
 
 			// If query is provided, run once and exit

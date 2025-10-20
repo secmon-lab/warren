@@ -14,6 +14,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
@@ -27,16 +28,19 @@ type Memory struct {
 	activityMu sync.RWMutex
 	tagMu      sync.RWMutex
 	noticeMu   sync.RWMutex
+	memoryMu   sync.RWMutex
 
-	alerts         map[types.AlertID]*alert.Alert
-	lists          map[types.AlertListID]*alert.List
-	histories      map[types.TicketID][]*ticket.History
-	tickets        map[types.TicketID]*ticket.Ticket
-	ticketComments map[types.TicketID][]ticket.Comment
-	tokens         map[auth.TokenID]*auth.Token
-	activities     map[types.ActivityID]*activity.Activity
-	tagsV2         map[string]*tag.Tag // New ID-based tags
-	notices        map[types.NoticeID]*notice.Notice
+	alerts            map[types.AlertID]*alert.Alert
+	lists             map[types.AlertListID]*alert.List
+	histories         map[types.TicketID][]*ticket.History
+	tickets           map[types.TicketID]*ticket.Ticket
+	ticketComments    map[types.TicketID][]ticket.Comment
+	tokens            map[auth.TokenID]*auth.Token
+	activities        map[types.ActivityID]*activity.Activity
+	tagsV2            map[string]*tag.Tag // New ID-based tags
+	notices           map[types.NoticeID]*notice.Notice
+	executionMemories map[types.AlertSchema][]*memory.ExecutionMemory // Store history as slice
+	ticketMemories    map[types.AlertSchema][]*memory.TicketMemory    // Store history as slice
 
 	// Call counter for tracking method invocations
 	callCounts map[string]int
@@ -49,17 +53,19 @@ var _ interfaces.Repository = &Memory{}
 
 func NewMemory() *Memory {
 	return &Memory{
-		alerts:         make(map[types.AlertID]*alert.Alert),
-		lists:          make(map[types.AlertListID]*alert.List),
-		histories:      make(map[types.TicketID][]*ticket.History),
-		tickets:        make(map[types.TicketID]*ticket.Ticket),
-		ticketComments: make(map[types.TicketID][]ticket.Comment),
-		tokens:         make(map[auth.TokenID]*auth.Token),
-		activities:     make(map[types.ActivityID]*activity.Activity),
-		tagsV2:         make(map[string]*tag.Tag),
-		notices:        make(map[types.NoticeID]*notice.Notice),
-		callCounts:     make(map[string]int),
-		eb:             goerr.NewBuilder(goerr.TV(errs.RepositoryKey, "memory")),
+		alerts:            make(map[types.AlertID]*alert.Alert),
+		lists:             make(map[types.AlertListID]*alert.List),
+		histories:         make(map[types.TicketID][]*ticket.History),
+		tickets:           make(map[types.TicketID]*ticket.Ticket),
+		ticketComments:    make(map[types.TicketID][]ticket.Comment),
+		tokens:            make(map[auth.TokenID]*auth.Token),
+		activities:        make(map[types.ActivityID]*activity.Activity),
+		tagsV2:            make(map[string]*tag.Tag),
+		notices:           make(map[types.NoticeID]*notice.Notice),
+		executionMemories: make(map[types.AlertSchema][]*memory.ExecutionMemory),
+		ticketMemories:    make(map[types.AlertSchema][]*memory.TicketMemory),
+		callCounts:        make(map[string]int),
+		eb:                goerr.NewBuilder(goerr.TV(errs.RepositoryKey, "memory")),
 	}
 }
 
@@ -1304,6 +1310,74 @@ func (r *Memory) UpdateNotice(ctx context.Context, notice *notice.Notice) error 
 	// Store a copy to prevent external modification
 	noticeCopy := *notice
 	r.notices[notice.ID] = &noticeCopy
+
+	return nil
+}
+
+// GetExecutionMemory retrieves the latest execution memory for the specified schema
+func (r *Memory) GetExecutionMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.ExecutionMemory, error) {
+	r.memoryMu.RLock()
+	defer r.memoryMu.RUnlock()
+
+	mems, exists := r.executionMemories[schemaID]
+	if !exists || len(mems) == 0 {
+		return nil, nil
+	}
+
+	// Return the latest memory (last in slice)
+	latest := mems[len(mems)-1]
+	memCopy := *latest
+	return &memCopy, nil
+}
+
+// PutExecutionMemory stores execution memory as history for the specified schema
+func (r *Memory) PutExecutionMemory(ctx context.Context, mem *memory.ExecutionMemory) error {
+	if err := mem.Validate(); err != nil {
+		return r.eb.Wrap(err, "invalid execution memory")
+	}
+
+	r.memoryMu.Lock()
+	defer r.memoryMu.Unlock()
+
+	// Store a copy to prevent external modification
+	memCopy := *mem
+
+	// Append to history
+	r.executionMemories[mem.SchemaID] = append(r.executionMemories[mem.SchemaID], &memCopy)
+
+	return nil
+}
+
+// GetTicketMemory retrieves the latest ticket memory for the specified schema
+func (r *Memory) GetTicketMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.TicketMemory, error) {
+	r.memoryMu.RLock()
+	defer r.memoryMu.RUnlock()
+
+	mems, exists := r.ticketMemories[schemaID]
+	if !exists || len(mems) == 0 {
+		return nil, nil
+	}
+
+	// Return the latest memory (last in slice)
+	latest := mems[len(mems)-1]
+	memCopy := *latest
+	return &memCopy, nil
+}
+
+// PutTicketMemory stores ticket memory as history for the specified schema
+func (r *Memory) PutTicketMemory(ctx context.Context, mem *memory.TicketMemory) error {
+	if err := mem.Validate(); err != nil {
+		return r.eb.Wrap(err, "invalid ticket memory")
+	}
+
+	r.memoryMu.Lock()
+	defer r.memoryMu.Unlock()
+
+	// Store a copy to prevent external modification
+	memCopy := *mem
+
+	// Append to history
+	r.ticketMemories[mem.SchemaID] = append(r.ticketMemories[mem.SchemaID], &memCopy)
 
 	return nil
 }

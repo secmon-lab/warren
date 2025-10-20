@@ -14,6 +14,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
@@ -2773,6 +2774,130 @@ func TestNoticeRepository(t *testing.T) {
 			err := repo.UpdateNotice(ctx, nonexistentNotice)
 			gt.Error(t, err)
 			gt.S(t, err.Error()).Contains("notice not found")
+		})
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+func TestMemory(t *testing.T) {
+	ctx := context.Background()
+
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		t.Run("ExecutionMemory round trip", func(t *testing.T) {
+			schemaID := types.AlertSchema(fmt.Sprintf("test-schema-%d", time.Now().UnixNano()))
+
+			mem := memory.NewExecutionMemory(schemaID)
+			mem.Keep = "successful patterns"
+			mem.Change = "areas to improve"
+			mem.Notes = "other insights"
+
+			// Put
+			err := repo.PutExecutionMemory(ctx, mem)
+			gt.NoError(t, err)
+
+			// Get
+			retrieved, err := repo.GetExecutionMemory(ctx, schemaID)
+			gt.NoError(t, err)
+			gt.V(t, retrieved).NotNil()
+			gt.Equal(t, retrieved.SchemaID, schemaID)
+			gt.S(t, retrieved.Keep).Equal("successful patterns")
+			gt.S(t, retrieved.Change).Equal("areas to improve")
+			gt.S(t, retrieved.Notes).Equal("other insights")
+			gt.Equal(t, retrieved.Version, 1)
+		})
+
+		t.Run("ExecutionMemory get nonexistent", func(t *testing.T) {
+			schemaID := types.AlertSchema(fmt.Sprintf("nonexistent-%d", time.Now().UnixNano()))
+
+			retrieved, err := repo.GetExecutionMemory(ctx, schemaID)
+			gt.NoError(t, err)
+			gt.Nil(t, retrieved)
+		})
+
+		t.Run("ExecutionMemory update", func(t *testing.T) {
+			schemaID := types.AlertSchema(fmt.Sprintf("test-schema-%d", time.Now().UnixNano()))
+
+			mem1 := memory.NewExecutionMemory(schemaID)
+			mem1.Keep = "initial keep"
+
+			err := repo.PutExecutionMemory(ctx, mem1)
+			gt.NoError(t, err)
+
+			// Update with new memory
+			mem2 := memory.NewExecutionMemory(schemaID)
+			mem2.Keep = "updated keep"
+			mem2.Change = "new change"
+			mem2.Version = 2
+
+			err = repo.PutExecutionMemory(ctx, mem2)
+			gt.NoError(t, err)
+
+			// Verify update
+			retrieved, err := repo.GetExecutionMemory(ctx, schemaID)
+			gt.NoError(t, err)
+			gt.S(t, retrieved.Keep).Equal("updated keep")
+			gt.S(t, retrieved.Change).Equal("new change")
+			gt.Equal(t, retrieved.Version, 2)
+		})
+
+		t.Run("TicketMemory round trip", func(t *testing.T) {
+			schemaID := types.AlertSchema(fmt.Sprintf("test-schema-%d", time.Now().UnixNano()))
+
+			mem := memory.NewTicketMemory(schemaID)
+			mem.Insights = "organizational knowledge"
+
+			// Put
+			err := repo.PutTicketMemory(ctx, mem)
+			gt.NoError(t, err)
+
+			// Get
+			retrieved, err := repo.GetTicketMemory(ctx, schemaID)
+			gt.NoError(t, err)
+			gt.V(t, retrieved).NotNil()
+			gt.Equal(t, retrieved.SchemaID, schemaID)
+			gt.S(t, retrieved.Insights).Equal("organizational knowledge")
+			gt.Equal(t, retrieved.Version, 1)
+		})
+
+		t.Run("TicketMemory get nonexistent", func(t *testing.T) {
+			schemaID := types.AlertSchema(fmt.Sprintf("nonexistent-%d", time.Now().UnixNano()))
+
+			retrieved, err := repo.GetTicketMemory(ctx, schemaID)
+			gt.NoError(t, err)
+			gt.Nil(t, retrieved)
+		})
+
+		t.Run("TicketMemory update", func(t *testing.T) {
+			schemaID := types.AlertSchema(fmt.Sprintf("test-schema-%d", time.Now().UnixNano()))
+
+			mem1 := memory.NewTicketMemory(schemaID)
+			mem1.Insights = "initial insights"
+
+			err := repo.PutTicketMemory(ctx, mem1)
+			gt.NoError(t, err)
+
+			// Update with new memory
+			mem2 := memory.NewTicketMemory(schemaID)
+			mem2.Insights = "updated insights"
+			mem2.Version = 2
+
+			err = repo.PutTicketMemory(ctx, mem2)
+			gt.NoError(t, err)
+
+			// Verify update
+			retrieved, err := repo.GetTicketMemory(ctx, schemaID)
+			gt.NoError(t, err)
+			gt.S(t, retrieved.Insights).Equal("updated insights")
+			gt.Equal(t, retrieved.Version, 2)
 		})
 	}
 

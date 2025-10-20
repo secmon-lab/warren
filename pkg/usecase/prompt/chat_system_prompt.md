@@ -152,6 +152,12 @@ Only update findings when explicitly requested and after thorough investigation 
 - Use line breaks to separate sections
 - Keep conversational tone - avoid formal report structure
 
+{{ if .memory_section }}
+-----------------------
+
+{{ .memory_section }}
+{{ end }}
+
 {{ if .additional_instructions }}
 -----------------------
 

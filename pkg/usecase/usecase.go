@@ -11,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/command"
+	"github.com/secmon-lab/warren/pkg/service/memory"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 )
@@ -23,6 +24,7 @@ type UseCases struct {
 	// services and adapters
 	slackService    *slackService.Service
 	tagService      *tag.Service
+	memoryService   *memory.Service
 	llmClient       gollem.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
@@ -68,6 +70,12 @@ func WithSlackService(slackService *slackService.Service) Option {
 func WithTagService(tagService *tag.Service) Option {
 	return func(u *UseCases) {
 		u.tagService = tagService
+	}
+}
+
+func WithMemoryService(memoryService *memory.Service) Option {
+	return func(u *UseCases) {
+		u.memoryService = memoryService
 	}
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
@@ -54,15 +55,17 @@ func (r *Firestore) Close() error {
 }
 
 const (
-	collectionAlerts     = "alerts"
-	collectionAlertLists = "lists"
-	collectionHistories  = "histories"
-	collectionTickets    = "tickets"
-	collectionComments   = "comments"
-	collectionTokens     = "tokens"
-	collectionActivities = "activities"
-	collectionTags       = "tags"
-	collectionNotices    = "notices"
+	collectionAlerts            = "alerts"
+	collectionAlertLists        = "lists"
+	collectionHistories         = "histories"
+	collectionTickets           = "tickets"
+	collectionComments          = "comments"
+	collectionTokens            = "tokens"
+	collectionActivities        = "activities"
+	collectionTags              = "tags"
+	collectionNotices           = "notices"
+	collectionExecutionMemories = "execution_memories"
+	collectionTicketMemories    = "ticket_memories"
 )
 
 // extractCountFromAggregationResult extracts an integer count from a Firestore aggregation result.
@@ -1814,5 +1817,108 @@ func (r *Firestore) UpdateNotice(ctx context.Context, notice *notice.Notice) err
 		return r.eb.Wrap(err, "failed to update notice", goerr.V("notice_id", notice.ID))
 	}
 
+	return nil
+}
+
+// Memory related methods
+func (r *Firestore) GetExecutionMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.ExecutionMemory, error) {
+	// Get all memories from sub-collection
+	// UUID v7 IDs are time-ordered, so we sort by ID to find the latest
+	docs, err := r.db.Collection(collectionExecutionMemories).
+		Doc(string(schemaID)).
+		Collection("records").
+		Documents(ctx).GetAll()
+
+	if err != nil {
+		return nil, r.eb.Wrap(err, "failed to get execution memory", goerr.V("schema_id", schemaID))
+	}
+
+	if len(docs) == 0 {
+		return nil, nil
+	}
+
+	// Find the document with the highest ID (latest UUID v7)
+	var latestDoc *firestore.DocumentSnapshot
+	for _, doc := range docs {
+		if latestDoc == nil || doc.Ref.ID > latestDoc.Ref.ID {
+			latestDoc = doc
+		}
+	}
+
+	var mem memory.ExecutionMemory
+	if err := latestDoc.DataTo(&mem); err != nil {
+		return nil, r.eb.Wrap(err, "failed to convert data to execution memory", goerr.V("schema_id", schemaID))
+	}
+
+	mem.SchemaID = schemaID
+	return &mem, nil
+}
+
+func (r *Firestore) PutExecutionMemory(ctx context.Context, mem *memory.ExecutionMemory) error {
+	if err := mem.Validate(); err != nil {
+		return r.eb.Wrap(err, "invalid execution memory")
+	}
+
+	// Save as a new record in sub-collection
+	doc := r.db.Collection(collectionExecutionMemories).
+		Doc(string(mem.SchemaID)).
+		Collection("records").
+		Doc(mem.ID.String())
+
+	_, err := doc.Set(ctx, mem)
+	if err != nil {
+		return r.eb.Wrap(err, "failed to put execution memory", goerr.V("schema_id", mem.SchemaID), goerr.V("id", mem.ID))
+	}
+	return nil
+}
+
+func (r *Firestore) GetTicketMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.TicketMemory, error) {
+	// Get all memories from sub-collection
+	// UUID v7 IDs are time-ordered, so we sort by ID to find the latest
+	docs, err := r.db.Collection(collectionTicketMemories).
+		Doc(string(schemaID)).
+		Collection("records").
+		Documents(ctx).GetAll()
+
+	if err != nil {
+		return nil, r.eb.Wrap(err, "failed to get ticket memory", goerr.V("schema_id", schemaID))
+	}
+
+	if len(docs) == 0 {
+		return nil, nil
+	}
+
+	// Find the document with the highest ID (latest UUID v7)
+	var latestDoc *firestore.DocumentSnapshot
+	for _, doc := range docs {
+		if latestDoc == nil || doc.Ref.ID > latestDoc.Ref.ID {
+			latestDoc = doc
+		}
+	}
+
+	var mem memory.TicketMemory
+	if err := latestDoc.DataTo(&mem); err != nil {
+		return nil, r.eb.Wrap(err, "failed to convert data to ticket memory", goerr.V("schema_id", schemaID))
+	}
+
+	mem.SchemaID = schemaID
+	return &mem, nil
+}
+
+func (r *Firestore) PutTicketMemory(ctx context.Context, mem *memory.TicketMemory) error {
+	if err := mem.Validate(); err != nil {
+		return r.eb.Wrap(err, "invalid ticket memory")
+	}
+
+	// Save as a new record in sub-collection
+	doc := r.db.Collection(collectionTicketMemories).
+		Doc(string(mem.SchemaID)).
+		Collection("records").
+		Doc(mem.ID.String())
+
+	_, err := doc.Set(ctx, mem)
+	if err != nil {
+		return r.eb.Wrap(err, "failed to put ticket memory", goerr.V("schema_id", mem.SchemaID), goerr.V("id", mem.ID))
+	}
 	return nil
 }
