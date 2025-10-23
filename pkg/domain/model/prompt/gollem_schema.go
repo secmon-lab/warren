@@ -7,20 +7,17 @@ import (
 	"github.com/m-mizutani/gollem"
 )
 
-// ToGollemSchema converts a Go struct to gollem.ResponseSchema
-func ToGollemSchema(name, description string, v interface{}) *gollem.ResponseSchema {
+// ToGollemSchema converts a Go struct to gollem.Parameter for response schema
+// Note: The name and description parameters are kept for backward compatibility
+// but only the schema (Parameter) is returned as gollem no longer uses ResponseSchema wrapper
+func ToGollemSchema(name, description string, v interface{}) *gollem.Parameter {
 	t := reflect.TypeOf(v)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
 
-	schema := &gollem.ResponseSchema{
-		Name:        name,
-		Description: description,
-		Schema:      toGollemParameter(t),
-	}
-
-	return schema
+	// Return the parameter directly - gollem now uses Parameter type for response schema
+	return toGollemParameter(t)
 }
 
 func toGollemParameter(t reflect.Type) *gollem.Parameter {

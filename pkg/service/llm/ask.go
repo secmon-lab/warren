@@ -3,12 +3,10 @@ package llm
 import (
 	"context"
 	"encoding/json"
-	"reflect"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
-	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
@@ -17,7 +15,7 @@ type askConfig[T any] struct {
 	maxRetry    int
 	retryPrompt func(ctx context.Context, err error) string
 	validate    func(v T) error
-	schema      *gollem.ResponseSchema
+	schema      *gollem.Parameter
 }
 
 type AskOption[T any] func(*askConfig[T])
@@ -40,7 +38,7 @@ func WithValidate[T any](f func(v T) error) AskOption[T] {
 	}
 }
 
-func WithSchema[T any](schema *gollem.ResponseSchema) AskOption[T] {
+func WithSchema[T any](schema *gollem.Parameter) AskOption[T] {
 	return func(c *askConfig[T]) {
 		c.schema = schema
 	}
@@ -68,8 +66,10 @@ func Ask[T any](ctx context.Context, llm gollem.LLMClient, prompt string, opts .
 	var zero T
 	schema := config.schema
 	if schema == nil {
-		// Try to generate schema from type T
-		schema = tryGenerateSchema(zero)
+		// Try to generate schema from type T using gollem.ToSchema
+		if s, err := gollem.ToSchema(zero); err == nil {
+			schema = s
+		}
 	}
 	if schema != nil {
 		sessionOpts = append(sessionOpts, gollem.WithSessionResponseSchema(schema))
@@ -128,23 +128,4 @@ func Ask[T any](ctx context.Context, llm gollem.LLMClient, prompt string, opts .
 	}
 
 	return response, nil
-}
-
-// tryGenerateSchema attempts to generate a schema from the generic type T
-func tryGenerateSchema[T any](zero T) *gollem.ResponseSchema {
-	t := reflect.TypeOf(zero)
-	if t == nil {
-		return nil
-	}
-
-	// Only generate schema for struct types
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	if t.Kind() != reflect.Struct {
-		return nil
-	}
-
-	// Use prompt package helper to generate schema
-	return prompt.ToGollemSchema("Response", "Structured response", zero)
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/llm/gemini"
+	"github.com/m-mizutani/gollem/middleware/compacter"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -328,6 +329,25 @@ func generateConfigWithFactory(ctx context.Context, cfg generateConfigInput, fac
 		gollem.WithSystemPrompt(promptText),
 		gollem.WithLoopLimit(15),
 		gollem.WithLogger(logger),
+		gollem.WithContentBlockMiddleware(
+			compacter.NewContentBlockMiddleware(
+				llmClient,
+				compacter.WithCompactRatio(0.7),
+				compacter.WithMaxRetries(3),
+				compacter.WithLogger(logger),
+				compacter.WithCompactionHook(func(ctx context.Context, event *compacter.CompactionEvent) {
+					logger.Info("conversation history compacted",
+						"original_size", event.OriginalDataSize,
+						"compacted_size", event.CompactedDataSize,
+						"input_tokens", event.InputTokens,
+						"output_tokens", event.OutputTokens,
+						"compression_ratio", float64(event.CompactedDataSize)/float64(event.OriginalDataSize))
+				}),
+			),
+		),
+		gollem.WithContentStreamMiddleware(
+			compacter.NewContentStreamMiddleware(llmClient),
+		),
 		gollem.WithToolSets(&configGeneratorTools{
 			bqClient:       bqClient,
 			scanLimit:      cfg.ScanLimit,

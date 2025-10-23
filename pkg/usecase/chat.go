@@ -8,6 +8,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	"github.com/m-mizutani/gollem/middleware/compacter"
 	"github.com/m-mizutani/gollem/strategy/planexec"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -245,17 +246,40 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithSystemPrompt(systemPrompt),
-		gollem.WithContentBlockMiddleware(func(next gollem.ContentBlockHandler) gollem.ContentBlockHandler {
-			return func(ctx context.Context, req *gollem.ContentRequest) (*gollem.ContentResponse, error) {
-				resp, err := next(ctx, req)
-				if err == nil && len(resp.Texts) > 0 {
-					for _, text := range resp.Texts {
-						msg.Trace(ctx, "💭 %s", text)
+		// Compaction middleware for automatic history compression
+		gollem.WithContentBlockMiddleware(
+			compacter.NewContentBlockMiddleware(
+				x.llmClient,
+				compacter.WithCompactRatio(0.7),
+				compacter.WithMaxRetries(3),
+				compacter.WithLogger(logging.From(ctx)),
+				compacter.WithCompactionHook(func(ctx context.Context, event *compacter.CompactionEvent) {
+					logging.From(ctx).Info("conversation history compacted",
+						"original_size", event.OriginalDataSize,
+						"compacted_size", event.CompactedDataSize,
+						"input_tokens", event.InputTokens,
+						"output_tokens", event.OutputTokens,
+						"compression_ratio", float64(event.CompactedDataSize)/float64(event.OriginalDataSize))
+				}),
+			),
+		),
+		// Trace middleware for message display
+		gollem.WithContentBlockMiddleware(
+			func(next gollem.ContentBlockHandler) gollem.ContentBlockHandler {
+				return func(ctx context.Context, req *gollem.ContentRequest) (*gollem.ContentResponse, error) {
+					resp, err := next(ctx, req)
+					if err == nil && len(resp.Texts) > 0 {
+						for _, text := range resp.Texts {
+							msg.Trace(ctx, "💭 %s", text)
+						}
 					}
+					return resp, err
 				}
-				return resp, err
-			}
-		}),
+			},
+		),
+		gollem.WithContentStreamMiddleware(
+			compacter.NewContentStreamMiddleware(x.llmClient),
+		),
 		gollem.WithToolMiddleware(func(next gollem.ToolHandler) gollem.ToolHandler {
 			return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
 				// Pre-execution: ツール呼び出しのトレース

@@ -118,13 +118,18 @@ func alertRawHandler(uc useCase) http.HandlerFunc {
 			return
 		}
 
+		// If Content-Length is 0, treat as empty data
 		var alertData any
-		if err := json.NewDecoder(r.Body).Decode(&alertData); err != nil {
-			handleError(w, r, goerr.Wrap(err, "failed to decode message",
-				goerr.T(errs.TagInvalidRequest),
-				goerr.V("body", r.Body),
-			))
-			return
+		if r.ContentLength == 0 {
+			alertData = nil
+		} else {
+			if err := json.NewDecoder(r.Body).Decode(&alertData); err != nil {
+				handleError(w, r, goerr.Wrap(err, "failed to decode message",
+					goerr.T(errs.TagInvalidRequest),
+					goerr.V("body", r.Body),
+				))
+				return
+			}
 		}
 
 		handleAlertWithAsync(w, r, uc, schema, alertData, hookEndpointRaw)
