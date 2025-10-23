@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
@@ -69,6 +70,10 @@ func Ask[T any](ctx context.Context, llm gollem.LLMClient, prompt string, opts .
 		// Try to generate schema from type T using gollem.ToSchema
 		if s, err := gollem.ToSchema(zero); err == nil {
 			schema = s
+		} else {
+			logger.Debug("failed to generate schema from type, will use unstructured response",
+				"error", err,
+				"type", fmt.Sprintf("%T", zero))
 		}
 	}
 	if schema != nil {
