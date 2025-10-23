@@ -151,7 +151,7 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 		slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*Status:*\n%s", ticket.Status.Label()), false, false),
 	}
 	if ticket.Assignee != nil {
-		fields = append(fields, slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*Assignee:*\n👤 <@%s>", ticket.Assignee.ID), false, false))
+		fields = append(fields, slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*Assignee:*\n👤 %s", ticket.Assignee.Name), false, false))
 	}
 	if ticket.Conclusion != "" {
 		fields = append(fields, slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*Conclusion:*\n%s", ticket.Conclusion.Label()), false, false))
@@ -860,7 +860,7 @@ func buildTicketListBlocks(ctx context.Context, tickets []*ticket.Ticket, metada
 		// Create a line with status, time and assignee information
 		statusInfo := fmt.Sprintf("%s %s (%s)", t.Status.Icon(), ticketLink, timeStr)
 		if t.Assignee != nil {
-			statusInfo += fmt.Sprintf(" 👤 <@%s>", t.Assignee.ID)
+			statusInfo += fmt.Sprintf(" 👤 %s", t.Assignee.Name)
 		}
 
 		messageText.WriteString(statusInfo + "\n")
