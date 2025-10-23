@@ -16,6 +16,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/llm/gemini"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
+	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 	"google.golang.org/api/iterator"
@@ -328,6 +329,8 @@ func generateConfigWithFactory(ctx context.Context, cfg generateConfigInput, fac
 		gollem.WithSystemPrompt(promptText),
 		gollem.WithLoopLimit(15),
 		gollem.WithLogger(logger),
+		gollem.WithContentBlockMiddleware(llm.NewCompactionMiddleware(llmClient, logger)),
+		gollem.WithContentStreamMiddleware(llm.NewCompactionStreamMiddleware(llmClient)),
 		gollem.WithToolSets(&configGeneratorTools{
 			bqClient:       bqClient,
 			scanLimit:      cfg.ScanLimit,

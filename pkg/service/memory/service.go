@@ -48,11 +48,10 @@ func (s *Service) GenerateExecutionMemory(
 	executionError error,
 ) (*memory.ExecutionMemory, error) {
 	// 1. Define response schema for structured output
-	schema := prompt.ToGollemSchema(
-		"ExecutionMemoryResponse",
-		"Structured execution memory with keep/change/notes format",
-		executionMemoryResponse{},
-	)
+	schema, err := gollem.ToSchema(executionMemoryResponse{})
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to generate schema")
+	}
 
 	// 2. Create session with history and schema
 	session, err := s.llmClient.NewSession(ctx,
@@ -104,11 +103,10 @@ func (s *Service) GenerateTicketMemory(
 	comments []ticket.Comment,
 ) (*memory.TicketMemory, error) {
 	// 1. Define response schema for structured output
-	schema := prompt.ToGollemSchema(
-		"TicketMemoryResponse",
-		"Organizational security knowledge from ticket resolution",
-		ticketMemoryResponse{},
-	)
+	schema, err := gollem.ToSchema(ticketMemoryResponse{})
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to generate schema")
+	}
 
 	// 2. Get existing memory
 	existing, err := s.repository.GetTicketMemory(ctx, schemaID)

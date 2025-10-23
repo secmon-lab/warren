@@ -17,6 +17,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -245,17 +246,23 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithSystemPrompt(systemPrompt),
-		gollem.WithContentBlockMiddleware(func(next gollem.ContentBlockHandler) gollem.ContentBlockHandler {
-			return func(ctx context.Context, req *gollem.ContentRequest) (*gollem.ContentResponse, error) {
-				resp, err := next(ctx, req)
-				if err == nil && len(resp.Texts) > 0 {
-					for _, text := range resp.Texts {
-						msg.Trace(ctx, "💭 %s", text)
+		// Compaction middleware for automatic history compression
+		gollem.WithContentBlockMiddleware(llm.NewCompactionMiddleware(x.llmClient, logging.From(ctx))),
+		// Trace middleware for message display
+		gollem.WithContentBlockMiddleware(
+			func(next gollem.ContentBlockHandler) gollem.ContentBlockHandler {
+				return func(ctx context.Context, req *gollem.ContentRequest) (*gollem.ContentResponse, error) {
+					resp, err := next(ctx, req)
+					if err == nil && len(resp.Texts) > 0 {
+						for _, text := range resp.Texts {
+							msg.Trace(ctx, "💭 %s", text)
+						}
 					}
+					return resp, err
 				}
-				return resp, err
-			}
-		}),
+			},
+		),
+		gollem.WithContentStreamMiddleware(llm.NewCompactionStreamMiddleware(x.llmClient)),
 		gollem.WithToolMiddleware(func(next gollem.ToolHandler) gollem.ToolHandler {
 			return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
 				// Pre-execution: ツール呼び出しのトレース
