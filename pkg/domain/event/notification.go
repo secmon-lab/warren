@@ -39,7 +39,7 @@ func (e *CommitPolicyResultEvent) isNotificationEvent() {}
 // EnrichTaskPromptEvent is fired when an enrich task prompt is prepared
 type EnrichTaskPromptEvent struct {
 	TaskID     string
-	TaskType   string // "query" or "agent"
+	TaskType   policy.TaskType
 	PromptText string
 }
 
@@ -48,7 +48,7 @@ func (e *EnrichTaskPromptEvent) isNotificationEvent() {}
 // EnrichTaskResponseEvent is fired when LLM responds to an enrich task
 type EnrichTaskResponseEvent struct {
 	TaskID   string
-	TaskType string // "query" or "agent"
+	TaskType policy.TaskType
 	Response any
 }
 

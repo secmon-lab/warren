@@ -203,7 +203,7 @@ func (uc *UseCases) executeQueryTask(ctx context.Context, alert *alert.Alert, ta
 	// Notify prompt
 	notifier.NotifyEnrichTaskPrompt(ctx, &event.EnrichTaskPromptEvent{
 		TaskID:     task.ID,
-		TaskType:   "query",
+		TaskType:   policy.TaskTypeQuery,
 		PromptText: promptText,
 	})
 
@@ -240,7 +240,7 @@ func (uc *UseCases) executeQueryTask(ctx context.Context, alert *alert.Alert, ta
 	// Notify response
 	notifier.NotifyEnrichTaskResponse(ctx, &event.EnrichTaskResponseEvent{
 		TaskID:   task.ID,
-		TaskType: "query",
+		TaskType: policy.TaskTypeQuery,
 		Response: result,
 	})
 
@@ -257,7 +257,7 @@ func (uc *UseCases) executeAgentTask(ctx context.Context, alert *alert.Alert, ta
 	// Notify prompt
 	notifier.NotifyEnrichTaskPrompt(ctx, &event.EnrichTaskPromptEvent{
 		TaskID:     task.ID,
-		TaskType:   "agent",
+		TaskType:   policy.TaskTypeAgent,
 		PromptText: promptText,
 	})
 
@@ -312,7 +312,7 @@ func (uc *UseCases) executeAgentTask(ctx context.Context, alert *alert.Alert, ta
 	// Notify response
 	notifier.NotifyEnrichTaskResponse(ctx, &event.EnrichTaskResponseEvent{
 		TaskID:   task.ID,
-		TaskType: "agent",
+		TaskType: policy.TaskTypeAgent,
 		Response: parsedResult,
 	})
 
