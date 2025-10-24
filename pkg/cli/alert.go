@@ -86,10 +86,6 @@ func runAlertPipeline(ctx context.Context, policyCfg *config.Policy, genaiCfg *c
 			return goerr.Wrap(err, "failed to create prompt service",
 				goerr.V("prompt_dir", genaiCfg.GetPromptDir()))
 		}
-		if promptService == nil {
-			return goerr.New("prompt service is nil after initialization",
-				goerr.V("prompt_dir", genaiCfg.GetPromptDir()))
-		}
 	}
 
 	// Create use case
