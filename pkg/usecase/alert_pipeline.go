@@ -21,8 +21,18 @@ type AlertPipelineResult struct {
 	CommitResult *policy.CommitPolicyResult
 }
 
-// ProcessAlertPipeline processes an alert through the complete pipeline
-// This is a pure function without side effects (no DB save, no Slack notification)
+// ProcessAlertPipeline processes an alert through the complete pipeline.
+// This is a pure function without side effects (no DB save, no Slack notification).
+//
+// Pipeline stages:
+// 1. Alert Policy Evaluation - transforms raw data into Alert objects
+// 2. Tag Conversion - converts tag names to tag IDs
+// 3. Metadata Generation - fills missing titles/descriptions using LLM
+// 4. Enrich Policy Evaluation - executes enrichment tasks (query/agent)
+// 5. Commit Policy Evaluation - applies final metadata and determines publish type
+//
+// All pipeline events are emitted through the notifier for real-time monitoring.
+// The notifier receives type-safe events for each stage of processing.
 func (uc *UseCases) ProcessAlertPipeline(
 	ctx context.Context,
 	schema types.AlertSchema,

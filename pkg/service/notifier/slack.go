@@ -17,12 +17,14 @@ type ThreadPoster interface {
 
 const slackMessageLimit = 3000
 
-// SlackNotifier is a Slack-based event notifier
+// SlackNotifier is a Slack-based event notifier that posts
+// alert pipeline events to a Slack thread with formatted messages.
+// Provides real-time visibility into alert processing for team collaboration.
 type SlackNotifier struct {
 	thread ThreadPoster
 }
 
-// NewSlackNotifier creates a new Slack notifier
+// NewSlackNotifier creates a new Slack notifier that posts events to the specified thread
 func NewSlackNotifier(thread ThreadPoster) interfaces.Notifier {
 	return &SlackNotifier{
 		thread: thread,

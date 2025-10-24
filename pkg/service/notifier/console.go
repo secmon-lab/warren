@@ -11,7 +11,9 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 )
 
-// ConsoleNotifier is a console-based event notifier
+// ConsoleNotifier is a console-based event notifier that outputs
+// alert pipeline events to the console with color formatting.
+// Useful for CLI mode and debugging.
 type ConsoleNotifier struct{}
 
 // NewConsoleNotifier creates a new console notifier

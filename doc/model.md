@@ -30,6 +30,169 @@ graph TD
     style T2 fill:#51cf66
 ```
 
+## Alert Processing Pipeline
+
+Warren processes alerts through a multi-stage pipeline that evaluates policies, enriches data, and determines final disposition.
+
+### Pipeline Stages
+
+```mermaid
+flowchart TD
+    A[Raw Alert Data] --> B[1. Alert Policy]
+    B --> C{Alerts Generated?}
+    C -->|No| Z[Discarded]
+    C -->|Yes| D[2. Tag Conversion]
+    D --> E[3. Metadata Fill]
+    E --> F[4. Enrich Policy]
+    F --> G[5. Commit Policy]
+    G --> H[Final Alert]
+
+    style A fill:#f9f,stroke:#333
+    style H fill:#9f9,stroke:#333
+    style Z fill:#faa,stroke:#333
+```
+
+### 1. Alert Policy Evaluation
+
+**Purpose**: Transform raw event data into Alert objects
+
+- **Input**: Raw webhook payload (any JSON structure)
+- **Output**: Zero or more Alert objects with basic metadata
+- **Policy Package**: `package alert.{schema_name}`
+- **Behavior if Missing**: Creates default alert with empty metadata
+
+**Key Features**:
+- Filter unwanted events
+- Generate multiple alerts from single event
+- Extract initial attributes
+- Define alert schema
+
+### 2. Tag Conversion
+
+**Purpose**: Convert tag names to tag IDs for database storage
+
+- Looks up tag names in `metadata.tags` array
+- Creates tags automatically if they don't exist
+- Stores tag IDs in alert for efficient filtering
+
+### 3. Metadata Generation
+
+**Purpose**: Fill missing titles and descriptions using LLM
+
+- Only runs if title or description is empty
+- Uses Vertex AI Gemini to analyze alert data
+- Generates semantic embeddings (768-dim vectors)
+- Sets `title_source` and `description_source` to `types.SourceAI`
+
+### 4. Enrich Policy Evaluation
+
+**Purpose**: Execute enrichment tasks using LLM
+
+- **Input**: Processed alert with metadata
+- **Output**: Enrichment results (task_id → response mapping)
+- **Policy Package**: `package enrich.{schema_name}`
+- **Behavior if Missing**: Returns empty results
+
+**Task Types**:
+- **Query Tasks**: Simple LLM queries with prompts
+- **Agent Tasks**: Complex multi-step LLM operations
+
+**Example Policy**:
+```rego
+package enrich.security
+
+query contains {
+    "id": "analyze_threat",
+    "prompt": "Analyze this security event and identify IOCs"
+}
+
+agent contains {
+    "id": "investigate",
+    "prompt": "Investigate the threat using available tools",
+    "format": "json"
+}
+```
+
+### 5. Commit Policy Evaluation
+
+**Purpose**: Apply final metadata and determine publish type
+
+- **Input**: Alert + enrichment results
+- **Output**: Commit result with final metadata
+- **Policy Package**: `package commit.{schema_name}`
+- **Behavior if Missing**: Returns default with `publish = "alert"`
+
+**Output Fields**:
+```go
+type CommitPolicyResult struct {
+    Publish     types.PublishType  // "alert", "notice", or "discard"
+    Title       string             // Override alert title
+    Description string             // Override alert description
+    Channel     string             // Slack channel ID
+    Attr        map[string]string  // Additional attributes
+}
+```
+
+**Publish Types**:
+- `"alert"` (default): Full alert processing with ticket creation
+- `"notice"`: Simple notification without ticket
+- `"discard"`: Drop alert silently
+
+### Event Notification System
+
+The pipeline emits events at each stage for real-time monitoring:
+
+**Event Types**:
+- `AlertPolicyResultEvent` - After step 1
+- `EnrichPolicyResultEvent` - After step 4
+- `CommitPolicyResultEvent` - After step 5
+- `EnrichTaskPromptEvent` - Before LLM task execution
+- `EnrichTaskResponseEvent` - After LLM task execution
+- `ErrorEvent` - On any error
+
+**Notifier Interface**:
+```go
+type Notifier interface {
+    NotifyAlertPolicyResult(ctx, *AlertPolicyResultEvent)
+    NotifyEnrichPolicyResult(ctx, *EnrichPolicyResultEvent)
+    NotifyCommitPolicyResult(ctx, *CommitPolicyResultEvent)
+    NotifyEnrichTaskPrompt(ctx, *EnrichTaskPromptEvent)
+    NotifyEnrichTaskResponse(ctx, *EnrichTaskResponseEvent)
+    NotifyError(ctx, *ErrorEvent)
+}
+```
+
+**Implementations**:
+- `ConsoleNotifier` - Outputs to console (CLI mode)
+- `SlackNotifier` - Posts to Slack thread (real-time collaboration)
+
+### Pipeline Execution
+
+**ProcessAlertPipeline()**: Pure pipeline processing without side effects
+- Executes stages 1-5
+- Emits events through notifier
+- Returns pipeline results
+- No database saves, no Slack posts
+
+**HandleAlert()**: Complete alert handling with side effects
+- Calls `ProcessAlertPipeline()`
+- Handles GenAI processing and Action policies
+- Performs similarity search for thread grouping
+- Saves to database
+- Posts to Slack
+
+### Graceful Degradation
+
+The pipeline continues even when policies are missing:
+
+| Missing Policy | Behavior |
+|---------------|----------|
+| Alert Policy | Creates default alert with raw data |
+| Enrich Policy | Returns empty enrichment results |
+| Commit Policy | Uses default publish type ("alert") |
+
+This ensures alerts are never lost due to missing configuration.
+
 ## Alert Model
 
 ### Structure
