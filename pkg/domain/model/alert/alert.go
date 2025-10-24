@@ -3,6 +3,8 @@ package alert
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
+	"fmt"
 	"math"
 	"time"
 
@@ -118,6 +120,39 @@ type Attribute struct {
 	Value string `json:"value"`
 	Link  string `json:"link"`
 	Auto  bool   `json:"auto"`
+}
+
+// UnmarshalJSON implements custom unmarshaling to handle both string and numeric values
+func (a *Attribute) UnmarshalJSON(data []byte) error {
+	type Alias Attribute
+	aux := &struct {
+		Value any `json:"value"`
+		*Alias
+	}{
+		Alias: (*Alias)(a),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return goerr.Wrap(err, "failed to unmarshal attribute")
+	}
+
+	// Convert value to string regardless of its type
+	switch v := aux.Value.(type) {
+	case string:
+		a.Value = v
+	case float64:
+		a.Value = fmt.Sprintf("%v", v)
+	case int:
+		a.Value = fmt.Sprintf("%d", v)
+	case bool:
+		a.Value = fmt.Sprintf("%t", v)
+	case nil:
+		a.Value = ""
+	default:
+		a.Value = fmt.Sprintf("%v", v)
+	}
+
+	return nil
 }
 
 // Finding is the conclusion of the alert. This is set by the AI.

@@ -17,12 +17,14 @@ import (
 // Service implements the PromptService interface
 type Service struct {
 	templates map[string]*template.Template
+	promptDir string
 }
 
 // New creates a new prompt service with preloaded templates from the specified directory
 func New(promptDir string) (interfaces.PromptService, error) {
 	service := &Service{
 		templates: make(map[string]*template.Template),
+		promptDir: promptDir,
 	}
 
 	if promptDir != "" {
@@ -115,6 +117,52 @@ func (s *Service) GeneratePrompt(ctx context.Context, templateName string, alert
 	logger.Debug("generated prompt from template",
 		"template_name", templateName,
 		"alert_id", alert.ID,
+		"prompt_length", len(prompt))
+
+	return prompt, nil
+}
+
+// ReadPromptFile reads a prompt file without template rendering
+// This is used when alert data is passed via system prompt instead of template
+func (s *Service) ReadPromptFile(ctx context.Context, templateName string) (string, error) {
+	logger := logging.From(ctx)
+
+	// Check if template exists in loaded templates
+	if _, exists := s.templates[templateName]; !exists {
+		return "", goerr.New("prompt template not found", goerr.V("template_name", templateName))
+	}
+
+	// Construct full file path
+	filePath := filepath.Join(s.promptDir, templateName)
+
+	// Validate that the resolved path is still within promptDir to prevent directory traversal
+	absPromptDir, err := filepath.Abs(s.promptDir)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to get absolute path of prompt directory")
+	}
+	absFilePath, err := filepath.Abs(filePath)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to get absolute path of template file")
+	}
+	if !strings.HasPrefix(absFilePath, absPromptDir+string(filepath.Separator)) &&
+		absFilePath != absPromptDir {
+		return "", goerr.New("template path is outside prompt directory",
+			goerr.V("template_name", templateName),
+			goerr.V("prompt_dir", absPromptDir))
+	}
+
+	// Read file content directly
+	content, err := os.ReadFile(filepath.Clean(filePath)) // #nosec G304 - path is validated above
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to read prompt file",
+			goerr.V("template_name", templateName),
+			goerr.V("file_path", filePath))
+	}
+
+	prompt := strings.TrimSpace(string(content))
+
+	logger.Debug("read prompt file",
+		"template_name", templateName,
 		"prompt_length", len(prompt))
 
 	return prompt, nil

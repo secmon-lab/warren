@@ -6617,6 +6617,9 @@ func (mock *AlertUsecasesMock) HandleAlertCalls() []struct {
 //			GeneratePromptFunc: func(ctx context.Context, templateName string, alertMoqParam *alert.Alert) (string, error) {
 //				panic("mock out the GeneratePrompt method")
 //			},
+//			ReadPromptFileFunc: func(ctx context.Context, templateName string) (string, error) {
+//				panic("mock out the ReadPromptFile method")
+//			},
 //		}
 //
 //		// use mockedPromptService in code that requires interfaces.PromptService
@@ -6626,6 +6629,9 @@ func (mock *AlertUsecasesMock) HandleAlertCalls() []struct {
 type PromptServiceMock struct {
 	// GeneratePromptFunc mocks the GeneratePrompt method.
 	GeneratePromptFunc func(ctx context.Context, templateName string, alertMoqParam *alert.Alert) (string, error)
+
+	// ReadPromptFileFunc mocks the ReadPromptFile method.
+	ReadPromptFileFunc func(ctx context.Context, templateName string) (string, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -6638,8 +6644,16 @@ type PromptServiceMock struct {
 			// AlertMoqParam is the alertMoqParam argument value.
 			AlertMoqParam *alert.Alert
 		}
+		// ReadPromptFile holds details about calls to the ReadPromptFile method.
+		ReadPromptFile []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TemplateName is the templateName argument value.
+			TemplateName string
+		}
 	}
 	lockGeneratePrompt sync.RWMutex
+	lockReadPromptFile sync.RWMutex
 }
 
 // GeneratePrompt calls GeneratePromptFunc.
@@ -6683,5 +6697,45 @@ func (mock *PromptServiceMock) GeneratePromptCalls() []struct {
 	mock.lockGeneratePrompt.RLock()
 	calls = mock.calls.GeneratePrompt
 	mock.lockGeneratePrompt.RUnlock()
+	return calls
+}
+
+// ReadPromptFile calls ReadPromptFileFunc.
+func (mock *PromptServiceMock) ReadPromptFile(ctx context.Context, templateName string) (string, error) {
+	callInfo := struct {
+		Ctx          context.Context
+		TemplateName string
+	}{
+		Ctx:          ctx,
+		TemplateName: templateName,
+	}
+	mock.lockReadPromptFile.Lock()
+	mock.calls.ReadPromptFile = append(mock.calls.ReadPromptFile, callInfo)
+	mock.lockReadPromptFile.Unlock()
+	if mock.ReadPromptFileFunc == nil {
+		var (
+			sOut   string
+			errOut error
+		)
+		return sOut, errOut
+	}
+	return mock.ReadPromptFileFunc(ctx, templateName)
+}
+
+// ReadPromptFileCalls gets all the calls that were made to ReadPromptFile.
+// Check the length with:
+//
+//	len(mockedPromptService.ReadPromptFileCalls())
+func (mock *PromptServiceMock) ReadPromptFileCalls() []struct {
+	Ctx          context.Context
+	TemplateName string
+} {
+	var calls []struct {
+		Ctx          context.Context
+		TemplateName string
+	}
+	mock.lockReadPromptFile.RLock()
+	calls = mock.calls.ReadPromptFile
+	mock.lockReadPromptFile.RUnlock()
 	return calls
 }

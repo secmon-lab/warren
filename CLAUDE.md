@@ -51,10 +51,22 @@ The application follows Domain-Driven Design (DDD) with clean architecture:
 
 ### Key Components
 
-#### Alert Processing
+#### Alert Processing Pipeline
 - `pkg/domain/model/alert/` - Core alert model with metadata and embedding support
+- `pkg/usecase/alert_pipeline.go` - Main alert processing pipeline
 - Alerts are immutable and can be linked to at most one ticket
 - Uses AI to generate titles, descriptions, and semantic embeddings
+
+**Pipeline Stages**:
+1. **Alert Policy Evaluation** - Transform raw alert data into Alert objects
+2. **Metadata Generation** - Fill missing titles/descriptions using LLM
+3. **Enrich Policy Evaluation** - Execute enrichment tasks (query/agent)
+4. **Commit Policy Evaluation** - Apply final metadata and determine publish type
+
+**Pipeline Execution**:
+- `ProcessAlertPipeline()` - Pure pipeline processing (no side effects)
+- `HandleAlert()` - Complete alert handling including DB save and Slack posting
+- All pipeline events are emitted through `Notifier` interface for real-time monitoring
 
 #### Command System
 - `pkg/service/command/` - Slack command processing (list, aggregate, ticket)
@@ -91,7 +103,29 @@ The application follows Domain-Driven Design (DDD) with clean architecture:
 - `interfaces.SlackClient` - Slack API client abstraction
 - `interfaces.PolicyClient` - Policy evaluation using OPA
 - `interfaces.StorageClient` - Cloud storage abstraction
+- `interfaces.Notifier` - Event notification abstraction for alert pipeline events
 - `clustering.Service` - Alert clustering service interface
+
+#### Event Notification System
+The alert processing pipeline uses an event-driven notification pattern:
+
+- **Notifier Interface** (`pkg/domain/interfaces/notifier.go`):
+  - Type-safe event handling with dedicated methods for each event type
+  - Methods: `NotifyAlertPolicyResult`, `NotifyEnrichPolicyResult`, `NotifyCommitPolicyResult`, `NotifyEnrichTaskPrompt`, `NotifyEnrichTaskResponse`, `NotifyError`
+  - No generic `Notify(event)` method - each event type has its own method signature
+
+- **Event Types** (`pkg/domain/event/`):
+  - `AlertPolicyResultEvent` - Alert policy evaluation results
+  - `EnrichPolicyResultEvent` - Enrichment policy evaluation results
+  - `CommitPolicyResultEvent` - Commit policy evaluation results
+  - `EnrichTaskPromptEvent` - LLM task prompt being sent
+  - `EnrichTaskResponseEvent` - LLM task response received
+  - `ErrorEvent` - Error occurred during pipeline processing
+
+- **Notifier Implementations**:
+  - `ConsoleNotifier` (`pkg/service/notifier/console.go`) - Outputs events to console with color formatting
+  - `SlackNotifier` (`pkg/service/notifier/slack.go`) - Posts events to Slack thread with formatted messages
+  - Both implementations provide real-time visibility into alert pipeline processing
 
 ### Tools Integration
 External security tools integrated via `pkg/tool/`:

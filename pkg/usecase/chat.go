@@ -262,7 +262,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 				}
 			},
 		),
-		gollem.WithContentStreamMiddleware(llm.NewCompactionStreamMiddleware(x.llmClient)),
 		gollem.WithToolMiddleware(func(next gollem.ToolHandler) gollem.ToolHandler {
 			return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
 				// Pre-execution: ツール呼び出しのトレース
