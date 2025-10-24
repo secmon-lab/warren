@@ -135,8 +135,24 @@ func (s *Service) ReadPromptFile(ctx context.Context, templateName string) (stri
 	// Construct full file path
 	filePath := filepath.Join(s.promptDir, templateName)
 
+	// Validate that the resolved path is still within promptDir to prevent directory traversal
+	absPromptDir, err := filepath.Abs(s.promptDir)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to get absolute path of prompt directory")
+	}
+	absFilePath, err := filepath.Abs(filePath)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to get absolute path of template file")
+	}
+	if !strings.HasPrefix(absFilePath, absPromptDir+string(filepath.Separator)) &&
+		absFilePath != absPromptDir {
+		return "", goerr.New("template path is outside prompt directory",
+			goerr.V("template_name", templateName),
+			goerr.V("prompt_dir", absPromptDir))
+	}
+
 	// Read file content directly
-	content, err := os.ReadFile(filePath)
+	content, err := os.ReadFile(filepath.Clean(filePath)) // #nosec G304 - path is validated above
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to read prompt file",
 			goerr.V("template_name", templateName),
