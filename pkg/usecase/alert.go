@@ -3,53 +3,18 @@ package usecase
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"strings"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
-	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/event"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
-
-// evaluateAction evaluates an action policy for the given alert and LLM response
-func evaluateAction(ctx context.Context, policyClient interfaces.PolicyClient, alert *alert.Alert, llmResponse any) (*action.PolicyResult, error) {
-	// Use the parsed LLM response directly for structured data access in policy
-	genAIData := llmResponse
-
-	queryInput := action.QueryInput{
-		Alert: alert,
-		GenAI: genAIData,
-	}
-
-	var result action.PolicyResult
-	query := "data.action"
-	hook := func(ctx context.Context, loc opaq.PrintLocation, msg string) error {
-		logging.From(ctx).Debug("[rego.print] "+msg, "location", loc)
-		return nil
-	}
-
-	err := policyClient.Query(ctx, query, queryInput, &result, opaq.WithPrintHook(hook))
-	if err != nil {
-		if errors.Is(err, opaq.ErrNoEvalResult) {
-			// Default behavior when no action policy is defined: publish as alert
-			return &action.PolicyResult{
-				Publish: types.PublishTypeAlert,
-			}, nil
-		}
-		return nil, goerr.Wrap(err, "failed to evaluate action policy")
-	}
-
-	return &result, nil
-}
 
 type noopNotifier struct{}
 
@@ -82,77 +47,10 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, a
 		return nil, goerr.Wrap(err, "failed to process alert pipeline")
 	}
 
-	// Process each alert result: save to DB and post to Slack
+	// Process each alert result
 	var results []*alert.Alert
 	for _, alertResult := range pipelineResults {
 		processedAlert := alertResult.Alert
-
-		// Process GenAI if configured
-		if processedAlert.Metadata.GenAI != nil {
-			llmResponse, err := uc.processGenAI(ctx, processedAlert)
-			if err != nil {
-				return nil, goerr.Wrap(err, "failed to process GenAI")
-			}
-
-			// Evaluate action policy if LLM response is not empty
-			if llmResponse != nil {
-				policyResult, err := evaluateAction(ctx, uc.policyClient, processedAlert, llmResponse)
-				if err != nil {
-					return nil, goerr.Wrap(err, "failed to evaluate action policy")
-				}
-
-				// Apply metadata updates from policy result
-				if policyResult.Title != "" {
-					processedAlert.Metadata.Title = policyResult.Title
-					processedAlert.Metadata.TitleSource = types.SourcePolicy
-				}
-				if policyResult.Description != "" {
-					processedAlert.Metadata.Description = policyResult.Description
-					processedAlert.Metadata.DescriptionSource = types.SourcePolicy
-				}
-				// Apply additional attributes
-				if len(policyResult.Attr) > 0 {
-					for key, value := range policyResult.Attr {
-						processedAlert.Metadata.Attributes = append(processedAlert.Metadata.Attributes, alert.Attribute{
-							Key:   key,
-							Value: value,
-							Auto:  true, // Set by policy, mark as auto-generated
-						})
-					}
-				}
-				// Apply channel configuration from policy result
-				if policyResult.Channel != "" {
-					processedAlert.Metadata.Channel = policyResult.Channel
-				}
-
-				// Handle publish type from policy result
-				switch policyResult.Publish {
-				case types.PublishTypeDiscard:
-					// Discard alert, just log and return
-					logger.Info("alert discarded by GenAI policy", "alert", processedAlert)
-					continue
-
-				case types.PublishTypeNotice:
-					// Create notice instead of full alert
-					genaiResponse := &alert.GenAIResponse{
-						Data:   llmResponse,
-						Format: processedAlert.Metadata.GenAI.Format,
-					}
-					if err := uc.handleNotice(ctx, processedAlert, policyResult.Channel, genaiResponse); err != nil {
-						return nil, goerr.Wrap(err, "failed to handle notice")
-					}
-					logger.Info("alert processed as notice", "alert", processedAlert)
-					continue
-
-				case types.PublishTypeAlert, "":
-					// Continue with normal alert processing
-					logger.Info("alert will be processed normally", "alert", processedAlert)
-
-				default:
-					logger.Warn("unknown publish type, defaulting to alert", "publish", policyResult.Publish)
-				}
-			}
-		}
 
 		// Find similar alerts for thread grouping
 		now := clock.Now(ctx)
@@ -519,40 +417,24 @@ func (uc *UseCases) EscalateNotice(ctx context.Context, noticeID types.NoticeID)
 		return goerr.Wrap(err, "failed to update notice", goerr.V("notice_id", noticeID))
 	}
 
-	// Process the alert normally (without GenAI processing to avoid recursion)
-	alert := notice.Alert
-	escalatedAlert, err := uc.handleAlertWithoutGenAI(ctx, alert)
-	if err != nil {
-		return goerr.Wrap(err, "failed to handle escalated alert", goerr.V("notice_id", noticeID))
+	// Post escalated alert to Slack
+	escalatedAlert := notice.Alert
+	if uc.slackService != nil {
+		newThread, err := uc.slackService.PostAlert(ctx, &escalatedAlert)
+		if err != nil {
+			return goerr.Wrap(err, "failed to post escalated alert", goerr.V("notice_id", noticeID))
+		}
+		if newThread != nil {
+			escalatedAlert.SlackThread = newThread.Entity()
+		}
+		logger.Info("escalated alert posted to new thread", "notice_id", noticeID, "alert_id", escalatedAlert.ID)
+	}
+
+	// Store escalated alert
+	if err := uc.repository.PutAlert(ctx, escalatedAlert); err != nil {
+		return goerr.Wrap(err, "failed to put escalated alert", goerr.V("notice_id", noticeID))
 	}
 
 	logger.Info("notice escalated to alert", "notice_id", noticeID, "alert_id", escalatedAlert.ID)
 	return nil
-}
-
-// handleAlertWithoutGenAI handles alert without GenAI processing (used for escalation)
-func (uc *UseCases) handleAlertWithoutGenAI(ctx context.Context, alert alert.Alert) (*alert.Alert, error) {
-	// This method processes alerts that have already been through tag processing and metadata filling
-	// Used for escalation from notices to avoid reprocessing
-	logger := logging.From(ctx)
-
-	// Post to Slack
-	if uc.slackService != nil {
-		newThread, err := uc.slackService.PostAlert(ctx, &alert)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to post alert")
-		}
-		if newThread != nil {
-			alert.SlackThread = newThread.Entity()
-		}
-		logger.Info("escalated alert posted to new thread", "alert", alert)
-	}
-
-	// Store alert
-	if err := uc.repository.PutAlert(ctx, alert); err != nil {
-		return nil, goerr.Wrap(err, "failed to put alert")
-	}
-	logger.Info("escalated alert created", "alert", alert)
-
-	return &alert, nil
 }

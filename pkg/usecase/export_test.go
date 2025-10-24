@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/action"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -88,9 +86,4 @@ func (uc *UseCases) ProcessGenAI(ctx context.Context, alert *alert.Alert) (any, 
 // HandleNotice exports the private handleNotice method for testing
 func (uc *UseCases) HandleNotice(ctx context.Context, alert *alert.Alert, channel string) error {
 	return uc.handleNotice(ctx, alert, channel, nil)
-}
-
-// EvaluateAction exports the private evaluateAction function for testing
-func EvaluateAction(ctx context.Context, policyClient interfaces.PolicyClient, alert *alert.Alert, llmResponse any) (*action.PolicyResult, error) {
-	return evaluateAction(ctx, policyClient, alert, llmResponse)
 }
