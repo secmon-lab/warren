@@ -151,6 +151,11 @@ func (uc *UseCases) ProcessAlertPipeline(
 
 // executeTasks executes all enrichment tasks and returns results
 func (uc *UseCases) executeTasks(ctx context.Context, alert *alert.Alert, policyResult *policy.EnrichPolicyResult, notifier interfaces.Notifier) (policy.EnrichResults, error) {
+	// Check if LLM client is configured when tasks are present
+	if uc.llmClient == nil && policyResult.TaskCount() > 0 {
+		return nil, goerr.New("LLM client is not configured, but enrich policy contains tasks")
+	}
+
 	results := make(policy.EnrichResults)
 
 	// Execute query tasks

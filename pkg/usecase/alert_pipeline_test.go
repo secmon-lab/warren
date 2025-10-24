@@ -340,4 +340,31 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		gt.Equal(t, len(results[0].EnrichResult), 0)          // No enrich tasks
 		gt.Equal(t, results[0].CommitResult.Publish, "alert") // Default publish type
 	})
+
+	t.Run("fails when LLM client is not configured but enrich tasks exist", func(t *testing.T) {
+		ctx := context.Background()
+
+		// Create policy client with enrich tasks
+		policyClient, err := opaq.New(
+			opaq.Files(
+				"testdata/alert_test.rego",
+				"testdata/enrich_query_task.rego",
+				"testdata/commit_simple.rego",
+			),
+		)
+		gt.NoError(t, err)
+
+		// Create use case WITHOUT LLM client
+		uc := usecase.New(
+			usecase.WithPolicyClient(policyClient),
+		)
+
+		notifier := &noopNotifier{}
+
+		// Process pipeline - should fail with appropriate error
+		_, err = uc.ProcessAlertPipeline(ctx, "test_schema", map[string]any{"test": "data"}, notifier)
+
+		// Should return error when LLM client is not configured
+		gt.Error(t, err)
+	})
 }
