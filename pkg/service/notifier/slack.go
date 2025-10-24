@@ -7,6 +7,7 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/domain/event"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 // ThreadPoster is an interface for posting messages to a Slack thread
@@ -56,42 +57,64 @@ func (n *SlackNotifier) NotifyError(ctx context.Context, ev *event.ErrorEvent) {
 }
 
 func handleAlertPolicyResult(ctx context.Context, thread ThreadPoster, e *event.AlertPolicyResultEvent) {
+	logger := logging.From(ctx)
+
 	// Post summary message
 	summary := fmt.Sprintf("*Alert Policy Result*\nSchema: `%s` | Alerts: %d", e.Schema, len(e.Alerts))
-	_ = thread.PostMessage(ctx, summary)
+	if err := thread.PostMessage(ctx, summary); err != nil {
+		logger.Warn("failed to post alert policy result to Slack", "error", err, "schema", e.Schema)
+	}
 
 	// Upload full alert details as JSON file
 	if len(e.Alerts) > 0 {
 		alertsJSON, err := json.MarshalIndent(e.Alerts, "", "  ")
 		if err == nil {
-			_ = thread.AttachFile(ctx, "Alert Details", "alerts.json", alertsJSON)
+			if err := thread.AttachFile(ctx, "Alert Details", "alerts.json", alertsJSON); err != nil {
+				logger.Warn("failed to attach alert details file to Slack", "error", err, "schema", e.Schema)
+			}
 		}
 	}
 }
 
 func handleEnrichPolicyResult(ctx context.Context, thread ThreadPoster, e *event.EnrichPolicyResultEvent) {
+	logger := logging.From(ctx)
+
 	message := formatEnrichPolicyResult(e)
-	_ = thread.PostMessage(ctx, message)
+	if err := thread.PostMessage(ctx, message); err != nil {
+		logger.Warn("failed to post enrich policy result to Slack", "error", err, "task_count", e.TaskCount)
+	}
 }
 
 func handleCommitPolicyResult(ctx context.Context, thread ThreadPoster, e *event.CommitPolicyResultEvent) {
+	logger := logging.From(ctx)
+
 	message := formatCommitPolicyResult(e)
-	_ = thread.PostMessage(ctx, message)
+	if err := thread.PostMessage(ctx, message); err != nil {
+		logger.Warn("failed to post commit policy result to Slack", "error", err, "publish", e.Result.Publish)
+	}
 }
 
 func handleEnrichTaskPrompt(ctx context.Context, thread ThreadPoster, e *event.EnrichTaskPromptEvent) {
+	logger := logging.From(ctx)
 	summary := fmt.Sprintf("*Task Prompt* `%s` (%s)\nLength: %d chars", e.TaskID, e.TaskType, len(e.PromptText))
 
 	if len(e.PromptText) > slackMessageLimit {
-		_ = thread.PostMessage(ctx, summary)
-		_ = thread.AttachFile(ctx, fmt.Sprintf("Prompt [%s]", e.TaskID), fmt.Sprintf("prompt_%s.txt", e.TaskID), []byte(e.PromptText))
+		if err := thread.PostMessage(ctx, summary); err != nil {
+			logger.Warn("failed to post enrich task prompt summary to Slack", "error", err, "task_id", e.TaskID)
+		}
+		if err := thread.AttachFile(ctx, fmt.Sprintf("Prompt [%s]", e.TaskID), fmt.Sprintf("prompt_%s.txt", e.TaskID), []byte(e.PromptText)); err != nil {
+			logger.Warn("failed to attach enrich task prompt file to Slack", "error", err, "task_id", e.TaskID)
+		}
 	} else {
 		message := summary + fmt.Sprintf("\n```\n%s\n```", e.PromptText)
-		_ = thread.PostMessage(ctx, message)
+		if err := thread.PostMessage(ctx, message); err != nil {
+			logger.Warn("failed to post enrich task prompt to Slack", "error", err, "task_id", e.TaskID)
+		}
 	}
 }
 
 func handleEnrichTaskResponse(ctx context.Context, thread ThreadPoster, e *event.EnrichTaskResponseEvent) {
+	logger := logging.From(ctx)
 	summary := fmt.Sprintf("*Task Response* `%s` (%s)", e.TaskID, e.TaskType)
 
 	var content string
@@ -118,17 +141,27 @@ func handleEnrichTaskResponse(ctx context.Context, thread ThreadPoster, e *event
 	}
 
 	if len(content) > slackMessageLimit {
-		_ = thread.PostMessage(ctx, summary)
-		_ = thread.AttachFile(ctx, fmt.Sprintf("Response [%s]", e.TaskID), fileName, []byte(content))
+		if err := thread.PostMessage(ctx, summary); err != nil {
+			logger.Warn("failed to post enrich task response summary to Slack", "error", err, "task_id", e.TaskID)
+		}
+		if err := thread.AttachFile(ctx, fmt.Sprintf("Response [%s]", e.TaskID), fileName, []byte(content)); err != nil {
+			logger.Warn("failed to attach enrich task response file to Slack", "error", err, "task_id", e.TaskID)
+		}
 	} else {
 		message := summary + fmt.Sprintf("\n```\n%s\n```", content)
-		_ = thread.PostMessage(ctx, message)
+		if err := thread.PostMessage(ctx, message); err != nil {
+			logger.Warn("failed to post enrich task response to Slack", "error", err, "task_id", e.TaskID)
+		}
 	}
 }
 
 func handleError(ctx context.Context, thread ThreadPoster, e *event.ErrorEvent) {
+	logger := logging.From(ctx)
+
 	message := formatError(e)
-	_ = thread.PostMessage(ctx, message)
+	if err := thread.PostMessage(ctx, message); err != nil {
+		logger.Warn("failed to post error event to Slack", "error", err, "task_id", e.TaskID, "original_error", e.Error)
+	}
 }
 
 func formatEnrichPolicyResult(e *event.EnrichPolicyResultEvent) string {
