@@ -17,12 +17,14 @@ import (
 // Service implements the PromptService interface
 type Service struct {
 	templates map[string]*template.Template
+	promptDir string
 }
 
 // New creates a new prompt service with preloaded templates from the specified directory
 func New(promptDir string) (interfaces.PromptService, error) {
 	service := &Service{
 		templates: make(map[string]*template.Template),
+		promptDir: promptDir,
 	}
 
 	if promptDir != "" {
@@ -125,22 +127,23 @@ func (s *Service) GeneratePrompt(ctx context.Context, templateName string, alert
 func (s *Service) ReadPromptFile(ctx context.Context, templateName string) (string, error) {
 	logger := logging.From(ctx)
 
-	tmpl, exists := s.templates[templateName]
-	if !exists {
+	// Check if template exists in loaded templates
+	if _, exists := s.templates[templateName]; !exists {
 		return "", goerr.New("prompt template not found", goerr.V("template_name", templateName))
 	}
 
-	// Execute template with empty data to get the raw template content
-	// This effectively returns the template as-is without any variable substitution
-	var buf bytes.Buffer
-	templateData := map[string]interface{}{}
+	// Construct full file path
+	filePath := filepath.Join(s.promptDir, templateName)
 
-	if err := tmpl.Execute(&buf, templateData); err != nil {
-		return "", goerr.Wrap(err, "failed to read prompt template",
-			goerr.V("template_name", templateName))
+	// Read file content directly
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to read prompt file",
+			goerr.V("template_name", templateName),
+			goerr.V("file_path", filePath))
 	}
 
-	prompt := strings.TrimSpace(buf.String())
+	prompt := strings.TrimSpace(string(content))
 
 	logger.Debug("read prompt file",
 		"template_name", templateName,
