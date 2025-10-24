@@ -49,18 +49,18 @@ func printAlertPolicyResult(e *event.AlertPolicyResultEvent) {
 	blue := color.New(color.FgBlue, color.Bold)
 	white := color.New(color.FgWhite)
 
-	blue.Println("Alert Policy Result:")
+	_, _ = blue.Println("Alert Policy Result:")
 	fmt.Printf("  Schema: %s\n", e.Schema)
 	fmt.Printf("  Alerts: %d\n\n", len(e.Alerts))
 
 	// Print full alert details
 	for i, alert := range e.Alerts {
-		blue.Printf("Alert #%d:\n", i+1)
+		_, _ = blue.Printf("Alert #%d:\n", i+1)
 		alertJSON, err := json.MarshalIndent(alert, "  ", "  ")
 		if err != nil {
-			white.Printf("  %v\n", alert)
+			_, _ = white.Printf("  %v\n", alert)
 		} else {
-			white.Printf("  %s\n", string(alertJSON))
+			_, _ = white.Printf("  %s\n", string(alertJSON))
 		}
 		fmt.Println()
 	}
@@ -70,7 +70,7 @@ func printEnrichPolicyResult(e *event.EnrichPolicyResultEvent) {
 	blue := color.New(color.FgBlue, color.Bold)
 	yellow := color.New(color.FgYellow)
 
-	blue.Print("Enrich Policy Result: ")
+	_, _ = blue.Print("Enrich Policy Result: ")
 	fmt.Printf("Tasks=%d\n", e.TaskCount)
 
 	if e.Policy != nil {
@@ -79,7 +79,7 @@ func printEnrichPolicyResult(e *event.EnrichPolicyResultEvent) {
 			for _, task := range e.Policy.Query {
 				queryIDs = append(queryIDs, task.ID)
 			}
-			yellow.Printf("  Query tasks: ")
+			_, _ = yellow.Printf("  Query tasks: ")
 			fmt.Printf("%s\n", strings.Join(queryIDs, ", "))
 		}
 		if len(e.Policy.Agent) > 0 {
@@ -87,7 +87,7 @@ func printEnrichPolicyResult(e *event.EnrichPolicyResultEvent) {
 			for _, task := range e.Policy.Agent {
 				agentIDs = append(agentIDs, task.ID)
 			}
-			yellow.Printf("  Agent tasks: ")
+			_, _ = yellow.Printf("  Agent tasks: ")
 			fmt.Printf("%s\n", strings.Join(agentIDs, ", "))
 		}
 	}
@@ -97,20 +97,20 @@ func printCommitPolicyResult(e *event.CommitPolicyResultEvent) {
 	blue := color.New(color.FgBlue, color.Bold)
 	green := color.New(color.FgGreen)
 
-	blue.Print("Commit Policy Result: ")
+	_, _ = blue.Print("Commit Policy Result: ")
 	fmt.Printf("Publish=%s\n", e.Result.Publish)
 
 	if e.Result.Title != "" {
-		green.Printf("  Title: %s\n", e.Result.Title)
+		_, _ = green.Printf("  Title: %s\n", e.Result.Title)
 	}
 	if e.Result.Description != "" {
-		green.Printf("  Description: %s\n", e.Result.Description)
+		_, _ = green.Printf("  Description: %s\n", e.Result.Description)
 	}
 	if e.Result.Channel != "" {
-		green.Printf("  Channel: %s\n", e.Result.Channel)
+		_, _ = green.Printf("  Channel: %s\n", e.Result.Channel)
 	}
 	if len(e.Result.Attr) > 0 {
-		green.Printf("  Attributes: %d\n", len(e.Result.Attr))
+		_, _ = green.Printf("  Attributes: %d\n", len(e.Result.Attr))
 	}
 }
 
@@ -118,32 +118,32 @@ func printEnrichTaskPrompt(e *event.EnrichTaskPromptEvent) {
 	cyan := color.New(color.FgCyan, color.Bold)
 	gray := color.New(color.FgHiBlack)
 
-	cyan.Printf("Task Prompt [%s] (%s): ", e.TaskID, e.TaskType)
+	_, _ = cyan.Printf("Task Prompt [%s] (%s): ", e.TaskID, e.TaskType)
 	fmt.Printf("%d chars\n", len(e.PromptText))
-	gray.Printf("  %s\n", e.PromptText)
+	_, _ = gray.Printf("  %s\n", e.PromptText)
 }
 
 func printEnrichTaskResponse(e *event.EnrichTaskResponseEvent) {
 	green := color.New(color.FgGreen, color.Bold)
 	white := color.New(color.FgWhite)
 
-	green.Printf("Task Response [%s] (%s):\n", e.TaskID, e.TaskType)
+	_, _ = green.Printf("Task Response [%s] (%s):\n", e.TaskID, e.TaskType)
 
 	// Format response based on type
 	switch v := e.Response.(type) {
 	case string:
-		white.Printf("  %s\n", v)
+		_, _ = white.Printf("  %s\n", v)
 
 	case map[string]any, []any:
 		jsonBytes, err := json.MarshalIndent(v, "  ", "  ")
 		if err != nil {
-			white.Printf("  %v\n", v)
+			_, _ = white.Printf("  %v\n", v)
 		} else {
-			white.Printf("  %s\n", string(jsonBytes))
+			_, _ = white.Printf("  %s\n", string(jsonBytes))
 		}
 
 	default:
-		white.Printf("  %v\n", v)
+		_, _ = white.Printf("  %v\n", v)
 	}
 }
 
@@ -151,13 +151,13 @@ func printError(e *event.ErrorEvent) {
 	red := color.New(color.FgRed, color.Bold)
 
 	if e.TaskID != "" {
-		red.Printf("Error [%s]: %s\n", e.TaskID, e.Message)
+		_, _ = red.Printf("Error [%s]: %s\n", e.TaskID, e.Message)
 	} else {
-		red.Printf("Error: %s\n", e.Message)
+		_, _ = red.Printf("Error: %s\n", e.Message)
 	}
 
 	if e.Error != nil {
 		gray := color.New(color.FgHiBlack)
-		gray.Printf("  %v\n", e.Error)
+		_, _ = gray.Printf("  %v\n", e.Error)
 	}
 }
