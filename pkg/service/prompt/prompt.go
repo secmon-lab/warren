@@ -119,3 +119,32 @@ func (s *Service) GeneratePrompt(ctx context.Context, templateName string, alert
 
 	return prompt, nil
 }
+
+// ReadPromptFile reads a prompt file without template rendering
+// This is used when alert data is passed via system prompt instead of template
+func (s *Service) ReadPromptFile(ctx context.Context, templateName string) (string, error) {
+	logger := logging.From(ctx)
+
+	tmpl, exists := s.templates[templateName]
+	if !exists {
+		return "", goerr.New("prompt template not found", goerr.V("template_name", templateName))
+	}
+
+	// Execute template with empty data to get the raw template content
+	// This effectively returns the template as-is without any variable substitution
+	var buf bytes.Buffer
+	templateData := map[string]interface{}{}
+
+	if err := tmpl.Execute(&buf, templateData); err != nil {
+		return "", goerr.Wrap(err, "failed to read prompt template",
+			goerr.V("template_name", templateName))
+	}
+
+	prompt := strings.TrimSpace(buf.String())
+
+	logger.Debug("read prompt file",
+		"template_name", templateName,
+		"prompt_length", len(prompt))
+
+	return prompt, nil
+}

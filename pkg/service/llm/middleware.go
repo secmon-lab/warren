@@ -6,6 +6,7 @@ import (
 
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/middleware/compacter"
+	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
 // NewCompactionMiddleware creates a content block middleware for automatic conversation history compaction.
@@ -18,6 +19,7 @@ func NewCompactionMiddleware(llmClient gollem.LLMClient, logger *slog.Logger) go
 		compacter.WithMaxRetries(3),
 		compacter.WithLogger(logger),
 		compacter.WithCompactionHook(func(ctx context.Context, event *compacter.CompactionEvent) {
+			msg.Trace(ctx, "compacted: (%d tokens -> %d tokens)", event.InputTokens, event.OutputTokens)
 			logger.Info("conversation history compacted",
 				"original_size", event.OriginalDataSize,
 				"compacted_size", event.CompactedDataSize,
