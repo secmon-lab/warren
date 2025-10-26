@@ -28,6 +28,7 @@ const (
 	CallbackSubmitBindAlert     CallbackID = "submit_bind_alert"
 	CallbackSubmitBindList      CallbackID = "submit_bind_list"
 	CallbackSubmitSalvage       CallbackID = "submit_salvage"
+	CallbackEditTicket          CallbackID = "edit_ticket"
 )
 
 type BlockID string
@@ -62,6 +63,8 @@ const (
 	BlockActionIDSalvageThreshold BlockActionID = "salvage_threshold_input"
 	BlockActionIDSalvageKeyword   BlockActionID = "salvage_keyword_input"
 	BlockActionIDSalvageRefresh   BlockActionID = "salvage_refresh_button"
+	BlockActionIDTicketTitle      BlockActionID = "ticket_title_input"
+	BlockActionIDTicketDesc       BlockActionID = "ticket_description_input"
 )
 
 type ActionID string
@@ -82,6 +85,7 @@ const (
 	// For ticket
 	ActionIDResolveTicket ActionID = "resolve_ticket"
 	ActionIDSalvage       ActionID = "salvage"
+	ActionIDEditTicket    ActionID = "edit_ticket"
 
 	// For notice
 	ActionIDEscalate ActionID = "escalate"

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -321,6 +322,102 @@ func (x *Service) PostTicket(ctx context.Context, ticket *ticket.Ticket, alerts 
 	}
 
 	return newThread, ts, nil
+}
+
+// ConversationMessage represents a message from conversation history
+type ConversationMessage struct {
+	User      *model.User
+	Text      string
+	Timestamp time.Time
+	Thread    model.Thread
+}
+
+// GetConversationHistory retrieves conversation history from Slack
+// If threadID is provided, gets thread messages. Otherwise gets channel messages.
+// limit: 0 means all messages, oldest: 0 means no time restriction
+func (x *Service) GetConversationHistory(
+	ctx context.Context,
+	channelID string,
+	threadID string,
+	limit int,
+	oldest int64,
+) ([]ConversationMessage, error) {
+	var messages []ConversationMessage
+	cursor := ""
+
+	for {
+		params := &slack.GetConversationHistoryParameters{
+			ChannelID: channelID,
+			Cursor:    cursor,
+			Limit:     100, // API limit per request
+		}
+
+		if threadID != "" {
+			// Get thread messages
+			params.Latest = threadID
+		}
+
+		if oldest > 0 {
+			params.Oldest = fmt.Sprintf("%d", oldest)
+		}
+
+		resp, err := x.client.GetConversationHistoryContext(ctx, params)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to get conversation history")
+		}
+
+		for _, msg := range resp.Messages {
+			// Convert message
+			convertedMsg, err := x.convertSlackMessage(ctx, msg)
+			if err != nil {
+				// Log and continue
+				continue
+			}
+			messages = append(messages, *convertedMsg)
+
+			// Check limit
+			if limit > 0 && len(messages) >= limit {
+				return messages[:limit], nil
+			}
+		}
+
+		if !resp.HasMore {
+			break
+		}
+		cursor = resp.ResponseMetaData.NextCursor
+	}
+
+	return messages, nil
+}
+
+// convertSlackMessage converts slack.Message to ConversationMessage
+func (x *Service) convertSlackMessage(_ context.Context, msg slack.Message) (*ConversationMessage, error) {
+	var user *model.User
+	if msg.User != "" {
+		userInfo, err := x.client.GetUserInfo(msg.User)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to get user info")
+		}
+		user = &model.User{
+			ID:   userInfo.ID,
+			Name: userInfo.Name,
+		}
+	}
+
+	timestamp, err := strconv.ParseFloat(msg.Timestamp, 64)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to parse timestamp")
+	}
+
+	return &ConversationMessage{
+		User:      user,
+		Text:      msg.Text,
+		Timestamp: time.Unix(int64(timestamp), 0),
+		Thread: model.Thread{
+			ChannelID: msg.Channel,
+			ThreadID:  msg.ThreadTimestamp,
+		},
+	}, nil
 }
 
 type ThreadService struct {
@@ -808,6 +905,19 @@ func (x *Service) UpdateSalvageModal(ctx context.Context, ticket *ticket.Ticket,
 			goerr.V("ticket_id", ticket.ID.String()),
 			goerr.V("threshold", threshold),
 			goerr.V("keyword", keyword),
+			goerr.V("request", req))
+	}
+
+	return nil
+}
+
+func (x *Service) ShowEditTicketModal(ctx context.Context, ticket *ticket.Ticket, triggerID string) error {
+	req := buildEditTicketModalViewRequest(model.CallbackEditTicket, ticket)
+	if _, err := x.client.OpenView(triggerID, req); err != nil {
+		return goerr.Wrap(err, "failed to open view",
+			goerr.V("callback_id", req.CallbackID),
+			goerr.V("ticket_id", ticket.ID.String()),
+			goerr.V("trigger_id", triggerID),
 			goerr.V("request", req))
 	}
 

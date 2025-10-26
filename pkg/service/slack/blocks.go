@@ -221,9 +221,19 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 		}
 	}
 
+	// Add action buttons
+	var buttons []slack.BlockElement
+
+	// Add Edit button (always available)
+	buttons = append(buttons, slack.NewButtonBlockElement(
+		model.ActionIDEditTicket.String(),
+		ticket.ID.String(),
+		slack.NewTextBlockObject("plain_text", "Edit", false, false),
+	).WithStyle(slack.StyleDefault))
+
 	// Add Resolve and Salvage buttons if ticket is not resolved or archived
 	if ticket.Status != types.TicketStatusResolved && ticket.Status != types.TicketStatusArchived {
-		buttons := []slack.BlockElement{
+		buttons = append(buttons,
 			slack.NewButtonBlockElement(
 				model.ActionIDResolveTicket.String(),
 				ticket.ID.String(),
@@ -234,7 +244,10 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 				ticket.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Salvage", false, false),
 			).WithStyle(slack.StyleDefault),
-		}
+		)
+	}
+
+	if len(buttons) > 0 {
 		blocks = append(blocks, slack.NewActionBlock("ticket_actions", buttons...))
 	}
 
@@ -488,6 +501,55 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 		Submit: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
 			Text: "Resolve",
+		},
+		Close: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Cancel",
+		},
+	}
+}
+
+func buildEditTicketModalViewRequest(callbackID model.CallbackID, ticket *ticket.Ticket) slack.ModalViewRequest {
+	blockSet := []slack.Block{
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.PlainTextType, "Edit ticket title and description.", false, false),
+			nil,
+			nil,
+		),
+		slack.NewInputBlock(
+			model.BlockIDTicketID.String(),
+			slack.NewTextBlockObject(slack.PlainTextType, "Title", false, false),
+			nil,
+			slack.NewPlainTextInputBlockElement(
+				slack.NewTextBlockObject(slack.PlainTextType, "Enter ticket title", false, false),
+				model.BlockActionIDTicketTitle.String(),
+			).WithInitialValue(ticket.Metadata.Title),
+		),
+		slack.NewInputBlock(
+			model.BlockIDTicketComment.String(),
+			slack.NewTextBlockObject(slack.PlainTextType, "Description", false, false),
+			nil,
+			slack.NewPlainTextInputBlockElement(
+				slack.NewTextBlockObject(slack.PlainTextType, "Enter ticket description", false, false),
+				model.BlockActionIDTicketDesc.String(),
+			).WithInitialValue(ticket.Metadata.Description).WithMultiline(true),
+		).WithOptional(true),
+	}
+
+	return slack.ModalViewRequest{
+		Type: slack.VTModal,
+		Title: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Edit Ticket",
+		},
+		Blocks: slack.Blocks{
+			BlockSet: blockSet,
+		},
+		CallbackID:      callbackID.String(),
+		PrivateMetadata: ticket.ID.String(),
+		Submit: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Save",
 		},
 		Close: &slack.TextBlockObject{
 			Type: slack.PlainTextType,

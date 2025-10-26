@@ -40,6 +40,7 @@ type SlackClient interface {
 	GetConversationInfo(input *slackSDK.GetConversationInfoInput) (*slackSDK.Channel, error)
 	GetUserGroups(options ...slackSDK.GetUserGroupsOption) ([]slackSDK.UserGroup, error)
 	GetBotInfoContext(ctx context.Context, parameters slackSDK.GetBotInfoParameters) (*slackSDK.Bot, error)
+	GetConversationHistoryContext(ctx context.Context, params *slackSDK.GetConversationHistoryParameters) (*slackSDK.GetConversationHistoryResponse, error)
 }
 
 type SlackThreadService interface {

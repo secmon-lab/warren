@@ -22,6 +22,17 @@ type ticketCommand struct {
 	args    []string
 }
 
+var knownSubCommands = []string{"help", "unresolved", "u", "from", "after", "since"}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
 func parseTicketCommand(input string) (*ticketCommand, error) {
 	if input == "help" {
 		return &ticketCommand{command: "help"}, nil
@@ -29,12 +40,22 @@ func parseTicketCommand(input string) (*ticketCommand, error) {
 
 	commands := strings.Fields(input)
 	if len(commands) == 0 {
-		return &ticketCommand{command: "unresolved"}, nil
+		// No arguments - create from conversation
+		return &ticketCommand{command: "create_from_conversation"}, nil
 	}
 
+	// Check if it's a known subcommand
+	if contains(knownSubCommands, commands[0]) {
+		return &ticketCommand{
+			command: commands[0],
+			args:    commands[1:],
+		}, nil
+	}
+
+	// Unknown command - treat as user context for conversation-based ticket creation
 	return &ticketCommand{
-		command: commands[0],
-		args:    commands[1:],
+		command: "create_from_conversation",
+		args:    []string{input}, // Whole input as context
 	}, nil
 }
 
@@ -104,6 +125,13 @@ func Create(ctx context.Context, clients *core.Clients, msg *slack.Message, inpu
 		since := time.Now().Add(-duration)
 		return nil, handleTicketsBySpan(ctx, clients, th, since, time.Now())
 
+	case "create_from_conversation":
+		userContext := ""
+		if len(cmd.args) > 0 {
+			userContext = cmd.args[0]
+		}
+		return nil, handleCreateFromConversation(ctx, clients, msg, userContext)
+
 	default:
 		th.Reply(ctx, ticketHelp)
 		return nil, goerr.New(fmt.Sprintf("unknown command: %s", cmd.command))
@@ -131,5 +159,42 @@ func handleTicketsBySpan(ctx context.Context, clients *core.Clients, th interfac
 	if err := th.PostTicketList(ctx, tickets); err != nil {
 		return goerr.Wrap(err, "failed to post ticket list")
 	}
+	return nil
+}
+
+func handleCreateFromConversation(
+	ctx context.Context,
+	clients *core.Clients,
+	msg *slack.Message,
+	userContext string,
+) error {
+	// Check if UseCase is available
+	ticketUC := clients.TicketUseCase()
+	if ticketUC == nil {
+		clients.Thread().Reply(ctx, "Ticket creation from conversation is not available")
+		return goerr.New("ticket use case not available")
+	}
+
+	// Show progress message using NewTraceMessage
+	trace := clients.Thread().NewTraceMessage(ctx, "🎫 Creating ticket from conversation...")
+	defer func() {
+		// Clear the trace message on completion
+		trace(ctx, "")
+	}()
+
+	// Create ticket from conversation using UseCase
+	ticket, err := ticketUC.CreateTicketFromConversation(
+		ctx,
+		msg.Thread(),
+		msg.User(),
+		userContext,
+	)
+	if err != nil {
+		clients.Thread().Reply(ctx, fmt.Sprintf("Failed to create ticket: %v", err))
+		return goerr.Wrap(err, "failed to create ticket from conversation")
+	}
+
+	// Success message is not needed as ticket posting is done by UseCase
+	_ = ticket
 	return nil
 }

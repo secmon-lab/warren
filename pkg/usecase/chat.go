@@ -134,12 +134,14 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		} else {
 			// Test if history is compatible with current gollem version
 			if history != nil {
-				// Try to validate history by attempting conversion
+				// Validate history: Version must be > 0 AND must have messages
+				// Empty Messages array indicates corrupted or incomplete history
 				if history.Version <= 0 || history.ToCount() <= 0 {
-					msg.Notify(ctx, "⚠️ Chat history incompatible, starting fresh")
-					logger.Warn("history version incompatible, starting with new history",
+					msg.Notify(ctx, "⚠️ Chat history incompatible (version=%d, messages=%d), starting fresh", history.Version, history.ToCount())
+					logger.Warn("history incompatible, starting with new history",
 						"error", err,
 						"version", history.Version,
+						"message_count", history.ToCount(),
 						"history_id", historyRecord.ID)
 					history = nil // Start with new history
 				}
@@ -349,7 +351,17 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	// Warren's response is automatically included in the agent session history
 	logger.Debug("saving chat history with Warren's response",
 		"warren_response", warrenResponse,
-		"history_version", newHistory.Version)
+		"history_version", newHistory.Version,
+		"message_count", newHistory.ToCount())
+
+	// Warn if history is empty but continue saving
+	if newHistory.ToCount() <= 0 {
+		logger.Warn("history has no messages, but saving anyway to maintain consistency",
+			"version", newHistory.Version,
+			"message_count", newHistory.ToCount(),
+			"ticket_id", target.ID)
+	}
+
 	if newHistory.Version > 0 {
 		newRecord := ticket.NewHistory(ctx, target.ID)
 
