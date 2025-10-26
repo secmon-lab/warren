@@ -175,13 +175,6 @@ func handleCreateFromConversation(
 		return goerr.New("ticket use case not available")
 	}
 
-	// Show progress message using NewTraceMessage
-	trace := clients.Thread().NewTraceMessage(ctx, "🎫 Creating ticket from conversation...")
-	defer func() {
-		// Clear the trace message on completion
-		trace(ctx, "")
-	}()
-
 	// Create ticket from conversation using UseCase
 	ticket, err := ticketUC.CreateTicketFromConversation(
 		ctx,

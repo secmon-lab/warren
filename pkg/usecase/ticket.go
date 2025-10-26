@@ -744,7 +744,12 @@ func (uc *UseCases) CreateTicketFromConversation(
 		}
 		newTicket.SlackMessageID = timestamp
 
-		// Save ticket again with Slack message ID
+		// If this is a new thread (not in an existing thread), update the ticket's thread ID
+		if newTicket.SlackThread.ThreadID == "" {
+			newTicket.SlackThread.ThreadID = timestamp
+		}
+
+		// Save ticket again with Slack message ID and updated thread ID
 		if err := uc.repository.PutTicket(ctx, newTicket); err != nil {
 			return nil, goerr.Wrap(err, "failed to update ticket with slack message ID")
 		}

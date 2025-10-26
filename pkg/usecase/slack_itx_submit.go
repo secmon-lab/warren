@@ -486,6 +486,8 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionEditTicket(ctx context.C
 	// Update ticket metadata
 	target.Metadata.Title = newTitle
 	target.Metadata.Description = newDescription
+	target.Metadata.TitleSource = types.SourceHuman
+	target.Metadata.DescriptionSource = types.SourceHuman
 
 	// Save updated ticket
 	if err := uc.repository.PutTicket(ctx, *target); err != nil {
