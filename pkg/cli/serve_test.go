@@ -15,10 +15,10 @@ func TestServeCommand_StrictAlertValidation(t *testing.T) {
 
 	// Temporarily unset WARREN_POLICY for this test
 	oldPolicy := os.Getenv("WARREN_POLICY")
-	os.Unsetenv("WARREN_POLICY")
+	_ = os.Unsetenv("WARREN_POLICY")
 	defer func() {
 		if oldPolicy != "" {
-			os.Setenv("WARREN_POLICY", oldPolicy)
+			_ = os.Setenv("WARREN_POLICY", oldPolicy)
 		}
 	}()
 

@@ -66,8 +66,8 @@ func (uc *UseCases) ProcessAlertPipeline(
 	var results []*AlertPipelineResult
 	for _, processedAlert := range alerts {
 		// Step 1.5: Convert metadata tags (names) to tag IDs
-		if len(processedAlert.Metadata.Tags) > 0 && uc.tagService != nil {
-			tags, err := uc.tagService.ConvertNamesToTags(ctx, processedAlert.Metadata.Tags)
+		if len(processedAlert.Tags) > 0 && uc.tagService != nil {
+			tags, err := uc.tagService.ConvertNamesToTags(ctx, processedAlert.Tags)
 			if err != nil {
 				notifier.NotifyError(ctx, &event.ErrorEvent{
 					Error:   err,
@@ -214,7 +214,7 @@ func (uc *UseCases) executeQueryTask(ctx context.Context, alert *alert.Alert, ta
 	}
 
 	var options []gollem.SessionOption
-	if task.EnrichTask.Format == types.GenAIContentFormatJSON {
+	if task.Format == types.GenAIContentFormatJSON {
 		options = append(options, gollem.WithSessionContentType(gollem.ContentTypeJSON))
 	}
 
@@ -232,7 +232,7 @@ func (uc *UseCases) executeQueryTask(ctx context.Context, alert *alert.Alert, ta
 		return nil, goerr.Wrap(err, "failed to generate content")
 	}
 
-	result, err := uc.parseResponse(response, task.EnrichTask.Format)
+	result, err := uc.parseResponse(response, task.Format)
 	if err != nil {
 		return nil, err
 	}

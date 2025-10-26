@@ -19,8 +19,8 @@ func TestAlert_FillMetadata(t *testing.T) {
 	}, alert.Metadata{})
 
 	gt.NoError(t, a.FillMetadata(t.Context(), client))
-	gt.NotEqual(t, a.Metadata.Title, "")
-	gt.NotEqual(t, a.Metadata.Description, "")
+	gt.NotEqual(t, a.Title, "")
+	gt.NotEqual(t, a.Description, "")
 	gt.Equal(t, len(a.Embedding), embedding.EmbeddingDimension)
 	t.Logf("metadata: %+v", a.Metadata)
 }

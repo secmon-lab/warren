@@ -37,7 +37,9 @@ func TestReadAlertData(t *testing.T) {
 
 		// Write test data to pipe in goroutine
 		go func() {
-			defer w.Close()
+			defer func() {
+				_ = w.Close()
+			}()
 			_, _ = w.Write(jsonData)
 		}()
 
@@ -120,7 +122,7 @@ func TestDisplayPipelineResult(t *testing.T) {
 		gt.NoError(t, err)
 
 		// Close writer and read output
-		w.Close()
+		_ = w.Close()
 		var buf bytes.Buffer
 		_, err = buf.ReadFrom(r)
 		gt.NoError(t, err)
@@ -177,7 +179,7 @@ func TestDisplayPipelineResult(t *testing.T) {
 		gt.NoError(t, err)
 
 		// Close writer and read output
-		w.Close()
+		_ = w.Close()
 		var buf bytes.Buffer
 		_, err = buf.ReadFrom(r)
 		gt.NoError(t, err)
@@ -238,7 +240,7 @@ func TestDisplayPipelineResult(t *testing.T) {
 		gt.NoError(t, err)
 
 		// Close writer and read output
-		w.Close()
+		_ = w.Close()
 		var buf bytes.Buffer
 		_, err = buf.ReadFrom(r)
 		gt.NoError(t, err)

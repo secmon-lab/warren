@@ -52,6 +52,9 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, slac
 	case slack.ActionIDSalvage:
 		return uc.showSalvageModal(ctx, slackUser, slackThread, types.TicketID(value), triggerID)
 
+	case slack.ActionIDEditTicket:
+		return uc.showEditTicketModal(ctx, slackUser, slackThread, types.TicketID(value), triggerID)
+
 	case slack.ActionIDEscalate:
 		return uc.handleEscalateAction(ctx, slackUser, slackThread, value)
 	}
@@ -211,6 +214,21 @@ func (uc *UseCases) showSalvageModal(ctx context.Context, _ slack.User, _ slack.
 
 	if err := uc.slackService.ShowSalvageModal(ctx, ticket, unboundAlerts, triggerID); err != nil {
 		return goerr.Wrap(err, "failed to show salvage modal")
+	}
+
+	return nil
+}
+
+func (uc *UseCases) showEditTicketModal(ctx context.Context, _ slack.User, _ slack.Thread, targetTicketID types.TicketID, triggerID string) error {
+	ticket, err := uc.repository.GetTicket(ctx, targetTicketID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get ticket")
+	} else if ticket == nil {
+		return goerr.New("ticket not found", goerr.V("ticket_id", targetTicketID))
+	}
+
+	if err := uc.slackService.ShowEditTicketModal(ctx, ticket, triggerID); err != nil {
+		return goerr.Wrap(err, "failed to show edit ticket modal")
 	}
 
 	return nil

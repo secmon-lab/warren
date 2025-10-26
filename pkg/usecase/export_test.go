@@ -76,13 +76,6 @@ func (uc *UseCases) GenerateInitialTicketCommentForTest(ctx context.Context, tic
 	return uc.generateInitialTicketComment(ctx, ticketData, alerts)
 }
 
-// GenAI related exports for testing
-
-// ProcessGenAI exports the private processGenAI method for testing
-func (uc *UseCases) ProcessGenAI(ctx context.Context, alert *alert.Alert) (any, error) {
-	return uc.processGenAI(ctx, alert)
-}
-
 // HandleNotice exports the private handleNotice method for testing
 func (uc *UseCases) HandleNotice(ctx context.Context, alert *alert.Alert, channel string) error {
 	return uc.handleNotice(ctx, alert, channel, nil)

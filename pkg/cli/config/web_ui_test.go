@@ -20,23 +20,23 @@ func TestWebUIConfig(t *testing.T) {
 	origFrontendURL := os.Getenv("WARREN_FRONTEND_URL")
 	origNoAuth := os.Getenv("WARREN_NO_AUTHENTICATION")
 
-	os.Unsetenv("WARREN_SLACK_CLIENT_ID")
-	os.Unsetenv("WARREN_SLACK_CLIENT_SECRET")
-	os.Unsetenv("WARREN_FRONTEND_URL")
-	os.Unsetenv("WARREN_NO_AUTHENTICATION")
+	_ = os.Unsetenv("WARREN_SLACK_CLIENT_ID")
+	_ = os.Unsetenv("WARREN_SLACK_CLIENT_SECRET")
+	_ = os.Unsetenv("WARREN_FRONTEND_URL")
+	_ = os.Unsetenv("WARREN_NO_AUTHENTICATION")
 
 	defer func() {
 		if origClientID != "" {
-			os.Setenv("WARREN_SLACK_CLIENT_ID", origClientID)
+			_ = os.Setenv("WARREN_SLACK_CLIENT_ID", origClientID)
 		}
 		if origClientSecret != "" {
-			os.Setenv("WARREN_SLACK_CLIENT_SECRET", origClientSecret)
+			_ = os.Setenv("WARREN_SLACK_CLIENT_SECRET", origClientSecret)
 		}
 		if origFrontendURL != "" {
-			os.Setenv("WARREN_FRONTEND_URL", origFrontendURL)
+			_ = os.Setenv("WARREN_FRONTEND_URL", origFrontendURL)
 		}
 		if origNoAuth != "" {
-			os.Setenv("WARREN_NO_AUTHENTICATION", origNoAuth)
+			_ = os.Setenv("WARREN_NO_AUTHENTICATION", origNoAuth)
 		}
 	}()
 

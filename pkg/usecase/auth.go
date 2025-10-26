@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
 type AuthUseCase struct {
@@ -144,7 +145,7 @@ func (uc *AuthUseCase) exchangeCodeForToken(code string) (*SlackTokenResponse, e
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to make token request")
 	}
-	defer resp.Body.Close()
+	defer safe.Close(context.Background(), resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -170,7 +171,7 @@ func (uc *AuthUseCase) getOpenIDConfiguration(ctx context.Context) (*OpenIDConfi
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to fetch OpenID configuration")
 	}
-	defer resp.Body.Close()
+	defer safe.Close(ctx, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, goerr.New("failed to fetch OpenID configuration", goerr.V("status", resp.StatusCode))

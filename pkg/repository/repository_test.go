@@ -480,7 +480,7 @@ func TestBatchGetTickets(t *testing.T) {
 		ticketIDs := make([]types.TicketID, 3)
 		for i := range 3 {
 			ticket := newTestTicket(&thread)
-			ticket.Metadata.Title = fmt.Sprintf("Test Ticket %d", i)
+			ticket.Title = fmt.Sprintf("Test Ticket %d", i)
 			gt.NoError(t, repo.PutTicket(ctx, ticket)).Required()
 			tickets[i] = &ticket
 			ticketIDs[i] = ticket.ID
@@ -494,7 +494,7 @@ func TestBatchGetTickets(t *testing.T) {
 		// Verify each ticket
 		for i, ticket := range got {
 			gt.Value(t, ticket.ID).Equal(tickets[i].ID)
-			gt.Value(t, ticket.Metadata.Title).Equal(tickets[i].Metadata.Title)
+			gt.Value(t, ticket.Title).Equal(tickets[i].Title)
 		}
 
 		// Test with non-existent ticket ID
@@ -1879,7 +1879,7 @@ func TestActivityCreation(t *testing.T) {
 				time.Sleep(100 * time.Millisecond)
 
 				// Now update the ticket
-				ticket.Metadata.Title = "Updated Title"
+				ticket.Title = "Updated Title"
 				ticket.UpdatedAt = time.Now()
 
 				err = repo.PutTicket(ctx, ticket)
@@ -2558,7 +2558,7 @@ func TestAlertAndTicketTags(t *testing.T) {
 
 			// Create a ticket with tags
 			tk := ticketmodel.New(ctx, []types.AlertID{}, nil)
-			tk.Metadata.Title = "Test Ticket"
+			tk.Title = "Test Ticket"
 			if tk.TagIDs == nil {
 				tk.TagIDs = make(map[string]bool)
 			}

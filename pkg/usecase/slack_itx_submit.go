@@ -41,6 +41,8 @@ func (uc *UseCases) HandleSlackInteractionViewSubmission(ctx context.Context, sl
 		return uc.handleSlackInteractionViewSubmissionBindList(ctx, slackUser, metadata, values)
 	case slack.CallbackSubmitSalvage:
 		return uc.handleSlackInteractionViewSubmissionSalvage(ctx, slackUser, metadata, values)
+	case slack.CallbackEditTicket:
+		return uc.handleSlackInteractionViewSubmissionEditTicket(ctx, slackUser, metadata, values)
 	}
 
 	return nil
@@ -437,6 +439,67 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionSalvage(ctx context.Cont
 	}
 
 	msg.Notify(ctx, "🎉 Salvaged %d alerts to ticket %s", len(unboundAlerts), target.Metadata.Title)
+
+	return nil
+}
+
+func (uc *UseCases) handleSlackInteractionViewSubmissionEditTicket(ctx context.Context, user slack.User, metadata string, values slack.StateValue) error {
+	logger := logging.From(ctx)
+	logger.Debug("editing ticket",
+		"user", user,
+		"metadata", metadata,
+		"values", values,
+	)
+
+	ticketID := types.TicketID(metadata)
+	target, err := uc.repository.GetTicket(ctx, ticketID)
+	if err != nil {
+		_ = msg.Trace(ctx, "💥 Failed to get ticket\n> %s", err.Error())
+		return goerr.Wrap(err, "failed to get ticket")
+	}
+	if target == nil {
+		msg.Notify(ctx, "💥 Ticket not found")
+		return nil
+	}
+
+	if uc.slackService == nil {
+		return goerr.New("slack service not configured")
+	}
+	st := uc.slackService.NewThread(*target.SlackThread)
+	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
+
+	// Get new title (required)
+	newTitle, ok := getSlackValue[string](values,
+		slack.BlockIDTicketID,
+		slack.BlockActionIDTicketTitle,
+	)
+	if !ok || newTitle == "" {
+		return goerr.New("title is required")
+	}
+
+	// Get new description (optional)
+	newDescription, _ := getSlackValue[string](values,
+		slack.BlockIDTicketComment,
+		slack.BlockActionIDTicketDesc,
+	)
+
+	// Update ticket metadata
+	target.Metadata.Title = newTitle
+	target.Metadata.Description = newDescription
+	target.Metadata.TitleSource = types.SourceHuman
+	target.Metadata.DescriptionSource = types.SourceHuman
+
+	// Save updated ticket
+	if err := uc.repository.PutTicket(ctx, *target); err != nil {
+		return goerr.Wrap(err, "failed to update ticket", goerr.V("ticket_id", ticketID))
+	}
+
+	// Update Slack message
+	if _, err := st.PostTicket(ctx, target, nil); err != nil {
+		return goerr.Wrap(err, "failed to update slack thread")
+	}
+
+	msg.Notify(ctx, "✅ Ticket updated successfully")
 
 	return nil
 }

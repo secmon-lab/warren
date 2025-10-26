@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/event"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
@@ -272,63 +271,6 @@ func containsIgnoreCase(s, substr string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
 
-// processGenAI processes GenAI configuration for the given alert
-func (uc *UseCases) processGenAI(ctx context.Context, alert *alert.Alert) (any, error) {
-	if alert.Metadata.GenAI == nil {
-		return "", nil
-	}
-
-	if uc.promptService == nil {
-		return "", goerr.New("prompt service not configured")
-	}
-
-	genaiConfig := alert.Metadata.GenAI
-
-	// Generate prompt using PromptService
-	prompt, err := uc.promptService.GeneratePrompt(ctx, genaiConfig.Prompt, alert)
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to generate prompt", goerr.V("prompt", genaiConfig.Prompt))
-	}
-
-	var options []gollem.SessionOption
-	if genaiConfig.Format == types.GenAIContentFormatJSON {
-		options = append(options, gollem.WithSessionContentType(gollem.ContentTypeJSON))
-	}
-
-	// Query LLM with JSON response format
-	session, err := uc.llmClient.NewSession(ctx, options...)
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to create LLM session")
-	}
-
-	response, err := session.GenerateContent(ctx, gollem.Text(prompt))
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to query LLM", goerr.V("prompt", prompt))
-	}
-
-	var responseText string
-	if len(response.Texts) > 0 {
-		responseText = response.Texts[0]
-	}
-
-	var responseData any = responseText
-	logger := logging.From(ctx)
-
-	// Parse JSON response if format is JSON
-	if genaiConfig.Format == types.GenAIContentFormatJSON {
-		var parsedResponse any
-		if err := json.Unmarshal([]byte(responseText), &parsedResponse); err != nil {
-			// If JSON parsing fails, return raw string
-			logger.Warn("failed to parse LLM response as JSON", "text", responseText)
-		} else {
-			responseData = parsedResponse
-		}
-	}
-
-	logger.Info("Got GenAI response", "response", responseData)
-	return responseData, nil
-}
-
 // handleNotice handles notice creation and simple notification
 func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channel string, llmResponse *alert.GenAIResponse) error {
 	logger := logging.From(ctx)
@@ -374,8 +316,8 @@ func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.N
 
 	// Create simple message with only title for main channel
 	var mainMessage string
-	if alert.Metadata.Title != "" {
-		mainMessage = "🔔 " + alert.Metadata.Title
+	if alert.Title != "" {
+		mainMessage = "🔔 " + alert.Title
 	} else {
 		mainMessage = "🔔 Security Notice"
 	}

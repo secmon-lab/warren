@@ -24,6 +24,12 @@ func New(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.Sla
 	}
 }
 
+func NewWithUseCase(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService, ticketUC core.TicketUseCase) *Service {
+	return &Service{
+		clients: core.NewClientsWithUseCase(repo, llm, thread, ticketUC),
+	}
+}
+
 var (
 	ErrUnknownCommand = goerr.New("unknown command")
 )

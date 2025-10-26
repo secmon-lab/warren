@@ -15,11 +15,11 @@ import (
 func Run(ctx context.Context, clients *core.Clients, slackMsg *slack.Message, input string) (any, error) {
 	args := strings.Fields(input)
 	if len(args) < 1 {
-		return nil, fmt.Errorf("Usage: repair embeddings <alerts|tickets|all>")
+		return nil, fmt.Errorf("usage: repair embeddings <alerts|tickets|all>")
 	}
 
 	if args[0] != "embeddings" {
-		return nil, fmt.Errorf("Unknown repair command: %s", args[0])
+		return nil, fmt.Errorf("unknown repair command: %s", args[0])
 	}
 
 	target := "all"
@@ -44,7 +44,7 @@ func Run(ctx context.Context, clients *core.Clients, slackMsg *slack.Message, in
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("Unknown target: %s. Use 'alerts', 'tickets', or 'all'", target)
+		return nil, fmt.Errorf("unknown target: %s. Use 'alerts', 'tickets', or 'all'", target)
 	}
 
 	return nil, nil

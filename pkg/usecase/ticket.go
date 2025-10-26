@@ -2,17 +2,28 @@ package usecase
 
 import (
 	"context"
+	_ "embed"
+	"fmt"
 	"math"
+	"strings"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/lang"
+	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/service/llm"
+	slacksvc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
+
+//go:embed prompt/ticket_from_conversation.md
+var ticketFromConversationPrompt string
 
 // TicketCreationOptions contains options for ticket creation
 type TicketCreationOptions struct {
@@ -661,4 +672,176 @@ func cosineSimilarity(a, b []float32) float32 {
 	}
 
 	return dotProduct / (float32(math.Sqrt(float64(normA))) * float32(math.Sqrt(float64(normB))))
+}
+
+// CreateTicketFromConversation creates a ticket from Slack conversation history
+func (uc *UseCases) CreateTicketFromConversation(
+	ctx context.Context,
+	thread slack.Thread,
+	user *slack.User,
+	userContext string,
+) (*ticket.Ticket, error) {
+	// Check for existing ticket in thread
+	if thread.ThreadID != "" {
+		existingTicket, err := uc.repository.GetTicketByThread(ctx, thread)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to check existing ticket")
+		}
+		if existingTicket != nil {
+			return nil, goerr.New("ticket already exists in this thread")
+		}
+	}
+
+	// Get conversation messages
+	messages, err := uc.getConversationMessages(ctx, thread)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get conversation history")
+	}
+
+	// Generate metadata using LLM
+	metadata, err := uc.generateTicketMetadataFromConversation(ctx, messages, userContext)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to generate ticket metadata")
+	}
+
+	// Resolve user name if needed
+	if user != nil && user.Name == user.ID && uc.IsSlackEnabled() {
+		// User name is not set (it's the same as ID), fetch it from Slack
+		userName, err := uc.slackService.GetUserProfile(ctx, user.ID)
+		if err != nil {
+			// Log but don't fail - use ID as fallback
+			logging.From(ctx).Warn("failed to get user profile", "user_id", user.ID, "error", err)
+		} else {
+			user.Name = userName
+		}
+	}
+
+	// Create new ticket
+	newTicket := ticket.New(ctx, []types.AlertID{}, &thread)
+	newTicket.Assignee = user
+	newTicket.Metadata.Title = metadata.Title
+	newTicket.Metadata.Description = metadata.Description
+	newTicket.Metadata.Summary = metadata.Summary
+	newTicket.Metadata.TitleSource = types.SourceAI
+	newTicket.Metadata.DescriptionSource = types.SourceAI
+
+	// Calculate embedding
+	if err := newTicket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
+		return nil, goerr.Wrap(err, "failed to calculate ticket embedding")
+	}
+
+	// Save ticket to repository
+	if err := uc.repository.PutTicket(ctx, newTicket); err != nil {
+		return nil, goerr.Wrap(err, "failed to put new ticket")
+	}
+
+	// Post ticket to Slack in the same thread
+	if uc.IsSlackEnabled() {
+		st := uc.slackService.NewThread(thread)
+		timestamp, err := st.PostTicket(ctx, &newTicket, nil)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to post ticket to slack")
+		}
+		newTicket.SlackMessageID = timestamp
+
+		// If this is a new thread (not in an existing thread), update the ticket's thread ID
+		if newTicket.SlackThread.ThreadID == "" {
+			newTicket.SlackThread.ThreadID = timestamp
+		}
+
+		// Save ticket again with Slack message ID and updated thread ID
+		if err := uc.repository.PutTicket(ctx, newTicket); err != nil {
+			return nil, goerr.Wrap(err, "failed to update ticket with slack message ID")
+		}
+	}
+
+	return &newTicket, nil
+}
+
+// getConversationMessages retrieves conversation history based on thread context
+func (uc *UseCases) getConversationMessages(
+	ctx context.Context,
+	thread slack.Thread,
+) ([]slacksvc.ConversationMessage, error) {
+	if !uc.IsSlackEnabled() {
+		return nil, goerr.New("Slack service is not enabled")
+	}
+
+	if thread.ThreadID != "" {
+		// Thread messages: get all messages
+		return uc.slackService.GetConversationHistory(ctx, thread.ChannelID, thread.ThreadID, 0, 0)
+	}
+
+	// Channel level: recent 100 messages or within 1 hour
+	limit := 100
+	oldest := time.Now().Add(-1 * time.Hour)
+	return uc.slackService.GetConversationHistory(ctx, thread.ChannelID, "", limit, oldest.Unix())
+}
+
+// conversationTicketMetadata is the structure for LLM to generate ticket metadata from conversation
+type conversationTicketMetadata struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Summary     string `json:"summary"`
+}
+
+// buildConversationPrompt builds a prompt for generating ticket metadata from conversation
+func buildConversationPrompt(ctx context.Context, messages []slacksvc.ConversationMessage, userContext string) (string, error) {
+	// Format messages
+	var conversationText strings.Builder
+	for _, msg := range messages {
+		timestamp := msg.Timestamp.Format("2006-01-02 15:04:05")
+		userName := "Unknown"
+		if msg.User != nil {
+			userName = msg.User.Name
+		}
+		conversationText.WriteString(fmt.Sprintf("[%s] %s: %s\n", timestamp, userName, msg.Text))
+	}
+
+	// Generate prompt template
+	promptData := map[string]any{
+		"conversation": conversationText.String(),
+		"user_context": userContext,
+		"schema":       prompt.ToSchema(conversationTicketMetadata{}),
+		"lang":         lang.From(ctx),
+	}
+
+	return prompt.Generate(ctx, ticketFromConversationPrompt, promptData)
+}
+
+// generateTicketMetadataFromConversation generates ticket metadata using LLM
+func (uc *UseCases) generateTicketMetadataFromConversation(
+	ctx context.Context,
+	messages []slacksvc.ConversationMessage,
+	userContext string,
+) (*ticket.Metadata, error) {
+	// Build prompt
+	conversationPrompt, err := buildConversationPrompt(ctx, messages, userContext)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to build conversation prompt")
+	}
+
+	// Generate metadata using LLM
+	llmMetadata, err := llm.Ask(ctx, uc.llmClient, conversationPrompt, llm.WithValidate(
+		func(meta conversationTicketMetadata) error {
+			if meta.Title == "" {
+				return goerr.New("title is required")
+			}
+			return nil
+		},
+	))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to generate metadata from LLM")
+	}
+
+	// Convert to ticket.Metadata and set source fields
+	metadata := &ticket.Metadata{
+		Title:             llmMetadata.Title,
+		Description:       llmMetadata.Description,
+		Summary:           llmMetadata.Summary,
+		TitleSource:       types.SourceAI,
+		DescriptionSource: types.SourceAI,
+	}
+
+	return metadata, nil
 }

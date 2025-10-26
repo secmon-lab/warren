@@ -61,27 +61,27 @@ func TestTicket_FillMetadata(t *testing.T) {
 	if err := ticketData.FillMetadata(ctx, llmClient, repo); err != nil {
 		t.Logf("LLM test failed (expected in CI): %v", err)
 		// If LLM fails, test the simplified logic instead
-		ticketData.Metadata.Title = "AI Generated Title"
-		ticketData.Metadata.Description = "AI Generated Description"
-		ticketData.Metadata.Summary = "AI Generated Summary"
+		ticketData.Title = "AI Generated Title"
+		ticketData.Description = "AI Generated Description"
+		ticketData.Summary = "AI Generated Summary"
 	}
 
-	gt.NotEqual(t, ticketData.Metadata.Title, "")
-	gt.NotEqual(t, ticketData.Metadata.Description, "")
-	gt.NotEqual(t, ticketData.Metadata.Summary, "")
+	gt.NotEqual(t, ticketData.Title, "")
+	gt.NotEqual(t, ticketData.Description, "")
+	gt.NotEqual(t, ticketData.Summary, "")
 
 	// Test case 2: FillMetadata with no AI generation needed
 	ticketData2 := ticket.New(ctx, []types.AlertID{alerts[0].ID}, &slack.Thread{})
-	ticketData2.Metadata.Title = "Human Title"
-	ticketData2.Metadata.Description = "Human Description"
-	ticketData2.Metadata.TitleSource = types.SourceHuman
-	ticketData2.Metadata.DescriptionSource = types.SourceHuman
+	ticketData2.Title = "Human Title"
+	ticketData2.Description = "Human Description"
+	ticketData2.TitleSource = types.SourceHuman
+	ticketData2.DescriptionSource = types.SourceHuman
 
 	// Should return early without calling LLM
 	if err := ticketData2.FillMetadata(ctx, llmClient, repo); err != nil {
 		t.Fatalf("FillMetadata should not fail when no AI generation needed: %v", err)
 	}
 
-	gt.Equal(t, ticketData2.Metadata.Title, "Human Title")
-	gt.Equal(t, ticketData2.Metadata.Description, "Human Description")
+	gt.Equal(t, ticketData2.Title, "Human Title")
+	gt.Equal(t, ticketData2.Description, "Human Description")
 }

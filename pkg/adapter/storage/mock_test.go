@@ -28,7 +28,7 @@ func TestMock(t *testing.T) {
 
 			reader, err := mock.GetObject(ctx, tc.object)
 			gt.NoError(t, err)
-			defer reader.Close()
+			defer func() { _ = reader.Close() }()
 
 			readData, err := io.ReadAll(reader)
 			gt.NoError(t, err)

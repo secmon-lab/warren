@@ -1,18 +1,27 @@
 package core
 
 import (
+	"context"
 	"strconv"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 )
 
+// TicketUseCase defines methods for ticket operations from conversation
+type TicketUseCase interface {
+	CreateTicketFromConversation(ctx context.Context, thread slack.Thread, user *slack.User, userContext string) (*ticket.Ticket, error)
+}
+
 type Clients struct {
-	repo   interfaces.Repository
-	llm    gollem.LLMClient
-	thread interfaces.SlackThreadService
+	repo     interfaces.Repository
+	llm      gollem.LLMClient
+	thread   interfaces.SlackThreadService
+	ticketUC TicketUseCase
 }
 
 func NewClients(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService) *Clients {
@@ -20,6 +29,15 @@ func NewClients(repo interfaces.Repository, llm gollem.LLMClient, thread interfa
 		repo:   repo,
 		llm:    llm,
 		thread: thread,
+	}
+}
+
+func NewClientsWithUseCase(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService, ticketUC TicketUseCase) *Clients {
+	return &Clients{
+		repo:     repo,
+		llm:      llm,
+		thread:   thread,
+		ticketUC: ticketUC,
 	}
 }
 
@@ -33,6 +51,10 @@ func (s *Clients) LLM() gollem.LLMClient {
 
 func (s *Clients) Thread() interfaces.SlackThreadService {
 	return s.thread
+}
+
+func (s *Clients) TicketUseCase() TicketUseCase {
+	return s.ticketUC
 }
 
 func ParseTime(timeStr string) (time.Time, error) {

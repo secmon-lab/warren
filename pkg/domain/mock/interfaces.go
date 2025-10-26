@@ -34,6 +34,9 @@ import (
 //			GetBotInfoContextFunc: func(ctx context.Context, parameters slackSDK.GetBotInfoParameters) (*slackSDK.Bot, error) {
 //				panic("mock out the GetBotInfoContext method")
 //			},
+//			GetConversationHistoryContextFunc: func(ctx context.Context, params *slackSDK.GetConversationHistoryParameters) (*slackSDK.GetConversationHistoryResponse, error) {
+//				panic("mock out the GetConversationHistoryContext method")
+//			},
 //			GetConversationInfoFunc: func(input *slackSDK.GetConversationInfoInput) (*slackSDK.Channel, error) {
 //				panic("mock out the GetConversationInfo method")
 //			},
@@ -77,6 +80,9 @@ type SlackClientMock struct {
 	// GetBotInfoContextFunc mocks the GetBotInfoContext method.
 	GetBotInfoContextFunc func(ctx context.Context, parameters slackSDK.GetBotInfoParameters) (*slackSDK.Bot, error)
 
+	// GetConversationHistoryContextFunc mocks the GetConversationHistoryContext method.
+	GetConversationHistoryContextFunc func(ctx context.Context, params *slackSDK.GetConversationHistoryParameters) (*slackSDK.GetConversationHistoryResponse, error)
+
 	// GetConversationInfoFunc mocks the GetConversationInfo method.
 	GetConversationInfoFunc func(input *slackSDK.GetConversationInfoInput) (*slackSDK.Channel, error)
 
@@ -118,6 +124,13 @@ type SlackClientMock struct {
 			Ctx context.Context
 			// Parameters is the parameters argument value.
 			Parameters slackSDK.GetBotInfoParameters
+		}
+		// GetConversationHistoryContext holds details about calls to the GetConversationHistoryContext method.
+		GetConversationHistoryContext []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Params is the params argument value.
+			Params *slackSDK.GetConversationHistoryParameters
 		}
 		// GetConversationInfo holds details about calls to the GetConversationInfo method.
 		GetConversationInfo []struct {
@@ -188,18 +201,19 @@ type SlackClientMock struct {
 			Params slackSDK.UploadFileV2Parameters
 		}
 	}
-	lockAuthTest             sync.RWMutex
-	lockGetBotInfoContext    sync.RWMutex
-	lockGetConversationInfo  sync.RWMutex
-	lockGetTeamInfo          sync.RWMutex
-	lockGetUserGroups        sync.RWMutex
-	lockGetUserInfo          sync.RWMutex
-	lockGetUsersInfo         sync.RWMutex
-	lockOpenView             sync.RWMutex
-	lockPostMessageContext   sync.RWMutex
-	lockUpdateMessageContext sync.RWMutex
-	lockUpdateView           sync.RWMutex
-	lockUploadFileV2Context  sync.RWMutex
+	lockAuthTest                      sync.RWMutex
+	lockGetBotInfoContext             sync.RWMutex
+	lockGetConversationHistoryContext sync.RWMutex
+	lockGetConversationInfo           sync.RWMutex
+	lockGetTeamInfo                   sync.RWMutex
+	lockGetUserGroups                 sync.RWMutex
+	lockGetUserInfo                   sync.RWMutex
+	lockGetUsersInfo                  sync.RWMutex
+	lockOpenView                      sync.RWMutex
+	lockPostMessageContext            sync.RWMutex
+	lockUpdateMessageContext          sync.RWMutex
+	lockUpdateView                    sync.RWMutex
+	lockUploadFileV2Context           sync.RWMutex
 }
 
 // AuthTest calls AuthTestFunc.
@@ -270,6 +284,46 @@ func (mock *SlackClientMock) GetBotInfoContextCalls() []struct {
 	mock.lockGetBotInfoContext.RLock()
 	calls = mock.calls.GetBotInfoContext
 	mock.lockGetBotInfoContext.RUnlock()
+	return calls
+}
+
+// GetConversationHistoryContext calls GetConversationHistoryContextFunc.
+func (mock *SlackClientMock) GetConversationHistoryContext(ctx context.Context, params *slackSDK.GetConversationHistoryParameters) (*slackSDK.GetConversationHistoryResponse, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Params *slackSDK.GetConversationHistoryParameters
+	}{
+		Ctx:    ctx,
+		Params: params,
+	}
+	mock.lockGetConversationHistoryContext.Lock()
+	mock.calls.GetConversationHistoryContext = append(mock.calls.GetConversationHistoryContext, callInfo)
+	mock.lockGetConversationHistoryContext.Unlock()
+	if mock.GetConversationHistoryContextFunc == nil {
+		var (
+			getConversationHistoryResponseOut *slackSDK.GetConversationHistoryResponse
+			errOut                            error
+		)
+		return getConversationHistoryResponseOut, errOut
+	}
+	return mock.GetConversationHistoryContextFunc(ctx, params)
+}
+
+// GetConversationHistoryContextCalls gets all the calls that were made to GetConversationHistoryContext.
+// Check the length with:
+//
+//	len(mockedSlackClient.GetConversationHistoryContextCalls())
+func (mock *SlackClientMock) GetConversationHistoryContextCalls() []struct {
+	Ctx    context.Context
+	Params *slackSDK.GetConversationHistoryParameters
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Params *slackSDK.GetConversationHistoryParameters
+	}
+	mock.lockGetConversationHistoryContext.RLock()
+	calls = mock.calls.GetConversationHistoryContext
+	mock.lockGetConversationHistoryContext.RUnlock()
 	return calls
 }
 
@@ -6008,6 +6062,9 @@ func (mock *LLMClientMock) NewSessionCalls() []struct {
 //
 //		// make and configure a mocked interfaces.LLMSession
 //		mockedLLMSession := &LLMSessionMock{
+//			AppendHistoryFunc: func(history *gollem.History) error {
+//				panic("mock out the AppendHistory method")
+//			},
 //			GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
 //				panic("mock out the GenerateContent method")
 //			},
@@ -6024,6 +6081,9 @@ func (mock *LLMClientMock) NewSessionCalls() []struct {
 //
 //	}
 type LLMSessionMock struct {
+	// AppendHistoryFunc mocks the AppendHistory method.
+	AppendHistoryFunc func(history *gollem.History) error
+
 	// GenerateContentFunc mocks the GenerateContent method.
 	GenerateContentFunc func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error)
 
@@ -6035,6 +6095,11 @@ type LLMSessionMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AppendHistory holds details about calls to the AppendHistory method.
+		AppendHistory []struct {
+			// History is the history argument value.
+			History *gollem.History
+		}
 		// GenerateContent holds details about calls to the GenerateContent method.
 		GenerateContent []struct {
 			// Ctx is the ctx argument value.
@@ -6053,9 +6118,45 @@ type LLMSessionMock struct {
 		History []struct {
 		}
 	}
+	lockAppendHistory   sync.RWMutex
 	lockGenerateContent sync.RWMutex
 	lockGenerateStream  sync.RWMutex
 	lockHistory         sync.RWMutex
+}
+
+// AppendHistory calls AppendHistoryFunc.
+func (mock *LLMSessionMock) AppendHistory(history *gollem.History) error {
+	callInfo := struct {
+		History *gollem.History
+	}{
+		History: history,
+	}
+	mock.lockAppendHistory.Lock()
+	mock.calls.AppendHistory = append(mock.calls.AppendHistory, callInfo)
+	mock.lockAppendHistory.Unlock()
+	if mock.AppendHistoryFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.AppendHistoryFunc(history)
+}
+
+// AppendHistoryCalls gets all the calls that were made to AppendHistory.
+// Check the length with:
+//
+//	len(mockedLLMSession.AppendHistoryCalls())
+func (mock *LLMSessionMock) AppendHistoryCalls() []struct {
+	History *gollem.History
+} {
+	var calls []struct {
+		History *gollem.History
+	}
+	mock.lockAppendHistory.RLock()
+	calls = mock.calls.AppendHistory
+	mock.lockAppendHistory.RUnlock()
+	return calls
 }
 
 // GenerateContent calls GenerateContentFunc.

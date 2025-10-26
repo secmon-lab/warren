@@ -33,7 +33,7 @@ func createMockClient(t *testing.T, hub *websocket_ctrl.Hub, ticketID types.Tick
 func TestHub_ClientRegistration(t *testing.T) {
 	hub, cancel := setupTestHub(t)
 	defer cancel()
-	defer hub.Close()
+	defer func() { _ = hub.Close() }()
 
 	ticketID := types.TicketID("test-ticket")
 	userID := "test-user"
@@ -57,7 +57,7 @@ func TestHub_ClientRegistration(t *testing.T) {
 func TestHub_ClientUnregistration(t *testing.T) {
 	hub, cancel := setupTestHub(t)
 	defer cancel()
-	defer hub.Close()
+	defer func() { _ = hub.Close() }()
 
 	ticketID := types.TicketID("test-ticket")
 	userID := "test-user"
@@ -83,7 +83,7 @@ func TestHub_ClientUnregistration(t *testing.T) {
 func TestHub_MultipleClients(t *testing.T) {
 	hub, cancel := setupTestHub(t)
 	defer cancel()
-	defer hub.Close()
+	defer func() { _ = hub.Close() }()
 
 	ticketID := types.TicketID("test-ticket")
 
@@ -113,7 +113,7 @@ func TestHub_MultipleClients(t *testing.T) {
 func TestHub_MultipleTickets(t *testing.T) {
 	hub, cancel := setupTestHub(t)
 	defer cancel()
-	defer hub.Close()
+	defer func() { _ = hub.Close() }()
 
 	ticket1 := types.TicketID("ticket-1")
 	ticket2 := types.TicketID("ticket-2")
@@ -149,7 +149,7 @@ func TestHub_MultipleTickets(t *testing.T) {
 func TestHub_SendMessageToTicket(t *testing.T) {
 	hub, cancel := setupTestHub(t)
 	defer cancel()
-	defer hub.Close()
+	defer func() { _ = hub.Close() }()
 
 	ticketID := types.TicketID("test-ticket")
 	user := &websocket_model.User{
@@ -173,7 +173,7 @@ func TestHub_SendMessageToTicket(t *testing.T) {
 func TestHub_BroadcastToTicket(t *testing.T) {
 	hub, cancel := setupTestHub(t)
 	defer cancel()
-	defer hub.Close()
+	defer func() { _ = hub.Close() }()
 
 	ticketID := types.TicketID("test-ticket")
 	message := []byte(`{"type":"message","content":"broadcast test"}`)
@@ -216,7 +216,7 @@ func TestHub_Close(t *testing.T) {
 func TestHub_GetNonExistentTicket(t *testing.T) {
 	hub, cancel := setupTestHub(t)
 	defer cancel()
-	defer hub.Close()
+	defer func() { _ = hub.Close() }()
 
 	nonExistentTicket := types.TicketID("non-existent")
 
@@ -263,7 +263,7 @@ func TestHub_ErrorHandling_Operations(t *testing.T) {
 
 	hub := websocket_ctrl.NewHub(ctx)
 	go hub.Run()
-	defer hub.Close()
+	defer func() { _ = hub.Close() }()
 
 	// Try to get client count for non-existent ticket
 	count := hub.GetClientCount(types.TicketID("non-existent"))
@@ -280,7 +280,7 @@ func TestHub_ConcurrentOperations(t *testing.T) {
 
 	hub := websocket_ctrl.NewHub(ctx)
 	go hub.Run()
-	defer hub.Close()
+	defer func() { _ = hub.Close() }()
 
 	// Start multiple goroutines doing operations concurrently
 	done := make(chan bool, 3)

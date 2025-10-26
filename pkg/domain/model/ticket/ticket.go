@@ -147,8 +147,8 @@ var ticketMetaPrompt string
 
 func (x *Ticket) FillMetadata(ctx context.Context, llmClient gollem.LLMClient, alertRepo AlertRepository) error {
 	// Only generate metadata for fields that have SourceAI
-	needsTitle := x.Metadata.TitleSource == types.SourceAI
-	needsDescription := x.Metadata.DescriptionSource == types.SourceAI
+	needsTitle := x.TitleSource == types.SourceAI
+	needsDescription := x.DescriptionSource == types.SourceAI
 
 	// If no AI generation is needed, return early
 	if !needsTitle && !needsDescription {
@@ -200,13 +200,13 @@ func (x *Ticket) FillMetadata(ctx context.Context, llmClient gollem.LLMClient, a
 
 	// Only update fields that were marked for AI generation
 	if needsTitle {
-		x.Metadata.Title = meta.Title
+		x.Title = meta.Title
 	}
 	if needsDescription {
-		x.Metadata.Description = meta.Description
+		x.Description = meta.Description
 	}
 	// Keep the existing Summary as it's always generated
-	x.Metadata.Summary = meta.Summary
+	x.Summary = meta.Summary
 
 	return nil
 }
@@ -219,10 +219,10 @@ func (x *Ticket) CalculateEmbedding(ctx context.Context, llmClient gollem.LLMCli
 
 	// Calculate embedding from title and description if title exists
 	// Description can be empty - this is explicitly allowed
-	if x.Metadata.Title != "" {
-		embeddingText := x.Metadata.Title
-		if x.Metadata.Description != "" {
-			embeddingText += " " + x.Metadata.Description
+	if x.Title != "" {
+		embeddingText := x.Title
+		if x.Description != "" {
+			embeddingText += " " + x.Description
 		}
 		vector32, err := embedding.Generate(ctx, llmClient, embeddingText)
 		if err != nil {

@@ -290,7 +290,7 @@ func sendGraphQLRequest(url string, req graphqlRequest) (*graphqlResponse, error
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var graphqlResp graphqlResponse
 	if err := json.NewDecoder(resp.Body).Decode(&graphqlResp); err != nil {
@@ -548,9 +548,10 @@ func TestDataLoaderIntegration(t *testing.T) {
 				// Verify user names are correctly mapped
 				userID := userMap["id"].(string)
 				userName := userMap["name"].(string)
-				if userID == "user1" {
+				switch userID {
+				case "user1":
 					gt.Equal(t, userName, "User One")
-				} else if userID == "user2" {
+				case "user2":
 					gt.Equal(t, userName, "User Two")
 				}
 			}

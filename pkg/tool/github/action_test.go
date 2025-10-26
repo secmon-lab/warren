@@ -245,11 +245,13 @@ func TestLoadConfig(t *testing.T) {
 
 	tmpFile, err := os.CreateTemp("", "github-app-config-*.yaml")
 	gt.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
 
 	_, err = tmpFile.WriteString(configContent)
 	gt.NoError(t, err)
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	// Create action and configure
 	action := &githubtool.Action{}

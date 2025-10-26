@@ -540,7 +540,7 @@ func (r *Memory) SearchAlerts(ctx context.Context, path, op string, value any, l
 		}
 
 		// Compare values based on comparison operator
-		var cmpValue any = value
+		cmpValue := value
 		if fieldValue.Type() != reflect.TypeOf(value) {
 			// Convert from string type to type aliases like string
 			if fieldValue.Type().Kind() == reflect.String && reflect.TypeOf(value).Kind() == reflect.String {

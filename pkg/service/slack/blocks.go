@@ -69,9 +69,9 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 		slack.NewDividerBlock(),
 	}...)
 
-	if len(alert.Metadata.Attributes) > 0 {
-		fields := make([]*slack.TextBlockObject, 0, len(alert.Metadata.Attributes)*2)
-		for _, attr := range alert.Metadata.Attributes {
+	if len(alert.Attributes) > 0 {
+		fields := make([]*slack.TextBlockObject, 0, len(alert.Attributes)*2)
+		for _, attr := range alert.Attributes {
 			var value string
 			if attr.Link != "" {
 				value = "<" + attr.Link + "|" + attr.Value + ">"
@@ -118,9 +118,9 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 	// Header with Title and emoji - add TEST indicator if it's a test ticket
 	var headerTitle string
 	if ticket.IsTest {
-		headerTitle = fmt.Sprintf("🧪 [TEST] %s", ticket.Metadata.Title)
+		headerTitle = fmt.Sprintf("🧪 [TEST] %s", ticket.Title)
 	} else {
-		headerTitle = fmt.Sprintf("🎫 %s", ticket.Metadata.Title)
+		headerTitle = fmt.Sprintf("🎫 %s", ticket.Title)
 	}
 	blocks = append(blocks, slack.NewHeaderBlock(
 		slack.NewTextBlockObject(slack.PlainTextType, headerTitle, false, false),
@@ -135,9 +135,9 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 
 	if frontendURL != "" {
 		ticketURL := fmt.Sprintf("%s/tickets/%s", frontendURL, ticket.ID.String())
-		idDescText = fmt.Sprintf("%s*ID:* `%s` | <%s|🔗 View Details>\n%s", testPrefix, ticket.ID.String(), ticketURL, ticket.Metadata.Description)
+		idDescText = fmt.Sprintf("%s*ID:* `%s` | <%s|🔗 View Details>\n%s", testPrefix, ticket.ID.String(), ticketURL, ticket.Description)
 	} else {
-		idDescText = fmt.Sprintf("%s*ID:* `%s`\n%s", testPrefix, ticket.ID.String(), ticket.Metadata.Description)
+		idDescText = fmt.Sprintf("%s*ID:* `%s`\n%s", testPrefix, ticket.ID.String(), ticket.Description)
 	}
 
 	blocks = append(blocks, slack.NewSectionBlock(
@@ -177,7 +177,7 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 			alert := alerts[i]
 			alertList += fmt.Sprintf("• <%s|%s>\n",
 				metadata.ToMsgURL(alert.SlackThread.ChannelID, alert.SlackThread.ThreadID),
-				alert.Metadata.Title)
+				alert.Title)
 		}
 		if displayCount < len(alerts) {
 			alertList += fmt.Sprintf("\n_Showing %d of %d alerts_", displayCount, len(alerts))
@@ -221,9 +221,19 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 		}
 	}
 
+	// Add action buttons
+	var buttons []slack.BlockElement
+
+	// Add Edit button (always available)
+	buttons = append(buttons, slack.NewButtonBlockElement(
+		model.ActionIDEditTicket.String(),
+		ticket.ID.String(),
+		slack.NewTextBlockObject("plain_text", "Edit", false, false),
+	).WithStyle(slack.StyleDefault))
+
 	// Add Resolve and Salvage buttons if ticket is not resolved or archived
 	if ticket.Status != types.TicketStatusResolved && ticket.Status != types.TicketStatusArchived {
-		buttons := []slack.BlockElement{
+		buttons = append(buttons,
 			slack.NewButtonBlockElement(
 				model.ActionIDResolveTicket.String(),
 				ticket.ID.String(),
@@ -234,7 +244,10 @@ func buildTicketBlocks(ticket ticket.Ticket, alerts alert.Alerts, metadata slack
 				ticket.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Salvage", false, false),
 			).WithStyle(slack.StyleDefault),
-		}
+		)
+	}
+
+	if len(buttons) > 0 {
 		blocks = append(blocks, slack.NewActionBlock("ticket_actions", buttons...))
 	}
 
@@ -271,8 +284,8 @@ func buildBindToTicketModalViewRequest(ctx context.Context, callbackID model.Cal
 			timeStr = t.CreatedAt.Format("2006-01-02")
 		}
 
-		title := shortenString(t.Metadata.Title, 32)
-		description := shortenString(t.Metadata.Description, 64)
+		title := shortenString(t.Title, 32)
+		description := shortenString(t.Description, 64)
 		status := t.Status.Icon()
 
 		label := fmt.Sprintf("%s %s (%s)", status, title, timeStr)
@@ -488,6 +501,55 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 		Submit: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
 			Text: "Resolve",
+		},
+		Close: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Cancel",
+		},
+	}
+}
+
+func buildEditTicketModalViewRequest(callbackID model.CallbackID, ticket *ticket.Ticket) slack.ModalViewRequest {
+	blockSet := []slack.Block{
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.PlainTextType, "Edit ticket title and description.", false, false),
+			nil,
+			nil,
+		),
+		slack.NewInputBlock(
+			model.BlockIDTicketID.String(),
+			slack.NewTextBlockObject(slack.PlainTextType, "Title", false, false),
+			nil,
+			slack.NewPlainTextInputBlockElement(
+				slack.NewTextBlockObject(slack.PlainTextType, "Enter ticket title", false, false),
+				model.BlockActionIDTicketTitle.String(),
+			).WithInitialValue(ticket.Title),
+		),
+		slack.NewInputBlock(
+			model.BlockIDTicketComment.String(),
+			slack.NewTextBlockObject(slack.PlainTextType, "Description", false, false),
+			nil,
+			slack.NewPlainTextInputBlockElement(
+				slack.NewTextBlockObject(slack.PlainTextType, "Enter ticket description", false, false),
+				model.BlockActionIDTicketDesc.String(),
+			).WithInitialValue(ticket.Description).WithMultiline(true),
+		).WithOptional(true),
+	}
+
+	return slack.ModalViewRequest{
+		Type: slack.VTModal,
+		Title: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Edit Ticket",
+		},
+		Blocks: slack.Blocks{
+			BlockSet: blockSet,
+		},
+		CallbackID:      callbackID.String(),
+		PrivateMetadata: ticket.ID.String(),
+		Submit: &slack.TextBlockObject{
+			Type: slack.PlainTextType,
+			Text: "Save",
 		},
 		Close: &slack.TextBlockObject{
 			Type: slack.PlainTextType,
@@ -832,9 +894,9 @@ func buildTicketListBlocks(ctx context.Context, tickets []*ticket.Ticket, metada
 		// Create a link to the ticket with test indicator
 		var ticketTitle string
 		if t.IsTest {
-			ticketTitle = fmt.Sprintf("🧪 [TEST] %s", t.Metadata.Title)
+			ticketTitle = fmt.Sprintf("🧪 [TEST] %s", t.Title)
 		} else {
-			ticketTitle = t.Metadata.Title
+			ticketTitle = t.Title
 		}
 		ticketLink := fmt.Sprintf("<%s|%s>", metadata.ToMsgURL(t.SlackThread.ChannelID, t.SlackThread.ThreadID), ticketTitle)
 

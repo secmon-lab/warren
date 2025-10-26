@@ -411,11 +411,11 @@ func (r *Firestore) PutTicket(ctx context.Context, t ticket.Ticket) error {
 	// Create activity for ticket creation or update (except when called from agent)
 	if !user.IsAgent(ctx) {
 		if isUpdate {
-			if err := createTicketUpdateActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
+			if err := createTicketUpdateActivity(ctx, r, t.ID, t.Title); err != nil {
 				return goerr.Wrap(err, "failed to create ticket update activity", goerr.V("ticket_id", t.ID))
 			}
 		} else {
-			if err := createTicketActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
+			if err := createTicketActivity(ctx, r, t.ID, t.Title); err != nil {
 				return goerr.Wrap(err, "failed to create ticket activity", goerr.V("ticket_id", t.ID))
 			}
 		}
@@ -434,7 +434,7 @@ func (r *Firestore) PutTicketComment(ctx context.Context, comment ticket.Comment
 	if !user.IsAgent(ctx) {
 		// Get ticket for activity creation
 		if t, err := r.GetTicket(ctx, comment.TicketID); err == nil {
-			if err := createCommentActivity(ctx, r, comment.TicketID, comment.ID, t.Metadata.Title); err != nil {
+			if err := createCommentActivity(ctx, r, comment.TicketID, comment.ID, t.Title); err != nil {
 				return goerr.Wrap(err, "failed to create comment activity", goerr.V("ticket_id", comment.TicketID), goerr.V("comment_id", comment.ID))
 			}
 		}

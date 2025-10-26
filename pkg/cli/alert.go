@@ -14,6 +14,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/notifier"
 	"github.com/secmon-lab/warren/pkg/service/prompt"
 	"github.com/secmon-lab/warren/pkg/usecase"
+	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/urfave/cli/v3"
 )
 
@@ -118,7 +119,7 @@ func readAlertData(inputFile string) (any, error) {
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to open input file")
 		}
-		defer file.Close()
+		defer safe.Close(context.Background(), file)
 		reader = file
 	} else {
 		// Read from stdin
@@ -152,13 +153,13 @@ func displayPipelineResult(results []*usecase.AlertPipelineResult) error {
 		fmt.Println("─────────────────────────────────────────────────────────────────────────")
 		fmt.Printf("ID:          %s\n", r.Alert.ID)
 		fmt.Printf("Schema:      %s\n", r.Alert.Schema)
-		fmt.Printf("Title:       %s\n", r.Alert.Metadata.Title)
-		fmt.Printf("Description: %s\n", r.Alert.Metadata.Description)
-		fmt.Printf("Channel:     %s\n", r.Alert.Metadata.Channel)
+		fmt.Printf("Title:       %s\n", r.Alert.Title)
+		fmt.Printf("Description: %s\n", r.Alert.Description)
+		fmt.Printf("Channel:     %s\n", r.Alert.Channel)
 
-		if len(r.Alert.Metadata.Attributes) > 0 {
+		if len(r.Alert.Attributes) > 0 {
 			fmt.Println("\nAttributes:")
-			for _, attr := range r.Alert.Metadata.Attributes {
+			for _, attr := range r.Alert.Attributes {
 				autoFlag := ""
 				if attr.Auto {
 					autoFlag = " (auto)"

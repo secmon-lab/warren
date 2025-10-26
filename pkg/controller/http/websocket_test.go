@@ -35,7 +35,7 @@ func TestHTTPServer_WebSocketEndpoint(t *testing.T) {
 	// Create WebSocket hub and handler
 	hub := websocket_controller.NewHub(ctx)
 	go hub.Run()
-	defer hub.Close()
+	defer func() { _ = hub.Close() }()
 
 	wsHandler := websocket_controller.NewHandler(hub, repo, nil)
 
@@ -54,7 +54,7 @@ func TestHTTPServer_WebSocketEndpoint(t *testing.T) {
 	// Test WebSocket endpoint with regular HTTP request (not WebSocket)
 	resp, err := http.Get(testServer.URL + "/ws/chat/ticket/test-ticket")
 	gt.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should return 400 Bad Request (WebSocket protocol required)
 	gt.Value(t, resp.StatusCode).Equal(http.StatusBadRequest)
@@ -69,7 +69,7 @@ func TestHTTPServer_WebSocketEndpoint_WithAuth(t *testing.T) {
 	repo := repository.NewMemory()
 	hub := websocket_controller.NewHub(ctx)
 	go hub.Run()
-	defer hub.Close()
+	defer func() { _ = hub.Close() }()
 
 	wsHandler := websocket_controller.NewHandler(hub, repo, nil)
 	mockUC := &UseCaseMock{}
@@ -97,7 +97,7 @@ func TestHTTPServer_WebSocketEndpoint_WithAuth(t *testing.T) {
 	// Test endpoint with regular HTTP request (not WebSocket)
 	resp, err := http.Get(testServer.URL + "/ws/chat/ticket/test-ticket")
 	gt.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should return 400 (WebSocket protocol required) - this confirms endpoint routing works
 	gt.Value(t, resp.StatusCode).Equal(http.StatusBadRequest)
@@ -118,7 +118,7 @@ func TestHTTPServer_WithoutWebSocketHandler(t *testing.T) {
 	// Test WebSocket endpoint should not exist
 	resp, err := http.Get(testServer.URL + "/ws/chat/ticket/test-ticket")
 	gt.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// When WebSocket handler is not configured, the /ws route doesn't exist
 	// In this case, the request falls through to the SPA handler which returns index.html
@@ -150,7 +150,7 @@ func TestHTTPServer_WebSocketEndpoint_NonExistentTicket(t *testing.T) {
 	repo := repository.NewMemory()
 	hub := websocket_controller.NewHub(ctx)
 	go hub.Run()
-	defer hub.Close()
+	defer func() { _ = hub.Close() }()
 
 	wsHandler := websocket_controller.NewHandler(hub, repo, nil)
 	mockUC := &UseCaseMock{}
@@ -166,7 +166,7 @@ func TestHTTPServer_WebSocketEndpoint_NonExistentTicket(t *testing.T) {
 	// Test endpoint with non-existent ticket - should fail at ticket check
 	resp, err := http.Get(testServer.URL + "/ws/chat/ticket/non-existent")
 	gt.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should return 500 (ticket not found) - this confirms endpoint routing works but ticket doesn't exist
 	gt.Value(t, resp.StatusCode).Equal(http.StatusInternalServerError)

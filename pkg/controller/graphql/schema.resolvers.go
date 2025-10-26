@@ -75,8 +75,8 @@ func (r *alertResolver) Data(ctx context.Context, obj *alert.Alert) (string, err
 
 // Attributes is the resolver for the attributes field.
 func (r *alertResolver) Attributes(ctx context.Context, obj *alert.Alert) ([]*graphql1.AlertAttribute, error) {
-	attributes := make([]*graphql1.AlertAttribute, len(obj.Metadata.Attributes))
-	for i, attr := range obj.Metadata.Attributes {
+	attributes := make([]*graphql1.AlertAttribute, len(obj.Attributes))
+	for i, attr := range obj.Attributes {
 		var link *string
 		if attr.Link != "" {
 			link = &attr.Link
