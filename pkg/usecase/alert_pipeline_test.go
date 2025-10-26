@@ -102,6 +102,10 @@ func (m *mockSession) History() (*gollem.History, error) {
 	return nil, nil
 }
 
+func (m *mockSession) AppendHistory(history *gollem.History) error {
+	return nil
+}
+
 func TestProcessAlertPipeline_Basic(t *testing.T) {
 	t.Run("processes alert through pipeline successfully", func(t *testing.T) {
 		ctx := context.Background()
@@ -131,7 +135,7 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		gt.NoError(t, err)
 		gt.NotEqual(t, results, nil)
 		gt.Equal(t, len(results), 1)
-		gt.Equal(t, results[0].Alert.Metadata.Title, "Updated Title")
+		gt.Equal(t, results[0].Alert.Title, "Updated Title")
 		gt.True(t, len(events) > 0)
 	})
 
@@ -279,7 +283,7 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		gt.NotEqual(t, results, nil)
 		gt.Equal(t, len(results), 1)
 		gt.Equal(t, len(results[0].EnrichResult), 0) // No enrich tasks
-		gt.Equal(t, results[0].Alert.Metadata.Title, "Updated Title")
+		gt.Equal(t, results[0].Alert.Title, "Updated Title")
 	})
 
 	t.Run("works without commit policy", func(t *testing.T) {

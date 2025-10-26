@@ -19,7 +19,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/service/prompt"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -417,8 +416,8 @@ func TestGetUnboundAlertsFiltered_SimilarityThreshold(t *testing.T) {
 
 	// Create a ticket with embedding
 	testTicket := ticket.New(ctx, []types.AlertID{}, nil)
-	testTicket.Metadata.Title = "Test Ticket"
-	testTicket.Metadata.Description = "Test Description"
+	testTicket.Title = "Test Ticket"
+	testTicket.Description = "Test Description"
 	testTicket.Embedding = firestore.Vector32{0.5, 0.5, 0.5}
 	gt.NoError(t, repo.PutTicket(ctx, testTicket))
 
@@ -594,8 +593,8 @@ func TestGetUnboundAlertsFiltered_Combined(t *testing.T) {
 
 	// Create a ticket
 	testTicket := ticket.New(ctx, []types.AlertID{}, nil)
-	testTicket.Metadata.Title = "Database Issues"
-	testTicket.Metadata.Description = "Database connectivity problems"
+	testTicket.Title = "Database Issues"
+	testTicket.Description = "Database connectivity problems"
 	testTicket.Embedding = firestore.Vector32{0.5, 0.5, 0.5}
 	gt.NoError(t, repo.PutTicket(ctx, testTicket))
 
@@ -714,8 +713,8 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 
 	// Create a ticket with existing metadata
 	testTicket := ticket.New(ctx, []types.AlertID{}, nil)
-	testTicket.Metadata.Title = "Original Ticket Title"
-	testTicket.Metadata.Description = "Original ticket description"
+	testTicket.Title = "Original Ticket Title"
+	testTicket.Description = "Original ticket description"
 	testTicket.Metadata.TitleSource = types.SourceAI
 	testTicket.Metadata.DescriptionSource = types.SourceAI
 	testTicket.SlackThread = &slack.Thread{
@@ -1532,11 +1531,12 @@ func TestHandleAlert_PolicyTagDuplicationPrevention(t *testing.T) {
 	tag1Count := 0
 	tag2Count := 0
 	for _, name := range tagNames {
-		if name == commonTag {
+		switch name {
+		case commonTag:
 			commonTagCount++
-		} else if name == alertSpecificTag1 {
+		case alertSpecificTag1:
 			tag1Count++
-		} else if name == alertSpecificTag2 {
+		case alertSpecificTag2:
 			tag2Count++
 		}
 	}
@@ -1545,129 +1545,6 @@ func TestHandleAlert_PolicyTagDuplicationPrevention(t *testing.T) {
 	gt.Number(t, commonTagCount).Equal(1)
 	gt.Number(t, tag1Count).Equal(1)
 	gt.Number(t, tag2Count).Equal(1)
-}
-
-func TestProcessGenAI(t *testing.T) {
-	repo := repository.NewMemory()
-	ctx := context.Background()
-
-	t.Run("no GenAI config", func(t *testing.T) {
-		uc := usecase.New(usecase.WithRepository(repo))
-
-		alert := &alert.Alert{
-			Metadata: alert.Metadata{
-				Title: "Test Alert",
-			},
-		}
-
-		response, err := uc.ProcessGenAI(ctx, alert)
-		gt.NoError(t, err)
-		gt.Equal(t, response, "")
-	})
-
-	t.Run("no prompt service configured", func(t *testing.T) {
-		uc := usecase.New(usecase.WithRepository(repo))
-
-		alert := &alert.Alert{
-			Metadata: alert.Metadata{
-				Title: "Test Alert",
-				GenAI: &alert.GenAIConfig{
-					Prompt: "test_prompt.tmpl",
-					Format: "text",
-				},
-			},
-		}
-
-		_, err := uc.ProcessGenAI(ctx, alert)
-		gt.Error(t, err)
-		gt.S(t, err.Error()).Contains("prompt service not configured")
-	})
-
-	t.Run("with GenAI config and prompt service", func(t *testing.T) {
-		// Create prompt service with test template
-		promptService, err := prompt.New("testdata/prompts")
-		gt.NoError(t, err)
-
-		// Mock LLM session and response
-		mockLLM := &gollem_mock.LLMClientMock{
-			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
-				return &gollem_mock.SessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
-						return &gollem.Response{
-							Texts: []string{"This is a test LLM response"},
-						}, nil
-					},
-				}, nil
-			},
-		}
-
-		uc := usecase.New(
-			usecase.WithRepository(repo),
-			usecase.WithLLMClient(mockLLM),
-			usecase.WithPromptService(promptService),
-		)
-
-		alert := &alert.Alert{
-			Metadata: alert.Metadata{
-				Title: "Test Alert",
-				GenAI: &alert.GenAIConfig{
-					Prompt: "test_prompt.tmpl",
-					Format: "text",
-				},
-			},
-		}
-
-		response, err := uc.ProcessGenAI(ctx, alert)
-		gt.NoError(t, err)
-		gt.Equal(t, response, "This is a test LLM response")
-	})
-
-	t.Run("with mock prompt service", func(t *testing.T) {
-		// Mock prompt service
-		mockPromptService := &mock.PromptServiceMock{
-			GeneratePromptFunc: func(ctx context.Context, templateName string, alert *alert.Alert) (string, error) {
-				return "Generated prompt for " + templateName, nil
-			},
-		}
-
-		// Mock LLM session and response
-		mockLLM := &gollem_mock.LLMClientMock{
-			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
-				return &gollem_mock.SessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
-						return &gollem.Response{
-							Texts: []string{"Mock LLM response"},
-						}, nil
-					},
-				}, nil
-			},
-		}
-
-		uc := usecase.New(
-			usecase.WithRepository(repo),
-			usecase.WithLLMClient(mockLLM),
-			usecase.WithPromptService(mockPromptService),
-		)
-
-		alert := &alert.Alert{
-			Metadata: alert.Metadata{
-				Title: "Test Alert",
-				GenAI: &alert.GenAIConfig{
-					Prompt: "mock_template",
-					Format: "text",
-				},
-			},
-		}
-
-		response, err := uc.ProcessGenAI(ctx, alert)
-		gt.NoError(t, err)
-		gt.Equal(t, response, "Mock LLM response")
-
-		// Verify prompt service was called correctly
-		calls := mockPromptService.GeneratePromptCalls()
-		gt.Array(t, calls).Length(1)
-		gt.Equal(t, calls[0].TemplateName, "mock_template")
-	})
 }
 
 func TestHandleNotice(t *testing.T) {

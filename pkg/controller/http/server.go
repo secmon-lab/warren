@@ -315,7 +315,7 @@ func faviconHandler(staticFS fs.FS, filename, contentType string) http.HandlerFu
 			http.NotFound(w, r)
 			return
 		}
-		defer file.Close()
+		defer safe.Close(r.Context(), file)
 
 		w.Header().Set("Content-Type", contentType)
 		w.Header().Set("Cache-Control", "public, max-age=31536000") // Cache for 1 year

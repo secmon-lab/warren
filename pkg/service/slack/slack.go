@@ -23,6 +23,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 
 	"github.com/slack-go/slack"
@@ -150,7 +151,7 @@ func New(client interfaces.SlackClient, channelID string, opts ...ServiceOption)
 		return nil, goerr.Wrap(err, "failed to get team info from slack")
 	}
 	if teamInfo != nil {
-		s.slackMetadata.workspaceDomain = teamInfo.Domain
+		s.workspaceDomain = teamInfo.Domain
 	} else {
 		logging.Default().Error("failed to get team info from slack", "error", err)
 	}
@@ -268,8 +269,8 @@ func (x *Service) postAlertWithFallback(ctx context.Context, failedChannel strin
 
 	// Create a copy of the alert with warning message prepended to description
 	fallbackAlert := *alert
-	fallbackAlert.Metadata.Description = fmt.Sprintf("⚠️ Failed to send to channel `%s`. Falling back to default channel.\n\n%s",
-		failedChannel, alert.Metadata.Description)
+	fallbackAlert.Description = fmt.Sprintf("⚠️ Failed to send to channel `%s`. Falling back to default channel.\n\n%s",
+		failedChannel, alert.Description)
 
 	// Use existing postAlertToChannel method with modified alert
 	return x.postAlertToChannel(ctx, x.channelID, &fallbackAlert)
@@ -277,7 +278,7 @@ func (x *Service) postAlertWithFallback(ctx context.Context, failedChannel strin
 
 func (x *Service) PostAlert(ctx context.Context, alert *alert.Alert) (interfaces.SlackThreadService, error) {
 	// Determine target channel from alert metadata
-	targetChannel := alert.Metadata.Channel
+	targetChannel := alert.Channel
 	if targetChannel == "" {
 		// No channel specified, use default
 		targetChannel = x.channelID
@@ -412,36 +413,6 @@ func (x *Service) GetConversationHistory(
 	}
 
 	return messages, nil
-}
-
-// convertSlackMessage converts slack.Message to ConversationMessage
-func (x *Service) convertSlackMessage(_ context.Context, msg slack.Message) (*ConversationMessage, error) {
-	var user *model.User
-	if msg.User != "" {
-		userInfo, err := x.client.GetUserInfo(msg.User)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get user info")
-		}
-		user = &model.User{
-			ID:   userInfo.ID,
-			Name: userInfo.Name,
-		}
-	}
-
-	timestamp, err := strconv.ParseFloat(msg.Timestamp, 64)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to parse timestamp")
-	}
-
-	return &ConversationMessage{
-		User:      user,
-		Text:      msg.Text,
-		Timestamp: time.Unix(int64(timestamp), 0),
-		Thread: model.Thread{
-			ChannelID: msg.Channel,
-			ThreadID:  msg.ThreadTimestamp,
-		},
-	}, nil
 }
 
 // convertSlackMessageWithUserMap converts slack.Message to ConversationMessage using pre-fetched user info map
@@ -1064,7 +1035,7 @@ func (x *Service) downloadUserImage(ctx context.Context, url string) ([]byte, st
 	if err != nil {
 		return nil, "", goerr.Wrap(err, "failed to download image")
 	}
-	defer resp.Body.Close()
+	defer safe.Close(ctx, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, "", goerr.New("failed to download image",

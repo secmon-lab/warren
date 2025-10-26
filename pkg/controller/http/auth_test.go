@@ -248,7 +248,7 @@ func TestE2ENoAuthnFlow(t *testing.T) {
 		// Step 1: Access /api/auth/me - should return anonymous user
 		resp, err := client.Get(ts.URL + "/api/auth/me")
 		gt.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		gt.Equal(t, resp.StatusCode, http.StatusOK)
 
@@ -267,7 +267,7 @@ func TestE2ENoAuthnFlow(t *testing.T) {
 
 		resp2, err := client.Do(req)
 		gt.NoError(t, err)
-		defer resp2.Body.Close()
+		defer func() { _ = resp2.Body.Close() }()
 
 		// Should not be 401
 		gt.True(t, resp2.StatusCode != http.StatusUnauthorized)
@@ -275,7 +275,9 @@ func TestE2ENoAuthnFlow(t *testing.T) {
 		// Step 3: Try to login - should redirect to root
 		resp3, err := client.Get(ts.URL + "/api/auth/login")
 		gt.NoError(t, err)
-		defer resp3.Body.Close()
+		defer func() {
+			_ = resp3.Body.Close()
+		}()
 
 		gt.Equal(t, resp3.StatusCode, http.StatusTemporaryRedirect)
 		gt.Equal(t, resp3.Header.Get("Location"), "/")
@@ -286,7 +288,9 @@ func TestE2ENoAuthnFlow(t *testing.T) {
 
 		resp4, err := client.Do(req4)
 		gt.NoError(t, err)
-		defer resp4.Body.Close()
+		defer func() {
+			_ = resp4.Body.Close()
+		}()
 
 		gt.Equal(t, resp4.StatusCode, http.StatusOK)
 
@@ -322,7 +326,7 @@ func TestE2ERegularAuthFlow(t *testing.T) {
 		// Step 1: Access /api/auth/me without auth - should fail
 		resp, err := client.Get(ts.URL + "/api/auth/me")
 		gt.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		gt.Equal(t, resp.StatusCode, http.StatusUnauthorized)
 
@@ -334,14 +338,18 @@ func TestE2ERegularAuthFlow(t *testing.T) {
 
 		resp2, err := client.Do(req)
 		gt.NoError(t, err)
-		defer resp2.Body.Close()
+		defer func() {
+			_ = resp2.Body.Close()
+		}()
 
 		gt.Equal(t, resp2.StatusCode, http.StatusUnauthorized)
 
 		// Step 3: Login redirects to Slack
 		resp3, err := client.Get(ts.URL + "/api/auth/login")
 		gt.NoError(t, err)
-		defer resp3.Body.Close()
+		defer func() {
+			_ = resp3.Body.Close()
+		}()
 
 		gt.Equal(t, resp3.StatusCode, http.StatusTemporaryRedirect)
 		location := resp3.Header.Get("Location")
@@ -366,7 +374,9 @@ func TestE2ERegularAuthFlow(t *testing.T) {
 
 		resp5, err := client.Do(req5)
 		gt.NoError(t, err)
-		defer resp5.Body.Close()
+		defer func() {
+			_ = resp5.Body.Close()
+		}()
 
 		gt.Equal(t, resp5.StatusCode, http.StatusOK)
 

@@ -67,8 +67,6 @@ type Metadata struct {
 	// Tags field is used temporarily during policy processing to pass tag names
 	// These are converted to TagIDs and not persisted in this field
 	Tags []string `json:"tags,omitempty"`
-	// GenAI field specifies LLM processing configuration
-	GenAI *GenAIConfig `json:"genai,omitempty"`
 	// Channel field specifies target Slack channel for alert notification
 	// Set by action policy evaluation
 	Channel string `json:"channel,omitempty"`
@@ -97,19 +95,19 @@ func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metad
 		TagIDs:    make(map[string]bool),
 	}
 
-	if newAlert.Metadata.Title == "" {
-		newAlert.Metadata.Title = DefaultAlertTitle
+	if newAlert.Title == "" {
+		newAlert.Title = DefaultAlertTitle
 	}
-	if newAlert.Metadata.Description == "" {
-		newAlert.Metadata.Description = DefaultAlertDescription
+	if newAlert.Description == "" {
+		newAlert.Description = DefaultAlertDescription
 	}
 
 	// Set default sources if not specified
-	if newAlert.Metadata.TitleSource == "" {
-		newAlert.Metadata.TitleSource = types.SourceHuman // Default alert metadata is human-provided
+	if newAlert.TitleSource == "" {
+		newAlert.TitleSource = types.SourceHuman // Default alert metadata is human-provided
 	}
-	if newAlert.Metadata.DescriptionSource == "" {
-		newAlert.Metadata.DescriptionSource = types.SourceHuman // Default alert metadata is human-provided
+	if newAlert.DescriptionSource == "" {
+		newAlert.DescriptionSource = types.SourceHuman // Default alert metadata is human-provided
 	}
 
 	return newAlert
@@ -191,7 +189,7 @@ func (x *Alert) CosineSimilarity(other []float32) float64 {
 var alertMetaPrompt string
 
 func (x *Alert) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) error {
-	if x.Metadata.Title == DefaultAlertTitle || x.Metadata.Title == "" {
+	if x.Title == DefaultAlertTitle || x.Title == "" {
 		logger := logging.From(ctx)
 		logger.Info("fill metadata", "alert", x.Data)
 		prompt, err := prompt.Generate(ctx, alertMetaPrompt, map[string]any{
@@ -216,19 +214,19 @@ func (x *Alert) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) er
 			return err
 		}
 
-		if x.Metadata.Title == "" || x.Metadata.Title == DefaultAlertTitle {
-			x.Metadata.Title = resp.Title
-			x.Metadata.TitleSource = types.SourceAI
+		if x.Title == "" || x.Title == DefaultAlertTitle {
+			x.Title = resp.Title
+			x.TitleSource = types.SourceAI
 		}
 
-		if x.Metadata.Description == "" || x.Metadata.Description == DefaultAlertDescription {
-			x.Metadata.Description = resp.Description
-			x.Metadata.DescriptionSource = types.SourceAI
+		if x.Description == "" || x.Description == DefaultAlertDescription {
+			x.Description = resp.Description
+			x.DescriptionSource = types.SourceAI
 		}
 
 		for _, resAttr := range resp.Attributes {
 			found := false
-			for _, aAttr := range x.Metadata.Attributes {
+			for _, aAttr := range x.Attributes {
 				if aAttr.Value == resAttr.Value {
 					found = true
 					break
@@ -236,7 +234,7 @@ func (x *Alert) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) er
 			}
 			if !found {
 				resAttr.Auto = true
-				x.Metadata.Attributes = append(x.Metadata.Attributes, resAttr)
+				x.Attributes = append(x.Attributes, resAttr)
 			}
 		}
 	}

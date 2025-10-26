@@ -142,7 +142,7 @@ func TestTagService_UpdateTicketTagsByName(t *testing.T) {
 
 	// Create a ticket
 	tk := ticket.New(ctx, []types.AlertID{}, nil)
-	tk.Metadata.Title = "Test Ticket"
+	tk.Title = "Test Ticket"
 	gt.NoError(t, repo.PutTicket(ctx, tk))
 
 	// Update ticket tags using name-based method
@@ -381,7 +381,7 @@ func TestTagService_DeleteTag_FullCleanup(t *testing.T) {
 
 	// Create a ticket with both tags
 	tk := ticket.New(ctx, []types.AlertID{}, nil)
-	tk.Metadata.Title = "Test Ticket"
+	tk.Title = "Test Ticket"
 	tk.TagIDs = map[string]bool{
 		deleteTagID: true,
 		keepTagID:   true,
@@ -471,7 +471,7 @@ func TestTagService_DeleteTag_MultipleAlertsAndTickets(t *testing.T) {
 	var ticketIDs []types.TicketID
 	for i := 0; i < 3; i++ {
 		tk := ticket.New(ctx, []types.AlertID{}, nil)
-		tk.Metadata.Title = "Test Ticket " + string(rune(i))
+		tk.Title = "Test Ticket " + string(rune(i))
 		tk.TagIDs = map[string]bool{sharedTagID: true}
 		gt.NoError(t, repo.PutTicket(ctx, tk))
 		ticketIDs = append(ticketIDs, tk.ID)

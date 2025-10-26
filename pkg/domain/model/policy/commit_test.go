@@ -25,9 +25,9 @@ func TestCommitPolicyResult_ApplyTo(t *testing.T) {
 
 		result.ApplyTo(&a)
 
-		gt.Equal(t, a.Metadata.Title, "New Title from Policy")
-		gt.Equal(t, a.Metadata.TitleSource, types.SourcePolicy)
-		gt.Equal(t, a.Metadata.Description, "Original Description") // unchanged
+		gt.Equal(t, a.Title, "New Title from Policy")
+		gt.Equal(t, a.TitleSource, types.SourcePolicy)
+		gt.Equal(t, a.Description, "Original Description") // unchanged
 	})
 
 	t.Run("applies description from commit policy", func(t *testing.T) {
@@ -43,9 +43,9 @@ func TestCommitPolicyResult_ApplyTo(t *testing.T) {
 
 		result.ApplyTo(&a)
 
-		gt.Equal(t, a.Metadata.Description, "New Description from Policy")
-		gt.Equal(t, a.Metadata.DescriptionSource, types.SourcePolicy)
-		gt.Equal(t, a.Metadata.Title, "Original Title") // unchanged
+		gt.Equal(t, a.Description, "New Description from Policy")
+		gt.Equal(t, a.DescriptionSource, types.SourcePolicy)
+		gt.Equal(t, a.Title, "Original Title") // unchanged
 	})
 
 	t.Run("applies channel from commit policy", func(t *testing.T) {
@@ -58,7 +58,7 @@ func TestCommitPolicyResult_ApplyTo(t *testing.T) {
 
 		result.ApplyTo(&a)
 
-		gt.Equal(t, a.Metadata.Channel, "security-alerts")
+		gt.Equal(t, a.Channel, "security-alerts")
 	})
 
 	t.Run("applies attributes from commit policy", func(t *testing.T) {
@@ -78,22 +78,22 @@ func TestCommitPolicyResult_ApplyTo(t *testing.T) {
 
 		result.ApplyTo(&a)
 
-		gt.Equal(t, len(a.Metadata.Attributes), 3)
+		gt.Equal(t, len(a.Attributes), 3)
 
 		// Check existing attribute is preserved
-		gt.Equal(t, a.Metadata.Attributes[0].Key, "existing")
-		gt.Equal(t, a.Metadata.Attributes[0].Value, "attr1")
-		gt.False(t, a.Metadata.Attributes[0].Auto)
+		gt.Equal(t, a.Attributes[0].Key, "existing")
+		gt.Equal(t, a.Attributes[0].Value, "attr1")
+		gt.False(t, a.Attributes[0].Auto)
 
 		// Check new attributes are added and marked as auto
-		gt.Equal(t, a.Metadata.Attributes[1].Key, "severity")
-		gt.Equal(t, a.Metadata.Attributes[1].Value, "high")
-		gt.True(t, a.Metadata.Attributes[1].Auto)
+		gt.Equal(t, a.Attributes[1].Key, "severity")
+		gt.Equal(t, a.Attributes[1].Value, "high")
+		gt.True(t, a.Attributes[1].Auto)
 
-		gt.Equal(t, a.Metadata.Attributes[2].Key, "score")
-		gt.Equal(t, a.Metadata.Attributes[2].Value, "95")
-		gt.Equal(t, a.Metadata.Attributes[2].Link, "https://example.com")
-		gt.True(t, a.Metadata.Attributes[2].Auto)
+		gt.Equal(t, a.Attributes[2].Key, "score")
+		gt.Equal(t, a.Attributes[2].Value, "95")
+		gt.Equal(t, a.Attributes[2].Link, "https://example.com")
+		gt.True(t, a.Attributes[2].Auto)
 	})
 
 	t.Run("applies all fields from commit policy", func(t *testing.T) {
@@ -111,13 +111,13 @@ func TestCommitPolicyResult_ApplyTo(t *testing.T) {
 
 		result.ApplyTo(&a)
 
-		gt.Equal(t, a.Metadata.Title, "Complete Title")
-		gt.Equal(t, a.Metadata.TitleSource, types.SourcePolicy)
-		gt.Equal(t, a.Metadata.Description, "Complete Description")
-		gt.Equal(t, a.Metadata.DescriptionSource, types.SourcePolicy)
-		gt.Equal(t, a.Metadata.Channel, "alerts-channel")
-		gt.Equal(t, len(a.Metadata.Attributes), 1)
-		gt.True(t, a.Metadata.Attributes[0].Auto)
+		gt.Equal(t, a.Title, "Complete Title")
+		gt.Equal(t, a.TitleSource, types.SourcePolicy)
+		gt.Equal(t, a.Description, "Complete Description")
+		gt.Equal(t, a.DescriptionSource, types.SourcePolicy)
+		gt.Equal(t, a.Channel, "alerts-channel")
+		gt.Equal(t, len(a.Attributes), 1)
+		gt.True(t, a.Attributes[0].Auto)
 	})
 
 	t.Run("does not modify alert when result is empty", func(t *testing.T) {
@@ -132,17 +132,17 @@ func TestCommitPolicyResult_ApplyTo(t *testing.T) {
 
 		result := policy.CommitPolicyResult{}
 
-		originalTitleSource := a.Metadata.TitleSource
-		originalDescriptionSource := a.Metadata.DescriptionSource
+		originalTitleSource := a.TitleSource
+		originalDescriptionSource := a.DescriptionSource
 
 		result.ApplyTo(&a)
 
-		gt.Equal(t, a.Metadata.Title, "Original Title")
-		gt.Equal(t, a.Metadata.TitleSource, originalTitleSource)
-		gt.Equal(t, a.Metadata.Description, "Original Description")
-		gt.Equal(t, a.Metadata.DescriptionSource, originalDescriptionSource)
-		gt.Equal(t, a.Metadata.Channel, "")
-		gt.Equal(t, len(a.Metadata.Attributes), 1)
+		gt.Equal(t, a.Title, "Original Title")
+		gt.Equal(t, a.TitleSource, originalTitleSource)
+		gt.Equal(t, a.Description, "Original Description")
+		gt.Equal(t, a.DescriptionSource, originalDescriptionSource)
+		gt.Equal(t, a.Channel, "")
+		gt.Equal(t, len(a.Attributes), 1)
 	})
 
 	t.Run("handles attributes with numeric values from JSON", func(t *testing.T) {
@@ -165,19 +165,19 @@ func TestCommitPolicyResult_ApplyTo(t *testing.T) {
 
 		result.ApplyTo(&a)
 
-		gt.Equal(t, len(a.Metadata.Attributes), 3)
+		gt.Equal(t, len(a.Attributes), 3)
 
 		// Verify numeric values are converted to strings
-		gt.Equal(t, a.Metadata.Attributes[0].Key, "count")
-		gt.Equal(t, a.Metadata.Attributes[0].Value, "42")
-		gt.True(t, a.Metadata.Attributes[0].Auto) // Should be marked as auto
+		gt.Equal(t, a.Attributes[0].Key, "count")
+		gt.Equal(t, a.Attributes[0].Value, "42")
+		gt.True(t, a.Attributes[0].Auto) // Should be marked as auto
 
-		gt.Equal(t, a.Metadata.Attributes[1].Key, "score")
-		gt.Equal(t, a.Metadata.Attributes[1].Value, "3.14")
-		gt.True(t, a.Metadata.Attributes[1].Auto)
+		gt.Equal(t, a.Attributes[1].Key, "score")
+		gt.Equal(t, a.Attributes[1].Value, "3.14")
+		gt.True(t, a.Attributes[1].Auto)
 
-		gt.Equal(t, a.Metadata.Attributes[2].Key, "is_critical")
-		gt.Equal(t, a.Metadata.Attributes[2].Value, "true")
-		gt.True(t, a.Metadata.Attributes[2].Auto)
+		gt.Equal(t, a.Attributes[2].Key, "is_critical")
+		gt.Equal(t, a.Attributes[2].Value, "true")
+		gt.True(t, a.Attributes[2].Auto)
 	})
 }

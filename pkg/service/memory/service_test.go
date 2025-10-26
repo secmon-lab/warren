@@ -314,8 +314,8 @@ func TestGenerateTicketMemoryWithRealLLM(t *testing.T) {
 		CreatedAt: time.Now().Add(-2 * time.Hour),
 		UpdatedAt: time.Now(),
 	}
-	ticketData.Metadata.Title = "Suspicious Login from Unknown Location"
-	ticketData.Metadata.Description = "Multiple failed login attempts followed by successful login from new IP address"
+	ticketData.Title = "Suspicious Login from Unknown Location"
+	ticketData.Description = "Multiple failed login attempts followed by successful login from new IP address"
 
 	// Create mock comments representing the investigation
 	comments := []ticket.Comment{

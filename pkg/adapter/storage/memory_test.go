@@ -31,7 +31,9 @@ func TestMemoryClient_BasicOperations(t *testing.T) {
 		// Get object
 		reader, err := client.GetObject(ctx, objectName)
 		gt.NoError(t, err)
-		defer reader.Close()
+		defer func() {
+			_ = reader.Close()
+		}()
 
 		retrievedData, err := io.ReadAll(reader)
 		gt.NoError(t, err)
@@ -64,7 +66,9 @@ func TestMemoryClient_BasicOperations(t *testing.T) {
 		// Verify second data is stored
 		reader, err := client.GetObject(ctx, objectName)
 		gt.NoError(t, err)
-		defer reader.Close()
+		defer func() {
+			_ = reader.Close()
+		}()
 
 		retrievedData, err := io.ReadAll(reader)
 		gt.NoError(t, err)
@@ -136,7 +140,7 @@ func TestMemoryClient_ConcurrentAccess(t *testing.T) {
 		gt.NoError(t, err)
 
 		retrievedData, err := io.ReadAll(reader)
-		reader.Close()
+		_ = reader.Close()
 		gt.NoError(t, err)
 		gt.Equal(t, expectedData, retrievedData)
 	}
@@ -160,7 +164,7 @@ func TestMemoryClient_EmptyData(t *testing.T) {
 		// Retrieve empty data
 		reader, err := client.GetObject(ctx, objectName)
 		gt.NoError(t, err)
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 
 		retrievedData, err := io.ReadAll(reader)
 		gt.NoError(t, err)
@@ -188,7 +192,7 @@ func TestMemoryClient_LargeData(t *testing.T) {
 		// Retrieve large data
 		reader, err := client.GetObject(ctx, objectName)
 		gt.NoError(t, err)
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 
 		retrievedData, err := io.ReadAll(reader)
 		gt.NoError(t, err)

@@ -66,7 +66,7 @@ func TestHandler_HandleTicketChat_MissingTicketID(t *testing.T) {
 	req, _ := http.NewRequest("GET", server.URL+"/ws/chat/ticket/", nil)
 	resp, err := http.DefaultClient.Do(req)
 	gt.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should return 404 (not found due to routing)
 	gt.Value(t, resp.StatusCode).Equal(http.StatusNotFound)
@@ -83,7 +83,7 @@ func TestHandler_HandleTicketChat_MissingUserID(t *testing.T) {
 	req, _ := http.NewRequest("GET", server.URL+"/ws/chat/ticket/test-ticket", nil)
 	resp, err := http.DefaultClient.Do(req)
 	gt.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should return 401 Unauthorized
 	gt.Value(t, resp.StatusCode).Equal(http.StatusUnauthorized)
@@ -110,7 +110,7 @@ func TestHandler_HandleTicketChat_TicketNotFound(t *testing.T) {
 
 	resp, err := http.DefaultClient.Do(req)
 	gt.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should return 500 Internal Server Error (repository error for non-existent ticket)
 	gt.Value(t, resp.StatusCode).Equal(http.StatusInternalServerError)
@@ -137,7 +137,7 @@ func TestHandler_HandleTicketChat_BadUpgrade(t *testing.T) {
 
 	resp, err := http.DefaultClient.Do(req)
 	gt.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should return 400 Bad Request (upgrade failed)
 	gt.Value(t, resp.StatusCode).Equal(http.StatusBadRequest)
@@ -146,7 +146,9 @@ func TestHandler_HandleTicketChat_BadUpgrade(t *testing.T) {
 func TestHandler_WebSocketConnection_Success(t *testing.T) {
 	handler, server, hub, _, cancel := setupTestHandler(t)
 	defer cancel()
-	defer hub.Close()
+	defer func() {
+		_ = hub.Close()
+	}()
 	defer server.Close()
 
 	configureTestServer(handler, server)
@@ -189,7 +191,9 @@ func TestHandler_ErrorHandling_Creation(t *testing.T) {
 
 	repo := repository.NewMemory()
 	hub := websocket_ctrl.NewHub(ctx)
-	defer hub.Close()
+	defer func() {
+		_ = hub.Close()
+	}()
 
 	// Should not panic with nil UseCases
 	handler := websocket_ctrl.NewHandler(hub, repo, nil)
@@ -306,12 +310,14 @@ func TestHandler_WebSocketIntegration(t *testing.T) {
 	repo := repository.NewMemory()
 	hub := websocket_ctrl.NewHub(ctx)
 	go hub.Run()
-	defer hub.Close()
+	defer func() {
+		_ = hub.Close()
+	}()
 
 	// Create test ticket
 	testTicket := ticket.New(ctx, []types.AlertID{}, nil)
 	testTicket.ID = types.TicketID("test-ticket")
-	testTicket.Metadata.Title = "Test Ticket"
+	testTicket.Title = "Test Ticket"
 	err := repo.PutTicket(ctx, testTicket)
 	gt.NoError(t, err)
 
@@ -338,7 +344,7 @@ func TestHandler_WebSocketIntegration(t *testing.T) {
 		ws, resp, err := websocket.DefaultDialer.Dial(wsURL, headers)
 		gt.NoError(t, err)
 		gt.Value(t, resp.StatusCode).Equal(http.StatusSwitchingProtocols)
-		defer ws.Close()
+		defer func() { _ = ws.Close() }()
 
 		// Should receive initial status message
 		var status websocket_model.ChatResponse
@@ -355,7 +361,9 @@ func TestHandler_WebSocketIntegration(t *testing.T) {
 		ws, resp, err := websocket.DefaultDialer.Dial(wsURL, headers)
 		gt.NoError(t, err)
 		gt.Value(t, resp.StatusCode).Equal(http.StatusSwitchingProtocols)
-		defer ws.Close()
+		defer func() {
+			_ = ws.Close()
+		}()
 
 		// Skip initial status message
 		var status websocket_model.ChatResponse
@@ -386,7 +394,9 @@ func TestHandler_WebSocketIntegration(t *testing.T) {
 		ws, resp, err := websocket.DefaultDialer.Dial(wsURL, headers)
 		gt.NoError(t, err)
 		gt.Value(t, resp.StatusCode).Equal(http.StatusSwitchingProtocols)
-		defer ws.Close()
+		defer func() {
+			_ = ws.Close()
+		}()
 
 		// Skip initial status message
 		var status websocket_model.ChatResponse
@@ -419,7 +429,7 @@ func TestHandler_WebSocketSecurity(t *testing.T) {
 		repo := repository.NewMemory()
 		hub := websocket_ctrl.NewHub(ctx)
 		go hub.Run()
-		defer hub.Close()
+		defer func() { _ = hub.Close() }()
 
 		handler, server := websocket_ctrl.NewTestHandler(hub, repo, nil)
 
@@ -443,7 +453,7 @@ func TestHandler_WebSocketSecurity(t *testing.T) {
 		repo := repository.NewMemory()
 		hub := websocket_ctrl.NewHub(ctx)
 		go hub.Run()
-		defer hub.Close()
+		defer func() { _ = hub.Close() }()
 
 		handler, server := websocket_ctrl.NewTestHandler(hub, repo, nil)
 

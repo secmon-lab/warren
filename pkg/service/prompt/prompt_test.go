@@ -16,7 +16,9 @@ func TestPromptService(t *testing.T) {
 	// Create temporary directory for test templates
 	tempDir, err := os.MkdirTemp("", "warren-prompt-test-*")
 	gt.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
 
 	// Create test template
 	templateContent := `You are a security analyst. Analyze the following alert:

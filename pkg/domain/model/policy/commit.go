@@ -23,17 +23,17 @@ type CommitPolicyResult struct {
 // ApplyTo applies the commit policy result to an alert
 func (r *CommitPolicyResult) ApplyTo(a *alert.Alert) {
 	if r.Title != "" {
-		a.Metadata.Title = r.Title
-		a.Metadata.TitleSource = types.SourcePolicy
+		a.Title = r.Title
+		a.TitleSource = types.SourcePolicy
 	}
 
 	if r.Description != "" {
-		a.Metadata.Description = r.Description
-		a.Metadata.DescriptionSource = types.SourcePolicy
+		a.Description = r.Description
+		a.DescriptionSource = types.SourcePolicy
 	}
 
 	if r.Channel != "" {
-		a.Metadata.Channel = r.Channel
+		a.Channel = r.Channel
 	}
 
 	if len(r.Attr) > 0 {
@@ -41,6 +41,6 @@ func (r *CommitPolicyResult) ApplyTo(a *alert.Alert) {
 		for i := range r.Attr {
 			r.Attr[i].Auto = true
 		}
-		a.Metadata.Attributes = append(a.Metadata.Attributes, r.Attr...)
+		a.Attributes = append(a.Attributes, r.Attr...)
 	}
 }

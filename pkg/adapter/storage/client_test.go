@@ -37,7 +37,9 @@ func TestClient(t *testing.T) {
 	t.Run("GetObject", func(t *testing.T) {
 		rc, err := client.GetObject(ctx, objectName)
 		gt.NoError(t, err)
-		defer rc.Close()
+		defer func() {
+			_ = rc.Close()
+		}()
 
 		data, err := io.ReadAll(rc)
 		gt.NoError(t, err)
@@ -73,7 +75,9 @@ func TestClient(t *testing.T) {
 		// Verify object found in other client
 		rc, err := otherClient.GetObject(ctx, objectName)
 		gt.NoError(t, err)
-		defer rc.Close()
+		defer func() {
+			_ = rc.Close()
+		}()
 
 		data, err := io.ReadAll(rc)
 		gt.NoError(t, err)

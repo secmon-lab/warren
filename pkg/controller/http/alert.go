@@ -14,6 +14,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/async"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
 // hookEndpointType represents the type of alert hook endpoint
@@ -82,7 +83,7 @@ func alertPubSubHandler(uc useCase) http.HandlerFunc {
 			handleError(w, r, goerr.Wrap(err, "failed to read body"))
 			return
 		}
-		defer r.Body.Close()
+		defer safe.Close(r.Context(), r.Body)
 
 		var msg message.PubSub
 		if err := json.Unmarshal(rawBody, &msg); err != nil {
