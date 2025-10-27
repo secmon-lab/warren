@@ -70,15 +70,15 @@ func (x *Ticket) Validate() error {
 
 type Metadata struct {
 	// Title is the title of the ticket for human readability.
-	Title string `json:"title"`
+	Title string `json:"title" required:"true" maxLength:"255"`
 	// Description is the description of the ticket for human readability.
-	Description string `json:"description"`
+	Description string `json:"description" required:"true" maxLength:"1024"`
 	// Summary is the summary of the ticket for AI analysis.
 	Summary string `json:"summary"`
 	// TitleSource indicates the source of the title (human, ai, inherited)
-	TitleSource types.Source `json:"title_source"`
+	TitleSource types.Source `json:"title_source" maxLength:"255"`
 	// DescriptionSource indicates the source of the description (human, ai, inherited)
-	DescriptionSource types.Source `json:"description_source"`
+	DescriptionSource types.Source `json:"description_source" maxLength:"1024"`
 }
 
 func (x *Metadata) Validate() error {
