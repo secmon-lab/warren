@@ -4,44 +4,34 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
-	"time"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/event"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	notifierSvc "github.com/secmon-lab/warren/pkg/service/notifier"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
-type noopNotifier struct{}
-
-func (n *noopNotifier) NotifyAlertPolicyResult(ctx context.Context, ev *event.AlertPolicyResultEvent) {
-}
-
-func (n *noopNotifier) NotifyEnrichPolicyResult(ctx context.Context, ev *event.EnrichPolicyResultEvent) {
-}
-
-func (n *noopNotifier) NotifyCommitPolicyResult(ctx context.Context, ev *event.CommitPolicyResultEvent) {
-}
-
-func (n *noopNotifier) NotifyEnrichTaskPrompt(ctx context.Context, ev *event.EnrichTaskPromptEvent) {
-}
-
-func (n *noopNotifier) NotifyEnrichTaskResponse(ctx context.Context, ev *event.EnrichTaskResponseEvent) {
-}
-
-func (n *noopNotifier) NotifyError(ctx context.Context, ev *event.ErrorEvent) {}
-
 func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 	logger := logging.From(ctx)
 
-	// Use no-op notifier for now (we'll add proper notification later)
-	notifier := &noopNotifier{}
+	// Create notifier based on whether Slack is available
+	// If Slack is available, use SlackNotifier which buffers events
+	// Otherwise, use ConsoleNotifier which outputs immediately
+	var pipelineNotifier interfaces.Notifier
+	var slackNotifier *notifierSvc.SlackNotifier
+	if uc.slackService != nil {
+		slackNotifier = notifierSvc.NewSlackNotifier().(*notifierSvc.SlackNotifier)
+		pipelineNotifier = slackNotifier
+	} else {
+		pipelineNotifier = uc.consoleNotifier
+	}
 
 	// Execute alert pipeline (policy evaluation + metadata generation)
-	pipelineResults, err := uc.ProcessAlertPipeline(ctx, schema, alertData, notifier)
+	pipelineResults, err := uc.ProcessAlertPipeline(ctx, schema, alertData, pipelineNotifier)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to process alert pipeline")
 	}
@@ -50,67 +40,80 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, a
 	var results []*alert.Alert
 	for _, alertResult := range pipelineResults {
 		processedAlert := alertResult.Alert
+		commitResult := alertResult.CommitResult
 
-		// Find similar alerts for thread grouping
-		now := clock.Now(ctx)
-		begin := now.Add(-24 * time.Hour)
-		end := now
-
-		recentAlerts, err := uc.repository.GetAlertsBySpan(ctx, begin, end)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get recent alerts")
+		// Determine publish type (default to alert if not specified)
+		publishType := types.PublishTypeAlert
+		if commitResult != nil && commitResult.Publish != "" {
+			publishType = commitResult.Publish
 		}
 
-		// Filter alerts that are not bound to tickets
-		var unboundAlerts []*alert.Alert
-		for _, recentAlert := range recentAlerts {
-			if recentAlert.TicketID == types.EmptyTicketID && len(recentAlert.Embedding) > 0 {
-				unboundAlerts = append(unboundAlerts, recentAlert)
+		logger.Info("processing alert based on publish type",
+			"alert_id", processedAlert.ID,
+			"publish_type", publishType,
+			"channel", processedAlert.Channel)
+
+		// Handle based on publish type
+		switch publishType {
+		case types.PublishTypeDiscard:
+			// Discard: do nothing, just log
+			logger.Info("alert discarded by commit policy", "alert_id", processedAlert.ID)
+			// Don't add to results
+
+		case types.PublishTypeNotice:
+			// Notice: create simple notification
+			if err := uc.handleNotice(ctx, processedAlert, processedAlert.Channel, nil, pipelineNotifier); err != nil {
+				return nil, goerr.Wrap(err, "failed to handle notice")
 			}
-		}
+			// Notices are not added to results
 
-		var existingAlert *alert.Alert
-		var bestSimilarity float64
+		case types.PublishTypeAlert:
+			// Alert: full alert processing with Slack and database
+			// Post to Slack and flush pipeline events
+			if slackNotifier != nil {
+				// Use SlackNotifier to publish alert and flush pipeline events together
+				// This avoids duplicate posting of alert content
+				newThread, err := slackNotifier.PublishAlert(ctx, uc.slackService, processedAlert)
+				if err != nil {
+					return nil, goerr.Wrap(err, "failed to publish alert with pipeline events")
+				}
+				if newThread != nil {
+					processedAlert.SlackThread = newThread.Entity()
+				}
+				logger.Info("alert published with pipeline events",
+					"alert_id", processedAlert.ID,
+					"channel", processedAlert.SlackThread.ChannelID,
+					"thread", processedAlert.SlackThread.ThreadID)
+			}
 
-		// Search for the alert with the closest embedding (similarity >= 0.99)
-		if len(unboundAlerts) > 0 {
-			for _, unboundAlert := range unboundAlerts {
-				similarity := processedAlert.CosineSimilarity(unboundAlert.Embedding)
-				if similarity >= 0.99 && similarity > bestSimilarity {
-					bestSimilarity = similarity
-					existingAlert = unboundAlert
+			// Save to database
+			if err := uc.repository.PutAlert(ctx, *processedAlert); err != nil {
+				return nil, goerr.Wrap(err, "failed to put alert")
+			}
+			logger.Info("alert created", "alert", processedAlert)
+
+			// Add alert to results
+			results = append(results, processedAlert)
+
+		default:
+			logger.Warn("unknown publish type, defaulting to alert", "publish_type", publishType)
+			// Default to alert behavior
+			if uc.slackService != nil {
+				newThread, err := uc.slackService.PostAlert(ctx, processedAlert)
+				if err != nil {
+					return nil, goerr.Wrap(err, "failed to post alert")
+				}
+				if newThread != nil {
+					processedAlert.SlackThread = newThread.Entity()
 				}
 			}
-		}
-
-		// Post to Slack
-		if existingAlert != nil && existingAlert.HasSlackThread() && uc.slackService != nil {
-			// Post to existing thread
-			thread := uc.slackService.NewThread(*existingAlert.SlackThread)
-			if err := thread.PostAlert(ctx, processedAlert); err != nil {
-				return nil, goerr.Wrap(err, "failed to post alert to existing thread")
+			if err := uc.repository.PutAlert(ctx, *processedAlert); err != nil {
+				return nil, goerr.Wrap(err, "failed to put alert")
 			}
-			processedAlert.SlackThread = existingAlert.SlackThread
-			logger.Info("alert posted to existing thread", "alert", processedAlert, "existing_alert", existingAlert, "similarity", bestSimilarity)
-		} else if uc.slackService != nil {
-			// Post to new thread
-			newThread, err := uc.slackService.PostAlert(ctx, processedAlert)
-			if err != nil {
-				return nil, goerr.Wrap(err, "failed to post alert")
-			}
-			if newThread != nil {
-				processedAlert.SlackThread = newThread.Entity()
-			}
-			logger.Info("alert posted to new thread", "alert", processedAlert)
-		}
 
-		// Save to database
-		if err := uc.repository.PutAlert(ctx, *processedAlert); err != nil {
-			return nil, goerr.Wrap(err, "failed to put alert")
+			// Add alert to results
+			results = append(results, processedAlert)
 		}
-		logger.Info("alert created", "alert", processedAlert)
-
-		results = append(results, processedAlert)
 	}
 
 	return results, nil
@@ -272,7 +275,7 @@ func containsIgnoreCase(s, substr string) bool {
 }
 
 // handleNotice handles notice creation and simple notification
-func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channel string, llmResponse *alert.GenAIResponse) error {
+func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channel string, llmResponse *alert.GenAIResponse, notifier interfaces.Notifier) error {
 	logger := logging.From(ctx)
 
 	// Create notice
@@ -288,9 +291,9 @@ func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channe
 		return goerr.Wrap(err, "failed to create notice")
 	}
 
-	// Send simple notification to Slack
+	// Send simple notification to Slack and flush pipeline events if SlackNotifier
 	if uc.slackService != nil {
-		slackTS, err := uc.sendSimpleNotification(ctx, notice, channel, llmResponse)
+		slackTS, err := uc.sendSimpleNotification(ctx, notice, channel, llmResponse, notifier)
 		if err != nil {
 			logger.Warn("failed to send simple notification", "error", err, "notice_id", notice.ID)
 		} else {
@@ -307,19 +310,9 @@ func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channe
 }
 
 // sendSimpleNotification sends a simple notification to Slack
-func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.Notice, channel string, llmResponse *alert.GenAIResponse) (string, error) {
+func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.Notice, channel string, llmResponse *alert.GenAIResponse, notifier interfaces.Notifier) (string, error) {
 	if uc.slackService == nil {
 		return "", goerr.New("slack service not available")
-	}
-
-	alert := &notice.Alert
-
-	// Create simple message with only title for main channel
-	var mainMessage string
-	if alert.Title != "" {
-		mainMessage = "🔔 " + alert.Title
-	} else {
-		mainMessage = "🔔 Security Notice"
 	}
 
 	// Resolve target channel (use default if empty)
@@ -328,15 +321,30 @@ func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.N
 		targetChannel = uc.slackService.DefaultChannelID()
 	}
 
-	// Post main notice message
+	// Use SlackNotifier.PublishNotice if available to flush pipeline events
+	if slackNotifier, ok := notifier.(*notifierSvc.SlackNotifier); ok {
+		timestamp, err := slackNotifier.PublishNotice(ctx, uc.slackService, notice, targetChannel, llmResponse)
+		if err != nil {
+			return "", goerr.Wrap(err, "failed to publish notice to Slack", goerr.V("channel", targetChannel))
+		}
+		return timestamp, nil
+	}
+
+	// Fallback: post notice without pipeline events (for non-Slack notifiers)
+	alertData := &notice.Alert
+	var mainMessage string
+	if alertData.Title != "" {
+		mainMessage = "🔔 " + alertData.Title
+	} else {
+		mainMessage = "🔔 Security Notice"
+	}
+
 	timestamp, err := uc.slackService.PostNotice(ctx, targetChannel, mainMessage, notice.ID)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to post notice to Slack", goerr.V("channel", targetChannel))
 	}
 
-	// Post detailed information in thread
-	if err := uc.slackService.PostNoticeThreadDetails(ctx, targetChannel, timestamp, alert, llmResponse); err != nil {
-		// Log error but don't fail the main operation
+	if err := uc.slackService.PostNoticeThreadDetails(ctx, targetChannel, timestamp, alertData, llmResponse); err != nil {
 		logging.From(ctx).Warn("failed to post notice thread details", "error", err, "channel", targetChannel)
 	}
 

@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
@@ -12,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	policySvc "github.com/secmon-lab/warren/pkg/service/policy"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 // AlertPipelineResult represents the result of processing a single alert through the pipeline
@@ -160,6 +162,12 @@ func (uc *UseCases) executeTasks(ctx context.Context, alert *alert.Alert, policy
 
 	// Execute query tasks
 	for _, task := range policyResult.Query {
+		logging.From(ctx).Info("executing query task",
+			"task_id", task.ID,
+			"format", task.Format,
+			"has_inline", task.Inline != "",
+			"has_prompt", task.Prompt != "")
+
 		result, err := uc.executeQueryTask(ctx, alert, task, notifier)
 		if err != nil {
 			notifier.NotifyError(ctx, &event.ErrorEvent{
@@ -167,15 +175,28 @@ func (uc *UseCases) executeTasks(ctx context.Context, alert *alert.Alert, policy
 				Error:   err,
 				Message: "Query task execution failed",
 			})
+			logging.From(ctx).Error("query task failed",
+				"task_id", task.ID,
+				"error", err)
 			return nil, goerr.Wrap(err, "failed to execute query task",
 				goerr.V("task_id", task.ID))
 		}
 
+		logging.From(ctx).Info("query task completed",
+			"task_id", task.ID,
+			"result_type", fmt.Sprintf("%T", result))
 		results[task.ID] = result
 	}
 
 	// Execute agent tasks
 	for _, task := range policyResult.Agent {
+		logging.From(ctx).Info("executing agent task",
+			"task_id", task.ID,
+			"format", task.Format,
+			"has_inline", task.Inline != "",
+			"has_prompt", task.Prompt != "",
+			"tools_count", len(uc.tools))
+
 		result, err := uc.executeAgentTask(ctx, alert, task, notifier)
 		if err != nil {
 			notifier.NotifyError(ctx, &event.ErrorEvent{
@@ -183,10 +204,16 @@ func (uc *UseCases) executeTasks(ctx context.Context, alert *alert.Alert, policy
 				Error:   err,
 				Message: "Agent task execution failed",
 			})
+			logging.From(ctx).Error("agent task failed",
+				"task_id", task.ID,
+				"error", err)
 			return nil, goerr.Wrap(err, "failed to execute agent task",
 				goerr.V("task_id", task.ID))
 		}
 
+		logging.From(ctx).Info("agent task completed",
+			"task_id", task.ID,
+			"result_type", fmt.Sprintf("%T", result))
 		results[task.ID] = result
 	}
 
@@ -195,10 +222,16 @@ func (uc *UseCases) executeTasks(ctx context.Context, alert *alert.Alert, policy
 
 // executeQueryTask executes a query-type task using GenerateContent
 func (uc *UseCases) executeQueryTask(ctx context.Context, alert *alert.Alert, task policy.QueryTask, notifier interfaces.Notifier) (any, error) {
+	logger := logging.From(ctx)
+
 	promptText, err := uc.resolvePrompt(ctx, &task.EnrichTask)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to resolve prompt")
 	}
+
+	logger.Debug("resolved query task prompt",
+		"task_id", task.ID,
+		"prompt_length", len(promptText))
 
 	// Notify prompt
 	notifier.NotifyEnrichTaskPrompt(ctx, &event.EnrichTaskPromptEvent{
@@ -213,15 +246,22 @@ func (uc *UseCases) executeQueryTask(ctx context.Context, alert *alert.Alert, ta
 		return nil, goerr.Wrap(err, "failed to build alert system prompt")
 	}
 
+	logger.Debug("built alert system prompt",
+		"task_id", task.ID,
+		"system_prompt_length", len(systemPrompt))
+
 	var options []gollem.SessionOption
 	if task.Format == types.GenAIContentFormatJSON {
 		options = append(options, gollem.WithSessionContentType(gollem.ContentTypeJSON))
+		logger.Debug("using JSON content type", "task_id", task.ID)
 	}
 
 	session, err := uc.llmClient.NewSession(ctx, options...)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create LLM session")
 	}
+
+	logger.Debug("calling LLM GenerateContent", "task_id", task.ID)
 
 	// Generate content with system prompt and user prompt
 	response, err := session.GenerateContent(ctx,
@@ -232,10 +272,18 @@ func (uc *UseCases) executeQueryTask(ctx context.Context, alert *alert.Alert, ta
 		return nil, goerr.Wrap(err, "failed to generate content")
 	}
 
+	logger.Debug("received LLM response",
+		"task_id", task.ID,
+		"response_texts", response.Texts)
+
 	result, err := uc.parseResponse(response, task.Format)
 	if err != nil {
 		return nil, err
 	}
+
+	logger.Debug("parsed query task response",
+		"task_id", task.ID,
+		"result_type", fmt.Sprintf("%T", result))
 
 	// Notify response
 	notifier.NotifyEnrichTaskResponse(ctx, &event.EnrichTaskResponseEvent{
@@ -249,10 +297,16 @@ func (uc *UseCases) executeQueryTask(ctx context.Context, alert *alert.Alert, ta
 
 // executeAgentTask executes an agent-type task using gollem.Agent
 func (uc *UseCases) executeAgentTask(ctx context.Context, alert *alert.Alert, task policy.AgentTask, notifier interfaces.Notifier) (any, error) {
+	logger := logging.From(ctx)
+
 	promptText, err := uc.resolvePrompt(ctx, &task.EnrichTask)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to resolve prompt")
 	}
+
+	logger.Debug("resolved agent task prompt",
+		"task_id", task.ID,
+		"prompt_length", len(promptText))
 
 	// Notify prompt
 	notifier.NotifyEnrichTaskPrompt(ctx, &event.EnrichTaskPromptEvent{
@@ -267,6 +321,10 @@ func (uc *UseCases) executeAgentTask(ctx context.Context, alert *alert.Alert, ta
 		return nil, goerr.Wrap(err, "failed to build alert system prompt")
 	}
 
+	logger.Debug("built alert system prompt for agent",
+		"task_id", task.ID,
+		"system_prompt_length", len(systemPrompt))
+
 	// Create agent options
 	var options []gollem.Option
 
@@ -276,9 +334,13 @@ func (uc *UseCases) executeAgentTask(ctx context.Context, alert *alert.Alert, ta
 	// Add tools if available
 	if len(uc.tools) > 0 {
 		options = append(options, gollem.WithToolSets(uc.tools...))
+		logger.Debug("agent has tools available",
+			"task_id", task.ID,
+			"tools_count", len(uc.tools))
 	}
 	if task.Format == types.GenAIContentFormatJSON {
 		options = append(options, gollem.WithContentType(gollem.ContentTypeJSON))
+		logger.Debug("using JSON content type for agent", "task_id", task.ID)
 	}
 
 	// Create agent
@@ -286,6 +348,10 @@ func (uc *UseCases) executeAgentTask(ctx context.Context, alert *alert.Alert, ta
 
 	// Combine system prompt with user prompt for agent
 	combinedPrompt := systemPrompt + "\n\n" + promptText
+
+	logger.Debug("executing agent",
+		"task_id", task.ID,
+		"combined_prompt_length", len(combinedPrompt))
 
 	// Run agent with combined prompt
 	result, err := agent.Execute(ctx, gollem.Text(combinedPrompt))
@@ -296,18 +362,31 @@ func (uc *UseCases) executeAgentTask(ctx context.Context, alert *alert.Alert, ta
 	// Extract response text
 	responseText := result.String()
 
+	logger.Debug("received agent response",
+		"task_id", task.ID,
+		"response_length", len(responseText))
+
 	// Parse response based on format
 	var parsedResult any
 	if task.Format == types.GenAIContentFormatJSON {
 		var parsed any
 		if err := json.Unmarshal([]byte(responseText), &parsed); err != nil {
+			logger.Debug("failed to parse JSON response, using raw text",
+				"task_id", task.ID,
+				"error", err)
 			parsedResult = responseText // Return raw text if JSON parsing fails
 		} else {
+			logger.Debug("successfully parsed JSON response",
+				"task_id", task.ID)
 			parsedResult = parsed
 		}
 	} else {
 		parsedResult = responseText
 	}
+
+	logger.Debug("parsed agent task response",
+		"task_id", task.ID,
+		"result_type", fmt.Sprintf("%T", parsedResult))
 
 	// Notify response
 	notifier.NotifyEnrichTaskResponse(ctx, &event.EnrichTaskResponseEvent{

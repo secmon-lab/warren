@@ -5,10 +5,39 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
+// CommitPolicyAlert represents alert data for commit policy input (matches doc/policy.md format)
+type CommitPolicyAlert struct {
+	ID       types.AlertID     `json:"id"`
+	Schema   types.AlertSchema `json:"schema"`
+	Metadata alert.Metadata    `json:"metadata"`
+	Data     any               `json:"data"`
+}
+
 // CommitPolicyInput represents the input for commit policy evaluation
 type CommitPolicyInput struct {
-	Alert  *alert.Alert  `json:"alert"`
-	Enrich EnrichResults `json:"enrich"`
+	Alert  CommitPolicyAlert `json:"alert"`
+	Enrich EnrichResults     `json:"enrich"`
+}
+
+// NewCommitPolicyInput creates a CommitPolicyInput from an Alert
+func NewCommitPolicyInput(a *alert.Alert, enrichResults EnrichResults) CommitPolicyInput {
+	return CommitPolicyInput{
+		Alert: CommitPolicyAlert{
+			ID:     a.ID,
+			Schema: a.Schema,
+			Metadata: alert.Metadata{
+				Title:             a.Title,
+				Description:       a.Description,
+				Attributes:        a.Attributes,
+				TitleSource:       a.TitleSource,
+				DescriptionSource: a.DescriptionSource,
+				Tags:              a.Tags,
+				Channel:           a.Channel,
+			},
+			Data: a.Data,
+		},
+		Enrich: enrichResults,
+	}
 }
 
 // CommitPolicyResult represents the result of commit policy evaluation

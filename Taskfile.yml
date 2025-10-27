@@ -46,6 +46,7 @@ tasks:
         SlackClient
         SlackThreadService
         ChatNotifier
+        Notifier
         Repository
         PolicyClient
         EmbeddingClient

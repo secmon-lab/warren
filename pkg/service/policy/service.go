@@ -55,16 +55,14 @@ func (s *Service) EvaluateEnrichPolicy(ctx context.Context, alert *alert.Alert) 
 
 // EvaluateCommitPolicy evaluates commit policy
 func (s *Service) EvaluateCommitPolicy(ctx context.Context, alert *alert.Alert, enrichResults policy.EnrichResults) (*policy.CommitPolicyResult, error) {
-	queryInput := policy.CommitPolicyInput{
-		Alert:  alert,
-		Enrich: enrichResults,
-	}
+	// Create input matching doc/policy.md format: input.alert.metadata.title
+	queryInput := policy.NewCommitPolicyInput(alert, enrichResults)
 
 	var result policy.CommitPolicyResult
 	query := "data.commit"
 
 	err := s.policyClient.Query(ctx, query, queryInput, &result)
-	logging.From(ctx).Debug("commit policy result", "input", alert, "output", result, "query", query, "error", err)
+	logging.From(ctx).Debug("commit policy result", "input", queryInput, "output", result, "query", query, "error", err)
 	if err != nil {
 		if errors.Is(err, opaq.ErrNoEvalResult) {
 			// No commit policy defined, return default behavior

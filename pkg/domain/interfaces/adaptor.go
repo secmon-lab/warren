@@ -53,6 +53,7 @@ type SlackThreadService interface {
 	PostAlert(ctx context.Context, alert *alert.Alert) error
 	PostComment(ctx context.Context, comment string) error
 	PostCommentWithMessageID(ctx context.Context, comment string) (string, error)
+	PostContextBlock(ctx context.Context, text string) error
 	PostTicket(ctx context.Context, ticket *ticket.Ticket, alerts alert.Alerts) (string, error)
 	PostLinkToTicket(ctx context.Context, ticketURL, ticketTitle string) error
 	PostFinding(ctx context.Context, finding *ticket.Finding) error

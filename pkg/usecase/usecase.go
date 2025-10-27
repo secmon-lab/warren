@@ -12,6 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/command"
 	"github.com/secmon-lab/warren/pkg/service/memory"
+	"github.com/secmon-lab/warren/pkg/service/notifier"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 )
@@ -46,6 +47,9 @@ type UseCases struct {
 
 	// GenAI
 	promptService interfaces.PromptService
+
+	// notifiers
+	consoleNotifier interfaces.Notifier
 }
 
 var _ interfaces.AlertUsecases = &UseCases{}
@@ -167,6 +171,11 @@ func New(opts ...Option) *UseCases {
 
 	for _, opt := range opts {
 		opt(u)
+	}
+
+	// Initialize console notifier for pipeline events
+	if u.consoleNotifier == nil {
+		u.consoleNotifier = notifier.NewConsoleNotifier()
 	}
 
 	// Initialize clustering use case

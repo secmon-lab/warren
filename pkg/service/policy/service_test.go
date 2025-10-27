@@ -153,7 +153,7 @@ func TestService_EvaluateCommitPolicy(t *testing.T) {
 
 				// Verify input structure
 				commitInput := input.(domainPolicy.CommitPolicyInput)
-				gt.NotEqual(t, commitInput.Alert, nil)
+				gt.NotEqual(t, commitInput.Alert.ID, "")
 				gt.Equal(t, len(commitInput.Enrich), 1)
 
 				// Set commit policy result

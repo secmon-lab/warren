@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -77,6 +78,6 @@ func (uc *UseCases) GenerateInitialTicketCommentForTest(ctx context.Context, tic
 }
 
 // HandleNotice exports the private handleNotice method for testing
-func (uc *UseCases) HandleNotice(ctx context.Context, alert *alert.Alert, channel string) error {
-	return uc.handleNotice(ctx, alert, channel, nil)
+func (uc *UseCases) HandleNotice(ctx context.Context, alert *alert.Alert, channel string, notifier interfaces.Notifier) error {
+	return uc.handleNotice(ctx, alert, channel, nil, notifier)
 }

@@ -764,6 +764,26 @@ func (x *ThreadService) PostCommentWithMessageID(ctx context.Context, comment st
 	return ts, nil
 }
 
+// PostContextBlock posts a message as a context block to the thread
+func (x *ThreadService) PostContextBlock(ctx context.Context, text string) error {
+	block := slack.NewContextBlock(
+		"",
+		slack.NewTextBlockObject(slack.MarkdownType, text, false, false),
+	)
+
+	_, _, err := x.client.PostMessageContext(
+		ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(block),
+		slack.MsgOptionTS(x.threadID),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post context block to slack")
+	}
+
+	return nil
+}
+
 func buildFindingBlocks(finding ticket.Finding) []slack.Block {
 	return []slack.Block{
 		slack.NewHeaderBlock(
