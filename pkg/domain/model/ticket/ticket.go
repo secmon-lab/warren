@@ -74,7 +74,7 @@ type Metadata struct {
 	// Description is the description of the ticket for human readability.
 	Description string `json:"description" required:"true" maxLength:"1024"`
 	// Summary is the summary of the ticket for AI analysis.
-	Summary string `json:"summary"`
+	Summary string `json:"summary" maxLength:"4096"`
 	// TitleSource indicates the source of the title (human, ai, inherited)
 	TitleSource types.Source `json:"title_source" maxLength:"255"`
 	// DescriptionSource indicates the source of the description (human, ai, inherited)
