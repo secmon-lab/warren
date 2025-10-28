@@ -84,17 +84,6 @@ func handleAlertPolicyResult(ctx context.Context, thread interfaces.SlackThreadS
 		return err
 	}
 
-	// Upload full alert details as JSON file
-	if len(e.Alerts) > 0 {
-		alertsJSON, err := json.MarshalIndent(e.Alerts, "", "  ")
-		if err == nil {
-			if err := thread.AttachFile(ctx, "Alert Details", "alerts.json", alertsJSON); err != nil {
-				logger.Warn("failed to attach alert details file to Slack", "error", err, "schema", e.Schema)
-				return err
-			}
-		}
-	}
-
 	return nil
 }
 

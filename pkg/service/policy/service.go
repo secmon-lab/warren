@@ -73,6 +73,11 @@ func (s *Service) EvaluateCommitPolicy(ctx context.Context, alert *alert.Alert, 
 		return nil, goerr.Wrap(err, "failed to evaluate commit policy")
 	}
 
+	// Set default publish type if empty
+	if result.Publish == "" {
+		result.Publish = types.PublishTypeAlert
+	}
+
 	return &result, nil
 }
 
