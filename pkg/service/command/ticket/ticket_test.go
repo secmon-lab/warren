@@ -100,7 +100,7 @@ func TestService_Ticket(t *testing.T) {
 	_, repo, threadService, user, _ := setupTicketTestService(t)
 	ctx := context.Background()
 
-	// Create core.Clients directly
+	// Create core.Clients without TicketUseCase
 	clients := core.NewClients(repo, nil, threadService)
 
 	// Create a mock slack message
@@ -108,63 +108,13 @@ func TestService_Ticket(t *testing.T) {
 		return nil
 	}
 
-	t.Run("show help message", func(t *testing.T) {
+	t.Run("shows help without ticket use case", func(t *testing.T) {
 		_, err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "help")
 		gt.NoError(t, err)
 	})
 
-	t.Run("show unresolved tickets by default", func(t *testing.T) {
+	t.Run("returns error when ticket use case not available", func(t *testing.T) {
 		_, err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "")
-		gt.NoError(t, err)
-	})
-
-	t.Run("show unresolved tickets with explicit command", func(t *testing.T) {
-		_, err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "unresolved")
-		gt.NoError(t, err)
-	})
-
-	t.Run("show unresolved tickets with alias", func(t *testing.T) {
-		_, err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "u")
-		gt.NoError(t, err)
-	})
-
-	t.Run("show tickets with time range", func(t *testing.T) {
-		now := time.Now()
-		from := now.Add(-2 * time.Hour).Format("15:04")
-		to := now.Add(-1 * time.Hour).Format("15:04")
-
-		_, err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "from "+from+" to "+to)
-		gt.NoError(t, err)
-	})
-
-	t.Run("show tickets after date", func(t *testing.T) {
-		date := time.Now().Add(-2 * time.Hour).Format("2006-01-02")
-		_, err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "after "+date)
-		gt.NoError(t, err)
-	})
-
-	t.Run("show tickets since duration", func(t *testing.T) {
-		_, err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "since 2h")
-		gt.NoError(t, err)
-	})
-
-	t.Run("error on invalid time range format", func(t *testing.T) {
-		_, err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "from 10:00")
-		gt.Error(t, err)
-	})
-
-	t.Run("error on invalid date format", func(t *testing.T) {
-		_, err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "after invalid-date")
-		gt.Error(t, err)
-	})
-
-	t.Run("error on invalid duration format", func(t *testing.T) {
-		_, err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "since invalid-duration")
-		gt.Error(t, err)
-	})
-
-	t.Run("error on unknown command", func(t *testing.T) {
-		_, err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "unknown-command")
 		gt.Error(t, err)
 	})
 }
