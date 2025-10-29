@@ -356,14 +356,28 @@ func (uc *UseCases) handleEscalateAction(ctx context.Context, slackUser slack.Us
 	logger.Info("escalating notice", "notice_id", noticeID, "user", slackUser.ID)
 
 	// Call the EscalateNotice method from alert.go
-	if err := uc.EscalateNotice(ctx, noticeID); err != nil {
+	escalatedAlert, err := uc.EscalateNotice(ctx, noticeID)
+	if err != nil {
 		return goerr.Wrap(err, "failed to escalate notice", goerr.V("notice_id", noticeID))
 	}
 
-	// Send confirmation message
+	// Send confirmation message with link to new alert thread
 	if uc.slackService != nil {
 		threadSvc := uc.slackService.NewThread(slackThread)
-		threadSvc.Reply(ctx, "✅ Notice escalated to full alert")
+
+		// Generate URL to the new alert thread
+		var message string
+		if escalatedAlert.SlackThread != nil {
+			alertURL := uc.slackService.ToExternalMsgURL(
+				escalatedAlert.SlackThread.ChannelID,
+				escalatedAlert.SlackThread.ThreadID,
+			)
+			message = "✅ Notice escalated to full alert: <" + alertURL + "|View Alert>"
+		} else {
+			message = "✅ Notice escalated to full alert"
+		}
+
+		threadSvc.Reply(ctx, message)
 	}
 
 	logger.Info("notice escalated successfully", "notice_id", noticeID)

@@ -352,19 +352,19 @@ func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.N
 }
 
 // EscalateNotice escalates a notice to a full alert
-func (uc *UseCases) EscalateNotice(ctx context.Context, noticeID types.NoticeID) error {
+func (uc *UseCases) EscalateNotice(ctx context.Context, noticeID types.NoticeID) (*alert.Alert, error) {
 	logger := logging.From(ctx)
 
 	// Get notice from repository
 	notice, err := uc.repository.GetNotice(ctx, noticeID)
 	if err != nil {
-		return goerr.Wrap(err, "failed to get notice", goerr.V("notice_id", noticeID))
+		return nil, goerr.Wrap(err, "failed to get notice", goerr.V("notice_id", noticeID))
 	}
 
 	// Mark notice as escalated
 	notice.Escalated = true
 	if err := uc.repository.UpdateNotice(ctx, notice); err != nil {
-		return goerr.Wrap(err, "failed to update notice", goerr.V("notice_id", noticeID))
+		return nil, goerr.Wrap(err, "failed to update notice", goerr.V("notice_id", noticeID))
 	}
 
 	// Post escalated alert to Slack
@@ -372,7 +372,7 @@ func (uc *UseCases) EscalateNotice(ctx context.Context, noticeID types.NoticeID)
 	if uc.slackService != nil {
 		newThread, err := uc.slackService.PostAlert(ctx, &escalatedAlert)
 		if err != nil {
-			return goerr.Wrap(err, "failed to post escalated alert", goerr.V("notice_id", noticeID))
+			return nil, goerr.Wrap(err, "failed to post escalated alert", goerr.V("notice_id", noticeID))
 		}
 		if newThread != nil {
 			escalatedAlert.SlackThread = newThread.Entity()
@@ -382,9 +382,9 @@ func (uc *UseCases) EscalateNotice(ctx context.Context, noticeID types.NoticeID)
 
 	// Store escalated alert
 	if err := uc.repository.PutAlert(ctx, escalatedAlert); err != nil {
-		return goerr.Wrap(err, "failed to put escalated alert", goerr.V("notice_id", noticeID))
+		return nil, goerr.Wrap(err, "failed to put escalated alert", goerr.V("notice_id", noticeID))
 	}
 
 	logger.Info("notice escalated to alert", "notice_id", noticeID, "alert_id", escalatedAlert.ID)
-	return nil
+	return &escalatedAlert, nil
 }

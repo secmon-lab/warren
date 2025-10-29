@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"strings"
 
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
@@ -103,6 +104,7 @@ func (x *Controller) HandleSlackInteraction(ctx context.Context, interaction sla
 }
 
 func (x *Controller) handleSlackInteractionBlockActions(ctx context.Context, interaction slack.InteractionCallback) error {
+	logger := logging.From(ctx)
 
 	user := slack_model.User{
 		ID:   interaction.User.ID,
@@ -125,7 +127,24 @@ func (x *Controller) handleSlackInteractionBlockActions(ctx context.Context, int
 	}
 
 	for _, action := range interaction.ActionCallback.BlockActions {
-		return x.interaction.HandleSlackInteractionBlockActions(ctx, user, th, slack_model.ActionID(action.ActionID), action.Value, interaction.TriggerID)
+		actionID := action.ActionID
+		value := action.Value
+
+		// Handle overflow menu actions (e.g., notice actions)
+		// Overflow menu uses action.SelectedOption.Value in format "actionType:parameter"
+		if actionID == "notice_actions" && action.SelectedOption.Value != "" {
+			parts := strings.SplitN(action.SelectedOption.Value, ":", 2)
+			if len(parts) != 2 {
+				logger.Warn("invalid overflow menu value format", "value", action.SelectedOption.Value)
+				continue
+			}
+			// Extract actual action ID and parameter from the value
+			actionID = parts[0]
+			value = parts[1]
+			logger.Debug("parsed overflow menu action", "action_id", actionID, "value", value)
+		}
+
+		return x.interaction.HandleSlackInteractionBlockActions(ctx, user, th, slack_model.ActionID(actionID), value, interaction.TriggerID)
 	}
 
 	return nil
