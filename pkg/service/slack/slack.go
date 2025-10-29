@@ -1346,14 +1346,26 @@ func (x *Service) PostNoticeThreadDetails(ctx context.Context, channelID, thread
 		return goerr.Wrap(err, "failed to post notice details message")
 	}
 
-	// Message 2: Original alert data in code format
-	originalDataMessage := formatOriginalDataMessage(alert)
-	_, _, err = x.client.PostMessageContext(ctx, channelID,
-		slack.MsgOptionText(originalDataMessage, false),
-		slack.MsgOptionTS(threadTS),
-	)
-	if err != nil {
-		return goerr.Wrap(err, "failed to post original data message")
+	// Message 2: Original alert data as file attachment
+	if alert.Data != nil {
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(alert.Data); err != nil {
+			return goerr.Wrap(err, "failed to encode alert data")
+		}
+
+		_, err = x.client.UploadFileV2Context(ctx, slack.UploadFileV2Parameters{
+			Channel:         channelID,
+			Reader:          bytes.NewReader(buf.Bytes()),
+			FileSize:        buf.Len(),
+			Filename:        "notice." + alert.ID.String() + ".json",
+			Title:           "Original Alert",
+			ThreadTimestamp: threadTS,
+		})
+		if err != nil {
+			return goerr.Wrap(err, "failed to upload notice alert data file")
+		}
 	}
 
 	// Message 3: LLM response if available
@@ -1407,20 +1419,6 @@ func (x *Service) formatNoticeDetailsMessage(alert *alert.Alert) string {
 	}
 
 	return strings.Join(details, "\n")
-}
-
-// formatOriginalDataMessage formats the original alert data as code
-func formatOriginalDataMessage(alert *alert.Alert) string {
-	if alert.Data == nil {
-		return "_No alert data_"
-	}
-
-	dataJSON, err := json.MarshalIndent(alert.Data, "", "  ")
-	if err != nil {
-		return fmt.Sprintf("Error formatting data:\n```%v\n```", err)
-	}
-
-	return fmt.Sprintf("```\n%s\n```", string(dataJSON))
 }
 
 // formatLLMResponseMessage formats the LLM response for display

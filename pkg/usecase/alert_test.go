@@ -1268,6 +1268,9 @@ func TestHandleNotice(t *testing.T) {
 			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
 				return channelID, "test-timestamp", nil
 			},
+			UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+				return &slack_sdk.FileSummary{}, nil
+			},
 			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
 				return &slack_sdk.AuthTestResponse{
 					UserID: "test-user",
@@ -1310,10 +1313,15 @@ func TestHandleNotice(t *testing.T) {
 		gt.Equal(t, createdNotice.Alert.Metadata.Description, "Test Description")
 		gt.False(t, createdNotice.Escalated)
 
-		// Verify Slack interaction - main notice + 2 thread messages were posted
+		// Verify Slack interaction - main notice + 1 thread message (details) were posted
 		postCalls := slackMock.PostMessageContextCalls()
-		gt.Array(t, postCalls).Length(3)
+		gt.Array(t, postCalls).Length(2)
 		gt.Equal(t, postCalls[0].ChannelID, "test-channel")
+
+		// Verify file upload was called for original alert data
+		uploadCalls := slackMock.UploadFileV2ContextCalls()
+		gt.Array(t, uploadCalls).Length(1)
+		gt.Equal(t, uploadCalls[0].Params.Channel, "test-channel")
 	})
 
 	t.Run("uses default channel when no channels specified", func(t *testing.T) {
@@ -1330,6 +1338,9 @@ func TestHandleNotice(t *testing.T) {
 		slackMock := &mock.SlackClientMock{
 			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
 				return channelID, "test-timestamp", nil
+			},
+			UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+				return &slack_sdk.FileSummary{}, nil
 			},
 			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
 				return &slack_sdk.AuthTestResponse{
@@ -1360,9 +1371,13 @@ func TestHandleNotice(t *testing.T) {
 		err = uc.HandleNotice(ctx, testAlert, "", &mock.NotifierMock{})
 		gt.NoError(t, err)
 
-		// Verify Slack was called with default channel (empty string becomes default) - main notice + 2 thread messages
+		// Verify Slack was called with default channel (empty string becomes default) - main notice + 1 thread message (details)
 		postCalls := slackMock.PostMessageContextCalls()
-		gt.Array(t, postCalls).Length(3)
+		gt.Array(t, postCalls).Length(2)
 		gt.Equal(t, postCalls[0].ChannelID, "#test-channel")
+
+		// Verify file upload was called (since testAlert has Data nil, this won't be called)
+		uploadCalls := slackMock.UploadFileV2ContextCalls()
+		gt.Array(t, uploadCalls).Length(0)
 	})
 }
