@@ -126,6 +126,7 @@ func (x *Controller) handleSlackInteractionBlockActions(ctx context.Context, int
 		ThreadID:  interaction.Message.ThreadTimestamp,
 	}
 
+	// Process only the first action (Slack interactions typically have one action per callback)
 	for _, action := range interaction.ActionCallback.BlockActions {
 		actionID := action.ActionID
 		value := action.Value
