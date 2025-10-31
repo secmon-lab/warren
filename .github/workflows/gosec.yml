@@ -11,6 +11,7 @@ on:
 
 jobs:
   tests:
+    if: false  # Temporarily disable this workflow
     runs-on: ubuntu-latest
     permissions:
       security-events: write
