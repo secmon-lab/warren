@@ -103,4 +103,10 @@ type Repository interface {
 	PutExecutionMemory(ctx context.Context, mem *memory.ExecutionMemory) error
 	GetTicketMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.TicketMemory, error)
 	PutTicketMemory(ctx context.Context, mem *memory.TicketMemory) error
+
+	// For agent memory management
+	// Note: Agent memories are stored in subcollection: agents/{agentID}/memories/{memoryID}
+	SaveAgentMemory(ctx context.Context, mem *memory.AgentMemory) error
+	GetAgentMemory(ctx context.Context, agentID string, id types.AgentMemoryID) (*memory.AgentMemory, error)
+	SearchMemoriesByEmbedding(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error)
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
+	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
@@ -65,6 +66,7 @@ func cmdServe() *cli.Command {
 		storageCfg       config.Storage
 		mcpCfg           config.MCPConfig
 		asyncCfg         config.AsyncAlertHook
+		bqAgentCfg       bqagent.CLIConfig
 	)
 
 	flags := joinFlags(
@@ -127,6 +129,7 @@ func cmdServe() *cli.Command {
 		storageCfg.Flags(),
 		mcpCfg.Flags(),
 		asyncCfg.Flags(),
+		bqAgentCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -257,6 +260,22 @@ func cmdServe() *cli.Command {
 
 			// Create memory service
 			memoryService := memory.New(llmClient, repo)
+
+			// Initialize BigQuery Agent if configured
+			if bqAgentCfg.ConfigPath != "" {
+				bqAgentConfig, err := bqAgentCfg.LoadConfig()
+				if err != nil {
+					return goerr.Wrap(err, "failed to load BigQuery Agent config")
+				}
+
+				if bqAgentConfig != nil {
+					bqAgent := bqagent.NewAgent(bqAgentConfig, llmClient, memoryService)
+					toolSets = append(toolSets, bqAgent)
+					logging.From(ctx).Info("BigQuery Agent configured",
+						"tables", len(bqAgentConfig.Tables),
+						"scan_limit", bqAgentConfig.ScanSizeLimit)
+				}
+			}
 
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(llmClient),

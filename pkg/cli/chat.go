@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
+	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -28,6 +29,7 @@ func cmdChat() *cli.Command {
 		policyCfg   config.Policy
 		storageCfg  config.Storage
 		mcpCfg      config.MCPConfig
+		bqAgentCfg  bqagent.CLIConfig
 
 		query string
 	)
@@ -54,6 +56,7 @@ func cmdChat() *cli.Command {
 		storageCfg.Flags(),
 		tools.Flags(),
 		mcpCfg.Flags(),
+		bqAgentCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -119,6 +122,25 @@ func cmdChat() *cli.Command {
 					"count", len(mcpToolSets))
 			}
 
+			// Create memory service
+			memoryService := memory.New(llmClient, repo)
+
+			// Initialize BigQuery Agent if configured
+			if bqAgentCfg.ConfigPath != "" {
+				bqAgentConfig, err := bqAgentCfg.LoadConfig()
+				if err != nil {
+					return goerr.Wrap(err, "failed to load BigQuery Agent config")
+				}
+
+				if bqAgentConfig != nil {
+					bqAgent := bqagent.NewAgent(bqAgentConfig, llmClient, memoryService)
+					allToolSets = append(allToolSets, bqAgent)
+					logging.From(ctx).Info("BigQuery Agent configured",
+						"tables", len(bqAgentConfig.Tables),
+						"scan_limit", bqAgentConfig.ScanSizeLimit)
+				}
+			}
+
 			// Show ticket information
 			fmt.Printf("\n🎫 Ticket Information:\n")
 			fmt.Printf("  📝 ID: %s\n", ticket.ID)
@@ -130,9 +152,6 @@ func cmdChat() *cli.Command {
 			}
 			fmt.Printf("  🔢 Alerts: %d\n", len(alerts))
 			fmt.Printf("\n")
-
-			// Create memory service
-			memoryService := memory.New(llmClient, repo)
 
 			// Create usecase
 			uc := usecase.New(

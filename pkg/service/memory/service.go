@@ -15,6 +15,11 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
+const (
+	// EmbeddingDimension is the dimension of embedding vectors
+	EmbeddingDimension = 256
+)
+
 //go:embed prompt/execution_memory.md
 var executionMemoryPromptTemplate string
 
@@ -328,4 +333,60 @@ func extractJSONFromMarkdown(text string) string {
 	}
 
 	return text
+}
+
+// SaveAgentMemory saves an agent memory record with automatic embedding generation
+func (s *Service) SaveAgentMemory(ctx context.Context, mem *memory.AgentMemory) error {
+	if err := mem.Validate(); err != nil {
+		return goerr.Wrap(err, "invalid agent memory")
+	}
+
+	// Generate embedding for TaskQuery if not already present
+	if len(mem.QueryEmbedding) == 0 {
+		embeddings, err := s.llmClient.GenerateEmbedding(ctx, EmbeddingDimension, []string{mem.TaskQuery})
+		if err != nil {
+			return goerr.Wrap(err, "failed to generate embedding", goerr.V("task_query", mem.TaskQuery))
+		}
+		if len(embeddings) > 0 {
+			// Convert float64 to float32
+			vector32 := make([]float32, len(embeddings[0]))
+			for i, v := range embeddings[0] {
+				vector32[i] = float32(v)
+			}
+			mem.QueryEmbedding = vector32
+		}
+	}
+
+	if err := s.repository.SaveAgentMemory(ctx, mem); err != nil {
+		return goerr.Wrap(err, "failed to save agent memory", goerr.V("id", mem.ID))
+	}
+
+	return nil
+}
+
+// SearchRelevantAgentMemories searches for similar memories using semantic search
+func (s *Service) SearchRelevantAgentMemories(ctx context.Context, agentID, query string, limit int) ([]*memory.AgentMemory, error) {
+	// Generate embedding for the query
+	embeddings, err := s.llmClient.GenerateEmbedding(ctx, EmbeddingDimension, []string{query})
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to generate embedding for search", goerr.V("query", query))
+	}
+
+	if len(embeddings) == 0 {
+		return nil, goerr.New("no embedding generated")
+	}
+
+	// Convert float64 to float32
+	vector32 := make([]float32, len(embeddings[0]))
+	for i, v := range embeddings[0] {
+		vector32[i] = float32(v)
+	}
+
+	// Search by embedding
+	memories, err := s.repository.SearchMemoriesByEmbedding(ctx, agentID, vector32, limit)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to search memories", goerr.V("agent_id", agentID), goerr.V("limit", limit))
+	}
+
+	return memories, nil
 }
