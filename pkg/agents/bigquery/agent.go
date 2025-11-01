@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -69,6 +70,21 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 		return nil, goerr.New("query parameter is required")
 	}
 
+	// Extract limit parameter if provided
+	var limit int
+	if limitVal, ok := args["limit"]; ok {
+		switch v := limitVal.(type) {
+		case int:
+			limit = v
+		case float64:
+			limit = int(v)
+		case float32:
+			limit = int(v)
+		case int64:
+			limit = int(v)
+		}
+	}
+
 	log := logging.From(ctx)
 	startTime := time.Now()
 
@@ -91,16 +107,22 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 		gollem.WithSystemPrompt(systemPrompt),
 	)
 
-	// Step 4: Execute task
-	resp, execErr := agent.Execute(ctx, gollem.Text(query))
+	// Step 4: Build task prompt with limit if specified
+	taskPrompt := query
+	if limit > 0 {
+		taskPrompt = fmt.Sprintf("%s (limit results to %d records)", query, limit)
+	}
+
+	// Step 5: Execute task
+	resp, execErr := agent.Execute(ctx, gollem.Text(taskPrompt))
 	duration := time.Since(startTime)
 
-	// Step 5: Save execution memory (metadata only)
+	// Step 6: Save execution memory (metadata only)
 	if err := a.saveExecutionMemory(ctx, query, resp, execErr, duration); err != nil {
 		log.Warn("failed to save execution memory", "error", err)
 	}
 
-	// Step 6: Return execution result
+	// Step 7: Return execution result
 	if execErr != nil {
 		return nil, execErr
 	}
