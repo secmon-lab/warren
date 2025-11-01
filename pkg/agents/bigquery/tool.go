@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/dustin/go-humanize"
 	"github.com/google/uuid"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
@@ -143,7 +143,7 @@ func (t *internalTool) executeQuery(ctx context.Context, args map[string]any) (m
 	}
 
 	// Wait for job to complete (with timeout)
-	waitCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	waitCtx, cancel := context.WithTimeout(ctx, t.config.GetQueryTimeout())
 	defer cancel()
 
 	status, err := job.Wait(waitCtx)

@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"os"
+	"time"
 
 	"github.com/dustin/go-humanize"
 	"github.com/m-mizutani/goerr/v2"
@@ -12,6 +13,7 @@ import (
 type Config struct {
 	Tables        []TableConfig `yaml:"tables"`
 	ScanSizeLimit uint64        `yaml:"scan_size_limit"`
+	QueryTimeout  time.Duration `yaml:"query_timeout"` // Timeout for waiting for BigQuery job completion (default: 5 minutes)
 }
 
 // TableConfig represents a BigQuery table configuration
@@ -34,7 +36,23 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, goerr.Wrap(err, "failed to unmarshal config", goerr.V("path", path))
 	}
 
+	cfg.setDefaults()
 	return &cfg, nil
+}
+
+// setDefaults sets default values for config fields if not specified
+func (c *Config) setDefaults() {
+	if c.QueryTimeout == 0 {
+		c.QueryTimeout = 5 * time.Minute
+	}
+}
+
+// GetQueryTimeout returns the query timeout with fallback to default
+func (c *Config) GetQueryTimeout() time.Duration {
+	if c.QueryTimeout == 0 {
+		return 5 * time.Minute
+	}
+	return c.QueryTimeout
 }
 
 // ParseScanSizeLimit parses human-readable size string (e.g., "10GB") into bytes
