@@ -9,6 +9,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/urfave/cli/v3"
 )
 
 // Agent represents a BigQuery Sub-Agent
@@ -17,9 +18,18 @@ type Agent struct {
 	internalTool  gollem.ToolSet
 	llmClient     gollem.LLMClient
 	memoryService *memory.Service
+
+	// CLI configuration fields
+	configPath       string
+	scanSizeLimitStr string
 }
 
-// NewAgent creates a new BigQuery Agent instance
+// New creates a new BigQuery Agent instance
+func New() *Agent {
+	return &Agent{}
+}
+
+// NewAgent creates a new BigQuery Agent instance with config (for testing and direct use)
 func NewAgent(
 	config *Config,
 	llmClient gollem.LLMClient,
@@ -33,6 +43,60 @@ func NewAgent(
 	}
 }
 
+// Flags returns CLI flags for this agent
+func (a *Agent) Flags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:        "agent-bigquery-config",
+			Usage:       "Path to BigQuery Agent configuration file (YAML)",
+			Destination: &a.configPath,
+		},
+		&cli.StringFlag{
+			Name:        "agent-bigquery-scan-size-limit",
+			Usage:       "Maximum scan size limit for BigQuery queries (e.g., '10GB', '1TB')",
+			Destination: &a.scanSizeLimitStr,
+		},
+	}
+}
+
+// Init initializes the agent with LLM client and memory service.
+// Returns (true, nil) if initialized successfully, (false, nil) if not configured, or (false, error) on error.
+func (a *Agent) Init(ctx context.Context, llmClient gollem.LLMClient, memoryService *memory.Service) (bool, error) {
+	if a.configPath == "" {
+		return false, nil // Agent is optional
+	}
+
+	cfg, err := LoadConfig(a.configPath)
+	if err != nil {
+		return false, goerr.Wrap(err, "failed to load BigQuery Agent config")
+	}
+
+	// Override scan size limit from CLI flag if provided
+	if a.scanSizeLimitStr != "" {
+		limit, err := ParseScanSizeLimit(a.scanSizeLimitStr)
+		if err != nil {
+			return false, goerr.Wrap(err, "failed to parse scan size limit")
+		}
+		cfg.ScanSizeLimit = limit
+	}
+
+	a.config = cfg
+	a.internalTool = &internalTool{config: cfg}
+	a.llmClient = llmClient
+	a.memoryService = memoryService
+
+	logging.From(ctx).Info("BigQuery Agent configured",
+		"tables", len(cfg.Tables),
+		"scan_limit", cfg.ScanSizeLimit)
+
+	return true, nil
+}
+
+// IsEnabled returns true if the agent is configured and initialized
+func (a *Agent) IsEnabled() bool {
+	return a.config != nil
+}
+
 // ID implements SubAgent interface
 func (a *Agent) ID() string {
 	return "bigquery"
@@ -40,6 +104,11 @@ func (a *Agent) ID() string {
 
 // Specs implements gollem.ToolSet
 func (a *Agent) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
+	// Return empty specs if agent is not enabled
+	if !a.IsEnabled() {
+		return []gollem.ToolSpec{}, nil
+	}
+
 	return []gollem.ToolSpec{
 		{
 			Name:        "query_bigquery",

@@ -29,10 +29,11 @@ func cmdChat() *cli.Command {
 		policyCfg   config.Policy
 		storageCfg  config.Storage
 		mcpCfg      config.MCPConfig
-		bqAgentCfg  bqagent.CLIConfig
 
 		query string
 	)
+
+	bqAgent := bqagent.New()
 
 	flags := joinFlags(
 		[]cli.Flag{
@@ -56,7 +57,7 @@ func cmdChat() *cli.Command {
 		storageCfg.Flags(),
 		tools.Flags(),
 		mcpCfg.Flags(),
-		bqAgentCfg.Flags(),
+		bqAgent.Flags(),
 	)
 
 	return &cli.Command{
@@ -125,20 +126,11 @@ func cmdChat() *cli.Command {
 			// Create memory service
 			memoryService := memory.New(llmClient, repo)
 
-			// Initialize BigQuery Agent if configured
-			if bqAgentCfg.ConfigPath != "" {
-				bqAgentConfig, err := bqAgentCfg.LoadConfig()
-				if err != nil {
-					return goerr.Wrap(err, "failed to load BigQuery Agent config")
-				}
-
-				if bqAgentConfig != nil {
-					bqAgent := bqagent.NewAgent(bqAgentConfig, llmClient, memoryService)
-					allToolSets = append(allToolSets, bqAgent)
-					logging.From(ctx).Info("BigQuery Agent configured",
-						"tables", len(bqAgentConfig.Tables),
-						"scan_limit", bqAgentConfig.ScanSizeLimit)
-				}
+			// Initialize BigQuery Agent
+			if enabled, err := bqAgent.Init(ctx, llmClient, memoryService); err != nil {
+				return err
+			} else if enabled {
+				allToolSets = append(allToolSets, bqAgent)
 			}
 
 			// Show ticket information
