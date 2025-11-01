@@ -42,7 +42,7 @@ func (a *Agent) saveExecutionMemory(
 	}
 
 	// T: Improvements (generated from Problems)
-	mem.Improvements = a.generateImprovements(mem.Problems)
+	mem.Improvements = a.generateImprovements(ctx, mem.Problems)
 
 	// Save memory (with embedding generation)
 	if err := a.memoryService.SaveAgentMemory(ctx, mem); err != nil {
@@ -113,13 +113,10 @@ func (a *Agent) extractProblems(execErr error) []string {
 }
 
 // generateImprovements generates improvement suggestions from problems using LLM
-func (a *Agent) generateImprovements(problems []string) []string {
+func (a *Agent) generateImprovements(ctx context.Context, problems []string) []string {
 	if len(problems) == 0 {
 		return nil
 	}
-
-	// Use LLM to analyze problems and generate improvements
-	ctx := context.Background()
 
 	// Build prompt for LLM
 	prompt := "Based on the following problems encountered during BigQuery task execution, suggest specific improvements:\n\n"
