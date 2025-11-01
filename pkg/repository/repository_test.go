@@ -3009,7 +3009,7 @@ func TestAgentMemory(t *testing.T) {
 
 			// Search memories
 			results, err := repo.SearchMemoriesByEmbedding(ctx, agentID, baseEmbedding, 2)
-			
+
 			// Skip if vector index is not created (test environment)
 			if err != nil {
 				errMsg := err.Error()
@@ -3018,7 +3018,7 @@ func TestAgentMemory(t *testing.T) {
 					return
 				}
 			}
-			
+
 			gt.NoError(t, err)
 			gt.Number(t, len(results)).GreaterOrEqual(1)
 			gt.Number(t, len(results)).LessOrEqual(2)
