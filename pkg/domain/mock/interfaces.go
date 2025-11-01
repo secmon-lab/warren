@@ -2359,6 +2359,9 @@ func (mock *NotifierMock) NotifyErrorCalls() []struct {
 //			GetActivitiesFunc: func(ctx context.Context, offset int, limit int) ([]*activity.Activity, error) {
 //				panic("mock out the GetActivities method")
 //			},
+//			GetAgentMemoryFunc: func(ctx context.Context, agentID string, id types.AgentMemoryID) (*memory.AgentMemory, error) {
+//				panic("mock out the GetAgentMemory method")
+//			},
 //			GetAlertFunc: func(ctx context.Context, alertID types.AlertID) (*alert.Alert, error) {
 //				panic("mock out the GetAlert method")
 //			},
@@ -2491,8 +2494,14 @@ func (mock *NotifierMock) NotifyErrorCalls() []struct {
 //			RemoveTagIDFromAllTicketsFunc: func(ctx context.Context, tagID string) error {
 //				panic("mock out the RemoveTagIDFromAllTickets method")
 //			},
+//			SaveAgentMemoryFunc: func(ctx context.Context, mem *memory.AgentMemory) error {
+//				panic("mock out the SaveAgentMemory method")
+//			},
 //			SearchAlertsFunc: func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
 //				panic("mock out the SearchAlerts method")
+//			},
+//			SearchMemoriesByEmbeddingFunc: func(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error) {
+//				panic("mock out the SearchMemoriesByEmbedding method")
 //			},
 //			UnbindAlertFromTicketFunc: func(ctx context.Context, alertID types.AlertID) error {
 //				panic("mock out the UnbindAlertFromTicket method")
@@ -2560,6 +2569,9 @@ type RepositoryMock struct {
 
 	// GetActivitiesFunc mocks the GetActivities method.
 	GetActivitiesFunc func(ctx context.Context, offset int, limit int) ([]*activity.Activity, error)
+
+	// GetAgentMemoryFunc mocks the GetAgentMemory method.
+	GetAgentMemoryFunc func(ctx context.Context, agentID string, id types.AgentMemoryID) (*memory.AgentMemory, error)
 
 	// GetAlertFunc mocks the GetAlert method.
 	GetAlertFunc func(ctx context.Context, alertID types.AlertID) (*alert.Alert, error)
@@ -2693,8 +2705,14 @@ type RepositoryMock struct {
 	// RemoveTagIDFromAllTicketsFunc mocks the RemoveTagIDFromAllTickets method.
 	RemoveTagIDFromAllTicketsFunc func(ctx context.Context, tagID string) error
 
+	// SaveAgentMemoryFunc mocks the SaveAgentMemory method.
+	SaveAgentMemoryFunc func(ctx context.Context, mem *memory.AgentMemory) error
+
 	// SearchAlertsFunc mocks the SearchAlerts method.
 	SearchAlertsFunc func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error)
+
+	// SearchMemoriesByEmbeddingFunc mocks the SearchMemoriesByEmbedding method.
+	SearchMemoriesByEmbeddingFunc func(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error)
 
 	// UnbindAlertFromTicketFunc mocks the UnbindAlertFromTicket method.
 	UnbindAlertFromTicketFunc func(ctx context.Context, alertID types.AlertID) error
@@ -2837,6 +2855,15 @@ type RepositoryMock struct {
 			Offset int
 			// Limit is the limit argument value.
 			Limit int
+		}
+		// GetAgentMemory holds details about calls to the GetAgentMemory method.
+		GetAgentMemory []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// AgentID is the agentID argument value.
+			AgentID string
+			// ID is the id argument value.
+			ID types.AgentMemoryID
 		}
 		// GetAlert holds details about calls to the GetAlert method.
 		GetAlert []struct {
@@ -3166,6 +3193,13 @@ type RepositoryMock struct {
 			// TagID is the tagID argument value.
 			TagID string
 		}
+		// SaveAgentMemory holds details about calls to the SaveAgentMemory method.
+		SaveAgentMemory []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Mem is the mem argument value.
+			Mem *memory.AgentMemory
+		}
 		// SearchAlerts holds details about calls to the SearchAlerts method.
 		SearchAlerts []struct {
 			// Ctx is the ctx argument value.
@@ -3176,6 +3210,17 @@ type RepositoryMock struct {
 			Op string
 			// Value is the value argument value.
 			Value any
+			// Limit is the limit argument value.
+			Limit int
+		}
+		// SearchMemoriesByEmbedding holds details about calls to the SearchMemoriesByEmbedding method.
+		SearchMemoriesByEmbedding []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// AgentID is the agentID argument value.
+			AgentID string
+			// Embedding is the embedding argument value.
+			Embedding []float32
 			// Limit is the limit argument value.
 			Limit int
 		}
@@ -3218,6 +3263,7 @@ type RepositoryMock struct {
 	lockFindNearestTickets             sync.RWMutex
 	lockFindNearestTicketsWithSpan     sync.RWMutex
 	lockGetActivities                  sync.RWMutex
+	lockGetAgentMemory                 sync.RWMutex
 	lockGetAlert                       sync.RWMutex
 	lockGetAlertList                   sync.RWMutex
 	lockGetAlertListByThread           sync.RWMutex
@@ -3262,7 +3308,9 @@ type RepositoryMock struct {
 	lockRemoveTagFromAllTickets        sync.RWMutex
 	lockRemoveTagIDFromAllAlerts       sync.RWMutex
 	lockRemoveTagIDFromAllTickets      sync.RWMutex
+	lockSaveAgentMemory                sync.RWMutex
 	lockSearchAlerts                   sync.RWMutex
+	lockSearchMemoriesByEmbedding      sync.RWMutex
 	lockUnbindAlertFromTicket          sync.RWMutex
 	lockUpdateNotice                   sync.RWMutex
 	lockUpdateTag                      sync.RWMutex
@@ -3962,6 +4010,50 @@ func (mock *RepositoryMock) GetActivitiesCalls() []struct {
 	mock.lockGetActivities.RLock()
 	calls = mock.calls.GetActivities
 	mock.lockGetActivities.RUnlock()
+	return calls
+}
+
+// GetAgentMemory calls GetAgentMemoryFunc.
+func (mock *RepositoryMock) GetAgentMemory(ctx context.Context, agentID string, id types.AgentMemoryID) (*memory.AgentMemory, error) {
+	callInfo := struct {
+		Ctx     context.Context
+		AgentID string
+		ID      types.AgentMemoryID
+	}{
+		Ctx:     ctx,
+		AgentID: agentID,
+		ID:      id,
+	}
+	mock.lockGetAgentMemory.Lock()
+	mock.calls.GetAgentMemory = append(mock.calls.GetAgentMemory, callInfo)
+	mock.lockGetAgentMemory.Unlock()
+	if mock.GetAgentMemoryFunc == nil {
+		var (
+			agentMemoryOut *memory.AgentMemory
+			errOut         error
+		)
+		return agentMemoryOut, errOut
+	}
+	return mock.GetAgentMemoryFunc(ctx, agentID, id)
+}
+
+// GetAgentMemoryCalls gets all the calls that were made to GetAgentMemory.
+// Check the length with:
+//
+//	len(mockedRepository.GetAgentMemoryCalls())
+func (mock *RepositoryMock) GetAgentMemoryCalls() []struct {
+	Ctx     context.Context
+	AgentID string
+	ID      types.AgentMemoryID
+} {
+	var calls []struct {
+		Ctx     context.Context
+		AgentID string
+		ID      types.AgentMemoryID
+	}
+	mock.lockGetAgentMemory.RLock()
+	calls = mock.calls.GetAgentMemory
+	mock.lockGetAgentMemory.RUnlock()
 	return calls
 }
 
@@ -5751,6 +5843,45 @@ func (mock *RepositoryMock) RemoveTagIDFromAllTicketsCalls() []struct {
 	return calls
 }
 
+// SaveAgentMemory calls SaveAgentMemoryFunc.
+func (mock *RepositoryMock) SaveAgentMemory(ctx context.Context, mem *memory.AgentMemory) error {
+	callInfo := struct {
+		Ctx context.Context
+		Mem *memory.AgentMemory
+	}{
+		Ctx: ctx,
+		Mem: mem,
+	}
+	mock.lockSaveAgentMemory.Lock()
+	mock.calls.SaveAgentMemory = append(mock.calls.SaveAgentMemory, callInfo)
+	mock.lockSaveAgentMemory.Unlock()
+	if mock.SaveAgentMemoryFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.SaveAgentMemoryFunc(ctx, mem)
+}
+
+// SaveAgentMemoryCalls gets all the calls that were made to SaveAgentMemory.
+// Check the length with:
+//
+//	len(mockedRepository.SaveAgentMemoryCalls())
+func (mock *RepositoryMock) SaveAgentMemoryCalls() []struct {
+	Ctx context.Context
+	Mem *memory.AgentMemory
+} {
+	var calls []struct {
+		Ctx context.Context
+		Mem *memory.AgentMemory
+	}
+	mock.lockSaveAgentMemory.RLock()
+	calls = mock.calls.SaveAgentMemory
+	mock.lockSaveAgentMemory.RUnlock()
+	return calls
+}
+
 // SearchAlerts calls SearchAlertsFunc.
 func (mock *RepositoryMock) SearchAlerts(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
 	callInfo := struct {
@@ -5800,6 +5931,54 @@ func (mock *RepositoryMock) SearchAlertsCalls() []struct {
 	mock.lockSearchAlerts.RLock()
 	calls = mock.calls.SearchAlerts
 	mock.lockSearchAlerts.RUnlock()
+	return calls
+}
+
+// SearchMemoriesByEmbedding calls SearchMemoriesByEmbeddingFunc.
+func (mock *RepositoryMock) SearchMemoriesByEmbedding(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error) {
+	callInfo := struct {
+		Ctx       context.Context
+		AgentID   string
+		Embedding []float32
+		Limit     int
+	}{
+		Ctx:       ctx,
+		AgentID:   agentID,
+		Embedding: embedding,
+		Limit:     limit,
+	}
+	mock.lockSearchMemoriesByEmbedding.Lock()
+	mock.calls.SearchMemoriesByEmbedding = append(mock.calls.SearchMemoriesByEmbedding, callInfo)
+	mock.lockSearchMemoriesByEmbedding.Unlock()
+	if mock.SearchMemoriesByEmbeddingFunc == nil {
+		var (
+			agentMemorysOut []*memory.AgentMemory
+			errOut          error
+		)
+		return agentMemorysOut, errOut
+	}
+	return mock.SearchMemoriesByEmbeddingFunc(ctx, agentID, embedding, limit)
+}
+
+// SearchMemoriesByEmbeddingCalls gets all the calls that were made to SearchMemoriesByEmbedding.
+// Check the length with:
+//
+//	len(mockedRepository.SearchMemoriesByEmbeddingCalls())
+func (mock *RepositoryMock) SearchMemoriesByEmbeddingCalls() []struct {
+	Ctx       context.Context
+	AgentID   string
+	Embedding []float32
+	Limit     int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		AgentID   string
+		Embedding []float32
+		Limit     int
+	}
+	mock.lockSearchMemoriesByEmbedding.RLock()
+	calls = mock.calls.SearchMemoriesByEmbedding
+	mock.lockSearchMemoriesByEmbedding.RUnlock()
 	return calls
 }
 

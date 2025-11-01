@@ -66,6 +66,8 @@ const (
 	collectionNotices           = "notices"
 	collectionExecutionMemories = "execution_memories"
 	collectionTicketMemories    = "ticket_memories"
+	collectionAgents            = "agents"
+	subcollectionMemories       = "memories"
 )
 
 // extractCountFromAggregationResult extracts an integer count from a Firestore aggregation result.
@@ -1825,7 +1827,7 @@ func (r *Firestore) GetExecutionMemory(ctx context.Context, schemaID types.Alert
 	docs, err := r.db.Collection(collectionExecutionMemories).
 		Doc(string(schemaID)).
 		Collection("records").
-		OrderBy("created_at", firestore.Desc).
+		OrderBy("CreatedAt", firestore.Desc).
 		Limit(1).
 		Documents(ctx).GetAll()
 
@@ -1868,7 +1870,7 @@ func (r *Firestore) GetTicketMemory(ctx context.Context, schemaID types.AlertSch
 	docs, err := r.db.Collection(collectionTicketMemories).
 		Doc(string(schemaID)).
 		Collection("records").
-		OrderBy("created_at", firestore.Desc).
+		OrderBy("CreatedAt", firestore.Desc).
 		Limit(1).
 		Documents(ctx).GetAll()
 
@@ -1905,4 +1907,86 @@ func (r *Firestore) PutTicketMemory(ctx context.Context, mem *memory.TicketMemor
 		return r.eb.Wrap(err, "failed to put ticket memory", goerr.V("schema_id", mem.SchemaID), goerr.V("id", mem.ID))
 	}
 	return nil
+}
+
+// SaveAgentMemory saves an agent memory record in subcollection structure
+// Path: agents/{agentID}/memories/{memoryID}
+func (r *Firestore) SaveAgentMemory(ctx context.Context, mem *memory.AgentMemory) error {
+	if err := mem.Validate(); err != nil {
+		return r.eb.Wrap(err, "invalid agent memory")
+	}
+
+	doc := r.db.Collection(collectionAgents).Doc(mem.AgentID).
+		Collection(subcollectionMemories).Doc(mem.ID.String())
+	_, err := doc.Set(ctx, mem)
+	if err != nil {
+		return r.eb.Wrap(err, "failed to save agent memory",
+			goerr.V("agent_id", mem.AgentID),
+			goerr.V("id", mem.ID))
+	}
+	return nil
+}
+
+// GetAgentMemory retrieves an agent memory record by agentID and memoryID
+// Path: agents/{agentID}/memories/{memoryID}
+func (r *Firestore) GetAgentMemory(ctx context.Context, agentID string, id types.AgentMemoryID) (*memory.AgentMemory, error) {
+	doc, err := r.db.Collection(collectionAgents).Doc(agentID).
+		Collection(subcollectionMemories).Doc(id.String()).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, r.eb.Wrap(goerr.New("agent memory not found"), "not found",
+				goerr.T(errs.TagNotFound),
+				goerr.V("agent_id", agentID),
+				goerr.V("id", id))
+		}
+		return nil, r.eb.Wrap(err, "failed to get agent memory",
+			goerr.V("agent_id", agentID),
+			goerr.V("id", id))
+	}
+
+	var mem memory.AgentMemory
+	if err := doc.DataTo(&mem); err != nil {
+		return nil, r.eb.Wrap(err, "failed to unmarshal agent memory",
+			goerr.V("agent_id", agentID),
+			goerr.V("id", id))
+	}
+
+	return &mem, nil
+}
+
+// SearchMemoriesByEmbedding searches for agent memories by embedding similarity within an agent's subcollection
+// Path: agents/{agentID}/memories/*
+func (r *Firestore) SearchMemoriesByEmbedding(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error) {
+	// Query the agent's memories subcollection
+	query := r.db.Collection(collectionAgents).Doc(agentID).
+		Collection(subcollectionMemories)
+
+	// Execute vector search using FindNearest
+	// Results are automatically ordered by similarity (cosine distance)
+	docs := query.FindNearest("query_embedding",
+		firestore.Vector32(embedding),
+		limit,
+		firestore.DistanceMeasureCosine,
+		nil,
+	).Documents(ctx)
+
+	var memories []*memory.AgentMemory
+	for {
+		doc, err := docs.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, r.eb.Wrap(err, "failed to iterate search results", goerr.V("agent_id", agentID))
+		}
+
+		var mem memory.AgentMemory
+		if err := doc.DataTo(&mem); err != nil {
+			return nil, r.eb.Wrap(err, "failed to unmarshal agent memory", goerr.V("id", doc.Ref.ID))
+		}
+
+		memories = append(memories, &mem)
+	}
+
+	return memories, nil
 }

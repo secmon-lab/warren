@@ -10,12 +10,12 @@ import (
 
 // TicketMemory represents organizational knowledge from ticket resolution
 type TicketMemory struct {
-	ID        types.MemoryID    `json:"id" firestore:"id"`
-	SchemaID  types.AlertSchema `json:"schema_id" firestore:"schema_id"`
-	Insights  string            `json:"insights" firestore:"insights"`
-	CreatedAt time.Time         `json:"created_at" firestore:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at" firestore:"updated_at"`
-	Version   int               `json:"version" firestore:"version"`
+	ID        types.MemoryID    `json:"id"`
+	SchemaID  types.AlertSchema `json:"schema_id"`
+	Insights  string            `json:"insights"`
+	CreatedAt time.Time         `json:"created_at"`
+	UpdatedAt time.Time         `json:"updated_at"`
+	Version   int               `json:"version"`
 }
 
 // NewTicketMemory creates a new TicketMemory with a unique ID

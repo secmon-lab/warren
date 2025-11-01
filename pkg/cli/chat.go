@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
+	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -32,6 +33,8 @@ func cmdChat() *cli.Command {
 		query string
 	)
 
+	bqAgent := bqagent.New()
+
 	flags := joinFlags(
 		[]cli.Flag{
 			&cli.StringFlag{
@@ -54,6 +57,7 @@ func cmdChat() *cli.Command {
 		storageCfg.Flags(),
 		tools.Flags(),
 		mcpCfg.Flags(),
+		bqAgent.Flags(),
 	)
 
 	return &cli.Command{
@@ -119,6 +123,16 @@ func cmdChat() *cli.Command {
 					"count", len(mcpToolSets))
 			}
 
+			// Create memory service
+			memoryService := memory.New(llmClient, repo)
+
+			// Initialize BigQuery Agent
+			if enabled, err := bqAgent.Init(ctx, llmClient, memoryService); err != nil {
+				return err
+			} else if enabled {
+				allToolSets = append(allToolSets, bqAgent)
+			}
+
 			// Show ticket information
 			fmt.Printf("\n🎫 Ticket Information:\n")
 			fmt.Printf("  📝 ID: %s\n", ticket.ID)
@@ -130,9 +144,6 @@ func cmdChat() *cli.Command {
 			}
 			fmt.Printf("  🔢 Alerts: %d\n", len(alerts))
 			fmt.Printf("\n")
-
-			// Create memory service
-			memoryService := memory.New(llmClient, repo)
 
 			// Create usecase
 			uc := usecase.New(

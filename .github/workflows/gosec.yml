@@ -11,6 +11,8 @@ on:
 
 jobs:
   tests:
+    if: false  # Temporarily disable this workflow for CI error
+    # it may be caused by https://github.com/securego/gosec/issues/1407
     runs-on: ubuntu-latest
     permissions:
       security-events: write
