@@ -21,6 +21,7 @@ type Agent struct {
 
 	// CLI configuration fields
 	configPath       string
+	projectID        string
 	scanSizeLimitStr string
 }
 
@@ -50,11 +51,22 @@ func (a *Agent) Flags() []cli.Flag {
 			Name:        "agent-bigquery-config",
 			Usage:       "Path to BigQuery Agent configuration file (YAML)",
 			Destination: &a.configPath,
+			Category:    "Agent:BigQuery",
+			Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_CONFIG"),
+		},
+		&cli.StringFlag{
+			Name:        "agent-bigquery-project-id",
+			Usage:       "Google Cloud Project ID for BigQuery operations",
+			Destination: &a.projectID,
+			Category:    "Agent:BigQuery",
+			Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_PROJECT_ID"),
 		},
 		&cli.StringFlag{
 			Name:        "agent-bigquery-scan-size-limit",
 			Usage:       "Maximum scan size limit for BigQuery queries (e.g., '10GB', '1TB')",
 			Destination: &a.scanSizeLimitStr,
+			Category:    "Agent:BigQuery",
+			Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_SCAN_SIZE_LIMIT"),
 		},
 	}
 }
@@ -81,7 +93,10 @@ func (a *Agent) Init(ctx context.Context, llmClient gollem.LLMClient, memoryServ
 	}
 
 	a.config = cfg
-	a.internalTool = &internalTool{config: cfg}
+	a.internalTool = &internalTool{
+		config:    cfg,
+		projectID: a.projectID,
+	}
 	a.llmClient = llmClient
 	a.memoryService = memoryService
 

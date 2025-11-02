@@ -23,40 +23,34 @@ func TestWithReply(t *testing.T) {
 	gt.Equal(t, "test message", gotMsg)
 }
 
-func TestWithNewStateMsg(t *testing.T) {
+func TestWithTraceFunc(t *testing.T) {
 	var calledReply bool
 	var callCount int
 	var lastMsg string
 	replyFunc := func(ctx context.Context, msg string) {
 		calledReply = true
 	}
-	newStateFunc := func(ctx context.Context, msg string) func(ctx context.Context, msg string) {
-		// NewTraceFunc should post the initial message immediately (like NewTraceMessage does)
+	traceFunc := func(ctx context.Context, msg string) func(ctx context.Context, msg string) {
+		// TraceFunc should post the trace message
 		callCount++
 		lastMsg = msg
-
-		// Return a function for potential updates (though with new behavior, this won't be used)
-		return func(ctx context.Context, updateMsg string) {
-			callCount++
-			lastMsg = updateMsg
-		}
+		// Return a no-op function (not used in current implementation)
+		return func(ctx context.Context, updateMsg string) {}
 	}
 
-	ctx := msg.With(context.Background(), replyFunc, newStateFunc)
-	ctx = msg.NewTrace(ctx, "test new state")
-	msg.Trace(ctx, "test state messsage")
+	ctx := msg.With(context.Background(), replyFunc, traceFunc)
+	msg.Trace(ctx, "test trace message 1")
+	msg.Trace(ctx, "test trace message 2")
 
 	gt.False(t, calledReply)
-	// Trace now always creates a new trace, so newStateFunc is called twice:
-	// once for NewTrace("test new state") and once for Trace("test state messsage")
+	// Trace is called twice
 	gt.Equal(t, callCount, 2)
-	gt.Equal(t, lastMsg, "test state messsage")
+	gt.Equal(t, lastMsg, "test trace message 2")
 }
 
-func TestNewStateMsg_Nil(t *testing.T) {
+func TestTrace_Nil(t *testing.T) {
 	ctx := context.Background()
-	ctx = msg.NewTrace(ctx, "test state")
 
-	// Should not panic
+	// Should not panic when TraceFunc is not set
 	msg.Trace(ctx, "test message")
 }

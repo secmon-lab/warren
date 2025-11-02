@@ -60,7 +60,7 @@ func repairAlertEmbeddings(ctx context.Context, clients *core.Clients) error {
 	}
 
 	if len(alerts) == 0 {
-		_ = msg.Trace(ctx, "✅ No alerts with invalid embeddings found")
+		msg.Trace(ctx, "✅ No alerts with invalid embeddings found")
 		return nil
 	}
 
@@ -73,7 +73,7 @@ func repairAlertEmbeddings(ctx context.Context, clients *core.Clients) error {
 
 	for i, alert := range alerts {
 		if clock.Since(ctx, ts) > notifyPeriod {
-			ctx = msg.Trace(ctx, "⌛ Repairing alert embeddings %d/%d (Success: %d, Failed: %d)",
+			msg.Trace(ctx, "⌛ Repairing alert embeddings %d/%d (Success: %d, Failed: %d)",
 				i+1, len(alerts), successCount, failCount)
 			ts = clock.Now(ctx)
 		}
@@ -97,7 +97,7 @@ func repairAlertEmbeddings(ctx context.Context, clients *core.Clients) error {
 		successCount++
 	}
 
-	_ = msg.Trace(ctx, "✅ Alert embedding repair completed - Success: %d, Failed: %d",
+	msg.Trace(ctx, "✅ Alert embedding repair completed - Success: %d, Failed: %d",
 		successCount, failCount)
 	return nil
 }
@@ -112,7 +112,7 @@ func repairTicketEmbeddings(ctx context.Context, clients *core.Clients) error {
 	}
 
 	if len(tickets) == 0 {
-		_ = msg.Trace(ctx, "✅ No tickets with invalid embeddings found")
+		msg.Trace(ctx, "✅ No tickets with invalid embeddings found")
 		return nil
 	}
 
@@ -128,7 +128,7 @@ func repairTicketEmbeddings(ctx context.Context, clients *core.Clients) error {
 		// No need to check again since GetTicketsWithInvalidEmbedding already filtered
 		processed++
 		if clock.Since(ctx, ts) > notifyPeriod {
-			ctx = msg.Trace(ctx, "⌛ Repairing ticket embeddings %d/%d (Success: %d, Failed: %d)",
+			msg.Trace(ctx, "⌛ Repairing ticket embeddings %d/%d (Success: %d, Failed: %d)",
 				processed, len(tickets), successCount, failCount)
 			ts = clock.Now(ctx)
 		}
@@ -150,7 +150,7 @@ func repairTicketEmbeddings(ctx context.Context, clients *core.Clients) error {
 		successCount++
 	}
 
-	_ = msg.Trace(ctx, "✅ Ticket embedding repair completed - Success: %d, Failed: %d",
+	msg.Trace(ctx, "✅ Ticket embedding repair completed - Success: %d, Failed: %d",
 		successCount, failCount)
 	return nil
 }

@@ -11,12 +11,34 @@ import (
 
 // Config represents BigQuery Agent configuration
 type Config struct {
-	Tables        []TableConfig `yaml:"tables"`
-	ScanSizeLimit uint64        `yaml:"scan_size_limit"`
-	QueryTimeout  time.Duration `yaml:"query_timeout"` // Timeout for waiting for BigQuery job completion (default: 5 minutes)
+	Tables           []TableConfig   `yaml:"-"`        // Internal use only (expanded from Projects)
+	Projects         []ProjectConfig `yaml:"projects"` // Hierarchical configuration
+	ScanSizeLimit    uint64          `yaml:"-"`        // Parsed from ScanSizeLimitStr
+	ScanSizeLimitStr string          `yaml:"scan_size_limit"`
+	QueryTimeout     time.Duration   `yaml:"query_timeout"` // Timeout for waiting for BigQuery job completion (default: 5 minutes)
 }
 
-// TableConfig represents a BigQuery table configuration
+// ProjectConfig represents a GCP project with datasets
+type ProjectConfig struct {
+	ID          string          `yaml:"id"`
+	Description string          `yaml:"description,omitempty"`
+	Datasets    []DatasetConfig `yaml:"datasets"`
+}
+
+// DatasetConfig represents a BigQuery dataset with tables
+type DatasetConfig struct {
+	ID          string        `yaml:"id"`
+	Description string        `yaml:"description,omitempty"`
+	Tables      []TableDetail `yaml:"tables"`
+}
+
+// TableDetail represents a table within a dataset
+type TableDetail struct {
+	ID          string `yaml:"id"`
+	Description string `yaml:"description,omitempty"`
+}
+
+// TableConfig represents a BigQuery table configuration (flat structure for backward compatibility)
 type TableConfig struct {
 	ProjectID   string `yaml:"project_id"`
 	DatasetID   string `yaml:"dataset_id"`
@@ -36,14 +58,54 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, goerr.Wrap(err, "failed to unmarshal config", goerr.V("path", path))
 	}
 
-	cfg.setDefaults()
+	if err := cfg.setDefaults(); err != nil {
+		return nil, err
+	}
 	return &cfg, nil
 }
 
 // setDefaults sets default values for config fields if not specified
-func (c *Config) setDefaults() {
+func (c *Config) setDefaults() error {
 	if c.QueryTimeout == 0 {
 		c.QueryTimeout = 5 * time.Minute
+	}
+
+	// Parse scan size limit from string
+	if c.ScanSizeLimitStr != "" {
+		limit, err := ParseScanSizeLimit(c.ScanSizeLimitStr)
+		if err != nil {
+			return goerr.Wrap(err, "failed to parse scan_size_limit")
+		}
+		c.ScanSizeLimit = limit
+	}
+
+	// Expand hierarchical projects into flat tables list
+	c.expandProjects()
+	return nil
+}
+
+// expandProjects expands hierarchical project/dataset/table structure into flat Tables list
+func (c *Config) expandProjects() {
+	for _, project := range c.Projects {
+		for _, dataset := range project.Datasets {
+			for _, table := range dataset.Tables {
+				// Build description with context
+				description := table.Description
+				if description == "" && dataset.Description != "" {
+					description = dataset.Description
+				}
+				if description == "" && project.Description != "" {
+					description = project.Description
+				}
+
+				c.Tables = append(c.Tables, TableConfig{
+					ProjectID:   project.ID,
+					DatasetID:   dataset.ID,
+					TableID:     table.ID,
+					Description: description,
+				})
+			}
+		}
 	}
 }
 

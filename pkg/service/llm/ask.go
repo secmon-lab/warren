@@ -93,14 +93,14 @@ func Ask[T any](ctx context.Context, llm gollem.LLMClient, prompt string, opts .
 		}
 
 		if len(resp.Texts) == 0 {
-			ctx = msg.Trace(ctx, "💥 failed to get valid response from LLM (no content parts), retry (%d/%d)", i+1, config.maxRetry)
+			msg.Trace(ctx, "💥 failed to get valid response from LLM (no content parts), retry (%d/%d)", i+1, config.maxRetry)
 			prompt = config.retryPrompt(ctx, err)
 			continue
 		}
 
 		text := resp.Texts[0]
 		if text == "" {
-			ctx = msg.Trace(ctx, "💥 failed to get valid response from LLM (no text data), retry (%d/%d)", i+1, config.maxRetry)
+			msg.Trace(ctx, "💥 failed to get valid response from LLM (no text data), retry (%d/%d)", i+1, config.maxRetry)
 			prompt = config.retryPrompt(ctx, err)
 			continue
 		}
@@ -108,14 +108,14 @@ func Ask[T any](ctx context.Context, llm gollem.LLMClient, prompt string, opts .
 		var result T
 		if err := json.Unmarshal([]byte(text), &result); err != nil {
 			logger.Debug("failed to unmarshal text", "text", text, "error", err)
-			ctx = msg.Trace(ctx, "💥 failed to unmarshal text. retry (%d/%d)\n> %s", i+1, config.maxRetry, err.Error())
+			msg.Trace(ctx, "💥 failed to unmarshal text. retry (%d/%d)\n> %s", i+1, config.maxRetry, err.Error())
 			prompt = config.retryPrompt(ctx, err)
 			continue
 		}
 
 		if config.validate != nil {
 			if err := config.validate(result); err != nil {
-				ctx = msg.Trace(ctx, "💥 invalid response from LLM, retry (%d/%d)", i+1, config.maxRetry)
+				msg.Trace(ctx, "💥 invalid response from LLM, retry (%d/%d)", i+1, config.maxRetry)
 				logger.Debug("invalid response from LLM",
 					"result", result,
 					"text", string(text),
