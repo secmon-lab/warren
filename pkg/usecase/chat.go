@@ -238,7 +238,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		requestID = "unknown"
 	}
 
-	ctx = msg.NewTrace(ctx, "🚀 Starting... (Request ID: %s)", requestID)
+	msg.Trace(ctx, "🚀 Thinking... (Request ID: %s)", requestID)
 
 	// Create agent with Strategy and Middleware
 	agent := gollem.New(x.llmClient,
@@ -294,7 +294,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	}
 
 	if hooks.planned {
-		ctx = msg.Trace(ctx, "✅ Execution completed")
+		msg.Trace(ctx, "✅ Execution completed")
 	}
 
 	// Prepare Warren's final response message

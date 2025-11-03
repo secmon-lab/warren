@@ -26,7 +26,16 @@ func (m *mockLLMClient) NewSession(ctx context.Context, options ...gollem.Sessio
 }
 
 func (m *mockLLMClient) GenerateEmbedding(ctx context.Context, dimension int, input []string) ([][]float64, error) {
-	return nil, nil
+	// Return dummy embeddings for testing
+	embeddings := make([][]float64, len(input))
+	for i := range input {
+		vec := make([]float64, dimension)
+		for j := 0; j < dimension; j++ {
+			vec[j] = 0.1 * float64(i+j)
+		}
+		embeddings[i] = vec
+	}
+	return embeddings, nil
 }
 
 func createTestRepository(t *testing.T) interfaces.Repository {
@@ -352,4 +361,59 @@ func TestGenerateTicketMemoryWithRealLLM(t *testing.T) {
 
 	t.Logf("Generated TicketMemory:")
 	t.Logf("  Insights: %s", ticketMem.Insights)
+}
+
+func TestAgentMemory_SaveAndSearch(t *testing.T) {
+	repo := createTestRepository(t)
+	llmClient := &mockLLMClient{}
+	svc := memoryService.New(llmClient, repo)
+	ctx := context.Background()
+
+	// Create test memory
+	mem1 := &memory.AgentMemory{
+		ID:                 types.NewAgentMemoryID(),
+		AgentID:            "bigquery",
+		TaskQuery:          "get login errors",
+		QueryEmbedding:     []float32{0.1, 0.2, 0.3},
+		Timestamp:          time.Now(),
+		Duration:           time.Second,
+		SuccessDescription: "Successfully executed",
+		SuccessResult:      map[string]any{"tool_call_count": 3},
+	}
+
+	mem2 := &memory.AgentMemory{
+		ID:             types.NewAgentMemoryID(),
+		AgentID:        "bigquery",
+		TaskQuery:      "get authentication failures",
+		QueryEmbedding: []float32{0.15, 0.25, 0.35},
+		Timestamp:      time.Now(),
+		Duration:       2 * time.Second,
+		Problems:       []string{"Query timeout"},
+		Improvements:   []string{"Add index"},
+	}
+
+	// Different agent
+	mem3 := &memory.AgentMemory{
+		ID:             types.NewAgentMemoryID(),
+		AgentID:        "virustotal",
+		TaskQuery:      "scan file hash",
+		QueryEmbedding: []float32{0.5, 0.6, 0.7},
+		Timestamp:      time.Now(),
+		Duration:       time.Second,
+	}
+
+	// Save memories
+	gt.NoError(t, svc.SaveAgentMemory(ctx, mem1))
+	gt.NoError(t, svc.SaveAgentMemory(ctx, mem2))
+	gt.NoError(t, svc.SaveAgentMemory(ctx, mem3))
+
+	// Search by similar embedding (should find mem1 and mem2, not mem3)
+	results, err := svc.SearchRelevantAgentMemories(ctx, "bigquery", "login errors", 2)
+	gt.NoError(t, err)
+	gt.V(t, len(results)).Equal(2)
+
+	// Verify results are from correct agent
+	for _, r := range results {
+		gt.V(t, r.AgentID).Equal("bigquery")
+	}
 }

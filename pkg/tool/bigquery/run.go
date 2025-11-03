@@ -298,7 +298,7 @@ type queryMetadata struct {
 }
 
 func (x *Action) executeQuery(ctx context.Context, client *bigquery.Client, query string) (map[string]any, error) {
-	ctx = msg.Trace(ctx, "📝 %s", query)
+	msg.Trace(ctx, "📝 %s", query)
 
 	q := client.Query(query)
 

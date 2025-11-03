@@ -200,7 +200,7 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 				st := uc.slackService.NewThread(*alert.SlackThread)
 				if err := st.UpdateAlert(ctx, *alert); err != nil {
 					// Log error but don't fail the main operation
-					_ = msg.Trace(ctx, "💥 Failed to update alert in Slack: %s", err.Error())
+					msg.Trace(ctx, "💥 Failed to update alert in Slack: %s", err.Error())
 				}
 			}
 		}
@@ -314,10 +314,10 @@ func (uc *UseCases) postTicketToSlack(ctx context.Context, newTicket *ticket.Tic
 	// For single alert tickets, the inherited metadata should be sufficient
 	if len(alerts) != 1 {
 		if comment, err := uc.generateInitialTicketComment(ctx, newTicket, alerts); err != nil {
-			_ = msg.Trace(ctx, "💥 Failed to generate initial comment: %s", err.Error())
+			msg.Trace(ctx, "💥 Failed to generate initial comment: %s", err.Error())
 		} else if comment != "" {
 			if err := threadService.PostComment(ctx, comment); err != nil {
-				_ = msg.Trace(ctx, "💥 Failed to post initial comment: %s", err.Error())
+				msg.Trace(ctx, "💥 Failed to post initial comment: %s", err.Error())
 			}
 		}
 	}
@@ -393,7 +393,7 @@ func (uc *UseCases) updateTicketWithSlackSync(ctx context.Context, ticketID type
 	// Update Slack post if ticket has a Slack thread
 	if err := uc.syncTicketToSlack(ctx, existingTicket); err != nil {
 		// Log error but don't fail the update
-		_ = msg.Trace(ctx, "💥 Failed to sync ticket to Slack: %s", err.Error())
+		msg.Trace(ctx, "💥 Failed to sync ticket to Slack: %s", err.Error())
 	}
 
 	return existingTicket, nil
@@ -500,13 +500,13 @@ func (uc *UseCases) UpdateTicketStatus(ctx context.Context, ticketID types.Ticke
 	}
 
 	// Trace ticket status change
-	_ = msg.Trace(ctx, "🎫 Ticket status updated: %s",
+	msg.Trace(ctx, "🎫 Ticket status updated: %s",
 		status)
 
 	// Update Slack post if ticket has a Slack thread
 	if err := uc.syncTicketToSlack(ctx, updatedTicket); err != nil {
 		// Log error but don't fail the update
-		_ = msg.Trace(ctx, "💥 Failed to sync ticket to Slack (ticket %s): %s", updatedTicket.ID, err.Error())
+		msg.Trace(ctx, "💥 Failed to sync ticket to Slack (ticket %s): %s", updatedTicket.ID, err.Error())
 	}
 
 	// Generate and save ticket memory when ticket is resolved
@@ -554,13 +554,13 @@ func (uc *UseCases) UpdateMultipleTicketsStatus(ctx context.Context, ticketIDs [
 	}
 
 	// Trace batch status update
-	_ = msg.Trace(ctx, "🎫 Batch updated %d tickets to status %s", len(tickets), status)
+	msg.Trace(ctx, "🎫 Batch updated %d tickets to status %s", len(tickets), status)
 
 	// Update Slack posts for tickets that have Slack threads
 	for _, t := range tickets {
 		if err := uc.syncTicketToSlack(ctx, t); err != nil {
 			// Log error but don't fail the update
-			_ = msg.Trace(ctx, "💥 Failed to sync ticket to Slack (ticket %s): %s", t.ID, err.Error())
+			msg.Trace(ctx, "💥 Failed to sync ticket to Slack (ticket %s): %s", t.ID, err.Error())
 		}
 	}
 

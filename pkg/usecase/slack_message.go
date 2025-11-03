@@ -38,7 +38,7 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg slack.Messa
 
 	comment := ticket.NewComment(ctx, slackMsg.Text(), slackMsg.User(), slackMsg.ID())
 	if err := uc.repository.PutTicketComment(ctx, comment); err != nil {
-		_ = msg.Trace(ctx, "💥 Failed to insert alert comment\n> %s", err.Error())
+		msg.Trace(ctx, "💥 Failed to insert alert comment\n> %s", err.Error())
 		return goerr.Wrap(err, "failed to insert alert comment", goerr.V("comment", comment))
 	}
 

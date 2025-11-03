@@ -11,14 +11,14 @@ import (
 
 // ExecutionMemory represents learning from task execution
 type ExecutionMemory struct {
-	ID        types.MemoryID    `json:"id" firestore:"id"`
-	SchemaID  types.AlertSchema `json:"schema_id" firestore:"schema_id"`
-	Keep      string            `json:"keep" firestore:"keep"`
-	Change    string            `json:"change" firestore:"change"`
-	Notes     string            `json:"notes" firestore:"notes"`
-	CreatedAt time.Time         `json:"created_at" firestore:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at" firestore:"updated_at"`
-	Version   int               `json:"version" firestore:"version"`
+	ID        types.MemoryID    `json:"id"`
+	SchemaID  types.AlertSchema `json:"schema_id"`
+	Keep      string            `json:"keep"`
+	Change    string            `json:"change"`
+	Notes     string            `json:"notes"`
+	CreatedAt time.Time         `json:"created_at"`
+	UpdatedAt time.Time         `json:"updated_at"`
+	Version   int               `json:"version"`
 }
 
 // NewExecutionMemory creates a new ExecutionMemory with a unique ID

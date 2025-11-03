@@ -64,7 +64,7 @@ type List struct {
 	Embedding firestore.Vector32 `json:"-"`
 
 	alertsMutex sync.RWMutex
-	alerts      Alerts `firestore:"-"`
+	alerts      Alerts `json:"-"`
 }
 
 func NewList(ctx context.Context, thread slack.Thread, createdBy *slack.User, alerts Alerts) *List {

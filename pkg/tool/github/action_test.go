@@ -338,6 +338,11 @@ func TestGitHubIntegration(t *testing.T) {
 		configPath = "./testdata/config.yaml"
 	}
 
+	// Check if config file exists
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		t.Skipf("Config file does not exist: %s", configPath)
+	}
+
 	// Create action
 	action := &githubtool.Action{}
 
