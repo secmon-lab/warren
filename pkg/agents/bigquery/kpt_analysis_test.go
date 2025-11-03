@@ -234,8 +234,11 @@ func TestGenerateKPTAnalysis_RealLLM(t *testing.T) {
 	agent := bigquery.NewAgent(config, llmClient, memSvc)
 
 	t.Run("success case", func(t *testing.T) {
-		// Simulate successful execution
-		resp := &gollem.ExecuteResponse{}
+		// Simulate successful execution with results
+		resp := gollem.NewExecuteResponse(
+			"Found 42 authentication failures",
+			"Query executed successfully using event_type='AUTHENTICATION_FAILURE' AND event_timestamp > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)",
+		)
 		successes, problems, improvements, err := agent.GenerateKPTAnalysis(
 			ctx,
 			"find authentication failures in the last 24 hours",

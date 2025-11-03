@@ -50,6 +50,11 @@ func (c *Firestore) ProjectID() string {
 	return c.projectID
 }
 
+// DatabaseID returns the database ID (exported for migrate command)
+func (c *Firestore) DatabaseID() string {
+	return c.databaseID
+}
+
 // IsConfigured returns true if Firestore is configured
 func (c *Firestore) IsConfigured() bool {
 	return c.projectID != ""
