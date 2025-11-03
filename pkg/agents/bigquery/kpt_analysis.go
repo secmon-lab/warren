@@ -58,14 +58,14 @@ func (a *Agent) generateKPTAnalysis(
 	prompt := a.buildKPTPrompt(query, resp, execErr, duration, session)
 	logger.Debug("KPT prompt built", "prompt_length", len(prompt))
 
-	// Generate analysis using LLM
-	session, err := a.llmClient.NewSession(ctx)
+	// Generate analysis using LLM (create new session for KPT analysis)
+	kptSession, err := a.llmClient.NewSession(ctx)
 	if err != nil {
 		logger.Warn("Failed to create LLM session for KPT analysis", "error", err)
 		return []string{}, []string{}, []string{}, nil // Fallback: return empty arrays
 	}
 
-	llmResp, err := session.GenerateContent(ctx, gollem.Text(prompt))
+	llmResp, err := kptSession.GenerateContent(ctx, gollem.Text(prompt))
 	if err != nil {
 		logger.Warn("Failed to generate KPT analysis", "error", err)
 		return []string{}, []string{}, []string{}, nil // Fallback: return empty arrays

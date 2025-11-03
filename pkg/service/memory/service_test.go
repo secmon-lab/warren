@@ -371,14 +371,15 @@ func TestAgentMemory_SaveAndSearch(t *testing.T) {
 
 	// Create test memory
 	mem1 := &memory.AgentMemory{
-		ID:                 types.NewAgentMemoryID(),
-		AgentID:            "bigquery",
-		TaskQuery:          "get login errors",
-		QueryEmbedding:     []float32{0.1, 0.2, 0.3},
-		Timestamp:          time.Now(),
-		Duration:           time.Second,
-		SuccessDescription: "Successfully executed",
-		SuccessResult:      map[string]any{"tool_call_count": 3},
+		ID:             types.NewAgentMemoryID(),
+		AgentID:        "bigquery",
+		TaskQuery:      "get login errors",
+		QueryEmbedding: []float32{0.1, 0.2, 0.3},
+		Timestamp:      time.Now(),
+		Duration:       time.Second,
+		Successes:      []string{"Successfully executed query"},
+		Problems:       []string{},
+		Improvements:   []string{},
 	}
 
 	mem2 := &memory.AgentMemory{
