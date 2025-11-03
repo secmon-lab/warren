@@ -189,9 +189,11 @@ func (a *Agent) formatHistory(history *gollem.History) string {
 					buf.WriteString(toolCall.Name)
 					buf.WriteString("]\n")
 					if len(toolCall.Arguments) > 0 {
-						argsJSON, _ := json.MarshalIndent(toolCall.Arguments, "", "  ")
-						buf.Write(argsJSON)
-						buf.WriteString("\n")
+						argsJSON, err := json.MarshalIndent(toolCall.Arguments, "", "  ")
+						if err == nil {
+							buf.Write(argsJSON)
+							buf.WriteString("\n")
+						}
 					}
 				}
 			case "tool_response":
@@ -204,9 +206,11 @@ func (a *Agent) formatHistory(history *gollem.History) string {
 					}
 					buf.WriteString("]\n")
 					if len(toolResp.Response) > 0 {
-						respJSON, _ := json.MarshalIndent(toolResp.Response, "", "  ")
-						buf.Write(respJSON)
-						buf.WriteString("\n")
+						respJSON, err := json.MarshalIndent(toolResp.Response, "", "  ")
+						if err == nil {
+							buf.Write(respJSON)
+							buf.WriteString("\n")
+						}
 					}
 				}
 			}
