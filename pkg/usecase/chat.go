@@ -180,32 +180,48 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	schemaID := x.determineSchemaID(ctx, target)
 	var memorySection string
 	if x.memoryService != nil && schemaID != "" {
-		execMem, ticketMem, err := x.memoryService.LoadMemoriesForPrompt(ctx, schemaID)
+		// Load only ticket memory (execution memory is searched semantically below)
+		_, ticketMem, err := x.memoryService.LoadMemoriesForPrompt(ctx, schemaID)
 		if err != nil {
 			logger.Warn("failed to load memories", "error", err)
 		} else {
-			memorySection = x.memoryService.FormatMemoriesForPrompt(execMem, ticketMem)
+			// Format only ticket memory (no execution memory)
+			memorySection = x.memoryService.FormatMemoriesForPrompt(nil, ticketMem)
 
 			// Log loaded memories
-			if execMem != nil {
-				logger.Info("loaded execution memory",
-					"schema_id", schemaID,
-					"memory_id", execMem.ID,
-					"created_at", execMem.CreatedAt,
-					"has_keep", execMem.Keep != "",
-					"has_change", execMem.Change != "",
-					"has_notes", execMem.Notes != "")
-			}
 			if ticketMem != nil {
 				logger.Info("loaded ticket memory",
 					"schema_id", schemaID,
 					"memory_id", ticketMem.ID,
 					"created_at", ticketMem.CreatedAt,
 					"has_insights", ticketMem.Insights != "")
+			} else {
+				logger.Info("no ticket memory found for schema", "schema_id", schemaID)
 			}
-			if execMem == nil && ticketMem == nil {
-				logger.Info("no memories found for schema", "schema_id", schemaID)
+		}
+
+		// Search for relevant execution memories using semantic search
+		relevantMems, err := x.memoryService.SearchRelevantExecutionMemories(ctx, schemaID, message, 3)
+		if err != nil {
+			logger.Warn("failed to search execution memories", "error", err)
+		} else if len(relevantMems) > 0 {
+			logger.Info("found relevant execution memories",
+				"schema_id", schemaID,
+				"count", len(relevantMems))
+
+			// Add relevant memories to memory section
+			var relevantSection strings.Builder
+			relevantSection.WriteString("\n\n# Relevant Past Experiences\n\n")
+			relevantSection.WriteString("The following experiences from past executions may be relevant:\n\n")
+			for i, mem := range relevantMems {
+				relevantSection.WriteString(fmt.Sprintf("## Experience %d\n\n", i+1))
+				if mem.Summary != "" {
+					relevantSection.WriteString(fmt.Sprintf("**Summary:** %s\n\n", mem.Summary))
+				}
+				relevantSection.WriteString(mem.String())
+				relevantSection.WriteString("\n\n")
 			}
+			memorySection += relevantSection.String()
 		}
 	}
 

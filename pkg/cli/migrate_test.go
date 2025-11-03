@@ -12,7 +12,7 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 	config := cli.DefineFirestoreIndexes()
 
 	gt.Value(t, config).NotNil()
-	gt.Equal(t, len(config.Collections), 4) // alerts, tickets, lists, memories (execution_memories and ticket_memories use auto-generated single-field indexes)
+	gt.Equal(t, len(config.Collections), 5) // alerts, tickets, lists, memories, records
 
 	// Helper function to find collection by name
 	findCollection := func(name string) *fireconf.Collection {
@@ -68,7 +68,6 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 		gt.Value(t, col).NotNil()
 		gt.Equal(t, len(col.Indexes), 2) // Same as alerts
 	})
-
 
 	// Test memories subcollection (COLLECTION scope)
 	t.Run("memories subcollection", func(t *testing.T) {

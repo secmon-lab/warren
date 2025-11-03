@@ -1350,6 +1350,56 @@ func (r *Memory) PutExecutionMemory(ctx context.Context, mem *memory.ExecutionMe
 	return nil
 }
 
+// SearchExecutionMemoriesByEmbedding searches execution memories by embedding similarity
+func (r *Memory) SearchExecutionMemoriesByEmbedding(ctx context.Context, schemaID types.AlertSchema, embedding []float32, limit int) ([]*memory.ExecutionMemory, error) {
+	r.memoryMu.RLock()
+	defer r.memoryMu.RUnlock()
+
+	// Early return if embedding is empty
+	if len(embedding) == 0 {
+		return nil, nil
+	}
+
+	// Get all memories for the schema
+	mems, exists := r.executionMemories[schemaID]
+	if !exists || len(mems) == 0 {
+		return nil, nil
+	}
+
+	// Filter memories that have embeddings
+	var memsWithEmbedding []*memory.ExecutionMemory
+	for _, m := range mems {
+		if len(m.Embedding) > 0 {
+			memsWithEmbedding = append(memsWithEmbedding, m)
+		}
+	}
+
+	if len(memsWithEmbedding) == 0 {
+		return nil, nil
+	}
+
+	// Sort by similarity (descending)
+	sort.Slice(memsWithEmbedding, func(i, j int) bool {
+		simI := cosineSimilarity(memsWithEmbedding[i].Embedding, embedding)
+		simJ := cosineSimilarity(memsWithEmbedding[j].Embedding, embedding)
+		return simI > simJ
+	})
+
+	// Return top limit results
+	if limit > 0 && limit < len(memsWithEmbedding) {
+		memsWithEmbedding = memsWithEmbedding[:limit]
+	}
+
+	// Create copies to prevent external modification
+	result := make([]*memory.ExecutionMemory, len(memsWithEmbedding))
+	for i, m := range memsWithEmbedding {
+		memCopy := *m
+		result[i] = &memCopy
+	}
+
+	return result, nil
+}
+
 // GetTicketMemory retrieves the latest ticket memory for the specified schema
 func (r *Memory) GetTicketMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.TicketMemory, error) {
 	r.memoryMu.RLock()

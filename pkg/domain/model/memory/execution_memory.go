@@ -5,20 +5,28 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 // ExecutionMemory represents learning from task execution
 type ExecutionMemory struct {
-	ID        types.MemoryID    `json:"id"`
-	SchemaID  types.AlertSchema `json:"schema_id"`
-	Keep      string            `json:"keep"`
-	Change    string            `json:"change"`
-	Notes     string            `json:"notes"`
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
-	Version   int               `json:"version"`
+	ID       types.MemoryID    `json:"id"`
+	SchemaID types.AlertSchema `json:"schema_id"`
+	Summary  string            `json:"summary"`
+	Keep     string            `json:"keep"`
+	Change   string            `json:"change"`
+	Notes    string            `json:"notes"`
+
+	// Embedding is the vector embedding of Summary for semantic search
+	// Generated automatically by Memory Service when saving
+	// Must use firestore.Vector32 type for Firestore vector search to work
+	Embedding firestore.Vector32 `json:"embedding,omitempty"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Version   int       `json:"version"`
 }
 
 // NewExecutionMemory creates a new ExecutionMemory with a unique ID

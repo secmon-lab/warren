@@ -101,6 +101,7 @@ type Repository interface {
 	// For memory management
 	GetExecutionMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.ExecutionMemory, error)
 	PutExecutionMemory(ctx context.Context, mem *memory.ExecutionMemory) error
+	SearchExecutionMemoriesByEmbedding(ctx context.Context, schemaID types.AlertSchema, embedding []float32, limit int) ([]*memory.ExecutionMemory, error)
 	GetTicketMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.TicketMemory, error)
 	PutTicketMemory(ctx context.Context, mem *memory.TicketMemory) error
 
