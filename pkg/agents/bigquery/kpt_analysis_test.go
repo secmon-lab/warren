@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/mock"
 	"github.com/m-mizutani/gt"
@@ -125,8 +126,9 @@ func TestGenerateKPTAnalysis_LLMError(t *testing.T) {
 		nil, // session
 	)
 
-	// Should return empty arrays without error (fallback)
-	gt.NoError(t, err)
+	// Should return error with fallback tag and empty arrays
+	gt.Error(t, err)
+	gt.True(t, goerr.HasTag(err, goerr.NewTag("kpt_analysis_fallback")))
 	gt.A(t, successes).Length(0)
 	gt.A(t, problems).Length(0)
 	gt.A(t, improvements).Length(0)
@@ -159,8 +161,9 @@ func TestGenerateKPTAnalysis_InvalidJSON(t *testing.T) {
 		nil, // session
 	)
 
-	// Should return empty arrays without error (fallback)
-	gt.NoError(t, err)
+	// Should return error with fallback tag and empty arrays
+	gt.Error(t, err)
+	gt.True(t, goerr.HasTag(err, goerr.NewTag("kpt_analysis_fallback")))
 	gt.A(t, successes).Length(0)
 	gt.A(t, problems).Length(0)
 	gt.A(t, improvements).Length(0)

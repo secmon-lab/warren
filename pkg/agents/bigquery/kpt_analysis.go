@@ -15,6 +15,11 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
+// Error tags for KPT analysis fallback scenarios
+var (
+	tagKPTAnalysisFallback = goerr.NewTag("kpt_analysis_fallback") // Tag for non-critical KPT analysis failures
+)
+
 //go:embed prompt/kpt_analysis.md
 var kptAnalysisPromptTemplate string
 
@@ -43,6 +48,7 @@ type kptPromptData struct {
 
 // generateKPTAnalysis generates comprehensive KPT (Keep/Problem/Try) analysis from execution result
 // Returns: (Successes, Problems, Improvements, error)
+// Note: Returns non-critical errors with tagKPTAnalysisFallback for graceful degradation
 func (a *Agent) generateKPTAnalysis(
 	ctx context.Context,
 	query string,
@@ -61,32 +67,28 @@ func (a *Agent) generateKPTAnalysis(
 	// Generate analysis using LLM (create new session for KPT analysis)
 	kptSession, err := a.llmClient.NewSession(ctx)
 	if err != nil {
-		logger.Warn("Failed to create LLM session for KPT analysis", "error", err)
-		return []string{}, []string{}, []string{}, nil // Fallback: return empty arrays
+		return []string{}, []string{}, []string{}, goerr.Wrap(err, "failed to create LLM session for KPT analysis", goerr.Tag(tagKPTAnalysisFallback))
 	}
 
 	llmResp, err := kptSession.GenerateContent(ctx, gollem.Text(prompt))
 	if err != nil {
-		logger.Warn("Failed to generate KPT analysis", "error", err)
-		return []string{}, []string{}, []string{}, nil // Fallback: return empty arrays
+		return []string{}, []string{}, []string{}, goerr.Wrap(err, "failed to generate KPT analysis", goerr.Tag(tagKPTAnalysisFallback))
 	}
 
 	if llmResp == nil || len(llmResp.Texts) == 0 {
-		logger.Warn("Empty response from LLM for KPT analysis")
-		return []string{}, []string{}, []string{}, nil // Fallback: return empty arrays
+		return []string{}, []string{}, []string{}, goerr.New("empty response from LLM for KPT analysis", goerr.Tag(tagKPTAnalysisFallback))
 	}
 
 	// Parse LLM response
 	successes, problems, improvements, err := a.parseKPTResponse(llmResp.Texts[0])
 	if err != nil {
-		logger.Warn("Failed to parse KPT analysis response", "error", err)
-		return []string{}, []string{}, []string{}, nil // Fallback: return empty arrays
+		return []string{}, []string{}, []string{}, goerr.Wrap(err, "failed to parse KPT analysis response", goerr.Tag(tagKPTAnalysisFallback))
 	}
 
 	logger.Debug("KPT analysis generated successfully",
-		"successes", successes,
-		"problems", problems,
-		"improvements", improvements)
+		"successes_count", len(successes),
+		"problems_count", len(problems),
+		"improvements_count", len(improvements))
 
 	return successes, problems, improvements, nil
 }

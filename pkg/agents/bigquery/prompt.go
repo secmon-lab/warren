@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"text/template"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
@@ -16,10 +17,15 @@ var basePrompt string
 //go:embed prompt/system_with_memories.md
 var systemWithMemoriesTemplate string
 
+//go:embed prompt/tool_description.md
+var toolDescriptionTemplate string
+
 var systemWithMemoriesTmpl *template.Template
+var toolDescriptionTmpl *template.Template
 
 func init() {
 	systemWithMemoriesTmpl = template.Must(template.New("system_with_memories").Parse(systemWithMemoriesTemplate))
+	toolDescriptionTmpl = template.Must(template.New("tool_description").Parse(toolDescriptionTemplate))
 }
 
 // promptData represents the data for system prompt template
@@ -56,8 +62,7 @@ func (a *Agent) buildSystemPromptWithMemories(ctx context.Context, memories []*m
 
 	// Execute template
 	if err := systemWithMemoriesTmpl.Execute(&buf, data); err != nil {
-		log.Warn("Failed to execute system prompt template", "error", err)
-		return buf.String(), err
+		return "", goerr.Wrap(err, "failed to execute system prompt template")
 	}
 
 	prompt := buf.String()
