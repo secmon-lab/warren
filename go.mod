@@ -20,6 +20,7 @@ require (
 	github.com/graph-gophers/dataloader/v7 v7.1.0
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/m-mizutani/clog v0.0.8
+	github.com/m-mizutani/fireconf v0.0.0-20251103023627-3c8db445b497
 	github.com/m-mizutani/goerr/v2 v2.0.0
 	github.com/m-mizutani/gollem v0.15.0
 	github.com/m-mizutani/gt v0.1.1
@@ -30,7 +31,7 @@ require (
 	github.com/newmo-oss/go-caller v0.1.0
 	github.com/slack-go/slack v0.16.0
 	github.com/stretchr/testify v1.11.1
-	github.com/urfave/cli/v3 v3.3.2
+	github.com/urfave/cli/v3 v3.3.8
 	github.com/vektah/gqlparser/v2 v2.5.26
 	google.golang.org/api v0.251.0
 	google.golang.org/genai v1.28.0
@@ -88,6 +89,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
+	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
@@ -102,7 +104,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
-	github.com/k0kubun/pp/v3 v3.4.1 // indirect
+	github.com/k0kubun/pp/v3 v3.5.0 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
@@ -174,8 +176,8 @@ require (
 	golang.org/x/time v0.13.0 // indirect
 	golang.org/x/tools v0.36.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
-	google.golang.org/genproto v0.0.0-20250715232539-7130f93afb79 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250721164621-a45f3dfb1074 // indirect
+	google.golang.org/genproto v0.0.0-20250728155136-f173205681a0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250728155136-f173205681a0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251002232023-7c0ddcbb5797 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect

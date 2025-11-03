@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
-	"strings"
 	"testing"
 	"time"
 
@@ -3012,15 +3011,6 @@ func TestAgentMemory(t *testing.T) {
 			// Search memories
 			results, err := repo.SearchMemoriesByEmbedding(ctx, agentID, baseEmbedding, 2)
 
-			// Skip if vector index is not created (test environment)
-			if err != nil {
-				errMsg := err.Error()
-				if strings.Contains(errMsg, "Missing vector index configuration") {
-					t.Skip("Skipping test: vector index not created in test environment")
-					return
-				}
-			}
-
 			gt.NoError(t, err)
 			gt.Number(t, len(results)).GreaterOrEqual(1)
 			gt.Number(t, len(results)).LessOrEqual(2)
@@ -3075,14 +3065,6 @@ func TestAgentMemory(t *testing.T) {
 
 			// Search for agent1's memories
 			results1, err := repo.SearchMemoriesByEmbedding(ctx, agent1ID, embedding, 10)
-			// Skip if vector index is not created (test environment)
-			if err != nil {
-				errMsg := err.Error()
-				if strings.Contains(errMsg, "Missing vector index configuration") {
-					t.Skip("Skipping test: vector index not created in test environment")
-					return
-				}
-			}
 			gt.NoError(t, err)
 
 			// Verify only agent1's memories are returned
@@ -3092,14 +3074,6 @@ func TestAgentMemory(t *testing.T) {
 
 			// Search for agent2's memories
 			results2, err := repo.SearchMemoriesByEmbedding(ctx, agent2ID, embedding, 10)
-			// Skip if vector index is not created (test environment)
-			if err != nil {
-				errMsg := err.Error()
-				if strings.Contains(errMsg, "Missing vector index configuration") {
-					t.Skip("Skipping test: vector index not created in test environment")
-					return
-				}
-			}
 			gt.NoError(t, err)
 
 			// Verify only agent2's memories are returned

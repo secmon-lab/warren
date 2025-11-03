@@ -52,6 +52,7 @@ func Run(ctx context.Context, args []string) error {
 			cmdChat(),
 			cmdTool(),
 			cmdAlert(),
+			cmdMigrate(),
 		},
 	}
 

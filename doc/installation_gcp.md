@@ -75,24 +75,28 @@ Warren requires specific indexes for vector search and query performance. These 
 - Efficient ticket and alert queries
 - Status-based ticket filtering
 
-#### Option 1: Using the Firestore Index Tool (Recommended)
+#### Option 1: Using Warren Migrate Command (Recommended)
 
 ```bash
-# Install the Warren Firestore index tool
-go install github.com/secmon-lab/warren/resources/firestore_index@latest
-
-# Verify installation
-which firestore_index || echo "Add $(go env GOPATH)/bin to your PATH"
+# Clone or download the Warren repository
+git clone https://github.com/secmon-lab/warren.git
+cd warren
 
 # Dry run to see what indexes will be created
-firestore_index create --dry-run \
-  --project=$PROJECT_ID \
-  --database="(default)"
+go run . migrate --dry-run \
+  --firestore-project-id=$PROJECT_ID \
+  --firestore-database-id="(default)"
 
 # Create all required indexes
-firestore_index create \
-  --project=$PROJECT_ID \
-  --database="(default)"
+go run . migrate \
+  --firestore-project-id=$PROJECT_ID \
+  --firestore-database-id="(default)"
+
+# Or build and use the binary
+go build -o warren
+./warren migrate \
+  --firestore-project-id=$PROJECT_ID \
+  --firestore-database-id="(default)"
 ```
 
 #### Option 2: Manual Index Creation
@@ -166,15 +170,15 @@ gcloud firestore indexes composite create \
   --database=$DATABASE_ID \
   --collection-group=execution_memories \
   --query-scope=COLLECTION \
-  --field-config=field-path=query_embedding,vector-config='{"dimension":256,"flat":{}}'
+  --field-config=field-path=QueryEmbedding,vector-config='{"dimension":256,"flat":{}}'
 
 gcloud firestore indexes composite create \
   --project=$PROJECT_ID \
   --database=$DATABASE_ID \
   --collection-group=execution_memories \
   --query-scope=COLLECTION \
-  --field-config=order=DESCENDING,field-path=created_at \
-  --field-config=field-path=query_embedding,vector-config='{"dimension":256,"flat":{}}'
+  --field-config=order=DESCENDING,field-path=CreatedAt \
+  --field-config=field-path=QueryEmbedding,vector-config='{"dimension":256,"flat":{}}'
 
 # Ticket memories collection indexes
 gcloud firestore indexes composite create \
@@ -182,15 +186,15 @@ gcloud firestore indexes composite create \
   --database=$DATABASE_ID \
   --collection-group=ticket_memories \
   --query-scope=COLLECTION \
-  --field-config=field-path=query_embedding,vector-config='{"dimension":256,"flat":{}}'
+  --field-config=field-path=QueryEmbedding,vector-config='{"dimension":256,"flat":{}}'
 
 gcloud firestore indexes composite create \
   --project=$PROJECT_ID \
   --database=$DATABASE_ID \
   --collection-group=ticket_memories \
   --query-scope=COLLECTION \
-  --field-config=order=DESCENDING,field-path=created_at \
-  --field-config=field-path=query_embedding,vector-config='{"dimension":256,"flat":{}}'
+  --field-config=order=DESCENDING,field-path=CreatedAt \
+  --field-config=field-path=QueryEmbedding,vector-config='{"dimension":256,"flat":{}}'
 
 # Memories subcollection index (COLLECTION_GROUP scope)
 gcloud firestore indexes composite create \
@@ -198,7 +202,7 @@ gcloud firestore indexes composite create \
   --database=$DATABASE_ID \
   --collection-group=memories \
   --query-scope=COLLECTION_GROUP \
-  --field-config=field-path=query_embedding,vector-config='{"dimension":256,"flat":{}}'
+  --field-config=field-path=QueryEmbedding,vector-config='{"dimension":256,"flat":{}}'
 ```
 
 #### Index Details
@@ -210,9 +214,9 @@ The following indexes are created:
 | alerts, tickets, lists | Vector | Embedding (256d) | Alert clustering & similarity search |
 | alerts, tickets, lists | Composite | CreatedAt DESC + Embedding | Time-based vector searches |
 | tickets | Composite | Status ASC + CreatedAt DESC | Dashboard filtering |
-| execution_memories, ticket_memories | Vector | query_embedding (256d) | Agent memory semantic search |
-| execution_memories, ticket_memories | Composite | created_at DESC + query_embedding | Time-based memory searches |
-| memories (subcollection) | Vector | query_embedding (256d) | Agent-specific memory search |
+| execution_memories, ticket_memories | Vector | QueryEmbedding (256d) | Agent memory semantic search |
+| execution_memories, ticket_memories | Composite | CreatedAt DESC + QueryEmbedding | Time-based memory searches |
+| memories (subcollection) | Vector | QueryEmbedding (256d) | Agent-specific memory search |
 
 > **Note**: 
 > - Index creation may take 5-10 minutes
@@ -222,8 +226,7 @@ The following indexes are created:
 #### Troubleshooting
 
 - **Permission errors**: Ensure `roles/datastore.indexAdmin` role
-- **Tool not found**: Add `$(go env GOPATH)/bin` to PATH
-- **Index already exists**: Safe to ignore, or check console first
+- **Index already exists**: Safe to ignore, the migrate command is idempotent
 
 ## 3. Cloud Storage Setup
 

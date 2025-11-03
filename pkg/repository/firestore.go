@@ -1963,7 +1963,7 @@ func (r *Firestore) SearchMemoriesByEmbedding(ctx context.Context, agentID strin
 
 	// Execute vector search using FindNearest
 	// Results are automatically ordered by similarity (cosine distance)
-	docs := query.FindNearest("query_embedding",
+	docs := query.FindNearest("QueryEmbedding",
 		firestore.Vector32(embedding),
 		limit,
 		firestore.DistanceMeasureCosine,
