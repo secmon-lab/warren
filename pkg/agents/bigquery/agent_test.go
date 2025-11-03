@@ -230,15 +230,9 @@ func TestAgent_MemoryMetadataOnly(t *testing.T) {
 
 	mem := memories[0]
 
-	// Verify SuccessResult contains only metadata, not the full result
-	gt.V(t, mem.SuccessResult).NotNil()
-
-	// SuccessResult should only have "had_response" key
-	hadResponse, ok := mem.SuccessResult["had_response"].(bool)
-	gt.True(t, ok)
-	gt.True(t, hadResponse)
-
-	// Should NOT contain the actual result string
-	_, hasResult := mem.SuccessResult["result"]
-	gt.False(t, hasResult)
+	// Verify memory has KPT structure (Successes, Problems, Improvements)
+	// Note: With mock LLM returning invalid JSON, KPT analysis fallback returns empty arrays
+	gt.A(t, mem.Successes).Length(0)    // Empty array from fallback
+	gt.A(t, mem.Problems).Length(0)     // Empty array from fallback
+	gt.A(t, mem.Improvements).Length(0) // Empty array from fallback
 }

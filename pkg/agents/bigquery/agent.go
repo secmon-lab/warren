@@ -2,7 +2,6 @@ package bigquery
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -177,7 +176,9 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	log.Debug("Searching for relevant memories", "agent_id", a.ID(), "limit", 5)
 	memories, err := a.memoryService.SearchRelevantAgentMemories(ctx, a.ID(), query, 5)
 	if err != nil {
-		log.Warn("failed to search memories", "error", err)
+		// Memory search failure is non-critical - continue with empty memories
+		log.Warn("Memory search failed, continuing without memories", "error", err)
+		memories = nil
 	} else {
 		log.Debug("Memories found", "count", len(memories))
 	}
@@ -186,7 +187,6 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	log.Debug("Building system prompt with memories", "memory_count", len(memories))
 	systemPrompt, err := a.buildSystemPromptWithMemories(ctx, memories)
 	if err != nil {
-		log.Debug("Failed to build system prompt", "error", err)
 		return nil, goerr.Wrap(err, "failed to build system prompt")
 	}
 	log.Debug("System prompt built", "prompt_length", len(systemPrompt))
@@ -207,10 +207,9 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 
 	// Step 5: Save execution memory (metadata only)
 	log.Debug("Saving execution memory", "has_error", execErr != nil)
-	if err := a.saveExecutionMemory(ctx, query, resp, execErr, duration); err != nil {
-		log.Warn("failed to save execution memory", "error", err)
-	} else {
-		log.Debug("Execution memory saved successfully")
+	if err := a.saveExecutionMemory(ctx, query, resp, execErr, duration, agent.Session()); err != nil {
+		// Memory save failure is non-critical for the main task
+		log.Warn("Failed to save execution memory", "error", err)
 	}
 
 	// Step 6: Return execution result
@@ -270,43 +269,31 @@ func (a *Agent) Prompt(ctx context.Context) (string, error) {
 		return "", nil
 	}
 
-	var sb strings.Builder
-	sb.WriteString("## BigQuery Agent\n\n")
-	sb.WriteString("You can query BigQuery tables using the `query_bigquery` tool. ")
-	sb.WriteString("The agent will automatically check table schemas and construct appropriate queries.\n\n")
-
-	sb.WriteString("**Important Guidelines**:\n")
-	sb.WriteString("- The agent MUST check table schemas before constructing queries\n")
-	sb.WriteString("- Results will be returned as raw data records without summarization\n")
-	sb.WriteString("- All query fields will be preserved in the response\n\n")
-
-	sb.WriteString("**How to Use**:\n")
-	sb.WriteString("- Do NOT specify table names or SQL details in your query\n")
-	sb.WriteString("- Focus on describing WHAT information you need, not HOW to get it\n")
-	sb.WriteString("- Be clear about the data you want to retrieve (e.g., \"login failures in the last 24 hours\")\n")
-	sb.WriteString("- The agent will automatically select appropriate tables and construct queries\n\n")
-
-	if len(a.config.Tables) > 0 {
-		sb.WriteString("### Available Tables\n\n")
-		for _, table := range a.config.Tables {
-			sb.WriteString(fmt.Sprintf("- **`%s.%s.%s`**",
-				table.ProjectID, table.DatasetID, table.TableID))
-			if table.Description != "" {
-				sb.WriteString(fmt.Sprintf(": %s", table.Description))
-			}
-			sb.WriteString("\n")
-		}
-		sb.WriteString("\n")
+	data := struct {
+		HasTables     bool
+		Tables        []TableConfig
+		ScanSizeLimit string
+		QueryTimeout  string
+	}{
+		HasTables:     len(a.config.Tables) > 0,
+		Tables:        a.config.Tables,
+		ScanSizeLimit: "",
+		QueryTimeout:  "",
 	}
 
 	if a.config.ScanSizeLimit > 0 {
-		sb.WriteString(fmt.Sprintf("**Scan Size Limit**: %s\n", humanize.Bytes(a.config.ScanSizeLimit)))
+		data.ScanSizeLimit = humanize.Bytes(a.config.ScanSizeLimit)
 	}
 	if a.config.QueryTimeout > 0 {
-		sb.WriteString(fmt.Sprintf("**Query Timeout**: %s\n", a.config.QueryTimeout))
+		data.QueryTimeout = a.config.QueryTimeout.String()
 	}
 
-	return sb.String(), nil
+	var buf strings.Builder
+	if err := toolDescriptionTmpl.Execute(&buf, data); err != nil {
+		return "", goerr.Wrap(err, "failed to execute tool description template")
+	}
+
+	return buf.String(), nil
 }
 
 var _ interfaces.Tool = (*Agent)(nil)

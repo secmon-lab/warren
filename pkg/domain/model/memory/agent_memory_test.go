@@ -62,16 +62,15 @@ func TestAgentMemory_Structure(t *testing.T) {
 	embedding := []float32{0.1, 0.2, 0.3}
 
 	mem := &memory.AgentMemory{
-		ID:                 types.NewAgentMemoryID(),
-		AgentID:            "bigquery",
-		TaskQuery:          "get login errors",
-		QueryEmbedding:     embedding,
-		Timestamp:          now,
-		Duration:           5 * time.Second,
-		SuccessDescription: "Successfully executed 3 tool calls",
-		SuccessResult: map[string]any{
-			"tool_call_count": 3,
-			"tools_used":      []string{"bigquery_query", "bigquery_result"},
+		ID:             types.NewAgentMemoryID(),
+		AgentID:        "bigquery",
+		TaskQuery:      "get login errors",
+		QueryEmbedding: embedding,
+		Timestamp:      now,
+		Duration:       5 * time.Second,
+		Successes: []string{
+			"Successfully executed tool calls to retrieve login error data",
+			"Used event_time field for time filtering",
 		},
 		Problems:     []string{"Query exceeded scan size limit"},
 		Improvements: []string{"Add WHERE clause to reduce scan size"},
@@ -82,8 +81,8 @@ func TestAgentMemory_Structure(t *testing.T) {
 	gt.V(t, len(mem.QueryEmbedding)).Equal(3)
 	gt.V(t, mem.QueryEmbedding[0]).Equal(float32(0.1))
 	gt.V(t, mem.Duration).Equal(5 * time.Second)
-	gt.V(t, mem.SuccessDescription).Equal("Successfully executed 3 tool calls")
-	gt.V(t, mem.SuccessResult["tool_call_count"]).Equal(3)
+	gt.V(t, len(mem.Successes)).Equal(2)
+	gt.V(t, mem.Successes[0]).Equal("Successfully executed tool calls to retrieve login error data")
 	gt.V(t, len(mem.Problems)).Equal(1)
 	gt.V(t, mem.Problems[0]).Equal("Query exceeded scan size limit")
 	gt.V(t, len(mem.Improvements)).Equal(1)
