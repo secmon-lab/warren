@@ -1866,6 +1866,48 @@ func (r *Firestore) PutExecutionMemory(ctx context.Context, mem *memory.Executio
 	return nil
 }
 
+// SearchExecutionMemoriesByEmbedding searches execution memories by embedding similarity
+func (r *Firestore) SearchExecutionMemoriesByEmbedding(ctx context.Context, schemaID types.AlertSchema, embedding []float32, limit int) ([]*memory.ExecutionMemory, error) {
+	if len(embedding) == 0 {
+		return nil, nil
+	}
+
+	// Convert []float32 to firestore.Vector32
+	vector32 := firestore.Vector32(embedding[:])
+
+	// Build vector search query on the sub-collection
+	iter := r.db.Collection(collectionExecutionMemories).
+		Doc(string(schemaID)).
+		Collection("records").
+		FindNearest("Embedding",
+			vector32,
+			limit,
+			firestore.DistanceMeasureCosine,
+			&firestore.FindNearestOptions{
+				DistanceResultField: "vector_distance",
+			}).Documents(ctx)
+
+	result := make([]*memory.ExecutionMemory, 0, limit)
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, r.eb.Wrap(err, "failed to get next execution memory")
+		}
+
+		var mem memory.ExecutionMemory
+		if err := doc.DataTo(&mem); err != nil {
+			return nil, r.eb.Wrap(err, "failed to convert data to execution memory")
+		}
+		mem.SchemaID = schemaID
+		result = append(result, &mem)
+	}
+
+	return result, nil
+}
+
 func (r *Firestore) GetTicketMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.TicketMemory, error) {
 	docs, err := r.db.Collection(collectionTicketMemories).
 		Doc(string(schemaID)).

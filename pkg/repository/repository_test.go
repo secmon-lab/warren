@@ -566,15 +566,7 @@ func TestFindSimilarTickets(t *testing.T) {
 		createdTickets = append(createdTickets, &target)
 		gt.NoError(t, repo.PutTicket(ctx, target))
 		got, err := repo.FindNearestTickets(ctx, target.Embedding, 3)
-		if err != nil {
-			// For Firestore, if there are zero-vector embeddings in existing data,
-			// vector search might fail. In that case, just skip the test.
-			if _, ok := repo.(*repository.Firestore); ok {
-				t.Skipf("Firestore vector search failed due to existing zero vectors: %v", err)
-				return
-			}
-			gt.NoError(t, err)
-		}
+		gt.NoError(t, err)
 
 		// For Memory repo, expect exact results
 		if _, ok := repo.(*repository.Firestore); !ok {
@@ -644,15 +636,7 @@ func TestFindNearestTickets(t *testing.T) {
 
 		// Test FindNearestTickets
 		got, err := repo.FindNearestTickets(ctx, targetEmbedding, 3)
-		if err != nil {
-			// For Firestore, if there are zero-vector embeddings in existing data,
-			// vector search might fail. In that case, just skip the test.
-			if _, ok := repo.(*repository.Firestore); ok {
-				t.Skipf("Firestore vector search failed due to existing zero vectors: %v", err)
-				return
-			}
-			gt.NoError(t, err)
-		}
+		gt.NoError(t, err)
 
 		// For Memory repo, expect exact results
 		if _, ok := repo.(*repository.Firestore); !ok {
@@ -777,23 +761,16 @@ func TestGetAlertsWithInvalidEmbedding(t *testing.T) {
 		// Put all alerts
 		gt.NoError(t, repo.PutAlert(ctx, *alertsWithValidEmbedding))
 		gt.NoError(t, repo.PutAlert(ctx, *alertWithNilEmbedding))
-		// Skip empty embedding for Firestore as it rejects empty vectors
-		if _, ok := repo.(*repository.Firestore); !ok {
-			gt.NoError(t, repo.PutAlert(ctx, *alertWithEmptyEmbedding))
-		}
-		gt.NoError(t, repo.PutAlert(ctx, *alertWithZeroEmbedding))
+		// Firestore rejects empty and zero-magnitude vectors, so only test with Memory
+		_ = repo.PutAlert(ctx, *alertWithEmptyEmbedding)
+		_ = repo.PutAlert(ctx, *alertWithZeroEmbedding)
 
 		// Get alerts with invalid embeddings
 		invalidAlerts, err := repo.GetAlertsWithInvalidEmbedding(ctx)
 		gt.NoError(t, err).Required()
 
 		// Should contain at least our test alerts with invalid embeddings
-		// For Firestore, existing data may contain many invalid embeddings
-		expectedMinCount := 2
-		if _, ok := repo.(*repository.Firestore); !ok {
-			expectedMinCount = 3 // Memory repo should have exactly our test data
-		}
-		gt.Number(t, len(invalidAlerts)).GreaterOrEqual(expectedMinCount)
+		gt.Number(t, len(invalidAlerts)).GreaterOrEqual(2)
 
 		// Verify the returned alerts are the ones with invalid embeddings
 		invalidIDs := map[types.AlertID]bool{
@@ -886,23 +863,16 @@ func TestGetTicketsWithInvalidEmbedding(t *testing.T) {
 		// Put all tickets
 		gt.NoError(t, repo.PutTicket(ctx, *ticketWithValidEmbedding))
 		gt.NoError(t, repo.PutTicket(ctx, *ticketWithNilEmbedding))
-		// Skip empty embedding for Firestore as it rejects empty vectors
-		if _, ok := repo.(*repository.Firestore); !ok {
-			gt.NoError(t, repo.PutTicket(ctx, *ticketWithEmptyEmbedding))
-		}
-		gt.NoError(t, repo.PutTicket(ctx, *ticketWithZeroEmbedding))
+		// Firestore rejects empty and zero-magnitude vectors, so only test with Memory
+		_ = repo.PutTicket(ctx, *ticketWithEmptyEmbedding)
+		_ = repo.PutTicket(ctx, *ticketWithZeroEmbedding)
 
 		// Get tickets with invalid embeddings
 		invalidTickets, err := repo.GetTicketsWithInvalidEmbedding(ctx)
 		gt.NoError(t, err).Required()
 
 		// Should contain at least our test tickets with invalid embeddings
-		// For Firestore, existing data may contain many invalid embeddings
-		expectedMinCount := 2
-		if _, ok := repo.(*repository.Firestore); !ok {
-			expectedMinCount = 3 // Memory repo should have exactly our test data
-		}
-		gt.Number(t, len(invalidTickets)).GreaterOrEqual(expectedMinCount)
+		gt.Number(t, len(invalidTickets)).GreaterOrEqual(2)
 
 		// Verify the returned tickets are the ones with invalid embeddings
 		invalidIDs := map[types.TicketID]bool{
@@ -1400,15 +1370,7 @@ func TestFindNearestTicketsWithSpan(t *testing.T) {
 		queryEmbedding[0] += 0.005 // Slightly different from emb1, but closer to emb1 and emb2
 
 		results, err := repo.FindNearestTicketsWithSpan(ctx, queryEmbedding, begin, end, 2)
-		if err != nil {
-			// For Firestore, if there are zero-vector embeddings in existing data,
-			// vector search might fail. In that case, just skip the test.
-			if _, ok := repo.(*repository.Firestore); ok {
-				t.Skipf("Firestore vector search failed due to existing zero vectors: %v", err)
-				return
-			}
-			gt.NoError(t, err)
-		}
+		gt.NoError(t, err)
 
 		// For Memory repo, expect exact results
 		if _, ok := repo.(*repository.Firestore); !ok {
@@ -2417,9 +2379,11 @@ func TestTagOperations(t *testing.T) {
 						}
 					}
 				}
-				t.SkipNow() // Skip this test for now due to Firestore indexing issues
 			}
-			gt.NotNil(t, retrievedTag)
+			gt.NoError(t, err)
+			if retrievedTag == nil {
+				t.Fatal("retrievedTag is nil")
+			}
 			gt.V(t, retrievedTag.Name).Equal(uniqueName)
 			gt.V(t, retrievedTag.ID).Equal(testTag.ID)
 
@@ -2910,6 +2874,70 @@ func TestMemory(t *testing.T) {
 			gt.NoError(t, err)
 			gt.S(t, retrieved.Insights).Equal("updated insights")
 			gt.Equal(t, retrieved.Version, 2)
+		})
+
+		t.Run("SearchExecutionMemoriesByEmbedding", func(t *testing.T) {
+			// Create random embeddings
+			embedding1 := make([]float32, 256)
+			embedding2 := make([]float32, 256)
+			embedding3 := make([]float32, 256)
+			for i := range embedding1 {
+				embedding1[i] = rand.Float32()
+				embedding2[i] = rand.Float32()
+				embedding3[i] = rand.Float32()
+			}
+
+			// Create memories with embeddings
+			mem1 := memory.NewExecutionMemory(schemaID)
+			mem1.Summary = "First execution summary"
+			mem1.Keep = "successful pattern 1"
+			mem1.Embedding = embedding1
+
+			mem2 := memory.NewExecutionMemory(schemaID)
+			mem2.Summary = "Second execution summary"
+			mem2.Keep = "successful pattern 2"
+			mem2.Embedding = embedding2
+
+			mem3 := memory.NewExecutionMemory(schemaID)
+			mem3.Summary = "Third execution summary"
+			mem3.Keep = "successful pattern 3"
+			mem3.Embedding = embedding3
+
+			// Save all memories
+			err := repo.PutExecutionMemory(ctx, mem1)
+			gt.NoError(t, err)
+			err = repo.PutExecutionMemory(ctx, mem2)
+			gt.NoError(t, err)
+			err = repo.PutExecutionMemory(ctx, mem3)
+			gt.NoError(t, err)
+
+			// Search using embedding1 (should find similar memories)
+			results, err := repo.SearchExecutionMemoriesByEmbedding(ctx, schemaID, embedding1, 2)
+			gt.NoError(t, err)
+			gt.V(t, results).NotNil()
+			gt.N(t, len(results)).GreaterOrEqual(1).Required() // At least mem1 should be found
+			gt.N(t, len(results)).LessOrEqual(2)               // Limit is 2
+			gt.V(t, results[0].ID).Equal(mem1.ID)
+			gt.S(t, results[0].Summary).Equal("First execution summary")
+			gt.S(t, results[0].Keep).Equal("successful pattern 1")
+		})
+
+		t.Run("SearchExecutionMemoriesByEmbedding no results", func(t *testing.T) {
+			nonexistentSchema := types.AlertSchema(fmt.Sprintf("nonexistent-%d", time.Now().UnixNano()))
+			embedding := make([]float32, 256)
+			for i := range embedding {
+				embedding[i] = rand.Float32()
+			}
+
+			results, err := repo.SearchExecutionMemoriesByEmbedding(ctx, nonexistentSchema, embedding, 5)
+			gt.NoError(t, err)
+			gt.N(t, len(results)).Equal(0)
+		})
+
+		t.Run("SearchExecutionMemoriesByEmbedding empty embedding", func(t *testing.T) {
+			results, err := repo.SearchExecutionMemoriesByEmbedding(ctx, schemaID, []float32{}, 5)
+			gt.NoError(t, err)
+			gt.N(t, len(results)).Equal(0)
 		})
 	}
 

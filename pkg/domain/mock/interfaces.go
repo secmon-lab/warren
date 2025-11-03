@@ -2500,6 +2500,9 @@ func (mock *NotifierMock) NotifyErrorCalls() []struct {
 //			SearchAlertsFunc: func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
 //				panic("mock out the SearchAlerts method")
 //			},
+//			SearchExecutionMemoriesByEmbeddingFunc: func(ctx context.Context, schemaID types.AlertSchema, embedding []float32, limit int) ([]*memory.ExecutionMemory, error) {
+//				panic("mock out the SearchExecutionMemoriesByEmbedding method")
+//			},
 //			SearchMemoriesByEmbeddingFunc: func(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error) {
 //				panic("mock out the SearchMemoriesByEmbedding method")
 //			},
@@ -2710,6 +2713,9 @@ type RepositoryMock struct {
 
 	// SearchAlertsFunc mocks the SearchAlerts method.
 	SearchAlertsFunc func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error)
+
+	// SearchExecutionMemoriesByEmbeddingFunc mocks the SearchExecutionMemoriesByEmbedding method.
+	SearchExecutionMemoriesByEmbeddingFunc func(ctx context.Context, schemaID types.AlertSchema, embedding []float32, limit int) ([]*memory.ExecutionMemory, error)
 
 	// SearchMemoriesByEmbeddingFunc mocks the SearchMemoriesByEmbedding method.
 	SearchMemoriesByEmbeddingFunc func(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error)
@@ -3213,6 +3219,17 @@ type RepositoryMock struct {
 			// Limit is the limit argument value.
 			Limit int
 		}
+		// SearchExecutionMemoriesByEmbedding holds details about calls to the SearchExecutionMemoriesByEmbedding method.
+		SearchExecutionMemoriesByEmbedding []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SchemaID is the schemaID argument value.
+			SchemaID types.AlertSchema
+			// Embedding is the embedding argument value.
+			Embedding []float32
+			// Limit is the limit argument value.
+			Limit int
+		}
 		// SearchMemoriesByEmbedding holds details about calls to the SearchMemoriesByEmbedding method.
 		SearchMemoriesByEmbedding []struct {
 			// Ctx is the ctx argument value.
@@ -3246,74 +3263,75 @@ type RepositoryMock struct {
 			TagMoqParam *tag.Tag
 		}
 	}
-	lockBatchGetAlerts                 sync.RWMutex
-	lockBatchGetTickets                sync.RWMutex
-	lockBatchPutAlerts                 sync.RWMutex
-	lockBatchUpdateTicketsStatus       sync.RWMutex
-	lockBindAlertsToTicket             sync.RWMutex
-	lockCountActivities                sync.RWMutex
-	lockCountAlertsWithoutTicket       sync.RWMutex
-	lockCountTicketComments            sync.RWMutex
-	lockCountTicketsByStatus           sync.RWMutex
-	lockCreateNotice                   sync.RWMutex
-	lockCreateTagWithID                sync.RWMutex
-	lockDeleteTagByID                  sync.RWMutex
-	lockDeleteToken                    sync.RWMutex
-	lockFindNearestAlerts              sync.RWMutex
-	lockFindNearestTickets             sync.RWMutex
-	lockFindNearestTicketsWithSpan     sync.RWMutex
-	lockGetActivities                  sync.RWMutex
-	lockGetAgentMemory                 sync.RWMutex
-	lockGetAlert                       sync.RWMutex
-	lockGetAlertList                   sync.RWMutex
-	lockGetAlertListByThread           sync.RWMutex
-	lockGetAlertListsInThread          sync.RWMutex
-	lockGetAlertWithoutEmbedding       sync.RWMutex
-	lockGetAlertWithoutTicket          sync.RWMutex
-	lockGetAlertsBySpan                sync.RWMutex
-	lockGetAlertsWithInvalidEmbedding  sync.RWMutex
-	lockGetExecutionMemory             sync.RWMutex
-	lockGetLatestAlertByThread         sync.RWMutex
-	lockGetLatestAlertListInThread     sync.RWMutex
-	lockGetLatestHistory               sync.RWMutex
-	lockGetNotice                      sync.RWMutex
-	lockGetOrCreateTagByName           sync.RWMutex
-	lockGetTagByID                     sync.RWMutex
-	lockGetTagByName                   sync.RWMutex
-	lockGetTagsByIDs                   sync.RWMutex
-	lockGetTicket                      sync.RWMutex
-	lockGetTicketByThread              sync.RWMutex
-	lockGetTicketComments              sync.RWMutex
-	lockGetTicketCommentsPaginated     sync.RWMutex
-	lockGetTicketMemory                sync.RWMutex
-	lockGetTicketUnpromptedComments    sync.RWMutex
-	lockGetTicketsBySpan               sync.RWMutex
-	lockGetTicketsByStatus             sync.RWMutex
-	lockGetTicketsByStatusAndSpan      sync.RWMutex
-	lockGetTicketsWithInvalidEmbedding sync.RWMutex
-	lockGetToken                       sync.RWMutex
-	lockIsTagNameExists                sync.RWMutex
-	lockListAllTags                    sync.RWMutex
-	lockPutActivity                    sync.RWMutex
-	lockPutAlert                       sync.RWMutex
-	lockPutAlertList                   sync.RWMutex
-	lockPutExecutionMemory             sync.RWMutex
-	lockPutHistory                     sync.RWMutex
-	lockPutTicket                      sync.RWMutex
-	lockPutTicketComment               sync.RWMutex
-	lockPutTicketCommentsPrompted      sync.RWMutex
-	lockPutTicketMemory                sync.RWMutex
-	lockPutToken                       sync.RWMutex
-	lockRemoveTagFromAllAlerts         sync.RWMutex
-	lockRemoveTagFromAllTickets        sync.RWMutex
-	lockRemoveTagIDFromAllAlerts       sync.RWMutex
-	lockRemoveTagIDFromAllTickets      sync.RWMutex
-	lockSaveAgentMemory                sync.RWMutex
-	lockSearchAlerts                   sync.RWMutex
-	lockSearchMemoriesByEmbedding      sync.RWMutex
-	lockUnbindAlertFromTicket          sync.RWMutex
-	lockUpdateNotice                   sync.RWMutex
-	lockUpdateTag                      sync.RWMutex
+	lockBatchGetAlerts                     sync.RWMutex
+	lockBatchGetTickets                    sync.RWMutex
+	lockBatchPutAlerts                     sync.RWMutex
+	lockBatchUpdateTicketsStatus           sync.RWMutex
+	lockBindAlertsToTicket                 sync.RWMutex
+	lockCountActivities                    sync.RWMutex
+	lockCountAlertsWithoutTicket           sync.RWMutex
+	lockCountTicketComments                sync.RWMutex
+	lockCountTicketsByStatus               sync.RWMutex
+	lockCreateNotice                       sync.RWMutex
+	lockCreateTagWithID                    sync.RWMutex
+	lockDeleteTagByID                      sync.RWMutex
+	lockDeleteToken                        sync.RWMutex
+	lockFindNearestAlerts                  sync.RWMutex
+	lockFindNearestTickets                 sync.RWMutex
+	lockFindNearestTicketsWithSpan         sync.RWMutex
+	lockGetActivities                      sync.RWMutex
+	lockGetAgentMemory                     sync.RWMutex
+	lockGetAlert                           sync.RWMutex
+	lockGetAlertList                       sync.RWMutex
+	lockGetAlertListByThread               sync.RWMutex
+	lockGetAlertListsInThread              sync.RWMutex
+	lockGetAlertWithoutEmbedding           sync.RWMutex
+	lockGetAlertWithoutTicket              sync.RWMutex
+	lockGetAlertsBySpan                    sync.RWMutex
+	lockGetAlertsWithInvalidEmbedding      sync.RWMutex
+	lockGetExecutionMemory                 sync.RWMutex
+	lockGetLatestAlertByThread             sync.RWMutex
+	lockGetLatestAlertListInThread         sync.RWMutex
+	lockGetLatestHistory                   sync.RWMutex
+	lockGetNotice                          sync.RWMutex
+	lockGetOrCreateTagByName               sync.RWMutex
+	lockGetTagByID                         sync.RWMutex
+	lockGetTagByName                       sync.RWMutex
+	lockGetTagsByIDs                       sync.RWMutex
+	lockGetTicket                          sync.RWMutex
+	lockGetTicketByThread                  sync.RWMutex
+	lockGetTicketComments                  sync.RWMutex
+	lockGetTicketCommentsPaginated         sync.RWMutex
+	lockGetTicketMemory                    sync.RWMutex
+	lockGetTicketUnpromptedComments        sync.RWMutex
+	lockGetTicketsBySpan                   sync.RWMutex
+	lockGetTicketsByStatus                 sync.RWMutex
+	lockGetTicketsByStatusAndSpan          sync.RWMutex
+	lockGetTicketsWithInvalidEmbedding     sync.RWMutex
+	lockGetToken                           sync.RWMutex
+	lockIsTagNameExists                    sync.RWMutex
+	lockListAllTags                        sync.RWMutex
+	lockPutActivity                        sync.RWMutex
+	lockPutAlert                           sync.RWMutex
+	lockPutAlertList                       sync.RWMutex
+	lockPutExecutionMemory                 sync.RWMutex
+	lockPutHistory                         sync.RWMutex
+	lockPutTicket                          sync.RWMutex
+	lockPutTicketComment                   sync.RWMutex
+	lockPutTicketCommentsPrompted          sync.RWMutex
+	lockPutTicketMemory                    sync.RWMutex
+	lockPutToken                           sync.RWMutex
+	lockRemoveTagFromAllAlerts             sync.RWMutex
+	lockRemoveTagFromAllTickets            sync.RWMutex
+	lockRemoveTagIDFromAllAlerts           sync.RWMutex
+	lockRemoveTagIDFromAllTickets          sync.RWMutex
+	lockSaveAgentMemory                    sync.RWMutex
+	lockSearchAlerts                       sync.RWMutex
+	lockSearchExecutionMemoriesByEmbedding sync.RWMutex
+	lockSearchMemoriesByEmbedding          sync.RWMutex
+	lockUnbindAlertFromTicket              sync.RWMutex
+	lockUpdateNotice                       sync.RWMutex
+	lockUpdateTag                          sync.RWMutex
 }
 
 // BatchGetAlerts calls BatchGetAlertsFunc.
@@ -5931,6 +5949,54 @@ func (mock *RepositoryMock) SearchAlertsCalls() []struct {
 	mock.lockSearchAlerts.RLock()
 	calls = mock.calls.SearchAlerts
 	mock.lockSearchAlerts.RUnlock()
+	return calls
+}
+
+// SearchExecutionMemoriesByEmbedding calls SearchExecutionMemoriesByEmbeddingFunc.
+func (mock *RepositoryMock) SearchExecutionMemoriesByEmbedding(ctx context.Context, schemaID types.AlertSchema, embedding []float32, limit int) ([]*memory.ExecutionMemory, error) {
+	callInfo := struct {
+		Ctx       context.Context
+		SchemaID  types.AlertSchema
+		Embedding []float32
+		Limit     int
+	}{
+		Ctx:       ctx,
+		SchemaID:  schemaID,
+		Embedding: embedding,
+		Limit:     limit,
+	}
+	mock.lockSearchExecutionMemoriesByEmbedding.Lock()
+	mock.calls.SearchExecutionMemoriesByEmbedding = append(mock.calls.SearchExecutionMemoriesByEmbedding, callInfo)
+	mock.lockSearchExecutionMemoriesByEmbedding.Unlock()
+	if mock.SearchExecutionMemoriesByEmbeddingFunc == nil {
+		var (
+			executionMemorysOut []*memory.ExecutionMemory
+			errOut              error
+		)
+		return executionMemorysOut, errOut
+	}
+	return mock.SearchExecutionMemoriesByEmbeddingFunc(ctx, schemaID, embedding, limit)
+}
+
+// SearchExecutionMemoriesByEmbeddingCalls gets all the calls that were made to SearchExecutionMemoriesByEmbedding.
+// Check the length with:
+//
+//	len(mockedRepository.SearchExecutionMemoriesByEmbeddingCalls())
+func (mock *RepositoryMock) SearchExecutionMemoriesByEmbeddingCalls() []struct {
+	Ctx       context.Context
+	SchemaID  types.AlertSchema
+	Embedding []float32
+	Limit     int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		SchemaID  types.AlertSchema
+		Embedding []float32
+		Limit     int
+	}
+	mock.lockSearchExecutionMemoriesByEmbedding.RLock()
+	calls = mock.calls.SearchExecutionMemoriesByEmbedding
+	mock.lockSearchExecutionMemoriesByEmbedding.RUnlock()
 	return calls
 }
 

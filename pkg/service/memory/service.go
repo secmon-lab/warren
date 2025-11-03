@@ -40,9 +40,10 @@ func New(llmClient gollem.LLMClient, repo interfaces.Repository) *Service {
 
 // executionMemoryResponse defines the structure for ExecutionMemory LLM response
 type executionMemoryResponse struct {
-	Keep   string `json:"keep,omitempty" description:"Successful patterns and approaches that should be kept"`
-	Change string `json:"change,omitempty" description:"Areas for improvement and changes needed"`
-	Notes  string `json:"notes,omitempty" description:"Other insights and observations"`
+	Summary string `json:"summary" description:"Concise 1-2 sentence overview of what was accomplished and key learnings, used for semantic search"`
+	Keep    string `json:"keep,omitempty" description:"Specific successful execution strategies: exact tools used, query patterns, effective methods"`
+	Change  string `json:"change,omitempty" description:"Specific failures and root causes: which tools failed, why they failed, concrete improvements"`
+	Notes   string `json:"notes,omitempty" description:"Additional insights: data schema observations, edge cases, contextual information"`
 }
 
 // GenerateExecutionMemory generates memory from execution history
@@ -86,8 +87,8 @@ func (s *Service) GenerateExecutionMemory(
 		return nil, goerr.Wrap(err, "failed to generate execution memory")
 	}
 
-	// 6. Parse response
-	mem, err := s.parseExecutionMemoryResponse(response, schemaID)
+	// 6. Parse response and generate embedding
+	mem, err := s.parseExecutionMemoryResponse(ctx, response, schemaID)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to parse execution memory response")
 	}
@@ -211,9 +212,10 @@ func (s *Service) FormatMemoriesForPrompt(
 func (s *Service) buildExecutionMemoryPrompt(ctx context.Context, existing *memory.ExecutionMemory, executionError error) (string, error) {
 	// Generate JSON schema
 	type ExecutionMemoryResponse struct {
-		Keep   string `json:"keep"`
-		Change string `json:"change"`
-		Notes  string `json:"notes"`
+		Summary string `json:"summary"`
+		Keep    string `json:"keep"`
+		Change  string `json:"change"`
+		Notes   string `json:"notes"`
 	}
 
 	schema := prompt.ToSchema(ExecutionMemoryResponse{})
@@ -238,7 +240,7 @@ func (s *Service) buildExecutionMemoryPrompt(ctx context.Context, existing *memo
 }
 
 // parseExecutionMemoryResponse parses LLM response into ExecutionMemory
-func (s *Service) parseExecutionMemoryResponse(response *gollem.Response, schemaID types.AlertSchema) (*memory.ExecutionMemory, error) {
+func (s *Service) parseExecutionMemoryResponse(ctx context.Context, response *gollem.Response, schemaID types.AlertSchema) (*memory.ExecutionMemory, error) {
 	if len(response.Texts) == 0 {
 		return nil, goerr.New("no response text from LLM")
 	}
@@ -249,9 +251,10 @@ func (s *Service) parseExecutionMemoryResponse(response *gollem.Response, schema
 	text = extractJSONFromMarkdown(text)
 
 	var resp struct {
-		Keep   string `json:"keep"`
-		Change string `json:"change"`
-		Notes  string `json:"notes"`
+		Summary string `json:"summary"`
+		Keep    string `json:"keep"`
+		Change  string `json:"change"`
+		Notes   string `json:"notes"`
 	}
 
 	if err := json.Unmarshal([]byte(text), &resp); err != nil {
@@ -259,9 +262,27 @@ func (s *Service) parseExecutionMemoryResponse(response *gollem.Response, schema
 	}
 
 	mem := memory.NewExecutionMemory(schemaID)
+	mem.Summary = resp.Summary
 	mem.Keep = resp.Keep
 	mem.Change = resp.Change
 	mem.Notes = resp.Notes
+
+	// Generate embedding from summary if summary is not empty
+	if mem.Summary != "" {
+		embeddings, err := s.llmClient.GenerateEmbedding(ctx, EmbeddingDimension, []string{mem.Summary})
+		if err != nil {
+			// Log error but continue - embedding is optional
+			return mem, nil
+		}
+		if len(embeddings) > 0 {
+			// Convert float64 to float32
+			vector32 := make([]float32, len(embeddings[0]))
+			for i, v := range embeddings[0] {
+				vector32[i] = float32(v)
+			}
+			mem.Embedding = vector32
+		}
+	}
 
 	return mem, nil
 }
@@ -386,6 +407,33 @@ func (s *Service) SearchRelevantAgentMemories(ctx context.Context, agentID, quer
 	memories, err := s.repository.SearchMemoriesByEmbedding(ctx, agentID, vector32, limit)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to search memories", goerr.V("agent_id", agentID), goerr.V("limit", limit))
+	}
+
+	return memories, nil
+}
+
+// SearchRelevantExecutionMemories searches for similar execution memories using semantic search
+func (s *Service) SearchRelevantExecutionMemories(ctx context.Context, schemaID types.AlertSchema, query string, limit int) ([]*memory.ExecutionMemory, error) {
+	// Generate embedding for the query
+	embeddings, err := s.llmClient.GenerateEmbedding(ctx, EmbeddingDimension, []string{query})
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to generate embedding for search", goerr.V("query", query))
+	}
+
+	if len(embeddings) == 0 {
+		return nil, goerr.New("no embedding generated")
+	}
+
+	// Convert float64 to float32
+	vector32 := make([]float32, len(embeddings[0]))
+	for i, v := range embeddings[0] {
+		vector32[i] = float32(v)
+	}
+
+	// Search by embedding
+	memories, err := s.repository.SearchExecutionMemoriesByEmbedding(ctx, schemaID, vector32, limit)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to search execution memories", goerr.V("schema_id", schemaID), goerr.V("limit", limit))
 	}
 
 	return memories, nil

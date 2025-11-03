@@ -159,6 +159,26 @@ func defineFirestoreIndexes() *fireconf.Config {
 		},
 	})
 
+	// Index for execution_memories/records subcollection (COLLECTION query scope)
+	// This is used for schema-specific execution memory searches: execution_memories/{schemaID}/records/*
+	// Note: COLLECTION scope is required for queries on a specific subcollection path
+	firestoreCollections = append(firestoreCollections, fireconf.Collection{
+		Name: "records",
+		Indexes: []fireconf.Index{
+			{
+				QueryScope: fireconf.QueryScopeCollection,
+				Fields: []fireconf.IndexField{
+					{
+						Path: "Embedding",
+						Vector: &fireconf.VectorConfig{
+							Dimension: 256,
+						},
+					},
+				},
+			},
+		},
+	})
+
 	return &fireconf.Config{
 		Collections: firestoreCollections,
 	}
