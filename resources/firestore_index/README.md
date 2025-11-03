@@ -77,23 +77,35 @@ firestore_index create --dry-run
 
 This tool creates indexes for the following collections:
 
-- `alerts`
-- `tickets`
-- `lists`
+- `alerts`, `tickets`, `lists` - Alert and ticket data with embeddings
+- `execution_memories`, `ticket_memories` - Agent memory collections
+- `memories` (subcollection) - Agent-specific memories
 
 For each collection, the following indexes are created:
 
-1. **Embedding Vector Index**
+1. **Embedding Vector Index** (`alerts`, `tickets`, `lists`)
+   - Field: `Embedding`
    - Vector dimension: 256
    - Configuration: flat
 
-2. **CreatedAt + Embedding Composite Index**
+2. **CreatedAt + Embedding Composite Index** (`alerts`, `tickets`, `lists`)
    - CreatedAt: descending
    - Embedding: vector (dimension: 256)
 
-3. **Status + CreatedAt Composite Index** (`tickets` collection only)
+3. **Status + CreatedAt Composite Index** (`tickets` only)
    - Status: ascending
    - CreatedAt: descending
+
+4. **Memory Embedding Vector Index** (`execution_memories`, `ticket_memories`, `memories`)
+   - Field: `query_embedding`
+   - Vector dimension: 256
+   - Configuration: flat
+
+5. **Memory Time-based Composite Index** (`execution_memories`, `ticket_memories`)
+   - created_at: descending
+   - query_embedding: vector (dimension: 256)
+
+For detailed information about all indexes, see [doc/installation_gcp.md](../../doc/installation_gcp.md#22-configure-firestore-indexes).
 
 ## Alternative: Running with go run
 

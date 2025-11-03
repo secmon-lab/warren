@@ -97,72 +97,108 @@ firestore_index create \
 
 #### Option 2: Manual Index Creation
 
-If you prefer to create indexes manually:
+If you prefer to create indexes manually using gcloud CLI:
 
 ```bash
-# Create comprehensive index configuration file
-cat > firestore.indexes.json << 'EOF'
-{
-  "indexes": [
-    {
-      "collectionGroup": "alerts",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {"fieldPath": "Embedding", "vectorConfig": {"dimension": 256, "flat": {}}}
-      ]
-    },
-    {
-      "collectionGroup": "alerts",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {"fieldPath": "CreatedAt", "order": "DESCENDING"},
-        {"fieldPath": "Embedding", "vectorConfig": {"dimension": 256, "flat": {}}}
-      ]
-    },
-    {
-      "collectionGroup": "tickets",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {"fieldPath": "Embedding", "vectorConfig": {"dimension": 256, "flat": {}}}
-      ]
-    },
-    {
-      "collectionGroup": "tickets",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {"fieldPath": "CreatedAt", "order": "DESCENDING"},
-        {"fieldPath": "Embedding", "vectorConfig": {"dimension": 256, "flat": {}}}
-      ]
-    },
-    {
-      "collectionGroup": "tickets",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {"fieldPath": "Status", "order": "ASCENDING"},
-        {"fieldPath": "CreatedAt", "order": "DESCENDING"}
-      ]
-    },
-    {
-      "collectionGroup": "lists",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {"fieldPath": "Embedding", "vectorConfig": {"dimension": 256, "flat": {}}}
-      ]
-    },
-    {
-      "collectionGroup": "lists",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {"fieldPath": "CreatedAt", "order": "DESCENDING"},
-        {"fieldPath": "Embedding", "vectorConfig": {"dimension": 256, "flat": {}}}
-      ]
-    }
-  ]
-}
-EOF
+# Set your project and database
+export PROJECT_ID="your-project-id"
+export DATABASE_ID="(default)"
 
-# Apply all indexes
-gcloud firestore indexes create --file=firestore.indexes.json
+# Alerts collection indexes
+gcloud firestore indexes composite create \
+  --project=$PROJECT_ID \
+  --database=$DATABASE_ID \
+  --collection-group=alerts \
+  --query-scope=COLLECTION \
+  --field-config=field-path=Embedding,vector-config='{"dimension":256,"flat":{}}'
+
+gcloud firestore indexes composite create \
+  --project=$PROJECT_ID \
+  --database=$DATABASE_ID \
+  --collection-group=alerts \
+  --query-scope=COLLECTION \
+  --field-config=order=DESCENDING,field-path=CreatedAt \
+  --field-config=field-path=Embedding,vector-config='{"dimension":256,"flat":{}}'
+
+# Tickets collection indexes
+gcloud firestore indexes composite create \
+  --project=$PROJECT_ID \
+  --database=$DATABASE_ID \
+  --collection-group=tickets \
+  --query-scope=COLLECTION \
+  --field-config=field-path=Embedding,vector-config='{"dimension":256,"flat":{}}'
+
+gcloud firestore indexes composite create \
+  --project=$PROJECT_ID \
+  --database=$DATABASE_ID \
+  --collection-group=tickets \
+  --query-scope=COLLECTION \
+  --field-config=order=DESCENDING,field-path=CreatedAt \
+  --field-config=field-path=Embedding,vector-config='{"dimension":256,"flat":{}}'
+
+gcloud firestore indexes composite create \
+  --project=$PROJECT_ID \
+  --database=$DATABASE_ID \
+  --collection-group=tickets \
+  --query-scope=COLLECTION \
+  --field-config=order=ASCENDING,field-path=Status \
+  --field-config=order=DESCENDING,field-path=CreatedAt
+
+# Lists collection indexes
+gcloud firestore indexes composite create \
+  --project=$PROJECT_ID \
+  --database=$DATABASE_ID \
+  --collection-group=lists \
+  --query-scope=COLLECTION \
+  --field-config=field-path=Embedding,vector-config='{"dimension":256,"flat":{}}'
+
+gcloud firestore indexes composite create \
+  --project=$PROJECT_ID \
+  --database=$DATABASE_ID \
+  --collection-group=lists \
+  --query-scope=COLLECTION \
+  --field-config=order=DESCENDING,field-path=CreatedAt \
+  --field-config=field-path=Embedding,vector-config='{"dimension":256,"flat":{}}'
+
+# Execution memories collection indexes
+gcloud firestore indexes composite create \
+  --project=$PROJECT_ID \
+  --database=$DATABASE_ID \
+  --collection-group=execution_memories \
+  --query-scope=COLLECTION \
+  --field-config=field-path=query_embedding,vector-config='{"dimension":256,"flat":{}}'
+
+gcloud firestore indexes composite create \
+  --project=$PROJECT_ID \
+  --database=$DATABASE_ID \
+  --collection-group=execution_memories \
+  --query-scope=COLLECTION \
+  --field-config=order=DESCENDING,field-path=created_at \
+  --field-config=field-path=query_embedding,vector-config='{"dimension":256,"flat":{}}'
+
+# Ticket memories collection indexes
+gcloud firestore indexes composite create \
+  --project=$PROJECT_ID \
+  --database=$DATABASE_ID \
+  --collection-group=ticket_memories \
+  --query-scope=COLLECTION \
+  --field-config=field-path=query_embedding,vector-config='{"dimension":256,"flat":{}}'
+
+gcloud firestore indexes composite create \
+  --project=$PROJECT_ID \
+  --database=$DATABASE_ID \
+  --collection-group=ticket_memories \
+  --query-scope=COLLECTION \
+  --field-config=order=DESCENDING,field-path=created_at \
+  --field-config=field-path=query_embedding,vector-config='{"dimension":256,"flat":{}}'
+
+# Memories subcollection index (COLLECTION_GROUP scope)
+gcloud firestore indexes composite create \
+  --project=$PROJECT_ID \
+  --database=$DATABASE_ID \
+  --collection-group=memories \
+  --query-scope=COLLECTION_GROUP \
+  --field-config=field-path=query_embedding,vector-config='{"dimension":256,"flat":{}}'
 ```
 
 #### Index Details
@@ -170,10 +206,13 @@ gcloud firestore indexes create --file=firestore.indexes.json
 The following indexes are created:
 
 | Collection | Index Type | Fields | Purpose |
-|------------|------------|--------|---------|  
+|------------|------------|--------|---------|
 | alerts, tickets, lists | Vector | Embedding (256d) | Alert clustering & similarity search |
 | alerts, tickets, lists | Composite | CreatedAt DESC + Embedding | Time-based vector searches |
 | tickets | Composite | Status ASC + CreatedAt DESC | Dashboard filtering |
+| execution_memories, ticket_memories | Vector | query_embedding (256d) | Agent memory semantic search |
+| execution_memories, ticket_memories | Composite | created_at DESC + query_embedding | Time-based memory searches |
+| memories (subcollection) | Vector | query_embedding (256d) | Agent-specific memory search |
 
 > **Note**: 
 > - Index creation may take 5-10 minutes
