@@ -207,7 +207,7 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 
 	// Step 5: Save execution memory (metadata only)
 	log.Debug("Saving execution memory", "has_error", execErr != nil)
-	if err := a.saveExecutionMemory(ctx, query, resp, execErr, duration); err != nil {
+	if err := a.saveExecutionMemory(ctx, query, resp, execErr, duration, agent.Session()); err != nil {
 		log.Warn("failed to save execution memory", "error", err)
 	} else {
 		log.Debug("Execution memory saved successfully")

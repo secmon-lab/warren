@@ -75,7 +75,16 @@ When performing security analysis, consider these field categories:
 
 5. **Execute and Validate**: Run the query with automatic scan size validation
 
-6. **Return Results**: Provide the raw query results as-is
+6. **Handle Zero Results**: **CRITICAL**: If query returns 0 rows, it is HIGHLY LIKELY that your query or filter values are INCORRECT. You MUST investigate:
+   - **ASSUME YOUR QUERY IS WRONG**: Do not assume the data doesn't exist - assume you made incorrect assumptions about field names, values, or data structure
+   - **Verify field values exist**: Query the table WITHOUT filters to check actual data values
+   - **Check value format mismatches**: The expected format (e.g., 'ERROR') may not match actual values (e.g., 'Error', 'error', 'ERR')
+   - **Validate field semantics**: The field you're filtering on may not contain the data you expect (e.g., filtering `event_type='login'` when logins are in `action` field)
+   - **Examine sample data**: Run `SELECT * FROM table LIMIT 10` to see what data actually looks like
+   - **Query for DISTINCT values**: Use `SELECT DISTINCT field_name FROM table LIMIT 20` to see what values actually exist in the field you're filtering on
+   - **Re-query with corrections**: Adjust your query based on actual data structure and values discovered
+
+7. **Return Results**: Provide the raw query results as-is
 
 ## Important Notes
 

@@ -29,20 +29,19 @@ type AgentMemory struct {
 	// Duration records how long the task took to complete
 	Duration time.Duration `json:"duration"`
 
-	// SuccessDescription is a natural language description of what worked well (K: Keep)
-	// Example: "Successfully executed 3 tool calls to retrieve login error data"
-	SuccessDescription string `json:"success_description,omitempty"`
+	// Successes is a list of successful patterns observed (K: Keep in KPT format)
+	// Contains domain knowledge about what worked: field semantics, data formats, query patterns
+	// Example: ["Login failures identified by severity='ERROR' AND action='login'. User ID is user.email (STRING) not user.id (INT64)"]
+	Successes []string `json:"successes,omitempty"`
 
-	// SuccessResult contains metadata about successful execution (NOT the actual result data)
-	// Example: {"tool_call_count": 3, "tools_used": ["bigquery_query", "bigquery_result"]}
-	SuccessResult map[string]any `json:"success_result,omitempty"`
-
-	// Problems is a list of issues encountered during execution (P: Problem)
-	// Example: ["Query exceeded scan size limit", "Table schema mismatch"]
+	// Problems is a list of issues encountered during execution (P: Problem in KPT format)
+	// Contains domain knowledge mistakes: wrong field assumptions, unexpected data formats
+	// Example: ["Expected 'timestamp' field but actual field is 'event_time' (TIMESTAMP type). user_id is INT64 not STRING email"]
 	Problems []string `json:"problems,omitempty"`
 
-	// Improvements is a list of suggestions for future executions (T: Try)
-	// Example: ["Add WHERE clause to reduce scan size", "Verify table schema before querying"]
+	// Improvements is a list of suggestions for future executions (T: Try in KPT format)
+	// Contains specific domain knowledge to apply: which fields to use, expected formats, search patterns
+	// Example: ["For user searches: use user.email (STRING) not user_id (INT64). For errors: check error_code field values"]
 	Improvements []string `json:"improvements,omitempty"`
 }
 
