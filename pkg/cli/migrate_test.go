@@ -12,7 +12,7 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 	config := cli.DefineFirestoreIndexes()
 
 	gt.Value(t, config).NotNil()
-	gt.Equal(t, len(config.Collections), 6) // alerts, tickets, lists, execution_memories, ticket_memories, memories
+	gt.Equal(t, len(config.Collections), 4) // alerts, tickets, lists, memories (execution_memories and ticket_memories use auto-generated single-field indexes)
 
 	// Helper function to find collection by name
 	findCollection := func(name string) *fireconf.Collection {
@@ -69,35 +69,6 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 		gt.Equal(t, len(col.Indexes), 2) // Same as alerts
 	})
 
-	// Test execution_memories collection
-	t.Run("execution_memories collection", func(t *testing.T) {
-		col := findCollection("execution_memories")
-		gt.Value(t, col).NotNil()
-		gt.Equal(t, len(col.Indexes), 2) // QueryEmbedding + created_at+QueryEmbedding
-
-		// Check QueryEmbedding vector index
-		embeddingIndex := col.Indexes[0]
-		gt.Equal(t, len(embeddingIndex.Fields), 1)
-		gt.Equal(t, embeddingIndex.Fields[0].Path, "QueryEmbedding")
-		gt.Value(t, embeddingIndex.Fields[0].Vector).NotNil()
-		gt.Equal(t, embeddingIndex.Fields[0].Vector.Dimension, 256)
-
-		// Check created_at + QueryEmbedding composite index
-		compositeIndex := col.Indexes[1]
-		gt.Equal(t, len(compositeIndex.Fields), 2)
-		gt.Equal(t, compositeIndex.Fields[0].Path, "created_at")
-		gt.Equal(t, compositeIndex.Fields[0].Order, fireconf.OrderDescending)
-		gt.Equal(t, compositeIndex.Fields[1].Path, "QueryEmbedding")
-		gt.Value(t, compositeIndex.Fields[1].Vector).NotNil()
-		gt.Equal(t, compositeIndex.Fields[1].Vector.Dimension, 256)
-	})
-
-	// Test ticket_memories collection
-	t.Run("ticket_memories collection", func(t *testing.T) {
-		col := findCollection("ticket_memories")
-		gt.Value(t, col).NotNil()
-		gt.Equal(t, len(col.Indexes), 2) // Same as execution_memories
-	})
 
 	// Test memories subcollection (COLLECTION scope)
 	t.Run("memories subcollection", func(t *testing.T) {

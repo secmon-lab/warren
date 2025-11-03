@@ -82,7 +82,6 @@ func runMigrate(ctx context.Context, cfg *config.Firestore, dryRun bool) error {
 
 func defineFirestoreIndexes() *fireconf.Config {
 	collections := []string{"alerts", "tickets", "lists"}
-	memoryCollections := []string{"execution_memories", "ticket_memories"}
 
 	var firestoreCollections []fireconf.Collection
 
@@ -133,44 +132,6 @@ func defineFirestoreIndexes() *fireconf.Config {
 				},
 			})
 		}
-
-		firestoreCollections = append(firestoreCollections, fireconf.Collection{
-			Name:    collectionName,
-			Indexes: indexes,
-		})
-	}
-
-	// Indexes for memory collections (with QueryEmbedding field)
-	for _, collectionName := range memoryCollections {
-		var indexes []fireconf.Index
-
-		// Single-field QueryEmbedding index
-		indexes = append(indexes, fireconf.Index{
-			Fields: []fireconf.IndexField{
-				{
-					Path: "QueryEmbedding",
-					Vector: &fireconf.VectorConfig{
-						Dimension: 256,
-					},
-				},
-			},
-		})
-
-		// created_at + QueryEmbedding composite index
-		indexes = append(indexes, fireconf.Index{
-			Fields: []fireconf.IndexField{
-				{
-					Path:  "created_at",
-					Order: fireconf.OrderDescending,
-				},
-				{
-					Path: "QueryEmbedding",
-					Vector: &fireconf.VectorConfig{
-						Dimension: 256,
-					},
-				},
-			},
-		})
 
 		firestoreCollections = append(firestoreCollections, fireconf.Collection{
 			Name:    collectionName,
