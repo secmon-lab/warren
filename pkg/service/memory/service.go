@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 const (
@@ -272,6 +273,7 @@ func (s *Service) parseExecutionMemoryResponse(ctx context.Context, response *go
 		embeddings, err := s.llmClient.GenerateEmbedding(ctx, EmbeddingDimension, []string{mem.Summary})
 		if err != nil {
 			// Log error but continue - embedding is optional
+			logging.From(ctx).Warn("failed to generate embedding for execution memory summary", "error", err)
 			return mem, nil
 		}
 		if len(embeddings) > 0 {
