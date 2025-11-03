@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -54,8 +55,8 @@ func TestGenerateKPTAnalysis_Success(t *testing.T) {
 	gt.A(t, successes).Length(2)
 	gt.A(t, problems).Length(0)
 	gt.A(t, improvements).Length(0)
-	gt.True(t, len(successes[0]) > 0 && contains(successes[0], "severity='ERROR'"))
-	gt.True(t, len(successes[0]) > 0 && contains(successes[0], "user.email"))
+	gt.True(t, len(successes[0]) > 0 && strings.Contains(successes[0], "severity='ERROR'"))
+	gt.True(t, len(successes[0]) > 0 && strings.Contains(successes[0], "user.email"))
 }
 
 func TestGenerateKPTAnalysis_Failure(t *testing.T) {
@@ -100,9 +101,9 @@ func TestGenerateKPTAnalysis_Failure(t *testing.T) {
 	gt.A(t, successes).Length(0)
 	gt.A(t, problems).Length(2)
 	gt.A(t, improvements).Length(2)
-	gt.True(t, contains(problems[0], "timestamp"))
-	gt.True(t, contains(problems[0], "event_time"))
-	gt.True(t, contains(improvements[0], "schema"))
+	gt.True(t, strings.Contains(problems[0], "timestamp"))
+	gt.True(t, strings.Contains(problems[0], "event_time"))
+	gt.True(t, strings.Contains(improvements[0], "schema"))
 }
 
 func TestGenerateKPTAnalysis_LLMError(t *testing.T) {
@@ -308,22 +309,10 @@ func TestGenerateKPTAnalysis_RealLLM(t *testing.T) {
 	})
 }
 
-// contains checks if string contains substring
-func contains(s, substr string) bool {
-	if len(s) >= len(substr) {
-		for i := 0; i <= len(s)-len(substr); i++ {
-			if s[i:i+len(substr)] == substr {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // containsAny checks if string contains any of the substrings
 func containsAny(s string, substrings []string) bool {
 	for _, sub := range substrings {
-		if contains(s, sub) {
+		if strings.Contains(s, sub) {
 			return true
 		}
 	}
