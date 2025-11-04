@@ -176,6 +176,7 @@ func (r *runbookLoader) extractTitleAndDescription(content string) (string, stri
 		// Check for title
 		if matches := titleRegex.FindStringSubmatch(line); matches != nil {
 			title = strings.TrimSpace(matches[1])
+			inDescription = false
 			continue
 		}
 

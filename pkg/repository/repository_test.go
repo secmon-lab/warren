@@ -68,6 +68,12 @@ func newTestAlert(thread *slack.Thread) alert.Alert {
 }
 
 func newTestTicket(thread *slack.Thread) ticketmodel.Ticket {
+	// Generate random embedding to avoid zero vector issues
+	embedding := make([]float32, 256)
+	for i := range embedding {
+		embedding[i] = rand.Float32()
+	}
+
 	return ticketmodel.Ticket{
 		ID: types.NewTicketID(),
 		Metadata: ticketmodel.Metadata{
@@ -75,6 +81,7 @@ func newTestTicket(thread *slack.Thread) ticketmodel.Ticket {
 			Description: "Test Description",
 		},
 		SlackThread: thread,
+		Embedding:   embedding,
 	}
 }
 
@@ -793,13 +800,10 @@ func TestGetAlertsWithInvalidEmbedding(t *testing.T) {
 		}
 	}
 
+	// This test only runs with Memory repository because Firestore now rejects
+	// invalid embeddings at the Put* method level
 	t.Run("Memory", func(t *testing.T) {
 		repo := repository.NewMemory()
-		testFn(t, repo)
-	})
-
-	t.Run("Firestore", func(t *testing.T) {
-		repo := newFirestoreClient(t)
 		testFn(t, repo)
 	})
 }
@@ -895,13 +899,10 @@ func TestGetTicketsWithInvalidEmbedding(t *testing.T) {
 		}
 	}
 
+	// This test only runs with Memory repository because Firestore now rejects
+	// invalid embeddings at the Put* method level
 	t.Run("Memory", func(t *testing.T) {
 		repo := repository.NewMemory()
-		testFn(t, repo)
-	})
-
-	t.Run("Firestore", func(t *testing.T) {
-		repo := newFirestoreClient(t)
 		testFn(t, repo)
 	})
 }
@@ -1059,6 +1060,15 @@ func TestGetTicketsByStatus(t *testing.T) {
 		ctx := t.Context()
 		thread := newTestThread()
 
+		// Helper to generate random embedding
+		genEmbedding := func() []float32 {
+			emb := make([]float32, 256)
+			for i := range emb {
+				emb[i] = rand.Float32()
+			}
+			return emb
+		}
+
 		// Create tickets
 		tickets := []*ticketmodel.Ticket{
 			{
@@ -1069,6 +1079,7 @@ func TestGetTicketsByStatus(t *testing.T) {
 					ChannelID: thread.ChannelID,
 					ThreadID:  thread.ThreadID,
 				},
+				Embedding: genEmbedding(),
 			},
 			{
 				ID:        types.NewTicketID(),
@@ -1078,6 +1089,7 @@ func TestGetTicketsByStatus(t *testing.T) {
 					ChannelID: thread.ChannelID,
 					ThreadID:  thread.ThreadID,
 				},
+				Embedding: genEmbedding(),
 			},
 			{
 				ID:        types.NewTicketID(),
@@ -1087,6 +1099,7 @@ func TestGetTicketsByStatus(t *testing.T) {
 					ChannelID: thread.ChannelID,
 					ThreadID:  thread.ThreadID,
 				},
+				Embedding: genEmbedding(),
 			},
 		}
 
@@ -1177,6 +1190,15 @@ func TestGetTicketsBySpan(t *testing.T) {
 		ctx := t.Context()
 		thread := newTestThread()
 
+		// Helper to generate random embedding
+		genEmbedding := func() []float32 {
+			emb := make([]float32, 256)
+			for i := range emb {
+				emb[i] = rand.Float32()
+			}
+			return emb
+		}
+
 		// Create tickets
 		tickets := []*ticketmodel.Ticket{
 			{
@@ -1187,6 +1209,7 @@ func TestGetTicketsBySpan(t *testing.T) {
 					ChannelID: thread.ChannelID,
 					ThreadID:  thread.ThreadID,
 				},
+				Embedding: genEmbedding(),
 			},
 			{
 				ID:        types.NewTicketID(),
@@ -1196,6 +1219,7 @@ func TestGetTicketsBySpan(t *testing.T) {
 					ChannelID: thread.ChannelID,
 					ThreadID:  thread.ThreadID,
 				},
+				Embedding: genEmbedding(),
 			},
 			{
 				ID:        types.NewTicketID(),
@@ -1205,6 +1229,7 @@ func TestGetTicketsBySpan(t *testing.T) {
 					ChannelID: thread.ChannelID,
 					ThreadID:  thread.ThreadID,
 				},
+				Embedding: genEmbedding(),
 			},
 		}
 
@@ -1296,13 +1321,10 @@ func TestGetAlertWithoutEmbedding(t *testing.T) {
 		})
 	}
 
+	// This test only runs with Memory repository because Firestore now rejects
+	// invalid embeddings at the Put* method level
 	t.Run("Memory", func(t *testing.T) {
 		repo := repository.NewMemory()
-		testFn(t, repo)
-	})
-
-	t.Run("Firestore", func(t *testing.T) {
-		repo := newFirestoreClient(t)
 		testFn(t, repo)
 	})
 }
@@ -1403,27 +1425,40 @@ func TestGetTicketsByStatusAndSpan(t *testing.T) {
 		ctx := t.Context()
 		now := time.Now()
 
+		// Helper to generate random embedding
+		genEmbedding := func() []float32 {
+			emb := make([]float32, 256)
+			for i := range emb {
+				emb[i] = rand.Float32()
+			}
+			return emb
+		}
+
 		// Create test tickets with different statuses and timestamps
 		tickets := []ticketmodel.Ticket{
 			{
 				ID:        types.NewTicketID(),
 				Status:    types.TicketStatusOpen,
 				CreatedAt: now.Add(-2 * time.Hour),
+				Embedding: genEmbedding(),
 			},
 			{
 				ID:        types.NewTicketID(),
 				Status:    types.TicketStatusOpen,
 				CreatedAt: now.Add(-1 * time.Hour),
+				Embedding: genEmbedding(),
 			},
 			{
 				ID:        types.NewTicketID(),
 				Status:    types.TicketStatusResolved,
 				CreatedAt: now.Add(-1 * time.Hour),
+				Embedding: genEmbedding(),
 			},
 			{
 				ID:        types.NewTicketID(),
 				Status:    types.TicketStatusOpen,
 				CreatedAt: now.Add(1 * time.Hour),
+				Embedding: genEmbedding(),
 			},
 		}
 
@@ -1510,6 +1545,15 @@ func TestCountTicketsByStatus(t *testing.T) {
 		ctx := t.Context()
 		thread := newTestThread()
 
+		// Helper to generate random embedding
+		genEmbedding := func() []float32 {
+			emb := make([]float32, 256)
+			for i := range emb {
+				emb[i] = rand.Float32()
+			}
+			return emb
+		}
+
 		// Create tickets with different statuses
 		tickets := []*ticketmodel.Ticket{
 			{
@@ -1520,6 +1564,7 @@ func TestCountTicketsByStatus(t *testing.T) {
 					ChannelID: thread.ChannelID,
 					ThreadID:  thread.ThreadID,
 				},
+				Embedding: genEmbedding(),
 			},
 			{
 				ID:        types.NewTicketID(),
@@ -1529,6 +1574,7 @@ func TestCountTicketsByStatus(t *testing.T) {
 					ChannelID: thread.ChannelID,
 					ThreadID:  thread.ThreadID,
 				},
+				Embedding: genEmbedding(),
 			},
 			{
 				ID:        types.NewTicketID(),
@@ -1538,6 +1584,7 @@ func TestCountTicketsByStatus(t *testing.T) {
 					ChannelID: thread.ChannelID,
 					ThreadID:  thread.ThreadID,
 				},
+				Embedding: genEmbedding(),
 			},
 			{
 				ID:        types.NewTicketID(),
@@ -1547,6 +1594,7 @@ func TestCountTicketsByStatus(t *testing.T) {
 					ChannelID: thread.ChannelID,
 					ThreadID:  thread.ThreadID,
 				},
+				Embedding: genEmbedding(),
 			},
 		}
 
@@ -1784,6 +1832,12 @@ func TestActivityCreation(t *testing.T) {
 			t.Run("TicketCreation", func(t *testing.T) {
 				ctx := user.WithUserID(context.Background(), "test-user")
 
+				// Generate random embedding
+				emb := make([]float32, 256)
+				for i := range emb {
+					emb[i] = rand.Float32()
+				}
+
 				ticket := ticketmodel.Ticket{
 					ID: types.NewTicketID(),
 					Metadata: ticketmodel.Metadata{
@@ -1791,6 +1845,7 @@ func TestActivityCreation(t *testing.T) {
 					},
 					Status:    types.TicketStatusOpen,
 					CreatedAt: time.Now(),
+					Embedding: emb,
 				}
 
 				err := repo.PutTicket(ctx, ticket)
@@ -1824,6 +1879,12 @@ func TestActivityCreation(t *testing.T) {
 			t.Run("TicketUpdate", func(t *testing.T) {
 				ctx := user.WithUserID(context.Background(), "update-user")
 
+				// Generate random embedding
+				emb := make([]float32, 256)
+				for i := range emb {
+					emb[i] = rand.Float32()
+				}
+
 				// First create a ticket
 				ticket := ticketmodel.Ticket{
 					ID: types.NewTicketID(),
@@ -1832,6 +1893,7 @@ func TestActivityCreation(t *testing.T) {
 					},
 					Status:    types.TicketStatusOpen,
 					CreatedAt: time.Now(),
+					Embedding: emb,
 				}
 
 				err := repo.PutTicket(ctx, ticket)
@@ -1884,6 +1946,12 @@ func TestActivityCreation(t *testing.T) {
 			t.Run("CommentAddition", func(t *testing.T) {
 				ctx := user.WithUserID(context.Background(), "comment-user")
 
+				// Generate random embedding
+				emb := make([]float32, 256)
+				for i := range emb {
+					emb[i] = rand.Float32()
+				}
+
 				ticket := ticketmodel.Ticket{
 					ID: types.NewTicketID(),
 					Metadata: ticketmodel.Metadata{
@@ -1891,6 +1959,7 @@ func TestActivityCreation(t *testing.T) {
 					},
 					Status:    types.TicketStatusOpen,
 					CreatedAt: time.Now(),
+					Embedding: emb,
 				}
 
 				err := repo.PutTicket(ctx, ticket)
@@ -1930,6 +1999,12 @@ func TestActivityCreation(t *testing.T) {
 			t.Run("AgentCommentNoActivity", func(t *testing.T) {
 				ctx := user.WithAgent(user.WithUserID(context.Background(), "agent"))
 
+				// Generate random embedding
+				emb := make([]float32, 256)
+				for i := range emb {
+					emb[i] = rand.Float32()
+				}
+
 				ticket := ticketmodel.Ticket{
 					ID: types.NewTicketID(),
 					Metadata: ticketmodel.Metadata{
@@ -1937,6 +2012,7 @@ func TestActivityCreation(t *testing.T) {
 					},
 					Status:    types.TicketStatusOpen,
 					CreatedAt: time.Now(),
+					Embedding: emb,
 				}
 
 				err := repo.PutTicket(ctx, ticket)
@@ -1990,6 +2066,12 @@ func TestActivityCreation(t *testing.T) {
 			t.Run("AlertBinding", func(t *testing.T) {
 				ctx := user.WithUserID(context.Background(), "bind-user")
 
+				// Generate random embedding
+				emb := make([]float32, 256)
+				for i := range emb {
+					emb[i] = rand.Float32()
+				}
+
 				ticket := ticketmodel.Ticket{
 					ID: types.NewTicketID(),
 					Metadata: ticketmodel.Metadata{
@@ -1997,6 +2079,13 @@ func TestActivityCreation(t *testing.T) {
 					},
 					Status:    types.TicketStatusOpen,
 					CreatedAt: time.Now(),
+					Embedding: emb,
+				}
+
+				// Generate random embedding for alert
+				alertEmb := make([]float32, 256)
+				for i := range alertEmb {
+					alertEmb[i] = rand.Float32()
 				}
 
 				alert := &alert.Alert{
@@ -2005,6 +2094,7 @@ func TestActivityCreation(t *testing.T) {
 						Title: "Test Alert",
 					},
 					CreatedAt: time.Now(),
+					Embedding: alertEmb,
 				}
 
 				err := repo.PutTicket(ctx, ticket)
@@ -2040,6 +2130,12 @@ func TestActivityCreation(t *testing.T) {
 			t.Run("BulkAlertBinding", func(t *testing.T) {
 				ctx := user.WithUserID(context.Background(), "bulk-bind-user")
 
+				// Generate random embedding
+				emb := make([]float32, 256)
+				for i := range emb {
+					emb[i] = rand.Float32()
+				}
+
 				ticket := ticketmodel.Ticket{
 					ID: types.NewTicketID(),
 					Metadata: ticketmodel.Metadata{
@@ -2047,17 +2143,25 @@ func TestActivityCreation(t *testing.T) {
 					},
 					Status:    types.TicketStatusOpen,
 					CreatedAt: time.Now(),
+					Embedding: emb,
 				}
 
 				// Create multiple alerts
 				alertIDs := make([]types.AlertID, 3)
 				for i := range 3 {
+					// Generate random embedding for each alert
+					alertEmb := make([]float32, 256)
+					for j := range alertEmb {
+						alertEmb[j] = rand.Float32()
+					}
+
 					alert := &alert.Alert{
 						ID: types.NewAlertID(),
 						Metadata: alert.Metadata{
 							Title: fmt.Sprintf("Test Alert %d", i+1),
 						},
 						CreatedAt: time.Now(),
+						Embedding: alertEmb,
 					}
 					alertIDs[i] = alert.ID
 
@@ -2094,6 +2198,12 @@ func TestActivityCreation(t *testing.T) {
 			t.Run("StatusChange", func(t *testing.T) {
 				ctx := user.WithUserID(context.Background(), "status-user")
 
+				// Generate random embedding
+				emb := make([]float32, 256)
+				for i := range emb {
+					emb[i] = rand.Float32()
+				}
+
 				ticket := ticketmodel.Ticket{
 					ID: types.NewTicketID(),
 					Metadata: ticketmodel.Metadata{
@@ -2101,6 +2211,7 @@ func TestActivityCreation(t *testing.T) {
 					},
 					Status:    types.TicketStatusOpen,
 					CreatedAt: time.Now(),
+					Embedding: emb,
 				}
 
 				err := repo.PutTicket(ctx, ticket)
@@ -2138,11 +2249,18 @@ func TestGetAlertWithoutTicketPagination(t *testing.T) {
 		return func(t *testing.T) {
 			ctx := context.Background()
 
+			// Generate random embedding for ticket
+			ticketEmb := make([]float32, 256)
+			for i := range ticketEmb {
+				ticketEmb[i] = rand.Float32()
+			}
+
 			// Create multiple tickets and alerts to test pagination
 			ticket1 := ticketmodel.Ticket{
-				ID:       types.TicketID("ticket-1"),
-				Metadata: ticketmodel.Metadata{Title: "Ticket 1"},
-				Status:   types.TicketStatusOpen,
+				ID:        types.TicketID("ticket-1"),
+				Metadata:  ticketmodel.Metadata{Title: "Ticket 1"},
+				Status:    types.TicketStatusOpen,
+				Embedding: ticketEmb,
 			}
 
 			// Create 10 alerts: 5 bound to ticket1, 5 unbound
@@ -2150,16 +2268,30 @@ func TestGetAlertWithoutTicketPagination(t *testing.T) {
 			unboundAlerts := make([]alert.Alert, 5)
 
 			for i := range 5 {
+				// Generate random embedding for bound alert
+				boundEmb := make([]float32, 256)
+				for j := range boundEmb {
+					boundEmb[j] = rand.Float32()
+				}
+
 				boundAlerts[i] = alert.Alert{
-					ID:       types.AlertID(fmt.Sprintf("bound-alert-%d", i)),
-					TicketID: ticket1.ID,
-					Metadata: alert.Metadata{Title: fmt.Sprintf("Bound Alert %d", i)},
+					ID:        types.AlertID(fmt.Sprintf("bound-alert-%d", i)),
+					TicketID:  ticket1.ID,
+					Metadata:  alert.Metadata{Title: fmt.Sprintf("Bound Alert %d", i)},
+					Embedding: boundEmb,
+				}
+
+				// Generate random embedding for unbound alert
+				unboundEmb := make([]float32, 256)
+				for j := range unboundEmb {
+					unboundEmb[j] = rand.Float32()
 				}
 
 				unboundAlerts[i] = alert.Alert{
-					ID:       types.AlertID(fmt.Sprintf("unbound-alert-%d", i)),
-					TicketID: types.EmptyTicketID,
-					Metadata: alert.Metadata{Title: fmt.Sprintf("Unbound Alert %d", i)},
+					ID:        types.AlertID(fmt.Sprintf("unbound-alert-%d", i)),
+					TicketID:  types.EmptyTicketID,
+					Metadata:  alert.Metadata{Title: fmt.Sprintf("Unbound Alert %d", i)},
+					Embedding: unboundEmb,
 				}
 			}
 
@@ -2365,6 +2497,9 @@ func TestTagOperations(t *testing.T) {
 			gt.NotNil(t, verifyTag)
 			t.Logf("Created tag with ID: %s, Name: %s", verifyTag.ID, verifyTag.Name)
 
+			// Wait for Firestore eventual consistency
+			time.Sleep(200 * time.Millisecond)
+
 			// Get existing tag by name
 			retrievedTag, err := repo.GetTagByName(ctx, uniqueName)
 			gt.NoError(t, err)
@@ -2482,6 +2617,12 @@ func TestAlertAndTicketTags(t *testing.T) {
 				Title:       "Test Alert",
 				Description: "Test Description",
 			})
+			// Generate random embedding
+			emb := make([]float32, 256)
+			for i := range emb {
+				emb[i] = rand.Float32()
+			}
+			a.Embedding = emb
 			if a.TagIDs == nil {
 				a.TagIDs = make(map[string]bool)
 			}
@@ -2523,6 +2664,12 @@ func TestAlertAndTicketTags(t *testing.T) {
 			// Create a ticket with tags
 			tk := ticketmodel.New(ctx, []types.AlertID{}, nil)
 			tk.Title = "Test Ticket"
+			// Generate random embedding
+			tkEmb := make([]float32, 256)
+			for i := range tkEmb {
+				tkEmb[i] = rand.Float32()
+			}
+			tk.Embedding = tkEmb
 			if tk.TagIDs == nil {
 				tk.TagIDs = make(map[string]bool)
 			}
@@ -2550,6 +2697,12 @@ func TestAlertAndTicketTags(t *testing.T) {
 				Description: "Test Description",
 			})
 			// a.Tags should be nil by default
+			// Generate random embedding
+			emb := make([]float32, 256)
+			for i := range emb {
+				emb[i] = rand.Float32()
+			}
+			a.Embedding = emb
 
 			gt.NoError(t, repo.PutAlert(ctx, a))
 
@@ -2588,6 +2741,12 @@ func TestAlertAndTicketTags(t *testing.T) {
 					Title:       fmt.Sprintf("Batch Alert %d", i),
 					Description: "Test Description",
 				})
+				// Generate random embedding
+				emb := make([]float32, 256)
+				for j := range emb {
+					emb[j] = rand.Float32()
+				}
+				a.Embedding = emb
 				if a.TagIDs == nil {
 					a.TagIDs = make(map[string]bool)
 				}
@@ -2763,6 +2922,12 @@ func TestMemory(t *testing.T) {
 			mem.Keep = "successful patterns"
 			mem.Change = "areas to improve"
 			mem.Notes = "other insights"
+			// Generate random embedding
+			emb := make([]float32, 256)
+			for i := range emb {
+				emb[i] = rand.Float32()
+			}
+			mem.Embedding = emb
 
 			// Put
 			err := repo.PutExecutionMemory(ctx, mem)
@@ -2793,6 +2958,12 @@ func TestMemory(t *testing.T) {
 		t.Run("ExecutionMemory update", func(t *testing.T) {
 			mem1 := memory.NewExecutionMemory(schemaID)
 			mem1.Keep = "initial keep"
+			// Generate random embedding
+			emb1 := make([]float32, 256)
+			for i := range emb1 {
+				emb1[i] = rand.Float32()
+			}
+			mem1.Embedding = emb1
 
 			err := repo.PutExecutionMemory(ctx, mem1)
 			gt.NoError(t, err)
@@ -2805,6 +2976,12 @@ func TestMemory(t *testing.T) {
 			mem2.Keep = "updated keep"
 			mem2.Change = "new change"
 			mem2.Version = 2
+			// Generate random embedding
+			emb2 := make([]float32, 256)
+			for i := range emb2 {
+				emb2[i] = rand.Float32()
+			}
+			mem2.Embedding = emb2
 
 			err = repo.PutExecutionMemory(ctx, mem2)
 			gt.NoError(t, err)
