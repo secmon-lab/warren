@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"google.golang.org/api/iterator"
@@ -36,7 +37,7 @@ func (t *internalTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			i+1, table.ProjectID, table.DatasetID, table.TableID, table.Description)
 	}
 
-	return []gollem.ToolSpec{
+	specs := []gollem.ToolSpec{
 		{
 			Name: "bigquery_query",
 			Description: fmt.Sprintf(`Execute a BigQuery SQL query to retrieve data.
@@ -91,7 +92,24 @@ Returns complete schema including nested RECORD fields.`,
 			},
 			Required: []string{"project_id", "dataset_id", "table_id"},
 		},
-	}, nil
+	}
+
+	// Add get_runbook tool if runbooks are configured
+	if len(t.config.Runbooks) > 0 {
+		specs = append(specs, gollem.ToolSpec{
+			Name:        "get_runbook",
+			Description: "Get the full SQL content of a runbook by its ID. Use this when you want to see or adapt a pre-written query template.",
+			Parameters: map[string]*gollem.Parameter{
+				"runbook_id": {
+					Type:        gollem.TypeString,
+					Description: "The ID of the runbook to retrieve",
+				},
+			},
+			Required: []string{"runbook_id"},
+		})
+	}
+
+	return specs, nil
 }
 
 // Run implements gollem.ToolSet
@@ -104,6 +122,8 @@ func (t *internalTool) Run(ctx context.Context, name string, args map[string]any
 		return t.executeQuery(ctx, args)
 	case "bigquery_schema":
 		return t.getTableSchema(ctx, args)
+	case "get_runbook":
+		return t.getRunbook(ctx, args)
 	default:
 		log.Debug("Unknown internal tool function", "name", name)
 		return nil, goerr.New("unknown function", goerr.V("name", name))
@@ -405,6 +425,39 @@ func convertBigQueryValue(val bigquery.Value) any {
 		// For primitive types, return as-is
 		return val
 	}
+}
+
+// getRunbook retrieves a runbook entry by ID
+func (t *internalTool) getRunbook(ctx context.Context, args map[string]any) (map[string]any, error) {
+	log := logging.From(ctx)
+	log.Debug("Getting runbook")
+
+	runbookIDStr, ok := args["runbook_id"].(string)
+	if !ok {
+		log.Debug("runbook_id parameter is missing or invalid")
+		return nil, goerr.New("runbook_id parameter is required")
+	}
+
+	// Parse runbook ID
+	runbookID := types.RunbookID(runbookIDStr)
+	log.Debug("Looking up runbook", "runbook_id", runbookID)
+
+	// Find runbook in config
+	entry, exists := t.config.Runbooks[runbookID]
+	if !exists {
+		log.Debug("Runbook not found", "runbook_id", runbookID)
+		return nil, goerr.New("runbook not found", goerr.V("runbook_id", runbookID))
+	}
+
+	log.Debug("Runbook found", "runbook_id", runbookID, "title", entry.Title)
+	msg.Trace(ctx, "📖 Retrieved runbook: %s", entry.Title)
+
+	return map[string]any{
+		"runbook_id":  runbookID.String(),
+		"title":       entry.Title,
+		"description": entry.Description,
+		"sql":         entry.SQLContent,
+	}, nil
 }
 
 // getMapKeys returns the keys of a map as a slice

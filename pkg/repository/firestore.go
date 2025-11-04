@@ -106,19 +106,11 @@ func extractCountFromAggregationResult(result firestore.AggregationResult, alias
 }
 
 func (r *Firestore) PutAlert(ctx context.Context, a alert.Alert) error {
-	// Check if embedding is zero vector and skip it to prevent Firestore vector search errors
-	if len(a.Embedding) > 0 {
-		isZeroVector := true
-		for _, v := range a.Embedding {
-			if v != 0 {
-				isZeroVector = false
-				break
-			}
-		}
-		if isZeroVector {
-			// Clear the embedding if it's a zero vector
-			a.Embedding = nil
-		}
+	// Reject alerts with invalid embeddings (nil, empty, or zero vector)
+	if isInvalidEmbedding(a.Embedding) {
+		return r.eb.New("alert has invalid embedding (nil, empty, or zero vector)",
+			goerr.TV(errs.AlertIDKey, a.ID),
+			goerr.V("embedding_length", len(a.Embedding)))
 	}
 
 	alertDoc := r.db.Collection(collectionAlerts).Doc(a.ID.String())
@@ -399,6 +391,13 @@ func (r *Firestore) GetTicket(ctx context.Context, ticketID types.TicketID) (*ti
 }
 
 func (r *Firestore) PutTicket(ctx context.Context, t ticket.Ticket) error {
+	// Reject tickets with invalid embeddings (nil, empty, or zero vector)
+	if isInvalidEmbedding(t.Embedding) {
+		return r.eb.New("ticket has invalid embedding (nil, empty, or zero vector)",
+			goerr.TV(errs.TicketIDKey, t.ID),
+			goerr.V("embedding_length", len(t.Embedding)))
+	}
+
 	// Check if ticket already exists to determine if this is create or update
 	existingTicket, err := r.GetTicket(ctx, t.ID)
 	isUpdate := err == nil && existingTicket != nil
@@ -1612,7 +1611,7 @@ func (r *Firestore) RemoveTagIDFromAllTickets(ctx context.Context, tagID string)
 }
 
 func (r *Firestore) GetTagByName(ctx context.Context, name string) (*tag.Tag, error) {
-	iter := r.db.Collection(collectionTags).Where("name", "==", name).Limit(1).Documents(ctx)
+	iter := r.db.Collection(collectionTags).Where("Name", "==", name).Limit(1).Documents(ctx)
 	defer iter.Stop()
 
 	doc, err := iter.Next()
@@ -1632,7 +1631,7 @@ func (r *Firestore) GetTagByName(ctx context.Context, name string) (*tag.Tag, er
 }
 
 func (r *Firestore) IsTagNameExists(ctx context.Context, name string) (bool, error) {
-	iter := r.db.Collection(collectionTags).Where("name", "==", name).Limit(1).Documents(ctx)
+	iter := r.db.Collection(collectionTags).Where("Name", "==", name).Limit(1).Documents(ctx)
 	defer iter.Stop()
 
 	_, err := iter.Next()
@@ -1853,6 +1852,14 @@ func (r *Firestore) PutExecutionMemory(ctx context.Context, mem *memory.Executio
 		return r.eb.Wrap(err, "invalid execution memory")
 	}
 
+	// Reject execution memories with invalid embeddings (nil, empty, or zero vector)
+	if isInvalidEmbedding(mem.Embedding) {
+		return r.eb.New("execution memory has invalid embedding (nil, empty, or zero vector)",
+			goerr.V("schema_id", mem.SchemaID),
+			goerr.V("id", mem.ID),
+			goerr.V("embedding_length", len(mem.Embedding)))
+	}
+
 	// Save as a new record in sub-collection
 	doc := r.db.Collection(collectionExecutionMemories).
 		Doc(string(mem.SchemaID)).
@@ -1956,6 +1963,14 @@ func (r *Firestore) PutTicketMemory(ctx context.Context, mem *memory.TicketMemor
 func (r *Firestore) SaveAgentMemory(ctx context.Context, mem *memory.AgentMemory) error {
 	if err := mem.Validate(); err != nil {
 		return r.eb.Wrap(err, "invalid agent memory")
+	}
+
+	// Reject agent memories with invalid embeddings (nil, empty, or zero vector)
+	if isInvalidEmbedding(mem.QueryEmbedding) {
+		return r.eb.New("agent memory has invalid query embedding (nil, empty, or zero vector)",
+			goerr.V("agent_id", mem.AgentID),
+			goerr.V("id", mem.ID),
+			goerr.V("embedding_length", len(mem.QueryEmbedding)))
 	}
 
 	doc := r.db.Collection(collectionAgents).Doc(mem.AgentID).

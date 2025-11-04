@@ -63,6 +63,43 @@ Bad example:
 description: CloudTrail data  # Too vague
 ```
 
+## SQL Runbooks
+
+SQL runbooks are pre-written query templates for common investigation patterns.
+
+### Runbook File Format
+
+Create `.sql` files with metadata in comments:
+
+```sql
+-- Title: Failed Login Investigation
+-- Description: Query to find failed login attempts by IP address
+SELECT
+  timestamp,
+  user_email,
+  source_ip,
+  error_code
+FROM `project.dataset.auth_logs`
+WHERE
+  event_type = 'login_failed'
+  AND timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
+ORDER BY timestamp DESC
+LIMIT 100
+```
+
+**Metadata Format** (case insensitive):
+- `-- Title: <title>` or `-- title: <title>`
+- `-- Description: <description>` or `-- description: <description>`
+
+If no title is specified, the filename (without `.sql`) is used.
+
+### How Runbooks Work
+
+1. **Loading**: Runbooks are loaded at agent initialization
+2. **Listing**: Agent's system prompt includes all runbook IDs, titles, and descriptions
+3. **Retrieval**: Agent can use `get_runbook` tool to fetch full SQL content
+4. **Adaptation**: Agent adapts runbook SQL for specific investigations
+
 ## Deployment
 
 ### Environment Variables
@@ -71,6 +108,7 @@ description: CloudTrail data  # Too vague
 export WARREN_AGENT_BIGQUERY_CONFIG="/path/to/config.yaml"
 export WARREN_AGENT_BIGQUERY_PROJECT_ID="my-project"
 export WARREN_AGENT_BIGQUERY_SCAN_SIZE_LIMIT="10GB"  # Optional override
+export WARREN_AGENT_BIGQUERY_RUNBOOK_DIR="/path/to/runbooks,/path/to/more"  # Optional
 ```
 
 ### CLI Flags
@@ -78,7 +116,9 @@ export WARREN_AGENT_BIGQUERY_SCAN_SIZE_LIMIT="10GB"  # Optional override
 ```bash
 warren serve \
   --agent-bigquery-config=/path/to/config.yaml \
-  --agent-bigquery-project-id=my-project
+  --agent-bigquery-project-id=my-project \
+  --agent-bigquery-runbook-dir=/path/to/runbooks \
+  --agent-bigquery-runbook-dir=/path/to/more/runbooks  # Can specify multiple times
 ```
 
 ### Cloud Run
