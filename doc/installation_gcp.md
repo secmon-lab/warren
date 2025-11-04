@@ -164,13 +164,21 @@ gcloud firestore indexes composite create \
   --field-config=order=DESCENDING,field-path=CreatedAt \
   --field-config=field-path=Embedding,vector-config='{"dimension":256,"flat":{}}'
 
-# Memories subcollection index (COLLECTION scope)
+# Agent memories subcollection index (COLLECTION scope)
 gcloud firestore indexes composite create \
   --project=$PROJECT_ID \
   --database=$DATABASE_ID \
   --collection-group=memories \
-  --query-scope=COLLECTION_GROUP \
+  --query-scope=COLLECTION \
   --field-config=field-path=QueryEmbedding,vector-config='{"dimension":256,"flat":{}}'
+
+# Execution memories records subcollection index (COLLECTION scope)
+gcloud firestore indexes composite create \
+  --project=$PROJECT_ID \
+  --database=$DATABASE_ID \
+  --collection-group=records \
+  --query-scope=COLLECTION \
+  --field-config=field-path=Embedding,vector-config='{"dimension":256,"flat":{}}'
 ```
 
 #### Index Details
