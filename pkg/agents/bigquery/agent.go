@@ -28,6 +28,7 @@ type Agent struct {
 	configPath       string
 	projectID        string
 	scanSizeLimitStr string
+	runbookPaths     []string
 }
 
 // New creates a new BigQuery Agent instance
@@ -73,6 +74,13 @@ func (a *Agent) Flags() []cli.Flag {
 			Category:    "Agent:BigQuery",
 			Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_SCAN_SIZE_LIMIT"),
 		},
+		&cli.StringSliceFlag{
+			Name:        "agent-bigquery-runbook-dir",
+			Usage:       "Path to SQL runbook files or directories",
+			Destination: &a.runbookPaths,
+			Category:    "Agent:BigQuery",
+			Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_RUNBOOK_DIR"),
+		},
 	}
 }
 
@@ -83,7 +91,7 @@ func (a *Agent) Init(ctx context.Context, llmClient gollem.LLMClient, memoryServ
 		return false, nil // Agent is optional
 	}
 
-	cfg, err := LoadConfig(a.configPath)
+	cfg, err := LoadConfigWithRunbooks(ctx, a.configPath, a.runbookPaths)
 	if err != nil {
 		return false, goerr.Wrap(err, "failed to load BigQuery Agent config")
 	}
@@ -114,7 +122,8 @@ func (a *Agent) Init(ctx context.Context, llmClient gollem.LLMClient, memoryServ
 	}
 	logging.From(ctx).Info("BigQuery Agent configured",
 		"tables", tables,
-		"scan_limit", scanLimit)
+		"scan_limit", scanLimit,
+		"runbooks", len(cfg.Runbooks))
 
 	return true, nil
 }
