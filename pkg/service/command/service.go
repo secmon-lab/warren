@@ -24,9 +24,9 @@ func New(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.Sla
 	}
 }
 
-func NewWithUseCase(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService, ticketUC core.TicketUseCase) *Service {
+func NewWithUseCase(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService, ticketUC core.TicketUseCase, slackClient interfaces.SlackClient) *Service {
 	return &Service{
-		clients: core.NewClientsWithUseCase(repo, llm, thread, ticketUC),
+		clients: core.NewClientsWithSlack(repo, llm, thread, ticketUC, slackClient),
 	}
 }
 
@@ -41,6 +41,7 @@ func (x *Service) Execute(ctx context.Context, msg *slack.Message, input string)
 		"t":      ticket.Create,
 		"ticket": ticket.Create,
 		"repair": repair.Run,
+		"purge":  purge,
 	}
 
 	cmd, remaining := messageToArgs(input)

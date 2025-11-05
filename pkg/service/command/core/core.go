@@ -18,10 +18,11 @@ type TicketUseCase interface {
 }
 
 type Clients struct {
-	repo     interfaces.Repository
-	llm      gollem.LLMClient
-	thread   interfaces.SlackThreadService
-	ticketUC TicketUseCase
+	repo        interfaces.Repository
+	llm         gollem.LLMClient
+	thread      interfaces.SlackThreadService
+	ticketUC    TicketUseCase
+	slackClient interfaces.SlackClient
 }
 
 func NewClients(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService) *Clients {
@@ -41,6 +42,16 @@ func NewClientsWithUseCase(repo interfaces.Repository, llm gollem.LLMClient, thr
 	}
 }
 
+func NewClientsWithSlack(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService, ticketUC TicketUseCase, slackClient interfaces.SlackClient) *Clients {
+	return &Clients{
+		repo:        repo,
+		llm:         llm,
+		thread:      thread,
+		ticketUC:    ticketUC,
+		slackClient: slackClient,
+	}
+}
+
 func (s *Clients) Repo() interfaces.Repository {
 	return s.repo
 }
@@ -55,6 +66,10 @@ func (s *Clients) Thread() interfaces.SlackThreadService {
 
 func (s *Clients) TicketUseCase() TicketUseCase {
 	return s.ticketUC
+}
+
+func (s *Clients) SlackClient() interfaces.SlackClient {
+	return s.slackClient
 }
 
 func ParseTime(timeStr string) (time.Time, error) {
