@@ -32,6 +32,9 @@ import (
 //			AuthTestFunc: func() (*slackSDK.AuthTestResponse, error) {
 //				panic("mock out the AuthTest method")
 //			},
+//			DeleteMessageContextFunc: func(ctx context.Context, channelID string, timestamp string) (string, string, error) {
+//				panic("mock out the DeleteMessageContext method")
+//			},
 //			GetBotInfoContextFunc: func(ctx context.Context, parameters slackSDK.GetBotInfoParameters) (*slackSDK.Bot, error) {
 //				panic("mock out the GetBotInfoContext method")
 //			},
@@ -40,6 +43,9 @@ import (
 //			},
 //			GetConversationInfoFunc: func(input *slackSDK.GetConversationInfoInput) (*slackSDK.Channel, error) {
 //				panic("mock out the GetConversationInfo method")
+//			},
+//			GetConversationRepliesContextFunc: func(ctx context.Context, params *slackSDK.GetConversationRepliesParameters) ([]slackSDK.Message, bool, string, error) {
+//				panic("mock out the GetConversationRepliesContext method")
 //			},
 //			GetTeamInfoFunc: func() (*slackSDK.TeamInfo, error) {
 //				panic("mock out the GetTeamInfo method")
@@ -78,6 +84,9 @@ type SlackClientMock struct {
 	// AuthTestFunc mocks the AuthTest method.
 	AuthTestFunc func() (*slackSDK.AuthTestResponse, error)
 
+	// DeleteMessageContextFunc mocks the DeleteMessageContext method.
+	DeleteMessageContextFunc func(ctx context.Context, channelID string, timestamp string) (string, string, error)
+
 	// GetBotInfoContextFunc mocks the GetBotInfoContext method.
 	GetBotInfoContextFunc func(ctx context.Context, parameters slackSDK.GetBotInfoParameters) (*slackSDK.Bot, error)
 
@@ -86,6 +95,9 @@ type SlackClientMock struct {
 
 	// GetConversationInfoFunc mocks the GetConversationInfo method.
 	GetConversationInfoFunc func(input *slackSDK.GetConversationInfoInput) (*slackSDK.Channel, error)
+
+	// GetConversationRepliesContextFunc mocks the GetConversationRepliesContext method.
+	GetConversationRepliesContextFunc func(ctx context.Context, params *slackSDK.GetConversationRepliesParameters) ([]slackSDK.Message, bool, string, error)
 
 	// GetTeamInfoFunc mocks the GetTeamInfo method.
 	GetTeamInfoFunc func() (*slackSDK.TeamInfo, error)
@@ -119,6 +131,15 @@ type SlackClientMock struct {
 		// AuthTest holds details about calls to the AuthTest method.
 		AuthTest []struct {
 		}
+		// DeleteMessageContext holds details about calls to the DeleteMessageContext method.
+		DeleteMessageContext []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ChannelID is the channelID argument value.
+			ChannelID string
+			// Timestamp is the timestamp argument value.
+			Timestamp string
+		}
 		// GetBotInfoContext holds details about calls to the GetBotInfoContext method.
 		GetBotInfoContext []struct {
 			// Ctx is the ctx argument value.
@@ -137,6 +158,13 @@ type SlackClientMock struct {
 		GetConversationInfo []struct {
 			// Input is the input argument value.
 			Input *slackSDK.GetConversationInfoInput
+		}
+		// GetConversationRepliesContext holds details about calls to the GetConversationRepliesContext method.
+		GetConversationRepliesContext []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Params is the params argument value.
+			Params *slackSDK.GetConversationRepliesParameters
 		}
 		// GetTeamInfo holds details about calls to the GetTeamInfo method.
 		GetTeamInfo []struct {
@@ -203,9 +231,11 @@ type SlackClientMock struct {
 		}
 	}
 	lockAuthTest                      sync.RWMutex
+	lockDeleteMessageContext          sync.RWMutex
 	lockGetBotInfoContext             sync.RWMutex
 	lockGetConversationHistoryContext sync.RWMutex
 	lockGetConversationInfo           sync.RWMutex
+	lockGetConversationRepliesContext sync.RWMutex
 	lockGetTeamInfo                   sync.RWMutex
 	lockGetUserGroups                 sync.RWMutex
 	lockGetUserInfo                   sync.RWMutex
@@ -245,6 +275,51 @@ func (mock *SlackClientMock) AuthTestCalls() []struct {
 	mock.lockAuthTest.RLock()
 	calls = mock.calls.AuthTest
 	mock.lockAuthTest.RUnlock()
+	return calls
+}
+
+// DeleteMessageContext calls DeleteMessageContextFunc.
+func (mock *SlackClientMock) DeleteMessageContext(ctx context.Context, channelID string, timestamp string) (string, string, error) {
+	callInfo := struct {
+		Ctx       context.Context
+		ChannelID string
+		Timestamp string
+	}{
+		Ctx:       ctx,
+		ChannelID: channelID,
+		Timestamp: timestamp,
+	}
+	mock.lockDeleteMessageContext.Lock()
+	mock.calls.DeleteMessageContext = append(mock.calls.DeleteMessageContext, callInfo)
+	mock.lockDeleteMessageContext.Unlock()
+	if mock.DeleteMessageContextFunc == nil {
+		var (
+			sOut1  string
+			sOut2  string
+			errOut error
+		)
+		return sOut1, sOut2, errOut
+	}
+	return mock.DeleteMessageContextFunc(ctx, channelID, timestamp)
+}
+
+// DeleteMessageContextCalls gets all the calls that were made to DeleteMessageContext.
+// Check the length with:
+//
+//	len(mockedSlackClient.DeleteMessageContextCalls())
+func (mock *SlackClientMock) DeleteMessageContextCalls() []struct {
+	Ctx       context.Context
+	ChannelID string
+	Timestamp string
+} {
+	var calls []struct {
+		Ctx       context.Context
+		ChannelID string
+		Timestamp string
+	}
+	mock.lockDeleteMessageContext.RLock()
+	calls = mock.calls.DeleteMessageContext
+	mock.lockDeleteMessageContext.RUnlock()
 	return calls
 }
 
@@ -361,6 +436,48 @@ func (mock *SlackClientMock) GetConversationInfoCalls() []struct {
 	mock.lockGetConversationInfo.RLock()
 	calls = mock.calls.GetConversationInfo
 	mock.lockGetConversationInfo.RUnlock()
+	return calls
+}
+
+// GetConversationRepliesContext calls GetConversationRepliesContextFunc.
+func (mock *SlackClientMock) GetConversationRepliesContext(ctx context.Context, params *slackSDK.GetConversationRepliesParameters) ([]slackSDK.Message, bool, string, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Params *slackSDK.GetConversationRepliesParameters
+	}{
+		Ctx:    ctx,
+		Params: params,
+	}
+	mock.lockGetConversationRepliesContext.Lock()
+	mock.calls.GetConversationRepliesContext = append(mock.calls.GetConversationRepliesContext, callInfo)
+	mock.lockGetConversationRepliesContext.Unlock()
+	if mock.GetConversationRepliesContextFunc == nil {
+		var (
+			messagesOut []slackSDK.Message
+			bOut        bool
+			sOut        string
+			errOut      error
+		)
+		return messagesOut, bOut, sOut, errOut
+	}
+	return mock.GetConversationRepliesContextFunc(ctx, params)
+}
+
+// GetConversationRepliesContextCalls gets all the calls that were made to GetConversationRepliesContext.
+// Check the length with:
+//
+//	len(mockedSlackClient.GetConversationRepliesContextCalls())
+func (mock *SlackClientMock) GetConversationRepliesContextCalls() []struct {
+	Ctx    context.Context
+	Params *slackSDK.GetConversationRepliesParameters
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Params *slackSDK.GetConversationRepliesParameters
+	}
+	mock.lockGetConversationRepliesContext.RLock()
+	calls = mock.calls.GetConversationRepliesContext
+	mock.lockGetConversationRepliesContext.RUnlock()
 	return calls
 }
 
@@ -2383,6 +2500,9 @@ func (mock *NotifierMock) NotifyErrorCalls() []struct {
 //			GetAlertsBySpanFunc: func(ctx context.Context, begin time.Time, end time.Time) (alert.Alerts, error) {
 //				panic("mock out the GetAlertsBySpan method")
 //			},
+//			GetAlertsByThreadFunc: func(ctx context.Context, thread slack.Thread) (alert.Alerts, error) {
+//				panic("mock out the GetAlertsByThread method")
+//			},
 //			GetAlertsWithInvalidEmbeddingFunc: func(ctx context.Context) (alert.Alerts, error) {
 //				panic("mock out the GetAlertsWithInvalidEmbedding method")
 //			},
@@ -2596,6 +2716,9 @@ type RepositoryMock struct {
 
 	// GetAlertsBySpanFunc mocks the GetAlertsBySpan method.
 	GetAlertsBySpanFunc func(ctx context.Context, begin time.Time, end time.Time) (alert.Alerts, error)
+
+	// GetAlertsByThreadFunc mocks the GetAlertsByThread method.
+	GetAlertsByThreadFunc func(ctx context.Context, thread slack.Thread) (alert.Alerts, error)
 
 	// GetAlertsWithInvalidEmbeddingFunc mocks the GetAlertsWithInvalidEmbedding method.
 	GetAlertsWithInvalidEmbeddingFunc func(ctx context.Context) (alert.Alerts, error)
@@ -2921,6 +3044,13 @@ type RepositoryMock struct {
 			Begin time.Time
 			// End is the end argument value.
 			End time.Time
+		}
+		// GetAlertsByThread holds details about calls to the GetAlertsByThread method.
+		GetAlertsByThread []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Thread is the thread argument value.
+			Thread slack.Thread
 		}
 		// GetAlertsWithInvalidEmbedding holds details about calls to the GetAlertsWithInvalidEmbedding method.
 		GetAlertsWithInvalidEmbedding []struct {
@@ -3288,6 +3418,7 @@ type RepositoryMock struct {
 	lockGetAlertWithoutEmbedding           sync.RWMutex
 	lockGetAlertWithoutTicket              sync.RWMutex
 	lockGetAlertsBySpan                    sync.RWMutex
+	lockGetAlertsByThread                  sync.RWMutex
 	lockGetAlertsWithInvalidEmbedding      sync.RWMutex
 	lockGetExecutionMemory                 sync.RWMutex
 	lockGetLatestAlertByThread             sync.RWMutex
@@ -4356,6 +4487,46 @@ func (mock *RepositoryMock) GetAlertsBySpanCalls() []struct {
 	mock.lockGetAlertsBySpan.RLock()
 	calls = mock.calls.GetAlertsBySpan
 	mock.lockGetAlertsBySpan.RUnlock()
+	return calls
+}
+
+// GetAlertsByThread calls GetAlertsByThreadFunc.
+func (mock *RepositoryMock) GetAlertsByThread(ctx context.Context, thread slack.Thread) (alert.Alerts, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Thread slack.Thread
+	}{
+		Ctx:    ctx,
+		Thread: thread,
+	}
+	mock.lockGetAlertsByThread.Lock()
+	mock.calls.GetAlertsByThread = append(mock.calls.GetAlertsByThread, callInfo)
+	mock.lockGetAlertsByThread.Unlock()
+	if mock.GetAlertsByThreadFunc == nil {
+		var (
+			alertsOut alert.Alerts
+			errOut    error
+		)
+		return alertsOut, errOut
+	}
+	return mock.GetAlertsByThreadFunc(ctx, thread)
+}
+
+// GetAlertsByThreadCalls gets all the calls that were made to GetAlertsByThread.
+// Check the length with:
+//
+//	len(mockedRepository.GetAlertsByThreadCalls())
+func (mock *RepositoryMock) GetAlertsByThreadCalls() []struct {
+	Ctx    context.Context
+	Thread slack.Thread
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Thread slack.Thread
+	}
+	mock.lockGetAlertsByThread.RLock()
+	calls = mock.calls.GetAlertsByThread
+	mock.lockGetAlertsByThread.RUnlock()
 	return calls
 }
 

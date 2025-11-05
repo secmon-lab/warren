@@ -24,9 +24,9 @@ func New(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.Sla
 	}
 }
 
-func NewWithUseCase(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService, ticketUC core.TicketUseCase) *Service {
+func NewWithUseCase(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService, ticketUC core.TicketUseCase, slackClient interfaces.SlackClient) *Service {
 	return &Service{
-		clients: core.NewClientsWithUseCase(repo, llm, thread, ticketUC),
+		clients: core.NewClientsWithSlack(repo, llm, thread, ticketUC, slackClient),
 	}
 }
 
@@ -34,13 +34,14 @@ var (
 	ErrUnknownCommand = goerr.New("unknown command")
 )
 
-type Command func(ctx context.Context, clients *core.Clients, msg *slack.Message, input string) (any, error)
+type Command func(ctx context.Context, clients *core.Clients, msg *slack.Message, input string) error
 
 func (x *Service) Execute(ctx context.Context, msg *slack.Message, input string) error {
 	commands := map[string]Command{
 		"t":      ticket.Create,
 		"ticket": ticket.Create,
 		"repair": repair.Run,
+		"purge":  purge,
 	}
 
 	cmd, remaining := messageToArgs(input)
@@ -53,11 +54,7 @@ func (x *Service) Execute(ctx context.Context, msg *slack.Message, input string)
 		return goerr.Wrap(ErrUnknownCommand, "unknown command", goerr.V("command", cmd))
 	}
 
-	if _, err := cmdFunc(ctx, x.clients, msg, remaining); err != nil {
-		return err
-	}
-
-	return nil
+	return cmdFunc(ctx, x.clients, msg, remaining)
 }
 
 func messageToArgs(message string) (string, string) {

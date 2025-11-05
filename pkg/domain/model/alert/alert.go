@@ -36,10 +36,11 @@ type Alert struct {
 
 	Metadata
 
-	CreatedAt   time.Time          `json:"created_at"`
-	SlackThread *slack.Thread      `json:"slack_thread"`
-	Embedding   firestore.Vector32 `json:"-"`
-	TagIDs      map[string]bool    `json:"tag_ids"`
+	CreatedAt      time.Time          `json:"created_at"`
+	SlackThread    *slack.Thread      `json:"slack_thread"`
+	SlackMessageID string             `json:"slack_message_id"`
+	Embedding      firestore.Vector32 `json:"-"`
+	TagIDs         map[string]bool    `json:"tag_ids"`
 }
 
 // HasSlackThread returns true if the alert has a valid Slack thread

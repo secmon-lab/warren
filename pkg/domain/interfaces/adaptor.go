@@ -30,6 +30,7 @@ type StorageClient interface {
 type SlackClient interface {
 	PostMessageContext(ctx context.Context, channelID string, options ...slackSDK.MsgOption) (string, string, error)
 	UpdateMessageContext(ctx context.Context, channelID, timestamp string, options ...slackSDK.MsgOption) (string, string, string, error)
+	DeleteMessageContext(ctx context.Context, channelID, timestamp string) (string, string, error)
 	AuthTest() (*slackSDK.AuthTestResponse, error)
 	GetTeamInfo() (*slackSDK.TeamInfo, error)
 	OpenView(triggerID string, view slackSDK.ModalViewRequest) (*slackSDK.ViewResponse, error)
@@ -41,6 +42,7 @@ type SlackClient interface {
 	GetUserGroups(options ...slackSDK.GetUserGroupsOption) ([]slackSDK.UserGroup, error)
 	GetBotInfoContext(ctx context.Context, parameters slackSDK.GetBotInfoParameters) (*slackSDK.Bot, error)
 	GetConversationHistoryContext(ctx context.Context, params *slackSDK.GetConversationHistoryParameters) (*slackSDK.GetConversationHistoryResponse, error)
+	GetConversationRepliesContext(ctx context.Context, params *slackSDK.GetConversationRepliesParameters) ([]slackSDK.Message, bool, string, error)
 }
 
 type SlackThreadService interface {

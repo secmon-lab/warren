@@ -12,14 +12,14 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-func Run(ctx context.Context, clients *core.Clients, slackMsg *slack.Message, input string) (any, error) {
+func Run(ctx context.Context, clients *core.Clients, slackMsg *slack.Message, input string) error {
 	args := strings.Fields(input)
 	if len(args) < 1 {
-		return nil, fmt.Errorf("usage: repair embeddings <alerts|tickets|all>")
+		return fmt.Errorf("usage: repair embeddings <alerts|tickets|all>")
 	}
 
 	if args[0] != "embeddings" {
-		return nil, fmt.Errorf("unknown repair command: %s", args[0])
+		return fmt.Errorf("unknown repair command: %s", args[0])
 	}
 
 	target := "all"
@@ -30,24 +30,24 @@ func Run(ctx context.Context, clients *core.Clients, slackMsg *slack.Message, in
 	switch target {
 	case "alerts":
 		if err := repairAlertEmbeddings(ctx, clients); err != nil {
-			return nil, err
+			return err
 		}
 	case "tickets":
 		if err := repairTicketEmbeddings(ctx, clients); err != nil {
-			return nil, err
+			return err
 		}
 	case "all":
 		if err := repairAlertEmbeddings(ctx, clients); err != nil {
-			return nil, err
+			return err
 		}
 		if err := repairTicketEmbeddings(ctx, clients); err != nil {
-			return nil, err
+			return err
 		}
 	default:
-		return nil, fmt.Errorf("unknown target: %s. Use 'alerts', 'tickets', or 'all'", target)
+		return fmt.Errorf("unknown target: %s. Use 'alerts', 'tickets', or 'all'", target)
 	}
 
-	return nil, nil
+	return nil
 }
 
 func repairAlertEmbeddings(ctx context.Context, clients *core.Clients) error {

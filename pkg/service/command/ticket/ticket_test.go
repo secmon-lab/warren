@@ -109,12 +109,12 @@ func TestService_Ticket(t *testing.T) {
 	}
 
 	t.Run("shows help without ticket use case", func(t *testing.T) {
-		_, err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "help")
+		err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "help")
 		gt.NoError(t, err)
 	})
 
 	t.Run("returns error when ticket use case not available", func(t *testing.T) {
-		_, err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "")
+		err := ticketcmd.Create(ctx, clients, createSlackMessage(user), "")
 		gt.Error(t, err)
 	})
 }

@@ -13,18 +13,18 @@ import (
 //go:embed ticket.help.md
 var ticketHelp string
 
-func Create(ctx context.Context, clients *core.Clients, msg *slack.Message, input string) (any, error) {
+func Create(ctx context.Context, clients *core.Clients, msg *slack.Message, input string) error {
 	// Show help if requested
 	if input == "help" {
 		clients.Thread().Reply(ctx, ticketHelp)
-		return nil, nil
+		return nil
 	}
 
 	// Check if UseCase is available
 	ticketUC := clients.TicketUseCase()
 	if ticketUC == nil {
 		clients.Thread().Reply(ctx, "Ticket creation from conversation is not available")
-		return nil, goerr.New("ticket use case not available")
+		return goerr.New("ticket use case not available")
 	}
 
 	// Create ticket from conversation using UseCase
@@ -37,10 +37,10 @@ func Create(ctx context.Context, clients *core.Clients, msg *slack.Message, inpu
 	)
 	if err != nil {
 		clients.Thread().Reply(ctx, fmt.Sprintf("Failed to create ticket: %v", err))
-		return nil, goerr.Wrap(err, "failed to create ticket from conversation")
+		return goerr.Wrap(err, "failed to create ticket from conversation")
 	}
 
 	// Success message is not needed as ticket posting is done by UseCase
 	_ = ticket
-	return nil, nil
+	return nil
 }

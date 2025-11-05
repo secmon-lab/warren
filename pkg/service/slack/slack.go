@@ -236,6 +236,9 @@ func (x *Service) postAlertToChannel(ctx context.Context, targetChannel string, 
 			goerr.V("blocks", blocks))
 	}
 
+	// Save message ID to alert
+	alert.SlackMessageID = timestamp
+
 	thread := &ThreadService{
 		channelID:          channelID,
 		threadID:           timestamp,

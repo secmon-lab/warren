@@ -139,6 +139,19 @@ func (r *Memory) GetLatestAlertByThread(ctx context.Context, thread slack.Thread
 	return latest, nil
 }
 
+func (r *Memory) GetAlertsByThread(ctx context.Context, thread slack.Thread) (alert.Alerts, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var alerts alert.Alerts
+	for _, alert := range r.alerts {
+		if alert.SlackThread != nil && alert.SlackThread.ChannelID == thread.ChannelID && alert.SlackThread.ThreadID == thread.ThreadID {
+			alerts = append(alerts, alert)
+		}
+	}
+	return alerts, nil
+}
+
 func (r *Memory) GetLatestHistory(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
