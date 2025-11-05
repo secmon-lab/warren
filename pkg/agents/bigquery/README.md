@@ -170,7 +170,7 @@ The identity running Warren (ADC) must have the `roles/iam.serviceAccountTokenCr
 ```bash
 gcloud iam service-accounts add-iam-policy-binding \
   bigquery-reader@my-project.iam.gserviceaccount.com \
-  --member="serviceAccount:warren-service@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --member="<MEMBER>" \
   --role="roles/iam.serviceAccountTokenCreator"
 ```
 
