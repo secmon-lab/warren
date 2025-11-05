@@ -34,7 +34,7 @@ var (
 	ErrUnknownCommand = goerr.New("unknown command")
 )
 
-type Command func(ctx context.Context, clients *core.Clients, msg *slack.Message, input string) (any, error)
+type Command func(ctx context.Context, clients *core.Clients, msg *slack.Message, input string) error
 
 func (x *Service) Execute(ctx context.Context, msg *slack.Message, input string) error {
 	commands := map[string]Command{
@@ -54,11 +54,7 @@ func (x *Service) Execute(ctx context.Context, msg *slack.Message, input string)
 		return goerr.Wrap(ErrUnknownCommand, "unknown command", goerr.V("command", cmd))
 	}
 
-	if _, err := cmdFunc(ctx, x.clients, msg, remaining); err != nil {
-		return err
-	}
-
-	return nil
+	return cmdFunc(ctx, x.clients, msg, remaining)
 }
 
 func messageToArgs(message string) (string, string) {
