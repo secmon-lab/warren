@@ -13,14 +13,16 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"google.golang.org/api/impersonate"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
 
 // internalTool implements the actual BigQuery operations
 type internalTool struct {
-	config    *Config
-	projectID string
+	config                    *Config
+	projectID                 string
+	impersonateServiceAccount string
 }
 
 // ID implements gollem.ToolSet
@@ -395,8 +397,33 @@ func (t *internalTool) getTableSchema(ctx context.Context, args map[string]any) 
 
 // newBigQueryClient creates a new BigQuery client
 func (t *internalTool) newBigQueryClient(ctx context.Context, projectID string) (*bigquery.Client, error) {
+	log := logging.From(ctx)
 	var opts []option.ClientOption
-	// Note: Relies on Application Default Credentials (ADC)
+
+	// If impersonation is configured, use impersonated credentials
+	if t.impersonateServiceAccount != "" {
+		log.Debug("Using service account impersonation for BigQuery",
+			"service_account", t.impersonateServiceAccount)
+
+		ts, err := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
+			TargetPrincipal: t.impersonateServiceAccount,
+			Scopes: []string{
+				"https://www.googleapis.com/auth/bigquery",
+				"https://www.googleapis.com/auth/cloud-platform",
+			},
+		})
+		if err != nil {
+			log.Debug("Failed to create impersonated credentials",
+				"error", err,
+				"service_account", t.impersonateServiceAccount)
+			return nil, goerr.Wrap(err, "failed to create impersonated credentials",
+				goerr.V("service_account", t.impersonateServiceAccount))
+		}
+		opts = append(opts, option.WithTokenSource(ts))
+	} else {
+		log.Debug("Using Application Default Credentials for BigQuery")
+	}
+
 	return bigquery.NewClient(ctx, projectID, opts...)
 }
 
