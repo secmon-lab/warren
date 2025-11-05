@@ -141,9 +141,54 @@ Uses [Application Default Credentials (ADC)](https://cloud.google.com/docs/authe
 gcloud auth application-default login
 ```
 
+### Service Account Impersonation
+
+You can configure the BigQuery agent to impersonate a service account for all BigQuery operations. This is useful when:
+- Running with different permissions than the default credentials
+- Implementing least-privilege access patterns
+- Testing with specific service account permissions
+
+#### Configuration
+
+Set via CLI flag or environment variable:
+
+```bash
+# CLI flag
+warren serve \
+  --agent-bigquery-config=/path/to/config.yaml \
+  --agent-bigquery-impersonate-service-account=bigquery-reader@my-project.iam.gserviceaccount.com
+
+# Environment variable
+export WARREN_AGENT_BIGQUERY_IMPERSONATE_SERVICE_ACCOUNT="bigquery-reader@my-project.iam.gserviceaccount.com"
+warren serve --agent-bigquery-config=/path/to/config.yaml
+```
+
+#### Required Permissions
+
+The identity running Warren (ADC) must have the `roles/iam.serviceAccountTokenCreator` role on the target service account:
+
+```bash
+gcloud iam service-accounts add-iam-policy-binding \
+  bigquery-reader@my-project.iam.gserviceaccount.com \
+  --member="serviceAccount:warren-service@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountTokenCreator"
+```
+
+The impersonated service account needs BigQuery permissions:
+
+```bash
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:bigquery-reader@my-project.iam.gserviceaccount.com" \
+  --role="roles/bigquery.jobUser"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:bigquery-reader@my-project.iam.gserviceaccount.com" \
+  --role="roles/bigquery.dataViewer"
+```
+
 ### Service Account Permissions
 
-Required IAM roles:
+Required IAM roles for the service account (either default ADC or impersonated):
 - `roles/bigquery.jobUser`
 - `roles/bigquery.dataViewer`
 

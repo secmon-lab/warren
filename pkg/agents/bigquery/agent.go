@@ -25,10 +25,11 @@ type Agent struct {
 	memoryService *memory.Service
 
 	// CLI configuration fields
-	configPath       string
-	projectID        string
-	scanSizeLimitStr string
-	runbookPaths     []string
+	configPath                string
+	projectID                 string
+	scanSizeLimitStr          string
+	runbookPaths              []string
+	impersonateServiceAccount string
 }
 
 // New creates a new BigQuery Agent instance
@@ -81,6 +82,13 @@ func (a *Agent) Flags() []cli.Flag {
 			Category:    "Agent:BigQuery",
 			Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_RUNBOOK_DIR"),
 		},
+		&cli.StringFlag{
+			Name:        "agent-bigquery-impersonate-service-account",
+			Usage:       "Service account email to impersonate for BigQuery operations",
+			Destination: &a.impersonateServiceAccount,
+			Category:    "Agent:BigQuery",
+			Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_IMPERSONATE_SERVICE_ACCOUNT"),
+		},
 	}
 }
 
@@ -107,8 +115,9 @@ func (a *Agent) Init(ctx context.Context, llmClient gollem.LLMClient, memoryServ
 
 	a.config = cfg
 	a.internalTool = &internalTool{
-		config:    cfg,
-		projectID: a.projectID,
+		config:                    cfg,
+		projectID:                 a.projectID,
+		impersonateServiceAccount: a.impersonateServiceAccount,
 	}
 	a.llmClient = llmClient
 	a.memoryService = memoryService
