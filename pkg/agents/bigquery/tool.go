@@ -13,8 +13,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 	"google.golang.org/api/impersonate"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -407,10 +405,19 @@ func (t *internalTool) newBigQueryClient(ctx context.Context, projectID string) 
 		log.Debug("Using service account impersonation for BigQuery",
 			"service_account", t.impersonateServiceAccount)
 
-		// Import required for impersonation
-		ts, err := t.createImpersonatedTokenSource(ctx)
+		ts, err := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
+			TargetPrincipal: t.impersonateServiceAccount,
+			Scopes: []string{
+				"https://www.googleapis.com/auth/bigquery",
+				"https://www.googleapis.com/auth/cloud-platform",
+			},
+		})
 		if err != nil {
-			return nil, goerr.Wrap(err, "failed to create impersonated token source")
+			log.Debug("Failed to create impersonated credentials",
+				"error", err,
+				"service_account", t.impersonateServiceAccount)
+			return nil, goerr.Wrap(err, "failed to create impersonated credentials",
+				goerr.V("service_account", t.impersonateServiceAccount))
 		}
 		opts = append(opts, option.WithTokenSource(ts))
 	} else {
@@ -418,36 +425,6 @@ func (t *internalTool) newBigQueryClient(ctx context.Context, projectID string) 
 	}
 
 	return bigquery.NewClient(ctx, projectID, opts...)
-}
-
-// createImpersonatedTokenSource creates a token source for service account impersonation
-func (t *internalTool) createImpersonatedTokenSource(ctx context.Context) (oauth2.TokenSource, error) {
-	log := logging.From(ctx)
-
-	// Get base credentials from ADC
-	baseCredentials, err := google.FindDefaultCredentials(ctx, bigquery.Scope)
-	if err != nil {
-		log.Debug("Failed to find default credentials", "error", err)
-		return nil, goerr.Wrap(err, "failed to find default credentials for impersonation")
-	}
-
-	// Create impersonated credentials
-	ts, err := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
-		TargetPrincipal: t.impersonateServiceAccount,
-		Scopes:          []string{bigquery.Scope},
-		// Use base credentials as the source
-	}, option.WithTokenSource(baseCredentials.TokenSource))
-	if err != nil {
-		log.Debug("Failed to create impersonated token source",
-			"error", err,
-			"service_account", t.impersonateServiceAccount)
-		return nil, goerr.Wrap(err, "failed to create impersonated credentials",
-			goerr.V("service_account", t.impersonateServiceAccount))
-	}
-
-	log.Debug("Impersonated token source created successfully",
-		"service_account", t.impersonateServiceAccount)
-	return ts, nil
 }
 
 // convertBigQueryValue converts BigQuery values to JSON-safe types
