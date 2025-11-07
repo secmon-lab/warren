@@ -198,15 +198,12 @@ func (t *internalTool) executeQuery(ctx context.Context, args map[string]any) (m
 			goerr.V("bytes_processed", totalBytes))
 	}
 
-	// Trace: Scan size check
+	// Check scan size
 	log.Debug("Checking scan size",
 		"total_bytes", totalBytes,
 		"scan_limit", t.config.ScanSizeLimit,
 		"total_bytes_human", humanize.Bytes(uint64(totalBytes)),
 		"scan_limit_human", humanize.Bytes(t.config.ScanSizeLimit))
-	msg.Trace(ctx, "📊 Scan size: %s (limit: %s)",
-		humanize.Bytes(uint64(totalBytes)),
-		humanize.Bytes(t.config.ScanSizeLimit))
 
 	// Check scan size limit
 	if totalBytes > 0 && uint64(totalBytes) > t.config.ScanSizeLimit {
@@ -230,9 +227,6 @@ func (t *internalTool) executeQuery(ctx context.Context, args map[string]any) (m
 		return nil, goerr.Wrap(err, "failed to run query")
 	}
 	log.Debug("Query job submitted", "job_id", job.ID())
-
-	// Trace: Job started
-	msg.Trace(ctx, "⏳ Waiting for query job to complete...")
 
 	// Wait for job to complete (with timeout)
 	timeout := t.config.GetQueryTimeout()
@@ -295,7 +289,8 @@ func (t *internalTool) executeQuery(ctx context.Context, args map[string]any) (m
 	log.Debug("Query execution complete", "query_id", queryID, "total_rows", len(rows))
 
 	// Trace: Query completed successfully
-	msg.Trace(ctx, "✅ Query completed: %d rows retrieved (query_id: %s)", len(rows), queryID)
+	msg.Trace(ctx, "✅ Query completed: %d rows retrieved, scan size: %s (query_id: %s)",
+		len(rows), humanize.Bytes(uint64(totalBytes)), queryID)
 
 	return map[string]any{
 		"query_id":         queryID,
