@@ -27,8 +27,23 @@ func newMockLLMClient() gollem.LLMClient {
 			return embeddings, nil
 		},
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			callCount := 0 // Reset for each session
 			return &mock.SessionMock{
 				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					callCount++
+					// First call: return plan JSON for plan & execute strategy
+					if callCount == 1 {
+						planJSON := `{
+							"objective": "Execute the query task",
+							"tasks": [
+								{"id": "task1", "description": "Complete the task", "state": "pending"}
+							]
+						}`
+						return &gollem.Response{
+							Texts: []string{planJSON},
+						}, nil
+					}
+					// Subsequent calls: return mock response
 					return &gollem.Response{
 						Texts: []string{"mock response"},
 					}, nil

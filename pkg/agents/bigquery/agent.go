@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	"github.com/m-mizutani/gollem/strategy/planexec"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/service/memory"
@@ -186,7 +188,7 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	}
 
 	log.Debug("Processing query", "query", query)
-	msg.Trace(ctx, "[bigquery agent] query: `%s`", query)
+	msg.Trace(ctx, "🔷 *[BigQuery Agent]* Query: `%s`", query)
 
 	startTime := time.Now()
 
@@ -209,15 +211,58 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	}
 	log.Debug("System prompt built", "prompt_length", len(systemPrompt))
 
-	// Step 3: Construct gollem.Agent with BigQuery tools
-	log.Debug("Constructing internal agent with BigQuery tools")
-	agent := gollem.New(
-		a.llmClient,
-		gollem.WithToolSets(a.internalTool),
-		gollem.WithSystemPrompt(systemPrompt),
+	// Step 3: Create hooks for plan progress tracking
+	hooks := &bigqueryPlanHooks{
+		ctx: ctx,
+	}
+
+	// Step 4: Create Plan & Execute strategy
+	strategy := planexec.New(a.llmClient,
+		planexec.WithHooks(hooks),
+		planexec.WithMaxIterations(20),
 	)
 
-	// Step 4: Execute task
+	// Step 5: Construct gollem.Agent with BigQuery tools
+	log.Debug("Constructing internal agent with BigQuery tools and Plan & Execute strategy")
+	agent := gollem.New(
+		a.llmClient,
+		gollem.WithStrategy(strategy),
+		gollem.WithToolSets(a.internalTool),
+		gollem.WithSystemPrompt(systemPrompt),
+		gollem.WithLogger(log),
+		// Trace middleware for sub-agent messages
+		gollem.WithContentBlockMiddleware(
+			func(next gollem.ContentBlockHandler) gollem.ContentBlockHandler {
+				return func(ctx context.Context, req *gollem.ContentRequest) (*gollem.ContentResponse, error) {
+					resp, err := next(ctx, req)
+					if err == nil && len(resp.Texts) > 0 {
+						for _, text := range resp.Texts {
+							msg.Trace(ctx, "  🔹 %s", text)
+						}
+					}
+					return resp, err
+				}
+			},
+		),
+		// Tool execution middleware
+		gollem.WithToolMiddleware(func(next gollem.ToolHandler) gollem.ToolHandler {
+			return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
+				msg.Trace(ctx, "  🔸 *Tool:* `%s`", req.Tool.Name)
+				log.Debug("execute tool", "tool", req.Tool.Name, "args", req.Tool.Arguments)
+
+				resp, err := next(ctx, req)
+
+				if resp != nil && resp.Error != nil {
+					msg.Trace(ctx, "  ❌ *Error:* %s", resp.Error.Error())
+					log.Error("tool error", "error", resp.Error, "call", req.Tool)
+				}
+
+				return resp, err
+			}
+		}),
+	)
+
+	// Step 6: Execute task
 	log.Debug("Executing query task via internal agent", "query", query)
 	resp, execErr := agent.Execute(ctx, gollem.Text(query))
 	duration := time.Since(startTime)
@@ -315,3 +360,66 @@ func (a *Agent) Prompt(ctx context.Context) (string, error) {
 }
 
 var _ interfaces.Tool = (*Agent)(nil)
+
+// bigqueryPlanHooks implements planexec.PlanExecuteHooks for BigQuery agent plan progress tracking
+type bigqueryPlanHooks struct {
+	ctx context.Context
+}
+
+var _ planexec.PlanExecuteHooks = &bigqueryPlanHooks{}
+
+func (h *bigqueryPlanHooks) OnPlanCreated(ctx context.Context, plan *planexec.Plan) error {
+	return postBigQueryPlanProgress(h.ctx, plan, "Plan created")
+}
+
+func (h *bigqueryPlanHooks) OnPlanUpdated(ctx context.Context, plan *planexec.Plan) error {
+	return postBigQueryPlanProgress(h.ctx, plan, "Plan updated")
+}
+
+func (h *bigqueryPlanHooks) OnTaskDone(ctx context.Context, plan *planexec.Plan, _ *planexec.Task) error {
+	return postBigQueryPlanProgress(h.ctx, plan, "Task done")
+}
+
+// postBigQueryPlanProgress posts the plan progress with BigQuery agent styling
+func postBigQueryPlanProgress(ctx context.Context, plan *planexec.Plan, action string) error {
+	if len(plan.Tasks) == 0 {
+		msg.Trace(ctx, "  🔷 *[BigQuery Agent]* %s (no tasks yet)", action)
+		return nil
+	}
+
+	completedCount := 0
+	for _, task := range plan.Tasks {
+		if task.State == planexec.TaskStateCompleted {
+			completedCount++
+		}
+	}
+
+	var messageBuilder strings.Builder
+	messageBuilder.WriteString(fmt.Sprintf("  🔷 *[BigQuery Agent]* %s\n", action))
+	messageBuilder.WriteString(fmt.Sprintf("  📊 *Progress:* %d/%d tasks\n", completedCount, len(plan.Tasks)))
+
+	for _, task := range plan.Tasks {
+		var icon string
+		var status string
+
+		switch task.State {
+		case planexec.TaskStatePending:
+			icon = "☑️"
+			status = task.Description
+		case planexec.TaskStateInProgress:
+			icon = "⟳"
+			status = task.Description
+		case planexec.TaskStateCompleted:
+			icon = "✅"
+			status = fmt.Sprintf("~%s~", task.Description)
+		default:
+			icon = "?"
+			status = task.Description
+		}
+
+		messageBuilder.WriteString(fmt.Sprintf("  %s %s\n", icon, status))
+	}
+
+	msg.Trace(ctx, "%s", messageBuilder.String())
+	return nil
+}
