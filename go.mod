@@ -25,7 +25,7 @@ require (
 	github.com/m-mizutani/gollem v0.15.0
 	github.com/m-mizutani/gt v0.1.1
 	github.com/m-mizutani/harlog v0.0.3
-	github.com/m-mizutani/masq v0.1.12-0.20250818113152-b9316b785b03
+	github.com/m-mizutani/masq v0.1.12-0.20250911075521-cfb6207440e8
 	github.com/m-mizutani/opaq v0.3.0
 	github.com/migueleliasweb/go-github-mock v1.4.0
 	github.com/newmo-oss/go-caller v0.1.0

@@ -267,8 +267,8 @@ github.com/m-mizutani/harlog v0.0.3 h1:bL3i/xM3wWPsvoOOsuu/a4eaz+1yj1UyO7OPUzkWP
 github.com/m-mizutani/harlog v0.0.3/go.mod h1:TH6btPQXEJ0Jk0QPju9zMLDr2uslqTryszY5bjmYLVQ=
 github.com/m-mizutani/jsonex v0.0.1 h1:YhWGBjp6uVZKCCr/6PEiTzq3Zl6kt+xtkiDV4lv5A8E=
 github.com/m-mizutani/jsonex v0.0.1/go.mod h1:VEvips7aLsfk/6TCtxG3PpcWAdgLrWMromAMTUZzLw4=
-github.com/m-mizutani/masq v0.1.12-0.20250818113152-b9316b785b03 h1:alCgqRzvXOHycyvGbtA2GyoOJTW6MuZ3jeR8NnYmbok=
-github.com/m-mizutani/masq v0.1.12-0.20250818113152-b9316b785b03/go.mod h1:H8jy743m5h+niZ1ByiZfPnLNnXzb7Khr/K59vT15f18=
+github.com/m-mizutani/masq v0.1.12-0.20250911075521-cfb6207440e8 h1:825ROxqJKUG0gj+ciHwVNLinB5sNjxh1St3dGNr942E=
+github.com/m-mizutani/masq v0.1.12-0.20250911075521-cfb6207440e8/go.mod h1:BD2SrjL686PR5ukLKP71x0NApEsAXR1wEyYSLnSukh0=
 github.com/m-mizutani/opaq v0.3.0 h1:YXn+liGP29PPA35lv9kZH+wkbTPis3ikjyPHHSe+2jM=
 github.com/m-mizutani/opaq v0.3.0/go.mod h1:2iRHIIKXXlWeHVUDhQ/szJ5DwFo1TxvJ61zXZsC2MUw=
 github.com/matryer/moq v0.5.3 h1:4femQCFmBUwFPYs8VfM5ID7AI67/DTEDRBbTtSWy7GU=
