@@ -7,7 +7,6 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"google.golang.org/api/option"
 )
@@ -32,16 +31,10 @@ func New(ctx context.Context, bucket string, opts ...option.ClientOption) (*Clie
 }
 
 func (x *Client) PutObject(ctx context.Context, object string) io.WriteCloser {
-	logging.From(ctx).Debug("storage.Client.PutObject",
-		"bucket", x.bucket,
-		"object", object)
 	return x.client.Bucket(x.bucket).Object(object).NewWriter(ctx)
 }
 
 func (x *Client) GetObject(ctx context.Context, object string) (io.ReadCloser, error) {
-	logging.From(ctx).Debug("storage.Client.GetObject",
-		"bucket", x.bucket,
-		"object", object)
 	rc, err := x.client.Bucket(x.bucket).Object(object).NewReader(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create reader",
