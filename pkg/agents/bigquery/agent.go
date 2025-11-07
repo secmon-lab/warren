@@ -268,14 +268,19 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	duration := time.Since(startTime)
 	log.Debug("Query task execution completed", "duration", duration, "has_error", execErr != nil)
 
-	// Step 5: Save execution memory (metadata only)
+	// Step 7: Save execution memory (metadata only)
+	msg.Trace(ctx, "  🔷 *[BigQuery Agent]* Task completed, saving execution memory...")
 	log.Debug("Saving execution memory", "has_error", execErr != nil)
 	if err := a.saveExecutionMemory(ctx, query, resp, execErr, duration, agent.Session()); err != nil {
 		// Memory save failure is non-critical for the main task
 		log.Warn("Failed to save execution memory", "error", err)
+		msg.Trace(ctx, "  ⚠️ *Warning:* Failed to save execution memory")
+	} else {
+		msg.Trace(ctx, "  ✅ *[BigQuery Agent]* Execution memory saved (Duration: %s)",
+			duration.Round(time.Millisecond))
 	}
 
-	// Step 6: Return execution result
+	// Step 8: Return execution result
 	if execErr != nil {
 		log.Debug("Execution failed, returning error", "error", execErr)
 		return nil, execErr
