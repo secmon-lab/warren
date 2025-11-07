@@ -10,11 +10,11 @@ var subjectsKey = contextKey{}
 // Multiple subjects can be added (e.g., both IAP and Slack authentication)
 // Returns a new context with the subject added, without modifying the original
 func WithSubject(ctx context.Context, subject Subject) context.Context {
-	existingSubjects := GetSubjects(ctx)
-	// Create a new slice to avoid modifying the existing one
-	newSubjects := make([]Subject, len(existingSubjects), len(existingSubjects)+1)
-	copy(newSubjects, existingSubjects)
-	newSubjects = append(newSubjects, subject)
+	subjects, _ := ctx.Value(subjectsKey).([]Subject)
+	// Create a new slice with capacity for one more element to ensure immutability
+	newSubjects := make([]Subject, len(subjects)+1)
+	copy(newSubjects, subjects)
+	newSubjects[len(subjects)] = subject
 	return context.WithValue(ctx, subjectsKey, newSubjects)
 }
 
