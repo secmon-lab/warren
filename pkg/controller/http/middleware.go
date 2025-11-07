@@ -22,6 +22,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/utils/async"
+	"github.com/secmon-lab/warren/pkg/utils/authctx"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/secmon-lab/warren/pkg/utils/user"
@@ -150,6 +151,14 @@ func validateGoogleIAPTokenWithJWKURL(next http.Handler, jwkURL string) http.Han
 
 		// Inject validated claims into request context
 		ctx := auth.WithGoogleIAPJWTClaims(r.Context(), claimsMap)
+
+		// Create and inject Subject from IAP claims
+		if subject, err := authctx.NewSubjectFromIAP(claimsMap); err == nil {
+			ctx = authctx.WithSubject(ctx, subject)
+		} else {
+			logging.From(ctx).Warn("failed to create Subject from IAP claims", "error", err)
+		}
+
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -203,6 +212,14 @@ func validateGoogleIDToken(next http.Handler) http.Handler {
 
 		// Inject validated claims into request context
 		ctx := auth.WithGoogleIDTokenClaims(r.Context(), payload.Claims)
+
+		// Create and inject Subject from Google ID token claims
+		if subject, err := authctx.NewSubjectFromGoogleID(payload.Claims); err == nil {
+			ctx = authctx.WithSubject(ctx, subject)
+		} else {
+			logging.From(ctx).Warn("failed to create Subject from Google ID token claims", "error", err)
+		}
+
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -394,6 +411,14 @@ func authMiddleware(authUC AuthUseCase) func(http.Handler) http.Handler {
 			// Add user context to request with Slack User ID
 			ctx := auth.ContextWithToken(r.Context(), token)
 			ctx = user.WithUserID(ctx, token.Sub) // Use Slack User ID
+
+			// Create and inject Subject from Slack token (Web UI authentication uses Slack OAuth)
+			if subject, err := authctx.NewSubjectFromSlackUser(token.Sub); err == nil {
+				ctx = authctx.WithSubject(ctx, subject)
+			} else {
+				logging.From(ctx).Warn("failed to create Subject from Slack user", "error", err)
+			}
+
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
