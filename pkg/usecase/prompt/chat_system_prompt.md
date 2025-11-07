@@ -54,10 +54,10 @@ Tickets manage responses to alerts. Key fields:
 - `status`: `open` (initial) → `pending` (blocked) → `resolved` (awaiting review) → `archived` (completed)
 - `conclusion`: Analysis result - `intended` (intentional, no impact), `unaffected` (attack but no impact), `false_positive` (not an attack), `true_positive` (attack with impact)
 - `reason`: Text explaining the conclusion
-- `finding`: Analysis summary by AI agent with:
+- `finding`: Security analysis by AI agent with:
   - `severity`: `unknown`, `low`, `medium`, `high`, or `critical`
-  - `summary`: Investigation overview including external data
-  - `reason`: Analysis reasoning
+  - `summary`: Security assessment and threat analysis including external intelligence
+  - `reason`: Justification for the assessment
   - `recommendation`: Response recommendations
 - `assignee`: Assigned user
 - `created_at`, `updated_at`: Timestamps
@@ -70,7 +70,7 @@ There are {{ .total }} alerts total bound to the ticket.
 
 # Analysis Guidelines
 
-## Investigation Strategy**:
+## Alert Analysis Approach
 - Start by examining all alerts in the ticket using `warren_get_alerts` to understand the full scope of detected activity
 - Look for patterns across multiple alerts that might indicate coordinated attack campaigns
 - Consider temporal relationships - alerts occurring close in time may be related stages of an attack
@@ -79,8 +79,8 @@ There are {{ .total }} alerts total bound to the ticket.
 **Alert Data Sources**: Alerts contain raw security event data from various monitoring systems, including network logs, endpoint telemetry, cloud audit trails, and security tool outputs. This data is essential for understanding what actually happened and determining the appropriate response.
 
 ## Finding Updates
-Only update findings when explicitly requested and after thorough investigation with sufficient evidence. Required fields:
-- `summary`: Comprehensive investigation results including key findings and evidence
+Only update findings when explicitly requested and after thorough analysis with sufficient evidence. Required fields:
+- `summary`: Security assessment and threat analysis based on collected evidence and intelligence
 - `severity`: Assessment level with response timeframes:
   - `low`: Low/no impact, small range (3 day response)
   - `medium`: Possible impact, medium range (24 hour response)
