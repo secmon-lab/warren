@@ -114,7 +114,10 @@ func TestGetSubjects_Immutability(t *testing.T) {
 		Email:  "",
 	})
 
-	// Get subjects again - should not include the appended subject
+	// Verify the local slice was modified
+	gt.Equal(t, len(subjects1), 2)
+
+	// Get subjects again - should not include the appended subject (verifies immutability)
 	subjects2 := authctx.GetSubjects(ctx)
 	gt.Equal(t, len(subjects2), 1)
 	gt.Equal(t, subjects2[0].UserID, "user-1")
