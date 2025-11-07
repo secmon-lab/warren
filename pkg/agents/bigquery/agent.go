@@ -212,9 +212,7 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	log.Debug("System prompt built", "prompt_length", len(systemPrompt))
 
 	// Step 3: Create hooks for plan progress tracking
-	hooks := &bigqueryPlanHooks{
-		ctx: ctx,
-	}
+	hooks := &bigqueryPlanHooks{}
 
 	// Step 4: Create Plan & Execute strategy
 	strategy := planexec.New(a.llmClient,
@@ -367,22 +365,20 @@ func (a *Agent) Prompt(ctx context.Context) (string, error) {
 var _ interfaces.Tool = (*Agent)(nil)
 
 // bigqueryPlanHooks implements planexec.PlanExecuteHooks for BigQuery agent plan progress tracking
-type bigqueryPlanHooks struct {
-	ctx context.Context
-}
+type bigqueryPlanHooks struct{}
 
 var _ planexec.PlanExecuteHooks = &bigqueryPlanHooks{}
 
 func (h *bigqueryPlanHooks) OnPlanCreated(ctx context.Context, plan *planexec.Plan) error {
-	return postBigQueryPlanProgress(h.ctx, plan, "Plan created")
+	return postBigQueryPlanProgress(ctx, plan, "Plan created")
 }
 
 func (h *bigqueryPlanHooks) OnPlanUpdated(ctx context.Context, plan *planexec.Plan) error {
-	return postBigQueryPlanProgress(h.ctx, plan, "Plan updated")
+	return postBigQueryPlanProgress(ctx, plan, "Plan updated")
 }
 
 func (h *bigqueryPlanHooks) OnTaskDone(ctx context.Context, plan *planexec.Plan, _ *planexec.Task) error {
-	return postBigQueryPlanProgress(h.ctx, plan, "Task done")
+	return postBigQueryPlanProgress(ctx, plan, "Task done")
 }
 
 // postBigQueryPlanProgress posts the plan progress with BigQuery agent styling
