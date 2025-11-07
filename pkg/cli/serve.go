@@ -280,6 +280,11 @@ func cmdServe() *cli.Command {
 				usecase.WithMemoryService(memoryService),
 			}
 
+			// Add storage prefix if configured
+			if storageCfg.IsConfigured() && storageCfg.Prefix() != "" {
+				ucOptions = append(ucOptions, usecase.WithStoragePrefix(storageCfg.Prefix()))
+			}
+
 			// Add GenAI configuration if configured
 			if genaiCfg.IsConfigured() {
 				promptService, err := prompt.New(genaiCfg.GetPromptDir())

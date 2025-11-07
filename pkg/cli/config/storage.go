@@ -61,7 +61,7 @@ func (x *Storage) Configure(ctx context.Context) (*storage.Client, error) {
 		opts = append(opts, option.WithQuotaProject(x.projectID))
 	}
 
-	client, err := storage.New(ctx, x.bucket, x.prefix, opts...)
+	client, err := storage.New(ctx, x.bucket, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +72,11 @@ func (x *Storage) Configure(ctx context.Context) (*storage.Client, error) {
 // Bucket returns the bucket name (exported for serve command)
 func (x *Storage) Bucket() string {
 	return x.bucket
+}
+
+// Prefix returns the storage prefix (exported for serve command)
+func (x *Storage) Prefix() string {
+	return x.prefix
 }
 
 // IsConfigured returns true if Storage is configured
