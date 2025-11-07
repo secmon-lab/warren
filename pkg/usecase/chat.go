@@ -519,6 +519,7 @@ func postPlanProgress(ctx context.Context, plan *planexec.Plan, action string) e
 	}
 
 	var messageBuilder strings.Builder
+	messageBuilder.WriteString(fmt.Sprintf("🎯 Objective *%s*\n\n", plan.Goal))
 	messageBuilder.WriteString(fmt.Sprintf("🤖 *%s*\n\n", action))
 	messageBuilder.WriteString(fmt.Sprintf("*Progress: %d/%d tasks completed*\n\n", completedCount, len(plan.Tasks)))
 

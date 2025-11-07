@@ -14,12 +14,11 @@ import (
 type Client struct {
 	client *storage.Client
 	bucket string
-	prefix string
 }
 
 var _ interfaces.StorageClient = &Client{}
 
-func New(ctx context.Context, bucket string, prefix string, opts ...option.ClientOption) (*Client, error) {
+func New(ctx context.Context, bucket string, opts ...option.ClientOption) (*Client, error) {
 	client, err := storage.NewClient(ctx, opts...)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create storage client")
@@ -28,16 +27,15 @@ func New(ctx context.Context, bucket string, prefix string, opts ...option.Clien
 	return &Client{
 		client: client,
 		bucket: bucket,
-		prefix: prefix,
 	}, nil
 }
 
 func (x *Client) PutObject(ctx context.Context, object string) io.WriteCloser {
-	return x.client.Bucket(x.bucket).Object(x.prefix + object).NewWriter(ctx)
+	return x.client.Bucket(x.bucket).Object(object).NewWriter(ctx)
 }
 
 func (x *Client) GetObject(ctx context.Context, object string) (io.ReadCloser, error) {
-	rc, err := x.client.Bucket(x.bucket).Object(x.prefix + object).NewReader(ctx)
+	rc, err := x.client.Bucket(x.bucket).Object(object).NewReader(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create reader",
 			goerr.V("bucket", x.bucket),
