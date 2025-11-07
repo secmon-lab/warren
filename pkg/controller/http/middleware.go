@@ -160,6 +160,7 @@ func validateGoogleIDToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
+			logging.From(r.Context()).Debug("no Authorization header found")
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -167,7 +168,15 @@ func validateGoogleIDToken(next http.Handler) http.Handler {
 		// Extract token from "Bearer <token>"
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			http.Error(w, "Invalid Authorization header format", http.StatusUnauthorized)
+			logging.From(r.Context()).Debug("invalid Authorization header format",
+				"parts_count", len(parts),
+				"first_part", func() string {
+					if len(parts) > 0 {
+						return parts[0]
+					}
+					return ""
+				}())
+			next.ServeHTTP(w, r)
 			return
 		}
 
@@ -176,15 +185,21 @@ func validateGoogleIDToken(next http.Handler) http.Handler {
 		// Validate token
 		validator, err := idtoken.NewValidator(r.Context())
 		if err != nil {
-			http.Error(w, "Failed to create token validator", http.StatusInternalServerError)
+			logging.From(r.Context()).Debug("failed to create token validator", "error", err)
+			next.ServeHTTP(w, r)
 			return
 		}
 
 		payload, err := validator.Validate(r.Context(), token, "")
 		if err != nil {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			logging.From(r.Context()).Debug("token validation failed as Google IDToken", "error", err)
+			next.ServeHTTP(w, r)
 			return
 		}
+
+		logging.From(r.Context()).Debug("Google ID token validated successfully",
+			"sub", payload.Claims["sub"],
+			"email", payload.Claims["email"])
 
 		// Inject validated claims into request context
 		ctx := auth.WithGoogleIDTokenClaims(r.Context(), payload.Claims)

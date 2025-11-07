@@ -133,6 +133,7 @@ func New(uc UseCase, opts ...Options) *Server {
 	r.Use(panicRecoveryMiddleware)
 	r.Use(withAuthHTTPRequest)
 	r.Use(validateGoogleIAPToken)
+	r.Use(validateGoogleIDToken)
 	r.Use(withAsyncConfig(s.asyncAlertHook))
 
 	// Migration to /hooks
@@ -143,7 +144,6 @@ func New(uc UseCase, opts ...Options) *Server {
 				r.Post("/{schema}", alertRawHandler(uc))
 			})
 			r.Route("/pubsub", func(r chi.Router) {
-				r.Use(validateGoogleIDToken)
 				r.Use(authorizeWithPolicy(s.policy, s.noAuthorization))
 				r.Post("/{schema}", alertPubSubHandler(uc))
 			})
