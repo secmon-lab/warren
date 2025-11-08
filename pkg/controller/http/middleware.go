@@ -22,6 +22,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/utils/async"
+	"github.com/secmon-lab/warren/pkg/utils/authctx"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/secmon-lab/warren/pkg/utils/user"
@@ -33,6 +34,17 @@ type contextKey string
 const (
 	httpClientKey contextKey = "http_client"
 )
+
+// addSubjectToContext is a helper function that creates a Subject and adds it to the context.
+// If Subject creation fails, it logs a warning and returns the original context unchanged.
+func addSubjectToContext(ctx context.Context, createSubject func() (authctx.Subject, error), failureMsg string) context.Context {
+	if subject, err := createSubject(); err == nil {
+		return authctx.WithSubject(ctx, subject)
+	} else {
+		logging.From(ctx).Warn(failureMsg, "error", err)
+		return ctx
+	}
+}
 
 type SNSMessage struct {
 	Type             string    `json:"Type"`
@@ -150,6 +162,12 @@ func validateGoogleIAPTokenWithJWKURL(next http.Handler, jwkURL string) http.Han
 
 		// Inject validated claims into request context
 		ctx := auth.WithGoogleIAPJWTClaims(r.Context(), claimsMap)
+
+		// Create and inject Subject from IAP claims
+		ctx = addSubjectToContext(ctx, func() (authctx.Subject, error) {
+			return authctx.NewSubjectFromIAP(claimsMap)
+		}, "failed to create Subject from IAP claims")
+
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -203,6 +221,12 @@ func validateGoogleIDToken(next http.Handler) http.Handler {
 
 		// Inject validated claims into request context
 		ctx := auth.WithGoogleIDTokenClaims(r.Context(), payload.Claims)
+
+		// Create and inject Subject from Google ID token claims
+		ctx = addSubjectToContext(ctx, func() (authctx.Subject, error) {
+			return authctx.NewSubjectFromGoogleID(payload.Claims)
+		}, "failed to create Subject from Google ID token claims")
+
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -394,6 +418,12 @@ func authMiddleware(authUC AuthUseCase) func(http.Handler) http.Handler {
 			// Add user context to request with Slack User ID
 			ctx := auth.ContextWithToken(r.Context(), token)
 			ctx = user.WithUserID(ctx, token.Sub) // Use Slack User ID
+
+			// Create and inject Subject from Slack token (Web UI authentication uses Slack OAuth)
+			ctx = addSubjectToContext(ctx, func() (authctx.Subject, error) {
+				return authctx.NewSubjectFromSlackUser(token.Sub)
+			}, "failed to create Subject from Slack user")
+
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

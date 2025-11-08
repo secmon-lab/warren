@@ -8,6 +8,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/utils/async"
+	"github.com/secmon-lab/warren/pkg/utils/authctx"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 	"github.com/slack-go/slack"
@@ -45,6 +46,13 @@ func (x *Controller) HandleSlackAppMention(ctx context.Context, apiEvent *slacke
 	// Set user context from Slack event
 	ctx = user.WithUserID(ctx, event.User)
 
+	// Add Subject from Slack user
+	if subject, err := authctx.NewSubjectFromSlackUser(event.User); err == nil {
+		ctx = authctx.WithSubject(ctx, subject)
+	} else {
+		logging.From(ctx).Warn("failed to create Subject from Slack user", "error", err)
+	}
+
 	slackMsg := slack_model.NewMessage(ctx, apiEvent)
 	if slackMsg == nil {
 		return nil
@@ -63,6 +71,13 @@ func (x *Controller) HandleSlackMessage(ctx context.Context, apiEvent *slackeven
 
 	// Set user context from Slack event
 	ctx = user.WithUserID(ctx, event.User)
+
+	// Add Subject from Slack user
+	if subject, err := authctx.NewSubjectFromSlackUser(event.User); err == nil {
+		ctx = authctx.WithSubject(ctx, subject)
+	} else {
+		logging.From(ctx).Warn("failed to create Subject from Slack user", "error", err)
+	}
 
 	logger.Debug("slack message event", "event", event)
 
@@ -88,6 +103,13 @@ func (x *Controller) HandleSlackInteraction(ctx context.Context, interaction sla
 
 	// Set user context from Slack interaction
 	ctx = user.WithUserID(ctx, interaction.User.ID)
+
+	// Add Subject from Slack user
+	if subject, err := authctx.NewSubjectFromSlackUser(interaction.User.ID); err == nil {
+		ctx = authctx.WithSubject(ctx, subject)
+	} else {
+		logging.From(ctx).Warn("failed to create Subject from Slack user", "error", err)
+	}
 
 	dispatch(ctx, func(ctx context.Context) error {
 		switch interaction.Type {
