@@ -28,7 +28,7 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 	t.Run("alerts collection", func(t *testing.T) {
 		col := findCollection("alerts")
 		gt.Value(t, col).NotNil()
-		gt.Equal(t, len(col.Indexes), 2) // Embedding index + CreatedAt+Embedding index
+		gt.Equal(t, len(col.Indexes), 2) // Embedding index + CreatedAt+__name__+Embedding index
 
 		// Check Embedding vector index
 		embeddingIndex := col.Indexes[0]
@@ -37,14 +37,16 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 		gt.Value(t, embeddingIndex.Fields[0].Vector).NotNil()
 		gt.Equal(t, embeddingIndex.Fields[0].Vector.Dimension, 256)
 
-		// Check CreatedAt + Embedding composite index
+		// Check CreatedAt + __name__ + Embedding composite index
 		compositeIndex := col.Indexes[1]
-		gt.Equal(t, len(compositeIndex.Fields), 2)
+		gt.Equal(t, len(compositeIndex.Fields), 3)
 		gt.Equal(t, compositeIndex.Fields[0].Path, "CreatedAt")
 		gt.Equal(t, compositeIndex.Fields[0].Order, fireconf.OrderDescending)
-		gt.Equal(t, compositeIndex.Fields[1].Path, "Embedding")
-		gt.Value(t, compositeIndex.Fields[1].Vector).NotNil()
-		gt.Equal(t, compositeIndex.Fields[1].Vector.Dimension, 256)
+		gt.Equal(t, compositeIndex.Fields[1].Path, "__name__")
+		gt.Equal(t, compositeIndex.Fields[1].Order, fireconf.OrderDescending)
+		gt.Equal(t, compositeIndex.Fields[2].Path, "Embedding")
+		gt.Value(t, compositeIndex.Fields[2].Vector).NotNil()
+		gt.Equal(t, compositeIndex.Fields[2].Vector.Dimension, 256)
 	})
 
 	// Test tickets collection (should have Status+CreatedAt index)

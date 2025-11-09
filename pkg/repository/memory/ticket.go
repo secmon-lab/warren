@@ -64,11 +64,11 @@ func (r *Memory) PutTicket(ctx context.Context, t ticket.Ticket) error {
 	// Create activity for ticket creation or update (except when called from agent)
 	if !user.IsAgent(ctx) {
 		if isUpdate {
-			if err := createTicketUpdateActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
+			if err := createTicketUpdateActivity(ctx, r, t.ID, t.Title); err != nil {
 				return goerr.Wrap(err, "failed to create ticket update activity", goerr.V("ticket_id", t.ID))
 			}
 		} else {
-			if err := createTicketActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
+			if err := createTicketActivity(ctx, r, t.ID, t.Title); err != nil {
 				return goerr.Wrap(err, "failed to create ticket activity", goerr.V("ticket_id", t.ID))
 			}
 		}
@@ -86,7 +86,7 @@ func (r *Memory) PutTicketComment(ctx context.Context, comment ticket.Comment) e
 	var ticketTitle string
 	var hasTicket bool
 	if t, exists := r.tickets[comment.TicketID]; exists {
-		ticketTitle = t.Metadata.Title
+		ticketTitle = t.Title
 		hasTicket = true
 	}
 	r.mu.Unlock()
@@ -217,7 +217,7 @@ func (r *Memory) BindAlertsToTicket(ctx context.Context, alertIDs []types.AlertI
 			return goerr.New("alert not found", goerr.V("alert_id", alertID))
 		}
 		alert.TicketID = ticketID
-		alertTitles = append(alertTitles, alert.Metadata.Title)
+		alertTitles = append(alertTitles, alert.Title)
 	}
 
 	// Update ticket's AlertIDs array to include newly bound alerts
@@ -235,7 +235,7 @@ func (r *Memory) BindAlertsToTicket(ctx context.Context, alertIDs []types.AlertI
 		}
 	}
 
-	ticketTitle := t.Metadata.Title
+	ticketTitle := t.Title
 	r.mu.Unlock()
 
 	// Create activity for bulk alert binding
@@ -468,7 +468,7 @@ func (r *Memory) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []types
 
 		updates = append(updates, ticketUpdate{
 			id:        ticketID,
-			title:     ticket.Metadata.Title,
+			title:     ticket.Title,
 			oldStatus: oldStatus,
 			newStatus: newStatus,
 		})

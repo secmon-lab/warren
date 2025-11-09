@@ -413,8 +413,8 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 	testTicket := ticket.New(ctx, []types.AlertID{}, nil)
 	testTicket.Title = "Original Ticket Title"
 	testTicket.Description = "Original ticket description"
-	testTicket.Metadata.TitleSource = types.SourceAI
-	testTicket.Metadata.DescriptionSource = types.SourceAI
+	testTicket.TitleSource = types.SourceAI
+	testTicket.DescriptionSource = types.SourceAI
 	testTicket.SlackThread = &slack.Thread{
 		ChannelID: "ticket-channel",
 		ThreadID:  "ticket-thread",
@@ -578,9 +578,9 @@ func TestBindAlertsToTicket_MetadataUpdateBasic(t *testing.T) {
 
 	// Create a ticket with AI metadata source
 	testTicket := ticket.New(ctx, []types.AlertID{}, nil)
-	testTicket.Metadata.Title = "Original Title"
-	testTicket.Metadata.TitleSource = types.SourceAI
-	testTicket.Metadata.DescriptionSource = types.SourceAI
+	testTicket.Title = "Original Title"
+	testTicket.TitleSource = types.SourceAI
+	testTicket.DescriptionSource = types.SourceAI
 	gt.NoError(t, repo.PutTicket(ctx, testTicket))
 
 	// Create an alert to bind
@@ -1309,8 +1309,8 @@ func TestHandleNotice(t *testing.T) {
 
 		createdNotice := createCalls[0].NoticeMoqParam
 		gt.Equal(t, createdNotice.Alert.ID, testAlert.ID)
-		gt.Equal(t, createdNotice.Alert.Metadata.Title, "Test Alert")
-		gt.Equal(t, createdNotice.Alert.Metadata.Description, "Test Description")
+		gt.Equal(t, createdNotice.Alert.Title, "Test Alert")
+		gt.Equal(t, createdNotice.Alert.Description, "Test Description")
 		gt.False(t, createdNotice.Escalated)
 
 		// Verify Slack interaction - main notice + 1 thread message (details) were posted

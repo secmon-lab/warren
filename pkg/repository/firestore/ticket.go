@@ -62,11 +62,11 @@ func (r *Firestore) PutTicket(ctx context.Context, t ticket.Ticket) error {
 	// Create activity for ticket creation or update (except when called from agent)
 	if !user.IsAgent(ctx) {
 		if isUpdate {
-			if err := createTicketUpdateActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
+			if err := createTicketUpdateActivity(ctx, r, t.ID, t.Title); err != nil {
 				return goerr.Wrap(err, "failed to create ticket update activity", goerr.V("ticket_id", t.ID))
 			}
 		} else {
-			if err := createTicketActivity(ctx, r, t.ID, t.Metadata.Title); err != nil {
+			if err := createTicketActivity(ctx, r, t.ID, t.Title); err != nil {
 				return goerr.Wrap(err, "failed to create ticket activity", goerr.V("ticket_id", t.ID))
 			}
 		}
@@ -112,7 +112,7 @@ func (r *Firestore) PutTicketComment(ctx context.Context, comment ticket.Comment
 	if !user.IsAgent(ctx) {
 		// Get ticket for activity creation
 		if t, err := r.GetTicket(ctx, comment.TicketID); err == nil {
-			if err := createCommentActivity(ctx, r, comment.TicketID, comment.ID, t.Metadata.Title); err != nil {
+			if err := createCommentActivity(ctx, r, comment.TicketID, comment.ID, t.Title); err != nil {
 				return goerr.Wrap(err, "failed to create comment activity", goerr.V("ticket_id", comment.TicketID), goerr.V("comment_id", comment.ID))
 			}
 		}
@@ -321,7 +321,7 @@ func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32,
 			// Skip errors related to zero magnitude vectors
 			errMsg := err.Error()
 			if status.Code(err) == codes.FailedPrecondition &&
-			   (len(errMsg) > 0 && (errMsg[0:7] == "Cannot " || errMsg[0:7] == "Missing")) {
+				(len(errMsg) > 0 && (errMsg[0:7] == "Cannot " || errMsg[0:7] == "Missing")) {
 				// Skip this document and continue
 				continue
 			}
@@ -575,7 +575,7 @@ func (r *Firestore) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []ty
 	for _, t := range ticketsForActivity {
 		oldStatus := string(t.Status)
 		newStatus := string(status)
-		if err := createStatusChangeActivity(ctx, r, t.ID, t.Metadata.Title, oldStatus, newStatus); err != nil {
+		if err := createStatusChangeActivity(ctx, r, t.ID, t.Title, oldStatus, newStatus); err != nil {
 			return goerr.Wrap(err, "failed to create status change activity", goerr.V("ticket_id", t.ID))
 		}
 	}

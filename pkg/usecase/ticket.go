@@ -115,37 +115,37 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 	if shouldInherit {
 		// Inherit from single alert
 		alert := alerts[0]
-		newTicket.Metadata.Title = alert.Metadata.Title
-		newTicket.Metadata.Description = alert.Metadata.Description
-		newTicket.Metadata.TitleSource = alert.Metadata.TitleSource
-		newTicket.Metadata.DescriptionSource = alert.Metadata.DescriptionSource
+		newTicket.Title = alert.Title
+		newTicket.Description = alert.Description
+		newTicket.TitleSource = alert.TitleSource
+		newTicket.DescriptionSource = alert.DescriptionSource
 		newTicket.Embedding = alert.Embedding
 	} else {
 		// Set metadata from options
 		if opts.Title != "" {
-			newTicket.Metadata.Title = opts.Title
+			newTicket.Title = opts.Title
 		}
 		if opts.Description != "" {
-			newTicket.Metadata.Description = opts.Description
+			newTicket.Description = opts.Description
 		}
 		// Set sources based on the intended logic:
 		// 1. Use opts.Source if provided
 		// 2. Otherwise, if opts.Title/Description is provided, use SourceHuman
 		// 3. Otherwise, default to SourceAI
 		if opts.TitleSource != "" {
-			newTicket.Metadata.TitleSource = opts.TitleSource
+			newTicket.TitleSource = opts.TitleSource
 		} else if opts.Title != "" {
-			newTicket.Metadata.TitleSource = types.SourceHuman
+			newTicket.TitleSource = types.SourceHuman
 		} else {
-			newTicket.Metadata.TitleSource = types.SourceAI
+			newTicket.TitleSource = types.SourceAI
 		}
 
 		if opts.DescriptionSource != "" {
-			newTicket.Metadata.DescriptionSource = opts.DescriptionSource
+			newTicket.DescriptionSource = opts.DescriptionSource
 		} else if opts.Description != "" {
-			newTicket.Metadata.DescriptionSource = types.SourceHuman
+			newTicket.DescriptionSource = types.SourceHuman
 		} else {
-			newTicket.Metadata.DescriptionSource = types.SourceAI
+			newTicket.DescriptionSource = types.SourceAI
 		}
 
 		// Fill metadata using LLM for fields marked as SourceAI
@@ -259,7 +259,7 @@ func (uc *UseCases) postTicketToSlack(ctx context.Context, newTicket *ticket.Tic
 
 				// Post link to the new ticket in the original thread
 				ticketURL := uc.slackService.ToMsgURL(newThreadSvc.ChannelID(), newThreadSvc.ThreadID())
-				if err := st.PostLinkToTicket(ctx, ticketURL, newTicket.Metadata.Title); err != nil {
+				if err := st.PostLinkToTicket(ctx, ticketURL, newTicket.Title); err != nil {
 					return "", goerr.Wrap(err, "failed to post link to ticket")
 				}
 			} else {
@@ -295,7 +295,7 @@ func (uc *UseCases) postTicketToSlack(ctx context.Context, newTicket *ticket.Tic
 
 				// Post link to the new ticket in the original thread
 				ticketURL := uc.slackService.ToMsgURL(newThreadSvc.ChannelID(), newThreadSvc.ThreadID())
-				if err := st.PostLinkToTicket(ctx, ticketURL, newTicket.Metadata.Title); err != nil {
+				if err := st.PostLinkToTicket(ctx, ticketURL, newTicket.Title); err != nil {
 					return "", goerr.Wrap(err, "failed to post link to ticket")
 				}
 			} else {
@@ -428,11 +428,11 @@ func (uc *UseCases) UpdateTicket(ctx context.Context, ticketID types.TicketID, t
 
 	updateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
 		// Update metadata
-		ticket.Metadata.Title = title
-		ticket.Metadata.Description = description
+		ticket.Title = title
+		ticket.Description = description
 		// Manual updates (like from GraphQL) are human-generated
-		ticket.Metadata.TitleSource = types.SourceHuman
-		ticket.Metadata.DescriptionSource = types.SourceHuman
+		ticket.TitleSource = types.SourceHuman
+		ticket.DescriptionSource = types.SourceHuman
 
 		// Recalculate embedding since title/description changed
 		if err := ticket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
@@ -719,11 +719,11 @@ func (uc *UseCases) CreateTicketFromConversation(
 	// Create new ticket
 	newTicket := ticket.New(ctx, []types.AlertID{}, &thread)
 	newTicket.Assignee = user
-	newTicket.Metadata.Title = metadata.Title
-	newTicket.Metadata.Description = metadata.Description
-	newTicket.Metadata.Summary = metadata.Summary
-	newTicket.Metadata.TitleSource = types.SourceAI
-	newTicket.Metadata.DescriptionSource = types.SourceAI
+	newTicket.Title = metadata.Title
+	newTicket.Description = metadata.Description
+	newTicket.Summary = metadata.Summary
+	newTicket.TitleSource = types.SourceAI
+	newTicket.DescriptionSource = types.SourceAI
 
 	// Calculate embedding
 	if err := newTicket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {

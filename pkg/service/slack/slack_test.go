@@ -91,9 +91,9 @@ func TestSlackUpdateTicket(t *testing.T) {
 		ChannelID: thread.ChannelID(),
 		ThreadID:  thread.ThreadID(),
 	})
-	ticketData.Metadata.Title = "Test Ticket Title"
-	ticketData.Metadata.Description = "Test Ticket Description"
-	ticketData.Metadata.Summary = "Test Ticket Summary"
+	ticketData.Title = "Test Ticket Title"
+	ticketData.Description = "Test Ticket Description"
+	ticketData.Summary = "Test Ticket Summary"
 	ticketData.Status = types.TicketStatusOpen
 	ticketData.Reason = "Test Ticket Reason"
 
