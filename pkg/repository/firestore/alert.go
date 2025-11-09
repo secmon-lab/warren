@@ -11,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/repository/activityutil"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -605,7 +606,7 @@ func (r *Firestore) BindAlertsToTicket(ctx context.Context, alertIDs []types.Ale
 		}
 
 		if len(alertIDs) > 1 {
-			if err := createBulkAlertBoundActivity(ctx, r, alertIDs, ticketID, ticket.Title, alertTitles); err != nil {
+			if err := activityutil.CreateBulkAlertBoundActivity(ctx, r, alertIDs, ticketID, ticket.Title, alertTitles); err != nil{
 				return goerr.Wrap(err, "failed to create bulk alert bound activity", goerr.V("ticket_id", ticketID))
 			}
 		} else if len(alertIDs) == 1 {
@@ -613,7 +614,7 @@ func (r *Firestore) BindAlertsToTicket(ctx context.Context, alertIDs []types.Ale
 			if len(alertTitles) > 0 {
 				alertTitle = alertTitles[0]
 			}
-			if err := createAlertBoundActivity(ctx, r, alertIDs[0], ticketID, alertTitle, ticket.Title); err != nil {
+			if err := activityutil.CreateAlertBoundActivity(ctx, r, alertIDs[0], ticketID, alertTitle, ticket.Title); err != nil {
 				return goerr.Wrap(err, "failed to create alert bound activity", goerr.V("alert_id", alertIDs[0]), goerr.V("ticket_id", ticketID))
 			}
 		}

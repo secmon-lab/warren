@@ -3,14 +3,13 @@ package memory
 import (
 	"context"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/repository/activityutil"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
@@ -64,11 +63,11 @@ func (r *Memory) PutTicket(ctx context.Context, t ticket.Ticket) error {
 	// Create activity for ticket creation or update (except when called from agent)
 	if !user.IsAgent(ctx) {
 		if isUpdate {
-			if err := createTicketUpdateActivity(ctx, r, t.ID, t.Title); err != nil {
+			if err := activityutil.CreateTicketUpdateActivity(ctx, r, t.ID, t.Title); err != nil {
 				return goerr.Wrap(err, "failed to create ticket update activity", goerr.V("ticket_id", t.ID))
 			}
 		} else {
-			if err := createTicketActivity(ctx, r, t.ID, t.Title); err != nil {
+			if err := activityutil.CreateTicketActivity(ctx, r, t.ID, t.Title); err != nil {
 				return goerr.Wrap(err, "failed to create ticket activity", goerr.V("ticket_id", t.ID))
 			}
 		}
@@ -93,7 +92,7 @@ func (r *Memory) PutTicketComment(ctx context.Context, comment ticket.Comment) e
 
 	// Create activity for comment addition - only for user comments, not agent
 	if !user.IsAgent(ctx) && hasTicket {
-		if err := createCommentActivity(ctx, r, comment.TicketID, comment.ID, ticketTitle); err != nil {
+		if err := activityutil.CreateCommentActivity(ctx, r, comment.TicketID, comment.ID, ticketTitle); err != nil {
 			return goerr.Wrap(err, "failed to create comment activity", goerr.V("ticket_id", comment.TicketID), goerr.V("comment_id", comment.ID))
 		}
 	}
@@ -240,7 +239,7 @@ func (r *Memory) BindAlertsToTicket(ctx context.Context, alertIDs []types.AlertI
 
 	// Create activity for bulk alert binding
 	if len(alertIDs) > 1 {
-		if err := createBulkAlertBoundActivity(ctx, r, alertIDs, ticketID, ticketTitle, alertTitles); err != nil {
+		if err := activityutil.CreateBulkAlertBoundActivity(ctx, r, alertIDs, ticketID, ticketTitle, alertTitles); err != nil {
 			return goerr.Wrap(err, "failed to create bulk alert bound activity", goerr.V("ticket_id", ticketID))
 		}
 	} else if len(alertIDs) == 1 {
@@ -248,7 +247,7 @@ func (r *Memory) BindAlertsToTicket(ctx context.Context, alertIDs []types.AlertI
 		if len(alertTitles) > 0 {
 			alertTitle = alertTitles[0]
 		}
-		if err := createAlertBoundActivity(ctx, r, alertIDs[0], ticketID, alertTitle, ticketTitle); err != nil {
+		if err := activityutil.CreateAlertBoundActivity(ctx, r, alertIDs[0], ticketID, alertTitle, ticketTitle); err != nil {
 			return goerr.Wrap(err, "failed to create alert bound activity", goerr.V("alert_id", alertIDs[0]), goerr.V("ticket_id", ticketID))
 		}
 	}
@@ -477,115 +476,10 @@ func (r *Memory) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []types
 
 	// Create activities after releasing the main mutex
 	for _, update := range updates {
-		if err := createStatusChangeActivity(ctx, r, update.id, update.title, update.oldStatus, update.newStatus); err != nil {
+		if err := activityutil.CreateStatusChangeActivity(ctx, r, update.id, update.title, update.oldStatus, update.newStatus); err != nil {
 			return goerr.Wrap(err, "failed to create status change activity", goerr.V("ticket_id", update.id))
 		}
 	}
 
-	return nil
-}
-
-// Activity helper functions for ticket operations
-
-func createTicketActivity(ctx context.Context, r *Memory, ticketID types.TicketID, title string) error {
-	return createTicketActivityWithType(ctx, r, ticketID, title, types.ActivityTypeTicketCreated)
-}
-
-func createTicketUpdateActivity(ctx context.Context, r *Memory, ticketID types.TicketID, title string) error {
-	return createTicketActivityWithType(ctx, r, ticketID, title, types.ActivityTypeTicketUpdated)
-}
-
-func createTicketActivityWithType(ctx context.Context, r *Memory, ticketID types.TicketID, title string, activityType types.ActivityType) error {
-	userID := user.FromContext(ctx)
-	activityID := types.NewActivityID()
-	act := &activity.Activity{
-		ID:        activityID,
-		Type:      activityType,
-		UserID:    userID,
-		TicketID:  ticketID,
-		CreatedAt: time.Now(),
-	}
-
-	if err := r.PutActivity(ctx, act); err != nil {
-		return goerr.Wrap(err, "failed to put activity")
-	}
-	return nil
-}
-
-func createCommentActivity(ctx context.Context, r *Memory, ticketID types.TicketID, commentID types.CommentID, title string) error {
-	userID := user.FromContext(ctx)
-	activityID := types.NewActivityID()
-	act := &activity.Activity{
-		ID:        activityID,
-		Type:      types.ActivityTypeCommentAdded,
-		UserID:    userID,
-		TicketID:  ticketID,
-		CommentID: commentID,
-		CreatedAt: time.Now(),
-	}
-
-	if err := r.PutActivity(ctx, act); err != nil {
-		return goerr.Wrap(err, "failed to put activity")
-	}
-	return nil
-}
-
-func createStatusChangeActivity(ctx context.Context, r *Memory, ticketID types.TicketID, title, oldStatus, newStatus string) error {
-	userID := user.FromContext(ctx)
-	activityID := types.NewActivityID()
-	act := &activity.Activity{
-		ID:        activityID,
-		Type:      types.ActivityTypeTicketStatusChanged,
-		UserID:    userID,
-		TicketID:  ticketID,
-		CreatedAt: time.Now(),
-		Metadata: map[string]interface{}{
-			"old_status": oldStatus,
-			"new_status": newStatus,
-		},
-	}
-
-	if err := r.PutActivity(ctx, act); err != nil {
-		return goerr.Wrap(err, "failed to put activity")
-	}
-	return nil
-}
-
-func createAlertBoundActivity(ctx context.Context, r *Memory, alertID types.AlertID, ticketID types.TicketID, alertTitle, ticketTitle string) error {
-	userID := user.FromContext(ctx)
-	activityID := types.NewActivityID()
-	act := &activity.Activity{
-		ID:        activityID,
-		Type:      types.ActivityTypeAlertBound,
-		UserID:    userID,
-		AlertID:   alertID,
-		TicketID:  ticketID,
-		CreatedAt: time.Now(),
-	}
-
-	if err := r.PutActivity(ctx, act); err != nil {
-		return goerr.Wrap(err, "failed to put activity")
-	}
-	return nil
-}
-
-func createBulkAlertBoundActivity(ctx context.Context, r *Memory, alertIDs []types.AlertID, ticketID types.TicketID, ticketTitle string, alertTitles []string) error {
-	userID := user.FromContext(ctx)
-	activityID := types.NewActivityID()
-	act := &activity.Activity{
-		ID:        activityID,
-		Type:      types.ActivityTypeAlertsBulkBound,
-		UserID:    userID,
-		TicketID:  ticketID,
-		CreatedAt: time.Now(),
-		Metadata: map[string]interface{}{
-			"alert_count":  len(alertIDs),
-			"alert_titles": strings.Join(alertTitles, ", "),
-		},
-	}
-
-	if err := r.PutActivity(ctx, act); err != nil {
-		return goerr.Wrap(err, "failed to put activity")
-	}
 	return nil
 }
