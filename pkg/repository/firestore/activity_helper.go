@@ -1,4 +1,4 @@
-package repository
+package firestore
 
 import (
 	"context"
@@ -6,24 +6,23 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
-// CreateTicketActivity creates a ticket creation activity
-func CreateTicketActivity(ctx context.Context, repo interfaces.Repository, ticketID types.TicketID, title string) error {
-	return createTicketActivityWithType(ctx, repo, ticketID, title, types.ActivityTypeTicketCreated)
+// createTicketActivity creates a ticket creation activity
+func createTicketActivity(ctx context.Context, r *Firestore, ticketID types.TicketID, title string) error {
+	return createTicketActivityWithType(ctx, r, ticketID, title, types.ActivityTypeTicketCreated)
 }
 
-// CreateTicketUpdateActivity creates a ticket update activity
-func CreateTicketUpdateActivity(ctx context.Context, repo interfaces.Repository, ticketID types.TicketID, title string) error {
-	return createTicketActivityWithType(ctx, repo, ticketID, title, types.ActivityTypeTicketUpdated)
+// createTicketUpdateActivity creates a ticket update activity
+func createTicketUpdateActivity(ctx context.Context, r *Firestore, ticketID types.TicketID, title string) error {
+	return createTicketActivityWithType(ctx, r, ticketID, title, types.ActivityTypeTicketUpdated)
 }
 
 // createTicketActivityWithType creates a ticket activity with specified type
-func createTicketActivityWithType(ctx context.Context, repo interfaces.Repository, ticketID types.TicketID, title string, activityType types.ActivityType) error {
+func createTicketActivityWithType(ctx context.Context, r *Firestore, ticketID types.TicketID, title string, activityType types.ActivityType) error {
 	userID := user.FromContext(ctx)
 	activityID := types.NewActivityID()
 	act := &activity.Activity{
@@ -34,14 +33,14 @@ func createTicketActivityWithType(ctx context.Context, repo interfaces.Repositor
 		CreatedAt: time.Now(),
 	}
 
-	if err := repo.PutActivity(ctx, act); err != nil {
+	if err := r.PutActivity(ctx, act); err != nil {
 		return goerr.Wrap(err, "failed to put activity")
 	}
 	return nil
 }
 
-// CreateCommentActivity creates a comment addition activity
-func CreateCommentActivity(ctx context.Context, repo interfaces.Repository, ticketID types.TicketID, commentID types.CommentID, title string) error {
+// createCommentActivity creates a comment addition activity
+func createCommentActivity(ctx context.Context, r *Firestore, ticketID types.TicketID, commentID types.CommentID, title string) error {
 	userID := user.FromContext(ctx)
 	activityID := types.NewActivityID()
 	act := &activity.Activity{
@@ -53,14 +52,14 @@ func CreateCommentActivity(ctx context.Context, repo interfaces.Repository, tick
 		CreatedAt: time.Now(),
 	}
 
-	if err := repo.PutActivity(ctx, act); err != nil {
+	if err := r.PutActivity(ctx, act); err != nil {
 		return goerr.Wrap(err, "failed to put activity")
 	}
 	return nil
 }
 
-// CreateStatusChangeActivity creates a status change activity
-func CreateStatusChangeActivity(ctx context.Context, repo interfaces.Repository, ticketID types.TicketID, title, oldStatus, newStatus string) error {
+// createStatusChangeActivity creates a status change activity
+func createStatusChangeActivity(ctx context.Context, r *Firestore, ticketID types.TicketID, title, oldStatus, newStatus string) error {
 	userID := user.FromContext(ctx)
 	activityID := types.NewActivityID()
 	act := &activity.Activity{
@@ -75,14 +74,14 @@ func CreateStatusChangeActivity(ctx context.Context, repo interfaces.Repository,
 		},
 	}
 
-	if err := repo.PutActivity(ctx, act); err != nil {
+	if err := r.PutActivity(ctx, act); err != nil {
 		return goerr.Wrap(err, "failed to put activity")
 	}
 	return nil
 }
 
-// CreateAlertBoundActivity creates an alert binding activity
-func CreateAlertBoundActivity(ctx context.Context, repo interfaces.Repository, alertID types.AlertID, ticketID types.TicketID, alertTitle, ticketTitle string) error {
+// createAlertBoundActivity creates an alert binding activity
+func createAlertBoundActivity(ctx context.Context, r *Firestore, alertID types.AlertID, ticketID types.TicketID, alertTitle, ticketTitle string) error {
 	userID := user.FromContext(ctx)
 	activityID := types.NewActivityID()
 	act := &activity.Activity{
@@ -94,14 +93,14 @@ func CreateAlertBoundActivity(ctx context.Context, repo interfaces.Repository, a
 		CreatedAt: time.Now(),
 	}
 
-	if err := repo.PutActivity(ctx, act); err != nil {
+	if err := r.PutActivity(ctx, act); err != nil {
 		return goerr.Wrap(err, "failed to put activity")
 	}
 	return nil
 }
 
-// CreateBulkAlertBoundActivity creates a bulk alert binding activity
-func CreateBulkAlertBoundActivity(ctx context.Context, repo interfaces.Repository, alertIDs []types.AlertID, ticketID types.TicketID, ticketTitle string, alertTitles []string) error {
+// createBulkAlertBoundActivity creates a bulk alert binding activity
+func createBulkAlertBoundActivity(ctx context.Context, r *Firestore, alertIDs []types.AlertID, ticketID types.TicketID, ticketTitle string, alertTitles []string) error {
 	userID := user.FromContext(ctx)
 	activityID := types.NewActivityID()
 	act := &activity.Activity{
@@ -116,7 +115,7 @@ func CreateBulkAlertBoundActivity(ctx context.Context, repo interfaces.Repositor
 		},
 	}
 
-	if err := repo.PutActivity(ctx, act); err != nil {
+	if err := r.PutActivity(ctx, act); err != nil {
 		return goerr.Wrap(err, "failed to put activity")
 	}
 	return nil
