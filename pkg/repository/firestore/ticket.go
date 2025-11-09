@@ -318,13 +318,6 @@ func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32,
 			if err == iterator.Done {
 				break
 			}
-			// Skip errors related to zero magnitude vectors
-			errMsg := err.Error()
-			if status.Code(err) == codes.FailedPrecondition &&
-				(len(errMsg) > 0 && (errMsg[0:7] == "Cannot " || errMsg[0:7] == "Missing")) {
-				// Skip this document and continue
-				continue
-			}
 			return nil, goerr.Wrap(err, "failed to get next ticket")
 		}
 
