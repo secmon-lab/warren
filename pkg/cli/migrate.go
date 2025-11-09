@@ -91,6 +91,7 @@ func defineFirestoreIndexes() *fireconf.Config {
 
 		// Single-field Embedding index
 		indexes = append(indexes, fireconf.Index{
+			QueryScope: fireconf.QueryScopeCollection,
 			Fields: []fireconf.IndexField{
 				{
 					Path: "Embedding",
@@ -103,9 +104,14 @@ func defineFirestoreIndexes() *fireconf.Config {
 
 		// CreatedAt + Embedding composite index
 		indexes = append(indexes, fireconf.Index{
+			QueryScope: fireconf.QueryScopeCollection,
 			Fields: []fireconf.IndexField{
 				{
 					Path:  "CreatedAt",
+					Order: fireconf.OrderDescending,
+				},
+				{
+					Path:  "__name__",
 					Order: fireconf.OrderDescending,
 				},
 				{
@@ -120,6 +126,7 @@ func defineFirestoreIndexes() *fireconf.Config {
 		// Status + CreatedAt index only for 'tickets'
 		if collectionName == "tickets" {
 			indexes = append(indexes, fireconf.Index{
+				QueryScope: fireconf.QueryScopeCollection,
 				Fields: []fireconf.IndexField{
 					{
 						Path:  "Status",

@@ -1391,8 +1391,8 @@ func (x *Service) formatNoticeDetailsMessage(alert *alert.Alert) string {
 	var details []string
 
 	// Add title
-	if alert.Metadata.Title != "" {
-		details = append(details, fmt.Sprintf("*Title:* %s", alert.Metadata.Title))
+	if alert.Title != "" {
+		details = append(details, fmt.Sprintf("*Title:* %s", alert.Title))
 	}
 
 	// Add schema
@@ -1401,14 +1401,14 @@ func (x *Service) formatNoticeDetailsMessage(alert *alert.Alert) string {
 	}
 
 	// Add description
-	if alert.Metadata.Description != "" {
-		details = append(details, fmt.Sprintf("*Description:* %s", alert.Metadata.Description))
+	if alert.Description != "" {
+		details = append(details, fmt.Sprintf("*Description:* %s", alert.Description))
 	}
 
 	// Add attributes
-	if len(alert.Metadata.Attributes) > 0 {
+	if len(alert.Attributes) > 0 {
 		details = append(details, "*Attributes:*")
-		for _, attr := range alert.Metadata.Attributes {
+		for _, attr := range alert.Attributes {
 			if attr.Link != "" {
 				details = append(details, fmt.Sprintf("• *%s:* <%s|%s>", attr.Key, attr.Link, attr.Value))
 			} else {

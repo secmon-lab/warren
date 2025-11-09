@@ -191,7 +191,7 @@ func (uc *UseCases) handleBindAlerts(ctx context.Context, slackUser slack.User, 
 		return goerr.Wrap(err, "failed to get updated ticket", goerr.V("ticket_id", ticketID))
 	}
 
-	msg.Notify(ctx, "🎉 Alert bound to ticket to %s (%s)", ticketID, ticket.Metadata.Title)
+	msg.Notify(ctx, "🎉 Alert bound to ticket to %s (%s)", ticketID, ticket.Title)
 
 	return nil
 }
@@ -217,7 +217,7 @@ func (uc *UseCases) generateResolveMessage(ctx context.Context, ticket *ticket.T
 
 	// Generate prompt with ticket information including comments
 	resolvePrompt, err := prompt.GenerateWithStruct(ctx, resolveMessagePromptTemplate, map[string]any{
-		"title":      ticket.Metadata.Title,
+		"title":      ticket.Title,
 		"conclusion": conclusionText,
 		"reason":     reasonText,
 		"comments":   comments,
@@ -438,7 +438,7 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionSalvage(ctx context.Cont
 		return goerr.Wrap(err, "failed to get updated ticket", goerr.V("ticket_id", ticketID))
 	}
 
-	msg.Notify(ctx, "🎉 Salvaged %d alerts to ticket %s", len(unboundAlerts), target.Metadata.Title)
+	msg.Notify(ctx, "🎉 Salvaged %d alerts to ticket %s", len(unboundAlerts), target.Title)
 
 	return nil
 }
@@ -484,10 +484,10 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionEditTicket(ctx context.C
 	)
 
 	// Update ticket metadata
-	target.Metadata.Title = newTitle
-	target.Metadata.Description = newDescription
-	target.Metadata.TitleSource = types.SourceHuman
-	target.Metadata.DescriptionSource = types.SourceHuman
+	target.Title = newTitle
+	target.Description = newDescription
+	target.TitleSource = types.SourceHuman
+	target.DescriptionSource = types.SourceHuman
 
 	// Save updated ticket
 	if err := uc.repository.PutTicket(ctx, *target); err != nil {

@@ -48,7 +48,7 @@ func TestTicketResolver(t *testing.T) {
 		got, err := resolver.Query().Ticket(ctx, string(testTicket.ID))
 		gt.NoError(t, err)
 		gt.Value(t, got.ID).Equal(testTicket.ID)
-		gt.Value(t, got.Metadata.Title).Equal(testTicket.Metadata.Title)
+		gt.Value(t, got.Metadata.Title).Equal(testTicket.Title)
 	})
 
 	t.Run("TicketTimestampResolvers", func(t *testing.T) {
@@ -159,7 +159,7 @@ func TestAlertResolver(t *testing.T) {
 		got, err := resolver.Query().Alert(ctx, string(testAlert.ID))
 		gt.NoError(t, err)
 		gt.Value(t, got.ID).Equal(testAlert.ID)
-		gt.Value(t, got.Metadata.Title).Equal(testAlert.Metadata.Title)
+		gt.Value(t, got.Metadata.Title).Equal(testAlert.Title)
 	})
 }
 
