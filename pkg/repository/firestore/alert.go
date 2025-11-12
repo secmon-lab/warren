@@ -606,7 +606,7 @@ func (r *Firestore) BindAlertsToTicket(ctx context.Context, alertIDs []types.Ale
 		}
 
 		if len(alertIDs) > 1 {
-			if err := activityutil.CreateBulkAlertBoundActivity(ctx, r, alertIDs, ticketID, ticket.Title, alertTitles); err != nil{
+			if err := activityutil.CreateBulkAlertBoundActivity(ctx, r, alertIDs, ticketID, ticket.Title, alertTitles); err != nil {
 				return goerr.Wrap(err, "failed to create bulk alert bound activity", goerr.V("ticket_id", ticketID))
 			}
 		} else if len(alertIDs) == 1 {
