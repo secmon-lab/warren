@@ -2,7 +2,6 @@ package bigquery
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -10,7 +9,6 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
-	"github.com/m-mizutani/gollem/strategy/planexec"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/service/memory"
@@ -211,20 +209,10 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	}
 	log.Debug("System prompt built", "prompt_length", len(systemPrompt))
 
-	// Step 3: Create hooks for plan progress tracking
-	hooks := &bigqueryPlanHooks{}
-
-	// Step 4: Create Plan & Execute strategy
-	strategy := planexec.New(a.llmClient,
-		planexec.WithHooks(hooks),
-		planexec.WithMaxIterations(20),
-	)
-
-	// Step 5: Construct gollem.Agent with BigQuery tools
-	log.Debug("Constructing internal agent with BigQuery tools and Plan & Execute strategy")
+	// Step 3: Construct gollem.Agent with BigQuery tools
+	log.Debug("Constructing internal agent with BigQuery tools")
 	agent := gollem.New(
 		a.llmClient,
-		gollem.WithStrategy(strategy),
 		gollem.WithToolSets(a.internalTool),
 		gollem.WithSystemPrompt(systemPrompt),
 		gollem.WithLogger(log),
@@ -260,14 +248,13 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 		}),
 	)
 
-	// Step 6: Execute task
+	// Step 4: Execute task
 	log.Debug("Executing query task via internal agent", "query", query)
 	resp, execErr := agent.Execute(ctx, gollem.Text(query))
 	duration := time.Since(startTime)
 	log.Debug("Query task execution completed", "duration", duration, "has_error", execErr != nil)
 
-	// Step 7: Save execution memory (metadata only)
-	msg.Trace(ctx, "  🔷 *[BigQuery Agent]* Task completed, saving execution memory...")
+	// Step 5: Save execution memory (metadata only)
 	log.Debug("Saving execution memory", "has_error", execErr != nil)
 	if err := a.saveExecutionMemory(ctx, query, resp, execErr, duration, agent.Session()); err != nil {
 		// Memory save failure is non-critical for the main task
@@ -278,7 +265,7 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 			duration.Round(time.Millisecond))
 	}
 
-	// Step 8: Return execution result
+	// Step 6: Return execution result
 	if execErr != nil {
 		log.Debug("Execution failed, returning error", "error", execErr)
 		return nil, execErr
@@ -363,64 +350,3 @@ func (a *Agent) Prompt(ctx context.Context) (string, error) {
 }
 
 var _ interfaces.Tool = (*Agent)(nil)
-
-// bigqueryPlanHooks implements planexec.PlanExecuteHooks for BigQuery agent plan progress tracking
-type bigqueryPlanHooks struct{}
-
-var _ planexec.PlanExecuteHooks = &bigqueryPlanHooks{}
-
-func (h *bigqueryPlanHooks) OnPlanCreated(ctx context.Context, plan *planexec.Plan) error {
-	return postBigQueryPlanProgress(ctx, plan, "Plan created")
-}
-
-func (h *bigqueryPlanHooks) OnPlanUpdated(ctx context.Context, plan *planexec.Plan) error {
-	return postBigQueryPlanProgress(ctx, plan, "Plan updated")
-}
-
-func (h *bigqueryPlanHooks) OnTaskDone(ctx context.Context, plan *planexec.Plan, _ *planexec.Task) error {
-	return postBigQueryPlanProgress(ctx, plan, "Task done")
-}
-
-// postBigQueryPlanProgress posts the plan progress with BigQuery agent styling
-func postBigQueryPlanProgress(ctx context.Context, plan *planexec.Plan, action string) error {
-	if len(plan.Tasks) == 0 {
-		msg.Trace(ctx, "  🔷 *[BigQuery Agent]* %s (no tasks yet)", action)
-		return nil
-	}
-
-	completedCount := 0
-	for _, task := range plan.Tasks {
-		if task.State == planexec.TaskStateCompleted {
-			completedCount++
-		}
-	}
-
-	var messageBuilder strings.Builder
-	messageBuilder.WriteString(fmt.Sprintf("  🔷 *[BigQuery Agent]* %s\n", action))
-	messageBuilder.WriteString(fmt.Sprintf("  📊 *Progress:* %d/%d tasks\n", completedCount, len(plan.Tasks)))
-
-	for _, task := range plan.Tasks {
-		var icon string
-		var status string
-
-		switch task.State {
-		case planexec.TaskStatePending:
-			icon = "☑️"
-			status = task.Description
-		case planexec.TaskStateInProgress:
-			icon = "⟳"
-			status = task.Description
-		case planexec.TaskStateCompleted:
-			icon = "✅"
-			status = fmt.Sprintf("~%s~", task.Description)
-		default:
-			icon = "?"
-			status = task.Description
-		}
-
-		messageBuilder.WriteString(fmt.Sprintf("  %s %s\n", icon, status))
-	}
-
-	msg.Trace(ctx, "%s", messageBuilder.String())
-	return nil
-}
