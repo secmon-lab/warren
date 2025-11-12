@@ -501,13 +501,16 @@ func (h *chatPlanHooks) OnPlanUpdated(ctx context.Context, plan *planexec.Plan) 
 
 func (h *chatPlanHooks) OnTaskDone(ctx context.Context, plan *planexec.Plan, _ *planexec.Task) error {
 	h.planned = true
+	if len(plan.Tasks) == 0 {
+		return nil
+	}
 	return postPlanProgress(h.ctx, plan, "Task done")
 }
 
 // postPlanProgress posts the plan progress as a new message (not an update)
 func postPlanProgress(ctx context.Context, plan *planexec.Plan, action string) error {
 	if len(plan.Tasks) == 0 {
-		msg.Trace(ctx, "🤖 *%s* (no tasks yet)", action)
+		// Suppress plan/task messages when there are no tasks
 		return nil
 	}
 
