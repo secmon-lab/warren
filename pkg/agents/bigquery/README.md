@@ -5,15 +5,11 @@
 Create a YAML file defining BigQuery tables:
 
 ```yaml
-projects:
-  - id: my-security-project
-    description: Security data warehouse
-    datasets:
-      - id: cloudtrail_logs
-        description: AWS CloudTrail audit logs
-        tables:
-          - id: events
-            description: CloudTrail events with user activity, API calls, and resource changes
+tables:
+  - project_id: my-security-project
+    dataset_id: cloudtrail_logs
+    table_id: events
+    description: CloudTrail events with user activity, API calls, and resource changes
 
 scan_size_limit: "10GB"  # Required: Maximum bytes scanned per query
 query_timeout: 5m        # Optional: Default 5m
@@ -21,18 +17,14 @@ query_timeout: 5m        # Optional: Default 5m
 
 ## Configuration Fields
 
-### Projects Structure
+### Tables Structure
 
 ```yaml
-projects:
-  - id: <project-id>              # Required: GCP project ID
-    description: <description>     # Optional: Inherited by child elements
-    datasets:
-      - id: <dataset-id>           # Required: Dataset ID
-        description: <description> # Optional: Inherited by tables
-        tables:
-          - id: <table-id>         # Required: Table ID
-            description: <desc>    # Recommended: Detailed table description
+tables:
+  - project_id: <project-id>  # Required: GCP project ID
+    dataset_id: <dataset-id>  # Required: Dataset ID
+    table_id: <table-id>      # Required: Table ID
+    description: <desc>       # Recommended: Detailed table description
 ```
 
 ### Global Settings
@@ -207,46 +199,61 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 ### Minimal
 
 ```yaml
+tables:
+  - project_id: my-project
+    dataset_id: security_logs
+    table_id: events
+    description: Security event logs
+
+scan_size_limit: "1GB"
+```
+
+### Multiple Tables
+
+```yaml
+tables:
+  - project_id: prod-logs
+    dataset_id: aws_cloudtrail
+    table_id: events_2024
+    description: |
+      CloudTrail events from 2024:
+      - Authentication (ConsoleLogin, AssumeRole)
+      - S3 access (GetObject, PutObject)
+      - IAM changes
+      - Partitioned by event_date
+
+  - project_id: prod-logs
+    dataset_id: gcp_audit
+    table_id: admin_activity
+    description: GCP admin activity logs
+
+  - project_id: staging-logs
+    dataset_id: app_logs
+    table_id: authentication
+    description: App authentication events
+
+scan_size_limit: "5GB"
+query_timeout: 3m
+```
+
+## Migration from Old Format
+
+If you're upgrading from the previous nested format, convert your configuration:
+
+**Old format (deprecated):**
+```yaml
 projects:
   - id: my-project
     datasets:
       - id: security_logs
         tables:
           - id: events
-            description: Security event logs
-
-scan_size_limit: "1GB"
 ```
 
-### Multi-Project
-
+**New format:**
 ```yaml
-projects:
-  - id: prod-logs
-    description: Production logs
-    datasets:
-      - id: aws_cloudtrail
-        tables:
-          - id: events_2024
-            description: |
-              CloudTrail events from 2024:
-              - Authentication (ConsoleLogin, AssumeRole)
-              - S3 access (GetObject, PutObject)
-              - IAM changes
-              - Partitioned by event_date
-
-      - id: gcp_audit
-        tables:
-          - id: admin_activity
-            description: GCP admin activity logs
-
-  - id: staging-logs
-    datasets:
-      - id: app_logs
-        tables:
-          - id: authentication
-            description: App authentication events
-
-scan_size_limit: "5GB"
-query_timeout: 3m
+tables:
+  - project_id: my-project
+    dataset_id: security_logs
+    table_id: events
 ```

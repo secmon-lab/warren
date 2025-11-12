@@ -1,0 +1,39 @@
+# BigQuery Agent Configuration Example
+# This file demonstrates the flat table structure for configuring BigQuery tables
+
+# Minimal configuration
+tables:
+  - project_id: my-project
+    dataset_id: security_logs
+    table_id: events
+    description: Security event logs
+
+scan_size_limit: "1GB"
+
+# ---
+# Multi-table configuration example
+# Uncomment and customize the section below for multiple tables
+
+# tables:
+#   - project_id: prod-logs
+#     dataset_id: aws_cloudtrail
+#     table_id: events_2024
+#     description: |
+#       CloudTrail events from 2024:
+#       - Authentication (ConsoleLogin, AssumeRole)
+#       - S3 access (GetObject, PutObject)
+#       - IAM changes
+#       - Partitioned by event_date
+#
+#   - project_id: prod-logs
+#     dataset_id: gcp_audit
+#     table_id: admin_activity
+#     description: GCP admin activity logs
+#
+#   - project_id: staging-logs
+#     dataset_id: app_logs
+#     table_id: authentication
+#     description: App authentication events
+#
+# scan_size_limit: "5GB"
+# query_timeout: 3m
