@@ -15,40 +15,19 @@ import (
 
 // Config represents BigQuery Agent configuration
 type Config struct {
-	Tables           []TableConfig                              `yaml:"-"`        // Internal use only (expanded from Projects)
-	Projects         []ProjectConfig                            `yaml:"projects"` // Hierarchical configuration
-	ScanSizeLimit    uint64                                     `yaml:"-"`        // Parsed from ScanSizeLimitStr
+	Tables           []TableConfig                              `yaml:"tables"`
+	ScanSizeLimit    uint64                                     `yaml:"-"` // Parsed from ScanSizeLimitStr
 	ScanSizeLimitStr string                                     `yaml:"scan_size_limit"`
 	QueryTimeout     time.Duration                              `yaml:"query_timeout"` // Timeout for waiting for BigQuery job completion (default: 5 minutes)
 	Runbooks         map[types.RunbookID]*bigquery.RunbookEntry `yaml:"-"`             // Loaded runbooks (not in YAML)
 }
 
-// ProjectConfig represents a GCP project with datasets
-type ProjectConfig struct {
-	ID          string          `yaml:"id"`
-	Description string          `yaml:"description,omitempty"`
-	Datasets    []DatasetConfig `yaml:"datasets"`
-}
-
-// DatasetConfig represents a BigQuery dataset with tables
-type DatasetConfig struct {
-	ID          string        `yaml:"id"`
-	Description string        `yaml:"description,omitempty"`
-	Tables      []TableDetail `yaml:"tables"`
-}
-
-// TableDetail represents a table within a dataset
-type TableDetail struct {
-	ID          string `yaml:"id"`
-	Description string `yaml:"description,omitempty"`
-}
-
-// TableConfig represents a BigQuery table configuration (flat structure for backward compatibility)
+// TableConfig represents a BigQuery table configuration
 type TableConfig struct {
 	ProjectID   string `yaml:"project_id"`
 	DatasetID   string `yaml:"dataset_id"`
 	TableID     string `yaml:"table_id"`
-	Description string `yaml:"description"`
+	Description string `yaml:"description,omitempty"`
 }
 
 // LoadConfig loads BigQuery Agent configuration from a YAML file
@@ -116,34 +95,7 @@ func (c *Config) setDefaults() error {
 		c.ScanSizeLimit = limit
 	}
 
-	// Expand hierarchical projects into flat tables list
-	c.expandProjects()
 	return nil
-}
-
-// expandProjects expands hierarchical project/dataset/table structure into flat Tables list
-func (c *Config) expandProjects() {
-	for _, project := range c.Projects {
-		for _, dataset := range project.Datasets {
-			for _, table := range dataset.Tables {
-				// Build description with context
-				description := table.Description
-				if description == "" && dataset.Description != "" {
-					description = dataset.Description
-				}
-				if description == "" && project.Description != "" {
-					description = project.Description
-				}
-
-				c.Tables = append(c.Tables, TableConfig{
-					ProjectID:   project.ID,
-					DatasetID:   dataset.ID,
-					TableID:     table.ID,
-					Description: description,
-				})
-			}
-		}
-	}
 }
 
 // GetQueryTimeout returns the query timeout with fallback to default

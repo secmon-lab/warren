@@ -1,12 +1,8 @@
-projects:
-  - id: test-project
-    description: Test project for BigQuery agent
-    datasets:
-      - id: test_dataset
-        description: Test dataset
-        tables:
-          - id: test_table
-            description: Test table with sample data
+tables:
+  - project_id: test-project
+    dataset_id: test_dataset
+    table_id: test_table
+    description: Test table with sample data
 
 scan_size_limit: "1GB"
 query_timeout: 5m

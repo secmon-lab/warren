@@ -163,16 +163,14 @@ servers:
 
 ```yaml
 # bigquery-config.yaml
-dataset_id: security_logs
-table_id: events
-description: "Security event logs"
-columns:
-  - name: timestamp
-    type: TIMESTAMP
-    description: "Event timestamp"
-  - name: source_ip
-    type: STRING
-    description: "Source IP address"
+tables:
+  - project_id: my-project
+    dataset_id: security_logs
+    table_id: events
+    description: Security event logs
+
+scan_size_limit: "10GB"
+query_timeout: 5m
 ```
 
 ## Environment Variable Expansion

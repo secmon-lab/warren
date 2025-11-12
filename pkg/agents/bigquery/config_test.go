@@ -82,13 +82,11 @@ func TestLoadConfigWithoutRunbooks(t *testing.T) {
 	// Create a temp config without runbooks
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config_no_runbooks.yaml")
-	configContent := `projects:
-  - id: test-project
-    datasets:
-      - id: test_dataset
-        tables:
-          - id: test_table
-            description: Test table
+	configContent := `tables:
+  - project_id: test-project
+    dataset_id: test_dataset
+    table_id: test_table
+    description: Test table
 
 scan_size_limit: "1GB"
 `
