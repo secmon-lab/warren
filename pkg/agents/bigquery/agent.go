@@ -265,6 +265,16 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 			duration.Round(time.Millisecond))
 	}
 
+	// Step 5.5: Collect and apply feedback for used memories
+	if len(memories) > 0 {
+		log.Debug("Collecting feedback for used memories", "count", len(memories))
+		if err := a.memoryService.CollectAndApplyFeedback(ctx, a.ID(), memories, query, agent.Session(), resp, execErr); err != nil {
+			// Feedback collection failure is non-critical
+			log.Warn("Failed to collect and apply feedback", "error", err)
+			msg.Trace(ctx, "  ⚠️ *Warning:* Failed to collect feedback for memories")
+		}
+	}
+
 	// Step 6: Return execution result
 	if execErr != nil {
 		log.Debug("Execution failed, returning error", "error", execErr)

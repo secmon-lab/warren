@@ -45,6 +45,18 @@ type AgentMemory struct {
 	// Contains specific domain knowledge to apply: which fields to use, expected formats, search patterns
 	// Example: ["For user searches: use user.email (STRING) not user_id (INT64). For errors: check error_code field values"]
 	Improvements []string
+
+	// QualityScore represents the usefulness of this memory (-10.0 to +10.0)
+	// - Positive: Helpful memory (higher is better)
+	// - 0: Neutral or unrated
+	// - Negative: Harmful/misleading memory (lower is worse)
+	// This field is optional and defaults to 0.0 for backward compatibility
+	QualityScore float64
+
+	// LastUsedAt records when this memory was last retrieved
+	// Used for recency calculation and cleanup
+	// This field is optional and defaults to zero time for backward compatibility
+	LastUsedAt time.Time
 }
 
 // Validate checks if the AgentMemory is valid

@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"sort"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
@@ -242,4 +243,107 @@ func (r *Memory) cosineDistance(v1, v2 []float32) float64 {
 
 	cosineSimilarity := dotProduct / (math.Sqrt(norm1) * math.Sqrt(norm2))
 	return 1.0 - cosineSimilarity
+}
+
+// UpdateMemoryScore updates the quality score and last used timestamp of an agent memory
+func (r *Memory) UpdateMemoryScore(ctx context.Context, agentID string, memoryID types.AgentMemoryID, score float64, lastUsedAt time.Time) error {
+	r.memoryMu.Lock()
+	defer r.memoryMu.Unlock()
+
+	mem, ok := r.agentMemories[memoryID]
+	if !ok {
+		return r.eb.Wrap(goerr.New("agent memory not found"), "not found",
+			goerr.T(errs.TagNotFound),
+			goerr.V("agent_id", agentID),
+			goerr.V("memory_id", memoryID))
+	}
+
+	// Verify agent_id matches
+	if mem.AgentID != agentID {
+		return r.eb.Wrap(goerr.New("agent memory not found"), "agent_id mismatch",
+			goerr.T(errs.TagNotFound),
+			goerr.V("agent_id", agentID),
+			goerr.V("memory_id", memoryID))
+	}
+
+	// Update the score and last used timestamp
+	mem.QualityScore = score
+	mem.LastUsedAt = lastUsedAt
+
+	return nil
+}
+
+// UpdateMemoryScoreBatch updates quality scores and last used timestamps for multiple agent memories
+func (r *Memory) UpdateMemoryScoreBatch(ctx context.Context, agentID string, updates map[types.AgentMemoryID]struct {
+	Score      float64
+	LastUsedAt time.Time
+}) error {
+	r.memoryMu.Lock()
+	defer r.memoryMu.Unlock()
+
+	for memoryID, update := range updates {
+		mem, ok := r.agentMemories[memoryID]
+		if !ok {
+			continue // Skip non-existent memories
+		}
+
+		// Verify agent_id matches
+		if mem.AgentID != agentID {
+			continue // Skip memories that don't belong to this agent
+		}
+
+		// Update the score and last used timestamp
+		mem.QualityScore = update.Score
+		mem.LastUsedAt = update.LastUsedAt
+	}
+
+	return nil
+}
+
+// DeleteAgentMemoriesBatch deletes multiple agent memories in a batch
+// Returns the number of successfully deleted memories
+func (r *Memory) DeleteAgentMemoriesBatch(ctx context.Context, agentID string, memoryIDs []types.AgentMemoryID) (int, error) {
+	r.memoryMu.Lock()
+	defer r.memoryMu.Unlock()
+
+	deletedCount := 0
+	for _, id := range memoryIDs {
+		mem, ok := r.agentMemories[id]
+		if !ok {
+			continue // Skip non-existent memories
+		}
+
+		// Verify agent_id matches
+		if mem.AgentID != agentID {
+			continue // Skip memories that don't belong to this agent
+		}
+
+		delete(r.agentMemories, id)
+		deletedCount++
+	}
+
+	return deletedCount, nil
+}
+
+// ListAgentMemories lists all memories for an agent
+// Results are ordered by Timestamp DESC
+func (r *Memory) ListAgentMemories(ctx context.Context, agentID string) ([]*memory.AgentMemory, error) {
+	r.memoryMu.RLock()
+	defer r.memoryMu.RUnlock()
+
+	var memories []*memory.AgentMemory
+	for _, mem := range r.agentMemories {
+		if mem.AgentID == agentID {
+			// Create a copy to prevent external modification
+			memCopy := *mem
+			memories = append(memories, &memCopy)
+		}
+	}
+
+	// Sort by Timestamp DESC
+	sort.Slice(memories, func(i, j int) bool {
+		return memories[i].Timestamp.After(memories[j].Timestamp)
+	})
+
+	return memories, nil
 }

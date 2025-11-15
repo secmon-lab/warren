@@ -111,4 +111,19 @@ type Repository interface {
 	SaveAgentMemory(ctx context.Context, mem *memory.AgentMemory) error
 	GetAgentMemory(ctx context.Context, agentID string, id types.AgentMemoryID) (*memory.AgentMemory, error)
 	SearchMemoriesByEmbedding(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error)
+
+	// Memory scoring methods
+	// UpdateMemoryScoreBatch updates quality scores and last used timestamps for multiple agent memories
+	UpdateMemoryScoreBatch(ctx context.Context, agentID string, updates map[types.AgentMemoryID]struct {
+		Score      float64
+		LastUsedAt time.Time
+	}) error
+
+	// DeleteAgentMemoriesBatch deletes multiple agent memories in a batch
+	// Returns the number of successfully deleted memories
+	DeleteAgentMemoriesBatch(ctx context.Context, agentID string, memoryIDs []types.AgentMemoryID) (int, error)
+
+	// ListAgentMemories lists all memories for an agent (for pruning)
+	// Results are ordered by Timestamp DESC
+	ListAgentMemories(ctx context.Context, agentID string) ([]*memory.AgentMemory, error)
 }
