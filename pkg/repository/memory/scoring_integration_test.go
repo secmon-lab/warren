@@ -69,13 +69,15 @@ func TestMemoryRepository_ScoringIntegration(t *testing.T) {
 
 	t.Run("ListAgentMemories returns all memories for agent", func(t *testing.T) {
 		// Clean up first
-		existing, _ := repo.ListAgentMemories(ctx, agentID)
+		existing, err := repo.ListAgentMemories(ctx, agentID)
+		gt.NoError(t, err)
 		if len(existing) > 0 {
 			ids := make([]types.AgentMemoryID, len(existing))
 			for i, m := range existing {
 				ids[i] = m.ID
 			}
-			_, _ = repo.DeleteAgentMemoriesBatch(ctx, agentID, ids)
+			_, err = repo.DeleteAgentMemoriesBatch(ctx, agentID, ids)
+			gt.NoError(t, err)
 		}
 
 		// Create memories with different timestamps
@@ -110,13 +112,15 @@ func TestMemoryRepository_ScoringIntegration(t *testing.T) {
 
 	t.Run("Score-based filtering and ranking", func(t *testing.T) {
 		// Clean up
-		existing, _ := repo.ListAgentMemories(ctx, agentID)
+		existing, err := repo.ListAgentMemories(ctx, agentID)
+		gt.NoError(t, err)
 		if len(existing) > 0 {
 			ids := make([]types.AgentMemoryID, len(existing))
 			for i, m := range existing {
 				ids[i] = m.ID
 			}
-			_, _ = repo.DeleteAgentMemoriesBatch(ctx, agentID, ids)
+			_, err = repo.DeleteAgentMemoriesBatch(ctx, agentID, ids)
+			gt.NoError(t, err)
 		}
 
 		// Create memories with different scores

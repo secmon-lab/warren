@@ -5,6 +5,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/m-mizutani/gollem/mock"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -15,7 +16,19 @@ import (
 func TestCollectAndApplyFeedback_EmptyMemories(t *testing.T) {
 	ctx := context.Background()
 	repo := memoryRepo.New()
-	llm := &mockLLMClient{}
+	llm := &mock.LLMClientMock{
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
+			embeddings := make([][]float64, len(input))
+			for i := range input {
+				vec := make([]float64, dimension)
+				for j := 0; j < dimension; j++ {
+					vec[j] = 0.1 * float64(i+j)
+				}
+				embeddings[i] = vec
+			}
+			return embeddings, nil
+		},
+	}
 	svc := memoryService.New(llm, repo)
 
 	// No error when no memories provided

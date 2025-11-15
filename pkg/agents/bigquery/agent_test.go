@@ -15,6 +15,9 @@ import (
 )
 
 // newMockLLMClient creates a mock LLM client for testing
+// Note: This uses a custom mock implementation instead of testutil.NewMockLLMClient()
+// because BigQuery agent tests require more sophisticated session behavior
+// (plan & execute strategy with state management)
 func newMockLLMClient() gollem.LLMClient {
 	return &mock.LLMClientMock{
 		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
@@ -312,18 +315,20 @@ func TestAgent_MemoryFeedbackIntegration(t *testing.T) {
 
 	t.Run("Memory scoring accumulates over multiple uses", func(t *testing.T) {
 		// Clean up
-		existing, _ := repo.ListAgentMemories(ctx, "bigquery")
+		existing, err := repo.ListAgentMemories(ctx, "bigquery")
+		gt.NoError(t, err)
 		if len(existing) > 0 {
 			ids := make([]types.AgentMemoryID, len(existing))
 			for i, m := range existing {
 				ids[i] = m.ID
 			}
-			_, _ = repo.DeleteAgentMemoriesBatch(ctx, "bigquery", ids)
+			_, err = repo.DeleteAgentMemoriesBatch(ctx, "bigquery", ids)
+			gt.NoError(t, err)
 		}
 
 		// Create initial memory
 		args := map[string]any{"query": "count active users"}
-		_, err := agent.Run(ctx, "query_bigquery", args)
+		_, err = agent.Run(ctx, "query_bigquery", args)
 		gt.NoError(t, err)
 
 		// Get initial memory
@@ -372,18 +377,20 @@ func TestAgent_MemoryPruning(t *testing.T) {
 
 	t.Run("Low quality memories can be pruned", func(t *testing.T) {
 		// Clean up
-		existing, _ := repo.ListAgentMemories(ctx, "bigquery")
+		existing, err := repo.ListAgentMemories(ctx, "bigquery")
+		gt.NoError(t, err)
 		if len(existing) > 0 {
 			ids := make([]types.AgentMemoryID, len(existing))
 			for i, m := range existing {
 				ids[i] = m.ID
 			}
-			_, _ = repo.DeleteAgentMemoriesBatch(ctx, "bigquery", ids)
+			_, err = repo.DeleteAgentMemoriesBatch(ctx, "bigquery", ids)
+			gt.NoError(t, err)
 		}
 
 		// Create some memories and manually set low quality scores
 		args := map[string]any{"query": "test query"}
-		_, err := agent.Run(ctx, "query_bigquery", args)
+		_, err = agent.Run(ctx, "query_bigquery", args)
 		gt.NoError(t, err)
 
 		// Get the memory and manually update its score to critical level

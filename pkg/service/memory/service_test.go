@@ -9,6 +9,7 @@ import (
 
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/llm/claude"
+	"github.com/m-mizutani/gollem/mock"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
@@ -17,26 +18,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/repository"
 	memoryService "github.com/secmon-lab/warren/pkg/service/memory"
 )
-
-// mockLLMClient is a simple mock for testing
-type mockLLMClient struct{}
-
-func (m *mockLLMClient) NewSession(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
-	return nil, nil
-}
-
-func (m *mockLLMClient) GenerateEmbedding(ctx context.Context, dimension int, input []string) ([][]float64, error) {
-	// Return dummy embeddings for testing
-	embeddings := make([][]float64, len(input))
-	for i := range input {
-		vec := make([]float64, dimension)
-		for j := 0; j < dimension; j++ {
-			vec[j] = 0.1 * float64(i+j)
-		}
-		embeddings[i] = vec
-	}
-	return embeddings, nil
-}
 
 func createTestRepository(t *testing.T) interfaces.Repository {
 	t.Helper()
@@ -159,7 +140,19 @@ func TestLoadMemoriesForPrompt(t *testing.T) {
 
 	t.Run("load non-existent memories returns nil", func(t *testing.T) {
 		repo := createTestRepository(t)
-		llmClient := &mockLLMClient{}
+		llmClient := &mock.LLMClientMock{
+			GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
+				embeddings := make([][]float64, len(input))
+				for i := range input {
+					vec := make([]float64, dimension)
+					for j := 0; j < dimension; j++ {
+						vec[j] = 0.1 * float64(i+j)
+					}
+					embeddings[i] = vec
+				}
+				return embeddings, nil
+			},
+		}
 		svc := memoryService.New(llmClient, repo)
 
 		schemaID := types.AlertSchema("non-existent")
@@ -172,7 +165,19 @@ func TestLoadMemoriesForPrompt(t *testing.T) {
 
 	t.Run("load existing memories", func(t *testing.T) {
 		repo := createTestRepository(t)
-		llmClient := &mockLLMClient{}
+		llmClient := &mock.LLMClientMock{
+			GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
+				embeddings := make([][]float64, len(input))
+				for i := range input {
+					vec := make([]float64, dimension)
+					for j := 0; j < dimension; j++ {
+						vec[j] = 0.1 * float64(i+j)
+					}
+					embeddings[i] = vec
+				}
+				return embeddings, nil
+			},
+		}
 		svc := memoryService.New(llmClient, repo)
 
 		schemaID := types.AlertSchema("existing")
@@ -365,7 +370,19 @@ func TestGenerateTicketMemoryWithRealLLM(t *testing.T) {
 
 func TestAgentMemory_SaveAndSearch(t *testing.T) {
 	repo := createTestRepository(t)
-	llmClient := &mockLLMClient{}
+	llmClient := &mock.LLMClientMock{
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
+			embeddings := make([][]float64, len(input))
+			for i := range input {
+				vec := make([]float64, dimension)
+				for j := 0; j < dimension; j++ {
+					vec[j] = 0.1 * float64(i+j)
+				}
+				embeddings[i] = vec
+			}
+			return embeddings, nil
+		},
+	}
 	svc := memoryService.New(llmClient, repo)
 	ctx := context.Background()
 
@@ -421,7 +438,19 @@ func TestAgentMemory_SaveAndSearch(t *testing.T) {
 
 // newMockLLMClient creates a mock LLM client for integration testing
 func newMockLLMClient() gollem.LLMClient {
-	return &mockLLMClient{}
+	return &mock.LLMClientMock{
+		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
+			embeddings := make([][]float64, len(input))
+			for i := range input {
+				vec := make([]float64, dimension)
+				for j := 0; j < dimension; j++ {
+					vec[j] = 0.1 * float64(i+j)
+				}
+				embeddings[i] = vec
+			}
+			return embeddings, nil
+		},
+	}
 }
 
 func TestMemoryService_E2E_ScoringFlow(t *testing.T) {
@@ -535,13 +564,15 @@ func TestMemoryService_E2E_ScoringFlow(t *testing.T) {
 
 	t.Run("Re-ranking with different weights", func(t *testing.T) {
 		// Clean up
-		existing, _ := repo.ListAgentMemories(ctx, agentID)
+		existing, err := repo.ListAgentMemories(ctx, agentID)
+		gt.NoError(t, err)
 		if len(existing) > 0 {
 			ids := make([]types.AgentMemoryID, len(existing))
 			for i, m := range existing {
 				ids[i] = m.ID
 			}
-			_, _ = repo.DeleteAgentMemoriesBatch(ctx, agentID, ids)
+			_, err = repo.DeleteAgentMemoriesBatch(ctx, agentID, ids)
+			gt.NoError(t, err)
 		}
 
 		// Create memories with different quality and recency
