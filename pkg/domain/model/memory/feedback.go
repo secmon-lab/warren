@@ -24,8 +24,9 @@ type MemoryFeedback struct {
 	Reasoning string
 }
 
-// TotalScore returns the sum of all feedback dimensions (0-10)
-func (f *MemoryFeedback) TotalScore() float64 {
+// totalScore returns the sum of all feedback dimensions (0-10)
+// This is unexported as it's only used internally by NormalizedScore
+func (f *MemoryFeedback) totalScore() float64 {
 	return float64(f.Relevance + f.Support + f.Impact)
 }
 
@@ -36,5 +37,5 @@ func (f *MemoryFeedback) TotalScore() float64 {
 //   - 10 (best) -> +10
 func (f *MemoryFeedback) NormalizedScore() float64 {
 	// Convert 0-10 scale to -10 to +10 scale
-	return (f.TotalScore() - 5.0) * 2.0
+	return (f.totalScore() - 5.0) * 2.0
 }

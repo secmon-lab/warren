@@ -8,18 +8,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
-func TestMemoryFeedback_TotalScore(t *testing.T) {
-	feedback := &memory.MemoryFeedback{
-		MemoryID:  types.NewAgentMemoryID(),
-		Relevance: 2,
-		Support:   3,
-		Impact:    1,
-		Reasoning: "Test reasoning",
-	}
-
-	gt.Equal(t, feedback.TotalScore(), 6.0)
-}
-
 func TestMemoryFeedback_NormalizedScore(t *testing.T) {
 	testCases := []struct {
 		name      string
