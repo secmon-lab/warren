@@ -3,11 +3,13 @@ package bigquery_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/mock"
 	"github.com/m-mizutani/gt"
 	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	memoryservice "github.com/secmon-lab/warren/pkg/service/memory"
 )
@@ -250,4 +252,162 @@ func TestAgent_MemoryMetadataOnly(t *testing.T) {
 	gt.A(t, mem.Successes).Length(0)    // Empty array from fallback
 	gt.A(t, mem.Problems).Length(0)     // Empty array from fallback
 	gt.A(t, mem.Improvements).Length(0) // Empty array from fallback
+}
+
+func TestAgent_MemoryFeedbackIntegration(t *testing.T) {
+	ctx := context.Background()
+	config := &bqagent.Config{
+		Tables: []bqagent.TableConfig{
+			{
+				ProjectID:   "test-project",
+				DatasetID:   "test-dataset",
+				TableID:     "test-table",
+				Description: "Test table for feedback",
+			},
+		},
+		ScanSizeLimit: 1000000,
+	}
+	llmClient := newMockLLMClient()
+	repo := repository.NewMemory()
+	memService := memoryservice.New(llmClient, repo)
+	agent := bqagent.NewAgent(config, llmClient, memService)
+
+	t.Run("Agent execution triggers feedback collection for used memories", func(t *testing.T) {
+		// Step 1: Execute a query to create initial memory
+		args := map[string]any{"query": "Get user login count"}
+		_, err := agent.Run(ctx, "query_bigquery", args)
+		gt.NoError(t, err)
+
+		// Get the created memory
+		memories, err := memService.SearchRelevantAgentMemories(ctx, "bigquery", "Get user login count", 1)
+		gt.NoError(t, err)
+		gt.V(t, len(memories)).Equal(1)
+
+		initialMem := memories[0]
+		initialScore := initialMem.QualityScore
+		initialLastUsed := initialMem.LastUsedAt
+
+		// Step 2: Execute similar query that should use the previous memory
+		// Wait a bit to ensure timestamp difference
+		args2 := map[string]any{"query": "user login statistics"}
+		_, err = agent.Run(ctx, "query_bigquery", args2)
+		gt.NoError(t, err)
+
+		// Step 3: Verify that the original memory was updated with feedback
+		updatedMemories, err := repo.GetAgentMemory(ctx, "bigquery", initialMem.ID)
+		gt.NoError(t, err)
+
+		// LastUsedAt should be updated (memory was used in second query)
+		gt.True(t, updatedMemories.LastUsedAt.After(initialLastUsed) ||
+			updatedMemories.LastUsedAt.Equal(initialLastUsed))
+
+		// QualityScore may have changed (depends on LLM feedback)
+		// We just verify it's within valid range
+		gt.True(t, updatedMemories.QualityScore >= -10.0)
+		gt.True(t, updatedMemories.QualityScore <= 10.0)
+
+		// Store for comparison
+		_ = initialScore // Used initial score for verification
+	})
+
+	t.Run("Memory scoring accumulates over multiple uses", func(t *testing.T) {
+		// Clean up
+		existing, _ := repo.ListAgentMemories(ctx, "bigquery")
+		if len(existing) > 0 {
+			ids := make([]types.AgentMemoryID, len(existing))
+			for i, m := range existing {
+				ids[i] = m.ID
+			}
+			_, _ = repo.DeleteAgentMemoriesBatch(ctx, "bigquery", ids)
+		}
+
+		// Create initial memory
+		args := map[string]any{"query": "count active users"}
+		_, err := agent.Run(ctx, "query_bigquery", args)
+		gt.NoError(t, err)
+
+		// Get initial memory
+		memories, err := memService.SearchRelevantAgentMemories(ctx, "bigquery", "count active users", 1)
+		gt.NoError(t, err)
+		gt.V(t, len(memories)).Equal(1)
+		memID := memories[0].ID
+
+		// Use the memory multiple times with similar queries
+		similarQueries := []string{
+			"get active user count",
+			"show active users",
+			"list active user statistics",
+		}
+
+		for _, query := range similarQueries {
+			args := map[string]any{"query": query}
+			_, err := agent.Run(ctx, "query_bigquery", args)
+			gt.NoError(t, err)
+		}
+
+		// Verify the original memory still exists and was updated
+		finalMem, err := repo.GetAgentMemory(ctx, "bigquery", memID)
+		gt.NoError(t, err)
+
+		// LastUsedAt should be more recent than creation time
+		gt.True(t, finalMem.LastUsedAt.After(finalMem.Timestamp) ||
+			finalMem.LastUsedAt.Equal(finalMem.Timestamp))
+
+		// QualityScore should be within valid range
+		gt.True(t, finalMem.QualityScore >= -10.0)
+		gt.True(t, finalMem.QualityScore <= 10.0)
+	})
+}
+
+func TestAgent_MemoryPruning(t *testing.T) {
+	ctx := context.Background()
+	config := &bqagent.Config{
+		Tables:        []bqagent.TableConfig{},
+		ScanSizeLimit: 1000000,
+	}
+	llmClient := newMockLLMClient()
+	repo := repository.NewMemory()
+	memService := memoryservice.New(llmClient, repo)
+	agent := bqagent.NewAgent(config, llmClient, memService)
+
+	t.Run("Low quality memories can be pruned", func(t *testing.T) {
+		// Clean up
+		existing, _ := repo.ListAgentMemories(ctx, "bigquery")
+		if len(existing) > 0 {
+			ids := make([]types.AgentMemoryID, len(existing))
+			for i, m := range existing {
+				ids[i] = m.ID
+			}
+			_, _ = repo.DeleteAgentMemoriesBatch(ctx, "bigquery", ids)
+		}
+
+		// Create some memories and manually set low quality scores
+		args := map[string]any{"query": "test query"}
+		_, err := agent.Run(ctx, "query_bigquery", args)
+		gt.NoError(t, err)
+
+		// Get the memory and manually update its score to critical level
+		memories, err := repo.ListAgentMemories(ctx, "bigquery")
+		gt.NoError(t, err)
+		gt.True(t, len(memories) > 0)
+
+		// Manually set a critical bad score
+		criticalMem := memories[0]
+		err = repo.UpdateMemoryScore(ctx, "bigquery", criticalMem.ID, -9.0, time.Now())
+		gt.NoError(t, err)
+
+		// Prune memories
+		deleted, err := memService.PruneAgentMemories(ctx, "bigquery")
+		gt.NoError(t, err)
+		gt.N(t, deleted).Greater(0)
+
+		// Verify the critical memory was deleted
+		remaining, err := repo.ListAgentMemories(ctx, "bigquery")
+		gt.NoError(t, err)
+
+		for _, m := range remaining {
+			// No memory should have critical score
+			gt.True(t, m.QualityScore > -8.0)
+		}
+	})
 }

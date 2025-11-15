@@ -90,6 +90,31 @@ The application follows Domain-Driven Design (DDD) with clean architecture:
 - WebUI at `/clusters` for visualizing and managing alert clusters
 - Supports creating tickets from clusters and binding clusters to existing tickets
 
+#### Agent Memory Scoring (Experimental)
+- `pkg/service/memory/scoring.go` - Quality-based memory ranking and pruning
+- `pkg/service/memory/feedback.go` - LLM-based feedback collection
+- `pkg/domain/model/memory/feedback.go` - Feedback model (Relevance/Support/Impact)
+
+**Features**:
+- **Quality Scoring**: Memories rated from -10 (harmful) to +10 (helpful)
+- **Adaptive Search**: Re-ranks memories by similarity (50%) + quality (30%) + recency (20%)
+- **LLM Feedback**: Automatically evaluates memory usefulness after each agent execution
+- **EMA Updates**: Smooth score evolution using exponential moving average (alpha=0.3)
+- **Conservative Pruning**: Strict deletion criteria to preserve memories
+  - Critical (≤-8.0): Immediate deletion
+  - Harmful (≤-5.0) + 90 days unused: Deletion
+  - Moderate (≤-3.0) + 180 days unused: Deletion
+
+**Configuration** (all parameters in `ScoringConfig`):
+- Fully configurable weights, thresholds, and decay rates
+- Default values optimized for gradual learning
+- Easy to remove if experimental feature proves ineffective
+
+**Implementation**:
+- Isolated in 3 files: `scoring.go`, `feedback.go`, `prompt/feedback.md`
+- Minimal changes to existing code (re-ranking in `SearchRelevantAgentMemories`)
+- Backward compatible (existing memories default to score=0.0)
+
 ### Application Modes
 - `serve` - HTTP server mode with Slack integration, GraphQL API
 - `run` - CLI mode for processing individual alerts
