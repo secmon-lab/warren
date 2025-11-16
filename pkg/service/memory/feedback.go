@@ -43,6 +43,20 @@ func (s *Service) generateMemoryFeedback(
 	}
 
 	// Build prompt - pass memory fields explicitly to avoid template interface{} issues
+	// Ensure slices are non-nil for proper template iteration
+	successes := mem.Successes
+	if successes == nil {
+		successes = []string{}
+	}
+	problems := mem.Problems
+	if problems == nil {
+		problems = []string{}
+	}
+	improvements := mem.Improvements
+	if improvements == nil {
+		improvements = []string{}
+	}
+
 	promptParams := map[string]any{
 		"TaskQuery":  taskQuery,
 		"ExecResult": execResult,
@@ -50,9 +64,9 @@ func (s *Service) generateMemoryFeedback(
 		"JSONSchema": jsonSchemaStr,
 		// Pass memory fields explicitly
 		"MemoryTaskQuery":    mem.TaskQuery,
-		"MemorySuccesses":    mem.Successes,
-		"MemoryProblems":     mem.Problems,
-		"MemoryImprovements": mem.Improvements,
+		"MemorySuccesses":    successes,
+		"MemoryProblems":     problems,
+		"MemoryImprovements": improvements,
 	}
 
 	promptText, err := prompt.Generate(ctx, feedbackPromptTemplate, promptParams)
