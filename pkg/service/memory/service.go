@@ -28,15 +28,133 @@ var executionMemoryPromptTemplate string
 var ticketMemoryPromptTemplate string
 
 type Service struct {
-	llmClient  gollem.LLMClient
-	repository interfaces.Repository
+	llmClient     gollem.LLMClient
+	repository    interfaces.Repository
+	ScoringConfig ScoringConfig
 }
 
 func New(llmClient gollem.LLMClient, repo interfaces.Repository) *Service {
 	return &Service{
-		llmClient:  llmClient,
-		repository: repo,
+		llmClient:     llmClient,
+		repository:    repo,
+		ScoringConfig: DefaultScoringConfig(),
 	}
+}
+
+// ScoringConfig holds all configurable parameters for memory scoring
+type ScoringConfig struct {
+	// EMA parameters
+	EMAAlpha float64 // Weight for new feedback (0.0-1.0), default: 0.3
+	ScoreMin float64 // Minimum score value, default: -10.0
+	ScoreMax float64 // Maximum score value, default: +10.0
+
+	// Search parameters
+	SearchMultiplier    int     // Multiplier for initial search limit, default: 10
+	SearchMaxCandidates int     // Maximum candidates for re-ranking, default: 50
+	FilterMinQuality    float64 // Minimum quality score for filtering, default: -5.0
+
+	// Ranking weights (should sum to 1.0)
+	RankSimilarityWeight float64 // Weight for similarity score, default: 0.5
+	RankQualityWeight    float64 // Weight for quality score, default: 0.3
+	RankRecencyWeight    float64 // Weight for recency score, default: 0.2
+	RecencyHalfLifeDays  float64 // Half-life for recency decay in days, default: 30
+
+	// Pruning thresholds
+	PruneCriticalScore float64 // Critical score threshold (immediate deletion), default: -8.0
+	PruneHarmfulScore  float64 // Harmful score threshold, default: -5.0
+	PruneHarmfulDays   int     // Days before pruning harmful memories, default: 90
+	PruneModerateScore float64 // Moderate score threshold, default: -3.0
+	PruneModerateDays  int     // Days before pruning moderate memories, default: 180
+}
+
+// DefaultScoringConfig returns default configuration
+func DefaultScoringConfig() ScoringConfig {
+	return ScoringConfig{
+		EMAAlpha:             0.3,
+		ScoreMin:             -10.0,
+		ScoreMax:             10.0,
+		SearchMultiplier:     10,
+		SearchMaxCandidates:  50,
+		FilterMinQuality:     -5.0,
+		RankSimilarityWeight: 0.5,
+		RankQualityWeight:    0.3,
+		RankRecencyWeight:    0.2,
+		RecencyHalfLifeDays:  30,
+		PruneCriticalScore:   -8.0,
+		PruneHarmfulScore:    -5.0,
+		PruneHarmfulDays:     90,
+		PruneModerateScore:   -3.0,
+		PruneModerateDays:    180,
+	}
+}
+
+// Validate checks if the ScoringConfig has valid values
+func (c *ScoringConfig) Validate() error {
+	// EMA alpha must be between 0 and 1
+	if c.EMAAlpha < 0.0 || c.EMAAlpha > 1.0 {
+		return goerr.New("EMAAlpha must be between 0.0 and 1.0", goerr.V("value", c.EMAAlpha))
+	}
+
+	// Score range must be valid
+	if c.ScoreMin >= c.ScoreMax {
+		return goerr.New("ScoreMin must be less than ScoreMax",
+			goerr.V("min", c.ScoreMin),
+			goerr.V("max", c.ScoreMax))
+	}
+
+	// Search parameters must be positive
+	if c.SearchMultiplier <= 0 {
+		return goerr.New("SearchMultiplier must be positive", goerr.V("value", c.SearchMultiplier))
+	}
+	if c.SearchMaxCandidates <= 0 {
+		return goerr.New("SearchMaxCandidates must be positive", goerr.V("value", c.SearchMaxCandidates))
+	}
+
+	// Ranking weights should be non-negative and sum to 1.0
+	if c.RankSimilarityWeight < 0 || c.RankQualityWeight < 0 || c.RankRecencyWeight < 0 {
+		return goerr.New("ranking weights must be non-negative",
+			goerr.V("similarity", c.RankSimilarityWeight),
+			goerr.V("quality", c.RankQualityWeight),
+			goerr.V("recency", c.RankRecencyWeight))
+	}
+	const epsilon = 0.001
+	if totalWeight := c.RankSimilarityWeight + c.RankQualityWeight + c.RankRecencyWeight; totalWeight < 1.0-epsilon || totalWeight > 1.0+epsilon {
+		return goerr.New("ranking weights must sum to 1.0", goerr.V("total", totalWeight))
+	}
+
+	// Recency half-life must be positive
+	if c.RecencyHalfLifeDays <= 0 {
+		return goerr.New("RecencyHalfLifeDays must be positive", goerr.V("value", c.RecencyHalfLifeDays))
+	}
+
+	// Pruning thresholds should be in order: critical < harmful < moderate < 0
+	if c.PruneCriticalScore >= c.PruneHarmfulScore {
+		return goerr.New("PruneCriticalScore must be less than PruneHarmfulScore",
+			goerr.V("critical", c.PruneCriticalScore),
+			goerr.V("harmful", c.PruneHarmfulScore))
+	}
+	if c.PruneHarmfulScore >= c.PruneModerateScore {
+		return goerr.New("PruneHarmfulScore must be less than PruneModerateScore",
+			goerr.V("harmful", c.PruneHarmfulScore),
+			goerr.V("moderate", c.PruneModerateScore))
+	}
+
+	// Pruning days must be positive
+	if c.PruneHarmfulDays <= 0 {
+		return goerr.New("PruneHarmfulDays must be positive", goerr.V("value", c.PruneHarmfulDays))
+	}
+	if c.PruneModerateDays <= 0 {
+		return goerr.New("PruneModerateDays must be positive", goerr.V("value", c.PruneModerateDays))
+	}
+
+	// Harmful days should be less than moderate days
+	if c.PruneHarmfulDays >= c.PruneModerateDays {
+		return goerr.New("PruneHarmfulDays should be less than PruneModerateDays",
+			goerr.V("harmful", c.PruneHarmfulDays),
+			goerr.V("moderate", c.PruneModerateDays))
+	}
+
+	return nil
 }
 
 // executionMemoryResponse defines the structure for ExecutionMemory LLM response
@@ -387,7 +505,7 @@ func (s *Service) SaveAgentMemory(ctx context.Context, mem *memory.AgentMemory) 
 	return nil
 }
 
-// SearchRelevantAgentMemories searches for similar memories using semantic search
+// SearchRelevantAgentMemories searches for similar memories using semantic search with re-ranking
 func (s *Service) SearchRelevantAgentMemories(ctx context.Context, agentID, query string, limit int) ([]*memory.AgentMemory, error) {
 	// Generate embedding for the query
 	embeddings, err := s.llmClient.GenerateEmbedding(ctx, EmbeddingDimension, []string{query})
@@ -405,10 +523,10 @@ func (s *Service) SearchRelevantAgentMemories(ctx context.Context, agentID, quer
 		vector32[i] = float32(v)
 	}
 
-	// Search by embedding
-	memories, err := s.repository.SearchMemoriesByEmbedding(ctx, agentID, vector32, limit)
+	// Use the new searchAndRerankMemories method which incorporates quality and recency scoring
+	memories, err := s.searchAndRerankMemories(ctx, agentID, vector32, limit)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to search memories", goerr.V("agent_id", agentID), goerr.V("limit", limit))
+		return nil, goerr.Wrap(err, "failed to search and rerank memories", goerr.V("agent_id", agentID), goerr.V("limit", limit))
 	}
 
 	return memories, nil

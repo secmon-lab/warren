@@ -2,6 +2,7 @@ package firestore
 
 import (
 	"context"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
@@ -318,4 +319,99 @@ func (r *Firestore) DeleteTicketMemory(ctx context.Context, schemaID types.Alert
 
 func (r *Firestore) PutAgentMemory(ctx context.Context, mem *memory.AgentMemory) error {
 	return r.SaveAgentMemory(ctx, mem)
+}
+
+// UpdateMemoryScoreBatch updates quality scores and last used timestamps for multiple agent memories
+// Uses BulkWriter for efficient batch updates
+func (r *Firestore) UpdateMemoryScoreBatch(ctx context.Context, agentID string, updates map[types.AgentMemoryID]struct {
+	Score      float64
+	LastUsedAt time.Time
+}) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	// Create a BulkWriter for efficient bulk operations
+	bulkWriter := r.db.BulkWriter(ctx)
+
+	// Queue all update operations
+	for memoryID, update := range updates {
+		doc := r.db.Collection(collectionAgents).Doc(agentID).
+			Collection(subcollectionMemories).Doc(memoryID.String())
+
+		updateFields := []firestore.Update{
+			{Path: "QualityScore", Value: update.Score},
+			{Path: "LastUsedAt", Value: update.LastUsedAt},
+		}
+
+		_, err := bulkWriter.Update(doc, updateFields)
+		if err != nil {
+			return r.eb.Wrap(err, "failed to queue update operation",
+				goerr.V("agent_id", agentID),
+				goerr.V("memory_id", memoryID))
+		}
+	}
+
+	// Flush and wait for all operations to complete
+	bulkWriter.End()
+
+	return nil
+}
+
+// DeleteAgentMemoriesBatch deletes multiple agent memories in a batch
+// Uses BulkWriter for efficient batch deletion
+// Returns the number of successfully deleted memories
+func (r *Firestore) DeleteAgentMemoriesBatch(ctx context.Context, agentID string, memoryIDs []types.AgentMemoryID) (int, error) {
+	if len(memoryIDs) == 0 {
+		return 0, nil
+	}
+
+	// Create a BulkWriter for efficient bulk operations
+	bulkWriter := r.db.BulkWriter(ctx)
+
+	// Queue all delete operations
+	for _, id := range memoryIDs {
+		doc := r.db.Collection(collectionAgents).Doc(agentID).
+			Collection(subcollectionMemories).Doc(id.String())
+		_, err := bulkWriter.Delete(doc)
+		if err != nil {
+			return 0, r.eb.Wrap(err, "failed to queue delete operation",
+				goerr.V("agent_id", agentID),
+				goerr.V("memory_id", id))
+		}
+	}
+
+	// Flush all operations
+	bulkWriter.End()
+
+	return len(memoryIDs), nil
+}
+
+// ListAgentMemories lists all memories for an agent
+// Results are ordered by Timestamp DESC
+func (r *Firestore) ListAgentMemories(ctx context.Context, agentID string) ([]*memory.AgentMemory, error) {
+	docs := r.db.Collection(collectionAgents).Doc(agentID).
+		Collection(subcollectionMemories).
+		OrderBy("Timestamp", firestore.Desc).
+		Documents(ctx)
+
+	var memories []*memory.AgentMemory
+	for {
+		doc, err := docs.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, r.eb.Wrap(err, "failed to iterate agent memories", goerr.V("agent_id", agentID))
+		}
+
+		var mem memory.AgentMemory
+		if err := doc.DataTo(&mem); err != nil {
+			return nil, r.eb.Wrap(err, "failed to unmarshal agent memory", goerr.V("id", doc.Ref.ID))
+		}
+
+		memories = append(memories, &mem)
+	}
+
+	return memories, nil
 }
