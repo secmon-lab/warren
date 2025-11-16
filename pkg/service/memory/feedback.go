@@ -93,34 +93,10 @@ func (s *Service) generateMemoryFeedback(
 		return nil, goerr.Wrap(err, "failed to unmarshal feedback response", goerr.V("text", text))
 	}
 
-	// Validate scores are within expected ranges
-	if resp.Relevance < 0 || resp.Relevance > 3 {
-		logging.From(ctx).Warn("relevance score out of range, clamping", "score", resp.Relevance)
-		if resp.Relevance < 0 {
-			resp.Relevance = 0
-		}
-		if resp.Relevance > 3 {
-			resp.Relevance = 3
-		}
-	}
-	if resp.Support < 0 || resp.Support > 4 {
-		logging.From(ctx).Warn("support score out of range, clamping", "score", resp.Support)
-		if resp.Support < 0 {
-			resp.Support = 0
-		}
-		if resp.Support > 4 {
-			resp.Support = 4
-		}
-	}
-	if resp.Impact < 0 || resp.Impact > 3 {
-		logging.From(ctx).Warn("impact score out of range, clamping", "score", resp.Impact)
-		if resp.Impact < 0 {
-			resp.Impact = 0
-		}
-		if resp.Impact > 3 {
-			resp.Impact = 3
-		}
-	}
+	// Validate and clamp scores to expected ranges
+	resp.Relevance = clampScore(ctx, resp.Relevance, 0, 3, "relevance")
+	resp.Support = clampScore(ctx, resp.Support, 0, 4, "support")
+	resp.Impact = clampScore(ctx, resp.Impact, 0, 3, "impact")
 
 	feedback := &memory.MemoryFeedback{
 		MemoryID:  mem.ID,
@@ -239,4 +215,18 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// clampScore clamps a score to the specified range and logs a warning if out of range
+func clampScore(ctx context.Context, score, min, max int, name string) int {
+	if score < min || score > max {
+		logging.From(ctx).Warn(name+" score out of range, clamping", "score", score)
+		if score < min {
+			return min
+		}
+		if score > max {
+			return max
+		}
+	}
+	return score
 }

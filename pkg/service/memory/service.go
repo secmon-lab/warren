@@ -110,12 +110,16 @@ func (c *ScoringConfig) Validate() error {
 		return goerr.New("SearchMaxCandidates must be positive", goerr.V("value", c.SearchMaxCandidates))
 	}
 
-	// Ranking weights should be non-negative and sum to a reasonable value
+	// Ranking weights should be non-negative and sum to 1.0
 	if c.RankSimilarityWeight < 0 || c.RankQualityWeight < 0 || c.RankRecencyWeight < 0 {
 		return goerr.New("ranking weights must be non-negative",
 			goerr.V("similarity", c.RankSimilarityWeight),
 			goerr.V("quality", c.RankQualityWeight),
 			goerr.V("recency", c.RankRecencyWeight))
+	}
+	const epsilon = 0.001
+	if totalWeight := c.RankSimilarityWeight + c.RankQualityWeight + c.RankRecencyWeight; totalWeight < 1.0-epsilon || totalWeight > 1.0+epsilon {
+		return goerr.New("ranking weights must sum to 1.0", goerr.V("total", totalWeight))
 	}
 
 	// Recency half-life must be positive

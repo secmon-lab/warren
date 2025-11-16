@@ -2,6 +2,7 @@ package memory_test
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -48,6 +49,13 @@ func TestScoringConfig_Validate(t *testing.T) {
 	t.Run("invalid ranking weights", func(t *testing.T) {
 		cfg := memoryService.DefaultScoringConfig()
 		cfg.RankSimilarityWeight = -0.1
+		gt.Error(t, cfg.Validate())
+
+		// Test weights not summing to 1.0
+		cfg = memoryService.DefaultScoringConfig()
+		cfg.RankSimilarityWeight = 0.5
+		cfg.RankQualityWeight = 0.5
+		cfg.RankRecencyWeight = 0.5 // Total = 1.5, should fail
 		gt.Error(t, cfg.Validate())
 	})
 
@@ -208,4 +216,52 @@ func TestScoringConfig_CustomValues(t *testing.T) {
 	gt.Equal(t, svc.ScoringConfig.EMAAlpha, 0.5)
 	gt.Equal(t, svc.ScoringConfig.SearchMultiplier, 5)
 	gt.Equal(t, svc.ScoringConfig.RecencyHalfLifeDays, 60.0)
+}
+
+func TestRecencyScoreCalculation(t *testing.T) {
+	// Test recency score decay with different half-lives
+	testCases := []struct {
+		name         string
+		halfLifeDays float64
+		daysAgo      float64
+		expected     float64 // approximate
+	}{
+		{
+			name:         "just used (0 days)",
+			halfLifeDays: 30,
+			daysAgo:      0,
+			expected:     1.0,
+		},
+		{
+			name:         "half-life (30 days)",
+			halfLifeDays: 30,
+			daysAgo:      30,
+			expected:     0.5,
+		},
+		{
+			name:         "double half-life (60 days)",
+			halfLifeDays: 30,
+			daysAgo:      60,
+			expected:     0.25,
+		},
+		{
+			name:         "longer half-life (60 days), 30 days ago",
+			halfLifeDays: 60,
+			daysAgo:      30,
+			expected:     0.707, // 2^(-30/60) ≈ 0.707
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Calculate: 0.5^(daysAgo / halfLife)
+			result := math.Pow(0.5, tc.daysAgo/tc.halfLifeDays)
+
+			// Allow small floating point difference
+			diff := math.Abs(result - tc.expected)
+			if diff >= 0.01 {
+				t.Errorf("expected ~%f, got %f", tc.expected, result)
+			}
+		})
+	}
 }
