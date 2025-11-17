@@ -226,7 +226,7 @@ func TestAlertSNS(t *testing.T) {
 		ApiUsecases:              uc,
 	}
 
-	srv := server.New(ucInterface)
+	srv := server.New(ucInterface, server.WithNoAuthorization(true))
 
 	ctx := server.WithHTTPClient(t.Context(), &mockHTTPClient{
 		GetFunc: func(url string) (*http.Response, error) {
@@ -254,7 +254,7 @@ func TestAlertSNS(t *testing.T) {
 
 func TestGraphQLHandler(t *testing.T) {
 	repo := repository.NewMemory()
-	server := server.New(nil, server.WithGraphQLRepo(repo))
+	server := server.New(nil, server.WithGraphQLRepo(repo), server.WithNoAuthorization(true))
 
 	// Add test data
 	ticketID := types.TicketID("test-ticket-1")
