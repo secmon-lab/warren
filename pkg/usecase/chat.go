@@ -99,7 +99,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	// Authorize agent execution
 	if err := x.authorizeAgentRequest(ctx, message); err != nil {
 		// Provide detailed feedback to user via Slack
-		if errors.Is(err, goerr.Unwrap(err)) && strings.Contains(err.Error(), "agent authorization policy not defined") {
+		if errors.Is(err, errAgentAuthPolicyNotDefined) {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nAgent execution policy is not defined. Please configure the `auth.agent` policy or use `--no-authorization` flag for development.\n\nSee: https://docs.warren.secmon-lab.com/policy.md#agent-execution-authorization")
 		} else {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nYou are not authorized to execute agent requests. Please contact your administrator if you believe this is an error.")
@@ -588,7 +588,7 @@ func (x *UseCases) authorizeAgentRequest(ctx context.Context, message string) er
 		if errors.Is(err, opaq.ErrNoEvalResult) {
 			// Policy not defined, deny by default
 			logging.From(ctx).Warn("agent authorization policy not defined, denying by default")
-			return goerr.New("agent authorization policy not defined")
+			return goerr.Wrap(errAgentAuthPolicyNotDefined, "agent authorization policy not defined")
 		}
 		return goerr.Wrap(err, "failed to evaluate agent authorization policy")
 	}

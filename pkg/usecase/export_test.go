@@ -81,3 +81,11 @@ func (uc *UseCases) GenerateInitialTicketCommentForTest(ctx context.Context, tic
 func (uc *UseCases) HandleNotice(ctx context.Context, alert *alert.Alert, channel string, notifier interfaces.Notifier) error {
 	return uc.handleNotice(ctx, alert, channel, nil, notifier)
 }
+
+// AuthorizeAgentRequest exports the private authorizeAgentRequest method for testing
+func (uc *UseCases) AuthorizeAgentRequest(ctx context.Context, message string) error {
+	return uc.authorizeAgentRequest(ctx, message)
+}
+
+// ErrAgentAuthPolicyNotDefined exports the private error for testing
+var ErrAgentAuthPolicyNotDefined = errAgentAuthPolicyNotDefined
