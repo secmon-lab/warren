@@ -285,18 +285,29 @@ gcloud firestore databases create \
 # Create Cloud Storage bucket
 gsutil mb gs://warren-storage-$PROJECT_ID
 
-# 3. Create authorization policy (required when removing WARREN_NO_AUTHORIZATION)
+# 3. Create authorization policies (required when removing WARREN_NO_AUTHORIZATION)
 mkdir -p policies/auth
 cat > policies/auth/basic.rego << 'EOF'
-package auth
+package auth.http
 
 default allow = false
 
-# Allow all requests for now (basic setup)
+# Allow all HTTP API requests for now (basic setup)
 # In production, implement proper authorization logic based on:
 # - input.google (Google OAuth claims)
 # - input.iap (Google IAP claims)
 # - input.req (HTTP request details)
+# - input.env (environment variables)
+allow = true
+EOF
+
+cat > policies/auth/agent.rego << 'EOF'
+package auth.agent
+
+# Allow all agent execution requests for now (basic setup)
+# In production, restrict based on:
+# - input.auth.slack.id (Slack user ID)
+# - input.message (command content)
 # - input.env (environment variables)
 allow = true
 EOF

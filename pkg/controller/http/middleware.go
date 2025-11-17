@@ -439,18 +439,13 @@ func authorizeWithPolicy(policy interfaces.PolicyClient, noAuthorization bool) f
 				return
 			}
 
-			if policy == nil {
-				next.ServeHTTP(w, r)
-				return
-			}
-
 			var result struct {
 				Allow bool `json:"allow"`
 			}
 
 			ctx := r.Context()
 			authCtx := auth.BuildContext(ctx)
-			if err := policy.Query(ctx, "data.auth", authCtx, &result); err != nil {
+			if err := policy.Query(ctx, "data.auth.http", authCtx, &result); err != nil {
 				handleError(w, r, goerr.Wrap(err, "failed to authorize request"))
 				return
 			}

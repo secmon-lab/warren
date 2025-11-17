@@ -3,14 +3,17 @@ package usecase
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/strategy/planexec"
+	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
@@ -92,6 +95,17 @@ func (x *UseCases) generateAndSaveExecutionMemory(
 // Message routing is handled via msg.Notify and msg.Trace functions in the context
 func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message string) error {
 	logger := logging.From(ctx)
+
+	// Authorize agent execution
+	if err := x.authorizeAgentRequest(ctx, message); err != nil {
+		// Provide detailed feedback to user via Slack
+		if errors.Is(err, goerr.Unwrap(err)) && strings.Contains(err.Error(), "agent authorization policy not defined") {
+			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nAgent execution policy is not defined. Please configure the `auth.agent` policy or use `--no-authorization` flag for development.\n\nSee: https://docs.warren.secmon-lab.com/policy.md#agent-execution-authorization")
+		} else {
+			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nYou are not authorized to execute agent requests. Please contact your administrator if you believe this is an error.")
+		}
+		return goerr.Wrap(err, "agent authorization failed")
+	}
 
 	// Setup update function for findings - only depends on SlackNotifier for Slack updates
 	slackUpdateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
@@ -549,5 +563,42 @@ func postPlanProgress(ctx context.Context, plan *planexec.Plan, action string) e
 	}
 
 	msg.Trace(ctx, "%s", messageBuilder.String())
+	return nil
+}
+
+// authorizeAgentRequest authorizes agent execution request using policy
+func (x *UseCases) authorizeAgentRequest(ctx context.Context, message string) error {
+	// Bypass authorization check if --no-authorization flag is set
+	if x.noAuthorization {
+		logging.From(ctx).Debug("agent authorization check bypassed due to --no-authorization flag")
+		return nil
+	}
+
+	// Build auth context using domain model
+	authCtx := auth.BuildAgentContext(ctx, message)
+
+	// Query policy
+	var result struct {
+		Allow bool `json:"allow"`
+	}
+
+	query := "data.auth.agent"
+	err := x.policyClient.Query(ctx, query, authCtx, &result)
+	if err != nil {
+		if errors.Is(err, opaq.ErrNoEvalResult) {
+			// Policy not defined, deny by default
+			logging.From(ctx).Warn("agent authorization policy not defined, denying by default")
+			return goerr.New("agent authorization policy not defined")
+		}
+		return goerr.Wrap(err, "failed to evaluate agent authorization policy")
+	}
+
+	logging.From(ctx).Debug("agent authorization result", "input", authCtx, "output", result)
+
+	if !result.Allow {
+		logging.From(ctx).Warn("agent authorization failed", "message", message)
+		return goerr.New("agent request not authorized", goerr.V("message", message))
+	}
+
 	return nil
 }

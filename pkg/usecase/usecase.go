@@ -39,11 +39,12 @@ type UseCases struct {
 	TagUC        *TagUseCase
 
 	// configs
-	timeSpan      time.Duration
-	actionLimit   int
-	findingLimit  int
-	storagePrefix string
-	strictAlert   bool
+	timeSpan        time.Duration
+	actionLimit     int
+	findingLimit    int
+	storagePrefix   string
+	strictAlert     bool
+	noAuthorization bool
 
 	// GenAI
 	promptService interfaces.PromptService
@@ -141,6 +142,12 @@ func WithStoragePrefix(storagePrefix string) Option {
 func WithStrictAlert(strict bool) Option {
 	return func(u *UseCases) {
 		u.strictAlert = strict
+	}
+}
+
+func WithNoAuthorization(noAuthorization bool) Option {
+	return func(u *UseCases) {
+		u.noAuthorization = noAuthorization
 	}
 }
 

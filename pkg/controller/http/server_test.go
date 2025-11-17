@@ -97,7 +97,7 @@ func TestValidateGoogleIDToken(t *testing.T) {
 				V2              any
 				QueryOptions    []opaq.QueryOption
 			}) {
-				gt.Equal(t, v.S, "data.auth")
+				gt.Equal(t, v.S, "data.auth.http")
 			}).
 			At(1, func(t testing.TB, v struct {
 				ContextMoqParam context.Context
