@@ -110,7 +110,7 @@ func BuildAgentContext(ctx context.Context, message string) AgentContext {
 	envVars := os.Environ()
 	agentCtx.Env = make(map[string]string)
 	for _, v := range envVars {
-		parts := strings.Split(v, "=")
+		parts := strings.SplitN(v, "=", 2)
 		if len(parts) == 2 {
 			agentCtx.Env[parts[0]] = parts[1]
 		}
