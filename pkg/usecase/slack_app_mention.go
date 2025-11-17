@@ -7,6 +7,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/service/command"
+	"github.com/secmon-lab/warren/pkg/utils/authctx"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/user"
@@ -26,6 +27,12 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 	ctx = msg.WithUpdatable(ctx, threadSvc.Reply, threadSvc.NewStateFunc, threadSvc.NewUpdatableMessage)
 	if slackMsg.User() != nil {
 		ctx = user.WithUserID(ctx, slackMsg.User().ID)
+		// Add Slack user to authctx for authorization
+		if subject, err := authctx.NewSubjectFromSlackUser(slackMsg.User().ID); err == nil {
+			ctx = authctx.WithSubject(ctx, subject)
+		} else {
+			logger.Warn("failed to create authctx subject from Slack user", "error", err)
+		}
 	}
 
 	// Nothing to do
