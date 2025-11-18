@@ -57,11 +57,18 @@ func (s *Service) generateMemoryFeedback(
 		improvements = []string{}
 	}
 
+	// Format ExecResult content for template
+	var execResultContent string
+	if execResult != nil && len(execResult.Texts) > 0 {
+		// Join all texts with newlines
+		execResultContent = strings.Join(execResult.Texts, "\n")
+	}
+
 	promptParams := map[string]any{
-		"TaskQuery":  taskQuery,
-		"ExecResult": execResult,
-		"ExecError":  execError,
-		"JSONSchema": jsonSchemaStr,
+		"TaskQuery":          taskQuery,
+		"ExecResultContent":  execResultContent,
+		"ExecError":          execError,
+		"JSONSchema":         jsonSchemaStr,
 		// Pass memory fields explicitly
 		"MemoryTaskQuery":    mem.TaskQuery,
 		"MemorySuccesses":    successes,
@@ -69,7 +76,7 @@ func (s *Service) generateMemoryFeedback(
 		"MemoryImprovements": improvements,
 	}
 
-	promptText, err := prompt.Generate(ctx, feedbackPromptTemplate, promptParams)
+	promptText, err := prompt.GenerateWithStruct(ctx, feedbackPromptTemplate, promptParams)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to generate feedback prompt")
 	}
