@@ -349,12 +349,14 @@ func (x *Service) GetConversationHistory(
 	var messages []ConversationMessage
 	cursor := ""
 
-	// Collect all messages first
-	var allMessages []slack.Message
+	// Define message fetcher function type to abstract API differences
+	type messageFetcher func(ctx context.Context, cursor string) (msgs []slack.Message, hasMore bool, nextCursor string, err error)
+
+	var fetcher messageFetcher
 
 	if threadID != "" {
-		// Get thread messages using GetConversationReplies
-		for {
+		// Fetcher for thread messages
+		fetcher = func(ctx context.Context, cursor string) ([]slack.Message, bool, string, error) {
 			params := &slack.GetConversationRepliesParameters{
 				ChannelID: channelID,
 				Timestamp: threadID,
@@ -362,56 +364,51 @@ func (x *Service) GetConversationHistory(
 				Limit:     100, // API limit per request
 				Inclusive: true,
 			}
-
 			msgs, hasMore, nextCursor, err := x.client.GetConversationRepliesContext(ctx, params)
 			if err != nil {
-				return nil, goerr.Wrap(err, "failed to get conversation replies")
+				return nil, false, "", goerr.Wrap(err, "failed to get conversation replies")
 			}
-
-			allMessages = append(allMessages, msgs...)
-
-			// Check limit
-			if limit > 0 && len(allMessages) >= limit {
-				allMessages = allMessages[:limit]
-				break
-			}
-
-			if !hasMore {
-				break
-			}
-			cursor = nextCursor
+			return msgs, hasMore, nextCursor, nil
 		}
 	} else {
-		// Get channel messages using GetConversationHistory
-		for {
+		// Fetcher for channel messages
+		fetcher = func(ctx context.Context, cursor string) ([]slack.Message, bool, string, error) {
 			params := &slack.GetConversationHistoryParameters{
 				ChannelID: channelID,
 				Cursor:    cursor,
 				Limit:     100, // API limit per request
 			}
-
 			if oldest > 0 {
 				params.Oldest = fmt.Sprintf("%d", oldest)
 			}
-
 			resp, err := x.client.GetConversationHistoryContext(ctx, params)
 			if err != nil {
-				return nil, goerr.Wrap(err, "failed to get conversation history")
+				return nil, false, "", goerr.Wrap(err, "failed to get conversation history")
 			}
-
-			allMessages = append(allMessages, resp.Messages...)
-
-			// Check limit
-			if limit > 0 && len(allMessages) >= limit {
-				allMessages = allMessages[:limit]
-				break
-			}
-
-			if !resp.HasMore {
-				break
-			}
-			cursor = resp.ResponseMetaData.NextCursor
+			return resp.Messages, resp.HasMore, resp.ResponseMetaData.NextCursor, nil
 		}
+	}
+
+	// Collect all messages using the appropriate fetcher
+	var allMessages []slack.Message
+	for {
+		msgs, hasMore, nextCursor, err := fetcher(ctx, cursor)
+		if err != nil {
+			return nil, err
+		}
+
+		allMessages = append(allMessages, msgs...)
+
+		// Check limit
+		if limit > 0 && len(allMessages) >= limit {
+			allMessages = allMessages[:limit]
+			break
+		}
+
+		if !hasMore {
+			break
+		}
+		cursor = nextCursor
 	}
 
 	// Collect unique user IDs
