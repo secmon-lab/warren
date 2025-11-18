@@ -276,6 +276,7 @@ func cmdServe() *cli.Command {
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(toolSets),
 				usecase.WithStrictAlert(strictAlert),
+				usecase.WithNoAuthorization(noAuthorization),
 				usecase.WithTagService(tagService),
 				usecase.WithMemoryService(memoryService),
 			}

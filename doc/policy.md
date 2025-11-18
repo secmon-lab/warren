@@ -284,17 +284,21 @@ publish := "alert"
 
 ### Authorization Policy
 
-**Package**: `auth`
-**When**: On every API request
+Warren provides two types of authorization policies to control access:
+
+#### HTTP API Authorization
+
+**Package**: `auth.http`
+**When**: On every HTTP API request
 **Input**: Request context (IAP, Google ID, SNS, headers, env)
 **Output**: `allow = true` or `false`
 
-Authorization policies control access to Warren's API endpoints:
+HTTP authorization policies control access to Warren's API endpoints:
 
 **Structure**:
 
 ```rego
-package auth
+package auth.http
 
 default allow = false
 
@@ -324,7 +328,80 @@ allow if {
 - `input.req.*`: HTTP request details (method, path, headers, body)
 - `input.env.*`: All environment variables
 
-See the original policy.md sections on Authorization Policies for detailed examples and context structure.
+#### Agent Execution Authorization
+
+**Package**: `auth.agent`
+**When**: Before executing AI agent (Slack chat, CLI chat)
+**Input**: Message text, environment variables, authenticated subject
+**Output**: `allow = true` or `false`
+
+Agent authorization policies control who can execute AI agent investigations through Slack mentions or CLI:
+
+**Structure**:
+
+```rego
+package auth.agent
+
+# Default policy: Allow all agent execution requests
+allow := true
+
+# Example 1: Allow only specific Slack users
+# allow {
+#     input.auth.slack.id == "U12345678"
+# }
+
+# Example 2: Allow based on environment variable
+# allow {
+#     input.env.WARREN_AGENT_AUTH_MODE == "permissive"
+# }
+
+# Example 3: Deny specific commands
+# allow {
+#     not contains(input.message, "dangerous_command")
+# }
+```
+
+**Input Structure**:
+
+```json
+{
+  "message": "User's message to the agent",
+  "env": {
+    "WARREN_ENV_VAR": "value",
+    ...
+  },
+  "auth": {
+    "slack": {
+      "id": "U12345678"
+    }
+  }
+}
+```
+
+**Context Available**:
+
+- `input.message`: The message text sent to the agent
+- `input.env.*`: All environment variables
+- `input.auth.slack`: Slack authentication information (if available)
+  - `id`: Slack user ID
+
+**Security Model**:
+
+Agent authorization follows a **deny-by-default** model:
+- If no policy is defined, all agent execution requests are **denied**
+- If policy evaluation fails, the request is **denied**
+- Only explicit `allow = true` permits agent execution
+
+**Key Points**:
+
+- Agent authorization is evaluated at the start of the `Chat()` usecase
+- On denial, user receives: "🚫 You are not authorized to execute this agent request."
+- Policy is optional - set `WARREN_POLICY` to enable
+- If policy client is not configured, agent execution is allowed (backward compatibility)
+
+**Migration Note**:
+
+If you have existing authorization policies using `package auth`, you must update them to `package auth.http` for HTTP API authorization. The `auth` package name is no longer supported.
 
 ## Pipeline Architecture
 
@@ -672,13 +749,31 @@ publish := "alert"
 
 ### Authorization Always Denied
 
-**Symptoms**: API requests fail with 403 Forbidden
+**Symptoms**: API requests fail with 403 Forbidden, or agent execution is blocked
 
 **Solutions**:
-1. Check auth policy package is exactly `auth` (not `auth.api`)
+
+For **HTTP API Authorization**:
+1. Check auth policy package is exactly `auth.http` (not `auth` or `auth.api`)
 2. Verify `default allow = false` has at least one `allow if` rule
 3. Debug context: Add `print("Auth input:", input)` to see what's available
 4. Start permissive: `allow = true` temporarily to test (remove in production!)
 5. Check that `WARREN_NO_AUTHORIZATION` flag is NOT set (removes auth entirely)
+
+For **Agent Authorization**:
+1. Check policy package is exactly `auth.agent`
+2. Verify at least one `allow` rule matches your use case
+3. Remember: deny-by-default - policy must explicitly allow
+4. For testing: Use simple `allow = true` to verify policy is loading
+5. Check Slack user ID in context: Add `print("Agent auth input:", input)` to debug
+6. Verify Slack user info is available at `input.auth.slack.id` (not `input.authctx.slack_user.id`)
+
+**Common Migration Issue**:
+
+If you recently upgraded and API requests are failing:
+- Old: `package auth`
+- New: `package auth.http`
+
+Update your policy file's package declaration to fix this.
 
 For more detailed troubleshooting and examples, see the sections in the original policy documentation.

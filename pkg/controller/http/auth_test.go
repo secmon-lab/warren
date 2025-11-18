@@ -22,7 +22,7 @@ func TestAuthEndpointsWithNoAuthn(t *testing.T) {
 	noAuthnUC := usecase.NewNoAuthnUseCase(repo)
 	uc := usecase.New()
 
-	srv := server.New(uc, server.WithAuthUseCase(noAuthnUC))
+	srv := server.New(uc, server.WithAuthUseCase(noAuthnUC), server.WithNoAuthorization(true))
 
 	t.Run("GET /api/auth/me returns anonymous user", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
@@ -94,6 +94,7 @@ func TestAuthMiddlewareWithNoAuthn(t *testing.T) {
 	srv := server.New(uc,
 		server.WithAuthUseCase(noAuthnUC),
 		server.WithGraphQLRepo(repo),
+		server.WithNoAuthorization(true),
 	)
 
 	t.Run("GraphQL endpoint accessible without cookies", func(t *testing.T) {
@@ -115,7 +116,7 @@ func TestAuthWithRegularAuth(t *testing.T) {
 	authUC := usecase.NewAuthUseCase(repo, nil, "test-client-id", "test-client-secret", "http://localhost/api/auth/callback")
 	uc := usecase.New()
 
-	srv := server.New(uc, server.WithAuthUseCase(authUC))
+	srv := server.New(uc, server.WithAuthUseCase(authUC), server.WithNoAuthorization(true))
 
 	t.Run("GET /api/auth/me requires authentication", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
@@ -179,6 +180,7 @@ func TestAuthMiddlewareProtection(t *testing.T) {
 	srv := server.New(uc,
 		server.WithAuthUseCase(authUC),
 		server.WithGraphQLRepo(repo),
+		server.WithNoAuthorization(true),
 	)
 
 	t.Run("GraphQL endpoint requires authentication", func(t *testing.T) {
@@ -232,6 +234,7 @@ func TestE2ENoAuthnFlow(t *testing.T) {
 	srv := server.New(uc,
 		server.WithAuthUseCase(noAuthnUC),
 		server.WithGraphQLRepo(repo), // Enable GraphQL for testing
+		server.WithNoAuthorization(true),
 	)
 
 	// Create test server
@@ -310,6 +313,7 @@ func TestE2ERegularAuthFlow(t *testing.T) {
 	srv := server.New(uc,
 		server.WithAuthUseCase(authUC),
 		server.WithGraphQLRepo(repo),
+		server.WithNoAuthorization(true),
 	)
 
 	// Create test server

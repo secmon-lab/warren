@@ -26,6 +26,9 @@ Warren is an AI agent and Slack-based security alert management tool. It process
 - Use `github.com/m-mizutani/goerr/v2` for error handling
 - Must wrap errors with `goerr.Wrap` to maintain error context
 - Add helpful variables with `goerr.V` for debugging
+- **NEVER check error messages using `strings.Contains(err.Error(), ...)`**
+- **ALWAYS use `errors.Is(err, targetErr)` or `errors.As(err, &target)` for error type checking**
+- Error discrimination must be done by error types, not by parsing error messages
 
 ### Testing with gt Package
 - Use `github.com/m-mizutani/gt` package for type-safe testing

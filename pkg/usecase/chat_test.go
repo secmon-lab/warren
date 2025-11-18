@@ -2,6 +2,8 @@ package usecase_test
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +14,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/llm/gemini"
 	"github.com/m-mizutani/gt"
+	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -21,6 +24,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/repository"
 	storage_svc "github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/usecase"
+	"github.com/secmon-lab/warren/pkg/utils/authctx"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/ptr"
 	"google.golang.org/genai"
@@ -33,6 +37,14 @@ func TestHandlePrompt(t *testing.T) {
 	mockStorage := storage.NewMock()
 
 	mockPolicy := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, input, result any, opts ...opaq.QueryOption) error {
+			// Allow agent authorization by default for existing tests
+			if query == "data.auth.agent" {
+				gt.NoError(t, json.Unmarshal([]byte(`{"allow":true}`), &result))
+				return nil
+			}
+			return nil
+		},
 		SourcesFunc: func() map[string]string {
 			return map[string]string{}
 		},
@@ -180,6 +192,194 @@ func TestHandlePrompt(t *testing.T) {
 	gt.Equal(t, newSessionCount, 4)
 }
 
+func TestChatAgentAuthorization(t *testing.T) {
+	ctx := t.Context()
+
+	t.Run("Authorization allows request", func(t *testing.T) {
+		mockRepo := repository.NewMemory()
+		mockStorage := storage.NewMock()
+
+		mockPolicy := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, query string, input, result any, opts ...opaq.QueryOption) error {
+				if query == "data.auth.agent" {
+					gt.NoError(t, json.Unmarshal([]byte(`{"allow":true}`), &result))
+					return nil
+				}
+				return nil
+			},
+			SourcesFunc: func() map[string]string {
+				return map[string]string{}
+			},
+		}
+
+		mockLLM := &mock.LLMClientMock{
+			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+				return &mock.LLMSessionMock{
+					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+						// Mock plan creation and execution responses
+						for _, inp := range input {
+							if text, ok := inp.(gollem.Text); ok {
+								inputStr := string(text)
+								if strings.Contains(inputStr, "clarify") || strings.Contains(inputStr, "goal") {
+									return &gollem.Response{
+										Texts: []string{`{"clarified_goal": "test query", "approach": "new_plan", "reasoning": "This task requires analysis"}`},
+									}, nil
+								}
+								if strings.Contains(inputStr, "plan") {
+									planJSON := `{
+										"input": "test query",
+										"todos": [
+											{
+												"id": "1",
+												"description": "Complete the task",
+												"intent": "Finish test"
+											}
+										]
+									}`
+									return &gollem.Response{Texts: []string{planJSON}}, nil
+								}
+							}
+						}
+						return &gollem.Response{
+							Texts: []string{`{"action": "complete", "reason": "Analysis complete", "completion": "Test completed successfully"}`},
+						}, nil
+					},
+					HistoryFunc: func() (*gollem.History, error) {
+						return &gollem.History{Version: 1}, nil
+					},
+				}, nil
+			},
+		}
+
+		uc := usecase.New(
+			usecase.WithRepository(mockRepo),
+			usecase.WithStorageClient(mockStorage),
+			usecase.WithPolicyClient(mockPolicy),
+			usecase.WithLLMClient(mockLLM),
+		)
+
+		ticketID := types.NewTicketID()
+		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		gt.NoError(t, err)
+	})
+
+	t.Run("Authorization denies request", func(t *testing.T) {
+		mockRepo := repository.NewMemory()
+		mockStorage := storage.NewMock()
+
+		mockPolicy := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, query string, input, result any, opts ...opaq.QueryOption) error {
+				if query == "data.auth.agent" {
+					gt.NoError(t, json.Unmarshal([]byte(`{"allow":false}`), &result))
+					return nil
+				}
+				return nil
+			},
+			SourcesFunc: func() map[string]string {
+				return map[string]string{}
+			},
+		}
+
+		uc := usecase.New(
+			usecase.WithRepository(mockRepo),
+			usecase.WithStorageClient(mockStorage),
+			usecase.WithPolicyClient(mockPolicy),
+		)
+
+		ticketID := types.NewTicketID()
+		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		gt.Error(t, err)
+		gt.True(t, strings.Contains(err.Error(), "agent request not authorized"))
+	})
+
+	t.Run("Policy not defined denies by default", func(t *testing.T) {
+		mockRepo := repository.NewMemory()
+		mockStorage := storage.NewMock()
+
+		mockPolicy := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, query string, input, result any, opts ...opaq.QueryOption) error {
+				if query == "data.auth.agent" {
+					return opaq.ErrNoEvalResult
+				}
+				return nil
+			},
+			SourcesFunc: func() map[string]string {
+				return map[string]string{}
+			},
+		}
+
+		uc := usecase.New(
+			usecase.WithRepository(mockRepo),
+			usecase.WithStorageClient(mockStorage),
+			usecase.WithPolicyClient(mockPolicy),
+		)
+
+		ticketID := types.NewTicketID()
+		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		gt.Error(t, err)
+		gt.True(t, strings.Contains(err.Error(), "agent authorization policy not defined"))
+	})
+
+	t.Run("NoAuthorization flag bypasses authorization", func(t *testing.T) {
+		mockRepo := repository.NewMemory()
+		mockStorage := storage.NewMock()
+
+		// Policy that denies all requests
+		mockPolicy := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, query string, input, result any, opts ...opaq.QueryOption) error {
+				// This should NOT be called due to noAuthorization flag
+				t.Error("Policy Query should not be called when noAuthorization is true")
+				return nil
+			},
+			SourcesFunc: func() map[string]string {
+				return map[string]string{}
+			},
+		}
+
+		mockLLM := &mock.LLMClientMock{
+			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+				return &mock.LLMSessionMock{
+					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+						for _, inp := range input {
+							if text, ok := inp.(gollem.Text); ok {
+								inputStr := string(text)
+								if strings.Contains(inputStr, "clarify") || strings.Contains(inputStr, "goal") {
+									return &gollem.Response{
+										Texts: []string{`{"clarified_goal": "test query", "approach": "new_plan", "reasoning": "This task requires analysis"}`},
+									}, nil
+								}
+								if strings.Contains(inputStr, "plan") {
+									return &gollem.Response{Texts: []string{`{"input": "test query", "todos": [{"id": "1", "description": "Complete", "intent": "Finish"}]}`}}, nil
+								}
+							}
+						}
+						return &gollem.Response{
+							Texts: []string{`{"action": "complete", "reason": "Done", "completion": "Success"}`},
+						}, nil
+					},
+					HistoryFunc: func() (*gollem.History, error) {
+						return &gollem.History{Version: 1}, nil
+					},
+				}, nil
+			},
+		}
+
+		// Set noAuthorization flag
+		uc := usecase.New(
+			usecase.WithRepository(mockRepo),
+			usecase.WithStorageClient(mockStorage),
+			usecase.WithPolicyClient(mockPolicy),
+			usecase.WithLLMClient(mockLLM),
+			usecase.WithNoAuthorization(true),
+		)
+
+		ticketID := types.NewTicketID()
+		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		// Should succeed without calling policy
+		gt.NoError(t, err)
+	})
+}
+
 func newLLMClient(t *testing.T) gollem.LLMClient {
 	projectID, ok := os.LookupEnv("TEST_GEMINI_PROJECT_ID")
 	if !ok {
@@ -282,6 +482,14 @@ func TestChatErrorNotifications(t *testing.T) {
 		}
 
 		mockPolicy := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, query string, input, result any, opts ...opaq.QueryOption) error {
+				// Allow agent authorization by default for existing tests
+				if query == "data.auth.agent" {
+					gt.NoError(t, json.Unmarshal([]byte(`{"allow":true}`), &result))
+					return nil
+				}
+				return nil
+			},
 			SourcesFunc: func() map[string]string {
 				return map[string]string{}
 			},
@@ -367,6 +575,14 @@ func TestChatErrorNotifications(t *testing.T) {
 
 		mockStorage := storage.NewMock()
 		mockPolicy := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, query string, input, result any, opts ...opaq.QueryOption) error {
+				// Allow agent authorization by default for existing tests
+				if query == "data.auth.agent" {
+					gt.NoError(t, json.Unmarshal([]byte(`{"allow":true}`), &result))
+					return nil
+				}
+				return nil
+			},
 			SourcesFunc: func() map[string]string {
 				return map[string]string{}
 			},
@@ -432,6 +648,14 @@ func TestChatErrorNotifications(t *testing.T) {
 		}
 
 		mockPolicy := &mock.PolicyClientMock{
+			QueryFunc: func(ctx context.Context, query string, input, result any, opts ...opaq.QueryOption) error {
+				// Allow agent authorization by default for existing tests
+				if query == "data.auth.agent" {
+					gt.NoError(t, json.Unmarshal([]byte(`{"allow":true}`), &result))
+					return nil
+				}
+				return nil
+			},
 			SourcesFunc: func() map[string]string {
 				return map[string]string{}
 			},
@@ -507,5 +731,294 @@ func TestChatErrorNotifications(t *testing.T) {
 		// We expect an error during save, but the notification might be sent or the operation might fail
 		// The important thing is that the Chat function returns an error due to save failure
 		_ = hasHistorySaveError // Error might be returned instead of notified
+	})
+}
+
+func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Allow policy from file", func(t *testing.T) {
+		mockRepo := repository.NewMemory()
+		mockStorage := storage.NewMock()
+
+		// Load policy from file
+		policyClient, err := opaq.New(
+			opaq.Files("testdata/policy/auth_allow.rego"),
+		)
+		gt.NoError(t, err)
+
+		mockLLM := &mock.LLMClientMock{
+			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+				return &mock.LLMSessionMock{
+					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+						for _, inp := range input {
+							if text, ok := inp.(gollem.Text); ok {
+								inputStr := string(text)
+								if strings.Contains(inputStr, "clarify") || strings.Contains(inputStr, "goal") {
+									return &gollem.Response{
+										Texts: []string{`{"clarified_goal": "test query", "approach": "new_plan", "reasoning": "This task requires analysis"}`},
+									}, nil
+								}
+								if strings.Contains(inputStr, "plan") {
+									return &gollem.Response{Texts: []string{`{"input": "test query", "todos": [{"id": "1", "description": "Complete", "intent": "Finish"}]}`}}, nil
+								}
+							}
+						}
+						return &gollem.Response{
+							Texts: []string{`{"action": "complete", "reason": "Done", "completion": "Success"}`},
+						}, nil
+					},
+					HistoryFunc: func() (*gollem.History, error) {
+						return &gollem.History{Version: 1}, nil
+					},
+				}, nil
+			},
+		}
+
+		uc := usecase.New(
+			usecase.WithRepository(mockRepo),
+			usecase.WithStorageClient(mockStorage),
+			usecase.WithPolicyClient(policyClient),
+			usecase.WithLLMClient(mockLLM),
+		)
+
+		ticketID := types.NewTicketID()
+		err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		gt.NoError(t, err)
+	})
+
+	t.Run("Deny policy from file", func(t *testing.T) {
+		mockRepo := repository.NewMemory()
+		mockStorage := storage.NewMock()
+
+		// Load policy from file
+		policyClient, err := opaq.New(
+			opaq.Files("testdata/policy/auth_deny.rego"),
+		)
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithRepository(mockRepo),
+			usecase.WithStorageClient(mockStorage),
+			usecase.WithPolicyClient(policyClient),
+		)
+
+		ticketID := types.NewTicketID()
+		err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		gt.Error(t, err)
+		gt.S(t, err.Error()).Contains("agent request not authorized")
+	})
+
+	t.Run("User-based policy from file - allowed user", func(t *testing.T) {
+		mockRepo := repository.NewMemory()
+		mockStorage := storage.NewMock()
+
+		// Load policy from file
+		policyClient, err := opaq.New(
+			opaq.Files("testdata/policy/auth_user_based.rego"),
+		)
+		gt.NoError(t, err)
+
+		mockLLM := &mock.LLMClientMock{
+			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+				return &mock.LLMSessionMock{
+					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+						for _, inp := range input {
+							if text, ok := inp.(gollem.Text); ok {
+								inputStr := string(text)
+								if strings.Contains(inputStr, "clarify") || strings.Contains(inputStr, "goal") {
+									return &gollem.Response{
+										Texts: []string{`{"clarified_goal": "test query", "approach": "new_plan", "reasoning": "This task requires analysis"}`},
+									}, nil
+								}
+								if strings.Contains(inputStr, "plan") {
+									return &gollem.Response{Texts: []string{`{"input": "test query", "todos": [{"id": "1", "description": "Complete", "intent": "Finish"}]}`}}, nil
+								}
+							}
+						}
+						return &gollem.Response{
+							Texts: []string{`{"action": "complete", "reason": "Done", "completion": "Success"}`},
+						}, nil
+					},
+					HistoryFunc: func() (*gollem.History, error) {
+						return &gollem.History{Version: 1}, nil
+					},
+				}, nil
+			},
+		}
+
+		// Set allowed user in context using authctx
+		ctxWithUser := authctx.WithSubject(ctx, authctx.Subject{
+			Type:   authctx.SubjectTypeSlack,
+			UserID: "U_ALLOWED_USER",
+		})
+
+		uc := usecase.New(
+			usecase.WithRepository(mockRepo),
+			usecase.WithStorageClient(mockStorage),
+			usecase.WithPolicyClient(policyClient),
+			usecase.WithLLMClient(mockLLM),
+		)
+
+		ticketID := types.NewTicketID()
+		err = uc.Chat(ctxWithUser, &ticket.Ticket{ID: ticketID}, "test message")
+		gt.NoError(t, err)
+	})
+
+	t.Run("User-based policy from file - denied user", func(t *testing.T) {
+		mockRepo := repository.NewMemory()
+		mockStorage := storage.NewMock()
+
+		// Load policy from file
+		policyClient, err := opaq.New(
+			opaq.Files("testdata/policy/auth_user_based.rego"),
+		)
+		gt.NoError(t, err)
+
+		// Set different user in context using authctx
+		ctxWithUser := authctx.WithSubject(ctx, authctx.Subject{
+			Type:   authctx.SubjectTypeSlack,
+			UserID: "U_DENIED_USER",
+		})
+
+		uc := usecase.New(
+			usecase.WithRepository(mockRepo),
+			usecase.WithStorageClient(mockStorage),
+			usecase.WithPolicyClient(policyClient),
+		)
+
+		ticketID := types.NewTicketID()
+		err = uc.Chat(ctxWithUser, &ticket.Ticket{ID: ticketID}, "test message")
+		gt.Error(t, err)
+		gt.S(t, err.Error()).Contains("agent request not authorized")
+	})
+
+	t.Run("Policy not defined returns specific error", func(t *testing.T) {
+		mockRepo := repository.NewMemory()
+		mockStorage := storage.NewMock()
+
+		// Create policy client without auth.agent policy (empty policy)
+		policyClient, err := opaq.New(opaq.DataMap(map[string]string{}))
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithRepository(mockRepo),
+			usecase.WithStorageClient(mockStorage),
+			usecase.WithPolicyClient(policyClient),
+		)
+
+		ticketID := types.NewTicketID()
+		err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		gt.Error(t, err)
+
+		// Verify the error is errAgentAuthPolicyNotDefined by checking the message
+		gt.S(t, err.Error()).Contains("agent authorization policy not defined")
+	})
+}
+
+func TestAuthorizeAgentRequest(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Policy allows request", func(t *testing.T) {
+		policyClient, err := opaq.New(
+			opaq.Files("testdata/policy/auth_allow.rego"),
+		)
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithPolicyClient(policyClient),
+		)
+
+		err = uc.AuthorizeAgentRequest(ctx, "test message")
+		gt.NoError(t, err)
+	})
+
+	t.Run("Policy denies request", func(t *testing.T) {
+		policyClient, err := opaq.New(
+			opaq.Files("testdata/policy/auth_deny.rego"),
+		)
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithPolicyClient(policyClient),
+		)
+
+		err = uc.AuthorizeAgentRequest(ctx, "test message")
+		gt.Error(t, err)
+		gt.S(t, err.Error()).Contains("agent request not authorized")
+	})
+
+	t.Run("Policy not defined returns errAgentAuthPolicyNotDefined", func(t *testing.T) {
+		// Empty policy (no auth.agent defined)
+		policyClient, err := opaq.New(opaq.DataMap(map[string]string{}))
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithPolicyClient(policyClient),
+		)
+
+		err = uc.AuthorizeAgentRequest(ctx, "test message")
+		gt.Error(t, err)
+
+		// Verify the error is errAgentAuthPolicyNotDefined using errors.Is
+		gt.True(t, errors.Is(err, usecase.ErrAgentAuthPolicyNotDefined))
+		gt.S(t, err.Error()).Contains("agent authorization policy not defined")
+	})
+
+	t.Run("NoAuthorization flag bypasses policy check", func(t *testing.T) {
+		// Use deny policy - should be bypassed
+		policyClient, err := opaq.New(
+			opaq.Files("testdata/policy/auth_deny.rego"),
+		)
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithPolicyClient(policyClient),
+			usecase.WithNoAuthorization(true),
+		)
+
+		err = uc.AuthorizeAgentRequest(ctx, "test message")
+		gt.NoError(t, err)
+	})
+
+	t.Run("User-based policy with allowed user", func(t *testing.T) {
+		policyClient, err := opaq.New(
+			opaq.Files("testdata/policy/auth_user_based.rego"),
+		)
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithPolicyClient(policyClient),
+		)
+
+		// Set allowed user in context
+		ctxWithUser := authctx.WithSubject(ctx, authctx.Subject{
+			Type:   authctx.SubjectTypeSlack,
+			UserID: "U_ALLOWED_USER",
+		})
+
+		err = uc.AuthorizeAgentRequest(ctxWithUser, "test message")
+		gt.NoError(t, err)
+	})
+
+	t.Run("User-based policy with denied user", func(t *testing.T) {
+		policyClient, err := opaq.New(
+			opaq.Files("testdata/policy/auth_user_based.rego"),
+		)
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithPolicyClient(policyClient),
+		)
+
+		// Set denied user in context
+		ctxWithUser := authctx.WithSubject(ctx, authctx.Subject{
+			Type:   authctx.SubjectTypeSlack,
+			UserID: "U_DENIED_USER",
+		})
+
+		err = uc.AuthorizeAgentRequest(ctxWithUser, "test message")
+		gt.Error(t, err)
+		gt.S(t, err.Error()).Contains("agent request not authorized")
 	})
 }

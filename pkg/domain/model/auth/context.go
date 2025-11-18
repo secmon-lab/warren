@@ -7,6 +7,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
+	"github.com/secmon-lab/warren/pkg/utils/authctx"
 )
 
 type contextKey string
@@ -84,4 +85,36 @@ func BuildContext(ctx context.Context) Context {
 	}
 
 	return authCtx
+}
+
+// BuildAgentContext creates AgentContext from Go context and message
+func BuildAgentContext(ctx context.Context, message string) AgentContext {
+	agentCtx := AgentContext{
+		Message: message,
+	}
+
+	// Get Slack user from authctx
+	subjects := authctx.GetSubjects(ctx)
+	for _, subject := range subjects {
+		if subject.Type == authctx.SubjectTypeSlack {
+			agentCtx.Auth = &AgentAuthInfo{
+				Slack: &SlackAuthInfo{
+					ID: subject.UserID,
+				},
+			}
+			break
+		}
+	}
+
+	// Get environment variables (same pattern as BuildContext for HTTP)
+	envVars := os.Environ()
+	agentCtx.Env = make(map[string]string)
+	for _, v := range envVars {
+		parts := strings.SplitN(v, "=", 2)
+		if len(parts) == 2 {
+			agentCtx.Env[parts[0]] = parts[1]
+		}
+	}
+
+	return agentCtx
 }

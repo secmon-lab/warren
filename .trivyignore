@@ -1,0 +1,6 @@
+# Frontend glob vulnerability requires major version upgrade of tailwindcss
+# This is a CLI-only vulnerability and does not affect the application runtime
+# The glob package is a transitive dependency via tailwindcss -> sucrase
+# Upgrading to tailwindcss v4 requires breaking changes that need careful migration
+CVE-2025-64756
+GHSA-5j98-mcp5-4vw2

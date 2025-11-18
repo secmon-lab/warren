@@ -97,7 +97,7 @@ func TestValidateGoogleIDToken(t *testing.T) {
 				V2              any
 				QueryOptions    []opaq.QueryOption
 			}) {
-				gt.Equal(t, v.S, "data.auth")
+				gt.Equal(t, v.S, "data.auth.http")
 			}).
 			At(1, func(t testing.TB, v struct {
 				ContextMoqParam context.Context
@@ -226,7 +226,7 @@ func TestAlertSNS(t *testing.T) {
 		ApiUsecases:              uc,
 	}
 
-	srv := server.New(ucInterface)
+	srv := server.New(ucInterface, server.WithNoAuthorization(true))
 
 	ctx := server.WithHTTPClient(t.Context(), &mockHTTPClient{
 		GetFunc: func(url string) (*http.Response, error) {
@@ -254,7 +254,7 @@ func TestAlertSNS(t *testing.T) {
 
 func TestGraphQLHandler(t *testing.T) {
 	repo := repository.NewMemory()
-	server := server.New(nil, server.WithGraphQLRepo(repo))
+	server := server.New(nil, server.WithGraphQLRepo(repo), server.WithNoAuthorization(true))
 
 	// Add test data
 	ticketID := types.TicketID("test-ticket-1")
