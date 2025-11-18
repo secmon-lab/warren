@@ -504,17 +504,17 @@ type chatPlanHooks struct {
 var _ planexec.PlanExecuteHooks = &chatPlanHooks{}
 
 func (h *chatPlanHooks) OnPlanCreated(ctx context.Context, plan *planexec.Plan) error {
-	h.planned = true
+	h.planned = len(plan.Tasks) > 0
 	return postPlanProgress(h.ctx, plan, "Plan created")
 }
 
 func (h *chatPlanHooks) OnPlanUpdated(ctx context.Context, plan *planexec.Plan) error {
-	h.planned = true
+	h.planned = len(plan.Tasks) > 0
 	return postPlanProgress(h.ctx, plan, "Plan updated")
 }
 
 func (h *chatPlanHooks) OnTaskDone(ctx context.Context, plan *planexec.Plan, _ *planexec.Task) error {
-	h.planned = true
+	h.planned = len(plan.Tasks) > 0
 	if len(plan.Tasks) == 0 {
 		return nil
 	}
