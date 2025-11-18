@@ -7044,6 +7044,9 @@ func (mock *LLMClientMock) NewSessionCalls() []struct {
 //			AppendHistoryFunc: func(history *gollem.History) error {
 //				panic("mock out the AppendHistory method")
 //			},
+//			CountTokenFunc: func(ctx context.Context, input ...gollem.Input) (int, error) {
+//				panic("mock out the CountToken method")
+//			},
 //			GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
 //				panic("mock out the GenerateContent method")
 //			},
@@ -7063,6 +7066,9 @@ type LLMSessionMock struct {
 	// AppendHistoryFunc mocks the AppendHistory method.
 	AppendHistoryFunc func(history *gollem.History) error
 
+	// CountTokenFunc mocks the CountToken method.
+	CountTokenFunc func(ctx context.Context, input ...gollem.Input) (int, error)
+
 	// GenerateContentFunc mocks the GenerateContent method.
 	GenerateContentFunc func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error)
 
@@ -7078,6 +7084,13 @@ type LLMSessionMock struct {
 		AppendHistory []struct {
 			// History is the history argument value.
 			History *gollem.History
+		}
+		// CountToken holds details about calls to the CountToken method.
+		CountToken []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Input is the input argument value.
+			Input []gollem.Input
 		}
 		// GenerateContent holds details about calls to the GenerateContent method.
 		GenerateContent []struct {
@@ -7098,6 +7111,7 @@ type LLMSessionMock struct {
 		}
 	}
 	lockAppendHistory   sync.RWMutex
+	lockCountToken      sync.RWMutex
 	lockGenerateContent sync.RWMutex
 	lockGenerateStream  sync.RWMutex
 	lockHistory         sync.RWMutex
@@ -7135,6 +7149,46 @@ func (mock *LLMSessionMock) AppendHistoryCalls() []struct {
 	mock.lockAppendHistory.RLock()
 	calls = mock.calls.AppendHistory
 	mock.lockAppendHistory.RUnlock()
+	return calls
+}
+
+// CountToken calls CountTokenFunc.
+func (mock *LLMSessionMock) CountToken(ctx context.Context, input ...gollem.Input) (int, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		Input []gollem.Input
+	}{
+		Ctx:   ctx,
+		Input: input,
+	}
+	mock.lockCountToken.Lock()
+	mock.calls.CountToken = append(mock.calls.CountToken, callInfo)
+	mock.lockCountToken.Unlock()
+	if mock.CountTokenFunc == nil {
+		var (
+			nOut   int
+			errOut error
+		)
+		return nOut, errOut
+	}
+	return mock.CountTokenFunc(ctx, input...)
+}
+
+// CountTokenCalls gets all the calls that were made to CountToken.
+// Check the length with:
+//
+//	len(mockedLLMSession.CountTokenCalls())
+func (mock *LLMSessionMock) CountTokenCalls() []struct {
+	Ctx   context.Context
+	Input []gollem.Input
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Input []gollem.Input
+	}
+	mock.lockCountToken.RLock()
+	calls = mock.calls.CountToken
+	mock.lockCountToken.RUnlock()
 	return calls
 }
 

@@ -65,10 +65,10 @@ func (s *Service) generateMemoryFeedback(
 	}
 
 	promptParams := map[string]any{
-		"TaskQuery":          taskQuery,
-		"ExecResultContent":  execResultContent,
-		"ExecError":          execError,
-		"JSONSchema":         jsonSchemaStr,
+		"TaskQuery":         taskQuery,
+		"ExecResultContent": execResultContent,
+		"ExecError":         execError,
+		"JSONSchema":        jsonSchemaStr,
 		// Pass memory fields explicitly
 		"MemoryTaskQuery":    mem.TaskQuery,
 		"MemorySuccesses":    successes,

@@ -129,7 +129,7 @@ func TestAgent_Run_SavesMemory(t *testing.T) {
 	result, err := agent.Run(ctx, "query_bigquery", args)
 	gt.NoError(t, err)
 	gt.V(t, result).NotNil()
-	gt.V(t, result["result"]).NotNil()
+	gt.V(t, result["data"]).NotNil()
 
 	// Verify memory was saved
 	memories, err := memService.SearchRelevantAgentMemories(ctx, "bigquery", "Get user count", 10)
@@ -241,7 +241,7 @@ func TestAgent_MemoryMetadataOnly(t *testing.T) {
 	}
 	result, err := agent.Run(ctx, "query_bigquery", args)
 	gt.NoError(t, err)
-	gt.V(t, result["result"]).NotNil()
+	gt.V(t, result["data"]).NotNil()
 
 	// Get the saved memory
 	memories, err := memService.SearchRelevantAgentMemories(ctx, "bigquery", "Test query", 1)
