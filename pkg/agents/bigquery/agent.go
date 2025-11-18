@@ -157,11 +157,11 @@ func (a *Agent) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return []gollem.ToolSpec{
 		{
 			Name:        "query_bigquery",
-			Description: "Execute high-level BigQuery data extraction tasks. Provide a natural language query describing what data you want, and the agent will handle table selection, query construction, and execution using past experiences. The agent will automatically check table schemas before constructing queries and return raw data records.",
+			Description: "Retrieve data from BigQuery tables. This tool ONLY extracts data records - it does NOT analyze or interpret the data. After receiving the data, YOU must analyze it yourself and provide a complete answer to the user based on the retrieved data. The tool handles table selection, query construction, and returns raw data records.",
 			Parameters: map[string]*gollem.Parameter{
 				"query": {
 					Type:        gollem.TypeString,
-					Description: "Natural language description of the data you want to retrieve (e.g., 'login errors in the past week')",
+					Description: "ONLY specify the conditions for data retrieval (e.g., 'records containing package name X from the last 7 days', 'login events in the past week'). Do NOT include analysis instructions, interpretation requests, or questions - ONLY data retrieval conditions.",
 				},
 			},
 			Required: []string{"query"},
@@ -282,12 +282,11 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	}
 
 	result := map[string]any{
-		"result": "",
-		"data":   nil,
+		"data": "",
 	}
 	if resp != nil && !resp.IsEmpty() {
-		result["result"] = resp.String()
-		log.Debug("Execution successful", "result_length", len(resp.String()))
+		result["data"] = resp.String()
+		log.Debug("Execution successful", "data_length", len(resp.String()))
 	} else {
 		log.Debug("Execution returned empty response")
 	}
