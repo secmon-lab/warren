@@ -351,39 +351,67 @@ func (x *Service) GetConversationHistory(
 
 	// Collect all messages first
 	var allMessages []slack.Message
-	for {
-		params := &slack.GetConversationHistoryParameters{
-			ChannelID: channelID,
-			Cursor:    cursor,
-			Limit:     100, // API limit per request
-		}
 
-		if threadID != "" {
-			// Get thread messages
-			params.Latest = threadID
-		}
+	if threadID != "" {
+		// Get thread messages using GetConversationReplies
+		for {
+			params := &slack.GetConversationRepliesParameters{
+				ChannelID: channelID,
+				Timestamp: threadID,
+				Cursor:    cursor,
+				Limit:     100, // API limit per request
+				Inclusive: true,
+			}
 
-		if oldest > 0 {
-			params.Oldest = fmt.Sprintf("%d", oldest)
-		}
+			msgs, hasMore, nextCursor, err := x.client.GetConversationRepliesContext(ctx, params)
+			if err != nil {
+				return nil, goerr.Wrap(err, "failed to get conversation replies")
+			}
 
-		resp, err := x.client.GetConversationHistoryContext(ctx, params)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get conversation history")
-		}
+			allMessages = append(allMessages, msgs...)
 
-		allMessages = append(allMessages, resp.Messages...)
+			// Check limit
+			if limit > 0 && len(allMessages) >= limit {
+				allMessages = allMessages[:limit]
+				break
+			}
 
-		// Check limit
-		if limit > 0 && len(allMessages) >= limit {
-			allMessages = allMessages[:limit]
-			break
+			if !hasMore {
+				break
+			}
+			cursor = nextCursor
 		}
+	} else {
+		// Get channel messages using GetConversationHistory
+		for {
+			params := &slack.GetConversationHistoryParameters{
+				ChannelID: channelID,
+				Cursor:    cursor,
+				Limit:     100, // API limit per request
+			}
 
-		if !resp.HasMore {
-			break
+			if oldest > 0 {
+				params.Oldest = fmt.Sprintf("%d", oldest)
+			}
+
+			resp, err := x.client.GetConversationHistoryContext(ctx, params)
+			if err != nil {
+				return nil, goerr.Wrap(err, "failed to get conversation history")
+			}
+
+			allMessages = append(allMessages, resp.Messages...)
+
+			// Check limit
+			if limit > 0 && len(allMessages) >= limit {
+				allMessages = allMessages[:limit]
+				break
+			}
+
+			if !resp.HasMore {
+				break
+			}
+			cursor = resp.ResponseMetaData.NextCursor
 		}
-		cursor = resp.ResponseMetaData.NextCursor
 	}
 
 	// Collect unique user IDs
