@@ -285,8 +285,9 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 		"data": "",
 	}
 	if resp != nil && !resp.IsEmpty() {
-		result["data"] = resp.String()
-		log.Debug("Execution successful", "data_length", len(resp.String()))
+		dataStr := resp.String()
+		result["data"] = dataStr
+		log.Debug("Execution successful", "data_length", len(dataStr))
 	} else {
 		log.Debug("Execution returned empty response")
 	}
