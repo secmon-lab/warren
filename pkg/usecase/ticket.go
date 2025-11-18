@@ -806,22 +806,35 @@ func (uc *UseCases) getConversationMessages(
 			"max_size", maxConversationDataSize,
 			"original_count", originalCount)
 
-		// Trim from the beginning (oldest messages first)
-		for len(messages) > 0 {
-			// Remove oldest message
-			messages = messages[1:]
+		// Trim from the beginning (oldest messages first) using binary search for efficiency
+		keepCount := 0
+		low, high := 0, len(messages)
+		for low <= high {
+			mid := low + (high-low)/2
+			if mid == 0 {
+				break
+			}
 
-			// Recalculate size
-			dataBytes, err = json.Marshal(messages)
+			checkBytes, err := json.Marshal(messages[len(messages)-mid:])
 			if err != nil {
 				return nil, goerr.Wrap(err, "failed to marshal conversation messages during trimming")
 			}
 
-			dataSize = len(dataBytes)
-			if dataSize <= maxConversationDataSize {
-				break
+			if len(checkBytes) <= maxConversationDataSize {
+				keepCount = mid
+				low = mid + 1
+			} else {
+				high = mid - 1
 			}
 		}
+
+		messages = messages[len(messages)-keepCount:]
+		// Recalculate final size for logging
+		dataBytes, err = json.Marshal(messages)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to marshal final trimmed messages")
+		}
+		dataSize = len(dataBytes)
 
 		logger.Info("trimmed conversation data",
 			"new_size", dataSize,
