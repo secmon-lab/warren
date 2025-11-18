@@ -349,30 +349,55 @@ func (x *Service) GetConversationHistory(
 	var messages []ConversationMessage
 	cursor := ""
 
-	// Collect all messages first
+	// Define message fetcher function type to abstract API differences
+	type messageFetcher func(ctx context.Context, cursor string) (msgs []slack.Message, hasMore bool, nextCursor string, err error)
+
+	var fetcher messageFetcher
+
+	if threadID != "" {
+		// Fetcher for thread messages
+		fetcher = func(ctx context.Context, cursor string) ([]slack.Message, bool, string, error) {
+			params := &slack.GetConversationRepliesParameters{
+				ChannelID: channelID,
+				Timestamp: threadID,
+				Cursor:    cursor,
+				Limit:     100, // API limit per request
+				Inclusive: true,
+			}
+			msgs, hasMore, nextCursor, err := x.client.GetConversationRepliesContext(ctx, params)
+			if err != nil {
+				return nil, false, "", goerr.Wrap(err, "failed to get conversation replies")
+			}
+			return msgs, hasMore, nextCursor, nil
+		}
+	} else {
+		// Fetcher for channel messages
+		fetcher = func(ctx context.Context, cursor string) ([]slack.Message, bool, string, error) {
+			params := &slack.GetConversationHistoryParameters{
+				ChannelID: channelID,
+				Cursor:    cursor,
+				Limit:     100, // API limit per request
+			}
+			if oldest > 0 {
+				params.Oldest = fmt.Sprintf("%d", oldest)
+			}
+			resp, err := x.client.GetConversationHistoryContext(ctx, params)
+			if err != nil {
+				return nil, false, "", goerr.Wrap(err, "failed to get conversation history")
+			}
+			return resp.Messages, resp.HasMore, resp.ResponseMetaData.NextCursor, nil
+		}
+	}
+
+	// Collect all messages using the appropriate fetcher
 	var allMessages []slack.Message
 	for {
-		params := &slack.GetConversationHistoryParameters{
-			ChannelID: channelID,
-			Cursor:    cursor,
-			Limit:     100, // API limit per request
-		}
-
-		if threadID != "" {
-			// Get thread messages
-			params.Latest = threadID
-		}
-
-		if oldest > 0 {
-			params.Oldest = fmt.Sprintf("%d", oldest)
-		}
-
-		resp, err := x.client.GetConversationHistoryContext(ctx, params)
+		msgs, hasMore, nextCursor, err := fetcher(ctx, cursor)
 		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get conversation history")
+			return nil, err
 		}
 
-		allMessages = append(allMessages, resp.Messages...)
+		allMessages = append(allMessages, msgs...)
 
 		// Check limit
 		if limit > 0 && len(allMessages) >= limit {
@@ -380,10 +405,10 @@ func (x *Service) GetConversationHistory(
 			break
 		}
 
-		if !resp.HasMore {
+		if !hasMore {
 			break
 		}
-		cursor = resp.ResponseMetaData.NextCursor
+		cursor = nextCursor
 	}
 
 	// Collect unique user IDs

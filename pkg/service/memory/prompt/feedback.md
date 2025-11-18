@@ -7,25 +7,25 @@ You are evaluating how useful a past memory was for completing a task.
 **Task Query:** {{ .MemoryTaskQuery }}
 
 **KPT Summary:**
-{{- if .MemorySuccesses }}
+{{- if gt (len .MemorySuccesses) 0 }}
 - **Keep (Successes):**
   {{- range .MemorySuccesses }}
   - {{ . }}
   {{- end }}
 {{- end }}
-{{- if .MemoryProblems }}
+{{- if gt (len .MemoryProblems) 0 }}
 - **Problems:**
   {{- range .MemoryProblems }}
   - {{ . }}
   {{- end }}
 {{- end }}
-{{- if .MemoryImprovements }}
+{{- if gt (len .MemoryImprovements) 0 }}
 - **Try (Improvements):**
   {{- range .MemoryImprovements }}
   - {{ . }}
   {{- end }}
 {{- end }}
-{{- if and (not .MemorySuccesses) (not .MemoryProblems) (not .MemoryImprovements) }}
+{{- if and (eq (len .MemorySuccesses) 0) (eq (len .MemoryProblems) 0) (eq (len .MemoryImprovements) 0) }}
 - No KPT data available
 {{- end }}
 
@@ -42,10 +42,10 @@ You are evaluating how useful a past memory was for completing a task.
 **Status:** Successful
 {{ end }}
 
-{{ if .ExecResult }}
+{{ if .ExecResultContent }}
 **LLM Response:**
 ```
-{{ .ExecResult.Content }}
+{{ .ExecResultContent }}
 ```
 {{ end }}
 

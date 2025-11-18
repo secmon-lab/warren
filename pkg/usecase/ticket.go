@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -758,24 +759,90 @@ func (uc *UseCases) CreateTicketFromConversation(
 	return &newTicket, nil
 }
 
+const (
+	// maxConversationDataSize is the maximum size of conversation data in bytes (100KB)
+	maxConversationDataSize = 100 * 1024
+)
+
 // getConversationMessages retrieves conversation history based on thread context
 func (uc *UseCases) getConversationMessages(
 	ctx context.Context,
 	thread slack.Thread,
 ) ([]slacksvc.ConversationMessage, error) {
+	logger := logging.From(ctx)
+
 	if !uc.IsSlackEnabled() {
 		return nil, goerr.New("Slack service is not enabled")
 	}
 
+	var messages []slacksvc.ConversationMessage
+	var err error
+
 	if thread.ThreadID != "" {
 		// Thread messages: get all messages
-		return uc.slackService.GetConversationHistory(ctx, thread.ChannelID, thread.ThreadID, 0, 0)
+		messages, err = uc.slackService.GetConversationHistory(ctx, thread.ChannelID, thread.ThreadID, 0, 0)
+	} else {
+		// Channel level: recent 100 messages or within 1 hour
+		limit := 100
+		oldest := time.Now().Add(-1 * time.Hour)
+		messages, err = uc.slackService.GetConversationHistory(ctx, thread.ChannelID, "", limit, oldest.Unix())
 	}
 
-	// Channel level: recent 100 messages or within 1 hour
-	limit := 100
-	oldest := time.Now().Add(-1 * time.Hour)
-	return uc.slackService.GetConversationHistory(ctx, thread.ChannelID, "", limit, oldest.Unix())
+	if err != nil {
+		return nil, err
+	}
+
+	// Check data size and trim if necessary
+	dataBytes, err := json.Marshal(messages)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to marshal conversation messages")
+	}
+
+	dataSize := len(dataBytes)
+	if dataSize > maxConversationDataSize {
+		originalCount := len(messages)
+		logger.Warn("conversation data size exceeds limit, trimming old messages",
+			"original_size", dataSize,
+			"max_size", maxConversationDataSize,
+			"original_count", originalCount)
+
+		// Trim from the beginning (oldest messages first) using binary search for efficiency
+		keepCount := 0
+		low, high := 0, len(messages)
+		for low <= high {
+			mid := low + (high-low)/2
+			if mid == 0 {
+				break
+			}
+
+			checkBytes, err := json.Marshal(messages[len(messages)-mid:])
+			if err != nil {
+				return nil, goerr.Wrap(err, "failed to marshal conversation messages during trimming")
+			}
+
+			if len(checkBytes) <= maxConversationDataSize {
+				keepCount = mid
+				low = mid + 1
+			} else {
+				high = mid - 1
+			}
+		}
+
+		messages = messages[len(messages)-keepCount:]
+		// Recalculate final size for logging
+		dataBytes, err = json.Marshal(messages)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to marshal final trimmed messages")
+		}
+		dataSize = len(dataBytes)
+
+		logger.Info("trimmed conversation data",
+			"new_size", dataSize,
+			"new_count", len(messages),
+			"removed_count", originalCount-len(messages))
+	}
+
+	return messages, nil
 }
 
 // conversationTicketMetadata is the structure for LLM to generate ticket metadata from conversation
