@@ -571,6 +571,8 @@ func postPlanProgress(ctx context.Context, plan *planexec.Plan, action string) e
 
 // authorizeAgentRequest authorizes agent execution request using policy
 func (x *UseCases) authorizeAgentRequest(ctx context.Context, message string) error {
+	logger := logging.From(ctx)
+
 	// Bypass authorization check if --no-authorization flag is set
 	if x.noAuthorization {
 		logging.From(ctx).Debug("agent authorization check bypassed due to --no-authorization flag")
@@ -587,7 +589,7 @@ func (x *UseCases) authorizeAgentRequest(ctx context.Context, message string) er
 
 	query := "data.auth.agent"
 	err := x.policyClient.Query(ctx, query, authCtx, &result, opaq.WithPrintHook(func(ctx context.Context, loc opaq.PrintLocation, msg string) error {
-		logging.From(ctx).Debug("[rego] "+msg, "loc", loc)
+		logger.Debug("[rego] "+msg, "loc", loc)
 		return nil
 	}))
 	if err != nil {
