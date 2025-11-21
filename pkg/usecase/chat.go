@@ -586,7 +586,10 @@ func (x *UseCases) authorizeAgentRequest(ctx context.Context, message string) er
 	}
 
 	query := "data.auth.agent"
-	err := x.policyClient.Query(ctx, query, authCtx, &result)
+	err := x.policyClient.Query(ctx, query, authCtx, &result, opaq.WithPrintHook(func(ctx context.Context, loc opaq.PrintLocation, msg string) error {
+		logging.From(ctx).Debug("[rego] "+msg, "loc", loc)
+		return nil
+	}))
 	if err != nil {
 		if errors.Is(err, opaq.ErrNoEvalResult) {
 			// Policy not defined, deny by default
