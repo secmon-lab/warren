@@ -105,9 +105,9 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nYou are not authorized to execute agent requests. Please contact your administrator if you believe this is an error.")
 		} else {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nFailed to check authorization. Please contact your administrator.")
-
 			return goerr.Wrap(err, "failed to evaluate agent auth")
 		}
+		return fmt.Errorf("%w: %v", errAgentAuthFailed, err)
 	}
 
 	// Setup update function for findings - only depends on SlackNotifier for Slack updates
