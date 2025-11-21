@@ -101,10 +101,13 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		// Provide detailed feedback to user via Slack
 		if errors.Is(err, errAgentAuthPolicyNotDefined) {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nAgent execution policy is not defined. Please configure the `auth.agent` policy or use `--no-authorization` flag for development.\n\nSee: https://docs.warren.secmon-lab.com/policy.md#agent-execution-authorization")
-		} else {
+		} else if errors.Is(err, errAgentAuthDenied) {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nYou are not authorized to execute agent requests. Please contact your administrator if you believe this is an error.")
+		} else {
+			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nFailed to check authorization. Please contact your administrator.")
+
+			return goerr.Wrap(err, "failed to evaluate agent auth")
 		}
-		return goerr.Wrap(err, "agent authorization failed")
 	}
 
 	// Setup update function for findings - only depends on SlackNotifier for Slack updates
@@ -597,7 +600,7 @@ func (x *UseCases) authorizeAgentRequest(ctx context.Context, message string) er
 
 	if !result.Allow {
 		logging.From(ctx).Warn("agent authorization failed", "message", message)
-		return goerr.New("agent request not authorized", goerr.V("message", message))
+		return goerr.Wrap(errAgentAuthDenied, "agent request denied by policy", goerr.V("message", message))
 	}
 
 	return nil
