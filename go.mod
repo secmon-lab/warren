@@ -1,6 +1,6 @@
 module github.com/secmon-lab/warren
 
-go 1.24.6
+go 1.25.4
 
 require (
 	cloud.google.com/go/bigquery v1.72.0
@@ -20,7 +20,7 @@ require (
 	github.com/m-mizutani/clog v0.1.0
 	github.com/m-mizutani/fireconf v0.1.1
 	github.com/m-mizutani/goerr/v2 v2.0.0
-	github.com/m-mizutani/gollem v0.16.1
+	github.com/m-mizutani/gollem v0.16.2
 	github.com/m-mizutani/gt v0.1.2
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.1.12-0.20250911075521-cfb6207440e8
@@ -94,6 +94,7 @@ require (
 	github.com/google/go-github/v73 v73.0.0 // indirect
 	github.com/google/go-github/v75 v75.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
+	github.com/google/jsonschema-go v0.3.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.7 // indirect
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
@@ -153,6 +154,7 @@ require (
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/yashtewari/glob-intersection v0.2.0 // indirect
+	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.38.0 // indirect
@@ -191,5 +193,3 @@ tool (
 	github.com/go-task/task/v3/cmd/task
 	github.com/matryer/moq
 )
-
-replace github.com/modelcontextprotocol/go-sdk => github.com/modelcontextprotocol/go-sdk v0.0.0-20250627194314-8a3f272dbbcf
