@@ -11,7 +11,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Go build stage
-FROM golang:1.24-alpine AS build-go
+FROM golang:1.25-alpine AS build-go
 ENV CGO_ENABLED=0
 ARG BUILD_VERSION
 
