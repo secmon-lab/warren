@@ -133,7 +133,7 @@ func (a *Agent) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "ONLY specify the search conditions (e.g., 'messages in #security-alerts from last week', 'messages containing error from @user'). Do NOT include analysis instructions or interpretation requests - ONLY search conditions.",
 				},
 				"limit": {
-					Type:        gollem.TypeInteger,
+					Type:        gollem.TypeNumber,
 					Description: "Maximum number of messages to return in the response (default: 50, max: 200). Use this to control response size.",
 				},
 			},
