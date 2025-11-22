@@ -203,3 +203,54 @@ func TestInternalTool_LimitEnforcement(t *testing.T) {
 	_, hasData := result["data"]
 	gt.True(t, hasData)
 }
+
+func TestInternalTool_DirectLimitEnforcement(t *testing.T) {
+	ctx := context.Background()
+
+	// Create 250 mock messages (exceeds limit)
+	matches := make([]slackSDK.SearchMessage, 250)
+	for i := 0; i < 250; i++ {
+		matches[i] = slackSDK.SearchMessage{
+			Type:      "message",
+			Timestamp: "1234567890.123456",
+			Text:      "Test message",
+			Username:  "user",
+			Channel: slackSDK.CtxChannel{
+				ID:   "C123",
+				Name: "general",
+			},
+		}
+	}
+
+	slackClient := &domainmock.SlackClientMock{
+		SearchMessagesContextFunc: func(ctx context.Context, query string, params slackSDK.SearchParameters) (*slackSDK.SearchMessages, error) {
+			return &slackSDK.SearchMessages{
+				Total:   250,
+				Matches: matches,
+			}, nil
+		},
+	}
+
+	// Create internal tool directly with maxLimit set
+	tool := slackagent.NewInternalToolForTest(slackClient, 50)
+
+	// Call searchMessages directly
+	result, err := tool.Run(ctx, "slack_search_messages", map[string]any{
+		"query": "test",
+	})
+
+	gt.NoError(t, err)
+	gt.V(t, result).NotNil()
+
+	// Verify that result has messages
+	messages, ok := result["messages"].([]any)
+	gt.True(t, ok)
+
+	// Verify that only 50 messages were returned (enforced by maxLimit)
+	gt.V(t, len(messages)).Equal(50)
+
+	// Verify total count is still 250 (from Slack API)
+	total, ok := result["total"].(float64)
+	gt.True(t, ok)
+	gt.V(t, total).Equal(250.0)
+}

@@ -175,26 +175,32 @@ func TestAgent_Run_BasicSearch(t *testing.T) {
 func TestAgent_Run_LimitEnforcement(t *testing.T) {
 	ctx := context.Background()
 
-	// Create 250 mock messages (exceeds max limit of 200)
-	matches := make([]slackSDK.SearchMessage, 250)
-	for i := 0; i < 250; i++ {
-		matches[i] = slackSDK.SearchMessage{
-			Type:      "message",
-			Timestamp: "1234567890.123456",
-			Text:      "Test message",
-			Username:  "user",
-			Channel: slackSDK.CtxChannel{
-				ID:   "C123",
-				Name: "general",
-			},
-		}
-	}
-
 	slackClient := &domainmock.SlackClientMock{
 		SearchMessagesContextFunc: func(ctx context.Context, query string, params slackSDK.SearchParameters) (*slackSDK.SearchMessages, error) {
 			return &slackSDK.SearchMessages{
-				Total:   250,
-				Matches: matches,
+				Total: 2,
+				Matches: []slackSDK.SearchMessage{
+					{
+						Type:      "message",
+						Timestamp: "1234567890.123456",
+						Text:      "Test message 1",
+						Username:  "user1",
+						Channel: slackSDK.CtxChannel{
+							ID:   "C123",
+							Name: "general",
+						},
+					},
+					{
+						Type:      "message",
+						Timestamp: "1234567891.123456",
+						Text:      "Test message 2",
+						Username:  "user2",
+						Channel: slackSDK.CtxChannel{
+							ID:   "C123",
+							Name: "general",
+						},
+					},
+				},
 			}, nil
 		},
 	}
@@ -209,7 +215,7 @@ func TestAgent_Run_LimitEnforcement(t *testing.T) {
 		slackagent.WithMemoryService(memService),
 	)
 
-	// Request 300 messages (should be capped at 200)
+	// Request 300 messages (should be capped at 200 by agent)
 	result, err := agent.Run(ctx, "search_slack", map[string]any{
 		"query": "test",
 		"limit": float64(300),
@@ -218,8 +224,7 @@ func TestAgent_Run_LimitEnforcement(t *testing.T) {
 	gt.NoError(t, err)
 	_, hasData := result["data"]
 	gt.True(t, hasData)
-	// Note: The mock LLM returns a simple response without calling tools,
-	// so we just verify the agent handled the limit parameter correctly
+	// Note: Limit enforcement is tested directly in TestInternalTool_DirectLimitEnforcement
 }
 
 func TestAgent_Run_MissingQuery(t *testing.T) {
