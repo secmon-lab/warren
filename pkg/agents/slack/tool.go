@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -15,6 +16,41 @@ import (
 type internalTool struct {
 	slackClient interfaces.SlackClient
 	maxLimit    int // Maximum number of results allowed from search
+}
+
+// parseSlackTimestamp parses a Slack timestamp string (e.g., "1234567890.123456")
+// and returns a time.Time with sub-second precision preserved.
+func parseSlackTimestamp(tsStr string) time.Time {
+	parts := strings.Split(tsStr, ".")
+	if len(parts) == 0 {
+		return time.Time{}
+	}
+
+	// Parse seconds
+	sec, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return time.Time{}
+	}
+
+	// Parse nanoseconds from fractional part
+	var nsec int64
+	if len(parts) > 1 {
+		// Pad or truncate to 9 digits (nanoseconds)
+		fracStr := parts[1]
+		if len(fracStr) > 9 {
+			fracStr = fracStr[:9]
+		} else {
+			// Pad with zeros to get 9 digits
+			fracStr = fracStr + strings.Repeat("0", 9-len(fracStr))
+		}
+		nsec, err = strconv.ParseInt(fracStr, 10, 64)
+		if err != nil {
+			// If fractional part is invalid, just use seconds
+			nsec = 0
+		}
+	}
+
+	return time.Unix(sec, nsec)
 }
 
 func (t *internalTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
@@ -147,10 +183,7 @@ func (t *internalTool) searchMessages(ctx context.Context, args map[string]any) 
 			break
 		}
 
-		var formattedTime time.Time
-		if ts, err := strconv.ParseFloat(msg.Timestamp, 64); err == nil {
-			formattedTime = time.Unix(int64(ts), 0)
-		}
+		formattedTime := parseSlackTimestamp(msg.Timestamp)
 
 		// Thread timestamp - if this message is in a thread, use msg.Timestamp as thread_ts
 		// Note: Slack's SearchMessage doesn't directly expose thread_ts, but for thread replies,
@@ -213,10 +246,7 @@ func (t *internalTool) getThreadMessages(ctx context.Context, args map[string]an
 
 	messages := make([]any, 0, len(msgs))
 	for _, msg := range msgs {
-		var formattedTime time.Time
-		if ts, err := strconv.ParseFloat(msg.Timestamp, 64); err == nil {
-			formattedTime = time.Unix(int64(ts), 0)
-		}
+		formattedTime := parseSlackTimestamp(msg.Timestamp)
 
 		messages = append(messages, map[string]any{
 			"user_name":      msg.Username,
@@ -293,10 +323,7 @@ func (t *internalTool) getContextMessages(ctx context.Context, args map[string]a
 	formatMessages := func(msgs []slackSDK.Message) []any {
 		result := make([]any, 0, len(msgs))
 		for _, msg := range msgs {
-			var formattedTime time.Time
-			if ts, err := strconv.ParseFloat(msg.Timestamp, 64); err == nil {
-				formattedTime = time.Unix(int64(ts), 0)
-			}
+			formattedTime := parseSlackTimestamp(msg.Timestamp)
 
 			result = append(result, map[string]any{
 				"user_name":      msg.Username,
