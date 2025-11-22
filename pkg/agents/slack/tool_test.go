@@ -18,14 +18,27 @@ func TestInternalTool_SearchMessages(t *testing.T) {
 
 	slackClient := &domainmock.SlackClientMock{
 		SearchMessagesContextFunc: func(ctx context.Context, query string, params slackSDK.SearchParameters) (*slackSDK.SearchMessages, error) {
+			// Verify query parameter
+			gt.V(t, query).Equal("test search")
+
 			return &slackSDK.SearchMessages{
-				Total: 1,
+				Total: 2,
 				Matches: []slackSDK.SearchMessage{
 					{
 						Type:      "message",
 						Timestamp: "1234567890.123456",
-						Text:      "Test message",
+						Text:      "Test message 1",
 						Username:  "testuser",
+						Channel: slackSDK.CtxChannel{
+							ID:   "C123456",
+							Name: "general",
+						},
+					},
+					{
+						Type:      "message",
+						Timestamp: "1234567891.654321",
+						Text:      "Test message 2",
+						Username:  "testuser2",
 						Channel: slackSDK.CtxChannel{
 							ID:   "C123456",
 							Name: "general",
@@ -36,24 +49,38 @@ func TestInternalTool_SearchMessages(t *testing.T) {
 		},
 	}
 
-	llmClient := newMockLLMClient()
-	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
+	tool := slackagent.NewInternalToolForTest(slackClient, 0)
 
-	agent := slackagent.New(
-		slackagent.WithSlackClient(slackClient),
-		slackagent.WithLLMClient(llmClient),
-		slackagent.WithMemoryService(memService),
-	)
+	// Call searchMessages directly
+	result, err := tool.Run(ctx, "slack_search_messages", map[string]any{
+		"query": "test search",
+	})
 
-	// Initialize to set up internal tool
-	initialized, err := agent.Init(ctx, llmClient, memService)
 	gt.NoError(t, err)
-	gt.True(t, initialized)
+	gt.V(t, result).NotNil()
 
-	specs, err := agent.Specs(ctx)
-	gt.NoError(t, err)
-	gt.True(t, len(specs) > 0)
+	// Verify response structure
+	total, ok := result["total"].(float64)
+	gt.True(t, ok)
+	gt.V(t, total).Equal(2.0)
+
+	messages, ok := result["messages"].([]any)
+	gt.True(t, ok)
+	gt.V(t, len(messages)).Equal(2)
+
+	// Verify first message
+	msg1, ok := messages[0].(map[string]any)
+	gt.True(t, ok)
+	gt.V(t, msg1["text"]).Equal("Test message 1")
+	gt.V(t, msg1["user_name"]).Equal("testuser")
+	gt.V(t, msg1["channel_id"]).Equal("C123456")
+	gt.V(t, msg1["channel_name"]).Equal("general")
+	gt.V(t, msg1["timestamp"]).Equal("1234567890.123456")
+
+	// Verify formatted time has sub-second precision
+	formattedTime, ok := msg1["formatted_time"].(string)
+	gt.True(t, ok)
+	gt.V(t, formattedTime).NotEqual("")
 }
 
 func TestInternalTool_GetThreadMessages(t *testing.T) {
@@ -61,6 +88,10 @@ func TestInternalTool_GetThreadMessages(t *testing.T) {
 
 	slackClient := &domainmock.SlackClientMock{
 		GetConversationRepliesContextFunc: func(ctx context.Context, params *slackSDK.GetConversationRepliesParameters) ([]slackSDK.Message, bool, string, error) {
+			// Verify parameters
+			gt.V(t, params.ChannelID).Equal("C123456")
+			gt.V(t, params.Timestamp).Equal("1234567890.123456")
+
 			return []slackSDK.Message{
 				{
 					Msg: slackSDK.Msg{
@@ -72,7 +103,7 @@ func TestInternalTool_GetThreadMessages(t *testing.T) {
 				},
 				{
 					Msg: slackSDK.Msg{
-						Timestamp:       "1234567891.123456",
+						Timestamp:       "1234567891.654321",
 						ThreadTimestamp: "1234567890.123456",
 						Text:            "Reply message",
 						User:            "U456",
@@ -83,19 +114,35 @@ func TestInternalTool_GetThreadMessages(t *testing.T) {
 		},
 	}
 
-	llmClient := newMockLLMClient()
-	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
+	tool := slackagent.NewInternalToolForTest(slackClient, 0)
 
-	agent := slackagent.New(
-		slackagent.WithSlackClient(slackClient),
-		slackagent.WithLLMClient(llmClient),
-		slackagent.WithMemoryService(memService),
-	)
+	// Call getThreadMessages directly
+	result, err := tool.Run(ctx, "slack_get_thread_messages", map[string]any{
+		"channel":   "C123456",
+		"thread_ts": "1234567890.123456",
+	})
 
-	initialized, err := agent.Init(ctx, llmClient, memService)
 	gt.NoError(t, err)
-	gt.True(t, initialized)
+	gt.V(t, result).NotNil()
+
+	// Verify response structure
+	messages, ok := result["messages"].([]any)
+	gt.True(t, ok)
+	gt.V(t, len(messages)).Equal(2)
+
+	// Verify parent message
+	msg1, ok := messages[0].(map[string]any)
+	gt.True(t, ok)
+	gt.V(t, msg1["text"]).Equal("Parent message")
+	gt.V(t, msg1["user_name"]).Equal("user1")
+	gt.V(t, msg1["timestamp"]).Equal("1234567890.123456")
+
+	// Verify reply message
+	msg2, ok := messages[1].(map[string]any)
+	gt.True(t, ok)
+	gt.V(t, msg2["text"]).Equal("Reply message")
+	gt.V(t, msg2["user_name"]).Equal("user2")
+	gt.V(t, msg2["timestamp"]).Equal("1234567891.654321")
 }
 
 func TestInternalTool_GetContextMessages(t *testing.T) {
@@ -103,9 +150,14 @@ func TestInternalTool_GetContextMessages(t *testing.T) {
 
 	slackClient := &domainmock.SlackClientMock{
 		GetConversationHistoryContextFunc: func(ctx context.Context, params *slackSDK.GetConversationHistoryParameters) (*slackSDK.GetConversationHistoryResponse, error) {
+			// Verify channel parameter
+			gt.V(t, params.ChannelID).Equal("C123456")
+
 			// Return different messages based on Latest/Oldest
 			if params.Latest != "" {
 				// Before messages
+				gt.V(t, params.Latest).Equal("1234567890.000000")
+				gt.V(t, params.Inclusive).Equal(false)
 				return &slackSDK.GetConversationHistoryResponse{
 					Messages: []slackSDK.Message{
 						{
@@ -119,11 +171,13 @@ func TestInternalTool_GetContextMessages(t *testing.T) {
 				}, nil
 			} else if params.Oldest != "" {
 				// After messages
+				gt.V(t, params.Oldest).Equal("1234567890.000000")
+				gt.V(t, params.Inclusive).Equal(false)
 				return &slackSDK.GetConversationHistoryResponse{
 					Messages: []slackSDK.Message{
 						{
 							Msg: slackSDK.Msg{
-								Timestamp: "1234567892.123456",
+								Timestamp: "1234567892.654321",
 								Text:      "Message after",
 								Username:  "user2",
 							},
@@ -137,19 +191,39 @@ func TestInternalTool_GetContextMessages(t *testing.T) {
 		},
 	}
 
-	llmClient := newMockLLMClient()
-	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
+	tool := slackagent.NewInternalToolForTest(slackClient, 0)
 
-	agent := slackagent.New(
-		slackagent.WithSlackClient(slackClient),
-		slackagent.WithLLMClient(llmClient),
-		slackagent.WithMemoryService(memService),
-	)
+	// Call getContextMessages directly
+	result, err := tool.Run(ctx, "slack_get_context_messages", map[string]any{
+		"channel":   "C123456",
+		"around_ts": "1234567890",
+		"before":    float64(1),
+		"after":     float64(1),
+	})
 
-	initialized, err := agent.Init(ctx, llmClient, memService)
 	gt.NoError(t, err)
-	gt.True(t, initialized)
+	gt.V(t, result).NotNil()
+
+	// Verify response structure
+	beforeMessages, ok := result["before_messages"].([]any)
+	gt.True(t, ok)
+	gt.V(t, len(beforeMessages)).Equal(1)
+
+	afterMessages, ok := result["after_messages"].([]any)
+	gt.True(t, ok)
+	gt.V(t, len(afterMessages)).Equal(1)
+
+	// Verify before message
+	beforeMsg, ok := beforeMessages[0].(map[string]any)
+	gt.True(t, ok)
+	gt.V(t, beforeMsg["text"]).Equal("Message before")
+	gt.V(t, beforeMsg["user_name"]).Equal("user1")
+
+	// Verify after message
+	afterMsg, ok := afterMessages[0].(map[string]any)
+	gt.True(t, ok)
+	gt.V(t, afterMsg["text"]).Equal("Message after")
+	gt.V(t, afterMsg["user_name"]).Equal("user2")
 }
 
 func TestInternalTool_LimitEnforcement(t *testing.T) {
