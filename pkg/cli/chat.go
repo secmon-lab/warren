@@ -10,6 +10,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
+	slackagent "github.com/secmon-lab/warren/pkg/agents/slack"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -34,6 +35,7 @@ func cmdChat() *cli.Command {
 	)
 
 	bqAgent := bqagent.New()
+	slackAgent := slackagent.New()
 
 	flags := joinFlags(
 		[]cli.Flag{
@@ -58,6 +60,7 @@ func cmdChat() *cli.Command {
 		tools.Flags(),
 		mcpCfg.Flags(),
 		bqAgent.Flags(),
+		slackAgent.Flags(),
 	)
 
 	return &cli.Command{
@@ -131,6 +134,13 @@ func cmdChat() *cli.Command {
 				return err
 			} else if enabled {
 				allToolSets = append(allToolSets, bqAgent)
+			}
+
+			// Initialize Slack Search Agent
+			if enabled, err := slackAgent.Init(ctx, llmClient, memoryService); err != nil {
+				return err
+			} else if enabled {
+				allToolSets = append(allToolSets, slackAgent)
 			}
 
 			// Show ticket information

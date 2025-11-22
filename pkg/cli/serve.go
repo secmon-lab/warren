@@ -14,6 +14,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
 	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
+	slackagent "github.com/secmon-lab/warren/pkg/agents/slack"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
@@ -69,6 +70,7 @@ func cmdServe() *cli.Command {
 	)
 
 	bqAgent := bqagent.New()
+	slackAgent := slackagent.New()
 
 	flags := joinFlags(
 		[]cli.Flag{
@@ -131,6 +133,7 @@ func cmdServe() *cli.Command {
 		mcpCfg.Flags(),
 		asyncCfg.Flags(),
 		bqAgent.Flags(),
+		slackAgent.Flags(),
 	)
 
 	return &cli.Command{
@@ -267,6 +270,13 @@ func cmdServe() *cli.Command {
 				return err
 			} else if enabled {
 				toolSets = append(toolSets, bqAgent)
+			}
+
+			// Initialize Slack Search Agent
+			if enabled, err := slackAgent.Init(ctx, llmClient, memoryService); err != nil {
+				return err
+			} else if enabled {
+				toolSets = append(toolSets, slackAgent)
 			}
 
 			ucOptions := []usecase.Option{

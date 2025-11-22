@@ -65,6 +65,9 @@ import (
 //			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slackSDK.MsgOption) (string, string, error) {
 //				panic("mock out the PostMessageContext method")
 //			},
+//			SearchMessagesContextFunc: func(ctx context.Context, query string, params slackSDK.SearchParameters) (*slackSDK.SearchMessages, error) {
+//				panic("mock out the SearchMessagesContext method")
+//			},
 //			UpdateMessageContextFunc: func(ctx context.Context, channelID string, timestamp string, options ...slackSDK.MsgOption) (string, string, string, error) {
 //				panic("mock out the UpdateMessageContext method")
 //			},
@@ -116,6 +119,9 @@ type SlackClientMock struct {
 
 	// PostMessageContextFunc mocks the PostMessageContext method.
 	PostMessageContextFunc func(ctx context.Context, channelID string, options ...slackSDK.MsgOption) (string, string, error)
+
+	// SearchMessagesContextFunc mocks the SearchMessagesContext method.
+	SearchMessagesContextFunc func(ctx context.Context, query string, params slackSDK.SearchParameters) (*slackSDK.SearchMessages, error)
 
 	// UpdateMessageContextFunc mocks the UpdateMessageContext method.
 	UpdateMessageContextFunc func(ctx context.Context, channelID string, timestamp string, options ...slackSDK.MsgOption) (string, string, string, error)
@@ -200,6 +206,15 @@ type SlackClientMock struct {
 			// Options is the options argument value.
 			Options []slackSDK.MsgOption
 		}
+		// SearchMessagesContext holds details about calls to the SearchMessagesContext method.
+		SearchMessagesContext []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Query is the query argument value.
+			Query string
+			// Params is the params argument value.
+			Params slackSDK.SearchParameters
+		}
 		// UpdateMessageContext holds details about calls to the UpdateMessageContext method.
 		UpdateMessageContext []struct {
 			// Ctx is the ctx argument value.
@@ -242,6 +257,7 @@ type SlackClientMock struct {
 	lockGetUsersInfo                  sync.RWMutex
 	lockOpenView                      sync.RWMutex
 	lockPostMessageContext            sync.RWMutex
+	lockSearchMessagesContext         sync.RWMutex
 	lockUpdateMessageContext          sync.RWMutex
 	lockUpdateView                    sync.RWMutex
 	lockUploadFileV2Context           sync.RWMutex
@@ -702,6 +718,50 @@ func (mock *SlackClientMock) PostMessageContextCalls() []struct {
 	mock.lockPostMessageContext.RLock()
 	calls = mock.calls.PostMessageContext
 	mock.lockPostMessageContext.RUnlock()
+	return calls
+}
+
+// SearchMessagesContext calls SearchMessagesContextFunc.
+func (mock *SlackClientMock) SearchMessagesContext(ctx context.Context, query string, params slackSDK.SearchParameters) (*slackSDK.SearchMessages, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Query  string
+		Params slackSDK.SearchParameters
+	}{
+		Ctx:    ctx,
+		Query:  query,
+		Params: params,
+	}
+	mock.lockSearchMessagesContext.Lock()
+	mock.calls.SearchMessagesContext = append(mock.calls.SearchMessagesContext, callInfo)
+	mock.lockSearchMessagesContext.Unlock()
+	if mock.SearchMessagesContextFunc == nil {
+		var (
+			searchMessagesOut *slackSDK.SearchMessages
+			errOut            error
+		)
+		return searchMessagesOut, errOut
+	}
+	return mock.SearchMessagesContextFunc(ctx, query, params)
+}
+
+// SearchMessagesContextCalls gets all the calls that were made to SearchMessagesContext.
+// Check the length with:
+//
+//	len(mockedSlackClient.SearchMessagesContextCalls())
+func (mock *SlackClientMock) SearchMessagesContextCalls() []struct {
+	Ctx    context.Context
+	Query  string
+	Params slackSDK.SearchParameters
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Query  string
+		Params slackSDK.SearchParameters
+	}
+	mock.lockSearchMessagesContext.RLock()
+	calls = mock.calls.SearchMessagesContext
+	mock.lockSearchMessagesContext.RUnlock()
 	return calls
 }
 
