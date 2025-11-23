@@ -43,6 +43,7 @@ type SlackClient interface {
 	GetBotInfoContext(ctx context.Context, parameters slackSDK.GetBotInfoParameters) (*slackSDK.Bot, error)
 	GetConversationHistoryContext(ctx context.Context, params *slackSDK.GetConversationHistoryParameters) (*slackSDK.GetConversationHistoryResponse, error)
 	GetConversationRepliesContext(ctx context.Context, params *slackSDK.GetConversationRepliesParameters) ([]slackSDK.Message, bool, string, error)
+	SearchMessagesContext(ctx context.Context, query string, params slackSDK.SearchParameters) (*slackSDK.SearchMessages, error)
 }
 
 type SlackThreadService interface {
