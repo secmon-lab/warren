@@ -126,18 +126,18 @@ func (a *Agent) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return []gollem.ToolSpec{
 		{
 			Name:        "search_slack",
-			Description: "Search for messages in Slack workspace. This tool ONLY searches and retrieves messages - it does NOT analyze or interpret the data. After receiving the search results, YOU must analyze them yourself and provide a complete answer to the user based on the retrieved messages.",
+			Description: "Search for messages in Slack workspace. This tool delegates to a specialized Slack search agent that will understand your request, search comprehensively, and return a response containing the relevant raw message data organized to fulfill your request. The agent will include actual message content (text, user, channel, timestamp) as raw data. You should use this data to answer the user's question.",
 			Parameters: map[string]*gollem.Parameter{
-				"query": {
+				"request": {
 					Type:        gollem.TypeString,
-					Description: "ONLY specify the search conditions (e.g., 'messages in #security-alerts from last week', 'messages containing error from @user'). Do NOT include analysis instructions or interpretation requests - ONLY search conditions.",
+					Description: "DO NOT specify search keywords or terms. Describe ONLY the concept/situation in natural language. The agent will determine all search keywords and variations. ✗ BAD: 'search for authentication keyword', 'messages containing auth error', 'find keyword login' ✓ GOOD: 'people having authentication problems', 'discussions about performance issues', 'error reports in #security-alerts channel'. Include: (1) What concept/situation to find (NOT keywords), (2) Time period if relevant, (3) Channel/user scope if relevant. The Slack agent handles all keyword selection, variations, and multilingual terms automatically.",
 				},
 				"limit": {
 					Type:        gollem.TypeNumber,
 					Description: "Maximum number of messages to return in the response (default: 50, max: 200). Use this to control response size.",
 				},
 			},
-			Required: []string{"query"},
+			Required: []string{"request"},
 		},
 	}, nil
 }
@@ -152,10 +152,10 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 		return nil, goerr.New("unknown function", goerr.V("name", name))
 	}
 
-	query, ok := args["query"].(string)
+	request, ok := args["request"].(string)
 	if !ok {
-		log.Debug("Query parameter is missing or invalid")
-		return nil, goerr.New("query parameter is required")
+		log.Debug("Request parameter is missing or invalid")
+		return nil, goerr.New("request parameter is required")
 	}
 
 	// Get limit parameter
@@ -167,14 +167,14 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 		limit = 200
 	}
 
-	log.Debug("Processing query", "query", query, "limit", limit)
-	msg.Trace(ctx, "🔵 *[Slack Search Agent]* Query: `%s` (limit: %d)", query, limit)
+	log.Debug("Processing request", "request", request, "limit", limit)
+	msg.Trace(ctx, "🔵 *[Slack Search Agent]* Request: `%s` (limit: %d)", request, limit)
 
 	startTime := time.Now()
 
 	// Step 1: Search for relevant memories
 	log.Debug("Searching for relevant memories", "agent_id", a.ID(), "limit", 5)
-	memories, err := a.memoryService.SearchRelevantAgentMemories(ctx, a.ID(), query, 5)
+	memories, err := a.memoryService.SearchRelevantAgentMemories(ctx, a.ID(), request, 5)
 	if err != nil {
 		// Memory search failure is non-critical - continue with empty memories
 		log.Warn("Memory search failed, continuing without memories", "error", err)
@@ -218,7 +218,14 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 		// Tool execution middleware
 		gollem.WithToolMiddleware(func(next gollem.ToolHandler) gollem.ToolHandler {
 			return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
-				msg.Trace(ctx, "  🔸 *Tool:* `%s`", req.Tool.Name)
+				// Show tool name and search query for slack_search_messages
+
+				if req.Tool.Name == "slack_search_messages" {
+					query, _ := req.Tool.Arguments["query"].(string)
+					msg.Trace(ctx, "  🔸 *Tool:* `%s` (query: `%s`)", req.Tool.Name, query)
+				} else {
+					msg.Trace(ctx, "  🔸 *Tool:* `%s`", req.Tool.Name)
+				}
 				log.Debug("execute tool", "tool", req.Tool.Name, "args", req.Tool.Arguments)
 
 				resp, err := next(ctx, req)
@@ -226,6 +233,11 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 				if resp != nil && resp.Error != nil {
 					msg.Trace(ctx, "  ❌ *Error:* %s", resp.Error.Error())
 					log.Error("tool error", "error", resp.Error, "call", req.Tool)
+				} else if resp != nil && req.Tool.Name == "slack_search_messages" {
+					// For slack_search_messages, only show count instead of full results
+					if msgs, ok := resp.Result["messages"].([]any); ok {
+						msg.Trace(ctx, "  ✅ *Found:* %d messages", len(msgs))
+					}
 				}
 
 				return resp, err
@@ -234,14 +246,14 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	)
 
 	// Step 4: Execute task
-	log.Debug("Executing query task via internal agent", "query", query)
-	resp, execErr := agent.Execute(ctx, gollem.Text(query))
+	log.Debug("Executing request task via internal agent", "request", request)
+	resp, execErr := agent.Execute(ctx, gollem.Text(request))
 	duration := time.Since(startTime)
 	log.Debug("Query task execution completed", "duration", duration, "has_error", execErr != nil)
 
 	// Step 5: Save execution memory (metadata only)
 	log.Debug("Saving execution memory", "has_error", execErr != nil)
-	if err := a.saveExecutionMemory(ctx, query, resp, execErr, duration, agent.Session()); err != nil {
+	if err := a.saveExecutionMemory(ctx, request, resp, execErr, duration, agent.Session()); err != nil {
 		// Memory save failure is non-critical for the main task
 		log.Warn("Failed to save execution memory", "error", err)
 		msg.Trace(ctx, "  ⚠️ *Warning:* Failed to save execution memory")
@@ -253,7 +265,7 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	// Step 5.5: Collect and apply feedback for used memories
 	if len(memories) > 0 {
 		log.Debug("Collecting feedback for used memories", "count", len(memories))
-		if err := a.memoryService.CollectAndApplyFeedback(ctx, a.ID(), memories, query, agent.Session(), resp, execErr); err != nil {
+		if err := a.memoryService.CollectAndApplyFeedback(ctx, a.ID(), memories, request, agent.Session(), resp, execErr); err != nil {
 			// Feedback collection failure is non-critical
 			log.Warn("Failed to collect and apply feedback", "error", err)
 			msg.Trace(ctx, "  ⚠️ *Warning:* Failed to collect feedback for memories")
@@ -266,13 +278,14 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 		return nil, execErr
 	}
 
+	// Return the agent's response which should contain raw data organized according to the request
 	result := map[string]any{
-		"data": "",
+		"response": "",
 	}
 	if resp != nil && !resp.IsEmpty() {
-		dataStr := resp.String()
-		result["data"] = dataStr
-		log.Debug("Execution successful", "data_length", len(dataStr))
+		responseStr := resp.String()
+		result["response"] = responseStr
+		log.Debug("Execution successful", "response_length", len(responseStr))
 	} else {
 		log.Debug("Execution returned empty response")
 	}

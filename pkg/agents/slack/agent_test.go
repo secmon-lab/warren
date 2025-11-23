@@ -84,9 +84,9 @@ func TestAgent_Specs_Enabled(t *testing.T) {
 	gt.V(t, len(specs)).Equal(1)
 	gt.V(t, specs[0].Name).Equal("search_slack")
 	gt.V(t, specs[0].Description).NotEqual("")
-	gt.V(t, len(specs[0].Parameters)).Equal(2) // query and limit
-	_, hasQuery := specs[0].Parameters["query"]
-	gt.True(t, hasQuery)
+	gt.V(t, len(specs[0].Parameters)).Equal(2) // request and limit
+	_, hasRequest := specs[0].Parameters["request"]
+	gt.True(t, hasRequest)
 	_, hasLimit := specs[0].Parameters["limit"]
 	gt.True(t, hasLimit)
 }
@@ -163,14 +163,13 @@ func TestAgent_Run_BasicSearch(t *testing.T) {
 
 	// Run search
 	result, err := agent.Run(ctx, "search_slack", map[string]any{
-		"query": "test search",
-		"limit": float64(50),
+		"request": "test search",
+		"limit":   float64(50),
 	})
 
 	gt.NoError(t, err)
-	_, hasData := result["data"]
-	gt.True(t, hasData)
-	gt.V(t, result["data"]).NotEqual("")
+	_, hasResponse := result["response"]
+	gt.True(t, hasResponse)
 }
 
 func TestAgent_Run_LimitEnforcement(t *testing.T) {
@@ -218,13 +217,13 @@ func TestAgent_Run_LimitEnforcement(t *testing.T) {
 
 	// Request 300 messages (should be capped at 200 by agent)
 	result, err := agent.Run(ctx, "search_slack", map[string]any{
-		"query": "test",
-		"limit": float64(300),
+		"request": "test",
+		"limit":   float64(300),
 	})
 
 	gt.NoError(t, err)
-	_, hasData := result["data"]
-	gt.True(t, hasData)
+	_, hasResponse := result["response"]
+	gt.True(t, hasResponse)
 	// Note: Limit enforcement is tested directly in TestInternalTool_DirectLimitEnforcement
 }
 

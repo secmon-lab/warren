@@ -242,44 +242,190 @@ Example:
 "Check if this file hash is known malware"
 ```
 
-### BigQuery Tools
+### BigQuery Agent
 
-For analyzing security logs and historical data:
+The BigQuery Agent is a specialized sub-agent that handles BigQuery data retrieval operations. It automatically selects appropriate tables, constructs queries, and retrieves data based on natural language requests.
 
-#### `bigquery_query`
-Execute SQL queries on your security data.
+**Important**: The agent delegates to a specialized BigQuery sub-agent that only retrieves data. The main agent must analyze the returned data and provide answers.
+
+#### Configuration
+
+The BigQuery Agent requires configuration before use. There are two ways to configure it:
+
+**1. Using a Configuration File (Recommended)**:
+
+Create a YAML configuration file specifying available tables:
+
+```yaml
+# bigquery-config.yaml
+tables:
+  - project_id: "my-project"
+    dataset_id: "security_logs"
+    table_id: "authentication_events"
+    description: "User authentication and login events"
+
+  - project_id: "my-project"
+    dataset_id: "security_logs"
+    table_id: "network_traffic"
+    description: "Network connection logs and traffic data"
+
+scan_size_limit: "10GB"  # Optional: Maximum scan size per query
+query_timeout: "5m"      # Optional: Query timeout duration
+```
+
+Use with Warren:
+```bash
+warren chat --ticket-id TICKET_ID \
+  --agent-bigquery-config bigquery-config.yaml \
+  --agent-bigquery-project-id my-project
+```
+
+**2. Using Environment Variables**:
+
+```bash
+export WARREN_AGENT_BIGQUERY_CONFIG=/path/to/bigquery-config.yaml
+export WARREN_AGENT_BIGQUERY_PROJECT_ID=my-project
+export WARREN_AGENT_BIGQUERY_SCAN_SIZE_LIMIT=10GB
+
+warren chat --ticket-id TICKET_ID
+```
+
+**Additional Options**:
+
+- `--agent-bigquery-runbook-dir`: Path to SQL runbook files or directories containing predefined queries
+- `--agent-bigquery-impersonate-service-account`: Service account email to impersonate for BigQuery operations
+
+**SQL Runbooks**:
+
+You can provide predefined SQL queries as "runbooks" that the agent can use:
+
+```sql
+-- saved-queries/recent-logins.sql
+-- description: Get recent login attempts for a specific user
+-- parameters: username, days
+SELECT
+  timestamp,
+  user,
+  source_ip,
+  status
+FROM `{project}.{dataset}.authentication_events`
+WHERE user = @username
+  AND timestamp > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @days DAY)
+ORDER BY timestamp DESC
+```
+
+Use runbooks:
+```bash
+warren chat --ticket-id TICKET_ID \
+  --agent-bigquery-config config.yaml \
+  --agent-bigquery-runbook-dir ./saved-queries
+```
+
+#### Available Tool
+
+When configured, the BigQuery Agent provides one tool to the main agent:
+
+##### `query_bigquery`
+Retrieve data from BigQuery tables using natural language.
 ```
 "Query login attempts from this IP in the last 30 days"
 "Show me all events from this user yesterday"
+"Find network connections to suspicious domains"
 ```
 
-#### `bigquery_list_dataset`
-List available BigQuery datasets.
-```
-"What datasets are available?"
-"Show me the security log tables"
+The agent will:
+1. Understand your data retrieval requirements
+2. Select the appropriate table(s)
+3. Construct and execute the SQL query
+4. Return the raw data for analysis
+
+**Note**: If the BigQuery Agent is not configured (no config file provided), this tool will not be available.
+
+### Slack Agent
+
+The Slack Agent is a specialized sub-agent that searches for messages in your Slack workspace. It understands natural language search requests, automatically determines search keywords and variations, and retrieves relevant messages.
+
+**Important**: The agent delegates to a specialized Slack search sub-agent that retrieves messages. The main agent must analyze the returned messages and provide answers.
+
+#### Configuration
+
+The Slack Agent requires a Slack User OAuth Token with `search:read` scope. This is different from the bot token used for posting alerts.
+
+**Setting up Slack User Token**:
+
+1. Go to your Slack App configuration at [api.slack.com/apps](https://api.slack.com/apps)
+2. Navigate to "OAuth & Permissions"
+3. Under "User Token Scopes", add the `search:read` scope
+4. Install/Reinstall the app to your workspace
+5. Copy the "User OAuth Token" (starts with `xoxp-`)
+
+**Configure the token**:
+
+Using environment variable (recommended):
+```bash
+export WARREN_AGENT_SLACK_USER_TOKEN=xoxp-your-user-token-here
+warren chat --ticket-id TICKET_ID
 ```
 
-#### `bigquery_result`
-Get results of a previously executed query.
-```
-"Show the results of query job-123"
-"Get the output from the last query"
-```
-
-#### `bigquery_schema`
-Get schema information for a table.
-```
-"Show me the schema for the events table"
-"What columns are in the security_logs table?"
+Using command-line flag:
+```bash
+warren chat --ticket-id TICKET_ID \
+  --agent-slack-user-token xoxp-your-user-token-here
 ```
 
-#### `bigquery_table_summary`
-Get summary information about a table.
+**Why User Token?**
+
+The Slack search API requires a user token (not a bot token) because it searches across all channels visible to the user, including private channels and DMs. Make sure to use a user token with appropriate channel access.
+
+#### Available Tool
+
+When configured, the Slack Agent provides one tool to the main agent:
+
+##### `search_slack`
+Search for messages in Slack workspace using natural language.
 ```
-"Summarize the security_events table"
-"How many rows are in the logs table?"
+"Find discussions about authentication issues"
+"People reporting performance problems in the last week"
+"Error messages in #security-alerts channel"
 ```
+
+**Parameters**:
+- `request`: Natural language description of what to find (NOT search keywords)
+- `limit`: Maximum number of messages to return (default: 50, max: 200)
+
+**Important Usage Notes**:
+
+❌ **DON'T** specify search keywords:
+- "search for authentication keyword"
+- "messages containing 'error'"
+- "find keyword login"
+
+✅ **DO** describe the concept/situation:
+- "people having authentication problems"
+- "discussions about performance issues"
+- "error reports in #security-alerts channel"
+
+The Slack Agent automatically:
+1. Determines appropriate search keywords and variations
+2. Handles multilingual terms
+3. Searches across channels and time periods
+4. Returns relevant messages with full context
+
+**Example Usage**:
+
+```
+User: What were people saying about the outage yesterday?
+
+Agent: [Calls search_slack with request="discussions about outage yesterday"]
+
+Slack Agent returns: 15 messages from #incidents and #engineering discussing
+the database outage on 2025-11-22...
+
+Agent: Based on the Slack messages, the team identified a database connection
+pool exhaustion issue that started at 14:30. [Provides analysis]
+```
+
+**Note**: If the Slack Agent is not configured (no user token provided), this tool will not be available.
 
 ## MCP (Model Context Protocol) Integration
 

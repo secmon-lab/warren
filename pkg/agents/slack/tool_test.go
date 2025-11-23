@@ -269,13 +269,13 @@ func TestInternalTool_LimitEnforcement(t *testing.T) {
 
 	// Run with limit of 50
 	result, err := agent.Run(ctx, "search_slack", map[string]any{
-		"query": "test",
-		"limit": float64(50),
+		"request": "test",
+		"limit":   float64(50),
 	})
 
 	gt.NoError(t, err)
-	_, hasData := result["data"]
-	gt.True(t, hasData)
+	_, hasResponse := result["response"]
+	gt.True(t, hasResponse)
 }
 
 func TestInternalTool_DirectLimitEnforcement(t *testing.T) {
