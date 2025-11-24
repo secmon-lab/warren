@@ -1,6 +1,6 @@
-package commit
+package triage
 
-# Basic commit policy for testing
+# Basic triage policy for testing
 import rego.v1
 
 default publish := "notice"

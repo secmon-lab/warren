@@ -198,9 +198,9 @@ When an alert arrives at any webhook endpoint:
 
 Define custom schemas using Rego policies to handle any alert format:
 
-1. Create policy file: `policies/alert/myservice.rego`
+1. Create policy file: `policies/ingest/myservice.rego`
 ```rego
-package alert.myservice
+package ingest.myservice
 
 alert contains {
     "title": input.alert_title,

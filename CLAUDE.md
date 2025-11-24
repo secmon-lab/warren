@@ -61,10 +61,10 @@ The application follows Domain-Driven Design (DDD) with clean architecture:
 - Uses AI to generate titles, descriptions, and semantic embeddings
 
 **Pipeline Stages**:
-1. **Alert Policy Evaluation** - Transform raw alert data into Alert objects
+1. **Ingest Policy Evaluation** - Transform raw alert data into Alert objects
 2. **Metadata Generation** - Fill missing titles/descriptions using LLM
 3. **Enrich Policy Evaluation** - Execute enrichment tasks (query/agent)
-4. **Commit Policy Evaluation** - Apply final metadata and determine publish type
+4. **Triage Policy Evaluation** - Apply final metadata and determine publish type
 
 **Pipeline Execution**:
 - `ProcessAlertPipeline()` - Pure pipeline processing (no side effects)

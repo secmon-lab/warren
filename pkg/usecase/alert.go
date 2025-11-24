@@ -40,7 +40,7 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, a
 	var results []*alert.Alert
 	for _, alertResult := range pipelineResults {
 		processedAlert := alertResult.Alert
-		commitResult := alertResult.CommitResult
+		commitResult := alertResult.TriageResult
 
 		// Determine publish type (default to alert if not specified)
 		publishType := types.PublishTypeAlert
@@ -57,7 +57,7 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, a
 		switch publishType {
 		case types.PublishTypeDiscard:
 			// Discard: do nothing, just log
-			logger.Info("alert discarded by commit policy", "alert_id", processedAlert.ID)
+			logger.Info("alert discarded by triage policy", "alert_id", processedAlert.ID)
 			// Don't add to results
 
 		case types.PublishTypeNotice:

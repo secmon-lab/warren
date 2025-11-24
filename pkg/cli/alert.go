@@ -171,18 +171,18 @@ func displayPipelineResult(results []*usecase.AlertPipelineResult) error {
 		// Commit result section
 		fmt.Println("\n✅ COMMIT RESULT")
 		fmt.Println("─────────────────────────────────────────────────────────────────────────")
-		fmt.Printf("Publish:     %s\n", r.CommitResult.Publish)
-		fmt.Printf("Title:       %s\n", r.CommitResult.Title)
-		if r.CommitResult.Description != "" {
-			fmt.Printf("Description: %s\n", r.CommitResult.Description)
+		fmt.Printf("Publish:     %s\n", r.TriageResult.Publish)
+		fmt.Printf("Title:       %s\n", r.TriageResult.Title)
+		if r.TriageResult.Description != "" {
+			fmt.Printf("Description: %s\n", r.TriageResult.Description)
 		}
-		if r.CommitResult.Channel != "" {
-			fmt.Printf("Channel:     %s\n", r.CommitResult.Channel)
+		if r.TriageResult.Channel != "" {
+			fmt.Printf("Channel:     %s\n", r.TriageResult.Channel)
 		}
 
-		if len(r.CommitResult.Attr) > 0 {
+		if len(r.TriageResult.Attr) > 0 {
 			fmt.Println("\nAdditional Attributes:")
-			for _, attr := range r.CommitResult.Attr {
+			for _, attr := range r.TriageResult.Attr {
 				autoFlag := ""
 				if attr.Auto {
 					autoFlag = " (auto)"

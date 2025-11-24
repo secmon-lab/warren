@@ -13,13 +13,13 @@ type NotificationEvent interface {
 	isNotificationEvent()
 }
 
-// AlertPolicyResultEvent is fired when alert policy evaluation completes
-type AlertPolicyResultEvent struct {
+// IngestPolicyResultEvent is fired when ingest policy evaluation completes
+type IngestPolicyResultEvent struct {
 	Schema types.AlertSchema
 	Alerts []*alert.Alert
 }
 
-func (e *AlertPolicyResultEvent) isNotificationEvent() {}
+func (e *IngestPolicyResultEvent) isNotificationEvent() {}
 
 // EnrichPolicyResultEvent is fired when enrich policy evaluation completes
 type EnrichPolicyResultEvent struct {
@@ -29,12 +29,12 @@ type EnrichPolicyResultEvent struct {
 
 func (e *EnrichPolicyResultEvent) isNotificationEvent() {}
 
-// CommitPolicyResultEvent is fired when commit policy evaluation completes
-type CommitPolicyResultEvent struct {
-	Result *policy.CommitPolicyResult
+// TriagePolicyResultEvent is fired when triage policy evaluation completes
+type TriagePolicyResultEvent struct {
+	Result *policy.TriagePolicyResult
 }
 
-func (e *CommitPolicyResultEvent) isNotificationEvent() {}
+func (e *TriagePolicyResultEvent) isNotificationEvent() {}
 
 // EnrichTaskPromptEvent is fired when an enrich task prompt is prepared
 type EnrichTaskPromptEvent struct {

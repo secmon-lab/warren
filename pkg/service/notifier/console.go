@@ -21,16 +21,16 @@ func NewConsoleNotifier() interfaces.Notifier {
 	return &ConsoleNotifier{}
 }
 
-func (n *ConsoleNotifier) NotifyAlertPolicyResult(ctx context.Context, ev *event.AlertPolicyResultEvent) {
-	printAlertPolicyResult(ev)
+func (n *ConsoleNotifier) NotifyIngestPolicyResult(ctx context.Context, ev *event.IngestPolicyResultEvent) {
+	printIngestPolicyResult(ev)
 }
 
 func (n *ConsoleNotifier) NotifyEnrichPolicyResult(ctx context.Context, ev *event.EnrichPolicyResultEvent) {
 	printEnrichPolicyResult(ev)
 }
 
-func (n *ConsoleNotifier) NotifyCommitPolicyResult(ctx context.Context, ev *event.CommitPolicyResultEvent) {
-	printCommitPolicyResult(ev)
+func (n *ConsoleNotifier) NotifyTriagePolicyResult(ctx context.Context, ev *event.TriagePolicyResultEvent) {
+	printTriagePolicyResult(ev)
 }
 
 func (n *ConsoleNotifier) NotifyEnrichTaskPrompt(ctx context.Context, ev *event.EnrichTaskPromptEvent) {
@@ -45,11 +45,11 @@ func (n *ConsoleNotifier) NotifyError(ctx context.Context, ev *event.ErrorEvent)
 	printError(ev)
 }
 
-func printAlertPolicyResult(e *event.AlertPolicyResultEvent) {
+func printIngestPolicyResult(e *event.IngestPolicyResultEvent) {
 	blue := color.New(color.FgBlue, color.Bold)
 	white := color.New(color.FgWhite)
 
-	_, _ = blue.Println("Alert Policy Result:")
+	_, _ = blue.Println("Ingest Policy Result:")
 	fmt.Printf("  Schema: %s\n", e.Schema)
 	fmt.Printf("  Alerts: %d\n\n", len(e.Alerts))
 
@@ -93,11 +93,11 @@ func printEnrichPolicyResult(e *event.EnrichPolicyResultEvent) {
 	}
 }
 
-func printCommitPolicyResult(e *event.CommitPolicyResultEvent) {
+func printTriagePolicyResult(e *event.TriagePolicyResultEvent) {
 	blue := color.New(color.FgBlue, color.Bold)
 	green := color.New(color.FgGreen)
 
-	_, _ = blue.Print("Commit Policy Result: ")
+	_, _ = blue.Print("Triage Policy Result: ")
 	fmt.Printf("Publish=%s\n", e.Result.Publish)
 
 	if e.Result.Title != "" {

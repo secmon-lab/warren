@@ -1,6 +1,6 @@
-package alert.test_schema
+package ingest.test_schema
 
-# Test alert policy for unit tests
+# Test ingest policy for unit tests
 import rego.v1
 
 alert contains {

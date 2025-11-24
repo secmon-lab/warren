@@ -53,24 +53,24 @@ func (s *Service) EvaluateEnrichPolicy(ctx context.Context, alert *alert.Alert) 
 	return &result, nil
 }
 
-// EvaluateCommitPolicy evaluates commit policy
-func (s *Service) EvaluateCommitPolicy(ctx context.Context, alert *alert.Alert, enrichResults policy.EnrichResults) (*policy.CommitPolicyResult, error) {
+// EvaluateTriagePolicy evaluates triage policy
+func (s *Service) EvaluateTriagePolicy(ctx context.Context, alert *alert.Alert, enrichResults policy.EnrichResults) (*policy.TriagePolicyResult, error) {
 	// Create input matching doc/policy.md format: input.alert.metadata.title
-	queryInput := policy.NewCommitPolicyInput(alert, enrichResults)
+	queryInput := policy.NewTriagePolicyInput(alert, enrichResults)
 
-	var result policy.CommitPolicyResult
-	query := "data.commit"
+	var result policy.TriagePolicyResult
+	query := "data.triage"
 
 	err := s.policyClient.Query(ctx, query, queryInput, &result)
-	logging.From(ctx).Debug("commit policy result", "input", queryInput, "output", result, "query", query, "error", err)
+	logging.From(ctx).Debug("triage policy result", "input", queryInput, "output", result, "query", query, "error", err)
 	if err != nil {
 		if errors.Is(err, opaq.ErrNoEvalResult) {
-			// No commit policy defined, return default behavior
-			return &policy.CommitPolicyResult{
+			// No triage policy defined, return default behavior
+			return &policy.TriagePolicyResult{
 				Publish: types.PublishTypeAlert,
 			}, nil
 		}
-		return nil, goerr.Wrap(err, "failed to evaluate commit policy")
+		return nil, goerr.Wrap(err, "failed to evaluate triage policy")
 	}
 
 	// Set default publish type if empty
@@ -81,19 +81,19 @@ func (s *Service) EvaluateCommitPolicy(ctx context.Context, alert *alert.Alert, 
 	return &result, nil
 }
 
-// EvaluateAlertPolicy evaluates alert policy and returns alerts
-func (s *Service) EvaluateAlertPolicy(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
+// EvaluateIngestPolicy evaluates ingest policy and returns alerts
+func (s *Service) EvaluateIngestPolicy(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 	logger := logging.From(ctx)
 
 	var result alert.QueryOutput
-	query := "data.alert." + string(schema)
+	query := "data.ingest." + string(schema)
 	hook := func(ctx context.Context, loc opaq.PrintLocation, msg string) error {
 		logging.From(ctx).Debug("[rego.print] "+msg, "location", loc)
 		return nil
 	}
 
 	err := s.policyClient.Query(ctx, query, alertData, &result, opaq.WithPrintHook(hook))
-	logger.Debug("alert policy result", "input", alertData, "output", result, "query", query)
+	logger.Debug("ingest policy result", "input", alertData, "output", result, "query", query)
 
 	if err != nil {
 		// Check if it's a "no evaluation result" error (package not found)
