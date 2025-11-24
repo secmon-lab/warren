@@ -7,9 +7,9 @@ Warren uses [Rego](https://www.openpolicyagent.org/docs/latest/policy-language/)
 - [Overview](#overview)
 - [Alert Lifecycle](#alert-lifecycle)
 - [Policy Types](#policy-types)
-  - [Alert Policy](#alert-policy)
+  - [Ingest Policy](#ingest-policy)
   - [Enrich Policy](#enrich-policy)
-  - [Commit Policy](#commit-policy)
+  - [Triage Policy](#triage-policy)
   - [Authorization Policy](#authorization-policy)
 - [Pipeline Architecture](#pipeline-architecture)
 - [Getting Started](#getting-started)
@@ -22,7 +22,7 @@ Warren's policy system enables you to:
 
 - **Transform** incoming security events into structured alerts
 - **Enrich** alerts with additional context using AI and external tools
-- **Control** alert routing, severity, and metadata
+- **Triage** alerts with priority judgment and routing decisions
 - **Authorize** API access with flexible authentication rules
 
 All policies are written in Rego, a declarative language designed for expressing complex policy logic. Warren evaluates these policies at different stages of the alert processing pipeline.
@@ -33,9 +33,9 @@ An alert in Warren goes through several stages from ingestion to notification:
 
 ```mermaid
 flowchart TD
-    A[Event Ingested] --> B[Stage 1: Alert Policy]
+    A[Event Ingested] --> B[Stage 1: Ingest Policy]
     B -->|Fill metadata by GenAI| D[Stage 2: Enrich Policy]
-    D --> E[Stage 3: Commit Policy]
+    D --> E[Stage 3: Triage Policy]
     E --> F[Alert Published]
 
     B -.->|Filter/Ignore| G[Event Dropped]
@@ -70,40 +70,40 @@ flowchart TD
 
 1. **Immutability**: Once an alert is created, its core data doesn't change. Policies can set metadata, but the original event data remains intact.
 
-2. **One Event, Multiple Alerts**: Alert policies can generate multiple alerts from a single event (e.g., processing an array of findings).
+2. **One Event, Multiple Alerts**: Ingest policies can generate multiple alerts from a single event (e.g., processing an array of findings).
 
 3. **Three Policy Stages**:
-   - **Alert Policy**: Transforms raw events into alerts, filters unwanted events
+   - **Ingest Policy**: Transforms raw events into alerts, filters unwanted events
    - **Enrich Policy**: Defines additional AI analysis tasks (query/agent)
-   - **Commit Policy**: Makes final routing and publishing decisions based on enrichment results
+   - **Triage Policy**: Makes final routing and publishing decisions based on enrichment results
 
 4. **Progressive Enhancement**: Each policy stage adds more context:
-   - Alert policy: Initial structure and filtering
+   - Ingest policy: Initial structure and filtering
    - Enrich policy: Additional investigation tasks
-   - Commit policy: Final decision and routing
+   - Triage policy: Final decision and routing
 
-> **Note**: Warren automatically fills missing titles/descriptions with AI between Alert and Enrich policies. This is not controlled by policies.
+> **Note**: Warren automatically fills missing titles/descriptions with AI between Ingest and Enrich policies. This is not controlled by policies.
 
 ## Policy Types
 
 Warren uses four types of policies, each evaluated at different stages of the pipeline:
 
-### Alert Policy
+### Ingest Policy
 
-**Package**: `alert.{schema_name}`
+**Package**: `ingest.{schema_name}`
 **When**: First stage - transforms raw events into alerts
 **Input**: Raw event data from webhook
 **Output**: Alert metadata (title, description, attributes)
 
-Alert policies define how external events become Warren alerts. The package name determines the webhook endpoint:
+Ingest policies define how external events become Warren alerts. The package name determines the webhook endpoint:
 
-- Package `alert.guardduty` → Endpoint `/hooks/alert/raw/guardduty`
-- Package `alert.custom` → Endpoint `/hooks/alert/raw/custom`
+- Package `ingest.guardduty` → Endpoint `/hooks/alert/raw/guardduty`
+- Package `ingest.custom` → Endpoint `/hooks/alert/raw/custom`
 
 **Structure**:
 
 ```rego
-package alert.{schema_name}
+package ingest.{schema_name}
 
 # Main rule - can generate multiple alerts
 alert contains {
@@ -188,24 +188,24 @@ has_external_ip if {
 
 **Key Points**:
 
-- Task IDs are used to reference results in commit policy
+- Task IDs are used to reference results in triage policy
 - Use `prompt` for file-based prompts, `inline` for simple text
 - Format can be `"text"` or `"json"` (JSON enables structured parsing)
 - Agent tasks have access to tools configured in Warren
 
-### Commit Policy
+### Triage Policy
 
-**Package**: `commit`
+**Package**: `triage`
 **When**: After enrichment tasks complete
 **Input**: Alert object + enrichment results map
 **Output**: Final metadata overrides and publish decision
 
-Commit policies make final decisions about alert handling based on original alert data and enrichment results:
+Triage policies make final decisions about alert handling based on original alert data and enrichment results:
 
 **Structure**:
 
 ```rego
-package commit
+package triage
 
 # Override title based on enrichment
 title := sprintf("CONFIRMED THREAT: %s", [input.alert.metadata.title]) if {
@@ -409,14 +409,14 @@ Warren's alert processing pipeline is implemented in `pkg/usecase/alert_pipeline
 
 ```mermaid
 flowchart TB
-    Start[ProcessAlertPipeline] --> A[EvaluateAlertPolicy]
+    Start[ProcessAlertPipeline] --> A[EvaluateIngestPolicy]
     A --> B{For each alert}
 
     B --> C[ConvertNamesToTags]
     C --> D[FillMetadata]
     D --> E[EvaluateEnrichPolicy]
     E --> F[ExecuteTasks]
-    F --> G[EvaluateCommitPolicy]
+    F --> G[EvaluateTriagePolicy]
 
     G --> H{More alerts?}
     H -->|Yes| B
@@ -427,7 +427,7 @@ flowchart TB
     D -.-> D1[AI title/desc/embedding]
     E -.-> E1[EnrichPolicyResult]
     F -.-> F1[EnrichResults]
-    G -.-> G1[CommitPolicyResult]
+    G -.-> G1[TriagePolicyResult]
 
     style Start fill:#e1f5ff
     style I fill:#d4edda
@@ -439,11 +439,11 @@ flowchart TB
 
 The pipeline emits events through the `Notifier` interface for real-time monitoring:
 
-- `NotifyAlertPolicyResult`: Alert policy evaluation complete
+- `NotifyIngestPolicyResult`: Ingest policy evaluation complete
 - `NotifyEnrichPolicyResult`: Enrich policy evaluation complete
 - `NotifyEnrichTaskPrompt`: Enrichment task prompt being sent
 - `NotifyEnrichTaskResponse`: Enrichment task response received
-- `NotifyCommitPolicyResult`: Commit policy evaluation complete
+- `NotifyTriagePolicyResult`: Triage policy evaluation complete
 - `NotifyError`: Error occurred during processing
 
 These events power:
@@ -460,12 +460,12 @@ This separation enables testing and reusability.
 
 ## Getting Started
 
-### 1. Basic Alert Policy
+### 1. Basic Ingest Policy
 
-Start with a simple alert policy that passes events through:
+Start with a simple ingest policy that passes events through:
 
 ```rego
-package alert.myservice
+package ingest.myservice
 
 alert contains {
     "title": input.title,
@@ -476,7 +476,7 @@ alert contains {
 }
 ```
 
-Save as `policies/alert/myservice.rego` and send events to `/hooks/alert/raw/myservice`.
+Save as `policies/ingest/myservice.rego` and send events to `/hooks/alert/raw/myservice`.
 
 ### 2. Add AI Enrichment
 
@@ -496,12 +496,12 @@ query contains {
 
 Save as `policies/enrich/enrich.rego`.
 
-### 3. Make Routing Decisions
+### 3. Make Triage Decisions
 
-Use commit policy to route based on enrichment:
+Use triage policy to route based on enrichment:
 
 ```rego
-package commit
+package triage
 
 # Route high-confidence threats to urgent channel
 channel := "security-urgent" if {
@@ -520,7 +520,7 @@ channel := "security-alerts"
 publish := "alert"
 ```
 
-Save as `policies/commit/commit.rego`.
+Save as `policies/triage/triage.rego`.
 
 ### 4. Test Your Policies
 
@@ -535,7 +535,7 @@ warren test \
 
 ## Best Practices
 
-### Alert Policy Best Practices
+### Ingest Policy Best Practices
 
 1. **Filter Early**: Use `ignore` rules to drop noise before AI processing
 2. **Structured Attributes**: Extract key fields as attributes for filtering/clustering
@@ -546,12 +546,12 @@ warren test \
 ### Enrich Policy Best Practices
 
 1. **Use Query for Simple Tasks**: Query tasks are faster than agents
-2. **Request JSON Format**: Structured responses are easier to parse in commit policy
+2. **Request JSON Format**: Structured responses are easier to parse in triage policy
 3. **Limit Agent Tasks**: Agents are powerful but slower - use sparingly
 4. **Descriptive Task IDs**: Use meaningful IDs like `check_threat_intel`, not `task1`
 5. **Conditional Enrichment**: Only run tasks when relevant (check alert schema/attributes)
 
-### Commit Policy Best Practices
+### Triage Policy Best Practices
 
 1. **Default to Alert**: Always provide default `publish = "alert"` and `channel`
 2. **Conservative Discarding**: Only discard with high confidence
@@ -571,10 +571,10 @@ warren test \
 
 ### Complete GuardDuty Pipeline
 
-**Alert Policy** (`policies/alert/guardduty.rego`):
+**Ingest Policy** (`policies/ingest/guardduty.rego`):
 
 ```rego
-package alert.guardduty
+package ingest.guardduty
 
 alert contains {
     "title": sprintf("%s in %s", [input.detail.type, input.detail.region]),
@@ -639,10 +639,10 @@ has_remote_ip if {
 }
 ```
 
-**Commit Policy** (`policies/commit/commit.rego`):
+**Triage Policy** (`policies/triage/triage.rego`):
 
 ```rego
-package commit
+package triage
 
 # Override title for confirmed threats
 title := sprintf("🚨 CONFIRMED THREAT: %s", [input.alert.metadata.title]) if {
@@ -681,10 +681,10 @@ publish := "alert"
 
 ### Severity-Based Routing
 
-Simple commit policy for routing by severity:
+Simple triage policy for routing by severity:
 
 ```rego
-package commit
+package triage
 
 channel := "security-critical" if {
     input.alert.metadata.severity == "critical"
@@ -729,7 +729,7 @@ publish := "alert"
 
 ### Enrichment Tasks Not Running
 
-**Symptoms**: Commit policy receives empty `input.enrich`
+**Symptoms**: Triage policy receives empty `input.enrich`
 
 **Solutions**:
 1. Verify enrich policy package is exactly `enrich` (not `enrich.something`)
@@ -737,12 +737,12 @@ publish := "alert"
 3. Ensure `WARREN_LLM_*` environment variables are set
 4. Check Warren logs for task execution errors
 
-### Commit Policy Not Applying
+### Triage Policy Not Applying
 
-**Symptoms**: Alert metadata doesn't reflect commit policy changes
+**Symptoms**: Alert metadata doesn't reflect triage policy changes
 
 **Solutions**:
-1. Verify commit policy package is exactly `commit`
+1. Verify triage policy package is exactly `triage`
 2. Check that field names match exactly (`title`, `description`, `channel`, `attr`, `publish`)
 3. Use `print()` statements to debug: `print("Setting channel:", channel)`
 4. Verify enrichment task IDs match: `input.enrich.{task_id}`

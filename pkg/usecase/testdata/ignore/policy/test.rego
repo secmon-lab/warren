@@ -1,4 +1,4 @@
-package alert.guardduty
+package ingest.guardduty
 
 alert contains {} if {
     not ignore

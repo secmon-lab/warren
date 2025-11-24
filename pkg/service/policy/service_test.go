@@ -136,7 +136,7 @@ func TestService_EvaluateEnrichPolicy(t *testing.T) {
 	})
 }
 
-func TestService_EvaluateCommitPolicy(t *testing.T) {
+func TestService_EvaluateTriagePolicy(t *testing.T) {
 	t.Run("evaluates commit policy successfully", func(t *testing.T) {
 		ctx := context.Background()
 		a := alert.New(ctx, "test-schema", nil, alert.Metadata{
@@ -149,15 +149,15 @@ func TestService_EvaluateCommitPolicy(t *testing.T) {
 
 		mockClient := &mockPolicyClient{
 			QueryFunc: func(ctx context.Context, path string, input any, output any) error {
-				gt.Equal(t, path, "data.commit")
+				gt.Equal(t, path, "data.triage")
 
 				// Verify input structure
-				commitInput := input.(domainPolicy.CommitPolicyInput)
+				commitInput := input.(domainPolicy.TriagePolicyInput)
 				gt.NotEqual(t, commitInput.Alert.ID, "")
 				gt.Equal(t, len(commitInput.Enrich), 1)
 
 				// Set commit policy result
-				result := output.(*domainPolicy.CommitPolicyResult)
+				result := output.(*domainPolicy.TriagePolicyResult)
 				result.Title = "Updated Title"
 				result.Description = "Updated Description"
 				result.Channel = "security-alerts"
@@ -167,7 +167,7 @@ func TestService_EvaluateCommitPolicy(t *testing.T) {
 		}
 
 		svc := policy.New(mockClient)
-		result, err := svc.EvaluateCommitPolicy(ctx, &a, enrichResults)
+		result, err := svc.EvaluateTriagePolicy(ctx, &a, enrichResults)
 
 		gt.NoError(t, err)
 		gt.NotEqual(t, result, nil)
@@ -189,7 +189,7 @@ func TestService_EvaluateCommitPolicy(t *testing.T) {
 		}
 
 		svc := policy.New(mockClient)
-		result, err := svc.EvaluateCommitPolicy(ctx, &a, enrichResults)
+		result, err := svc.EvaluateTriagePolicy(ctx, &a, enrichResults)
 
 		gt.NoError(t, err)
 		gt.NotEqual(t, result, nil)
@@ -210,7 +210,7 @@ func TestService_EvaluateCommitPolicy(t *testing.T) {
 		}
 
 		svc := policy.New(mockClient)
-		result, err := svc.EvaluateCommitPolicy(ctx, &a, enrichResults)
+		result, err := svc.EvaluateTriagePolicy(ctx, &a, enrichResults)
 
 		gt.Error(t, err)
 		gt.Equal(t, result, nil)

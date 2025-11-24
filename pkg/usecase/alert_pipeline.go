@@ -20,18 +20,18 @@ import (
 type AlertPipelineResult struct {
 	Alert        *alert.Alert
 	EnrichResult policy.EnrichResults
-	CommitResult *policy.CommitPolicyResult
+	TriageResult *policy.TriagePolicyResult
 }
 
 // ProcessAlertPipeline processes an alert through the complete pipeline.
 // This is a pure function without side effects (no DB save, no Slack notification).
 //
 // Pipeline stages:
-// 1. Alert Policy Evaluation - transforms raw data into Alert objects
+// 1. Ingest Policy Evaluation - transforms raw data into Alert objects
 // 2. Tag Conversion - converts tag names to tag IDs
 // 3. Metadata Generation - fills missing titles/descriptions using LLM
 // 4. Enrich Policy Evaluation - executes enrichment tasks (query/agent)
-// 5. Commit Policy Evaluation - applies final metadata and determines publish type
+// 5. Triage Policy Evaluation - applies final metadata and determines publish type
 //
 // All pipeline events are emitted through the notifier for real-time monitoring.
 // The notifier receives type-safe events for each stage of processing.
@@ -44,18 +44,18 @@ func (uc *UseCases) ProcessAlertPipeline(
 	// Create policy service
 	policyService := policySvc.NewWithStrictMode(uc.policyClient, uc.strictAlert)
 
-	// Step 1: Evaluate alert policy
-	alerts, err := policyService.EvaluateAlertPolicy(ctx, schema, alertData)
+	// Step 1: Evaluate ingest policy
+	alerts, err := policyService.EvaluateIngestPolicy(ctx, schema, alertData)
 	if err != nil {
 		notifier.NotifyError(ctx, &event.ErrorEvent{
 			Error:   err,
-			Message: "Alert policy evaluation failed",
+			Message: "Ingest policy evaluation failed",
 		})
-		return nil, goerr.Wrap(err, "failed to evaluate alert policy")
+		return nil, goerr.Wrap(err, "failed to evaluate ingest policy")
 	}
 
-	// Notify alert policy result
-	notifier.NotifyAlertPolicyResult(ctx, &event.AlertPolicyResultEvent{
+	// Notify ingest policy result
+	notifier.NotifyIngestPolicyResult(ctx, &event.IngestPolicyResultEvent{
 		Schema: schema,
 		Alerts: alerts,
 	})
@@ -123,28 +123,28 @@ func (uc *UseCases) ProcessAlertPipeline(
 			}
 		}
 
-		// Step 3: Evaluate commit policy for this alert
-		commitResult, err := policyService.EvaluateCommitPolicy(ctx, processedAlert, enrichResults)
+		// Step 3: Evaluate triage policy for this alert
+		triageResult, err := policyService.EvaluateTriagePolicy(ctx, processedAlert, enrichResults)
 		if err != nil {
 			notifier.NotifyError(ctx, &event.ErrorEvent{
 				Error:   err,
-				Message: "Commit policy evaluation failed",
+				Message: "Triage policy evaluation failed",
 			})
-			return nil, goerr.Wrap(err, "failed to evaluate commit policy")
+			return nil, goerr.Wrap(err, "failed to evaluate triage policy")
 		}
 
-		// Notify commit policy result
-		notifier.NotifyCommitPolicyResult(ctx, &event.CommitPolicyResultEvent{
-			Result: commitResult,
+		// Notify triage policy result
+		notifier.NotifyTriagePolicyResult(ctx, &event.TriagePolicyResultEvent{
+			Result: triageResult,
 		})
 
-		// Step 4: Apply commit policy result to alert
-		commitResult.ApplyTo(processedAlert)
+		// Step 4: Apply triage policy result to alert
+		triageResult.ApplyTo(processedAlert)
 
 		results = append(results, &AlertPipelineResult{
 			Alert:        processedAlert,
 			EnrichResult: enrichResults,
-			CommitResult: commitResult,
+			TriageResult: triageResult,
 		})
 	}
 

@@ -23,9 +23,9 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		// Create real policy client with test policies
 		policyClient, err := opaq.New(
 			opaq.Files(
-				"testdata/alert_test.rego",
+				"testdata/ingest_test.rego",
 				"testdata/enrich_no_tasks.rego",
-				"testdata/commit_basic.rego",
+				"testdata/triage_basic.rego",
 			),
 		)
 		gt.NoError(t, err)
@@ -73,9 +73,9 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		// Create real policy client with test policies
 		policyClient, err := opaq.New(
 			opaq.Files(
-				"testdata/alert_test.rego",
+				"testdata/ingest_test.rego",
 				"testdata/enrich_query_task.rego",
-				"testdata/commit_simple.rego",
+				"testdata/triage_simple.rego",
 			),
 		)
 		gt.NoError(t, err)
@@ -125,9 +125,9 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		// Create real policy client with test policies
 		policyClient, err := opaq.New(
 			opaq.Files(
-				"testdata/alert_test.rego",
+				"testdata/ingest_test.rego",
 				"testdata/enrich_inline_prompt.rego",
-				"testdata/commit_simple.rego",
+				"testdata/triage_simple.rego",
 			),
 		)
 		gt.NoError(t, err)
@@ -157,7 +157,7 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		// Create policy that returns no alerts (input doesn't match)
 		policyClient, err := opaq.New(
 			opaq.Files(
-				"testdata/alert_test.rego",
+				"testdata/ingest_test.rego",
 			),
 		)
 		gt.NoError(t, err)
@@ -184,8 +184,8 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		// Create policy client with only alert and commit policies (no enrich)
 		policyClient, err := opaq.New(
 			opaq.Files(
-				"testdata/alert_test.rego",
-				"testdata/commit_basic.rego",
+				"testdata/ingest_test.rego",
+				"testdata/triage_basic.rego",
 			),
 		)
 		gt.NoError(t, err)
@@ -214,7 +214,7 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		// Create policy client with only alert and enrich policies (no commit)
 		policyClient, err := opaq.New(
 			opaq.Files(
-				"testdata/alert_test.rego",
+				"testdata/ingest_test.rego",
 				"testdata/enrich_no_tasks.rego",
 			),
 		)
@@ -235,7 +235,7 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		gt.NotEqual(t, results, nil)
 		gt.Equal(t, len(results), 1)
 		// Commit policy should use default behavior (PublishTypeAlert)
-		gt.Equal(t, results[0].CommitResult.Publish, "alert")
+		gt.Equal(t, results[0].TriageResult.Publish, "alert")
 	})
 
 	t.Run("works without enrich and commit policies", func(t *testing.T) {
@@ -244,7 +244,7 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		// Create policy client with only alert policy
 		policyClient, err := opaq.New(
 			opaq.Files(
-				"testdata/alert_test.rego",
+				"testdata/ingest_test.rego",
 			),
 		)
 		gt.NoError(t, err)
@@ -264,7 +264,7 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		gt.NotEqual(t, results, nil)
 		gt.Equal(t, len(results), 1)
 		gt.Equal(t, len(results[0].EnrichResult), 0)          // No enrich tasks
-		gt.Equal(t, results[0].CommitResult.Publish, "alert") // Default publish type
+		gt.Equal(t, results[0].TriageResult.Publish, "alert") // Default publish type
 	})
 
 	t.Run("fails when LLM client is not configured but enrich tasks exist", func(t *testing.T) {
@@ -273,9 +273,9 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		// Create policy client with enrich tasks
 		policyClient, err := opaq.New(
 			opaq.Files(
-				"testdata/alert_test.rego",
+				"testdata/ingest_test.rego",
 				"testdata/enrich_query_task.rego",
-				"testdata/commit_simple.rego",
+				"testdata/triage_simple.rego",
 			),
 		)
 		gt.NoError(t, err)
@@ -334,9 +334,9 @@ func TestHandleAlert_PublishTypes(t *testing.T) {
 		// Create policy
 		policyClient, err := opaq.New(
 			opaq.Files(
-				"testdata/alert_test.rego",
+				"testdata/ingest_test.rego",
 				"testdata/enrich_no_tasks.rego",
-				"testdata/commit_publish_alert.rego",
+				"testdata/triage_publish_alert.rego",
 			),
 		)
 		gt.NoError(t, err)
@@ -427,9 +427,9 @@ func TestHandleAlert_PublishTypes(t *testing.T) {
 		// Create policy with notice publish type
 		policyClient, err := opaq.New(
 			opaq.Files(
-				"testdata/alert_test.rego",
+				"testdata/ingest_test.rego",
 				"testdata/enrich_no_tasks.rego",
-				"testdata/commit_publish_notice.rego",
+				"testdata/triage_publish_notice.rego",
 			),
 		)
 		gt.NoError(t, err)
@@ -489,9 +489,9 @@ func TestHandleAlert_PublishTypes(t *testing.T) {
 		// Create policy with discard
 		policyClient, err := opaq.New(
 			opaq.Files(
-				"testdata/alert_test.rego",
+				"testdata/ingest_test.rego",
 				"testdata/enrich_no_tasks.rego",
-				"testdata/commit_publish_discard.rego",
+				"testdata/triage_publish_discard.rego",
 			),
 		)
 		gt.NoError(t, err)
