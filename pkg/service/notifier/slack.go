@@ -111,7 +111,7 @@ func handleTriagePolicyResult(ctx context.Context, thread interfaces.SlackThread
 
 func handleEnrichTaskPrompt(ctx context.Context, thread interfaces.SlackThreadService, e *event.EnrichTaskPromptEvent) error {
 	logger := logging.From(ctx)
-	summary := fmt.Sprintf("*Task Prompt* `%s` (%s)\nLength: %d chars", e.TaskID, e.TaskType, len(e.PromptText))
+	summary := fmt.Sprintf("*Task Prompt* `%s`\nLength: %d chars", e.TaskID, len(e.PromptText))
 
 	if len(e.PromptText) > slackMessageLimit {
 		if err := thread.PostContextBlock(ctx, summary); err != nil {
@@ -134,7 +134,7 @@ func handleEnrichTaskPrompt(ctx context.Context, thread interfaces.SlackThreadSe
 
 func handleEnrichTaskResponse(ctx context.Context, thread interfaces.SlackThreadService, e *event.EnrichTaskResponseEvent) error {
 	logger := logging.From(ctx)
-	summary := fmt.Sprintf("*Task Response* `%s` (%s)", e.TaskID, e.TaskType)
+	summary := fmt.Sprintf("*Task Response* `%s`", e.TaskID)
 
 	var content string
 	var fileName string
@@ -193,43 +193,27 @@ func formatEnrichPolicyResult(e *event.EnrichPolicyResultEvent) string {
 	msg := ":mag: *Enrich Policy Result*\n"
 	msg += fmt.Sprintf("Total Tasks: *%d*\n", e.TaskCount)
 
-	if e.Policy == nil || (len(e.Policy.Query) == 0 && len(e.Policy.Agent) == 0) {
+	if e.Policy == nil || len(e.Policy.Prompts) == 0 {
 		msg += "_No enrichment tasks defined_\n"
 		return msg
 	}
 
-	if len(e.Policy.Query) > 0 {
-		msg += fmt.Sprintf("\n*Query Tasks* (%d):\n", len(e.Policy.Query))
-		for i, task := range e.Policy.Query {
-			msg += fmt.Sprintf("  %d. `%s` [%s]", i+1, task.ID, task.Format)
-			if task.Prompt != "" {
-				msg += fmt.Sprintf(" • Prompt: `%s`", task.Prompt)
-			} else if task.Inline != "" {
-				inlinePreview := task.Inline
-				if len(inlinePreview) > 50 {
-					inlinePreview = inlinePreview[:50] + "..."
-				}
-				msg += fmt.Sprintf(" • Inline: %s", inlinePreview)
+	msg += fmt.Sprintf("\n*Prompt Tasks* (%d):\n", len(e.Policy.Prompts))
+	for i, task := range e.Policy.Prompts {
+		msg += fmt.Sprintf("  %d. `%s` [%s]", i+1, task.ID, task.Format)
+		if task.Template != "" {
+			msg += fmt.Sprintf(" • Template: `%s`", task.Template)
+			if len(task.Params) > 0 {
+				msg += fmt.Sprintf(" (with %d params)", len(task.Params))
 			}
-			msg += "\n"
-		}
-	}
-
-	if len(e.Policy.Agent) > 0 {
-		msg += fmt.Sprintf("\n*Agent Tasks* (%d):\n", len(e.Policy.Agent))
-		for i, task := range e.Policy.Agent {
-			msg += fmt.Sprintf("  %d. `%s` [%s]", i+1, task.ID, task.Format)
-			if task.Prompt != "" {
-				msg += fmt.Sprintf(" • Prompt: `%s`", task.Prompt)
-			} else if task.Inline != "" {
-				inlinePreview := task.Inline
-				if len(inlinePreview) > 50 {
-					inlinePreview = inlinePreview[:50] + "..."
-				}
-				msg += fmt.Sprintf(" • Inline: %s", inlinePreview)
+		} else if task.Inline != "" {
+			inlinePreview := task.Inline
+			if len(inlinePreview) > 50 {
+				inlinePreview = inlinePreview[:50] + "..."
 			}
-			msg += "\n"
+			msg += fmt.Sprintf(" • Inline: %s", inlinePreview)
 		}
+		msg += "\n"
 	}
 
 	return msg

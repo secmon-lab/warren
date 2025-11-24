@@ -56,7 +56,7 @@ func (a *Alert) GetTagNames(ctx context.Context, tagGetter func(context.Context,
 type Alerts []*Alert
 
 type QueryOutput struct {
-	Alert []Metadata `json:"alert"`
+	Alerts []Metadata `json:"alerts"`
 }
 
 type Metadata struct {

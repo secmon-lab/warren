@@ -106,7 +106,7 @@ Ingest policies define how external events become Warren alerts. The package nam
 package ingest.{schema_name}
 
 # Main rule - can generate multiple alerts
-alert contains {
+alerts contains {
     "title": "Alert title",
     "description": "Alert description",
     "attrs": [
@@ -130,7 +130,7 @@ ignore if {
 
 **Key Points**:
 
-- Use `alert contains` to generate alerts (can produce multiple from one event)
+- Use `alerts contains` to generate alerts (can produce multiple from one event)
 - Use `ignore` to filter out unwanted events
 - If no policy exists, Warren creates a default alert and uses AI for metadata
 - Attributes can include links to external tools (VirusTotal, IPinfo, etc.)
@@ -140,7 +140,7 @@ ignore if {
 **Package**: `enrich`
 **When**: After alert creation and AI metadata generation
 **Input**: Complete alert object with metadata
-**Output**: Task definitions (query/agent types)
+**Output**: Prompt task definitions
 
 Enrich policies define additional analysis to perform on alerts using AI:
 
@@ -149,22 +149,34 @@ Enrich policies define additional analysis to perform on alerts using AI:
 ```rego
 package enrich
 
-# Query tasks - simple LLM questions
-query contains {
+# Prompt tasks with template files
+prompts contains {
     "id": "check_ioc",
-    "prompt": "threat_analysis.md",  # Prompt file path
-    "format": "json"                 # or "text"
+    "template": "threat_analysis.md",  # Template file path
+    "params": {
+        "severity_threshold": "high",
+        "include_context": true
+    },
+    "format": "json"  # or "text"
 } if {
     input.schema == "guardduty"
 }
 
-# Agent tasks - AI agents with tool access
-agent contains {
+# Prompt tasks with inline text
+prompts contains {
     "id": "investigate_ip",
     "inline": "Investigate the source IP address",  # Inline prompt
     "format": "text"
 } if {
     has_external_ip
+}
+
+# ID is optional - auto-generated if omitted
+prompts contains {
+    "inline": "Quick security check",  # ID will be auto-generated
+    "format": "text"
+} if {
+    input.schema == "vpc_flow"
 }
 
 has_external_ip if {
@@ -174,30 +186,22 @@ has_external_ip if {
 }
 ```
 
-**Task Types**:
-
-1. **Query Tasks**: Simple LLM queries for analysis
-   - Uses `gollem.GenerateContent()`
-   - Fast, no tool access
-   - Good for classification, summarization
-
-2. **Agent Tasks**: AI agents with tool access
-   - Uses `gollem.Agent` with tool execution
-   - Can call security tools (VirusTotal, BigQuery, etc.)
-   - Slower but more powerful
-
 **Key Points**:
 
+- All tasks are executed as AI agents with tool access (using `gollem.Agent`)
+- Task IDs are **optional** - if omitted, a unique ID is auto-generated (e.g., `task_a1b2c3d4`)
 - Task IDs are used to reference results in triage policy
-- Use `prompt` for file-based prompts, `inline` for simple text
+- Use `template` for template files (supports `text/template` syntax)
+- Use `params` to pass custom parameters to templates
+- Use `inline` for simple inline prompts
 - Format can be `"text"` or `"json"` (JSON enables structured parsing)
-- Agent tasks have access to tools configured in Warren
+- All tasks have access to tools configured in Warren
 
 ### Triage Policy
 
 **Package**: `triage`
 **When**: After enrichment tasks complete
-**Input**: Alert object + enrichment results map
+**Input**: Alert object + enrichment results array
 **Output**: Final metadata overrides and publish decision
 
 Triage policies make final decisions about alert handling based on original alert data and enrichment results:
@@ -207,33 +211,40 @@ Triage policies make final decisions about alert handling based on original aler
 ```rego
 package triage
 
+# Helper function to get enrichment result by ID
+get_enrich(task_id) := result if {
+    some e in input.enrich
+    e.id == task_id
+    result := e.result
+}
+
 # Override title based on enrichment
 title := sprintf("CONFIRMED THREAT: %s", [input.alert.metadata.title]) if {
-    input.enrich.check_ioc.is_malicious == true
+    get_enrich("check_ioc").is_malicious == true
 }
 
 # Override description
-description := input.enrich.check_ioc.analysis if {
-    input.enrich.check_ioc.analysis
+description := get_enrich("check_ioc").analysis if {
+    get_enrich("check_ioc").analysis
 }
 
 # Set notification channel
 channel := "security-urgent" if {
-    input.enrich.check_ioc.severity == "critical"
+    get_enrich("check_ioc").severity == "critical"
 }
 
 # Add attributes from enrichment
 attr contains {
     "key": "threat_score",
-    "value": input.enrich.check_ioc.score,
+    "value": get_enrich("check_ioc").score,
     "link": ""
 } if {
-    input.enrich.check_ioc.score
+    get_enrich("check_ioc").score
 }
 
 # Determine publish type
 publish := "discard" if {
-    input.enrich.check_ioc.is_false_positive == true
+    get_enrich("check_ioc").is_false_positive == true
 }
 
 publish := "notice" if {
@@ -264,20 +275,30 @@ publish := "alert"
     },
     "data": { /* original event */ }
   },
-  "enrich": {
-    "check_ioc": {
-      "is_malicious": true,
-      "score": "8.5",
-      "analysis": "..."
+  "enrich": [
+    {
+      "id": "check_ioc",
+      "prompt": "Analyze this security alert...",
+      "result": {
+        "is_malicious": true,
+        "score": "8.5",
+        "analysis": "..."
+      }
     },
-    "investigate_ip": "..."
-  }
+    {
+      "id": "investigate_ip",
+      "prompt": "Investigate the source IP address",
+      "result": "IP is associated with known botnet"
+    }
+  ]
 }
 ```
 
 **Key Points**:
 
-- Access enrichment results via `input.enrich.{task_id}`
+- Enrichment results are in array format: `input.enrich[]`
+- Each result has `id`, `prompt` (used prompt text), and `result` (task output)
+- Use helper functions like `get_enrich(task_id)` to access specific results
 - Can override any metadata field
 - Use `publish` to control alert disposition
 - Default behavior is to publish as full alert
@@ -576,7 +597,7 @@ warren test \
 ```rego
 package ingest.guardduty
 
-alert contains {
+alerts contains {
     "title": sprintf("%s in %s", [input.detail.type, input.detail.region]),
     "description": input.detail.description,
     "attrs": [
@@ -615,7 +636,7 @@ else := "medium"
 package enrich
 
 # Analyze GuardDuty findings with AI
-query contains {
+prompts contains {
     "id": "analyze_finding",
     "inline": "Analyze this GuardDuty finding. Provide: 1) Is this a real threat or false positive? 2) Recommended actions. 3) Urgency level. Respond in JSON: {\"is_threat\": boolean, \"confidence\": number, \"actions\": string[], \"urgency\": string}",
     "format": "json"
@@ -624,7 +645,7 @@ query contains {
 }
 
 # Use agent to investigate external IPs
-agent contains {
+prompts contains {
     "id": "investigate_ip",
     "inline": "Investigate the remote IP address in this GuardDuty finding using available threat intelligence tools. Summarize your findings.",
     "format": "text"
@@ -644,34 +665,41 @@ has_remote_ip if {
 ```rego
 package triage
 
+# Helper function to get enrichment result
+get_enrich(task_id) := result if {
+    some e in input.enrich
+    e.id == task_id
+    result := e.result
+}
+
 # Override title for confirmed threats
 title := sprintf("🚨 CONFIRMED THREAT: %s", [input.alert.metadata.title]) if {
-    input.enrich.analyze_finding.is_threat == true
-    input.enrich.analyze_finding.confidence > 0.85
+    get_enrich("analyze_finding").is_threat == true
+    get_enrich("analyze_finding").confidence > 0.85
 }
 
 # Add threat intelligence findings
 attr contains {
     "key": "threat_intel",
-    "value": input.enrich.investigate_ip,
+    "value": get_enrich("investigate_ip"),
     "link": ""
 } if {
-    input.enrich.investigate_ip
+    get_enrich("investigate_ip")
 }
 
 # Route based on urgency
 channel := "security-critical" if {
-    input.enrich.analyze_finding.urgency == "critical"
+    get_enrich("analyze_finding").urgency == "critical"
 }
 
 channel := "security-urgent" if {
-    input.enrich.analyze_finding.urgency == "high"
+    get_enrich("analyze_finding").urgency == "high"
 }
 
 # Discard false positives
 publish := "discard" if {
-    input.enrich.analyze_finding.is_threat == false
-    input.enrich.analyze_finding.confidence > 0.9
+    get_enrich("analyze_finding").is_threat == false
+    get_enrich("analyze_finding").confidence > 0.9
 }
 
 # Default routing

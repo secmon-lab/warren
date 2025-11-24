@@ -156,8 +156,12 @@ func TestDisplayPipelineResult(t *testing.T) {
 		}
 
 		enrichResults := policy.EnrichResults{
-			"task1": map[string]any{
-				"result": "enriched data",
+			{
+				ID:     "task1",
+				Prompt: "Analyze data",
+				Result: map[string]any{
+					"result": "enriched data",
+				},
 			},
 		}
 
