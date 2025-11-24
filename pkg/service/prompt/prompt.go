@@ -93,6 +93,11 @@ func (s *Service) loadTemplates(promptDir string) error {
 
 // GeneratePrompt generates a prompt from template name and alert data
 func (s *Service) GeneratePrompt(ctx context.Context, templateName string, alert *alert.Alert) (string, error) {
+	return s.GeneratePromptWithParams(ctx, templateName, alert, nil)
+}
+
+// GeneratePromptWithParams generates a prompt from template name, alert data, and custom parameters
+func (s *Service) GeneratePromptWithParams(ctx context.Context, templateName string, alert *alert.Alert, params map[string]any) (string, error) {
 	logger := logging.From(ctx)
 
 	tmpl, exists := s.templates[templateName]
@@ -100,12 +105,21 @@ func (s *Service) GeneratePrompt(ctx context.Context, templateName string, alert
 		return "", goerr.New("prompt template not found", goerr.V("template_name", templateName))
 	}
 
-	// Execute template with alert data
-	var buf bytes.Buffer
-	templateData := map[string]interface{}{
-		"Alert": alert,
+	// Build template data by merging custom params with Alert
+	templateData := make(map[string]interface{})
+
+	// Add custom parameters first
+	for k, v := range params {
+		templateData[k] = v
 	}
 
+	// Add Alert (this will not override params if "Alert" was in params)
+	if _, exists := templateData["Alert"]; !exists {
+		templateData["Alert"] = alert
+	}
+
+	// Execute template
+	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, templateData); err != nil {
 		return "", goerr.Wrap(err, "failed to execute prompt template",
 			goerr.V("template_name", templateName),
@@ -117,7 +131,8 @@ func (s *Service) GeneratePrompt(ctx context.Context, templateName string, alert
 	logger.Debug("generated prompt from template",
 		"template_name", templateName,
 		"alert_id", alert.ID,
-		"prompt_length", len(prompt))
+		"prompt", prompt,
+		"custom_params", len(params))
 
 	return prompt, nil
 }
@@ -163,7 +178,7 @@ func (s *Service) ReadPromptFile(ctx context.Context, templateName string) (stri
 
 	logger.Debug("read prompt file",
 		"template_name", templateName,
-		"prompt_length", len(prompt))
+		"prompt", prompt)
 
 	return prompt, nil
 }

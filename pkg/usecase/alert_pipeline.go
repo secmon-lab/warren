@@ -184,7 +184,6 @@ func (uc *UseCases) executeTasks(ctx context.Context, alert *alert.Alert, policy
 
 		logging.From(ctx).Debug("resolved prompt",
 			"task_id", task.ID,
-			"prompt_length", len(promptText),
 			"prompt_text", promptText)
 
 		// Execute task (unified execution)
@@ -232,15 +231,9 @@ func (uc *UseCases) resolvePrompt(ctx context.Context, task *policy.EnrichTask, 
 				goerr.V("template_file", task.Template))
 		}
 
-		if len(task.Params) > 0 {
-			// Use template with custom parameters
-			// TODO: Implement ExecuteTemplateWithParams or extend GeneratePrompt to accept params
-			// For now, use GeneratePrompt and merge params with Alert
-			return uc.promptService.GeneratePrompt(ctx, task.Template, alert)
-		}
-
-		// No params: read template file with Alert data
-		return uc.promptService.GeneratePrompt(ctx, task.Template, alert)
+		// Use GeneratePromptWithParams regardless of whether params exist
+		// If params is nil or empty, it will just use Alert data
+		return uc.promptService.GeneratePromptWithParams(ctx, task.Template, alert, task.Params)
 	}
 
 	return "", goerr.New("no prompt content specified",
@@ -306,7 +299,7 @@ func (uc *UseCases) executePromptTask(ctx context.Context, alert *alert.Alert, t
 
 	logger.Debug("received agent response",
 		"task_id", task.ID,
-		"response_length", len(responseText))
+		"response", responseText)
 
 	// Parse response based on format
 	var parsedResult any
@@ -353,22 +346,4 @@ func (uc *UseCases) buildAlertSystemPrompt(alert *alert.Alert) (string, error) {
 	systemPrompt += "Use this alert information to respond to the user's request. Do not include the alert data in your response unless specifically asked."
 
 	return systemPrompt, nil
-}
-
-// parseResponse parses the LLM response based on format
-func (uc *UseCases) parseResponse(response *gollem.Response, format types.GenAIContentFormat) (any, error) {
-	var responseText string
-	if len(response.Texts) > 0 {
-		responseText = response.Texts[0]
-	}
-
-	if format == types.GenAIContentFormatJSON {
-		var parsed any
-		if err := json.Unmarshal([]byte(responseText), &parsed); err != nil {
-			return responseText, nil // Return raw text if JSON parsing fails
-		}
-		return parsed, nil
-	}
-
-	return responseText, nil
 }

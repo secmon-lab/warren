@@ -189,7 +189,7 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build system prompt")
 	}
-	log.Debug("System prompt built", "prompt_length", len(systemPrompt))
+	log.Debug("System prompt built", "prompt", systemPrompt)
 
 	// Step 3: Set limit in internal tool and construct internal agent with Slack tools
 	log.Debug("Setting limit in internal tool", "limit", limit)
@@ -285,7 +285,7 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	if resp != nil && !resp.IsEmpty() {
 		responseStr := resp.String()
 		result["response"] = responseStr
-		log.Debug("Execution successful", "response_length", len(responseStr))
+		log.Debug("Execution successful", "response", responseStr)
 	} else {
 		log.Debug("Execution returned empty response")
 	}
