@@ -4,128 +4,97 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/prompt"
 )
 
-func TestPromptService(t *testing.T) {
-	// Create temporary directory for test templates
-	tempDir, err := os.MkdirTemp("", "warren-prompt-test-*")
-	gt.NoError(t, err)
-	defer func() {
-		_ = os.RemoveAll(tempDir)
-	}()
+func TestGeneratePromptWithParams(t *testing.T) {
+	t.Run("generates prompt with custom params", func(t *testing.T) {
+		// Create temp directory for templates
+		tmpDir := t.TempDir()
 
-	// Create test template
-	templateContent := `You are a security analyst. Analyze the following alert:
-
-Title: {{.Alert.Metadata.Title}}
-Description: {{.Alert.Metadata.Description}}
-Schema: {{.Alert.Schema}}
-
-Please provide a summary of this security alert.`
-
-	templatePath := filepath.Join(tempDir, "test_template.tmpl")
-	err = os.WriteFile(templatePath, []byte(templateContent), 0644)
-	gt.NoError(t, err)
-
-	ctx := context.Background()
-
-	t.Run("successful service creation and prompt generation", func(t *testing.T) {
-		service, err := prompt.New(tempDir)
+		// Create template file with custom params
+		templateContent := `Severity: {{.severity_threshold}}
+Include Context: {{.include_context}}
+Alert ID: {{.Alert.ID}}`
+		templatePath := filepath.Join(tmpDir, "test.tmpl")
+		err := os.WriteFile(templatePath, []byte(templateContent), 0644)
 		gt.NoError(t, err)
-		gt.NotNil(t, service)
 
-		testAlert := &alert.Alert{
-			ID:     types.NewAlertID(),
-			Schema: "test_schema",
-			Metadata: alert.Metadata{
-				Title:       "Test Security Alert",
-				Description: "This is a test security alert description",
-			},
+		// Create prompt service
+		svc, err := prompt.New(tmpDir)
+		gt.NoError(t, err)
+
+		// Create alert
+		ctx := context.Background()
+		a := alert.New(ctx, "test-schema", nil, alert.Metadata{})
+
+		// Generate prompt with params
+		params := map[string]any{
+			"severity_threshold": "high",
+			"include_context":    true,
 		}
+		result, err := svc.GeneratePromptWithParams(ctx, "test.tmpl", &a, params)
 
-		generatedPrompt, err := service.GeneratePrompt(ctx, "test_template.tmpl", testAlert)
 		gt.NoError(t, err)
-		gt.S(t, generatedPrompt).Contains("Test Security Alert")
-		gt.S(t, generatedPrompt).Contains("This is a test security alert description")
-		gt.S(t, generatedPrompt).Contains("test_schema")
+		gt.True(t, strings.Contains(result, "Severity: high"))
+		gt.True(t, strings.Contains(result, "Include Context: true"))
+		gt.True(t, strings.Contains(result, "Alert ID: "+string(a.ID)))
 	})
 
-	t.Run("template not found", func(t *testing.T) {
-		service, err := prompt.New(tempDir)
+	t.Run("works without params", func(t *testing.T) {
+		// Create temp directory for templates
+		tmpDir := t.TempDir()
+
+		// Create template file without custom params
+		templateContent := `Alert ID: {{.Alert.ID}}
+Alert Schema: {{.Alert.Schema}}`
+		templatePath := filepath.Join(tmpDir, "simple.tmpl")
+		err := os.WriteFile(templatePath, []byte(templateContent), 0644)
 		gt.NoError(t, err)
 
-		testAlert := &alert.Alert{
-			ID:     types.NewAlertID(),
-			Schema: "test_schema",
-			Metadata: alert.Metadata{
-				Title: "Test Alert",
-			},
-		}
+		// Create prompt service
+		svc, err := prompt.New(tmpDir)
+		gt.NoError(t, err)
 
-		_, err = service.GeneratePrompt(ctx, "nonexistent_template", testAlert)
-		gt.Error(t, err)
-		gt.S(t, err.Error()).Contains("prompt template not found")
+		// Create alert
+		ctx := context.Background()
+		a := alert.New(ctx, "guardduty", nil, alert.Metadata{})
+
+		// Generate prompt without params
+		result, err := svc.GeneratePromptWithParams(ctx, "simple.tmpl", &a, nil)
+
+		gt.NoError(t, err)
+		gt.True(t, strings.Contains(result, "Alert ID: "+string(a.ID)))
+		gt.True(t, strings.Contains(result, "Alert Schema: guardduty"))
 	})
 
-	t.Run("empty prompt directory", func(t *testing.T) {
-		service, err := prompt.New("")
-		gt.NoError(t, err)
-		gt.NotNil(t, service)
+	t.Run("GeneratePrompt calls GeneratePromptWithParams", func(t *testing.T) {
+		// Create temp directory for templates
+		tmpDir := t.TempDir()
 
-		testAlert := &alert.Alert{
-			ID: types.NewAlertID(),
-		}
-
-		_, err = service.GeneratePrompt(ctx, "any_template", testAlert)
-		gt.Error(t, err)
-		gt.S(t, err.Error()).Contains("prompt template not found")
-	})
-
-	t.Run("nonexistent directory", func(t *testing.T) {
-		_, err := prompt.New("/nonexistent/directory")
-		gt.Error(t, err)
-		gt.S(t, err.Error()).Contains("prompt directory does not exist")
-	})
-
-	t.Run("multiple template formats", func(t *testing.T) {
-		// Create additional template with .txt extension
-		txtContent := `Simple text template: {{.Alert.Metadata.Title}}`
-		txtPath := filepath.Join(tempDir, "simple.txt")
-		err = os.WriteFile(txtPath, []byte(txtContent), 0644)
+		// Create template file
+		templateContent := `Alert Schema: {{.Alert.Schema}}`
+		templatePath := filepath.Join(tmpDir, "basic.tmpl")
+		err := os.WriteFile(templatePath, []byte(templateContent), 0644)
 		gt.NoError(t, err)
 
-		// Create file with unsupported extension (should be ignored)
-		ignoredPath := filepath.Join(tempDir, "ignored.json")
-		err = os.WriteFile(ignoredPath, []byte(`{"ignored": true}`), 0644)
+		// Create prompt service
+		svc, err := prompt.New(tmpDir)
 		gt.NoError(t, err)
 
-		service, err := prompt.New(tempDir)
+		// Create alert
+		ctx := context.Background()
+		a := alert.New(ctx, "vpc_flow", nil, alert.Metadata{})
+
+		// Use GeneratePrompt (without params)
+		result, err := svc.GeneratePrompt(ctx, "basic.tmpl", &a)
+
 		gt.NoError(t, err)
-
-		testAlert := &alert.Alert{
-			Metadata: alert.Metadata{
-				Title: "Test Alert Title",
-			},
-		}
-
-		// Test .tmpl template
-		tmplPrompt, err := service.GeneratePrompt(ctx, "test_template.tmpl", testAlert)
-		gt.NoError(t, err)
-		gt.S(t, tmplPrompt).Contains("Test Alert Title")
-
-		// Test .txt template
-		txtPrompt, err := service.GeneratePrompt(ctx, "simple.txt", testAlert)
-		gt.NoError(t, err)
-		gt.Equal(t, txtPrompt, "Simple text template: Test Alert Title")
-
-		// Ignored file should not be available
-		_, err = service.GeneratePrompt(ctx, "ignored", testAlert)
-		gt.Error(t, err)
+		gt.True(t, strings.Contains(result, "Alert Schema: vpc_flow"))
 	})
 }

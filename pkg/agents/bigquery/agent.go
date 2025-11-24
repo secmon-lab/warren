@@ -207,7 +207,7 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build system prompt")
 	}
-	log.Debug("System prompt built", "prompt_length", len(systemPrompt))
+	log.Debug("System prompt built", "prompt", systemPrompt)
 
 	// Step 3: Construct gollem.Agent with BigQuery tools
 	log.Debug("Constructing internal agent with BigQuery tools")

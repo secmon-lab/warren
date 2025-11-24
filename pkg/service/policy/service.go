@@ -123,7 +123,7 @@ func (s *Service) EvaluateIngestPolicy(ctx context.Context, schema types.AlertSc
 	}
 
 	var alerts []*alert.Alert
-	for _, a := range result.Alert {
+	for _, a := range result.Alerts {
 		newAlert := alert.New(ctx, schema, alertData, a)
 		if newAlert.Data == nil {
 			newAlert.Data = alertData

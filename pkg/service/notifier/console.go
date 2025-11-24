@@ -74,21 +74,13 @@ func printEnrichPolicyResult(e *event.EnrichPolicyResultEvent) {
 	fmt.Printf("Tasks=%d\n", e.TaskCount)
 
 	if e.Policy != nil {
-		if len(e.Policy.Query) > 0 {
-			queryIDs := make([]string, 0, len(e.Policy.Query))
-			for _, task := range e.Policy.Query {
-				queryIDs = append(queryIDs, task.ID)
+		if len(e.Policy.Prompts) > 0 {
+			promptIDs := make([]string, 0, len(e.Policy.Prompts))
+			for _, task := range e.Policy.Prompts {
+				promptIDs = append(promptIDs, task.ID)
 			}
-			_, _ = yellow.Printf("  Query tasks: ")
-			fmt.Printf("%s\n", strings.Join(queryIDs, ", "))
-		}
-		if len(e.Policy.Agent) > 0 {
-			agentIDs := make([]string, 0, len(e.Policy.Agent))
-			for _, task := range e.Policy.Agent {
-				agentIDs = append(agentIDs, task.ID)
-			}
-			_, _ = yellow.Printf("  Agent tasks: ")
-			fmt.Printf("%s\n", strings.Join(agentIDs, ", "))
+			_, _ = yellow.Printf("  Prompt tasks: ")
+			fmt.Printf("%s\n", strings.Join(promptIDs, ", "))
 		}
 	}
 }
@@ -118,7 +110,7 @@ func printEnrichTaskPrompt(e *event.EnrichTaskPromptEvent) {
 	cyan := color.New(color.FgCyan, color.Bold)
 	gray := color.New(color.FgHiBlack)
 
-	_, _ = cyan.Printf("Task Prompt [%s] (%s): ", e.TaskID, e.TaskType)
+	_, _ = cyan.Printf("Task Prompt [%s]: ", e.TaskID)
 	fmt.Printf("%d chars\n", len(e.PromptText))
 	_, _ = gray.Printf("  %s\n", e.PromptText)
 }
@@ -127,7 +119,7 @@ func printEnrichTaskResponse(e *event.EnrichTaskResponseEvent) {
 	green := color.New(color.FgGreen, color.Bold)
 	white := color.New(color.FgWhite)
 
-	_, _ = green.Printf("Task Response [%s] (%s):\n", e.TaskID, e.TaskType)
+	_, _ = green.Printf("Task Response [%s]:\n", e.TaskID)
 
 	// Format response based on type
 	switch v := e.Response.(type) {

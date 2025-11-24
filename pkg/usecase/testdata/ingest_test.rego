@@ -3,7 +3,7 @@ package ingest.test_schema
 # Test ingest policy for unit tests
 import rego.v1
 
-alert contains {
+alerts contains {
     "title": title,
     "description": description,
 } if {

@@ -104,7 +104,7 @@ func test(ctx context.Context, queryFunc QueryFunc, testData *TestData, shouldDe
 				return nil
 			}
 
-			err := queryFunc(ctx, "data.alert."+schema.String(), testData, &resp, opaq.WithPrintHook(hook))
+			err := queryFunc(ctx, "data.ingest."+schema.String()+".alerts", testData, &resp, opaq.WithPrintHook(hook))
 			if err != nil {
 				if errors.Is(err, opaq.ErrNoEvalResult) {
 					if shouldDetect {
@@ -118,7 +118,7 @@ func test(ctx context.Context, queryFunc QueryFunc, testData *TestData, shouldDe
 				}
 			}
 
-			if len(resp.Alert) == 0 && shouldDetect {
+			if len(resp.Alerts) == 0 && shouldDetect {
 				logging.From(ctx).Debug("❌ FAIL (should be detected, but not detected)", "schema", schema, "filename", filename)
 				results = append(results, goerr.New("should be detected, but not detected",
 					goerr.V("schema", schema),
@@ -127,7 +127,7 @@ func test(ctx context.Context, queryFunc QueryFunc, testData *TestData, shouldDe
 				continue
 			}
 
-			if len(resp.Alert) > 0 && !shouldDetect {
+			if len(resp.Alerts) > 0 && !shouldDetect {
 				logging.From(ctx).Debug("❌ FAIL (should be ignored, but detected)", "schema", schema, "filename", filename)
 				results = append(results, goerr.New("should be ignored, but detected",
 					goerr.V("schema", schema),
@@ -136,7 +136,7 @@ func test(ctx context.Context, queryFunc QueryFunc, testData *TestData, shouldDe
 				continue
 			}
 
-			logging.From(ctx).Debug("✅ PASS", "schema", schema, "filename", filename, "should_detect", shouldDetect, "count", len(resp.Alert))
+			logging.From(ctx).Debug("✅ PASS", "schema", schema, "filename", filename, "should_detect", shouldDetect, "count", len(resp.Alerts))
 		}
 	}
 
