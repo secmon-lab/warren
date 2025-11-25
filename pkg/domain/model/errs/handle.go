@@ -9,6 +9,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/request_id"
 )
 
 func Handle(ctx context.Context, err error) {
@@ -25,6 +26,11 @@ func Handle(ctx context.Context, err error) {
 
 	hub := sentry.CurrentHub().Clone()
 	hub.ConfigureScope(func(scope *sentry.Scope) {
+		// Add request ID from context
+		if reqID := request_id.FromContext(ctx); reqID != "" {
+			scope.SetTag("request_id", reqID)
+		}
+
 		for k, v := range goerr.Values(err) {
 			scope.SetExtra(k, v)
 		}
