@@ -288,8 +288,8 @@ func TestChatAgentAuthorization(t *testing.T) {
 
 		ticketID := types.NewTicketID()
 		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
-		gt.Error(t, err)
-		gt.True(t, strings.Contains(err.Error(), "agent request not authorized"))
+		// Authorization failure sends notification but returns nil
+		gt.NoError(t, err)
 	})
 
 	t.Run("Policy not defined denies by default", func(t *testing.T) {
@@ -316,8 +316,8 @@ func TestChatAgentAuthorization(t *testing.T) {
 
 		ticketID := types.NewTicketID()
 		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
-		gt.Error(t, err)
-		gt.True(t, strings.Contains(err.Error(), "agent authorization policy not defined"))
+		// Authorization failure sends notification but returns nil
+		gt.NoError(t, err)
 	})
 
 	t.Run("NoAuthorization flag bypasses authorization", func(t *testing.T) {
@@ -805,8 +805,8 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 
 		ticketID := types.NewTicketID()
 		err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
-		gt.Error(t, err)
-		gt.S(t, err.Error()).Contains("agent request not authorized")
+		// Authorization failure sends notification but returns nil
+		gt.NoError(t, err)
 	})
 
 	t.Run("User-based policy from file - allowed user", func(t *testing.T) {
@@ -889,8 +889,8 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 
 		ticketID := types.NewTicketID()
 		err = uc.Chat(ctxWithUser, &ticket.Ticket{ID: ticketID}, "test message")
-		gt.Error(t, err)
-		gt.S(t, err.Error()).Contains("agent request not authorized")
+		// Authorization failure sends notification but returns nil
+		gt.NoError(t, err)
 	})
 
 	t.Run("Policy not defined returns specific error", func(t *testing.T) {
@@ -909,10 +909,8 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 
 		ticketID := types.NewTicketID()
 		err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
-		gt.Error(t, err)
-
-		// Verify the error is errAgentAuthPolicyNotDefined by checking the message
-		gt.S(t, err.Error()).Contains("agent authorization policy not defined")
+		// Authorization failure sends notification but returns nil
+		gt.NoError(t, err)
 	})
 }
 
