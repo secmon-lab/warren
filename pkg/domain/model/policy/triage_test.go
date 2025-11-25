@@ -11,15 +11,15 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
-func TestCommitPolicyResult_ApplyTo(t *testing.T) {
-	t.Run("applies title from commit policy", func(t *testing.T) {
+func TestTriagePolicyResult_ApplyTo(t *testing.T) {
+	t.Run("applies title from triage policy", func(t *testing.T) {
 		ctx := context.Background()
 		a := alert.New(ctx, "test-schema", nil, alert.Metadata{
 			Title:       "Original Title",
 			Description: "Original Description",
 		})
 
-		result := policy.CommitPolicyResult{
+		result := policy.TriagePolicyResult{
 			Title: "New Title from Policy",
 		}
 
@@ -30,14 +30,14 @@ func TestCommitPolicyResult_ApplyTo(t *testing.T) {
 		gt.Equal(t, a.Description, "Original Description") // unchanged
 	})
 
-	t.Run("applies description from commit policy", func(t *testing.T) {
+	t.Run("applies description from triage policy", func(t *testing.T) {
 		ctx := context.Background()
 		a := alert.New(ctx, "test-schema", nil, alert.Metadata{
 			Title:       "Original Title",
 			Description: "Original Description",
 		})
 
-		result := policy.CommitPolicyResult{
+		result := policy.TriagePolicyResult{
 			Description: "New Description from Policy",
 		}
 
@@ -48,11 +48,11 @@ func TestCommitPolicyResult_ApplyTo(t *testing.T) {
 		gt.Equal(t, a.Title, "Original Title") // unchanged
 	})
 
-	t.Run("applies channel from commit policy", func(t *testing.T) {
+	t.Run("applies channel from triage policy", func(t *testing.T) {
 		ctx := context.Background()
 		a := alert.New(ctx, "test-schema", nil, alert.Metadata{})
 
-		result := policy.CommitPolicyResult{
+		result := policy.TriagePolicyResult{
 			Channel: "security-alerts",
 		}
 
@@ -61,7 +61,7 @@ func TestCommitPolicyResult_ApplyTo(t *testing.T) {
 		gt.Equal(t, a.Channel, "security-alerts")
 	})
 
-	t.Run("applies attributes from commit policy", func(t *testing.T) {
+	t.Run("applies attributes from triage policy", func(t *testing.T) {
 		ctx := context.Background()
 		a := alert.New(ctx, "test-schema", nil, alert.Metadata{
 			Attributes: []alert.Attribute{
@@ -69,7 +69,7 @@ func TestCommitPolicyResult_ApplyTo(t *testing.T) {
 			},
 		})
 
-		result := policy.CommitPolicyResult{
+		result := policy.TriagePolicyResult{
 			Attr: []alert.Attribute{
 				{Key: "severity", Value: "high"},
 				{Key: "score", Value: "95", Link: "https://example.com"},
@@ -96,11 +96,11 @@ func TestCommitPolicyResult_ApplyTo(t *testing.T) {
 		gt.True(t, a.Attributes[2].Auto)
 	})
 
-	t.Run("applies all fields from commit policy", func(t *testing.T) {
+	t.Run("applies all fields from triage policy", func(t *testing.T) {
 		ctx := context.Background()
 		a := alert.New(ctx, "test-schema", nil, alert.Metadata{})
 
-		result := policy.CommitPolicyResult{
+		result := policy.TriagePolicyResult{
 			Title:       "Complete Title",
 			Description: "Complete Description",
 			Channel:     "alerts-channel",
@@ -130,7 +130,7 @@ func TestCommitPolicyResult_ApplyTo(t *testing.T) {
 			},
 		})
 
-		result := policy.CommitPolicyResult{}
+		result := policy.TriagePolicyResult{}
 
 		originalTitleSource := a.TitleSource
 		originalDescriptionSource := a.DescriptionSource
@@ -159,7 +159,7 @@ func TestCommitPolicyResult_ApplyTo(t *testing.T) {
 			]
 		}`
 
-		var result policy.CommitPolicyResult
+		var result policy.TriagePolicyResult
 		err := json.Unmarshal([]byte(jsonData), &result)
 		gt.NoError(t, err)
 

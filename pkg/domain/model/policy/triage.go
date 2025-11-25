@@ -5,24 +5,24 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
-// CommitPolicyAlert represents alert data for commit policy input (matches doc/policy.md format)
-type CommitPolicyAlert struct {
+// TriagePolicyAlert represents alert data for triage policy input (matches doc/policy.md format)
+type TriagePolicyAlert struct {
 	ID       types.AlertID     `json:"id"`
 	Schema   types.AlertSchema `json:"schema"`
 	Metadata alert.Metadata    `json:"metadata"`
 	Data     any               `json:"data"`
 }
 
-// CommitPolicyInput represents the input for commit policy evaluation
-type CommitPolicyInput struct {
-	Alert  CommitPolicyAlert `json:"alert"`
+// TriagePolicyInput represents the input for triage policy evaluation
+type TriagePolicyInput struct {
+	Alert  TriagePolicyAlert `json:"alert"`
 	Enrich EnrichResults     `json:"enrich"`
 }
 
-// NewCommitPolicyInput creates a CommitPolicyInput from an Alert
-func NewCommitPolicyInput(a *alert.Alert, enrichResults EnrichResults) CommitPolicyInput {
-	return CommitPolicyInput{
-		Alert: CommitPolicyAlert{
+// NewTriagePolicyInput creates a TriagePolicyInput from an Alert
+func NewTriagePolicyInput(a *alert.Alert, enrichResults EnrichResults) TriagePolicyInput {
+	return TriagePolicyInput{
+		Alert: TriagePolicyAlert{
 			ID:     a.ID,
 			Schema: a.Schema,
 			Metadata: alert.Metadata{
@@ -40,8 +40,8 @@ func NewCommitPolicyInput(a *alert.Alert, enrichResults EnrichResults) CommitPol
 	}
 }
 
-// CommitPolicyResult represents the result of commit policy evaluation
-type CommitPolicyResult struct {
+// TriagePolicyResult represents the result of triage policy evaluation
+type TriagePolicyResult struct {
 	Title       string            `json:"title,omitempty"`
 	Description string            `json:"description,omitempty"`
 	Channel     string            `json:"channel,omitempty"`
@@ -49,8 +49,8 @@ type CommitPolicyResult struct {
 	Publish     types.PublishType `json:"publish,omitempty"`
 }
 
-// ApplyTo applies the commit policy result to an alert
-func (r *CommitPolicyResult) ApplyTo(a *alert.Alert) {
+// ApplyTo applies the triage policy result to an alert
+func (r *TriagePolicyResult) ApplyTo(a *alert.Alert) {
 	if r.Title != "" {
 		a.Title = r.Title
 		a.TitleSource = types.SourcePolicy
@@ -66,7 +66,7 @@ func (r *CommitPolicyResult) ApplyTo(a *alert.Alert) {
 	}
 
 	if len(r.Attr) > 0 {
-		// Mark all attributes from commit policy as auto-generated
+		// Mark all attributes from triage policy as auto-generated
 		for i := range r.Attr {
 			r.Attr[i].Auto = true
 		}

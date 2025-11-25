@@ -21,16 +21,16 @@ func NewConsoleNotifier() interfaces.Notifier {
 	return &ConsoleNotifier{}
 }
 
-func (n *ConsoleNotifier) NotifyAlertPolicyResult(ctx context.Context, ev *event.AlertPolicyResultEvent) {
-	printAlertPolicyResult(ev)
+func (n *ConsoleNotifier) NotifyIngestPolicyResult(ctx context.Context, ev *event.IngestPolicyResultEvent) {
+	printIngestPolicyResult(ev)
 }
 
 func (n *ConsoleNotifier) NotifyEnrichPolicyResult(ctx context.Context, ev *event.EnrichPolicyResultEvent) {
 	printEnrichPolicyResult(ev)
 }
 
-func (n *ConsoleNotifier) NotifyCommitPolicyResult(ctx context.Context, ev *event.CommitPolicyResultEvent) {
-	printCommitPolicyResult(ev)
+func (n *ConsoleNotifier) NotifyTriagePolicyResult(ctx context.Context, ev *event.TriagePolicyResultEvent) {
+	printTriagePolicyResult(ev)
 }
 
 func (n *ConsoleNotifier) NotifyEnrichTaskPrompt(ctx context.Context, ev *event.EnrichTaskPromptEvent) {
@@ -45,11 +45,11 @@ func (n *ConsoleNotifier) NotifyError(ctx context.Context, ev *event.ErrorEvent)
 	printError(ev)
 }
 
-func printAlertPolicyResult(e *event.AlertPolicyResultEvent) {
+func printIngestPolicyResult(e *event.IngestPolicyResultEvent) {
 	blue := color.New(color.FgBlue, color.Bold)
 	white := color.New(color.FgWhite)
 
-	_, _ = blue.Println("Alert Policy Result:")
+	_, _ = blue.Println("Ingest Policy Result:")
 	fmt.Printf("  Schema: %s\n", e.Schema)
 	fmt.Printf("  Alerts: %d\n\n", len(e.Alerts))
 
@@ -74,30 +74,22 @@ func printEnrichPolicyResult(e *event.EnrichPolicyResultEvent) {
 	fmt.Printf("Tasks=%d\n", e.TaskCount)
 
 	if e.Policy != nil {
-		if len(e.Policy.Query) > 0 {
-			queryIDs := make([]string, 0, len(e.Policy.Query))
-			for _, task := range e.Policy.Query {
-				queryIDs = append(queryIDs, task.ID)
+		if len(e.Policy.Prompts) > 0 {
+			promptIDs := make([]string, 0, len(e.Policy.Prompts))
+			for _, task := range e.Policy.Prompts {
+				promptIDs = append(promptIDs, task.ID)
 			}
-			_, _ = yellow.Printf("  Query tasks: ")
-			fmt.Printf("%s\n", strings.Join(queryIDs, ", "))
-		}
-		if len(e.Policy.Agent) > 0 {
-			agentIDs := make([]string, 0, len(e.Policy.Agent))
-			for _, task := range e.Policy.Agent {
-				agentIDs = append(agentIDs, task.ID)
-			}
-			_, _ = yellow.Printf("  Agent tasks: ")
-			fmt.Printf("%s\n", strings.Join(agentIDs, ", "))
+			_, _ = yellow.Printf("  Prompt tasks: ")
+			fmt.Printf("%s\n", strings.Join(promptIDs, ", "))
 		}
 	}
 }
 
-func printCommitPolicyResult(e *event.CommitPolicyResultEvent) {
+func printTriagePolicyResult(e *event.TriagePolicyResultEvent) {
 	blue := color.New(color.FgBlue, color.Bold)
 	green := color.New(color.FgGreen)
 
-	_, _ = blue.Print("Commit Policy Result: ")
+	_, _ = blue.Print("Triage Policy Result: ")
 	fmt.Printf("Publish=%s\n", e.Result.Publish)
 
 	if e.Result.Title != "" {
@@ -118,7 +110,7 @@ func printEnrichTaskPrompt(e *event.EnrichTaskPromptEvent) {
 	cyan := color.New(color.FgCyan, color.Bold)
 	gray := color.New(color.FgHiBlack)
 
-	_, _ = cyan.Printf("Task Prompt [%s] (%s): ", e.TaskID, e.TaskType)
+	_, _ = cyan.Printf("Task Prompt [%s]: ", e.TaskID)
 	fmt.Printf("%d chars\n", len(e.PromptText))
 	_, _ = gray.Printf("  %s\n", e.PromptText)
 }
@@ -127,7 +119,7 @@ func printEnrichTaskResponse(e *event.EnrichTaskResponseEvent) {
 	green := color.New(color.FgGreen, color.Bold)
 	white := color.New(color.FgWhite)
 
-	_, _ = green.Printf("Task Response [%s] (%s):\n", e.TaskID, e.TaskType)
+	_, _ = green.Printf("Task Response [%s]:\n", e.TaskID)
 
 	// Format response based on type
 	switch v := e.Response.(type) {

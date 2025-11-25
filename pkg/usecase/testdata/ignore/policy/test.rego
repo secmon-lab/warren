@@ -1,6 +1,6 @@
-package alert.guardduty
+package ingest.guardduty
 
-alert contains {} if {
+alerts contains {} if {
     not ignore
 }
 

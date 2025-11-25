@@ -73,7 +73,7 @@ func TestHandleAlert_NoSimilarAlert(t *testing.T) {
 	policyMock := &mock.PolicyClientMock{
 		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
 			if queryResult, ok := result.(*alert.QueryOutput); ok {
-				queryResult.Alert = []alert.Metadata{
+				queryResult.Alerts = []alert.Metadata{
 					{
 						Title:       "Test Alert",
 						Description: "Test Description",
@@ -786,7 +786,7 @@ func TestHandleAlert_ExistingPolicyUnchanged(t *testing.T) {
 	policyMock := &mock.PolicyClientMock{
 		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
 			if queryResult, ok := result.(*alert.QueryOutput); ok {
-				queryResult.Alert = []alert.Metadata{
+				queryResult.Alerts = []alert.Metadata{
 					{
 						Title:       "Policy Title",
 						Description: "Policy Description",
@@ -873,7 +873,7 @@ func TestHandleAlert_PolicyWithTags(t *testing.T) {
 		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
 			if queryResult, ok := result.(*alert.QueryOutput); ok {
 				// Return tags as string slice (for alert.Metadata)
-				queryResult.Alert = []alert.Metadata{
+				queryResult.Alerts = []alert.Metadata{
 					{
 						Title:       "Security Alert",
 						Description: "Network security incident detected",
@@ -996,7 +996,7 @@ func TestHandleAlert_PolicyWithNewAndExistingTags(t *testing.T) {
 	policyMock := &mock.PolicyClientMock{
 		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
 			if queryResult, ok := result.(*alert.QueryOutput); ok {
-				queryResult.Alert = []alert.Metadata{
+				queryResult.Alerts = []alert.Metadata{
 					{
 						Title:       "Mixed Tags Alert",
 						Description: "Alert with existing and new tags",
@@ -1125,7 +1125,7 @@ func TestHandleAlert_PolicyTagDuplicationPrevention(t *testing.T) {
 				callCount++
 				if callCount == 1 {
 					// First alert: common tag + specific tag
-					queryResult.Alert = []alert.Metadata{
+					queryResult.Alerts = []alert.Metadata{
 						{
 							Title:       "First Security Alert",
 							Description: "First security incident",
@@ -1134,7 +1134,7 @@ func TestHandleAlert_PolicyTagDuplicationPrevention(t *testing.T) {
 					}
 				} else {
 					// Second alert: same common tag + different specific tag
-					queryResult.Alert = []alert.Metadata{
+					queryResult.Alerts = []alert.Metadata{
 						{
 							Title:       "Second Security Alert",
 							Description: "Second security incident",

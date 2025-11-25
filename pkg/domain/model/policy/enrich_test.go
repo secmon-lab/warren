@@ -44,11 +44,11 @@ func TestEnrichTask_EnsureID(t *testing.T) {
 }
 
 func TestEnrichTask_Validate(t *testing.T) {
-	t.Run("valid with prompt file", func(t *testing.T) {
+	t.Run("valid with template file", func(t *testing.T) {
 		task := policy.EnrichTask{
-			ID:     "test-task",
-			Prompt: "path/to/prompt.md",
-			Format: types.GenAIContentFormatText,
+			ID:       "test-task",
+			Template: "path/to/template.md",
+			Format:   types.GenAIContentFormatText,
 		}
 
 		err := task.Validate()
@@ -66,19 +66,19 @@ func TestEnrichTask_Validate(t *testing.T) {
 		gt.NoError(t, err)
 	})
 
-	t.Run("invalid with both prompt and inline", func(t *testing.T) {
+	t.Run("invalid with both template and inline", func(t *testing.T) {
 		task := policy.EnrichTask{
-			ID:     "test-task",
-			Prompt: "path/to/prompt.md",
-			Inline: "Analyze this alert",
-			Format: types.GenAIContentFormatText,
+			ID:       "test-task",
+			Template: "path/to/template.md",
+			Inline:   "Analyze this alert",
+			Format:   types.GenAIContentFormatText,
 		}
 
 		err := task.Validate()
 		gt.Error(t, err)
 	})
 
-	t.Run("invalid with neither prompt nor inline", func(t *testing.T) {
+	t.Run("invalid with neither template nor inline", func(t *testing.T) {
 		task := policy.EnrichTask{
 			ID:     "test-task",
 			Format: types.GenAIContentFormatText,
@@ -89,13 +89,13 @@ func TestEnrichTask_Validate(t *testing.T) {
 	})
 }
 
-func TestEnrichTask_HasPromptFile(t *testing.T) {
-	t.Run("returns true when prompt is set", func(t *testing.T) {
+func TestEnrichTask_HasTemplateFile(t *testing.T) {
+	t.Run("returns true when template is set", func(t *testing.T) {
 		task := policy.EnrichTask{
-			Prompt: "path/to/prompt.md",
+			Template: "path/to/template.md",
 		}
 
-		gt.True(t, task.HasPromptFile())
+		gt.True(t, task.HasTemplateFile())
 	})
 
 	t.Run("returns false when inline is set", func(t *testing.T) {
@@ -103,7 +103,7 @@ func TestEnrichTask_HasPromptFile(t *testing.T) {
 			Inline: "Analyze this alert",
 		}
 
-		gt.False(t, task.HasPromptFile())
+		gt.False(t, task.HasTemplateFile())
 	})
 }
 
@@ -116,24 +116,22 @@ func TestEnrichTask_GetPromptContent(t *testing.T) {
 		gt.Equal(t, task.GetPromptContent(), "Analyze this alert")
 	})
 
-	t.Run("returns prompt path when inline is not set", func(t *testing.T) {
+	t.Run("returns template path when inline is not set", func(t *testing.T) {
 		task := policy.EnrichTask{
-			Prompt: "path/to/prompt.md",
+			Template: "path/to/template.md",
 		}
 
-		gt.Equal(t, task.GetPromptContent(), "path/to/prompt.md")
+		gt.Equal(t, task.GetPromptContent(), "path/to/template.md")
 	})
 }
 
 func TestEnrichPolicyResult_TaskCount(t *testing.T) {
-	t.Run("counts query and agent tasks", func(t *testing.T) {
+	t.Run("counts prompt tasks", func(t *testing.T) {
 		result := policy.EnrichPolicyResult{
-			Query: []policy.QueryTask{
-				{EnrichTask: policy.EnrichTask{ID: "q1"}},
-				{EnrichTask: policy.EnrichTask{ID: "q2"}},
-			},
-			Agent: []policy.AgentTask{
-				{EnrichTask: policy.EnrichTask{ID: "a1"}},
+			Prompts: []policy.EnrichTask{
+				{ID: "p1"},
+				{ID: "p2"},
+				{ID: "p3"},
 			},
 		}
 
@@ -150,20 +148,18 @@ func TestEnrichPolicyResult_TaskCount(t *testing.T) {
 func TestEnrichPolicyResult_EnsureTaskIDs(t *testing.T) {
 	t.Run("ensures IDs for all tasks", func(t *testing.T) {
 		result := policy.EnrichPolicyResult{
-			Query: []policy.QueryTask{
-				{EnrichTask: policy.EnrichTask{Inline: "query1"}},
-				{EnrichTask: policy.EnrichTask{ID: "existing", Inline: "query2"}},
-			},
-			Agent: []policy.AgentTask{
-				{EnrichTask: policy.EnrichTask{Inline: "agent1"}},
+			Prompts: []policy.EnrichTask{
+				{Inline: "prompt1"},
+				{ID: "existing", Inline: "prompt2"},
+				{Inline: "prompt3"},
 			},
 		}
 
 		result.EnsureTaskIDs()
 
 		// Check all tasks have IDs
-		gt.NotEqual(t, result.Query[0].ID, "")
-		gt.Equal(t, result.Query[1].ID, "existing")
-		gt.NotEqual(t, result.Agent[0].ID, "")
+		gt.NotEqual(t, result.Prompts[0].ID, "")
+		gt.Equal(t, result.Prompts[1].ID, "existing")
+		gt.NotEqual(t, result.Prompts[2].ID, "")
 	})
 }

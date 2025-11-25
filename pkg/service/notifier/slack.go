@@ -30,9 +30,9 @@ func NewSlackNotifier() interfaces.Notifier {
 	}
 }
 
-func (n *SlackNotifier) NotifyAlertPolicyResult(ctx context.Context, ev *event.AlertPolicyResultEvent) {
+func (n *SlackNotifier) NotifyIngestPolicyResult(ctx context.Context, ev *event.IngestPolicyResultEvent) {
 	n.buffer = append(n.buffer, func(ctx context.Context, thread interfaces.SlackThreadService) error {
-		return handleAlertPolicyResult(ctx, thread, ev)
+		return handleIngestPolicyResult(ctx, thread, ev)
 	})
 }
 
@@ -42,9 +42,9 @@ func (n *SlackNotifier) NotifyEnrichPolicyResult(ctx context.Context, ev *event.
 	})
 }
 
-func (n *SlackNotifier) NotifyCommitPolicyResult(ctx context.Context, ev *event.CommitPolicyResultEvent) {
+func (n *SlackNotifier) NotifyTriagePolicyResult(ctx context.Context, ev *event.TriagePolicyResultEvent) {
 	n.buffer = append(n.buffer, func(ctx context.Context, thread interfaces.SlackThreadService) error {
-		return handleCommitPolicyResult(ctx, thread, ev)
+		return handleTriagePolicyResult(ctx, thread, ev)
 	})
 }
 
@@ -66,21 +66,21 @@ func (n *SlackNotifier) NotifyError(ctx context.Context, ev *event.ErrorEvent) {
 	})
 }
 
-func handleAlertPolicyResult(ctx context.Context, thread interfaces.SlackThreadService, e *event.AlertPolicyResultEvent) error {
+func handleIngestPolicyResult(ctx context.Context, thread interfaces.SlackThreadService, e *event.IngestPolicyResultEvent) error {
 	logger := logging.From(ctx)
 
 	// Post summary message with better formatting as context block
 	var summary string
 	if len(e.Alerts) == 0 {
-		summary = fmt.Sprintf(":outbox_tray: *Alert Policy Result*\nSchema: `%s`\n_No alerts generated_", e.Schema)
+		summary = fmt.Sprintf(":inbox_tray: *Ingest Policy Result*\nSchema: `%s`\n_No alerts generated_", e.Schema)
 	} else if len(e.Alerts) == 1 {
-		summary = fmt.Sprintf(":outbox_tray: *Alert Policy Result*\nSchema: `%s`\nGenerated: *1 alert*", e.Schema)
+		summary = fmt.Sprintf(":inbox_tray: *Ingest Policy Result*\nSchema: `%s`\nGenerated: *1 alert*", e.Schema)
 	} else {
-		summary = fmt.Sprintf(":outbox_tray: *Alert Policy Result*\nSchema: `%s`\nGenerated: *%d alerts*", e.Schema, len(e.Alerts))
+		summary = fmt.Sprintf(":inbox_tray: *Ingest Policy Result*\nSchema: `%s`\nGenerated: *%d alerts*", e.Schema, len(e.Alerts))
 	}
 
 	if err := thread.PostContextBlock(ctx, summary); err != nil {
-		logger.Warn("failed to post alert policy result to Slack", "error", err, "schema", e.Schema)
+		logger.Warn("failed to post ingest policy result to Slack", "error", err, "schema", e.Schema)
 		return err
 	}
 
@@ -98,12 +98,12 @@ func handleEnrichPolicyResult(ctx context.Context, thread interfaces.SlackThread
 	return nil
 }
 
-func handleCommitPolicyResult(ctx context.Context, thread interfaces.SlackThreadService, e *event.CommitPolicyResultEvent) error {
+func handleTriagePolicyResult(ctx context.Context, thread interfaces.SlackThreadService, e *event.TriagePolicyResultEvent) error {
 	logger := logging.From(ctx)
 
-	message := formatCommitPolicyResult(e)
+	message := formatTriagePolicyResult(e)
 	if err := thread.PostContextBlock(ctx, message); err != nil {
-		logger.Warn("failed to post commit policy result to Slack", "error", err, "publish", e.Result.Publish)
+		logger.Warn("failed to post triage policy result to Slack", "error", err, "publish", e.Result.Publish)
 		return err
 	}
 	return nil
@@ -111,7 +111,7 @@ func handleCommitPolicyResult(ctx context.Context, thread interfaces.SlackThread
 
 func handleEnrichTaskPrompt(ctx context.Context, thread interfaces.SlackThreadService, e *event.EnrichTaskPromptEvent) error {
 	logger := logging.From(ctx)
-	summary := fmt.Sprintf("*Task Prompt* `%s` (%s)\nLength: %d chars", e.TaskID, e.TaskType, len(e.PromptText))
+	summary := fmt.Sprintf("*Task Prompt* `%s`\nLength: %d chars", e.TaskID, len(e.PromptText))
 
 	if len(e.PromptText) > slackMessageLimit {
 		if err := thread.PostContextBlock(ctx, summary); err != nil {
@@ -134,7 +134,7 @@ func handleEnrichTaskPrompt(ctx context.Context, thread interfaces.SlackThreadSe
 
 func handleEnrichTaskResponse(ctx context.Context, thread interfaces.SlackThreadService, e *event.EnrichTaskResponseEvent) error {
 	logger := logging.From(ctx)
-	summary := fmt.Sprintf("*Task Response* `%s` (%s)", e.TaskID, e.TaskType)
+	summary := fmt.Sprintf("*Task Response* `%s`", e.TaskID)
 
 	var content string
 	var fileName string
@@ -193,50 +193,34 @@ func formatEnrichPolicyResult(e *event.EnrichPolicyResultEvent) string {
 	msg := ":mag: *Enrich Policy Result*\n"
 	msg += fmt.Sprintf("Total Tasks: *%d*\n", e.TaskCount)
 
-	if e.Policy == nil || (len(e.Policy.Query) == 0 && len(e.Policy.Agent) == 0) {
+	if e.Policy == nil || len(e.Policy.Prompts) == 0 {
 		msg += "_No enrichment tasks defined_\n"
 		return msg
 	}
 
-	if len(e.Policy.Query) > 0 {
-		msg += fmt.Sprintf("\n*Query Tasks* (%d):\n", len(e.Policy.Query))
-		for i, task := range e.Policy.Query {
-			msg += fmt.Sprintf("  %d. `%s` [%s]", i+1, task.ID, task.Format)
-			if task.Prompt != "" {
-				msg += fmt.Sprintf(" • Prompt: `%s`", task.Prompt)
-			} else if task.Inline != "" {
-				inlinePreview := task.Inline
-				if len(inlinePreview) > 50 {
-					inlinePreview = inlinePreview[:50] + "..."
-				}
-				msg += fmt.Sprintf(" • Inline: %s", inlinePreview)
+	msg += fmt.Sprintf("\n*Prompt Tasks* (%d):\n", len(e.Policy.Prompts))
+	for i, task := range e.Policy.Prompts {
+		msg += fmt.Sprintf("  %d. `%s` [%s]", i+1, task.ID, task.Format)
+		if task.Template != "" {
+			msg += fmt.Sprintf(" • Template: `%s`", task.Template)
+			if len(task.Params) > 0 {
+				msg += fmt.Sprintf(" (with %d params)", len(task.Params))
 			}
-			msg += "\n"
-		}
-	}
-
-	if len(e.Policy.Agent) > 0 {
-		msg += fmt.Sprintf("\n*Agent Tasks* (%d):\n", len(e.Policy.Agent))
-		for i, task := range e.Policy.Agent {
-			msg += fmt.Sprintf("  %d. `%s` [%s]", i+1, task.ID, task.Format)
-			if task.Prompt != "" {
-				msg += fmt.Sprintf(" • Prompt: `%s`", task.Prompt)
-			} else if task.Inline != "" {
-				inlinePreview := task.Inline
-				if len(inlinePreview) > 50 {
-					inlinePreview = inlinePreview[:50] + "..."
-				}
-				msg += fmt.Sprintf(" • Inline: %s", inlinePreview)
+		} else if task.Inline != "" {
+			inlinePreview := task.Inline
+			if len(inlinePreview) > 50 {
+				inlinePreview = inlinePreview[:50] + "..."
 			}
-			msg += "\n"
+			msg += fmt.Sprintf(" • Inline: %s", inlinePreview)
 		}
+		msg += "\n"
 	}
 
 	return msg
 }
 
-func formatCommitPolicyResult(e *event.CommitPolicyResultEvent) string {
-	msg := ":white_check_mark: *Commit Policy Result*\n"
+func formatTriagePolicyResult(e *event.TriagePolicyResultEvent) string {
+	msg := ":white_check_mark: *Triage Policy Result*\n"
 
 	// Show publish decision with appropriate emoji
 	var publishIcon string

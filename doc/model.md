@@ -38,13 +38,13 @@ Warren processes alerts through a multi-stage pipeline that evaluates policies, 
 
 ```mermaid
 flowchart TD
-    A[Raw Alert Data] --> B[1. Alert Policy]
+    A[Raw Alert Data] --> B[1. Ingest Policy]
     B --> C{Alerts Generated?}
     C -->|No| Z[Discarded]
     C -->|Yes| D[2. Tag Conversion]
     D --> E[3. Metadata Fill]
     E --> F[4. Enrich Policy]
-    F --> G[5. Commit Policy]
+    F --> G[5. Triage Policy]
     G --> H[Final Alert]
 
     style A fill:#f9f,stroke:#333
@@ -52,13 +52,13 @@ flowchart TD
     style Z fill:#faa,stroke:#333
 ```
 
-### 1. Alert Policy Evaluation
+### 1. Ingest Policy Evaluation
 
 **Purpose**: Transform raw event data into Alert objects
 
 - **Input**: Raw webhook payload (any JSON structure)
 - **Output**: Zero or more Alert objects with basic metadata
-- **Policy Package**: `package alert.{schema_name}`
+- **Policy Package**: `package ingest.{schema_name}`
 - **Behavior if Missing**: Creates default alert with empty metadata
 
 **Key Features**:
@@ -113,18 +113,18 @@ agent contains {
 }
 ```
 
-### 5. Commit Policy Evaluation
+### 5. Triage Policy Evaluation
 
 **Purpose**: Apply final metadata and determine publish type
 
 - **Input**: Alert + enrichment results
-- **Output**: Commit result with final metadata
-- **Policy Package**: `package commit.{schema_name}`
+- **Output**: Triage result with final metadata
+- **Policy Package**: `package triage`
 - **Behavior if Missing**: Returns default with `publish = "alert"`
 
 **Output Fields**:
 ```go
-type CommitPolicyResult struct {
+type TriagePolicyResult struct {
     Publish     types.PublishType  // "alert", "notice", or "discard"
     Title       string             // Override alert title
     Description string             // Override alert description
@@ -143,9 +143,9 @@ type CommitPolicyResult struct {
 The pipeline emits events at each stage for real-time monitoring:
 
 **Event Types**:
-- `AlertPolicyResultEvent` - After step 1
+- `IngestPolicyResultEvent` - After step 1
 - `EnrichPolicyResultEvent` - After step 4
-- `CommitPolicyResultEvent` - After step 5
+- `TriagePolicyResultEvent` - After step 5
 - `EnrichTaskPromptEvent` - Before LLM task execution
 - `EnrichTaskResponseEvent` - After LLM task execution
 - `ErrorEvent` - On any error
@@ -153,9 +153,9 @@ The pipeline emits events at each stage for real-time monitoring:
 **Notifier Interface**:
 ```go
 type Notifier interface {
-    NotifyAlertPolicyResult(ctx, *AlertPolicyResultEvent)
+    NotifyIngestPolicyResult(ctx, *IngestPolicyResultEvent)
     NotifyEnrichPolicyResult(ctx, *EnrichPolicyResultEvent)
-    NotifyCommitPolicyResult(ctx, *CommitPolicyResultEvent)
+    NotifyTriagePolicyResult(ctx, *TriagePolicyResultEvent)
     NotifyEnrichTaskPrompt(ctx, *EnrichTaskPromptEvent)
     NotifyEnrichTaskResponse(ctx, *EnrichTaskResponseEvent)
     NotifyError(ctx, *ErrorEvent)
@@ -187,9 +187,9 @@ The pipeline continues even when policies are missing:
 
 | Missing Policy | Behavior |
 |---------------|----------|
-| Alert Policy | Creates default alert with raw data |
+| Ingest Policy | Creates default alert with raw data |
 | Enrich Policy | Returns empty enrichment results |
-| Commit Policy | Uses default publish type ("alert") |
+| Triage Policy | Uses default publish type ("alert") |
 
 This ensures alerts are never lost due to missing configuration.
 

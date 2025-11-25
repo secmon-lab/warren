@@ -1,4 +1,4 @@
-package alert.color
+package ingest.color
 
 alert contains {} if {
     not ignore

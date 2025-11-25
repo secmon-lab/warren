@@ -42,19 +42,17 @@ func TestService_EvaluateEnrichPolicy(t *testing.T) {
 
 				// Set enrich policy result
 				result := output.(*domainPolicy.EnrichPolicyResult)
-				result.Query = []domainPolicy.QueryTask{
-					{EnrichTask: domainPolicy.EnrichTask{
+				result.Prompts = []domainPolicy.EnrichTask{
+					{
 						ID:     "task1",
 						Inline: "Analyze this alert",
 						Format: types.GenAIContentFormatText,
-					}},
-				}
-				result.Agent = []domainPolicy.AgentTask{
-					{EnrichTask: domainPolicy.EnrichTask{
+					},
+					{
 						ID:     "task2",
 						Inline: "Investigate this threat",
 						Format: types.GenAIContentFormatJSON,
-					}},
+					},
 				}
 				return nil
 			},
@@ -65,10 +63,9 @@ func TestService_EvaluateEnrichPolicy(t *testing.T) {
 
 		gt.NoError(t, err)
 		gt.NotEqual(t, result, nil)
-		gt.Equal(t, len(result.Query), 1)
-		gt.Equal(t, len(result.Agent), 1)
-		gt.Equal(t, result.Query[0].ID, "task1")
-		gt.Equal(t, result.Agent[0].ID, "task2")
+		gt.Equal(t, len(result.Prompts), 2)
+		gt.Equal(t, result.Prompts[0].ID, "task1")
+		gt.Equal(t, result.Prompts[1].ID, "task2")
 	})
 
 	t.Run("returns empty result when no policy defined", func(t *testing.T) {
@@ -86,8 +83,7 @@ func TestService_EvaluateEnrichPolicy(t *testing.T) {
 
 		gt.NoError(t, err)
 		gt.NotEqual(t, result, nil)
-		gt.Equal(t, len(result.Query), 0)
-		gt.Equal(t, len(result.Agent), 0)
+		gt.Equal(t, len(result.Prompts), 0)
 	})
 
 	t.Run("ensures task IDs are generated", func(t *testing.T) {
@@ -98,11 +94,11 @@ func TestService_EvaluateEnrichPolicy(t *testing.T) {
 			QueryFunc: func(ctx context.Context, path string, input any, output any) error {
 				// Return tasks without IDs
 				result := output.(*domainPolicy.EnrichPolicyResult)
-				result.Query = []domainPolicy.QueryTask{
-					{EnrichTask: domainPolicy.EnrichTask{
+				result.Prompts = []domainPolicy.EnrichTask{
+					{
 						Inline: "Analyze this",
 						Format: types.GenAIContentFormatText,
-					}},
+					},
 				}
 				return nil
 			},
@@ -113,9 +109,9 @@ func TestService_EvaluateEnrichPolicy(t *testing.T) {
 
 		gt.NoError(t, err)
 		gt.NotEqual(t, result, nil)
-		gt.Equal(t, len(result.Query), 1)
+		gt.Equal(t, len(result.Prompts), 1)
 		// ID should be auto-generated
-		gt.NotEqual(t, result.Query[0].ID, "")
+		gt.NotEqual(t, result.Prompts[0].ID, "")
 	})
 
 	t.Run("returns error on policy evaluation failure", func(t *testing.T) {
@@ -136,7 +132,7 @@ func TestService_EvaluateEnrichPolicy(t *testing.T) {
 	})
 }
 
-func TestService_EvaluateCommitPolicy(t *testing.T) {
+func TestService_EvaluateTriagePolicy(t *testing.T) {
 	t.Run("evaluates commit policy successfully", func(t *testing.T) {
 		ctx := context.Background()
 		a := alert.New(ctx, "test-schema", nil, alert.Metadata{
@@ -144,20 +140,24 @@ func TestService_EvaluateCommitPolicy(t *testing.T) {
 		})
 
 		enrichResults := domainPolicy.EnrichResults{
-			"task1": map[string]any{"severity": "high"},
+			{
+				ID:     "task1",
+				Prompt: "Analyze severity",
+				Result: map[string]any{"severity": "high"},
+			},
 		}
 
 		mockClient := &mockPolicyClient{
 			QueryFunc: func(ctx context.Context, path string, input any, output any) error {
-				gt.Equal(t, path, "data.commit")
+				gt.Equal(t, path, "data.triage")
 
 				// Verify input structure
-				commitInput := input.(domainPolicy.CommitPolicyInput)
+				commitInput := input.(domainPolicy.TriagePolicyInput)
 				gt.NotEqual(t, commitInput.Alert.ID, "")
 				gt.Equal(t, len(commitInput.Enrich), 1)
 
 				// Set commit policy result
-				result := output.(*domainPolicy.CommitPolicyResult)
+				result := output.(*domainPolicy.TriagePolicyResult)
 				result.Title = "Updated Title"
 				result.Description = "Updated Description"
 				result.Channel = "security-alerts"
@@ -167,7 +167,7 @@ func TestService_EvaluateCommitPolicy(t *testing.T) {
 		}
 
 		svc := policy.New(mockClient)
-		result, err := svc.EvaluateCommitPolicy(ctx, &a, enrichResults)
+		result, err := svc.EvaluateTriagePolicy(ctx, &a, enrichResults)
 
 		gt.NoError(t, err)
 		gt.NotEqual(t, result, nil)
@@ -189,7 +189,7 @@ func TestService_EvaluateCommitPolicy(t *testing.T) {
 		}
 
 		svc := policy.New(mockClient)
-		result, err := svc.EvaluateCommitPolicy(ctx, &a, enrichResults)
+		result, err := svc.EvaluateTriagePolicy(ctx, &a, enrichResults)
 
 		gt.NoError(t, err)
 		gt.NotEqual(t, result, nil)
@@ -210,7 +210,7 @@ func TestService_EvaluateCommitPolicy(t *testing.T) {
 		}
 
 		svc := policy.New(mockClient)
-		result, err := svc.EvaluateCommitPolicy(ctx, &a, enrichResults)
+		result, err := svc.EvaluateTriagePolicy(ctx, &a, enrichResults)
 
 		gt.Error(t, err)
 		gt.Equal(t, result, nil)

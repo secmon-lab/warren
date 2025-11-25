@@ -1,4 +1,4 @@
-package commit
+package triage
 
 import rego.v1
 

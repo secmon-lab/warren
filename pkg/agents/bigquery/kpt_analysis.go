@@ -62,7 +62,7 @@ func (a *Agent) generateKPTAnalysis(
 
 	// Build prompt for LLM
 	prompt := a.buildKPTPrompt(query, resp, execErr, duration, session)
-	logger.Debug("KPT prompt built", "prompt_length", len(prompt))
+	logger.Debug("KPT prompt built", "prompt", prompt)
 
 	// Generate analysis using LLM (create new session for KPT analysis)
 	kptSession, err := a.llmClient.NewSession(ctx)

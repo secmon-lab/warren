@@ -65,6 +65,9 @@ import (
 //			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slackSDK.MsgOption) (string, string, error) {
 //				panic("mock out the PostMessageContext method")
 //			},
+//			SearchMessagesContextFunc: func(ctx context.Context, query string, params slackSDK.SearchParameters) (*slackSDK.SearchMessages, error) {
+//				panic("mock out the SearchMessagesContext method")
+//			},
 //			UpdateMessageContextFunc: func(ctx context.Context, channelID string, timestamp string, options ...slackSDK.MsgOption) (string, string, string, error) {
 //				panic("mock out the UpdateMessageContext method")
 //			},
@@ -116,6 +119,9 @@ type SlackClientMock struct {
 
 	// PostMessageContextFunc mocks the PostMessageContext method.
 	PostMessageContextFunc func(ctx context.Context, channelID string, options ...slackSDK.MsgOption) (string, string, error)
+
+	// SearchMessagesContextFunc mocks the SearchMessagesContext method.
+	SearchMessagesContextFunc func(ctx context.Context, query string, params slackSDK.SearchParameters) (*slackSDK.SearchMessages, error)
 
 	// UpdateMessageContextFunc mocks the UpdateMessageContext method.
 	UpdateMessageContextFunc func(ctx context.Context, channelID string, timestamp string, options ...slackSDK.MsgOption) (string, string, string, error)
@@ -200,6 +206,15 @@ type SlackClientMock struct {
 			// Options is the options argument value.
 			Options []slackSDK.MsgOption
 		}
+		// SearchMessagesContext holds details about calls to the SearchMessagesContext method.
+		SearchMessagesContext []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Query is the query argument value.
+			Query string
+			// Params is the params argument value.
+			Params slackSDK.SearchParameters
+		}
 		// UpdateMessageContext holds details about calls to the UpdateMessageContext method.
 		UpdateMessageContext []struct {
 			// Ctx is the ctx argument value.
@@ -242,6 +257,7 @@ type SlackClientMock struct {
 	lockGetUsersInfo                  sync.RWMutex
 	lockOpenView                      sync.RWMutex
 	lockPostMessageContext            sync.RWMutex
+	lockSearchMessagesContext         sync.RWMutex
 	lockUpdateMessageContext          sync.RWMutex
 	lockUpdateView                    sync.RWMutex
 	lockUploadFileV2Context           sync.RWMutex
@@ -702,6 +718,50 @@ func (mock *SlackClientMock) PostMessageContextCalls() []struct {
 	mock.lockPostMessageContext.RLock()
 	calls = mock.calls.PostMessageContext
 	mock.lockPostMessageContext.RUnlock()
+	return calls
+}
+
+// SearchMessagesContext calls SearchMessagesContextFunc.
+func (mock *SlackClientMock) SearchMessagesContext(ctx context.Context, query string, params slackSDK.SearchParameters) (*slackSDK.SearchMessages, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Query  string
+		Params slackSDK.SearchParameters
+	}{
+		Ctx:    ctx,
+		Query:  query,
+		Params: params,
+	}
+	mock.lockSearchMessagesContext.Lock()
+	mock.calls.SearchMessagesContext = append(mock.calls.SearchMessagesContext, callInfo)
+	mock.lockSearchMessagesContext.Unlock()
+	if mock.SearchMessagesContextFunc == nil {
+		var (
+			searchMessagesOut *slackSDK.SearchMessages
+			errOut            error
+		)
+		return searchMessagesOut, errOut
+	}
+	return mock.SearchMessagesContextFunc(ctx, query, params)
+}
+
+// SearchMessagesContextCalls gets all the calls that were made to SearchMessagesContext.
+// Check the length with:
+//
+//	len(mockedSlackClient.SearchMessagesContextCalls())
+func (mock *SlackClientMock) SearchMessagesContextCalls() []struct {
+	Ctx    context.Context
+	Query  string
+	Params slackSDK.SearchParameters
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Query  string
+		Params slackSDK.SearchParameters
+	}
+	mock.lockSearchMessagesContext.RLock()
+	calls = mock.calls.SearchMessagesContext
+	mock.lockSearchMessagesContext.RUnlock()
 	return calls
 }
 
@@ -2107,12 +2167,6 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //
 //		// make and configure a mocked interfaces.Notifier
 //		mockedNotifier := &NotifierMock{
-//			NotifyAlertPolicyResultFunc: func(ctx context.Context, ev *event.AlertPolicyResultEvent)  {
-//				panic("mock out the NotifyAlertPolicyResult method")
-//			},
-//			NotifyCommitPolicyResultFunc: func(ctx context.Context, ev *event.CommitPolicyResultEvent)  {
-//				panic("mock out the NotifyCommitPolicyResult method")
-//			},
 //			NotifyEnrichPolicyResultFunc: func(ctx context.Context, ev *event.EnrichPolicyResultEvent)  {
 //				panic("mock out the NotifyEnrichPolicyResult method")
 //			},
@@ -2125,6 +2179,12 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //			NotifyErrorFunc: func(ctx context.Context, ev *event.ErrorEvent)  {
 //				panic("mock out the NotifyError method")
 //			},
+//			NotifyIngestPolicyResultFunc: func(ctx context.Context, ev *event.IngestPolicyResultEvent)  {
+//				panic("mock out the NotifyIngestPolicyResult method")
+//			},
+//			NotifyTriagePolicyResultFunc: func(ctx context.Context, ev *event.TriagePolicyResultEvent)  {
+//				panic("mock out the NotifyTriagePolicyResult method")
+//			},
 //		}
 //
 //		// use mockedNotifier in code that requires interfaces.Notifier
@@ -2132,12 +2192,6 @@ func (mock *ChatNotifierMock) NotifyTraceCalls() []struct {
 //
 //	}
 type NotifierMock struct {
-	// NotifyAlertPolicyResultFunc mocks the NotifyAlertPolicyResult method.
-	NotifyAlertPolicyResultFunc func(ctx context.Context, ev *event.AlertPolicyResultEvent)
-
-	// NotifyCommitPolicyResultFunc mocks the NotifyCommitPolicyResult method.
-	NotifyCommitPolicyResultFunc func(ctx context.Context, ev *event.CommitPolicyResultEvent)
-
 	// NotifyEnrichPolicyResultFunc mocks the NotifyEnrichPolicyResult method.
 	NotifyEnrichPolicyResultFunc func(ctx context.Context, ev *event.EnrichPolicyResultEvent)
 
@@ -2150,22 +2204,14 @@ type NotifierMock struct {
 	// NotifyErrorFunc mocks the NotifyError method.
 	NotifyErrorFunc func(ctx context.Context, ev *event.ErrorEvent)
 
+	// NotifyIngestPolicyResultFunc mocks the NotifyIngestPolicyResult method.
+	NotifyIngestPolicyResultFunc func(ctx context.Context, ev *event.IngestPolicyResultEvent)
+
+	// NotifyTriagePolicyResultFunc mocks the NotifyTriagePolicyResult method.
+	NotifyTriagePolicyResultFunc func(ctx context.Context, ev *event.TriagePolicyResultEvent)
+
 	// calls tracks calls to the methods.
 	calls struct {
-		// NotifyAlertPolicyResult holds details about calls to the NotifyAlertPolicyResult method.
-		NotifyAlertPolicyResult []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Ev is the ev argument value.
-			Ev *event.AlertPolicyResultEvent
-		}
-		// NotifyCommitPolicyResult holds details about calls to the NotifyCommitPolicyResult method.
-		NotifyCommitPolicyResult []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Ev is the ev argument value.
-			Ev *event.CommitPolicyResultEvent
-		}
 		// NotifyEnrichPolicyResult holds details about calls to the NotifyEnrichPolicyResult method.
 		NotifyEnrichPolicyResult []struct {
 			// Ctx is the ctx argument value.
@@ -2194,85 +2240,27 @@ type NotifierMock struct {
 			// Ev is the ev argument value.
 			Ev *event.ErrorEvent
 		}
+		// NotifyIngestPolicyResult holds details about calls to the NotifyIngestPolicyResult method.
+		NotifyIngestPolicyResult []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Ev is the ev argument value.
+			Ev *event.IngestPolicyResultEvent
+		}
+		// NotifyTriagePolicyResult holds details about calls to the NotifyTriagePolicyResult method.
+		NotifyTriagePolicyResult []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Ev is the ev argument value.
+			Ev *event.TriagePolicyResultEvent
+		}
 	}
-	lockNotifyAlertPolicyResult  sync.RWMutex
-	lockNotifyCommitPolicyResult sync.RWMutex
 	lockNotifyEnrichPolicyResult sync.RWMutex
 	lockNotifyEnrichTaskPrompt   sync.RWMutex
 	lockNotifyEnrichTaskResponse sync.RWMutex
 	lockNotifyError              sync.RWMutex
-}
-
-// NotifyAlertPolicyResult calls NotifyAlertPolicyResultFunc.
-func (mock *NotifierMock) NotifyAlertPolicyResult(ctx context.Context, ev *event.AlertPolicyResultEvent) {
-	callInfo := struct {
-		Ctx context.Context
-		Ev  *event.AlertPolicyResultEvent
-	}{
-		Ctx: ctx,
-		Ev:  ev,
-	}
-	mock.lockNotifyAlertPolicyResult.Lock()
-	mock.calls.NotifyAlertPolicyResult = append(mock.calls.NotifyAlertPolicyResult, callInfo)
-	mock.lockNotifyAlertPolicyResult.Unlock()
-	if mock.NotifyAlertPolicyResultFunc == nil {
-		return
-	}
-	mock.NotifyAlertPolicyResultFunc(ctx, ev)
-}
-
-// NotifyAlertPolicyResultCalls gets all the calls that were made to NotifyAlertPolicyResult.
-// Check the length with:
-//
-//	len(mockedNotifier.NotifyAlertPolicyResultCalls())
-func (mock *NotifierMock) NotifyAlertPolicyResultCalls() []struct {
-	Ctx context.Context
-	Ev  *event.AlertPolicyResultEvent
-} {
-	var calls []struct {
-		Ctx context.Context
-		Ev  *event.AlertPolicyResultEvent
-	}
-	mock.lockNotifyAlertPolicyResult.RLock()
-	calls = mock.calls.NotifyAlertPolicyResult
-	mock.lockNotifyAlertPolicyResult.RUnlock()
-	return calls
-}
-
-// NotifyCommitPolicyResult calls NotifyCommitPolicyResultFunc.
-func (mock *NotifierMock) NotifyCommitPolicyResult(ctx context.Context, ev *event.CommitPolicyResultEvent) {
-	callInfo := struct {
-		Ctx context.Context
-		Ev  *event.CommitPolicyResultEvent
-	}{
-		Ctx: ctx,
-		Ev:  ev,
-	}
-	mock.lockNotifyCommitPolicyResult.Lock()
-	mock.calls.NotifyCommitPolicyResult = append(mock.calls.NotifyCommitPolicyResult, callInfo)
-	mock.lockNotifyCommitPolicyResult.Unlock()
-	if mock.NotifyCommitPolicyResultFunc == nil {
-		return
-	}
-	mock.NotifyCommitPolicyResultFunc(ctx, ev)
-}
-
-// NotifyCommitPolicyResultCalls gets all the calls that were made to NotifyCommitPolicyResult.
-// Check the length with:
-//
-//	len(mockedNotifier.NotifyCommitPolicyResultCalls())
-func (mock *NotifierMock) NotifyCommitPolicyResultCalls() []struct {
-	Ctx context.Context
-	Ev  *event.CommitPolicyResultEvent
-} {
-	var calls []struct {
-		Ctx context.Context
-		Ev  *event.CommitPolicyResultEvent
-	}
-	mock.lockNotifyCommitPolicyResult.RLock()
-	calls = mock.calls.NotifyCommitPolicyResult
-	mock.lockNotifyCommitPolicyResult.RUnlock()
-	return calls
+	lockNotifyIngestPolicyResult sync.RWMutex
+	lockNotifyTriagePolicyResult sync.RWMutex
 }
 
 // NotifyEnrichPolicyResult calls NotifyEnrichPolicyResultFunc.
@@ -2416,6 +2404,78 @@ func (mock *NotifierMock) NotifyErrorCalls() []struct {
 	mock.lockNotifyError.RLock()
 	calls = mock.calls.NotifyError
 	mock.lockNotifyError.RUnlock()
+	return calls
+}
+
+// NotifyIngestPolicyResult calls NotifyIngestPolicyResultFunc.
+func (mock *NotifierMock) NotifyIngestPolicyResult(ctx context.Context, ev *event.IngestPolicyResultEvent) {
+	callInfo := struct {
+		Ctx context.Context
+		Ev  *event.IngestPolicyResultEvent
+	}{
+		Ctx: ctx,
+		Ev:  ev,
+	}
+	mock.lockNotifyIngestPolicyResult.Lock()
+	mock.calls.NotifyIngestPolicyResult = append(mock.calls.NotifyIngestPolicyResult, callInfo)
+	mock.lockNotifyIngestPolicyResult.Unlock()
+	if mock.NotifyIngestPolicyResultFunc == nil {
+		return
+	}
+	mock.NotifyIngestPolicyResultFunc(ctx, ev)
+}
+
+// NotifyIngestPolicyResultCalls gets all the calls that were made to NotifyIngestPolicyResult.
+// Check the length with:
+//
+//	len(mockedNotifier.NotifyIngestPolicyResultCalls())
+func (mock *NotifierMock) NotifyIngestPolicyResultCalls() []struct {
+	Ctx context.Context
+	Ev  *event.IngestPolicyResultEvent
+} {
+	var calls []struct {
+		Ctx context.Context
+		Ev  *event.IngestPolicyResultEvent
+	}
+	mock.lockNotifyIngestPolicyResult.RLock()
+	calls = mock.calls.NotifyIngestPolicyResult
+	mock.lockNotifyIngestPolicyResult.RUnlock()
+	return calls
+}
+
+// NotifyTriagePolicyResult calls NotifyTriagePolicyResultFunc.
+func (mock *NotifierMock) NotifyTriagePolicyResult(ctx context.Context, ev *event.TriagePolicyResultEvent) {
+	callInfo := struct {
+		Ctx context.Context
+		Ev  *event.TriagePolicyResultEvent
+	}{
+		Ctx: ctx,
+		Ev:  ev,
+	}
+	mock.lockNotifyTriagePolicyResult.Lock()
+	mock.calls.NotifyTriagePolicyResult = append(mock.calls.NotifyTriagePolicyResult, callInfo)
+	mock.lockNotifyTriagePolicyResult.Unlock()
+	if mock.NotifyTriagePolicyResultFunc == nil {
+		return
+	}
+	mock.NotifyTriagePolicyResultFunc(ctx, ev)
+}
+
+// NotifyTriagePolicyResultCalls gets all the calls that were made to NotifyTriagePolicyResult.
+// Check the length with:
+//
+//	len(mockedNotifier.NotifyTriagePolicyResultCalls())
+func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
+	Ctx context.Context
+	Ev  *event.TriagePolicyResultEvent
+} {
+	var calls []struct {
+		Ctx context.Context
+		Ev  *event.TriagePolicyResultEvent
+	}
+	mock.lockNotifyTriagePolicyResult.RLock()
+	calls = mock.calls.NotifyTriagePolicyResult
+	mock.lockNotifyTriagePolicyResult.RUnlock()
 	return calls
 }
 

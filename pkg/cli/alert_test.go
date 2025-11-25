@@ -156,12 +156,16 @@ func TestDisplayPipelineResult(t *testing.T) {
 		}
 
 		enrichResults := policy.EnrichResults{
-			"task1": map[string]any{
-				"result": "enriched data",
+			{
+				ID:     "task1",
+				Prompt: "Analyze data",
+				Result: map[string]any{
+					"result": "enriched data",
+				},
 			},
 		}
 
-		commitResult := &policy.CommitPolicyResult{
+		commitResult := &policy.TriagePolicyResult{
 			Title:       "Updated Title",
 			Description: "Updated Description",
 			Channel:     "test-channel",
@@ -171,7 +175,7 @@ func TestDisplayPipelineResult(t *testing.T) {
 			{
 				Alert:        testAlert,
 				EnrichResult: enrichResults,
-				CommitResult: commitResult,
+				TriageResult: commitResult,
 			},
 		}
 
@@ -222,7 +226,7 @@ func TestDisplayPipelineResult(t *testing.T) {
 					},
 				},
 				EnrichResult: policy.EnrichResults{},
-				CommitResult: &policy.CommitPolicyResult{},
+				TriageResult: &policy.TriagePolicyResult{},
 			},
 			{
 				Alert: &alert.Alert{
@@ -232,7 +236,7 @@ func TestDisplayPipelineResult(t *testing.T) {
 					},
 				},
 				EnrichResult: policy.EnrichResults{},
-				CommitResult: &policy.CommitPolicyResult{},
+				TriageResult: &policy.TriagePolicyResult{},
 			},
 		}
 

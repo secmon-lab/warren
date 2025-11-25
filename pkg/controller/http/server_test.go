@@ -66,7 +66,7 @@ func TestValidateGoogleIDToken(t *testing.T) {
 
 	policyClient := &mock.PolicyClientMock{
 		QueryFunc: func(ctx context.Context, s string, v1, v2 any, queryOptions ...opaq.QueryOption) error {
-			if s == "data.alert.test" {
+			if s == "data.ingest.test" {
 				return nil
 			}
 
@@ -106,7 +106,7 @@ func TestValidateGoogleIDToken(t *testing.T) {
 				V2              any
 				QueryOptions    []opaq.QueryOption
 			}) {
-				gt.Equal(t, v.S, "data.alert.test")
+				gt.Equal(t, v.S, "data.ingest.test")
 			})
 	})
 }
