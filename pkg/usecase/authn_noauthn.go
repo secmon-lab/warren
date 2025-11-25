@@ -2,10 +2,12 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 // NoAuthnUseCase provides a mock authentication that always returns an anonymous user
@@ -30,7 +32,11 @@ func (uc *NoAuthnUseCase) HandleCallback(ctx context.Context, code string) (*aut
 	// In no-auth mode, this should not be called, but we create an anonymous token anyway
 	token := auth.NewAnonymousUser()
 	if err := uc.repo.PutToken(ctx, token); err != nil {
-		return nil, goerr.Wrap(err, "failed to store anonymous token")
+		logger := logging.From(ctx)
+		if data, jsonErr := json.Marshal(token); jsonErr == nil {
+			logger.Error("failed to save token", "error", err, "token", string(data))
+		}
+		return nil, goerr.Wrap(err, "failed to store anonymous token", goerr.V("token", token))
 	}
 	return token, nil
 }

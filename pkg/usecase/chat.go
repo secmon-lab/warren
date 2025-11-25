@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -84,7 +85,10 @@ func (x *UseCases) generateAndSaveExecutionMemory(
 
 	// Save
 	if err := x.repository.PutExecutionMemory(ctx, newMem); err != nil {
-		return err
+		if data, jsonErr := json.Marshal(newMem); jsonErr == nil {
+			logger.Error("failed to save execution memory", "error", err, "memory", string(data))
+		}
+		return goerr.Wrap(err, "failed to save execution memory", goerr.V("memory", newMem))
 	}
 
 	logger.Info("saved execution memory", "schema_id", schemaID, "memory_id", newMem.ID)
@@ -356,7 +360,11 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 				comment := target.NewComment(agentCtx, warrenResponse, botUser, ts)
 
 				if err := x.repository.PutTicketComment(agentCtx, comment); err != nil {
-					errs.Handle(ctx, goerr.Wrap(err, "failed to save ticket comment"))
+					logger := logging.From(agentCtx)
+					if data, jsonErr := json.Marshal(comment); jsonErr == nil {
+						logger.Error("failed to save ticket comment", "error", err, "comment", string(data))
+					}
+					errs.Handle(ctx, goerr.Wrap(err, "failed to save ticket comment", goerr.V("comment", comment)))
 				}
 			}
 
@@ -404,8 +412,12 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		}
 
 		if err := x.repository.PutHistory(ctx, target.ID, &newRecord); err != nil {
+			logger := logging.From(ctx)
+			if data, jsonErr := json.Marshal(&newRecord); jsonErr == nil {
+				logger.Error("failed to save history", "error", err, "history", string(data))
+			}
 			msg.Notify(ctx, "💥 Failed to save chat record: %s", err.Error())
-			return goerr.Wrap(err, "failed to put history")
+			return goerr.Wrap(err, "failed to put history", goerr.V("history", &newRecord))
 		}
 
 		logger.Debug("history saved", "history_id", newRecord.ID, "ticket_id", target.ID)
