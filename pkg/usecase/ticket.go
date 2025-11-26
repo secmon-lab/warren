@@ -164,7 +164,11 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 
 	// Save ticket to repository
 	if err := uc.repository.PutTicket(ctx, newTicket); err != nil {
-		return nil, goerr.Wrap(err, "failed to put new ticket")
+		logger := logging.From(ctx)
+		if data, jsonErr := json.Marshal(&newTicket); jsonErr == nil {
+			logger.Error("failed to save ticket", "error", err, "ticket", string(data))
+		}
+		return nil, goerr.Wrap(err, "failed to put new ticket", goerr.V("ticket", &newTicket))
 	}
 
 	newTicketPtr := &newTicket
@@ -176,7 +180,11 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 		}
 
 		if err := uc.repository.BatchPutAlerts(ctx, alerts); err != nil {
-			return nil, goerr.Wrap(err, "failed to update alerts with ticket ID")
+			logger := logging.From(ctx)
+			if data, jsonErr := json.Marshal(alerts); jsonErr == nil {
+				logger.Error("failed to batch save alerts", "error", err, "alerts", string(data))
+			}
+			return nil, goerr.Wrap(err, "failed to update alerts with ticket ID", goerr.V("alerts", alerts))
 		}
 	}
 
@@ -190,7 +198,11 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 
 		// Save ticket again with Slack message ID
 		if err := uc.repository.PutTicket(ctx, *newTicketPtr); err != nil {
-			return nil, goerr.Wrap(err, "failed to update ticket with slack message ID")
+			logger := logging.From(ctx)
+			if data, jsonErr := json.Marshal(newTicketPtr); jsonErr == nil {
+				logger.Error("failed to save ticket", "error", err, "ticket", string(data))
+			}
+			return nil, goerr.Wrap(err, "failed to update ticket with slack message ID", goerr.V("ticket", newTicketPtr))
 		}
 	}
 
@@ -388,7 +400,11 @@ func (uc *UseCases) updateTicketWithSlackSync(ctx context.Context, ticketID type
 
 	// Save updated ticket
 	if err := uc.repository.PutTicket(ctx, *existingTicket); err != nil {
-		return nil, goerr.Wrap(err, "failed to save updated ticket")
+		logger := logging.From(ctx)
+		if data, jsonErr := json.Marshal(existingTicket); jsonErr == nil {
+			logger.Error("failed to save ticket", "error", err, "ticket", string(data))
+		}
+		return nil, goerr.Wrap(err, "failed to save updated ticket", goerr.V("ticket", existingTicket))
 	}
 
 	// Update Slack post if ticket has a Slack thread
@@ -478,7 +494,10 @@ func (uc *UseCases) generateAndSaveTicketMemory(ctx context.Context, ticketID ty
 
 	// Save
 	if err := uc.repository.PutTicketMemory(ctx, newMem); err != nil {
-		return goerr.Wrap(err, "failed to save ticket memory")
+		if data, jsonErr := json.Marshal(newMem); jsonErr == nil {
+			logger.Error("failed to save ticket memory", "error", err, "memory", string(data))
+		}
+		return goerr.Wrap(err, "failed to save ticket memory", goerr.V("memory", newMem))
 	}
 
 	logger.Debug("ticket memory generated and saved", "ticket_id", ticketID, "schema_id", schemaID)
@@ -733,7 +752,11 @@ func (uc *UseCases) CreateTicketFromConversation(
 
 	// Save ticket to repository
 	if err := uc.repository.PutTicket(ctx, newTicket); err != nil {
-		return nil, goerr.Wrap(err, "failed to put new ticket")
+		logger := logging.From(ctx)
+		if data, jsonErr := json.Marshal(&newTicket); jsonErr == nil {
+			logger.Error("failed to save ticket", "error", err, "ticket", string(data))
+		}
+		return nil, goerr.Wrap(err, "failed to put new ticket", goerr.V("ticket", &newTicket))
 	}
 
 	// Post ticket to Slack in the same thread
@@ -752,7 +775,11 @@ func (uc *UseCases) CreateTicketFromConversation(
 
 		// Save ticket again with Slack message ID and updated thread ID
 		if err := uc.repository.PutTicket(ctx, newTicket); err != nil {
-			return nil, goerr.Wrap(err, "failed to update ticket with slack message ID")
+			logger := logging.From(ctx)
+			if data, jsonErr := json.Marshal(&newTicket); jsonErr == nil {
+				logger.Error("failed to save ticket", "error", err, "ticket", string(data))
+			}
+			return nil, goerr.Wrap(err, "failed to update ticket with slack message ID", goerr.V("ticket", &newTicket))
 		}
 	}
 

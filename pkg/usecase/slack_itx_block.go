@@ -116,6 +116,9 @@ func (uc *UseCases) slackActionAckList(ctx context.Context, user slack.User, sla
 	// Update the alert list status to bound
 	list.Status = alert.ListStatusBound
 	if err := uc.repository.PutAlertList(ctx, list); err != nil {
+		if data, jsonErr := json.Marshal(list); jsonErr == nil {
+			logger.Error("failed to save alert list", "error", err, "list", string(data))
+		}
 		logger.Warn("failed to update alert list status", "error", err)
 	}
 

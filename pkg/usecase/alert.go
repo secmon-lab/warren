@@ -15,6 +15,18 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
+// putAlertWithLogging saves an alert and logs the full alert data on error
+func putAlertWithLogging(ctx context.Context, repo interfaces.Repository, alert *alert.Alert) error {
+	if err := repo.PutAlert(ctx, *alert); err != nil {
+		logger := logging.From(ctx)
+		if data, jsonErr := json.Marshal(alert); jsonErr == nil {
+			logger.Error("failed to save alert", "error", err, "alert", string(data))
+		}
+		return goerr.Wrap(err, "failed to put alert", goerr.V("alert", alert))
+	}
+	return nil
+}
+
 func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 	logger := logging.From(ctx)
 
@@ -87,8 +99,8 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, a
 			}
 
 			// Save to database
-			if err := uc.repository.PutAlert(ctx, *processedAlert); err != nil {
-				return nil, goerr.Wrap(err, "failed to put alert")
+			if err := putAlertWithLogging(ctx, uc.repository, processedAlert); err != nil {
+				return nil, err
 			}
 			logger.Info("alert created", "alert", processedAlert)
 
@@ -107,8 +119,8 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, a
 					processedAlert.SlackThread = newThread.Entity()
 				}
 			}
-			if err := uc.repository.PutAlert(ctx, *processedAlert); err != nil {
-				return nil, goerr.Wrap(err, "failed to put alert")
+			if err := putAlertWithLogging(ctx, uc.repository, processedAlert); err != nil {
+				return nil, err
 			}
 
 			// Add alert to results
@@ -231,7 +243,11 @@ func (uc *UseCases) BindAlertsToTicket(ctx context.Context, ticketID types.Ticke
 
 	// Save the updated ticket with new embedding and metadata
 	if err := uc.repository.PutTicket(ctx, *ticket); err != nil {
-		return goerr.Wrap(err, "failed to save ticket with updated embedding and metadata")
+		logger := logging.From(ctx)
+		if data, jsonErr := json.Marshal(ticket); jsonErr == nil {
+			logger.Error("failed to save ticket", "error", err, "ticket", string(data))
+		}
+		return goerr.Wrap(err, "failed to save ticket with updated embedding and metadata", goerr.V("ticket", ticket))
 	}
 
 	// Update Slack display for both ticket and individual alerts (using updated metadata)
@@ -288,7 +304,10 @@ func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channe
 
 	// Store notice in repository
 	if err := uc.repository.CreateNotice(ctx, notice); err != nil {
-		return goerr.Wrap(err, "failed to create notice")
+		if data, jsonErr := json.Marshal(notice); jsonErr == nil {
+			logger.Error("failed to create notice", "error", err, "notice", string(data))
+		}
+		return goerr.Wrap(err, "failed to create notice", goerr.V("notice", notice))
 	}
 
 	// Send simple notification to Slack and flush pipeline events if SlackNotifier
@@ -300,7 +319,11 @@ func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channe
 			// Update notice with Slack timestamp
 			notice.SlackTS = slackTS
 			if err := uc.repository.UpdateNotice(ctx, notice); err != nil {
-				logger.Warn("failed to update notice with slack timestamp", "error", err, "notice_id", notice.ID)
+				if data, jsonErr := json.Marshal(notice); jsonErr == nil {
+					logger.Warn("failed to update notice with slack timestamp", "error", err, "notice", string(data))
+				} else {
+					logger.Warn("failed to update notice with slack timestamp", "error", err, "notice_id", notice.ID)
+				}
 			}
 		}
 	}
@@ -364,7 +387,10 @@ func (uc *UseCases) EscalateNotice(ctx context.Context, noticeID types.NoticeID)
 	// Mark notice as escalated
 	notice.Escalated = true
 	if err := uc.repository.UpdateNotice(ctx, notice); err != nil {
-		return nil, goerr.Wrap(err, "failed to update notice", goerr.V("notice_id", noticeID))
+		if data, jsonErr := json.Marshal(notice); jsonErr == nil {
+			logger.Error("failed to update notice", "error", err, "notice", string(data))
+		}
+		return nil, goerr.Wrap(err, "failed to update notice", goerr.V("notice_id", noticeID), goerr.V("notice", notice))
 	}
 
 	// Post escalated alert to Slack
@@ -381,7 +407,7 @@ func (uc *UseCases) EscalateNotice(ctx context.Context, noticeID types.NoticeID)
 	}
 
 	// Store escalated alert
-	if err := uc.repository.PutAlert(ctx, escalatedAlert); err != nil {
+	if err := putAlertWithLogging(ctx, uc.repository, &escalatedAlert); err != nil {
 		return nil, goerr.Wrap(err, "failed to put escalated alert", goerr.V("notice_id", noticeID))
 	}
 

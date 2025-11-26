@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -38,6 +39,10 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg slack.Messa
 
 	comment := ticket.NewComment(ctx, slackMsg.Text(), slackMsg.User(), slackMsg.ID())
 	if err := uc.repository.PutTicketComment(ctx, comment); err != nil {
+		logger := logging.From(ctx)
+		if data, jsonErr := json.Marshal(comment); jsonErr == nil {
+			logger.Error("failed to save ticket comment", "error", err, "comment", string(data))
+		}
 		msg.Trace(ctx, "💥 Failed to insert alert comment\n> %s", err.Error())
 		return goerr.Wrap(err, "failed to insert alert comment", goerr.V("comment", comment))
 	}

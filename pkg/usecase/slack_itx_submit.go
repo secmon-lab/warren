@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"strconv"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -156,6 +157,9 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Con
 	// Update the alert list status to bound
 	list.Status = alert.ListStatusBound
 	if err := uc.repository.PutAlertList(ctx, list); err != nil {
+		if data, jsonErr := json.Marshal(list); jsonErr == nil {
+			logger.Error("failed to save alert list", "error", err, "list", string(data))
+		}
 		logger.Warn("failed to update alert list status", "error", err)
 	}
 
@@ -352,7 +356,10 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 
 	logger.Debug("saving ticket to repository", "ticketID", target.ID, "TagIDs", target.TagIDs, "target.Status", target.Status)
 	if err := uc.repository.PutTicket(ctx, *target); err != nil {
-		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID))
+		if data, jsonErr := json.Marshal(target); jsonErr == nil {
+			logger.Error("failed to save ticket", "error", err, "ticket", string(data))
+		}
+		return goerr.Wrap(err, "failed to put ticket", goerr.V("ticket_id", ticketID), goerr.V("ticket", target))
 	}
 
 	if _, err := st.PostTicket(ctx, target, nil); err != nil {
@@ -491,7 +498,10 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionEditTicket(ctx context.C
 
 	// Save updated ticket
 	if err := uc.repository.PutTicket(ctx, *target); err != nil {
-		return goerr.Wrap(err, "failed to update ticket", goerr.V("ticket_id", ticketID))
+		if data, jsonErr := json.Marshal(target); jsonErr == nil {
+			logger.Error("failed to save ticket", "error", err, "ticket", string(data))
+		}
+		return goerr.Wrap(err, "failed to update ticket", goerr.V("ticket_id", ticketID), goerr.V("ticket", target))
 	}
 
 	// Update Slack message
