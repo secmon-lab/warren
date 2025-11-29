@@ -1,5 +1,5 @@
 # Task
-Extract the raw query result records from the conversation history and return them as a JSON array.
+Extract the raw query result records from the conversation history and return them as a JSON object with a "records" field.
 
 # Key Principle: Understand User Intent
 - Do NOT just extract data literally based on the user's wording
@@ -14,8 +14,7 @@ Extract the raw query result records from the conversation history and return th
 4. Convert each row/record into a JSON object with proper field names and values
 5. Preserve ALL field names and values exactly as they appear in the results
 6. If multiple queries were executed, intelligently select records that fulfill the user's intent
-7. Return ONLY the records array - no wrapper object, no additional fields
-8. **IMPORTANT**: Each record MUST be a non-empty object with the actual field names and values from the query results
+7. **IMPORTANT**: Each record MUST be a non-empty object with the actual field names and values from the query results
 
 # Examples of Intent Understanding
 - User asks "recent suspicious activities" → Extract records showing anomalies, not just recent records
