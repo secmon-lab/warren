@@ -2,10 +2,12 @@ package bigquery_test
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/m-mizutani/gollem"
+	"github.com/m-mizutani/gollem/llm/gemini"
 	"github.com/m-mizutani/gollem/mock"
 	"github.com/m-mizutani/gt"
 	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
@@ -417,4 +419,98 @@ func TestAgent_MemoryPruning(t *testing.T) {
 			gt.True(t, m.QualityScore > -8.0)
 		}
 	})
+}
+
+func TestAgent_ExtractRecords_WithRealLLM(t *testing.T) {
+	projectID := os.Getenv("TEST_GEMINI_PROJECT_ID")
+	location := os.Getenv("TEST_GEMINI_LOCATION")
+
+	if projectID == "" || location == "" {
+		t.Skip("TEST_GEMINI_PROJECT_ID and TEST_GEMINI_LOCATION must be set for real LLM test")
+	}
+
+	ctx := context.Background()
+
+	// Create real Gemini client
+	llmClient, err := gemini.New(ctx, projectID, location, gemini.WithModel("gemini-2.0-flash-exp"))
+	gt.NoError(t, err)
+
+	// Create memory service with in-memory repository
+	repo := repository.NewMemory()
+	memSvc := memoryservice.New(llmClient, repo)
+
+	// Create agent config
+	cfg := &bqagent.Config{
+		Tables:        []bqagent.TableConfig{},
+		ScanSizeLimit: 1024 * 1024 * 10, // 10MB
+		QueryTimeout:  time.Minute,
+	}
+
+	agent := bqagent.NewAgent(cfg, llmClient, memSvc)
+
+	// Create a session with conversation history containing query results
+	session, err := llmClient.NewSession(ctx)
+	gt.NoError(t, err)
+
+	// Simulate a conversation with BigQuery results
+	userQuery := "Show me login events from users in the last 7 days"
+
+	// Add user request and assistant response with query results
+	queryResults := `Query result from BigQuery:
+
++----------+---------------------+------------------+
+| user_id  | login_time          | ip_address       |
++----------+---------------------+------------------+
+| user123  | 2024-11-25 10:30:00 | 192.168.1.100    |
+| user456  | 2024-11-26 14:20:00 | 10.0.0.50        |
+| user789  | 2024-11-27 09:15:00 | 172.16.0.25      |
++----------+---------------------+------------------+
+3 rows returned`
+
+	userContent, err := gollem.NewTextContent(userQuery)
+	gt.NoError(t, err)
+	modelContent, err := gollem.NewTextContent(queryResults)
+	gt.NoError(t, err)
+
+	history := &gollem.History{
+		Messages: []gollem.Message{
+			{
+				Role:     gollem.RoleUser,
+				Contents: []gollem.MessageContent{userContent},
+			},
+			{
+				Role:     gollem.RoleAssistant,
+				Contents: []gollem.MessageContent{modelContent},
+			},
+		},
+	}
+
+	err = session.AppendHistory(history)
+	gt.NoError(t, err)
+
+	// Test extractRecords with the session containing results
+	records, err := agent.ExportedExtractRecords(ctx, userQuery, session)
+	gt.NoError(t, err)
+	gt.V(t, len(records)).NotEqual(0)
+
+	t.Logf("Successfully extracted %d records", len(records))
+	t.Logf("Sample record: %+v", records[0])
+
+	// Verify first record has expected fields and values from the test data
+	firstRecord := records[0]
+
+	// user_id should be one of the expected users
+	userID, ok := firstRecord["user_id"].(string)
+	gt.True(t, ok)
+	gt.S(t, userID).ContainsAny("user123", "user456", "user789")
+
+	// login_time should be one of the expected dates
+	loginTime, ok := firstRecord["login_time"].(string)
+	gt.True(t, ok)
+	gt.S(t, loginTime).ContainsAny("2024-11-25", "2024-11-26", "2024-11-27")
+
+	// ip_address should be one of the expected IPs
+	ipAddress, ok := firstRecord["ip_address"].(string)
+	gt.True(t, ok)
+	gt.S(t, ipAddress).ContainsAny("192.168.1.100", "10.0.0.50", "172.16.0.25")
 }
