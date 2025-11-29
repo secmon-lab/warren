@@ -24,3 +24,8 @@ func ExportNewInternalTool(config *Config, projectID string) gollem.ToolSet {
 
 // ToolSpec is exported for testing
 type ToolSpec = gollem.ToolSpec
+
+// ExportedExtractRecords is exported for testing
+func (a *Agent) ExportedExtractRecords(ctx context.Context, originalQuery string, session gollem.Session) ([]map[string]any, error) {
+	return a.extractRecords(ctx, originalQuery, session)
+}

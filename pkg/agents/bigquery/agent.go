@@ -223,7 +223,7 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 					resp, err := next(ctx, req)
 					if err == nil && len(resp.Texts) > 0 {
 						for _, text := range resp.Texts {
-							msg.Trace(ctx, "  🔹 %s", text)
+							msg.Trace(ctx, "  💭 %s", text)
 						}
 					}
 					return resp, err
@@ -281,17 +281,22 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 		return nil, execErr
 	}
 
-	result := map[string]any{
-		"data": "",
+	// Step 7: Extract records from session history
+	log.Debug("Extracting records from session history")
+	records, err := a.extractRecords(ctx, query, agent.Session())
+	if err != nil {
+		// Fallback to original response
+		log.Warn("Failed to extract records, falling back to text response", "error", err)
+		msg.Trace(ctx, "  ⚠️ *Warning:* Failed to extract records, returning text response")
+		result := map[string]any{"data": ""}
+		if resp != nil && !resp.IsEmpty() {
+			result["data"] = resp.String()
+		}
+		return result, nil
 	}
-	if resp != nil && !resp.IsEmpty() {
-		dataStr := resp.String()
-		result["data"] = dataStr
-		log.Debug("Execution successful", "data_length", len(dataStr))
-	} else {
-		log.Debug("Execution returned empty response")
-	}
-	return result, nil
+
+	log.Debug("Successfully extracted records", "count", len(records))
+	return map[string]any{"records": records}, nil
 }
 
 // Name implements interfaces.Tool
