@@ -348,14 +348,19 @@ func (s *Service) buildExecutionMemoryPrompt(ctx context.Context, existing *memo
 	}
 
 	if existing != nil && !existing.IsEmpty() {
-		params["existing_memory"] = existing
+		// Pass fields individually to avoid template field access issues with interface{}
+		params["existing_memory"] = map[string]any{
+			"Keep":   existing.Keep,
+			"Change": existing.Change,
+			"Notes":  existing.Notes,
+		}
 	}
 
 	if executionError != nil {
 		params["error"] = executionError.Error()
 	}
 
-	return prompt.Generate(ctx, executionMemoryPromptTemplate, params)
+	return prompt.GenerateWithStruct(ctx, executionMemoryPromptTemplate, params)
 }
 
 // parseExecutionMemoryResponse parses LLM response into ExecutionMemory
@@ -427,10 +432,13 @@ func (s *Service) buildTicketMemoryPrompt(ctx context.Context, existing *memory.
 	}
 
 	if existing != nil && !existing.IsEmpty() {
-		params["existing_memory"] = existing
+		// Pass fields individually to avoid template field access issues with interface{}
+		params["existing_memory"] = map[string]any{
+			"Insights": existing.Insights,
+		}
 	}
 
-	return prompt.Generate(ctx, ticketMemoryPromptTemplate, params)
+	return prompt.GenerateWithStruct(ctx, ticketMemoryPromptTemplate, params)
 }
 
 // parseTicketMemoryResponse parses LLM response into TicketMemory
