@@ -24,12 +24,13 @@ import (
 
 func cmdChat() *cli.Command {
 	var (
-		ticketID    types.TicketID
-		firestoreDB config.Firestore
-		llmCfg      config.LLMCfg
-		policyCfg   config.Policy
-		storageCfg  config.Storage
-		mcpCfg      config.MCPConfig
+		ticketID        types.TicketID
+		noAuthorization bool
+		firestoreDB     config.Firestore
+		llmCfg          config.LLMCfg
+		policyCfg       config.Policy
+		storageCfg      config.Storage
+		mcpCfg          config.MCPConfig
 
 		query string
 	)
@@ -51,6 +52,14 @@ func cmdChat() *cli.Command {
 				Aliases:     []string{"q"},
 				Usage:       "Query prompt (if not provided, interactive mode will start)",
 				Destination: &query,
+			},
+			&cli.BoolFlag{
+				Name:        "no-authorization",
+				Aliases:     []string{"no-authz"},
+				Usage:       "Disable policy-based authorization checks (development only)",
+				Category:    "Security",
+				Sources:     cli.EnvVars("WARREN_NO_AUTHORIZATION"),
+				Destination: &noAuthorization,
 			},
 		},
 		firestoreDB.Flags(),
@@ -93,6 +102,15 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to configure storage")
 			}
 
+			// Create embedding client using unified LLM configuration
+			embeddingClient, err := llmCfg.ConfigureEmbeddingClient(ctx)
+			if err != nil {
+				return err
+			}
+
+			// Inject dependencies into tools that support them
+			tools.InjectDependencies(repo, embeddingClient)
+
 			// Get the ticket
 			ticket, err := repo.GetTicket(ctx, ticketID)
 			if err != nil {
@@ -114,18 +132,6 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to get tool sets")
 			}
 
-			// Add MCP tool sets if configured
-			mcpToolSets, err := mcpCfg.CreateMCPToolSets(ctx)
-			if err != nil {
-				return goerr.Wrap(err, "failed to create MCP tool sets")
-			}
-			if len(mcpToolSets) > 0 {
-				allToolSets = append(allToolSets, mcpToolSets...)
-				logging.From(ctx).Info("MCP tool sets configured",
-					"servers", mcpCfg.GetServerNames(),
-					"count", len(mcpToolSets))
-			}
-
 			// Create memory service
 			memoryService := memory.New(llmClient, repo)
 
@@ -143,6 +149,18 @@ func cmdChat() *cli.Command {
 				allToolSets = append(allToolSets, slackAgent)
 			}
 
+			// Add MCP tool sets if configured
+			mcpToolSets, err := mcpCfg.CreateMCPToolSets(ctx)
+			if err != nil {
+				return goerr.Wrap(err, "failed to create MCP tool sets")
+			}
+			if len(mcpToolSets) > 0 {
+				allToolSets = append(allToolSets, mcpToolSets...)
+				logging.From(ctx).Info("MCP tool sets configured",
+					"servers", mcpCfg.GetServerNames(),
+					"count", len(mcpToolSets))
+			}
+
 			// Show ticket information
 			fmt.Printf("\n🎫 Ticket Information:\n")
 			fmt.Printf("  📝 ID: %s\n", ticket.ID)
@@ -155,6 +173,13 @@ func cmdChat() *cli.Command {
 			fmt.Printf("  🔢 Alerts: %d\n", len(alerts))
 			fmt.Printf("\n")
 
+			// Add no-authorization warning if specified
+			if noAuthorization {
+				logging.From(ctx).Warn("⚠️  SECURITY WARNING: Authorization checks are DISABLED",
+					"flag", "--no-authorization",
+					"recommendation", "This should only be used in development environments")
+			}
+
 			// Create usecase
 			uc := usecase.New(
 				usecase.WithRepository(repo),
@@ -163,6 +188,7 @@ func cmdChat() *cli.Command {
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(allToolSets),
 				usecase.WithMemoryService(memoryService),
+				usecase.WithNoAuthorization(noAuthorization),
 			)
 
 			// If query is provided, run once and exit
