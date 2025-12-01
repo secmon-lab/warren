@@ -36,6 +36,9 @@ type Memory struct {
 	ticketMemories    map[types.AlertSchema][]*memory.TicketMemory    // Store history as slice
 	agentMemories     map[types.AgentMemoryID]*memory.AgentMemory
 
+	// Session management
+	session *sessionStore
+
 	// Call counter for tracking method invocations
 	callCounts map[string]int
 	callMu     sync.RWMutex
@@ -59,6 +62,7 @@ func New() *Memory {
 		executionMemories: make(map[types.AlertSchema][]*memory.ExecutionMemory),
 		ticketMemories:    make(map[types.AlertSchema][]*memory.TicketMemory),
 		agentMemories:     make(map[types.AgentMemoryID]*memory.AgentMemory),
+		session:           newSessionStore(),
 		callCounts:        make(map[string]int),
 		eb:                goerr.NewBuilder(goerr.TV(errs.RepositoryKey, "memory")),
 	}

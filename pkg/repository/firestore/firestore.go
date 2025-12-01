@@ -51,6 +51,7 @@ const (
 	collectionExecutionMemories = "execution_memories"
 	collectionTicketMemories    = "ticket_memories"
 	collectionAgents            = "agents"
+	collectionSessions          = "sessions"
 	subcollectionMemories       = "memories"
 )
 

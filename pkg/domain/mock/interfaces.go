@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -2521,6 +2522,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			DeleteAgentMemoriesBatchFunc: func(ctx context.Context, agentID string, memoryIDs []types.AgentMemoryID) (int, error) {
 //				panic("mock out the DeleteAgentMemoriesBatch method")
 //			},
+//			DeleteSessionFunc: func(ctx context.Context, sessionID types.SessionID) error {
+//				panic("mock out the DeleteSession method")
+//			},
 //			DeleteTagByIDFunc: func(ctx context.Context, tagID string) error {
 //				panic("mock out the DeleteTagByID method")
 //			},
@@ -2587,6 +2591,12 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetOrCreateTagByNameFunc: func(ctx context.Context, name string, description string, color string, createdBy string) (*tag.Tag, error) {
 //				panic("mock out the GetOrCreateTagByName method")
 //			},
+//			GetSessionFunc: func(ctx context.Context, sessionID types.SessionID) (*session.Session, error) {
+//				panic("mock out the GetSession method")
+//			},
+//			GetSessionByTicketFunc: func(ctx context.Context, ticketID types.TicketID) (*session.Session, error) {
+//				panic("mock out the GetSessionByTicket method")
+//			},
 //			GetTagByIDFunc: func(ctx context.Context, tagID string) (*tag.Tag, error) {
 //				panic("mock out the GetTagByID method")
 //			},
@@ -2652,6 +2662,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			PutHistoryFunc: func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
 //				panic("mock out the PutHistory method")
+//			},
+//			PutSessionFunc: func(ctx context.Context, sessionMoqParam *session.Session) error {
+//				panic("mock out the PutSession method")
 //			},
 //			PutTicketFunc: func(ctx context.Context, ticketMoqParam ticket.Ticket) error {
 //				panic("mock out the PutTicket method")
@@ -2747,6 +2760,9 @@ type RepositoryMock struct {
 	// DeleteAgentMemoriesBatchFunc mocks the DeleteAgentMemoriesBatch method.
 	DeleteAgentMemoriesBatchFunc func(ctx context.Context, agentID string, memoryIDs []types.AgentMemoryID) (int, error)
 
+	// DeleteSessionFunc mocks the DeleteSession method.
+	DeleteSessionFunc func(ctx context.Context, sessionID types.SessionID) error
+
 	// DeleteTagByIDFunc mocks the DeleteTagByID method.
 	DeleteTagByIDFunc func(ctx context.Context, tagID string) error
 
@@ -2813,6 +2829,12 @@ type RepositoryMock struct {
 	// GetOrCreateTagByNameFunc mocks the GetOrCreateTagByName method.
 	GetOrCreateTagByNameFunc func(ctx context.Context, name string, description string, color string, createdBy string) (*tag.Tag, error)
 
+	// GetSessionFunc mocks the GetSession method.
+	GetSessionFunc func(ctx context.Context, sessionID types.SessionID) (*session.Session, error)
+
+	// GetSessionByTicketFunc mocks the GetSessionByTicket method.
+	GetSessionByTicketFunc func(ctx context.Context, ticketID types.TicketID) (*session.Session, error)
+
 	// GetTagByIDFunc mocks the GetTagByID method.
 	GetTagByIDFunc func(ctx context.Context, tagID string) (*tag.Tag, error)
 
@@ -2878,6 +2900,9 @@ type RepositoryMock struct {
 
 	// PutHistoryFunc mocks the PutHistory method.
 	PutHistoryFunc func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error
+
+	// PutSessionFunc mocks the PutSession method.
+	PutSessionFunc func(ctx context.Context, sessionMoqParam *session.Session) error
 
 	// PutTicketFunc mocks the PutTicket method.
 	PutTicketFunc func(ctx context.Context, ticketMoqParam ticket.Ticket) error
@@ -3020,6 +3045,13 @@ type RepositoryMock struct {
 			AgentID string
 			// MemoryIDs is the memoryIDs argument value.
 			MemoryIDs []types.AgentMemoryID
+		}
+		// DeleteSession holds details about calls to the DeleteSession method.
+		DeleteSession []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SessionID is the sessionID argument value.
+			SessionID types.SessionID
 		}
 		// DeleteTagByID holds details about calls to the DeleteTagByID method.
 		DeleteTagByID []struct {
@@ -3195,6 +3227,20 @@ type RepositoryMock struct {
 			// CreatedBy is the createdBy argument value.
 			CreatedBy string
 		}
+		// GetSession holds details about calls to the GetSession method.
+		GetSession []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SessionID is the sessionID argument value.
+			SessionID types.SessionID
+		}
+		// GetSessionByTicket holds details about calls to the GetSessionByTicket method.
+		GetSessionByTicket []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TicketID is the ticketID argument value.
+			TicketID types.TicketID
+		}
 		// GetTagByID holds details about calls to the GetTagByID method.
 		GetTagByID []struct {
 			// Ctx is the ctx argument value.
@@ -3361,6 +3407,13 @@ type RepositoryMock struct {
 			// History is the history argument value.
 			History *ticket.History
 		}
+		// PutSession holds details about calls to the PutSession method.
+		PutSession []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SessionMoqParam is the sessionMoqParam argument value.
+			SessionMoqParam *session.Session
+		}
 		// PutTicket holds details about calls to the PutTicket method.
 		PutTicket []struct {
 			// Ctx is the ctx argument value.
@@ -3514,6 +3567,7 @@ type RepositoryMock struct {
 	lockCreateNotice                       sync.RWMutex
 	lockCreateTagWithID                    sync.RWMutex
 	lockDeleteAgentMemoriesBatch           sync.RWMutex
+	lockDeleteSession                      sync.RWMutex
 	lockDeleteTagByID                      sync.RWMutex
 	lockDeleteToken                        sync.RWMutex
 	lockFindNearestAlerts                  sync.RWMutex
@@ -3536,6 +3590,8 @@ type RepositoryMock struct {
 	lockGetLatestHistory                   sync.RWMutex
 	lockGetNotice                          sync.RWMutex
 	lockGetOrCreateTagByName               sync.RWMutex
+	lockGetSession                         sync.RWMutex
+	lockGetSessionByTicket                 sync.RWMutex
 	lockGetTagByID                         sync.RWMutex
 	lockGetTagByName                       sync.RWMutex
 	lockGetTagsByIDs                       sync.RWMutex
@@ -3558,6 +3614,7 @@ type RepositoryMock struct {
 	lockPutAlertList                       sync.RWMutex
 	lockPutExecutionMemory                 sync.RWMutex
 	lockPutHistory                         sync.RWMutex
+	lockPutSession                         sync.RWMutex
 	lockPutTicket                          sync.RWMutex
 	lockPutTicketComment                   sync.RWMutex
 	lockPutTicketCommentsPrompted          sync.RWMutex
@@ -4053,6 +4110,45 @@ func (mock *RepositoryMock) DeleteAgentMemoriesBatchCalls() []struct {
 	mock.lockDeleteAgentMemoriesBatch.RLock()
 	calls = mock.calls.DeleteAgentMemoriesBatch
 	mock.lockDeleteAgentMemoriesBatch.RUnlock()
+	return calls
+}
+
+// DeleteSession calls DeleteSessionFunc.
+func (mock *RepositoryMock) DeleteSession(ctx context.Context, sessionID types.SessionID) error {
+	callInfo := struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+	}{
+		Ctx:       ctx,
+		SessionID: sessionID,
+	}
+	mock.lockDeleteSession.Lock()
+	mock.calls.DeleteSession = append(mock.calls.DeleteSession, callInfo)
+	mock.lockDeleteSession.Unlock()
+	if mock.DeleteSessionFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.DeleteSessionFunc(ctx, sessionID)
+}
+
+// DeleteSessionCalls gets all the calls that were made to DeleteSession.
+// Check the length with:
+//
+//	len(mockedRepository.DeleteSessionCalls())
+func (mock *RepositoryMock) DeleteSessionCalls() []struct {
+	Ctx       context.Context
+	SessionID types.SessionID
+} {
+	var calls []struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+	}
+	mock.lockDeleteSession.RLock()
+	calls = mock.calls.DeleteSession
+	mock.lockDeleteSession.RUnlock()
 	return calls
 }
 
@@ -4974,6 +5070,86 @@ func (mock *RepositoryMock) GetOrCreateTagByNameCalls() []struct {
 	return calls
 }
 
+// GetSession calls GetSessionFunc.
+func (mock *RepositoryMock) GetSession(ctx context.Context, sessionID types.SessionID) (*session.Session, error) {
+	callInfo := struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+	}{
+		Ctx:       ctx,
+		SessionID: sessionID,
+	}
+	mock.lockGetSession.Lock()
+	mock.calls.GetSession = append(mock.calls.GetSession, callInfo)
+	mock.lockGetSession.Unlock()
+	if mock.GetSessionFunc == nil {
+		var (
+			sessionOut *session.Session
+			errOut     error
+		)
+		return sessionOut, errOut
+	}
+	return mock.GetSessionFunc(ctx, sessionID)
+}
+
+// GetSessionCalls gets all the calls that were made to GetSession.
+// Check the length with:
+//
+//	len(mockedRepository.GetSessionCalls())
+func (mock *RepositoryMock) GetSessionCalls() []struct {
+	Ctx       context.Context
+	SessionID types.SessionID
+} {
+	var calls []struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+	}
+	mock.lockGetSession.RLock()
+	calls = mock.calls.GetSession
+	mock.lockGetSession.RUnlock()
+	return calls
+}
+
+// GetSessionByTicket calls GetSessionByTicketFunc.
+func (mock *RepositoryMock) GetSessionByTicket(ctx context.Context, ticketID types.TicketID) (*session.Session, error) {
+	callInfo := struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+	}{
+		Ctx:      ctx,
+		TicketID: ticketID,
+	}
+	mock.lockGetSessionByTicket.Lock()
+	mock.calls.GetSessionByTicket = append(mock.calls.GetSessionByTicket, callInfo)
+	mock.lockGetSessionByTicket.Unlock()
+	if mock.GetSessionByTicketFunc == nil {
+		var (
+			sessionOut *session.Session
+			errOut     error
+		)
+		return sessionOut, errOut
+	}
+	return mock.GetSessionByTicketFunc(ctx, ticketID)
+}
+
+// GetSessionByTicketCalls gets all the calls that were made to GetSessionByTicket.
+// Check the length with:
+//
+//	len(mockedRepository.GetSessionByTicketCalls())
+func (mock *RepositoryMock) GetSessionByTicketCalls() []struct {
+	Ctx      context.Context
+	TicketID types.TicketID
+} {
+	var calls []struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+	}
+	mock.lockGetSessionByTicket.RLock()
+	calls = mock.calls.GetSessionByTicket
+	mock.lockGetSessionByTicket.RUnlock()
+	return calls
+}
+
 // GetTagByID calls GetTagByIDFunc.
 func (mock *RepositoryMock) GetTagByID(ctx context.Context, tagID string) (*tag.Tag, error) {
 	callInfo := struct {
@@ -5870,6 +6046,45 @@ func (mock *RepositoryMock) PutHistoryCalls() []struct {
 	mock.lockPutHistory.RLock()
 	calls = mock.calls.PutHistory
 	mock.lockPutHistory.RUnlock()
+	return calls
+}
+
+// PutSession calls PutSessionFunc.
+func (mock *RepositoryMock) PutSession(ctx context.Context, sessionMoqParam *session.Session) error {
+	callInfo := struct {
+		Ctx             context.Context
+		SessionMoqParam *session.Session
+	}{
+		Ctx:             ctx,
+		SessionMoqParam: sessionMoqParam,
+	}
+	mock.lockPutSession.Lock()
+	mock.calls.PutSession = append(mock.calls.PutSession, callInfo)
+	mock.lockPutSession.Unlock()
+	if mock.PutSessionFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutSessionFunc(ctx, sessionMoqParam)
+}
+
+// PutSessionCalls gets all the calls that were made to PutSession.
+// Check the length with:
+//
+//	len(mockedRepository.PutSessionCalls())
+func (mock *RepositoryMock) PutSessionCalls() []struct {
+	Ctx             context.Context
+	SessionMoqParam *session.Session
+} {
+	var calls []struct {
+		Ctx             context.Context
+		SessionMoqParam *session.Session
+	}
+	mock.lockPutSession.RLock()
+	calls = mock.calls.PutSession
+	mock.lockPutSession.RUnlock()
 	return calls
 }
 
@@ -7811,6 +8026,9 @@ func (mock *AlertUsecasesMock) HandleAlertCalls() []struct {
 //			GeneratePromptFunc: func(ctx context.Context, templateName string, alertMoqParam *alert.Alert) (string, error) {
 //				panic("mock out the GeneratePrompt method")
 //			},
+//			GeneratePromptWithParamsFunc: func(ctx context.Context, templateName string, alertMoqParam *alert.Alert, params map[string]any) (string, error) {
+//				panic("mock out the GeneratePromptWithParams method")
+//			},
 //			ReadPromptFileFunc: func(ctx context.Context, templateName string) (string, error) {
 //				panic("mock out the ReadPromptFile method")
 //			},
@@ -7823,6 +8041,9 @@ func (mock *AlertUsecasesMock) HandleAlertCalls() []struct {
 type PromptServiceMock struct {
 	// GeneratePromptFunc mocks the GeneratePrompt method.
 	GeneratePromptFunc func(ctx context.Context, templateName string, alertMoqParam *alert.Alert) (string, error)
+
+	// GeneratePromptWithParamsFunc mocks the GeneratePromptWithParams method.
+	GeneratePromptWithParamsFunc func(ctx context.Context, templateName string, alertMoqParam *alert.Alert, params map[string]any) (string, error)
 
 	// ReadPromptFileFunc mocks the ReadPromptFile method.
 	ReadPromptFileFunc func(ctx context.Context, templateName string) (string, error)
@@ -7838,6 +8059,17 @@ type PromptServiceMock struct {
 			// AlertMoqParam is the alertMoqParam argument value.
 			AlertMoqParam *alert.Alert
 		}
+		// GeneratePromptWithParams holds details about calls to the GeneratePromptWithParams method.
+		GeneratePromptWithParams []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TemplateName is the templateName argument value.
+			TemplateName string
+			// AlertMoqParam is the alertMoqParam argument value.
+			AlertMoqParam *alert.Alert
+			// Params is the params argument value.
+			Params map[string]any
+		}
 		// ReadPromptFile holds details about calls to the ReadPromptFile method.
 		ReadPromptFile []struct {
 			// Ctx is the ctx argument value.
@@ -7846,8 +8078,9 @@ type PromptServiceMock struct {
 			TemplateName string
 		}
 	}
-	lockGeneratePrompt sync.RWMutex
-	lockReadPromptFile sync.RWMutex
+	lockGeneratePrompt           sync.RWMutex
+	lockGeneratePromptWithParams sync.RWMutex
+	lockReadPromptFile           sync.RWMutex
 }
 
 // GeneratePrompt calls GeneratePromptFunc.
@@ -7891,6 +8124,54 @@ func (mock *PromptServiceMock) GeneratePromptCalls() []struct {
 	mock.lockGeneratePrompt.RLock()
 	calls = mock.calls.GeneratePrompt
 	mock.lockGeneratePrompt.RUnlock()
+	return calls
+}
+
+// GeneratePromptWithParams calls GeneratePromptWithParamsFunc.
+func (mock *PromptServiceMock) GeneratePromptWithParams(ctx context.Context, templateName string, alertMoqParam *alert.Alert, params map[string]any) (string, error) {
+	callInfo := struct {
+		Ctx           context.Context
+		TemplateName  string
+		AlertMoqParam *alert.Alert
+		Params        map[string]any
+	}{
+		Ctx:           ctx,
+		TemplateName:  templateName,
+		AlertMoqParam: alertMoqParam,
+		Params:        params,
+	}
+	mock.lockGeneratePromptWithParams.Lock()
+	mock.calls.GeneratePromptWithParams = append(mock.calls.GeneratePromptWithParams, callInfo)
+	mock.lockGeneratePromptWithParams.Unlock()
+	if mock.GeneratePromptWithParamsFunc == nil {
+		var (
+			sOut   string
+			errOut error
+		)
+		return sOut, errOut
+	}
+	return mock.GeneratePromptWithParamsFunc(ctx, templateName, alertMoqParam, params)
+}
+
+// GeneratePromptWithParamsCalls gets all the calls that were made to GeneratePromptWithParams.
+// Check the length with:
+//
+//	len(mockedPromptService.GeneratePromptWithParamsCalls())
+func (mock *PromptServiceMock) GeneratePromptWithParamsCalls() []struct {
+	Ctx           context.Context
+	TemplateName  string
+	AlertMoqParam *alert.Alert
+	Params        map[string]any
+} {
+	var calls []struct {
+		Ctx           context.Context
+		TemplateName  string
+		AlertMoqParam *alert.Alert
+		Params        map[string]any
+	}
+	mock.lockGeneratePromptWithParams.RLock()
+	calls = mock.calls.GeneratePromptWithParams
+	mock.lockGeneratePromptWithParams.RUnlock()
 	return calls
 }
 

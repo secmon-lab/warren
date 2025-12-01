@@ -9,6 +9,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -126,4 +127,10 @@ type Repository interface {
 	// ListAgentMemories lists all memories for an agent (for pruning)
 	// Results are ordered by Timestamp DESC
 	ListAgentMemories(ctx context.Context, agentID string) ([]*memory.AgentMemory, error)
+
+	// Session management
+	PutSession(ctx context.Context, session *session.Session) error
+	GetSession(ctx context.Context, sessionID types.SessionID) (*session.Session, error)
+	GetSessionByTicket(ctx context.Context, ticketID types.TicketID) (*session.Session, error)
+	DeleteSession(ctx context.Context, sessionID types.SessionID) error
 }
