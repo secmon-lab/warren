@@ -3,7 +3,6 @@ package firestore
 import (
 	"context"
 
-	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
@@ -45,34 +44,35 @@ func (r *Firestore) GetSession(ctx context.Context, sessionID types.SessionID) (
 	return &sess, nil
 }
 
-func (r *Firestore) GetSessionByTicket(ctx context.Context, ticketID types.TicketID) (*session.Session, error) {
-	// ticket_id + status=running で最新セッションを取得
+func (r *Firestore) GetSessionsByTicket(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error) {
 	query := r.db.Collection(collectionSessions).
-		Where("ticket_id", "==", ticketID.String()).
-		Where("status", "==", string(types.SessionStatusRunning)).
-		OrderBy("created_at", firestore.Desc).
-		Limit(1)
+		Where("ticket_id", "==", ticketID.String())
 
 	iter := query.Documents(ctx)
 	defer iter.Stop()
 
-	doc, err := iter.Next()
-	if err == iterator.Done {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, r.eb.Wrap(err, "failed to query session by ticket",
-			goerr.V("ticket_id", ticketID),
-			goerr.T(errs.TagDatabase))
+	var sessions []*session.Session
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, r.eb.Wrap(err, "failed to query sessions by ticket",
+				goerr.V("ticket_id", ticketID),
+				goerr.T(errs.TagDatabase))
+		}
+
+		var sess session.Session
+		if err := doc.DataTo(&sess); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to session",
+				goerr.V("ticket_id", ticketID),
+				goerr.T(errs.TagInternal))
+		}
+		sessions = append(sessions, &sess)
 	}
 
-	var sess session.Session
-	if err := doc.DataTo(&sess); err != nil {
-		return nil, goerr.Wrap(err, "failed to convert data to session",
-			goerr.V("ticket_id", ticketID),
-			goerr.T(errs.TagInternal))
-	}
-	return &sess, nil
+	return sessions, nil
 }
 
 func (r *Firestore) DeleteSession(ctx context.Context, sessionID types.SessionID) error {

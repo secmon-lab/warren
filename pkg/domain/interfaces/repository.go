@@ -131,6 +131,6 @@ type Repository interface {
 	// Session management
 	PutSession(ctx context.Context, session *session.Session) error
 	GetSession(ctx context.Context, sessionID types.SessionID) (*session.Session, error)
-	GetSessionByTicket(ctx context.Context, ticketID types.TicketID) (*session.Session, error)
+	GetSessionsByTicket(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error)
 	DeleteSession(ctx context.Context, sessionID types.SessionID) error
 }

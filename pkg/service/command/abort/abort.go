@@ -2,6 +2,7 @@ package abort
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -24,28 +25,39 @@ func Execute(ctx context.Context, clients *core.Clients, msg *slack.Message, inp
 		return nil
 	}
 
-	// Get running session for this ticket
-	session, err := clients.Repo().GetSessionByTicket(ctx, ticket.ID)
+	// Get all sessions for this ticket
+	sessions, err := clients.Repo().GetSessionsByTicket(ctx, ticket.ID)
 	if err != nil {
-		return goerr.Wrap(err, "failed to get session by ticket")
+		return goerr.Wrap(err, "failed to get sessions by ticket")
 	}
 
-	if session == nil {
-		if err := clients.Thread().PostComment(ctx, "ℹ️ No running session found for this ticket."); err != nil {
-			return goerr.Wrap(err, "failed to post info message")
+	// Find and abort all running sessions
+	var abortedCount int
+	for _, session := range sessions {
+		if session.Status == types.SessionStatusRunning {
+			session.UpdateStatus(ctx, types.SessionStatusAborted)
+			if err := clients.Repo().PutSession(ctx, session); err != nil {
+				return goerr.Wrap(err, "failed to update session status")
+			}
+			abortedCount++
 		}
-		return nil
-	}
-
-	// Update session status to aborted
-	session.UpdateStatus(ctx, types.SessionStatusAborted)
-	if err := clients.Repo().PutSession(ctx, session); err != nil {
-		return goerr.Wrap(err, "failed to update session status")
 	}
 
 	// Notify user
-	if err := clients.Thread().PostComment(ctx, "🛑 Session aborted. The agent will stop at the next checkpoint."); err != nil {
-		return goerr.Wrap(err, "failed to post confirmation message")
+	if abortedCount == 0 {
+		if err := clients.Thread().PostComment(ctx, "ℹ️ No running session found for this ticket."); err != nil {
+			return goerr.Wrap(err, "failed to post info message")
+		}
+	} else {
+		var message string
+		if abortedCount == 1 {
+			message = "🛑 Session aborted. The agent will stop at the next checkpoint."
+		} else {
+			message = fmt.Sprintf("🛑 %d sessions aborted. The agents will stop at the next checkpoint.", abortedCount)
+		}
+		if err := clients.Thread().PostComment(ctx, message); err != nil {
+			return goerr.Wrap(err, "failed to post confirmation message")
+		}
 	}
 
 	return nil

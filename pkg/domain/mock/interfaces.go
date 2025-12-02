@@ -2594,8 +2594,8 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetSessionFunc: func(ctx context.Context, sessionID types.SessionID) (*session.Session, error) {
 //				panic("mock out the GetSession method")
 //			},
-//			GetSessionByTicketFunc: func(ctx context.Context, ticketID types.TicketID) (*session.Session, error) {
-//				panic("mock out the GetSessionByTicket method")
+//			GetSessionsByTicketFunc: func(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error) {
+//				panic("mock out the GetSessionsByTicket method")
 //			},
 //			GetTagByIDFunc: func(ctx context.Context, tagID string) (*tag.Tag, error) {
 //				panic("mock out the GetTagByID method")
@@ -2832,8 +2832,8 @@ type RepositoryMock struct {
 	// GetSessionFunc mocks the GetSession method.
 	GetSessionFunc func(ctx context.Context, sessionID types.SessionID) (*session.Session, error)
 
-	// GetSessionByTicketFunc mocks the GetSessionByTicket method.
-	GetSessionByTicketFunc func(ctx context.Context, ticketID types.TicketID) (*session.Session, error)
+	// GetSessionsByTicketFunc mocks the GetSessionsByTicket method.
+	GetSessionsByTicketFunc func(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error)
 
 	// GetTagByIDFunc mocks the GetTagByID method.
 	GetTagByIDFunc func(ctx context.Context, tagID string) (*tag.Tag, error)
@@ -3234,8 +3234,8 @@ type RepositoryMock struct {
 			// SessionID is the sessionID argument value.
 			SessionID types.SessionID
 		}
-		// GetSessionByTicket holds details about calls to the GetSessionByTicket method.
-		GetSessionByTicket []struct {
+		// GetSessionsByTicket holds details about calls to the GetSessionsByTicket method.
+		GetSessionsByTicket []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// TicketID is the ticketID argument value.
@@ -3591,7 +3591,7 @@ type RepositoryMock struct {
 	lockGetNotice                          sync.RWMutex
 	lockGetOrCreateTagByName               sync.RWMutex
 	lockGetSession                         sync.RWMutex
-	lockGetSessionByTicket                 sync.RWMutex
+	lockGetSessionsByTicket                sync.RWMutex
 	lockGetTagByID                         sync.RWMutex
 	lockGetTagByName                       sync.RWMutex
 	lockGetTagsByIDs                       sync.RWMutex
@@ -5110,8 +5110,8 @@ func (mock *RepositoryMock) GetSessionCalls() []struct {
 	return calls
 }
 
-// GetSessionByTicket calls GetSessionByTicketFunc.
-func (mock *RepositoryMock) GetSessionByTicket(ctx context.Context, ticketID types.TicketID) (*session.Session, error) {
+// GetSessionsByTicket calls GetSessionsByTicketFunc.
+func (mock *RepositoryMock) GetSessionsByTicket(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error) {
 	callInfo := struct {
 		Ctx      context.Context
 		TicketID types.TicketID
@@ -5119,24 +5119,24 @@ func (mock *RepositoryMock) GetSessionByTicket(ctx context.Context, ticketID typ
 		Ctx:      ctx,
 		TicketID: ticketID,
 	}
-	mock.lockGetSessionByTicket.Lock()
-	mock.calls.GetSessionByTicket = append(mock.calls.GetSessionByTicket, callInfo)
-	mock.lockGetSessionByTicket.Unlock()
-	if mock.GetSessionByTicketFunc == nil {
+	mock.lockGetSessionsByTicket.Lock()
+	mock.calls.GetSessionsByTicket = append(mock.calls.GetSessionsByTicket, callInfo)
+	mock.lockGetSessionsByTicket.Unlock()
+	if mock.GetSessionsByTicketFunc == nil {
 		var (
-			sessionOut *session.Session
-			errOut     error
+			sessionsOut []*session.Session
+			errOut      error
 		)
-		return sessionOut, errOut
+		return sessionsOut, errOut
 	}
-	return mock.GetSessionByTicketFunc(ctx, ticketID)
+	return mock.GetSessionsByTicketFunc(ctx, ticketID)
 }
 
-// GetSessionByTicketCalls gets all the calls that were made to GetSessionByTicket.
+// GetSessionsByTicketCalls gets all the calls that were made to GetSessionsByTicket.
 // Check the length with:
 //
-//	len(mockedRepository.GetSessionByTicketCalls())
-func (mock *RepositoryMock) GetSessionByTicketCalls() []struct {
+//	len(mockedRepository.GetSessionsByTicketCalls())
+func (mock *RepositoryMock) GetSessionsByTicketCalls() []struct {
 	Ctx      context.Context
 	TicketID types.TicketID
 } {
@@ -5144,9 +5144,9 @@ func (mock *RepositoryMock) GetSessionByTicketCalls() []struct {
 		Ctx      context.Context
 		TicketID types.TicketID
 	}
-	mock.lockGetSessionByTicket.RLock()
-	calls = mock.calls.GetSessionByTicket
-	mock.lockGetSessionByTicket.RUnlock()
+	mock.lockGetSessionsByTicket.RLock()
+	calls = mock.calls.GetSessionsByTicket
+	mock.lockGetSessionsByTicket.RUnlock()
 	return calls
 }
 
