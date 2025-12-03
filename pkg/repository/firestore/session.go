@@ -78,6 +78,10 @@ func (r *Firestore) GetSessionsByTicket(ctx context.Context, ticketID types.Tick
 func (r *Firestore) DeleteSession(ctx context.Context, sessionID types.SessionID) error {
 	_, err := r.db.Collection(collectionSessions).Doc(sessionID.String()).Delete(ctx)
 	if err != nil {
+		// NotFound is not an error - deleting non-existent document is idempotent
+		if status.Code(err) == codes.NotFound {
+			return nil
+		}
 		return r.eb.Wrap(err, "failed to delete session",
 			goerr.V("session_id", sessionID),
 			goerr.T(errs.TagDatabase))
