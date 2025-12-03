@@ -130,19 +130,25 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	}
 	ctx = sessutil.WithStatusCheck(ctx, statusCheckFunc)
 
+	// Track final session status (will be updated by execution flow)
+	finalStatus := types.SessionStatusCompleted
+
 	// Ensure session status is updated on completion or error
 	defer func() {
-		// Update session status based on execution result
-		finalStatus := types.SessionStatusCompleted
 		if r := recover(); r != nil {
 			// If panic occurred, mark as aborted
 			finalStatus = types.SessionStatusAborted
-			panic(r) // Re-panic after updating status
+			// Update status before re-panicking
+			sess.UpdateStatus(ctx, finalStatus)
+			if err := x.repository.PutSession(ctx, sess); err != nil {
+				logger.Error("failed to update session status on panic", "error", err, "status", finalStatus)
+			}
+			panic(r) // Re-panic
 		}
 
 		sess.UpdateStatus(ctx, finalStatus)
 		if err := x.repository.PutSession(ctx, sess); err != nil {
-			logger.Error("failed to update session status", "error", err, "status", finalStatus)
+			logger.Error("failed to update final session status", "error", err, "status", finalStatus)
 		}
 	}()
 
@@ -379,6 +385,9 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	// Execute with Strategy
 	result, executionErr := agent.Execute(ctx, gollem.Text(message))
 	if executionErr != nil {
+		// Mark session as aborted on any error
+		finalStatus = types.SessionStatusAborted
+
 		// Check if error is due to session abort
 		if errors.Is(executionErr, ErrSessionAborted) {
 			msg.Notify(ctx, "🛑 Execution aborted by user request.")
