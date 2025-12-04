@@ -8,8 +8,8 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/service/command/abort"
 	"github.com/secmon-lab/warren/pkg/service/command/core"
-
 	"github.com/secmon-lab/warren/pkg/service/command/repair"
 	"github.com/secmon-lab/warren/pkg/service/command/ticket"
 )
@@ -42,6 +42,7 @@ func (x *Service) Execute(ctx context.Context, msg *slack.Message, input string)
 		"ticket": ticket.Create,
 		"repair": repair.Run,
 		"purge":  purge,
+		"abort":  abort.Execute,
 	}
 
 	cmd, remaining := messageToArgs(input)

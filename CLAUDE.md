@@ -207,13 +207,21 @@ All comment and character literal in source code must be in English
 
 - Test files should have `package {name}_test`. Do not use same package name
 - Test file name convention is: `xyz.go` → `xyz_test.go`. Other test file names (e.g., `xyz_e2e_test.go`) are not allowed.
+- Repository Tests Location:
+  - NEVER create test files in `pkg/repository/firestore/` or `pkg/repository/memory/` subdirectories
+  - ALL repository tests MUST be placed directly in `pkg/repository/*_test.go`
+  - Use `runRepositoryTest()` helper to test against both memory and firestore implementations
 - Repository Tests Best Practices:
   - Always use random IDs (e.g., using `time.Now().UnixNano()`) to avoid test conflicts
   - Never use hardcoded IDs like "msg-001", "user-001" as they cause test failures when running in parallel
   - Always verify ALL fields of returned values, not just checking for nil/existence
   - Compare expected values properly - don't just check if something exists, verify it matches what was saved
   - For timestamp comparisons, use tolerance (e.g., `< time.Second`) to account for storage precision
-
+- Test Skip Policy:
+  - **NEVER use `t.Skip()` for anything other than missing environment variables**
+  - If a test requires infrastructure (like Firestore index), fix the infrastructure, don't skip the test
+  - If a feature is not implemented, write the code, don't skip the test
+  - The only acceptable skip pattern: checking for missing environment variables at the beginning of a test
 
 ### Test File Checklist (Use this EVERY time)
 Before creating or modifying tests:
@@ -221,3 +229,4 @@ Before creating or modifying tests:
 2. ✓ Does the test file name match exactly? (`xyz.go` → `xyz_test.go`)
 3. ✓ Are all tests for a source file in ONE test file?
 4. ✓ No standalone feature/e2e/integration test files?
+5. ✓ For repository tests: placed in `pkg/repository/*_test.go`, NOT in firestore/ or memory/ subdirectories?

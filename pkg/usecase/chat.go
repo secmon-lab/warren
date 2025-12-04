@@ -18,6 +18,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -27,11 +28,17 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/request_id"
+	sessutil "github.com/secmon-lab/warren/pkg/utils/session"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 //go:embed prompt/chat_system_prompt.md
 var chatSystemPromptTemplate string
+
+var (
+	// ErrSessionAborted is returned when a session is aborted by user request
+	ErrSessionAborted = goerr.New("session aborted by user")
+)
 
 // determineSchemaID determines the schema ID for the ticket
 func (x *UseCases) determineSchemaID(ctx context.Context, target *ticket.Ticket) types.AlertSchema {
@@ -99,6 +106,51 @@ func (x *UseCases) generateAndSaveExecutionMemory(
 // Message routing is handled via msg.Notify and msg.Trace functions in the context
 func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message string) error {
 	logger := logging.From(ctx)
+
+	// Create and save session
+	sess := session.NewSession(ctx, target.ID)
+	if err := x.repository.PutSession(ctx, sess); err != nil {
+		return goerr.Wrap(err, "failed to save session")
+	}
+
+	// Embed session ID in logger
+	logger = logger.With("session_id", sess.ID)
+	ctx = logging.With(ctx, logger)
+
+	// Create status check function and embed in context
+	statusCheckFunc := func(ctx context.Context) error {
+		s, err := x.repository.GetSession(ctx, sess.ID)
+		if err != nil {
+			return goerr.Wrap(err, "failed to get session status")
+		}
+		if s != nil && s.Status == types.SessionStatusAborted {
+			return ErrSessionAborted
+		}
+		return nil
+	}
+	ctx = sessutil.WithStatusCheck(ctx, statusCheckFunc)
+
+	// Track final session status (will be updated by execution flow)
+	finalStatus := types.SessionStatusCompleted
+
+	// Ensure session status is updated on completion or error
+	defer func() {
+		if r := recover(); r != nil {
+			// If panic occurred, mark as aborted
+			finalStatus = types.SessionStatusAborted
+			// Update status before re-panicking
+			sess.UpdateStatus(ctx, finalStatus)
+			if err := x.repository.PutSession(ctx, sess); err != nil {
+				logger.Error("failed to update session status on panic", "error", err, "status", finalStatus)
+			}
+			panic(r) // Re-panic
+		}
+
+		sess.UpdateStatus(ctx, finalStatus)
+		if err := x.repository.PutSession(ctx, sess); err != nil {
+			logger.Error("failed to update final session status", "error", err, "status", finalStatus)
+		}
+	}()
 
 	// Authorize agent execution
 	if err := x.authorizeAgentRequest(ctx, message); err != nil {
@@ -303,6 +355,13 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		),
 		gollem.WithToolMiddleware(func(next gollem.ToolHandler) gollem.ToolHandler {
 			return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
+				// Check if session is aborted before executing tool
+				if err := sessutil.CheckStatus(ctx); err != nil {
+					return &gollem.ToolExecResponse{
+						Error: err,
+					}, nil
+				}
+
 				// Pre-execution: ツール呼び出しのトレース
 				if !base.IgnorableTool(req.Tool.Name) {
 					message := toolCallToText(ctx, x.llmClient, req.ToolSpec, req.Tool)
@@ -326,6 +385,14 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	// Execute with Strategy
 	result, executionErr := agent.Execute(ctx, gollem.Text(message))
 	if executionErr != nil {
+		// Mark session as aborted on any error
+		finalStatus = types.SessionStatusAborted
+
+		// Check if error is due to session abort
+		if errors.Is(executionErr, ErrSessionAborted) {
+			msg.Notify(ctx, "🛑 Execution aborted by user request.")
+			return nil // Don't treat abort as error
+		}
 		msg.Notify(ctx, "💥 Execution failed: %s", executionErr.Error())
 		return goerr.Wrap(executionErr, "failed to execute agent")
 	}
@@ -519,16 +586,31 @@ type chatPlanHooks struct {
 var _ planexec.PlanExecuteHooks = &chatPlanHooks{}
 
 func (h *chatPlanHooks) OnPlanCreated(ctx context.Context, plan *planexec.Plan) error {
+	// Check if session is aborted
+	if err := sessutil.CheckStatus(ctx); err != nil {
+		return err
+	}
+
 	h.planned = len(plan.Tasks) > 0
 	return postPlanProgress(h.ctx, plan, "Plan created")
 }
 
 func (h *chatPlanHooks) OnPlanUpdated(ctx context.Context, plan *planexec.Plan) error {
+	// Check if session is aborted
+	if err := sessutil.CheckStatus(ctx); err != nil {
+		return err
+	}
+
 	h.planned = len(plan.Tasks) > 0
 	return postPlanProgress(h.ctx, plan, "Plan updated")
 }
 
 func (h *chatPlanHooks) OnTaskDone(ctx context.Context, plan *planexec.Plan, _ *planexec.Task) error {
+	// Check if session is aborted
+	if err := sessutil.CheckStatus(ctx); err != nil {
+		return err
+	}
+
 	h.planned = len(plan.Tasks) > 0
 	if len(plan.Tasks) == 0 {
 		return nil
