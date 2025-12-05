@@ -462,52 +462,8 @@ func (uc *UseCases) UpdateTicket(ctx context.Context, ticketID types.TicketID, t
 	return uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
 }
 
-// generateAndSaveTicketMemory generates and saves ticket memory after resolution
-func (uc *UseCases) generateAndSaveTicketMemory(ctx context.Context, ticketID types.TicketID) error {
-	logger := logging.From(ctx)
-
-	// Get ticket
-	ticketData, err := uc.repository.GetTicket(ctx, ticketID)
-	if err != nil {
-		return goerr.Wrap(err, "failed to get ticket")
-	}
-
-	// Determine schema ID
-	schemaID := uc.determineSchemaID(ctx, ticketData)
-	if schemaID == "" {
-		// Skip memory generation for tickets without schema
-		logger.Debug("skipping ticket memory generation: no schema", "ticket_id", ticketID)
-		return nil
-	}
-
-	// Get comments
-	comments, err := uc.repository.GetTicketComments(ctx, ticketID)
-	if err != nil {
-		return goerr.Wrap(err, "failed to get ticket comments")
-	}
-
-	// Generate new memory
-	newMem, err := uc.memoryService.GenerateTicketMemory(ctx, schemaID, ticketData, comments)
-	if err != nil {
-		return goerr.Wrap(err, "failed to generate ticket memory")
-	}
-
-	// Save
-	if err := uc.repository.PutTicketMemory(ctx, newMem); err != nil {
-		if data, jsonErr := json.Marshal(newMem); jsonErr == nil {
-			logger.Error("failed to save ticket memory", "error", err, "memory", string(data))
-		}
-		return goerr.Wrap(err, "failed to save ticket memory", goerr.V("memory", newMem))
-	}
-
-	logger.Debug("ticket memory generated and saved", "ticket_id", ticketID, "schema_id", schemaID)
-	return nil
-}
-
 // UpdateTicketStatus updates a ticket's status
 func (uc *UseCases) UpdateTicketStatus(ctx context.Context, ticketID types.TicketID, status types.TicketStatus) (*ticket.Ticket, error) {
-	logger := logging.From(ctx)
-
 	// Use batch update to ensure proper activity creation
 	if err := uc.repository.BatchUpdateTicketsStatus(ctx, []types.TicketID{ticketID}, status); err != nil {
 		return nil, goerr.Wrap(err, "failed to update ticket status")
@@ -527,15 +483,6 @@ func (uc *UseCases) UpdateTicketStatus(ctx context.Context, ticketID types.Ticke
 	if err := uc.syncTicketToSlack(ctx, updatedTicket); err != nil {
 		// Log error but don't fail the update
 		msg.Trace(ctx, "💥 Failed to sync ticket to Slack (ticket %s): %s", updatedTicket.ID, err.Error())
-	}
-
-	// Generate and save ticket memory when ticket is resolved
-	// UpdateTicketStatus is already running in a goroutine, so this is synchronous
-	if status == types.TicketStatusResolved && uc.memoryService != nil {
-		if err := uc.generateAndSaveTicketMemory(ctx, ticketID); err != nil {
-			logger.Warn("failed to generate ticket memory", "error", err, "ticket_id", ticketID)
-			// Error does not affect main flow
-		}
 	}
 
 	return updatedTicket, nil
