@@ -11,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
@@ -2486,6 +2487,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //
 //		// make and configure a mocked interfaces.Repository
 //		mockedRepository := &RepositoryMock{
+//			ArchiveKnowledgeFunc: func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) error {
+//				panic("mock out the ArchiveKnowledge method")
+//			},
 //			BatchGetAlertsFunc: func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
 //				panic("mock out the BatchGetAlerts method")
 //			},
@@ -2500,6 +2504,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			BindAlertsToTicketFunc: func(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
 //				panic("mock out the BindAlertsToTicket method")
+//			},
+//			CalculateKnowledgeSizeFunc: func(ctx context.Context, topic types.KnowledgeTopic) (int, error) {
+//				panic("mock out the CalculateKnowledgeSize method")
 //			},
 //			CountActivitiesFunc: func(ctx context.Context) (int, error) {
 //				panic("mock out the CountActivities method")
@@ -2573,6 +2580,15 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetAlertsWithInvalidEmbeddingFunc: func(ctx context.Context) (alert.Alerts, error) {
 //				panic("mock out the GetAlertsWithInvalidEmbedding method")
 //			},
+//			GetKnowledgeFunc: func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) (*knowledge.Knowledge, error) {
+//				panic("mock out the GetKnowledge method")
+//			},
+//			GetKnowledgeByCommitFunc: func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug, commitID string) (*knowledge.Knowledge, error) {
+//				panic("mock out the GetKnowledgeByCommit method")
+//			},
+//			GetKnowledgesFunc: func(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.Knowledge, error) {
+//				panic("mock out the GetKnowledges method")
+//			},
 //			GetLatestAlertByThreadFunc: func(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
 //				panic("mock out the GetLatestAlertByThread method")
 //			},
@@ -2642,6 +2658,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			ListAllTagsFunc: func(ctx context.Context) ([]*tag.Tag, error) {
 //				panic("mock out the ListAllTags method")
 //			},
+//			ListKnowledgeSlugsFunc: func(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.SlugInfo, error) {
+//				panic("mock out the ListKnowledgeSlugs method")
+//			},
 //			PutActivityFunc: func(ctx context.Context, activityMoqParam *activity.Activity) error {
 //				panic("mock out the PutActivity method")
 //			},
@@ -2653,6 +2672,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			PutHistoryFunc: func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
 //				panic("mock out the PutHistory method")
+//			},
+//			PutKnowledgeFunc: func(ctx context.Context, k *knowledge.Knowledge) error {
+//				panic("mock out the PutKnowledge method")
 //			},
 //			PutSessionFunc: func(ctx context.Context, sessionMoqParam *session.Session) error {
 //				panic("mock out the PutSession method")
@@ -2709,6 +2731,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //
 //	}
 type RepositoryMock struct {
+	// ArchiveKnowledgeFunc mocks the ArchiveKnowledge method.
+	ArchiveKnowledgeFunc func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) error
+
 	// BatchGetAlertsFunc mocks the BatchGetAlerts method.
 	BatchGetAlertsFunc func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
 
@@ -2723,6 +2748,9 @@ type RepositoryMock struct {
 
 	// BindAlertsToTicketFunc mocks the BindAlertsToTicket method.
 	BindAlertsToTicketFunc func(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error
+
+	// CalculateKnowledgeSizeFunc mocks the CalculateKnowledgeSize method.
+	CalculateKnowledgeSizeFunc func(ctx context.Context, topic types.KnowledgeTopic) (int, error)
 
 	// CountActivitiesFunc mocks the CountActivities method.
 	CountActivitiesFunc func(ctx context.Context) (int, error)
@@ -2796,6 +2824,15 @@ type RepositoryMock struct {
 	// GetAlertsWithInvalidEmbeddingFunc mocks the GetAlertsWithInvalidEmbedding method.
 	GetAlertsWithInvalidEmbeddingFunc func(ctx context.Context) (alert.Alerts, error)
 
+	// GetKnowledgeFunc mocks the GetKnowledge method.
+	GetKnowledgeFunc func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) (*knowledge.Knowledge, error)
+
+	// GetKnowledgeByCommitFunc mocks the GetKnowledgeByCommit method.
+	GetKnowledgeByCommitFunc func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug, commitID string) (*knowledge.Knowledge, error)
+
+	// GetKnowledgesFunc mocks the GetKnowledges method.
+	GetKnowledgesFunc func(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.Knowledge, error)
+
 	// GetLatestAlertByThreadFunc mocks the GetLatestAlertByThread method.
 	GetLatestAlertByThreadFunc func(ctx context.Context, thread slack.Thread) (*alert.Alert, error)
 
@@ -2865,6 +2902,9 @@ type RepositoryMock struct {
 	// ListAllTagsFunc mocks the ListAllTags method.
 	ListAllTagsFunc func(ctx context.Context) ([]*tag.Tag, error)
 
+	// ListKnowledgeSlugsFunc mocks the ListKnowledgeSlugs method.
+	ListKnowledgeSlugsFunc func(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.SlugInfo, error)
+
 	// PutActivityFunc mocks the PutActivity method.
 	PutActivityFunc func(ctx context.Context, activityMoqParam *activity.Activity) error
 
@@ -2876,6 +2916,9 @@ type RepositoryMock struct {
 
 	// PutHistoryFunc mocks the PutHistory method.
 	PutHistoryFunc func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error
+
+	// PutKnowledgeFunc mocks the PutKnowledge method.
+	PutKnowledgeFunc func(ctx context.Context, k *knowledge.Knowledge) error
 
 	// PutSessionFunc mocks the PutSession method.
 	PutSessionFunc func(ctx context.Context, sessionMoqParam *session.Session) error
@@ -2930,6 +2973,15 @@ type RepositoryMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// ArchiveKnowledge holds details about calls to the ArchiveKnowledge method.
+		ArchiveKnowledge []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Topic is the topic argument value.
+			Topic types.KnowledgeTopic
+			// Slug is the slug argument value.
+			Slug types.KnowledgeSlug
+		}
 		// BatchGetAlerts holds details about calls to the BatchGetAlerts method.
 		BatchGetAlerts []struct {
 			// Ctx is the ctx argument value.
@@ -2968,6 +3020,13 @@ type RepositoryMock struct {
 			AlertIDs []types.AlertID
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
+		}
+		// CalculateKnowledgeSize holds details about calls to the CalculateKnowledgeSize method.
+		CalculateKnowledgeSize []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Topic is the topic argument value.
+			Topic types.KnowledgeTopic
 		}
 		// CountActivities holds details about calls to the CountActivities method.
 		CountActivities []struct {
@@ -3149,6 +3208,33 @@ type RepositoryMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
+		// GetKnowledge holds details about calls to the GetKnowledge method.
+		GetKnowledge []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Topic is the topic argument value.
+			Topic types.KnowledgeTopic
+			// Slug is the slug argument value.
+			Slug types.KnowledgeSlug
+		}
+		// GetKnowledgeByCommit holds details about calls to the GetKnowledgeByCommit method.
+		GetKnowledgeByCommit []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Topic is the topic argument value.
+			Topic types.KnowledgeTopic
+			// Slug is the slug argument value.
+			Slug types.KnowledgeSlug
+			// CommitID is the commitID argument value.
+			CommitID string
+		}
+		// GetKnowledges holds details about calls to the GetKnowledges method.
+		GetKnowledges []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Topic is the topic argument value.
+			Topic types.KnowledgeTopic
+		}
 		// GetLatestAlertByThread holds details about calls to the GetLatestAlertByThread method.
 		GetLatestAlertByThread []struct {
 			// Ctx is the ctx argument value.
@@ -3326,6 +3412,13 @@ type RepositoryMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
+		// ListKnowledgeSlugs holds details about calls to the ListKnowledgeSlugs method.
+		ListKnowledgeSlugs []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Topic is the topic argument value.
+			Topic types.KnowledgeTopic
+		}
 		// PutActivity holds details about calls to the PutActivity method.
 		PutActivity []struct {
 			// Ctx is the ctx argument value.
@@ -3355,6 +3448,13 @@ type RepositoryMock struct {
 			TicketID types.TicketID
 			// History is the history argument value.
 			History *ticket.History
+		}
+		// PutKnowledge holds details about calls to the PutKnowledge method.
+		PutKnowledge []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// K is the k argument value.
+			K *knowledge.Knowledge
 		}
 		// PutSession holds details about calls to the PutSession method.
 		PutSession []struct {
@@ -3486,11 +3586,13 @@ type RepositoryMock struct {
 			TagMoqParam *tag.Tag
 		}
 	}
+	lockArchiveKnowledge               sync.RWMutex
 	lockBatchGetAlerts                 sync.RWMutex
 	lockBatchGetTickets                sync.RWMutex
 	lockBatchPutAlerts                 sync.RWMutex
 	lockBatchUpdateTicketsStatus       sync.RWMutex
 	lockBindAlertsToTicket             sync.RWMutex
+	lockCalculateKnowledgeSize         sync.RWMutex
 	lockCountActivities                sync.RWMutex
 	lockCountAlertsWithoutTicket       sync.RWMutex
 	lockCountTicketComments            sync.RWMutex
@@ -3515,6 +3617,9 @@ type RepositoryMock struct {
 	lockGetAlertsBySpan                sync.RWMutex
 	lockGetAlertsByThread              sync.RWMutex
 	lockGetAlertsWithInvalidEmbedding  sync.RWMutex
+	lockGetKnowledge                   sync.RWMutex
+	lockGetKnowledgeByCommit           sync.RWMutex
+	lockGetKnowledges                  sync.RWMutex
 	lockGetLatestAlertByThread         sync.RWMutex
 	lockGetLatestAlertListInThread     sync.RWMutex
 	lockGetLatestHistory               sync.RWMutex
@@ -3538,10 +3643,12 @@ type RepositoryMock struct {
 	lockIsTagNameExists                sync.RWMutex
 	lockListAgentMemories              sync.RWMutex
 	lockListAllTags                    sync.RWMutex
+	lockListKnowledgeSlugs             sync.RWMutex
 	lockPutActivity                    sync.RWMutex
 	lockPutAlert                       sync.RWMutex
 	lockPutAlertList                   sync.RWMutex
 	lockPutHistory                     sync.RWMutex
+	lockPutKnowledge                   sync.RWMutex
 	lockPutSession                     sync.RWMutex
 	lockPutTicket                      sync.RWMutex
 	lockPutTicketComment               sync.RWMutex
@@ -3558,6 +3665,49 @@ type RepositoryMock struct {
 	lockUpdateMemoryScoreBatch         sync.RWMutex
 	lockUpdateNotice                   sync.RWMutex
 	lockUpdateTag                      sync.RWMutex
+}
+
+// ArchiveKnowledge calls ArchiveKnowledgeFunc.
+func (mock *RepositoryMock) ArchiveKnowledge(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) error {
+	callInfo := struct {
+		Ctx   context.Context
+		Topic types.KnowledgeTopic
+		Slug  types.KnowledgeSlug
+	}{
+		Ctx:   ctx,
+		Topic: topic,
+		Slug:  slug,
+	}
+	mock.lockArchiveKnowledge.Lock()
+	mock.calls.ArchiveKnowledge = append(mock.calls.ArchiveKnowledge, callInfo)
+	mock.lockArchiveKnowledge.Unlock()
+	if mock.ArchiveKnowledgeFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.ArchiveKnowledgeFunc(ctx, topic, slug)
+}
+
+// ArchiveKnowledgeCalls gets all the calls that were made to ArchiveKnowledge.
+// Check the length with:
+//
+//	len(mockedRepository.ArchiveKnowledgeCalls())
+func (mock *RepositoryMock) ArchiveKnowledgeCalls() []struct {
+	Ctx   context.Context
+	Topic types.KnowledgeTopic
+	Slug  types.KnowledgeSlug
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Topic types.KnowledgeTopic
+		Slug  types.KnowledgeSlug
+	}
+	mock.lockArchiveKnowledge.RLock()
+	calls = mock.calls.ArchiveKnowledge
+	mock.lockArchiveKnowledge.RUnlock()
+	return calls
 }
 
 // BatchGetAlerts calls BatchGetAlertsFunc.
@@ -3762,6 +3912,46 @@ func (mock *RepositoryMock) BindAlertsToTicketCalls() []struct {
 	mock.lockBindAlertsToTicket.RLock()
 	calls = mock.calls.BindAlertsToTicket
 	mock.lockBindAlertsToTicket.RUnlock()
+	return calls
+}
+
+// CalculateKnowledgeSize calls CalculateKnowledgeSizeFunc.
+func (mock *RepositoryMock) CalculateKnowledgeSize(ctx context.Context, topic types.KnowledgeTopic) (int, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		Topic types.KnowledgeTopic
+	}{
+		Ctx:   ctx,
+		Topic: topic,
+	}
+	mock.lockCalculateKnowledgeSize.Lock()
+	mock.calls.CalculateKnowledgeSize = append(mock.calls.CalculateKnowledgeSize, callInfo)
+	mock.lockCalculateKnowledgeSize.Unlock()
+	if mock.CalculateKnowledgeSizeFunc == nil {
+		var (
+			nOut   int
+			errOut error
+		)
+		return nOut, errOut
+	}
+	return mock.CalculateKnowledgeSizeFunc(ctx, topic)
+}
+
+// CalculateKnowledgeSizeCalls gets all the calls that were made to CalculateKnowledgeSize.
+// Check the length with:
+//
+//	len(mockedRepository.CalculateKnowledgeSizeCalls())
+func (mock *RepositoryMock) CalculateKnowledgeSizeCalls() []struct {
+	Ctx   context.Context
+	Topic types.KnowledgeTopic
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Topic types.KnowledgeTopic
+	}
+	mock.lockCalculateKnowledgeSize.RLock()
+	calls = mock.calls.CalculateKnowledgeSize
+	mock.lockCalculateKnowledgeSize.RUnlock()
 	return calls
 }
 
@@ -4744,6 +4934,138 @@ func (mock *RepositoryMock) GetAlertsWithInvalidEmbeddingCalls() []struct {
 	return calls
 }
 
+// GetKnowledge calls GetKnowledgeFunc.
+func (mock *RepositoryMock) GetKnowledge(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) (*knowledge.Knowledge, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		Topic types.KnowledgeTopic
+		Slug  types.KnowledgeSlug
+	}{
+		Ctx:   ctx,
+		Topic: topic,
+		Slug:  slug,
+	}
+	mock.lockGetKnowledge.Lock()
+	mock.calls.GetKnowledge = append(mock.calls.GetKnowledge, callInfo)
+	mock.lockGetKnowledge.Unlock()
+	if mock.GetKnowledgeFunc == nil {
+		var (
+			knowledgeOut *knowledge.Knowledge
+			errOut       error
+		)
+		return knowledgeOut, errOut
+	}
+	return mock.GetKnowledgeFunc(ctx, topic, slug)
+}
+
+// GetKnowledgeCalls gets all the calls that were made to GetKnowledge.
+// Check the length with:
+//
+//	len(mockedRepository.GetKnowledgeCalls())
+func (mock *RepositoryMock) GetKnowledgeCalls() []struct {
+	Ctx   context.Context
+	Topic types.KnowledgeTopic
+	Slug  types.KnowledgeSlug
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Topic types.KnowledgeTopic
+		Slug  types.KnowledgeSlug
+	}
+	mock.lockGetKnowledge.RLock()
+	calls = mock.calls.GetKnowledge
+	mock.lockGetKnowledge.RUnlock()
+	return calls
+}
+
+// GetKnowledgeByCommit calls GetKnowledgeByCommitFunc.
+func (mock *RepositoryMock) GetKnowledgeByCommit(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug, commitID string) (*knowledge.Knowledge, error) {
+	callInfo := struct {
+		Ctx      context.Context
+		Topic    types.KnowledgeTopic
+		Slug     types.KnowledgeSlug
+		CommitID string
+	}{
+		Ctx:      ctx,
+		Topic:    topic,
+		Slug:     slug,
+		CommitID: commitID,
+	}
+	mock.lockGetKnowledgeByCommit.Lock()
+	mock.calls.GetKnowledgeByCommit = append(mock.calls.GetKnowledgeByCommit, callInfo)
+	mock.lockGetKnowledgeByCommit.Unlock()
+	if mock.GetKnowledgeByCommitFunc == nil {
+		var (
+			knowledgeOut *knowledge.Knowledge
+			errOut       error
+		)
+		return knowledgeOut, errOut
+	}
+	return mock.GetKnowledgeByCommitFunc(ctx, topic, slug, commitID)
+}
+
+// GetKnowledgeByCommitCalls gets all the calls that were made to GetKnowledgeByCommit.
+// Check the length with:
+//
+//	len(mockedRepository.GetKnowledgeByCommitCalls())
+func (mock *RepositoryMock) GetKnowledgeByCommitCalls() []struct {
+	Ctx      context.Context
+	Topic    types.KnowledgeTopic
+	Slug     types.KnowledgeSlug
+	CommitID string
+} {
+	var calls []struct {
+		Ctx      context.Context
+		Topic    types.KnowledgeTopic
+		Slug     types.KnowledgeSlug
+		CommitID string
+	}
+	mock.lockGetKnowledgeByCommit.RLock()
+	calls = mock.calls.GetKnowledgeByCommit
+	mock.lockGetKnowledgeByCommit.RUnlock()
+	return calls
+}
+
+// GetKnowledges calls GetKnowledgesFunc.
+func (mock *RepositoryMock) GetKnowledges(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.Knowledge, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		Topic types.KnowledgeTopic
+	}{
+		Ctx:   ctx,
+		Topic: topic,
+	}
+	mock.lockGetKnowledges.Lock()
+	mock.calls.GetKnowledges = append(mock.calls.GetKnowledges, callInfo)
+	mock.lockGetKnowledges.Unlock()
+	if mock.GetKnowledgesFunc == nil {
+		var (
+			knowledgesOut []*knowledge.Knowledge
+			errOut        error
+		)
+		return knowledgesOut, errOut
+	}
+	return mock.GetKnowledgesFunc(ctx, topic)
+}
+
+// GetKnowledgesCalls gets all the calls that were made to GetKnowledges.
+// Check the length with:
+//
+//	len(mockedRepository.GetKnowledgesCalls())
+func (mock *RepositoryMock) GetKnowledgesCalls() []struct {
+	Ctx   context.Context
+	Topic types.KnowledgeTopic
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Topic types.KnowledgeTopic
+	}
+	mock.lockGetKnowledges.RLock()
+	calls = mock.calls.GetKnowledges
+	mock.lockGetKnowledges.RUnlock()
+	return calls
+}
+
 // GetLatestAlertByThread calls GetLatestAlertByThreadFunc.
 func (mock *RepositoryMock) GetLatestAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
 	callInfo := struct {
@@ -5696,6 +6018,46 @@ func (mock *RepositoryMock) ListAllTagsCalls() []struct {
 	return calls
 }
 
+// ListKnowledgeSlugs calls ListKnowledgeSlugsFunc.
+func (mock *RepositoryMock) ListKnowledgeSlugs(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.SlugInfo, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		Topic types.KnowledgeTopic
+	}{
+		Ctx:   ctx,
+		Topic: topic,
+	}
+	mock.lockListKnowledgeSlugs.Lock()
+	mock.calls.ListKnowledgeSlugs = append(mock.calls.ListKnowledgeSlugs, callInfo)
+	mock.lockListKnowledgeSlugs.Unlock()
+	if mock.ListKnowledgeSlugsFunc == nil {
+		var (
+			slugInfosOut []*knowledge.SlugInfo
+			errOut       error
+		)
+		return slugInfosOut, errOut
+	}
+	return mock.ListKnowledgeSlugsFunc(ctx, topic)
+}
+
+// ListKnowledgeSlugsCalls gets all the calls that were made to ListKnowledgeSlugs.
+// Check the length with:
+//
+//	len(mockedRepository.ListKnowledgeSlugsCalls())
+func (mock *RepositoryMock) ListKnowledgeSlugsCalls() []struct {
+	Ctx   context.Context
+	Topic types.KnowledgeTopic
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Topic types.KnowledgeTopic
+	}
+	mock.lockListKnowledgeSlugs.RLock()
+	calls = mock.calls.ListKnowledgeSlugs
+	mock.lockListKnowledgeSlugs.RUnlock()
+	return calls
+}
+
 // PutActivity calls PutActivityFunc.
 func (mock *RepositoryMock) PutActivity(ctx context.Context, activityMoqParam *activity.Activity) error {
 	callInfo := struct {
@@ -5853,6 +6215,45 @@ func (mock *RepositoryMock) PutHistoryCalls() []struct {
 	mock.lockPutHistory.RLock()
 	calls = mock.calls.PutHistory
 	mock.lockPutHistory.RUnlock()
+	return calls
+}
+
+// PutKnowledge calls PutKnowledgeFunc.
+func (mock *RepositoryMock) PutKnowledge(ctx context.Context, k *knowledge.Knowledge) error {
+	callInfo := struct {
+		Ctx context.Context
+		K   *knowledge.Knowledge
+	}{
+		Ctx: ctx,
+		K:   k,
+	}
+	mock.lockPutKnowledge.Lock()
+	mock.calls.PutKnowledge = append(mock.calls.PutKnowledge, callInfo)
+	mock.lockPutKnowledge.Unlock()
+	if mock.PutKnowledgeFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutKnowledgeFunc(ctx, k)
+}
+
+// PutKnowledgeCalls gets all the calls that were made to PutKnowledge.
+// Check the length with:
+//
+//	len(mockedRepository.PutKnowledgeCalls())
+func (mock *RepositoryMock) PutKnowledgeCalls() []struct {
+	Ctx context.Context
+	K   *knowledge.Knowledge
+} {
+	var calls []struct {
+		Ctx context.Context
+		K   *knowledge.Knowledge
+	}
+	mock.lockPutKnowledge.RLock()
+	calls = mock.calls.PutKnowledge
+	mock.lockPutKnowledge.RUnlock()
 	return calls
 }
 

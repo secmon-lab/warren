@@ -9,6 +9,19 @@ Please summarize the given set of security alerts. You will need to output the f
   - Correlation: If there is noteworthy information about connections between alerts, please summarize it.
   - Impact: If there is information that already indicates the impact status of alerts, please summarize it. Information indicating success/failure of attacks is particularly important.
 
+{{ if .knowledges }}
+## Domain Knowledge
+
+The following domain knowledge is available for topic '{{ .topic }}':
+
+{{ range .knowledges }}
+### {{ .Name }}
+
+{{ .Content }}
+
+{{ end }}
+{{ end }}
+
 {{ if .summary }}
 
 ## Input (Summary)

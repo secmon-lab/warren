@@ -67,6 +67,11 @@ func (uc *UseCases) ProcessAlertPipeline(
 	// Process each alert through enrich and commit policies
 	var results []*AlertPipelineResult
 	for _, processedAlert := range alerts {
+		// Step 1.4: Set default topic from schema if not already set
+		if processedAlert.Topic == "" {
+			processedAlert.Topic = types.KnowledgeTopic(schema)
+		}
+
 		// Step 1.5: Convert metadata tags (names) to tag IDs
 		if len(processedAlert.Tags) > 0 && uc.tagService != nil {
 			tags, err := uc.tagService.ConvertNamesToTags(ctx, processedAlert.Tags)
@@ -332,7 +337,7 @@ func (uc *UseCases) executePromptTask(ctx context.Context, alert *alert.Alert, t
 	return parsedResult, nil
 }
 
-// buildAlertSystemPrompt creates a system prompt containing alert data
+// buildAlertSystemPrompt creates a system prompt containing alert data and relevant domain knowledge
 func (uc *UseCases) buildAlertSystemPrompt(alert *alert.Alert) (string, error) {
 	alertJSON, err := json.MarshalIndent(alert, "", "  ")
 	if err != nil {
@@ -343,6 +348,7 @@ func (uc *UseCases) buildAlertSystemPrompt(alert *alert.Alert) (string, error) {
 	systemPrompt += "```json\n"
 	systemPrompt += string(alertJSON)
 	systemPrompt += "\n```\n\n"
+
 	systemPrompt += "Use this alert information to respond to the user's request. Do not include the alert data in your response unless specifically asked."
 
 	return systemPrompt, nil

@@ -34,6 +34,9 @@ type Alert struct {
 	Schema   types.AlertSchema `json:"schema"`
 	Data     any               `json:"data"`
 
+	// Topic is the namespace for domain knowledge (defaults to Schema if not set by policy)
+	Topic types.KnowledgeTopic `json:"topic"`
+
 	Metadata
 
 	CreatedAt      time.Time          `json:"created_at"`

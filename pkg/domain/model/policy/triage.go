@@ -42,11 +42,12 @@ func NewTriagePolicyInput(a *alert.Alert, enrichResults EnrichResults) TriagePol
 
 // TriagePolicyResult represents the result of triage policy evaluation
 type TriagePolicyResult struct {
-	Title       string            `json:"title,omitempty"`
-	Description string            `json:"description,omitempty"`
-	Channel     string            `json:"channel,omitempty"`
-	Attr        []alert.Attribute `json:"attr,omitempty"`
-	Publish     types.PublishType `json:"publish,omitempty"`
+	Title       string               `json:"title,omitempty"`
+	Description string               `json:"description,omitempty"`
+	Channel     string               `json:"channel,omitempty"`
+	Attr        []alert.Attribute    `json:"attr,omitempty"`
+	Publish     types.PublishType    `json:"publish,omitempty"`
+	Topic       types.KnowledgeTopic `json:"topic,omitempty"`
 }
 
 // ApplyTo applies the triage policy result to an alert
@@ -63,6 +64,10 @@ func (r *TriagePolicyResult) ApplyTo(a *alert.Alert) {
 
 	if r.Channel != "" {
 		a.Channel = r.Channel
+	}
+
+	if r.Topic != "" {
+		a.Topic = r.Topic
 	}
 
 	if len(r.Attr) > 0 {
