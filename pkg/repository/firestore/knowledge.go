@@ -78,7 +78,7 @@ func (r *Firestore) getSlugState(ctx context.Context, topic types.KnowledgeTopic
 
 func (r *Firestore) getLatestCommit(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug, state types.KnowledgeState) (*knowledge.Knowledge, error) {
 	iter := r.slugDoc(topic, slug).Collection(collectionCommits).
-		OrderBy("updated_at", firestore.Desc).
+		OrderBy("UpdatedAt", firestore.Desc).
 		Limit(1).
 		Documents(ctx)
 	defer iter.Stop()
@@ -224,8 +224,8 @@ func (r *Firestore) PutKnowledge(ctx context.Context, k *knowledge.Knowledge) er
 
 	// Set/update slug state to active
 	slugRef := r.slugDoc(k.Topic, k.Slug)
-	job1, err := bw.Set(slugRef, map[string]any{
-		"state": types.KnowledgeStateActive.String(),
+	job1, err := bw.Set(slugRef, slugDoc{
+		State: types.KnowledgeStateActive.String(),
 	}, firestore.MergeAll)
 	if err != nil {
 		return r.eb.Wrap(err, "failed to set slug state", goerr.V("topic", k.Topic), goerr.V("slug", k.Slug))
@@ -234,14 +234,14 @@ func (r *Firestore) PutKnowledge(ctx context.Context, k *knowledge.Knowledge) er
 
 	// Store the commit
 	commitRef := r.commitDoc(k.Topic, k.Slug, k.CommitID)
-	job2, err := bw.Set(commitRef, map[string]any{
-		"slug":       k.Slug.String(),
-		"name":       k.Name,
-		"content":    k.Content,
-		"commit_id":  k.CommitID,
-		"author":     k.Author.String(),
-		"created_at": k.CreatedAt,
-		"updated_at": k.UpdatedAt,
+	job2, err := bw.Set(commitRef, commitDoc{
+		Slug:      k.Slug.String(),
+		Name:      k.Name,
+		Content:   k.Content,
+		CommitID:  k.CommitID,
+		Author:    k.Author.String(),
+		CreatedAt: k.CreatedAt,
+		UpdatedAt: k.UpdatedAt,
 	})
 	if err != nil {
 		return r.eb.Wrap(err, "failed to set commit", goerr.V("topic", k.Topic), goerr.V("slug", k.Slug))
@@ -261,8 +261,8 @@ func (r *Firestore) PutKnowledge(ctx context.Context, k *knowledge.Knowledge) er
 }
 
 func (r *Firestore) ArchiveKnowledge(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) error {
-	_, err := r.slugDoc(topic, slug).Set(ctx, map[string]any{
-		"state": types.KnowledgeStateArchived.String(),
+	_, err := r.slugDoc(topic, slug).Set(ctx, slugDoc{
+		State: types.KnowledgeStateArchived.String(),
 	}, firestore.MergeAll)
 	if err != nil {
 		return r.eb.Wrap(err, "failed to archive knowledge", goerr.V("topic", topic), goerr.V("slug", slug))
