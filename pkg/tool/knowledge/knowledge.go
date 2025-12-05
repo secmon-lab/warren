@@ -138,7 +138,7 @@ func (x *Knowledge) listSlugs(ctx context.Context) (map[string]any, error) {
 		return nil, goerr.Wrap(err, "failed to list knowledge slugs")
 	}
 
-	msg.Trace(ctx, "📚 Listed %d knowledge(s) in topic '%s'", len(slugs), x.topic)
+	msg.Trace(ctx, "📚 Found %d knowledge entries", len(slugs))
 
 	return map[string]any{
 		"slugs": slugs,
@@ -155,15 +155,14 @@ func (x *Knowledge) getKnowledges(ctx context.Context, args map[string]any) (map
 			return nil, goerr.Wrap(err, "failed to get knowledge")
 		}
 		if k == nil {
-			msg.Trace(ctx, "📚 Knowledge not found: slug='%s' topic='%s'", slug, x.topic)
+			msg.Trace(ctx, "📚 Knowledge '%s' not found", slug)
 			return map[string]any{
 				"found":   false,
 				"message": fmt.Sprintf("Knowledge with slug '%s' not found", slug),
 			}, nil
 		}
 
-		msg.Trace(ctx, "📚 Retrieved knowledge: slug='%s' name='%s' commit='%s' size=%d bytes",
-			k.Slug, k.Name, k.CommitID[:8], len(k.Content))
+		msg.Trace(ctx, "📚 Retrieved knowledge: %s", k.Name)
 
 		return map[string]any{
 			"found":     true,
@@ -177,7 +176,7 @@ func (x *Knowledge) getKnowledges(ctx context.Context, args map[string]any) (map
 		return nil, goerr.Wrap(err, "failed to get knowledges")
 	}
 
-	msg.Trace(ctx, "📚 Retrieved %d knowledge(s) from topic '%s'", len(knowledges), x.topic)
+	msg.Trace(ctx, "📚 Retrieved %d knowledge entries", len(knowledges))
 
 	return map[string]any{
 		"knowledges": knowledges,
