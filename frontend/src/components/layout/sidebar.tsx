@@ -1,5 +1,13 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, List, Kanban, AlertTriangle, GitBranch, Settings } from "lucide-react";
+import {
+  Home,
+  List,
+  Kanban,
+  AlertTriangle,
+  GitBranch,
+  Settings,
+  BookOpen,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -30,6 +38,11 @@ const navigation = [
     icon: Kanban,
   },
   {
+    name: "Knowledge",
+    href: "/knowledge",
+    icon: BookOpen,
+  },
+  {
     name: "Settings",
     href: "/settings",
     icon: Settings,
@@ -43,9 +56,9 @@ export function Sidebar() {
     <div className="flex h-full w-52 flex-col fixed inset-y-0 z-50 bg-background border-r">
       <div className="flex h-14 items-center border-b px-4">
         <NavLink className="flex items-center space-x-2" to="/">
-          <img 
-            src="/logo.png" 
-            alt="Warren Logo" 
+          <img
+            src="/logo.png"
+            alt="Warren Logo"
             className="h-8 w-8 object-contain"
           />
           <span className="font-bold">Warren</span>

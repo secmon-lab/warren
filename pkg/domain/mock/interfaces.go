@@ -2661,6 +2661,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			ListKnowledgeSlugsFunc: func(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.SlugInfo, error) {
 //				panic("mock out the ListKnowledgeSlugs method")
 //			},
+//			ListKnowledgeTopicsFunc: func(ctx context.Context) ([]*knowledge.TopicSummary, error) {
+//				panic("mock out the ListKnowledgeTopics method")
+//			},
 //			PutActivityFunc: func(ctx context.Context, activityMoqParam *activity.Activity) error {
 //				panic("mock out the PutActivity method")
 //			},
@@ -2904,6 +2907,9 @@ type RepositoryMock struct {
 
 	// ListKnowledgeSlugsFunc mocks the ListKnowledgeSlugs method.
 	ListKnowledgeSlugsFunc func(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.SlugInfo, error)
+
+	// ListKnowledgeTopicsFunc mocks the ListKnowledgeTopics method.
+	ListKnowledgeTopicsFunc func(ctx context.Context) ([]*knowledge.TopicSummary, error)
 
 	// PutActivityFunc mocks the PutActivity method.
 	PutActivityFunc func(ctx context.Context, activityMoqParam *activity.Activity) error
@@ -3419,6 +3425,11 @@ type RepositoryMock struct {
 			// Topic is the topic argument value.
 			Topic types.KnowledgeTopic
 		}
+		// ListKnowledgeTopics holds details about calls to the ListKnowledgeTopics method.
+		ListKnowledgeTopics []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// PutActivity holds details about calls to the PutActivity method.
 		PutActivity []struct {
 			// Ctx is the ctx argument value.
@@ -3644,6 +3655,7 @@ type RepositoryMock struct {
 	lockListAgentMemories              sync.RWMutex
 	lockListAllTags                    sync.RWMutex
 	lockListKnowledgeSlugs             sync.RWMutex
+	lockListKnowledgeTopics            sync.RWMutex
 	lockPutActivity                    sync.RWMutex
 	lockPutAlert                       sync.RWMutex
 	lockPutAlertList                   sync.RWMutex
@@ -6055,6 +6067,42 @@ func (mock *RepositoryMock) ListKnowledgeSlugsCalls() []struct {
 	mock.lockListKnowledgeSlugs.RLock()
 	calls = mock.calls.ListKnowledgeSlugs
 	mock.lockListKnowledgeSlugs.RUnlock()
+	return calls
+}
+
+// ListKnowledgeTopics calls ListKnowledgeTopicsFunc.
+func (mock *RepositoryMock) ListKnowledgeTopics(ctx context.Context) ([]*knowledge.TopicSummary, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockListKnowledgeTopics.Lock()
+	mock.calls.ListKnowledgeTopics = append(mock.calls.ListKnowledgeTopics, callInfo)
+	mock.lockListKnowledgeTopics.Unlock()
+	if mock.ListKnowledgeTopicsFunc == nil {
+		var (
+			topicSummarysOut []*knowledge.TopicSummary
+			errOut           error
+		)
+		return topicSummarysOut, errOut
+	}
+	return mock.ListKnowledgeTopicsFunc(ctx)
+}
+
+// ListKnowledgeTopicsCalls gets all the calls that were made to ListKnowledgeTopics.
+// Check the length with:
+//
+//	len(mockedRepository.ListKnowledgeTopicsCalls())
+func (mock *RepositoryMock) ListKnowledgeTopicsCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockListKnowledgeTopics.RLock()
+	calls = mock.calls.ListKnowledgeTopics
+	mock.lockListKnowledgeTopics.RUnlock()
 	return calls
 }
 

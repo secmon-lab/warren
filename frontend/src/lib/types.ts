@@ -114,3 +114,20 @@ export interface TagMetadata {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface Knowledge {
+  slug: string;
+  name: string;
+  topic: string;
+  content: string;
+  commitID: string;
+  author: User;
+  createdAt: string;
+  updatedAt: string;
+  state: string;
+}
+
+export interface TopicSummary {
+  topic: string;
+  count: number;
+}

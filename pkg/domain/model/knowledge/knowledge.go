@@ -46,6 +46,12 @@ type SlugInfo struct {
 	Name string              `json:"name"`
 }
 
+// TopicSummary contains topic and knowledge count
+type TopicSummary struct {
+	Topic types.KnowledgeTopic `json:"topic"`
+	Count int                  `json:"count"`
+}
+
 // GenerateCommitID generates SHA256 hash from updatedAt + author + content
 func GenerateCommitID(updatedAt time.Time, author types.UserID, content string) string {
 	data := fmt.Sprintf("%d%s%s", updatedAt.UnixNano(), author.String(), content)

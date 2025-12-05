@@ -284,3 +284,36 @@ func (r *Firestore) CalculateKnowledgeSize(ctx context.Context, topic types.Know
 
 	return totalSize, nil
 }
+
+func (r *Firestore) ListKnowledgeTopics(ctx context.Context) ([]*knowledge.TopicSummary, error) {
+	iter := r.db.Collection(collectionTopics).Documents(ctx)
+	defer iter.Stop()
+
+	var result []*knowledge.TopicSummary
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, r.eb.Wrap(err, "failed to iterate topics")
+		}
+
+		topic := types.KnowledgeTopic(doc.Ref.ID)
+
+		// Count active knowledges in this topic
+		knowledges, err := r.GetKnowledges(ctx, topic)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(knowledges) > 0 {
+			result = append(result, &knowledge.TopicSummary{
+				Topic: topic,
+				Count: len(knowledges),
+			})
+		}
+	}
+
+	return result, nil
+}
