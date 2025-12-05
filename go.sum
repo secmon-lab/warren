@@ -266,8 +266,8 @@ github.com/m-mizutani/fireconf v0.1.1 h1:AV0XzAAUrOdMWY+qJcLWw/mJo0GmVIoawL9RWSm
 github.com/m-mizutani/fireconf v0.1.1/go.mod h1:fRoeeZfeG46lVyP1EBp6ArPT8PSZkCPlZTYyPgQ/ofc=
 github.com/m-mizutani/goerr/v2 v2.0.0 h1:kbsQ1EuVsd/cd/bzmt4C9+Rau/s3ATPW4wjEgx/PAOs=
 github.com/m-mizutani/goerr/v2 v2.0.0/go.mod h1:Ax59zs+j3NmzB/mPLc1w3g4yIutdrwcY7cB6IRO18EU=
-github.com/m-mizutani/gollem v0.17.3 h1:bQUemnsXBfAxJvKb3Yf1V7Ppkhyf+vqhcale2Yi8eQE=
-github.com/m-mizutani/gollem v0.17.3/go.mod h1:1Kxzhb12Ett+nRb6h5kdf+jpYXM+GS1ZaRT5p9Tt24Y=
+github.com/m-mizutani/gollem v0.17.4-0.20251205093023-53e6bcdff58c h1:nDKdK/d2EgmkAlpsHfzDgAa9roHgHOEXLgDc0mHB9WI=
+github.com/m-mizutani/gollem v0.17.4-0.20251205093023-53e6bcdff58c/go.mod h1:1Kxzhb12Ett+nRb6h5kdf+jpYXM+GS1ZaRT5p9Tt24Y=
 github.com/m-mizutani/gt v0.1.2 h1:kulbh306ZuFzLMUG82EIjSqycPyE3eHC4TWuHqWfR5M=
 github.com/m-mizutani/gt v0.1.2/go.mod h1:0MPYSfGBLmYjTduzADVmIqD58ELQ5IfBFiK/f0FmB3k=
 github.com/m-mizutani/harlog v0.0.3 h1:bL3i/xM3wWPsvoOOsuu/a4eaz+1yj1UyO7OPUzkWPyU=
