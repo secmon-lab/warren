@@ -138,7 +138,7 @@ func (x *Knowledge) listSlugs(ctx context.Context) (map[string]any, error) {
 		return nil, goerr.Wrap(err, "failed to list knowledge slugs")
 	}
 
-	msg.Trace(ctx, "📚 Found %d knowledge entries", len(slugs))
+	msg.Trace(ctx, "📚 Found *%d* knowledge entries", len(slugs))
 
 	return map[string]any{
 		"slugs": slugs,
@@ -155,14 +155,15 @@ func (x *Knowledge) getKnowledges(ctx context.Context, args map[string]any) (map
 			return nil, goerr.Wrap(err, "failed to get knowledge")
 		}
 		if k == nil {
-			msg.Trace(ctx, "📚 Knowledge '%s' not found", slug)
+			msg.Trace(ctx, "📚 Knowledge *%s* not found", slug)
 			return map[string]any{
 				"found":   false,
 				"message": fmt.Sprintf("Knowledge with slug '%s' not found", slug),
 			}, nil
 		}
 
-		msg.Trace(ctx, "📚 Retrieved knowledge: %s", k.Name)
+		msg.Trace(ctx, "📚 Retrieved knowledge *%s* (ID: `%s`, version: `%s`)",
+			k.Name, k.Slug, k.CommitID[:8])
 
 		return map[string]any{
 			"found":     true,
@@ -176,7 +177,7 @@ func (x *Knowledge) getKnowledges(ctx context.Context, args map[string]any) (map
 		return nil, goerr.Wrap(err, "failed to get knowledges")
 	}
 
-	msg.Trace(ctx, "📚 Retrieved %d knowledge entries", len(knowledges))
+	msg.Trace(ctx, "📚 Retrieved *%d* knowledge entries", len(knowledges))
 
 	return map[string]any{
 		"knowledges": knowledges,
@@ -205,8 +206,8 @@ func (x *Knowledge) saveKnowledge(ctx context.Context, args map[string]any) (map
 		return nil, goerr.Wrap(err, "failed to save knowledge")
 	}
 
-	msg.Trace(ctx, "📚 Saved knowledge: slug='%s' name='%s' commit='%s' size=%d bytes topic='%s'",
-		slug, name, commitID[:8], len(content), x.topic)
+	msg.Trace(ctx, "📚 Saved knowledge *%s* (ID: `%s`, version: `%s`)",
+		name, slug, commitID[:8])
 
 	return map[string]any{
 		"success":   true,
@@ -225,7 +226,7 @@ func (x *Knowledge) archiveKnowledge(ctx context.Context, args map[string]any) (
 		return nil, goerr.Wrap(err, "failed to archive knowledge")
 	}
 
-	msg.Trace(ctx, "📚 Archived knowledge: slug='%s' topic='%s'", slug, x.topic)
+	msg.Trace(ctx, "📚 Archived knowledge (ID: `%s`)", slug)
 
 	return map[string]any{
 		"success": true,
