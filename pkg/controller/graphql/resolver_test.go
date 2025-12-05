@@ -9,6 +9,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
@@ -266,5 +267,70 @@ func TestCreateTicket(t *testing.T) {
 		ctxNoAuth := context.Background()
 		_, err := resolver.Mutation().CreateTicket(ctxNoAuth, "title", "description", nil)
 		gt.Error(t, err)
+	})
+}
+
+func TestKnowledgeResolver(t *testing.T) {
+	repo := repository.NewMemory()
+	resolver := NewResolver(repo, nil, nil)
+	ctx := context.Background()
+
+	// Create test knowledges
+	knowledges := []struct {
+		topic   types.KnowledgeTopic
+		slug    types.KnowledgeSlug
+		name    string
+		content string
+	}{
+		{types.KnowledgeTopic("security"), types.KnowledgeSlug("incident-response"), "Incident Response", "How to respond to security incidents"},
+		{types.KnowledgeTopic("security"), types.KnowledgeSlug("password-policy"), "Password Policy", "Password requirements for all systems"},
+		{types.KnowledgeTopic("development"), types.KnowledgeSlug("coding-standards"), "Coding Standards", "Development best practices"},
+	}
+
+	now := time.Now()
+	for _, k := range knowledges {
+		knowledgeObj := &knowledge.Knowledge{
+			Slug:      k.slug,
+			Name:      k.name,
+			Topic:     k.topic,
+			Content:   k.content,
+			CommitID:  "test-commit-id",
+			Author:    types.UserID("test-user"),
+			CreatedAt: now,
+			UpdatedAt: now,
+			State:     types.KnowledgeStateActive,
+		}
+		_ = repo.PutKnowledge(ctx, knowledgeObj)
+	}
+
+	t.Run("ListKnowledgeTopics", func(t *testing.T) {
+		got, err := resolver.Query().KnowledgeTopics(ctx)
+		gt.NoError(t, err)
+		gt.Array(t, got).Length(2)
+
+		// Check topics are returned
+		topicMap := make(map[string]int)
+		for _, ts := range got {
+			topicMap[ts.Topic] = ts.Count
+		}
+		gt.Value(t, topicMap["security"]).Equal(2)
+		gt.Value(t, topicMap["development"]).Equal(1)
+	})
+
+	t.Run("GetKnowledgesByTopic", func(t *testing.T) {
+		got, err := resolver.Query().KnowledgesByTopic(ctx, "security")
+		gt.NoError(t, err)
+		gt.Array(t, got).Length(2)
+
+		// Check knowledge fields
+		gt.Value(t, got[0].Topic).Equal("security")
+		gt.Value(t, got[0].Author.ID).Equal("test-user")
+		gt.Value(t, got[0].State).Equal("active")
+	})
+
+	t.Run("GetKnowledgesByTopic_NoKnowledges", func(t *testing.T) {
+		got, err := resolver.Query().KnowledgesByTopic(ctx, "nonexistent")
+		gt.NoError(t, err)
+		gt.Array(t, got).Length(0)
 	})
 }

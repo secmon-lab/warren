@@ -146,16 +146,44 @@ type AlertsConnection {
 type Query {
   ticket(id: ID!): Ticket
   tickets(statuses: [String!], offset: Int, limit: Int): TicketsResponse!
-  similarTickets(ticketId: ID!, threshold: Float!, offset: Int, limit: Int): TicketsResponse!
-  similarTicketsForAlert(alertId: ID!, threshold: Float!, offset: Int, limit: Int): TicketsResponse!
+  similarTickets(
+    ticketId: ID!
+    threshold: Float!
+    offset: Int
+    limit: Int
+  ): TicketsResponse!
+  similarTicketsForAlert(
+    alertId: ID!
+    threshold: Float!
+    offset: Int
+    limit: Int
+  ): TicketsResponse!
   ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
   alert(id: ID!): Alert
   alerts(offset: Int, limit: Int): AlertsResponse!
-  unboundAlerts(threshold: Float, keyword: String, ticketId: ID, offset: Int, limit: Int): AlertsResponse!
+  unboundAlerts(
+    threshold: Float
+    keyword: String
+    ticketId: ID
+    offset: Int
+    limit: Int
+  ): AlertsResponse!
   dashboard: DashboardStats!
   activities(offset: Int, limit: Int): ActivitiesResponse!
-  alertClusters(limit: Int, offset: Int, minClusterSize: Int, eps: Float, minSamples: Int, keyword: String): ClusteringSummary!
-  clusterAlerts(clusterID: ID!, keyword: String, limit: Int, offset: Int): AlertsConnection!
+  alertClusters(
+    limit: Int
+    offset: Int
+    minClusterSize: Int
+    eps: Float
+    minSamples: Int
+    keyword: String
+  ): ClusteringSummary!
+  clusterAlerts(
+    clusterID: ID!
+    keyword: String
+    limit: Int
+    offset: Int
+  ): AlertsConnection!
   tags: [TagMetadata!]!
   availableTagColors: [String!]!
   availableTagColorNames: [String!]!
@@ -167,7 +195,11 @@ type Mutation {
   updateTicketConclusion(id: ID!, conclusion: String!, reason: String!): Ticket!
   updateTicket(id: ID!, title: String!, description: String): Ticket!
   createTicket(title: String!, description: String!, isTest: Boolean): Ticket!
-  createTicketFromAlerts(alertIds: [ID!]!, title: String, description: String): Ticket!
+  createTicketFromAlerts(
+    alertIds: [ID!]!
+    title: String
+    description: String
+  ): Ticket!
   bindAlertsToTicket(ticketId: ID!, alertIds: [ID!]!): Ticket!
   updateAlertTags(alertId: ID!, tagIds: [ID!]!): Alert!
   updateTicketTags(ticketId: ID!, tagIds: [ID!]!): Ticket!
@@ -181,6 +213,28 @@ input UpdateTagInput {
   name: String!
   color: String!
   description: String
+}
+
+type Knowledge {
+  slug: String!
+  name: String!
+  topic: String!
+  content: String!
+  commitID: String!
+  author: User!
+  createdAt: String!
+  updatedAt: String!
+  state: String!
+}
+
+type TopicSummary {
+  topic: String!
+  count: Int!
+}
+
+extend type Query {
+  knowledgeTopics: [TopicSummary!]!
+  knowledgesByTopic(topic: String!): [Knowledge!]!
 }
 
 schema {

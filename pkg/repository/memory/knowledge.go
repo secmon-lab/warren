@@ -206,3 +206,34 @@ func (r *Memory) CalculateKnowledgeSize(ctx context.Context, topic types.Knowled
 
 	return totalSize, nil
 }
+
+func (r *Memory) ListKnowledgeTopics(ctx context.Context) ([]*knowledge.TopicSummary, error) {
+	r.knowledge.mu.RLock()
+	defer r.knowledge.mu.RUnlock()
+
+	var result []*knowledge.TopicSummary
+	for topicStr, slugs := range r.knowledge.slugStates {
+		count := 0
+		for slug, meta := range slugs {
+			if meta.state.IsActive() {
+				if k := r.knowledge.getLatestCommit(topicStr, slug); k != nil {
+					count++
+				}
+			}
+		}
+
+		if count > 0 {
+			result = append(result, &knowledge.TopicSummary{
+				Topic: types.KnowledgeTopic(topicStr),
+				Count: count,
+			})
+		}
+	}
+
+	// Sort by topic for consistent ordering
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Topic < result[j].Topic
+	})
+
+	return result, nil
+}
