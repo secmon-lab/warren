@@ -90,8 +90,11 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 	newTicket.Assignee = opts.Assignee
 	newTicket.IsTest = opts.IsTest
 
-	// Inherit tags from alerts
+	// Inherit topic and tags from alerts
 	if len(alerts) > 0 {
+		// Inherit topic from the first alert
+		newTicket.Topic = alerts[0].Topic
+
 		// Collect all unique tag IDs from alerts
 		inheritedTagIDs := make(map[string]bool)
 		for _, alert := range alerts {

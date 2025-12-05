@@ -9,6 +9,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -26,6 +27,9 @@ type Ticket struct {
 	SlackMessageID string          `json:"slack_message_id"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
+
+	// Topic is inherited from the first alert and never changes
+	Topic types.KnowledgeTopic `json:"topic"`
 
 	Metadata
 
@@ -140,6 +144,7 @@ func (x *Finding) Validate() error {
 
 type AlertRepository interface {
 	BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
+	GetKnowledges(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.Knowledge, error)
 }
 
 //go:embed prompt/ticket_meta.md
@@ -170,11 +175,23 @@ func (x *Ticket) FillMetadata(ctx context.Context, llmClient gollem.LLMClient, a
 		return goerr.Wrap(err, "failed to generate summary")
 	}
 
-	metaPrompt, err := prompt.Generate(ctx, ticketMetaPrompt, map[string]any{
+	// Prepare template parameters
+	params := map[string]any{
 		"summary": summary,
 		"schema":  prompt.ToSchema(Metadata{}),
 		"lang":    lang.From(ctx),
-	})
+	}
+
+	// Add knowledges if topic is set
+	if x.Topic != "" {
+		knowledges, err := alertRepo.GetKnowledges(ctx, x.Topic)
+		if err == nil && len(knowledges) > 0 {
+			params["knowledges"] = knowledges
+			params["topic"] = x.Topic
+		}
+	}
+
+	metaPrompt, err := prompt.Generate(ctx, ticketMetaPrompt, params)
 	if err != nil {
 		return goerr.Wrap(err, "failed to generate meta prompt")
 	}

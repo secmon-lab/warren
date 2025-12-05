@@ -93,7 +93,7 @@ Warren uses four types of policies, each evaluated at different stages of the pi
 **Package**: `ingest.{schema_name}`
 **When**: First stage - transforms raw events into alerts
 **Input**: Raw event data from webhook
-**Output**: Alert metadata (title, description, attributes)
+**Output**: Alert metadata (title, description, attributes, topic)
 
 Ingest policies define how external events become Warren alerts. The package name determines the webhook endpoint:
 
@@ -109,6 +109,7 @@ package ingest.{schema_name}
 alerts contains {
     "title": "Alert title",
     "description": "Alert description",
+    "topic": "aws-guardduty",  # Optional: namespace for domain knowledge
     "attrs": [
         {
             "key": "severity",
@@ -202,7 +203,7 @@ has_external_ip if {
 **Package**: `triage`
 **When**: After enrichment tasks complete
 **Input**: Alert object + enrichment results array
-**Output**: Final metadata overrides and publish decision
+**Output**: Final metadata overrides, topic (for domain knowledge), and publish decision
 
 Triage policies make final decisions about alert handling based on original alert data and enrichment results:
 
@@ -232,6 +233,9 @@ description := get_enrich("check_ioc").analysis if {
 channel := "security-urgent" if {
     get_enrich("check_ioc").severity == "critical"
 }
+
+# Set topic for domain knowledge (optional)
+topic := "aws-security-alerts"
 
 # Add attributes from enrichment
 attr contains {
@@ -302,6 +306,15 @@ publish := "alert"
 - Can override any metadata field
 - Use `publish` to control alert disposition
 - Default behavior is to publish as full alert
+
+**Topic for Domain Knowledge**:
+
+The `topic` field defines a namespace for domain-specific knowledge that agents can access. Topic priority:
+1. **Triage Policy** `topic` (highest priority - overrides all)
+2. **Ingest Policy** `topic`
+3. **Alert Schema** (default - if no topic is set)
+
+Example: If an alert has schema `aws.guardduty`, the default topic is `aws.guardduty`. Setting `topic := "aws-security"` in triage policy overrides this to `aws-security`.
 
 ### Authorization Policy
 
