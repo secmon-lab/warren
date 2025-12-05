@@ -2573,9 +2573,6 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetAlertsWithInvalidEmbeddingFunc: func(ctx context.Context) (alert.Alerts, error) {
 //				panic("mock out the GetAlertsWithInvalidEmbedding method")
 //			},
-//			GetExecutionMemoryFunc: func(ctx context.Context, schemaID types.AlertSchema) (*memory.ExecutionMemory, error) {
-//				panic("mock out the GetExecutionMemory method")
-//			},
 //			GetLatestAlertByThreadFunc: func(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
 //				panic("mock out the GetLatestAlertByThread method")
 //			},
@@ -2618,9 +2615,6 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetTicketCommentsPaginatedFunc: func(ctx context.Context, ticketID types.TicketID, offset int, limit int) ([]ticket.Comment, error) {
 //				panic("mock out the GetTicketCommentsPaginated method")
 //			},
-//			GetTicketMemoryFunc: func(ctx context.Context, schemaID types.AlertSchema) (*memory.TicketMemory, error) {
-//				panic("mock out the GetTicketMemory method")
-//			},
 //			GetTicketUnpromptedCommentsFunc: func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
 //				panic("mock out the GetTicketUnpromptedComments method")
 //			},
@@ -2657,9 +2651,6 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			PutAlertListFunc: func(ctx context.Context, list *alert.List) error {
 //				panic("mock out the PutAlertList method")
 //			},
-//			PutExecutionMemoryFunc: func(ctx context.Context, mem *memory.ExecutionMemory) error {
-//				panic("mock out the PutExecutionMemory method")
-//			},
 //			PutHistoryFunc: func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
 //				panic("mock out the PutHistory method")
 //			},
@@ -2674,9 +2665,6 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			PutTicketCommentsPromptedFunc: func(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error {
 //				panic("mock out the PutTicketCommentsPrompted method")
-//			},
-//			PutTicketMemoryFunc: func(ctx context.Context, mem *memory.TicketMemory) error {
-//				panic("mock out the PutTicketMemory method")
 //			},
 //			PutTokenFunc: func(ctx context.Context, token *auth.Token) error {
 //				panic("mock out the PutToken method")
@@ -2698,9 +2686,6 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			SearchAlertsFunc: func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
 //				panic("mock out the SearchAlerts method")
-//			},
-//			SearchExecutionMemoriesByEmbeddingFunc: func(ctx context.Context, schemaID types.AlertSchema, embedding []float32, limit int) ([]*memory.ExecutionMemory, error) {
-//				panic("mock out the SearchExecutionMemoriesByEmbedding method")
 //			},
 //			SearchMemoriesByEmbeddingFunc: func(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error) {
 //				panic("mock out the SearchMemoriesByEmbedding method")
@@ -2811,9 +2796,6 @@ type RepositoryMock struct {
 	// GetAlertsWithInvalidEmbeddingFunc mocks the GetAlertsWithInvalidEmbedding method.
 	GetAlertsWithInvalidEmbeddingFunc func(ctx context.Context) (alert.Alerts, error)
 
-	// GetExecutionMemoryFunc mocks the GetExecutionMemory method.
-	GetExecutionMemoryFunc func(ctx context.Context, schemaID types.AlertSchema) (*memory.ExecutionMemory, error)
-
 	// GetLatestAlertByThreadFunc mocks the GetLatestAlertByThread method.
 	GetLatestAlertByThreadFunc func(ctx context.Context, thread slack.Thread) (*alert.Alert, error)
 
@@ -2856,9 +2838,6 @@ type RepositoryMock struct {
 	// GetTicketCommentsPaginatedFunc mocks the GetTicketCommentsPaginated method.
 	GetTicketCommentsPaginatedFunc func(ctx context.Context, ticketID types.TicketID, offset int, limit int) ([]ticket.Comment, error)
 
-	// GetTicketMemoryFunc mocks the GetTicketMemory method.
-	GetTicketMemoryFunc func(ctx context.Context, schemaID types.AlertSchema) (*memory.TicketMemory, error)
-
 	// GetTicketUnpromptedCommentsFunc mocks the GetTicketUnpromptedComments method.
 	GetTicketUnpromptedCommentsFunc func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
 
@@ -2895,9 +2874,6 @@ type RepositoryMock struct {
 	// PutAlertListFunc mocks the PutAlertList method.
 	PutAlertListFunc func(ctx context.Context, list *alert.List) error
 
-	// PutExecutionMemoryFunc mocks the PutExecutionMemory method.
-	PutExecutionMemoryFunc func(ctx context.Context, mem *memory.ExecutionMemory) error
-
 	// PutHistoryFunc mocks the PutHistory method.
 	PutHistoryFunc func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error
 
@@ -2912,9 +2888,6 @@ type RepositoryMock struct {
 
 	// PutTicketCommentsPromptedFunc mocks the PutTicketCommentsPrompted method.
 	PutTicketCommentsPromptedFunc func(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error
-
-	// PutTicketMemoryFunc mocks the PutTicketMemory method.
-	PutTicketMemoryFunc func(ctx context.Context, mem *memory.TicketMemory) error
 
 	// PutTokenFunc mocks the PutToken method.
 	PutTokenFunc func(ctx context.Context, token *auth.Token) error
@@ -2936,9 +2909,6 @@ type RepositoryMock struct {
 
 	// SearchAlertsFunc mocks the SearchAlerts method.
 	SearchAlertsFunc func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error)
-
-	// SearchExecutionMemoriesByEmbeddingFunc mocks the SearchExecutionMemoriesByEmbedding method.
-	SearchExecutionMemoriesByEmbeddingFunc func(ctx context.Context, schemaID types.AlertSchema, embedding []float32, limit int) ([]*memory.ExecutionMemory, error)
 
 	// SearchMemoriesByEmbeddingFunc mocks the SearchMemoriesByEmbedding method.
 	SearchMemoriesByEmbeddingFunc func(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error)
@@ -3179,13 +3149,6 @@ type RepositoryMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
-		// GetExecutionMemory holds details about calls to the GetExecutionMemory method.
-		GetExecutionMemory []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// SchemaID is the schemaID argument value.
-			SchemaID types.AlertSchema
-		}
 		// GetLatestAlertByThread holds details about calls to the GetLatestAlertByThread method.
 		GetLatestAlertByThread []struct {
 			// Ctx is the ctx argument value.
@@ -3294,13 +3257,6 @@ type RepositoryMock struct {
 			// Limit is the limit argument value.
 			Limit int
 		}
-		// GetTicketMemory holds details about calls to the GetTicketMemory method.
-		GetTicketMemory []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// SchemaID is the schemaID argument value.
-			SchemaID types.AlertSchema
-		}
 		// GetTicketUnpromptedComments holds details about calls to the GetTicketUnpromptedComments method.
 		GetTicketUnpromptedComments []struct {
 			// Ctx is the ctx argument value.
@@ -3391,13 +3347,6 @@ type RepositoryMock struct {
 			// List is the list argument value.
 			List *alert.List
 		}
-		// PutExecutionMemory holds details about calls to the PutExecutionMemory method.
-		PutExecutionMemory []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Mem is the mem argument value.
-			Mem *memory.ExecutionMemory
-		}
 		// PutHistory holds details about calls to the PutHistory method.
 		PutHistory []struct {
 			// Ctx is the ctx argument value.
@@ -3436,13 +3385,6 @@ type RepositoryMock struct {
 			TicketID types.TicketID
 			// CommentIDs is the commentIDs argument value.
 			CommentIDs []types.CommentID
-		}
-		// PutTicketMemory holds details about calls to the PutTicketMemory method.
-		PutTicketMemory []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Mem is the mem argument value.
-			Mem *memory.TicketMemory
 		}
 		// PutToken holds details about calls to the PutToken method.
 		PutToken []struct {
@@ -3499,17 +3441,6 @@ type RepositoryMock struct {
 			// Limit is the limit argument value.
 			Limit int
 		}
-		// SearchExecutionMemoriesByEmbedding holds details about calls to the SearchExecutionMemoriesByEmbedding method.
-		SearchExecutionMemoriesByEmbedding []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// SchemaID is the schemaID argument value.
-			SchemaID types.AlertSchema
-			// Embedding is the embedding argument value.
-			Embedding []float32
-			// Limit is the limit argument value.
-			Limit int
-		}
 		// SearchMemoriesByEmbedding holds details about calls to the SearchMemoriesByEmbedding method.
 		SearchMemoriesByEmbedding []struct {
 			// Ctx is the ctx argument value.
@@ -3555,83 +3486,78 @@ type RepositoryMock struct {
 			TagMoqParam *tag.Tag
 		}
 	}
-	lockBatchGetAlerts                     sync.RWMutex
-	lockBatchGetTickets                    sync.RWMutex
-	lockBatchPutAlerts                     sync.RWMutex
-	lockBatchUpdateTicketsStatus           sync.RWMutex
-	lockBindAlertsToTicket                 sync.RWMutex
-	lockCountActivities                    sync.RWMutex
-	lockCountAlertsWithoutTicket           sync.RWMutex
-	lockCountTicketComments                sync.RWMutex
-	lockCountTicketsByStatus               sync.RWMutex
-	lockCreateNotice                       sync.RWMutex
-	lockCreateTagWithID                    sync.RWMutex
-	lockDeleteAgentMemoriesBatch           sync.RWMutex
-	lockDeleteSession                      sync.RWMutex
-	lockDeleteTagByID                      sync.RWMutex
-	lockDeleteToken                        sync.RWMutex
-	lockFindNearestAlerts                  sync.RWMutex
-	lockFindNearestTickets                 sync.RWMutex
-	lockFindNearestTicketsWithSpan         sync.RWMutex
-	lockGetActivities                      sync.RWMutex
-	lockGetAgentMemory                     sync.RWMutex
-	lockGetAlert                           sync.RWMutex
-	lockGetAlertList                       sync.RWMutex
-	lockGetAlertListByThread               sync.RWMutex
-	lockGetAlertListsInThread              sync.RWMutex
-	lockGetAlertWithoutEmbedding           sync.RWMutex
-	lockGetAlertWithoutTicket              sync.RWMutex
-	lockGetAlertsBySpan                    sync.RWMutex
-	lockGetAlertsByThread                  sync.RWMutex
-	lockGetAlertsWithInvalidEmbedding      sync.RWMutex
-	lockGetExecutionMemory                 sync.RWMutex
-	lockGetLatestAlertByThread             sync.RWMutex
-	lockGetLatestAlertListInThread         sync.RWMutex
-	lockGetLatestHistory                   sync.RWMutex
-	lockGetNotice                          sync.RWMutex
-	lockGetOrCreateTagByName               sync.RWMutex
-	lockGetSession                         sync.RWMutex
-	lockGetSessionsByTicket                sync.RWMutex
-	lockGetTagByID                         sync.RWMutex
-	lockGetTagByName                       sync.RWMutex
-	lockGetTagsByIDs                       sync.RWMutex
-	lockGetTicket                          sync.RWMutex
-	lockGetTicketByThread                  sync.RWMutex
-	lockGetTicketComments                  sync.RWMutex
-	lockGetTicketCommentsPaginated         sync.RWMutex
-	lockGetTicketMemory                    sync.RWMutex
-	lockGetTicketUnpromptedComments        sync.RWMutex
-	lockGetTicketsBySpan                   sync.RWMutex
-	lockGetTicketsByStatus                 sync.RWMutex
-	lockGetTicketsByStatusAndSpan          sync.RWMutex
-	lockGetTicketsWithInvalidEmbedding     sync.RWMutex
-	lockGetToken                           sync.RWMutex
-	lockIsTagNameExists                    sync.RWMutex
-	lockListAgentMemories                  sync.RWMutex
-	lockListAllTags                        sync.RWMutex
-	lockPutActivity                        sync.RWMutex
-	lockPutAlert                           sync.RWMutex
-	lockPutAlertList                       sync.RWMutex
-	lockPutExecutionMemory                 sync.RWMutex
-	lockPutHistory                         sync.RWMutex
-	lockPutSession                         sync.RWMutex
-	lockPutTicket                          sync.RWMutex
-	lockPutTicketComment                   sync.RWMutex
-	lockPutTicketCommentsPrompted          sync.RWMutex
-	lockPutTicketMemory                    sync.RWMutex
-	lockPutToken                           sync.RWMutex
-	lockRemoveTagFromAllAlerts             sync.RWMutex
-	lockRemoveTagFromAllTickets            sync.RWMutex
-	lockRemoveTagIDFromAllAlerts           sync.RWMutex
-	lockRemoveTagIDFromAllTickets          sync.RWMutex
-	lockSaveAgentMemory                    sync.RWMutex
-	lockSearchAlerts                       sync.RWMutex
-	lockSearchExecutionMemoriesByEmbedding sync.RWMutex
-	lockSearchMemoriesByEmbedding          sync.RWMutex
-	lockUnbindAlertFromTicket              sync.RWMutex
-	lockUpdateMemoryScoreBatch             sync.RWMutex
-	lockUpdateNotice                       sync.RWMutex
-	lockUpdateTag                          sync.RWMutex
+	lockBatchGetAlerts                 sync.RWMutex
+	lockBatchGetTickets                sync.RWMutex
+	lockBatchPutAlerts                 sync.RWMutex
+	lockBatchUpdateTicketsStatus       sync.RWMutex
+	lockBindAlertsToTicket             sync.RWMutex
+	lockCountActivities                sync.RWMutex
+	lockCountAlertsWithoutTicket       sync.RWMutex
+	lockCountTicketComments            sync.RWMutex
+	lockCountTicketsByStatus           sync.RWMutex
+	lockCreateNotice                   sync.RWMutex
+	lockCreateTagWithID                sync.RWMutex
+	lockDeleteAgentMemoriesBatch       sync.RWMutex
+	lockDeleteSession                  sync.RWMutex
+	lockDeleteTagByID                  sync.RWMutex
+	lockDeleteToken                    sync.RWMutex
+	lockFindNearestAlerts              sync.RWMutex
+	lockFindNearestTickets             sync.RWMutex
+	lockFindNearestTicketsWithSpan     sync.RWMutex
+	lockGetActivities                  sync.RWMutex
+	lockGetAgentMemory                 sync.RWMutex
+	lockGetAlert                       sync.RWMutex
+	lockGetAlertList                   sync.RWMutex
+	lockGetAlertListByThread           sync.RWMutex
+	lockGetAlertListsInThread          sync.RWMutex
+	lockGetAlertWithoutEmbedding       sync.RWMutex
+	lockGetAlertWithoutTicket          sync.RWMutex
+	lockGetAlertsBySpan                sync.RWMutex
+	lockGetAlertsByThread              sync.RWMutex
+	lockGetAlertsWithInvalidEmbedding  sync.RWMutex
+	lockGetLatestAlertByThread         sync.RWMutex
+	lockGetLatestAlertListInThread     sync.RWMutex
+	lockGetLatestHistory               sync.RWMutex
+	lockGetNotice                      sync.RWMutex
+	lockGetOrCreateTagByName           sync.RWMutex
+	lockGetSession                     sync.RWMutex
+	lockGetSessionsByTicket            sync.RWMutex
+	lockGetTagByID                     sync.RWMutex
+	lockGetTagByName                   sync.RWMutex
+	lockGetTagsByIDs                   sync.RWMutex
+	lockGetTicket                      sync.RWMutex
+	lockGetTicketByThread              sync.RWMutex
+	lockGetTicketComments              sync.RWMutex
+	lockGetTicketCommentsPaginated     sync.RWMutex
+	lockGetTicketUnpromptedComments    sync.RWMutex
+	lockGetTicketsBySpan               sync.RWMutex
+	lockGetTicketsByStatus             sync.RWMutex
+	lockGetTicketsByStatusAndSpan      sync.RWMutex
+	lockGetTicketsWithInvalidEmbedding sync.RWMutex
+	lockGetToken                       sync.RWMutex
+	lockIsTagNameExists                sync.RWMutex
+	lockListAgentMemories              sync.RWMutex
+	lockListAllTags                    sync.RWMutex
+	lockPutActivity                    sync.RWMutex
+	lockPutAlert                       sync.RWMutex
+	lockPutAlertList                   sync.RWMutex
+	lockPutHistory                     sync.RWMutex
+	lockPutSession                     sync.RWMutex
+	lockPutTicket                      sync.RWMutex
+	lockPutTicketComment               sync.RWMutex
+	lockPutTicketCommentsPrompted      sync.RWMutex
+	lockPutToken                       sync.RWMutex
+	lockRemoveTagFromAllAlerts         sync.RWMutex
+	lockRemoveTagFromAllTickets        sync.RWMutex
+	lockRemoveTagIDFromAllAlerts       sync.RWMutex
+	lockRemoveTagIDFromAllTickets      sync.RWMutex
+	lockSaveAgentMemory                sync.RWMutex
+	lockSearchAlerts                   sync.RWMutex
+	lockSearchMemoriesByEmbedding      sync.RWMutex
+	lockUnbindAlertFromTicket          sync.RWMutex
+	lockUpdateMemoryScoreBatch         sync.RWMutex
+	lockUpdateNotice                   sync.RWMutex
+	lockUpdateTag                      sync.RWMutex
 }
 
 // BatchGetAlerts calls BatchGetAlertsFunc.
@@ -4818,46 +4744,6 @@ func (mock *RepositoryMock) GetAlertsWithInvalidEmbeddingCalls() []struct {
 	return calls
 }
 
-// GetExecutionMemory calls GetExecutionMemoryFunc.
-func (mock *RepositoryMock) GetExecutionMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.ExecutionMemory, error) {
-	callInfo := struct {
-		Ctx      context.Context
-		SchemaID types.AlertSchema
-	}{
-		Ctx:      ctx,
-		SchemaID: schemaID,
-	}
-	mock.lockGetExecutionMemory.Lock()
-	mock.calls.GetExecutionMemory = append(mock.calls.GetExecutionMemory, callInfo)
-	mock.lockGetExecutionMemory.Unlock()
-	if mock.GetExecutionMemoryFunc == nil {
-		var (
-			executionMemoryOut *memory.ExecutionMemory
-			errOut             error
-		)
-		return executionMemoryOut, errOut
-	}
-	return mock.GetExecutionMemoryFunc(ctx, schemaID)
-}
-
-// GetExecutionMemoryCalls gets all the calls that were made to GetExecutionMemory.
-// Check the length with:
-//
-//	len(mockedRepository.GetExecutionMemoryCalls())
-func (mock *RepositoryMock) GetExecutionMemoryCalls() []struct {
-	Ctx      context.Context
-	SchemaID types.AlertSchema
-} {
-	var calls []struct {
-		Ctx      context.Context
-		SchemaID types.AlertSchema
-	}
-	mock.lockGetExecutionMemory.RLock()
-	calls = mock.calls.GetExecutionMemory
-	mock.lockGetExecutionMemory.RUnlock()
-	return calls
-}
-
 // GetLatestAlertByThread calls GetLatestAlertByThreadFunc.
 func (mock *RepositoryMock) GetLatestAlertByThread(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
 	callInfo := struct {
@@ -5438,46 +5324,6 @@ func (mock *RepositoryMock) GetTicketCommentsPaginatedCalls() []struct {
 	return calls
 }
 
-// GetTicketMemory calls GetTicketMemoryFunc.
-func (mock *RepositoryMock) GetTicketMemory(ctx context.Context, schemaID types.AlertSchema) (*memory.TicketMemory, error) {
-	callInfo := struct {
-		Ctx      context.Context
-		SchemaID types.AlertSchema
-	}{
-		Ctx:      ctx,
-		SchemaID: schemaID,
-	}
-	mock.lockGetTicketMemory.Lock()
-	mock.calls.GetTicketMemory = append(mock.calls.GetTicketMemory, callInfo)
-	mock.lockGetTicketMemory.Unlock()
-	if mock.GetTicketMemoryFunc == nil {
-		var (
-			ticketMemoryOut *memory.TicketMemory
-			errOut          error
-		)
-		return ticketMemoryOut, errOut
-	}
-	return mock.GetTicketMemoryFunc(ctx, schemaID)
-}
-
-// GetTicketMemoryCalls gets all the calls that were made to GetTicketMemory.
-// Check the length with:
-//
-//	len(mockedRepository.GetTicketMemoryCalls())
-func (mock *RepositoryMock) GetTicketMemoryCalls() []struct {
-	Ctx      context.Context
-	SchemaID types.AlertSchema
-} {
-	var calls []struct {
-		Ctx      context.Context
-		SchemaID types.AlertSchema
-	}
-	mock.lockGetTicketMemory.RLock()
-	calls = mock.calls.GetTicketMemory
-	mock.lockGetTicketMemory.RUnlock()
-	return calls
-}
-
 // GetTicketUnpromptedComments calls GetTicketUnpromptedCommentsFunc.
 func (mock *RepositoryMock) GetTicketUnpromptedComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
 	callInfo := struct {
@@ -5967,45 +5813,6 @@ func (mock *RepositoryMock) PutAlertListCalls() []struct {
 	return calls
 }
 
-// PutExecutionMemory calls PutExecutionMemoryFunc.
-func (mock *RepositoryMock) PutExecutionMemory(ctx context.Context, mem *memory.ExecutionMemory) error {
-	callInfo := struct {
-		Ctx context.Context
-		Mem *memory.ExecutionMemory
-	}{
-		Ctx: ctx,
-		Mem: mem,
-	}
-	mock.lockPutExecutionMemory.Lock()
-	mock.calls.PutExecutionMemory = append(mock.calls.PutExecutionMemory, callInfo)
-	mock.lockPutExecutionMemory.Unlock()
-	if mock.PutExecutionMemoryFunc == nil {
-		var (
-			errOut error
-		)
-		return errOut
-	}
-	return mock.PutExecutionMemoryFunc(ctx, mem)
-}
-
-// PutExecutionMemoryCalls gets all the calls that were made to PutExecutionMemory.
-// Check the length with:
-//
-//	len(mockedRepository.PutExecutionMemoryCalls())
-func (mock *RepositoryMock) PutExecutionMemoryCalls() []struct {
-	Ctx context.Context
-	Mem *memory.ExecutionMemory
-} {
-	var calls []struct {
-		Ctx context.Context
-		Mem *memory.ExecutionMemory
-	}
-	mock.lockPutExecutionMemory.RLock()
-	calls = mock.calls.PutExecutionMemory
-	mock.lockPutExecutionMemory.RUnlock()
-	return calls
-}
-
 // PutHistory calls PutHistoryFunc.
 func (mock *RepositoryMock) PutHistory(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
 	callInfo := struct {
@@ -6206,45 +6013,6 @@ func (mock *RepositoryMock) PutTicketCommentsPromptedCalls() []struct {
 	mock.lockPutTicketCommentsPrompted.RLock()
 	calls = mock.calls.PutTicketCommentsPrompted
 	mock.lockPutTicketCommentsPrompted.RUnlock()
-	return calls
-}
-
-// PutTicketMemory calls PutTicketMemoryFunc.
-func (mock *RepositoryMock) PutTicketMemory(ctx context.Context, mem *memory.TicketMemory) error {
-	callInfo := struct {
-		Ctx context.Context
-		Mem *memory.TicketMemory
-	}{
-		Ctx: ctx,
-		Mem: mem,
-	}
-	mock.lockPutTicketMemory.Lock()
-	mock.calls.PutTicketMemory = append(mock.calls.PutTicketMemory, callInfo)
-	mock.lockPutTicketMemory.Unlock()
-	if mock.PutTicketMemoryFunc == nil {
-		var (
-			errOut error
-		)
-		return errOut
-	}
-	return mock.PutTicketMemoryFunc(ctx, mem)
-}
-
-// PutTicketMemoryCalls gets all the calls that were made to PutTicketMemory.
-// Check the length with:
-//
-//	len(mockedRepository.PutTicketMemoryCalls())
-func (mock *RepositoryMock) PutTicketMemoryCalls() []struct {
-	Ctx context.Context
-	Mem *memory.TicketMemory
-} {
-	var calls []struct {
-		Ctx context.Context
-		Mem *memory.TicketMemory
-	}
-	mock.lockPutTicketMemory.RLock()
-	calls = mock.calls.PutTicketMemory
-	mock.lockPutTicketMemory.RUnlock()
 	return calls
 }
 
@@ -6531,54 +6299,6 @@ func (mock *RepositoryMock) SearchAlertsCalls() []struct {
 	mock.lockSearchAlerts.RLock()
 	calls = mock.calls.SearchAlerts
 	mock.lockSearchAlerts.RUnlock()
-	return calls
-}
-
-// SearchExecutionMemoriesByEmbedding calls SearchExecutionMemoriesByEmbeddingFunc.
-func (mock *RepositoryMock) SearchExecutionMemoriesByEmbedding(ctx context.Context, schemaID types.AlertSchema, embedding []float32, limit int) ([]*memory.ExecutionMemory, error) {
-	callInfo := struct {
-		Ctx       context.Context
-		SchemaID  types.AlertSchema
-		Embedding []float32
-		Limit     int
-	}{
-		Ctx:       ctx,
-		SchemaID:  schemaID,
-		Embedding: embedding,
-		Limit:     limit,
-	}
-	mock.lockSearchExecutionMemoriesByEmbedding.Lock()
-	mock.calls.SearchExecutionMemoriesByEmbedding = append(mock.calls.SearchExecutionMemoriesByEmbedding, callInfo)
-	mock.lockSearchExecutionMemoriesByEmbedding.Unlock()
-	if mock.SearchExecutionMemoriesByEmbeddingFunc == nil {
-		var (
-			executionMemorysOut []*memory.ExecutionMemory
-			errOut              error
-		)
-		return executionMemorysOut, errOut
-	}
-	return mock.SearchExecutionMemoriesByEmbeddingFunc(ctx, schemaID, embedding, limit)
-}
-
-// SearchExecutionMemoriesByEmbeddingCalls gets all the calls that were made to SearchExecutionMemoriesByEmbedding.
-// Check the length with:
-//
-//	len(mockedRepository.SearchExecutionMemoriesByEmbeddingCalls())
-func (mock *RepositoryMock) SearchExecutionMemoriesByEmbeddingCalls() []struct {
-	Ctx       context.Context
-	SchemaID  types.AlertSchema
-	Embedding []float32
-	Limit     int
-} {
-	var calls []struct {
-		Ctx       context.Context
-		SchemaID  types.AlertSchema
-		Embedding []float32
-		Limit     int
-	}
-	mock.lockSearchExecutionMemoriesByEmbedding.RLock()
-	calls = mock.calls.SearchExecutionMemoriesByEmbedding
-	mock.lockSearchExecutionMemoriesByEmbedding.RUnlock()
 	return calls
 }
 
