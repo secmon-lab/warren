@@ -226,7 +226,7 @@ func (r *Firestore) PutKnowledge(ctx context.Context, k *knowledge.Knowledge) er
 	slugRef := r.slugDoc(k.Topic, k.Slug)
 	job1, err := bw.Set(slugRef, slugDoc{
 		State: types.KnowledgeStateActive.String(),
-	}, firestore.MergeAll)
+	}, firestore.Merge([]firestore.FieldPath{{"State"}}...))
 	if err != nil {
 		return r.eb.Wrap(err, "failed to set slug state", goerr.V("topic", k.Topic), goerr.V("slug", k.Slug))
 	}
@@ -263,7 +263,7 @@ func (r *Firestore) PutKnowledge(ctx context.Context, k *knowledge.Knowledge) er
 func (r *Firestore) ArchiveKnowledge(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) error {
 	_, err := r.slugDoc(topic, slug).Set(ctx, slugDoc{
 		State: types.KnowledgeStateArchived.String(),
-	}, firestore.MergeAll)
+	}, firestore.Merge([]firestore.FieldPath{{"State"}}...))
 	if err != nil {
 		return r.eb.Wrap(err, "failed to archive knowledge", goerr.V("topic", topic), goerr.V("slug", slug))
 	}
