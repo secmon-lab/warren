@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	DefaultKnowledgeTopic     = "default"
 	DefaultKnowledgeSizeLimit = 10 * 1024 // 10KB
 )
 
@@ -28,23 +29,37 @@ func New(repo interfaces.Repository) *Service {
 	}
 }
 
+// normalizeKnowledgeTopic converts empty topic to default topic
+func normalizeKnowledgeTopic(topic types.KnowledgeTopic) types.KnowledgeTopic {
+	if topic == "" {
+		return types.KnowledgeTopic(DefaultKnowledgeTopic)
+	}
+	return topic
+}
+
 // GetKnowledges retrieves all active knowledges for a topic
 func (s *Service) GetKnowledges(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.Knowledge, error) {
+	topic = normalizeKnowledgeTopic(topic)
 	return s.repo.GetKnowledges(ctx, topic)
 }
 
 // GetKnowledge retrieves a specific knowledge by slug
 func (s *Service) GetKnowledge(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) (*knowledge.Knowledge, error) {
+	topic = normalizeKnowledgeTopic(topic)
 	return s.repo.GetKnowledge(ctx, topic, slug)
 }
 
 // ListSlugs returns all slugs and names for a topic
 func (s *Service) ListSlugs(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.SlugInfo, error) {
+	topic = normalizeKnowledgeTopic(topic)
 	return s.repo.ListKnowledgeSlugs(ctx, topic)
 }
 
 // SaveKnowledge saves a new version of a knowledge with quota check
 func (s *Service) SaveKnowledge(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug, name, content string, author types.UserID) (string, error) {
+	// Normalize topic before validation
+	topic = normalizeKnowledgeTopic(topic)
+
 	// Validate input
 	if err := topic.Validate(); err != nil {
 		return "", goerr.Wrap(err, "invalid topic")
@@ -125,6 +140,9 @@ func (s *Service) SaveKnowledge(ctx context.Context, topic types.KnowledgeTopic,
 
 // ArchiveKnowledge archives a knowledge
 func (s *Service) ArchiveKnowledge(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) error {
+	// Normalize topic before validation
+	topic = normalizeKnowledgeTopic(topic)
+
 	if err := topic.Validate(); err != nil {
 		return goerr.Wrap(err, "invalid topic")
 	}
