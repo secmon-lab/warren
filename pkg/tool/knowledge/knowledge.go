@@ -55,9 +55,33 @@ func (x *Knowledge) LogValue() slog.Value {
 }
 
 func (x *Knowledge) Prompt(ctx context.Context) (string, error) {
-	// Knowledges are injected directly into templates via params, not via this method
-	// This method is kept for interface compatibility but returns empty string
-	return "", nil
+	return `## Knowledge Management
+
+**CRITICAL**: Save/store/remember requests MUST use tools, not just words.
+
+### Requests Requiring Tool Execution
+- Save/store/remember → ` + "`knowledge_save`" + `
+- Delete/archive → ` + "`knowledge_archive`" + `
+
+### Examples
+
+❌ WRONG:
+User: "Remember this alert needs no action"
+Agent: {"needs_plan": false, "direct_response": "Understood"}
+→ Nothing is saved!
+
+✅ CORRECT:
+User: "Remember this alert needs no action"
+Agent: {"needs_plan": true, "tasks": [{"description": "Use knowledge_save..."}]}
+→ Actually saved.
+
+### Workflow
+1. List: ` + "`knowledge_list`" + `
+2. Check existing: ` + "`knowledge_get`" + `
+3. Save/update: ` + "`knowledge_save`" + `
+4. Confirm with commit ID
+
+Current topic: ` + "`" + x.topic.String() + "`", nil
 }
 
 const (
