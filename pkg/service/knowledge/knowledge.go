@@ -37,6 +37,18 @@ func normalizeKnowledgeTopic(topic types.KnowledgeTopic) types.KnowledgeTopic {
 	return topic
 }
 
+<<<<<<< HEAD
+=======
+// normalizeAndValidateTopic normalizes and validates the topic
+func normalizeAndValidateTopic(topic types.KnowledgeTopic) (types.KnowledgeTopic, error) {
+	normalized := normalizeKnowledgeTopic(topic)
+	if err := normalized.Validate(); err != nil {
+		return "", goerr.Wrap(err, "invalid topic")
+	}
+	return normalized, nil
+}
+
+>>>>>>> fix/knowledge-empty-topic-handling
 // GetKnowledges retrieves all active knowledges for a topic
 func (s *Service) GetKnowledges(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.Knowledge, error) {
 	topic = normalizeKnowledgeTopic(topic)
@@ -57,12 +69,20 @@ func (s *Service) ListSlugs(ctx context.Context, topic types.KnowledgeTopic) ([]
 
 // SaveKnowledge saves a new version of a knowledge with quota check
 func (s *Service) SaveKnowledge(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug, name, content string, author types.UserID) (string, error) {
+<<<<<<< HEAD
 	// Normalize topic before validation
 	topic = normalizeKnowledgeTopic(topic)
 
 	// Validate input
 	if err := topic.Validate(); err != nil {
 		return "", goerr.Wrap(err, "invalid topic")
+=======
+	// Normalize and validate topic
+	var err error
+	topic, err = normalizeAndValidateTopic(topic)
+	if err != nil {
+		return "", err
+>>>>>>> fix/knowledge-empty-topic-handling
 	}
 	if err := slug.Validate(); err != nil {
 		return "", goerr.Wrap(err, "invalid slug")
@@ -140,11 +160,19 @@ func (s *Service) SaveKnowledge(ctx context.Context, topic types.KnowledgeTopic,
 
 // ArchiveKnowledge archives a knowledge
 func (s *Service) ArchiveKnowledge(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) error {
+<<<<<<< HEAD
 	// Normalize topic before validation
 	topic = normalizeKnowledgeTopic(topic)
 
 	if err := topic.Validate(); err != nil {
 		return goerr.Wrap(err, "invalid topic")
+=======
+	// Normalize and validate topic
+	var err error
+	topic, err = normalizeAndValidateTopic(topic)
+	if err != nil {
+		return err
+>>>>>>> fix/knowledge-empty-topic-handling
 	}
 	if err := slug.Validate(); err != nil {
 		return goerr.Wrap(err, "invalid slug")
