@@ -158,9 +158,16 @@ func TestServiceValidation(t *testing.T) {
 		gt.Error(t, err)
 	})
 
-	t.Run("empty topic", func(t *testing.T) {
-		_, err := svc.SaveKnowledge(ctx, "", slug, "Name", "Content", types.SystemUserID)
-		gt.Error(t, err)
+	t.Run("empty topic defaults to 'default'", func(t *testing.T) {
+		commitID, err := svc.SaveKnowledge(ctx, "", slug, "Name", "Content", types.SystemUserID)
+		gt.NoError(t, err)
+		gt.V(t, commitID).NotEqual("")
+
+		// Verify knowledge was saved with default topic
+		k, err := svc.GetKnowledge(ctx, types.KnowledgeTopic(knowledge.DefaultKnowledgeTopic), slug)
+		gt.NoError(t, err)
+		gt.V(t, k).NotNil()
+		gt.Equal(t, k.Topic, types.KnowledgeTopic(knowledge.DefaultKnowledgeTopic))
 	})
 
 	t.Run("empty slug", func(t *testing.T) {
