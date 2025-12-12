@@ -131,9 +131,14 @@ func userBatchFn(slackClient interfaces.SlackClient) func(ctx context.Context, k
 				// Create map for O(1) lookup
 				userMap := make(map[string]*graphql1.User)
 				for _, slackUser := range *slackUsers {
+					icon := slackUser.Profile.Image48
+					if icon == "" {
+						icon = slackUser.Profile.Image32
+					}
 					userMap[slackUser.ID] = &graphql1.User{
 						ID:   slackUser.ID,
 						Name: slackUser.Name,
+						Icon: &icon,
 					}
 				}
 
