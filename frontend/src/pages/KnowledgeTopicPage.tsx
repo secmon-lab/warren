@@ -214,18 +214,27 @@ export default function KnowledgeTopicPage() {
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            <Avatar className="h-4 w-4">
-                              {knowledge.author.icon && (
-                                <AvatarImage
-                                  src={knowledge.author.icon}
-                                  alt={knowledge.author.name}
-                                />
-                              )}
-                              <AvatarFallback className="text-[10px]">
-                                {knowledge.author.name.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span>{knowledge.author.name}</span>
+                            {knowledge.author.id === "system" ? (
+                              <>
+                                <span className="text-base">🤖</span>
+                                <span>{knowledge.author.name}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Avatar className="h-4 w-4">
+                                  {knowledge.author.icon && (
+                                    <AvatarImage
+                                      src={knowledge.author.icon}
+                                      alt={knowledge.author.name}
+                                    />
+                                  )}
+                                  <AvatarFallback className="text-[10px]">
+                                    {knowledge.author.name.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span>{knowledge.author.name}</span>
+                              </>
+                            )}
                           </div>
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
