@@ -7,7 +7,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -754,8 +753,8 @@ func TestDataLoaderIntegration(t *testing.T) {
 		gt.Number(t, individualAlertCalls).Equal(0)
 	})
 
-	t.Run("Slack_API_Error_Propagation", func(t *testing.T) {
-		// Test that Slack API errors are properly propagated to GraphQL responses
+	t.Run("Slack_API_Error_Fallback", func(t *testing.T) {
+		// Test that Slack API errors trigger fallback behavior (user ID as name)
 		repo := setupGraphQLTestData(t)
 
 		// Setup mock Slack service with error
@@ -802,9 +801,33 @@ func TestDataLoaderIntegration(t *testing.T) {
 		resp, err := sendGraphQLRequest(server.URL, req)
 		gt.NoError(t, err)
 
-		// Verify that GraphQL errors are returned
-		gt.Array(t, resp.Errors).Length(1)
-		gt.True(t, strings.Contains(resp.Errors[0].Message, "failed to fetch user info from Slack"))
-		gt.True(t, strings.Contains(resp.Errors[0].Message, "slack API rate limit exceeded"))
+		// Verify that query succeeds with fallback behavior (no GraphQL errors)
+		gt.Array(t, resp.Errors).Length(0)
+
+		// Verify that user data falls back to user ID
+		var result struct {
+			Activities struct {
+				Activities []struct {
+					ID   string
+					Type string
+					User *struct {
+						ID   string
+						Name string
+					}
+				}
+			}
+		}
+		// Marshal resp.Data back to JSON, then unmarshal to our struct
+		dataBytes, err := json.Marshal(resp.Data)
+		gt.NoError(t, err)
+		gt.NoError(t, json.Unmarshal(dataBytes, &result))
+
+		// Should have at least one activity with user fallback
+		gt.Array(t, result.Activities.Activities).Longer(0)
+		activity := result.Activities.Activities[0]
+		if activity.User != nil {
+			// User ID and Name should be the same (fallback behavior)
+			gt.Value(t, activity.User.ID).Equal(activity.User.Name)
+		}
 	})
 }

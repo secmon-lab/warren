@@ -117,11 +117,12 @@ func userBatchFn(slackClient interfaces.SlackClient) func(ctx context.Context, k
 			// Use batch API to fetch all users at once
 			slackUsers, err := slackClient.GetUsersInfo(keys...)
 			if err != nil {
-				// If Slack API fails, propagate error to all keys
-				for i := range keys {
+				// If Slack API fails with user_not_found or similar errors, fallback to ID instead of propagating error
+				// This prevents the entire query from failing when some users don't exist in Slack
+				for i, id := range keys {
 					results[i] = &dataloader.Result[*graphql1.User]{
-						Data:  nil,
-						Error: goerr.Wrap(err, "failed to fetch user info from Slack", goerr.V("user_ids", keys)),
+						Data:  &graphql1.User{ID: id, Name: id},
+						Error: nil,
 					}
 				}
 				return results

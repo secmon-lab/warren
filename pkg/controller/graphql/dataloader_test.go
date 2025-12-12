@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"testing"
 
@@ -198,7 +197,7 @@ func TestErrorHandling(t *testing.T) {
 		gt.Error(t, err)
 	})
 
-	t.Run("Slack API errors are propagated", func(t *testing.T) {
+	t.Run("Slack API errors fallback to ID", func(t *testing.T) {
 		repo, slackClient := setupTestData()
 
 		// Set slack client to simulate error for batch method
@@ -209,11 +208,11 @@ func TestErrorHandling(t *testing.T) {
 		loaders := NewDataLoaders(repo, slackClient)
 		ctx := context.Background()
 
-		// Test user error handling - Slack API errors should now be propagated
-		_, err := GetUserWithLoaders(ctx, loaders, "user1")
-		gt.Error(t, err) // Should error with Slack API error
-		gt.True(t, strings.Contains(err.Error(), "failed to fetch user info from Slack"))
-		gt.True(t, strings.Contains(err.Error(), "simulated slack batch error"))
+		// Test user error handling - Slack API errors should fallback to ID to prevent query failures
+		user, err := GetUserWithLoaders(ctx, loaders, "user1")
+		gt.NoError(t, err) // Should not error, falls back to ID
+		gt.Equal(t, user.ID, "user1")
+		gt.Equal(t, user.Name, "user1") // Fallback to ID
 	})
 
 	t.Run("Nil SlackClient falls back without error", func(t *testing.T) {
