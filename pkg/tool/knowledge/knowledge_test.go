@@ -173,9 +173,18 @@ func TestKnowledgeToolPrompt(t *testing.T) {
 	topic := types.KnowledgeTopic(fmt.Sprintf("test-topic-%d", time.Now().UnixNano()))
 	tool.SetTopic(topic)
 
-	// Prompt method always returns empty string
-	// Knowledge formatting is done in templates
+	// Prompt method now returns guidance to help LLM use knowledge tools correctly
 	prompt, err := tool.Prompt(ctx)
 	gt.NoError(t, err)
-	gt.Equal(t, prompt, "")
+	gt.V(t, prompt).NotEqual("")
+	// Verify key elements are present in the guidance
+	if !strings.Contains(prompt, "CRITICAL") {
+		t.Error("Prompt should contain CRITICAL instruction")
+	}
+	if !strings.Contains(prompt, "knowledge_save") {
+		t.Error("Prompt should mention knowledge_save")
+	}
+	if !strings.Contains(prompt, topic.String()) {
+		t.Error("Prompt should include current topic")
+	}
 }
