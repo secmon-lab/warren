@@ -77,6 +77,18 @@ type DashboardStats struct {
 	UnboundAlerts      []*alert.Alert   `json:"unboundAlerts"`
 }
 
+type Knowledge struct {
+	Slug      string `json:"slug"`
+	Name      string `json:"name"`
+	Topic     string `json:"topic"`
+	Content   string `json:"content"`
+	CommitID  string `json:"commitID"`
+	Author    *User  `json:"author"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+	State     string `json:"state"`
+}
+
 type Mutation struct {
 }
 
@@ -100,6 +112,11 @@ type TagObject struct {
 type TicketsResponse struct {
 	Tickets    []*ticket.Ticket `json:"tickets"`
 	TotalCount int              `json:"totalCount"`
+}
+
+type TopicSummary struct {
+	Topic string `json:"topic"`
+	Count int    `json:"count"`
 }
 
 type UpdateTagInput struct {

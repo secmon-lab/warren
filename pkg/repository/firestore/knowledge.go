@@ -284,3 +284,51 @@ func (r *Firestore) CalculateKnowledgeSize(ctx context.Context, topic types.Know
 
 	return totalSize, nil
 }
+
+func (r *Firestore) ListKnowledgeTopics(ctx context.Context) ([]*knowledge.TopicSummary, error) {
+	// Use CollectionGroup to find all knowledge documents across all topics
+	iter := r.db.CollectionGroup(collectionKnowledges).Documents(ctx)
+	defer iter.Stop()
+
+	// Map to track unique topics and their counts
+	topicCounts := make(map[types.KnowledgeTopic]int)
+
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, r.eb.Wrap(err, "failed to iterate knowledge documents")
+		}
+
+		// Parse the slug document to check if it's active
+		var slug slugDoc
+		if err := doc.DataTo(&slug); err != nil {
+			return nil, r.eb.Wrap(err, "failed to parse slug document")
+		}
+
+		state := types.KnowledgeState(slug.State)
+		if !state.IsActive() {
+			continue
+		}
+
+		// Extract topic from document path: topics/{topic}/knowledges/{slug}
+		// doc.Ref.Parent.Parent.ID gives us the topic document ID
+		if doc.Ref.Parent != nil && doc.Ref.Parent.Parent != nil {
+			topic := types.KnowledgeTopic(doc.Ref.Parent.Parent.ID)
+			topicCounts[topic]++
+		}
+	}
+
+	// Convert map to slice
+	var result []*knowledge.TopicSummary
+	for topic, count := range topicCounts {
+		result = append(result, &knowledge.TopicSummary{
+			Topic: topic,
+			Count: count,
+		})
+	}
+
+	return result, nil
+}

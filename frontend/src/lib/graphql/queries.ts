@@ -391,8 +391,18 @@ export const CREATE_TICKET = gql`
 `;
 
 export const GET_SIMILAR_TICKETS = gql`
-  query GetSimilarTickets($ticketId: ID!, $threshold: Float!, $offset: Int, $limit: Int) {
-    similarTickets(ticketId: $ticketId, threshold: $threshold, offset: $offset, limit: $limit) {
+  query GetSimilarTickets(
+    $ticketId: ID!
+    $threshold: Float!
+    $offset: Int
+    $limit: Int
+  ) {
+    similarTickets(
+      ticketId: $ticketId
+      threshold: $threshold
+      offset: $offset
+      limit: $limit
+    ) {
       tickets {
         id
         status
@@ -412,8 +422,18 @@ export const GET_SIMILAR_TICKETS = gql`
 `;
 
 export const GET_SIMILAR_TICKETS_FOR_ALERT = gql`
-  query GetSimilarTicketsForAlert($alertId: ID!, $threshold: Float!, $offset: Int, $limit: Int) {
-    similarTicketsForAlert(alertId: $alertId, threshold: $threshold, offset: $offset, limit: $limit) {
+  query GetSimilarTicketsForAlert(
+    $alertId: ID!
+    $threshold: Float!
+    $offset: Int
+    $limit: Int
+  ) {
+    similarTicketsForAlert(
+      alertId: $alertId
+      threshold: $threshold
+      offset: $offset
+      limit: $limit
+    ) {
       tickets {
         id
         status
@@ -433,8 +453,20 @@ export const GET_SIMILAR_TICKETS_FOR_ALERT = gql`
 `;
 
 export const GET_UNBOUND_ALERTS = gql`
-  query GetNewAlerts($threshold: Float, $keyword: String, $ticketId: ID, $offset: Int, $limit: Int) {
-    unboundAlerts(threshold: $threshold, keyword: $keyword, ticketId: $ticketId, offset: $offset, limit: $limit) {
+  query GetNewAlerts(
+    $threshold: Float
+    $keyword: String
+    $ticketId: ID
+    $offset: Int
+    $limit: Int
+  ) {
+    unboundAlerts(
+      threshold: $threshold
+      keyword: $keyword
+      ticketId: $ticketId
+      offset: $offset
+      limit: $limit
+    ) {
       alerts {
         id
         title
@@ -470,8 +502,16 @@ export const BIND_ALERTS_TO_TICKET = gql`
 `;
 
 export const CREATE_TICKET_FROM_ALERTS = gql`
-  mutation CreateTicketFromAlerts($alertIds: [ID!]!, $title: String, $description: String) {
-    createTicketFromAlerts(alertIds: $alertIds, title: $title, description: $description) {
+  mutation CreateTicketFromAlerts(
+    $alertIds: [ID!]!
+    $title: String
+    $description: String
+  ) {
+    createTicketFromAlerts(
+      alertIds: $alertIds
+      title: $title
+      description: $description
+    ) {
       id
       status
       title
@@ -495,8 +535,22 @@ export const CREATE_TICKET_FROM_ALERTS = gql`
 `;
 
 export const GET_ALERT_CLUSTERS = gql`
-  query AlertClusters($limit: Int, $offset: Int, $minClusterSize: Int, $eps: Float, $minSamples: Int, $keyword: String) {
-    alertClusters(limit: $limit, offset: $offset, minClusterSize: $minClusterSize, eps: $eps, minSamples: $minSamples, keyword: $keyword) {
+  query AlertClusters(
+    $limit: Int
+    $offset: Int
+    $minClusterSize: Int
+    $eps: Float
+    $minSamples: Int
+    $keyword: String
+  ) {
+    alertClusters(
+      limit: $limit
+      offset: $offset
+      minClusterSize: $minClusterSize
+      eps: $eps
+      minSamples: $minSamples
+      keyword: $keyword
+    ) {
       clusters {
         id
         size
@@ -529,8 +583,18 @@ export const GET_ALERT_CLUSTERS = gql`
 `;
 
 export const GET_CLUSTER_ALERTS = gql`
-  query ClusterAlerts($clusterID: ID!, $keyword: String, $limit: Int, $offset: Int) {
-    clusterAlerts(clusterID: $clusterID, keyword: $keyword, limit: $limit, offset: $offset) {
+  query ClusterAlerts(
+    $clusterID: ID!
+    $keyword: String
+    $limit: Int
+    $offset: Int
+  ) {
+    clusterAlerts(
+      clusterID: $clusterID
+      keyword: $keyword
+      limit: $limit
+      offset: $offset
+    ) {
       alerts {
         id
         title
@@ -630,6 +694,34 @@ export const UPDATE_TICKET_TAGS = gql`
         id
         name
       }
+    }
+  }
+`;
+
+export const GET_KNOWLEDGE_TOPICS = gql`
+  query GetKnowledgeTopics {
+    knowledgeTopics {
+      topic
+      count
+    }
+  }
+`;
+
+export const GET_KNOWLEDGES_BY_TOPIC = gql`
+  query GetKnowledgesByTopic($topic: String!) {
+    knowledgesByTopic(topic: $topic) {
+      slug
+      name
+      topic
+      content
+      commitID
+      author {
+        id
+        name
+      }
+      createdAt
+      updatedAt
+      state
     }
   }
 `;

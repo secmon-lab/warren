@@ -153,4 +153,7 @@ type Repository interface {
 
 	// CalculateKnowledgeSize returns total content size for non-archived knowledges in a topic
 	CalculateKnowledgeSize(ctx context.Context, topic types.KnowledgeTopic) (int, error)
+
+	// ListKnowledgeTopics returns all topics with their knowledge counts (non-archived only)
+	ListKnowledgeTopics(ctx context.Context) ([]*knowledge.TopicSummary, error)
 }
