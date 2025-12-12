@@ -49,6 +49,10 @@ models:
         resolver: true
       ticket:
         resolver: true
+  Knowledge:
+    fields:
+      author:
+        resolver: true
   ID:
     model:
       - github.com/99designs/gqlgen/graphql.ID

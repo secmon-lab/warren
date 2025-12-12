@@ -44,6 +44,7 @@ type ResolverRoot interface {
 	Alert() AlertResolver
 	Comment() CommentResolver
 	Finding() FindingResolver
+	Knowledge() KnowledgeResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
 	Ticket() TicketResolver
@@ -153,6 +154,7 @@ type ComplexityRoot struct {
 
 	Knowledge struct {
 		Author    func(childComplexity int) int
+		AuthorID  func(childComplexity int) int
 		CommitID  func(childComplexity int) int
 		Content   func(childComplexity int) int
 		CreatedAt func(childComplexity int) int
@@ -164,12 +166,15 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
+		ArchiveKnowledge            func(childComplexity int, topic string, slug string) int
 		BindAlertsToTicket          func(childComplexity int, ticketID string, alertIds []string) int
+		CreateKnowledge             func(childComplexity int, input graphql1.CreateKnowledgeInput) int
 		CreateTag                   func(childComplexity int, name string) int
 		CreateTicket                func(childComplexity int, title string, description string, isTest *bool) int
 		CreateTicketFromAlerts      func(childComplexity int, alertIds []string, title *string, description *string) int
 		DeleteTag                   func(childComplexity int, id string) int
 		UpdateAlertTags             func(childComplexity int, alertID string, tagIds []string) int
+		UpdateKnowledge             func(childComplexity int, input graphql1.UpdateKnowledgeInput) int
 		UpdateMultipleTicketsStatus func(childComplexity int, ids []string, status string) int
 		UpdateTag                   func(childComplexity int, input graphql1.UpdateTagInput) int
 		UpdateTicket                func(childComplexity int, id string, title string, description *string) int
@@ -247,6 +252,7 @@ type ComplexityRoot struct {
 
 	User struct {
 		ID   func(childComplexity int) int
+		Icon func(childComplexity int) int
 		Name func(childComplexity int) int
 	}
 }
@@ -277,6 +283,9 @@ type CommentResolver interface {
 type FindingResolver interface {
 	Severity(ctx context.Context, obj *ticket.Finding) (string, error)
 }
+type KnowledgeResolver interface {
+	Author(ctx context.Context, obj *graphql1.Knowledge) (*graphql1.User, error)
+}
 type MutationResolver interface {
 	UpdateTicketStatus(ctx context.Context, id string, status string) (*ticket.Ticket, error)
 	UpdateMultipleTicketsStatus(ctx context.Context, ids []string, status string) ([]*ticket.Ticket, error)
@@ -290,6 +299,9 @@ type MutationResolver interface {
 	CreateTag(ctx context.Context, name string) (*graphql1.TagMetadata, error)
 	DeleteTag(ctx context.Context, id string) (bool, error)
 	UpdateTag(ctx context.Context, input graphql1.UpdateTagInput) (*graphql1.TagMetadata, error)
+	CreateKnowledge(ctx context.Context, input graphql1.CreateKnowledgeInput) (*graphql1.Knowledge, error)
+	UpdateKnowledge(ctx context.Context, input graphql1.UpdateKnowledgeInput) (*graphql1.Knowledge, error)
+	ArchiveKnowledge(ctx context.Context, topic string, slug string) (bool, error)
 }
 type QueryResolver interface {
 	Ticket(ctx context.Context, id string) (*ticket.Ticket, error)
@@ -722,6 +734,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Knowledge.Author(childComplexity), true
+	case "Knowledge.authorID":
+		if e.complexity.Knowledge.AuthorID == nil {
+			break
+		}
+
+		return e.complexity.Knowledge.AuthorID(childComplexity), true
 	case "Knowledge.commitID":
 		if e.complexity.Knowledge.CommitID == nil {
 			break
@@ -771,6 +789,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Knowledge.UpdatedAt(childComplexity), true
 
+	case "Mutation.archiveKnowledge":
+		if e.complexity.Mutation.ArchiveKnowledge == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_archiveKnowledge_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ArchiveKnowledge(childComplexity, args["topic"].(string), args["slug"].(string)), true
 	case "Mutation.bindAlertsToTicket":
 		if e.complexity.Mutation.BindAlertsToTicket == nil {
 			break
@@ -782,6 +811,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.BindAlertsToTicket(childComplexity, args["ticketId"].(string), args["alertIds"].([]string)), true
+	case "Mutation.createKnowledge":
+		if e.complexity.Mutation.CreateKnowledge == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createKnowledge_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CreateKnowledge(childComplexity, args["input"].(graphql1.CreateKnowledgeInput)), true
 	case "Mutation.createTag":
 		if e.complexity.Mutation.CreateTag == nil {
 			break
@@ -837,6 +877,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.UpdateAlertTags(childComplexity, args["alertId"].(string), args["tagIds"].([]string)), true
+	case "Mutation.updateKnowledge":
+		if e.complexity.Mutation.UpdateKnowledge == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateKnowledge_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateKnowledge(childComplexity, args["input"].(graphql1.UpdateKnowledgeInput)), true
 	case "Mutation.updateMultipleTicketsStatus":
 		if e.complexity.Mutation.UpdateMultipleTicketsStatus == nil {
 			break
@@ -1275,6 +1326,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.User.ID(childComplexity), true
+	case "User.icon":
+		if e.complexity.User.Icon == nil {
+			break
+		}
+
+		return e.complexity.User.Icon(childComplexity), true
 	case "User.name":
 		if e.complexity.User.Name == nil {
 			break
@@ -1290,6 +1347,8 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
 	ec := executionContext{opCtx, e, 0, 0, make(chan graphql.DeferredResult)}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputCreateKnowledgeInput,
+		ec.unmarshalInputUpdateKnowledgeInput,
 		ec.unmarshalInputUpdateTagInput,
 	)
 	first := true
@@ -1419,6 +1478,7 @@ type Ticket {
 type User {
   id: ID!
   name: String!
+  icon: String
 }
 
 type Comment {
@@ -1536,16 +1596,44 @@ type AlertsConnection {
 type Query {
   ticket(id: ID!): Ticket
   tickets(statuses: [String!], offset: Int, limit: Int): TicketsResponse!
-  similarTickets(ticketId: ID!, threshold: Float!, offset: Int, limit: Int): TicketsResponse!
-  similarTicketsForAlert(alertId: ID!, threshold: Float!, offset: Int, limit: Int): TicketsResponse!
+  similarTickets(
+    ticketId: ID!
+    threshold: Float!
+    offset: Int
+    limit: Int
+  ): TicketsResponse!
+  similarTicketsForAlert(
+    alertId: ID!
+    threshold: Float!
+    offset: Int
+    limit: Int
+  ): TicketsResponse!
   ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
   alert(id: ID!): Alert
   alerts(offset: Int, limit: Int): AlertsResponse!
-  unboundAlerts(threshold: Float, keyword: String, ticketId: ID, offset: Int, limit: Int): AlertsResponse!
+  unboundAlerts(
+    threshold: Float
+    keyword: String
+    ticketId: ID
+    offset: Int
+    limit: Int
+  ): AlertsResponse!
   dashboard: DashboardStats!
   activities(offset: Int, limit: Int): ActivitiesResponse!
-  alertClusters(limit: Int, offset: Int, minClusterSize: Int, eps: Float, minSamples: Int, keyword: String): ClusteringSummary!
-  clusterAlerts(clusterID: ID!, keyword: String, limit: Int, offset: Int): AlertsConnection!
+  alertClusters(
+    limit: Int
+    offset: Int
+    minClusterSize: Int
+    eps: Float
+    minSamples: Int
+    keyword: String
+  ): ClusteringSummary!
+  clusterAlerts(
+    clusterID: ID!
+    keyword: String
+    limit: Int
+    offset: Int
+  ): AlertsConnection!
   tags: [TagMetadata!]!
   availableTagColors: [String!]!
   availableTagColorNames: [String!]!
@@ -1557,7 +1645,11 @@ type Mutation {
   updateTicketConclusion(id: ID!, conclusion: String!, reason: String!): Ticket!
   updateTicket(id: ID!, title: String!, description: String): Ticket!
   createTicket(title: String!, description: String!, isTest: Boolean): Ticket!
-  createTicketFromAlerts(alertIds: [ID!]!, title: String, description: String): Ticket!
+  createTicketFromAlerts(
+    alertIds: [ID!]!
+    title: String
+    description: String
+  ): Ticket!
   bindAlertsToTicket(ticketId: ID!, alertIds: [ID!]!): Ticket!
   updateAlertTags(alertId: ID!, tagIds: [ID!]!): Alert!
   updateTicketTags(ticketId: ID!, tagIds: [ID!]!): Ticket!
@@ -1573,12 +1665,27 @@ input UpdateTagInput {
   description: String
 }
 
+input CreateKnowledgeInput {
+  topic: String!
+  slug: String!
+  name: String!
+  content: String!
+}
+
+input UpdateKnowledgeInput {
+  topic: String!
+  slug: String!
+  name: String!
+  content: String!
+}
+
 type Knowledge {
   slug: String!
   name: String!
   topic: String!
   content: String!
   commitID: String!
+  authorID: String!
   author: User!
   createdAt: String!
   updatedAt: String!
@@ -1595,6 +1702,12 @@ extend type Query {
   knowledgesByTopic(topic: String!): [Knowledge!]!
 }
 
+extend type Mutation {
+  createKnowledge(input: CreateKnowledgeInput!): Knowledge!
+  updateKnowledge(input: UpdateKnowledgeInput!): Knowledge!
+  archiveKnowledge(topic: String!, slug: String!): Boolean!
+}
+
 schema {
   query: Query
   mutation: Mutation
@@ -1606,6 +1719,22 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_Mutation_archiveKnowledge_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "topic", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["topic"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "slug", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["slug"] = arg1
+	return args, nil
+}
 
 func (ec *executionContext) field_Mutation_bindAlertsToTicket_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
@@ -1620,6 +1749,17 @@ func (ec *executionContext) field_Mutation_bindAlertsToTicket_args(ctx context.C
 		return nil, err
 	}
 	args["alertIds"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_createKnowledge_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNCreateKnowledgeInput2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐCreateKnowledgeInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -1700,6 +1840,17 @@ func (ec *executionContext) field_Mutation_updateAlertTags_args(ctx context.Cont
 		return nil, err
 	}
 	args["tagIds"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateKnowledge_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNUpdateKnowledgeInput2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐUpdateKnowledgeInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -2477,6 +2628,8 @@ func (ec *executionContext) fieldContext_Activity_user(_ context.Context, field 
 				return ec.fieldContext_User_id(ctx, field)
 			case "name":
 				return ec.fieldContext_User_name(ctx, field)
+			case "icon":
+				return ec.fieldContext_User_icon(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -3721,6 +3874,8 @@ func (ec *executionContext) fieldContext_Comment_user(_ context.Context, field g
 				return ec.fieldContext_User_id(ctx, field)
 			case "name":
 				return ec.fieldContext_User_name(ctx, field)
+			case "icon":
+				return ec.fieldContext_User_icon(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -4355,6 +4510,35 @@ func (ec *executionContext) fieldContext_Knowledge_commitID(_ context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _Knowledge_authorID(ctx context.Context, field graphql.CollectedField, obj *graphql1.Knowledge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Knowledge_authorID,
+		func(ctx context.Context) (any, error) {
+			return obj.AuthorID, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Knowledge_authorID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Knowledge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Knowledge_author(ctx context.Context, field graphql.CollectedField, obj *graphql1.Knowledge) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4362,7 +4546,7 @@ func (ec *executionContext) _Knowledge_author(ctx context.Context, field graphql
 		field,
 		ec.fieldContext_Knowledge_author,
 		func(ctx context.Context) (any, error) {
-			return obj.Author, nil
+			return ec.resolvers.Knowledge().Author(ctx, obj)
 		},
 		nil,
 		ec.marshalNUser2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐUser,
@@ -4375,14 +4559,16 @@ func (ec *executionContext) fieldContext_Knowledge_author(_ context.Context, fie
 	fc = &graphql.FieldContext{
 		Object:     "Knowledge",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_User_id(ctx, field)
 			case "name":
 				return ec.fieldContext_User_name(ctx, field)
+			case "icon":
+				return ec.fieldContext_User_icon(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -5355,6 +5541,173 @@ func (ec *executionContext) fieldContext_Mutation_updateTag(ctx context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_createKnowledge(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_createKnowledge,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().CreateKnowledge(ctx, fc.Args["input"].(graphql1.CreateKnowledgeInput))
+		},
+		nil,
+		ec.marshalNKnowledge2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐKnowledge,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_createKnowledge(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "slug":
+				return ec.fieldContext_Knowledge_slug(ctx, field)
+			case "name":
+				return ec.fieldContext_Knowledge_name(ctx, field)
+			case "topic":
+				return ec.fieldContext_Knowledge_topic(ctx, field)
+			case "content":
+				return ec.fieldContext_Knowledge_content(ctx, field)
+			case "commitID":
+				return ec.fieldContext_Knowledge_commitID(ctx, field)
+			case "authorID":
+				return ec.fieldContext_Knowledge_authorID(ctx, field)
+			case "author":
+				return ec.fieldContext_Knowledge_author(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Knowledge_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Knowledge_updatedAt(ctx, field)
+			case "state":
+				return ec.fieldContext_Knowledge_state(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Knowledge", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createKnowledge_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateKnowledge(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_updateKnowledge,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().UpdateKnowledge(ctx, fc.Args["input"].(graphql1.UpdateKnowledgeInput))
+		},
+		nil,
+		ec.marshalNKnowledge2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐKnowledge,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateKnowledge(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "slug":
+				return ec.fieldContext_Knowledge_slug(ctx, field)
+			case "name":
+				return ec.fieldContext_Knowledge_name(ctx, field)
+			case "topic":
+				return ec.fieldContext_Knowledge_topic(ctx, field)
+			case "content":
+				return ec.fieldContext_Knowledge_content(ctx, field)
+			case "commitID":
+				return ec.fieldContext_Knowledge_commitID(ctx, field)
+			case "authorID":
+				return ec.fieldContext_Knowledge_authorID(ctx, field)
+			case "author":
+				return ec.fieldContext_Knowledge_author(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Knowledge_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Knowledge_updatedAt(ctx, field)
+			case "state":
+				return ec.fieldContext_Knowledge_state(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Knowledge", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateKnowledge_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_archiveKnowledge(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_archiveKnowledge,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().ArchiveKnowledge(ctx, fc.Args["topic"].(string), fc.Args["slug"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_archiveKnowledge(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_archiveKnowledge_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_ticket(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6140,6 +6493,8 @@ func (ec *executionContext) fieldContext_Query_knowledgesByTopic(ctx context.Con
 				return ec.fieldContext_Knowledge_content(ctx, field)
 			case "commitID":
 				return ec.fieldContext_Knowledge_commitID(ctx, field)
+			case "authorID":
+				return ec.fieldContext_Knowledge_authorID(ctx, field)
 			case "author":
 				return ec.fieldContext_Knowledge_author(ctx, field)
 			case "createdAt":
@@ -6679,6 +7034,8 @@ func (ec *executionContext) fieldContext_Ticket_assignee(_ context.Context, fiel
 				return ec.fieldContext_User_id(ctx, field)
 			case "name":
 				return ec.fieldContext_User_name(ctx, field)
+			case "icon":
+				return ec.fieldContext_User_icon(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -7364,6 +7721,35 @@ func (ec *executionContext) _User_name(ctx context.Context, field graphql.Collec
 }
 
 func (ec *executionContext) fieldContext_User_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_icon(ctx context.Context, field graphql.CollectedField, obj *graphql1.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_icon,
+		func(ctx context.Context) (any, error) {
+			return obj.Icon, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_icon(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
@@ -8822,6 +9208,102 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputCreateKnowledgeInput(ctx context.Context, obj any) (graphql1.CreateKnowledgeInput, error) {
+	var it graphql1.CreateKnowledgeInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"topic", "slug", "name", "content"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "topic":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("topic"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Topic = data
+		case "slug":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("slug"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Slug = data
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "content":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("content"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Content = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputUpdateKnowledgeInput(ctx context.Context, obj any) (graphql1.UpdateKnowledgeInput, error) {
+	var it graphql1.UpdateKnowledgeInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"topic", "slug", "name", "content"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "topic":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("topic"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Topic = data
+		case "slug":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("slug"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Slug = data
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "content":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("content"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Content = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputUpdateTagInput(ctx context.Context, obj any) (graphql1.UpdateTagInput, error) {
 	var it graphql1.UpdateTagInput
 	asMap := map[string]any{}
@@ -10086,47 +10568,83 @@ func (ec *executionContext) _Knowledge(ctx context.Context, sel ast.SelectionSet
 		case "slug":
 			out.Values[i] = ec._Knowledge_slug(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "name":
 			out.Values[i] = ec._Knowledge_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "topic":
 			out.Values[i] = ec._Knowledge_topic(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "content":
 			out.Values[i] = ec._Knowledge_content(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "commitID":
 			out.Values[i] = ec._Knowledge_commitID(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "authorID":
+			out.Values[i] = ec._Knowledge_authorID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "author":
-			out.Values[i] = ec._Knowledge_author(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Knowledge_author(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "createdAt":
 			out.Values[i] = ec._Knowledge_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Knowledge_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "state":
 			out.Values[i] = ec._Knowledge_state(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -10250,6 +10768,27 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateTag":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateTag(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createKnowledge":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createKnowledge(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateKnowledge":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateKnowledge(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "archiveKnowledge":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_archiveKnowledge(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -11462,6 +12001,8 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "icon":
+			out.Values[i] = ec._User_icon(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12180,6 +12721,11 @@ func (ec *executionContext) marshalNCommentsResponse2ᚖgithubᚗcomᚋsecmonᚑ
 	return ec._CommentsResponse(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNCreateKnowledgeInput2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐCreateKnowledgeInput(ctx context.Context, v any) (graphql1.CreateKnowledgeInput, error) {
+	res, err := ec.unmarshalInputCreateKnowledgeInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNDBSCANParameters2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDBSCANParameters(ctx context.Context, sel ast.SelectionSet, v *graphql1.DBSCANParameters) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -12280,6 +12826,10 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNKnowledge2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐKnowledge(ctx context.Context, sel ast.SelectionSet, v graphql1.Knowledge) graphql.Marshaler {
+	return ec._Knowledge(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNKnowledge2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐKnowledgeᚄ(ctx context.Context, sel ast.SelectionSet, v []*graphql1.Knowledge) graphql.Marshaler {
@@ -12620,9 +13170,18 @@ func (ec *executionContext) marshalNTopicSummary2ᚖgithubᚗcomᚋsecmonᚑlab�
 	return ec._TopicSummary(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNUpdateKnowledgeInput2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐUpdateKnowledgeInput(ctx context.Context, v any) (graphql1.UpdateKnowledgeInput, error) {
+	res, err := ec.unmarshalInputUpdateKnowledgeInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNUpdateTagInput2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐUpdateTagInput(ctx context.Context, v any) (graphql1.UpdateTagInput, error) {
 	res, err := ec.unmarshalInputUpdateTagInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNUser2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐUser(ctx context.Context, sel ast.SelectionSet, v graphql1.User) graphql.Marshaler {
+	return ec._User(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNUser2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐUser(ctx context.Context, sel ast.SelectionSet, v *graphql1.User) graphql.Marshaler {

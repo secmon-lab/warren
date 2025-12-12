@@ -1,18 +1,35 @@
-import { useQuery } from "@apollo/client";
+import { useQuery, useMutation } from "@apollo/client";
 import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { GET_KNOWLEDGES_BY_TOPIC } from "@/lib/graphql/queries";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  GET_KNOWLEDGES_BY_TOPIC,
+  ARCHIVE_KNOWLEDGE,
+} from "@/lib/graphql/queries";
 import { Knowledge } from "@/lib/types";
+import { KnowledgeEditDialog } from "@/components/KnowledgeEditDialog";
 import {
   ChevronDown,
   ChevronRight,
   ArrowLeft,
-  User,
   Calendar,
   FileText,
+  Plus,
+  Edit,
+  Archive,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -20,11 +37,35 @@ export default function KnowledgeTopicPage() {
   const { topic } = useParams<{ topic: string }>();
   const navigate = useNavigate();
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editMode, setEditMode] = useState<"create" | "edit">("create");
+  const [selectedKnowledge, setSelectedKnowledge] = useState<
+    Knowledge | undefined
+  >(undefined);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [knowledgeToArchive, setKnowledgeToArchive] = useState<
+    Knowledge | undefined
+  >(undefined);
 
-  const { data, loading, error } = useQuery(GET_KNOWLEDGES_BY_TOPIC, {
+  const { data, loading, error, refetch } = useQuery(GET_KNOWLEDGES_BY_TOPIC, {
     variables: { topic },
     skip: !topic,
   });
+
+  const [archiveKnowledge, { loading: archiving }] = useMutation(
+    ARCHIVE_KNOWLEDGE,
+    {
+      onCompleted: () => {
+        refetch();
+        setArchiveDialogOpen(false);
+        setKnowledgeToArchive(undefined);
+      },
+      onError: (error) => {
+        console.error("Failed to archive knowledge:", error);
+        alert(`Failed to archive: ${error.message}`);
+      },
+    }
+  );
 
   const toggleItem = (slug: string) => {
     const newExpanded = new Set(expandedItems);
@@ -34,6 +75,37 @@ export default function KnowledgeTopicPage() {
       newExpanded.add(slug);
     }
     setExpandedItems(newExpanded);
+  };
+
+  const handleCreateClick = () => {
+    setEditMode("create");
+    setSelectedKnowledge(undefined);
+    setEditDialogOpen(true);
+  };
+
+  const handleEditClick = (knowledge: Knowledge) => {
+    setEditMode("edit");
+    setSelectedKnowledge(knowledge);
+    setEditDialogOpen(true);
+  };
+
+  const handleArchiveClick = (knowledge: Knowledge) => {
+    setKnowledgeToArchive(knowledge);
+    setArchiveDialogOpen(true);
+  };
+
+  const handleArchiveConfirm = async () => {
+    if (!knowledgeToArchive) return;
+    await archiveKnowledge({
+      variables: {
+        topic: knowledgeToArchive.topic,
+        slug: knowledgeToArchive.slug,
+      },
+    });
+  };
+
+  const handleDialogSuccess = () => {
+    refetch();
   };
 
   if (!topic) {
@@ -87,6 +159,10 @@ export default function KnowledgeTopicPage() {
             {knowledges.length !== 1 ? "s" : ""}
           </p>
         </div>
+        <Button onClick={handleCreateClick} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Add Knowledge
+        </Button>
       </div>
 
       {knowledges.length === 0 ? (
@@ -138,8 +214,27 @@ export default function KnowledgeTopicPage() {
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            <span>{knowledge.author.name}</span>
+                            {knowledge.author.id === "system" ? (
+                              <>
+                                <span className="text-base">🤖</span>
+                                <span>{knowledge.author.name}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Avatar className="h-4 w-4">
+                                  {knowledge.author.icon && (
+                                    <AvatarImage
+                                      src={knowledge.author.icon}
+                                      alt={knowledge.author.name}
+                                    />
+                                  )}
+                                  <AvatarFallback className="text-[10px]">
+                                    {knowledge.author.name.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span>{knowledge.author.name}</span>
+                              </>
+                            )}
                           </div>
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
@@ -155,6 +250,24 @@ export default function KnowledgeTopicPage() {
                           </div>
                         </div>
                       </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditClick(knowledge)}
+                        className="flex items-center gap-1">
+                        <Edit className="h-3 w-3" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleArchiveClick(knowledge)}
+                        className="flex items-center gap-1 text-orange-600 hover:text-orange-700">
+                        <Archive className="h-3 w-3" />
+                        Archive
+                      </Button>
                     </div>
                   </div>
                 </CardHeader>
@@ -194,6 +307,37 @@ export default function KnowledgeTopicPage() {
           })}
         </div>
       )}
+
+      <KnowledgeEditDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        mode={editMode}
+        topic={topic || ""}
+        knowledge={selectedKnowledge}
+        onSuccess={handleDialogSuccess}
+      />
+
+      <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive Knowledge</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to archive "{knowledgeToArchive?.name}"?
+              This will remove it from the active knowledge list, but the data
+              will be preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleArchiveConfirm}
+              disabled={archiving}
+              className="bg-orange-600 hover:bg-orange-700">
+              {archiving ? "Archiving..." : "Archive"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

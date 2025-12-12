@@ -65,6 +65,13 @@ type CommentsResponse struct {
 	TotalCount int               `json:"totalCount"`
 }
 
+type CreateKnowledgeInput struct {
+	Topic   string `json:"topic"`
+	Slug    string `json:"slug"`
+	Name    string `json:"name"`
+	Content string `json:"content"`
+}
+
 type DBSCANParameters struct {
 	Eps        float64 `json:"eps"`
 	MinSamples int     `json:"minSamples"`
@@ -83,6 +90,7 @@ type Knowledge struct {
 	Topic     string `json:"topic"`
 	Content   string `json:"content"`
 	CommitID  string `json:"commitID"`
+	AuthorID  string `json:"authorID"`
 	Author    *User  `json:"author"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
@@ -119,6 +127,13 @@ type TopicSummary struct {
 	Count int    `json:"count"`
 }
 
+type UpdateKnowledgeInput struct {
+	Topic   string `json:"topic"`
+	Slug    string `json:"slug"`
+	Name    string `json:"name"`
+	Content string `json:"content"`
+}
+
 type UpdateTagInput struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`
@@ -127,6 +142,7 @@ type UpdateTagInput struct {
 }
 
 type User struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID   string  `json:"id"`
+	Name string  `json:"name"`
+	Icon *string `json:"icon,omitempty"`
 }

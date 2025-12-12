@@ -29,6 +29,7 @@ type Ticket {
 type User {
   id: ID!
   name: String!
+  icon: String
 }
 
 type Comment {
@@ -215,12 +216,27 @@ input UpdateTagInput {
   description: String
 }
 
+input CreateKnowledgeInput {
+  topic: String!
+  slug: String!
+  name: String!
+  content: String!
+}
+
+input UpdateKnowledgeInput {
+  topic: String!
+  slug: String!
+  name: String!
+  content: String!
+}
+
 type Knowledge {
   slug: String!
   name: String!
   topic: String!
   content: String!
   commitID: String!
+  authorID: String!
   author: User!
   createdAt: String!
   updatedAt: String!
@@ -235,6 +251,12 @@ type TopicSummary {
 extend type Query {
   knowledgeTopics: [TopicSummary!]!
   knowledgesByTopic(topic: String!): [Knowledge!]!
+}
+
+extend type Mutation {
+  createKnowledge(input: CreateKnowledgeInput!): Knowledge!
+  updateKnowledge(input: UpdateKnowledgeInput!): Knowledge!
+  archiveKnowledge(topic: String!, slug: String!): Boolean!
 }
 
 schema {

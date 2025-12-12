@@ -56,6 +56,7 @@ export interface AlertAttribute {
 export interface User {
   id: string;
   name: string;
+  icon?: string;
 }
 
 export interface Finding {

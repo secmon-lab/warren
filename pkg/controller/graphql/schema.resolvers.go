@@ -7,11 +7,13 @@ package graphql
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	goerr "github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
+	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -172,6 +174,16 @@ func (r *commentResolver) UpdatedAt(ctx context.Context, obj *ticket.Comment) (s
 // Severity is the resolver for the severity field.
 func (r *findingResolver) Severity(ctx context.Context, obj *ticket.Finding) (string, error) {
 	return string(obj.Severity), nil
+}
+
+// Author is the resolver for the author field.
+func (r *knowledgeResolver) Author(ctx context.Context, obj *graphql1.Knowledge) (*graphql1.User, error) {
+	if obj.AuthorID == "" {
+		return nil, nil
+	}
+
+	// Use DataLoader to efficiently fetch user from Slack
+	return GetUser(ctx, obj.AuthorID)
 }
 
 // UpdateTicketStatus is the resolver for the updateTicketStatus field.
@@ -474,6 +486,169 @@ func (r *mutationResolver) UpdateTag(ctx context.Context, input graphql1.UpdateT
 		CreatedAt:   tag.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:   tag.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}, nil
+}
+
+// CreateKnowledge is the resolver for the createKnowledge field.
+func (r *mutationResolver) CreateKnowledge(ctx context.Context, input graphql1.CreateKnowledgeInput) (*graphql1.Knowledge, error) {
+	// Extract user information from authentication context
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "authentication required")
+	}
+
+	// Convert and validate input
+	topicTyped := types.KnowledgeTopic(input.Topic)
+	if err := topicTyped.Validate(); err != nil {
+		return nil, goerr.Wrap(err, "invalid topic", goerr.V("topic", input.Topic))
+	}
+
+	slugTyped := types.KnowledgeSlug(input.Slug)
+	if err := slugTyped.Validate(); err != nil {
+		return nil, goerr.Wrap(err, "invalid slug", goerr.V("slug", input.Slug))
+	}
+
+	// Check if knowledge already exists
+	existing, err := r.repo.GetKnowledge(ctx, topicTyped, slugTyped)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to check existing knowledge")
+	}
+	if existing != nil {
+		return nil, goerr.New("knowledge already exists", goerr.V("topic", input.Topic), goerr.V("slug", input.Slug))
+	}
+
+	// Create new knowledge
+	now := time.Now()
+	author := types.UserID(token.Sub)
+
+	k := &knowledge.Knowledge{
+		Slug:      slugTyped,
+		Name:      input.Name,
+		Topic:     topicTyped,
+		Content:   input.Content,
+		CommitID:  knowledge.GenerateCommitID(now, author, input.Content),
+		Author:    author,
+		CreatedAt: now,
+		UpdatedAt: now,
+		State:     types.KnowledgeStateActive,
+	}
+
+	// Validate knowledge
+	if err := k.Validate(); err != nil {
+		return nil, goerr.Wrap(err, "invalid knowledge")
+	}
+
+	// Save to repository
+	if err := r.repo.PutKnowledge(ctx, k); err != nil {
+		return nil, goerr.Wrap(err, "failed to create knowledge")
+	}
+
+	// Convert to GraphQL model
+	return &graphql1.Knowledge{
+		Slug:      k.Slug.String(),
+		Name:      k.Name,
+		Topic:     k.Topic.String(),
+		Content:   k.Content,
+		CommitID:  k.CommitID,
+		AuthorID:  k.Author.String(),
+		CreatedAt: k.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt: k.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		State:     k.State.String(),
+	}, nil
+}
+
+// UpdateKnowledge is the resolver for the updateKnowledge field.
+func (r *mutationResolver) UpdateKnowledge(ctx context.Context, input graphql1.UpdateKnowledgeInput) (*graphql1.Knowledge, error) {
+	// Extract user information from authentication context
+	token, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "authentication required")
+	}
+
+	// Convert and validate input
+	topicTyped := types.KnowledgeTopic(input.Topic)
+	if err := topicTyped.Validate(); err != nil {
+		return nil, goerr.Wrap(err, "invalid topic", goerr.V("topic", input.Topic))
+	}
+
+	slugTyped := types.KnowledgeSlug(input.Slug)
+	if err := slugTyped.Validate(); err != nil {
+		return nil, goerr.Wrap(err, "invalid slug", goerr.V("slug", input.Slug))
+	}
+
+	// Get existing knowledge
+	existing, err := r.repo.GetKnowledge(ctx, topicTyped, slugTyped)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get existing knowledge")
+	}
+	if existing == nil {
+		return nil, goerr.New("knowledge not found", goerr.V("topic", input.Topic), goerr.V("slug", input.Slug))
+	}
+
+	// Create updated knowledge with new commit
+	now := time.Now()
+	author := types.UserID(token.Sub)
+
+	k := &knowledge.Knowledge{
+		Slug:      slugTyped,
+		Name:      input.Name,
+		Topic:     topicTyped,
+		Content:   input.Content,
+		CommitID:  knowledge.GenerateCommitID(now, author, input.Content),
+		Author:    author,
+		CreatedAt: existing.CreatedAt, // Preserve original creation time
+		UpdatedAt: now,
+		State:     types.KnowledgeStateActive,
+	}
+
+	// Validate knowledge
+	if err := k.Validate(); err != nil {
+		return nil, goerr.Wrap(err, "invalid knowledge")
+	}
+
+	// Save new version to repository
+	if err := r.repo.PutKnowledge(ctx, k); err != nil {
+		return nil, goerr.Wrap(err, "failed to update knowledge")
+	}
+
+	// Convert to GraphQL model
+	return &graphql1.Knowledge{
+		Slug:      k.Slug.String(),
+		Name:      k.Name,
+		Topic:     k.Topic.String(),
+		Content:   k.Content,
+		CommitID:  k.CommitID,
+		AuthorID:  k.Author.String(),
+		CreatedAt: k.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt: k.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		State:     k.State.String(),
+	}, nil
+}
+
+// ArchiveKnowledge is the resolver for the archiveKnowledge field.
+func (r *mutationResolver) ArchiveKnowledge(ctx context.Context, topic string, slug string) (bool, error) {
+	// Extract user information from authentication context
+	_, err := auth.TokenFromContext(ctx)
+	if err != nil {
+		return false, goerr.Wrap(err, "authentication required")
+	}
+
+	// Convert and validate input
+	topicTyped := types.KnowledgeTopic(topic)
+	if err := topicTyped.Validate(); err != nil {
+		return false, goerr.Wrap(err, "invalid topic", goerr.V("topic", topic))
+	}
+
+	slugTyped := types.KnowledgeSlug(slug)
+	if err := slugTyped.Validate(); err != nil {
+		return false, goerr.Wrap(err, "invalid slug", goerr.V("slug", slug))
+	}
+
+	// Archive the knowledge
+	if err := r.repo.ArchiveKnowledge(ctx, topicTyped, slugTyped); err != nil {
+		return false, goerr.Wrap(err, "failed to archive knowledge")
+	}
+
+	return true, nil
 }
 
 // Ticket is the resolver for the ticket field.
@@ -1022,7 +1197,7 @@ func (r *queryResolver) KnowledgesByTopic(ctx context.Context, topic string) ([]
 			Topic:     k.Topic.String(),
 			Content:   k.Content,
 			CommitID:  k.CommitID,
-			Author:    &graphql1.User{ID: k.Author.String(), Name: k.Author.String()},
+			AuthorID:  k.Author.String(),
 			CreatedAt: k.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			UpdatedAt: k.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			State:     k.State.String(),
@@ -1212,6 +1387,9 @@ func (r *Resolver) Comment() CommentResolver { return &commentResolver{r} }
 // Finding returns FindingResolver implementation.
 func (r *Resolver) Finding() FindingResolver { return &findingResolver{r} }
 
+// Knowledge returns KnowledgeResolver implementation.
+func (r *Resolver) Knowledge() KnowledgeResolver { return &knowledgeResolver{r} }
+
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
@@ -1225,6 +1403,7 @@ type activityResolver struct{ *Resolver }
 type alertResolver struct{ *Resolver }
 type commentResolver struct{ *Resolver }
 type findingResolver struct{ *Resolver }
+type knowledgeResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }

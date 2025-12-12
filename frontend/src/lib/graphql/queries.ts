@@ -715,13 +715,63 @@ export const GET_KNOWLEDGES_BY_TOPIC = gql`
       topic
       content
       commitID
+      authorID
       author {
         id
         name
+        icon
       }
       createdAt
       updatedAt
       state
     }
+  }
+`;
+
+export const CREATE_KNOWLEDGE = gql`
+  mutation CreateKnowledge($input: CreateKnowledgeInput!) {
+    createKnowledge(input: $input) {
+      slug
+      name
+      topic
+      content
+      commitID
+      authorID
+      author {
+        id
+        name
+        icon
+      }
+      createdAt
+      updatedAt
+      state
+    }
+  }
+`;
+
+export const UPDATE_KNOWLEDGE = gql`
+  mutation UpdateKnowledge($input: UpdateKnowledgeInput!) {
+    updateKnowledge(input: $input) {
+      slug
+      name
+      topic
+      content
+      commitID
+      authorID
+      author {
+        id
+        name
+        icon
+      }
+      createdAt
+      updatedAt
+      state
+    }
+  }
+`;
+
+export const ARCHIVE_KNOWLEDGE = gql`
+  mutation ArchiveKnowledge($topic: String!, $slug: String!) {
+    archiveKnowledge(topic: $topic, slug: $slug)
   }
 `;
