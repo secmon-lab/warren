@@ -324,7 +324,7 @@ func TestKnowledgeResolver(t *testing.T) {
 
 		// Check knowledge fields
 		gt.Value(t, got[0].Topic).Equal("security")
-		gt.Value(t, got[0].Author.ID).Equal("test-user")
+		gt.Value(t, got[0].AuthorID).Equal("test-user")
 		gt.Value(t, got[0].State).Equal("active")
 	})
 
