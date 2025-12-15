@@ -402,7 +402,7 @@ func TestGetUnboundAlertsFiltered_Pagination(t *testing.T) {
 }
 
 func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
-	// Test that BindAlertsToTicket updates metadata and Slack display
+	// Test that BindAlertsToTicket binds alerts and updates Slack display without changing metadata
 	ctx := context.Background()
 	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	ctx = clock.With(ctx, func() time.Time { return now })
@@ -457,35 +457,8 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 	gt.NoError(t, repo.PutAlert(ctx, alert1))
 	gt.NoError(t, repo.PutAlert(ctx, alert2))
 
-	// Track LLM calls for metadata filling
-	var fillMetadataCalled bool
-	var generatedTitle string
-	var generatedDescription string
-
-	llmMock := &gollem_mock.LLMClientMock{
-		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
-			return &gollem_mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
-					fillMetadataCalled = true
-					// Simulate LLM updating metadata based on existing + new alert info
-					generatedTitle = "Updated Ticket Title with New Alerts"
-					generatedDescription = "Updated description incorporating new alert information"
-					return &gollem.Response{
-						Texts: []string{
-							fmt.Sprintf(`{"title": "%s", "description": "%s"}`, generatedTitle, generatedDescription),
-						},
-					}, nil
-				},
-			}, nil
-		},
-		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
-			return [][]float64{{0.1, 0.2, 0.3}}, nil
-		},
-	}
-
 	// Track Slack update calls
 	var slackTicketUpdateCalled bool
-	var slackAlertUpdateCalled int
 
 	slackMock := &mock.SlackClientMock{
 		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
@@ -495,7 +468,6 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 			return channelID, "updated-thread", nil
 		},
 		UpdateMessageContextFunc: func(ctx context.Context, channelID, timestamp string, options ...slack_sdk.MsgOption) (string, string, string, error) {
-			slackAlertUpdateCalled++
 			return channelID, timestamp, "updated", nil
 		},
 		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
@@ -524,7 +496,6 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 	uc := usecase.New(
 		usecase.WithRepository(repo),
 		usecase.WithSlackService(slackSvc),
-		usecase.WithLLMClient(llmMock),
 	)
 
 	// Execute: Bind alerts to ticket
@@ -552,10 +523,9 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 	gt.Value(t, slices.Contains(updatedTicket.AlertIDs, alert1.ID)).Equal(true)
 	gt.Value(t, slices.Contains(updatedTicket.AlertIDs, alert2.ID)).Equal(true)
 
-	// Verify: Check that FillMetadata was called (metadata update)
-	gt.Value(t, fillMetadataCalled).Equal(true)
-	gt.Value(t, updatedTicket.Metadata.Title).Equal(generatedTitle)
-	gt.Value(t, updatedTicket.Metadata.Description).Equal(generatedDescription)
+	// Verify: Check that metadata was NOT changed (remains original)
+	gt.Value(t, updatedTicket.Metadata.Title).Equal("Original Ticket Title")
+	gt.Value(t, updatedTicket.Metadata.Description).Equal("Original ticket description")
 
 	// Verify: Check that Slack was updated for the ticket and individual alerts
 	gt.Value(t, slackTicketUpdateCalled).Equal(true)
@@ -563,13 +533,10 @@ func TestBindAlertsToTicket_MetadataAndSlackUpdate(t *testing.T) {
 	// Check that individual alert messages were updated
 	updateCalls := slackMock.UpdateMessageContextCalls()
 	gt.Value(t, len(updateCalls)).Equal(2)
-
-	// Verify: Check that embedding was recalculated (not nil/empty)
-	gt.Value(t, len(updatedTicket.Embedding) > 0).Equal(true)
 }
 
 func TestBindAlertsToTicket_MetadataUpdateBasic(t *testing.T) {
-	// Simple test that metadata update happens when binding alerts
+	// Simple test that metadata is NOT updated when binding alerts
 	ctx := context.Background()
 	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	ctx = clock.With(ctx, func() time.Time { return now })
@@ -579,6 +546,7 @@ func TestBindAlertsToTicket_MetadataUpdateBasic(t *testing.T) {
 	// Create a ticket with AI metadata source
 	testTicket := ticket.New(ctx, []types.AlertID{}, nil)
 	testTicket.Title = "Original Title"
+	testTicket.Description = "Original Description"
 	testTicket.TitleSource = types.SourceAI
 	testTicket.DescriptionSource = types.SourceAI
 	gt.NoError(t, repo.PutTicket(ctx, testTicket))
@@ -597,42 +565,19 @@ func TestBindAlertsToTicket_MetadataUpdateBasic(t *testing.T) {
 	}
 	gt.NoError(t, repo.PutAlert(ctx, testAlert))
 
-	// Track if FillMetadata was called
-	var fillMetadataCalled bool
-
-	llmMock := &gollem_mock.LLMClientMock{
-		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
-			return &gollem_mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
-					fillMetadataCalled = true
-					return &gollem.Response{
-						Texts: []string{`{"title": "Updated with New Alert Info", "description": "Updated description"}`},
-					}, nil
-				},
-			}, nil
-		},
-		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, texts []string) ([][]float64, error) {
-			return [][]float64{{0.1, 0.2, 0.3}}, nil
-		},
-	}
-
 	uc := usecase.New(
 		usecase.WithRepository(repo),
-		usecase.WithLLMClient(llmMock),
 	)
 
 	// Execute: Bind alert to ticket
 	err := uc.BindAlertsToTicket(ctx, testTicket.ID, []types.AlertID{testAlert.ID})
 	gt.NoError(t, err)
 
-	// Verify: FillMetadata was called
-	gt.Value(t, fillMetadataCalled).Equal(true)
-
-	// Verify: Ticket metadata was updated
+	// Verify: Ticket metadata was NOT updated (remains original)
 	updatedTicket, err := repo.GetTicket(ctx, testTicket.ID)
 	gt.NoError(t, err)
-	gt.Value(t, updatedTicket.Metadata.Title).Equal("Updated with New Alert Info")
-	gt.Value(t, updatedTicket.Metadata.Description).Equal("Updated description")
+	gt.Value(t, updatedTicket.Metadata.Title).Equal("Original Title")
+	gt.Value(t, updatedTicket.Metadata.Description).Equal("Original Description")
 }
 
 func TestHandleAlert_DefaultPolicyMode(t *testing.T) {

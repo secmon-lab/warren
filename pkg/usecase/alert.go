@@ -217,7 +217,7 @@ func (uc *UseCases) GetUnboundAlertsFiltered(ctx context.Context, threshold *flo
 	return result, totalCount, nil
 }
 
-// BindAlertsToTicket binds multiple alerts to a ticket, recalculates embedding, and updates Slack display
+// BindAlertsToTicket binds multiple alerts to a ticket and updates Slack display
 func (uc *UseCases) BindAlertsToTicket(ctx context.Context, ticketID types.TicketID, alertIDs []types.AlertID) error {
 	// Bind alerts to ticket (repository handles bidirectional binding)
 	err := uc.repository.BindAlertsToTicket(ctx, alertIDs, ticketID)
@@ -231,26 +231,7 @@ func (uc *UseCases) BindAlertsToTicket(ctx context.Context, ticketID types.Ticke
 		return goerr.Wrap(err, "failed to get updated ticket")
 	}
 
-	// Recalculate ticket embedding with all bound alerts
-	if err := ticket.CalculateEmbedding(ctx, uc.llmClient, uc.repository); err != nil {
-		return goerr.Wrap(err, "failed to recalculate ticket embedding")
-	}
-
-	// Update ticket metadata based on existing title/description and new alert information
-	if err := ticket.FillMetadata(ctx, uc.llmClient, uc.repository); err != nil {
-		return goerr.Wrap(err, "failed to update ticket metadata with new alert information")
-	}
-
-	// Save the updated ticket with new embedding and metadata
-	if err := uc.repository.PutTicket(ctx, *ticket); err != nil {
-		logger := logging.From(ctx)
-		if data, jsonErr := json.Marshal(ticket); jsonErr == nil {
-			logger.Error("failed to save ticket", "error", err, "ticket", string(data))
-		}
-		return goerr.Wrap(err, "failed to save ticket with updated embedding and metadata", goerr.V("ticket", ticket))
-	}
-
-	// Update Slack display for both ticket and individual alerts (using updated metadata)
+	// Update Slack display for both ticket and individual alerts (using existing metadata)
 	// Update ticket display if it has a Slack thread
 	if ticket.HasSlackThread() {
 		// Get all alerts bound to the ticket for display
