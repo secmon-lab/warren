@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 
@@ -10,11 +11,17 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/event"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
+	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	policySvc "github.com/secmon-lab/warren/pkg/service/policy"
+	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
+
+//go:embed prompt/alert_system_prompt.md
+var alertSystemPromptTemplate string
 
 // AlertPipelineResult represents the result of processing a single alert through the pipeline
 type AlertPipelineResult struct {
@@ -256,7 +263,7 @@ func (uc *UseCases) executePromptTask(ctx context.Context, alert *alert.Alert, t
 	})
 
 	// Prepare system prompt with alert data
-	systemPrompt, err := uc.buildAlertSystemPrompt(alert)
+	systemPrompt, err := uc.buildAlertSystemPrompt(ctx, alert)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build alert system prompt")
 	}
@@ -273,6 +280,16 @@ func (uc *UseCases) executePromptTask(ctx context.Context, alert *alert.Alert, t
 
 	// Add tools if available
 	if len(uc.tools) > 0 {
+		// Set topic for knowledge tool if present
+		for _, tool := range uc.tools {
+			if kt, ok := tool.(*knowledgeTool.Knowledge); ok {
+				kt.SetTopic(alert.Topic)
+				defer kt.SetTopic("") // Reset after use
+				logger.Debug("set topic for knowledge tool", "topic", alert.Topic)
+				break
+			}
+		}
+
 		options = append(options, gollem.WithToolSets(uc.tools...))
 		logger.Debug("agent has tools available",
 			"task_id", task.ID,
@@ -338,18 +355,35 @@ func (uc *UseCases) executePromptTask(ctx context.Context, alert *alert.Alert, t
 }
 
 // buildAlertSystemPrompt creates a system prompt containing alert data and relevant domain knowledge
-func (uc *UseCases) buildAlertSystemPrompt(alert *alert.Alert) (string, error) {
+func (uc *UseCases) buildAlertSystemPrompt(ctx context.Context, alert *alert.Alert) (string, error) {
+	// Get knowledges for the topic
+	knowledges := []*knowledge.Knowledge{} // Initialize as empty slice, not nil
+	if alert.Topic != "" {
+		var err error
+		retrieved, err := uc.repository.GetKnowledges(ctx, alert.Topic)
+		if err != nil {
+			logging.From(ctx).Warn("failed to get knowledges", "error", err, "topic", alert.Topic)
+			// Continue with empty knowledges
+		} else if retrieved != nil {
+			knowledges = retrieved
+		}
+	}
+
+	// Marshal alert to JSON for template
 	alertJSON, err := json.MarshalIndent(alert, "", "  ")
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to marshal alert to JSON")
 	}
 
-	systemPrompt := "You are analyzing a security alert. Here is the alert information:\n\n"
-	systemPrompt += "```json\n"
-	systemPrompt += string(alertJSON)
-	systemPrompt += "\n```\n\n"
-
-	systemPrompt += "Use this alert information to respond to the user's request. Do not include the alert data in your response unless specifically asked."
+	// Generate prompt from template
+	systemPrompt, err := prompt.GenerateWithStruct(ctx, alertSystemPromptTemplate, map[string]any{
+		"alert_json": "```json\n" + string(alertJSON) + "\n```",
+		"topic":      alert.Topic,
+		"knowledges": knowledges,
+	})
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to generate alert system prompt")
+	}
 
 	return systemPrompt, nil
 }

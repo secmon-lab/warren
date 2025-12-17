@@ -200,11 +200,19 @@ NEVER end with "data has been collected" - ALWAYS end with "here's what this mea
 - Use line breaks to separate sections
 - Keep conversational tone - avoid formal report structure
 
-{{ if .memory_section }}
+{{- if .knowledges }}
 -----------------------
 
-{{ .memory_section }}
+# Domain Knowledge
+
+The following domain knowledge is available for topic '{{ .topic }}':
+{{ range .knowledges }}
+
+## {{ .Name }}
+
+{{ .Content }}
 {{ end }}
+{{- end }}
 
 {{ if .additional_instructions }}
 -----------------------

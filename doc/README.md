@@ -16,6 +16,7 @@ Warren is an AI-powered security alert management platform that streamlines inci
 | [Data Models](./model.md) | Understanding Alerts, Tickets, and core concepts | All users |
 | [User Guide](./user_guide.md) | Daily operations and workflow management | Security analysts |
 | [AI Agent Guide](./agent.md) | Using Chat features and AI-powered analysis | Security analysts |
+| [Knowledge Management](./knowledge.md) | Managing organizational security knowledge | All users |
 | [Integration Guide](./integration.md) | API reference and external system integration | System administrators |
 | [Policy Guide](./policy.md) | Writing and managing Rego policies | System administrators |
 
@@ -26,6 +27,7 @@ Warren is an AI-powered security alert management platform that streamlines inci
 2. **[Data Models](./model.md)** - Learn about Alerts and Tickets
 3. **[User Guide](./user_guide.md)** - Master daily operations
 4. **[AI Agent Guide](./agent.md)** - Leverage AI for investigations
+5. **[Knowledge Management](./knowledge.md)** - Capture and use organizational expertise
 
 ### For System Administrators
 1. **[Getting Started](./getting_started.md)** - Overview of Warren's architecture
@@ -42,6 +44,7 @@ Warren is an AI-powered security alert management platform that streamlines inci
 - **Policy**: Rego rules that determine which events become alerts
 - **Clustering**: AI-powered grouping of similar alerts
 - **Agent**: AI assistant for security analysis and investigation
+- **Knowledge**: Organizational security expertise that informs AI analysis
 
 ## Finding Help
 
