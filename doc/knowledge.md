@@ -18,7 +18,7 @@ Knowledge Management in Warren allows you to capture and preserve organizational
 
 ## Core Concepts
 
-### Topic (トピック)
+### Topic
 
 A **Topic** is a category or domain that groups related knowledge together. Topics are automatically assigned to alerts based on their schema and inherited by tickets.
 
