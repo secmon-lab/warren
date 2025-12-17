@@ -11,7 +11,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/tool/bigquery"
 	"github.com/secmon-lab/warren/pkg/tool/github"
 	"github.com/secmon-lab/warren/pkg/tool/ipdb"
-	"github.com/secmon-lab/warren/pkg/tool/knowledge"
 	"github.com/secmon-lab/warren/pkg/tool/otx"
 	"github.com/secmon-lab/warren/pkg/tool/shodan"
 	"github.com/secmon-lab/warren/pkg/tool/slack"
@@ -45,8 +44,8 @@ var tools = toolList{
 
 // InjectDependencies injects repository and embedding client into tools that support them
 func (x *toolList) InjectDependencies(repo interfaces.Repository, embeddingClient interfaces.EmbeddingClient) {
-	// Add knowledge tool which requires repository
-	*x = append(*x, knowledge.New(repo))
+	// NOTE: knowledge tool is not added here anymore.
+	// It is created per chat session with the appropriate topic in usecase/chat.go
 
 	for _, tool := range *x {
 		// Check if tool supports repository injection

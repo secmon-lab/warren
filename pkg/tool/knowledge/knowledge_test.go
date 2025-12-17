@@ -16,10 +16,8 @@ import (
 func TestKnowledgeToolListSlugs(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	tool := knowledge.New(repo)
-
 	topic := types.KnowledgeTopic(fmt.Sprintf("test-topic-%d", time.Now().UnixNano()))
-	tool.SetTopic(topic)
+	tool := knowledge.New(repo, topic)
 
 	// Initially empty
 	result, err := tool.Run(ctx, "knowledge_list", nil)
@@ -53,10 +51,8 @@ func TestKnowledgeToolListSlugs(t *testing.T) {
 func TestKnowledgeToolGetKnowledges(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	tool := knowledge.New(repo)
-
 	topic := types.KnowledgeTopic(fmt.Sprintf("test-topic-%d", time.Now().UnixNano()))
-	tool.SetTopic(topic)
+	tool := knowledge.New(repo, topic)
 
 	// Save knowledge
 	_, err := tool.Run(ctx, "knowledge_save", map[string]any{
@@ -84,10 +80,8 @@ func TestKnowledgeToolGetKnowledges(t *testing.T) {
 func TestKnowledgeToolSave(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	tool := knowledge.New(repo)
-
 	topic := types.KnowledgeTopic(fmt.Sprintf("test-topic-%d", time.Now().UnixNano()))
-	tool.SetTopic(topic)
+	tool := knowledge.New(repo, topic)
 
 	result, err := tool.Run(ctx, "knowledge_save", map[string]any{
 		"slug":    "test-slug",
@@ -104,10 +98,8 @@ func TestKnowledgeToolSave(t *testing.T) {
 func TestKnowledgeToolArchive(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	tool := knowledge.New(repo)
-
 	topic := types.KnowledgeTopic(fmt.Sprintf("test-topic-%d", time.Now().UnixNano()))
-	tool.SetTopic(topic)
+	tool := knowledge.New(repo, topic)
 
 	// Save knowledge
 	_, err := tool.Run(ctx, "knowledge_save", map[string]any{
@@ -135,10 +127,8 @@ func TestKnowledgeToolArchive(t *testing.T) {
 func TestKnowledgeToolValidation(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	tool := knowledge.New(repo)
-
 	topic := types.KnowledgeTopic("test-topic")
-	tool.SetTopic(topic)
+	tool := knowledge.New(repo, topic)
 
 	t.Run("missing slug", func(t *testing.T) {
 		_, err := tool.Run(ctx, "knowledge_save", map[string]any{
@@ -168,10 +158,8 @@ func TestKnowledgeToolValidation(t *testing.T) {
 func TestKnowledgeToolPrompt(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	tool := knowledge.New(repo)
-
 	topic := types.KnowledgeTopic(fmt.Sprintf("test-topic-%d", time.Now().UnixNano()))
-	tool.SetTopic(topic)
+	tool := knowledge.New(repo, topic)
 
 	// Prompt method now returns guidance to help LLM use knowledge tools correctly
 	prompt, err := tool.Prompt(ctx)
