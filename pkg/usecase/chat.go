@@ -16,6 +16,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
@@ -25,7 +26,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
-	"github.com/secmon-lab/warren/pkg/tool/knowledge"
+	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/request_id"
@@ -176,8 +177,18 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		msg.Trace(ctx, "⚠️ Ticket topic is empty, using schema `%s` as topic", alerts[0].Schema)
 	}
 
+	// Set topic for knowledge tool in x.tools if present
+	for _, tool := range x.tools {
+		if kt, ok := tool.(*knowledgeTool.Knowledge); ok {
+			kt.SetTopic(effectiveTopic)
+			defer kt.SetTopic("") // Reset after use
+			logger.Debug("set topic for knowledge tool", "topic", effectiveTopic)
+			break
+		}
+	}
+
 	// Create knowledge tool with ticket topic for this chat session
-	knowledgeTool := knowledge.New(x.repository, effectiveTopic)
+	knowledgeTool := knowledgeTool.New(x.repository, effectiveTopic)
 	tools := append(x.tools, baseAction, knowledgeTool)
 
 	// Collect additional prompts from tools
@@ -202,12 +213,26 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
 	}
 
+	// Get knowledges for the topic
+	knowledges := []*knowledge.Knowledge{} // Initialize as empty slice, not nil
+	if target.Topic != "" {
+		var err error
+		retrieved, err := x.repository.GetKnowledges(ctx, target.Topic)
+		if err != nil {
+			logger.Warn("failed to get knowledges", "error", err, "topic", target.Topic)
+			// Continue with empty knowledges
+		} else if retrieved != nil {
+			knowledges = retrieved
+		}
+	}
+
 	// Generate system prompt first (before creating agent)
-	systemPrompt, err := prompt.Generate(ctx, chatSystemPromptTemplate, map[string]any{
+	systemPrompt, err := prompt.GenerateWithStruct(ctx, chatSystemPromptTemplate, map[string]any{
 		"ticket":                  target,
 		"total":                   len(alerts),
 		"additional_instructions": additionalInstructions,
-		"memory_section":          "",
+		"knowledges":              knowledges,
+		"topic":                   target.Topic,
 		"lang":                    lang.From(ctx),
 	})
 	if err != nil {
