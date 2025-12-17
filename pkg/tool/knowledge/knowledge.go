@@ -21,9 +21,10 @@ type Knowledge struct {
 
 var _ interfaces.Tool = &Knowledge{}
 
-func New(repo interfaces.Repository) *Knowledge {
+func New(repo interfaces.Repository, topic types.KnowledgeTopic) *Knowledge {
 	return &Knowledge{
-		svc: knowledge.New(repo),
+		svc:   knowledge.New(repo),
+		topic: topic,
 	}
 }
 

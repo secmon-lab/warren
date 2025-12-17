@@ -25,6 +25,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
+	"github.com/secmon-lab/warren/pkg/tool/knowledge"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/request_id"
@@ -126,7 +127,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	}
 
 	baseAction := base.New(x.repository, target.ID, base.WithSlackUpdate(slackUpdateFunc), base.WithLLMClient(x.llmClient))
-	tools := append(x.tools, baseAction)
 
 	storageSvc := storage.New(x.storageClient, storage.WithPrefix(x.storagePrefix))
 
@@ -164,6 +164,21 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	if err != nil {
 		return goerr.Wrap(err, "failed to get alerts")
 	}
+
+	// Fallback topic to schema if empty
+	effectiveTopic := target.Topic
+	if effectiveTopic == "" && len(alerts) > 0 {
+		effectiveTopic = types.KnowledgeTopic(alerts[0].Schema)
+		logger.Warn("ticket topic is empty, falling back to schema",
+			"ticket_id", target.ID,
+			"schema", alerts[0].Schema,
+			"topic", effectiveTopic)
+		msg.Trace(ctx, "⚠️ Ticket topic is empty, using schema `%s` as topic", alerts[0].Schema)
+	}
+
+	// Create knowledge tool with ticket topic for this chat session
+	knowledgeTool := knowledge.New(x.repository, effectiveTopic)
+	tools := append(x.tools, baseAction, knowledgeTool)
 
 	// Collect additional prompts from tools
 	var toolPrompts []string
