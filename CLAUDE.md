@@ -16,6 +16,12 @@ Warren is an AI agent and Slack-based security alert management tool. It process
 - `task mock` (alias: `task m`) - Generate all mock files
 - `task graphql` - Generate GraphQL code from schema
 
+### Frontend Development
+- `cd frontend && pnpm install` - Install frontend dependencies
+- `pnpm run dev` - Start development server
+- `pnpm run build` - Build frontend for production
+- `pnpm run codegen` - Generate GraphQL types from schema
+
 ### Code Generation
 - `go tool moq` - Generate mocks (handled by task commands)
 - `go tool gqlgen generate` - Generate GraphQL resolvers and types

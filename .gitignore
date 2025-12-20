@@ -43,3 +43,6 @@ todo.md
 frontend/dist/*
 !frontend/dist/.gitkeep
 /warren
+
+# Frontend dependencies
+frontend/node_modules

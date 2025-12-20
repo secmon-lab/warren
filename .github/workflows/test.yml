@@ -29,13 +29,32 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
 
-      # Explicitly restore Go module cache (supplement when using go-version-file)
+      # Cache pnpm store and node_modules
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+            frontend/node_modules
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      # Explicitly cache Go modules (supplement when using go-version-file)
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
@@ -51,18 +70,28 @@ jobs:
         uses: actions/cache@v4
         with:
           path: frontend/dist
-          key: ${{ runner.os }}-frontend-dist-${{ hashFiles('frontend/package-lock.json', 'frontend/src/**', 'frontend/index.html', 'frontend/vite.config.ts') }}
+          key: ${{ runner.os }}-frontend-dist-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/src/**', 'frontend/index.html', 'frontend/vite.config.ts') }}
           restore-keys: |
             ${{ runner.os }}-frontend-dist-
+
+      # Install dependencies if needed
+      - name: Install dependencies
+        run: |
+          cd frontend
+          if [ ! -d "node_modules" ]; then
+            echo "Installing dependencies..."
+            pnpm install --frozen-lockfile
+          else
+            echo "Using cached dependencies"
+          fi
 
       # Build frontend if not cached
       - name: Build frontend
         run: |
-          if [ ! -d "frontend/dist" ] || [ ! -f "frontend/dist/index.html" ]; then
+          cd frontend
+          if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
             echo "Building frontend..."
-            cd frontend
-            npm ci
-            npm run build
+            pnpm run build
           else
             echo "Using cached frontend build"
           fi
