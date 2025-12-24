@@ -35,7 +35,8 @@ type Memory struct {
 	agentMemories  map[types.AgentMemoryID]*memory.AgentMemory
 
 	// Session management
-	session *sessionStore
+	session       *sessionStore
+	sessionRecord *sessionRecordStore
 
 	// Knowledge management
 	knowledge *knowledgeStore
@@ -62,6 +63,7 @@ func New() *Memory {
 		notices:        make(map[types.NoticeID]*notice.Notice),
 		agentMemories:  make(map[types.AgentMemoryID]*memory.AgentMemory),
 		session:        newSessionStore(),
+		sessionRecord:  newSessionRecordStore(),
 		knowledge:      newKnowledgeStore(),
 		callCounts:     make(map[string]int),
 		eb:             goerr.NewBuilder(goerr.TV(errs.RepositoryKey, "memory")),

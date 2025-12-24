@@ -128,6 +128,10 @@ type Repository interface {
 	GetSessionsByTicket(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error)
 	DeleteSession(ctx context.Context, sessionID types.SessionID) error
 
+	// Session sub-records
+	PutSessionRecord(ctx context.Context, record *session.SessionRecord) error
+	GetSessionRecords(ctx context.Context, sessionID types.SessionID) ([]*session.SessionRecord, error)
+
 	// Knowledge memory management
 	// Knowledges are stored with topic/slug as composite key
 	// Each knowledge maintains version history via commit IDs

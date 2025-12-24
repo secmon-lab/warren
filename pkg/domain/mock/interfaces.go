@@ -2607,6 +2607,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetSessionFunc: func(ctx context.Context, sessionID types.SessionID) (*session.Session, error) {
 //				panic("mock out the GetSession method")
 //			},
+//			GetSessionRecordsFunc: func(ctx context.Context, sessionID types.SessionID) ([]*session.SessionRecord, error) {
+//				panic("mock out the GetSessionRecords method")
+//			},
 //			GetSessionsByTicketFunc: func(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error) {
 //				panic("mock out the GetSessionsByTicket method")
 //			},
@@ -2681,6 +2684,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			PutSessionFunc: func(ctx context.Context, sessionMoqParam *session.Session) error {
 //				panic("mock out the PutSession method")
+//			},
+//			PutSessionRecordFunc: func(ctx context.Context, record *session.SessionRecord) error {
+//				panic("mock out the PutSessionRecord method")
 //			},
 //			PutTicketFunc: func(ctx context.Context, ticketMoqParam ticket.Ticket) error {
 //				panic("mock out the PutTicket method")
@@ -2854,6 +2860,9 @@ type RepositoryMock struct {
 	// GetSessionFunc mocks the GetSession method.
 	GetSessionFunc func(ctx context.Context, sessionID types.SessionID) (*session.Session, error)
 
+	// GetSessionRecordsFunc mocks the GetSessionRecords method.
+	GetSessionRecordsFunc func(ctx context.Context, sessionID types.SessionID) ([]*session.SessionRecord, error)
+
 	// GetSessionsByTicketFunc mocks the GetSessionsByTicket method.
 	GetSessionsByTicketFunc func(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error)
 
@@ -2928,6 +2937,9 @@ type RepositoryMock struct {
 
 	// PutSessionFunc mocks the PutSession method.
 	PutSessionFunc func(ctx context.Context, sessionMoqParam *session.Session) error
+
+	// PutSessionRecordFunc mocks the PutSessionRecord method.
+	PutSessionRecordFunc func(ctx context.Context, record *session.SessionRecord) error
 
 	// PutTicketFunc mocks the PutTicket method.
 	PutTicketFunc func(ctx context.Context, ticketMoqParam ticket.Ticket) error
@@ -3289,6 +3301,13 @@ type RepositoryMock struct {
 			// SessionID is the sessionID argument value.
 			SessionID types.SessionID
 		}
+		// GetSessionRecords holds details about calls to the GetSessionRecords method.
+		GetSessionRecords []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SessionID is the sessionID argument value.
+			SessionID types.SessionID
+		}
 		// GetSessionsByTicket holds details about calls to the GetSessionsByTicket method.
 		GetSessionsByTicket []struct {
 			// Ctx is the ctx argument value.
@@ -3474,6 +3493,13 @@ type RepositoryMock struct {
 			// SessionMoqParam is the sessionMoqParam argument value.
 			SessionMoqParam *session.Session
 		}
+		// PutSessionRecord holds details about calls to the PutSessionRecord method.
+		PutSessionRecord []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Record is the record argument value.
+			Record *session.SessionRecord
+		}
 		// PutTicket holds details about calls to the PutTicket method.
 		PutTicket []struct {
 			// Ctx is the ctx argument value.
@@ -3637,6 +3663,7 @@ type RepositoryMock struct {
 	lockGetNotice                      sync.RWMutex
 	lockGetOrCreateTagByName           sync.RWMutex
 	lockGetSession                     sync.RWMutex
+	lockGetSessionRecords              sync.RWMutex
 	lockGetSessionsByTicket            sync.RWMutex
 	lockGetTagByID                     sync.RWMutex
 	lockGetTagByName                   sync.RWMutex
@@ -3662,6 +3689,7 @@ type RepositoryMock struct {
 	lockPutHistory                     sync.RWMutex
 	lockPutKnowledge                   sync.RWMutex
 	lockPutSession                     sync.RWMutex
+	lockPutSessionRecord               sync.RWMutex
 	lockPutTicket                      sync.RWMutex
 	lockPutTicketComment               sync.RWMutex
 	lockPutTicketCommentsPrompted      sync.RWMutex
@@ -5330,6 +5358,46 @@ func (mock *RepositoryMock) GetSessionCalls() []struct {
 	return calls
 }
 
+// GetSessionRecords calls GetSessionRecordsFunc.
+func (mock *RepositoryMock) GetSessionRecords(ctx context.Context, sessionID types.SessionID) ([]*session.SessionRecord, error) {
+	callInfo := struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+	}{
+		Ctx:       ctx,
+		SessionID: sessionID,
+	}
+	mock.lockGetSessionRecords.Lock()
+	mock.calls.GetSessionRecords = append(mock.calls.GetSessionRecords, callInfo)
+	mock.lockGetSessionRecords.Unlock()
+	if mock.GetSessionRecordsFunc == nil {
+		var (
+			sessionRecordsOut []*session.SessionRecord
+			errOut            error
+		)
+		return sessionRecordsOut, errOut
+	}
+	return mock.GetSessionRecordsFunc(ctx, sessionID)
+}
+
+// GetSessionRecordsCalls gets all the calls that were made to GetSessionRecords.
+// Check the length with:
+//
+//	len(mockedRepository.GetSessionRecordsCalls())
+func (mock *RepositoryMock) GetSessionRecordsCalls() []struct {
+	Ctx       context.Context
+	SessionID types.SessionID
+} {
+	var calls []struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+	}
+	mock.lockGetSessionRecords.RLock()
+	calls = mock.calls.GetSessionRecords
+	mock.lockGetSessionRecords.RUnlock()
+	return calls
+}
+
 // GetSessionsByTicket calls GetSessionsByTicketFunc.
 func (mock *RepositoryMock) GetSessionsByTicket(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error) {
 	callInfo := struct {
@@ -6341,6 +6409,45 @@ func (mock *RepositoryMock) PutSessionCalls() []struct {
 	mock.lockPutSession.RLock()
 	calls = mock.calls.PutSession
 	mock.lockPutSession.RUnlock()
+	return calls
+}
+
+// PutSessionRecord calls PutSessionRecordFunc.
+func (mock *RepositoryMock) PutSessionRecord(ctx context.Context, record *session.SessionRecord) error {
+	callInfo := struct {
+		Ctx    context.Context
+		Record *session.SessionRecord
+	}{
+		Ctx:    ctx,
+		Record: record,
+	}
+	mock.lockPutSessionRecord.Lock()
+	mock.calls.PutSessionRecord = append(mock.calls.PutSessionRecord, callInfo)
+	mock.lockPutSessionRecord.Unlock()
+	if mock.PutSessionRecordFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutSessionRecordFunc(ctx, record)
+}
+
+// PutSessionRecordCalls gets all the calls that were made to PutSessionRecord.
+// Check the length with:
+//
+//	len(mockedRepository.PutSessionRecordCalls())
+func (mock *RepositoryMock) PutSessionRecordCalls() []struct {
+	Ctx    context.Context
+	Record *session.SessionRecord
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Record *session.SessionRecord
+	}
+	mock.lockPutSessionRecord.RLock()
+	calls = mock.calls.PutSessionRecord
+	mock.lockPutSessionRecord.RUnlock()
 	return calls
 }
 

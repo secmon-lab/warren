@@ -26,3 +26,15 @@ const (
 func (x SessionStatus) String() string {
 	return string(x)
 }
+
+// SessionRecordID represents a unique session record identifier
+type SessionRecordID string
+
+// NewSessionRecordID generates a new session record ID
+func NewSessionRecordID() SessionRecordID {
+	return SessionRecordID(uuid.New().String())
+}
+
+func (x SessionRecordID) String() string {
+	return string(x)
+}

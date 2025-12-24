@@ -57,6 +57,16 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	logger = logger.With("session_id", sess.ID)
 	ctx = logging.With(ctx, logger)
 
+	// Setup session record function
+	recordFunc := func(ctx context.Context, content string) {
+		record := session.NewSessionRecord(ctx, sess.ID, content)
+		if err := x.repository.PutSessionRecord(ctx, record); err != nil {
+			logger.Error("failed to save session record", "error", err)
+		}
+	}
+
+	ctx = msg.WithRecorder(ctx, recordFunc)
+
 	// Create status check function and embed in context
 	statusCheckFunc := func(ctx context.Context) error {
 		s, err := x.repository.GetSession(ctx, sess.ID)
@@ -334,6 +344,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	var warrenResponse string
 	if result != nil && !result.IsEmpty() {
 		warrenResponse = fmt.Sprintf("💬 %s", result.String())
+		// Record final response
+		msg.Record(ctx, warrenResponse)
 
 		if x.slackService != nil && target.SlackThread != nil {
 			// Set agent context for agent messages

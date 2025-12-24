@@ -52,6 +52,7 @@ const (
 	collectionTicketMemories    = "ticket_memories"
 	collectionAgents            = "agents"
 	collectionSessions          = "sessions"
+	collectionSessionRecords    = "records"
 	subcollectionMemories       = "memories"
 )
 

@@ -10,10 +10,12 @@ import (
 type NotifyFunc func(ctx context.Context, msg string)
 type TraceFunc func(ctx context.Context, msg string) func(ctx context.Context, msg string)
 type NewUpdatableFunc func(ctx context.Context, msg string) func(ctx context.Context, msg string)
+type RecordFunc func(ctx context.Context, content string)
 
 type ctxNotifyFuncKey struct{}
 type ctxTraceFuncKey struct{}
 type ctxNewUpdatableFuncKey struct{}
+type ctxRecordFuncKey struct{}
 
 func With(ctx context.Context, NotifyFunc NotifyFunc, TraceFunc TraceFunc) context.Context {
 	ctx = context.WithValue(ctx, ctxNotifyFuncKey{}, NotifyFunc)
@@ -46,6 +48,9 @@ func Trace(ctx context.Context, format string, args ...any) {
 	} else {
 		logging.From(ctx).Debug("failed to propagate trace func", "message", msg)
 	}
+
+	// Automatically record trace if recorder is set (e.g., in Chat usecase)
+	Record(ctx, msg)
 }
 
 func NewUpdatable(ctx context.Context, format string, args ...any) func(ctx context.Context, msg string) {
@@ -57,11 +62,24 @@ func NewUpdatable(ctx context.Context, format string, args ...any) func(ctx cont
 	return func(ctx context.Context, msg string) {}
 }
 
+func WithRecorder(ctx context.Context, recordFunc RecordFunc) context.Context {
+	ctx = context.WithValue(ctx, ctxRecordFuncKey{}, recordFunc)
+	return ctx
+}
+
+func Record(ctx context.Context, content string) {
+	if v := ctx.Value(ctxRecordFuncKey{}); v != nil {
+		if fn, ok := v.(RecordFunc); ok && fn != nil {
+			fn(ctx, content)
+		}
+	}
+}
+
 func WithContext(original context.Context) context.Context {
 	ctx := original
 	ctx = context.WithValue(ctx, ctxNotifyFuncKey{}, original.Value(ctxNotifyFuncKey{}))
 	ctx = context.WithValue(ctx, ctxTraceFuncKey{}, original.Value(ctxTraceFuncKey{}))
-	ctx = context.WithValue(ctx, ctxTraceFuncKey{}, original.Value(ctxTraceFuncKey{}))
 	ctx = context.WithValue(ctx, ctxNewUpdatableFuncKey{}, original.Value(ctxNewUpdatableFuncKey{}))
+	ctx = context.WithValue(ctx, ctxRecordFuncKey{}, original.Value(ctxRecordFuncKey{}))
 	return ctx
 }
