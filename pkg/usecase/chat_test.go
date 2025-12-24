@@ -444,10 +444,8 @@ func TestChatErrorNotifications(t *testing.T) {
 	mockNotify := func(ctx context.Context, msg string) {
 		notifiedMessages = append(notifiedMessages, msg)
 	}
-	mockNewTrace := func(ctx context.Context, msg string) func(context.Context, string) {
-		return func(c context.Context, s string) {}
-	}
-	ctx = msg.With(ctx, mockNotify, mockNewTrace)
+	mockTrace := func(ctx context.Context, msg string) {}
+	ctx = msg.With(ctx, mockNotify, mockTrace)
 
 	t.Run("History load failure triggers notification", func(t *testing.T) {
 		notifiedMessages = []string{} // Reset messages

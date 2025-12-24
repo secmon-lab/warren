@@ -23,8 +23,6 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 	if uc.slackService == nil {
 		return goerr.New("slack service not configured")
 	}
-	threadSvc := uc.slackService.NewThread(slackMsg.Thread())
-	ctx = msg.WithUpdatable(ctx, threadSvc.Reply, threadSvc.NewStateFunc, threadSvc.NewUpdatableMessage)
 	if slackMsg.User() != nil {
 		ctx = user.WithUserID(ctx, slackMsg.User().ID)
 		// Add Slack user to authctx for authorization
@@ -87,8 +85,8 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 			}
 		}
 
-		traceFunc := func(ctx context.Context, message string) func(context.Context, string) {
-			return threadSvc.NewTraceMessage(ctx, message)
+		traceFunc := func(ctx context.Context, message string) {
+			threadSvc.NewTraceMessage(ctx, message)
 		}
 
 		// Setup context with Slack-specific message handlers

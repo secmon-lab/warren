@@ -443,15 +443,13 @@ func (h *Handler) handleChatMessage(client *Client, message *websocket_model.Cha
 				}
 			}
 
-			traceFunc := func(ctx context.Context, message string) func(context.Context, string) {
-				return func(ctx context.Context, traceMsg string) {
-					if err := h.hub.SendTraceToClient(client.clientID, traceMsg, warrenUser); err != nil {
-						// Check if the error is due to client disconnection
-						if err.Error() == "client not found" {
-							logger.Debug("client disconnected, skipping trace", "client_id", client.clientID)
-						} else {
-							logger.Error("failed to send trace to client", "error", err, "client_id", client.clientID)
-						}
+			traceFunc := func(ctx context.Context, message string) {
+				if err := h.hub.SendTraceToClient(client.clientID, message, warrenUser); err != nil {
+					// Check if the error is due to client disconnection
+					if err.Error() == "client not found" {
+						logger.Debug("client disconnected, skipping trace", "client_id", client.clientID)
+					} else {
+						logger.Error("failed to send trace to client", "error", err, "client_id", client.clientID)
 					}
 				}
 			}

@@ -3,6 +3,7 @@ package firestore
 import (
 	"context"
 
+	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
@@ -87,4 +88,54 @@ func (r *Firestore) DeleteSession(ctx context.Context, sessionID types.SessionID
 			goerr.T(errs.TagDatabase))
 	}
 	return nil
+}
+
+func (r *Firestore) PutSessionMessage(ctx context.Context, message *session.Message) error {
+	// Store in subcollection: sessions/{sessionID}/messages/{messageID}
+	_, err := r.db.Collection(collectionSessions).
+		Doc(message.SessionID.String()).
+		Collection("messages").
+		Doc(message.ID.String()).
+		Set(ctx, message)
+	if err != nil {
+		return r.eb.Wrap(err, "failed to put session message",
+			goerr.V("session_id", message.SessionID),
+			goerr.V("message_id", message.ID),
+			goerr.T(errs.TagDatabase))
+	}
+	return nil
+}
+
+func (r *Firestore) GetSessionMessages(ctx context.Context, sessionID types.SessionID) ([]*session.Message, error) {
+	// Query messages subcollection ordered by created_at
+	query := r.db.Collection(collectionSessions).
+		Doc(sessionID.String()).
+		Collection("messages").
+		OrderBy("created_at", firestore.Asc)
+
+	iter := query.Documents(ctx)
+	defer iter.Stop()
+
+	var messages []*session.Message
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, r.eb.Wrap(err, "failed to query session messages",
+				goerr.V("session_id", sessionID),
+				goerr.T(errs.TagDatabase))
+		}
+
+		var msg session.Message
+		if err := doc.DataTo(&msg); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to message",
+				goerr.V("session_id", sessionID),
+				goerr.T(errs.TagInternal))
+		}
+		messages = append(messages, &msg)
+	}
+
+	return messages, nil
 }

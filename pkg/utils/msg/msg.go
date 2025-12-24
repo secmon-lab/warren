@@ -8,23 +8,14 @@ import (
 )
 
 type NotifyFunc func(ctx context.Context, msg string)
-type TraceFunc func(ctx context.Context, msg string) func(ctx context.Context, msg string)
-type NewUpdatableFunc func(ctx context.Context, msg string) func(ctx context.Context, msg string)
+type TraceFunc func(ctx context.Context, msg string)
 
 type ctxNotifyFuncKey struct{}
 type ctxTraceFuncKey struct{}
-type ctxNewUpdatableFuncKey struct{}
 
 func With(ctx context.Context, NotifyFunc NotifyFunc, TraceFunc TraceFunc) context.Context {
 	ctx = context.WithValue(ctx, ctxNotifyFuncKey{}, NotifyFunc)
 	ctx = context.WithValue(ctx, ctxTraceFuncKey{}, TraceFunc)
-	return ctx
-}
-
-func WithUpdatable(ctx context.Context, NotifyFunc NotifyFunc, TraceFunc TraceFunc, NewUpdatableFunc NewUpdatableFunc) context.Context {
-	ctx = context.WithValue(ctx, ctxNotifyFuncKey{}, NotifyFunc)
-	ctx = context.WithValue(ctx, ctxTraceFuncKey{}, TraceFunc)
-	ctx = context.WithValue(ctx, ctxNewUpdatableFuncKey{}, NewUpdatableFunc)
 	return ctx
 }
 
@@ -48,20 +39,9 @@ func Trace(ctx context.Context, format string, args ...any) {
 	}
 }
 
-func NewUpdatable(ctx context.Context, format string, args ...any) func(ctx context.Context, msg string) {
-	if v := ctx.Value(ctxNewUpdatableFuncKey{}); v != nil {
-		if fn, ok := v.(NewUpdatableFunc); ok && fn != nil {
-			return fn(ctx, fmt.Sprintf(format, args...))
-		}
-	}
-	return func(ctx context.Context, msg string) {}
-}
-
 func WithContext(original context.Context) context.Context {
 	ctx := original
 	ctx = context.WithValue(ctx, ctxNotifyFuncKey{}, original.Value(ctxNotifyFuncKey{}))
 	ctx = context.WithValue(ctx, ctxTraceFuncKey{}, original.Value(ctxTraceFuncKey{}))
-	ctx = context.WithValue(ctx, ctxTraceFuncKey{}, original.Value(ctxTraceFuncKey{}))
-	ctx = context.WithValue(ctx, ctxNewUpdatableFuncKey{}, original.Value(ctxNewUpdatableFuncKey{}))
 	return ctx
 }

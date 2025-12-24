@@ -64,7 +64,6 @@ func TestActivityCreation(t *testing.T) {
 				gt.NoError(t, err).Required()
 
 				// Wait a bit for Firestore eventual consistency
-				time.Sleep(100 * time.Millisecond)
 
 				// Check that activity was created
 				activities, err := repo.GetActivities(ctx, 0, 100) // Get more activities to account for test accumulation
@@ -112,7 +111,6 @@ func TestActivityCreation(t *testing.T) {
 				gt.NoError(t, err).Required()
 
 				// Wait a bit for Firestore eventual consistency
-				time.Sleep(100 * time.Millisecond)
 
 				// Now update the ticket
 				ticket.Title = "Updated Title"
@@ -122,7 +120,6 @@ func TestActivityCreation(t *testing.T) {
 				gt.NoError(t, err).Required()
 
 				// Wait a bit for Firestore eventual consistency
-				time.Sleep(100 * time.Millisecond)
 
 				// Check that both creation and update activities were created
 				activities, err := repo.GetActivities(ctx, 0, 100)

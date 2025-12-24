@@ -30,12 +30,10 @@ func TestWithTraceFunc(t *testing.T) {
 	replyFunc := func(ctx context.Context, msg string) {
 		calledReply = true
 	}
-	traceFunc := func(ctx context.Context, msg string) func(ctx context.Context, msg string) {
+	traceFunc := func(ctx context.Context, msg string) {
 		// TraceFunc should post the trace message
 		callCount++
 		lastMsg = msg
-		// Return a no-op function (not used in current implementation)
-		return func(ctx context.Context, updateMsg string) {}
 	}
 
 	ctx := msg.With(context.Background(), replyFunc, traceFunc)
