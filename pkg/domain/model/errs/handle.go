@@ -27,7 +27,7 @@ func Handle(ctx context.Context, err error) {
 	hub := sentry.CurrentHub().Clone()
 	hub.ConfigureScope(func(scope *sentry.Scope) {
 		// Add request ID from context
-		if reqID := request_id.FromContext(ctx); reqID != "" {
+		if reqID := request_id.FromContext(ctx); reqID != "" && reqID != "(unknown)" {
 			scope.SetTag("request_id", reqID)
 		}
 

@@ -31,7 +31,10 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, slac
 		return goerr.New("slack service not configured")
 	}
 	threadSvc := uc.slackService.NewThread(slackThread)
-	ctx = msg.With(ctx, threadSvc.Reply, threadSvc.NewStateFunc)
+	traceFunc := func(ctx context.Context, message string) {
+		threadSvc.NewStateFunc(ctx, message)
+	}
+	ctx = msg.With(ctx, threadSvc.Reply, traceFunc)
 
 	switch actionID {
 	case slack.ActionIDAckAlert:

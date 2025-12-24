@@ -56,8 +56,8 @@ func TestNewSession_NoRequestID(t *testing.T) {
 
 	sess := session.NewSession(ctx, ticketID)
 
-	if sess.RequestID != "unknown" {
-		t.Errorf("RequestID = %v, want %v", sess.RequestID, "unknown")
+	if sess.RequestID != "(unknown)" {
+		t.Errorf("RequestID = %v, want %v", sess.RequestID, "(unknown)")
 	}
 }
 

@@ -22,15 +22,11 @@ type Session struct {
 // NewSession creates a new session with running status
 func NewSession(ctx context.Context, ticketID types.TicketID) *Session {
 	now := clock.Now(ctx)
-	requestID := request_id.FromContext(ctx)
-	if requestID == "" {
-		requestID = "unknown"
-	}
 
 	return &Session{
 		ID:        types.NewSessionID(),
 		TicketID:  ticketID,
-		RequestID: requestID,
+		RequestID: request_id.FromContext(ctx),
 		Status:    types.SessionStatusRunning,
 		CreatedAt: now,
 		UpdatedAt: now,

@@ -30,7 +30,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/request_id"
-	sessutil "github.com/secmon-lab/warren/pkg/utils/session"
+	ssnutil "github.com/secmon-lab/warren/pkg/utils/session"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
@@ -42,24 +42,90 @@ var (
 	ErrSessionAborted = goerr.New("session aborted by user")
 )
 
+func (x *UseCases) setupChatMessageFuncs(ctx context.Context, repo interfaces.Repository, sess *session.Session, target *ticket.Ticket) (msg.NotifyFunc, msg.TraceFunc, msg.TraceFunc) {
+	threadSvc := x.slackService.NewThread(*target.SlackThread)
+
+	notifyFunc := func(ctx context.Context, message string) {
+		// Save response message to repository
+		m := session.NewMessage(ctx, sess.ID, session.MessageTypeResponse, message)
+		if err := repo.PutSessionMessage(ctx, m); err != nil {
+			errs.Handle(ctx, err)
+		}
+		// Post to Slack
+		if err := threadSvc.PostComment(ctx, message); err != nil {
+			errs.Handle(ctx, err)
+		}
+	}
+
+	var traceUpdateFunc func(context.Context, string)
+	traceFunc := func(ctx context.Context, message string) {
+		// Save trace message to repository
+		m := session.NewMessage(ctx, sess.ID, session.MessageTypeTrace, message)
+		if err := repo.PutSessionMessage(ctx, m); err != nil {
+			errs.Handle(ctx, err)
+		}
+
+		// Initialize traceUpdateFunc on first message
+		if traceUpdateFunc == nil {
+			traceUpdateFunc = threadSvc.NewUpdatableMessage(ctx, message)
+		} else {
+			traceUpdateFunc(ctx, message)
+		}
+	}
+
+	var planUpdateFunc func(context.Context, string)
+	planFunc := func(ctx context.Context, message string) {
+		// Save trace message to repository
+		m := session.NewMessage(ctx, sess.ID, session.MessageTypeTrace, message)
+		if err := repo.PutSessionMessage(ctx, m); err != nil {
+			errs.Handle(ctx, err)
+		}
+
+		// Initialize planUpdateFunc on first message
+		if planUpdateFunc == nil {
+			planUpdateFunc = threadSvc.NewUpdatableMessage(ctx, message)
+		} else {
+			planUpdateFunc(ctx, message)
+		}
+	}
+
+	return notifyFunc, traceFunc, planFunc
+}
+
 // Chat processes a chat message for the specified ticket
 // Message routing is handled via msg.Notify and msg.Trace functions in the context
 func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message string) error {
 	logger := logging.From(ctx)
 
 	// Create and save session
-	sess := session.NewSession(ctx, target.ID)
-	if err := x.repository.PutSession(ctx, sess); err != nil {
+	ssn := session.NewSession(ctx, target.ID)
+	if err := x.repository.PutSession(ctx, ssn); err != nil {
 		return goerr.Wrap(err, "failed to save session")
 	}
 
 	// Embed session ID in logger
-	logger = logger.With("session_id", sess.ID)
+	logger = logger.With("session_id", ssn.ID)
 	ctx = logging.With(ctx, logger)
+
+	// Setup message functions only if Slack is enabled
+	planFunc := func(ctx context.Context, msg string) {
+	}
+	if x.slackService != nil && target.SlackThread != nil {
+		notifyFunc, traceFunc, pf := x.setupChatMessageFuncs(ctx, x.repository, ssn, target)
+		ctx = msg.With(ctx, notifyFunc, traceFunc)
+		planFunc = pf
+
+		// Post initial request ID message using planFunc
+		requestID := request_id.FromContext(ctx)
+		if requestID == "" {
+			requestID = "unknown"
+		}
+		planFunc(ctx, fmt.Sprintf("🚀 Thinking... (Request ID: %s)", requestID))
+	}
 
 	// Create status check function and embed in context
 	statusCheckFunc := func(ctx context.Context) error {
-		s, err := x.repository.GetSession(ctx, sess.ID)
+		s, err := x.repository.GetSession(ctx, ssn.ID)
 		if err != nil {
 			return goerr.Wrap(err, "failed to get session status")
 		}
@@ -68,7 +134,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		}
 		return nil
 	}
-	ctx = sessutil.WithStatusCheck(ctx, statusCheckFunc)
+	ctx = ssnutil.WithStatusCheck(ctx, statusCheckFunc)
 
 	// Track final session status (will be updated by execution flow)
 	finalStatus := types.SessionStatusCompleted
@@ -79,15 +145,15 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			// If panic occurred, mark as aborted
 			finalStatus = types.SessionStatusAborted
 			// Update status before re-panicking
-			sess.UpdateStatus(ctx, finalStatus)
-			if err := x.repository.PutSession(ctx, sess); err != nil {
+			ssn.UpdateStatus(ctx, finalStatus)
+			if err := x.repository.PutSession(ctx, ssn); err != nil {
 				logger.Error("failed to update session status on panic", "error", err, "status", finalStatus)
 			}
 			panic(r) // Re-panic
 		}
 
-		sess.UpdateStatus(ctx, finalStatus)
-		if err := x.repository.PutSession(ctx, sess); err != nil {
+		ssn.UpdateStatus(ctx, finalStatus)
+		if err := x.repository.PutSession(ctx, ssn); err != nil {
 			logger.Error("failed to update final session status", "error", err, "status", finalStatus)
 		}
 	}()
@@ -174,7 +240,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			"ticket_id", target.ID,
 			"schema", alerts[0].Schema,
 			"topic", effectiveTopic)
-		msg.Trace(ctx, "⚠️ Ticket topic is empty, using schema `%s` as topic", alerts[0].Schema)
+		msg.Notify(ctx, "⚠️ Ticket topic is empty, using schema `%s` as topic", alerts[0].Schema)
 	}
 
 	// Set topic for knowledge tool in x.tools if present
@@ -239,9 +305,17 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		return goerr.Wrap(err, "failed to build system prompt")
 	}
 
+	// Get request ID from context
+	requestID := request_id.FromContext(ctx)
+	if requestID == "" {
+		requestID = "unknown"
+	}
+
 	// Create hooks for plan progress tracking
 	hooks := &chatPlanHooks{
-		ctx: ctx,
+		ctx:       ctx,
+		planFunc:  planFunc,
+		requestID: requestID,
 	}
 
 	// Create Plan & Execute strategy
@@ -249,14 +323,6 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		planexec.WithHooks(hooks),
 		planexec.WithMaxIterations(30),
 	)
-
-	// Get request ID from context
-	requestID := request_id.FromContext(ctx)
-	if requestID == "" {
-		requestID = "unknown"
-	}
-
-	msg.Trace(ctx, "🚀 Thinking... (Request ID: %s)", requestID)
 
 	// Create agent with Strategy and Middleware
 	agent := gollem.New(x.llmClient,
@@ -285,7 +351,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithToolMiddleware(func(next gollem.ToolHandler) gollem.ToolHandler {
 			return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
 				// Check if session is aborted before executing tool
-				if err := sessutil.CheckStatus(ctx); err != nil {
+				if err := ssnutil.CheckStatus(ctx); err != nil {
 					return &gollem.ToolExecResponse{
 						Error: err,
 					}, nil
@@ -499,35 +565,37 @@ func (x *UseCases) generateInitialTicketComment(ctx context.Context, ticketData 
 
 // chatPlanHooks implements planexec.PlanExecuteHooks for chat progress tracking
 type chatPlanHooks struct {
-	ctx     context.Context
-	planned bool
+	ctx       context.Context
+	planned   bool
+	planFunc  func(context.Context, string)
+	requestID string
 }
 
 var _ planexec.PlanExecuteHooks = &chatPlanHooks{}
 
 func (h *chatPlanHooks) OnPlanCreated(ctx context.Context, plan *planexec.Plan) error {
 	// Check if session is aborted
-	if err := sessutil.CheckStatus(ctx); err != nil {
+	if err := ssnutil.CheckStatus(ctx); err != nil {
 		return err
 	}
 
 	h.planned = len(plan.Tasks) > 0
-	return postPlanProgress(h.ctx, plan, "Plan created")
+	return postPlanProgress(h.ctx, h.planFunc, h.requestID, plan)
 }
 
 func (h *chatPlanHooks) OnPlanUpdated(ctx context.Context, plan *planexec.Plan) error {
 	// Check if session is aborted
-	if err := sessutil.CheckStatus(ctx); err != nil {
+	if err := ssnutil.CheckStatus(ctx); err != nil {
 		return err
 	}
 
 	h.planned = len(plan.Tasks) > 0
-	return postPlanProgress(h.ctx, plan, "Plan updated")
+	return postPlanProgress(h.ctx, h.planFunc, h.requestID, plan)
 }
 
 func (h *chatPlanHooks) OnTaskDone(ctx context.Context, plan *planexec.Plan, _ *planexec.Task) error {
 	// Check if session is aborted
-	if err := sessutil.CheckStatus(ctx); err != nil {
+	if err := ssnutil.CheckStatus(ctx); err != nil {
 		return err
 	}
 
@@ -535,27 +603,44 @@ func (h *chatPlanHooks) OnTaskDone(ctx context.Context, plan *planexec.Plan, _ *
 	if len(plan.Tasks) == 0 {
 		return nil
 	}
-	return postPlanProgress(h.ctx, plan, "Task done")
+	return postPlanProgress(h.ctx, h.planFunc, h.requestID, plan)
 }
 
 // postPlanProgress posts the plan progress as a new message (not an update)
-func postPlanProgress(ctx context.Context, plan *planexec.Plan, action string) error {
+func postPlanProgress(ctx context.Context, planFunc func(context.Context, string), requestID string, plan *planexec.Plan) error {
 	if len(plan.Tasks) == 0 {
 		// Suppress plan/task messages when there are no tasks
 		return nil
 	}
 
 	completedCount := 0
+	inProgressCount := 0
 	for _, task := range plan.Tasks {
-		if task.State == planexec.TaskStateCompleted {
+		switch task.State {
+		case planexec.TaskStateCompleted:
 			completedCount++
+		case planexec.TaskStateInProgress:
+			inProgressCount++
 		}
 	}
 
 	var messageBuilder strings.Builder
-	messageBuilder.WriteString(fmt.Sprintf("🎯 Objective *%s*\n\n", plan.Goal))
-	messageBuilder.WriteString(fmt.Sprintf("🤖 *%s*\n\n", action))
-	messageBuilder.WriteString(fmt.Sprintf("*Progress: %d/%d tasks completed*\n\n", completedCount, len(plan.Tasks)))
+
+	// Show status based on progress
+	var statusMessage string
+	switch {
+	case completedCount == len(plan.Tasks):
+		statusMessage = "✅ Completed"
+	case inProgressCount > 0:
+		statusMessage = "⟳ Working..."
+	default:
+		statusMessage = "🚀 Thinking..."
+	}
+	messageBuilder.WriteString(fmt.Sprintf("%s (Request ID: %s)\n", statusMessage, requestID))
+
+	messageBuilder.WriteString(fmt.Sprintf("🎯 Objective *%s*\n", plan.Goal))
+	messageBuilder.WriteString("\n")
+	messageBuilder.WriteString(fmt.Sprintf("*Progress: %d/%d tasks completed*\n", completedCount, len(plan.Tasks)))
 
 	for _, task := range plan.Tasks {
 		var icon string
@@ -579,7 +664,7 @@ func postPlanProgress(ctx context.Context, plan *planexec.Plan, action string) e
 		messageBuilder.WriteString(fmt.Sprintf("%s %s\n", icon, status))
 	}
 
-	msg.Trace(ctx, "%s", messageBuilder.String())
+	planFunc(ctx, messageBuilder.String())
 	return nil
 }
 

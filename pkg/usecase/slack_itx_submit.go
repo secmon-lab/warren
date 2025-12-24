@@ -112,7 +112,10 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindAlert(ctx context.Co
 		return goerr.New("slack service not configured")
 	}
 	st := uc.slackService.NewThread(*alert.SlackThread)
-	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
+	traceFunc := func(ctx context.Context, message string) {
+		st.NewStateFunc(ctx, message)
+	}
+	ctx = msg.With(ctx, st.Reply, traceFunc)
 
 	ticketID, err := getTicketID(values)
 	if err != nil {
@@ -141,7 +144,10 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Con
 	}
 
 	st := uc.slackService.NewThread(*list.SlackThread)
-	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
+	traceFunc := func(ctx context.Context, message string) {
+		st.NewStateFunc(ctx, message)
+	}
+	ctx = msg.With(ctx, st.Reply, traceFunc)
 
 	ticketID, err := getTicketID(values)
 	if err != nil {
@@ -273,7 +279,10 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 		return goerr.New("slack service not configured")
 	}
 	st := uc.slackService.NewThread(*target.SlackThread)
-	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
+	traceFunc := func(ctx context.Context, message string) {
+		st.NewStateFunc(ctx, message)
+	}
+	ctx = msg.With(ctx, st.Reply, traceFunc)
 
 	conclusion, ok := getSlackSelectValue[types.AlertConclusion](values,
 		slack.BlockIDTicketConclusion,
@@ -393,7 +402,10 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionSalvage(ctx context.Cont
 	}
 
 	st := uc.slackService.NewThread(*target.SlackThread)
-	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
+	traceFunc := func(ctx context.Context, message string) {
+		st.NewStateFunc(ctx, message)
+	}
+	ctx = msg.With(ctx, st.Reply, traceFunc)
 
 	// Get threshold and keyword from form values
 	thresholdStr, _ := getSlackValue[string](values,
@@ -473,7 +485,10 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionEditTicket(ctx context.C
 		return goerr.New("slack service not configured")
 	}
 	st := uc.slackService.NewThread(*target.SlackThread)
-	ctx = msg.With(ctx, st.Reply, st.NewStateFunc)
+	traceFunc := func(ctx context.Context, message string) {
+		st.NewStateFunc(ctx, message)
+	}
+	ctx = msg.With(ctx, st.Reply, traceFunc)
 
 	// Get new title (required)
 	newTitle, ok := getSlackValue[string](values,

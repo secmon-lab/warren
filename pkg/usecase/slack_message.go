@@ -18,7 +18,10 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg slack.Messa
 		return goerr.New("slack service not configured")
 	}
 	th := uc.slackService.NewThread(slackMsg.Thread())
-	ctx = msg.With(ctx, th.Reply, th.NewTraceMessage)
+	traceFunc := func(ctx context.Context, message string) {
+		th.NewTraceMessage(ctx, message)
+	}
+	ctx = msg.With(ctx, th.Reply, traceFunc)
 
 	// Set user ID in context for activity tracking and skip if the message is from the bot
 	if slackMsg.User() != nil {

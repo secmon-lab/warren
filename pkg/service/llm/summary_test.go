@@ -22,11 +22,8 @@ func TestSummaryWithSchemaData(t *testing.T) {
 		func(ctx context.Context, msg string) {
 			t.Log("Notify", msg)
 		},
-		func(ctx context.Context, msg string) func(ctx context.Context, msg string) {
-			t.Log("NewTrace", msg)
-			return func(ctx context.Context, msg string) {
-				t.Log("Trace", msg)
-			}
+		func(ctx context.Context, msg string) {
+			t.Log("Trace", msg)
 		},
 	)
 
