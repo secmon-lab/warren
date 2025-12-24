@@ -57,37 +57,27 @@ func (x *UseCases) setupChatMessageFuncs(ctx context.Context, repo interfaces.Re
 		}
 	}
 
-	var traceUpdateFunc func(context.Context, string)
-	traceFunc := func(ctx context.Context, message string) {
-		// Save trace message to repository
-		m := session.NewMessage(ctx, sess.ID, session.MessageTypeTrace, message)
-		if err := repo.PutSessionMessage(ctx, m); err != nil {
-			errs.Handle(ctx, err)
-		}
+	// createUpdatableMessageFunc is a helper to reduce duplication between trace and plan funcs
+	createUpdatableMessageFunc := func(msgType session.MessageType) msg.TraceFunc {
+		var updateFunc func(context.Context, string)
+		return func(ctx context.Context, message string) {
+			// Save message to repository
+			m := session.NewMessage(ctx, sess.ID, msgType, message)
+			if err := repo.PutSessionMessage(ctx, m); err != nil {
+				errs.Handle(ctx, err)
+			}
 
-		// Initialize traceUpdateFunc on first message
-		if traceUpdateFunc == nil {
-			traceUpdateFunc = threadSvc.NewUpdatableMessage(ctx, message)
-		} else {
-			traceUpdateFunc(ctx, message)
+			// Initialize or update the Slack message
+			if updateFunc == nil {
+				updateFunc = threadSvc.NewUpdatableMessage(ctx, message)
+			} else {
+				updateFunc(ctx, message)
+			}
 		}
 	}
 
-	var planUpdateFunc func(context.Context, string)
-	planFunc := func(ctx context.Context, message string) {
-		// Save trace message to repository
-		m := session.NewMessage(ctx, sess.ID, session.MessageTypeTrace, message)
-		if err := repo.PutSessionMessage(ctx, m); err != nil {
-			errs.Handle(ctx, err)
-		}
-
-		// Initialize planUpdateFunc on first message
-		if planUpdateFunc == nil {
-			planUpdateFunc = threadSvc.NewUpdatableMessage(ctx, message)
-		} else {
-			planUpdateFunc(ctx, message)
-		}
-	}
+	traceFunc := createUpdatableMessageFunc(session.MessageTypeTrace)
+	planFunc := createUpdatableMessageFunc(session.MessageTypePlan)
 
 	return notifyFunc, traceFunc, planFunc
 }
