@@ -35,11 +35,9 @@ func TestSessionMessageOperations(t *testing.T) {
 			// Create and save messages with small delays to ensure ordering
 			msg1 := session.NewMessage(ctx, sessionID, session.MessageTypeTrace, "💭 Thinking...")
 			gt.NoError(t, repo.PutSessionMessage(ctx, msg1))
-			time.Sleep(10 * time.Millisecond)
 
 			msg2 := session.NewMessage(ctx, sessionID, session.MessageTypeTrace, "🤖 Executing tool")
 			gt.NoError(t, repo.PutSessionMessage(ctx, msg2))
-			time.Sleep(10 * time.Millisecond)
 
 			msg3 := session.NewMessage(ctx, sessionID, session.MessageTypePlan, "🎯 Goal\n☑️ Task1")
 			gt.NoError(t, repo.PutSessionMessage(ctx, msg3))
@@ -94,11 +92,9 @@ func TestSessionMessageOperations(t *testing.T) {
 			// Add messages of all types
 			trace := session.NewMessage(ctx, sessionID2, session.MessageTypeTrace, "trace msg")
 			gt.NoError(t, repo.PutSessionMessage(ctx, trace))
-			time.Sleep(10 * time.Millisecond)
 
 			plan := session.NewMessage(ctx, sessionID2, session.MessageTypePlan, "plan msg")
 			gt.NoError(t, repo.PutSessionMessage(ctx, plan))
-			time.Sleep(10 * time.Millisecond)
 
 			response := session.NewMessage(ctx, sessionID2, session.MessageTypeResponse, "response msg")
 			gt.NoError(t, repo.PutSessionMessage(ctx, response))
@@ -131,7 +127,6 @@ func TestSessionMessageOperations(t *testing.T) {
 			for i := 1; i <= 10; i++ {
 				msg := session.NewMessage(ctx, sessionID3, session.MessageTypeTrace, "msg-"+string(rune('0'+i)))
 				gt.NoError(t, repo.PutSessionMessage(ctx, msg))
-				time.Sleep(5 * time.Millisecond)
 			}
 
 			// Retrieve and verify order

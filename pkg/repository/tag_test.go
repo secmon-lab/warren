@@ -121,7 +121,6 @@ func TestTagOperations(t *testing.T) {
 			t.Logf("Created tag with ID: %s, Name: %s", verifyTag.ID, verifyTag.Name)
 
 			// Wait for Firestore eventual consistency
-			time.Sleep(200 * time.Millisecond)
 
 			// Get existing tag by name
 			retrievedTag, err := repo.GetTagByName(ctx, uniqueName)

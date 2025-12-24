@@ -46,9 +46,6 @@ func TestAgentMemory(t *testing.T) {
 			err := repo.SaveAgentMemory(ctx, mem)
 			gt.NoError(t, err)
 
-			// Wait for Firestore to propagate
-			time.Sleep(100 * time.Millisecond)
-
 			// Get memory
 			retrieved, err := repo.GetAgentMemory(ctx, agentID, memID)
 			gt.NoError(t, err)
@@ -98,7 +95,6 @@ func TestAgentMemory(t *testing.T) {
 			}
 
 			// Wait for Firestore to propagate
-			time.Sleep(200 * time.Millisecond)
 
 			// Search memories
 			results, err := repo.SearchMemoriesByEmbedding(ctx, agentID, baseEmbedding, 2)
@@ -153,7 +149,6 @@ func TestAgentMemory(t *testing.T) {
 			gt.NoError(t, err)
 
 			// Wait for Firestore to propagate
-			time.Sleep(100 * time.Millisecond)
 
 			// Search for agent1's memories
 			results1, err := repo.SearchMemoriesByEmbedding(ctx, agent1ID, embedding, 10)
