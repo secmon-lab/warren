@@ -28,6 +28,14 @@ Warren is an AI agent and Slack-based security alert management tool. It process
 
 ## Important Development Guidelines
 
+### Implementation Completeness
+- **NEVER leave incomplete implementations, TODOs, or placeholder code**
+- **NEVER skip implementation because it's complex or lengthy**
+- **ALWAYS complete the full implementation in one go**
+- If a task seems too complex, break it down into smaller steps, but complete ALL steps
+- Complexity is not an excuse - implement everything thoroughly
+- Long code is acceptable - incomplete code is NOT
+
 ### Error Handling
 - Use `github.com/m-mizutani/goerr/v2` for error handling
 - Must wrap errors with `goerr.Wrap` to maintain error context
