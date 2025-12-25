@@ -66,19 +66,19 @@ export default function SessionDetailPage() {
   // Message type configurations
   const messageTypeConfig = {
     trace: {
-      wrapperClass: "hover:bg-gray-50/50",
+      wrapperClass: "hover:bg-gray-100/60",
       timeClass: "opacity-0 group-hover:opacity-100 transition-opacity",
       separatorClass: "border-gray-300/70",
       separatorPadding: "",
     },
     plan: {
-      wrapperClass: "hover:bg-blue-50/30",
+      wrapperClass: "hover:bg-blue-50/50",
       timeClass: "",
       separatorClass: "border-blue-300/60",
       separatorPadding: "pb-2",
     },
     response: {
-      wrapperClass: "hover:bg-gray-50/50",
+      wrapperClass: "hover:bg-gray-100/60",
       timeClass: "",
       separatorClass: "border-gray-300/70",
       separatorPadding: "pb-2",
