@@ -89,6 +89,7 @@ func authCallbackHandler(authUC AuthUseCase) http.HandlerFunc {
 		// Exchange code for token
 		token, err := authUC.HandleCallback(r.Context(), code)
 		if err != nil {
+			logging.From(r.Context()).Error("Authentication failed", logging.ErrAttr(err))
 			http.Error(w, "Authentication failed", http.StatusInternalServerError)
 			return
 		}

@@ -77,6 +77,7 @@ import { SimilarTickets } from "@/components/SimilarTickets";
 import { TicketComments } from "@/components/TicketComments";
 import { SalvageModal } from "@/components/SalvageModal";
 import { TicketChat } from "@/components/TicketChat";
+import { SessionsList } from "@/components/SessionsList";
 
 const ALERTS_PER_PAGE = 5;
 
@@ -929,6 +930,9 @@ export default function TicketDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Sessions */}
+          <SessionsList ticketId={ticket.id} />
 
           {/* Similar Tickets */}
           <SimilarTickets ticketId={ticket.id} />

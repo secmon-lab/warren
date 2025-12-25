@@ -310,6 +310,11 @@ func cmdServe() *cli.Command {
 				ucOptions = append(ucOptions, usecase.WithSlackService(slackSvc))
 			}
 
+			// Add frontend URL if configured
+			if webUICfg.GetFrontendURL() != "" {
+				ucOptions = append(ucOptions, usecase.WithFrontendURL(webUICfg.GetFrontendURL()))
+			}
+
 			uc := usecase.New(ucOptions...)
 
 			// Build HTTP server options

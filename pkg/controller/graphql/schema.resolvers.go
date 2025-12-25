@@ -1207,6 +1207,71 @@ func (r *queryResolver) KnowledgesByTopic(ctx context.Context, topic string) ([]
 	return result, nil
 }
 
+// TicketSessions is the resolver for the ticketSessions field.
+func (r *queryResolver) TicketSessions(ctx context.Context, ticketID string) ([]*graphql1.Session, error) {
+	sessions, err := r.repo.GetSessionsByTicket(ctx, types.TicketID(ticketID))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get sessions by ticket", goerr.V("ticketID", ticketID))
+	}
+
+	// Convert to GraphQL model
+	result := make([]*graphql1.Session, len(sessions))
+	for i, s := range sessions {
+		result[i] = &graphql1.Session{
+			ID:        string(s.ID),
+			TicketID:  string(s.TicketID),
+			Status:    s.Status.String(),
+			CreatedAt: s.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			UpdatedAt: s.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+	}
+
+	return result, nil
+}
+
+// Session is the resolver for the session field.
+func (r *queryResolver) Session(ctx context.Context, id string) (*graphql1.Session, error) {
+	s, err := r.repo.GetSession(ctx, types.SessionID(id))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get session", goerr.V("sessionID", id))
+	}
+
+	if s == nil {
+		return nil, nil
+	}
+
+	return &graphql1.Session{
+		ID:        string(s.ID),
+		TicketID:  string(s.TicketID),
+		Status:    s.Status.String(),
+		CreatedAt: s.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt: s.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}, nil
+}
+
+// SessionMessages is the resolver for the sessionMessages field.
+func (r *queryResolver) SessionMessages(ctx context.Context, sessionID string) ([]*graphql1.SessionMessage, error) {
+	messages, err := r.repo.GetSessionMessages(ctx, types.SessionID(sessionID))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get session messages", goerr.V("sessionID", sessionID))
+	}
+
+	// Convert to GraphQL model
+	result := make([]*graphql1.SessionMessage, len(messages))
+	for i, m := range messages {
+		result[i] = &graphql1.SessionMessage{
+			ID:        string(m.ID),
+			SessionID: string(m.SessionID),
+			Type:      string(m.Type),
+			Content:   m.Content,
+			CreatedAt: m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			UpdatedAt: m.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+	}
+
+	return result, nil
+}
+
 // ID is the resolver for the id field.
 func (r *ticketResolver) ID(ctx context.Context, obj *ticket.Ticket) (string, error) {
 	return string(obj.ID), nil

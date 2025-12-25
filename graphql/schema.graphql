@@ -259,6 +259,29 @@ extend type Mutation {
   archiveKnowledge(topic: String!, slug: String!): Boolean!
 }
 
+type Session {
+  id: ID!
+  ticketID: ID!
+  status: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type SessionMessage {
+  id: ID!
+  sessionID: ID!
+  type: String!
+  content: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+extend type Query {
+  ticketSessions(ticketId: ID!): [Session!]!
+  session(id: ID!): Session
+  sessionMessages(sessionId: ID!): [SessionMessage!]!
+}
+
 schema {
   query: Query
   mutation: Mutation

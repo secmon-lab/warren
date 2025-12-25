@@ -210,7 +210,8 @@ func (uc *AuthUseCase) decodeIDToken(ctx context.Context, idToken string) (*Slac
 	}
 
 	// Parse and verify the JWT token
-	token, err := jwt.Parse([]byte(idToken), jwt.WithKeySet(keySet), jwt.WithValidate(true), jwt.WithAudience(uc.clientID))
+	// Allow 10 seconds of clock skew to handle time synchronization differences
+	token, err := jwt.Parse([]byte(idToken), jwt.WithKeySet(keySet), jwt.WithValidate(true), jwt.WithAudience(uc.clientID), jwt.WithAcceptableSkew(10))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to parse or verify JWT token")
 	}

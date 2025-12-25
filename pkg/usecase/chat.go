@@ -146,6 +146,16 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		if err := x.repository.PutSession(ctx, ssn); err != nil {
 			logger.Error("failed to update final session status", "error", err, "status", finalStatus)
 		}
+
+		// Post session link to Slack thread when session is completed
+		if finalStatus == types.SessionStatusCompleted && x.frontendURL != "" && x.slackService != nil && target.SlackThread != nil {
+			threadSvc := x.slackService.NewThread(*target.SlackThread)
+			sessionURL := fmt.Sprintf("%s/sessions/%s", x.frontendURL, ssn.ID)
+			linkMessage := fmt.Sprintf("📊 Session Details: %s", sessionURL)
+			if err := threadSvc.PostContextBlock(ctx, linkMessage); err != nil {
+				logger.Error("failed to post session link to Slack", "error", err, "session_id", ssn.ID)
+			}
+		}
 	}()
 
 	// Authorize agent execution

@@ -775,3 +775,40 @@ export const ARCHIVE_KNOWLEDGE = gql`
     archiveKnowledge(topic: $topic, slug: $slug)
   }
 `;
+
+export const GET_TICKET_SESSIONS = gql`
+  query GetTicketSessions($ticketId: ID!) {
+    ticketSessions(ticketId: $ticketId) {
+      id
+      ticketID
+      status
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const GET_SESSION = gql`
+  query GetSession($id: ID!) {
+    session(id: $id) {
+      id
+      ticketID
+      status
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const GET_SESSION_MESSAGES = gql`
+  query GetSessionMessages($sessionId: ID!) {
+    sessionMessages(sessionId: $sessionId) {
+      id
+      sessionID
+      type
+      content
+      createdAt
+      updatedAt
+    }
+  }
+`;

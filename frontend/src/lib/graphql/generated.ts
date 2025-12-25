@@ -106,6 +106,13 @@ export type CommentsResponse = {
   totalCount: Scalars['Int']['output'];
 };
 
+export type CreateKnowledgeInput = {
+  content: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+  slug: Scalars['String']['input'];
+  topic: Scalars['String']['input'];
+};
+
 export type DbscanParameters = {
   __typename?: 'DBSCANParameters';
   eps: Scalars['Float']['output'];
@@ -128,14 +135,31 @@ export type Finding = {
   summary: Scalars['String']['output'];
 };
 
+export type Knowledge = {
+  __typename?: 'Knowledge';
+  author: User;
+  authorID: Scalars['String']['output'];
+  commitID: Scalars['String']['output'];
+  content: Scalars['String']['output'];
+  createdAt: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+  topic: Scalars['String']['output'];
+  updatedAt: Scalars['String']['output'];
+};
+
 export type Mutation = {
   __typename?: 'Mutation';
+  archiveKnowledge: Scalars['Boolean']['output'];
   bindAlertsToTicket: Ticket;
+  createKnowledge: Knowledge;
   createTag: TagMetadata;
   createTicket: Ticket;
   createTicketFromAlerts: Ticket;
   deleteTag: Scalars['Boolean']['output'];
   updateAlertTags: Alert;
+  updateKnowledge: Knowledge;
   updateMultipleTicketsStatus: Array<Ticket>;
   updateTag: TagMetadata;
   updateTicket: Ticket;
@@ -145,9 +169,20 @@ export type Mutation = {
 };
 
 
+export type MutationArchiveKnowledgeArgs = {
+  slug: Scalars['String']['input'];
+  topic: Scalars['String']['input'];
+};
+
+
 export type MutationBindAlertsToTicketArgs = {
   alertIds: Array<Scalars['ID']['input']>;
   ticketId: Scalars['ID']['input'];
+};
+
+
+export type MutationCreateKnowledgeArgs = {
+  input: CreateKnowledgeInput;
 };
 
 
@@ -171,13 +206,18 @@ export type MutationCreateTicketFromAlertsArgs = {
 
 
 export type MutationDeleteTagArgs = {
-  name: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
 };
 
 
 export type MutationUpdateAlertTagsArgs = {
   alertId: Scalars['ID']['input'];
   tagIds: Array<Scalars['ID']['input']>;
+};
+
+
+export type MutationUpdateKnowledgeArgs = {
+  input: UpdateKnowledgeInput;
 };
 
 
@@ -227,11 +267,16 @@ export type Query = {
   availableTagColors: Array<Scalars['String']['output']>;
   clusterAlerts: AlertsConnection;
   dashboard: DashboardStats;
+  knowledgeTopics: Array<TopicSummary>;
+  knowledgesByTopic: Array<Knowledge>;
+  session?: Maybe<Session>;
+  sessionMessages: Array<SessionMessage>;
   similarTickets: TicketsResponse;
   similarTicketsForAlert: TicketsResponse;
   tags: Array<TagMetadata>;
   ticket?: Maybe<Ticket>;
   ticketComments: CommentsResponse;
+  ticketSessions: Array<Session>;
   tickets: TicketsResponse;
   unboundAlerts: AlertsResponse;
 };
@@ -272,6 +317,21 @@ export type QueryClusterAlertsArgs = {
 };
 
 
+export type QueryKnowledgesByTopicArgs = {
+  topic: Scalars['String']['input'];
+};
+
+
+export type QuerySessionArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QuerySessionMessagesArgs = {
+  sessionId: Scalars['ID']['input'];
+};
+
+
 export type QuerySimilarTicketsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -300,6 +360,11 @@ export type QueryTicketCommentsArgs = {
 };
 
 
+export type QueryTicketSessionsArgs = {
+  ticketId: Scalars['ID']['input'];
+};
+
+
 export type QueryTicketsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -313,6 +378,25 @@ export type QueryUnboundAlertsArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   threshold?: InputMaybe<Scalars['Float']['input']>;
   ticketId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+export type Session = {
+  __typename?: 'Session';
+  createdAt: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  status: Scalars['String']['output'];
+  ticketID: Scalars['ID']['output'];
+  updatedAt: Scalars['String']['output'];
+};
+
+export type SessionMessage = {
+  __typename?: 'SessionMessage';
+  content: Scalars['String']['output'];
+  createdAt: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  sessionID: Scalars['ID']['output'];
+  type: Scalars['String']['output'];
+  updatedAt: Scalars['String']['output'];
 };
 
 export type TagMetadata = {
@@ -367,6 +451,19 @@ export type TicketsResponse = {
   totalCount: Scalars['Int']['output'];
 };
 
+export type TopicSummary = {
+  __typename?: 'TopicSummary';
+  count: Scalars['Int']['output'];
+  topic: Scalars['String']['output'];
+};
+
+export type UpdateKnowledgeInput = {
+  content: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+  slug: Scalars['String']['input'];
+  topic: Scalars['String']['input'];
+};
+
 export type UpdateTagInput = {
   color: Scalars['String']['input'];
   description?: InputMaybe<Scalars['String']['input']>;
@@ -376,6 +473,7 @@ export type UpdateTagInput = {
 
 export type User = {
   __typename?: 'User';
+  icon?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   name: Scalars['String']['output'];
 };
@@ -568,7 +666,7 @@ export type CreateTagMutationVariables = Exact<{
 export type CreateTagMutation = { __typename?: 'Mutation', createTag: { __typename?: 'TagMetadata', id: string, name: string, description?: string | null, color: string, createdAt: string, updatedAt: string } };
 
 export type DeleteTagMutationVariables = Exact<{
-  name: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
 }>;
 
 
@@ -607,6 +705,61 @@ export type UpdateTicketTagsMutationVariables = Exact<{
 
 export type UpdateTicketTagsMutation = { __typename?: 'Mutation', updateTicketTags: { __typename?: 'Ticket', id: string, title: string, tags: Array<string>, tagObjects: Array<{ __typename?: 'TagObject', id: string, name: string }> } };
 
+export type GetKnowledgeTopicsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetKnowledgeTopicsQuery = { __typename?: 'Query', knowledgeTopics: Array<{ __typename?: 'TopicSummary', topic: string, count: number }> };
+
+export type GetKnowledgesByTopicQueryVariables = Exact<{
+  topic: Scalars['String']['input'];
+}>;
+
+
+export type GetKnowledgesByTopicQuery = { __typename?: 'Query', knowledgesByTopic: Array<{ __typename?: 'Knowledge', slug: string, name: string, topic: string, content: string, commitID: string, authorID: string, createdAt: string, updatedAt: string, state: string, author: { __typename?: 'User', id: string, name: string, icon?: string | null } }> };
+
+export type CreateKnowledgeMutationVariables = Exact<{
+  input: CreateKnowledgeInput;
+}>;
+
+
+export type CreateKnowledgeMutation = { __typename?: 'Mutation', createKnowledge: { __typename?: 'Knowledge', slug: string, name: string, topic: string, content: string, commitID: string, authorID: string, createdAt: string, updatedAt: string, state: string, author: { __typename?: 'User', id: string, name: string, icon?: string | null } } };
+
+export type UpdateKnowledgeMutationVariables = Exact<{
+  input: UpdateKnowledgeInput;
+}>;
+
+
+export type UpdateKnowledgeMutation = { __typename?: 'Mutation', updateKnowledge: { __typename?: 'Knowledge', slug: string, name: string, topic: string, content: string, commitID: string, authorID: string, createdAt: string, updatedAt: string, state: string, author: { __typename?: 'User', id: string, name: string, icon?: string | null } } };
+
+export type ArchiveKnowledgeMutationVariables = Exact<{
+  topic: Scalars['String']['input'];
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type ArchiveKnowledgeMutation = { __typename?: 'Mutation', archiveKnowledge: boolean };
+
+export type GetTicketSessionsQueryVariables = Exact<{
+  ticketId: Scalars['ID']['input'];
+}>;
+
+
+export type GetTicketSessionsQuery = { __typename?: 'Query', ticketSessions: Array<{ __typename?: 'Session', id: string, ticketID: string, status: string, createdAt: string, updatedAt: string }> };
+
+export type GetSessionQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type GetSessionQuery = { __typename?: 'Query', session?: { __typename?: 'Session', id: string, ticketID: string, status: string, createdAt: string, updatedAt: string } | null };
+
+export type GetSessionMessagesQueryVariables = Exact<{
+  sessionId: Scalars['ID']['input'];
+}>;
+
+
+export type GetSessionMessagesQuery = { __typename?: 'Query', sessionMessages: Array<{ __typename?: 'SessionMessage', id: string, sessionID: string, type: string, content: string, createdAt: string, updatedAt: string }> };
+
 
 export const GetTicketsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTickets"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"statuses"},"value":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"commentsCount"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
 
@@ -636,6 +789,9 @@ export function useGetTicketsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<GetTicketsQuery, GetTicketsQueryVariables>(GetTicketsDocument, options);
         }
+// @ts-ignore
+export function useGetTicketsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetTicketsQuery, GetTicketsQueryVariables>): Apollo.UseSuspenseQueryResult<GetTicketsQuery, GetTicketsQueryVariables>;
+export function useGetTicketsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTicketsQuery, GetTicketsQueryVariables>): Apollo.UseSuspenseQueryResult<GetTicketsQuery | undefined, GetTicketsQueryVariables>;
 export function useGetTicketsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTicketsQuery, GetTicketsQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<GetTicketsQuery, GetTicketsQueryVariables>(GetTicketsDocument, options);
@@ -670,6 +826,9 @@ export function useGetTicketLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<GetTicketQuery, GetTicketQueryVariables>(GetTicketDocument, options);
         }
+// @ts-ignore
+export function useGetTicketSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetTicketQuery, GetTicketQueryVariables>): Apollo.UseSuspenseQueryResult<GetTicketQuery, GetTicketQueryVariables>;
+export function useGetTicketSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTicketQuery, GetTicketQueryVariables>): Apollo.UseSuspenseQueryResult<GetTicketQuery | undefined, GetTicketQueryVariables>;
 export function useGetTicketSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTicketQuery, GetTicketQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<GetTicketQuery, GetTicketQueryVariables>(GetTicketDocument, options);
@@ -706,6 +865,9 @@ export function useGetTicketAlertsLazyQuery(baseOptions?: Apollo.LazyQueryHookOp
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<GetTicketAlertsQuery, GetTicketAlertsQueryVariables>(GetTicketAlertsDocument, options);
         }
+// @ts-ignore
+export function useGetTicketAlertsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetTicketAlertsQuery, GetTicketAlertsQueryVariables>): Apollo.UseSuspenseQueryResult<GetTicketAlertsQuery, GetTicketAlertsQueryVariables>;
+export function useGetTicketAlertsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTicketAlertsQuery, GetTicketAlertsQueryVariables>): Apollo.UseSuspenseQueryResult<GetTicketAlertsQuery | undefined, GetTicketAlertsQueryVariables>;
 export function useGetTicketAlertsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTicketAlertsQuery, GetTicketAlertsQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<GetTicketAlertsQuery, GetTicketAlertsQueryVariables>(GetTicketAlertsDocument, options);
@@ -740,6 +902,9 @@ export function useGetAlertLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<G
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<GetAlertQuery, GetAlertQueryVariables>(GetAlertDocument, options);
         }
+// @ts-ignore
+export function useGetAlertSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetAlertQuery, GetAlertQueryVariables>): Apollo.UseSuspenseQueryResult<GetAlertQuery, GetAlertQueryVariables>;
+export function useGetAlertSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAlertQuery, GetAlertQueryVariables>): Apollo.UseSuspenseQueryResult<GetAlertQuery | undefined, GetAlertQueryVariables>;
 export function useGetAlertSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAlertQuery, GetAlertQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<GetAlertQuery, GetAlertQueryVariables>(GetAlertDocument, options);
@@ -775,6 +940,9 @@ export function useGetAlertsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<GetAlertsQuery, GetAlertsQueryVariables>(GetAlertsDocument, options);
         }
+// @ts-ignore
+export function useGetAlertsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetAlertsQuery, GetAlertsQueryVariables>): Apollo.UseSuspenseQueryResult<GetAlertsQuery, GetAlertsQueryVariables>;
+export function useGetAlertsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAlertsQuery, GetAlertsQueryVariables>): Apollo.UseSuspenseQueryResult<GetAlertsQuery | undefined, GetAlertsQueryVariables>;
 export function useGetAlertsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAlertsQuery, GetAlertsQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<GetAlertsQuery, GetAlertsQueryVariables>(GetAlertsDocument, options);
@@ -808,6 +976,9 @@ export function useGetDashboardLazyQuery(baseOptions?: Apollo.LazyQueryHookOptio
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<GetDashboardQuery, GetDashboardQueryVariables>(GetDashboardDocument, options);
         }
+// @ts-ignore
+export function useGetDashboardSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetDashboardQuery, GetDashboardQueryVariables>): Apollo.UseSuspenseQueryResult<GetDashboardQuery, GetDashboardQueryVariables>;
+export function useGetDashboardSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetDashboardQuery, GetDashboardQueryVariables>): Apollo.UseSuspenseQueryResult<GetDashboardQuery | undefined, GetDashboardQueryVariables>;
 export function useGetDashboardSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetDashboardQuery, GetDashboardQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<GetDashboardQuery, GetDashboardQueryVariables>(GetDashboardDocument, options);
@@ -843,6 +1014,9 @@ export function useGetActivitiesLazyQuery(baseOptions?: Apollo.LazyQueryHookOpti
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<GetActivitiesQuery, GetActivitiesQueryVariables>(GetActivitiesDocument, options);
         }
+// @ts-ignore
+export function useGetActivitiesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetActivitiesQuery, GetActivitiesQueryVariables>): Apollo.UseSuspenseQueryResult<GetActivitiesQuery, GetActivitiesQueryVariables>;
+export function useGetActivitiesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetActivitiesQuery, GetActivitiesQueryVariables>): Apollo.UseSuspenseQueryResult<GetActivitiesQuery | undefined, GetActivitiesQueryVariables>;
 export function useGetActivitiesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetActivitiesQuery, GetActivitiesQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<GetActivitiesQuery, GetActivitiesQueryVariables>(GetActivitiesDocument, options);
@@ -879,6 +1053,9 @@ export function useGetTicketCommentsLazyQuery(baseOptions?: Apollo.LazyQueryHook
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>(GetTicketCommentsDocument, options);
         }
+// @ts-ignore
+export function useGetTicketCommentsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>): Apollo.UseSuspenseQueryResult<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>;
+export function useGetTicketCommentsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>): Apollo.UseSuspenseQueryResult<GetTicketCommentsQuery | undefined, GetTicketCommentsQueryVariables>;
 export function useGetTicketCommentsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>(GetTicketCommentsDocument, options);
@@ -1059,6 +1236,9 @@ export function useGetSimilarTicketsLazyQuery(baseOptions?: Apollo.LazyQueryHook
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<GetSimilarTicketsQuery, GetSimilarTicketsQueryVariables>(GetSimilarTicketsDocument, options);
         }
+// @ts-ignore
+export function useGetSimilarTicketsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetSimilarTicketsQuery, GetSimilarTicketsQueryVariables>): Apollo.UseSuspenseQueryResult<GetSimilarTicketsQuery, GetSimilarTicketsQueryVariables>;
+export function useGetSimilarTicketsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetSimilarTicketsQuery, GetSimilarTicketsQueryVariables>): Apollo.UseSuspenseQueryResult<GetSimilarTicketsQuery | undefined, GetSimilarTicketsQueryVariables>;
 export function useGetSimilarTicketsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetSimilarTicketsQuery, GetSimilarTicketsQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<GetSimilarTicketsQuery, GetSimilarTicketsQueryVariables>(GetSimilarTicketsDocument, options);
@@ -1096,6 +1276,9 @@ export function useGetSimilarTicketsForAlertLazyQuery(baseOptions?: Apollo.LazyQ
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<GetSimilarTicketsForAlertQuery, GetSimilarTicketsForAlertQueryVariables>(GetSimilarTicketsForAlertDocument, options);
         }
+// @ts-ignore
+export function useGetSimilarTicketsForAlertSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetSimilarTicketsForAlertQuery, GetSimilarTicketsForAlertQueryVariables>): Apollo.UseSuspenseQueryResult<GetSimilarTicketsForAlertQuery, GetSimilarTicketsForAlertQueryVariables>;
+export function useGetSimilarTicketsForAlertSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetSimilarTicketsForAlertQuery, GetSimilarTicketsForAlertQueryVariables>): Apollo.UseSuspenseQueryResult<GetSimilarTicketsForAlertQuery | undefined, GetSimilarTicketsForAlertQueryVariables>;
 export function useGetSimilarTicketsForAlertSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetSimilarTicketsForAlertQuery, GetSimilarTicketsForAlertQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<GetSimilarTicketsForAlertQuery, GetSimilarTicketsForAlertQueryVariables>(GetSimilarTicketsForAlertDocument, options);
@@ -1134,6 +1317,9 @@ export function useGetNewAlertsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptio
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<GetNewAlertsQuery, GetNewAlertsQueryVariables>(GetNewAlertsDocument, options);
         }
+// @ts-ignore
+export function useGetNewAlertsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetNewAlertsQuery, GetNewAlertsQueryVariables>): Apollo.UseSuspenseQueryResult<GetNewAlertsQuery, GetNewAlertsQueryVariables>;
+export function useGetNewAlertsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetNewAlertsQuery, GetNewAlertsQueryVariables>): Apollo.UseSuspenseQueryResult<GetNewAlertsQuery | undefined, GetNewAlertsQueryVariables>;
 export function useGetNewAlertsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetNewAlertsQuery, GetNewAlertsQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<GetNewAlertsQuery, GetNewAlertsQueryVariables>(GetNewAlertsDocument, options);
@@ -1230,6 +1416,9 @@ export function useAlertClustersLazyQuery(baseOptions?: Apollo.LazyQueryHookOpti
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<AlertClustersQuery, AlertClustersQueryVariables>(AlertClustersDocument, options);
         }
+// @ts-ignore
+export function useAlertClustersSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<AlertClustersQuery, AlertClustersQueryVariables>): Apollo.UseSuspenseQueryResult<AlertClustersQuery, AlertClustersQueryVariables>;
+export function useAlertClustersSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<AlertClustersQuery, AlertClustersQueryVariables>): Apollo.UseSuspenseQueryResult<AlertClustersQuery | undefined, AlertClustersQueryVariables>;
 export function useAlertClustersSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<AlertClustersQuery, AlertClustersQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<AlertClustersQuery, AlertClustersQueryVariables>(AlertClustersDocument, options);
@@ -1267,6 +1456,9 @@ export function useClusterAlertsLazyQuery(baseOptions?: Apollo.LazyQueryHookOpti
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<ClusterAlertsQuery, ClusterAlertsQueryVariables>(ClusterAlertsDocument, options);
         }
+// @ts-ignore
+export function useClusterAlertsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<ClusterAlertsQuery, ClusterAlertsQueryVariables>): Apollo.UseSuspenseQueryResult<ClusterAlertsQuery, ClusterAlertsQueryVariables>;
+export function useClusterAlertsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<ClusterAlertsQuery, ClusterAlertsQueryVariables>): Apollo.UseSuspenseQueryResult<ClusterAlertsQuery | undefined, ClusterAlertsQueryVariables>;
 export function useClusterAlertsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<ClusterAlertsQuery, ClusterAlertsQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<ClusterAlertsQuery, ClusterAlertsQueryVariables>(ClusterAlertsDocument, options);
@@ -1300,6 +1492,9 @@ export function useGetTagsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<Ge
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<GetTagsQuery, GetTagsQueryVariables>(GetTagsDocument, options);
         }
+// @ts-ignore
+export function useGetTagsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetTagsQuery, GetTagsQueryVariables>): Apollo.UseSuspenseQueryResult<GetTagsQuery, GetTagsQueryVariables>;
+export function useGetTagsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTagsQuery, GetTagsQueryVariables>): Apollo.UseSuspenseQueryResult<GetTagsQuery | undefined, GetTagsQueryVariables>;
 export function useGetTagsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTagsQuery, GetTagsQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<GetTagsQuery, GetTagsQueryVariables>(GetTagsDocument, options);
@@ -1335,7 +1530,7 @@ export function useCreateTagMutation(baseOptions?: Apollo.MutationHookOptions<Cr
 export type CreateTagMutationHookResult = ReturnType<typeof useCreateTagMutation>;
 export type CreateTagMutationResult = Apollo.MutationResult<CreateTagMutation>;
 export type CreateTagMutationOptions = Apollo.BaseMutationOptions<CreateTagMutation, CreateTagMutationVariables>;
-export const DeleteTagDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteTag"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"name"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteTag"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"name"},"value":{"kind":"Variable","name":{"kind":"Name","value":"name"}}}]}]}}]} as unknown as DocumentNode;
+export const DeleteTagDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteTag"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteTag"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}]}}]} as unknown as DocumentNode;
 export type DeleteTagMutationFn = Apollo.MutationFunction<DeleteTagMutation, DeleteTagMutationVariables>;
 
 /**
@@ -1351,7 +1546,7 @@ export type DeleteTagMutationFn = Apollo.MutationFunction<DeleteTagMutation, Del
  * @example
  * const [deleteTagMutation, { data, loading, error }] = useDeleteTagMutation({
  *   variables: {
- *      name: // value for 'name'
+ *      id: // value for 'id'
  *   },
  * });
  */
@@ -1414,6 +1609,9 @@ export function useGetAvailableTagColorsLazyQuery(baseOptions?: Apollo.LazyQuery
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<GetAvailableTagColorsQuery, GetAvailableTagColorsQueryVariables>(GetAvailableTagColorsDocument, options);
         }
+// @ts-ignore
+export function useGetAvailableTagColorsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetAvailableTagColorsQuery, GetAvailableTagColorsQueryVariables>): Apollo.UseSuspenseQueryResult<GetAvailableTagColorsQuery, GetAvailableTagColorsQueryVariables>;
+export function useGetAvailableTagColorsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAvailableTagColorsQuery, GetAvailableTagColorsQueryVariables>): Apollo.UseSuspenseQueryResult<GetAvailableTagColorsQuery | undefined, GetAvailableTagColorsQueryVariables>;
 export function useGetAvailableTagColorsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAvailableTagColorsQuery, GetAvailableTagColorsQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<GetAvailableTagColorsQuery, GetAvailableTagColorsQueryVariables>(GetAvailableTagColorsDocument, options);
@@ -1447,6 +1645,9 @@ export function useGetAvailableTagColorNamesLazyQuery(baseOptions?: Apollo.LazyQ
           const options = {...defaultOptions, ...baseOptions}
           return Apollo.useLazyQuery<GetAvailableTagColorNamesQuery, GetAvailableTagColorNamesQueryVariables>(GetAvailableTagColorNamesDocument, options);
         }
+// @ts-ignore
+export function useGetAvailableTagColorNamesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetAvailableTagColorNamesQuery, GetAvailableTagColorNamesQueryVariables>): Apollo.UseSuspenseQueryResult<GetAvailableTagColorNamesQuery, GetAvailableTagColorNamesQueryVariables>;
+export function useGetAvailableTagColorNamesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAvailableTagColorNamesQuery, GetAvailableTagColorNamesQueryVariables>): Apollo.UseSuspenseQueryResult<GetAvailableTagColorNamesQuery | undefined, GetAvailableTagColorNamesQueryVariables>;
 export function useGetAvailableTagColorNamesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAvailableTagColorNamesQuery, GetAvailableTagColorNamesQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
           return Apollo.useSuspenseQuery<GetAvailableTagColorNamesQuery, GetAvailableTagColorNamesQueryVariables>(GetAvailableTagColorNamesDocument, options);
@@ -1511,3 +1712,269 @@ export function useUpdateTicketTagsMutation(baseOptions?: Apollo.MutationHookOpt
 export type UpdateTicketTagsMutationHookResult = ReturnType<typeof useUpdateTicketTagsMutation>;
 export type UpdateTicketTagsMutationResult = Apollo.MutationResult<UpdateTicketTagsMutation>;
 export type UpdateTicketTagsMutationOptions = Apollo.BaseMutationOptions<UpdateTicketTagsMutation, UpdateTicketTagsMutationVariables>;
+export const GetKnowledgeTopicsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetKnowledgeTopics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"knowledgeTopics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"topic"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useGetKnowledgeTopicsQuery__
+ *
+ * To run a query within a React component, call `useGetKnowledgeTopicsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetKnowledgeTopicsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetKnowledgeTopicsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetKnowledgeTopicsQuery(baseOptions?: Apollo.QueryHookOptions<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>(GetKnowledgeTopicsDocument, options);
+      }
+export function useGetKnowledgeTopicsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>(GetKnowledgeTopicsDocument, options);
+        }
+// @ts-ignore
+export function useGetKnowledgeTopicsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>;
+export function useGetKnowledgeTopicsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgeTopicsQuery | undefined, GetKnowledgeTopicsQueryVariables>;
+export function useGetKnowledgeTopicsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>(GetKnowledgeTopicsDocument, options);
+        }
+export type GetKnowledgeTopicsQueryHookResult = ReturnType<typeof useGetKnowledgeTopicsQuery>;
+export type GetKnowledgeTopicsLazyQueryHookResult = ReturnType<typeof useGetKnowledgeTopicsLazyQuery>;
+export type GetKnowledgeTopicsSuspenseQueryHookResult = ReturnType<typeof useGetKnowledgeTopicsSuspenseQuery>;
+export type GetKnowledgeTopicsQueryResult = Apollo.QueryResult<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>;
+export const GetKnowledgesByTopicDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetKnowledgesByTopic"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"topic"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"knowledgesByTopic"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"topic"},"value":{"kind":"Variable","name":{"kind":"Name","value":"topic"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"topic"}},{"kind":"Field","name":{"kind":"Name","value":"content"}},{"kind":"Field","name":{"kind":"Name","value":"commitID"}},{"kind":"Field","name":{"kind":"Name","value":"authorID"}},{"kind":"Field","name":{"kind":"Name","value":"author"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"state"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useGetKnowledgesByTopicQuery__
+ *
+ * To run a query within a React component, call `useGetKnowledgesByTopicQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetKnowledgesByTopicQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetKnowledgesByTopicQuery({
+ *   variables: {
+ *      topic: // value for 'topic'
+ *   },
+ * });
+ */
+export function useGetKnowledgesByTopicQuery(baseOptions: Apollo.QueryHookOptions<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables> & ({ variables: GetKnowledgesByTopicQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>(GetKnowledgesByTopicDocument, options);
+      }
+export function useGetKnowledgesByTopicLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>(GetKnowledgesByTopicDocument, options);
+        }
+// @ts-ignore
+export function useGetKnowledgesByTopicSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>;
+export function useGetKnowledgesByTopicSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgesByTopicQuery | undefined, GetKnowledgesByTopicQueryVariables>;
+export function useGetKnowledgesByTopicSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>(GetKnowledgesByTopicDocument, options);
+        }
+export type GetKnowledgesByTopicQueryHookResult = ReturnType<typeof useGetKnowledgesByTopicQuery>;
+export type GetKnowledgesByTopicLazyQueryHookResult = ReturnType<typeof useGetKnowledgesByTopicLazyQuery>;
+export type GetKnowledgesByTopicSuspenseQueryHookResult = ReturnType<typeof useGetKnowledgesByTopicSuspenseQuery>;
+export type GetKnowledgesByTopicQueryResult = Apollo.QueryResult<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>;
+export const CreateKnowledgeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateKnowledge"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateKnowledgeInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createKnowledge"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"topic"}},{"kind":"Field","name":{"kind":"Name","value":"content"}},{"kind":"Field","name":{"kind":"Name","value":"commitID"}},{"kind":"Field","name":{"kind":"Name","value":"authorID"}},{"kind":"Field","name":{"kind":"Name","value":"author"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"state"}}]}}]}}]} as unknown as DocumentNode;
+export type CreateKnowledgeMutationFn = Apollo.MutationFunction<CreateKnowledgeMutation, CreateKnowledgeMutationVariables>;
+
+/**
+ * __useCreateKnowledgeMutation__
+ *
+ * To run a mutation, you first call `useCreateKnowledgeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateKnowledgeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createKnowledgeMutation, { data, loading, error }] = useCreateKnowledgeMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCreateKnowledgeMutation(baseOptions?: Apollo.MutationHookOptions<CreateKnowledgeMutation, CreateKnowledgeMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CreateKnowledgeMutation, CreateKnowledgeMutationVariables>(CreateKnowledgeDocument, options);
+      }
+export type CreateKnowledgeMutationHookResult = ReturnType<typeof useCreateKnowledgeMutation>;
+export type CreateKnowledgeMutationResult = Apollo.MutationResult<CreateKnowledgeMutation>;
+export type CreateKnowledgeMutationOptions = Apollo.BaseMutationOptions<CreateKnowledgeMutation, CreateKnowledgeMutationVariables>;
+export const UpdateKnowledgeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateKnowledge"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateKnowledgeInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateKnowledge"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"topic"}},{"kind":"Field","name":{"kind":"Name","value":"content"}},{"kind":"Field","name":{"kind":"Name","value":"commitID"}},{"kind":"Field","name":{"kind":"Name","value":"authorID"}},{"kind":"Field","name":{"kind":"Name","value":"author"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"state"}}]}}]}}]} as unknown as DocumentNode;
+export type UpdateKnowledgeMutationFn = Apollo.MutationFunction<UpdateKnowledgeMutation, UpdateKnowledgeMutationVariables>;
+
+/**
+ * __useUpdateKnowledgeMutation__
+ *
+ * To run a mutation, you first call `useUpdateKnowledgeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateKnowledgeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateKnowledgeMutation, { data, loading, error }] = useUpdateKnowledgeMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateKnowledgeMutation(baseOptions?: Apollo.MutationHookOptions<UpdateKnowledgeMutation, UpdateKnowledgeMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateKnowledgeMutation, UpdateKnowledgeMutationVariables>(UpdateKnowledgeDocument, options);
+      }
+export type UpdateKnowledgeMutationHookResult = ReturnType<typeof useUpdateKnowledgeMutation>;
+export type UpdateKnowledgeMutationResult = Apollo.MutationResult<UpdateKnowledgeMutation>;
+export type UpdateKnowledgeMutationOptions = Apollo.BaseMutationOptions<UpdateKnowledgeMutation, UpdateKnowledgeMutationVariables>;
+export const ArchiveKnowledgeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ArchiveKnowledge"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"topic"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"slug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"archiveKnowledge"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"topic"},"value":{"kind":"Variable","name":{"kind":"Name","value":"topic"}}},{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"slug"}}}]}]}}]} as unknown as DocumentNode;
+export type ArchiveKnowledgeMutationFn = Apollo.MutationFunction<ArchiveKnowledgeMutation, ArchiveKnowledgeMutationVariables>;
+
+/**
+ * __useArchiveKnowledgeMutation__
+ *
+ * To run a mutation, you first call `useArchiveKnowledgeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useArchiveKnowledgeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [archiveKnowledgeMutation, { data, loading, error }] = useArchiveKnowledgeMutation({
+ *   variables: {
+ *      topic: // value for 'topic'
+ *      slug: // value for 'slug'
+ *   },
+ * });
+ */
+export function useArchiveKnowledgeMutation(baseOptions?: Apollo.MutationHookOptions<ArchiveKnowledgeMutation, ArchiveKnowledgeMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ArchiveKnowledgeMutation, ArchiveKnowledgeMutationVariables>(ArchiveKnowledgeDocument, options);
+      }
+export type ArchiveKnowledgeMutationHookResult = ReturnType<typeof useArchiveKnowledgeMutation>;
+export type ArchiveKnowledgeMutationResult = Apollo.MutationResult<ArchiveKnowledgeMutation>;
+export type ArchiveKnowledgeMutationOptions = Apollo.BaseMutationOptions<ArchiveKnowledgeMutation, ArchiveKnowledgeMutationVariables>;
+export const GetTicketSessionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTicketSessions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ticketSessions"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ticketId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"ticketID"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useGetTicketSessionsQuery__
+ *
+ * To run a query within a React component, call `useGetTicketSessionsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTicketSessionsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTicketSessionsQuery({
+ *   variables: {
+ *      ticketId: // value for 'ticketId'
+ *   },
+ * });
+ */
+export function useGetTicketSessionsQuery(baseOptions: Apollo.QueryHookOptions<GetTicketSessionsQuery, GetTicketSessionsQueryVariables> & ({ variables: GetTicketSessionsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetTicketSessionsQuery, GetTicketSessionsQueryVariables>(GetTicketSessionsDocument, options);
+      }
+export function useGetTicketSessionsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetTicketSessionsQuery, GetTicketSessionsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetTicketSessionsQuery, GetTicketSessionsQueryVariables>(GetTicketSessionsDocument, options);
+        }
+// @ts-ignore
+export function useGetTicketSessionsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetTicketSessionsQuery, GetTicketSessionsQueryVariables>): Apollo.UseSuspenseQueryResult<GetTicketSessionsQuery, GetTicketSessionsQueryVariables>;
+export function useGetTicketSessionsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTicketSessionsQuery, GetTicketSessionsQueryVariables>): Apollo.UseSuspenseQueryResult<GetTicketSessionsQuery | undefined, GetTicketSessionsQueryVariables>;
+export function useGetTicketSessionsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTicketSessionsQuery, GetTicketSessionsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetTicketSessionsQuery, GetTicketSessionsQueryVariables>(GetTicketSessionsDocument, options);
+        }
+export type GetTicketSessionsQueryHookResult = ReturnType<typeof useGetTicketSessionsQuery>;
+export type GetTicketSessionsLazyQueryHookResult = ReturnType<typeof useGetTicketSessionsLazyQuery>;
+export type GetTicketSessionsSuspenseQueryHookResult = ReturnType<typeof useGetTicketSessionsSuspenseQuery>;
+export type GetTicketSessionsQueryResult = Apollo.QueryResult<GetTicketSessionsQuery, GetTicketSessionsQueryVariables>;
+export const GetSessionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetSession"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"session"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"ticketID"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useGetSessionQuery__
+ *
+ * To run a query within a React component, call `useGetSessionQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetSessionQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetSessionQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useGetSessionQuery(baseOptions: Apollo.QueryHookOptions<GetSessionQuery, GetSessionQueryVariables> & ({ variables: GetSessionQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetSessionQuery, GetSessionQueryVariables>(GetSessionDocument, options);
+      }
+export function useGetSessionLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetSessionQuery, GetSessionQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetSessionQuery, GetSessionQueryVariables>(GetSessionDocument, options);
+        }
+// @ts-ignore
+export function useGetSessionSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetSessionQuery, GetSessionQueryVariables>): Apollo.UseSuspenseQueryResult<GetSessionQuery, GetSessionQueryVariables>;
+export function useGetSessionSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetSessionQuery, GetSessionQueryVariables>): Apollo.UseSuspenseQueryResult<GetSessionQuery | undefined, GetSessionQueryVariables>;
+export function useGetSessionSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetSessionQuery, GetSessionQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetSessionQuery, GetSessionQueryVariables>(GetSessionDocument, options);
+        }
+export type GetSessionQueryHookResult = ReturnType<typeof useGetSessionQuery>;
+export type GetSessionLazyQueryHookResult = ReturnType<typeof useGetSessionLazyQuery>;
+export type GetSessionSuspenseQueryHookResult = ReturnType<typeof useGetSessionSuspenseQuery>;
+export type GetSessionQueryResult = Apollo.QueryResult<GetSessionQuery, GetSessionQueryVariables>;
+export const GetSessionMessagesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetSessionMessages"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"sessionId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sessionMessages"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"sessionId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"sessionId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"sessionID"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"content"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useGetSessionMessagesQuery__
+ *
+ * To run a query within a React component, call `useGetSessionMessagesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetSessionMessagesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetSessionMessagesQuery({
+ *   variables: {
+ *      sessionId: // value for 'sessionId'
+ *   },
+ * });
+ */
+export function useGetSessionMessagesQuery(baseOptions: Apollo.QueryHookOptions<GetSessionMessagesQuery, GetSessionMessagesQueryVariables> & ({ variables: GetSessionMessagesQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetSessionMessagesQuery, GetSessionMessagesQueryVariables>(GetSessionMessagesDocument, options);
+      }
+export function useGetSessionMessagesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetSessionMessagesQuery, GetSessionMessagesQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetSessionMessagesQuery, GetSessionMessagesQueryVariables>(GetSessionMessagesDocument, options);
+        }
+// @ts-ignore
+export function useGetSessionMessagesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetSessionMessagesQuery, GetSessionMessagesQueryVariables>): Apollo.UseSuspenseQueryResult<GetSessionMessagesQuery, GetSessionMessagesQueryVariables>;
+export function useGetSessionMessagesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetSessionMessagesQuery, GetSessionMessagesQueryVariables>): Apollo.UseSuspenseQueryResult<GetSessionMessagesQuery | undefined, GetSessionMessagesQueryVariables>;
+export function useGetSessionMessagesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetSessionMessagesQuery, GetSessionMessagesQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetSessionMessagesQuery, GetSessionMessagesQueryVariables>(GetSessionMessagesDocument, options);
+        }
+export type GetSessionMessagesQueryHookResult = ReturnType<typeof useGetSessionMessagesQuery>;
+export type GetSessionMessagesLazyQueryHookResult = ReturnType<typeof useGetSessionMessagesLazyQuery>;
+export type GetSessionMessagesSuspenseQueryHookResult = ReturnType<typeof useGetSessionMessagesSuspenseQuery>;
+export type GetSessionMessagesQueryResult = Apollo.QueryResult<GetSessionMessagesQuery, GetSessionMessagesQueryVariables>;
