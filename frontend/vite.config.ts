@@ -27,9 +27,10 @@ export default defineConfig({
   },
   server: {
     host: "127.0.0.1",
+    // Explicitly allow Tailscale hosts and other development hosts
+    // Note: Vite 6.4.1 may have issues with allowedHosts configuration
     allowedHosts: [
-      ".ngrok-free.app",
-      ".ts.net"
+      ".ts.net",
     ],
     proxy: {
       "/graphql": "http://localhost:8080",

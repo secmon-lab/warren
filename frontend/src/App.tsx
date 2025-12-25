@@ -16,6 +16,7 @@ import BoardPage from "@/pages/BoardPage";
 import ClusteringPage from "@/pages/ClusteringPage";
 import KnowledgePage from "@/pages/KnowledgePage";
 import KnowledgeTopicPage from "@/pages/KnowledgeTopicPage";
+import SessionDetailPage from "@/pages/SessionDetailPage";
 import SettingsPage from "@/pages/SettingsPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 
@@ -32,6 +33,7 @@ function AuthenticatedApp() {
         <Route path="/clusters" element={<ClusteringPage />} />
         <Route path="/knowledge" element={<KnowledgePage />} />
         <Route path="/knowledge/:topic" element={<KnowledgeTopicPage />} />
+        <Route path="/sessions/:id" element={<SessionDetailPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

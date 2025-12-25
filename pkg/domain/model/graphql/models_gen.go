@@ -103,6 +103,23 @@ type Mutation struct {
 type Query struct {
 }
 
+type Session struct {
+	ID        string `json:"id"`
+	TicketID  string `json:"ticketID"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type SessionMessage struct {
+	ID        string `json:"id"`
+	SessionID string `json:"sessionID"`
+	Type      string `json:"type"`
+	Content   string `json:"content"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
 type TagMetadata struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`

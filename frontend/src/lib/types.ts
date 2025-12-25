@@ -132,3 +132,20 @@ export interface TopicSummary {
   topic: string;
   count: number;
 }
+
+export interface Session {
+  id: string;
+  ticketID: string;
+  status: string; // 'running' | 'completed' | 'aborted'
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SessionMessage {
+  id: string;
+  sessionID: string;
+  type: string; // 'trace' | 'plan' | 'response'
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}

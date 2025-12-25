@@ -45,6 +45,7 @@ type UseCases struct {
 	storagePrefix   string
 	strictAlert     bool
 	noAuthorization bool
+	frontendURL     string
 
 	// GenAI
 	promptService interfaces.PromptService
@@ -154,6 +155,12 @@ func WithNoAuthorization(noAuthorization bool) Option {
 func WithPromptService(promptService interfaces.PromptService) Option {
 	return func(u *UseCases) {
 		u.promptService = promptService
+	}
+}
+
+func WithFrontendURL(frontendURL string) Option {
+	return func(u *UseCases) {
+		u.frontendURL = frontendURL
 	}
 }
 
