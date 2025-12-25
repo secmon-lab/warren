@@ -101,7 +101,7 @@ export default function SessionDetailPage() {
       return (
         <div className="flex-1 min-w-0">
           <div className="px-4 py-3 rounded-lg bg-gradient-to-br from-blue-50 to-blue-50/50 shadow-sm">
-            <div className="text-sm prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5">
+            <div className="text-sm prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 whitespace-pre-line">
               <ReactMarkdown>{message.content}</ReactMarkdown>
             </div>
           </div>
