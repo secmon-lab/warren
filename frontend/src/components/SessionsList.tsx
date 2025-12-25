@@ -37,11 +37,6 @@ export function SessionsList({ ticketId }: SessionsListProps) {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  // Debug: log session user data
-  if (sessions.length > 0 && sessions[0].user) {
-    console.log("Session user data:", sessions[0].user);
-  }
-
   const handleSessionClick = (sessionId: string) => {
     navigate(`/sessions/${sessionId}`);
   };
