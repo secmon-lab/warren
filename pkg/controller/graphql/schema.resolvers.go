@@ -14,7 +14,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
-	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -1465,36 +1464,6 @@ func (r *Resolver) Session() SessionResolver { return &sessionResolver{r} }
 
 // Ticket returns TicketResolver implementation.
 func (r *Resolver) Ticket() TicketResolver { return &ticketResolver{r} }
-
-// toGraphQLSession converts a domain session.Session to a GraphQL Session
-func toGraphQLSession(s *session.Session) *graphql1.Session {
-	var userID, query, slackURL, intent *string
-	if s.UserID != "" {
-		uid := string(s.UserID)
-		userID = &uid
-	}
-	if s.Query != "" {
-		query = &s.Query
-	}
-	if s.SlackURL != "" {
-		slackURL = &s.SlackURL
-	}
-	if s.Intent != "" {
-		intent = &s.Intent
-	}
-
-	return &graphql1.Session{
-		ID:        string(s.ID),
-		TicketID:  string(s.TicketID),
-		Status:    s.Status.String(),
-		UserID:    userID,
-		Query:     query,
-		SlackURL:  slackURL,
-		Intent:    intent,
-		CreatedAt: s.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: s.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	}
-}
 
 type activityResolver struct{ *Resolver }
 type alertResolver struct{ *Resolver }

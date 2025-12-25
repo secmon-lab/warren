@@ -96,13 +96,6 @@ jobs:
             echo "Using cached frontend build"
           fi
 
-      # Generate mock and GraphQL code (accelerated with cache)
-      - name: Generate code
-        run: |
-          go install github.com/matryer/moq@latest
-          go install github.com/99designs/gqlgen@latest
-          go tool task mock graphql
-
       # Run tests in parallel
       - name: Run tests
         run: go test ./...
