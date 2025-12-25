@@ -8,6 +8,7 @@ import { Session, SessionMessage } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
 import { ChevronLeft, MessageSquare, Clock, Calendar } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { format } from "date-fns";
 
 const SESSION_STATUS_COLORS = {
   running: "bg-blue-100 text-blue-800",
@@ -55,78 +56,52 @@ export default function SessionDetailPage() {
   };
 
   const formatAbsoluteTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    const seconds = String(date.getSeconds()).padStart(2, "0");
-
-    const timezoneOffset = -date.getTimezoneOffset();
-    const offsetHours = Math.floor(Math.abs(timezoneOffset) / 60);
-    const offsetMinutes = Math.round(Math.abs(timezoneOffset) % 60);
-    const offsetSign = timezoneOffset >= 0 ? "+" : "-";
-    const timezone = `${offsetSign}${String(offsetHours).padStart(
-      2,
-      "0"
-    )}:${String(offsetMinutes).padStart(2, "0")}`;
-
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${timezone}`;
+    return format(new Date(dateString), "yyyy-MM-dd HH:mm:ss XXX");
   };
 
   const formatCompactTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${hours}:${minutes}`;
+    return format(new Date(dateString), "HH:mm");
   };
 
-  const renderMessage = (message: SessionMessage) => {
-    const timeLabel = formatCompactTime(message.createdAt);
+  // Message type configurations
+  const messageTypeConfig = {
+    trace: {
+      wrapperClass: "hover:bg-gray-50/50",
+      timeClass: "opacity-0 group-hover:opacity-100 transition-opacity",
+      separatorClass: "border-gray-300/70",
+      separatorPadding: "",
+    },
+    plan: {
+      wrapperClass: "hover:bg-blue-50/30",
+      timeClass: "",
+      separatorClass: "border-blue-300/60",
+      separatorPadding: "pb-2",
+    },
+    response: {
+      wrapperClass: "hover:bg-gray-50/50",
+      timeClass: "",
+      separatorClass: "border-gray-300/70",
+      separatorPadding: "pb-2",
+    },
+  } as const;
 
+  const renderMessageContent = (message: SessionMessage) => {
     if (message.type === "trace") {
       return (
-        <div key={message.id}>
-          <div className="flex gap-3 py-2 px-4 hover:bg-gray-50/50 transition-colors group">
-            <div className="text-xs text-gray-400 font-mono w-12 flex-shrink-0 text-right pt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              {timeLabel}
-            </div>
-            <div className="flex-1">
-              <span className="text-xs text-muted-foreground italic whitespace-pre-line">
-                {message.content}
-              </span>
-            </div>
-          </div>
-          <div className="flex gap-3 px-4">
-            <div className="w-12 flex-shrink-0" />
-            <div className="flex-1 pr-12">
-              <div className="border-b border-gray-300/70" />
-            </div>
-          </div>
+        <div className="flex-1">
+          <span className="text-xs text-muted-foreground italic whitespace-pre-line">
+            {message.content}
+          </span>
         </div>
       );
     }
 
     if (message.type === "plan") {
       return (
-        <div key={message.id}>
-          <div className="flex gap-3 py-2 px-4 hover:bg-blue-50/30 transition-colors group">
-            <div className="text-xs text-gray-400 font-mono w-12 flex-shrink-0 text-right pt-0.5">
-              {timeLabel}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="px-4 py-3 rounded-lg bg-gradient-to-br from-blue-50 to-blue-50/50 shadow-sm">
-                <div className="text-sm prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5">
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-3 px-4 pb-2">
-            <div className="w-12 flex-shrink-0" />
-            <div className="flex-1 pr-12">
-              <div className="border-b border-blue-300/60" />
+        <div className="flex-1 min-w-0">
+          <div className="px-4 py-3 rounded-lg bg-gradient-to-br from-blue-50 to-blue-50/50 shadow-sm">
+            <div className="text-sm prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5">
+              <ReactMarkdown>{message.content}</ReactMarkdown>
             </div>
           </div>
         </div>
@@ -135,48 +110,54 @@ export default function SessionDetailPage() {
 
     if (message.type === "response") {
       return (
-        <div key={message.id}>
-          <div className="flex gap-3 py-2 px-4 hover:bg-gray-50/50 transition-colors group">
-            <div className="text-xs text-gray-400 font-mono w-12 flex-shrink-0 text-right pt-0.5">
-              {timeLabel}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="px-4 py-3 rounded-lg bg-white shadow-sm ring-1 ring-gray-200/50">
-                <div className="text-sm prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5">
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-3 px-4 pb-2">
-            <div className="w-12 flex-shrink-0" />
-            <div className="flex-1 pr-12">
-              <div className="border-b border-gray-300/70" />
+        <div className="flex-1 min-w-0">
+          <div className="px-4 py-3 rounded-lg bg-white shadow-sm ring-1 ring-gray-200/50">
+            <div className="text-sm prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5">
+              <ReactMarkdown>{message.content}</ReactMarkdown>
             </div>
           </div>
         </div>
       );
     }
 
-    // Default message rendering
+    // Default
     return (
-      <div key={message.id}>
-        <div className="flex gap-3 py-2 px-4 hover:bg-gray-50/50 transition-colors group">
-          <div className="text-xs text-gray-400 font-mono w-12 flex-shrink-0 text-right pt-0.5">
-            {timeLabel}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="px-4 py-3 rounded-lg bg-gray-50/80 shadow-sm">
-              <div className="text-sm prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5">
-                <ReactMarkdown>{message.content}</ReactMarkdown>
-              </div>
-            </div>
+      <div className="flex-1 min-w-0">
+        <div className="px-4 py-3 rounded-lg bg-gray-50/80 shadow-sm">
+          <div className="text-sm prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5">
+            <ReactMarkdown>{message.content}</ReactMarkdown>
           </div>
         </div>
-        <div className="flex gap-3 px-4 pb-2">
+      </div>
+    );
+  };
+
+  const renderMessage = (message: SessionMessage) => {
+    const timeLabel = formatCompactTime(message.createdAt);
+    const config =
+      messageTypeConfig[message.type as keyof typeof messageTypeConfig] ||
+      messageTypeConfig.response;
+
+    return (
+      <div key={message.id}>
+        {/* Message wrapper */}
+        <div
+          className={`flex gap-3 py-2 px-4 ${config.wrapperClass} transition-colors group`}
+        >
+          {/* Time label */}
+          <div
+            className={`text-xs text-gray-400 font-mono w-12 flex-shrink-0 text-right pt-0.5 ${config.timeClass}`}
+          >
+            {timeLabel}
+          </div>
+          {/* Message content */}
+          {renderMessageContent(message)}
+        </div>
+        {/* Separator */}
+        <div className={`flex gap-3 px-4 ${config.separatorPadding}`}>
           <div className="w-12 flex-shrink-0" />
           <div className="flex-1 pr-12">
-            <div className="border-b border-gray-300/70" />
+            <div className={`border-b ${config.separatorClass}`} />
           </div>
         </div>
       </div>
