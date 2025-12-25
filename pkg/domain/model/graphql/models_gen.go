@@ -104,11 +104,16 @@ type Query struct {
 }
 
 type Session struct {
-	ID        string `json:"id"`
-	TicketID  string `json:"ticketID"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	ID        string  `json:"id"`
+	TicketID  string  `json:"ticketID"`
+	Status    string  `json:"status"`
+	UserID    *string `json:"userID,omitempty"`
+	User      *User   `json:"user,omitempty"`
+	Query     *string `json:"query,omitempty"`
+	SlackURL  *string `json:"slackURL,omitempty"`
+	Intent    *string `json:"intent,omitempty"`
+	CreatedAt string  `json:"createdAt"`
+	UpdatedAt string  `json:"updatedAt"`
 }
 
 type SessionMessage struct {

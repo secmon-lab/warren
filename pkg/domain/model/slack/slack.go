@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"strings"
 
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/slack-go/slack/slackevents"
@@ -79,6 +80,19 @@ func (x *Message) TeamID() string {
 
 func (x *Message) InThread() bool {
 	return x.threadID != ""
+}
+
+// SlackURL returns the Slack message URL
+// Format: https://slack.com/archives/{channelID}/p{timestamp}
+func (x *Message) SlackURL() string {
+	if x.channel == "" || x.ts == "" {
+		return ""
+	}
+
+	// Convert timestamp format: "1234567890.123456" -> "1234567890123456"
+	ts := strings.ReplaceAll(x.ts, ".", "")
+
+	return "https://slack.com/archives/" + x.channel + "/p" + ts
 }
 
 func NewMessage(ctx context.Context, ev *slackevents.EventsAPIEvent) *Message {

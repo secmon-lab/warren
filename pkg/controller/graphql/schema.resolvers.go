@@ -1217,13 +1217,7 @@ func (r *queryResolver) TicketSessions(ctx context.Context, ticketID string) ([]
 	// Convert to GraphQL model
 	result := make([]*graphql1.Session, len(sessions))
 	for i, s := range sessions {
-		result[i] = &graphql1.Session{
-			ID:        string(s.ID),
-			TicketID:  string(s.TicketID),
-			Status:    s.Status.String(),
-			CreatedAt: s.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt: s.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		}
+		result[i] = toGraphQLSession(s)
 	}
 
 	return result, nil
@@ -1240,13 +1234,7 @@ func (r *queryResolver) Session(ctx context.Context, id string) (*graphql1.Sessi
 		return nil, nil
 	}
 
-	return &graphql1.Session{
-		ID:        string(s.ID),
-		TicketID:  string(s.TicketID),
-		Status:    s.Status.String(),
-		CreatedAt: s.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: s.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	}, nil
+	return toGraphQLSession(s), nil
 }
 
 // SessionMessages is the resolver for the sessionMessages field.
@@ -1270,6 +1258,16 @@ func (r *queryResolver) SessionMessages(ctx context.Context, sessionID string) (
 	}
 
 	return result, nil
+}
+
+// User is the resolver for the user field.
+func (r *sessionResolver) User(ctx context.Context, obj *graphql1.Session) (*graphql1.User, error) {
+	if obj.UserID == nil || *obj.UserID == "" {
+		return nil, nil
+	}
+
+	// Use DataLoader to efficiently fetch user
+	return GetUser(ctx, *obj.UserID)
 }
 
 // ID is the resolver for the id field.
@@ -1461,6 +1459,9 @@ func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
+// Session returns SessionResolver implementation.
+func (r *Resolver) Session() SessionResolver { return &sessionResolver{r} }
+
 // Ticket returns TicketResolver implementation.
 func (r *Resolver) Ticket() TicketResolver { return &ticketResolver{r} }
 
@@ -1471,4 +1472,5 @@ type findingResolver struct{ *Resolver }
 type knowledgeResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type sessionResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }

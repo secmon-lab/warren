@@ -1,0 +1,44 @@
+name: Code Generation Check
+
+on:
+  pull_request:
+    paths:
+      - 'pkg/domain/interfaces/*.go'
+      - 'pkg/controller/http/*.go'
+      - 'pkg/domain/model/message/*.go'
+      - 'graphql/**'
+      - 'gqlgen.yml'
+      - 'Taskfile.yml'
+      - '.github/workflows/codegen.yml'
+
+jobs:
+  check-codegen:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Install code generators
+        run: |
+          go install github.com/matryer/moq@latest
+          go install github.com/99designs/gqlgen@latest
+
+      - name: Generate mock files
+        run: |
+          go tool moq -out pkg/domain/mock/interfaces.go -pkg mock -rm -skip-ensure -stub pkg/domain/interfaces SlackClient SlackThreadService ChatNotifier Notifier Repository PolicyClient EmbeddingClient StorageClient LLMClient LLMSession SlackEventUsecases SlackInteractionUsecases AlertUsecases PromptService
+          go tool moq -out pkg/domain/model/message/mock_test.go -pkg message_test -rm -skip-ensure -stub pkg/domain/model/message HTTPClient
+          go tool moq -out pkg/controller/http/mock_test.go -pkg http_test -rm -skip-ensure -stub pkg/controller/http UseCase
+
+      - name: Generate GraphQL code
+        run: go tool gqlgen generate
+
+      - name: Check for uncommitted changes
+        run: |
+          git diff --exit-code || (echo "Error: Generated code is out of sync. Please run 'task mock' and 'task graphql' and commit the changes." && exit 1)

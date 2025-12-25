@@ -3,10 +3,11 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { GET_SESSION, GET_SESSION_MESSAGES } from "@/lib/graphql/queries";
 import { Session, SessionMessage } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
-import { ChevronLeft, MessageSquare, Clock, Calendar } from "lucide-react";
+import { ChevronLeft, MessageSquare, Clock, Calendar, User as UserIcon, ExternalLink } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { format } from "date-fns";
 
@@ -100,7 +101,7 @@ export default function SessionDetailPage() {
       return (
         <div className="flex-1 min-w-0">
           <div className="px-4 py-3 rounded-lg bg-gradient-to-br from-blue-50 to-blue-50/50 shadow-sm">
-            <div className="text-sm prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5">
+            <div className="text-sm prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 whitespace-pre-line">
               <ReactMarkdown>{message.content}</ReactMarkdown>
             </div>
           </div>
@@ -276,6 +277,60 @@ export default function SessionDetailPage() {
                     {session.ticketID.slice(0, 8)}
                   </p>
                 </div>
+                {(session.user || session.userID) && (
+                  <div>
+                    <span className="text-gray-500 text-xs flex items-center gap-1">
+                      <UserIcon className="h-3 w-3" />
+                      Started By
+                    </span>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Avatar className="h-5 w-5">
+                        <AvatarImage
+                          src={`/api/user/${session.user?.id || session.userID}/icon`}
+                          alt={session.user?.name || session.userID!}
+                        />
+                        <AvatarFallback className="text-xs leading-none">
+                          {(session.user?.name || session.userID!).charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">
+                        {session.user?.name || session.userID}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {session.query && (
+                  <div>
+                    <span className="text-gray-500 text-xs">Original Query</span>
+                    <p className="text-xs mt-1 whitespace-pre-wrap">
+                      {session.query}
+                    </p>
+                  </div>
+                )}
+                {session.intent && (
+                  <div>
+                    <span className="text-gray-500 text-xs">Intent</span>
+                    <p className="text-xs mt-1">
+                      {session.intent}
+                    </p>
+                  </div>
+                )}
+                {session.slackURL && (
+                  <div>
+                    <span className="text-gray-500 text-xs">Slack Message</span>
+                    <p className="text-xs mt-1">
+                      <a
+                        href={session.slackURL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        Open in Slack
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </p>
+                  </div>
+                )}
                 <div>
                   <span className="text-gray-500 text-xs flex items-center gap-1">
                     <Calendar className="h-3 w-3" />

@@ -2,6 +2,7 @@ import { useQuery } from "@apollo/client";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { GET_TICKET_SESSIONS } from "@/lib/graphql/queries";
 import { Session } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
@@ -31,7 +32,10 @@ export function SessionsList({ ticketId }: SessionsListProps) {
     skip: !ticketId,
   });
 
-  const sessions: Session[] = data?.ticketSessions || [];
+  const rawSessions: Session[] = data?.ticketSessions || [];
+  const sessions = [...rawSessions].sort((a: Session, b: Session) => {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 
   const handleSessionClick = (sessionId: string) => {
     navigate(`/sessions/${sessionId}`);
@@ -73,8 +77,8 @@ export function SessionsList({ ticketId }: SessionsListProps) {
                 className="p-3 rounded-md border cursor-pointer hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex items-center gap-2">
                       <span className="text-sm font-mono text-muted-foreground">
                         #{session.id.slice(0, 8)}
                       </span>
@@ -91,6 +95,25 @@ export function SessionsList({ ticketId }: SessionsListProps) {
                         ] || session.status}
                       </Badge>
                     </div>
+                    {(session.user || session.userID) && (
+                      <div className="flex items-center gap-1 text-xs text-gray-600">
+                        <Avatar className="h-3 w-3">
+                          <AvatarImage
+                            src={`/api/user/${session.user?.id || session.userID}/icon`}
+                            alt={session.user?.name || session.userID!}
+                          />
+                          <AvatarFallback className="text-xs leading-none">
+                            {(session.user?.name || session.userID!).charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>Started by: {session.user?.name || session.userID}</span>
+                      </div>
+                    )}
+                    {session.intent && (
+                      <div className="text-xs text-gray-600 line-clamp-1">
+                        {session.intent}
+                      </div>
+                    )}
                     <div className="text-xs text-muted-foreground">
                       Created {formatRelativeTime(session.createdAt)}
                     </div>

@@ -124,7 +124,7 @@ func TestAbortCommand(t *testing.T) {
 	}
 
 	// Create running session
-	sess := session.NewSession(ctx, tk.ID)
+	sess := session.NewSession(ctx, tk.ID, "", "", "")
 	if err := repo.PutSession(ctx, sess); err != nil {
 		t.Fatalf("Failed to put session: %v", err)
 	}

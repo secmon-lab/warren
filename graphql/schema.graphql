@@ -263,6 +263,11 @@ type Session {
   id: ID!
   ticketID: ID!
   status: String!
+  userID: String
+  user: User
+  query: String
+  slackURL: String
+  intent: String
   createdAt: String!
   updatedAt: String!
 }
