@@ -31,6 +31,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/request_id"
 	ssnutil "github.com/secmon-lab/warren/pkg/utils/session"
+	"github.com/secmon-lab/warren/pkg/utils/slackctx"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
@@ -87,8 +88,14 @@ func (x *UseCases) setupChatMessageFuncs(ctx context.Context, repo interfaces.Re
 func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message string) error {
 	logger := logging.From(ctx)
 
+	// Get user ID from context
+	userID := types.UserID(user.FromContext(ctx))
+
+	// Get slack URL from context using type-safe helper (will be set by HandleSlackAppMention)
+	slackURL := slackctx.SlackURL(ctx)
+
 	// Create and save session
-	ssn := session.NewSession(ctx, target.ID)
+	ssn := session.NewSession(ctx, target.ID, userID, message, slackURL)
 	if err := x.repository.PutSession(ctx, ssn); err != nil {
 		return goerr.Wrap(err, "failed to save session")
 	}
@@ -151,7 +158,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		if finalStatus == types.SessionStatusCompleted && x.frontendURL != "" && x.slackService != nil && target.SlackThread != nil {
 			threadSvc := x.slackService.NewThread(*target.SlackThread)
 			sessionURL := fmt.Sprintf("%s/sessions/%s", x.frontendURL, ssn.ID)
-			linkMessage := fmt.Sprintf("📊 Session Details: %s", sessionURL)
+			linkMessage := fmt.Sprintf("📊 <%s|Session Details>", sessionURL)
 			if err := threadSvc.PostContextBlock(ctx, linkMessage); err != nil {
 				logger.Error("failed to post session link to Slack", "error", err, "session_id", ssn.ID)
 			}
@@ -313,9 +320,11 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 
 	// Create hooks for plan progress tracking
 	hooks := &chatPlanHooks{
-		ctx:       ctx,
-		planFunc:  planFunc,
-		requestID: requestID,
+		ctx:        ctx,
+		planFunc:   planFunc,
+		requestID:  requestID,
+		session:    ssn,
+		repository: x.repository,
 	}
 
 	// Create Plan & Execute strategy
@@ -410,6 +419,12 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			botUser := &slack.User{
 				ID:   x.slackService.BotID(),
 				Name: "Warren",
+			}
+
+			// Save response message to repository (must happen before Slack post)
+			m := session.NewMessage(ctx, ssn.ID, session.MessageTypeResponse, warrenResponse)
+			if err := x.repository.PutSessionMessage(ctx, m); err != nil {
+				errs.Handle(ctx, err)
 			}
 
 			// Post agent message to Slack and get message ID
@@ -565,10 +580,12 @@ func (x *UseCases) generateInitialTicketComment(ctx context.Context, ticketData 
 
 // chatPlanHooks implements planexec.PlanExecuteHooks for chat progress tracking
 type chatPlanHooks struct {
-	ctx       context.Context
-	planned   bool
-	planFunc  func(context.Context, string)
-	requestID string
+	ctx        context.Context
+	planned    bool
+	planFunc   func(context.Context, string)
+	requestID  string
+	session    *session.Session
+	repository interfaces.Repository
 }
 
 var _ planexec.PlanExecuteHooks = &chatPlanHooks{}
@@ -580,6 +597,15 @@ func (h *chatPlanHooks) OnPlanCreated(ctx context.Context, plan *planexec.Plan) 
 	}
 
 	h.planned = len(plan.Tasks) > 0
+
+	// Update session intent with plan goal
+	if plan.Goal != "" && h.session != nil && h.repository != nil {
+		h.session.UpdateIntent(ctx, plan.Goal)
+		if err := h.repository.PutSession(ctx, h.session); err != nil {
+			logging.From(ctx).Error("failed to update session intent", "error", err)
+		}
+	}
+
 	return postPlanProgress(h.ctx, h.planFunc, h.requestID, plan)
 }
 

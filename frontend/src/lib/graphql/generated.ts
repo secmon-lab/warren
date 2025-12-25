@@ -384,9 +384,14 @@ export type Session = {
   __typename?: 'Session';
   createdAt: Scalars['String']['output'];
   id: Scalars['ID']['output'];
+  intent?: Maybe<Scalars['String']['output']>;
+  query?: Maybe<Scalars['String']['output']>;
+  slackURL?: Maybe<Scalars['String']['output']>;
   status: Scalars['String']['output'];
   ticketID: Scalars['ID']['output'];
   updatedAt: Scalars['String']['output'];
+  user?: Maybe<User>;
+  userID?: Maybe<Scalars['String']['output']>;
 };
 
 export type SessionMessage = {
@@ -744,14 +749,14 @@ export type GetTicketSessionsQueryVariables = Exact<{
 }>;
 
 
-export type GetTicketSessionsQuery = { __typename?: 'Query', ticketSessions: Array<{ __typename?: 'Session', id: string, ticketID: string, status: string, createdAt: string, updatedAt: string }> };
+export type GetTicketSessionsQuery = { __typename?: 'Query', ticketSessions: Array<{ __typename?: 'Session', id: string, ticketID: string, status: string, userID?: string | null, query?: string | null, slackURL?: string | null, intent?: string | null, createdAt: string, updatedAt: string, user?: { __typename?: 'User', id: string, name: string, icon?: string | null } | null }> };
 
 export type GetSessionQueryVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type GetSessionQuery = { __typename?: 'Query', session?: { __typename?: 'Session', id: string, ticketID: string, status: string, createdAt: string, updatedAt: string } | null };
+export type GetSessionQuery = { __typename?: 'Query', session?: { __typename?: 'Session', id: string, ticketID: string, status: string, userID?: string | null, query?: string | null, slackURL?: string | null, intent?: string | null, createdAt: string, updatedAt: string, user?: { __typename?: 'User', id: string, name: string, icon?: string | null } | null } | null };
 
 export type GetSessionMessagesQueryVariables = Exact<{
   sessionId: Scalars['ID']['input'];
@@ -1867,7 +1872,7 @@ export function useArchiveKnowledgeMutation(baseOptions?: Apollo.MutationHookOpt
 export type ArchiveKnowledgeMutationHookResult = ReturnType<typeof useArchiveKnowledgeMutation>;
 export type ArchiveKnowledgeMutationResult = Apollo.MutationResult<ArchiveKnowledgeMutation>;
 export type ArchiveKnowledgeMutationOptions = Apollo.BaseMutationOptions<ArchiveKnowledgeMutation, ArchiveKnowledgeMutationVariables>;
-export const GetTicketSessionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTicketSessions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ticketSessions"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ticketId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"ticketID"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+export const GetTicketSessionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTicketSessions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ticketSessions"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ticketId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"ticketID"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"userID"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}}]}},{"kind":"Field","name":{"kind":"Name","value":"query"}},{"kind":"Field","name":{"kind":"Name","value":"slackURL"}},{"kind":"Field","name":{"kind":"Name","value":"intent"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
 
 /**
  * __useGetTicketSessionsQuery__
@@ -1904,7 +1909,7 @@ export type GetTicketSessionsQueryHookResult = ReturnType<typeof useGetTicketSes
 export type GetTicketSessionsLazyQueryHookResult = ReturnType<typeof useGetTicketSessionsLazyQuery>;
 export type GetTicketSessionsSuspenseQueryHookResult = ReturnType<typeof useGetTicketSessionsSuspenseQuery>;
 export type GetTicketSessionsQueryResult = Apollo.QueryResult<GetTicketSessionsQuery, GetTicketSessionsQueryVariables>;
-export const GetSessionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetSession"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"session"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"ticketID"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+export const GetSessionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetSession"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"session"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"ticketID"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"userID"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}}]}},{"kind":"Field","name":{"kind":"Name","value":"query"}},{"kind":"Field","name":{"kind":"Name","value":"slackURL"}},{"kind":"Field","name":{"kind":"Name","value":"intent"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
 
 /**
  * __useGetSessionQuery__

@@ -10,6 +10,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/authctx"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/secmon-lab/warren/pkg/utils/slackctx"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
@@ -91,6 +92,10 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 
 		// Setup context with Slack-specific message handlers
 		ctx = msg.With(ctx, notifyFunc, traceFunc)
+
+		// Add Slack URL to context using type-safe context key
+		slackURL := slackMsg.SlackURL()
+		ctx = slackctx.WithSlackURL(ctx, slackURL)
 
 		// Pass user-enriched context to chat function
 		return uc.Chat(ctx, ticket, mention.Message)

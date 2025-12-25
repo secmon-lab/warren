@@ -21,7 +21,7 @@ func TestSessionRepository(t *testing.T) {
 		ctx = clock.With(ctx, func() time.Time { return now })
 
 		ticketID := types.TicketID(time.Now().Format("test-ticket-20060102-150405.000000"))
-		sess := session.NewSession(ctx, ticketID)
+		sess := session.NewSession(ctx, ticketID, types.UserID("user-test"), "test query", "")
 
 		t.Run("PutSession and GetSession", func(t *testing.T) {
 			gt.NoError(t, repo.PutSession(ctx, sess))
@@ -42,7 +42,7 @@ func TestSessionRepository(t *testing.T) {
 
 		t.Run("GetSessionsByTicket", func(t *testing.T) {
 			ticketID2 := types.TicketID(time.Now().Format("test-ticket2-20060102-150405.000000"))
-			sess2 := session.NewSession(ctx, ticketID2)
+			sess2 := session.NewSession(ctx, ticketID2, "", "", "")
 
 			gt.NoError(t, repo.PutSession(ctx, sess2))
 			defer func() {
@@ -58,8 +58,8 @@ func TestSessionRepository(t *testing.T) {
 
 		t.Run("GetSessionsByTicket with multiple sessions", func(t *testing.T) {
 			ticketID3 := types.TicketID(time.Now().Format("test-ticket3-20060102-150405.000000"))
-			sess3a := session.NewSession(ctx, ticketID3)
-			sess3b := session.NewSession(ctx, ticketID3)
+			sess3a := session.NewSession(ctx, ticketID3, "", "", "")
+			sess3b := session.NewSession(ctx, ticketID3, "", "", "")
 
 			gt.NoError(t, repo.PutSession(ctx, sess3a))
 			gt.NoError(t, repo.PutSession(ctx, sess3b))
@@ -83,7 +83,7 @@ func TestSessionRepository(t *testing.T) {
 
 		t.Run("UpdateStatus to aborted", func(t *testing.T) {
 			ticketID4 := types.TicketID(time.Now().Format("test-ticket4-20060102-150405.000000"))
-			sess4 := session.NewSession(ctx, ticketID4)
+			sess4 := session.NewSession(ctx, ticketID4, "", "", "")
 
 			gt.NoError(t, repo.PutSession(ctx, sess4))
 			defer func() {
@@ -108,7 +108,7 @@ func TestSessionRepository(t *testing.T) {
 
 		t.Run("DeleteSession", func(t *testing.T) {
 			ticketID5 := types.TicketID(time.Now().Format("test-ticket5-20060102-150405.000000"))
-			sess5 := session.NewSession(ctx, ticketID5)
+			sess5 := session.NewSession(ctx, ticketID5, "", "", "")
 
 			gt.NoError(t, repo.PutSession(ctx, sess5))
 			gt.NoError(t, repo.DeleteSession(ctx, sess5.ID))

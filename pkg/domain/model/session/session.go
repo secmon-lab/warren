@@ -15,12 +15,16 @@ type Session struct {
 	TicketID  types.TicketID      `firestore:"ticket_id" json:"ticket_id"`
 	RequestID string              `firestore:"request_id" json:"request_id"`
 	Status    types.SessionStatus `firestore:"status" json:"status"`
+	UserID    types.UserID        `firestore:"user_id" json:"user_id"`
+	Query     string              `firestore:"query" json:"query"`
+	SlackURL  string              `firestore:"slack_url" json:"slack_url"`
+	Intent    string              `firestore:"intent" json:"intent"`
 	CreatedAt time.Time           `firestore:"created_at" json:"created_at"`
 	UpdatedAt time.Time           `firestore:"updated_at" json:"updated_at"`
 }
 
 // NewSession creates a new session with running status
-func NewSession(ctx context.Context, ticketID types.TicketID) *Session {
+func NewSession(ctx context.Context, ticketID types.TicketID, userID types.UserID, query string, slackURL string) *Session {
 	now := clock.Now(ctx)
 
 	return &Session{
@@ -28,6 +32,10 @@ func NewSession(ctx context.Context, ticketID types.TicketID) *Session {
 		TicketID:  ticketID,
 		RequestID: request_id.FromContext(ctx),
 		Status:    types.SessionStatusRunning,
+		UserID:    userID,
+		Query:     query,
+		SlackURL:  slackURL,
+		Intent:    "",
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -36,5 +44,11 @@ func NewSession(ctx context.Context, ticketID types.TicketID) *Session {
 // UpdateStatus updates the session status
 func (s *Session) UpdateStatus(ctx context.Context, status types.SessionStatus) {
 	s.Status = status
+	s.UpdatedAt = clock.Now(ctx)
+}
+
+// UpdateIntent updates the session intent
+func (s *Session) UpdateIntent(ctx context.Context, intent string) {
+	s.Intent = intent
 	s.UpdatedAt = clock.Now(ctx)
 }

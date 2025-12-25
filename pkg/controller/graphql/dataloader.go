@@ -9,6 +9,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -117,6 +118,8 @@ func userBatchFn(slackClient interfaces.SlackClient) func(ctx context.Context, k
 			// Use batch API to fetch all users at once
 			slackUsers, err := slackClient.GetUsersInfo(keys...)
 			if err != nil {
+				// Handle the error for debugging
+				errs.Handle(ctx, goerr.Wrap(err, "failed to get users info from Slack", goerr.V("userIDs", keys)))
 				// If Slack API fails with user_not_found or similar errors, fallback to ID instead of propagating error
 				// This prevents the entire query from failing when some users don't exist in Slack
 				for i, id := range keys {
@@ -136,9 +139,25 @@ func userBatchFn(slackClient interfaces.SlackClient) func(ctx context.Context, k
 					if icon == "" {
 						icon = slackUser.Profile.Image32
 					}
+
+					// Prefer RealName over Name, then DisplayName
+					name := slackUser.RealName
+					if name == "" {
+						name = slackUser.Profile.RealName
+					}
+					if name == "" {
+						name = slackUser.Profile.DisplayName
+					}
+					if name == "" {
+						name = slackUser.Name
+					}
+					if name == "" {
+						name = slackUser.ID
+					}
+
 					userMap[slackUser.ID] = &graphql1.User{
 						ID:   slackUser.ID,
-						Name: slackUser.Name,
+						Name: name,
 						Icon: &icon,
 					}
 				}

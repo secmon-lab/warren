@@ -47,6 +47,7 @@ type ResolverRoot interface {
 	Knowledge() KnowledgeResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
+	Session() SessionResolver
 	Ticket() TicketResolver
 }
 
@@ -209,9 +210,14 @@ type ComplexityRoot struct {
 	Session struct {
 		CreatedAt func(childComplexity int) int
 		ID        func(childComplexity int) int
+		Intent    func(childComplexity int) int
+		Query     func(childComplexity int) int
+		SlackURL  func(childComplexity int) int
 		Status    func(childComplexity int) int
 		TicketID  func(childComplexity int) int
 		UpdatedAt func(childComplexity int) int
+		User      func(childComplexity int) int
+		UserID    func(childComplexity int) int
 	}
 
 	SessionMessage struct {
@@ -344,6 +350,9 @@ type QueryResolver interface {
 	TicketSessions(ctx context.Context, ticketID string) ([]*graphql1.Session, error)
 	Session(ctx context.Context, id string) (*graphql1.Session, error)
 	SessionMessages(ctx context.Context, sessionID string) ([]*graphql1.SessionMessage, error)
+}
+type SessionResolver interface {
+	User(ctx context.Context, obj *graphql1.Session) (*graphql1.User, error)
 }
 type TicketResolver interface {
 	ID(ctx context.Context, obj *ticket.Ticket) (string, error)
@@ -1186,6 +1195,24 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Session.ID(childComplexity), true
+	case "Session.intent":
+		if e.complexity.Session.Intent == nil {
+			break
+		}
+
+		return e.complexity.Session.Intent(childComplexity), true
+	case "Session.query":
+		if e.complexity.Session.Query == nil {
+			break
+		}
+
+		return e.complexity.Session.Query(childComplexity), true
+	case "Session.slackURL":
+		if e.complexity.Session.SlackURL == nil {
+			break
+		}
+
+		return e.complexity.Session.SlackURL(childComplexity), true
 	case "Session.status":
 		if e.complexity.Session.Status == nil {
 			break
@@ -1204,6 +1231,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Session.UpdatedAt(childComplexity), true
+	case "Session.user":
+		if e.complexity.Session.User == nil {
+			break
+		}
+
+		return e.complexity.Session.User(childComplexity), true
+	case "Session.userID":
+		if e.complexity.Session.UserID == nil {
+			break
+		}
+
+		return e.complexity.Session.UserID(childComplexity), true
 
 	case "SessionMessage.content":
 		if e.complexity.SessionMessage.Content == nil {
@@ -1836,6 +1875,11 @@ type Session {
   id: ID!
   ticketID: ID!
   status: String!
+  userID: String
+  user: User
+  query: String
+  slackURL: String
+  intent: String
   createdAt: String!
   updatedAt: String!
 }
@@ -6732,6 +6776,16 @@ func (ec *executionContext) fieldContext_Query_ticketSessions(ctx context.Contex
 				return ec.fieldContext_Session_ticketID(ctx, field)
 			case "status":
 				return ec.fieldContext_Session_status(ctx, field)
+			case "userID":
+				return ec.fieldContext_Session_userID(ctx, field)
+			case "user":
+				return ec.fieldContext_Session_user(ctx, field)
+			case "query":
+				return ec.fieldContext_Session_query(ctx, field)
+			case "slackURL":
+				return ec.fieldContext_Session_slackURL(ctx, field)
+			case "intent":
+				return ec.fieldContext_Session_intent(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Session_createdAt(ctx, field)
 			case "updatedAt":
@@ -6785,6 +6839,16 @@ func (ec *executionContext) fieldContext_Query_session(ctx context.Context, fiel
 				return ec.fieldContext_Session_ticketID(ctx, field)
 			case "status":
 				return ec.fieldContext_Session_status(ctx, field)
+			case "userID":
+				return ec.fieldContext_Session_userID(ctx, field)
+			case "user":
+				return ec.fieldContext_Session_user(ctx, field)
+			case "query":
+				return ec.fieldContext_Session_query(ctx, field)
+			case "slackURL":
+				return ec.fieldContext_Session_slackURL(ctx, field)
+			case "intent":
+				return ec.fieldContext_Session_intent(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Session_createdAt(ctx, field)
 			case "updatedAt":
@@ -7045,6 +7109,159 @@ func (ec *executionContext) _Session_status(ctx context.Context, field graphql.C
 }
 
 func (ec *executionContext) fieldContext_Session_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Session",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Session_userID(ctx context.Context, field graphql.CollectedField, obj *graphql1.Session) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Session_userID,
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Session_userID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Session",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Session_user(ctx context.Context, field graphql.CollectedField, obj *graphql1.Session) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Session_user,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Session().User(ctx, obj)
+		},
+		nil,
+		ec.marshalOUser2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐUser,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Session_user(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Session",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "icon":
+				return ec.fieldContext_User_icon(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Session_query(ctx context.Context, field graphql.CollectedField, obj *graphql1.Session) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Session_query,
+		func(ctx context.Context) (any, error) {
+			return obj.Query, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Session_query(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Session",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Session_slackURL(ctx context.Context, field graphql.CollectedField, obj *graphql1.Session) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Session_slackURL,
+		func(ctx context.Context) (any, error) {
+			return obj.SlackURL, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Session_slackURL(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Session",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Session_intent(ctx context.Context, field graphql.CollectedField, obj *graphql1.Session) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Session_intent,
+		func(ctx context.Context) (any, error) {
+			return obj.Intent, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Session_intent(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Session",
 		Field:      field,
@@ -11971,27 +12188,68 @@ func (ec *executionContext) _Session(ctx context.Context, sel ast.SelectionSet, 
 		case "id":
 			out.Values[i] = ec._Session_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "ticketID":
 			out.Values[i] = ec._Session_ticketID(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "status":
 			out.Values[i] = ec._Session_status(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "userID":
+			out.Values[i] = ec._Session_userID(ctx, field, obj)
+		case "user":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Session_user(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "query":
+			out.Values[i] = ec._Session_query(ctx, field, obj)
+		case "slackURL":
+			out.Values[i] = ec._Session_slackURL(ctx, field, obj)
+		case "intent":
+			out.Values[i] = ec._Session_intent(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._Session_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Session_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))

@@ -139,6 +139,11 @@ export interface Session {
   id: string;
   ticketID: string;
   status: SessionStatus;
+  userID?: string;
+  user?: User;
+  query?: string;
+  slackURL?: string;
+  intent?: string;
   createdAt: string;
   updatedAt: string;
 }

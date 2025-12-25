@@ -782,6 +782,15 @@ export const GET_TICKET_SESSIONS = gql`
       id
       ticketID
       status
+      userID
+      user {
+        id
+        name
+        icon
+      }
+      query
+      slackURL
+      intent
       createdAt
       updatedAt
     }
@@ -794,6 +803,15 @@ export const GET_SESSION = gql`
       id
       ticketID
       status
+      userID
+      user {
+        id
+        name
+        icon
+      }
+      query
+      slackURL
+      intent
       createdAt
       updatedAt
     }
