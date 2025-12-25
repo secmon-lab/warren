@@ -30,10 +30,14 @@ jobs:
           go install github.com/matryer/moq@latest
           go install github.com/99designs/gqlgen@latest
 
-      - name: Run code generation
+      - name: Generate mock files
         run: |
-          task mock
-          task graphql
+          go tool moq -out pkg/domain/mock/interfaces.go -pkg mock -rm -skip-ensure -stub pkg/domain/interfaces SlackClient SlackThreadService ChatNotifier Notifier Repository PolicyClient EmbeddingClient StorageClient LLMClient LLMSession SlackEventUsecases SlackInteractionUsecases AlertUsecases PromptService
+          go tool moq -out pkg/domain/model/message/mock_test.go -pkg message_test -rm -skip-ensure -stub pkg/domain/model/message HTTPClient
+          go tool moq -out pkg/controller/http/mock_test.go -pkg http_test -rm -skip-ensure -stub pkg/controller/http UseCase
+
+      - name: Generate GraphQL code
+        run: go tool gqlgen generate
 
       - name: Check for uncommitted changes
         run: |
