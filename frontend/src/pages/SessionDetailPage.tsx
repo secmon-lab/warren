@@ -277,7 +277,7 @@ export default function SessionDetailPage() {
                     {session.ticketID.slice(0, 8)}
                   </p>
                 </div>
-                {session.user && (
+                {(session.user || session.userID) && (
                   <div>
                     <span className="text-gray-500 text-xs flex items-center gap-1">
                       <UserIcon className="h-3 w-3" />
@@ -285,32 +285,16 @@ export default function SessionDetailPage() {
                     </span>
                     <div className="mt-1 flex items-center gap-2">
                       <Avatar className="h-5 w-5">
-                        <AvatarImage src={`/api/user/${session.user.id}/icon`} alt={session.user.name || session.user.id} />
+                        <AvatarImage
+                          src={`/api/user/${session.user?.id || session.userID}/icon`}
+                          alt={session.user?.name || session.userID!}
+                        />
                         <AvatarFallback className="text-xs leading-none">
-                          {(session.user.name || session.user.id).charAt(0).toUpperCase()}
+                          {(session.user?.name || session.userID!).charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <span className="text-sm">
-                        {session.user.name || session.user.id}
-                      </span>
-                    </div>
-                  </div>
-                )}
-                {!session.user && session.userID && (
-                  <div>
-                    <span className="text-gray-500 text-xs flex items-center gap-1">
-                      <UserIcon className="h-3 w-3" />
-                      Started By
-                    </span>
-                    <div className="mt-1 flex items-center gap-2">
-                      <Avatar className="h-5 w-5">
-                        <AvatarImage src={`/api/user/${session.userID}/icon`} alt={session.userID} />
-                        <AvatarFallback className="text-xs leading-none">
-                          {session.userID.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm">
-                        {session.userID}
+                        {session.user?.name || session.userID}
                       </span>
                     </div>
                   </div>

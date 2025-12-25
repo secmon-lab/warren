@@ -95,33 +95,23 @@ export function SessionsList({ ticketId }: SessionsListProps) {
                         ] || session.status}
                       </Badge>
                     </div>
-                    {session.user && (
+                    {(session.user || session.userID) && (
                       <div className="flex items-center gap-1 text-xs text-gray-600">
                         <Avatar className="h-3 w-3">
-                          <AvatarImage src={`/api/user/${session.user.id}/icon`} alt={session.user.name || session.user.id} />
+                          <AvatarImage
+                            src={`/api/user/${session.user?.id || session.userID}/icon`}
+                            alt={session.user?.name || session.userID!}
+                          />
                           <AvatarFallback className="text-xs leading-none">
-                            {(session.user.name || session.user.id).charAt(0).toUpperCase()}
+                            {(session.user?.name || session.userID!).charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <span>Started by: {session.user.name || session.user.id}</span>
-                      </div>
-                    )}
-                    {!session.user && session.userID && (
-                      <div className="flex items-center gap-1 text-xs text-gray-600">
-                        <Avatar className="h-3 w-3">
-                          <AvatarImage src={`/api/user/${session.userID}/icon`} alt={session.userID} />
-                          <AvatarFallback className="text-xs leading-none">
-                            {session.userID.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span>Started by: {session.userID}</span>
+                        <span>Started by: {session.user?.name || session.userID}</span>
                       </div>
                     )}
                     {session.intent && (
                       <div className="text-xs text-gray-600 line-clamp-1">
-                        {session.intent.length > 60
-                          ? session.intent.substring(0, 60) + "..."
-                          : session.intent}
+                        {session.intent}
                       </div>
                     )}
                     <div className="text-xs text-muted-foreground">
