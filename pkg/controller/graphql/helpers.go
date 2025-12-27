@@ -2,6 +2,7 @@ package graphql
 
 import (
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
+	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 )
 
@@ -32,5 +33,24 @@ func toGraphQLSession(s *session.Session) *graphql1.Session {
 		Intent:    intent,
 		CreatedAt: s.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt: s.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+}
+
+// memoryToGraphQL converts domain AgentMemory to GraphQL AgentMemory
+func memoryToGraphQL(mem *memory.AgentMemory) *graphql1.AgentMemory {
+	var lastUsedAt *string
+	if !mem.LastUsedAt.IsZero() {
+		timestamp := mem.LastUsedAt.Format("2006-01-02T15:04:05Z07:00")
+		lastUsedAt = &timestamp
+	}
+
+	return &graphql1.AgentMemory{
+		ID:         string(mem.ID),
+		AgentID:    mem.AgentID,
+		Query:      mem.Query,
+		Claim:      mem.Claim,
+		Score:      mem.Score,
+		CreatedAt:  mem.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		LastUsedAt: lastUsedAt,
 	}
 }
