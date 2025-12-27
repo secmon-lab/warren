@@ -8,6 +8,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/event"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
@@ -2661,7 +2662,7 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			ListAgentMemoriesFunc: func(ctx context.Context, agentID string) ([]*memory.AgentMemory, error) {
 //				panic("mock out the ListAgentMemories method")
 //			},
-//			ListAllAgentIDsFunc: func(ctx context.Context) (map[string]int, error) {
+//			ListAllAgentIDsFunc: func(ctx context.Context) ([]*interfaces.AgentSummary, error) {
 //				panic("mock out the ListAllAgentIDs method")
 //			},
 //			ListAllTagsFunc: func(ctx context.Context) ([]*tag.Tag, error) {
@@ -2921,7 +2922,7 @@ type RepositoryMock struct {
 	ListAgentMemoriesFunc func(ctx context.Context, agentID string) ([]*memory.AgentMemory, error)
 
 	// ListAllAgentIDsFunc mocks the ListAllAgentIDs method.
-	ListAllAgentIDsFunc func(ctx context.Context) (map[string]int, error)
+	ListAllAgentIDsFunc func(ctx context.Context) ([]*interfaces.AgentSummary, error)
 
 	// ListAllTagsFunc mocks the ListAllTags method.
 	ListAllTagsFunc func(ctx context.Context) ([]*tag.Tag, error)
@@ -6128,7 +6129,7 @@ func (mock *RepositoryMock) ListAgentMemoriesCalls() []struct {
 }
 
 // ListAllAgentIDs calls ListAllAgentIDsFunc.
-func (mock *RepositoryMock) ListAllAgentIDs(ctx context.Context) (map[string]int, error) {
+func (mock *RepositoryMock) ListAllAgentIDs(ctx context.Context) ([]*interfaces.AgentSummary, error) {
 	callInfo := struct {
 		Ctx context.Context
 	}{
@@ -6139,10 +6140,10 @@ func (mock *RepositoryMock) ListAllAgentIDs(ctx context.Context) (map[string]int
 	mock.lockListAllAgentIDs.Unlock()
 	if mock.ListAllAgentIDsFunc == nil {
 		var (
-			stringToIntOut map[string]int
-			errOut         error
+			agentSummarysOut []*interfaces.AgentSummary
+			errOut           error
 		)
-		return stringToIntOut, errOut
+		return agentSummarysOut, errOut
 	}
 	return mock.ListAllAgentIDsFunc(ctx)
 }

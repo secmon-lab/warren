@@ -85,10 +85,24 @@ func TestListAllAgentIDs(t *testing.T) {
 		result, err := repo.ListAllAgentIDs(ctx)
 		gt.NoError(t, err)
 
+		// Convert to map for easier verification
+		resultMap := make(map[string]*interfaces.AgentSummary)
+		for _, summary := range result {
+			resultMap[summary.AgentID] = summary
+		}
+
 		// Verify counts for our test agents
-		gt.Equal(t, result[bigqueryID], 2)
-		gt.Equal(t, result[slackID], 1)
-		gt.Equal(t, result[virustotalID], 1)
+		gt.V(t, resultMap[bigqueryID]).NotNil()
+		gt.Equal(t, resultMap[bigqueryID].Count, 2)
+		gt.V(t, resultMap[slackID]).NotNil()
+		gt.Equal(t, resultMap[slackID].Count, 1)
+		gt.V(t, resultMap[virustotalID]).NotNil()
+		gt.Equal(t, resultMap[virustotalID].Count, 1)
+
+		// Verify latest timestamps are set
+		gt.False(t, resultMap[bigqueryID].LatestMemoryAt.IsZero())
+		gt.False(t, resultMap[slackID].LatestMemoryAt.IsZero())
+		gt.False(t, resultMap[virustotalID].LatestMemoryAt.IsZero())
 	}
 
 	t.Run("Memory", func(t *testing.T) {
@@ -110,7 +124,7 @@ func TestListAllAgentIDs_Empty(t *testing.T) {
 		// Get all agent IDs when no memories exist (Memory implementation starts empty)
 		result, err := repo.ListAllAgentIDs(ctx)
 		gt.NoError(t, err)
-		gt.V(t, len(result)).Equal(0)
+		gt.Equal(t, len(result), 0)
 	})
 
 	t.Run("Firestore", func(t *testing.T) {

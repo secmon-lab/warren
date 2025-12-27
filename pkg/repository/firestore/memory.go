@@ -6,6 +6,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -243,10 +244,11 @@ func (r *Firestore) ListAgentMemories(ctx context.Context, agentID string) ([]*m
 	return memories, nil
 }
 
-// ListAllAgentIDs returns all agent IDs that have memories with their counts
+// ListAllAgentIDs returns all agent IDs that have memories with their counts and latest memory timestamp
 // Uses CollectionGroup query to find all memories subcollections regardless of parent document existence
-func (r *Firestore) ListAllAgentIDs(ctx context.Context) (map[string]int, error) {
-	result := make(map[string]int)
+func (r *Firestore) ListAllAgentIDs(ctx context.Context) ([]*interfaces.AgentSummary, error) {
+	// Use map to aggregate data by agentID
+	agentMap := make(map[string]*interfaces.AgentSummary)
 
 	// Use CollectionGroup to query all memories subcollections
 	memoryDocs := r.db.CollectionGroup(subcollectionMemories).Documents(ctx)
@@ -264,7 +266,38 @@ func (r *Firestore) ListAllAgentIDs(ctx context.Context) (map[string]int, error)
 		// doc.Ref.Path = "agents/{agentID}/memories/{memoryID}"
 		agentID := doc.Ref.Parent.Parent.ID
 
-		result[agentID]++
+		// Extract only CreatedAt field to avoid decoding issues with embeddings
+		data := doc.Data()
+		createdAtVal, ok := data["CreatedAt"]
+		if !ok {
+			// Skip memories without CreatedAt
+			continue
+		}
+		createdAt, ok := createdAtVal.(time.Time)
+		if !ok {
+			// Skip if CreatedAt is not a time
+			continue
+		}
+
+		// Update or create summary
+		if summary, exists := agentMap[agentID]; exists {
+			summary.Count++
+			if createdAt.After(summary.LatestMemoryAt) {
+				summary.LatestMemoryAt = createdAt
+			}
+		} else {
+			agentMap[agentID] = &interfaces.AgentSummary{
+				AgentID:        agentID,
+				Count:          1,
+				LatestMemoryAt: createdAt,
+			}
+		}
+	}
+
+	// Convert map to slice
+	result := make([]*interfaces.AgentSummary, 0, len(agentMap))
+	for _, summary := range agentMap {
+		result = append(result, summary)
 	}
 
 	return result, nil

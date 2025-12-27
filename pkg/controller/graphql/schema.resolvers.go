@@ -12,6 +12,7 @@ import (
 	"time"
 
 	goerr "github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
@@ -1265,28 +1266,18 @@ func (r *queryResolver) SessionMessages(ctx context.Context, sessionID string) (
 
 // ListAgentSummaries is the resolver for the listAgentSummaries field.
 func (r *queryResolver) ListAgentSummaries(ctx context.Context, offset *int, limit *int, keyword *string) (*graphql1.AgentSummariesResponse, error) {
-	// Get all agent IDs with their memory counts
-	agentMap, err := r.repo.ListAllAgentIDs(ctx)
+	// Get all agent summaries with counts and latest timestamps in a single query
+	summaries, err := r.repo.ListAllAgentIDs(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list agent IDs")
-	}
-
-	// Convert map to slice for filtering, sorting and pagination
-	type agentSummary struct {
-		agentID string
-		count   int
-	}
-	summaries := make([]agentSummary, 0, len(agentMap))
-	for agentID, count := range agentMap {
-		summaries = append(summaries, agentSummary{agentID: agentID, count: count})
 	}
 
 	// Filter by keyword if provided
 	if keyword != nil && *keyword != "" {
 		kw := strings.ToLower(*keyword)
-		filtered := make([]agentSummary, 0)
+		filtered := make([]*interfaces.AgentSummary, 0)
 		for _, summary := range summaries {
-			if strings.Contains(strings.ToLower(summary.agentID), kw) {
+			if strings.Contains(strings.ToLower(summary.AgentID), kw) {
 				filtered = append(filtered, summary)
 			}
 		}
@@ -1295,7 +1286,7 @@ func (r *queryResolver) ListAgentSummaries(ctx context.Context, offset *int, lim
 
 	// Sort by agentID alphabetically
 	sort.Slice(summaries, func(i, j int) bool {
-		return summaries[i].agentID < summaries[j].agentID
+		return summaries[i].AgentID < summaries[j].AgentID
 	})
 
 	totalCount := len(summaries)
@@ -1325,28 +1316,15 @@ func (r *queryResolver) ListAgentSummaries(ctx context.Context, offset *int, lim
 	// Convert to GraphQL response
 	agents := make([]*graphql1.AgentSummary, len(pagedSummaries))
 	for i, summary := range pagedSummaries {
-		// Get latest memory timestamp for this agent
-		memories, err := r.repo.ListAgentMemories(ctx, summary.agentID)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to list agent memories", goerr.V("agent_id", summary.agentID))
-		}
-
 		var latestMemoryAt *string
-		if len(memories) > 0 {
-			// Find the latest CreatedAt
-			latest := memories[0].CreatedAt
-			for _, mem := range memories[1:] {
-				if mem.CreatedAt.After(latest) {
-					latest = mem.CreatedAt
-				}
-			}
-			timestamp := latest.Format("2006-01-02T15:04:05Z07:00")
+		if !summary.LatestMemoryAt.IsZero() {
+			timestamp := summary.LatestMemoryAt.Format("2006-01-02T15:04:05Z07:00")
 			latestMemoryAt = &timestamp
 		}
 
 		agents[i] = &graphql1.AgentSummary{
-			AgentID:        summary.agentID,
-			MemoriesCount:  summary.count,
+			AgentID:        summary.AgentID,
+			MemoriesCount:  summary.Count,
 			LatestMemoryAt: latestMemoryAt,
 		}
 	}

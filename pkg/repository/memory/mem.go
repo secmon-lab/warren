@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -257,13 +258,31 @@ func (r *Memory) ListAgentMemories(ctx context.Context, agentID string) ([]*memo
 }
 
 // ListAllAgentIDs returns all agent IDs that have memories with their counts
-func (r *Memory) ListAllAgentIDs(ctx context.Context) (map[string]int, error) {
+func (r *Memory) ListAllAgentIDs(ctx context.Context) ([]*interfaces.AgentSummary, error) {
 	r.memoryMu.RLock()
 	defer r.memoryMu.RUnlock()
 
-	result := make(map[string]int)
+	// Use map to aggregate data by agentID
+	agentMap := make(map[string]*interfaces.AgentSummary)
 	for _, mem := range r.agentMemories {
-		result[mem.AgentID]++
+		if summary, exists := agentMap[mem.AgentID]; exists {
+			summary.Count++
+			if mem.CreatedAt.After(summary.LatestMemoryAt) {
+				summary.LatestMemoryAt = mem.CreatedAt
+			}
+		} else {
+			agentMap[mem.AgentID] = &interfaces.AgentSummary{
+				AgentID:        mem.AgentID,
+				Count:          1,
+				LatestMemoryAt: mem.CreatedAt,
+			}
+		}
+	}
+
+	// Convert map to slice
+	result := make([]*interfaces.AgentSummary, 0, len(agentMap))
+	for _, summary := range agentMap {
+		result = append(result, summary)
 	}
 
 	return result, nil
