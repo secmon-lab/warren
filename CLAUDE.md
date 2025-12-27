@@ -49,6 +49,10 @@ Warren is an AI agent and Slack-based security alert management tool. It process
 - Prefer Helper Driven Testing style over Table Driven Tests
 - Use Memory repository from `pkg/repository` instead of mocks for repository testing
 - Use mock implementations from `pkg/domain/mock`
+- **NEVER comment out test assertions** - if a test doesn't work, fix it or delete it
+- **NEVER use length-only checks** - always verify individual IDs/values explicitly
+  - BAD: `gt.A(t, toDelete).Length(3)` with commented out ID checks
+  - GOOD: Check each expected ID explicitly with `gt.True(t, deleteMap[id])`
 
 ### Code Visibility
 - Do not expose unnecessary methods, variables and types

@@ -7,7 +7,6 @@ import (
 	"github.com/m-mizutani/gt"
 	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
 	"github.com/secmon-lab/warren/pkg/repository"
-	memoryservice "github.com/secmon-lab/warren/pkg/service/memory"
 )
 
 // Mock BigQuery client tests - these will fail without actual BigQuery credentials
@@ -29,9 +28,8 @@ func TestInternalTool_Specs(t *testing.T) {
 
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
-	agent := bqagent.NewAgent(config, llmClient, memService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	// Get agent specs (which includes internal tool specs)
 	specs, err := agent.Specs(ctx)
@@ -58,9 +56,8 @@ func TestInternalTool_Run_InvalidFunction(t *testing.T) {
 
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
-	agent := bqagent.NewAgent(config, llmClient, memService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	// Try to call an invalid function through the agent
 	args := map[string]any{
@@ -86,9 +83,8 @@ func TestInternalTool_QueryMissingSQL(t *testing.T) {
 
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
-	agent := bqagent.NewAgent(config, llmClient, memService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	// The agent will translate "query" to "sql" and call the internal tool
 	// But let's test the validation by passing empty query
@@ -113,9 +109,8 @@ func TestInternalTool_SchemaMissingParameters(t *testing.T) {
 
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
-	agent := bqagent.NewAgent(config, llmClient, memService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	// Note: The agent wrapper doesn't directly expose bigquery_schema
 	// It's only available through the internal tool
@@ -183,9 +178,8 @@ func TestInternalTool_ConfigValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			llmClient := newMockLLMClient()
 			repo := repository.NewMemory()
-			memService := memoryservice.New(llmClient, repo)
 
-			agent := bqagent.NewAgent(tt.config, llmClient, memService)
+			agent := bqagent.NewAgent(tt.config, llmClient, repo)
 			gt.V(t, agent).NotNil()
 
 			// Verify specs can be retrieved
@@ -218,9 +212,8 @@ func TestInternalTool_TableDescriptionInSpecs(t *testing.T) {
 
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
-	agent := bqagent.NewAgent(config, llmClient, memService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	specs, err := agent.Specs(ctx)
 	gt.NoError(t, err)

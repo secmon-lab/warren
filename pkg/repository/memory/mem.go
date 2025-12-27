@@ -28,6 +28,32 @@ func (r *Memory) SaveAgentMemory(ctx context.Context, mem *memory.AgentMemory) e
 	return nil
 }
 
+// BatchSaveAgentMemories saves multiple agent memories in a batch
+func (r *Memory) BatchSaveAgentMemories(ctx context.Context, memories []*memory.AgentMemory) error {
+	if len(memories) == 0 {
+		return nil
+	}
+
+	// Validate all memories first
+	for _, mem := range memories {
+		if err := mem.Validate(); err != nil {
+			return r.eb.Wrap(err, "invalid agent memory in batch")
+		}
+	}
+
+	r.memoryMu.Lock()
+	defer r.memoryMu.Unlock()
+
+	// Save all memories
+	for _, mem := range memories {
+		// Store a copy to prevent external modification
+		memCopy := *mem
+		r.agentMemories[mem.ID] = &memCopy
+	}
+
+	return nil
+}
+
 // GetAgentMemory retrieves an agent memory record by agentID and memoryID
 func (r *Memory) GetAgentMemory(ctx context.Context, agentID string, id types.AgentMemoryID) (*memory.AgentMemory, error) {
 	r.memoryMu.RLock()
@@ -149,7 +175,7 @@ func (r *Memory) UpdateMemoryScore(ctx context.Context, agentID string, memoryID
 	}
 
 	// Update the score and last used timestamp
-	mem.QualityScore = score
+	mem.Score = score
 	mem.LastUsedAt = lastUsedAt
 
 	return nil
@@ -175,7 +201,7 @@ func (r *Memory) UpdateMemoryScoreBatch(ctx context.Context, agentID string, upd
 		}
 
 		// Update the score and last used timestamp
-		mem.QualityScore = update.Score
+		mem.Score = update.Score
 		mem.LastUsedAt = update.LastUsedAt
 	}
 
@@ -208,7 +234,7 @@ func (r *Memory) DeleteAgentMemoriesBatch(ctx context.Context, agentID string, m
 }
 
 // ListAgentMemories lists all memories for an agent
-// Results are ordered by Timestamp DESC
+// Results are ordered by CreatedAt DESC
 func (r *Memory) ListAgentMemories(ctx context.Context, agentID string) ([]*memory.AgentMemory, error) {
 	r.memoryMu.RLock()
 	defer r.memoryMu.RUnlock()
@@ -222,9 +248,9 @@ func (r *Memory) ListAgentMemories(ctx context.Context, agentID string) ([]*memo
 		}
 	}
 
-	// Sort by Timestamp DESC
+	// Sort by CreatedAt DESC
 	sort.Slice(memories, func(i, j int) bool {
-		return memories[i].Timestamp.After(memories[j].Timestamp)
+		return memories[i].CreatedAt.After(memories[j].CreatedAt)
 	})
 
 	return memories, nil

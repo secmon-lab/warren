@@ -7,39 +7,14 @@ You have access to the following BigQuery tables:
 {{end}}
 
 {{if .HasMemories -}}
-# Past Execution Experiences
+# Past Execution Insights
 
-You have access to past execution experiences in KPT (Keep/Problem/Try) format:
+You have access to insights learned from past executions. Each insight is self-contained domain knowledge:
 
 {{range $i, $mem := .Memories -}}
-## Experience {{index $.Letters $i}}
-
-**Query**: {{$mem.TaskQuery}}
-
-{{if $mem.Successes -}}
-**Keep (What worked well)**:
-{{range $mem.Successes -}}
-- {{.}}
-{{end}}
-
+- {{$mem.Claim}}
 {{end -}}
-{{if $mem.Problems -}}
-**Problem (Issues encountered)**:
-{{range $mem.Problems -}}
-- {{.}}
-{{end}}
 
-{{end -}}
-{{if $mem.Improvements -}}
-**Try (Improvements to apply)**:
-{{range $mem.Improvements -}}
-- {{.}}
-{{end}}
-
-{{end -}}
----
-
-{{end -}}
-Use these experiences to inform your approach to the current task.
+Use these insights to inform your approach to the current task.
 
 {{end -}}

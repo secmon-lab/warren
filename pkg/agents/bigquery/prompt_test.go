@@ -11,7 +11,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/service/memory"
 )
 
 // TestAgent_InterfaceTool verifies that Agent implements interfaces.Tool
@@ -39,9 +38,9 @@ func TestAgent_InterfaceTool(t *testing.T) {
 
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
-	memoryService := memory.New(llmClient, repo)
+	// Memory service is created inside agent Init()
 
-	agent := bqagent.NewAgent(config, llmClient, memoryService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	// Verify interfaces.Tool interface implementation
 	var _ interfaces.Tool = agent

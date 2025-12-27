@@ -20,7 +20,6 @@ import (
 	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/service/memory"
 	"github.com/secmon-lab/warren/pkg/service/prompt"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -262,18 +261,15 @@ func cmdServe() *cli.Command {
 			// Create tag service
 			tagService := tag.New(repo)
 
-			// Create memory service
-			memoryService := memory.New(llmClient, repo)
-
-			// Initialize BigQuery Agent
-			if enabled, err := bqAgent.Init(ctx, llmClient, memoryService); err != nil {
+			// Initialize BigQuery Agent (creates its own memory service)
+			if enabled, err := bqAgent.Init(ctx, llmClient, repo); err != nil {
 				return err
 			} else if enabled {
 				toolSets = append(toolSets, bqAgent)
 			}
 
-			// Initialize Slack Search Agent
-			if enabled, err := slackAgent.Init(ctx, llmClient, memoryService); err != nil {
+			// Initialize Slack Search Agent (creates its own memory service)
+			if enabled, err := slackAgent.Init(ctx, llmClient, repo); err != nil {
 				return err
 			} else if enabled {
 				toolSets = append(toolSets, slackAgent)
@@ -288,7 +284,6 @@ func cmdServe() *cli.Command {
 				usecase.WithStrictAlert(strictAlert),
 				usecase.WithNoAuthorization(noAuthorization),
 				usecase.WithTagService(tagService),
-				usecase.WithMemoryService(memoryService),
 			}
 
 			// Add storage prefix if configured
