@@ -462,6 +462,12 @@ func (h *Hub) SendTraceToClient(clientID string, content string, user *websocket
 	return h.SendToClient(clientID, response)
 }
 
+// SendWarningToClient sends a warning message to a specific client
+func (h *Hub) SendWarningToClient(clientID string, content string, user *websocket_model.User) error {
+	response := websocket_model.NewWarningResponse(content, user)
+	return h.SendToClient(clientID, response)
+}
+
 // GetClientID returns the client ID for a client
 func (c *Client) GetClientID() string {
 	return c.clientID

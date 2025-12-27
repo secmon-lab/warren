@@ -168,6 +168,8 @@ func TestChatResponse_IsValidResponseType(t *testing.T) {
 		{"history", true},
 		{"status", true},
 		{"error", true},
+		{"trace", true},
+		{"warning", true},
 		{"invalid", false},
 		{"", false},
 	}
@@ -191,5 +193,27 @@ func TestHelperFunctions(t *testing.T) {
 		resp := websocket.NewErrorResponse("Authentication failed")
 		gt.Value(t, resp.Type).Equal("error")
 		gt.Value(t, resp.Content).Equal("Authentication failed")
+	})
+
+	t.Run("NewTraceResponse", func(t *testing.T) {
+		user := &websocket.User{
+			ID:   "user789",
+			Name: "Trace User",
+		}
+		resp := websocket.NewTraceResponse("Tracing...", user)
+		gt.Value(t, resp.Type).Equal("trace")
+		gt.Value(t, resp.Content).Equal("Tracing...")
+		gt.Value(t, resp.User).Equal(user)
+	})
+
+	t.Run("NewWarningResponse", func(t *testing.T) {
+		user := &websocket.User{
+			ID:   "user999",
+			Name: "Warning User",
+		}
+		resp := websocket.NewWarningResponse("Warning: Something went wrong", user)
+		gt.Value(t, resp.Type).Equal("warning")
+		gt.Value(t, resp.Content).Equal("Warning: Something went wrong")
+		gt.Value(t, resp.User).Equal(user)
 	})
 }

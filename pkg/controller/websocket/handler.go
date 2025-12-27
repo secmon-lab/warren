@@ -455,7 +455,7 @@ func (h *Handler) handleChatMessage(client *Client, message *websocket_model.Cha
 			}
 
 			warnFunc := func(ctx context.Context, message string) {
-				if err := h.hub.SendMessageToClient(client.clientID, message, warrenUser); err != nil {
+				if err := h.hub.SendWarningToClient(client.clientID, message, warrenUser); err != nil {
 					// Check if the error is due to client disconnection
 					if err.Error() == "client not found" {
 						logger.Debug("client disconnected, skipping warning", "client_id", client.clientID)

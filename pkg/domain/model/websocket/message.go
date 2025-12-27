@@ -16,7 +16,7 @@ type ChatMessage struct {
 
 // ChatResponse represents a message sent from server to client
 type ChatResponse struct {
-	Type      string `json:"type"`                 // "message", "history", "status", "error", "pong", "trace"
+	Type      string `json:"type"`                 // "message", "history", "status", "error", "pong", "trace", "warning"
 	Content   string `json:"content"`              // message content
 	User      *User  `json:"user,omitempty"`       // sender information
 	Timestamp int64  `json:"timestamp"`            // unix timestamp
@@ -77,6 +77,13 @@ func NewTraceResponse(content string, user *User) *ChatResponse {
 	return resp
 }
 
+// NewWarningResponse creates a warning message response
+func NewWarningResponse(content string, user *User) *ChatResponse {
+	resp := NewChatResponse("warning", content)
+	resp.User = user
+	return resp
+}
+
 // UserFromSlackUser converts slack.User to websocket.User
 func UserFromSlackUser(slackUser *slack.User) *User {
 	if slackUser == nil {
@@ -101,7 +108,7 @@ func (m *ChatMessage) IsValidMessageType() bool {
 // IsValidResponseType checks if response type is valid
 func (r *ChatResponse) IsValidResponseType() bool {
 	switch r.Type {
-	case "message", "history", "status", "error", "pong", "trace":
+	case "message", "history", "status", "error", "pong", "trace", "warning":
 		return true
 	default:
 		return false
