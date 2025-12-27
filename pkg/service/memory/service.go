@@ -2,12 +2,15 @@ package memory
 
 import (
 	"context"
-	"strings"
+	"fmt"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
+	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 const (
@@ -15,206 +18,277 @@ const (
 	EmbeddingDimension = 256
 )
 
+// Service provides agent memory management with scoring, selection, and pruning
+// Each service instance is bound to a specific agent
 type Service struct {
-	llmClient     gollem.LLMClient
-	repository    interfaces.Repository
-	ScoringConfig ScoringConfig
+	agentID    string
+	repository interfaces.Repository
+	llmClient  gollem.LLMClient
+
+	// Algorithm functions (replaceable)
+	scoringAlgo   ScoringAlgorithm
+	selectionAlgo SelectionAlgorithm
+	pruningAlgo   PruningAlgorithm
 }
 
-func New(llmClient gollem.LLMClient, repo interfaces.Repository) *Service {
+// New creates a new memory service bound to a specific agent with default algorithms
+func New(agentID string, llmClient gollem.LLMClient, repo interfaces.Repository) *Service {
 	return &Service{
-		llmClient:     llmClient,
+		agentID:       agentID,
 		repository:    repo,
-		ScoringConfig: DefaultScoringConfig(),
+		llmClient:     llmClient,
+		scoringAlgo:   DefaultScoringAlgorithm,
+		selectionAlgo: DefaultSelectionAlgorithm,
+		pruningAlgo:   DefaultPruningAlgorithm,
 	}
 }
 
-// ScoringConfig holds all configurable parameters for memory scoring
-type ScoringConfig struct {
-	// EMA parameters
-	EMAAlpha float64 // Weight for new feedback (0.0-1.0), default: 0.3
-	ScoreMin float64 // Minimum score value, default: -10.0
-	ScoreMax float64 // Maximum score value, default: +10.0
-
-	// Search parameters
-	SearchMultiplier    int     // Multiplier for initial search limit, default: 10
-	SearchMaxCandidates int     // Maximum candidates for re-ranking, default: 50
-	FilterMinQuality    float64 // Minimum quality score for filtering, default: -5.0
-
-	// Ranking weights (should sum to 1.0)
-	RankSimilarityWeight float64 // Weight for similarity score, default: 0.5
-	RankQualityWeight    float64 // Weight for quality score, default: 0.3
-	RankRecencyWeight    float64 // Weight for recency score, default: 0.2
-	RecencyHalfLifeDays  float64 // Half-life for recency decay in days, default: 30
-
-	// Pruning thresholds
-	PruneCriticalScore float64 // Critical score threshold (immediate deletion), default: -8.0
-	PruneHarmfulScore  float64 // Harmful score threshold, default: -5.0
-	PruneHarmfulDays   int     // Days before pruning harmful memories, default: 90
-	PruneModerateScore float64 // Moderate score threshold, default: -3.0
-	PruneModerateDays  int     // Days before pruning moderate memories, default: 180
+// WithScoringAlgorithm replaces the scoring algorithm
+func (s *Service) WithScoringAlgorithm(algo ScoringAlgorithm) *Service {
+	s.scoringAlgo = algo
+	return s
 }
 
-// DefaultScoringConfig returns default configuration
-func DefaultScoringConfig() ScoringConfig {
-	return ScoringConfig{
-		EMAAlpha:             0.3,
-		ScoreMin:             -10.0,
-		ScoreMax:             10.0,
-		SearchMultiplier:     10,
-		SearchMaxCandidates:  50,
-		FilterMinQuality:     -5.0,
-		RankSimilarityWeight: 0.5,
-		RankQualityWeight:    0.3,
-		RankRecencyWeight:    0.2,
-		RecencyHalfLifeDays:  30,
-		PruneCriticalScore:   -8.0,
-		PruneHarmfulScore:    -5.0,
-		PruneHarmfulDays:     90,
-		PruneModerateScore:   -3.0,
-		PruneModerateDays:    180,
-	}
+// WithSelectionAlgorithm replaces the selection algorithm
+func (s *Service) WithSelectionAlgorithm(algo SelectionAlgorithm) *Service {
+	s.selectionAlgo = algo
+	return s
 }
 
-// Validate checks if the ScoringConfig has valid values
-func (c *ScoringConfig) Validate() error {
-	// EMA alpha must be between 0 and 1
-	if c.EMAAlpha < 0.0 || c.EMAAlpha > 1.0 {
-		return goerr.New("EMAAlpha must be between 0.0 and 1.0", goerr.V("value", c.EMAAlpha))
-	}
-
-	// Score range must be valid
-	if c.ScoreMin >= c.ScoreMax {
-		return goerr.New("ScoreMin must be less than ScoreMax",
-			goerr.V("min", c.ScoreMin),
-			goerr.V("max", c.ScoreMax))
-	}
-
-	// Search parameters must be positive
-	if c.SearchMultiplier <= 0 {
-		return goerr.New("SearchMultiplier must be positive", goerr.V("value", c.SearchMultiplier))
-	}
-	if c.SearchMaxCandidates <= 0 {
-		return goerr.New("SearchMaxCandidates must be positive", goerr.V("value", c.SearchMaxCandidates))
-	}
-
-	// Ranking weights should be non-negative and sum to 1.0
-	if c.RankSimilarityWeight < 0 || c.RankQualityWeight < 0 || c.RankRecencyWeight < 0 {
-		return goerr.New("ranking weights must be non-negative",
-			goerr.V("similarity", c.RankSimilarityWeight),
-			goerr.V("quality", c.RankQualityWeight),
-			goerr.V("recency", c.RankRecencyWeight))
-	}
-	const epsilon = 0.001
-	if totalWeight := c.RankSimilarityWeight + c.RankQualityWeight + c.RankRecencyWeight; totalWeight < 1.0-epsilon || totalWeight > 1.0+epsilon {
-		return goerr.New("ranking weights must sum to 1.0", goerr.V("total", totalWeight))
-	}
-
-	// Recency half-life must be positive
-	if c.RecencyHalfLifeDays <= 0 {
-		return goerr.New("RecencyHalfLifeDays must be positive", goerr.V("value", c.RecencyHalfLifeDays))
-	}
-
-	// Pruning thresholds should be in order: critical < harmful < moderate < 0
-	if c.PruneCriticalScore >= c.PruneHarmfulScore {
-		return goerr.New("PruneCriticalScore must be less than PruneHarmfulScore",
-			goerr.V("critical", c.PruneCriticalScore),
-			goerr.V("harmful", c.PruneHarmfulScore))
-	}
-	if c.PruneHarmfulScore >= c.PruneModerateScore {
-		return goerr.New("PruneHarmfulScore must be less than PruneModerateScore",
-			goerr.V("harmful", c.PruneHarmfulScore),
-			goerr.V("moderate", c.PruneModerateScore))
-	}
-
-	// Pruning days must be positive
-	if c.PruneHarmfulDays <= 0 {
-		return goerr.New("PruneHarmfulDays must be positive", goerr.V("value", c.PruneHarmfulDays))
-	}
-	if c.PruneModerateDays <= 0 {
-		return goerr.New("PruneModerateDays must be positive", goerr.V("value", c.PruneModerateDays))
-	}
-
-	// Harmful days should be less than moderate days
-	if c.PruneHarmfulDays >= c.PruneModerateDays {
-		return goerr.New("PruneHarmfulDays should be less than PruneModerateDays",
-			goerr.V("harmful", c.PruneHarmfulDays),
-			goerr.V("moderate", c.PruneModerateDays))
-	}
-
-	return nil
+// WithPruningAlgorithm replaces the pruning algorithm
+func (s *Service) WithPruningAlgorithm(algo PruningAlgorithm) *Service {
+	s.pruningAlgo = algo
+	return s
 }
 
-// extractJSONFromMarkdown extracts JSON content from markdown code blocks
-func extractJSONFromMarkdown(text string) string {
-	text = strings.TrimSpace(text)
-
-	// Check if wrapped in markdown code block
-	if strings.HasPrefix(text, "```json") {
-		text = strings.TrimPrefix(text, "```json")
-		text = strings.TrimSuffix(text, "```")
-		text = strings.TrimSpace(text)
-	} else if strings.HasPrefix(text, "```") {
-		text = strings.TrimPrefix(text, "```")
-		text = strings.TrimSuffix(text, "```")
-		text = strings.TrimSpace(text)
-	}
-
-	return text
-}
-
-// SaveAgentMemory saves an agent memory record with automatic embedding generation
-func (s *Service) SaveAgentMemory(ctx context.Context, mem *memory.AgentMemory) error {
-	if err := mem.Validate(); err != nil {
-		return goerr.Wrap(err, "invalid agent memory")
-	}
-
-	// Generate embedding for TaskQuery if not already present
-	if len(mem.QueryEmbedding) == 0 {
-		embeddings, err := s.llmClient.GenerateEmbedding(ctx, EmbeddingDimension, []string{mem.TaskQuery})
-		if err != nil {
-			return goerr.Wrap(err, "failed to generate embedding", goerr.V("task_query", mem.TaskQuery))
-		}
-		if len(embeddings) > 0 {
-			// Convert float64 to float32
-			vector32 := make([]float32, len(embeddings[0]))
-			for i, v := range embeddings[0] {
-				vector32[i] = float32(v)
-			}
-			mem.QueryEmbedding = vector32
-		}
-	}
-
-	if err := s.repository.SaveAgentMemory(ctx, mem); err != nil {
-		return goerr.Wrap(err, "failed to save agent memory", goerr.V("id", mem.ID))
-	}
-
-	return nil
-}
-
-// SearchRelevantAgentMemories searches for similar memories using semantic search with re-ranking
-func (s *Service) SearchRelevantAgentMemories(ctx context.Context, agentID, query string, limit int) ([]*memory.AgentMemory, error) {
+// SearchAndSelectMemories searches for relevant memories and selects top N using injection algorithm
+// This is the main method agents should call before execution to get relevant memories
+func (s *Service) SearchAndSelectMemories(
+	ctx context.Context,
+	query string,
+	limit int,
+) ([]*memory.AgentMemory, error) {
 	// Generate embedding for the query
 	embeddings, err := s.llmClient.GenerateEmbedding(ctx, EmbeddingDimension, []string{query})
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to generate embedding for search", goerr.V("query", query))
 	}
 
-	if len(embeddings) == 0 {
+	if len(embeddings) == 0 || len(embeddings[0]) == 0 {
 		return nil, goerr.New("no embedding generated")
 	}
 
 	// Convert float64 to float32
-	vector32 := make([]float32, len(embeddings[0]))
+	queryEmbedding := make([]float32, len(embeddings[0]))
 	for i, v := range embeddings[0] {
-		vector32[i] = float32(v)
+		queryEmbedding[i] = float32(v)
 	}
 
-	// Use the new searchAndRerankMemories method which incorporates quality and recency scoring
-	memories, err := s.searchAndRerankMemories(ctx, agentID, vector32, limit)
+	// Calculate search limit using multiplier from injection algorithm
+	const searchMultiplier = 5
+	const searchMaxCandidates = 100
+	searchLimit := limit * searchMultiplier
+	if searchLimit > searchMaxCandidates {
+		searchLimit = searchMaxCandidates
+	}
+
+	// Perform vector search to get candidates
+	candidates, err := s.repository.SearchMemoriesByEmbedding(ctx, s.agentID, queryEmbedding, searchLimit)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to search and rerank memories", goerr.V("agent_id", agentID), goerr.V("limit", limit))
+		return nil, goerr.Wrap(err, "failed to search memories by embedding", goerr.V("agent_id", s.agentID))
 	}
 
-	return memories, nil
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+
+	// Use selection algorithm to rank and filter
+	selected := s.selectionAlgo(candidates, queryEmbedding, limit)
+
+	// Update LastUsedAt for selected memories (non-blocking)
+	if len(selected) > 0 {
+		go func() {
+			now := time.Now()
+			updates := make(map[types.AgentMemoryID]struct {
+				Score      float64
+				LastUsedAt time.Time
+			})
+			for _, mem := range selected {
+				updates[mem.ID] = struct {
+					Score      float64
+					LastUsedAt time.Time
+				}{
+					Score:      mem.Score,
+					LastUsedAt: now,
+				}
+			}
+
+			if err := s.repository.UpdateMemoryScoreBatch(context.Background(), s.agentID, updates); err != nil {
+				logging.Default().Warn("failed to batch update last used at", "agent_id", s.agentID, "error", err)
+			}
+		}()
+	}
+
+	return selected, nil
+}
+
+// ExtractAndSaveMemories extracts new claims from execution history and saves them
+// This method uses LLM to generate reflection and extract claims from execution history
+// Responsibilities: Extract claims, update scores, generate embeddings, save memories
+// Does NOT perform pruning - caller should call PruneMemories separately when needed
+func (s *Service) ExtractAndSaveMemories(
+	ctx context.Context,
+	query string,
+	usedMemories []*memory.AgentMemory,
+	history *gollem.History,
+) error {
+	// Step 1: Generate reflection using LLM
+	reflection, err := s.generateReflection(ctx, query, usedMemories, history)
+	if err != nil {
+		return goerr.Wrap(err, "failed to generate reflection",
+			goerr.V("agent_id", s.agentID),
+			goerr.V("query", query))
+	}
+
+	// Step 2: Update scores for helpful/harmful memories and collect score changes
+	var scoreChanges []string
+	if len(reflection.HelpfulMemories) > 0 || len(reflection.HarmfulMemories) > 0 {
+		// Build memory map for scoring algorithm
+		memoryMap := make(map[types.AgentMemoryID]*memory.AgentMemory)
+		for _, mem := range usedMemories {
+			memoryMap[mem.ID] = mem
+		}
+
+		// Apply scoring algorithm
+		scoreUpdates := s.scoringAlgo(memoryMap, reflection)
+
+		if len(scoreUpdates) > 0 {
+			now := time.Now()
+			updates := make(map[types.AgentMemoryID]struct {
+				Score      float64
+				LastUsedAt time.Time
+			})
+			for memID, newScore := range scoreUpdates {
+				oldScore := memoryMap[memID].Score
+				updates[memID] = struct {
+					Score      float64
+					LastUsedAt time.Time
+				}{
+					Score:      newScore,
+					LastUsedAt: now,
+				}
+				// Record score change for logging
+				scoreChanges = append(scoreChanges,
+					fmt.Sprintf("%s: %.2f → %.2f (Δ%.2f)",
+						memID, oldScore, newScore, newScore-oldScore))
+			}
+
+			if err := s.repository.UpdateMemoryScoreBatch(ctx, s.agentID, updates); err != nil {
+				return goerr.Wrap(err, "failed to update memory scores batch", goerr.V("agent_id", s.agentID))
+			}
+		}
+	}
+
+	// Log reflection summary with new claims and score changes
+	logger := logging.From(ctx)
+	logArgs := []any{
+		"agent_id", s.agentID,
+		"new_claims_count", len(reflection.NewClaims),
+		"helpful_memories_count", len(reflection.HelpfulMemories),
+		"harmful_memories_count", len(reflection.HarmfulMemories),
+	}
+
+	// Add new claims to log
+	if len(reflection.NewClaims) > 0 {
+		logArgs = append(logArgs, "new_claims", reflection.NewClaims)
+	}
+
+	// Add score changes to log
+	if len(scoreChanges) > 0 {
+		logArgs = append(logArgs, "score_changes", scoreChanges)
+	}
+
+	logger.Info("reflection completed", logArgs...)
+
+	// Step 3: Save new claims as memories
+	if len(reflection.NewClaims) > 0 {
+		// Generate embeddings for all new claims
+		embeddings, err := s.llmClient.GenerateEmbedding(ctx, EmbeddingDimension, []string{query})
+		if err != nil {
+			return goerr.Wrap(err, "failed to generate embeddings for new claims", goerr.V("agent_id", s.agentID))
+		}
+
+		if len(embeddings) == 0 || len(embeddings[0]) == 0 {
+			return goerr.New("no embedding generated for query")
+		}
+
+		// Convert embedding to float32
+		queryEmbedding := make([]float32, len(embeddings[0]))
+		for i, v := range embeddings[0] {
+			queryEmbedding[i] = float32(v)
+		}
+
+		// Create new memory records for each claim
+		now := time.Now()
+		newMemories := make([]*memory.AgentMemory, len(reflection.NewClaims))
+		for i, claim := range reflection.NewClaims {
+			newMemories[i] = &memory.AgentMemory{
+				ID:             types.NewAgentMemoryID(),
+				AgentID:        s.agentID,
+				Query:          query,
+				QueryEmbedding: queryEmbedding,
+				Claim:          claim,
+				Score:          0.0, // neutral initial score
+				CreatedAt:      now,
+				LastUsedAt:     time.Time{}, // zero value indicates never used
+			}
+		}
+
+		// Batch save new memories
+		if err := s.repository.BatchSaveAgentMemories(ctx, newMemories); err != nil {
+			return goerr.Wrap(err, "failed to batch save new memories",
+				goerr.V("agent_id", s.agentID),
+				goerr.V("count", len(newMemories)))
+		}
+	}
+
+	return nil
+}
+
+// PruneMemories removes low-quality memories based on score and usage patterns
+// This is a separate operation from ExtractAndSaveMemories for clear separation of concerns
+// Caller controls when to prune (e.g., periodically, after N executions, manually)
+func (s *Service) PruneMemories(ctx context.Context) (int, error) {
+	// Get all memories for the agent
+	allMemories, err := s.repository.ListAgentMemories(ctx, s.agentID)
+	if err != nil {
+		return 0, goerr.Wrap(err, "failed to list agent memories", goerr.V("agent_id", s.agentID))
+	}
+
+	if len(allMemories) == 0 {
+		return 0, nil
+	}
+
+	// Apply pruning algorithm
+	now := time.Now()
+	toDelete := s.pruningAlgo(allMemories, now)
+
+	if len(toDelete) == 0 {
+		return 0, nil
+	}
+
+	// Delete in batch
+	deleted, err := s.repository.DeleteAgentMemoriesBatch(ctx, s.agentID, toDelete)
+	if err != nil {
+		return deleted, goerr.Wrap(err, "failed to delete memories batch",
+			goerr.V("agent_id", s.agentID),
+			goerr.V("to_delete_count", len(toDelete)))
+	}
+
+	logging.From(ctx).Info("pruned agent memories",
+		"agent_id", s.agentID,
+		"deleted_count", deleted,
+		"total_memories", len(allMemories))
+
+	return deleted, nil
 }

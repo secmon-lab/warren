@@ -108,6 +108,46 @@ func (r *Firestore) PutAgentMemory(ctx context.Context, mem *memory.AgentMemory)
 	return r.SaveAgentMemory(ctx, mem)
 }
 
+// BatchSaveAgentMemories saves multiple agent memories in batches
+// Firestore supports max 500 operations per batch, so this method splits if needed
+func (r *Firestore) BatchSaveAgentMemories(ctx context.Context, memories []*memory.AgentMemory) error {
+	if len(memories) == 0 {
+		return nil
+	}
+
+	// Validate all memories first
+	for _, mem := range memories {
+		if err := mem.Validate(); err != nil {
+			return r.eb.Wrap(err, "invalid agent memory in batch")
+		}
+		if isInvalidEmbedding(mem.QueryEmbedding) {
+			return r.eb.New("agent memory has invalid query embedding",
+				goerr.V("agent_id", mem.AgentID),
+				goerr.V("id", mem.ID))
+		}
+	}
+
+	// Use BulkWriter for efficient batch operations
+	bulkWriter := r.db.BulkWriter(ctx)
+
+	// Queue all save operations
+	for _, mem := range memories {
+		doc := r.db.Collection(collectionAgents).Doc(mem.AgentID).
+			Collection(subcollectionMemories).Doc(mem.ID.String())
+		_, err := bulkWriter.Set(doc, mem)
+		if err != nil {
+			return r.eb.Wrap(err, "failed to queue save operation",
+				goerr.V("agent_id", mem.AgentID),
+				goerr.V("memory_id", mem.ID))
+		}
+	}
+
+	// Flush and wait for all operations to complete
+	bulkWriter.End()
+
+	return nil
+}
+
 // UpdateMemoryScoreBatch updates quality scores and last used timestamps for multiple agent memories
 // Uses BulkWriter for efficient batch updates
 func (r *Firestore) UpdateMemoryScoreBatch(ctx context.Context, agentID string, updates map[types.AgentMemoryID]struct {
@@ -127,7 +167,7 @@ func (r *Firestore) UpdateMemoryScoreBatch(ctx context.Context, agentID string, 
 			Collection(subcollectionMemories).Doc(memoryID.String())
 
 		updateFields := []firestore.Update{
-			{Path: "QualityScore", Value: update.Score},
+			{Path: "Score", Value: update.Score},
 			{Path: "LastUsedAt", Value: update.LastUsedAt},
 		}
 
@@ -175,11 +215,11 @@ func (r *Firestore) DeleteAgentMemoriesBatch(ctx context.Context, agentID string
 }
 
 // ListAgentMemories lists all memories for an agent
-// Results are ordered by Timestamp DESC
+// Results are ordered by CreatedAt DESC
 func (r *Firestore) ListAgentMemories(ctx context.Context, agentID string) ([]*memory.AgentMemory, error) {
 	docs := r.db.Collection(collectionAgents).Doc(agentID).
 		Collection(subcollectionMemories).
-		OrderBy("Timestamp", firestore.Desc).
+		OrderBy("CreatedAt", firestore.Desc).
 		Documents(ctx)
 
 	var memories []*memory.AgentMemory

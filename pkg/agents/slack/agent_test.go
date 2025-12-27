@@ -71,13 +71,10 @@ func TestAgent_Specs_Enabled(t *testing.T) {
 		},
 	}
 	llmClient := newMockLLMClient()
-	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
 	agent := slackagent.New(
 		slackagent.WithSlackClient(slackClient),
 		slackagent.WithLLMClient(llmClient),
-		slackagent.WithMemoryService(memService),
 	)
 
 	specs, err := agent.Specs(ctx)
@@ -96,10 +93,9 @@ func TestAgent_Init_NoToken(t *testing.T) {
 	ctx := context.Background()
 	agent := slackagent.New()
 	llmClient := newMockLLMClient()
-	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
-	initialized, err := agent.Init(ctx, llmClient, memService)
+	repo := repository.NewMemory()
+	initialized, err := agent.Init(ctx, llmClient, repo)
 	gt.NoError(t, err)
 	gt.False(t, initialized) // Not initialized without token or client
 }
@@ -109,10 +105,9 @@ func TestAgent_Init_WithClient(t *testing.T) {
 	slackClient := &domainmock.SlackClientMock{}
 	agent := slackagent.New(slackagent.WithSlackClient(slackClient))
 	llmClient := newMockLLMClient()
-	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
-	initialized, err := agent.Init(ctx, llmClient, memService)
+	repo := repository.NewMemory()
+	initialized, err := agent.Init(ctx, llmClient, repo)
 	gt.NoError(t, err)
 	gt.True(t, initialized)
 	gt.True(t, agent.IsEnabled())
@@ -154,13 +149,16 @@ func TestAgent_Run_BasicSearch(t *testing.T) {
 
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
 	agent := slackagent.New(
 		slackagent.WithSlackClient(slackClient),
 		slackagent.WithLLMClient(llmClient),
-		slackagent.WithMemoryService(memService),
 	)
+
+	// Initialize agent
+	initialized, err := agent.Init(ctx, llmClient, repo)
+	gt.NoError(t, err)
+	gt.True(t, initialized)
 
 	// Run search
 	result, err := agent.Run(ctx, "search_slack", map[string]any{
@@ -208,13 +206,15 @@ func TestAgent_Run_LimitEnforcement(t *testing.T) {
 
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
 	agent := slackagent.New(
 		slackagent.WithSlackClient(slackClient),
 		slackagent.WithLLMClient(llmClient),
-		slackagent.WithMemoryService(memService),
 	)
+
+	initialized, err := agent.Init(ctx, llmClient, repo)
+	gt.NoError(t, err)
+	gt.True(t, initialized)
 
 	// Request 300 messages (should be capped at 200 by agent)
 	result, err := agent.Run(ctx, "search_slack", map[string]any{
@@ -234,16 +234,18 @@ func TestAgent_Run_MissingQuery(t *testing.T) {
 	slackClient := &domainmock.SlackClientMock{}
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
 	agent := slackagent.New(
 		slackagent.WithSlackClient(slackClient),
 		slackagent.WithLLMClient(llmClient),
-		slackagent.WithMemoryService(memService),
 	)
 
+	initialized, err := agent.Init(ctx, llmClient, repo)
+	gt.NoError(t, err)
+	gt.True(t, initialized)
+
 	// Run without query parameter
-	_, err := agent.Run(ctx, "search_slack", map[string]any{})
+	_, err = agent.Run(ctx, "search_slack", map[string]any{})
 
 	gt.Error(t, err) // Should return error for missing query
 }
@@ -254,16 +256,18 @@ func TestAgent_Run_UnknownFunction(t *testing.T) {
 	slackClient := &domainmock.SlackClientMock{}
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
 	agent := slackagent.New(
 		slackagent.WithSlackClient(slackClient),
 		slackagent.WithLLMClient(llmClient),
-		slackagent.WithMemoryService(memService),
 	)
 
+	initialized, err := agent.Init(ctx, llmClient, repo)
+	gt.NoError(t, err)
+	gt.True(t, initialized)
+
 	// Run with unknown function name
-	_, err := agent.Run(ctx, "unknown_function", map[string]any{
+	_, err = agent.Run(ctx, "unknown_function", map[string]any{
 		"query": "test",
 	})
 
@@ -274,14 +278,13 @@ func TestAgent_Configure_WithToken(t *testing.T) {
 	ctx := context.Background()
 	agent := slackagent.New()
 	llmClient := newMockLLMClient()
-	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
 	// Mock Slack client to simulate enabled state
 	slackClient := &domainmock.SlackClientMock{}
 	agent.SetSlackClient(slackClient)
 
-	initialized, err := agent.Init(ctx, llmClient, memService)
+	repo := repository.NewMemory()
+	initialized, err := agent.Init(ctx, llmClient, repo)
 	gt.NoError(t, err)
 	gt.True(t, initialized)
 
@@ -338,13 +341,9 @@ func TestAgent_SearchMessagesIntegration(t *testing.T) {
 		},
 	}
 
-	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
-
 	agent := slackagent.New(
 		slackagent.WithSlackClient(slackClient),
 		slackagent.WithLLMClient(llmClient),
-		slackagent.WithMemoryService(memService),
 	)
 
 	query := os.Getenv("TEST_SLACK_QUERY")
@@ -398,7 +397,7 @@ func TestAgent_ExtractRecords_WithRealLLM(t *testing.T) {
 
 	// Create memory service with in-memory repository
 	repo := repository.NewMemory()
-	memSvc := memoryservice.New(llmClient, repo)
+	memSvc := memoryservice.New("slack", llmClient, repo)
 
 	// Create agent
 	agent := slackagent.New(

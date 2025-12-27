@@ -10,7 +10,6 @@ import (
 	slackagent "github.com/secmon-lab/warren/pkg/agents/slack"
 	domainmock "github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/repository"
-	memoryservice "github.com/secmon-lab/warren/pkg/service/memory"
 )
 
 func TestInternalTool_SearchMessages(t *testing.T) {
@@ -255,15 +254,13 @@ func TestInternalTool_LimitEnforcement(t *testing.T) {
 
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
 	agent := slackagent.New(
 		slackagent.WithSlackClient(slackClient),
 		slackagent.WithLLMClient(llmClient),
-		slackagent.WithMemoryService(memService),
 	)
 
-	initialized, err := agent.Init(ctx, llmClient, memService)
+	initialized, err := agent.Init(ctx, llmClient, repo)
 	gt.NoError(t, err)
 	gt.True(t, initialized)
 

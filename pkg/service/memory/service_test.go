@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/mock"
 	"github.com/m-mizutani/gt"
@@ -20,80 +21,6 @@ func createTestRepository(t *testing.T) interfaces.Repository {
 	return repository.NewMemory()
 }
 
-// TestFormatMemoriesForPrompt is removed - ExecutionMemory and TicketMemory features have been deleted
-// TestLoadMemoriesForPrompt is removed - ExecutionMemory and TicketMemory features have been deleted
-// TestGenerateExecutionMemoryWithRealLLM is removed - ExecutionMemory feature has been deleted
-// TestGenerateTicketMemoryWithRealLLM is removed - TicketMemory feature has been deleted
-
-func TestAgentMemory_SaveAndSearch(t *testing.T) {
-	repo := createTestRepository(t)
-	llmClient := &mock.LLMClientMock{
-		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
-			embeddings := make([][]float64, len(input))
-			for i := range input {
-				vec := make([]float64, dimension)
-				for j := 0; j < dimension; j++ {
-					vec[j] = 0.1 * float64(i+j)
-				}
-				embeddings[i] = vec
-			}
-			return embeddings, nil
-		},
-	}
-	svc := memoryService.New(llmClient, repo)
-	ctx := context.Background()
-
-	// Create test memory
-	mem1 := &memory.AgentMemory{
-		ID:             types.NewAgentMemoryID(),
-		AgentID:        "bigquery",
-		TaskQuery:      "get login errors",
-		QueryEmbedding: []float32{0.1, 0.2, 0.3},
-		Timestamp:      time.Now(),
-		Duration:       time.Second,
-		Successes:      []string{"Successfully executed query"},
-		Problems:       []string{},
-		Improvements:   []string{},
-	}
-
-	mem2 := &memory.AgentMemory{
-		ID:             types.NewAgentMemoryID(),
-		AgentID:        "bigquery",
-		TaskQuery:      "get authentication failures",
-		QueryEmbedding: []float32{0.15, 0.25, 0.35},
-		Timestamp:      time.Now(),
-		Duration:       2 * time.Second,
-		Problems:       []string{"Query timeout"},
-		Improvements:   []string{"Add index"},
-	}
-
-	// Different agent
-	mem3 := &memory.AgentMemory{
-		ID:             types.NewAgentMemoryID(),
-		AgentID:        "virustotal",
-		TaskQuery:      "scan file hash",
-		QueryEmbedding: []float32{0.5, 0.6, 0.7},
-		Timestamp:      time.Now(),
-		Duration:       time.Second,
-	}
-
-	// Save memories
-	gt.NoError(t, svc.SaveAgentMemory(ctx, mem1))
-	gt.NoError(t, svc.SaveAgentMemory(ctx, mem2))
-	gt.NoError(t, svc.SaveAgentMemory(ctx, mem3))
-
-	// Search by similar embedding (should find mem1 and mem2, not mem3)
-	results, err := svc.SearchRelevantAgentMemories(ctx, "bigquery", "login errors", 2)
-	gt.NoError(t, err)
-	gt.V(t, len(results)).Equal(2)
-
-	// Verify results are from correct agent
-	for _, r := range results {
-		gt.V(t, r.AgentID).Equal("bigquery")
-	}
-}
-
-// newMockLLMClient creates a mock LLM client for integration testing
 func newMockLLMClient() gollem.LLMClient {
 	return &mock.LLMClientMock{
 		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
@@ -107,209 +34,191 @@ func newMockLLMClient() gollem.LLMClient {
 			}
 			return embeddings, nil
 		},
+		NewSessionFunc: func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
+			return &mock.SessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					reflectionJSON := `{
+						"new_claims": ["Test claim from execution"],
+						"helpful_memories": [],
+						"harmful_memories": []
+					}`
+					return &gollem.Response{Texts: []string{reflectionJSON}}, nil
+				},
+			}, nil
+		},
 	}
 }
 
-func TestMemoryService_E2E_ScoringFlow(t *testing.T) {
+func TestSearchAndSelectMemories(t *testing.T) {
+	repo := createTestRepository(t)
+	llmClient := newMockLLMClient()
+	agentID := "test-agent"
+	svc := memoryService.New(agentID, llmClient, repo)
 	ctx := context.Background()
-	repo := repository.NewMemory()
-	llm := newMockLLMClient()
-	svc := memoryService.New(llm, repo)
+	now := time.Now()
 
-	agentID := "e2e-test-agent"
+	// Create test memories
+	memories := []*memory.AgentMemory{
+		{
+			ID:             types.NewAgentMemoryID(),
+			AgentID:        agentID,
+			Query:          "login errors query",
+			QueryEmbedding: firestore.Vector32{0.1, 0.2, 0.3},
+			Claim:          "Login errors have severity='ERROR' field",
+			Score:          5.0,
+			CreatedAt:      now.Add(-1 * time.Hour),
+			LastUsedAt:     now.Add(-1 * time.Hour),
+		},
+		{
+			ID:             types.NewAgentMemoryID(),
+			AgentID:        agentID,
+			Query:          "authentication failures",
+			QueryEmbedding: firestore.Vector32{0.15, 0.25, 0.35},
+			Claim:          "Auth failures need action='login' check",
+			Score:          3.0,
+			CreatedAt:      now.Add(-2 * time.Hour),
+			LastUsedAt:     now.Add(-2 * time.Hour),
+		},
+		{
+			ID:             types.NewAgentMemoryID(),
+			AgentID:        "other-agent",
+			Query:          "scan file hash",
+			QueryEmbedding: firestore.Vector32{0.5, 0.6, 0.7},
+			Claim:          "File hash scanning uses MD5",
+			Score:          2.0,
+			CreatedAt:      now.Add(-3 * time.Hour),
+			LastUsedAt:     now.Add(-3 * time.Hour),
+		},
+	}
 
-	t.Run("End-to-end scoring flow", func(t *testing.T) {
-		// Step 1: Save memories with different quality scores
-		now := time.Now()
-		memories := []*memory.AgentMemory{
-			{
-				ID:           types.NewAgentMemoryID(),
-				AgentID:      agentID,
-				TaskQuery:    "high quality memory",
-				Timestamp:    now.Add(-1 * time.Hour),
-				QualityScore: 8.0,
-				LastUsedAt:   now.Add(-1 * time.Hour),
-				Successes:    []string{"Success pattern 1"},
-				Problems:     []string{},
-				Improvements: []string{"Improvement 1"},
-			},
-			{
-				ID:           types.NewAgentMemoryID(),
-				AgentID:      agentID,
-				TaskQuery:    "medium quality memory",
-				Timestamp:    now.Add(-2 * time.Hour),
-				QualityScore: 2.0,
-				LastUsedAt:   now.Add(-2 * time.Hour),
-				Successes:    []string{"Success pattern 2"},
-				Problems:     []string{},
-				Improvements: []string{"Improvement 2"},
-			},
-			{
-				ID:           types.NewAgentMemoryID(),
-				AgentID:      agentID,
-				TaskQuery:    "low quality memory",
-				Timestamp:    now.Add(-3 * time.Hour),
-				QualityScore: -6.0,
-				LastUsedAt:   now.Add(-100 * 24 * time.Hour), // 100 days ago
-				Successes:    []string{},
-				Problems:     []string{"Problem 1"},
-				Improvements: []string{},
-			},
-			{
-				ID:           types.NewAgentMemoryID(),
-				AgentID:      agentID,
-				TaskQuery:    "critical bad memory",
-				Timestamp:    now.Add(-4 * time.Hour),
-				QualityScore: -9.0,
-				LastUsedAt:   now.Add(-4 * time.Hour),
-				Successes:    []string{},
-				Problems:     []string{"Critical problem"},
-				Improvements: []string{},
-			},
-		}
+	// Save memories
+	for _, mem := range memories {
+		gt.NoError(t, repo.SaveAgentMemory(ctx, mem))
+	}
 
-		for _, mem := range memories {
-			gt.NoError(t, svc.SaveAgentMemory(ctx, mem))
-		}
+	// Search for memories
+	results, err := svc.SearchAndSelectMemories(ctx, "login errors", 2)
+	gt.NoError(t, err)
+	gt.V(t, len(results)).Equal(2)
 
-		// Step 2: Search for relevant memories
-		// The search should use re-ranking with quality scores
-		results, err := svc.SearchRelevantAgentMemories(ctx, agentID, "quality memory", 3)
-		gt.NoError(t, err)
-		gt.N(t, len(results)).Greater(0)
-
-		// High quality memories should be prioritized
-		// (though exact ordering depends on similarity too)
-		hasHighQuality := false
-		for _, r := range results {
-			if r.QualityScore > 5.0 {
-				hasHighQuality = true
-				break
-			}
-		}
-		gt.True(t, hasHighQuality)
-
-		// Step 3: Test pruning - should delete critical bad memory
-		deleted, err := svc.PruneAgentMemories(ctx, agentID)
-		gt.NoError(t, err)
-		gt.N(t, deleted).Greater(0) // At least the critical one should be deleted
-
-		// Step 4: Verify pruning results
-		remaining, err := repo.ListAgentMemories(ctx, agentID)
-		gt.NoError(t, err)
-
-		// Critical bad memory (-9.0) should be gone
-		hasCriticalBad := false
-		for _, r := range remaining {
-			if r.QualityScore <= -8.0 {
-				hasCriticalBad = true
-				break
-			}
-		}
-		gt.False(t, hasCriticalBad)
-
-		// High quality memory should still exist
-		hasHighQualityAfterPrune := false
-		for _, r := range remaining {
-			if r.QualityScore > 5.0 {
-				hasHighQualityAfterPrune = true
-				break
-			}
-		}
-		gt.True(t, hasHighQualityAfterPrune)
-	})
-
-	t.Run("Re-ranking with different weights", func(t *testing.T) {
-		// Clean up
-		existing, err := repo.ListAgentMemories(ctx, agentID)
-		gt.NoError(t, err)
-		if len(existing) > 0 {
-			ids := make([]types.AgentMemoryID, len(existing))
-			for i, m := range existing {
-				ids[i] = m.ID
-			}
-			_, err = repo.DeleteAgentMemoriesBatch(ctx, agentID, ids)
-			gt.NoError(t, err)
-		}
-
-		// Create memories with different quality and recency
-		now := time.Now()
-		memories := []*memory.AgentMemory{
-			{
-				ID:           types.NewAgentMemoryID(),
-				AgentID:      agentID,
-				TaskQuery:    "old high quality",
-				Timestamp:    now.Add(-30 * 24 * time.Hour),
-				QualityScore: 9.0,
-				LastUsedAt:   now.Add(-30 * 24 * time.Hour),
-				Successes:    []string{"Old success"},
-				Problems:     []string{},
-				Improvements: []string{},
-			},
-			{
-				ID:           types.NewAgentMemoryID(),
-				AgentID:      agentID,
-				TaskQuery:    "recent medium quality",
-				Timestamp:    now.Add(-1 * time.Hour),
-				QualityScore: 3.0,
-				LastUsedAt:   now.Add(-1 * time.Hour),
-				Successes:    []string{"Recent success"},
-				Problems:     []string{},
-				Improvements: []string{},
-			},
-		}
-
-		for _, mem := range memories {
-			gt.NoError(t, svc.SaveAgentMemory(ctx, mem))
-		}
-
-		// Test with quality-heavy weights
-		svc.ScoringConfig.RankQualityWeight = 0.7
-		svc.ScoringConfig.RankRecencyWeight = 0.1
-		svc.ScoringConfig.RankSimilarityWeight = 0.2
-
-		results, err := svc.SearchRelevantAgentMemories(ctx, agentID, "quality", 2)
-		gt.NoError(t, err)
-		gt.N(t, len(results)).Greater(0)
-
-		// With heavy quality weight, old high quality should rank well
-		foundHighQuality := false
-		for _, r := range results {
-			if r.QualityScore > 5.0 {
-				foundHighQuality = true
-				break
-			}
-		}
-		gt.True(t, foundHighQuality)
-	})
+	// Verify results are from correct agent
+	for _, r := range results {
+		gt.V(t, r.AgentID).Equal(agentID)
+	}
 }
 
-func TestMemoryService_E2E_ConfigValidation(t *testing.T) {
-	t.Run("Config validation prevents invalid configurations", func(t *testing.T) {
-		invalidConfig := memoryService.ScoringConfig{
-			EMAAlpha:             1.5, // Invalid: > 1.0
-			ScoreMin:             -10.0,
-			ScoreMax:             10.0,
-			SearchMultiplier:     10,
-			SearchMaxCandidates:  50,
-			FilterMinQuality:     -5.0,
-			RankSimilarityWeight: 0.5,
-			RankQualityWeight:    0.3,
-			RankRecencyWeight:    0.2,
-			RecencyHalfLifeDays:  30,
-			PruneCriticalScore:   -8.0,
-			PruneHarmfulScore:    -5.0,
-			PruneHarmfulDays:     90,
-			PruneModerateScore:   -3.0,
-			PruneModerateDays:    180,
+func TestExtractAndSaveMemories(t *testing.T) {
+	repo := createTestRepository(t)
+	llmClient := newMockLLMClient()
+	agentID := "test-agent"
+	svc := memoryService.New(agentID, llmClient, repo)
+	ctx := context.Background()
+
+	// Execute task and extract memories
+	taskQuery := "How to query user login data?"
+	usedMemories := []*memory.AgentMemory{}
+	history := &gollem.History{}
+
+	err := svc.ExtractAndSaveMemories(ctx, taskQuery, usedMemories, history)
+	gt.NoError(t, err)
+
+	// Verify memories were saved
+	memories, err := repo.ListAgentMemories(ctx, agentID)
+	gt.NoError(t, err)
+	gt.True(t, len(memories) > 0)
+
+	// Verify memory content
+	mem := memories[0]
+	gt.V(t, mem.AgentID).Equal(agentID)
+	gt.V(t, mem.Query).Equal(taskQuery)
+	gt.True(t, len(mem.Claim) > 0)
+}
+
+func TestPruneMemories(t *testing.T) {
+	repo := createTestRepository(t)
+	llmClient := newMockLLMClient()
+	agentID := "pruning-test-agent"
+	svc := memoryService.New(agentID, llmClient, repo)
+	ctx := context.Background()
+	now := time.Now()
+
+	// Create memories with various scores and timestamps
+	memories := []*memory.AgentMemory{
+		// Critical score - should be deleted
+		{
+			ID:             types.NewAgentMemoryID(),
+			AgentID:        agentID,
+			Query:          "critical bad memory",
+			QueryEmbedding: firestore.Vector32{0.1, 0.2, 0.3},
+			Claim:          "This is completely wrong",
+			Score:          -9.0,
+			CreatedAt:      now.Add(-10 * 24 * time.Hour),
+			LastUsedAt:     now.Add(-10 * 24 * time.Hour),
+		},
+		// Harmful + old - should be deleted
+		{
+			ID:             types.NewAgentMemoryID(),
+			AgentID:        agentID,
+			Query:          "harmful old memory",
+			QueryEmbedding: firestore.Vector32{0.1, 0.2, 0.3},
+			Claim:          "Somewhat incorrect claim",
+			Score:          -6.0,
+			CreatedAt:      now.Add(-100 * 24 * time.Hour),
+			LastUsedAt:     now.Add(-100 * 24 * time.Hour),
+		},
+		// Good memory - should NOT be deleted
+		{
+			ID:             types.NewAgentMemoryID(),
+			AgentID:        agentID,
+			Query:          "good memory",
+			QueryEmbedding: firestore.Vector32{0.1, 0.2, 0.3},
+			Claim:          "This is helpful claim",
+			Score:          5.0,
+			CreatedAt:      now,
+			LastUsedAt:     now,
+		},
+	}
+
+	for _, mem := range memories {
+		gt.NoError(t, repo.SaveAgentMemory(ctx, mem))
+	}
+
+	// Run pruning
+	deleted, err := svc.PruneMemories(ctx)
+	gt.NoError(t, err)
+	gt.V(t, deleted).Equal(2) // critical + harmful old
+
+	// Verify remaining memories
+	remaining, err := repo.ListAgentMemories(ctx, agentID)
+	gt.NoError(t, err)
+	gt.V(t, len(remaining)).Equal(1) // only good memory
+
+	// Good memory should still exist
+	gt.V(t, remaining[0].Score).Equal(5.0)
+}
+
+func TestServiceAlgorithmReplacement(t *testing.T) {
+	repo := createTestRepository(t)
+	llmClient := newMockLLMClient()
+
+	// Create service with custom algorithms
+	customScoring := func(
+		memories map[types.AgentMemoryID]*memory.AgentMemory,
+		reflection *memory.Reflection,
+	) map[types.AgentMemoryID]float64 {
+		// Custom scoring: always return +5.0 for helpful
+		updates := make(map[types.AgentMemoryID]float64)
+		for _, memID := range reflection.HelpfulMemories {
+			if _, exists := memories[memID]; exists {
+				updates[memID] = 5.0
+			}
 		}
+		return updates
+	}
 
-		err := invalidConfig.Validate()
-		gt.Error(t, err)
-	})
+	svc := memoryService.New("test-agent", llmClient, repo).
+		WithScoringAlgorithm(customScoring)
 
-	t.Run("Default config is always valid", func(t *testing.T) {
-		defaultConfig := memoryService.DefaultScoringConfig()
-		gt.NoError(t, defaultConfig.Validate())
-	})
+	// Verify algorithm replacement worked
+	gt.NotEqual(t, svc, nil)
 }

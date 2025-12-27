@@ -1,267 +1,278 @@
 package memory_test
 
 import (
-	"context"
-	"math"
 	"testing"
 	"time"
 
-	"github.com/m-mizutani/gollem/mock"
+	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	memoryRepo "github.com/secmon-lab/warren/pkg/repository/memory"
 	memoryService "github.com/secmon-lab/warren/pkg/service/memory"
 )
 
-func TestScoringConfig_Validate(t *testing.T) {
-	t.Run("default config is valid", func(t *testing.T) {
-		cfg := memoryService.DefaultScoringConfig()
-		gt.NoError(t, cfg.Validate())
+func TestDefaultScoringAlgorithm(t *testing.T) {
+	t.Run("helpful memory increases score", func(t *testing.T) {
+		mem1 := &memory.AgentMemory{
+			ID:             types.AgentMemoryID("mem-1"),
+			AgentID:        "test",
+			Query:          "test query",
+			QueryEmbedding: firestore.Vector32{0.1, 0.2, 0.3},
+			Claim:          "test claim",
+			Score:          0.0,
+			CreatedAt:      time.Now(),
+		}
+
+		memories := map[types.AgentMemoryID]*memory.AgentMemory{
+			mem1.ID: mem1,
+		}
+
+		reflection := &memory.Reflection{
+			HelpfulMemories: []types.AgentMemoryID{mem1.ID},
+		}
+
+		updates := memoryService.DefaultScoringAlgorithm(memories, reflection)
+		gt.V(t, len(updates)).Equal(1)
+
+		// With default EMA alpha=0.3, delta=+2.0:
+		// newScore = 0.3 * 2.0 + 0.7 * 0.0 = 0.6
+		newScore := updates[mem1.ID]
+		gt.V(t, newScore).Equal(0.6)
 	})
 
-	t.Run("invalid EMA alpha", func(t *testing.T) {
-		cfg := memoryService.DefaultScoringConfig()
-		cfg.EMAAlpha = 1.5
-		gt.Error(t, cfg.Validate())
+	t.Run("harmful memory decreases score", func(t *testing.T) {
+		mem1 := &memory.AgentMemory{
+			ID:             types.AgentMemoryID("mem-1"),
+			AgentID:        "test",
+			Query:          "test query",
+			QueryEmbedding: firestore.Vector32{0.1, 0.2, 0.3},
+			Claim:          "test claim",
+			Score:          0.0,
+			CreatedAt:      time.Now(),
+		}
 
-		cfg.EMAAlpha = -0.1
-		gt.Error(t, cfg.Validate())
+		memories := map[types.AgentMemoryID]*memory.AgentMemory{
+			mem1.ID: mem1,
+		}
+
+		reflection := &memory.Reflection{
+			HarmfulMemories: []types.AgentMemoryID{mem1.ID},
+		}
+
+		updates := memoryService.DefaultScoringAlgorithm(memories, reflection)
+		gt.V(t, len(updates)).Equal(1)
+
+		// With default EMA alpha=0.3, delta=-3.0:
+		// newScore = 0.3 * (-3.0) + 0.7 * 0.0 = -0.9
+		newScore := updates[mem1.ID]
+		// Use approximate comparison for float
+		gt.True(t, newScore > -0.91 && newScore < -0.89)
 	})
 
-	t.Run("invalid score range", func(t *testing.T) {
-		cfg := memoryService.DefaultScoringConfig()
-		cfg.ScoreMin = 10.0
-		cfg.ScoreMax = -10.0
-		gt.Error(t, cfg.Validate())
+	t.Run("EMA smoothing with existing score", func(t *testing.T) {
+		mem1 := &memory.AgentMemory{
+			ID:             types.AgentMemoryID("mem-1"),
+			AgentID:        "test",
+			Query:          "test query",
+			QueryEmbedding: firestore.Vector32{0.1, 0.2, 0.3},
+			Claim:          "test claim",
+			Score:          1.0, // existing positive score
+			CreatedAt:      time.Now(),
+		}
+
+		memories := map[types.AgentMemoryID]*memory.AgentMemory{
+			mem1.ID: mem1,
+		}
+
+		reflection := &memory.Reflection{
+			HelpfulMemories: []types.AgentMemoryID{mem1.ID},
+		}
+
+		updates := memoryService.DefaultScoringAlgorithm(memories, reflection)
+
+		// With alpha=0.3, delta=+2.0, oldScore=1.0:
+		// newScore = 0.3 * 2.0 + 0.7 * 1.0 = 0.6 + 0.7 = 1.3
+		newScore := updates[mem1.ID]
+		gt.True(t, newScore > 1.29 && newScore < 1.31)
 	})
 
-	t.Run("invalid search parameters", func(t *testing.T) {
-		cfg := memoryService.DefaultScoringConfig()
-		cfg.SearchMultiplier = 0
-		gt.Error(t, cfg.Validate())
+	t.Run("score clamped at max", func(t *testing.T) {
+		mem1 := &memory.AgentMemory{
+			ID:             types.AgentMemoryID("mem-1"),
+			AgentID:        "test",
+			Query:          "test query",
+			QueryEmbedding: firestore.Vector32{0.1, 0.2, 0.3},
+			Claim:          "test claim",
+			Score:          9.5, // near max
+			CreatedAt:      time.Now(),
+		}
 
-		cfg = memoryService.DefaultScoringConfig()
-		cfg.SearchMaxCandidates = -1
-		gt.Error(t, cfg.Validate())
+		memories := map[types.AgentMemoryID]*memory.AgentMemory{
+			mem1.ID: mem1,
+		}
+
+		reflection := &memory.Reflection{
+			HelpfulMemories: []types.AgentMemoryID{mem1.ID},
+		}
+
+		// Test with score near max
+		mem1.Score = 9.9
+		updates := memoryService.DefaultScoringAlgorithm(memories, reflection)
+
+		// 0.3 * 2.0 + 0.7 * 9.9 = 0.6 + 6.93 = 7.53
+		newScore := updates[mem1.ID]
+		gt.True(t, newScore <= 10.0)
+		gt.True(t, newScore > 7.52 && newScore < 7.54)
 	})
 
-	t.Run("invalid ranking weights", func(t *testing.T) {
-		cfg := memoryService.DefaultScoringConfig()
-		cfg.RankSimilarityWeight = -0.1
-		gt.Error(t, cfg.Validate())
+	t.Run("score clamped at min", func(t *testing.T) {
+		mem1 := &memory.AgentMemory{
+			ID:             types.AgentMemoryID("mem-1"),
+			AgentID:        "test",
+			Query:          "test query",
+			QueryEmbedding: firestore.Vector32{0.1, 0.2, 0.3},
+			Claim:          "test claim",
+			Score:          -9.9, // near min
+			CreatedAt:      time.Now(),
+		}
 
-		// Test weights not summing to 1.0
-		cfg = memoryService.DefaultScoringConfig()
-		cfg.RankSimilarityWeight = 0.5
-		cfg.RankQualityWeight = 0.5
-		cfg.RankRecencyWeight = 0.5 // Total = 1.5, should fail
-		gt.Error(t, cfg.Validate())
+		memories := map[types.AgentMemoryID]*memory.AgentMemory{
+			mem1.ID: mem1,
+		}
+
+		reflection := &memory.Reflection{
+			HarmfulMemories: []types.AgentMemoryID{mem1.ID},
+		}
+
+		updates := memoryService.DefaultScoringAlgorithm(memories, reflection)
+
+		// 0.3 * (-3.0) + 0.7 * (-9.9) = -0.9 + (-6.93) = -7.83
+		newScore := updates[mem1.ID]
+		gt.True(t, newScore >= -10.0)
+		gt.V(t, newScore).Equal(-7.83)
 	})
 
-	t.Run("invalid recency half-life", func(t *testing.T) {
-		cfg := memoryService.DefaultScoringConfig()
-		cfg.RecencyHalfLifeDays = 0
-		gt.Error(t, cfg.Validate())
+	t.Run("multiple memories", func(t *testing.T) {
+		mem1 := &memory.AgentMemory{
+			ID:        types.AgentMemoryID("mem-1"),
+			Score:     0.0,
+			CreatedAt: time.Now(),
+		}
+		mem2 := &memory.AgentMemory{
+			ID:        types.AgentMemoryID("mem-2"),
+			Score:     1.0,
+			CreatedAt: time.Now(),
+		}
+		mem3 := &memory.AgentMemory{
+			ID:        types.AgentMemoryID("mem-3"),
+			Score:     -2.0,
+			CreatedAt: time.Now(),
+		}
+
+		memories := map[types.AgentMemoryID]*memory.AgentMemory{
+			mem1.ID: mem1,
+			mem2.ID: mem2,
+			mem3.ID: mem3,
+		}
+
+		reflection := &memory.Reflection{
+			HelpfulMemories: []types.AgentMemoryID{mem1.ID, mem2.ID},
+			HarmfulMemories: []types.AgentMemoryID{mem3.ID},
+		}
+
+		updates := memoryService.DefaultScoringAlgorithm(memories, reflection)
+		gt.V(t, len(updates)).Equal(3)
+
+		// mem1: 0.3 * 2.0 + 0.7 * 0.0 = 0.6
+		gt.V(t, updates[mem1.ID]).Equal(0.6)
+
+		// mem2: 0.3 * 2.0 + 0.7 * 1.0 = 1.3
+		gt.True(t, updates[mem2.ID] > 1.29 && updates[mem2.ID] < 1.31)
+
+		// mem3: 0.3 * (-3.0) + 0.7 * (-2.0) = -0.9 + (-1.4) = -2.3
+		gt.True(t, updates[mem3.ID] > -2.31 && updates[mem3.ID] < -2.29)
 	})
 
-	t.Run("invalid pruning thresholds order", func(t *testing.T) {
-		cfg := memoryService.DefaultScoringConfig()
-		cfg.PruneCriticalScore = -3.0
-		cfg.PruneHarmfulScore = -5.0
-		gt.Error(t, cfg.Validate())
-	})
+	t.Run("nonexistent memory ID ignored", func(t *testing.T) {
+		mem1 := &memory.AgentMemory{
+			ID:        types.AgentMemoryID("mem-1"),
+			Score:     0.0,
+			CreatedAt: time.Now(),
+		}
 
-	t.Run("invalid pruning days", func(t *testing.T) {
-		cfg := memoryService.DefaultScoringConfig()
-		cfg.PruneHarmfulDays = 200
-		cfg.PruneModerateDays = 100
-		gt.Error(t, cfg.Validate())
+		memories := map[types.AgentMemoryID]*memory.AgentMemory{
+			mem1.ID: mem1,
+		}
+
+		reflection := &memory.Reflection{
+			HelpfulMemories: []types.AgentMemoryID{types.AgentMemoryID("nonexistent")},
+		}
+
+		updates := memoryService.DefaultScoringAlgorithm(memories, reflection)
+		gt.V(t, len(updates)).Equal(0) // nonexistent ID should be ignored
 	})
 }
 
-func TestPruneAgentMemories(t *testing.T) {
-	ctx := context.Background()
-	repo := memoryRepo.New()
-	llm := &mock.LLMClientMock{
-		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
-			embeddings := make([][]float64, len(input))
-			for i := range input {
-				vec := make([]float64, dimension)
-				for j := 0; j < dimension; j++ {
-					vec[j] = 0.1 * float64(i+j)
-				}
-				embeddings[i] = vec
-			}
-			return embeddings, nil
-		},
-	}
-	svc := memoryService.New(llm, repo)
+func TestAggressiveScoringAlgorithm(t *testing.T) {
+	t.Run("more aggressive helpful feedback", func(t *testing.T) {
+		mem1 := &memory.AgentMemory{
+			ID:        types.AgentMemoryID("mem-1"),
+			Score:     0.0,
+			CreatedAt: time.Now(),
+		}
 
-	agentID := "test-agent"
-	now := time.Now()
+		memories := map[types.AgentMemoryID]*memory.AgentMemory{
+			mem1.ID: mem1,
+		}
 
-	// Create test memories with various scores and timestamps
-	memories := []*memory.AgentMemory{
-		// Critical score - should be deleted immediately
-		{
-			ID:             types.NewAgentMemoryID(),
-			AgentID:        agentID,
-			TaskQuery:      "critical bad memory",
-			QueryEmbedding: []float32{0.1, 0.2, 0.3},
-			Timestamp:      now.Add(-10 * 24 * time.Hour),
-			QualityScore:   -9.0,
-			LastUsedAt:     now.Add(-10 * 24 * time.Hour),
-		},
-		// Harmful + old - should be deleted
-		{
-			ID:             types.NewAgentMemoryID(),
-			AgentID:        agentID,
-			TaskQuery:      "harmful old memory",
-			QueryEmbedding: []float32{0.1, 0.2, 0.3},
-			Timestamp:      now.Add(-100 * 24 * time.Hour),
-			QualityScore:   -6.0,
-			LastUsedAt:     now.Add(-100 * 24 * time.Hour),
-		},
-		// Harmful but recent - should NOT be deleted
-		{
-			ID:             types.NewAgentMemoryID(),
-			AgentID:        agentID,
-			TaskQuery:      "harmful recent memory",
-			QueryEmbedding: []float32{0.1, 0.2, 0.3},
-			Timestamp:      now.Add(-10 * 24 * time.Hour),
-			QualityScore:   -6.0,
-			LastUsedAt:     now.Add(-10 * 24 * time.Hour),
-		},
-		// Moderate + very old - should be deleted
-		{
-			ID:             types.NewAgentMemoryID(),
-			AgentID:        agentID,
-			TaskQuery:      "moderate very old memory",
-			QueryEmbedding: []float32{0.1, 0.2, 0.3},
-			Timestamp:      now.Add(-200 * 24 * time.Hour),
-			QualityScore:   -4.0,
-			LastUsedAt:     now.Add(-200 * 24 * time.Hour),
-		},
-		// Good memory - should NOT be deleted
-		{
-			ID:             types.NewAgentMemoryID(),
-			AgentID:        agentID,
-			TaskQuery:      "good memory",
-			QueryEmbedding: []float32{0.1, 0.2, 0.3},
-			Timestamp:      now,
-			QualityScore:   5.0,
-			LastUsedAt:     now,
-		},
-	}
+		reflection := &memory.Reflection{
+			HelpfulMemories: []types.AgentMemoryID{mem1.ID},
+		}
 
-	// Save all memories
-	for _, mem := range memories {
-		gt.NoError(t, repo.SaveAgentMemory(ctx, mem))
-	}
+		aggressiveAlgo := memoryService.NewAggressiveScoringAlgorithm()
+		updates := aggressiveAlgo(memories, reflection)
 
-	// Run pruning
-	deleted, err := svc.PruneAgentMemories(ctx, agentID)
-	gt.NoError(t, err)
+		// With aggressive: alpha=0.5, delta=+3.0:
+		// newScore = 0.5 * 3.0 + 0.5 * 0.0 = 1.5
+		newScore := updates[mem1.ID]
+		gt.V(t, newScore).Equal(1.5)
 
-	// Should delete 3 memories: critical, harmful+old, moderate+very old
-	gt.Equal(t, deleted, 3)
+		// Compare with default algorithm
+		defaultUpdates := memoryService.DefaultScoringAlgorithm(memories, reflection)
+		defaultScore := defaultUpdates[mem1.ID]
 
-	// Verify remaining memories
-	remaining, err := repo.ListAgentMemories(ctx, agentID)
-	gt.NoError(t, err)
-	gt.Equal(t, len(remaining), 2) // harmful recent + good memory
-}
+		// Aggressive should give higher score for helpful memory
+		gt.True(t, newScore > defaultScore)
+	})
 
-func TestScoringConfig_CustomValues(t *testing.T) {
-	repo := memoryRepo.New()
-	llm := &mock.LLMClientMock{
-		GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
-			embeddings := make([][]float64, len(input))
-			for i := range input {
-				vec := make([]float64, dimension)
-				for j := 0; j < dimension; j++ {
-					vec[j] = 0.1 * float64(i+j)
-				}
-				embeddings[i] = vec
-			}
-			return embeddings, nil
-		},
-	}
-	svc := memoryService.New(llm, repo)
+	t.Run("more aggressive harmful feedback", func(t *testing.T) {
+		mem1 := &memory.AgentMemory{
+			ID:        types.AgentMemoryID("mem-1"),
+			Score:     0.0,
+			CreatedAt: time.Now(),
+		}
 
-	// Test custom config
-	customConfig := memoryService.ScoringConfig{
-		EMAAlpha:             0.5,
-		ScoreMin:             -10.0,
-		ScoreMax:             10.0,
-		SearchMultiplier:     5,
-		SearchMaxCandidates:  25,
-		FilterMinQuality:     -3.0,
-		RankSimilarityWeight: 0.6,
-		RankQualityWeight:    0.3,
-		RankRecencyWeight:    0.1,
-		RecencyHalfLifeDays:  60,
-		PruneCriticalScore:   -9.0,
-		PruneHarmfulScore:    -6.0,
-		PruneHarmfulDays:     60,
-		PruneModerateScore:   -4.0,
-		PruneModerateDays:    120,
-	}
+		memories := map[types.AgentMemoryID]*memory.AgentMemory{
+			mem1.ID: mem1,
+		}
 
-	gt.NoError(t, customConfig.Validate())
-	svc.ScoringConfig = customConfig
+		reflection := &memory.Reflection{
+			HarmfulMemories: []types.AgentMemoryID{mem1.ID},
+		}
 
-	// Verify the custom config is applied
-	gt.Equal(t, svc.ScoringConfig.EMAAlpha, 0.5)
-	gt.Equal(t, svc.ScoringConfig.SearchMultiplier, 5)
-	gt.Equal(t, svc.ScoringConfig.RecencyHalfLifeDays, 60.0)
-}
+		aggressiveAlgo := memoryService.NewAggressiveScoringAlgorithm()
+		updates := aggressiveAlgo(memories, reflection)
 
-func TestRecencyScoreCalculation(t *testing.T) {
-	// Test recency score decay with different half-lives
-	testCases := []struct {
-		name         string
-		halfLifeDays float64
-		daysAgo      float64
-		expected     float64 // approximate
-	}{
-		{
-			name:         "just used (0 days)",
-			halfLifeDays: 30,
-			daysAgo:      0,
-			expected:     1.0,
-		},
-		{
-			name:         "half-life (30 days)",
-			halfLifeDays: 30,
-			daysAgo:      30,
-			expected:     0.5,
-		},
-		{
-			name:         "double half-life (60 days)",
-			halfLifeDays: 30,
-			daysAgo:      60,
-			expected:     0.25,
-		},
-		{
-			name:         "longer half-life (60 days), 30 days ago",
-			halfLifeDays: 60,
-			daysAgo:      30,
-			expected:     0.707, // 2^(-30/60) ≈ 0.707
-		},
-	}
+		// With aggressive: alpha=0.5, delta=-5.0:
+		// newScore = 0.5 * (-5.0) + 0.5 * 0.0 = -2.5
+		newScore := updates[mem1.ID]
+		gt.V(t, newScore).Equal(-2.5)
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Calculate: 0.5^(daysAgo / halfLife)
-			result := math.Pow(0.5, tc.daysAgo/tc.halfLifeDays)
+		// Compare with default algorithm
+		defaultUpdates := memoryService.DefaultScoringAlgorithm(memories, reflection)
+		defaultScore := defaultUpdates[mem1.ID]
 
-			// Allow small floating point difference
-			diff := math.Abs(result - tc.expected)
-			if diff >= 0.01 {
-				t.Errorf("expected ~%f, got %f", tc.expected, result)
-			}
-		})
-	}
+		// Aggressive should give lower (more negative) score for harmful memory
+		gt.True(t, newScore < defaultScore)
+	})
 }

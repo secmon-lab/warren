@@ -107,6 +107,10 @@ type Repository interface {
 	GetAgentMemory(ctx context.Context, agentID string, id types.AgentMemoryID) (*memory.AgentMemory, error)
 	SearchMemoriesByEmbedding(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error)
 
+	// BatchSaveAgentMemories saves multiple agent memories efficiently in a batch
+	// Uses batch write operations to minimize round trips to the database
+	BatchSaveAgentMemories(ctx context.Context, memories []*memory.AgentMemory) error
+
 	// Memory scoring methods
 	// UpdateMemoryScoreBatch updates quality scores and last used timestamps for multiple agent memories
 	UpdateMemoryScoreBatch(ctx context.Context, agentID string, updates map[types.AgentMemoryID]struct {
@@ -119,7 +123,7 @@ type Repository interface {
 	DeleteAgentMemoriesBatch(ctx context.Context, agentID string, memoryIDs []types.AgentMemoryID) (int, error)
 
 	// ListAgentMemories lists all memories for an agent (for pruning)
-	// Results are ordered by Timestamp DESC
+	// Results are ordered by CreatedAt DESC
 	ListAgentMemories(ctx context.Context, agentID string) ([]*memory.AgentMemory, error)
 
 	// Session management

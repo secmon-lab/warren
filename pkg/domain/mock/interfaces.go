@@ -2499,6 +2499,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			BatchPutAlertsFunc: func(ctx context.Context, alerts alert.Alerts) error {
 //				panic("mock out the BatchPutAlerts method")
 //			},
+//			BatchSaveAgentMemoriesFunc: func(ctx context.Context, memories []*memory.AgentMemory) error {
+//				panic("mock out the BatchSaveAgentMemories method")
+//			},
 //			BatchUpdateTicketsStatusFunc: func(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error {
 //				panic("mock out the BatchUpdateTicketsStatus method")
 //			},
@@ -2751,6 +2754,9 @@ type RepositoryMock struct {
 
 	// BatchPutAlertsFunc mocks the BatchPutAlerts method.
 	BatchPutAlertsFunc func(ctx context.Context, alerts alert.Alerts) error
+
+	// BatchSaveAgentMemoriesFunc mocks the BatchSaveAgentMemories method.
+	BatchSaveAgentMemoriesFunc func(ctx context.Context, memories []*memory.AgentMemory) error
 
 	// BatchUpdateTicketsStatusFunc mocks the BatchUpdateTicketsStatus method.
 	BatchUpdateTicketsStatusFunc func(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error
@@ -3020,6 +3026,13 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Alerts is the alerts argument value.
 			Alerts alert.Alerts
+		}
+		// BatchSaveAgentMemories holds details about calls to the BatchSaveAgentMemories method.
+		BatchSaveAgentMemories []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Memories is the memories argument value.
+			Memories []*memory.AgentMemory
 		}
 		// BatchUpdateTicketsStatus holds details about calls to the BatchUpdateTicketsStatus method.
 		BatchUpdateTicketsStatus []struct {
@@ -3627,6 +3640,7 @@ type RepositoryMock struct {
 	lockBatchGetAlerts                 sync.RWMutex
 	lockBatchGetTickets                sync.RWMutex
 	lockBatchPutAlerts                 sync.RWMutex
+	lockBatchSaveAgentMemories         sync.RWMutex
 	lockBatchUpdateTicketsStatus       sync.RWMutex
 	lockBindAlertsToTicket             sync.RWMutex
 	lockCalculateKnowledgeSize         sync.RWMutex
@@ -3866,6 +3880,45 @@ func (mock *RepositoryMock) BatchPutAlertsCalls() []struct {
 	mock.lockBatchPutAlerts.RLock()
 	calls = mock.calls.BatchPutAlerts
 	mock.lockBatchPutAlerts.RUnlock()
+	return calls
+}
+
+// BatchSaveAgentMemories calls BatchSaveAgentMemoriesFunc.
+func (mock *RepositoryMock) BatchSaveAgentMemories(ctx context.Context, memories []*memory.AgentMemory) error {
+	callInfo := struct {
+		Ctx      context.Context
+		Memories []*memory.AgentMemory
+	}{
+		Ctx:      ctx,
+		Memories: memories,
+	}
+	mock.lockBatchSaveAgentMemories.Lock()
+	mock.calls.BatchSaveAgentMemories = append(mock.calls.BatchSaveAgentMemories, callInfo)
+	mock.lockBatchSaveAgentMemories.Unlock()
+	if mock.BatchSaveAgentMemoriesFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.BatchSaveAgentMemoriesFunc(ctx, memories)
+}
+
+// BatchSaveAgentMemoriesCalls gets all the calls that were made to BatchSaveAgentMemories.
+// Check the length with:
+//
+//	len(mockedRepository.BatchSaveAgentMemoriesCalls())
+func (mock *RepositoryMock) BatchSaveAgentMemoriesCalls() []struct {
+	Ctx      context.Context
+	Memories []*memory.AgentMemory
+} {
+	var calls []struct {
+		Ctx      context.Context
+		Memories []*memory.AgentMemory
+	}
+	mock.lockBatchSaveAgentMemories.RLock()
+	calls = mock.calls.BatchSaveAgentMemories
+	mock.lockBatchSaveAgentMemories.RUnlock()
 	return calls
 }
 

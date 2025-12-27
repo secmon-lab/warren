@@ -29,11 +29,10 @@ Maximum messages per search: **{{ .limit }}**
 ## Past Learnings
 
 {{ if .memories }}
+You have access to insights learned from past executions. Each insight is self-contained domain knowledge:
+
 {{ range .memories }}
-- **Query**: {{ .TaskQuery }}
-  {{ if .Successes }}**Success**: {{ range .Successes }}{{ . }}; {{ end }}{{ end }}
-  {{ if .Problems }}**Problem**: {{ range .Problems }}{{ . }}; {{ end }}{{ end }}
-  {{ if .Improvements }}**Tip**: {{ range .Improvements }}{{ . }}; {{ end }}{{ end }}
+- {{ .Claim }}
 {{ end }}
 {{ else }}
 No past learnings yet.

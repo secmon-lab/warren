@@ -12,7 +12,7 @@ import (
 	"github.com/m-mizutani/gollem/mock"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/agents/bigquery"
-	"github.com/secmon-lab/warren/pkg/service/memory"
+	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 )
 
@@ -38,8 +38,8 @@ func TestGenerateKPTAnalysis_Success(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	memSvc := memory.New(mockLLM, nil)
-	agent := bigquery.NewAgent(&bigquery.Config{}, mockLLM, memSvc)
+	repo := repository.NewMemory()
+	agent := bigquery.NewAgent(&bigquery.Config{}, mockLLM, repo)
 
 	resp := &gollem.ExecuteResponse{}
 	successes, problems, improvements, err := agent.GenerateKPTAnalysis(
@@ -84,8 +84,8 @@ func TestGenerateKPTAnalysis_Failure(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	memSvc := memory.New(mockLLM, nil)
-	agent := bigquery.NewAgent(&bigquery.Config{}, mockLLM, memSvc)
+	repo := repository.NewMemory()
+	agent := bigquery.NewAgent(&bigquery.Config{}, mockLLM, repo)
 
 	execErr := errors.New("query exceeded scan size limit")
 	successes, problems, improvements, err := agent.GenerateKPTAnalysis(
@@ -115,8 +115,8 @@ func TestGenerateKPTAnalysis_LLMError(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	memSvc := memory.New(mockLLM, nil)
-	agent := bigquery.NewAgent(&bigquery.Config{}, mockLLM, memSvc)
+	repo := repository.NewMemory()
+	agent := bigquery.NewAgent(&bigquery.Config{}, mockLLM, repo)
 
 	successes, problems, improvements, err := agent.GenerateKPTAnalysis(
 		ctx,
@@ -150,8 +150,8 @@ func TestGenerateKPTAnalysis_InvalidJSON(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	memSvc := memory.New(mockLLM, nil)
-	agent := bigquery.NewAgent(&bigquery.Config{}, mockLLM, memSvc)
+	repo := repository.NewMemory()
+	agent := bigquery.NewAgent(&bigquery.Config{}, mockLLM, repo)
 
 	successes, problems, improvements, err := agent.GenerateKPTAnalysis(
 		ctx,
@@ -189,8 +189,8 @@ func TestGenerateKPTAnalysis_WithMarkdownCodeBlocks(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	memSvc := memory.New(mockLLM, nil)
-	agent := bigquery.NewAgent(&bigquery.Config{}, mockLLM, memSvc)
+	repo := repository.NewMemory()
+	agent := bigquery.NewAgent(&bigquery.Config{}, mockLLM, repo)
 
 	successes, _, _, err := agent.GenerateKPTAnalysis(
 		ctx,
@@ -218,7 +218,7 @@ func TestGenerateKPTAnalysis_RealLLM(t *testing.T) {
 	// Create real Gemini client
 	llmClient := test.NewGeminiClient(t)
 
-	memSvc := memory.New(llmClient, nil)
+	repo := repository.NewMemory()
 
 	// Create agent with empty config for testing
 	config := &bigquery.Config{
@@ -231,7 +231,7 @@ func TestGenerateKPTAnalysis_RealLLM(t *testing.T) {
 			},
 		},
 	}
-	agent := bigquery.NewAgent(config, llmClient, memSvc)
+	agent := bigquery.NewAgent(config, llmClient, repo)
 
 	t.Run("success case", func(t *testing.T) {
 		// Simulate successful execution with results

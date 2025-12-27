@@ -41,13 +41,13 @@ func New() *Agent {
 func NewAgent(
 	config *Config,
 	llmClient gollem.LLMClient,
-	memoryService *memory.Service,
+	repo interfaces.Repository,
 ) *Agent {
 	return &Agent{
 		config:        config,
 		internalTool:  &internalTool{config: config},
 		llmClient:     llmClient,
-		memoryService: memoryService,
+		memoryService: memory.New("bigquery", llmClient, repo),
 	}
 }
 
@@ -94,7 +94,7 @@ func (a *Agent) Flags() []cli.Flag {
 
 // Init initializes the agent with LLM client and memory service.
 // Returns (true, nil) if initialized successfully, (false, nil) if not configured, or (false, error) on error.
-func (a *Agent) Init(ctx context.Context, llmClient gollem.LLMClient, memoryService *memory.Service) (bool, error) {
+func (a *Agent) Init(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) (bool, error) {
 	if a.configPath == "" {
 		return false, nil // Agent is optional
 	}
@@ -120,7 +120,8 @@ func (a *Agent) Init(ctx context.Context, llmClient gollem.LLMClient, memoryServ
 		impersonateServiceAccount: a.impersonateServiceAccount,
 	}
 	a.llmClient = llmClient
-	a.memoryService = memoryService
+	// Create memory service bound to this agent
+	a.memoryService = memory.New(a.ID(), llmClient, repo)
 
 	scanLimit := humanize.Bytes(cfg.ScanSizeLimit)
 	var tables []string
@@ -191,11 +192,11 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	startTime := time.Now()
 
 	// Step 1: Search for relevant memories
-	log.Debug("Searching for relevant memories", "agent_id", a.ID(), "limit", 5)
-	memories, err := a.memoryService.SearchRelevantAgentMemories(ctx, a.ID(), query, 5)
+	log.Debug("Searching for relevant memories", "agent_id", a.ID(), "limit", 16)
+	memories, err := a.memoryService.SearchAndSelectMemories(ctx, query, 16)
 	if err != nil {
 		// Memory search failure is non-critical - continue with empty memories
-		log.Warn("Memory search failed, continuing without memories", "error", err)
+		errs.Handle(ctx, goerr.Wrap(err, "memory search failed, continuing without memories"))
 		memories = nil
 	} else {
 		log.Debug("Memories found", "count", len(memories))
@@ -254,25 +255,16 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	duration := time.Since(startTime)
 	log.Debug("Query task execution completed", "duration", duration, "has_error", execErr != nil)
 
-	// Step 5: Save execution memory (metadata only)
-	log.Debug("Saving execution memory", "has_error", execErr != nil)
-	if err := a.saveExecutionMemory(ctx, query, resp, execErr, duration, agent.Session()); err != nil {
-		// Memory save failure is non-critical for the main task
-		log.Warn("Failed to save execution memory", "error", err)
-		msg.Trace(ctx, "  ⚠️ *Warning:* Failed to save execution memory")
-	} else {
-		msg.Trace(ctx, "  ✅ *[BigQuery Agent]* Execution memory saved (Duration: %s)",
-			duration.Round(time.Millisecond))
-	}
-
-	// Step 5.5: Collect and apply feedback for used memories
-	if len(memories) > 0 {
-		log.Debug("Collecting feedback for used memories", "count", len(memories))
-		if err := a.memoryService.CollectAndApplyFeedback(ctx, a.ID(), memories, query, agent.Session(), resp, execErr); err != nil {
-			// Feedback collection failure is non-critical
-			log.Warn("Failed to collect and apply feedback", "error", err)
-			msg.Trace(ctx, "  ⚠️ *Warning:* Failed to collect feedback for memories")
-		}
+	// Step 5: Extract and save memories from execution
+	log.Debug("Extracting and saving memories from execution")
+	// Get the full session history for memory extraction
+	history, err := agent.Session().History()
+	if err != nil {
+		errs.Handle(ctx, goerr.Wrap(err, "failed to get session history"))
+	} else if err := a.memoryService.ExtractAndSaveMemories(ctx, query, memories, history); err != nil {
+		// Memory extraction failure is non-critical
+		errs.Handle(ctx, goerr.Wrap(err, "failed to extract and save memories"))
+		msg.Trace(ctx, "  ⚠️ *Warning:* Failed to save execution memories")
 	}
 
 	// Step 6: Return execution result

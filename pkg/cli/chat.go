@@ -14,7 +14,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/service/memory"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/dryrun"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -132,18 +131,15 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to get tool sets")
 			}
 
-			// Create memory service
-			memoryService := memory.New(llmClient, repo)
-
-			// Initialize BigQuery Agent
-			if enabled, err := bqAgent.Init(ctx, llmClient, memoryService); err != nil {
+			// Initialize BigQuery Agent (creates its own memory service)
+			if enabled, err := bqAgent.Init(ctx, llmClient, repo); err != nil {
 				return err
 			} else if enabled {
 				allToolSets = append(allToolSets, bqAgent)
 			}
 
-			// Initialize Slack Search Agent
-			if enabled, err := slackAgent.Init(ctx, llmClient, memoryService); err != nil {
+			// Initialize Slack Search Agent (creates its own memory service)
+			if enabled, err := slackAgent.Init(ctx, llmClient, repo); err != nil {
 				return err
 			} else if enabled {
 				allToolSets = append(allToolSets, slackAgent)
@@ -187,7 +183,6 @@ func cmdChat() *cli.Command {
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(allToolSets),
-				usecase.WithMemoryService(memoryService),
 				usecase.WithNoAuthorization(noAuthorization),
 			)
 

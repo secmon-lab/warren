@@ -3,6 +3,7 @@ package bigquery_test
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,6 +39,30 @@ func newMockLLMClient() gollem.LLMClient {
 			return &mock.SessionMock{
 				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
 					callCount++
+
+					// Check if this is a reflection request
+					isReflection := false
+					for _, inp := range input {
+						if text, ok := inp.(gollem.Text); ok {
+							if strings.Contains(string(text), "Agent Task Reflection") {
+								isReflection = true
+								break
+							}
+						}
+					}
+
+					if isReflection {
+						// Return reflection JSON (use snake_case as per JSON tags in reflectionResponse)
+						reflectionJSON := `{
+							"new_claims": ["Test claim from execution"],
+							"helpful_memories": [],
+							"harmful_memories": []
+						}`
+						return &gollem.Response{
+							Texts: []string{reflectionJSON},
+						}, nil
+					}
+
 					// First call: return plan JSON for plan & execute strategy
 					if callCount == 1 {
 						planJSON := `{
@@ -75,9 +100,8 @@ func TestAgent_ID(t *testing.T) {
 	}
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
-	agent := bqagent.NewAgent(config, llmClient, memService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	gt.V(t, agent.ID()).Equal("bigquery")
 }
@@ -91,9 +115,8 @@ func TestAgent_Specs(t *testing.T) {
 	llmClient := newMockLLMClient()
 
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
-	agent := bqagent.NewAgent(config, llmClient, memService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	specs, err := agent.Specs(ctx)
 	gt.NoError(t, err)
@@ -118,32 +141,28 @@ func TestAgent_Run_SavesMemory(t *testing.T) {
 		ScanSizeLimit: 1000000,
 	}
 	llmClient := newMockLLMClient()
-
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
-	agent := bqagent.NewAgent(config, llmClient, memService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
-	// Run the agent
+	// Execute a query that should create memories
 	args := map[string]any{
-		"query": "Get user count",
+		"query": "Get login count",
 	}
-	result, err := agent.Run(ctx, "query_bigquery", args)
+	_, err := agent.Run(ctx, "query_bigquery", args)
 	gt.NoError(t, err)
-	gt.V(t, result).NotNil()
-	gt.V(t, result["data"]).NotNil()
 
-	// Verify memory was saved
-	memories, err := memService.SearchRelevantAgentMemories(ctx, "bigquery", "Get user count", 10)
+	// Verify that memories were created
+	memories, err := repo.ListAgentMemories(ctx, "bigquery")
 	gt.NoError(t, err)
-	gt.True(t, len(memories) > 0)
+	gt.Number(t, len(memories)).Greater(0)
 
-	// Verify memory structure
+	// Verify the memory has expected fields
 	mem := memories[0]
 	gt.V(t, mem.AgentID).Equal("bigquery")
-	gt.V(t, mem.TaskQuery).Equal("Get user count")
-	gt.V(t, len(mem.QueryEmbedding)).Equal(256)
-	gt.True(t, mem.Duration > 0)
+	gt.V(t, mem.Query).Equal("Get login count")
+	gt.V(t, mem.Claim).NotEqual("")
+	gt.True(t, mem.Score >= -10.0 && mem.Score <= 10.0)
 }
 
 func TestAgent_Run_InvalidFunctionName(t *testing.T) {
@@ -155,9 +174,8 @@ func TestAgent_Run_InvalidFunctionName(t *testing.T) {
 	llmClient := newMockLLMClient()
 
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
-	agent := bqagent.NewAgent(config, llmClient, memService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	// Try to run with invalid function name
 	args := map[string]any{
@@ -176,9 +194,8 @@ func TestAgent_Run_MissingQueryParameter(t *testing.T) {
 	llmClient := newMockLLMClient()
 
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
-	agent := bqagent.NewAgent(config, llmClient, memService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	// Try to run without query parameter
 	args := map[string]any{}
@@ -193,35 +210,22 @@ func TestAgent_MemorySearch(t *testing.T) {
 		ScanSizeLimit: 1000000,
 	}
 	llmClient := newMockLLMClient()
-
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
-	agent := bqagent.NewAgent(config, llmClient, memService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
-	// Execute multiple queries to build up memory
-	queries := []string{
-		"Get user count",
-		"Get active users",
-		"Get user count by region",
+	// First, create a memory by running a query
+	args := map[string]any{
+		"query": "Get user login statistics",
 	}
-
-	for _, query := range queries {
-		args := map[string]any{"query": query}
-		_, err := agent.Run(ctx, "query_bigquery", args)
-		gt.NoError(t, err)
-	}
-
-	// Search for similar query
-	memories, err := memService.SearchRelevantAgentMemories(ctx, "bigquery", "user statistics", 5)
+	_, err := agent.Run(ctx, "query_bigquery", args)
 	gt.NoError(t, err)
-	gt.True(t, len(memories) > 0)
-	gt.True(t, len(memories) <= 3)
 
-	// Verify all memories are for bigquery agent
-	for _, mem := range memories {
-		gt.V(t, mem.AgentID).Equal("bigquery")
-	}
+	// Search for memories with similar query using memory service
+	memSvc := memoryservice.New("bigquery", llmClient, repo)
+	memories, err := memSvc.SearchAndSelectMemories(ctx, "user login data", 5)
+	gt.NoError(t, err)
+	gt.Number(t, len(memories)).Greater(0)
 }
 
 func TestAgent_MemoryMetadataOnly(t *testing.T) {
@@ -231,35 +235,33 @@ func TestAgent_MemoryMetadataOnly(t *testing.T) {
 		ScanSizeLimit: 1000000,
 	}
 	llmClient := newMockLLMClient()
-
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
 
-	agent := bqagent.NewAgent(config, llmClient, memService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
-	// Execute a query
+	// Create a memory
 	args := map[string]any{
-		"query": "Test query",
+		"query": "Count active sessions",
 	}
-	result, err := agent.Run(ctx, "query_bigquery", args)
+	_, err := agent.Run(ctx, "query_bigquery", args)
 	gt.NoError(t, err)
-	gt.V(t, result["data"]).NotNil()
 
-	// Get the saved memory
-	memories, err := memService.SearchRelevantAgentMemories(ctx, "bigquery", "Test query", 1)
+	// Retrieve memory and verify metadata
+	memories, err := repo.ListAgentMemories(ctx, "bigquery")
 	gt.NoError(t, err)
-	gt.V(t, len(memories)).Equal(1)
+	gt.Number(t, len(memories)).Greater(0)
 
 	mem := memories[0]
-
-	// Verify memory has KPT structure (Successes, Problems, Improvements)
-	// Note: With mock LLM returning invalid JSON, KPT analysis fallback returns empty arrays
-	gt.A(t, mem.Successes).Length(0)    // Empty array from fallback
-	gt.A(t, mem.Problems).Length(0)     // Empty array from fallback
-	gt.A(t, mem.Improvements).Length(0) // Empty array from fallback
+	gt.V(t, mem.AgentID).Equal("bigquery")
+	gt.V(t, mem.Query).NotEqual("")
+	gt.V(t, mem.Claim).NotEqual("")
+	gt.False(t, mem.CreatedAt.IsZero())
+	// LastUsedAt is zero for newly created memories
+	gt.True(t, mem.LastUsedAt.IsZero())
 }
 
 func TestAgent_MemoryFeedbackIntegration(t *testing.T) {
+	// Original test code:
 	ctx := context.Background()
 	config := &bqagent.Config{
 		Tables: []bqagent.TableConfig{
@@ -274,8 +276,7 @@ func TestAgent_MemoryFeedbackIntegration(t *testing.T) {
 	}
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
-	agent := bqagent.NewAgent(config, llmClient, memService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	t.Run("Agent execution triggers feedback collection for used memories", func(t *testing.T) {
 		// Step 1: Execute a query to create initial memory
@@ -284,12 +285,13 @@ func TestAgent_MemoryFeedbackIntegration(t *testing.T) {
 		gt.NoError(t, err)
 
 		// Get the created memory
-		memories, err := memService.SearchRelevantAgentMemories(ctx, "bigquery", "Get user login count", 1)
+		memSvc := memoryservice.New("bigquery", llmClient, repo)
+		memories, err := memSvc.SearchAndSelectMemories(ctx, "Get user login count", 1)
 		gt.NoError(t, err)
 		gt.V(t, len(memories)).Equal(1)
 
 		initialMem := memories[0]
-		initialScore := initialMem.QualityScore
+		initialScore := initialMem.Score
 		initialLastUsed := initialMem.LastUsedAt
 
 		// Step 2: Execute similar query that should use the previous memory
@@ -306,10 +308,10 @@ func TestAgent_MemoryFeedbackIntegration(t *testing.T) {
 		gt.True(t, updatedMemories.LastUsedAt.After(initialLastUsed) ||
 			updatedMemories.LastUsedAt.Equal(initialLastUsed))
 
-		// QualityScore may have changed (depends on LLM feedback)
+		// Score may have changed (depends on LLM feedback)
 		// We just verify it's within valid range
-		gt.True(t, updatedMemories.QualityScore >= -10.0)
-		gt.True(t, updatedMemories.QualityScore <= 10.0)
+		gt.True(t, updatedMemories.Score >= -10.0)
+		gt.True(t, updatedMemories.Score <= 10.0)
 
 		// Store for comparison
 		_ = initialScore // Used initial score for verification
@@ -334,7 +336,8 @@ func TestAgent_MemoryFeedbackIntegration(t *testing.T) {
 		gt.NoError(t, err)
 
 		// Get initial memory
-		memories, err := memService.SearchRelevantAgentMemories(ctx, "bigquery", "count active users", 1)
+		memSvc := memoryservice.New("bigquery", llmClient, repo)
+		memories, err := memSvc.SearchAndSelectMemories(ctx, "count active users", 1)
 		gt.NoError(t, err)
 		gt.V(t, len(memories)).Equal(1)
 		memID := memories[0].ID
@@ -357,16 +360,17 @@ func TestAgent_MemoryFeedbackIntegration(t *testing.T) {
 		gt.NoError(t, err)
 
 		// LastUsedAt should be more recent than creation time
-		gt.True(t, finalMem.LastUsedAt.After(finalMem.Timestamp) ||
-			finalMem.LastUsedAt.Equal(finalMem.Timestamp))
+		gt.True(t, finalMem.LastUsedAt.After(finalMem.CreatedAt) ||
+			finalMem.LastUsedAt.Equal(finalMem.CreatedAt))
 
-		// QualityScore should be within valid range
-		gt.True(t, finalMem.QualityScore >= -10.0)
-		gt.True(t, finalMem.QualityScore <= 10.0)
+		// Score should be within valid range
+		gt.True(t, finalMem.Score >= -10.0)
+		gt.True(t, finalMem.Score <= 10.0)
 	})
 }
 
 func TestAgent_MemoryPruning(t *testing.T) {
+	// Original test code:
 	ctx := context.Background()
 	config := &bqagent.Config{
 		Tables:        []bqagent.TableConfig{},
@@ -374,8 +378,7 @@ func TestAgent_MemoryPruning(t *testing.T) {
 	}
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
-	memService := memoryservice.New(llmClient, repo)
-	agent := bqagent.NewAgent(config, llmClient, memService)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	t.Run("Low quality memories can be pruned", func(t *testing.T) {
 		// Clean up
@@ -406,7 +409,8 @@ func TestAgent_MemoryPruning(t *testing.T) {
 		gt.NoError(t, err)
 
 		// Prune memories
-		deleted, err := memService.PruneAgentMemories(ctx, "bigquery")
+		memSvc := memoryservice.New("bigquery", llmClient, repo)
+		deleted, err := memSvc.PruneMemories(ctx)
 		gt.NoError(t, err)
 		gt.N(t, deleted).Greater(0)
 
@@ -416,7 +420,7 @@ func TestAgent_MemoryPruning(t *testing.T) {
 
 		for _, m := range remaining {
 			// No memory should have critical score
-			gt.True(t, m.QualityScore > -8.0)
+			gt.True(t, m.Score > -8.0)
 		}
 	})
 }
@@ -435,9 +439,8 @@ func TestAgent_ExtractRecords_WithRealLLM(t *testing.T) {
 	llmClient, err := gemini.New(ctx, projectID, location, gemini.WithModel("gemini-2.0-flash-exp"))
 	gt.NoError(t, err)
 
-	// Create memory service with in-memory repository
+	// Create in-memory repository
 	repo := repository.NewMemory()
-	memSvc := memoryservice.New(llmClient, repo)
 
 	// Create agent config
 	cfg := &bqagent.Config{
@@ -446,7 +449,7 @@ func TestAgent_ExtractRecords_WithRealLLM(t *testing.T) {
 		QueryTimeout:  time.Minute,
 	}
 
-	agent := bqagent.NewAgent(cfg, llmClient, memSvc)
+	agent := bqagent.NewAgent(cfg, llmClient, repo)
 
 	// Create a session with conversation history containing query results
 	session, err := llmClient.NewSession(ctx)
