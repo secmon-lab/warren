@@ -379,6 +379,7 @@ export type QueryListAgentMemoriesArgs = {
 
 
 export type QueryListAgentSummariesArgs = {
+  keyword?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -834,6 +835,7 @@ export type GetSessionMessagesQuery = { __typename?: 'Query', sessionMessages: A
 export type ListAgentSummariesQueryVariables = Exact<{
   offset?: InputMaybe<Scalars['Int']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
+  keyword?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
@@ -2079,7 +2081,7 @@ export type GetSessionMessagesQueryHookResult = ReturnType<typeof useGetSessionM
 export type GetSessionMessagesLazyQueryHookResult = ReturnType<typeof useGetSessionMessagesLazyQuery>;
 export type GetSessionMessagesSuspenseQueryHookResult = ReturnType<typeof useGetSessionMessagesSuspenseQuery>;
 export type GetSessionMessagesQueryResult = Apollo.QueryResult<GetSessionMessagesQuery, GetSessionMessagesQueryVariables>;
-export const ListAgentSummariesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListAgentSummaries"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"listAgentSummaries"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"agents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"agentID"}},{"kind":"Field","name":{"kind":"Name","value":"memoriesCount"}},{"kind":"Field","name":{"kind":"Name","value":"latestMemoryAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
+export const ListAgentSummariesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListAgentSummaries"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"listAgentSummaries"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"agents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"agentID"}},{"kind":"Field","name":{"kind":"Name","value":"memoriesCount"}},{"kind":"Field","name":{"kind":"Name","value":"latestMemoryAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
 
 /**
  * __useListAgentSummariesQuery__
@@ -2095,6 +2097,7 @@ export const ListAgentSummariesDocument = {"kind":"Document","definitions":[{"ki
  *   variables: {
  *      offset: // value for 'offset'
  *      limit: // value for 'limit'
+ *      keyword: // value for 'keyword'
  *   },
  * });
  */

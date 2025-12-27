@@ -832,8 +832,8 @@ export const GET_SESSION_MESSAGES = gql`
 `;
 
 export const LIST_AGENT_SUMMARIES = gql`
-  query ListAgentSummaries($offset: Int, $limit: Int) {
-    listAgentSummaries(offset: $offset, limit: $limit) {
+  query ListAgentSummaries($offset: Int, $limit: Int, $keyword: String) {
+    listAgentSummaries(offset: $offset, limit: $limit, keyword: $keyword) {
       agents {
         agentID
         memoriesCount

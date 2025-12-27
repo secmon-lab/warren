@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ export default function AgentMemoryListPage() {
     variables: {
       offset: (currentPage - 1) * ITEMS_PER_PAGE,
       limit: ITEMS_PER_PAGE,
+      keyword: searchQuery || undefined,
     },
   });
 
@@ -38,10 +39,10 @@ export default function AgentMemoryListPage() {
   const totalCount = data?.listAgentSummaries?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
-  // Filter agents by search query
-  const filteredAgents = agents.filter((agent) =>
-    agent.agentID.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Reset to page 1 when search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   return (
     <div className="container mx-auto p-6">
@@ -82,7 +83,7 @@ export default function AgentMemoryListPage() {
             </Card>
           ))}
         </div>
-      ) : filteredAgents.length === 0 ? (
+      ) : agents.length === 0 ? (
         <Card>
           <CardContent className="py-8">
             <p className="text-center text-muted-foreground">
@@ -92,7 +93,7 @@ export default function AgentMemoryListPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredAgents.map((agent) => (
+          {agents.map((agent) => (
             <Card
               key={agent.agentID}
               className="cursor-pointer hover:shadow-lg transition-shadow"

@@ -223,7 +223,7 @@ type ComplexityRoot struct {
 		KnowledgeTopics        func(childComplexity int) int
 		KnowledgesByTopic      func(childComplexity int, topic string) int
 		ListAgentMemories      func(childComplexity int, agentID string, offset *int, limit *int, sortBy *graphql1.MemorySortField, sortOrder *graphql1.SortOrder, keyword *string, minScore *float64, maxScore *float64) int
-		ListAgentSummaries     func(childComplexity int, offset *int, limit *int) int
+		ListAgentSummaries     func(childComplexity int, offset *int, limit *int, keyword *string) int
 		Session                func(childComplexity int, id string) int
 		SessionMessages        func(childComplexity int, sessionID string) int
 		SimilarTickets         func(childComplexity int, ticketID string, threshold float64, offset *int, limit *int) int
@@ -379,7 +379,7 @@ type QueryResolver interface {
 	TicketSessions(ctx context.Context, ticketID string) ([]*graphql1.Session, error)
 	Session(ctx context.Context, id string) (*graphql1.Session, error)
 	SessionMessages(ctx context.Context, sessionID string) ([]*graphql1.SessionMessage, error)
-	ListAgentSummaries(ctx context.Context, offset *int, limit *int) (*graphql1.AgentSummariesResponse, error)
+	ListAgentSummaries(ctx context.Context, offset *int, limit *int, keyword *string) (*graphql1.AgentSummariesResponse, error)
 	ListAgentMemories(ctx context.Context, agentID string, offset *int, limit *int, sortBy *graphql1.MemorySortField, sortOrder *graphql1.SortOrder, keyword *string, minScore *float64, maxScore *float64) (*graphql1.AgentMemoriesResponse, error)
 	GetAgentMemory(ctx context.Context, agentID string, memoryID string) (*graphql1.AgentMemory, error)
 }
@@ -1229,7 +1229,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.ListAgentSummaries(childComplexity, args["offset"].(*int), args["limit"].(*int)), true
+		return e.complexity.Query.ListAgentSummaries(childComplexity, args["offset"].(*int), args["limit"].(*int), args["keyword"].(*string)), true
 	case "Query.session":
 		if e.complexity.Query.Session == nil {
 			break
@@ -2090,7 +2090,7 @@ enum SortOrder {
 }
 
 extend type Query {
-  listAgentSummaries(offset: Int, limit: Int): AgentSummariesResponse!
+  listAgentSummaries(offset: Int, limit: Int, keyword: String): AgentSummariesResponse!
   listAgentMemories(
     agentID: String!
     offset: Int
@@ -2553,6 +2553,11 @@ func (ec *executionContext) field_Query_listAgentSummaries_args(ctx context.Cont
 		return nil, err
 	}
 	args["limit"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "keyword", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["keyword"] = arg2
 	return args, nil
 }
 
@@ -7647,7 +7652,7 @@ func (ec *executionContext) _Query_listAgentSummaries(ctx context.Context, field
 		ec.fieldContext_Query_listAgentSummaries,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().ListAgentSummaries(ctx, fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+			return ec.resolvers.Query().ListAgentSummaries(ctx, fc.Args["offset"].(*int), fc.Args["limit"].(*int), fc.Args["keyword"].(*string))
 		},
 		nil,
 		ec.marshalNAgentSummariesResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentSummariesResponse,

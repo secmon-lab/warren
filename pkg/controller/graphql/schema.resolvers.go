@@ -1264,14 +1264,14 @@ func (r *queryResolver) SessionMessages(ctx context.Context, sessionID string) (
 }
 
 // ListAgentSummaries is the resolver for the listAgentSummaries field.
-func (r *queryResolver) ListAgentSummaries(ctx context.Context, offset *int, limit *int) (*graphql1.AgentSummariesResponse, error) {
+func (r *queryResolver) ListAgentSummaries(ctx context.Context, offset *int, limit *int, keyword *string) (*graphql1.AgentSummariesResponse, error) {
 	// Get all agent IDs with their memory counts
 	agentMap, err := r.repo.ListAllAgentIDs(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list agent IDs")
 	}
 
-	// Convert map to slice for sorting and pagination
+	// Convert map to slice for filtering, sorting and pagination
 	type agentSummary struct {
 		agentID string
 		count   int
@@ -1279,6 +1279,18 @@ func (r *queryResolver) ListAgentSummaries(ctx context.Context, offset *int, lim
 	summaries := make([]agentSummary, 0, len(agentMap))
 	for agentID, count := range agentMap {
 		summaries = append(summaries, agentSummary{agentID: agentID, count: count})
+	}
+
+	// Filter by keyword if provided
+	if keyword != nil && *keyword != "" {
+		kw := strings.ToLower(*keyword)
+		filtered := make([]agentSummary, 0)
+		for _, summary := range summaries {
+			if strings.Contains(strings.ToLower(summary.agentID), kw) {
+				filtered = append(filtered, summary)
+			}
+		}
+		summaries = filtered
 	}
 
 	// Sort by agentID alphabetically

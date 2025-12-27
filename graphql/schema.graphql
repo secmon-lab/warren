@@ -325,7 +325,7 @@ enum SortOrder {
 }
 
 extend type Query {
-  listAgentSummaries(offset: Int, limit: Int): AgentSummariesResponse!
+  listAgentSummaries(offset: Int, limit: Int, keyword: String): AgentSummariesResponse!
   listAgentMemories(
     agentID: String!
     offset: Int
