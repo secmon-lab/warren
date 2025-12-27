@@ -174,8 +174,8 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	startTime := time.Now()
 
 	// Step 1: Search for relevant memories
-	log.Debug("Searching for relevant memories", "agent_id", a.ID(), "limit", 32)
-	memories, err := a.memoryService.SearchAndSelectMemories(ctx, request, 32)
+	log.Debug("Searching for relevant memories", "agent_id", a.ID(), "limit", 16)
+	memories, err := a.memoryService.SearchAndSelectMemories(ctx, request, 16)
 	if err != nil {
 		// Memory search failure is non-critical - continue with empty memories
 		errs.Handle(ctx, goerr.Wrap(err, "memory search failed, continuing without memories"))
