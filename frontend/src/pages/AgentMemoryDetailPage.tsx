@@ -168,13 +168,13 @@ export default function AgentMemoryDetailPage() {
           <CardContent className="space-y-4">
             <div>
               <label className="text-sm font-medium text-muted-foreground">Created At</label>
-              <p className="text-sm">{new Date(memory.createdAt).toLocaleString()}</p>
+              <p className="text-sm">{new Date(memory.createdAt).toISOString().split('T')[0].replace(/-/g, '/')} {new Date(memory.createdAt).toISOString().split('T')[1].split('.')[0]}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-muted-foreground">Last Used At</label>
               <p className="text-sm">
                 {memory.lastUsedAt
-                  ? new Date(memory.lastUsedAt).toLocaleString()
+                  ? `${new Date(memory.lastUsedAt).toISOString().split('T')[0].replace(/-/g, '/')} ${new Date(memory.lastUsedAt).toISOString().split('T')[1].split('.')[0]}`
                   : "Never used"}
               </p>
             </div>
