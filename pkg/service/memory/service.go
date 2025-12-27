@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -149,13 +150,8 @@ func (s *Service) ExtractAndSaveMemories(
 			goerr.V("query", query))
 	}
 
-	logging.From(ctx).Info("generated reflection",
-		"agent_id", s.agentID,
-		"new_claims", len(reflection.NewClaims),
-		"helpful_memories", len(reflection.HelpfulMemories),
-		"harmful_memories", len(reflection.HarmfulMemories))
-
-	// Step 2: Update scores for helpful/harmful memories
+	// Step 2: Update scores for helpful/harmful memories and collect score changes
+	var scoreChanges []string
 	if len(reflection.HelpfulMemories) > 0 || len(reflection.HarmfulMemories) > 0 {
 		// Build memory map for scoring algorithm
 		memoryMap := make(map[types.AgentMemoryID]*memory.AgentMemory)
@@ -173,6 +169,7 @@ func (s *Service) ExtractAndSaveMemories(
 				LastUsedAt time.Time
 			})
 			for memID, newScore := range scoreUpdates {
+				oldScore := memoryMap[memID].Score
 				updates[memID] = struct {
 					Score      float64
 					LastUsedAt time.Time
@@ -180,6 +177,10 @@ func (s *Service) ExtractAndSaveMemories(
 					Score:      newScore,
 					LastUsedAt: now,
 				}
+				// Record score change for logging
+				scoreChanges = append(scoreChanges,
+					fmt.Sprintf("%s: %.2f → %.2f (Δ%.2f)",
+						memID, oldScore, newScore, newScore-oldScore))
 			}
 
 			if err := s.repository.UpdateMemoryScoreBatch(ctx, s.agentID, updates); err != nil {
@@ -187,6 +188,27 @@ func (s *Service) ExtractAndSaveMemories(
 			}
 		}
 	}
+
+	// Log reflection summary with new claims and score changes
+	logger := logging.From(ctx)
+	logArgs := []any{
+		"agent_id", s.agentID,
+		"new_claims_count", len(reflection.NewClaims),
+		"helpful_memories_count", len(reflection.HelpfulMemories),
+		"harmful_memories_count", len(reflection.HarmfulMemories),
+	}
+
+	// Add new claims to log
+	if len(reflection.NewClaims) > 0 {
+		logArgs = append(logArgs, "new_claims", reflection.NewClaims)
+	}
+
+	// Add score changes to log
+	if len(scoreChanges) > 0 {
+		logArgs = append(logArgs, "score_changes", scoreChanges)
+	}
+
+	logger.Info("reflection completed", logArgs...)
 
 	// Step 3: Save new claims as memories
 	if len(reflection.NewClaims) > 0 {
@@ -228,10 +250,6 @@ func (s *Service) ExtractAndSaveMemories(
 				goerr.V("agent_id", s.agentID),
 				goerr.V("count", len(newMemories)))
 		}
-
-		logging.From(ctx).Info("saved new agent memories",
-			"agent_id", s.agentID,
-			"count", len(newMemories))
 	}
 
 	return nil

@@ -62,6 +62,16 @@ Examples of **BAD** claims (missing context, not self-contained):
 
 If the answer to ANY of these is "NO", the claim needs more context.
 
+**Multiple Claims**: If the execution revealed multiple distinct insights, create separate claims for each. A task execution may yield insights covering different aspects:
+- Schema/structure discoveries (table schemas, field types, data formats)
+- Error patterns and their solutions (error messages, causes, fixes)
+- Performance optimizations (partition keys, query patterns, cost limits)
+- Configuration findings (API endpoints, authentication, settings)
+- API behaviors (rate limits, response formats, edge cases)
+- Domain-specific rules (business logic, validation rules, workflows)
+
+Each distinct insight should be a separate claim in the array, not combined into one long claim.
+
 ### 2. Helpful Memories
 
 Identify which provided memories (by ID) were **helpful** during execution:
