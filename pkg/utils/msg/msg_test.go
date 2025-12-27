@@ -16,7 +16,7 @@ func TestWithReply(t *testing.T) {
 		gotMsg = msg
 	}
 
-	ctx := msg.With(context.Background(), replyFunc, nil)
+	ctx := msg.With(context.Background(), replyFunc, nil, nil)
 	msg.Notify(ctx, "test message")
 
 	gt.True(t, called)
@@ -36,7 +36,7 @@ func TestWithTraceFunc(t *testing.T) {
 		lastMsg = msg
 	}
 
-	ctx := msg.With(context.Background(), replyFunc, traceFunc)
+	ctx := msg.With(context.Background(), replyFunc, traceFunc, nil)
 	msg.Trace(ctx, "test trace message 1")
 	msg.Trace(ctx, "test trace message 2")
 
@@ -51,4 +51,38 @@ func TestTrace_Nil(t *testing.T) {
 
 	// Should not panic when TraceFunc is not set
 	msg.Trace(ctx, "test message")
+}
+
+func TestWithWarnFunc(t *testing.T) {
+	var calledWarn bool
+	var warnMsg string
+	warnFunc := func(ctx context.Context, msg string) {
+		calledWarn = true
+		warnMsg = msg
+	}
+
+	ctx := msg.With(context.Background(), nil, nil, warnFunc)
+	msg.Warn(ctx, "test warning message")
+
+	gt.True(t, calledWarn)
+	gt.Equal(t, "test warning message", warnMsg)
+}
+
+func TestWarn_Nil(t *testing.T) {
+	ctx := context.Background()
+
+	// Should not panic when WarnFunc is not set
+	msg.Warn(ctx, "test message")
+}
+
+func TestWarn_Format(t *testing.T) {
+	var warnMsg string
+	warnFunc := func(ctx context.Context, msg string) {
+		warnMsg = msg
+	}
+
+	ctx := msg.With(context.Background(), nil, nil, warnFunc)
+	msg.Warn(ctx, "warning: %s, code: %d", "test", 123)
+
+	gt.Equal(t, "warning: test, code: 123", warnMsg)
 }

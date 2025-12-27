@@ -34,7 +34,7 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, slac
 	traceFunc := func(ctx context.Context, message string) {
 		threadSvc.NewStateFunc(ctx, message)
 	}
-	ctx = msg.With(ctx, threadSvc.Reply, traceFunc)
+	ctx = msg.With(ctx, threadSvc.Reply, traceFunc, createSlackWarnFunc(threadSvc))
 
 	switch actionID {
 	case slack.ActionIDAckAlert:

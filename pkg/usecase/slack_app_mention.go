@@ -91,7 +91,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 		}
 
 		// Setup context with Slack-specific message handlers
-		ctx = msg.With(ctx, notifyFunc, traceFunc)
+		ctx = msg.With(ctx, notifyFunc, traceFunc, createSlackWarnFunc(threadSvc))
 
 		// Add Slack URL to context using type-safe context key
 		slackURL := slackMsg.SlackURL()

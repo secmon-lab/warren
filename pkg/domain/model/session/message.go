@@ -15,6 +15,7 @@ const (
 	MessageTypeTrace    MessageType = "trace"    // Progress messages displayed in context block
 	MessageTypePlan     MessageType = "plan"     // Plan messages displayed in context block
 	MessageTypeResponse MessageType = "response" // Final response displayed in normal block
+	MessageTypeWarning  MessageType = "warning"  // Warning messages displayed in normal block
 )
 
 // Message represents a message recorded during a chat session
