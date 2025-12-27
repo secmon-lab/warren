@@ -74,6 +74,32 @@ type ComplexityRoot struct {
 		UserID    func(childComplexity int) int
 	}
 
+	AgentMemoriesResponse struct {
+		Memories   func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
+	AgentMemory struct {
+		AgentID    func(childComplexity int) int
+		Claim      func(childComplexity int) int
+		CreatedAt  func(childComplexity int) int
+		ID         func(childComplexity int) int
+		LastUsedAt func(childComplexity int) int
+		Query      func(childComplexity int) int
+		Score      func(childComplexity int) int
+	}
+
+	AgentSummariesResponse struct {
+		Agents     func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
+	AgentSummary struct {
+		AgentID        func(childComplexity int) int
+		LatestMemoryAt func(childComplexity int) int
+		MemoriesCount  func(childComplexity int) int
+	}
+
 	Alert struct {
 		Attributes  func(childComplexity int) int
 		CreatedAt   func(childComplexity int) int
@@ -193,8 +219,11 @@ type ComplexityRoot struct {
 		AvailableTagColors     func(childComplexity int) int
 		ClusterAlerts          func(childComplexity int, clusterID string, keyword *string, limit *int, offset *int) int
 		Dashboard              func(childComplexity int) int
+		GetAgentMemory         func(childComplexity int, agentID string, memoryID string) int
 		KnowledgeTopics        func(childComplexity int) int
 		KnowledgesByTopic      func(childComplexity int, topic string) int
+		ListAgentMemories      func(childComplexity int, agentID string, offset *int, limit *int, sortBy *graphql1.MemorySortField, sortOrder *graphql1.SortOrder, keyword *string, minScore *float64, maxScore *float64) int
+		ListAgentSummaries     func(childComplexity int, offset *int, limit *int) int
 		Session                func(childComplexity int, id string) int
 		SessionMessages        func(childComplexity int, sessionID string) int
 		SimilarTickets         func(childComplexity int, ticketID string, threshold float64, offset *int, limit *int) int
@@ -350,6 +379,9 @@ type QueryResolver interface {
 	TicketSessions(ctx context.Context, ticketID string) ([]*graphql1.Session, error)
 	Session(ctx context.Context, id string) (*graphql1.Session, error)
 	SessionMessages(ctx context.Context, sessionID string) ([]*graphql1.SessionMessage, error)
+	ListAgentSummaries(ctx context.Context, offset *int, limit *int) (*graphql1.AgentSummariesResponse, error)
+	ListAgentMemories(ctx context.Context, agentID string, offset *int, limit *int, sortBy *graphql1.MemorySortField, sortOrder *graphql1.SortOrder, keyword *string, minScore *float64, maxScore *float64) (*graphql1.AgentMemoriesResponse, error)
+	GetAgentMemory(ctx context.Context, agentID string, memoryID string) (*graphql1.AgentMemory, error)
 }
 type SessionResolver interface {
 	User(ctx context.Context, obj *graphql1.Session) (*graphql1.User, error)
@@ -472,6 +504,94 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Activity.UserID(childComplexity), true
+
+	case "AgentMemoriesResponse.memories":
+		if e.complexity.AgentMemoriesResponse.Memories == nil {
+			break
+		}
+
+		return e.complexity.AgentMemoriesResponse.Memories(childComplexity), true
+	case "AgentMemoriesResponse.totalCount":
+		if e.complexity.AgentMemoriesResponse.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.AgentMemoriesResponse.TotalCount(childComplexity), true
+
+	case "AgentMemory.agentID":
+		if e.complexity.AgentMemory.AgentID == nil {
+			break
+		}
+
+		return e.complexity.AgentMemory.AgentID(childComplexity), true
+	case "AgentMemory.claim":
+		if e.complexity.AgentMemory.Claim == nil {
+			break
+		}
+
+		return e.complexity.AgentMemory.Claim(childComplexity), true
+	case "AgentMemory.createdAt":
+		if e.complexity.AgentMemory.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.AgentMemory.CreatedAt(childComplexity), true
+	case "AgentMemory.id":
+		if e.complexity.AgentMemory.ID == nil {
+			break
+		}
+
+		return e.complexity.AgentMemory.ID(childComplexity), true
+	case "AgentMemory.lastUsedAt":
+		if e.complexity.AgentMemory.LastUsedAt == nil {
+			break
+		}
+
+		return e.complexity.AgentMemory.LastUsedAt(childComplexity), true
+	case "AgentMemory.query":
+		if e.complexity.AgentMemory.Query == nil {
+			break
+		}
+
+		return e.complexity.AgentMemory.Query(childComplexity), true
+	case "AgentMemory.score":
+		if e.complexity.AgentMemory.Score == nil {
+			break
+		}
+
+		return e.complexity.AgentMemory.Score(childComplexity), true
+
+	case "AgentSummariesResponse.agents":
+		if e.complexity.AgentSummariesResponse.Agents == nil {
+			break
+		}
+
+		return e.complexity.AgentSummariesResponse.Agents(childComplexity), true
+	case "AgentSummariesResponse.totalCount":
+		if e.complexity.AgentSummariesResponse.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.AgentSummariesResponse.TotalCount(childComplexity), true
+
+	case "AgentSummary.agentID":
+		if e.complexity.AgentSummary.AgentID == nil {
+			break
+		}
+
+		return e.complexity.AgentSummary.AgentID(childComplexity), true
+	case "AgentSummary.latestMemoryAt":
+		if e.complexity.AgentSummary.LatestMemoryAt == nil {
+			break
+		}
+
+		return e.complexity.AgentSummary.LatestMemoryAt(childComplexity), true
+	case "AgentSummary.memoriesCount":
+		if e.complexity.AgentSummary.MemoriesCount == nil {
+			break
+		}
+
+		return e.complexity.AgentSummary.MemoriesCount(childComplexity), true
 
 	case "Alert.attributes":
 		if e.complexity.Alert.Attributes == nil {
@@ -1060,6 +1180,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Dashboard(childComplexity), true
+	case "Query.getAgentMemory":
+		if e.complexity.Query.GetAgentMemory == nil {
+			break
+		}
+
+		args, err := ec.field_Query_getAgentMemory_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.GetAgentMemory(childComplexity, args["agentID"].(string), args["memoryID"].(string)), true
 	case "Query.knowledgeTopics":
 		if e.complexity.Query.KnowledgeTopics == nil {
 			break
@@ -1077,6 +1208,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.KnowledgesByTopic(childComplexity, args["topic"].(string)), true
+	case "Query.listAgentMemories":
+		if e.complexity.Query.ListAgentMemories == nil {
+			break
+		}
+
+		args, err := ec.field_Query_listAgentMemories_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.ListAgentMemories(childComplexity, args["agentID"].(string), args["offset"].(*int), args["limit"].(*int), args["sortBy"].(*graphql1.MemorySortField), args["sortOrder"].(*graphql1.SortOrder), args["keyword"].(*string), args["minScore"].(*float64), args["maxScore"].(*float64)), true
+	case "Query.listAgentSummaries":
+		if e.complexity.Query.ListAgentSummaries == nil {
+			break
+		}
+
+		args, err := ec.field_Query_listAgentSummaries_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.ListAgentSummaries(childComplexity, args["offset"].(*int), args["limit"].(*int)), true
 	case "Query.session":
 		if e.complexity.Query.Session == nil {
 			break
@@ -1899,6 +2052,58 @@ extend type Query {
   sessionMessages(sessionId: ID!): [SessionMessage!]!
 }
 
+type AgentMemory {
+  id: ID!
+  agentID: String!
+  query: String!
+  claim: String!
+  score: Float!
+  createdAt: String!
+  lastUsedAt: String
+}
+
+type AgentSummary {
+  agentID: String!
+  memoriesCount: Int!
+  latestMemoryAt: String
+}
+
+type AgentMemoriesResponse {
+  memories: [AgentMemory!]!
+  totalCount: Int!
+}
+
+type AgentSummariesResponse {
+  agents: [AgentSummary!]!
+  totalCount: Int!
+}
+
+enum MemorySortField {
+  SCORE
+  CREATED_AT
+  LAST_USED_AT
+}
+
+enum SortOrder {
+  ASC
+  DESC
+}
+
+extend type Query {
+  listAgentSummaries(offset: Int, limit: Int): AgentSummariesResponse!
+  listAgentMemories(
+    agentID: String!
+    offset: Int
+    limit: Int
+    sortBy: MemorySortField
+    sortOrder: SortOrder
+    keyword: String
+    minScore: Float
+    maxScore: Float
+  ): AgentMemoriesResponse!
+  getAgentMemory(agentID: String!, memoryID: ID!): AgentMemory
+}
+
 schema {
   query: Query
   mutation: Mutation
@@ -2262,6 +2467,22 @@ func (ec *executionContext) field_Query_clusterAlerts_args(ctx context.Context, 
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_getAgentMemory_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "agentID", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["agentID"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "memoryID", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["memoryID"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_knowledgesByTopic_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2270,6 +2491,68 @@ func (ec *executionContext) field_Query_knowledgesByTopic_args(ctx context.Conte
 		return nil, err
 	}
 	args["topic"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_listAgentMemories_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "agentID", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["agentID"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "sortBy", ec.unmarshalOMemorySortField2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMemorySortField)
+	if err != nil {
+		return nil, err
+	}
+	args["sortBy"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "sortOrder", ec.unmarshalOSortOrder2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐSortOrder)
+	if err != nil {
+		return nil, err
+	}
+	args["sortOrder"] = arg4
+	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "keyword", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["keyword"] = arg5
+	arg6, err := graphql.ProcessArgField(ctx, rawArgs, "minScore", ec.unmarshalOFloat2ᚖfloat64)
+	if err != nil {
+		return nil, err
+	}
+	args["minScore"] = arg6
+	arg7, err := graphql.ProcessArgField(ctx, rawArgs, "maxScore", ec.unmarshalOFloat2ᚖfloat64)
+	if err != nil {
+		return nil, err
+	}
+	args["maxScore"] = arg7
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_listAgentSummaries_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg1
 	return args, nil
 }
 
@@ -2978,6 +3261,436 @@ func (ec *executionContext) fieldContext_Activity_ticket(_ context.Context, fiel
 				return ec.fieldContext_Ticket_tagObjects(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentMemoriesResponse_memories(ctx context.Context, field graphql.CollectedField, obj *graphql1.AgentMemoriesResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentMemoriesResponse_memories,
+		func(ctx context.Context) (any, error) {
+			return obj.Memories, nil
+		},
+		nil,
+		ec.marshalNAgentMemory2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentMemoryᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentMemoriesResponse_memories(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentMemoriesResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_AgentMemory_id(ctx, field)
+			case "agentID":
+				return ec.fieldContext_AgentMemory_agentID(ctx, field)
+			case "query":
+				return ec.fieldContext_AgentMemory_query(ctx, field)
+			case "claim":
+				return ec.fieldContext_AgentMemory_claim(ctx, field)
+			case "score":
+				return ec.fieldContext_AgentMemory_score(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_AgentMemory_createdAt(ctx, field)
+			case "lastUsedAt":
+				return ec.fieldContext_AgentMemory_lastUsedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AgentMemory", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentMemoriesResponse_totalCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.AgentMemoriesResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentMemoriesResponse_totalCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentMemoriesResponse_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentMemoriesResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentMemory_id(ctx context.Context, field graphql.CollectedField, obj *graphql1.AgentMemory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentMemory_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentMemory_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentMemory",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentMemory_agentID(ctx context.Context, field graphql.CollectedField, obj *graphql1.AgentMemory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentMemory_agentID,
+		func(ctx context.Context) (any, error) {
+			return obj.AgentID, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentMemory_agentID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentMemory",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentMemory_query(ctx context.Context, field graphql.CollectedField, obj *graphql1.AgentMemory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentMemory_query,
+		func(ctx context.Context) (any, error) {
+			return obj.Query, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentMemory_query(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentMemory",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentMemory_claim(ctx context.Context, field graphql.CollectedField, obj *graphql1.AgentMemory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentMemory_claim,
+		func(ctx context.Context) (any, error) {
+			return obj.Claim, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentMemory_claim(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentMemory",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentMemory_score(ctx context.Context, field graphql.CollectedField, obj *graphql1.AgentMemory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentMemory_score,
+		func(ctx context.Context) (any, error) {
+			return obj.Score, nil
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentMemory_score(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentMemory",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentMemory_createdAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.AgentMemory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentMemory_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentMemory_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentMemory",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentMemory_lastUsedAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.AgentMemory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentMemory_lastUsedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.LastUsedAt, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentMemory_lastUsedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentMemory",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentSummariesResponse_agents(ctx context.Context, field graphql.CollectedField, obj *graphql1.AgentSummariesResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentSummariesResponse_agents,
+		func(ctx context.Context) (any, error) {
+			return obj.Agents, nil
+		},
+		nil,
+		ec.marshalNAgentSummary2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentSummaryᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentSummariesResponse_agents(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentSummariesResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "agentID":
+				return ec.fieldContext_AgentSummary_agentID(ctx, field)
+			case "memoriesCount":
+				return ec.fieldContext_AgentSummary_memoriesCount(ctx, field)
+			case "latestMemoryAt":
+				return ec.fieldContext_AgentSummary_latestMemoryAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AgentSummary", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentSummariesResponse_totalCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.AgentSummariesResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentSummariesResponse_totalCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentSummariesResponse_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentSummariesResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentSummary_agentID(ctx context.Context, field graphql.CollectedField, obj *graphql1.AgentSummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentSummary_agentID,
+		func(ctx context.Context) (any, error) {
+			return obj.AgentID, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentSummary_agentID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentSummary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentSummary_memoriesCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.AgentSummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentSummary_memoriesCount,
+		func(ctx context.Context) (any, error) {
+			return obj.MemoriesCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentSummary_memoriesCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentSummary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentSummary_latestMemoryAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.AgentSummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentSummary_latestMemoryAt,
+		func(ctx context.Context) (any, error) {
+			return obj.LatestMemoryAt, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentSummary_latestMemoryAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentSummary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -6926,6 +7639,157 @@ func (ec *executionContext) fieldContext_Query_sessionMessages(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_listAgentSummaries(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_listAgentSummaries,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().ListAgentSummaries(ctx, fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+		},
+		nil,
+		ec.marshalNAgentSummariesResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentSummariesResponse,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_listAgentSummaries(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "agents":
+				return ec.fieldContext_AgentSummariesResponse_agents(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_AgentSummariesResponse_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AgentSummariesResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_listAgentSummaries_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_listAgentMemories(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_listAgentMemories,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().ListAgentMemories(ctx, fc.Args["agentID"].(string), fc.Args["offset"].(*int), fc.Args["limit"].(*int), fc.Args["sortBy"].(*graphql1.MemorySortField), fc.Args["sortOrder"].(*graphql1.SortOrder), fc.Args["keyword"].(*string), fc.Args["minScore"].(*float64), fc.Args["maxScore"].(*float64))
+		},
+		nil,
+		ec.marshalNAgentMemoriesResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentMemoriesResponse,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_listAgentMemories(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "memories":
+				return ec.fieldContext_AgentMemoriesResponse_memories(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_AgentMemoriesResponse_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AgentMemoriesResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_listAgentMemories_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_getAgentMemory(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_getAgentMemory,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().GetAgentMemory(ctx, fc.Args["agentID"].(string), fc.Args["memoryID"].(string))
+		},
+		nil,
+		ec.marshalOAgentMemory2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentMemory,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_getAgentMemory(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_AgentMemory_id(ctx, field)
+			case "agentID":
+				return ec.fieldContext_AgentMemory_agentID(ctx, field)
+			case "query":
+				return ec.fieldContext_AgentMemory_query(ctx, field)
+			case "claim":
+				return ec.fieldContext_AgentMemory_claim(ctx, field)
+			case "score":
+				return ec.fieldContext_AgentMemory_score(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_AgentMemory_createdAt(ctx, field)
+			case "lastUsedAt":
+				return ec.fieldContext_AgentMemory_lastUsedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AgentMemory", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_getAgentMemory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -10439,6 +11303,206 @@ func (ec *executionContext) _Activity(ctx context.Context, sel ast.SelectionSet,
 	return out
 }
 
+var agentMemoriesResponseImplementors = []string{"AgentMemoriesResponse"}
+
+func (ec *executionContext) _AgentMemoriesResponse(ctx context.Context, sel ast.SelectionSet, obj *graphql1.AgentMemoriesResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, agentMemoriesResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AgentMemoriesResponse")
+		case "memories":
+			out.Values[i] = ec._AgentMemoriesResponse_memories(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._AgentMemoriesResponse_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var agentMemoryImplementors = []string{"AgentMemory"}
+
+func (ec *executionContext) _AgentMemory(ctx context.Context, sel ast.SelectionSet, obj *graphql1.AgentMemory) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, agentMemoryImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AgentMemory")
+		case "id":
+			out.Values[i] = ec._AgentMemory_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "agentID":
+			out.Values[i] = ec._AgentMemory_agentID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "query":
+			out.Values[i] = ec._AgentMemory_query(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "claim":
+			out.Values[i] = ec._AgentMemory_claim(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "score":
+			out.Values[i] = ec._AgentMemory_score(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._AgentMemory_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastUsedAt":
+			out.Values[i] = ec._AgentMemory_lastUsedAt(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var agentSummariesResponseImplementors = []string{"AgentSummariesResponse"}
+
+func (ec *executionContext) _AgentSummariesResponse(ctx context.Context, sel ast.SelectionSet, obj *graphql1.AgentSummariesResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, agentSummariesResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AgentSummariesResponse")
+		case "agents":
+			out.Values[i] = ec._AgentSummariesResponse_agents(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._AgentSummariesResponse_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var agentSummaryImplementors = []string{"AgentSummary"}
+
+func (ec *executionContext) _AgentSummary(ctx context.Context, sel ast.SelectionSet, obj *graphql1.AgentSummary) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, agentSummaryImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AgentSummary")
+		case "agentID":
+			out.Values[i] = ec._AgentSummary_agentID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "memoriesCount":
+			out.Values[i] = ec._AgentSummary_memoriesCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "latestMemoryAt":
+			out.Values[i] = ec._AgentSummary_latestMemoryAt(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var alertImplementors = []string{"Alert"}
 
 func (ec *executionContext) _Alert(ctx context.Context, sel ast.SelectionSet, obj *alert.Alert) graphql.Marshaler {
@@ -12143,6 +13207,69 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "listAgentSummaries":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_listAgentSummaries(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "listAgentMemories":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_listAgentMemories(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "getAgentMemory":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_getAgentMemory(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -13533,6 +14660,142 @@ func (ec *executionContext) marshalNActivity2ᚖgithubᚗcomᚋsecmonᚑlabᚋwa
 	return ec._Activity(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNAgentMemoriesResponse2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentMemoriesResponse(ctx context.Context, sel ast.SelectionSet, v graphql1.AgentMemoriesResponse) graphql.Marshaler {
+	return ec._AgentMemoriesResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNAgentMemoriesResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentMemoriesResponse(ctx context.Context, sel ast.SelectionSet, v *graphql1.AgentMemoriesResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AgentMemoriesResponse(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNAgentMemory2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentMemoryᚄ(ctx context.Context, sel ast.SelectionSet, v []*graphql1.AgentMemory) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNAgentMemory2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentMemory(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNAgentMemory2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentMemory(ctx context.Context, sel ast.SelectionSet, v *graphql1.AgentMemory) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AgentMemory(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNAgentSummariesResponse2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentSummariesResponse(ctx context.Context, sel ast.SelectionSet, v graphql1.AgentSummariesResponse) graphql.Marshaler {
+	return ec._AgentSummariesResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNAgentSummariesResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentSummariesResponse(ctx context.Context, sel ast.SelectionSet, v *graphql1.AgentSummariesResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AgentSummariesResponse(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNAgentSummary2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentSummaryᚄ(ctx context.Context, sel ast.SelectionSet, v []*graphql1.AgentSummary) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNAgentSummary2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentSummary(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNAgentSummary2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentSummary(ctx context.Context, sel ast.SelectionSet, v *graphql1.AgentSummary) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AgentSummary(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNAlert2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐAlert(ctx context.Context, sel ast.SelectionSet, v alert.Alert) graphql.Marshaler {
 	return ec._Alert(ctx, sel, &v)
 }
@@ -14659,6 +15922,13 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
+func (ec *executionContext) marshalOAgentMemory2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAgentMemory(ctx context.Context, sel ast.SelectionSet, v *graphql1.AgentMemory) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._AgentMemory(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOAlert2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐAlert(ctx context.Context, sel ast.SelectionSet, v *alert.Alert) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -14757,11 +16027,43 @@ func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.Sele
 	return res
 }
 
+func (ec *executionContext) unmarshalOMemorySortField2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMemorySortField(ctx context.Context, v any) (*graphql1.MemorySortField, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(graphql1.MemorySortField)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOMemorySortField2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMemorySortField(ctx context.Context, sel ast.SelectionSet, v *graphql1.MemorySortField) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
 func (ec *executionContext) marshalOSession2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐSession(ctx context.Context, sel ast.SelectionSet, v *graphql1.Session) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._Session(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOSortOrder2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐSortOrder(ctx context.Context, v any) (*graphql1.SortOrder, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(graphql1.SortOrder)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOSortOrder2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐSortOrder(ctx context.Context, sel ast.SelectionSet, v *graphql1.SortOrder) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) unmarshalOString2string(ctx context.Context, v any) (string, error) {

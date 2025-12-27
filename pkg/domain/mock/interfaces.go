@@ -2661,6 +2661,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			ListAgentMemoriesFunc: func(ctx context.Context, agentID string) ([]*memory.AgentMemory, error) {
 //				panic("mock out the ListAgentMemories method")
 //			},
+//			ListAllAgentIDsFunc: func(ctx context.Context) (map[string]int, error) {
+//				panic("mock out the ListAllAgentIDs method")
+//			},
 //			ListAllTagsFunc: func(ctx context.Context) ([]*tag.Tag, error) {
 //				panic("mock out the ListAllTags method")
 //			},
@@ -2916,6 +2919,9 @@ type RepositoryMock struct {
 
 	// ListAgentMemoriesFunc mocks the ListAgentMemories method.
 	ListAgentMemoriesFunc func(ctx context.Context, agentID string) ([]*memory.AgentMemory, error)
+
+	// ListAllAgentIDsFunc mocks the ListAllAgentIDs method.
+	ListAllAgentIDsFunc func(ctx context.Context) (map[string]int, error)
 
 	// ListAllTagsFunc mocks the ListAllTags method.
 	ListAllTagsFunc func(ctx context.Context) ([]*tag.Tag, error)
@@ -3445,6 +3451,11 @@ type RepositoryMock struct {
 			// AgentID is the agentID argument value.
 			AgentID string
 		}
+		// ListAllAgentIDs holds details about calls to the ListAllAgentIDs method.
+		ListAllAgentIDs []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// ListAllTags holds details about calls to the ListAllTags method.
 		ListAllTags []struct {
 			// Ctx is the ctx argument value.
@@ -3694,6 +3705,7 @@ type RepositoryMock struct {
 	lockGetToken                       sync.RWMutex
 	lockIsTagNameExists                sync.RWMutex
 	lockListAgentMemories              sync.RWMutex
+	lockListAllAgentIDs                sync.RWMutex
 	lockListAllTags                    sync.RWMutex
 	lockListKnowledgeSlugs             sync.RWMutex
 	lockListKnowledgeTopics            sync.RWMutex
@@ -6112,6 +6124,42 @@ func (mock *RepositoryMock) ListAgentMemoriesCalls() []struct {
 	mock.lockListAgentMemories.RLock()
 	calls = mock.calls.ListAgentMemories
 	mock.lockListAgentMemories.RUnlock()
+	return calls
+}
+
+// ListAllAgentIDs calls ListAllAgentIDsFunc.
+func (mock *RepositoryMock) ListAllAgentIDs(ctx context.Context) (map[string]int, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockListAllAgentIDs.Lock()
+	mock.calls.ListAllAgentIDs = append(mock.calls.ListAllAgentIDs, callInfo)
+	mock.lockListAllAgentIDs.Unlock()
+	if mock.ListAllAgentIDsFunc == nil {
+		var (
+			stringToIntOut map[string]int
+			errOut         error
+		)
+		return stringToIntOut, errOut
+	}
+	return mock.ListAllAgentIDsFunc(ctx)
+}
+
+// ListAllAgentIDsCalls gets all the calls that were made to ListAllAgentIDs.
+// Check the length with:
+//
+//	len(mockedRepository.ListAllAgentIDsCalls())
+func (mock *RepositoryMock) ListAllAgentIDsCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockListAllAgentIDs.RLock()
+	calls = mock.calls.ListAllAgentIDs
+	mock.lockListAllAgentIDs.RUnlock()
 	return calls
 }
 

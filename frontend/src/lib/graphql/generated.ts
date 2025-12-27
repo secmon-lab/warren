@@ -38,6 +38,36 @@ export type Activity = {
   userID?: Maybe<Scalars['String']['output']>;
 };
 
+export type AgentMemoriesResponse = {
+  __typename?: 'AgentMemoriesResponse';
+  memories: Array<AgentMemory>;
+  totalCount: Scalars['Int']['output'];
+};
+
+export type AgentMemory = {
+  __typename?: 'AgentMemory';
+  agentID: Scalars['String']['output'];
+  claim: Scalars['String']['output'];
+  createdAt: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  lastUsedAt?: Maybe<Scalars['String']['output']>;
+  query: Scalars['String']['output'];
+  score: Scalars['Float']['output'];
+};
+
+export type AgentSummariesResponse = {
+  __typename?: 'AgentSummariesResponse';
+  agents: Array<AgentSummary>;
+  totalCount: Scalars['Int']['output'];
+};
+
+export type AgentSummary = {
+  __typename?: 'AgentSummary';
+  agentID: Scalars['String']['output'];
+  latestMemoryAt?: Maybe<Scalars['String']['output']>;
+  memoriesCount: Scalars['Int']['output'];
+};
+
 export type Alert = {
   __typename?: 'Alert';
   attributes: Array<AlertAttribute>;
@@ -148,6 +178,11 @@ export type Knowledge = {
   topic: Scalars['String']['output'];
   updatedAt: Scalars['String']['output'];
 };
+
+export type MemorySortField =
+  | 'CREATED_AT'
+  | 'LAST_USED_AT'
+  | 'SCORE';
 
 export type Mutation = {
   __typename?: 'Mutation';
@@ -267,8 +302,11 @@ export type Query = {
   availableTagColors: Array<Scalars['String']['output']>;
   clusterAlerts: AlertsConnection;
   dashboard: DashboardStats;
+  getAgentMemory?: Maybe<AgentMemory>;
   knowledgeTopics: Array<TopicSummary>;
   knowledgesByTopic: Array<Knowledge>;
+  listAgentMemories: AgentMemoriesResponse;
+  listAgentSummaries: AgentSummariesResponse;
   session?: Maybe<Session>;
   sessionMessages: Array<SessionMessage>;
   similarTickets: TicketsResponse;
@@ -317,8 +355,32 @@ export type QueryClusterAlertsArgs = {
 };
 
 
+export type QueryGetAgentMemoryArgs = {
+  agentID: Scalars['String']['input'];
+  memoryID: Scalars['ID']['input'];
+};
+
+
 export type QueryKnowledgesByTopicArgs = {
   topic: Scalars['String']['input'];
+};
+
+
+export type QueryListAgentMemoriesArgs = {
+  agentID: Scalars['String']['input'];
+  keyword?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  maxScore?: InputMaybe<Scalars['Float']['input']>;
+  minScore?: InputMaybe<Scalars['Float']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  sortBy?: InputMaybe<MemorySortField>;
+  sortOrder?: InputMaybe<SortOrder>;
+};
+
+
+export type QueryListAgentSummariesArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -403,6 +465,10 @@ export type SessionMessage = {
   type: Scalars['String']['output'];
   updatedAt: Scalars['String']['output'];
 };
+
+export type SortOrder =
+  | 'ASC'
+  | 'DESC';
 
 export type TagMetadata = {
   __typename?: 'TagMetadata';
@@ -764,6 +830,36 @@ export type GetSessionMessagesQueryVariables = Exact<{
 
 
 export type GetSessionMessagesQuery = { __typename?: 'Query', sessionMessages: Array<{ __typename?: 'SessionMessage', id: string, sessionID: string, type: string, content: string, createdAt: string, updatedAt: string }> };
+
+export type ListAgentSummariesQueryVariables = Exact<{
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type ListAgentSummariesQuery = { __typename?: 'Query', listAgentSummaries: { __typename?: 'AgentSummariesResponse', totalCount: number, agents: Array<{ __typename?: 'AgentSummary', agentID: string, memoriesCount: number, latestMemoryAt?: string | null }> } };
+
+export type ListAgentMemoriesQueryVariables = Exact<{
+  agentID: Scalars['String']['input'];
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  sortBy?: InputMaybe<MemorySortField>;
+  sortOrder?: InputMaybe<SortOrder>;
+  keyword?: InputMaybe<Scalars['String']['input']>;
+  minScore?: InputMaybe<Scalars['Float']['input']>;
+  maxScore?: InputMaybe<Scalars['Float']['input']>;
+}>;
+
+
+export type ListAgentMemoriesQuery = { __typename?: 'Query', listAgentMemories: { __typename?: 'AgentMemoriesResponse', totalCount: number, memories: Array<{ __typename?: 'AgentMemory', id: string, agentID: string, query: string, claim: string, score: number, createdAt: string, lastUsedAt?: string | null }> } };
+
+export type GetAgentMemoryQueryVariables = Exact<{
+  agentID: Scalars['String']['input'];
+  memoryID: Scalars['ID']['input'];
+}>;
+
+
+export type GetAgentMemoryQuery = { __typename?: 'Query', getAgentMemory?: { __typename?: 'AgentMemory', id: string, agentID: string, query: string, claim: string, score: number, createdAt: string, lastUsedAt?: string | null } | null };
 
 
 export const GetTicketsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTickets"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"statuses"},"value":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"commentsCount"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
@@ -1983,3 +2079,123 @@ export type GetSessionMessagesQueryHookResult = ReturnType<typeof useGetSessionM
 export type GetSessionMessagesLazyQueryHookResult = ReturnType<typeof useGetSessionMessagesLazyQuery>;
 export type GetSessionMessagesSuspenseQueryHookResult = ReturnType<typeof useGetSessionMessagesSuspenseQuery>;
 export type GetSessionMessagesQueryResult = Apollo.QueryResult<GetSessionMessagesQuery, GetSessionMessagesQueryVariables>;
+export const ListAgentSummariesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListAgentSummaries"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"listAgentSummaries"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"agents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"agentID"}},{"kind":"Field","name":{"kind":"Name","value":"memoriesCount"}},{"kind":"Field","name":{"kind":"Name","value":"latestMemoryAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useListAgentSummariesQuery__
+ *
+ * To run a query within a React component, call `useListAgentSummariesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useListAgentSummariesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useListAgentSummariesQuery({
+ *   variables: {
+ *      offset: // value for 'offset'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useListAgentSummariesQuery(baseOptions?: Apollo.QueryHookOptions<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>(ListAgentSummariesDocument, options);
+      }
+export function useListAgentSummariesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>(ListAgentSummariesDocument, options);
+        }
+// @ts-ignore
+export function useListAgentSummariesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>): Apollo.UseSuspenseQueryResult<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>;
+export function useListAgentSummariesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>): Apollo.UseSuspenseQueryResult<ListAgentSummariesQuery | undefined, ListAgentSummariesQueryVariables>;
+export function useListAgentSummariesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>(ListAgentSummariesDocument, options);
+        }
+export type ListAgentSummariesQueryHookResult = ReturnType<typeof useListAgentSummariesQuery>;
+export type ListAgentSummariesLazyQueryHookResult = ReturnType<typeof useListAgentSummariesLazyQuery>;
+export type ListAgentSummariesSuspenseQueryHookResult = ReturnType<typeof useListAgentSummariesSuspenseQuery>;
+export type ListAgentSummariesQueryResult = Apollo.QueryResult<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>;
+export const ListAgentMemoriesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListAgentMemories"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"agentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"sortBy"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"MemorySortField"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"sortOrder"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"SortOrder"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"minScore"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Float"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"maxScore"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Float"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"listAgentMemories"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"agentID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"agentID"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"sortBy"},"value":{"kind":"Variable","name":{"kind":"Name","value":"sortBy"}}},{"kind":"Argument","name":{"kind":"Name","value":"sortOrder"},"value":{"kind":"Variable","name":{"kind":"Name","value":"sortOrder"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}},{"kind":"Argument","name":{"kind":"Name","value":"minScore"},"value":{"kind":"Variable","name":{"kind":"Name","value":"minScore"}}},{"kind":"Argument","name":{"kind":"Name","value":"maxScore"},"value":{"kind":"Variable","name":{"kind":"Name","value":"maxScore"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"memories"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"agentID"}},{"kind":"Field","name":{"kind":"Name","value":"query"}},{"kind":"Field","name":{"kind":"Name","value":"claim"}},{"kind":"Field","name":{"kind":"Name","value":"score"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"lastUsedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useListAgentMemoriesQuery__
+ *
+ * To run a query within a React component, call `useListAgentMemoriesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useListAgentMemoriesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useListAgentMemoriesQuery({
+ *   variables: {
+ *      agentID: // value for 'agentID'
+ *      offset: // value for 'offset'
+ *      limit: // value for 'limit'
+ *      sortBy: // value for 'sortBy'
+ *      sortOrder: // value for 'sortOrder'
+ *      keyword: // value for 'keyword'
+ *      minScore: // value for 'minScore'
+ *      maxScore: // value for 'maxScore'
+ *   },
+ * });
+ */
+export function useListAgentMemoriesQuery(baseOptions: Apollo.QueryHookOptions<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables> & ({ variables: ListAgentMemoriesQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>(ListAgentMemoriesDocument, options);
+      }
+export function useListAgentMemoriesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>(ListAgentMemoriesDocument, options);
+        }
+// @ts-ignore
+export function useListAgentMemoriesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>): Apollo.UseSuspenseQueryResult<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>;
+export function useListAgentMemoriesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>): Apollo.UseSuspenseQueryResult<ListAgentMemoriesQuery | undefined, ListAgentMemoriesQueryVariables>;
+export function useListAgentMemoriesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>(ListAgentMemoriesDocument, options);
+        }
+export type ListAgentMemoriesQueryHookResult = ReturnType<typeof useListAgentMemoriesQuery>;
+export type ListAgentMemoriesLazyQueryHookResult = ReturnType<typeof useListAgentMemoriesLazyQuery>;
+export type ListAgentMemoriesSuspenseQueryHookResult = ReturnType<typeof useListAgentMemoriesSuspenseQuery>;
+export type ListAgentMemoriesQueryResult = Apollo.QueryResult<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>;
+export const GetAgentMemoryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAgentMemory"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"agentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"memoryID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getAgentMemory"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"agentID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"agentID"}}},{"kind":"Argument","name":{"kind":"Name","value":"memoryID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"memoryID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"agentID"}},{"kind":"Field","name":{"kind":"Name","value":"query"}},{"kind":"Field","name":{"kind":"Name","value":"claim"}},{"kind":"Field","name":{"kind":"Name","value":"score"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"lastUsedAt"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useGetAgentMemoryQuery__
+ *
+ * To run a query within a React component, call `useGetAgentMemoryQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAgentMemoryQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAgentMemoryQuery({
+ *   variables: {
+ *      agentID: // value for 'agentID'
+ *      memoryID: // value for 'memoryID'
+ *   },
+ * });
+ */
+export function useGetAgentMemoryQuery(baseOptions: Apollo.QueryHookOptions<GetAgentMemoryQuery, GetAgentMemoryQueryVariables> & ({ variables: GetAgentMemoryQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>(GetAgentMemoryDocument, options);
+      }
+export function useGetAgentMemoryLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>(GetAgentMemoryDocument, options);
+        }
+// @ts-ignore
+export function useGetAgentMemorySuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>): Apollo.UseSuspenseQueryResult<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>;
+export function useGetAgentMemorySuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>): Apollo.UseSuspenseQueryResult<GetAgentMemoryQuery | undefined, GetAgentMemoryQueryVariables>;
+export function useGetAgentMemorySuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>(GetAgentMemoryDocument, options);
+        }
+export type GetAgentMemoryQueryHookResult = ReturnType<typeof useGetAgentMemoryQuery>;
+export type GetAgentMemoryLazyQueryHookResult = ReturnType<typeof useGetAgentMemoryLazyQuery>;
+export type GetAgentMemorySuspenseQueryHookResult = ReturnType<typeof useGetAgentMemorySuspenseQuery>;
+export type GetAgentMemoryQueryResult = Apollo.QueryResult<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>;

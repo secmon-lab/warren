@@ -255,3 +255,16 @@ func (r *Memory) ListAgentMemories(ctx context.Context, agentID string) ([]*memo
 
 	return memories, nil
 }
+
+// ListAllAgentIDs returns all agent IDs that have memories with their counts
+func (r *Memory) ListAllAgentIDs(ctx context.Context) (map[string]int, error) {
+	r.memoryMu.RLock()
+	defer r.memoryMu.RUnlock()
+
+	result := make(map[string]int)
+	for _, mem := range r.agentMemories {
+		result[mem.AgentID]++
+	}
+
+	return result, nil
+}

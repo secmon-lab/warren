@@ -242,3 +242,30 @@ func (r *Firestore) ListAgentMemories(ctx context.Context, agentID string) ([]*m
 
 	return memories, nil
 }
+
+// ListAllAgentIDs returns all agent IDs that have memories with their counts
+// Uses CollectionGroup query to find all memories subcollections regardless of parent document existence
+func (r *Firestore) ListAllAgentIDs(ctx context.Context) (map[string]int, error) {
+	result := make(map[string]int)
+
+	// Use CollectionGroup to query all memories subcollections
+	memoryDocs := r.db.CollectionGroup(subcollectionMemories).Documents(ctx)
+
+	for {
+		doc, err := memoryDocs.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, r.eb.Wrap(err, "failed to iterate memory documents")
+		}
+
+		// Extract agent ID from document path: agents/{agentID}/memories/{memoryID}
+		// doc.Ref.Path = "agents/{agentID}/memories/{memoryID}"
+		agentID := doc.Ref.Parent.Parent.ID
+
+		result[agentID]++
+	}
+
+	return result, nil
+}

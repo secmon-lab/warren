@@ -126,6 +126,10 @@ type Repository interface {
 	// Results are ordered by CreatedAt DESC
 	ListAgentMemories(ctx context.Context, agentID string) ([]*memory.AgentMemory, error)
 
+	// ListAllAgentIDs returns all agent IDs that have memories with their counts
+	// Used for the agent summary list in the UI
+	ListAllAgentIDs(ctx context.Context) (map[string]int, error)
+
 	// Session management
 	PutSession(ctx context.Context, session *session.Session) error
 	GetSession(ctx context.Context, sessionID types.SessionID) (*session.Session, error)

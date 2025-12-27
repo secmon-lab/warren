@@ -830,3 +830,65 @@ export const GET_SESSION_MESSAGES = gql`
     }
   }
 `;
+
+export const LIST_AGENT_SUMMARIES = gql`
+  query ListAgentSummaries($offset: Int, $limit: Int) {
+    listAgentSummaries(offset: $offset, limit: $limit) {
+      agents {
+        agentID
+        memoriesCount
+        latestMemoryAt
+      }
+      totalCount
+    }
+  }
+`;
+
+export const LIST_AGENT_MEMORIES = gql`
+  query ListAgentMemories(
+    $agentID: String!
+    $offset: Int
+    $limit: Int
+    $sortBy: MemorySortField
+    $sortOrder: SortOrder
+    $keyword: String
+    $minScore: Float
+    $maxScore: Float
+  ) {
+    listAgentMemories(
+      agentID: $agentID
+      offset: $offset
+      limit: $limit
+      sortBy: $sortBy
+      sortOrder: $sortOrder
+      keyword: $keyword
+      minScore: $minScore
+      maxScore: $maxScore
+    ) {
+      memories {
+        id
+        agentID
+        query
+        claim
+        score
+        createdAt
+        lastUsedAt
+      }
+      totalCount
+    }
+  }
+`;
+
+export const GET_AGENT_MEMORY = gql`
+  query GetAgentMemory($agentID: String!, $memoryID: ID!) {
+    getAgentMemory(agentID: $agentID, memoryID: $memoryID) {
+      id
+      agentID
+      query
+      claim
+      score
+      createdAt
+      lastUsedAt
+    }
+  }
+`;
