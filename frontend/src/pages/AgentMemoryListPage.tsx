@@ -111,7 +111,7 @@ export default function AgentMemoryListPage() {
                   </p>
                   {agent.latestMemoryAt && (
                     <p className="text-xs text-muted-foreground">
-                      Latest: {new Date(agent.latestMemoryAt).toLocaleDateString()}
+                      Latest: {new Date(agent.latestMemoryAt).toISOString().split('T')[0].replace(/-/g, '/')}
                     </p>
                   )}
                 </div>

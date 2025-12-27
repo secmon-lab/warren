@@ -180,9 +180,9 @@ export default function AgentMemoriesPage() {
                 <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
                   <span>Score: <strong className={mem.score >= 0 ? "text-green-600" : "text-red-600"}>{mem.score.toFixed(1)}</strong></span>
                   <span>Final Score: <strong>{mem.finalScore.toFixed(3)}</strong></span>
-                  <span>Created: {new Date(mem.createdAt).toLocaleDateString()}</span>
+                  <span>Created: {new Date(mem.createdAt).toISOString().split('T')[0].replace(/-/g, '/')}</span>
                   {mem.lastUsedAt && (
-                    <span>Last Used: {new Date(mem.lastUsedAt).toLocaleDateString()}</span>
+                    <span>Last Used: {new Date(mem.lastUsedAt).toISOString().split('T')[0].replace(/-/g, '/')}</span>
                   )}
                 </div>
               </CardContent>
