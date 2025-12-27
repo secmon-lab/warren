@@ -90,14 +90,8 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 			threadSvc.NewTraceMessage(ctx, message)
 		}
 
-		warnFunc := func(ctx context.Context, message string) {
-			if err := threadSvc.PostComment(ctx, message); err != nil {
-				logging.From(ctx).Error("failed to post warning message to slack", "error", err)
-			}
-		}
-
 		// Setup context with Slack-specific message handlers
-		ctx = msg.With(ctx, notifyFunc, traceFunc, warnFunc)
+		ctx = msg.With(ctx, notifyFunc, traceFunc, createSlackWarnFunc(threadSvc))
 
 		// Add Slack URL to context using type-safe context key
 		slackURL := slackMsg.SlackURL()

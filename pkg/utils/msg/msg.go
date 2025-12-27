@@ -15,17 +15,17 @@ type ctxNotifyFuncKey struct{}
 type ctxTraceFuncKey struct{}
 type ctxWarnFuncKey struct{}
 
-func With(ctx context.Context, NotifyFunc NotifyFunc, TraceFunc TraceFunc, WarnFunc WarnFunc) context.Context {
-	ctx = context.WithValue(ctx, ctxNotifyFuncKey{}, NotifyFunc)
-	ctx = context.WithValue(ctx, ctxTraceFuncKey{}, TraceFunc)
-	ctx = context.WithValue(ctx, ctxWarnFuncKey{}, WarnFunc)
+func With(ctx context.Context, notifyFunc NotifyFunc, traceFunc TraceFunc, warnFunc WarnFunc) context.Context {
+	ctx = context.WithValue(ctx, ctxNotifyFuncKey{}, notifyFunc)
+	ctx = context.WithValue(ctx, ctxTraceFuncKey{}, traceFunc)
+	ctx = context.WithValue(ctx, ctxWarnFuncKey{}, warnFunc)
 	return ctx
 }
 
 func Notify(ctx context.Context, format string, args ...any) {
 	if v := ctx.Value(ctxNotifyFuncKey{}); v != nil {
-		if NotifyFunc, ok := v.(NotifyFunc); ok && NotifyFunc != nil {
-			NotifyFunc(ctx, fmt.Sprintf(format, args...))
+		if notifyFunc, ok := v.(NotifyFunc); ok && notifyFunc != nil {
+			notifyFunc(ctx, fmt.Sprintf(format, args...))
 			return
 		}
 	}
