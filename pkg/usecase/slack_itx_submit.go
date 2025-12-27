@@ -115,7 +115,12 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindAlert(ctx context.Co
 	traceFunc := func(ctx context.Context, message string) {
 		st.NewStateFunc(ctx, message)
 	}
-	ctx = msg.With(ctx, st.Reply, traceFunc)
+	warnFunc := func(ctx context.Context, message string) {
+		if err := st.PostComment(ctx, message); err != nil {
+			logging.From(ctx).Error("failed to post warning message to slack", "error", err)
+		}
+	}
+	ctx = msg.With(ctx, st.Reply, traceFunc, warnFunc)
 
 	ticketID, err := getTicketID(values)
 	if err != nil {
@@ -147,7 +152,12 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionBindList(ctx context.Con
 	traceFunc := func(ctx context.Context, message string) {
 		st.NewStateFunc(ctx, message)
 	}
-	ctx = msg.With(ctx, st.Reply, traceFunc)
+	warnFunc := func(ctx context.Context, message string) {
+		if err := st.PostComment(ctx, message); err != nil {
+			logging.From(ctx).Error("failed to post warning message to slack", "error", err)
+		}
+	}
+	ctx = msg.With(ctx, st.Reply, traceFunc, warnFunc)
 
 	ticketID, err := getTicketID(values)
 	if err != nil {
@@ -282,7 +292,12 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 	traceFunc := func(ctx context.Context, message string) {
 		st.NewStateFunc(ctx, message)
 	}
-	ctx = msg.With(ctx, st.Reply, traceFunc)
+	warnFunc := func(ctx context.Context, message string) {
+		if err := st.PostComment(ctx, message); err != nil {
+			logging.From(ctx).Error("failed to post warning message to slack", "error", err)
+		}
+	}
+	ctx = msg.With(ctx, st.Reply, traceFunc, warnFunc)
 
 	conclusion, ok := getSlackSelectValue[types.AlertConclusion](values,
 		slack.BlockIDTicketConclusion,
@@ -405,7 +420,12 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionSalvage(ctx context.Cont
 	traceFunc := func(ctx context.Context, message string) {
 		st.NewStateFunc(ctx, message)
 	}
-	ctx = msg.With(ctx, st.Reply, traceFunc)
+	warnFunc := func(ctx context.Context, message string) {
+		if err := st.PostComment(ctx, message); err != nil {
+			logging.From(ctx).Error("failed to post warning message to slack", "error", err)
+		}
+	}
+	ctx = msg.With(ctx, st.Reply, traceFunc, warnFunc)
 
 	// Get threshold and keyword from form values
 	thresholdStr, _ := getSlackValue[string](values,
@@ -488,7 +508,12 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionEditTicket(ctx context.C
 	traceFunc := func(ctx context.Context, message string) {
 		st.NewStateFunc(ctx, message)
 	}
-	ctx = msg.With(ctx, st.Reply, traceFunc)
+	warnFunc := func(ctx context.Context, message string) {
+		if err := st.PostComment(ctx, message); err != nil {
+			logging.From(ctx).Error("failed to post warning message to slack", "error", err)
+		}
+	}
+	ctx = msg.With(ctx, st.Reply, traceFunc, warnFunc)
 
 	// Get new title (required)
 	newTitle, ok := getSlackValue[string](values,

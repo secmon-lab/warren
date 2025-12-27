@@ -43,7 +43,7 @@ var (
 	ErrSessionAborted = goerr.New("session aborted by user")
 )
 
-func (x *UseCases) setupChatMessageFuncs(ctx context.Context, repo interfaces.Repository, sess *session.Session, target *ticket.Ticket) (msg.NotifyFunc, msg.TraceFunc, msg.TraceFunc) {
+func (x *UseCases) setupChatMessageFuncs(ctx context.Context, repo interfaces.Repository, sess *session.Session, target *ticket.Ticket) (msg.NotifyFunc, msg.TraceFunc, msg.TraceFunc, msg.WarnFunc) {
 	threadSvc := x.slackService.NewThread(*target.SlackThread)
 
 	notifyFunc := func(ctx context.Context, message string) {
@@ -80,7 +80,20 @@ func (x *UseCases) setupChatMessageFuncs(ctx context.Context, repo interfaces.Re
 	traceFunc := createUpdatableMessageFunc(session.MessageTypeTrace)
 	planFunc := createUpdatableMessageFunc(session.MessageTypePlan)
 
-	return notifyFunc, traceFunc, planFunc
+	// warnFunc creates a new message block (like notifyFunc) instead of updating
+	warnFunc := func(ctx context.Context, message string) {
+		// Save warning message to repository
+		m := session.NewMessage(ctx, sess.ID, session.MessageTypeWarning, message)
+		if err := repo.PutSessionMessage(ctx, m); err != nil {
+			errs.Handle(ctx, err)
+		}
+		// Post to Slack as a new comment
+		if err := threadSvc.PostComment(ctx, message); err != nil {
+			errs.Handle(ctx, err)
+		}
+	}
+
+	return notifyFunc, traceFunc, planFunc, warnFunc
 }
 
 // Chat processes a chat message for the specified ticket
@@ -108,8 +121,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	planFunc := func(ctx context.Context, msg string) {
 	}
 	if x.slackService != nil && target.SlackThread != nil {
-		notifyFunc, traceFunc, pf := x.setupChatMessageFuncs(ctx, x.repository, ssn, target)
-		ctx = msg.With(ctx, notifyFunc, traceFunc)
+		notifyFunc, traceFunc, pf, warnFunc := x.setupChatMessageFuncs(ctx, x.repository, ssn, target)
+		ctx = msg.With(ctx, notifyFunc, traceFunc, warnFunc)
 		planFunc = pf
 
 		// Post initial request ID message using planFunc

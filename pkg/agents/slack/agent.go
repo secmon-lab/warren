@@ -261,7 +261,7 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	} else if err := a.memoryService.ExtractAndSaveMemories(ctx, request, memories, history); err != nil {
 		// Memory extraction failure is non-critical
 		errs.Handle(ctx, goerr.Wrap(err, "failed to extract and save memories"))
-		msg.Trace(ctx, "  ⚠️ *Warning:* Failed to save execution memories")
+		msg.Warn(ctx, "⚠️ *Warning:* Failed to save execution memories")
 	}
 
 	// Step 6: Return execution result
@@ -276,7 +276,7 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	if err != nil {
 		// Fallback to original response
 		log.Warn("Failed to extract messages, falling back to text response", "error", err)
-		msg.Trace(ctx, "  ⚠️ *Warning:* Failed to extract messages, returning text response")
+		msg.Warn(ctx, "⚠️ *Warning:* Failed to extract messages, returning text response")
 		result := map[string]any{"response": ""}
 		if resp != nil && !resp.IsEmpty() {
 			result["response"] = resp.String()

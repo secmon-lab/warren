@@ -34,7 +34,12 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, slac
 	traceFunc := func(ctx context.Context, message string) {
 		threadSvc.NewStateFunc(ctx, message)
 	}
-	ctx = msg.With(ctx, threadSvc.Reply, traceFunc)
+	warnFunc := func(ctx context.Context, message string) {
+		if err := threadSvc.PostComment(ctx, message); err != nil {
+			logging.From(ctx).Error("failed to post warning message to slack", "error", err)
+		}
+	}
+	ctx = msg.With(ctx, threadSvc.Reply, traceFunc, warnFunc)
 
 	switch actionID {
 	case slack.ActionIDAckAlert:

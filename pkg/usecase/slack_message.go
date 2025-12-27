@@ -21,7 +21,12 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg slack.Messa
 	traceFunc := func(ctx context.Context, message string) {
 		th.NewTraceMessage(ctx, message)
 	}
-	ctx = msg.With(ctx, th.Reply, traceFunc)
+	warnFunc := func(ctx context.Context, message string) {
+		if err := th.PostComment(ctx, message); err != nil {
+			logging.From(ctx).Error("failed to post warning message to slack", "error", err)
+		}
+	}
+	ctx = msg.With(ctx, th.Reply, traceFunc, warnFunc)
 
 	// Set user ID in context for activity tracking and skip if the message is from the bot
 	if slackMsg.User() != nil {

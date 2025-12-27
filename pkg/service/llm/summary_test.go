@@ -25,6 +25,9 @@ func TestSummaryWithSchemaData(t *testing.T) {
 		func(ctx context.Context, msg string) {
 			t.Log("Trace", msg)
 		},
+		func(ctx context.Context, msg string) {
+			t.Log("Warn", msg)
+		},
 	)
 
 	projectID, ok := os.LookupEnv("TEST_GEMINI_PROJECT_ID")

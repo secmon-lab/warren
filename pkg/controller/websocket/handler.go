@@ -454,8 +454,19 @@ func (h *Handler) handleChatMessage(client *Client, message *websocket_model.Cha
 				}
 			}
 
+			warnFunc := func(ctx context.Context, message string) {
+				if err := h.hub.SendMessageToClient(client.clientID, message, warrenUser); err != nil {
+					// Check if the error is due to client disconnection
+					if err.Error() == "client not found" {
+						logger.Debug("client disconnected, skipping warning", "client_id", client.clientID)
+					} else {
+						logger.Error("failed to send warning to client", "error", err, "client_id", client.clientID)
+					}
+				}
+			}
+
 			// Setup context with WebSocket-specific message handlers
-			asyncCtx = msg.With(asyncCtx, notifyFunc, traceFunc)
+			asyncCtx = msg.With(asyncCtx, notifyFunc, traceFunc, warnFunc)
 
 			if err := h.useCases.Chat(asyncCtx, ticket, message.Content); err != nil {
 				logger.Error("failed to process chat message",

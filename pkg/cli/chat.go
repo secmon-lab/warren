@@ -275,5 +275,10 @@ func setupCLIMessageHandlers(ctx context.Context) context.Context {
 		fmt.Printf("🔄 %s\n", message)
 	}
 
-	return msg.With(ctx, notifyFunc, traceFunc)
+	// Handle warning messages - these are displayed as new messages
+	warnFunc := func(ctx context.Context, message string) {
+		fmt.Printf("⚠️  %s\n", message)
+	}
+
+	return msg.With(ctx, notifyFunc, traceFunc, warnFunc)
 }
