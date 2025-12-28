@@ -2662,6 +2662,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			ListAgentMemoriesFunc: func(ctx context.Context, agentID string) ([]*memory.AgentMemory, error) {
 //				panic("mock out the ListAgentMemories method")
 //			},
+//			ListAgentMemoriesWithOptionsFunc: func(ctx context.Context, agentID string, opts interfaces.AgentMemoryListOptions) ([]*memory.AgentMemory, int, error) {
+//				panic("mock out the ListAgentMemoriesWithOptions method")
+//			},
 //			ListAllAgentIDsFunc: func(ctx context.Context) ([]*interfaces.AgentSummary, error) {
 //				panic("mock out the ListAllAgentIDs method")
 //			},
@@ -2920,6 +2923,9 @@ type RepositoryMock struct {
 
 	// ListAgentMemoriesFunc mocks the ListAgentMemories method.
 	ListAgentMemoriesFunc func(ctx context.Context, agentID string) ([]*memory.AgentMemory, error)
+
+	// ListAgentMemoriesWithOptionsFunc mocks the ListAgentMemoriesWithOptions method.
+	ListAgentMemoriesWithOptionsFunc func(ctx context.Context, agentID string, opts interfaces.AgentMemoryListOptions) ([]*memory.AgentMemory, int, error)
 
 	// ListAllAgentIDsFunc mocks the ListAllAgentIDs method.
 	ListAllAgentIDsFunc func(ctx context.Context) ([]*interfaces.AgentSummary, error)
@@ -3452,6 +3458,15 @@ type RepositoryMock struct {
 			// AgentID is the agentID argument value.
 			AgentID string
 		}
+		// ListAgentMemoriesWithOptions holds details about calls to the ListAgentMemoriesWithOptions method.
+		ListAgentMemoriesWithOptions []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// AgentID is the agentID argument value.
+			AgentID string
+			// Opts is the opts argument value.
+			Opts interfaces.AgentMemoryListOptions
+		}
 		// ListAllAgentIDs holds details about calls to the ListAllAgentIDs method.
 		ListAllAgentIDs []struct {
 			// Ctx is the ctx argument value.
@@ -3706,6 +3721,7 @@ type RepositoryMock struct {
 	lockGetToken                       sync.RWMutex
 	lockIsTagNameExists                sync.RWMutex
 	lockListAgentMemories              sync.RWMutex
+	lockListAgentMemoriesWithOptions   sync.RWMutex
 	lockListAllAgentIDs                sync.RWMutex
 	lockListAllTags                    sync.RWMutex
 	lockListKnowledgeSlugs             sync.RWMutex
@@ -6125,6 +6141,51 @@ func (mock *RepositoryMock) ListAgentMemoriesCalls() []struct {
 	mock.lockListAgentMemories.RLock()
 	calls = mock.calls.ListAgentMemories
 	mock.lockListAgentMemories.RUnlock()
+	return calls
+}
+
+// ListAgentMemoriesWithOptions calls ListAgentMemoriesWithOptionsFunc.
+func (mock *RepositoryMock) ListAgentMemoriesWithOptions(ctx context.Context, agentID string, opts interfaces.AgentMemoryListOptions) ([]*memory.AgentMemory, int, error) {
+	callInfo := struct {
+		Ctx     context.Context
+		AgentID string
+		Opts    interfaces.AgentMemoryListOptions
+	}{
+		Ctx:     ctx,
+		AgentID: agentID,
+		Opts:    opts,
+	}
+	mock.lockListAgentMemoriesWithOptions.Lock()
+	mock.calls.ListAgentMemoriesWithOptions = append(mock.calls.ListAgentMemoriesWithOptions, callInfo)
+	mock.lockListAgentMemoriesWithOptions.Unlock()
+	if mock.ListAgentMemoriesWithOptionsFunc == nil {
+		var (
+			agentMemorysOut []*memory.AgentMemory
+			nOut            int
+			errOut          error
+		)
+		return agentMemorysOut, nOut, errOut
+	}
+	return mock.ListAgentMemoriesWithOptionsFunc(ctx, agentID, opts)
+}
+
+// ListAgentMemoriesWithOptionsCalls gets all the calls that were made to ListAgentMemoriesWithOptions.
+// Check the length with:
+//
+//	len(mockedRepository.ListAgentMemoriesWithOptionsCalls())
+func (mock *RepositoryMock) ListAgentMemoriesWithOptionsCalls() []struct {
+	Ctx     context.Context
+	AgentID string
+	Opts    interfaces.AgentMemoryListOptions
+} {
+	var calls []struct {
+		Ctx     context.Context
+		AgentID string
+		Opts    interfaces.AgentMemoryListOptions
+	}
+	mock.lockListAgentMemoriesWithOptions.RLock()
+	calls = mock.calls.ListAgentMemoriesWithOptions
+	mock.lockListAgentMemoriesWithOptions.RUnlock()
 	return calls
 }
 

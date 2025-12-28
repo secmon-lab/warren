@@ -2,6 +2,8 @@ package firestore
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -301,4 +303,74 @@ func (r *Firestore) ListAllAgentIDs(ctx context.Context) ([]*interfaces.AgentSum
 	}
 
 	return result, nil
+}
+
+// ListAgentMemoriesWithOptions lists memories with filtering, sorting, and pagination
+// Note: Firestore implementation fetches all memories and applies filtering/sorting in-memory
+// to avoid requiring additional composite indexes
+func (r *Firestore) ListAgentMemoriesWithOptions(ctx context.Context, agentID string, opts interfaces.AgentMemoryListOptions) ([]*memory.AgentMemory, int, error) {
+	// Fetch all memories for the agent
+	allMemories, err := r.ListAgentMemories(ctx, agentID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Filter by keyword
+	var filtered []*memory.AgentMemory
+	for _, mem := range allMemories {
+		// Filter by keyword
+		if opts.Keyword != nil && *opts.Keyword != "" {
+			keyword := strings.ToLower(*opts.Keyword)
+			if !strings.Contains(strings.ToLower(mem.Query), keyword) &&
+				!strings.Contains(strings.ToLower(mem.Claim), keyword) {
+				continue
+			}
+		}
+
+		// Filter by score range
+		if opts.MinScore != nil && mem.Score < *opts.MinScore {
+			continue
+		}
+		if opts.MaxScore != nil && mem.Score > *opts.MaxScore {
+			continue
+		}
+
+		filtered = append(filtered, mem)
+	}
+
+	totalCount := len(filtered)
+
+	// Sort
+	sortBy := opts.SortBy
+	if sortBy == "" {
+		sortBy = "created_at"
+	}
+
+	sort.Slice(filtered, func(i, j int) bool {
+		var less bool
+		switch sortBy {
+		case "score":
+			less = filtered[i].Score < filtered[j].Score
+		case "last_used_at":
+			less = filtered[i].LastUsedAt.Before(filtered[j].LastUsedAt)
+		default: // "created_at"
+			less = filtered[i].CreatedAt.Before(filtered[j].CreatedAt)
+		}
+		if opts.SortDesc {
+			return !less
+		}
+		return less
+	})
+
+	// Paginate
+	start := opts.Offset
+	if start > len(filtered) {
+		start = len(filtered)
+	}
+	end := start + opts.Limit
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+
+	return filtered[start:end], totalCount, nil
 }

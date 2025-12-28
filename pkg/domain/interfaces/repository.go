@@ -19,9 +19,20 @@ import (
 
 // AgentSummary contains summary information about an agent's memories
 type AgentSummary struct {
-	AgentID         string
-	Count           int
-	LatestMemoryAt  time.Time
+	AgentID        string
+	Count          int
+	LatestMemoryAt time.Time
+}
+
+// AgentMemoryListOptions contains filtering, sorting, and pagination options for listing agent memories
+type AgentMemoryListOptions struct {
+	Offset   int
+	Limit    int
+	SortBy   string  // "score", "created_at", "last_used_at"
+	SortDesc bool    // true for descending, false for ascending
+	Keyword  *string // filter by query or claim content
+	MinScore *float64
+	MaxScore *float64
 }
 
 type Repository interface {
@@ -132,6 +143,10 @@ type Repository interface {
 	// ListAgentMemories lists all memories for an agent (for pruning)
 	// Results are ordered by CreatedAt DESC
 	ListAgentMemories(ctx context.Context, agentID string) ([]*memory.AgentMemory, error)
+
+	// ListAgentMemoriesWithOptions lists memories with filtering, sorting, and pagination
+	// Returns memories and total count (before pagination)
+	ListAgentMemoriesWithOptions(ctx context.Context, agentID string, opts AgentMemoryListOptions) ([]*memory.AgentMemory, int, error)
 
 	// ListAllAgentIDs returns all agent IDs that have memories with their counts and latest memory timestamp
 	// Used for the agent summary list in the UI

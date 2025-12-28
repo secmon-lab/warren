@@ -17,7 +17,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
-	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -1337,100 +1336,46 @@ func (r *queryResolver) ListAgentSummaries(ctx context.Context, offset *int, lim
 
 // ListAgentMemories is the resolver for the listAgentMemories field.
 func (r *queryResolver) ListAgentMemories(ctx context.Context, agentID string, offset *int, limit *int, sortBy *graphql1.MemorySortField, sortOrder *graphql1.SortOrder, keyword *string, minScore *float64, maxScore *float64) (*graphql1.AgentMemoriesResponse, error) {
-	// Get all memories for the agent
-	allMemories, err := r.repo.ListAgentMemories(ctx, agentID)
+	// Build options
+	opts := interfaces.AgentMemoryListOptions{
+		Offset:   0,
+		Limit:    20,
+		SortBy:   "created_at",
+		SortDesc: true,
+		Keyword:  keyword,
+		MinScore: minScore,
+		MaxScore: maxScore,
+	}
+
+	if offset != nil {
+		opts.Offset = *offset
+	}
+	if limit != nil {
+		opts.Limit = *limit
+	}
+
+	// Map GraphQL sort field to repository sort field
+	if sortBy != nil {
+		switch *sortBy {
+		case graphql1.MemorySortFieldScore:
+			opts.SortBy = "score"
+		case graphql1.MemorySortFieldCreatedAt:
+			opts.SortBy = "created_at"
+		case graphql1.MemorySortFieldLastUsedAt:
+			opts.SortBy = "last_used_at"
+		}
+	}
+
+	// Map GraphQL sort order
+	if sortOrder != nil {
+		opts.SortDesc = *sortOrder == graphql1.SortOrderDesc
+	}
+
+	// Use repository method for filtering, sorting, and pagination
+	pagedMemories, totalCount, err := r.repo.ListAgentMemoriesWithOptions(ctx, agentID, opts)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list agent memories", goerr.V("agent_id", agentID))
 	}
-
-	// Filter by keyword
-	var filtered []*memory.AgentMemory
-	if keyword != nil && *keyword != "" {
-		kw := strings.ToLower(*keyword)
-		for _, mem := range allMemories {
-			if strings.Contains(strings.ToLower(mem.Claim), kw) ||
-				strings.Contains(strings.ToLower(mem.Query), kw) {
-				filtered = append(filtered, mem)
-			}
-		}
-	} else {
-		filtered = allMemories
-	}
-
-	// Filter by score range
-	var scoreFiltered []*memory.AgentMemory
-	for _, mem := range filtered {
-		include := true
-		if minScore != nil && mem.Score < *minScore {
-			include = false
-		}
-		if maxScore != nil && mem.Score > *maxScore {
-			include = false
-		}
-		if include {
-			scoreFiltered = append(scoreFiltered, mem)
-		}
-	}
-
-	// Sort
-	sortByField := graphql1.MemorySortFieldCreatedAt // default
-	if sortBy != nil {
-		sortByField = *sortBy
-	}
-	order := graphql1.SortOrderDesc // default
-	if sortOrder != nil {
-		order = *sortOrder
-	}
-
-	sort.Slice(scoreFiltered, func(i, j int) bool {
-		var less bool
-		switch sortByField {
-		case graphql1.MemorySortFieldScore:
-			less = scoreFiltered[i].Score < scoreFiltered[j].Score
-		case graphql1.MemorySortFieldCreatedAt:
-			less = scoreFiltered[i].CreatedAt.Before(scoreFiltered[j].CreatedAt)
-		case graphql1.MemorySortFieldLastUsedAt:
-			// Handle zero time (never used)
-			iTime := scoreFiltered[i].LastUsedAt
-			jTime := scoreFiltered[j].LastUsedAt
-			if iTime.IsZero() && jTime.IsZero() {
-				less = false
-			} else if iTime.IsZero() {
-				less = true // never used goes last
-			} else if jTime.IsZero() {
-				less = false
-			} else {
-				less = iTime.Before(jTime)
-			}
-		}
-		if order == graphql1.SortOrderDesc {
-			return !less
-		}
-		return less
-	})
-
-	totalCount := len(scoreFiltered)
-
-	// Apply pagination
-	offsetVal := 0
-	if offset != nil {
-		offsetVal = *offset
-	}
-	limitVal := 20 // default
-	if limit != nil {
-		limitVal = *limit
-	}
-
-	start := offsetVal
-	if start > len(scoreFiltered) {
-		start = len(scoreFiltered)
-	}
-	end := start + limitVal
-	if end > len(scoreFiltered) {
-		end = len(scoreFiltered)
-	}
-
-	pagedMemories := scoreFiltered[start:end]
 
 	// Convert to GraphQL response
 	memories := make([]*graphql1.AgentMemory, len(pagedMemories))
