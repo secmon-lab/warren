@@ -10,7 +10,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/slack-go/slack"
 )
@@ -140,14 +140,14 @@ func (r *RateLimitedUpdater) processRequest(ctx context.Context, request *AlertU
 	defer func() {
 		if r := recover(); r != nil {
 			err := goerr.New("panic in alert update processing", goerr.V("panic", r))
-			errs.Handle(ctx, err)
+			errutil.Handle(ctx, err)
 		}
 	}()
 
 	alert := request.Alert
 	if alert.SlackThread == nil {
 		err := goerr.New("alert has no slack thread")
-		errs.Handle(ctx, err)
+		errutil.Handle(ctx, err)
 		return
 	}
 
@@ -199,7 +199,7 @@ func (r *RateLimitedUpdater) processRequest(ctx context.Context, request *AlertU
 			goerr.V("channel_id", alert.SlackThread.ChannelID),
 			goerr.V("thread_id", alert.SlackThread.ThreadID))
 
-		errs.Handle(ctx, wrappedErr)
+		errutil.Handle(ctx, wrappedErr)
 		return
 	}
 
@@ -208,7 +208,7 @@ func (r *RateLimitedUpdater) processRequest(ctx context.Context, request *AlertU
 		goerr.V("alert_id", alert.ID),
 		goerr.V("max_retries", maxRetries))
 
-	errs.Handle(ctx, finalErr)
+	errutil.Handle(ctx, finalErr)
 }
 
 // isRateLimitError checks if the error is a rate limiting error

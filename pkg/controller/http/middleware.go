@@ -18,11 +18,11 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	asyncModel "github.com/secmon-lab/warren/pkg/domain/model/async"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/message"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/utils/async"
 	"github.com/secmon-lab/warren/pkg/utils/authctx"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/secmon-lab/warren/pkg/utils/user"
@@ -248,7 +248,7 @@ func verifySlackRequest(verifier slack.PayloadVerifier) func(http.Handler) http.
 			r.Body = io.NopCloser(bytes.NewBuffer(body))
 
 			if err := verifier(r.Context(), r.Header, body); err != nil {
-				handleError(w, r, goerr.Wrap(err, "failed to verify slack request", goerr.T(errs.TagInvalidRequest)))
+				handleError(w, r, goerr.Wrap(err, "failed to verify slack request", goerr.T(errutil.TagInvalidRequest)))
 				return
 			}
 
@@ -336,7 +336,7 @@ func verifySNSRequest(next http.Handler) http.Handler {
 
 		// Verify SNS message signature
 		if err := msg.Verify(r.Context(), client); err != nil {
-			handleError(w, r, goerr.Wrap(err, "failed to verify SNS message", goerr.T(errs.TagInvalidRequest)))
+			handleError(w, r, goerr.Wrap(err, "failed to verify SNS message", goerr.T(errutil.TagInvalidRequest)))
 			return
 		}
 

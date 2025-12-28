@@ -7,7 +7,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
@@ -129,7 +129,7 @@ func Ask[T any](ctx context.Context, llm gollem.LLMClient, prompt string, opts .
 	}
 
 	if response == nil {
-		return nil, goerr.New("failed to get valid response from LLM", goerr.T(errs.TagInvalidLLMResponse))
+		return nil, goerr.New("failed to get valid response from LLM", goerr.T(errutil.TagInvalidLLMResponse))
 	}
 
 	return response, nil

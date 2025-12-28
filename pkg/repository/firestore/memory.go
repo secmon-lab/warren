@@ -9,9 +9,9 @@ import (
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -51,7 +51,7 @@ func (r *Firestore) GetAgentMemory(ctx context.Context, agentID string, id types
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
 			return nil, r.eb.Wrap(goerr.New("agent memory not found"), "not found",
-				goerr.T(errs.TagNotFound),
+				goerr.T(errutil.TagNotFound),
 				goerr.V("agent_id", agentID),
 				goerr.V("id", id))
 		}

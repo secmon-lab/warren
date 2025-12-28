@@ -9,8 +9,8 @@ import (
 	"github.com/m-mizutani/gt"
 	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 )
 
 // TestAgent_InterfaceTool verifies that Agent implements interfaces.Tool
@@ -96,7 +96,7 @@ func TestAgent_InterfaceTool_Disabled(t *testing.T) {
 	// Test Configure() - should return ErrActionUnavailable when disabled
 	err := agent.Configure(ctx)
 	gt.Error(t, err)
-	gt.Equal(t, err, errs.ErrActionUnavailable)
+	gt.Equal(t, err, errutil.ErrActionUnavailable)
 
 	// Test Prompt() - should return empty string when disabled
 	prompt, err := agent.Prompt(ctx)

@@ -6,11 +6,11 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository/activityutil"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
@@ -23,19 +23,19 @@ func (r *Firestore) GetTicket(ctx context.Context, ticketID types.TicketID) (*ti
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
 			return nil, goerr.New("ticket not found",
-				goerr.TV(errs.TicketIDKey, ticketID),
-				goerr.T(errs.TagNotFound))
+				goerr.TV(errutil.TicketIDKey, ticketID),
+				goerr.T(errutil.TagNotFound))
 		}
 		return nil, r.eb.Wrap(err, "failed to get ticket",
-			goerr.TV(errs.TicketIDKey, ticketID),
-			goerr.T(errs.TagDatabase))
+			goerr.TV(errutil.TicketIDKey, ticketID),
+			goerr.T(errutil.TagDatabase))
 	}
 
 	var t ticket.Ticket
 	if err := doc.DataTo(&t); err != nil {
 		return nil, goerr.Wrap(err, "failed to convert data to ticket",
-			goerr.TV(errs.TicketIDKey, ticketID),
-			goerr.T(errs.TagInternal))
+			goerr.TV(errutil.TicketIDKey, ticketID),
+			goerr.T(errutil.TagInternal))
 	}
 
 	return &t, nil
@@ -45,7 +45,7 @@ func (r *Firestore) PutTicket(ctx context.Context, t ticket.Ticket) error {
 	// Reject tickets with invalid embeddings (nil, empty, or zero vector)
 	if isInvalidEmbedding(t.Embedding) {
 		return r.eb.New("ticket has invalid embedding (nil, empty, or zero vector)",
-			goerr.TV(errs.TicketIDKey, t.ID),
+			goerr.TV(errutil.TicketIDKey, t.ID),
 			goerr.V("embedding_length", len(t.Embedding)))
 	}
 
@@ -56,8 +56,8 @@ func (r *Firestore) PutTicket(ctx context.Context, t ticket.Ticket) error {
 	_, err = r.db.Collection(collectionTickets).Doc(t.ID.String()).Set(ctx, t)
 	if err != nil {
 		return r.eb.Wrap(err, "failed to put ticket",
-			goerr.TV(errs.TicketIDKey, t.ID),
-			goerr.T(errs.TagDatabase))
+			goerr.TV(errutil.TicketIDKey, t.ID),
+			goerr.T(errutil.TagDatabase))
 	}
 
 	// Create activity for ticket creation or update (except when called from agent)

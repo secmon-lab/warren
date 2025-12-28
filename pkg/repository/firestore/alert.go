@@ -8,10 +8,10 @@ import (
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository/activityutil"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -21,7 +21,7 @@ func (r *Firestore) PutAlert(ctx context.Context, a alert.Alert) error {
 	// Reject alerts with invalid embeddings (nil, empty, or zero vector)
 	if isInvalidEmbedding(a.Embedding) {
 		return r.eb.New("alert has invalid embedding (nil, empty, or zero vector)",
-			goerr.TV(errs.AlertIDKey, a.ID),
+			goerr.TV(errutil.AlertIDKey, a.ID),
 			goerr.V("embedding_length", len(a.Embedding)))
 	}
 
@@ -29,8 +29,8 @@ func (r *Firestore) PutAlert(ctx context.Context, a alert.Alert) error {
 	_, err := alertDoc.Set(ctx, a)
 	if err != nil {
 		return r.eb.Wrap(err, "failed to put alert",
-			goerr.TV(errs.AlertIDKey, a.ID),
-			goerr.T(errs.TagDatabase))
+			goerr.TV(errutil.AlertIDKey, a.ID),
+			goerr.T(errutil.TagDatabase))
 	}
 	return nil
 }
@@ -41,19 +41,19 @@ func (r *Firestore) GetAlert(ctx context.Context, alertID types.AlertID) (*alert
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
 			return nil, goerr.New("alert not found",
-				goerr.TV(errs.AlertIDKey, alertID),
-				goerr.T(errs.TagNotFound))
+				goerr.TV(errutil.AlertIDKey, alertID),
+				goerr.T(errutil.TagNotFound))
 		}
 		return nil, r.eb.Wrap(err, "failed to get alert",
-			goerr.TV(errs.AlertIDKey, alertID),
-			goerr.T(errs.TagDatabase))
+			goerr.TV(errutil.AlertIDKey, alertID),
+			goerr.T(errutil.TagDatabase))
 	}
 
 	var a alert.Alert
 	if err := doc.DataTo(&a); err != nil {
 		return nil, goerr.Wrap(err, "failed to convert data to alert",
-			goerr.TV(errs.AlertIDKey, alertID),
-			goerr.T(errs.TagInternal))
+			goerr.TV(errutil.AlertIDKey, alertID),
+			goerr.T(errutil.TagInternal))
 	}
 
 	return &a, nil

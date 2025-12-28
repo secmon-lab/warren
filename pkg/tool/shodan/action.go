@@ -12,7 +12,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/urfave/cli/v3"
 )
@@ -195,7 +195,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 
 func (x *Action) Configure(ctx context.Context) error {
 	if x.apiKey == "" {
-		return errs.ErrActionUnavailable
+		return errutil.ErrActionUnavailable
 	}
 	if _, err := url.Parse(x.baseURL); err != nil {
 		return goerr.Wrap(err, "invalid base URL", goerr.V("base_url", x.baseURL))

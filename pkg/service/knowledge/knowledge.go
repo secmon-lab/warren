@@ -7,9 +7,9 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 )
 
 const (
@@ -107,7 +107,7 @@ func (s *Service) SaveKnowledge(ctx context.Context, topic types.KnowledgeTopic,
 	newSize := currentSize + len(content)
 	if newSize > s.sizeLimit {
 		exceeded := newSize - s.sizeLimit
-		return "", goerr.Wrap(errs.ErrKnowledgeQuotaExceeded, "knowledge quota exceeded",
+		return "", goerr.Wrap(errutil.ErrKnowledgeQuotaExceeded, "knowledge quota exceeded",
 			goerr.V("current_size", currentSize),
 			goerr.V("new_content_size", len(content)),
 			goerr.V("total_size", newSize),

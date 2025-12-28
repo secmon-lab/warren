@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/tool/bigquery"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/urfave/cli/v3"
 )
 
@@ -84,7 +84,7 @@ func TestBigQuery_Enabled(t *testing.T) {
 		Name:  "bigquery",
 		Flags: action.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.Equal(t, action.Configure(ctx), errs.ErrActionUnavailable)
+			gt.Equal(t, action.Configure(ctx), errutil.ErrActionUnavailable)
 			return nil
 		},
 	}

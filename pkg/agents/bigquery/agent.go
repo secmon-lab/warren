@@ -10,8 +10,8 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/service/memory"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/urfave/cli/v3"
@@ -196,7 +196,7 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	memories, err := a.memoryService.SearchAndSelectMemories(ctx, query, 16)
 	if err != nil {
 		// Memory search failure is non-critical - continue with empty memories
-		errs.Handle(ctx, goerr.Wrap(err, "memory search failed, continuing without memories"))
+		errutil.Handle(ctx, goerr.Wrap(err, "memory search failed, continuing without memories"))
 		memories = nil
 	} else {
 		log.Debug("Memories found", "count", len(memories))
@@ -260,10 +260,10 @@ func (a *Agent) Run(ctx context.Context, name string, args map[string]any) (map[
 	// Get the full session history for memory extraction
 	history, err := agent.Session().History()
 	if err != nil {
-		errs.Handle(ctx, goerr.Wrap(err, "failed to get session history"))
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to get session history"))
 	} else if err := a.memoryService.ExtractAndSaveMemories(ctx, query, memories, history); err != nil {
 		// Memory extraction failure is non-critical
-		errs.Handle(ctx, goerr.Wrap(err, "failed to extract and save memories"))
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to extract and save memories"))
 		msg.Warn(ctx, "⚠️ *Warning:* Failed to save execution memories")
 	}
 
@@ -299,7 +299,7 @@ func (a *Agent) Name() string {
 // Configure implements interfaces.Tool
 func (a *Agent) Configure(ctx context.Context) error {
 	if !a.IsEnabled() {
-		return errs.ErrActionUnavailable
+		return errutil.ErrActionUnavailable
 	}
 	return nil
 }

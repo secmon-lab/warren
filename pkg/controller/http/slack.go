@@ -7,7 +7,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	slack_ctrl "github.com/secmon-lab/warren/pkg/controller/slack"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
@@ -24,7 +24,7 @@ func slackEventHandler(ctrl *slack_ctrl.Controller) http.HandlerFunc {
 		eventsAPIEvent, err := slackevents.ParseEvent(json.RawMessage(body), slackevents.OptionNoVerifyToken())
 		if err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to parse slack event",
-				goerr.T(errs.TagInvalidRequest),
+				goerr.T(errutil.TagInvalidRequest),
 				goerr.V("body", string(body)),
 			))
 			return
@@ -36,7 +36,7 @@ func slackEventHandler(ctrl *slack_ctrl.Controller) http.HandlerFunc {
 			err := json.Unmarshal([]byte(body), &response)
 			if err != nil {
 				handleError(w, r, goerr.Wrap(err, "failed to unmarshal slack challenge response",
-					goerr.T(errs.TagInvalidRequest),
+					goerr.T(errutil.TagInvalidRequest),
 					goerr.V("body", string(body)),
 				))
 				return
@@ -73,7 +73,7 @@ func slackInteractionHandler(slackCtrl *slack_ctrl.Controller) http.HandlerFunc 
 		payload := r.FormValue("payload")
 		if payload == "" {
 			handleError(w, r, goerr.New("payload is required",
-				goerr.T(errs.TagInvalidRequest)),
+				goerr.T(errutil.TagInvalidRequest)),
 			)
 			return
 		}
@@ -81,7 +81,7 @@ func slackInteractionHandler(slackCtrl *slack_ctrl.Controller) http.HandlerFunc 
 		var interaction slack.InteractionCallback
 		if err := json.Unmarshal([]byte(payload), &interaction); err != nil {
 			handleError(w, r, goerr.Wrap(err, "failed to unmarshal slack interaction",
-				goerr.T(errs.TagInvalidRequest),
+				goerr.T(errutil.TagInvalidRequest),
 				goerr.V("payload", payload),
 			))
 			return

@@ -5,8 +5,8 @@ import (
 	"runtime/debug"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/request_id"
@@ -21,14 +21,14 @@ func Dispatch(ctx context.Context, handler func(ctx context.Context) error) {
 		defer func() {
 			if r := recover(); r != nil {
 				stack := debug.Stack()
-				errs.Handle(newCtx, goerr.New("panic in async handler",
+				errutil.Handle(newCtx, goerr.New("panic in async handler",
 					goerr.V("recover", r),
 					goerr.V("stack", string(stack))))
 			}
 		}()
 
 		if err := handler(newCtx); err != nil {
-			errs.Handle(newCtx, err)
+			errutil.Handle(newCtx, err)
 		}
 	}()
 }

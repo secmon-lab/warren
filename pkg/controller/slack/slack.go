@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/utils/async"
 	"github.com/secmon-lab/warren/pkg/utils/authctx"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 	"github.com/slack-go/slack"
@@ -18,7 +18,7 @@ import (
 func dispatch(ctx context.Context, handler func(ctx context.Context) error) {
 	if IsSync(ctx) {
 		if err := handler(ctx); err != nil {
-			errs.Handle(ctx, err)
+			errutil.Handle(ctx, err)
 		}
 		return
 	}
