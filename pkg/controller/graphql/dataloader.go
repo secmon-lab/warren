@@ -9,10 +9,10 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 )
 
 type ctxKey string
@@ -119,7 +119,7 @@ func userBatchFn(slackClient interfaces.SlackClient) func(ctx context.Context, k
 			slackUsers, err := slackClient.GetUsersInfo(keys...)
 			if err != nil {
 				// Handle the error for debugging
-				errs.Handle(ctx, goerr.Wrap(err, "failed to get users info from Slack", goerr.V("userIDs", keys)))
+				errutil.Handle(ctx, goerr.Wrap(err, "failed to get users info from Slack", goerr.V("userIDs", keys)))
 				// If Slack API fails with user_not_found or similar errors, fallback to ID instead of propagating error
 				// This prevents the entire query from failing when some users don't exist in Slack
 				for i, id := range keys {

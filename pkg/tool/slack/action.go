@@ -14,7 +14,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/urfave/cli/v3"
 )
@@ -303,7 +303,7 @@ func (x *Action) formatOutput(resp *SearchResponse) SearchOutput {
 
 func (x *Action) Configure(ctx context.Context) error {
 	if x.oauthToken == "" {
-		return errs.ErrActionUnavailable
+		return errutil.ErrActionUnavailable
 	}
 
 	// Initialize HTTP client if not already set

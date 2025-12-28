@@ -8,7 +8,7 @@ import (
 	"cloud.google.com/go/firestore/apiv1/firestorepb"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 )
 
 type Firestore struct {
@@ -27,7 +27,7 @@ func New(ctx context.Context, projectID, databaseID string) (*Firestore, error) 
 	return &Firestore{
 		db: db,
 		eb: goerr.NewBuilder(
-			goerr.TV(errs.RepositoryKey, "firestore"),
+			goerr.TV(errutil.RepositoryKey, "firestore"),
 			goerr.V("project_id", projectID),
 			goerr.V("database_id", databaseID),
 		),
@@ -62,7 +62,7 @@ func extractCountFromAggregationResult(result firestore.AggregationResult, alias
 	if !ok {
 		return 0, goerr.New("count alias not found in aggregation result",
 			goerr.V("alias", alias),
-			goerr.T(errs.TagInternal))
+			goerr.T(errutil.TagInternal))
 	}
 
 	switch v := countVal.(type) {
@@ -76,17 +76,17 @@ func extractCountFromAggregationResult(result firestore.AggregationResult, alias
 			return 0, goerr.New("firestorepb.Value from count is not an integer type",
 				goerr.V("value_type", fmt.Sprintf("%T", v.ValueType)),
 				goerr.V("alias", alias),
-				goerr.T(errs.TagInternal))
+				goerr.T(errutil.TagInternal))
 		}
 		return 0, goerr.New("count value is a nil or invalid *firestorepb.Value",
 			goerr.V("alias", alias),
-			goerr.T(errs.TagInternal))
+			goerr.T(errutil.TagInternal))
 	default:
 		return 0, goerr.New("unexpected count value type from Firestore aggregation",
 			goerr.V("type", fmt.Sprintf("%T", v)),
 			goerr.V("value", v),
 			goerr.V("alias", alias),
-			goerr.T(errs.TagInternal))
+			goerr.T(errutil.TagInternal))
 	}
 }
 

@@ -12,8 +12,8 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/bigquery"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
@@ -153,12 +153,12 @@ func (x *Action) Flags() []cli.Flag {
 
 func (x *Action) Configure(ctx context.Context) error {
 	if x.projectID == "" {
-		return errs.ErrActionUnavailable
+		return errutil.ErrActionUnavailable
 	}
 
 	if len(x.configFiles) == 0 {
 		logging.Default().Warn("project ID is provided, but no configuration file is provided. bigquery tool is disabled.")
-		return errs.ErrActionUnavailable
+		return errutil.ErrActionUnavailable
 	}
 
 	// Initialize runbooks map if not already done

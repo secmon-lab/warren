@@ -5,9 +5,9 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -20,7 +20,7 @@ func (r *Firestore) PutSession(ctx context.Context, sess *session.Session) error
 		return r.eb.Wrap(err, "failed to put session",
 			goerr.V("session_id", sess.ID),
 			goerr.V("ticket_id", sess.TicketID),
-			goerr.T(errs.TagDatabase))
+			goerr.T(errutil.TagDatabase))
 	}
 	return nil
 }
@@ -33,14 +33,14 @@ func (r *Firestore) GetSession(ctx context.Context, sessionID types.SessionID) (
 		}
 		return nil, r.eb.Wrap(err, "failed to get session",
 			goerr.V("session_id", sessionID),
-			goerr.T(errs.TagDatabase))
+			goerr.T(errutil.TagDatabase))
 	}
 
 	var sess session.Session
 	if err := doc.DataTo(&sess); err != nil {
 		return nil, goerr.Wrap(err, "failed to convert data to session",
 			goerr.V("session_id", sessionID),
-			goerr.T(errs.TagInternal))
+			goerr.T(errutil.TagInternal))
 	}
 	return &sess, nil
 }
@@ -61,14 +61,14 @@ func (r *Firestore) GetSessionsByTicket(ctx context.Context, ticketID types.Tick
 		if err != nil {
 			return nil, r.eb.Wrap(err, "failed to query sessions by ticket",
 				goerr.V("ticket_id", ticketID),
-				goerr.T(errs.TagDatabase))
+				goerr.T(errutil.TagDatabase))
 		}
 
 		var sess session.Session
 		if err := doc.DataTo(&sess); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to session",
 				goerr.V("ticket_id", ticketID),
-				goerr.T(errs.TagInternal))
+				goerr.T(errutil.TagInternal))
 		}
 		sessions = append(sessions, &sess)
 	}
@@ -85,7 +85,7 @@ func (r *Firestore) DeleteSession(ctx context.Context, sessionID types.SessionID
 		}
 		return r.eb.Wrap(err, "failed to delete session",
 			goerr.V("session_id", sessionID),
-			goerr.T(errs.TagDatabase))
+			goerr.T(errutil.TagDatabase))
 	}
 	return nil
 }
@@ -101,7 +101,7 @@ func (r *Firestore) PutSessionMessage(ctx context.Context, message *session.Mess
 		return r.eb.Wrap(err, "failed to put session message",
 			goerr.V("session_id", message.SessionID),
 			goerr.V("message_id", message.ID),
-			goerr.T(errs.TagDatabase))
+			goerr.T(errutil.TagDatabase))
 	}
 	return nil
 }
@@ -125,14 +125,14 @@ func (r *Firestore) GetSessionMessages(ctx context.Context, sessionID types.Sess
 		if err != nil {
 			return nil, r.eb.Wrap(err, "failed to query session messages",
 				goerr.V("session_id", sessionID),
-				goerr.T(errs.TagDatabase))
+				goerr.T(errutil.TagDatabase))
 		}
 
 		var msg session.Message
 		if err := doc.DataTo(&msg); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to message",
 				goerr.V("session_id", sessionID),
-				goerr.T(errs.TagInternal))
+				goerr.T(errutil.TagInternal))
 		}
 		messages = append(messages, &msg)
 	}

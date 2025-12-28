@@ -15,7 +15,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
@@ -86,12 +86,12 @@ func (x *Action) LogValue() slog.Value {
 func (x *Action) Configure(ctx context.Context) error {
 	// Validate required settings
 	if x.appID == 0 || x.installationID == 0 || x.privateKey == "" {
-		return errs.ErrActionUnavailable
+		return errutil.ErrActionUnavailable
 	}
 
 	if len(x.configFiles) == 0 {
 		logging.Default().Warn("GitHub App credentials provided but no config files specified")
-		return errs.ErrActionUnavailable
+		return errutil.ErrActionUnavailable
 	}
 
 	// Private key is already loaded from flag/env var

@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
@@ -38,12 +38,12 @@ type HTTPClient interface {
 func (x *SNS) Verify(ctx context.Context, client HTTPClient) error {
 	parsedURL, err := url.Parse(x.SigningCertURL)
 	if err != nil {
-		return goerr.Wrap(err, "failed to parse signing cert URL", goerr.T(errs.TagInvalidRequest), goerr.V("url", x.SigningCertURL))
+		return goerr.Wrap(err, "failed to parse signing cert URL", goerr.T(errutil.TagInvalidRequest), goerr.V("url", x.SigningCertURL))
 	}
 
 	// Check if the URL is from AWS SNS
 	if !strings.HasPrefix(parsedURL.Host, "sns.") || !strings.HasSuffix(parsedURL.Host, ".amazonaws.com") || !strings.HasPrefix(parsedURL.Path, "/SimpleNotificationService-") {
-		return goerr.New("invalid signing cert URL", goerr.T(errs.TagInvalidRequest), goerr.V("url", x.SigningCertURL))
+		return goerr.New("invalid signing cert URL", goerr.T(errutil.TagInvalidRequest), goerr.V("url", x.SigningCertURL))
 	}
 
 	if client == nil {
@@ -122,7 +122,7 @@ func (x *SNS) Verify(ctx context.Context, client HTTPClient) error {
 		alg = x509.SHA256WithRSA
 		hash = crypto.SHA256
 	default:
-		return goerr.New("invalid signature version", goerr.T(errs.TagInvalidRequest), goerr.V("version", x.SignatureVersion))
+		return goerr.New("invalid signature version", goerr.T(errutil.TagInvalidRequest), goerr.V("version", x.SignatureVersion))
 	}
 
 	if err := cert.CheckSignature(alg, []byte(stringToSign.String()), signature); err != nil {

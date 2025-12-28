@@ -6,15 +6,15 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 )
 
 // GetUserIcon returns the user's icon image data and content type
 func (u *UseCases) GetUserIcon(ctx context.Context, userID string) ([]byte, string, error) {
 	if u.slackService == nil {
 		return nil, "", goerr.New("slack service not configured",
-			goerr.T(errs.TagInternal))
+			goerr.T(errutil.TagInternal))
 	}
 	return u.slackService.GetUserIcon(ctx, userID)
 }
@@ -23,7 +23,7 @@ func (u *UseCases) GetUserIcon(ctx context.Context, userID string) ([]byte, stri
 func (u *UseCases) GetUserProfile(ctx context.Context, userID string) (string, error) {
 	if u.slackService == nil {
 		return "", goerr.New("slack service not configured",
-			goerr.T(errs.TagInternal))
+			goerr.T(errutil.TagInternal))
 	}
 	return u.slackService.GetUserProfile(ctx, userID)
 }
@@ -34,12 +34,12 @@ func (u *UseCases) GenerateTicketAlertsJSONL(ctx context.Context, ticketID types
 	ticket, err := u.repository.GetTicket(ctx, ticketID)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get ticket",
-			goerr.TV(errs.TicketIDKey, ticketID))
+			goerr.TV(errutil.TicketIDKey, ticketID))
 	}
 	if ticket == nil {
 		return nil, goerr.New("ticket not found",
-			goerr.TV(errs.TicketIDKey, ticketID),
-			goerr.T(errs.TagNotFound))
+			goerr.TV(errutil.TicketIDKey, ticketID),
+			goerr.T(errutil.TagNotFound))
 	}
 
 	// Get alerts for the ticket
@@ -48,7 +48,7 @@ func (u *UseCases) GenerateTicketAlertsJSONL(ctx context.Context, ticketID types
 		alerts, err = u.repository.BatchGetAlerts(ctx, ticket.AlertIDs)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to get alerts",
-				goerr.TV(errs.TicketIDKey, ticketID))
+				goerr.TV(errutil.TicketIDKey, ticketID))
 		}
 	}
 

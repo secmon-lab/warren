@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 )
 
 // renderToMarkdown converts AST to standard markdown
@@ -127,7 +127,7 @@ func (c *Converter) renderUserMention(ctx context.Context, node *userMentionNode
 	// Try to get user profile from service
 	if c.service != nil {
 		if profile, err := c.service.GetUserProfile(ctx, node.UserID); err != nil {
-			errs.Handle(ctx, goerr.Wrap(err, "failed to get user profile",
+			errutil.Handle(ctx, goerr.Wrap(err, "failed to get user profile",
 				goerr.V("userID", node.UserID)))
 		} else if profile != "" {
 			c.cache.setCached("users", node.UserID, profile, c.ttl)
@@ -152,7 +152,7 @@ func (c *Converter) renderChannelLink(ctx context.Context, node *channelLinkNode
 	// Try to get channel name from service
 	if c.service != nil {
 		if channelName, err := c.service.GetChannelName(ctx, node.ChannelID); err != nil {
-			errs.Handle(ctx, goerr.Wrap(err, "failed to get channel name",
+			errutil.Handle(ctx, goerr.Wrap(err, "failed to get channel name",
 				goerr.V("channelID", node.ChannelID)))
 		} else if channelName != "" {
 			c.cache.setCached("channels", node.ChannelID, channelName, c.ttl)
@@ -177,7 +177,7 @@ func (c *Converter) renderUserGroupMention(ctx context.Context, node *userGroupM
 	// Try to get user group name from service
 	if c.service != nil {
 		if groupName, err := c.service.GetUserGroupName(ctx, node.GroupID); err != nil {
-			errs.Handle(ctx, goerr.Wrap(err, "failed to get user group name",
+			errutil.Handle(ctx, goerr.Wrap(err, "failed to get user group name",
 				goerr.V("groupID", node.GroupID)))
 		} else if groupName != "" {
 			c.cache.setCached("userGroups", node.GroupID, groupName, c.ttl)

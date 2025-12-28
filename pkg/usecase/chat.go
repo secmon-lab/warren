@@ -15,7 +15,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
@@ -27,6 +26,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/request_id"
@@ -50,11 +50,11 @@ func (x *UseCases) setupChatMessageFuncs(ctx context.Context, repo interfaces.Re
 		// Save response message to repository
 		m := session.NewMessage(ctx, sess.ID, session.MessageTypeResponse, message)
 		if err := repo.PutSessionMessage(ctx, m); err != nil {
-			errs.Handle(ctx, err)
+			errutil.Handle(ctx, err)
 		}
 		// Post to Slack
 		if err := threadSvc.PostComment(ctx, message); err != nil {
-			errs.Handle(ctx, err)
+			errutil.Handle(ctx, err)
 		}
 	}
 
@@ -65,7 +65,7 @@ func (x *UseCases) setupChatMessageFuncs(ctx context.Context, repo interfaces.Re
 			// Save message to repository
 			m := session.NewMessage(ctx, sess.ID, msgType, message)
 			if err := repo.PutSessionMessage(ctx, m); err != nil {
-				errs.Handle(ctx, err)
+				errutil.Handle(ctx, err)
 			}
 
 			// Initialize or update the Slack message
@@ -85,11 +85,11 @@ func (x *UseCases) setupChatMessageFuncs(ctx context.Context, repo interfaces.Re
 		// Save warning message to repository
 		m := session.NewMessage(ctx, sess.ID, session.MessageTypeWarning, message)
 		if err := repo.PutSessionMessage(ctx, m); err != nil {
-			errs.Handle(ctx, err)
+			errutil.Handle(ctx, err)
 		}
 		// Post to Slack as a new comment
 		if err := threadSvc.PostComment(ctx, message); err != nil {
-			errs.Handle(ctx, err)
+			errutil.Handle(ctx, err)
 		}
 	}
 
@@ -437,7 +437,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			// Save response message to repository (must happen before Slack post)
 			m := session.NewMessage(ctx, ssn.ID, session.MessageTypeResponse, warrenResponse)
 			if err := x.repository.PutSessionMessage(ctx, m); err != nil {
-				errs.Handle(ctx, err)
+				errutil.Handle(ctx, err)
 			}
 
 			// Post agent message to Slack and get message ID
@@ -445,7 +445,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			logging.From(ctx).Debug("message notify", "from", "Agent", "msg", warrenResponse)
 			ts, err := threadSvc.PostCommentWithMessageID(ctx, warrenResponse)
 			if err != nil {
-				errs.Handle(ctx, goerr.Wrap(err, "failed to post agent message to slack"))
+				errutil.Handle(ctx, goerr.Wrap(err, "failed to post agent message to slack"))
 			} else {
 				comment := target.NewComment(agentCtx, warrenResponse, botUser, ts)
 
@@ -454,7 +454,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 					if data, jsonErr := json.Marshal(comment); jsonErr == nil {
 						logger.Error("failed to save ticket comment", "error", err, "comment", string(data))
 					}
-					errs.Handle(ctx, goerr.Wrap(err, "failed to save ticket comment", goerr.V("comment", comment)))
+					errutil.Handle(ctx, goerr.Wrap(err, "failed to save ticket comment", goerr.V("comment", comment)))
 				}
 			}
 
@@ -529,7 +529,7 @@ func toolCallToText(ctx context.Context, llmClient gollem.LLMClient, spec *golle
 	)
 	defaultMsg := fmt.Sprintf("⚡ Execute Tool: `%s`", call.Name)
 	if spec == nil {
-		errs.Handle(ctx, eb.New("tool not found"))
+		errutil.Handle(ctx, eb.New("tool not found"))
 		return defaultMsg
 	}
 
@@ -539,24 +539,24 @@ func toolCallToText(ctx context.Context, llmClient gollem.LLMClient, spec *golle
 		"lang":      lang.From(ctx),
 	})
 	if err != nil {
-		errs.Handle(ctx, eb.Wrap(err, "failed to generate prompt"))
+		errutil.Handle(ctx, eb.Wrap(err, "failed to generate prompt"))
 		return defaultMsg
 	}
 
 	session, err := llmClient.NewSession(ctx)
 	if err != nil {
-		errs.Handle(ctx, eb.Wrap(err, "failed to create session"))
+		errutil.Handle(ctx, eb.Wrap(err, "failed to create session"))
 		return defaultMsg
 	}
 
 	response, err := session.GenerateContent(ctx, gollem.Text(prompt))
 	if err != nil {
-		errs.Handle(ctx, eb.Wrap(err, "failed to generate content"))
+		errutil.Handle(ctx, eb.Wrap(err, "failed to generate content"))
 		return defaultMsg
 	}
 
 	if len(response.Texts) == 0 {
-		errs.Handle(ctx, eb.New("no response"))
+		errutil.Handle(ctx, eb.New("no response"))
 		return defaultMsg
 	}
 

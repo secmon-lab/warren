@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/tool/shodan"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/urfave/cli/v3"
 )
@@ -180,7 +180,7 @@ func TestShodan_Enabled(t *testing.T) {
 		Name:  "shodan",
 		Flags: action.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.Equal(t, action.Configure(ctx), errs.ErrActionUnavailable)
+			gt.Equal(t, action.Configure(ctx), errutil.ErrActionUnavailable)
 			return nil
 		},
 	}

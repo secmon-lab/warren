@@ -9,8 +9,8 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
@@ -112,7 +112,7 @@ func test(ctx context.Context, queryFunc QueryFunc, testData *TestData, shouldDe
 						results = append(results, goerr.New("should be detected, but not detected",
 							goerr.V("schema", schema),
 							goerr.V("filename", filename),
-							goerr.T(errs.TagTestFailed)))
+							goerr.T(errutil.TagTestFailed)))
 					}
 					continue
 				}
@@ -123,7 +123,7 @@ func test(ctx context.Context, queryFunc QueryFunc, testData *TestData, shouldDe
 				results = append(results, goerr.New("should be detected, but not detected",
 					goerr.V("schema", schema),
 					goerr.V("filename", filename),
-					goerr.T(errs.TagTestFailed)))
+					goerr.T(errutil.TagTestFailed)))
 				continue
 			}
 
@@ -132,7 +132,7 @@ func test(ctx context.Context, queryFunc QueryFunc, testData *TestData, shouldDe
 				results = append(results, goerr.New("should be ignored, but detected",
 					goerr.V("schema", schema),
 					goerr.V("filename", filename),
-					goerr.T(errs.TagTestFailed)))
+					goerr.T(errutil.TagTestFailed)))
 				continue
 			}
 

@@ -1,4 +1,4 @@
-package errs_test
+package errutil_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/request_id"
 )
 
@@ -32,7 +32,7 @@ func TestHandle(t *testing.T) {
 		ctx = request_id.With(ctx, "test-request-id-123")
 
 		testErr := goerr.New("test error with request ID")
-		errs.Handle(ctx, testErr)
+		errutil.Handle(ctx, testErr)
 
 		sentry.Flush(0)
 
@@ -47,7 +47,7 @@ func TestHandle(t *testing.T) {
 		ctx := context.Background()
 
 		testErr := goerr.New("test error without request ID")
-		errs.Handle(ctx, testErr)
+		errutil.Handle(ctx, testErr)
 
 		sentry.Flush(0)
 
@@ -64,7 +64,7 @@ func TestHandle(t *testing.T) {
 		ctx = request_id.With(ctx, "")
 
 		testErr := goerr.New("test error with empty request ID")
-		errs.Handle(ctx, testErr)
+		errutil.Handle(ctx, testErr)
 
 		sentry.Flush(0)
 

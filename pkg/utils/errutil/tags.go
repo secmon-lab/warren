@@ -1,4 +1,4 @@
-package errs
+package errutil
 
 import "github.com/m-mizutani/goerr/v2"
 

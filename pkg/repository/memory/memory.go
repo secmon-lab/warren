@@ -8,12 +8,12 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 )
 
 type Memory struct {
@@ -64,7 +64,7 @@ func New() *Memory {
 		session:        newSessionStore(),
 		knowledge:      newKnowledgeStore(),
 		callCounts:     make(map[string]int),
-		eb:             goerr.NewBuilder(goerr.TV(errs.RepositoryKey, "memory")),
+		eb:             goerr.NewBuilder(goerr.TV(errutil.RepositoryKey, "memory")),
 	}
 }
 

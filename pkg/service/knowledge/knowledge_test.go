@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/knowledge"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 )
 
 func TestServiceSaveAndGet(t *testing.T) {
@@ -59,7 +59,7 @@ func TestServiceQuotaCheck(t *testing.T) {
 	// Try to add 1 more byte (should fail)
 	_, err = svc.SaveKnowledge(ctx, topic, "slug3", "Name 3", "x", types.SystemUserID)
 	gt.Error(t, err)
-	gt.True(t, errors.Is(err, errs.ErrKnowledgeQuotaExceeded))
+	gt.True(t, errors.Is(err, errutil.ErrKnowledgeQuotaExceeded))
 }
 
 func TestServiceQuotaWithUpdate(t *testing.T) {

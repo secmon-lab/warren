@@ -6,7 +6,6 @@ import (
 
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/tool/abusech"
 	"github.com/secmon-lab/warren/pkg/tool/bigquery"
 	"github.com/secmon-lab/warren/pkg/tool/github"
@@ -16,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/tool/slack"
 	"github.com/secmon-lab/warren/pkg/tool/urlscan"
 	"github.com/secmon-lab/warren/pkg/tool/vt"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/urfave/cli/v3"
 )
 
@@ -91,7 +91,7 @@ func (x toolList) ToolSets(ctx context.Context) ([]gollem.ToolSet, error) {
 	toolSets := []gollem.ToolSet{}
 	for _, tool := range x {
 		if err := tool.Configure(ctx); err != nil {
-			if err == errs.ErrActionUnavailable {
+			if err == errutil.ErrActionUnavailable {
 				continue
 			}
 			return nil, err

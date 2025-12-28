@@ -17,11 +17,11 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/secmon-lab/warren/pkg/utils/test"
@@ -587,7 +587,7 @@ func (x *ThreadService) Reply(ctx context.Context, message string) {
 	)
 
 	if err != nil {
-		errs.Handle(ctx, goerr.Wrap(err, "failed to reply to slack",
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to reply to slack",
 			goerr.V("channelID", x.channelID),
 			goerr.V("threadID", x.threadID),
 			goerr.V("message", message),
@@ -719,7 +719,7 @@ func (x *ThreadService) postInitialMessage(ctx context.Context, blocks []slack.B
 	)
 
 	if err != nil {
-		errs.Handle(ctx, goerr.Wrap(err, "failed to post message to slack",
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to post message to slack",
 			goerr.V("channelID", x.channelID),
 			goerr.V("threadID", x.threadID),
 			goerr.V("blocks", blocks),
@@ -737,7 +737,7 @@ func (x *ThreadService) updateMessage(ctx context.Context, msgID string, blocks 
 		slack.MsgOptionBlocks(blocks...),
 	)
 	if err != nil {
-		errs.Handle(ctx, goerr.Wrap(err, "failed to update message to slack",
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to update message to slack",
 			goerr.V("channelID", x.channelID),
 			goerr.V("threadID", x.threadID),
 			goerr.V("msgID", msgID),

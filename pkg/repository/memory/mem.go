@@ -9,9 +9,9 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 )
 
 // SaveAgentMemory saves an agent memory record
@@ -64,7 +64,7 @@ func (r *Memory) GetAgentMemory(ctx context.Context, agentID string, id types.Ag
 	mem, ok := r.agentMemories[id]
 	if !ok {
 		return nil, r.eb.Wrap(goerr.New("agent memory not found"), "not found",
-			goerr.T(errs.TagNotFound),
+			goerr.T(errutil.TagNotFound),
 			goerr.V("agent_id", agentID),
 			goerr.V("id", id))
 	}
@@ -72,7 +72,7 @@ func (r *Memory) GetAgentMemory(ctx context.Context, agentID string, id types.Ag
 	// Verify agent_id matches (for consistency with subcollection behavior)
 	if mem.AgentID != agentID {
 		return nil, r.eb.Wrap(goerr.New("agent memory not found"), "agent_id mismatch",
-			goerr.T(errs.TagNotFound),
+			goerr.T(errutil.TagNotFound),
 			goerr.V("agent_id", agentID),
 			goerr.V("id", id))
 	}
@@ -163,7 +163,7 @@ func (r *Memory) UpdateMemoryScore(ctx context.Context, agentID string, memoryID
 	mem, ok := r.agentMemories[memoryID]
 	if !ok {
 		return r.eb.Wrap(goerr.New("agent memory not found"), "not found",
-			goerr.T(errs.TagNotFound),
+			goerr.T(errutil.TagNotFound),
 			goerr.V("agent_id", agentID),
 			goerr.V("memory_id", memoryID))
 	}
@@ -171,7 +171,7 @@ func (r *Memory) UpdateMemoryScore(ctx context.Context, agentID string, memoryID
 	// Verify agent_id matches
 	if mem.AgentID != agentID {
 		return r.eb.Wrap(goerr.New("agent memory not found"), "agent_id mismatch",
-			goerr.T(errs.TagNotFound),
+			goerr.T(errutil.TagNotFound),
 			goerr.V("agent_id", agentID),
 			goerr.V("memory_id", memoryID))
 	}
