@@ -18,6 +18,9 @@ import KnowledgePage from "@/pages/KnowledgePage";
 import KnowledgeTopicPage from "@/pages/KnowledgeTopicPage";
 import SessionDetailPage from "@/pages/SessionDetailPage";
 import SettingsPage from "@/pages/SettingsPage";
+import AgentMemoryListPage from "@/pages/AgentMemoryListPage";
+import AgentMemoriesPage from "@/pages/AgentMemoriesPage";
+import AgentMemoryDetailPage from "@/pages/AgentMemoryDetailPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 
 function AuthenticatedApp() {
@@ -34,6 +37,9 @@ function AuthenticatedApp() {
         <Route path="/knowledge" element={<KnowledgePage />} />
         <Route path="/knowledge/:topic" element={<KnowledgeTopicPage />} />
         <Route path="/sessions/:id" element={<SessionDetailPage />} />
+        <Route path="/memory" element={<AgentMemoryListPage />} />
+        <Route path="/memory/:agentId" element={<AgentMemoriesPage />} />
+        <Route path="/memory/:agentId/:memoryId" element={<AgentMemoryDetailPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

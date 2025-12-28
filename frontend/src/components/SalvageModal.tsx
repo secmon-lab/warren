@@ -354,7 +354,7 @@ export function SalvageModal({ isOpen, onClose, ticketId }: SalvageModalProps) {
                               {alert.schema}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
-                              {new Date(alert.createdAt).toLocaleString()}
+                              {new Date(alert.createdAt).toISOString().split('T')[0].replace(/-/g, '/')} {new Date(alert.createdAt).toISOString().split('T')[1].split('.')[0]}
                             </span>
                           </div>
                           <h4 className="font-medium text-sm mb-1 line-clamp-2">

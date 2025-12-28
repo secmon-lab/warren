@@ -7,6 +7,7 @@ import {
   GitBranch,
   Settings,
   BookOpen,
+  Brain,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,11 @@ const navigation = [
     name: "Knowledge",
     href: "/knowledge",
     icon: BookOpen,
+  },
+  {
+    name: "Memory",
+    href: "/memory",
+    icon: Brain,
   },
   {
     name: "Settings",

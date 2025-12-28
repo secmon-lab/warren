@@ -2,10 +2,13 @@ package firestore
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -241,4 +244,133 @@ func (r *Firestore) ListAgentMemories(ctx context.Context, agentID string) ([]*m
 	}
 
 	return memories, nil
+}
+
+// ListAllAgentIDs returns all agent IDs that have memories with their counts and latest memory timestamp
+// Uses CollectionGroup query to find all memories subcollections regardless of parent document existence
+func (r *Firestore) ListAllAgentIDs(ctx context.Context) ([]*interfaces.AgentSummary, error) {
+	// Use map to aggregate data by agentID
+	agentMap := make(map[string]*interfaces.AgentSummary)
+
+	// Use CollectionGroup to query all memories subcollections
+	memoryDocs := r.db.CollectionGroup(subcollectionMemories).Documents(ctx)
+
+	for {
+		doc, err := memoryDocs.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, r.eb.Wrap(err, "failed to iterate memory documents")
+		}
+
+		// Extract agent ID from document path: agents/{agentID}/memories/{memoryID}
+		// doc.Ref.Path = "agents/{agentID}/memories/{memoryID}"
+		agentID := doc.Ref.Parent.Parent.ID
+
+		// Extract only CreatedAt field to avoid decoding issues with embeddings
+		data := doc.Data()
+		createdAtVal, ok := data["CreatedAt"]
+		if !ok {
+			// Skip memories without CreatedAt
+			continue
+		}
+		createdAt, ok := createdAtVal.(time.Time)
+		if !ok {
+			// Skip if CreatedAt is not a time
+			continue
+		}
+
+		// Update or create summary
+		if summary, exists := agentMap[agentID]; exists {
+			summary.Count++
+			if createdAt.After(summary.LatestMemoryAt) {
+				summary.LatestMemoryAt = createdAt
+			}
+		} else {
+			agentMap[agentID] = &interfaces.AgentSummary{
+				AgentID:        agentID,
+				Count:          1,
+				LatestMemoryAt: createdAt,
+			}
+		}
+	}
+
+	// Convert map to slice
+	result := make([]*interfaces.AgentSummary, 0, len(agentMap))
+	for _, summary := range agentMap {
+		result = append(result, summary)
+	}
+
+	return result, nil
+}
+
+// ListAgentMemoriesWithOptions lists memories with filtering, sorting, and pagination
+// Note: Firestore implementation fetches all memories and applies filtering/sorting in-memory
+// to avoid requiring additional composite indexes
+func (r *Firestore) ListAgentMemoriesWithOptions(ctx context.Context, agentID string, opts interfaces.AgentMemoryListOptions) ([]*memory.AgentMemory, int, error) {
+	// Fetch all memories for the agent
+	allMemories, err := r.ListAgentMemories(ctx, agentID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Filter by keyword
+	var filtered []*memory.AgentMemory
+	for _, mem := range allMemories {
+		// Filter by keyword
+		if opts.Keyword != nil && *opts.Keyword != "" {
+			keyword := strings.ToLower(*opts.Keyword)
+			if !strings.Contains(strings.ToLower(mem.Query), keyword) &&
+				!strings.Contains(strings.ToLower(mem.Claim), keyword) {
+				continue
+			}
+		}
+
+		// Filter by score range
+		if opts.MinScore != nil && mem.Score < *opts.MinScore {
+			continue
+		}
+		if opts.MaxScore != nil && mem.Score > *opts.MaxScore {
+			continue
+		}
+
+		filtered = append(filtered, mem)
+	}
+
+	totalCount := len(filtered)
+
+	// Sort
+	sortBy := opts.SortBy
+	if sortBy == "" {
+		sortBy = "created_at"
+	}
+
+	sort.Slice(filtered, func(i, j int) bool {
+		var less bool
+		switch sortBy {
+		case "score":
+			less = filtered[i].Score < filtered[j].Score
+		case "last_used_at":
+			less = filtered[i].LastUsedAt.Before(filtered[j].LastUsedAt)
+		default: // "created_at"
+			less = filtered[i].CreatedAt.Before(filtered[j].CreatedAt)
+		}
+		if opts.SortDesc {
+			return !less
+		}
+		return less
+	})
+
+	// Paginate
+	start := opts.Offset
+	if start > len(filtered) {
+		start = len(filtered)
+	}
+	end := start + opts.Limit
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+
+	return filtered[start:end], totalCount, nil
 }

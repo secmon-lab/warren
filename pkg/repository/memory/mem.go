@@ -4,9 +4,11 @@ import (
 	"context"
 	"math"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/errs"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -254,4 +256,105 @@ func (r *Memory) ListAgentMemories(ctx context.Context, agentID string) ([]*memo
 	})
 
 	return memories, nil
+}
+
+// ListAgentMemoriesWithOptions lists memories with filtering, sorting, and pagination
+func (r *Memory) ListAgentMemoriesWithOptions(ctx context.Context, agentID string, opts interfaces.AgentMemoryListOptions) ([]*memory.AgentMemory, int, error) {
+	r.memoryMu.RLock()
+	defer r.memoryMu.RUnlock()
+
+	var memories []*memory.AgentMemory
+	for _, mem := range r.agentMemories {
+		if mem.AgentID != agentID {
+			continue
+		}
+
+		// Filter by keyword
+		if opts.Keyword != nil && *opts.Keyword != "" {
+			keyword := strings.ToLower(*opts.Keyword)
+			if !strings.Contains(strings.ToLower(mem.Query), keyword) &&
+				!strings.Contains(strings.ToLower(mem.Claim), keyword) {
+				continue
+			}
+		}
+
+		// Filter by score range
+		if opts.MinScore != nil && mem.Score < *opts.MinScore {
+			continue
+		}
+		if opts.MaxScore != nil && mem.Score > *opts.MaxScore {
+			continue
+		}
+
+		// Create a copy to prevent external modification
+		memCopy := *mem
+		memories = append(memories, &memCopy)
+	}
+
+	totalCount := len(memories)
+
+	// Sort
+	sortBy := opts.SortBy
+	if sortBy == "" {
+		sortBy = "created_at"
+	}
+
+	sort.Slice(memories, func(i, j int) bool {
+		var less bool
+		switch sortBy {
+		case "score":
+			less = memories[i].Score < memories[j].Score
+		case "last_used_at":
+			less = memories[i].LastUsedAt.Before(memories[j].LastUsedAt)
+		default: // "created_at"
+			less = memories[i].CreatedAt.Before(memories[j].CreatedAt)
+		}
+		if opts.SortDesc {
+			return !less
+		}
+		return less
+	})
+
+	// Paginate
+	start := opts.Offset
+	if start > len(memories) {
+		start = len(memories)
+	}
+	end := start + opts.Limit
+	if end > len(memories) {
+		end = len(memories)
+	}
+
+	return memories[start:end], totalCount, nil
+}
+
+// ListAllAgentIDs returns all agent IDs that have memories with their counts
+func (r *Memory) ListAllAgentIDs(ctx context.Context) ([]*interfaces.AgentSummary, error) {
+	r.memoryMu.RLock()
+	defer r.memoryMu.RUnlock()
+
+	// Use map to aggregate data by agentID
+	agentMap := make(map[string]*interfaces.AgentSummary)
+	for _, mem := range r.agentMemories {
+		if summary, exists := agentMap[mem.AgentID]; exists {
+			summary.Count++
+			if mem.CreatedAt.After(summary.LatestMemoryAt) {
+				summary.LatestMemoryAt = mem.CreatedAt
+			}
+		} else {
+			agentMap[mem.AgentID] = &interfaces.AgentSummary{
+				AgentID:        mem.AgentID,
+				Count:          1,
+				LatestMemoryAt: mem.CreatedAt,
+			}
+		}
+	}
+
+	// Convert map to slice
+	result := make([]*interfaces.AgentSummary, 0, len(agentMap))
+	for _, summary := range agentMap {
+		result = append(result, summary)
+	}
+
+	return result, nil
 }

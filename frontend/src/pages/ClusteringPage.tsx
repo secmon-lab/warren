@@ -168,7 +168,7 @@ const ClusteringPage = memo(() => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground">Computed At</p>
-                <p className="font-medium">{new Date(computedAt).toLocaleString()}</p>
+                <p className="font-medium">{new Date(computedAt).toISOString().split('T')[0].replace(/-/g, '/')} {new Date(computedAt).toISOString().split('T')[1].split('.')[0]}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Total Clusters</p>

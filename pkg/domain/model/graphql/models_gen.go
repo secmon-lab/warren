@@ -3,6 +3,11 @@
 package graphql
 
 import (
+	"bytes"
+	"fmt"
+	"io"
+	"strconv"
+
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 )
@@ -24,6 +29,32 @@ type Activity struct {
 	User      *User          `json:"user,omitempty"`
 	Alert     *alert.Alert   `json:"alert,omitempty"`
 	Ticket    *ticket.Ticket `json:"ticket,omitempty"`
+}
+
+type AgentMemoriesResponse struct {
+	Memories   []*AgentMemory `json:"memories"`
+	TotalCount int            `json:"totalCount"`
+}
+
+type AgentMemory struct {
+	ID         string  `json:"id"`
+	AgentID    string  `json:"agentID"`
+	Query      string  `json:"query"`
+	Claim      string  `json:"claim"`
+	Score      float64 `json:"score"`
+	CreatedAt  string  `json:"createdAt"`
+	LastUsedAt *string `json:"lastUsedAt,omitempty"`
+}
+
+type AgentSummariesResponse struct {
+	Agents     []*AgentSummary `json:"agents"`
+	TotalCount int             `json:"totalCount"`
+}
+
+type AgentSummary struct {
+	AgentID        string  `json:"agentID"`
+	MemoriesCount  int     `json:"memoriesCount"`
+	LatestMemoryAt *string `json:"latestMemoryAt,omitempty"`
 }
 
 type AlertAttribute struct {
@@ -167,4 +198,116 @@ type User struct {
 	ID   string  `json:"id"`
 	Name string  `json:"name"`
 	Icon *string `json:"icon,omitempty"`
+}
+
+type MemorySortField string
+
+const (
+	MemorySortFieldScore      MemorySortField = "SCORE"
+	MemorySortFieldCreatedAt  MemorySortField = "CREATED_AT"
+	MemorySortFieldLastUsedAt MemorySortField = "LAST_USED_AT"
+)
+
+var AllMemorySortField = []MemorySortField{
+	MemorySortFieldScore,
+	MemorySortFieldCreatedAt,
+	MemorySortFieldLastUsedAt,
+}
+
+func (e MemorySortField) IsValid() bool {
+	switch e {
+	case MemorySortFieldScore, MemorySortFieldCreatedAt, MemorySortFieldLastUsedAt:
+		return true
+	}
+	return false
+}
+
+func (e MemorySortField) String() string {
+	return string(e)
+}
+
+func (e *MemorySortField) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = MemorySortField(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid MemorySortField", str)
+	}
+	return nil
+}
+
+func (e MemorySortField) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *MemorySortField) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e MemorySortField) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type SortOrder string
+
+const (
+	SortOrderAsc  SortOrder = "ASC"
+	SortOrderDesc SortOrder = "DESC"
+)
+
+var AllSortOrder = []SortOrder{
+	SortOrderAsc,
+	SortOrderDesc,
+}
+
+func (e SortOrder) IsValid() bool {
+	switch e {
+	case SortOrderAsc, SortOrderDesc:
+		return true
+	}
+	return false
+}
+
+func (e SortOrder) String() string {
+	return string(e)
+}
+
+func (e *SortOrder) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = SortOrder(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid SortOrder", str)
+	}
+	return nil
+}
+
+func (e SortOrder) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *SortOrder) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e SortOrder) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }

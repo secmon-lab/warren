@@ -287,6 +287,58 @@ extend type Query {
   sessionMessages(sessionId: ID!): [SessionMessage!]!
 }
 
+type AgentMemory {
+  id: ID!
+  agentID: String!
+  query: String!
+  claim: String!
+  score: Float!
+  createdAt: String!
+  lastUsedAt: String
+}
+
+type AgentSummary {
+  agentID: String!
+  memoriesCount: Int!
+  latestMemoryAt: String
+}
+
+type AgentMemoriesResponse {
+  memories: [AgentMemory!]!
+  totalCount: Int!
+}
+
+type AgentSummariesResponse {
+  agents: [AgentSummary!]!
+  totalCount: Int!
+}
+
+enum MemorySortField {
+  SCORE
+  CREATED_AT
+  LAST_USED_AT
+}
+
+enum SortOrder {
+  ASC
+  DESC
+}
+
+extend type Query {
+  listAgentSummaries(offset: Int, limit: Int, keyword: String): AgentSummariesResponse!
+  listAgentMemories(
+    agentID: String!
+    offset: Int
+    limit: Int
+    sortBy: MemorySortField
+    sortOrder: SortOrder
+    keyword: String
+    minScore: Float
+    maxScore: Float
+  ): AgentMemoriesResponse!
+  getAgentMemory(agentID: String!, memoryID: ID!): AgentMemory
+}
+
 schema {
   query: Query
   mutation: Mutation

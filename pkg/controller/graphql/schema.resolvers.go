@@ -7,9 +7,12 @@ package graphql
 import (
 	"context"
 	"encoding/json"
+	"sort"
+	"strings"
 	"time"
 
 	goerr "github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
@@ -1258,6 +1261,144 @@ func (r *queryResolver) SessionMessages(ctx context.Context, sessionID string) (
 	}
 
 	return result, nil
+}
+
+// ListAgentSummaries is the resolver for the listAgentSummaries field.
+func (r *queryResolver) ListAgentSummaries(ctx context.Context, offset *int, limit *int, keyword *string) (*graphql1.AgentSummariesResponse, error) {
+	// Get all agent summaries with counts and latest timestamps in a single query
+	summaries, err := r.repo.ListAllAgentIDs(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to list agent IDs")
+	}
+
+	// Filter by keyword if provided
+	if keyword != nil && *keyword != "" {
+		kw := strings.ToLower(*keyword)
+		filtered := make([]*interfaces.AgentSummary, 0)
+		for _, summary := range summaries {
+			if strings.Contains(strings.ToLower(summary.AgentID), kw) {
+				filtered = append(filtered, summary)
+			}
+		}
+		summaries = filtered
+	}
+
+	// Sort by agentID alphabetically
+	sort.Slice(summaries, func(i, j int) bool {
+		return summaries[i].AgentID < summaries[j].AgentID
+	})
+
+	totalCount := len(summaries)
+
+	// Apply pagination
+	offsetVal := 0
+	if offset != nil {
+		offsetVal = *offset
+	}
+	limitVal := 20 // default
+	if limit != nil {
+		limitVal = *limit
+	}
+
+	// Calculate pagination range
+	start := offsetVal
+	if start > len(summaries) {
+		start = len(summaries)
+	}
+	end := start + limitVal
+	if end > len(summaries) {
+		end = len(summaries)
+	}
+
+	pagedSummaries := summaries[start:end]
+
+	// Convert to GraphQL response
+	agents := make([]*graphql1.AgentSummary, len(pagedSummaries))
+	for i, summary := range pagedSummaries {
+		var latestMemoryAt *string
+		if !summary.LatestMemoryAt.IsZero() {
+			timestamp := summary.LatestMemoryAt.Format("2006-01-02T15:04:05Z07:00")
+			latestMemoryAt = &timestamp
+		}
+
+		agents[i] = &graphql1.AgentSummary{
+			AgentID:        summary.AgentID,
+			MemoriesCount:  summary.Count,
+			LatestMemoryAt: latestMemoryAt,
+		}
+	}
+
+	return &graphql1.AgentSummariesResponse{
+		Agents:     agents,
+		TotalCount: totalCount,
+	}, nil
+}
+
+// ListAgentMemories is the resolver for the listAgentMemories field.
+func (r *queryResolver) ListAgentMemories(ctx context.Context, agentID string, offset *int, limit *int, sortBy *graphql1.MemorySortField, sortOrder *graphql1.SortOrder, keyword *string, minScore *float64, maxScore *float64) (*graphql1.AgentMemoriesResponse, error) {
+	// Build options
+	opts := interfaces.AgentMemoryListOptions{
+		Offset:   0,
+		Limit:    20,
+		SortBy:   "created_at",
+		SortDesc: true,
+		Keyword:  keyword,
+		MinScore: minScore,
+		MaxScore: maxScore,
+	}
+
+	if offset != nil {
+		opts.Offset = *offset
+	}
+	if limit != nil {
+		opts.Limit = *limit
+	}
+
+	// Map GraphQL sort field to repository sort field
+	if sortBy != nil {
+		switch *sortBy {
+		case graphql1.MemorySortFieldScore:
+			opts.SortBy = "score"
+		case graphql1.MemorySortFieldCreatedAt:
+			opts.SortBy = "created_at"
+		case graphql1.MemorySortFieldLastUsedAt:
+			opts.SortBy = "last_used_at"
+		}
+	}
+
+	// Map GraphQL sort order
+	if sortOrder != nil {
+		opts.SortDesc = *sortOrder == graphql1.SortOrderDesc
+	}
+
+	// Use repository method for filtering, sorting, and pagination
+	pagedMemories, totalCount, err := r.repo.ListAgentMemoriesWithOptions(ctx, agentID, opts)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to list agent memories", goerr.V("agent_id", agentID))
+	}
+
+	// Convert to GraphQL response
+	memories := make([]*graphql1.AgentMemory, len(pagedMemories))
+	for i, mem := range pagedMemories {
+		memories[i] = memoryToGraphQL(mem)
+	}
+
+	return &graphql1.AgentMemoriesResponse{
+		Memories:   memories,
+		TotalCount: totalCount,
+	}, nil
+}
+
+// GetAgentMemory is the resolver for the getAgentMemory field.
+func (r *queryResolver) GetAgentMemory(ctx context.Context, agentID string, memoryID string) (*graphql1.AgentMemory, error) {
+	mem, err := r.repo.GetAgentMemory(ctx, agentID, types.AgentMemoryID(memoryID))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get agent memory",
+			goerr.V("agent_id", agentID),
+			goerr.V("memory_id", memoryID))
+	}
+
+	return memoryToGraphQL(mem), nil
 }
 
 // User is the resolver for the user field.

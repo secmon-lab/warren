@@ -60,13 +60,10 @@ export default function AlertsPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("ja-JP", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const date = new Date(dateString);
+    const datePart = date.toISOString().split('T')[0].replace(/-/g, '/');
+    const timePart = date.toISOString().split('T')[1].split('.')[0];
+    return `${datePart} ${timePart}`;
   };
 
   if (alertsLoading) {

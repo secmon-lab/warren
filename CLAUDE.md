@@ -21,6 +21,9 @@ Warren is an AI agent and Slack-based security alert management tool. It process
 - `pnpm run dev` - Start development server
 - `pnpm run build` - Build frontend for production
 - `pnpm run codegen` - Generate GraphQL types from schema
+- **Date Format**: ALWAYS use `YYYY/MM/DD` format. NEVER use `MM/DD/YYYY` or locale-dependent formats like `toLocaleDateString()`
+  - Use: `date.toISOString().split('T')[0].replace(/-/g, '/')`
+  - Do NOT use: `date.toLocaleDateString()`
 
 ### Code Generation
 - `go tool moq` - Generate mocks (handled by task commands)
