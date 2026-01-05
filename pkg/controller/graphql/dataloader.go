@@ -114,15 +114,37 @@ func userBatchFn(slackClient interfaces.SlackClient) func(ctx context.Context, k
 	return func(ctx context.Context, keys []string) []*dataloader.Result[*graphql1.User] {
 		results := make([]*dataloader.Result[*graphql1.User], len(keys))
 
+		// Separate system users from regular Slack users
+		var slackUserIDs []string
+		slackUserIndices := make(map[int]string) // map[index]userID for Slack users
+
+		for i, key := range keys {
+			if key == string(types.SystemUserID) {
+				// Return system user immediately without calling Slack API
+				results[i] = &dataloader.Result[*graphql1.User]{
+					Data:  &graphql1.User{ID: key, Name: "System"},
+					Error: nil,
+				}
+			} else {
+				slackUserIDs = append(slackUserIDs, key)
+				slackUserIndices[i] = key
+			}
+		}
+
+		// If no Slack users to fetch, return early
+		if len(slackUserIDs) == 0 {
+			return results
+		}
+
 		if slackClient != nil {
 			// Use batch API to fetch all users at once
-			slackUsers, err := slackClient.GetUsersInfo(keys...)
+			slackUsers, err := slackClient.GetUsersInfo(slackUserIDs...)
 			if err != nil {
 				// Handle the error for debugging
-				errutil.Handle(ctx, goerr.Wrap(err, "failed to get users info from Slack", goerr.V("userIDs", keys)))
+				errutil.Handle(ctx, goerr.Wrap(err, "failed to get users info from Slack", goerr.V("userIDs", slackUserIDs)))
 				// If Slack API fails with user_not_found or similar errors, fallback to ID instead of propagating error
 				// This prevents the entire query from failing when some users don't exist in Slack
-				for i, id := range keys {
+				for i, id := range slackUserIndices {
 					results[i] = &dataloader.Result[*graphql1.User]{
 						Data:  &graphql1.User{ID: id, Name: id},
 						Error: nil,
@@ -163,13 +185,13 @@ func userBatchFn(slackClient interfaces.SlackClient) func(ctx context.Context, k
 				}
 
 				// Build results in the same order as keys
-				for i, key := range keys {
-					if user, found := userMap[key]; found {
+				for i, userID := range slackUserIndices {
+					if user, found := userMap[userID]; found {
 						results[i] = &dataloader.Result[*graphql1.User]{Data: user, Error: nil}
 					} else {
 						// User not found in Slack response, fallback to ID
 						results[i] = &dataloader.Result[*graphql1.User]{
-							Data:  &graphql1.User{ID: key, Name: key},
+							Data:  &graphql1.User{ID: userID, Name: userID},
 							Error: nil,
 						}
 					}
@@ -179,7 +201,7 @@ func userBatchFn(slackClient interfaces.SlackClient) func(ctx context.Context, k
 		}
 
 		// Fallback for when SlackClient is nil (not an error condition)
-		for i, id := range keys {
+		for i, id := range slackUserIndices {
 			results[i] = &dataloader.Result[*graphql1.User]{
 				Data:  &graphql1.User{ID: id, Name: id},
 				Error: nil,

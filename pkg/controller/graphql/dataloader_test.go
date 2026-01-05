@@ -418,6 +418,106 @@ func TestUserLoaderUseBatchMethod(t *testing.T) {
 	}
 }
 
+func TestSystemUserLoader(t *testing.T) {
+	t.Run("System user does not call Slack API", func(t *testing.T) {
+		repo, slackClient := setupTestData()
+		loaders := NewDataLoaders(repo, slackClient)
+		ctx := context.Background()
+
+		// Load system user
+		user, err := GetUserWithLoaders(ctx, loaders, string(types.SystemUserID))
+		gt.NoError(t, err)
+		gt.Equal(t, user.ID, string(types.SystemUserID))
+		gt.Equal(t, user.Name, "System")
+
+		// Verify Slack API was NOT called
+		getUsersInfoCalls := slackClient.GetUsersInfoCalls()
+		gt.Number(t, len(getUsersInfoCalls)).Equal(0)
+	})
+
+	t.Run("System user mixed with regular users", func(t *testing.T) {
+		repo, slackClient := setupTestData()
+		loaders := NewDataLoaders(repo, slackClient)
+		ctx := context.Background()
+
+		// Load system user and regular users concurrently
+		userIDs := []string{string(types.SystemUserID), "user1", "user2"}
+		results := make([]*graphql1.User, len(userIDs))
+		errors := make([]error, len(userIDs))
+
+		var wg sync.WaitGroup
+		for i, id := range userIDs {
+			wg.Add(1)
+			go func(index int, userID string) {
+				defer wg.Done()
+				u, err := GetUserWithLoaders(ctx, loaders, userID)
+				results[index] = u
+				errors[index] = err
+			}(i, id)
+		}
+		wg.Wait()
+
+		// Verify all loads returned correct data
+		for i, err := range errors {
+			gt.NoError(t, err)
+			gt.NotNil(t, results[i])
+			gt.Equal(t, results[i].ID, userIDs[i])
+		}
+
+		// Verify system user has correct name
+		gt.Equal(t, results[0].Name, "System")
+		gt.Equal(t, results[1].Name, "User One")
+		gt.Equal(t, results[2].Name, "User Two")
+
+		// Verify Slack API was called only for non-system users
+		getUsersInfoCalls := slackClient.GetUsersInfoCalls()
+		gt.Number(t, len(getUsersInfoCalls)).Greater(0)
+
+		// The batch call should only contain non-system users
+		if len(getUsersInfoCalls) > 0 {
+			calledUsers := getUsersInfoCalls[0].Users
+			for _, userID := range calledUsers {
+				gt.NotEqual(t, userID, string(types.SystemUserID))
+			}
+		}
+	})
+
+	t.Run("Multiple system users only", func(t *testing.T) {
+		repo, slackClient := setupTestData()
+		loaders := NewDataLoaders(repo, slackClient)
+		ctx := context.Background()
+
+		// Load multiple system users
+		userIDs := []string{string(types.SystemUserID), string(types.SystemUserID)}
+		results := make([]*graphql1.User, len(userIDs))
+		errors := make([]error, len(userIDs))
+
+		var wg sync.WaitGroup
+		for i, id := range userIDs {
+			wg.Add(1)
+			go func(index int, userID string) {
+				defer wg.Done()
+				u, err := GetUserWithLoaders(ctx, loaders, userID)
+				results[index] = u
+				errors[index] = err
+			}(i, id)
+		}
+		wg.Wait()
+
+		// Verify all loads returned correct data
+		for i, err := range errors {
+			gt.NoError(t, err)
+			gt.NotNil(t, results[i])
+			gt.Equal(t, results[i].ID, string(types.SystemUserID))
+			gt.Equal(t, results[i].Name, "System")
+		}
+
+		// Verify Slack API was NOT called at all
+		getUsersInfoCalls := slackClient.GetUsersInfoCalls()
+		gt.Number(t, len(getUsersInfoCalls)).Equal(0)
+	})
+}
+
 // Helper functions for testing with loaders
 func GetTicketWithLoaders(ctx context.Context, loaders *DataLoaders, ticketID types.TicketID) (*ticket.Ticket, error) {
 	thunk := loaders.TicketLoader.Load(ctx, ticketID)
