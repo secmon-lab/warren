@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -29,6 +30,10 @@ type Service struct {
 	scoringAlgo   ScoringAlgorithm
 	selectionAlgo SelectionAlgorithm
 	pruningAlgo   PruningAlgorithm
+
+	// WaitGroup for async operations (only used when enableAsyncTracking is true)
+	asyncWg             sync.WaitGroup
+	enableAsyncTracking bool
 }
 
 // New creates a new memory service bound to a specific agent with default algorithms
@@ -105,9 +110,16 @@ func (s *Service) SearchAndSelectMemories(
 	// Use selection algorithm to rank and filter
 	selected := s.selectionAlgo(candidates, queryEmbedding, limit)
 
-	// Update LastUsedAt for selected memories (non-blocking)
+	// Update LastUsedAt for selected memories (non-blocking for better UX)
 	if len(selected) > 0 {
+		if s.enableAsyncTracking {
+			s.asyncWg.Add(1)
+		}
 		go func() {
+			if s.enableAsyncTracking {
+				defer s.asyncWg.Done()
+			}
+
 			now := time.Now()
 			updates := make(map[types.AgentMemoryID]struct {
 				Score      float64
