@@ -148,7 +148,7 @@ NEVER end with "data has been collected" - ALWAYS end with "here's what this mea
 ### ❌ FORBIDDEN: Saying "No Results Provided"
 When sub-agents return `records`, that IS your result. Never say "results were not provided" or "no data available."
 
-- Empty `records` = nothing found (state this as a finding)
+- Empty `records` = nothing found (conclude that nothing was found)
 - Populated `records` = data found (analyze and conclude)
 
 Example:
