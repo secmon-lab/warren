@@ -355,13 +355,9 @@ func TestAgent_MemoryFeedbackIntegration(t *testing.T) {
 			gt.NoError(t, err)
 		}
 
-		// Verify the original memory still exists and was updated
+		// Verify the memory still exists
 		finalMem, err := repo.GetAgentMemory(ctx, "bigquery", memID)
 		gt.NoError(t, err)
-
-		// LastUsedAt should be more recent than creation time
-		gt.True(t, finalMem.LastUsedAt.After(finalMem.CreatedAt) ||
-			finalMem.LastUsedAt.Equal(finalMem.CreatedAt))
 
 		// Score should be within valid range
 		gt.True(t, finalMem.Score >= -10.0)

@@ -222,3 +222,42 @@ func TestServiceAlgorithmReplacement(t *testing.T) {
 	// Verify algorithm replacement worked
 	gt.NotEqual(t, svc, nil)
 }
+
+func TestSearchAndSelectMemories_UpdatesLastUsedAt(t *testing.T) {
+	repo := createTestRepository(t)
+	llmClient := newMockLLMClient()
+	agentID := "test-agent"
+	svc := memoryService.New(agentID, llmClient, repo).EnableAsyncTrackingForTest()
+	ctx := context.Background()
+	now := time.Now()
+
+	// Create a test memory
+	mem := &memory.AgentMemory{
+		ID:             types.NewAgentMemoryID(),
+		AgentID:        agentID,
+		Query:          "test query",
+		QueryEmbedding: firestore.Vector32{0.1, 0.2, 0.3},
+		Claim:          "test claim",
+		Score:          0.0,
+		CreatedAt:      now.Add(-1 * time.Hour),
+		LastUsedAt:     now.Add(-1 * time.Hour),
+	}
+
+	// Save memory
+	gt.NoError(t, repo.SaveAgentMemory(ctx, mem))
+
+	// Search and select memories
+	results, err := svc.SearchAndSelectMemories(ctx, "test query", 1)
+	gt.NoError(t, err)
+	gt.V(t, len(results)).Equal(1)
+
+	// Wait for async update to complete
+	svc.WaitForAsyncOperationsForTest()
+
+	// Retrieve the memory and verify LastUsedAt was updated
+	updated, err := repo.GetAgentMemory(ctx, agentID, mem.ID)
+	gt.NoError(t, err)
+
+	// LastUsedAt should be more recent than the original value
+	gt.True(t, updated.LastUsedAt.After(mem.LastUsedAt))
+}
