@@ -67,6 +67,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"query": {
 					Type:        gollem.TypeString,
 					Description: "The search query (e.g., 'from:@user', 'in:general', 'has:link')",
+					Required:    true,
 				},
 				"sort": {
 					Type:        gollem.TypeString,
@@ -89,7 +90,6 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "Enable highlighting of search terms in results",
 				},
 			},
-			Required: []string{"query"},
 		},
 	}, nil
 }

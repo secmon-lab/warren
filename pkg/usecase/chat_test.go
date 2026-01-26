@@ -414,13 +414,14 @@ func TestToolCallToText(t *testing.T) {
 		Description: "Generate a random number",
 		Parameters: map[string]*gollem.Parameter{
 			"min": {
-				Type: "integer",
+				Type:     "integer",
+				Required: true,
 			},
 			"max": {
-				Type: "integer",
+				Type:     "integer",
+				Required: true,
 			},
 		},
-		Required: []string{"min", "max"},
 	}
 	call := &gollem.FunctionCall{
 		Name: "random_number",

@@ -116,17 +116,19 @@ func (x *Knowledge) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"slug": {
 					Type:        gollem.TypeString,
 					Description: "Unique identifier for the knowledge within the topic",
+					Required:    true,
 				},
 				"name": {
 					Type:        gollem.TypeString,
 					Description: "Human-readable name (max 100 characters)",
+					Required:    true,
 				},
 				"content": {
 					Type:        gollem.TypeString,
 					Description: "The knowledge content",
+					Required:    true,
 				},
 			},
-			Required: []string{"slug", "name", "content"},
 		},
 		{
 			Name:        cmdArchiveKnowledge,
@@ -135,9 +137,9 @@ func (x *Knowledge) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"slug": {
 					Type:        gollem.TypeString,
 					Description: "Slug of the knowledge to archive",
+					Required:    true,
 				},
 			},
-			Required: []string{"slug"},
 		},
 	}, nil
 }

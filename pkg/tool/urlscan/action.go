@@ -82,9 +82,9 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"url": {
 					Type:        gollem.TypeString,
 					Description: "The URL to scan",
+					Required:    true,
 				},
 			},
-			Required: []string{"url"},
 		},
 	}, nil
 }

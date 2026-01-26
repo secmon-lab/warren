@@ -132,13 +132,13 @@ func (a *Agent) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"request": {
 					Type:        gollem.TypeString,
 					Description: "DO NOT specify search keywords or terms. Describe ONLY the concept/situation in natural language. The agent will determine all search keywords and variations. ✗ BAD: 'search for authentication keyword', 'messages containing auth error', 'find keyword login' ✓ GOOD: 'people having authentication problems', 'discussions about performance issues', 'error reports in #security-alerts channel'. Include: (1) What concept/situation to find (NOT keywords), (2) Time period if relevant, (3) Channel/user scope if relevant. The Slack agent handles all keyword selection, variations, and multilingual terms automatically.",
+					Required:    true,
 				},
 				"limit": {
 					Type:        gollem.TypeNumber,
 					Description: "Maximum number of messages to return in the response (default: 50, max: 200). Use this to control response size.",
 				},
 			},
-			Required: []string{"request"},
 		},
 	}, nil
 }

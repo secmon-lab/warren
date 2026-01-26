@@ -65,13 +65,13 @@ Best practices:
 				"sql": {
 					Type:        gollem.TypeString,
 					Description: "The SQL query to execute. Must be a valid BigQuery SQL query.",
+					Required:    true,
 				},
 				"description": {
 					Type:        gollem.TypeString,
 					Description: "Brief description of what this query is trying to achieve (optional, for logging/tracking)",
 				},
 			},
-			Required: []string{"sql"},
 		},
 		{
 			Name: "bigquery_schema",
@@ -82,17 +82,19 @@ Returns complete schema including nested RECORD fields.`,
 				"project_id": {
 					Type:        gollem.TypeString,
 					Description: "The project ID of the table",
+					Required:    true,
 				},
 				"dataset_id": {
 					Type:        gollem.TypeString,
 					Description: "The dataset ID of the table",
+					Required:    true,
 				},
 				"table_id": {
 					Type:        gollem.TypeString,
 					Description: "The table ID to get schema for",
+					Required:    true,
 				},
 			},
-			Required: []string{"project_id", "dataset_id", "table_id"},
 		},
 	}
 
@@ -105,9 +107,9 @@ Returns complete schema including nested RECORD fields.`,
 				"runbook_id": {
 					Type:        gollem.TypeString,
 					Description: "The ID of the runbook to retrieve",
+					Required:    true,
 				},
 			},
-			Required: []string{"runbook_id"},
 		})
 	}
 

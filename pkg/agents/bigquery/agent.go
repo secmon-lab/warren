@@ -163,9 +163,9 @@ func (a *Agent) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"query": {
 					Type:        gollem.TypeString,
 					Description: "ONLY specify the conditions for data retrieval (e.g., 'records containing package name X from the last 7 days', 'login events in the past week'). Do NOT include analysis instructions, interpretation requests, or questions - ONLY data retrieval conditions.",
+					Required:    true,
 				},
 			},
-			Required: []string{"query"},
 		},
 	}, nil
 }

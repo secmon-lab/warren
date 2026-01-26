@@ -207,6 +207,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"query": {
 					Type:        gollem.TypeString,
 					Description: "Search query using GitHub code search syntax. Supports operators like AND, OR, NOT",
+					Required:    true,
 					MinLength:   github.Ptr(1),
 				},
 				"language": {
@@ -228,7 +229,6 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "Filter repositories by name pattern (case-insensitive substring match)",
 				},
 			},
-			Required: []string{"query"},
 		},
 		{
 			Name:        "github_issue_search",
@@ -237,6 +237,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"query": {
 					Type:        gollem.TypeString,
 					Description: "Search query using GitHub issue search syntax. Supports operators like in:title, in:body",
+					Required:    true,
 					MinLength:   github.Ptr(1),
 				},
 				"state": {
@@ -267,7 +268,6 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "Filter repositories by name pattern (case-insensitive substring match)",
 				},
 			},
-			Required: []string{"query"},
 		},
 		{
 			Name:        "github_get_content",
@@ -276,6 +276,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"owner": {
 					Type:        gollem.TypeString,
 					Description: "Repository owner (organization or username)",
+					Required:    true,
 					Pattern:     "^[a-zA-Z0-9][a-zA-Z0-9-]*$",
 					MinLength:   github.Ptr(1),
 					MaxLength:   github.Ptr(39),
@@ -283,6 +284,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"repo": {
 					Type:        gollem.TypeString,
 					Description: "Repository name",
+					Required:    true,
 					Pattern:     "^[a-zA-Z0-9_.-]+$",
 					MinLength:   github.Ptr(1),
 					MaxLength:   github.Ptr(100),
@@ -290,6 +292,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"path": {
 					Type:        gollem.TypeString,
 					Description: "File path in the repository (e.g., 'src/main.go', 'README.md')",
+					Required:    true,
 					MinLength:   github.Ptr(1),
 				},
 				"ref": {
@@ -298,7 +301,6 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Pattern:     "^[a-zA-Z0-9/_.-]+$",
 				},
 			},
-			Required: []string{"owner", "repo", "path"},
 		},
 	}, nil
 }

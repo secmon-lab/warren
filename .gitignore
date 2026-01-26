@@ -33,7 +33,6 @@ go.work.sum
 
 # for AI instruction
 todo.md
-/.claude
 /.todo
 /.backlog
 /.cckiro

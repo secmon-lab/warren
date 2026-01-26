@@ -117,7 +117,10 @@ func TestBigQuery_Specs(t *testing.T) {
 			gt.Map(t, spec.Parameters).HasKey("project_id")
 			gt.Map(t, spec.Parameters).HasKey("dataset_id")
 			gt.Map(t, spec.Parameters).HasKey("table_id")
-			gt.Value(t, len(spec.Required)).Equal(0) // All parameters are optional
+			// All parameters are optional
+			gt.False(t, spec.Parameters["project_id"].Required)
+			gt.False(t, spec.Parameters["dataset_id"].Required)
+			gt.False(t, spec.Parameters["table_id"].Required)
 		case "bigquery_schema":
 			gt.Map(t, spec.Parameters).HasKey("dataset_id")
 			gt.Map(t, spec.Parameters).HasKey("table_id")
@@ -128,7 +131,7 @@ func TestBigQuery_Specs(t *testing.T) {
 			gt.Map(t, spec.Parameters).HasKey("limit")
 			gt.Value(t, spec.Parameters["query"].Type).Equal("string")
 			gt.Value(t, spec.Parameters["limit"].Type).Equal("integer")
-			gt.Array(t, spec.Required).Has("query")
+			gt.True(t, spec.Parameters["query"].Required)
 		}
 	}
 }

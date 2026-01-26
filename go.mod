@@ -20,8 +20,8 @@ require (
 	github.com/m-mizutani/clog v0.1.0
 	github.com/m-mizutani/fireconf v0.1.1
 	github.com/m-mizutani/goerr/v2 v2.0.0
-	github.com/m-mizutani/gollem v0.17.5
-	github.com/m-mizutani/gt v0.1.2
+	github.com/m-mizutani/gollem v0.18.0
+	github.com/m-mizutani/gt v0.2.1
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.1.12-0.20250911075521-cfb6207440e8
 	github.com/m-mizutani/opaq v0.3.0
