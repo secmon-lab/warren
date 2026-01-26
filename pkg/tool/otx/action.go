@@ -61,9 +61,9 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"target": {
 					Type:        gollem.TypeString,
 					Description: "The IPv4 address to search",
+					Required:    true,
 				},
 			},
-			Required: []string{"target"},
 		},
 		{
 			Name:        "otx_domain",
@@ -72,9 +72,9 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"target": {
 					Type:        gollem.TypeString,
 					Description: "The domain to search",
+					Required:    true,
 				},
 			},
-			Required: []string{"target"},
 		},
 		{
 			Name:        "otx_ipv6",
@@ -83,9 +83,9 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"target": {
 					Type:        gollem.TypeString,
 					Description: "The IPv6 address to search",
+					Required:    true,
 				},
 			},
-			Required: []string{"target"},
 		},
 		{
 			Name:        "otx_hostname",
@@ -94,9 +94,9 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"target": {
 					Type:        gollem.TypeString,
 					Description: "The hostname to search",
+					Required:    true,
 				},
 			},
-			Required: []string{"target"},
 		},
 		{
 			Name:        "otx_file_hash",
@@ -105,9 +105,9 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"target": {
 					Type:        gollem.TypeString,
 					Description: "The file hash to search",
+					Required:    true,
 				},
 			},
-			Required: []string{"target"},
 		},
 	}, nil
 }

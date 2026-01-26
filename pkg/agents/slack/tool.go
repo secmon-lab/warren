@@ -62,6 +62,7 @@ func (t *internalTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"query": {
 					Type:        gollem.TypeString,
 					Description: "The search query (e.g., 'from:@user', 'in:general', 'has:link')",
+					Required:    true,
 				},
 				"sort": {
 					Type:        gollem.TypeString,
@@ -84,7 +85,6 @@ func (t *internalTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "Enable highlighting of search terms in results",
 				},
 			},
-			Required: []string{"query"},
 		},
 		{
 			Name:        "slack_get_thread_messages",
@@ -93,17 +93,18 @@ func (t *internalTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"channel": {
 					Type:        gollem.TypeString,
 					Description: "Channel ID",
+					Required:    true,
 				},
 				"thread_ts": {
 					Type:        gollem.TypeString,
 					Description: "Thread timestamp (ts of the parent message)",
+					Required:    true,
 				},
 				"limit": {
 					Type:        gollem.TypeNumber,
 					Description: "Maximum number of messages to return (default: 50, max: 200)",
 				},
 			},
-			Required: []string{"channel", "thread_ts"},
 		},
 		{
 			Name:        "slack_get_context_messages",
@@ -112,10 +113,12 @@ func (t *internalTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"channel": {
 					Type:        gollem.TypeString,
 					Description: "Channel ID",
+					Required:    true,
 				},
 				"around_ts": {
 					Type:        gollem.TypeString,
 					Description: "Timestamp of the message to get context around",
+					Required:    true,
 				},
 				"before": {
 					Type:        gollem.TypeNumber,
@@ -126,7 +129,6 @@ func (t *internalTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "Number of messages after the timestamp (default: 10)",
 				},
 			},
-			Required: []string{"channel", "around_ts"},
 		},
 	}, nil
 }

@@ -404,9 +404,9 @@ func (t *configGeneratorTools) Specs(ctx context.Context) ([]gollem.ToolSpec, er
 				"query": {
 					Type:        gollem.TypeString,
 					Description: "The SQL query to execute",
+					Required:    true,
 				},
 			},
-			Required: []string{"query"},
 		},
 		{
 			Name:        "generate_config",
@@ -415,9 +415,9 @@ func (t *configGeneratorTools) Specs(ctx context.Context) ([]gollem.ToolSpec, er
 				"config": {
 					Type:        gollem.TypeObject,
 					Description: "The complete configuration object",
+					Required:    true,
 				},
 			},
-			Required: []string{"config"},
 		},
 	}, nil
 }

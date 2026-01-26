@@ -191,20 +191,7 @@ func TestWarren_Specs(t *testing.T) {
 	requiredParams := []string{"summary", "severity", "reason", "recommendation"}
 	for _, param := range requiredParams {
 		gt.NotNil(t, updateFindingSpec.Parameters[param])
-	}
-
-	gt.Value(t, len(updateFindingSpec.Required)).Equal(4)
-	for _, required := range requiredParams {
-		found := false
-		for _, req := range updateFindingSpec.Required {
-			if req == required {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("Required parameter %s not found", required)
-		}
+		gt.True(t, updateFindingSpec.Parameters[param].Required)
 	}
 
 	// Test get_ticket_comments spec
@@ -216,7 +203,8 @@ func TestWarren_Specs(t *testing.T) {
 	gt.NotNil(t, getCommentsSpec.Parameters["offset"])
 
 	// Check that limit and offset are not required (should be optional)
-	gt.Value(t, len(getCommentsSpec.Required)).Equal(0)
+	gt.False(t, getCommentsSpec.Parameters["limit"].Required)
+	gt.False(t, getCommentsSpec.Parameters["offset"].Required)
 }
 
 func TestWarren_UpdateFindingDryRun(t *testing.T) {

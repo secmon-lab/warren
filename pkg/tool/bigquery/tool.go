@@ -271,9 +271,9 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"query": {
 					Type:        gollem.TypeString,
 					Description: "The SQL query to execute",
+					Required:    true,
 				},
 			},
-			Required: []string{"query"},
 		},
 		{
 			Name:        "bigquery_result",
@@ -282,6 +282,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"query_id": {
 					Type:        gollem.TypeString,
 					Description: "The ID of the query to get results for",
+					Required:    true,
 				},
 				"limit": {
 					Type:        gollem.TypeInteger,
@@ -292,7 +293,6 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "Number of rows to skip",
 				},
 			},
-			Required: []string{"query_id"},
 		},
 		{
 			Name:        "bigquery_table_summary",
@@ -319,17 +319,19 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"project_id": {
 					Type:        gollem.TypeString,
 					Description: "The project ID of the table",
+					Required:    true,
 				},
 				"dataset_id": {
 					Type:        gollem.TypeString,
 					Description: "The dataset ID of the table",
+					Required:    true,
 				},
 				"table_id": {
 					Type:        gollem.TypeString,
 					Description: "The table ID to get schema for",
+					Required:    true,
 				},
 			},
-			Required: []string{"project_id", "dataset_id", "table_id"},
 		},
 		{
 			Name:        "get_runbook_entry",
@@ -338,9 +340,9 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"runbook_id": {
 					Type:        gollem.TypeString,
 					Description: "The ID of the runbook entry to retrieve",
+					Required:    true,
 				},
 			},
-			Required: []string{"runbook_id"},
 		},
 	}, nil
 }

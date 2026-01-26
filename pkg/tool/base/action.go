@@ -163,6 +163,7 @@ func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"query": {
 					Type:        gollem.TypeString,
 					Description: "Search query using natural language or keywords to find similar tickets",
+					Required:    true,
 				},
 				"limit": {
 					Type:        gollem.TypeInteger,
@@ -173,7 +174,6 @@ func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "Duration to search back in days (default: 30)",
 				},
 			},
-			Required: []string{"query"},
 		},
 		{
 			Name:        cmdUpdateFinding,
@@ -182,21 +182,24 @@ func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				"summary": {
 					Type:        gollem.TypeString,
 					Description: "Summary of the investigation results analyzed by the agent",
+					Required:    true,
 				},
 				"severity": {
 					Type:        gollem.TypeString,
 					Description: "Severity level of the finding. Must be one of: 'low', 'medium', 'high', 'critical'",
+					Required:    true,
 				},
 				"reason": {
 					Type:        gollem.TypeString,
 					Description: "Detailed reasoning and justification for the severity assessment",
+					Required:    true,
 				},
 				"recommendation": {
 					Type:        gollem.TypeString,
 					Description: "Recommended actions based on the analysis results",
+					Required:    true,
 				},
 			},
-			Required: []string{"summary", "severity", "reason", "recommendation"},
 		},
 		{
 			Name:        cmdGetTicketComments,

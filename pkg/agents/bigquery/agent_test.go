@@ -123,8 +123,7 @@ func TestAgent_Specs(t *testing.T) {
 	gt.V(t, len(specs)).Equal(1)
 	gt.V(t, specs[0].Name).Equal("query_bigquery")
 	gt.V(t, specs[0].Description).NotEqual("")
-	gt.V(t, len(specs[0].Required)).Equal(1)
-	gt.V(t, specs[0].Required[0]).Equal("query")
+	gt.True(t, specs[0].Parameters["query"].Required)
 }
 
 func TestAgent_Run_SavesMemory(t *testing.T) {

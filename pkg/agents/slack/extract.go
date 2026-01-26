@@ -25,21 +25,24 @@ var slackMessagesSchema = &gollem.Parameter{
 			"text": {
 				Type:        gollem.TypeString,
 				Description: "Full message text content",
+				Required:    true,
 			},
 			"user": {
 				Type:        gollem.TypeString,
 				Description: "User ID or display name who posted the message",
+				Required:    true,
 			},
 			"channel": {
 				Type:        gollem.TypeString,
 				Description: "Channel ID or channel name where the message was posted",
+				Required:    true,
 			},
 			"timestamp": {
 				Type:        gollem.TypeString,
 				Description: "Message timestamp (Slack ts format or ISO8601)",
+				Required:    true,
 			},
 		},
-		Required: []string{"text", "user", "channel", "timestamp"},
 	},
 }
 

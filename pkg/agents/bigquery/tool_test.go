@@ -321,8 +321,7 @@ func TestInternalTool_Specs_WithRunbooks(t *testing.T) {
 
 		gt.V(t, getRunbookSpec).NotNil()
 		gt.V(t, getRunbookSpec.Name).Equal("get_runbook")
-		gt.V(t, len(getRunbookSpec.Required)).Equal(1)
-		gt.V(t, getRunbookSpec.Required[0]).Equal("runbook_id")
+		gt.True(t, getRunbookSpec.Parameters["runbook_id"].Required)
 	})
 
 	t.Run("specs exclude get_runbook when no runbooks", func(t *testing.T) {
