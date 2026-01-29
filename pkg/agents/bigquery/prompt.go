@@ -2,13 +2,14 @@ package bigquery
 
 import (
 	"bytes"
-	"context"
 	_ "embed"
+	"fmt"
+	"strings"
 	"text/template"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 //go:embed prompt/base.md
@@ -42,34 +43,62 @@ type promptData struct {
 	Runbooks    map[string]interface{}
 }
 
-// buildSystemPromptWithMemories builds system prompt with KPT-formatted memories using templates
-func (a *Agent) buildSystemPromptWithMemories(ctx context.Context, memories []*memory.AgentMemory) (string, error) {
-	log := logging.From(ctx)
-	log.Debug("Building system prompt with memories", "memory_count", len(memories), "table_count", len(a.config.Tables), "runbooks", len(a.config.Runbooks))
+// newPromptTemplate creates a PromptTemplate for the SubAgent
+func newPromptTemplate() (*gollem.PromptTemplate, error) {
+	return gollem.NewPromptTemplate(
+		// Template can use both _memory_context and query
+		// _memory_context is injected by middleware (not visible to LLM as a parameter)
+		"{{if ._memory_context}}{{._memory_context}}\n\n{{end}}{{.query}}",
+		map[string]*gollem.Parameter{
+			// Only define parameters that LLM should know about
+			"query": {
+				Type:        gollem.TypeString,
+				Description: "ONLY specify the conditions for data retrieval (e.g., 'records containing package name X from the last 7 days', 'login events in the past week'). Do NOT include analysis instructions, interpretation requests, or questions - ONLY data retrieval conditions.",
+				Required:    true,
+			},
+			// _memory_context is NOT included - it's an internal parameter
+		},
+	)
+}
 
+// formatMemoryContext formats memories for injection into the prompt
+func formatMemoryContext(memories []*memory.AgentMemory) string {
+	if len(memories) == 0 {
+		return ""
+	}
+
+	var buf strings.Builder
+	buf.WriteString("# Past Experiences\n\n")
+	buf.WriteString("You have access to relevant past experiences that may help with this task:\n\n")
+
+	for i, mem := range memories {
+		letter := string(rune('A' + i))
+		buf.WriteString(fmt.Sprintf("## Experience %s\n", letter))
+		buf.WriteString(fmt.Sprintf("**Claim:** %s\n", mem.Claim))
+		buf.WriteString("\n")
+	}
+
+	return buf.String()
+}
+
+// buildSystemPrompt builds system prompt without memories (for factory)
+func buildSystemPrompt(config *Config) (string, error) {
 	// Build base prompt
 	var buf bytes.Buffer
 	buf.WriteString(basePrompt)
 	buf.WriteString("\n\n")
 
-	// Generate letters for experiences (A, B, C, ...)
-	letters := make([]string, len(memories))
-	for i := range memories {
-		letters[i] = string(rune('A' + i))
-	}
-
-	// Convert runbooks map to interface{} for template
+	// Prepare template data
 	runbooksData := make(map[string]interface{})
-	for id, entry := range a.config.Runbooks {
+	for id, entry := range config.Runbooks {
 		runbooksData[id.String()] = entry
 	}
 
-	// Prepare template data
 	data := promptData{
-		Tables:      a.config.Tables,
-		HasMemories: len(memories) > 0,
-		Memories:    memories,
-		Letters:     letters,
+		Tables:      config.Tables,
+		HasMemories: false,
+		Memories:    nil,
+		Letters:     []string{},
 		Runbooks:    runbooksData,
 	}
 
@@ -79,15 +108,12 @@ func (a *Agent) buildSystemPromptWithMemories(ctx context.Context, memories []*m
 	}
 
 	// Append runbooks section
-	if len(a.config.Runbooks) > 0 {
+	if len(config.Runbooks) > 0 {
 		buf.WriteString("\n\n")
 		if err := runbooksTmpl.Execute(&buf, data); err != nil {
 			return "", goerr.Wrap(err, "failed to execute runbooks template")
 		}
 	}
 
-	prompt := buf.String()
-	log.Debug("System prompt built successfully", "total_length", len(prompt))
-
-	return prompt, nil
+	return buf.String(), nil
 }
