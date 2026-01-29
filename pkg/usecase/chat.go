@@ -351,6 +351,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithStrategy(strategy),
 		gollem.WithHistory(history),
 		gollem.WithToolSets(tools...),
+		gollem.WithSubAgents(x.subAgents...),
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithSystemPrompt(systemPrompt),

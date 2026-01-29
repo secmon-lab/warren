@@ -9,7 +9,6 @@ import (
 
 	slackagent "github.com/secmon-lab/warren/pkg/agents/slack"
 	domainmock "github.com/secmon-lab/warren/pkg/domain/mock"
-	"github.com/secmon-lab/warren/pkg/repository"
 )
 
 func TestInternalTool_SearchMessages(t *testing.T) {
@@ -223,56 +222,6 @@ func TestInternalTool_GetContextMessages(t *testing.T) {
 	gt.True(t, ok)
 	gt.V(t, afterMsg["text"]).Equal("Message after")
 	gt.V(t, afterMsg["user_name"]).Equal("user2")
-}
-
-func TestInternalTool_LimitEnforcement(t *testing.T) {
-	ctx := context.Background()
-
-	// Create 150 mock messages
-	matches := make([]slackSDK.SearchMessage, 150)
-	for i := 0; i < 150; i++ {
-		matches[i] = slackSDK.SearchMessage{
-			Type:      "message",
-			Timestamp: "1234567890.123456",
-			Text:      "Test message",
-			Username:  "user",
-			Channel: slackSDK.CtxChannel{
-				ID:   "C123",
-				Name: "general",
-			},
-		}
-	}
-
-	slackClient := &domainmock.SlackClientMock{
-		SearchMessagesContextFunc: func(ctx context.Context, query string, params slackSDK.SearchParameters) (*slackSDK.SearchMessages, error) {
-			return &slackSDK.SearchMessages{
-				Total:   150,
-				Matches: matches,
-			}, nil
-		},
-	}
-
-	llmClient := newMockLLMClient()
-	repo := repository.NewMemory()
-
-	agent := slackagent.New(
-		slackagent.WithSlackClient(slackClient),
-		slackagent.WithLLMClient(llmClient),
-	)
-
-	initialized, err := agent.Init(ctx, llmClient, repo)
-	gt.NoError(t, err)
-	gt.True(t, initialized)
-
-	// Run with limit of 50
-	result, err := agent.Run(ctx, "search_slack", map[string]any{
-		"request": "test",
-		"limit":   float64(50),
-	})
-
-	gt.NoError(t, err)
-	_, hasResponse := result["response"]
-	gt.True(t, hasResponse)
 }
 
 func TestInternalTool_DirectLimitEnforcement(t *testing.T) {

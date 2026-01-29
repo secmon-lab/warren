@@ -32,7 +32,8 @@ type UseCases struct {
 	storageClient   interfaces.StorageClient
 	policyClient    interfaces.PolicyClient
 
-	tools []gollem.ToolSet
+	tools     []gollem.ToolSet
+	subAgents []*gollem.SubAgent
 
 	// use cases
 	ClusteringUC *ClusteringUseCase
@@ -112,6 +113,12 @@ func WithRepository(repository interfaces.Repository) Option {
 func WithTools(tools []gollem.ToolSet) Option {
 	return func(u *UseCases) {
 		u.tools = append(u.tools, tools...)
+	}
+}
+
+func WithSubAgents(subAgents []*gollem.SubAgent) Option {
+	return func(u *UseCases) {
+		u.subAgents = append(u.subAgents, subAgents...)
 	}
 }
 

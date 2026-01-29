@@ -17,8 +17,9 @@ func (a *Agent) GenerateKPTAnalysis(ctx context.Context, query string, resp *gol
 // ExportNewInternalTool creates a new internalTool instance for testing
 func ExportNewInternalTool(config *Config, projectID string) gollem.ToolSet {
 	return &internalTool{
-		config:    config,
-		projectID: projectID,
+		config:                    config,
+		projectID:                 projectID,
+		impersonateServiceAccount: config.ImpersonateServiceAccount,
 	}
 }
 

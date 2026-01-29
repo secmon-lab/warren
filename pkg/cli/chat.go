@@ -9,6 +9,9 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollem"
+	slackSDK "github.com/slack-go/slack"
+
 	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
 	slackagent "github.com/secmon-lab/warren/pkg/agents/slack"
 	"github.com/secmon-lab/warren/pkg/cli/config"
@@ -32,10 +35,17 @@ func cmdChat() *cli.Command {
 		mcpCfg          config.MCPConfig
 
 		query string
-	)
 
-	bqAgent := bqagent.New()
-	slackAgent := slackagent.New()
+		// BigQuery Agent flags
+		bqConfigPath                string
+		bqProjectID                 string
+		bqScanSizeLimitStr          string
+		bqRunbookPaths              []string
+		bqImpersonateServiceAccount string
+
+		// Slack Agent flags
+		slackUserToken string
+	)
 
 	flags := joinFlags(
 		[]cli.Flag{
@@ -60,6 +70,50 @@ func cmdChat() *cli.Command {
 				Sources:     cli.EnvVars("WARREN_NO_AUTHORIZATION"),
 				Destination: &noAuthorization,
 			},
+			// BigQuery Agent flags
+			&cli.StringFlag{
+				Name:        "agent-bigquery-config",
+				Usage:       "Path to BigQuery Agent configuration file (YAML)",
+				Destination: &bqConfigPath,
+				Category:    "Agent:BigQuery",
+				Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_CONFIG"),
+			},
+			&cli.StringFlag{
+				Name:        "agent-bigquery-project-id",
+				Usage:       "Google Cloud Project ID for BigQuery operations",
+				Destination: &bqProjectID,
+				Category:    "Agent:BigQuery",
+				Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_PROJECT_ID"),
+			},
+			&cli.StringFlag{
+				Name:        "agent-bigquery-scan-size-limit",
+				Usage:       "Maximum scan size limit for BigQuery queries (e.g., '10GB', '1TB')",
+				Destination: &bqScanSizeLimitStr,
+				Category:    "Agent:BigQuery",
+				Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_SCAN_SIZE_LIMIT"),
+			},
+			&cli.StringSliceFlag{
+				Name:        "agent-bigquery-runbook-dir",
+				Usage:       "Path to SQL runbook files or directories",
+				Destination: &bqRunbookPaths,
+				Category:    "Agent:BigQuery",
+				Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_RUNBOOK_DIR"),
+			},
+			&cli.StringFlag{
+				Name:        "agent-bigquery-impersonate-service-account",
+				Usage:       "Service account email to impersonate for BigQuery operations",
+				Destination: &bqImpersonateServiceAccount,
+				Category:    "Agent:BigQuery",
+				Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_IMPERSONATE_SERVICE_ACCOUNT"),
+			},
+			// Slack Agent flags
+			&cli.StringFlag{
+				Name:        "agent-slack-user-token",
+				Usage:       "Slack User OAuth Token for message search (requires search:read scope)",
+				Destination: &slackUserToken,
+				Category:    "Agent:Slack",
+				Sources:     cli.EnvVars("WARREN_AGENT_SLACK_USER_TOKEN"),
+			},
 		},
 		firestoreDB.Flags(),
 		llmCfg.Flags(),
@@ -67,8 +121,6 @@ func cmdChat() *cli.Command {
 		storageCfg.Flags(),
 		tools.Flags(),
 		mcpCfg.Flags(),
-		bqAgent.Flags(),
-		slackAgent.Flags(),
 	)
 
 	return &cli.Command{
@@ -131,18 +183,50 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to get tool sets")
 			}
 
-			// Initialize BigQuery Agent (creates its own memory service)
-			if enabled, err := bqAgent.Init(ctx, llmClient, repo); err != nil {
-				return err
-			} else if enabled {
-				allToolSets = append(allToolSets, bqAgent)
+			// Collect SubAgents
+			var subAgents []*gollem.SubAgent
+
+			// Initialize BigQuery Agent if configured
+			if bqConfigPath != "" {
+				bqConfig, err := bqagent.LoadConfigWithRunbooks(ctx, bqConfigPath, bqRunbookPaths)
+				if err != nil {
+					return goerr.Wrap(err, "failed to load BigQuery Agent config")
+				}
+
+				// Override scan size limit from CLI flag if provided
+				if bqScanSizeLimitStr != "" {
+					limit, err := bqagent.ParseScanSizeLimit(bqScanSizeLimitStr)
+					if err != nil {
+						return goerr.Wrap(err, "failed to parse scan size limit")
+					}
+					bqConfig.ScanSizeLimit = limit
+				}
+
+				// Set project ID and impersonate service account
+				bqConfig.ProjectID = bqProjectID
+				bqConfig.ImpersonateServiceAccount = bqImpersonateServiceAccount
+
+				// Create BigQuery Agent
+				bqAgent := bqagent.New(ctx, bqConfig, llmClient, repo)
+				bqSubAgent, err := bqAgent.SubAgent()
+				if err != nil {
+					return goerr.Wrap(err, "failed to create BigQuery SubAgent")
+				}
+				subAgents = append(subAgents, bqSubAgent)
+				logging.From(ctx).Info("BigQuery Agent configured")
 			}
 
-			// Initialize Slack Search Agent (creates its own memory service)
-			if enabled, err := slackAgent.Init(ctx, llmClient, repo); err != nil {
-				return err
-			} else if enabled {
-				allToolSets = append(allToolSets, slackAgent)
+			// Initialize Slack Search Agent if configured
+			if slackUserToken != "" {
+				// Create Slack Agent
+				slackClient := slackSDK.New(slackUserToken)
+				slackAgent := slackagent.New(ctx, slackClient, llmClient, repo)
+				slackSubAgent, err := slackAgent.SubAgent()
+				if err != nil {
+					return goerr.Wrap(err, "failed to create Slack SubAgent")
+				}
+				subAgents = append(subAgents, slackSubAgent)
+				logging.From(ctx).Info("Slack Search Agent configured")
 			}
 
 			// Add MCP tool sets if configured
@@ -176,13 +260,14 @@ func cmdChat() *cli.Command {
 					"recommendation", "This should only be used in development environments")
 			}
 
-			// Create usecase
+			// Create usecase with SubAgents
 			uc := usecase.New(
 				usecase.WithRepository(repo),
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(allToolSets),
+				usecase.WithSubAgents(subAgents),
 				usecase.WithNoAuthorization(noAuthorization),
 			)
 
