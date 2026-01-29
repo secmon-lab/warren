@@ -18,19 +18,14 @@ var basePrompt string
 //go:embed prompt/system_with_memories.md
 var systemWithMemoriesTemplate string
 
-//go:embed prompt/tool_description.md
-var toolDescriptionTemplate string
-
 //go:embed prompt/runbooks.md
 var runbooksTemplate string
 
 var systemWithMemoriesTmpl *template.Template
-var toolDescriptionTmpl *template.Template
 var runbooksTmpl *template.Template
 
 func init() {
 	systemWithMemoriesTmpl = template.Must(template.New("system_with_memories").Parse(systemWithMemoriesTemplate))
-	toolDescriptionTmpl = template.Must(template.New("tool_description").Parse(toolDescriptionTemplate))
 	runbooksTmpl = template.Must(template.New("runbooks").Parse(runbooksTemplate))
 }
 
