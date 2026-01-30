@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 )
 
 // Expose internal types and functions for testing
@@ -34,4 +35,19 @@ func (a *Agent) ExportedExtractRecords(ctx context.Context, originalQuery string
 // ExportedCreateMiddleware is exported for testing
 func (a *Agent) ExportedCreateMiddleware() func(gollem.SubAgentHandler) gollem.SubAgentHandler {
 	return a.createMiddleware()
+}
+
+// ExportedBuildSystemPrompt is exported for testing
+func ExportedBuildSystemPrompt(config *Config) (string, error) {
+	return buildSystemPrompt(config)
+}
+
+// ExportedNewPromptTemplate is exported for testing
+func ExportedNewPromptTemplate() (*gollem.PromptTemplate, error) {
+	return newPromptTemplate()
+}
+
+// ExportedFormatMemoryContext is exported for testing
+func ExportedFormatMemoryContext(memories []*memory.AgentMemory) string {
+	return formatMemoryContext(memories)
 }
