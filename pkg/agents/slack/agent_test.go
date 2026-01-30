@@ -325,11 +325,11 @@ func TestAgent_Middleware(t *testing.T) {
 			}
 			return gollem.SubAgentResult{
 				Data: map[string]any{
-					"response":           "test response",
-					"_original_request":  "should be removed",
-					"_memories":          "should be removed",
-					"_memory_context":    "should be removed",
-					"_limit":             "should be removed",
+					"response":          "test response",
+					"_original_request": "should be removed",
+					"_memories":         "should be removed",
+					"_memory_context":   "should be removed",
+					"_limit":            "should be removed",
 				},
 				Session: session,
 			}, nil
