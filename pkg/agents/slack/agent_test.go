@@ -208,3 +208,177 @@ func TestAgent_SearchMessagesIntegration(t *testing.T) {
 
 	t.Logf("Slack Search Agent configured successfully")
 }
+
+// TestAgent_Middleware tests the middleware logic
+func TestAgent_Middleware(t *testing.T) {
+	ctx := context.Background()
+	slackClient := &domainmock.SlackClientMock{}
+	llmClient := newMockLLMClient()
+	repo := repository.NewMemory()
+
+	agent := slackagent.New(ctx, slackClient, llmClient, repo)
+	middleware := agent.ExportedCreateMiddleware()
+
+	t.Run("parameter parsing - request and default limit", func(t *testing.T) {
+		var capturedArgs map[string]any
+		nextHandler := func(ctx context.Context, args map[string]any) (gollem.SubAgentResult, error) {
+			capturedArgs = make(map[string]any)
+			for k, v := range args {
+				capturedArgs[k] = v
+			}
+			// Return minimal valid result
+			session := &mock.SessionMock{
+				HistoryFunc: func() (*gollem.History, error) {
+					return &gollem.History{}, nil
+				},
+			}
+			return gollem.SubAgentResult{
+				Data:    map[string]any{"response": "test response"},
+				Session: session,
+			}, nil
+		}
+
+		handler := middleware(nextHandler)
+		args := map[string]any{
+			"request": "test search query",
+		}
+
+		result, err := handler(ctx, args)
+		gt.NoError(t, err)
+		gt.V(t, result).NotNil()
+
+		// Check that limit defaults to 50
+		gt.V(t, capturedArgs["_limit"]).Equal(50)
+		gt.V(t, capturedArgs["_original_request"]).Equal("test search query")
+	})
+
+	t.Run("parameter parsing - custom limit", func(t *testing.T) {
+		var capturedArgs map[string]any
+		nextHandler := func(ctx context.Context, args map[string]any) (gollem.SubAgentResult, error) {
+			capturedArgs = make(map[string]any)
+			for k, v := range args {
+				capturedArgs[k] = v
+			}
+			session := &mock.SessionMock{
+				HistoryFunc: func() (*gollem.History, error) {
+					return &gollem.History{}, nil
+				},
+			}
+			return gollem.SubAgentResult{
+				Data:    map[string]any{"response": "test response"},
+				Session: session,
+			}, nil
+		}
+
+		handler := middleware(nextHandler)
+		args := map[string]any{
+			"request": "test search query",
+			"limit":   float64(100),
+		}
+
+		result, err := handler(ctx, args)
+		gt.NoError(t, err)
+		gt.V(t, result).NotNil()
+
+		// Check that limit is set to 100
+		gt.V(t, capturedArgs["_limit"]).Equal(100)
+	})
+
+	t.Run("parameter parsing - limit exceeds maximum", func(t *testing.T) {
+		var capturedArgs map[string]any
+		nextHandler := func(ctx context.Context, args map[string]any) (gollem.SubAgentResult, error) {
+			capturedArgs = make(map[string]any)
+			for k, v := range args {
+				capturedArgs[k] = v
+			}
+			session := &mock.SessionMock{
+				HistoryFunc: func() (*gollem.History, error) {
+					return &gollem.History{}, nil
+				},
+			}
+			return gollem.SubAgentResult{
+				Data:    map[string]any{"response": "test response"},
+				Session: session,
+			}, nil
+		}
+
+		handler := middleware(nextHandler)
+		args := map[string]any{
+			"request": "test search query",
+			"limit":   float64(500),
+		}
+
+		result, err := handler(ctx, args)
+		gt.NoError(t, err)
+		gt.V(t, result).NotNil()
+
+		// Check that limit is capped at 200
+		gt.V(t, capturedArgs["_limit"]).Equal(200)
+	})
+
+	t.Run("internal fields cleanup", func(t *testing.T) {
+		nextHandler := func(ctx context.Context, args map[string]any) (gollem.SubAgentResult, error) {
+			session := &mock.SessionMock{
+				HistoryFunc: func() (*gollem.History, error) {
+					return &gollem.History{}, nil
+				},
+			}
+			return gollem.SubAgentResult{
+				Data: map[string]any{
+					"response":           "test response",
+					"_original_request":  "should be removed",
+					"_memories":          "should be removed",
+					"_memory_context":    "should be removed",
+					"_limit":             "should be removed",
+				},
+				Session: session,
+			}, nil
+		}
+
+		handler := middleware(nextHandler)
+		args := map[string]any{
+			"request": "test search query",
+		}
+
+		result, err := handler(ctx, args)
+		gt.NoError(t, err)
+		gt.V(t, result).NotNil()
+
+		// Check that internal fields are removed
+		_, hasOriginalRequest := result.Data["_original_request"]
+		gt.False(t, hasOriginalRequest)
+		_, hasMemories := result.Data["_memories"]
+		gt.False(t, hasMemories)
+		_, hasMemoryContext := result.Data["_memory_context"]
+		gt.False(t, hasMemoryContext)
+		_, hasLimit := result.Data["_limit"]
+		gt.False(t, hasLimit)
+
+		// Check that response is preserved
+		gt.V(t, result.Data["response"]).Equal("test response")
+	})
+
+	t.Run("no request parameter - passes through", func(t *testing.T) {
+		nextCalled := false
+		nextHandler := func(ctx context.Context, args map[string]any) (gollem.SubAgentResult, error) {
+			nextCalled = true
+			session := &mock.SessionMock{
+				HistoryFunc: func() (*gollem.History, error) {
+					return &gollem.History{}, nil
+				},
+			}
+			return gollem.SubAgentResult{
+				Data:    map[string]any{},
+				Session: session,
+			}, nil
+		}
+
+		handler := middleware(nextHandler)
+		args := map[string]any{}
+
+		result, err := handler(ctx, args)
+		gt.NoError(t, err)
+		gt.V(t, result).NotNil()
+		gt.True(t, nextCalled)
+	})
+}

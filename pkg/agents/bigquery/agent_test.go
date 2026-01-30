@@ -235,3 +235,114 @@ func TestAgent_ExtractRecords_WithRealLLM(t *testing.T) {
 	gt.True(t, ok)
 	gt.S(t, ipAddress).ContainsAny("192.168.1.100", "10.0.0.50", "172.16.0.25")
 }
+
+// TestAgent_Middleware tests the middleware logic
+func TestAgent_Middleware(t *testing.T) {
+	ctx := context.Background()
+	config := &bqagent.Config{
+		Tables:        []bqagent.TableConfig{},
+		ScanSizeLimit: 1000000,
+	}
+	llmClient := newMockLLMClient()
+	repo := repository.NewMemory()
+
+	agent := bqagent.New(ctx, config, llmClient, repo)
+	middleware := agent.ExportedCreateMiddleware()
+
+	t.Run("parameter parsing - query parameter", func(t *testing.T) {
+		var capturedArgs map[string]any
+		nextHandler := func(ctx context.Context, args map[string]any) (gollem.SubAgentResult, error) {
+			capturedArgs = make(map[string]any)
+			for k, v := range args {
+				capturedArgs[k] = v
+			}
+			// Return minimal valid result
+			session := &mock.SessionMock{
+				HistoryFunc: func() (*gollem.History, error) {
+					return &gollem.History{}, nil
+				},
+			}
+			return gollem.SubAgentResult{
+				Data:    map[string]any{"response": "test response"},
+				Session: session,
+			}, nil
+		}
+
+		handler := middleware(nextHandler)
+		args := map[string]any{
+			"query": "test BigQuery query",
+		}
+
+		result, err := handler(ctx, args)
+		gt.NoError(t, err)
+		gt.V(t, result).NotNil()
+
+		// Check that _original_query is set
+		gt.V(t, capturedArgs["_original_query"]).Equal("test BigQuery query")
+	})
+
+	t.Run("internal fields cleanup", func(t *testing.T) {
+		nextHandler := func(ctx context.Context, args map[string]any) (gollem.SubAgentResult, error) {
+			session := &mock.SessionMock{
+				HistoryFunc: func() (*gollem.History, error) {
+					return &gollem.History{}, nil
+				},
+			}
+			return gollem.SubAgentResult{
+				Data: map[string]any{
+					"response":          "test response",
+					"_original_query":   "should be removed",
+					"_memories":         "should be removed",
+					"_memory_context":   "should be removed",
+				},
+				Session: session,
+			}, nil
+		}
+
+		handler := middleware(nextHandler)
+		args := map[string]any{
+			"query": "test BigQuery query",
+		}
+
+		result, err := handler(ctx, args)
+		gt.NoError(t, err)
+		gt.V(t, result).NotNil()
+
+		// Check that internal fields are removed
+		_, hasOriginalQuery := result.Data["_original_query"]
+		gt.False(t, hasOriginalQuery)
+		_, hasMemories := result.Data["_memories"]
+		gt.False(t, hasMemories)
+		_, hasMemoryContext := result.Data["_memory_context"]
+		gt.False(t, hasMemoryContext)
+
+		// Check that response was converted to data (fallback)
+		gt.V(t, result.Data["data"]).Equal("test response")
+		_, hasResponse := result.Data["response"]
+		gt.False(t, hasResponse)
+	})
+
+	t.Run("no query parameter - passes through", func(t *testing.T) {
+		nextCalled := false
+		nextHandler := func(ctx context.Context, args map[string]any) (gollem.SubAgentResult, error) {
+			nextCalled = true
+			session := &mock.SessionMock{
+				HistoryFunc: func() (*gollem.History, error) {
+					return &gollem.History{}, nil
+				},
+			}
+			return gollem.SubAgentResult{
+				Data:    map[string]any{},
+				Session: session,
+			}, nil
+		}
+
+		handler := middleware(nextHandler)
+		args := map[string]any{}
+
+		result, err := handler(ctx, args)
+		gt.NoError(t, err)
+		gt.V(t, result).NotNil()
+		gt.True(t, nextCalled)
+	})
+}
