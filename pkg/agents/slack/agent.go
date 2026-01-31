@@ -6,30 +6,113 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	slackSDK "github.com/slack-go/slack"
+
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/urfave/cli/v3"
 )
 
 // Agent represents a Slack Search Sub-Agent
 type Agent struct {
-	slackClient   interfaces.SlackClient
 	internalTool  gollem.ToolSet
 	llmClient     gollem.LLMClient
 	memoryService *memory.Service
+	slackClient   interfaces.SlackClient
+
+	// CLI configuration field
+	oauthToken string
 }
 
 // New creates a new Slack Search Agent instance
-func New(ctx context.Context, slackClient interfaces.SlackClient, llmClient gollem.LLMClient, repo interfaces.Repository) *Agent {
-	return &Agent{
-		slackClient: slackClient,
-		internalTool: &internalTool{
-			slackClient: slackClient,
-		},
-		llmClient:     llmClient,
-		memoryService: memory.New("slack_search", llmClient, repo),
+func New(opts ...Option) *Agent {
+	a := &Agent{}
+	for _, opt := range opts {
+		opt(a)
 	}
+	return a
+}
+
+// Option is a functional option for configuring Agent
+type Option func(*Agent)
+
+// WithSlackClient sets the Slack client
+func WithSlackClient(client interfaces.SlackClient) Option {
+	return func(a *Agent) {
+		a.slackClient = client
+		if client != nil {
+			a.internalTool = &internalTool{slackClient: client}
+		}
+	}
+}
+
+// WithLLMClient sets the LLM client
+func WithLLMClient(client gollem.LLMClient) Option {
+	return func(a *Agent) {
+		a.llmClient = client
+	}
+}
+
+// WithMemoryService sets the memory service
+func WithMemoryService(svc *memory.Service) Option {
+	return func(a *Agent) {
+		a.memoryService = svc
+	}
+}
+
+// ID implements SubAgent interface
+func (a *Agent) ID() string {
+	return "slack_search"
+}
+
+// Flags returns CLI flags for this agent
+func (a *Agent) Flags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:        "agent-slack-user-token",
+			Usage:       "Slack User OAuth Token for message search (requires search:read scope)",
+			Destination: &a.oauthToken,
+			Category:    "Agent:Slack",
+			Sources:     cli.EnvVars("WARREN_AGENT_SLACK_USER_TOKEN"),
+		},
+	}
+}
+
+// Init initializes the agent with LLM client and memory service.
+// Returns (true, nil) if initialized successfully, (false, nil) if not configured, or (false, error) on error.
+func (a *Agent) Init(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) (bool, error) {
+	// If no OAuth token provided, agent is not configured
+	if a.oauthToken == "" && a.slackClient == nil {
+		return false, nil // Agent is optional
+	}
+
+	// Create Slack client from OAuth token if not already set
+	if a.slackClient == nil {
+		a.slackClient = slackSDK.New(a.oauthToken)
+	}
+
+	a.internalTool = &internalTool{
+		slackClient: a.slackClient,
+	}
+	a.llmClient = llmClient
+	// Create memory service bound to this agent
+	a.memoryService = memory.New(a.ID(), llmClient, repo)
+
+	logging.From(ctx).Info("Slack Search Agent configured")
+
+	return true, nil
+}
+
+// IsEnabled returns true if the agent is configured and initialized
+func (a *Agent) IsEnabled() bool {
+	return a.slackClient != nil && a.llmClient != nil
+}
+
+// SetSlackClient sets the Slack client
+func (a *Agent) SetSlackClient(client interfaces.SlackClient) {
+	a.slackClient = client
 }
 
 // Name returns the agent name

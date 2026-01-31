@@ -36,6 +36,9 @@ func cmdChat() *cli.Command {
 		query string
 	)
 
+	bqAgent := bqagent.New()
+	slackAgent := slackagent.New()
+
 	flags := joinFlags(
 		[]cli.Flag{
 			&cli.StringFlag{
@@ -66,8 +69,8 @@ func cmdChat() *cli.Command {
 		storageCfg.Flags(),
 		tools.Flags(),
 		mcpCfg.Flags(),
-		bqagent.Flags(),
-		slackagent.Flags(),
+		bqAgent.Flags(),
+		slackAgent.Flags(),
 	)
 
 	return &cli.Command{
@@ -133,24 +136,26 @@ func cmdChat() *cli.Command {
 			// Collect SubAgents
 			var subAgents []*gollem.SubAgent
 
-			// Initialize BigQuery Agent if configured
-			bqSubAgent, err := bqagent.NewSubAgentFromCLI(ctx, c, llmClient, repo)
-			if err != nil {
-				return goerr.Wrap(err, "failed to create BigQuery SubAgent")
-			}
-			if bqSubAgent != nil {
+			// Initialize BigQuery Agent (creates its own memory service)
+			if enabled, err := bqAgent.Init(ctx, llmClient, repo); err != nil {
+				return err
+			} else if enabled {
+				bqSubAgent, err := bqAgent.SubAgent()
+				if err != nil {
+					return goerr.Wrap(err, "failed to create BigQuery SubAgent")
+				}
 				subAgents = append(subAgents, bqSubAgent)
-				logging.From(ctx).Info("BigQuery Agent configured")
 			}
 
-			// Initialize Slack Search Agent if configured
-			slackSubAgent, err := slackagent.NewSubAgentFromCLI(ctx, c, llmClient, repo)
-			if err != nil {
-				return goerr.Wrap(err, "failed to create Slack SubAgent")
-			}
-			if slackSubAgent != nil {
+			// Initialize Slack Search Agent (creates its own memory service)
+			if enabled, err := slackAgent.Init(ctx, llmClient, repo); err != nil {
+				return err
+			} else if enabled {
+				slackSubAgent, err := slackAgent.SubAgent()
+				if err != nil {
+					return goerr.Wrap(err, "failed to create Slack SubAgent")
+				}
 				subAgents = append(subAgents, slackSubAgent)
-				logging.From(ctx).Info("Slack Search Agent configured")
 			}
 
 			// Add MCP tool sets if configured

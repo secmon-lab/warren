@@ -50,23 +50,25 @@ func newMockLLMClient() gollem.LLMClient {
 }
 
 func TestAgent_Name(t *testing.T) {
-	ctx := context.Background()
 	slackClient := &domainmock.SlackClientMock{}
 	llmClient := newMockLLMClient()
-	repo := repository.NewMemory()
 
-	agent := slackagent.New(ctx, slackClient, llmClient, repo)
+	agent := slackagent.New(
+		slackagent.WithSlackClient(slackClient),
+		slackagent.WithLLMClient(llmClient),
+	)
 
 	gt.V(t, agent.Name()).Equal("search_slack")
 }
 
 func TestAgent_Description(t *testing.T) {
-	ctx := context.Background()
 	slackClient := &domainmock.SlackClientMock{}
 	llmClient := newMockLLMClient()
-	repo := repository.NewMemory()
 
-	agent := slackagent.New(ctx, slackClient, llmClient, repo)
+	agent := slackagent.New(
+		slackagent.WithSlackClient(slackClient),
+		slackagent.WithLLMClient(llmClient),
+	)
 
 	description := agent.Description()
 	gt.V(t, description).NotEqual("")
@@ -75,12 +77,13 @@ func TestAgent_Description(t *testing.T) {
 }
 
 func TestAgent_SubAgent(t *testing.T) {
-	ctx := context.Background()
 	slackClient := &domainmock.SlackClientMock{}
 	llmClient := newMockLLMClient()
-	repo := repository.NewMemory()
 
-	agent := slackagent.New(ctx, slackClient, llmClient, repo)
+	agent := slackagent.New(
+		slackagent.WithSlackClient(slackClient),
+		slackagent.WithLLMClient(llmClient),
+	)
 
 	subAgent, err := agent.SubAgent()
 	gt.NoError(t, err)
@@ -101,14 +104,14 @@ func TestAgent_ExtractRecords_WithRealLLM(t *testing.T) {
 	llmClient, err := gemini.New(ctx, projectID, location, gemini.WithModel("gemini-2.0-flash-exp"))
 	gt.NoError(t, err)
 
-	// Create memory service with in-memory repository
-	repo := repository.NewMemory()
-
 	// Create mock Slack client
 	slackClient := &domainmock.SlackClientMock{}
 
 	// Create agent
-	agent := slackagent.New(ctx, slackClient, llmClient, repo)
+	agent := slackagent.New(
+		slackagent.WithSlackClient(slackClient),
+		slackagent.WithLLMClient(llmClient),
+	)
 
 	// Create a session with conversation history containing search results
 	session, err := llmClient.NewSession(ctx)
@@ -155,10 +158,22 @@ Text: "Multiple authentication failures detected. Seems to be affecting users in
 
 	// Test extractRecords with the session containing results
 	records, err := agent.ExportedExtractRecords(ctx, userQuery, session)
-	gt.NoError(t, err)
+	if err != nil {
+		// Skip test if API quota is exhausted (temporary infrastructure issue)
+		if strings.Contains(err.Error(), "RESOURCE_EXHAUSTED") {
+			t.Skipf("API quota exhausted (temporary): %v", err)
+		}
+		gt.NoError(t, err)
+	}
 	gt.V(t, len(records)).NotEqual(0)
 
 	t.Logf("Successfully extracted %d records", len(records))
+
+	// Skip further checks if no records were extracted (e.g., due to API errors)
+	if len(records) == 0 {
+		return
+	}
+
 	t.Logf("Sample record: %+v", records[0])
 
 	// Verify that message records have expected fields and values
@@ -192,14 +207,14 @@ func TestAgent_SearchMessagesIntegration(t *testing.T) {
 		t.Skip("TEST_SLACK_USER_TOKEN not set, skipping integration test")
 	}
 
-	ctx := context.Background()
-
 	// Create agent with real Slack client
 	slackClient := slackSDK.New(token)
 	llmClient := newMockLLMClient()
-	repo := repository.NewMemory()
 
-	agent := slackagent.New(ctx, slackClient, llmClient, repo)
+	agent := slackagent.New(
+		slackagent.WithSlackClient(slackClient),
+		slackagent.WithLLMClient(llmClient),
+	)
 
 	// Create SubAgent
 	subAgent, err := agent.SubAgent()
@@ -214,9 +229,18 @@ func TestAgent_Middleware(t *testing.T) {
 	ctx := context.Background()
 	slackClient := &domainmock.SlackClientMock{}
 	llmClient := newMockLLMClient()
-	repo := repository.NewMemory()
 
-	agent := slackagent.New(ctx, slackClient, llmClient, repo)
+	// Create agent and initialize it properly
+	agent := slackagent.New(
+		slackagent.WithSlackClient(slackClient),
+		slackagent.WithLLMClient(llmClient),
+	)
+
+	// Initialize agent to set up memory service
+	repo := repository.NewMemory()
+	_, err := agent.Init(ctx, llmClient, repo)
+	gt.NoError(t, err)
+
 	middleware := agent.ExportedCreateMiddleware()
 
 	t.Run("parameter parsing - request and default limit", func(t *testing.T) {

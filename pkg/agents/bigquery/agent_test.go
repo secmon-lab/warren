@@ -90,7 +90,6 @@ func newMockLLMClient() gollem.LLMClient {
 }
 
 func TestAgent_Name(t *testing.T) {
-	ctx := context.Background()
 	config := &bqagent.Config{
 		Tables:        []bqagent.TableConfig{},
 		ScanSizeLimit: 1000000,
@@ -98,13 +97,12 @@ func TestAgent_Name(t *testing.T) {
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
 
-	agent := bqagent.New(ctx, config, llmClient, repo)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	gt.V(t, agent.Name()).Equal("query_bigquery")
 }
 
 func TestAgent_Description(t *testing.T) {
-	ctx := context.Background()
 	config := &bqagent.Config{
 		Tables:        []bqagent.TableConfig{},
 		ScanSizeLimit: 1000000,
@@ -112,7 +110,7 @@ func TestAgent_Description(t *testing.T) {
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
 
-	agent := bqagent.New(ctx, config, llmClient, repo)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	description := agent.Description()
 	gt.V(t, description).NotEqual("")
@@ -121,7 +119,6 @@ func TestAgent_Description(t *testing.T) {
 }
 
 func TestAgent_SubAgent(t *testing.T) {
-	ctx := context.Background()
 	config := &bqagent.Config{
 		Tables: []bqagent.TableConfig{
 			{
@@ -136,7 +133,7 @@ func TestAgent_SubAgent(t *testing.T) {
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
 
-	agent := bqagent.New(ctx, config, llmClient, repo)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 
 	subAgent, err := agent.SubAgent()
 	gt.NoError(t, err)
@@ -167,7 +164,7 @@ func TestAgent_ExtractRecords_WithRealLLM(t *testing.T) {
 		QueryTimeout:  time.Minute,
 	}
 
-	agent := bqagent.New(ctx, cfg, llmClient, repo)
+	agent := bqagent.NewAgent(cfg, llmClient, repo)
 
 	// Create a session with conversation history containing query results
 	session, err := llmClient.NewSession(ctx)
@@ -246,7 +243,7 @@ func TestAgent_Middleware(t *testing.T) {
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
 
-	agent := bqagent.New(ctx, config, llmClient, repo)
+	agent := bqagent.NewAgent(config, llmClient, repo)
 	middleware := agent.ExportedCreateMiddleware()
 
 	t.Run("parameter parsing - query parameter", func(t *testing.T) {
