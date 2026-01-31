@@ -97,7 +97,7 @@ func TestAgent_Name(t *testing.T) {
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
 
-	agent := bqagent.NewAgentForTest(config, llmClient, repo)
+	agent := bqagent.NewAgentForTest(config, llmClient, repo, "test-project", "")
 
 	gt.V(t, agent.Name()).Equal("query_bigquery")
 }
@@ -110,7 +110,7 @@ func TestAgent_Description(t *testing.T) {
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
 
-	agent := bqagent.NewAgentForTest(config, llmClient, repo)
+	agent := bqagent.NewAgentForTest(config, llmClient, repo, "test-project", "")
 
 	description := agent.Description()
 	gt.V(t, description).NotEqual("")
@@ -133,7 +133,7 @@ func TestAgent_SubAgent(t *testing.T) {
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
 
-	agent := bqagent.NewAgentForTest(config, llmClient, repo)
+	agent := bqagent.NewAgentForTest(config, llmClient, repo, "test-project", "")
 
 	subAgent, err := agent.SubAgent()
 	gt.NoError(t, err)
@@ -164,7 +164,7 @@ func TestAgent_ExtractRecords_WithRealLLM(t *testing.T) {
 		QueryTimeout:  time.Minute,
 	}
 
-	agent := bqagent.NewAgentForTest(cfg, llmClient, repo)
+	agent := bqagent.NewAgentForTest(cfg, llmClient, repo, "test-project", "")
 
 	// Create a session with conversation history containing query results
 	session, err := llmClient.NewSession(ctx)
@@ -243,7 +243,7 @@ func TestAgent_Middleware(t *testing.T) {
 	llmClient := newMockLLMClient()
 	repo := repository.NewMemory()
 
-	agent := bqagent.NewAgentForTest(config, llmClient, repo)
+	agent := bqagent.NewAgentForTest(config, llmClient, repo, "test-project", "")
 	middleware := agent.ExportedCreateMiddleware()
 
 	t.Run("parameter parsing - query parameter", func(t *testing.T) {

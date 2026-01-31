@@ -47,7 +47,7 @@ var slackMessagesSchema = &gollem.Parameter{
 }
 
 // extractRecords extracts the raw Slack messages from the session history
-func (a *Agent) extractRecords(ctx context.Context, originalRequest string, session gollem.Session) ([]map[string]any, error) {
+func (a *agent) extractRecords(ctx context.Context, originalRequest string, session gollem.Session) ([]map[string]any, error) {
 	log := logging.From(ctx)
 	log.Debug("Extracting messages from session history", "original_request", originalRequest)
 

@@ -15,13 +15,11 @@ import (
 
 // Config represents BigQuery Agent configuration
 type Config struct {
-	Tables                    []TableConfig                              `yaml:"tables"`
-	ScanSizeLimit             uint64                                     `yaml:"-"` // Parsed from ScanSizeLimitStr
-	ScanSizeLimitStr          string                                     `yaml:"scan_size_limit"`
-	QueryTimeout              time.Duration                              `yaml:"query_timeout"` // Timeout for waiting for BigQuery job completion (default: 5 minutes)
-	Runbooks                  map[types.RunbookID]*bigquery.RunbookEntry `yaml:"-"`             // Loaded runbooks (not in YAML)
-	ProjectID                 string                                     `yaml:"-"`             // Google Cloud Project ID (set by Warren)
-	ImpersonateServiceAccount string                                     `yaml:"-"`             // Service account to impersonate (set by Warren)
+	Tables           []TableConfig                              `yaml:"tables"`
+	ScanSizeLimit    uint64                                     `yaml:"-"` // Parsed from ScanSizeLimitStr
+	ScanSizeLimitStr string                                     `yaml:"scan_size_limit"`
+	QueryTimeout     time.Duration                              `yaml:"query_timeout"` // Timeout for waiting for BigQuery job completion (default: 5 minutes)
+	Runbooks         map[types.RunbookID]*bigquery.RunbookEntry `yaml:"-"`             // Loaded runbooks (not in YAML)
 }
 
 // TableConfig represents a BigQuery table configuration

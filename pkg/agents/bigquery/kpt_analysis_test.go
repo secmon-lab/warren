@@ -39,7 +39,7 @@ func TestGenerateKPTAnalysis_Success(t *testing.T) {
 
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	agent := bigquery.NewAgentForTest(&bigquery.Config{}, mockLLM, repo)
+	agent := bigquery.NewAgentForTest(&bigquery.Config{}, mockLLM, repo, "test-project", "")
 
 	resp := &gollem.ExecuteResponse{}
 	successes, problems, improvements, err := agent.GenerateKPTAnalysis(
@@ -85,7 +85,7 @@ func TestGenerateKPTAnalysis_Failure(t *testing.T) {
 
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	agent := bigquery.NewAgentForTest(&bigquery.Config{}, mockLLM, repo)
+	agent := bigquery.NewAgentForTest(&bigquery.Config{}, mockLLM, repo, "test-project", "")
 
 	execErr := errors.New("query exceeded scan size limit")
 	successes, problems, improvements, err := agent.GenerateKPTAnalysis(
@@ -116,7 +116,7 @@ func TestGenerateKPTAnalysis_LLMError(t *testing.T) {
 
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	agent := bigquery.NewAgentForTest(&bigquery.Config{}, mockLLM, repo)
+	agent := bigquery.NewAgentForTest(&bigquery.Config{}, mockLLM, repo, "test-project", "")
 
 	successes, problems, improvements, err := agent.GenerateKPTAnalysis(
 		ctx,
@@ -151,7 +151,7 @@ func TestGenerateKPTAnalysis_InvalidJSON(t *testing.T) {
 
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	agent := bigquery.NewAgentForTest(&bigquery.Config{}, mockLLM, repo)
+	agent := bigquery.NewAgentForTest(&bigquery.Config{}, mockLLM, repo, "test-project", "")
 
 	successes, problems, improvements, err := agent.GenerateKPTAnalysis(
 		ctx,
@@ -190,7 +190,7 @@ func TestGenerateKPTAnalysis_WithMarkdownCodeBlocks(t *testing.T) {
 
 	ctx := context.Background()
 	repo := repository.NewMemory()
-	agent := bigquery.NewAgentForTest(&bigquery.Config{}, mockLLM, repo)
+	agent := bigquery.NewAgentForTest(&bigquery.Config{}, mockLLM, repo, "test-project", "")
 
 	successes, _, _, err := agent.GenerateKPTAnalysis(
 		ctx,
@@ -231,7 +231,7 @@ func TestGenerateKPTAnalysis_RealLLM(t *testing.T) {
 			},
 		},
 	}
-	agent := bigquery.NewAgentForTest(config, llmClient, repo)
+	agent := bigquery.NewAgentForTest(config, llmClient, repo, "test-project", "")
 
 	t.Run("success case", func(t *testing.T) {
 		// Simulate successful execution with results

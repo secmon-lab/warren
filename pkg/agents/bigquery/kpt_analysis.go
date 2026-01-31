@@ -46,10 +46,10 @@ type kptPromptData struct {
 	Error            string
 }
 
-// generateKPTAnalysis generates comprehensive KPT (Keep/Problem/Try) analysis from execution result
+// generateKPTAnalysis generates comprehensive KPT (Keep/Problem/Try) analysis from execution result (private method)
 // Returns: (Successes, Problems, Improvements, error)
 // Note: Returns non-critical errors with tagKPTAnalysisFallback for graceful degradation
-func (a *Agent) generateKPTAnalysis(
+func (a *agent) generateKPTAnalysis(
 	ctx context.Context,
 	query string,
 	resp *gollem.ExecuteResponse,
@@ -94,7 +94,7 @@ func (a *Agent) generateKPTAnalysis(
 }
 
 // buildKPTPrompt builds the prompt for KPT analysis using template
-func (a *Agent) buildKPTPrompt(
+func (a *agent) buildKPTPrompt(
 	query string,
 	resp *gollem.ExecuteResponse,
 	execErr error,
@@ -157,7 +157,7 @@ func (a *Agent) buildKPTPrompt(
 }
 
 // formatHistory converts conversation history into human-readable text
-func (a *Agent) formatHistory(history *gollem.History) string {
+func (a *agent) formatHistory(history *gollem.History) string {
 	if history == nil || len(history.Messages) == 0 {
 		return "No conversation history"
 	}
@@ -224,7 +224,7 @@ func (a *Agent) formatHistory(history *gollem.History) string {
 }
 
 // parseKPTResponse parses the LLM response into KPT components
-func (a *Agent) parseKPTResponse(responseText string) ([]string, []string, []string, error) {
+func (a *agent) parseKPTResponse(responseText string) ([]string, []string, []string, error) {
 	// Clean up response text (remove markdown code blocks if present)
 	responseText = strings.TrimSpace(responseText)
 	responseText = strings.TrimPrefix(responseText, "```json")

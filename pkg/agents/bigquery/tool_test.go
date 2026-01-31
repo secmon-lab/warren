@@ -24,7 +24,7 @@ func TestInternalTool_Specs(t *testing.T) {
 		ScanSizeLimit: 10 * 1024 * 1024 * 1024, // 10GB
 	}
 
-	tool := bqagent.ExportNewInternalTool(config, "test-project")
+	tool := bqagent.ExportNewInternalTool(config, "test-project", "")
 
 	specs, err := tool.Specs(ctx)
 	gt.NoError(t, err)
@@ -65,7 +65,7 @@ func TestInternalTool_GetRunbook(t *testing.T) {
 		gt.V(t, targetID != "").Equal(true)
 
 		// Call get_runbook through internal tool
-		tool := bqagent.ExportNewInternalTool(cfg, "test-project")
+		tool := bqagent.ExportNewInternalTool(cfg, "test-project", "")
 		result, err := tool.Run(ctx, "get_runbook", map[string]any{
 			"runbook_id": targetID,
 		})
@@ -94,7 +94,7 @@ func TestInternalTool_GetRunbook(t *testing.T) {
 		cfg, err := bqagent.LoadConfigWithRunbooks(ctx, configPath, []string{runbookDir})
 		gt.NoError(t, err)
 
-		tool := bqagent.ExportNewInternalTool(cfg, "test-project")
+		tool := bqagent.ExportNewInternalTool(cfg, "test-project", "")
 		_, err = tool.Run(ctx, "get_runbook", map[string]any{
 			"runbook_id": "nonexistent",
 		})
@@ -107,7 +107,7 @@ func TestInternalTool_GetRunbook(t *testing.T) {
 		cfg, err := bqagent.LoadConfigWithRunbooks(ctx, configPath, []string{runbookDir})
 		gt.NoError(t, err)
 
-		tool := bqagent.ExportNewInternalTool(cfg, "test-project")
+		tool := bqagent.ExportNewInternalTool(cfg, "test-project", "")
 		_, err = tool.Run(ctx, "get_runbook", map[string]any{})
 		gt.Error(t, err)
 	})
@@ -122,7 +122,7 @@ func TestInternalTool_Specs_WithRunbooks(t *testing.T) {
 		cfg, err := bqagent.LoadConfigWithRunbooks(ctx, configPath, []string{runbookDir})
 		gt.NoError(t, err)
 
-		tool := bqagent.ExportNewInternalTool(cfg, "test-project")
+		tool := bqagent.ExportNewInternalTool(cfg, "test-project", "")
 		specs, err := tool.Specs(ctx)
 		gt.NoError(t, err)
 
@@ -148,7 +148,7 @@ func TestInternalTool_Specs_WithRunbooks(t *testing.T) {
 		cfg, err := bqagent.LoadConfig(configPath)
 		gt.NoError(t, err)
 
-		tool := bqagent.ExportNewInternalTool(cfg, "test-project")
+		tool := bqagent.ExportNewInternalTool(cfg, "test-project", "")
 		specs, err := tool.Specs(ctx)
 		gt.NoError(t, err)
 

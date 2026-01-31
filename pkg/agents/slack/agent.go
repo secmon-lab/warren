@@ -6,17 +6,15 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
-	slackSDK "github.com/slack-go/slack"
-
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
-	"github.com/urfave/cli/v3"
 )
 
-// Agent represents a Slack Search Sub-Agent
-type Agent struct {
+// agent represents a Slack Search Sub-Agent (private).
+// This struct is private and only created through the factory.
+type agent struct {
 	internalTool  gollem.ToolSet
 	llmClient     gollem.LLMClient
 	memoryService *memory.Service
@@ -24,90 +22,34 @@ type Agent struct {
 	repo          interfaces.Repository
 }
 
-// CLIConfig holds CLI flag values for Slack Agent
-type CLIConfig struct {
-	oauthToken string
-}
-
-// ID implements SubAgent interface
-func (a *Agent) ID() string {
-	return "slack_search"
-}
-
-// Flags returns CLI flags for Slack agent configuration
-func Flags() ([]cli.Flag, *CLIConfig) {
-	cfg := &CLIConfig{}
-	flags := []cli.Flag{
-		&cli.StringFlag{
-			Name:        "agent-slack-user-token",
-			Usage:       "Slack User OAuth Token for message search (requires search:read scope)",
-			Category:    "Agent:Slack",
-			Sources:     cli.EnvVars("WARREN_AGENT_SLACK_USER_TOKEN"),
-			Destination: &cfg.oauthToken,
-		},
-	}
-	return flags, cfg
-}
-
-// Init initializes and returns a fully configured immutable Agent
-func Init(ctx context.Context, cliCfg *CLIConfig, llmClient gollem.LLMClient, repo interfaces.Repository) (*Agent, error) {
-	if cliCfg.oauthToken == "" {
-		return nil, nil // Agent is optional
-	}
-
-	logging.From(ctx).Info("Slack Search Agent configured")
-
-	// Return immutable Agent
-	return New(llmClient, repo, cliCfg.oauthToken), nil
-}
-
-// New creates a new immutable Slack Search Agent instance
-func New(llmClient gollem.LLMClient, repo interfaces.Repository, oauthToken string) *Agent {
-	slackClient := slackSDK.New(oauthToken)
-	return &Agent{
-		llmClient:   llmClient,
-		repo:        repo,
-		slackClient: slackClient,
-		internalTool: &internalTool{
-			slackClient: slackClient,
-		},
-		memoryService: memory.New("slack_search", llmClient, repo),
-	}
-}
-
-// IsEnabled returns true if the agent is initialized
-func (a *Agent) IsEnabled() bool {
-	return a.slackClient != nil
-}
-
-// Name returns the agent name
-func (a *Agent) Name() string {
+// name returns the agent name (private method)
+func (a *agent) name() string {
 	return "search_slack"
 }
 
-// Description returns the agent description
-func (a *Agent) Description() string {
+// description returns the agent description (private method)
+func (a *agent) description() string {
 	return "Search for messages in Slack workspace. This tool delegates to a specialized Slack search agent that will understand your request, search comprehensively, and return a response containing the relevant raw message data organized to fulfill your request. The agent will include actual message content (text, user, channel, timestamp) as raw data. You should use this data to answer the user's question."
 }
 
-// SubAgent returns a gollem.SubAgent
-func (a *Agent) SubAgent() (*gollem.SubAgent, error) {
+// subAgent creates a gollem.SubAgent (private method)
+func (a *agent) subAgent() (*gollem.SubAgent, error) {
 	promptTemplate, err := newPromptTemplate()
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create prompt template")
 	}
 
 	return gollem.NewSubAgent(
-		a.Name(),
-		a.Description(),
+		a.name(),
+		a.description(),
 		a.factory,
 		gollem.WithPromptTemplate(promptTemplate),
 		gollem.WithSubAgentMiddleware(a.createMiddleware()),
 	), nil
 }
 
-// factory creates an internal agent
-func (a *Agent) factory() (*gollem.Agent, error) {
+// factory creates an internal agent (private method)
+func (a *agent) factory() (*gollem.Agent, error) {
 	systemPrompt, err := buildSystemPrompt()
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to build system prompt")
@@ -120,8 +62,8 @@ func (a *Agent) factory() (*gollem.Agent, error) {
 	), nil
 }
 
-// createMiddleware creates middleware for pre/post-execution processing
-func (a *Agent) createMiddleware() func(gollem.SubAgentHandler) gollem.SubAgentHandler {
+// createMiddleware creates middleware for pre/post-execution processing (private method)
+func (a *agent) createMiddleware() func(gollem.SubAgentHandler) gollem.SubAgentHandler {
 	return func(next gollem.SubAgentHandler) gollem.SubAgentHandler {
 		return func(ctx context.Context, args map[string]any) (gollem.SubAgentResult, error) {
 			log := logging.From(ctx)

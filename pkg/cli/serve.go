@@ -12,11 +12,9 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
 
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
-	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
-	slackagent "github.com/secmon-lab/warren/pkg/agents/slack"
+	"github.com/secmon-lab/warren/pkg/agents"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
@@ -69,10 +67,6 @@ func cmdServe() *cli.Command {
 		mcpCfg           config.MCPConfig
 		asyncCfg         config.AsyncAlertHook
 	)
-
-	// Get agent CLI flags
-	bqFlags, bqCLI := bqagent.Flags()
-	slackFlags, slackCLI := slackagent.Flags()
 
 	flags := joinFlags(
 		[]cli.Flag{
@@ -134,8 +128,7 @@ func cmdServe() *cli.Command {
 		storageCfg.Flags(),
 		mcpCfg.Flags(),
 		asyncCfg.Flags(),
-		bqFlags,
-		slackFlags,
+		agents.AllFlags(),
 	)
 
 	return &cli.Command{
@@ -264,33 +257,10 @@ func cmdServe() *cli.Command {
 			// Create tag service
 			tagService := tag.New(repo)
 
-			// Collect SubAgents
-			var subAgents []*gollem.SubAgent
-
-			// Initialize BigQuery Agent if configured
-			bqAgent, err := bqagent.Init(ctx, bqCLI, llmClient, repo)
+			// Initialize all configured agents
+			subAgents, err := agents.ConfigureAll(ctx, llmClient, repo)
 			if err != nil {
-				return goerr.Wrap(err, "failed to initialize BigQuery Agent")
-			}
-			if bqAgent != nil {
-				bqSubAgent, err := bqAgent.SubAgent()
-				if err != nil {
-					return goerr.Wrap(err, "failed to create BigQuery SubAgent")
-				}
-				subAgents = append(subAgents, bqSubAgent)
-			}
-
-			// Initialize Slack Search Agent if configured
-			slackAgent, err := slackagent.Init(ctx, slackCLI, llmClient, repo)
-			if err != nil {
-				return goerr.Wrap(err, "failed to initialize Slack Agent")
-			}
-			if slackAgent != nil {
-				slackSubAgent, err := slackAgent.SubAgent()
-				if err != nil {
-					return goerr.Wrap(err, "failed to create Slack SubAgent")
-				}
-				subAgents = append(subAgents, slackSubAgent)
+				return goerr.Wrap(err, "failed to configure agents")
 			}
 
 			ucOptions := []usecase.Option{
