@@ -52,11 +52,9 @@ func newMockLLMClient() gollem.LLMClient {
 func TestAgent_Name(t *testing.T) {
 	slackClient := &domainmock.SlackClientMock{}
 	llmClient := newMockLLMClient()
+	repo := repository.NewMemory()
 
-	agent := slackagent.New(
-		slackagent.WithSlackClient(slackClient),
-		slackagent.WithLLMClient(llmClient),
-	)
+	agent := slackagent.NewAgentForTest(llmClient, repo, slackClient)
 
 	gt.V(t, agent.Name()).Equal("search_slack")
 }
@@ -64,11 +62,9 @@ func TestAgent_Name(t *testing.T) {
 func TestAgent_Description(t *testing.T) {
 	slackClient := &domainmock.SlackClientMock{}
 	llmClient := newMockLLMClient()
+	repo := repository.NewMemory()
 
-	agent := slackagent.New(
-		slackagent.WithSlackClient(slackClient),
-		slackagent.WithLLMClient(llmClient),
-	)
+	agent := slackagent.NewAgentForTest(llmClient, repo, slackClient)
 
 	description := agent.Description()
 	gt.V(t, description).NotEqual("")
@@ -79,11 +75,9 @@ func TestAgent_Description(t *testing.T) {
 func TestAgent_SubAgent(t *testing.T) {
 	slackClient := &domainmock.SlackClientMock{}
 	llmClient := newMockLLMClient()
+	repo := repository.NewMemory()
 
-	agent := slackagent.New(
-		slackagent.WithSlackClient(slackClient),
-		slackagent.WithLLMClient(llmClient),
-	)
+	agent := slackagent.NewAgentForTest(llmClient, repo, slackClient)
 
 	subAgent, err := agent.SubAgent()
 	gt.NoError(t, err)
@@ -106,12 +100,10 @@ func TestAgent_ExtractRecords_WithRealLLM(t *testing.T) {
 
 	// Create mock Slack client
 	slackClient := &domainmock.SlackClientMock{}
+	repo := repository.NewMemory()
 
 	// Create agent
-	agent := slackagent.New(
-		slackagent.WithSlackClient(slackClient),
-		slackagent.WithLLMClient(llmClient),
-	)
+	agent := slackagent.NewAgentForTest(llmClient, repo, slackClient)
 
 	// Create a session with conversation history containing search results
 	session, err := llmClient.NewSession(ctx)
@@ -210,11 +202,9 @@ func TestAgent_SearchMessagesIntegration(t *testing.T) {
 	// Create agent with real Slack client
 	slackClient := slackSDK.New(token)
 	llmClient := newMockLLMClient()
+	repo := repository.NewMemory()
 
-	agent := slackagent.New(
-		slackagent.WithSlackClient(slackClient),
-		slackagent.WithLLMClient(llmClient),
-	)
+	agent := slackagent.NewAgentForTest(llmClient, repo, slackClient)
 
 	// Create SubAgent
 	subAgent, err := agent.SubAgent()
@@ -229,17 +219,10 @@ func TestAgent_Middleware(t *testing.T) {
 	ctx := context.Background()
 	slackClient := &domainmock.SlackClientMock{}
 	llmClient := newMockLLMClient()
-
-	// Create agent and initialize it properly
-	agent := slackagent.New(
-		slackagent.WithSlackClient(slackClient),
-		slackagent.WithLLMClient(llmClient),
-	)
-
-	// Initialize agent to set up memory service
 	repo := repository.NewMemory()
-	_, err := agent.Init(ctx, llmClient, repo)
-	gt.NoError(t, err)
+
+	// Create agent
+	agent := slackagent.NewAgentForTest(llmClient, repo, slackClient)
 
 	middleware := agent.ExportedCreateMiddleware()
 

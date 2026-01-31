@@ -70,8 +70,9 @@ func cmdServe() *cli.Command {
 		asyncCfg         config.AsyncAlertHook
 	)
 
-	bqAgent := bqagent.New()
-	slackAgent := slackagent.New()
+	// Get agent CLI flags
+	bqFlags, bqCLI := bqagent.Flags()
+	slackFlags, slackCLI := slackagent.Flags()
 
 	flags := joinFlags(
 		[]cli.Flag{
@@ -133,8 +134,8 @@ func cmdServe() *cli.Command {
 		storageCfg.Flags(),
 		mcpCfg.Flags(),
 		asyncCfg.Flags(),
-		bqAgent.Flags(),
-		slackAgent.Flags(),
+		bqFlags,
+		slackFlags,
 	)
 
 	return &cli.Command{
@@ -266,10 +267,12 @@ func cmdServe() *cli.Command {
 			// Collect SubAgents
 			var subAgents []*gollem.SubAgent
 
-			// Initialize BigQuery Agent (creates its own memory service)
-			if enabled, err := bqAgent.Init(ctx, llmClient, repo); err != nil {
-				return err
-			} else if enabled {
+			// Initialize BigQuery Agent if configured
+			bqAgent, err := bqagent.Init(ctx, bqCLI, llmClient, repo)
+			if err != nil {
+				return goerr.Wrap(err, "failed to initialize BigQuery Agent")
+			}
+			if bqAgent != nil {
 				bqSubAgent, err := bqAgent.SubAgent()
 				if err != nil {
 					return goerr.Wrap(err, "failed to create BigQuery SubAgent")
@@ -277,10 +280,12 @@ func cmdServe() *cli.Command {
 				subAgents = append(subAgents, bqSubAgent)
 			}
 
-			// Initialize Slack Search Agent (creates its own memory service)
-			if enabled, err := slackAgent.Init(ctx, llmClient, repo); err != nil {
-				return err
-			} else if enabled {
+			// Initialize Slack Search Agent if configured
+			slackAgent, err := slackagent.Init(ctx, slackCLI, llmClient, repo)
+			if err != nil {
+				return goerr.Wrap(err, "failed to initialize Slack Agent")
+			}
+			if slackAgent != nil {
 				slackSubAgent, err := slackAgent.SubAgent()
 				if err != nil {
 					return goerr.Wrap(err, "failed to create Slack SubAgent")

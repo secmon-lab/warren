@@ -21,8 +21,11 @@ type Agent struct {
 	internalTool  gollem.ToolSet
 	llmClient     gollem.LLMClient
 	memoryService *memory.Service
+	repo          interfaces.Repository
+}
 
-	// CLI configuration fields
+// CLIConfig holds CLI flag values for BigQuery Agent
+type CLIConfig struct {
 	configPath                string
 	projectID                 string
 	scanSizeLimitStr          string
@@ -30,100 +33,81 @@ type Agent struct {
 	impersonateServiceAccount string
 }
 
-// New creates a new BigQuery Agent instance
-func New() *Agent {
-	return &Agent{}
-}
-
-// NewAgent creates a new BigQuery Agent instance with config (for testing and direct use)
-func NewAgent(
-	config *Config,
-	llmClient gollem.LLMClient,
-	repo interfaces.Repository,
-) *Agent {
-	return &Agent{
-		config:        config,
-		internalTool:  &internalTool{config: config},
-		llmClient:     llmClient,
-		memoryService: memory.New("bigquery", llmClient, repo),
-	}
-}
-
-// Flags returns CLI flags for this agent
-func (a *Agent) Flags() []cli.Flag {
-	return []cli.Flag{
+// Flags returns CLI flags for BigQuery agent configuration
+func Flags() ([]cli.Flag, *CLIConfig) {
+	cfg := &CLIConfig{}
+	flags := []cli.Flag{
 		&cli.StringFlag{
 			Name:        "agent-bigquery-config",
 			Usage:       "Path to BigQuery Agent configuration file (YAML)",
-			Destination: &a.configPath,
 			Category:    "Agent:BigQuery",
 			Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_CONFIG"),
+			Destination: &cfg.configPath,
 		},
 		&cli.StringFlag{
 			Name:        "agent-bigquery-project-id",
 			Usage:       "Google Cloud Project ID for BigQuery operations",
-			Destination: &a.projectID,
 			Category:    "Agent:BigQuery",
 			Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_PROJECT_ID"),
+			Destination: &cfg.projectID,
 		},
 		&cli.StringFlag{
 			Name:        "agent-bigquery-scan-size-limit",
 			Usage:       "Maximum scan size limit for BigQuery queries (e.g., '10GB', '1TB')",
-			Destination: &a.scanSizeLimitStr,
 			Category:    "Agent:BigQuery",
 			Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_SCAN_SIZE_LIMIT"),
+			Destination: &cfg.scanSizeLimitStr,
 		},
 		&cli.StringSliceFlag{
 			Name:        "agent-bigquery-runbook-dir",
 			Usage:       "Path to SQL runbook files or directories",
-			Destination: &a.runbookPaths,
 			Category:    "Agent:BigQuery",
 			Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_RUNBOOK_DIR"),
+			Destination: &cfg.runbookPaths,
 		},
 		&cli.StringFlag{
 			Name:        "agent-bigquery-impersonate-service-account",
 			Usage:       "Service account email to impersonate for BigQuery operations",
-			Destination: &a.impersonateServiceAccount,
 			Category:    "Agent:BigQuery",
 			Sources:     cli.EnvVars("WARREN_AGENT_BIGQUERY_IMPERSONATE_SERVICE_ACCOUNT"),
+			Destination: &cfg.impersonateServiceAccount,
 		},
 	}
+	return flags, cfg
 }
 
-// Init initializes the agent with LLM client and memory service.
-// Returns (true, nil) if initialized successfully, (false, nil) if not configured, or (false, error) on error.
-func (a *Agent) Init(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) (bool, error) {
-	if a.configPath == "" {
-		return false, nil // Agent is optional
+// Init initializes and returns a fully configured immutable Agent
+func Init(ctx context.Context, cliCfg *CLIConfig, llmClient gollem.LLMClient, repo interfaces.Repository) (*Agent, error) {
+	if cliCfg.configPath == "" {
+		return nil, nil // Agent is optional
 	}
 
-	cfg, err := LoadConfigWithRunbooks(ctx, a.configPath, a.runbookPaths)
+	// Load config with runbooks
+	config, err := LoadConfigWithRunbooks(ctx, cliCfg.configPath, cliCfg.runbookPaths)
 	if err != nil {
-		return false, goerr.Wrap(err, "failed to load BigQuery Agent config")
+		return nil, goerr.Wrap(err, "failed to load BigQuery Agent config")
 	}
 
 	// Override scan size limit from CLI flag if provided
-	if a.scanSizeLimitStr != "" {
-		limit, err := ParseScanSizeLimit(a.scanSizeLimitStr)
+	if cliCfg.scanSizeLimitStr != "" {
+		limit, err := ParseScanSizeLimit(cliCfg.scanSizeLimitStr)
 		if err != nil {
-			return false, goerr.Wrap(err, "failed to parse scan size limit")
+			return nil, goerr.Wrap(err, "failed to parse scan size limit")
 		}
-		cfg.ScanSizeLimit = limit
+		config.ScanSizeLimit = limit
 	}
 
-	a.config = cfg
-	a.internalTool = &internalTool{
-		config:                    cfg,
-		projectID:                 a.projectID,
-		impersonateServiceAccount: a.impersonateServiceAccount,
+	// Override project ID and impersonate service account
+	if cliCfg.projectID != "" {
+		config.ProjectID = cliCfg.projectID
 	}
-	a.llmClient = llmClient
-	// Create memory service bound to this agent
-	a.memoryService = memory.New(a.ID(), llmClient, repo)
+	if cliCfg.impersonateServiceAccount != "" {
+		config.ImpersonateServiceAccount = cliCfg.impersonateServiceAccount
+	}
 
-	scanLimit := humanize.Bytes(cfg.ScanSizeLimit)
+	scanLimit := humanize.Bytes(config.ScanSizeLimit)
 	var tables []string
-	for _, t := range cfg.Tables {
+	for _, t := range config.Tables {
 		tables = append(tables, strings.Join([]string{
 			t.ProjectID, t.DatasetID, t.TableID,
 		}, "."))
@@ -131,12 +115,28 @@ func (a *Agent) Init(ctx context.Context, llmClient gollem.LLMClient, repo inter
 	logging.From(ctx).Info("BigQuery Agent configured",
 		"tables", tables,
 		"scan_limit", scanLimit,
-		"runbooks", len(cfg.Runbooks))
+		"runbooks", len(config.Runbooks))
 
-	return true, nil
+	// Return immutable Agent
+	return New(llmClient, repo, config), nil
 }
 
-// IsEnabled returns true if the agent is configured and initialized
+// New creates a new immutable BigQuery Agent instance
+func New(llmClient gollem.LLMClient, repo interfaces.Repository, config *Config) *Agent {
+	return &Agent{
+		llmClient: llmClient,
+		repo:      repo,
+		config:    config,
+		internalTool: &internalTool{
+			config:                    config,
+			projectID:                 config.ProjectID,
+			impersonateServiceAccount: config.ImpersonateServiceAccount,
+		},
+		memoryService: memory.New("bigquery", llmClient, repo),
+	}
+}
+
+// IsEnabled returns true if the agent is initialized
 func (a *Agent) IsEnabled() bool {
 	return a.config != nil
 }

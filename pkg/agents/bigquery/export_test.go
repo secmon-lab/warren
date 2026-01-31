@@ -5,10 +5,16 @@ import (
 	"time"
 
 	"github.com/m-mizutani/gollem"
-	"github.com/secmon-lab/warren/pkg/domain/model/memory"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	agentmemory "github.com/secmon-lab/warren/pkg/domain/model/memory"
 )
 
 // Expose internal types and functions for testing
+
+// NewAgentForTest creates an Agent instance for testing with direct configuration
+func NewAgentForTest(config *Config, llmClient gollem.LLMClient, repo interfaces.Repository) *Agent {
+	return New(llmClient, repo, config)
+}
 
 // GenerateKPTAnalysis is exported for testing
 func (a *Agent) GenerateKPTAnalysis(ctx context.Context, query string, resp *gollem.ExecuteResponse, execErr error, duration time.Duration, session gollem.Session) ([]string, []string, []string, error) {
@@ -48,6 +54,6 @@ func ExportedNewPromptTemplate() (*gollem.PromptTemplate, error) {
 }
 
 // ExportedFormatMemoryContext is exported for testing
-func ExportedFormatMemoryContext(memories []*memory.AgentMemory) string {
+func ExportedFormatMemoryContext(memories []*agentmemory.AgentMemory) string {
 	return formatMemoryContext(memories)
 }
