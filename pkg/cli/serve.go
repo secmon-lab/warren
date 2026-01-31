@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
+
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
-	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
-	slackagent "github.com/secmon-lab/warren/pkg/agents/slack"
+	"github.com/secmon-lab/warren/pkg/agents"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
@@ -67,9 +67,6 @@ func cmdServe() *cli.Command {
 		mcpCfg           config.MCPConfig
 		asyncCfg         config.AsyncAlertHook
 	)
-
-	bqAgent := bqagent.New()
-	slackAgent := slackagent.New()
 
 	flags := joinFlags(
 		[]cli.Flag{
@@ -131,8 +128,7 @@ func cmdServe() *cli.Command {
 		storageCfg.Flags(),
 		mcpCfg.Flags(),
 		asyncCfg.Flags(),
-		bqAgent.Flags(),
-		slackAgent.Flags(),
+		agents.AllFlags(),
 	)
 
 	return &cli.Command{
@@ -261,18 +257,10 @@ func cmdServe() *cli.Command {
 			// Create tag service
 			tagService := tag.New(repo)
 
-			// Initialize BigQuery Agent (creates its own memory service)
-			if enabled, err := bqAgent.Init(ctx, llmClient, repo); err != nil {
-				return err
-			} else if enabled {
-				toolSets = append(toolSets, bqAgent)
-			}
-
-			// Initialize Slack Search Agent (creates its own memory service)
-			if enabled, err := slackAgent.Init(ctx, llmClient, repo); err != nil {
-				return err
-			} else if enabled {
-				toolSets = append(toolSets, slackAgent)
+			// Initialize all configured agents
+			subAgents, err := agents.ConfigureAll(ctx, llmClient, repo)
+			if err != nil {
+				return goerr.Wrap(err, "failed to configure agents")
 			}
 
 			ucOptions := []usecase.Option{
@@ -281,6 +269,7 @@ func cmdServe() *cli.Command {
 				usecase.WithRepository(repo),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(toolSets),
+				usecase.WithSubAgents(subAgents),
 				usecase.WithStrictAlert(strictAlert),
 				usecase.WithNoAuthorization(noAuthorization),
 				usecase.WithTagService(tagService),

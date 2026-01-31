@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
-	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
-	slackagent "github.com/secmon-lab/warren/pkg/agents/slack"
+
+	"github.com/secmon-lab/warren/pkg/agents"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -33,9 +33,6 @@ func cmdChat() *cli.Command {
 
 		query string
 	)
-
-	bqAgent := bqagent.New()
-	slackAgent := slackagent.New()
 
 	flags := joinFlags(
 		[]cli.Flag{
@@ -67,8 +64,7 @@ func cmdChat() *cli.Command {
 		storageCfg.Flags(),
 		tools.Flags(),
 		mcpCfg.Flags(),
-		bqAgent.Flags(),
-		slackAgent.Flags(),
+		agents.AllFlags(),
 	)
 
 	return &cli.Command{
@@ -131,18 +127,10 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to get tool sets")
 			}
 
-			// Initialize BigQuery Agent (creates its own memory service)
-			if enabled, err := bqAgent.Init(ctx, llmClient, repo); err != nil {
-				return err
-			} else if enabled {
-				allToolSets = append(allToolSets, bqAgent)
-			}
-
-			// Initialize Slack Search Agent (creates its own memory service)
-			if enabled, err := slackAgent.Init(ctx, llmClient, repo); err != nil {
-				return err
-			} else if enabled {
-				allToolSets = append(allToolSets, slackAgent)
+			// Initialize all configured agents
+			subAgents, err := agents.ConfigureAll(ctx, llmClient, repo)
+			if err != nil {
+				return goerr.Wrap(err, "failed to configure agents")
 			}
 
 			// Add MCP tool sets if configured
@@ -176,13 +164,14 @@ func cmdChat() *cli.Command {
 					"recommendation", "This should only be used in development environments")
 			}
 
-			// Create usecase
+			// Create usecase with SubAgents
 			uc := usecase.New(
 				usecase.WithRepository(repo),
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(allToolSets),
+				usecase.WithSubAgents(subAgents),
 				usecase.WithNoAuthorization(noAuthorization),
 			)
 

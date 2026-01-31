@@ -14,14 +14,14 @@ import (
 //go:embed prompt/extract.md
 var extractPrompt string
 
-// extractRecords extracts the raw query result records from the session history
+// extractRecords extracts the raw query result records from the session history (private method)
 //
 // IMPORTANT: This function does NOT use WithSessionResponseSchema because:
 // 1. gollem requires Properties != nil for TypeObject (Validate enforces this)
 // 2. When Properties != nil, gollem automatically sets "additionalProperties: false"
 // 3. This blocks dynamic field names which BigQuery results require
 // 4. Therefore, we use JSON mode WITHOUT schema and rely on the prompt
-func (a *Agent) extractRecords(ctx context.Context, originalQuery string, session gollem.Session) ([]map[string]any, error) {
+func (a *agent) extractRecords(ctx context.Context, originalQuery string, session gollem.Session) ([]map[string]any, error) {
 	log := logging.From(ctx)
 	log.Debug("Extracting records from session history", "original_query", originalQuery)
 

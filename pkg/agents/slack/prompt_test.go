@@ -1,37 +1,22 @@
-package bigquery_test
+package slack_test
 
 import (
 	"testing"
 
 	"github.com/m-mizutani/gt"
-	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
+	slackagent "github.com/secmon-lab/warren/pkg/agents/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 )
 
 func TestBuildSystemPrompt(t *testing.T) {
-	config := &bqagent.Config{
-		Tables: []bqagent.TableConfig{
-			{
-				ProjectID:   "test-project",
-				DatasetID:   "test-dataset",
-				TableID:     "test-table",
-				Description: "Test table",
-			},
-		},
-		ScanSizeLimit: 1000000,
-	}
-
-	prompt, err := bqagent.ExportedBuildSystemPrompt(config)
+	prompt, err := slackagent.ExportedBuildSystemPrompt()
 	gt.NoError(t, err)
 	gt.V(t, prompt).NotEqual("")
 	gt.True(t, len(prompt) > 0)
-	gt.S(t, prompt).Contains("test-project")
-	gt.S(t, prompt).Contains("test-dataset")
-	gt.S(t, prompt).Contains("test-table")
 }
 
 func TestNewPromptTemplate(t *testing.T) {
-	template, err := bqagent.ExportedNewPromptTemplate()
+	template, err := slackagent.ExportedNewPromptTemplate()
 	gt.NoError(t, err)
 	gt.V(t, template).NotNil()
 
@@ -39,12 +24,19 @@ func TestNewPromptTemplate(t *testing.T) {
 	params := template.Parameters()
 	gt.V(t, len(params)).NotEqual(0)
 
-	// Check query parameter exists and is required
-	queryParam, hasQuery := params["query"]
-	gt.True(t, hasQuery)
-	gt.V(t, queryParam).NotNil()
-	gt.True(t, queryParam.Required)
-	gt.V(t, queryParam.Type).Equal("string")
+	// Check request parameter exists and is required
+	requestParam, hasRequest := params["request"]
+	gt.True(t, hasRequest)
+	gt.V(t, requestParam).NotNil()
+	gt.True(t, requestParam.Required)
+	gt.V(t, requestParam.Type).Equal("string")
+
+	// Check limit parameter exists and is optional
+	limitParam, hasLimit := params["limit"]
+	gt.True(t, hasLimit)
+	gt.V(t, limitParam).NotNil()
+	gt.False(t, limitParam.Required)
+	gt.V(t, limitParam.Type).Equal("number")
 
 	// Check that _memory_context is NOT in parameters (internal only)
 	_, hasMemoryContext := params["_memory_context"]
@@ -53,10 +45,10 @@ func TestNewPromptTemplate(t *testing.T) {
 
 func TestFormatMemoryContext(t *testing.T) {
 	t.Run("empty memories", func(t *testing.T) {
-		result := bqagent.ExportedFormatMemoryContext(nil)
+		result := slackagent.ExportedFormatMemoryContext(nil)
 		gt.V(t, result).Equal("")
 
-		result = bqagent.ExportedFormatMemoryContext([]*memory.AgentMemory{})
+		result = slackagent.ExportedFormatMemoryContext([]*memory.AgentMemory{})
 		gt.V(t, result).Equal("")
 	})
 
@@ -64,11 +56,11 @@ func TestFormatMemoryContext(t *testing.T) {
 		memories := []*memory.AgentMemory{
 			{
 				ID:      "mem-1",
-				AgentID: "bigquery",
+				AgentID: "slack_search",
 				Claim:   "Test claim A",
 			},
 		}
-		result := bqagent.ExportedFormatMemoryContext(memories)
+		result := slackagent.ExportedFormatMemoryContext(memories)
 		gt.V(t, result).NotEqual("")
 		gt.S(t, result).Contains("Past Experiences")
 		gt.S(t, result).Contains("Experience A")
@@ -79,21 +71,21 @@ func TestFormatMemoryContext(t *testing.T) {
 		memories := []*memory.AgentMemory{
 			{
 				ID:      "mem-1",
-				AgentID: "bigquery",
+				AgentID: "slack_search",
 				Claim:   "First claim",
 			},
 			{
 				ID:      "mem-2",
-				AgentID: "bigquery",
+				AgentID: "slack_search",
 				Claim:   "Second claim",
 			},
 			{
 				ID:      "mem-3",
-				AgentID: "bigquery",
+				AgentID: "slack_search",
 				Claim:   "Third claim",
 			},
 		}
-		result := bqagent.ExportedFormatMemoryContext(memories)
+		result := slackagent.ExportedFormatMemoryContext(memories)
 		gt.V(t, result).NotEqual("")
 		gt.S(t, result).Contains("Experience A")
 		gt.S(t, result).Contains("Experience B")
