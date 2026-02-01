@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/m-mizutani/gt"
 	gollemtrace "github.com/m-mizutani/gollem/trace"
+	"github.com/m-mizutani/gt"
 	traceAdapter "github.com/secmon-lab/warren/pkg/adapter/trace"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
