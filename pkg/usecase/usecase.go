@@ -6,6 +6,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	"github.com/m-mizutani/gollem/trace"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -32,8 +33,9 @@ type UseCases struct {
 	storageClient   interfaces.StorageClient
 	policyClient    interfaces.PolicyClient
 
-	tools     []gollem.ToolSet
-	subAgents []*gollem.SubAgent
+	tools           []gollem.ToolSet
+	subAgents       []*gollem.SubAgent
+	traceRepository trace.Repository
 
 	// use cases
 	ClusteringUC *ClusteringUseCase
@@ -119,6 +121,12 @@ func WithTools(tools []gollem.ToolSet) Option {
 func WithSubAgents(subAgents []*gollem.SubAgent) Option {
 	return func(u *UseCases) {
 		u.subAgents = append(u.subAgents, subAgents...)
+	}
+}
+
+func WithTraceRepository(repo trace.Repository) Option {
+	return func(u *UseCases) {
+		u.traceRepository = repo
 	}
 }
 

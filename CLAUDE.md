@@ -47,6 +47,12 @@ Warren is an AI agent and Slack-based security alert management tool. It process
 - **ALWAYS use `errors.Is(err, targetErr)` or `errors.As(err, &target)` for error type checking**
 - Error discrimination must be done by error types, not by parsing error messages
 
+### Resource Cleanup
+- **ALWAYS use `safe.Close(ctx, closer)` from `pkg/utils/safe`** to close `io.Closer` resources
+- **NEVER use `_ = x.Close()` or bare `x.Close()`** — use `safe.Close` instead for nil-safe, error-logged cleanup
+  - BAD: `defer func() { _ = client.Close() }()`, `defer client.Close()`
+  - GOOD: `defer safe.Close(ctx, client)`
+
 ### Testing with gt Package
 - Use `github.com/m-mizutani/gt` package for type-safe testing
 - Prefer Helper Driven Testing style over Table Driven Tests

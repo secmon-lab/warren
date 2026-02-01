@@ -10,6 +10,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 
+	"github.com/secmon-lab/warren/pkg/adapter/trace"
 	"github.com/secmon-lab/warren/pkg/agents"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -30,6 +31,7 @@ func cmdChat() *cli.Command {
 		policyCfg       config.Policy
 		storageCfg      config.Storage
 		mcpCfg          config.MCPConfig
+		traceCfg        config.Trace
 
 		query string
 	)
@@ -65,6 +67,7 @@ func cmdChat() *cli.Command {
 		tools.Flags(),
 		mcpCfg.Flags(),
 		agents.AllFlags(),
+		traceCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -164,8 +167,8 @@ func cmdChat() *cli.Command {
 					"recommendation", "This should only be used in development environments")
 			}
 
-			// Create usecase with SubAgents
-			uc := usecase.New(
+			// Create usecase options
+			ucOptions := []usecase.Option{
 				usecase.WithRepository(repo),
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
@@ -173,7 +176,20 @@ func cmdChat() *cli.Command {
 				usecase.WithTools(allToolSets),
 				usecase.WithSubAgents(subAgents),
 				usecase.WithNoAuthorization(noAuthorization),
-			)
+			}
+
+			// Configure trace repository if trace bucket is set
+			if traceCfg.IsConfigured() {
+				traceRepo, err := traceCfg.Configure(ctx)
+				if err != nil {
+					return goerr.Wrap(err, "failed to configure trace repository")
+				}
+				safeRepo := trace.NewSafe(traceRepo, logging.From(ctx))
+				ucOptions = append(ucOptions, usecase.WithTraceRepository(safeRepo))
+				logging.From(ctx).Info("Trace recording enabled", "trace", traceCfg.LogValue())
+			}
+
+			uc := usecase.New(ucOptions...)
 
 			// If query is provided, run once and exit
 			if query != "" {

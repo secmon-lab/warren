@@ -14,6 +14,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
+	traceAdapter "github.com/secmon-lab/warren/pkg/adapter/trace"
 	"github.com/secmon-lab/warren/pkg/agents"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
@@ -66,6 +67,7 @@ func cmdServe() *cli.Command {
 		storageCfg       config.Storage
 		mcpCfg           config.MCPConfig
 		asyncCfg         config.AsyncAlertHook
+		traceCfg         config.Trace
 	)
 
 	flags := joinFlags(
@@ -129,6 +131,7 @@ func cmdServe() *cli.Command {
 		mcpCfg.Flags(),
 		asyncCfg.Flags(),
 		agents.AllFlags(),
+		traceCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -297,6 +300,17 @@ func cmdServe() *cli.Command {
 			// Add frontend URL if configured
 			if webUICfg.GetFrontendURL() != "" {
 				ucOptions = append(ucOptions, usecase.WithFrontendURL(webUICfg.GetFrontendURL()))
+			}
+
+			// Configure trace repository if trace bucket is set
+			if traceCfg.IsConfigured() {
+				traceRepo, err := traceCfg.Configure(ctx)
+				if err != nil {
+					return goerr.Wrap(err, "failed to configure trace repository")
+				}
+				safeRepo := traceAdapter.NewSafe(traceRepo, logging.From(ctx))
+				ucOptions = append(ucOptions, usecase.WithTraceRepository(safeRepo))
+				logging.From(ctx).Info("Trace recording enabled", "trace", traceCfg.LogValue())
 			}
 
 			uc := usecase.New(ucOptions...)
