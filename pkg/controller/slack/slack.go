@@ -69,11 +69,15 @@ func (x *Controller) HandleSlackMessage(ctx context.Context, apiEvent *slackeven
 	logger := logging.From(ctx).With("event_ts", event.EventTimeStamp)
 	ctx = logging.With(ctx, logger)
 
+	// Extract user ID considering message subtypes.
+	// For message_changed events, the user info is in the nested Message field.
+	userID := resolveMessageEventUserID(event)
+
 	// Set user context from Slack event
-	ctx = user.WithUserID(ctx, event.User)
+	ctx = user.WithUserID(ctx, userID)
 
 	// Add Subject from Slack user
-	if subject, err := authctx.NewSubjectFromSlackUser(event.User); err == nil {
+	if subject, err := authctx.NewSubjectFromSlackUser(userID); err == nil {
 		ctx = authctx.WithSubject(ctx, subject)
 	} else {
 		logging.From(ctx).Warn("failed to create Subject from Slack user", "error", err)
@@ -81,12 +85,12 @@ func (x *Controller) HandleSlackMessage(ctx context.Context, apiEvent *slackeven
 
 	logger.Debug("slack message event", "event", event)
 
-	if event.ThreadTimeStamp == "" {
+	slackMsg := slack_model.NewMessage(ctx, apiEvent)
+	if slackMsg == nil {
 		return nil
 	}
 
-	slackMsg := slack_model.NewMessage(ctx, apiEvent)
-	if slackMsg == nil {
+	if !slackMsg.InThread() {
 		return nil
 	}
 
@@ -95,6 +99,18 @@ func (x *Controller) HandleSlackMessage(ctx context.Context, apiEvent *slackeven
 	})
 
 	return nil
+}
+
+// resolveMessageEventUserID extracts the user ID from a MessageEvent,
+// handling subtypes where the user info is in a nested field.
+func resolveMessageEventUserID(event *slackevents.MessageEvent) string {
+	if event.User != "" {
+		return event.User
+	}
+	if event.SubType == "message_changed" && event.Message != nil {
+		return event.Message.User
+	}
+	return ""
 }
 
 func (x *Controller) HandleSlackInteraction(ctx context.Context, interaction slack.InteractionCallback) error {

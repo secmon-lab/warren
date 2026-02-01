@@ -113,11 +113,23 @@ func NewMessage(ctx context.Context, ev *slackevents.EventsAPIEvent) *Message {
 		}
 
 	case *slackevents.MessageEvent:
+		return newMessageFromMessageEvent(ctx, inEv, ev.TeamID)
+
+	default:
+		logging.From(ctx).Warn("unknown event type", "event", ev)
+	}
+
+	return nil
+}
+
+func newMessageFromMessageEvent(ctx context.Context, inEv *slackevents.MessageEvent, teamID string) *Message {
+	switch inEv.SubType {
+	case "": // normal user message
 		return &Message{
 			id:       inEv.TimeStamp,
 			channel:  inEv.Channel,
 			threadID: inEv.ThreadTimeStamp,
-			teamID:   ev.TeamID,
+			teamID:   teamID,
 			user: User{
 				ID:   inEv.User,
 				Name: inEv.User,
@@ -126,11 +138,28 @@ func NewMessage(ctx context.Context, ev *slackevents.EventsAPIEvent) *Message {
 			ts:  inEv.TimeStamp,
 		}
 
-	default:
-		logging.From(ctx).Warn("unknown event type", "event", ev)
-	}
+	case "message_changed":
+		if inEv.Message == nil {
+			logging.From(ctx).Debug("message_changed event with nil Message, skipping")
+			return nil
+		}
+		return &Message{
+			id:       inEv.Message.Timestamp,
+			channel:  inEv.Channel,
+			threadID: inEv.Message.ThreadTimestamp,
+			teamID:   teamID,
+			user: User{
+				ID:   inEv.Message.User,
+				Name: inEv.Message.User,
+			},
+			msg: inEv.Message.Text,
+			ts:  inEv.Message.Timestamp,
+		}
 
-	return nil
+	default:
+		logging.From(ctx).Debug("skipping message event with subtype", "subtype", inEv.SubType)
+		return nil
+	}
 }
 
 type User struct {
