@@ -300,6 +300,18 @@ func (uc *UseCases) executePromptTask(ctx context.Context, alert *alert.Alert, t
 		logger.Debug("using JSON content type", "task_id", task.ID)
 	}
 
+	// Add sub-agents if available
+	if len(uc.subAgents) > 0 {
+		gollemSubAgents := make([]*gollem.SubAgent, len(uc.subAgents))
+		for i, sa := range uc.subAgents {
+			gollemSubAgents[i] = sa.Inner()
+		}
+		options = append(options, gollem.WithSubAgents(gollemSubAgents...))
+		logger.Debug("agent has sub-agents available",
+			"task_id", task.ID,
+			"sub_agents_count", len(gollemSubAgents))
+	}
+
 	// Create agent
 	agent := gollem.New(uc.llmClient, options...)
 

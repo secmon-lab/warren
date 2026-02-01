@@ -305,6 +305,13 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		}
 	}
 
+	// Collect prompt hints from sub-agents
+	for _, sa := range x.subAgents {
+		if ph := sa.PromptHint(); ph != "" {
+			toolPrompts = append(toolPrompts, ph)
+		}
+	}
+
 	// Prepare additional instructions from tool prompts
 	var additionalInstructions string
 	if len(toolPrompts) > 0 {
@@ -358,12 +365,18 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		planexec.WithMaxIterations(30),
 	)
 
+	// Extract inner gollem.SubAgents for passing to gollem API
+	gollemSubAgents := make([]*gollem.SubAgent, len(x.subAgents))
+	for i, sa := range x.subAgents {
+		gollemSubAgents[i] = sa.Inner()
+	}
+
 	// Build agent options
 	agentOpts := []gollem.Option{
 		gollem.WithStrategy(strategy),
 		gollem.WithHistory(history),
 		gollem.WithToolSets(tools...),
-		gollem.WithSubAgents(x.subAgents...),
+		gollem.WithSubAgents(gollemSubAgents...),
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithSystemPrompt(systemPrompt),
