@@ -161,5 +161,6 @@ func TestSendRequest(t *testing.T) {
 	gt.NoError(t, cmd.Run(context.Background(), []string{
 		"urlscan",
 		"--urlscan-api-key", vars.Get("TEST_URLSCAN_API_KEY"),
+		"--urlscan-timeout", "120s",
 	}))
 }

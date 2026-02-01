@@ -25,8 +25,8 @@ func FromContext(ctx context.Context) string {
 	return "(unknown)"
 }
 
-// Generate generates a new request ID and sets it in context
+// Generate generates a new request ID using UUID v7 (time-sortable) and sets it in context
 func Generate(ctx context.Context) (context.Context, string) {
-	requestID := uuid.New().String()
+	requestID := uuid.Must(uuid.NewV7()).String()
 	return With(ctx, requestID), requestID
 }

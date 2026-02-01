@@ -11,6 +11,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/strategy/planexec"
+	"github.com/m-mizutani/gollem/trace"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -346,8 +347,8 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		planexec.WithMaxIterations(30),
 	)
 
-	// Create agent with Strategy and Middleware
-	agent := gollem.New(x.llmClient,
+	// Build agent options
+	agentOpts := []gollem.Option{
 		gollem.WithStrategy(strategy),
 		gollem.WithHistory(history),
 		gollem.WithToolSets(tools...),
@@ -355,6 +356,19 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithLogger(logging.From(ctx)),
 		gollem.WithSystemPrompt(systemPrompt),
+	}
+
+	// Configure trace recorder if trace repository is set
+	if x.traceRepository != nil {
+		recorder := trace.New(
+			trace.WithTraceID(requestID),
+			trace.WithRepository(x.traceRepository),
+		)
+		agentOpts = append(agentOpts, gollem.WithTrace(recorder))
+	}
+
+	// Add middleware options
+	agentOpts = append(agentOpts,
 		// Compaction middleware for automatic history compression
 		gollem.WithContentBlockMiddleware(llm.NewCompactionMiddleware(x.llmClient, logging.From(ctx))),
 		// Trace middleware for message display
@@ -399,6 +413,9 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			}
 		}),
 	)
+
+	// Create agent with Strategy and Middleware
+	agent := gollem.New(x.llmClient, agentOpts...)
 
 	// Execute with Strategy
 	result, executionErr := agent.Execute(ctx, gollem.Text(message))
