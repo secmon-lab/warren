@@ -119,7 +119,7 @@ func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, rep
 	// Create and return SubAgent with prompt hint
 	subAgent, err := a.subAgent()
 	if err != nil {
-		return nil, "", err
+		return nil, "", goerr.Wrap(err, "failed to create bigquery sub-agent")
 	}
 
 	return subAgent, promptHint, nil

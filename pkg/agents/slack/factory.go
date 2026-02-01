@@ -3,6 +3,7 @@ package slack
 import (
 	"context"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/service/memory"
@@ -49,7 +50,7 @@ func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, rep
 
 	subAgent, err := a.subAgent()
 	if err != nil {
-		return nil, "", err
+		return nil, "", goerr.Wrap(err, "failed to create slack sub-agent")
 	}
 
 	// Slack agent has no config-dependent prompt hint
