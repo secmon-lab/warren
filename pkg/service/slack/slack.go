@@ -792,6 +792,94 @@ func (x *ThreadService) PostCommentWithMessageID(ctx context.Context, comment st
 	return ts, nil
 }
 
+// PostSessionActions posts session details link and Resolve/Edit action buttons to the thread
+func (x *ThreadService) PostSessionActions(ctx context.Context, ticketID types.TicketID, ticketStatus types.TicketStatus, sessionURL string) error {
+	var blocks []slack.Block
+
+	// Context block with session details link (if URL provided)
+	if sessionURL != "" {
+		linkMessage := fmt.Sprintf("📊 <%s|Session Details>", sessionURL)
+		blocks = append(blocks, slack.NewContextBlock(
+			"",
+			slack.NewTextBlockObject(slack.MarkdownType, linkMessage, false, false),
+		))
+	}
+
+	// Action block with Resolve and Edit buttons
+	var buttons []slack.BlockElement
+
+	// Add Resolve button only if ticket is not resolved or archived
+	if ticketStatus != types.TicketStatusResolved && ticketStatus != types.TicketStatusArchived {
+		buttons = append(buttons,
+			slack.NewButtonBlockElement(
+				model.ActionIDResolveTicket.String(),
+				ticketID.String(),
+				slack.NewTextBlockObject("plain_text", "Resolve", false, false),
+			).WithStyle(slack.StylePrimary),
+		)
+	}
+
+	// Always add Edit button
+	buttons = append(buttons, slack.NewButtonBlockElement(
+		model.ActionIDEditTicket.String(),
+		ticketID.String(),
+		slack.NewTextBlockObject("plain_text", "Edit", false, false),
+	).WithStyle(slack.StyleDefault))
+
+	blocks = append(blocks, slack.NewActionBlock("", buttons...))
+
+	_, _, err := x.client.PostMessageContext(
+		ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(x.threadID),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post session actions to slack")
+	}
+
+	return nil
+}
+
+// PostResolveDetails posts resolve details (conclusion and comment) to the thread
+func (x *ThreadService) PostResolveDetails(ctx context.Context, t *ticket.Ticket) error {
+	var sections []slack.Block
+
+	// Header
+	sections = append(sections, slack.NewSectionBlock(
+		slack.NewTextBlockObject(slack.MarkdownType, "✅ *Ticket Resolved*", false, false),
+		nil, nil,
+	))
+
+	// Conclusion (use Label() for emoji-prefixed display)
+	if t.Conclusion != "" {
+		sections = append(sections, slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*Conclusion:* %s", t.Conclusion.Label()), false, false),
+			nil, nil,
+		))
+	}
+
+	// Comment/Reason
+	if t.Reason != "" {
+		sections = append(sections, slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*Comment:* %s", t.Reason), false, false),
+			nil, nil,
+		))
+	}
+
+	_, _, err := x.client.PostMessageContext(
+		ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(sections...),
+		slack.MsgOptionTS(x.threadID),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post resolve details to slack")
+	}
+
+	return nil
+}
+
 // PostContextBlock posts a message as a context block to the thread
 func (x *ThreadService) PostContextBlock(ctx context.Context, text string) error {
 	block := slack.NewContextBlock(
