@@ -9,7 +9,6 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem/trace"
-	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"google.golang.org/api/option"
 )
 
@@ -50,7 +49,9 @@ func (r *Repository) Save(ctx context.Context, t *trace.Trace) error {
 	w.ContentType = "application/json"
 
 	if err := json.NewEncoder(w).Encode(t); err != nil {
-		safe.Close(ctx, w)
+		// Do not call w.Close() here: closing a storage.Writer finalizes the upload,
+		// which would commit a partially written, corrupt JSON file to GCS.
+		// Leaving the writer unclosed discards the partial data.
 		return goerr.Wrap(err, "failed to encode trace data",
 			goerr.V("bucket", r.bucket),
 			goerr.V("object", objectPath),
