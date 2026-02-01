@@ -10,7 +10,8 @@ import (
 	"github.com/slack-go/slack/slackevents"
 )
 
-func buildMessageAPIEvent(subType, user, text, threadTS, ts, channel string, innerMsg json.RawMessage) *slackevents.EventsAPIEvent {
+func buildMessageAPIEvent(t *testing.T, subType, user, text, threadTS, ts, channel string, innerMsg json.RawMessage) *slackevents.EventsAPIEvent {
+	t.Helper()
 	raw := map[string]interface{}{
 		"type":     "message",
 		"user":     user,
@@ -29,10 +30,11 @@ func buildMessageAPIEvent(subType, user, text, threadTS, ts, channel string, inn
 		raw["message"] = json.RawMessage(innerMsg)
 	}
 
-	data, _ := json.Marshal(raw)
+	data, err := json.Marshal(raw)
+	gt.NoError(t, err)
 
 	ev := &slackevents.MessageEvent{}
-	_ = json.Unmarshal(data, ev)
+	gt.NoError(t, json.Unmarshal(data, ev))
 
 	return &slackevents.EventsAPIEvent{
 		TeamID: "T-TEAM",
@@ -43,7 +45,7 @@ func buildMessageAPIEvent(subType, user, text, threadTS, ts, channel string, inn
 }
 
 func TestNewMessage_NormalMessage(t *testing.T) {
-	apiEvent := buildMessageAPIEvent(
+	apiEvent := buildMessageAPIEvent(t,
 		"",          // subType
 		"U-USER001", // user
 		"hello",     // text
@@ -65,14 +67,15 @@ func TestNewMessage_NormalMessage(t *testing.T) {
 }
 
 func TestNewMessage_MessageChanged(t *testing.T) {
-	innerMsg, _ := json.Marshal(map[string]interface{}{
+	innerMsg, err := json.Marshal(map[string]interface{}{
 		"user":      "U-EDITOR",
 		"text":      "edited text",
 		"ts":        "1234.5678",
 		"thread_ts": "1234.0000",
 	})
+	gt.NoError(t, err)
 
-	apiEvent := buildMessageAPIEvent(
+	apiEvent := buildMessageAPIEvent(t,
 		"message_changed", // subType
 		"",                // user (empty for message_changed)
 		"",                // text (empty for message_changed)
@@ -102,10 +105,11 @@ func TestNewMessage_MessageChangedNilMessage(t *testing.T) {
 		"channel":  "C-CHAN001",
 		"event_ts": "1234.9999",
 	}
-	data, _ := json.Marshal(raw)
+	data, err := json.Marshal(raw)
+	gt.NoError(t, err)
 
 	ev := &slackevents.MessageEvent{}
-	_ = json.Unmarshal(data, ev)
+	gt.NoError(t, json.Unmarshal(data, ev))
 
 	// The custom UnmarshalJSON in slack-go populates Message even for message_changed
 	// by unmarshalling top-level fields. Force Message to nil for this test.
@@ -131,10 +135,11 @@ func TestNewMessage_MessageDeleted(t *testing.T) {
 		"channel":    "C-CHAN001",
 		"event_ts":   "1234.9999",
 	}
-	data, _ := json.Marshal(raw)
+	data, err := json.Marshal(raw)
+	gt.NoError(t, err)
 
 	ev := &slackevents.MessageEvent{}
-	_ = json.Unmarshal(data, ev)
+	gt.NoError(t, json.Unmarshal(data, ev))
 
 	apiEvent := &slackevents.EventsAPIEvent{
 		TeamID: "T-TEAM",
@@ -148,7 +153,7 @@ func TestNewMessage_MessageDeleted(t *testing.T) {
 }
 
 func TestNewMessage_NormalMessageNotInThread(t *testing.T) {
-	apiEvent := buildMessageAPIEvent(
+	apiEvent := buildMessageAPIEvent(t,
 		"",          // subType
 		"U-USER001", // user
 		"hello",     // text
