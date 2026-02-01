@@ -45,6 +45,14 @@ func (m *mockThreadService) PostContextBlock(ctx context.Context, text string) e
 	return nil
 }
 
+func (m *mockThreadService) PostSessionActions(ctx context.Context, ticketID types.TicketID, ticketStatus types.TicketStatus, sessionURL string) error {
+	return nil
+}
+
+func (m *mockThreadService) PostResolveDetails(ctx context.Context, ticket *ticketmodel.Ticket) error {
+	return nil
+}
+
 func (m *mockThreadService) PostTicket(ctx context.Context, ticket *ticketmodel.Ticket, alerts alertmodel.Alerts) (string, error) {
 	return "", nil
 }

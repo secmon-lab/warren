@@ -168,13 +168,24 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 			logger.Error("failed to update final session status", "error", err, "status", finalStatus)
 		}
 
-		// Post session link to Slack thread when session is completed
-		if finalStatus == types.SessionStatusCompleted && x.frontendURL != "" && x.slackService != nil && target.SlackThread != nil {
+		// Post session actions (link + Resolve/Edit buttons) to Slack thread when session is completed
+		if finalStatus == types.SessionStatusCompleted && x.slackService != nil && target.SlackThread != nil {
 			threadSvc := x.slackService.NewThread(*target.SlackThread)
-			sessionURL := fmt.Sprintf("%s/sessions/%s", x.frontendURL, ssn.ID)
-			linkMessage := fmt.Sprintf("📊 <%s|Session Details>", sessionURL)
-			if err := threadSvc.PostContextBlock(ctx, linkMessage); err != nil {
-				logger.Error("failed to post session link to Slack", "error", err, "session_id", ssn.ID)
+
+			// Build session URL (may be empty if frontendURL is not set)
+			var sessionURL string
+			if x.frontendURL != "" {
+				sessionURL = fmt.Sprintf("%s/sessions/%s", x.frontendURL, ssn.ID)
+			}
+
+			// Get current ticket status to determine which buttons to show
+			currentTicket, err := x.repository.GetTicket(ctx, target.ID)
+			if err != nil {
+				logger.Error("failed to get ticket for session actions", "error", err, "ticket_id", target.ID)
+			} else if currentTicket != nil {
+				if err := threadSvc.PostSessionActions(ctx, target.ID, currentTicket.Status, sessionURL); err != nil {
+					logger.Error("failed to post session actions to Slack", "error", err, "session_id", ssn.ID)
+				}
 			}
 		}
 	}()

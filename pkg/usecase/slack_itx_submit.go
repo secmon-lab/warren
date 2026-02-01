@@ -375,6 +375,11 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 		return goerr.Wrap(err, "failed to update slack thread")
 	}
 
+	// Post resolve details (conclusion and comment) to the thread
+	if err := st.PostResolveDetails(ctx, target); err != nil {
+		return goerr.Wrap(err, "failed to post resolve details")
+	}
+
 	// Generate and send humorous resolve message
 	resolveMessage := uc.generateResolveMessage(ctx, target)
 	msg.Notify(ctx, "%s", resolveMessage)

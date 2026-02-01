@@ -9,6 +9,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	slackSDK "github.com/slack-go/slack"
 )
 
@@ -57,6 +58,8 @@ type SlackThreadService interface {
 	PostComment(ctx context.Context, comment string) error
 	PostCommentWithMessageID(ctx context.Context, comment string) (string, error)
 	PostContextBlock(ctx context.Context, text string) error
+	PostSessionActions(ctx context.Context, ticketID types.TicketID, ticketStatus types.TicketStatus, sessionURL string) error
+	PostResolveDetails(ctx context.Context, ticket *ticket.Ticket) error
 	PostTicket(ctx context.Context, ticket *ticket.Ticket, alerts alert.Alerts) (string, error)
 	PostLinkToTicket(ctx context.Context, ticketURL, ticketTitle string) error
 	PostFinding(ctx context.Context, finding *ticket.Finding) error

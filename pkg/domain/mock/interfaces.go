@@ -957,6 +957,12 @@ func (mock *SlackClientMock) UploadFileV2ContextCalls() []struct {
 //			PostLinkToTicketFunc: func(ctx context.Context, ticketURL string, ticketTitle string) error {
 //				panic("mock out the PostLinkToTicket method")
 //			},
+//			PostResolveDetailsFunc: func(ctx context.Context, ticketMoqParam *ticket.Ticket) error {
+//				panic("mock out the PostResolveDetails method")
+//			},
+//			PostSessionActionsFunc: func(ctx context.Context, ticketID types.TicketID, ticketStatus types.TicketStatus, sessionURL string) error {
+//				panic("mock out the PostSessionActions method")
+//			},
 //			PostTicketFunc: func(ctx context.Context, ticketMoqParam *ticket.Ticket, alerts alert.Alerts) (string, error) {
 //				panic("mock out the PostTicket method")
 //			},
@@ -1026,6 +1032,12 @@ type SlackThreadServiceMock struct {
 
 	// PostLinkToTicketFunc mocks the PostLinkToTicket method.
 	PostLinkToTicketFunc func(ctx context.Context, ticketURL string, ticketTitle string) error
+
+	// PostResolveDetailsFunc mocks the PostResolveDetails method.
+	PostResolveDetailsFunc func(ctx context.Context, ticketMoqParam *ticket.Ticket) error
+
+	// PostSessionActionsFunc mocks the PostSessionActions method.
+	PostSessionActionsFunc func(ctx context.Context, ticketID types.TicketID, ticketStatus types.TicketStatus, sessionURL string) error
 
 	// PostTicketFunc mocks the PostTicket method.
 	PostTicketFunc func(ctx context.Context, ticketMoqParam *ticket.Ticket, alerts alert.Alerts) (string, error)
@@ -1150,6 +1162,24 @@ type SlackThreadServiceMock struct {
 			// TicketTitle is the ticketTitle argument value.
 			TicketTitle string
 		}
+		// PostResolveDetails holds details about calls to the PostResolveDetails method.
+		PostResolveDetails []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TicketMoqParam is the ticketMoqParam argument value.
+			TicketMoqParam *ticket.Ticket
+		}
+		// PostSessionActions holds details about calls to the PostSessionActions method.
+		PostSessionActions []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TicketID is the ticketID argument value.
+			TicketID types.TicketID
+			// TicketStatus is the ticketStatus argument value.
+			TicketStatus types.TicketStatus
+			// SessionURL is the sessionURL argument value.
+			SessionURL string
+		}
 		// PostTicket holds details about calls to the PostTicket method.
 		PostTicket []struct {
 			// Ctx is the ctx argument value.
@@ -1208,6 +1238,8 @@ type SlackThreadServiceMock struct {
 	lockPostContextBlock         sync.RWMutex
 	lockPostFinding              sync.RWMutex
 	lockPostLinkToTicket         sync.RWMutex
+	lockPostResolveDetails       sync.RWMutex
+	lockPostSessionActions       sync.RWMutex
 	lockPostTicket               sync.RWMutex
 	lockPostTicketList           sync.RWMutex
 	lockReply                    sync.RWMutex
@@ -1794,6 +1826,92 @@ func (mock *SlackThreadServiceMock) PostLinkToTicketCalls() []struct {
 	mock.lockPostLinkToTicket.RLock()
 	calls = mock.calls.PostLinkToTicket
 	mock.lockPostLinkToTicket.RUnlock()
+	return calls
+}
+
+// PostResolveDetails calls PostResolveDetailsFunc.
+func (mock *SlackThreadServiceMock) PostResolveDetails(ctx context.Context, ticketMoqParam *ticket.Ticket) error {
+	callInfo := struct {
+		Ctx            context.Context
+		TicketMoqParam *ticket.Ticket
+	}{
+		Ctx:            ctx,
+		TicketMoqParam: ticketMoqParam,
+	}
+	mock.lockPostResolveDetails.Lock()
+	mock.calls.PostResolveDetails = append(mock.calls.PostResolveDetails, callInfo)
+	mock.lockPostResolveDetails.Unlock()
+	if mock.PostResolveDetailsFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PostResolveDetailsFunc(ctx, ticketMoqParam)
+}
+
+// PostResolveDetailsCalls gets all the calls that were made to PostResolveDetails.
+// Check the length with:
+//
+//	len(mockedSlackThreadService.PostResolveDetailsCalls())
+func (mock *SlackThreadServiceMock) PostResolveDetailsCalls() []struct {
+	Ctx            context.Context
+	TicketMoqParam *ticket.Ticket
+} {
+	var calls []struct {
+		Ctx            context.Context
+		TicketMoqParam *ticket.Ticket
+	}
+	mock.lockPostResolveDetails.RLock()
+	calls = mock.calls.PostResolveDetails
+	mock.lockPostResolveDetails.RUnlock()
+	return calls
+}
+
+// PostSessionActions calls PostSessionActionsFunc.
+func (mock *SlackThreadServiceMock) PostSessionActions(ctx context.Context, ticketID types.TicketID, ticketStatus types.TicketStatus, sessionURL string) error {
+	callInfo := struct {
+		Ctx          context.Context
+		TicketID     types.TicketID
+		TicketStatus types.TicketStatus
+		SessionURL   string
+	}{
+		Ctx:          ctx,
+		TicketID:     ticketID,
+		TicketStatus: ticketStatus,
+		SessionURL:   sessionURL,
+	}
+	mock.lockPostSessionActions.Lock()
+	mock.calls.PostSessionActions = append(mock.calls.PostSessionActions, callInfo)
+	mock.lockPostSessionActions.Unlock()
+	if mock.PostSessionActionsFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PostSessionActionsFunc(ctx, ticketID, ticketStatus, sessionURL)
+}
+
+// PostSessionActionsCalls gets all the calls that were made to PostSessionActions.
+// Check the length with:
+//
+//	len(mockedSlackThreadService.PostSessionActionsCalls())
+func (mock *SlackThreadServiceMock) PostSessionActionsCalls() []struct {
+	Ctx          context.Context
+	TicketID     types.TicketID
+	TicketStatus types.TicketStatus
+	SessionURL   string
+} {
+	var calls []struct {
+		Ctx          context.Context
+		TicketID     types.TicketID
+		TicketStatus types.TicketStatus
+		SessionURL   string
+	}
+	mock.lockPostSessionActions.RLock()
+	calls = mock.calls.PostSessionActions
+	mock.lockPostSessionActions.RUnlock()
 	return calls
 }
 
