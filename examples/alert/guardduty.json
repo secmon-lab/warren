@@ -1,0 +1,117 @@
+{
+  "version": "0",
+  "id": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
+  "detail-type": "GuardDuty Finding",
+  "source": "aws.guardduty",
+  "account": "123456789012",
+  "time": "2025-01-20T14:32:00Z",
+  "region": "ap-northeast-1",
+  "resources": [],
+  "detail": {
+    "schemaVersion": "2.0",
+    "accountId": "123456789012",
+    "region": "ap-northeast-1",
+    "partition": "aws",
+    "id": "92b49806f26831e4f3895e2f4cd97a52",
+    "arn": "arn:aws:guardduty:ap-northeast-1:123456789012:detector/d4b040365221be2b54a6264dc9a4bc64/finding/92b49806f26831e4f3895e2f4cd97a52",
+    "type": "Backdoor:EC2/C&CActivity.B!DNS",
+    "title": "EC2 instance i-0a1b2c3d4e5f67890 is querying a domain name associated with a known command and control server.",
+    "description": "EC2 instance i-0a1b2c3d4e5f67890 is querying a domain name that is associated with a known Cobalt Strike command and control server. This activity could indicate that the instance is compromised.",
+    "severity": 8,
+    "confidence": 90,
+    "createdAt": "2025-01-20T14:32:00.000Z",
+    "updatedAt": "2025-01-20T14:35:00.000Z",
+    "resource": {
+      "resourceType": "Instance",
+      "instanceDetails": {
+        "instanceId": "i-0a1b2c3d4e5f67890",
+        "instanceType": "c5.2xlarge",
+        "launchTime": "2025-01-18T03:12:00Z",
+        "platform": "linux",
+        "availabilityZone": "ap-northeast-1a",
+        "imageId": "ami-0abcdef1234567890",
+        "imageDescription": "Amazon Linux 2023 AMI",
+        "instanceState": "running",
+        "outpostArn": null,
+        "iamInstanceProfile": {
+          "arn": "arn:aws:iam::123456789012:instance-profile/WebAppRole",
+          "id": "AIPA1234567890EXAMPLE"
+        },
+        "networkInterfaces": [
+          {
+            "networkInterfaceId": "eni-0fedcba0987654321",
+            "privateIpAddress": "172.31.24.50",
+            "privateDnsName": "ip-172-31-24-50.ap-northeast-1.compute.internal",
+            "publicIp": "198.51.100.23",
+            "publicDnsName": "ec2-198-51-100-23.ap-northeast-1.compute.amazonaws.com",
+            "vpcId": "vpc-0abc123def456",
+            "subnetId": "subnet-0abc123def456",
+            "securityGroups": [
+              {
+                "groupId": "sg-0abcdef123456789",
+                "groupName": "webapp-sg"
+              }
+            ],
+            "ipv6Addresses": [],
+            "privateIpAddresses": [
+              {
+                "privateIpAddress": "172.31.24.50",
+                "privateDnsName": "ip-172-31-24-50.ap-northeast-1.compute.internal"
+              }
+            ]
+          }
+        ],
+        "productCodes": [],
+        "tags": [
+          {
+            "key": "Name",
+            "value": "webapp-production-01"
+          },
+          {
+            "key": "Environment",
+            "value": "production"
+          },
+          {
+            "key": "Team",
+            "value": "platform"
+          }
+        ]
+      }
+    },
+    "service": {
+      "serviceName": "guardduty",
+      "featureName": "DnsLogs",
+      "detectorId": "d4b040365221be2b54a6264dc9a4bc64",
+      "action": {
+        "actionType": "DNS_REQUEST",
+        "dnsRequestAction": {
+          "domain": "xr7v2k9q.com",
+          "domainWithSuffix": "xr7v2k9q.com",
+          "protocol": "UDP",
+          "blocked": false
+        }
+      },
+      "resourceRole": "TARGET",
+      "evidence": {
+        "threatIntelligenceDetails": [
+          {
+            "threatListName": "ProofPoint",
+            "threatNames": [
+              "Cobalt Strike"
+            ],
+            "threatFileSha256": null
+          }
+        ]
+      },
+      "archived": false,
+      "count": 47,
+      "eventFirstSeen": "2025-01-20T14:00:00.000Z",
+      "eventLastSeen": "2025-01-20T14:32:00.000Z",
+      "userFeedback": "USEFUL",
+      "additionalInfo": {
+        "type": "default",
+        "value": "{\"domain\":\"xr7v2k9q.com\"}"
+      }
+    }
+  }
+}

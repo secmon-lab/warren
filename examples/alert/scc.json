@@ -1,0 +1,98 @@
+{
+  "notificationConfigName": "organizations/123456789012/notificationConfigs/scc-alerts",
+  "finding": {
+    "name": "organizations/123456789012/sources/1234567890123456789/findings/abc123def456",
+    "parent": "organizations/123456789012/sources/1234567890123456789",
+    "resourceName": "//compute.googleapis.com/projects/my-project-id/zones/us-central1-a/instances/suspicious-instance",
+    "state": "ACTIVE",
+    "category": "Malware: Bad Domain",
+    "externalUri": "https://console.cloud.google.com/security/command-center/findings?organizationId=123456789012",
+    "sourceProperties": {
+      "detectionCategory": {
+        "ruleName": "bad_domain",
+        "technique": "T1071",
+        "indicator": "domain"
+      },
+      "evidence": [
+        {
+          "sourceLogId": {
+            "projectId": "my-project-id",
+            "resourceContainer": "projects/my-project-id",
+            "timestamp": "2024-01-15T10:30:00.000Z"
+          }
+        }
+      ],
+      "properties": {
+        "domains": ["download-update.online"],
+        "instanceDetails": "/projects/my-project-id/zones/us-central1-a/instances/suspicious-instance",
+        "network": "default",
+        "subnetwork": "default",
+        "ip": "10.128.0.15",
+        "destIp": "161.97.182.121",
+        "destPort": 443,
+        "protocol": "TCP"
+      }
+    },
+    "securityMarks": {
+      "name": "organizations/123456789012/sources/1234567890123456789/findings/abc123def456/securityMarks",
+      "marks": {}
+    },
+    "eventTime": "2024-01-15T10:30:00.000Z",
+    "createTime": "2024-01-15T10:31:00.000Z",
+    "severity": "HIGH",
+    "canonicalName": "organizations/123456789012/sources/1234567890123456789/findings/abc123def456",
+    "mute": "UNMUTED",
+    "findingClass": "THREAT",
+    "indicator": {
+      "ipAddresses": ["161.97.182.121"],
+      "domains": ["download-update.online"]
+    },
+    "contacts": {
+      "security": {
+        "contacts": [
+          {
+            "email": "security-team@example.com"
+          }
+        ]
+      }
+    },
+    "compliances": [],
+    "parentDisplayName": "Event Threat Detection",
+    "description": "A connection to a known malicious domain was detected from a Compute Engine instance.",
+    "nextSteps": "Investigate the instance for potential compromise. Check running processes and network connections. Consider isolating the instance if malware is confirmed."
+  },
+  "resource": {
+    "name": "//compute.googleapis.com/projects/my-project-id/zones/us-central1-a/instances/suspicious-instance",
+    "displayName": "suspicious-instance",
+    "type": "google.compute.Instance",
+    "projectName": "//cloudresourcemanager.googleapis.com/projects/my-project-id",
+    "projectDisplayName": "My Project",
+    "parentName": "//cloudresourcemanager.googleapis.com/projects/my-project-id",
+    "parentDisplayName": "My Project",
+    "folders": [],
+    "cloudProvider": "GOOGLE_CLOUD_PLATFORM",
+    "organization": "organizations/123456789012",
+    "service": "compute.googleapis.com",
+    "location": "us-central1-a",
+    "resourcePath": {
+      "nodes": [
+        {
+          "nodeType": "GCP_ORGANIZATION",
+          "id": "123456789012",
+          "displayName": "example.com"
+        },
+        {
+          "nodeType": "GCP_PROJECT",
+          "id": "my-project-id",
+          "displayName": "My Project"
+        },
+        {
+          "nodeType": "COMPUTE_INSTANCE",
+          "id": "1234567890123456789",
+          "displayName": "suspicious-instance"
+        }
+      ]
+    },
+    "resourcePathString": "organizations/123456789012/projects/my-project-id/instances/suspicious-instance"
+  }
+}
