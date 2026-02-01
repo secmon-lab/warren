@@ -2,6 +2,7 @@ package bigquery_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/m-mizutani/gt"
 	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
@@ -49,6 +50,93 @@ func TestNewPromptTemplate(t *testing.T) {
 	// Check that _memory_context is NOT in parameters (internal only)
 	_, hasMemoryContext := params["_memory_context"]
 	gt.False(t, hasMemoryContext)
+}
+
+func TestBuildPromptHint(t *testing.T) {
+	t.Run("with tables and limits", func(t *testing.T) {
+		config := &bqagent.Config{
+			Tables: []bqagent.TableConfig{
+				{
+					ProjectID:   "my-project",
+					DatasetID:   "my-dataset",
+					TableID:     "my-table",
+					Description: "A test table",
+				},
+				{
+					ProjectID:   "my-project",
+					DatasetID:   "my-dataset",
+					TableID:     "other-table",
+					Description: "Another table",
+				},
+			},
+			ScanSizeLimit: 10 * 1024 * 1024 * 1024, // 10 GB
+			QueryTimeout:  5 * time.Minute,
+		}
+
+		hint, err := bqagent.ExportedBuildPromptHint(config)
+		gt.NoError(t, err)
+		gt.V(t, hint).NotEqual("")
+		gt.S(t, hint).Contains("my-project.my-dataset.my-table")
+		gt.S(t, hint).Contains("my-project.my-dataset.other-table")
+		gt.S(t, hint).Contains("A test table")
+		gt.S(t, hint).Contains("Another table")
+		// humanize.Bytes(10*1024*1024*1024) returns "11 GB" due to rounding (10 GiB ≈ 10.7 GB)
+		gt.S(t, hint).Contains("Scan Size Limit")
+		gt.S(t, hint).Contains("5m0s")
+	})
+
+	t.Run("without tables", func(t *testing.T) {
+		config := &bqagent.Config{
+			Tables: nil,
+		}
+
+		hint, err := bqagent.ExportedBuildPromptHint(config)
+		gt.NoError(t, err)
+		gt.V(t, hint).NotEqual("")
+		// Should still contain the base description
+		gt.S(t, hint).Contains("BigQuery Agent")
+	})
+
+	t.Run("without limits", func(t *testing.T) {
+		config := &bqagent.Config{
+			Tables: []bqagent.TableConfig{
+				{
+					ProjectID: "proj",
+					DatasetID: "ds",
+					TableID:   "tbl",
+				},
+			},
+		}
+
+		hint, err := bqagent.ExportedBuildPromptHint(config)
+		gt.NoError(t, err)
+		gt.S(t, hint).Contains("proj.ds.tbl")
+		gt.S(t, hint).NotContains("Scan Size Limit")
+		gt.S(t, hint).NotContains("Query Timeout")
+	})
+}
+
+func TestDynamicDescription(t *testing.T) {
+	config := &bqagent.Config{
+		Tables: []bqagent.TableConfig{
+			{
+				ProjectID: "proj-a",
+				DatasetID: "ds-a",
+				TableID:   "tbl-a",
+			},
+			{
+				ProjectID: "proj-b",
+				DatasetID: "ds-b",
+				TableID:   "tbl-b",
+			},
+		},
+	}
+
+	a := bqagent.NewAgentForTest(config, nil, nil, "test-project", "")
+	desc := a.Description()
+	gt.S(t, desc).Contains("proj-a.ds-a.tbl-a")
+	gt.S(t, desc).Contains("proj-b.ds-b.tbl-b")
+	gt.S(t, desc).Contains("Available tables:")
 }
 
 func TestFormatMemoryContext(t *testing.T) {

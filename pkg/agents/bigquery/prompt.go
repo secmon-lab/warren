@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/dustin/go-humanize"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
@@ -74,6 +75,46 @@ func formatMemoryContext(memories []*memory.AgentMemory) string {
 	}
 
 	return buf.String()
+}
+
+//go:embed prompt/tool_description.md
+var toolDescriptionTemplate string
+
+var toolDescriptionTmpl *template.Template
+
+func init() {
+	toolDescriptionTmpl = template.Must(template.New("tool_description").Parse(toolDescriptionTemplate))
+}
+
+// promptHintData represents the data for tool_description.md template
+type promptHintData struct {
+	HasTables     bool
+	Tables        []TableConfig
+	ScanSizeLimit string
+	QueryTimeout  string
+}
+
+// buildPromptHint renders the tool_description.md template with config data.
+// The result is intended to be included in the parent agent's system prompt.
+func buildPromptHint(config *Config) (string, error) {
+	data := promptHintData{
+		HasTables: len(config.Tables) > 0,
+		Tables:    config.Tables,
+	}
+
+	if config.ScanSizeLimit > 0 {
+		data.ScanSizeLimit = humanize.Bytes(config.ScanSizeLimit)
+	}
+	if config.QueryTimeout > 0 {
+		data.QueryTimeout = config.QueryTimeout.String()
+	}
+
+	var buf bytes.Buffer
+	if err := toolDescriptionTmpl.Execute(&buf, data); err != nil {
+		return "", goerr.Wrap(err, "failed to execute tool description template")
+	}
+
+	return buf.String(), nil
 }
 
 // buildSystemPrompt builds system prompt without memories (for factory)

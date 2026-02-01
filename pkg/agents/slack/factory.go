@@ -30,9 +30,9 @@ func (f *Factory) Flags() []cli.Flag {
 }
 
 // Configure implements agents.AgentFactory
-func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) (*gollem.SubAgent, error) {
+func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) (*gollem.SubAgent, string, error) {
 	if f.oauthToken == "" {
-		return nil, nil
+		return nil, "", nil
 	}
 
 	slackClient := slackSDK.New(f.oauthToken)
@@ -47,5 +47,11 @@ func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, rep
 
 	logging.From(ctx).Info("Slack Search Agent configured")
 
-	return a.subAgent()
+	subAgent, err := a.subAgent()
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Slack agent has no config-dependent prompt hint
+	return subAgent, "", nil
 }

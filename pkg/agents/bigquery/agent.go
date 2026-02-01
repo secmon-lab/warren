@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -27,9 +28,21 @@ func (a *agent) name() string {
 	return "query_bigquery"
 }
 
-// description returns the agent description (private method)
+// description returns the agent description (private method).
+// It dynamically includes available table names so the parent agent
+// knows which tables this sub-agent has access to.
 func (a *agent) description() string {
-	return "Retrieve data from BigQuery tables. This tool ONLY extracts data records - it does NOT analyze or interpret the data. After receiving the data, YOU must analyze it yourself and provide a complete answer to the user based on the retrieved data. The tool handles table selection, query construction, and returns raw data records."
+	base := "Retrieve data from BigQuery tables. This tool ONLY extracts data records - it does NOT analyze or interpret the data. After receiving the data, YOU must analyze it yourself and provide a complete answer to the user based on the retrieved data. The tool handles table selection, query construction, and returns raw data records."
+
+	if len(a.config.Tables) > 0 {
+		var tables []string
+		for _, t := range a.config.Tables {
+			tables = append(tables, strings.Join([]string{t.ProjectID, t.DatasetID, t.TableID}, "."))
+		}
+		base += " Available tables: " + strings.Join(tables, ", ") + "."
+	}
+
+	return base
 }
 
 // subAgent creates a gollem.SubAgent (private method)

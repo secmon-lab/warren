@@ -29,17 +29,19 @@ func AllFlags() []cli.Flag {
 
 // ConfigureAll initializes all configured agents and returns a slice of SubAgents.
 // Agents that are not configured will return nil and be skipped.
-func ConfigureAll(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) ([]*gollem.SubAgent, error) {
-	var subAgents []*gollem.SubAgent
+// Each factory returns a gollem.SubAgent and a prompt hint, which are wrapped
+// into an agents.SubAgent for use by the parent agent.
+func ConfigureAll(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) ([]*SubAgent, error) {
+	var subAgents []*SubAgent
 
 	for _, factory := range All {
-		subAgent, err := factory.Configure(ctx, llmClient, repo)
+		inner, promptHint, err := factory.Configure(ctx, llmClient, repo)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to configure agent")
 		}
 
-		if subAgent != nil {
-			subAgents = append(subAgents, subAgent)
+		if inner != nil {
+			subAgents = append(subAgents, NewSubAgent(inner, promptHint))
 		}
 	}
 

@@ -64,22 +64,22 @@ func (f *Factory) Flags() []cli.Flag {
 }
 
 // Configure implements agents.AgentFactory
-func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) (*gollem.SubAgent, error) {
+func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) (*gollem.SubAgent, string, error) {
 	if f.configPath == "" {
-		return nil, nil
+		return nil, "", nil
 	}
 
 	// Load config and runbooks
 	cfg, err := LoadConfigWithRunbooks(ctx, f.configPath, f.runbookPaths)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to load BigQuery Agent config")
+		return nil, "", goerr.Wrap(err, "failed to load BigQuery Agent config")
 	}
 
 	// Override scan size limit from CLI flag if provided
 	if f.scanSizeLimitStr != "" {
 		limit, err := ParseScanSizeLimit(f.scanSizeLimitStr)
 		if err != nil {
-			return nil, goerr.Wrap(err, "failed to parse scan size limit")
+			return nil, "", goerr.Wrap(err, "failed to parse scan size limit")
 		}
 		cfg.ScanSizeLimit = limit
 	}
@@ -110,6 +110,17 @@ func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, rep
 		"scan_limit", scanLimit,
 		"runbooks", len(cfg.Runbooks))
 
-	// Create and return SubAgent
-	return a.subAgent()
+	// Build prompt hint for parent agent
+	promptHint, err := buildPromptHint(cfg)
+	if err != nil {
+		return nil, "", goerr.Wrap(err, "failed to build prompt hint")
+	}
+
+	// Create and return SubAgent with prompt hint
+	subAgent, err := a.subAgent()
+	if err != nil {
+		return nil, "", err
+	}
+
+	return subAgent, promptHint, nil
 }

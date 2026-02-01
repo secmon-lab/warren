@@ -83,3 +83,8 @@ func ExportedNewPromptTemplate() (*gollem.PromptTemplate, error) {
 func ExportedFormatMemoryContext(memories []*agentmemory.AgentMemory) string {
 	return formatMemoryContext(memories)
 }
+
+// ExportedBuildPromptHint is exported for testing
+func ExportedBuildPromptHint(config *Config) (string, error) {
+	return buildPromptHint(config)
+}
