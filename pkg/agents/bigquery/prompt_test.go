@@ -80,8 +80,7 @@ func TestBuildPromptHint(t *testing.T) {
 		gt.S(t, hint).Contains("my-project.my-dataset.other-table")
 		gt.S(t, hint).Contains("A test table")
 		gt.S(t, hint).Contains("Another table")
-		// humanize.Bytes(10*1024*1024*1024) returns "11 GB" due to rounding (10 GiB ≈ 10.7 GB)
-		gt.S(t, hint).Contains("Scan Size Limit")
+		gt.S(t, hint).Contains("10 GiB")
 		gt.S(t, hint).Contains("5m0s")
 	})
 

@@ -99,7 +99,7 @@ func buildPromptHint(config *Config) (string, error) {
 	}
 
 	if config.ScanSizeLimit > 0 {
-		data.ScanSizeLimit = humanize.Bytes(config.ScanSizeLimit)
+		data.ScanSizeLimit = humanize.IBytes(config.ScanSizeLimit)
 	}
 	if config.QueryTimeout > 0 {
 		data.QueryTimeout = config.QueryTimeout.String()
