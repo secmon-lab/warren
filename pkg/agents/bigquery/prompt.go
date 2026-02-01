@@ -22,12 +22,17 @@ var systemWithMemoriesTemplate string
 //go:embed prompt/runbooks.md
 var runbooksTemplate string
 
+//go:embed prompt/tool_description.md
+var toolDescriptionTemplate string
+
 var systemWithMemoriesTmpl *template.Template
 var runbooksTmpl *template.Template
+var toolDescriptionTmpl *template.Template
 
 func init() {
 	systemWithMemoriesTmpl = template.Must(template.New("system_with_memories").Parse(systemWithMemoriesTemplate))
 	runbooksTmpl = template.Must(template.New("runbooks").Parse(runbooksTemplate))
+	toolDescriptionTmpl = template.Must(template.New("tool_description").Parse(toolDescriptionTemplate))
 }
 
 // promptData represents the data for system prompt template
@@ -75,15 +80,6 @@ func formatMemoryContext(memories []*memory.AgentMemory) string {
 	}
 
 	return buf.String()
-}
-
-//go:embed prompt/tool_description.md
-var toolDescriptionTemplate string
-
-var toolDescriptionTmpl *template.Template
-
-func init() {
-	toolDescriptionTmpl = template.Must(template.New("tool_description").Parse(toolDescriptionTemplate))
 }
 
 // promptHintData represents the data for tool_description.md template
