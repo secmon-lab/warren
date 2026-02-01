@@ -9,6 +9,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem/trace"
+	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"google.golang.org/api/option"
 )
 
@@ -49,7 +50,7 @@ func (r *Repository) Save(ctx context.Context, t *trace.Trace) error {
 	w.ContentType = "application/json"
 
 	if err := json.NewEncoder(w).Encode(t); err != nil {
-		_ = w.Close()
+		safe.Close(ctx, w)
 		return goerr.Wrap(err, "failed to encode trace data",
 			goerr.V("bucket", r.bucket),
 			goerr.V("object", objectPath),
