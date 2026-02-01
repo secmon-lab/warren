@@ -6,6 +6,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	agentModel "github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	slackSDK "github.com/slack-go/slack"
@@ -31,9 +32,9 @@ func (f *Factory) Flags() []cli.Flag {
 }
 
 // Configure implements agents.AgentFactory
-func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) (*gollem.SubAgent, string, error) {
+func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) (*agentModel.SubAgent, error) {
 	if f.oauthToken == "" {
-		return nil, "", nil
+		return nil, nil
 	}
 
 	slackClient := slackSDK.New(f.oauthToken)
@@ -50,9 +51,9 @@ func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, rep
 
 	subAgent, err := a.subAgent()
 	if err != nil {
-		return nil, "", goerr.Wrap(err, "failed to create slack sub-agent")
+		return nil, goerr.Wrap(err, "failed to create slack sub-agent")
 	}
 
 	// Slack agent has no config-dependent prompt hint
-	return subAgent, "", nil
+	return agentModel.NewSubAgent(subAgent, ""), nil
 }

@@ -8,8 +8,8 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/m-mizutani/opaq"
-	"github.com/secmon-lab/warren/pkg/agents"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/command"
@@ -35,7 +35,7 @@ type UseCases struct {
 	policyClient    interfaces.PolicyClient
 
 	tools           []gollem.ToolSet
-	subAgents       []*agents.SubAgent
+	subAgents       []*agent.SubAgent
 	traceRepository trace.Repository
 
 	// use cases
@@ -119,7 +119,7 @@ func WithTools(tools []gollem.ToolSet) Option {
 	}
 }
 
-func WithSubAgents(subAgents []*agents.SubAgent) Option {
+func WithSubAgents(subAgents []*agent.SubAgent) Option {
 	return func(u *UseCases) {
 		u.subAgents = append(u.subAgents, subAgents...)
 	}

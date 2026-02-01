@@ -8,6 +8,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	agentModel "github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -64,22 +65,22 @@ func (f *Factory) Flags() []cli.Flag {
 }
 
 // Configure implements agents.AgentFactory
-func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) (*gollem.SubAgent, string, error) {
+func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) (*agentModel.SubAgent, error) {
 	if f.configPath == "" {
-		return nil, "", nil
+		return nil, nil
 	}
 
 	// Load config and runbooks
 	cfg, err := LoadConfigWithRunbooks(ctx, f.configPath, f.runbookPaths)
 	if err != nil {
-		return nil, "", goerr.Wrap(err, "failed to load BigQuery Agent config")
+		return nil, goerr.Wrap(err, "failed to load BigQuery Agent config")
 	}
 
 	// Override scan size limit from CLI flag if provided
 	if f.scanSizeLimitStr != "" {
 		limit, err := ParseScanSizeLimit(f.scanSizeLimitStr)
 		if err != nil {
-			return nil, "", goerr.Wrap(err, "failed to parse scan size limit")
+			return nil, goerr.Wrap(err, "failed to parse scan size limit")
 		}
 		cfg.ScanSizeLimit = limit
 	}
@@ -113,14 +114,14 @@ func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, rep
 	// Build prompt hint for parent agent
 	promptHint, err := buildPromptHint(cfg)
 	if err != nil {
-		return nil, "", goerr.Wrap(err, "failed to build prompt hint")
+		return nil, goerr.Wrap(err, "failed to build prompt hint")
 	}
 
 	// Create and return SubAgent with prompt hint
 	subAgent, err := a.subAgent()
 	if err != nil {
-		return nil, "", goerr.Wrap(err, "failed to create bigquery sub-agent")
+		return nil, goerr.Wrap(err, "failed to create bigquery sub-agent")
 	}
 
-	return subAgent, promptHint, nil
+	return agentModel.NewSubAgent(subAgent, promptHint), nil
 }

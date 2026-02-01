@@ -8,6 +8,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/agents/bigquery"
 	"github.com/secmon-lab/warren/pkg/agents/slack"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/urfave/cli/v3"
 )
 
@@ -29,19 +30,17 @@ func AllFlags() []cli.Flag {
 
 // ConfigureAll initializes all configured agents and returns a slice of SubAgents.
 // Agents that are not configured will return nil and be skipped.
-// Each factory returns a gollem.SubAgent and a prompt hint, which are wrapped
-// into an agents.SubAgent for use by the parent agent.
-func ConfigureAll(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) ([]*SubAgent, error) {
-	var subAgents []*SubAgent
+func ConfigureAll(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) ([]*agent.SubAgent, error) {
+	var subAgents []*agent.SubAgent
 
 	for _, factory := range All {
-		inner, promptHint, err := factory.Configure(ctx, llmClient, repo)
+		sa, err := factory.Configure(ctx, llmClient, repo)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to configure agent")
 		}
 
-		if inner != nil {
-			subAgents = append(subAgents, NewSubAgent(inner, promptHint))
+		if sa != nil {
+			subAgents = append(subAgents, sa)
 		}
 	}
 
