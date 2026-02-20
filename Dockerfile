@@ -14,7 +14,7 @@ COPY frontend/ ./
 RUN pnpm run build
 
 # Go build stage
-FROM golang:1.25-alpine AS build-go
+FROM golang:1.26-alpine AS build-go
 ENV CGO_ENABLED=0
 ARG BUILD_VERSION
 
