@@ -53,8 +53,8 @@ func formatMemoryContext(memories []*memory.AgentMemory) string {
 
 	for i, mem := range memories {
 		letter := string(rune('A' + i))
-		buf.WriteString(fmt.Sprintf("## Experience %s\n", letter))
-		buf.WriteString(fmt.Sprintf("**Claim:** %s\n", mem.Claim))
+		fmt.Fprintf(&buf, "## Experience %s\n", letter)
+		fmt.Fprintf(&buf, "**Claim:** %s\n", mem.Claim)
 		buf.WriteString("\n")
 	}
 

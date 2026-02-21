@@ -717,11 +717,11 @@ func postPlanProgress(ctx context.Context, planFunc func(context.Context, string
 	default:
 		statusMessage = "🚀 Thinking..."
 	}
-	messageBuilder.WriteString(fmt.Sprintf("%s (Request ID: %s)\n", statusMessage, requestID))
+	fmt.Fprintf(&messageBuilder, "%s (Request ID: %s)\n", statusMessage, requestID)
 
-	messageBuilder.WriteString(fmt.Sprintf("🎯 Objective *%s*\n", plan.Goal))
+	fmt.Fprintf(&messageBuilder, "🎯 Objective *%s*\n", plan.Goal)
 	messageBuilder.WriteString("\n")
-	messageBuilder.WriteString(fmt.Sprintf("*Progress: %d/%d tasks completed*\n", completedCount, len(plan.Tasks)))
+	fmt.Fprintf(&messageBuilder, "*Progress: %d/%d tasks completed*\n", completedCount, len(plan.Tasks))
 
 	for _, task := range plan.Tasks {
 		var icon string
@@ -742,7 +742,7 @@ func postPlanProgress(ctx context.Context, planFunc func(context.Context, string
 			status = task.Description
 		}
 
-		messageBuilder.WriteString(fmt.Sprintf("%s %s\n", icon, status))
+		fmt.Fprintf(&messageBuilder, "%s %s\n", icon, status)
 	}
 
 	planFunc(ctx, messageBuilder.String())

@@ -70,7 +70,7 @@ func (c *Converter) renderNode(ctx context.Context, node node) string {
 		var result strings.Builder
 		for i, child := range n.Children {
 			rendered := c.renderNode(ctx, child)
-			result.WriteString(fmt.Sprintf("%d. %s\n", i+1, rendered))
+			fmt.Fprintf(&result, "%d. %s\n", i+1, rendered)
 		}
 		return result.String()
 

@@ -358,7 +358,7 @@ func (x *Action) executeQuery(ctx context.Context, client *bigquery.Client, quer
 func (x *Action) newClient(ctx context.Context, projectID string) (*bigquery.Client, error) {
 	var opts []option.ClientOption
 	if x.credentials != "" {
-		opts = append(opts, option.WithCredentialsFile(x.credentials))
+		opts = append(opts, option.WithCredentialsFile(x.credentials)) //nolint:staticcheck // credentials file path is from trusted internal config, not external input
 	}
 	if x.impersonateServiceAccount != "" {
 		ts, err := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{

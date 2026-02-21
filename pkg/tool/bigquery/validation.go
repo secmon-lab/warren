@@ -114,7 +114,7 @@ func formatValidationReport(result SchemaValidationResult) string {
 
 	var report strings.Builder
 	report.WriteString("❌ Schema validation failed\n\n")
-	report.WriteString(fmt.Sprintf("Found %d issue(s):\n\n", len(result.Issues)))
+	fmt.Fprintf(&report, "Found %d issue(s):\n\n", len(result.Issues))
 
 	// Group issues by type
 	fieldNotFound := []SchemaValidationIssue{}
@@ -132,7 +132,7 @@ func formatValidationReport(result SchemaValidationResult) string {
 	if len(fieldNotFound) > 0 {
 		report.WriteString("Fields not found:\n")
 		for i, issue := range fieldNotFound {
-			report.WriteString(fmt.Sprintf("  %d. %s\n", i+1, issue.Message))
+			fmt.Fprintf(&report, "  %d. %s\n", i+1, issue.Message)
 		}
 		report.WriteString("\n")
 	}
@@ -140,7 +140,7 @@ func formatValidationReport(result SchemaValidationResult) string {
 	if len(typeMismatch) > 0 {
 		report.WriteString("Type mismatches:\n")
 		for i, issue := range typeMismatch {
-			report.WriteString(fmt.Sprintf("  %d. %s\n", i+1, issue.Message))
+			fmt.Fprintf(&report, "  %d. %s\n", i+1, issue.Message)
 		}
 		report.WriteString("\n")
 	}
