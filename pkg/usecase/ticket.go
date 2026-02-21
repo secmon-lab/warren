@@ -839,7 +839,7 @@ func buildConversationPrompt(ctx context.Context, messages []slacksvc.Conversati
 		if msg.User != nil {
 			userName = msg.User.Name
 		}
-		conversationText.WriteString(fmt.Sprintf("[%s] %s: %s\n", timestamp, userName, msg.Text))
+		fmt.Fprintf(&conversationText, "[%s] %s: %s\n", timestamp, userName, msg.Text)
 	}
 
 	// Generate prompt template

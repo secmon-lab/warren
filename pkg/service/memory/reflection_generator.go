@@ -65,7 +65,7 @@ func (s *Service) generateReflection(
 	var historyBuilder strings.Builder
 	if history != nil && len(history.Messages) > 0 {
 		for i, message := range history.Messages {
-			historyBuilder.WriteString(fmt.Sprintf("### Message %d (%s)\n", i+1, message.Role))
+			fmt.Fprintf(&historyBuilder, "### Message %d (%s)\n", i+1, message.Role)
 
 			// Format message contents
 			for _, content := range message.Contents {
@@ -79,20 +79,20 @@ func (s *Service) generateReflection(
 				case gollem.MessageContentTypeToolCall:
 					toolCall, err := content.GetToolCallContent()
 					if err == nil {
-						historyBuilder.WriteString(fmt.Sprintf("Tool Call: %s (ID: %s)\n", toolCall.Name, toolCall.ID))
+						fmt.Fprintf(&historyBuilder, "Tool Call: %s (ID: %s)\n", toolCall.Name, toolCall.ID)
 						if toolCall.Arguments != nil {
 							if argsJSON, err := json.Marshal(toolCall.Arguments); err == nil {
-								historyBuilder.WriteString(fmt.Sprintf("Arguments: %s\n", string(argsJSON)))
+								fmt.Fprintf(&historyBuilder, "Arguments: %s\n", string(argsJSON))
 							}
 						}
 					}
 				case gollem.MessageContentTypeToolResponse:
 					toolResp, err := content.GetToolResponseContent()
 					if err == nil {
-						historyBuilder.WriteString(fmt.Sprintf("Tool Response: %s (Call ID: %s)\n", toolResp.Name, toolResp.ToolCallID))
+						fmt.Fprintf(&historyBuilder, "Tool Response: %s (Call ID: %s)\n", toolResp.Name, toolResp.ToolCallID)
 						if toolResp.Response != nil {
 							if respJSON, err := json.Marshal(toolResp.Response); err == nil {
-								historyBuilder.WriteString(fmt.Sprintf("Response: %s\n", string(respJSON)))
+								fmt.Fprintf(&historyBuilder, "Response: %s\n", string(respJSON))
 							}
 						}
 					}

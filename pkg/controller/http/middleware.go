@@ -269,7 +269,7 @@ func getDetailedStackTrace() string {
 
 	for {
 		frame, more := frames.Next()
-		buf.WriteString(fmt.Sprintf("  %s\n    %s:%d\n", frame.Function, frame.File, frame.Line))
+		fmt.Fprintf(&buf, "  %s\n    %s:%d\n", frame.Function, frame.File, frame.Line)
 		if !more {
 			break
 		}

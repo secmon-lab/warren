@@ -334,12 +334,12 @@ func (x *Action) Prompt(ctx context.Context) (string, error) {
 	sb.WriteString("The following GitHub repositories are configured and accessible:\n\n")
 
 	for _, config := range x.configs {
-		sb.WriteString(fmt.Sprintf("- **%s/%s**", config.Owner, config.Repository))
+		fmt.Fprintf(&sb, "- **%s/%s**", config.Owner, config.Repository)
 		if config.Description != "" {
-			sb.WriteString(fmt.Sprintf(": %s", config.Description))
+			fmt.Fprintf(&sb, ": %s", config.Description)
 		}
 		if config.DefaultBranch != "" {
-			sb.WriteString(fmt.Sprintf(" (default branch: %s)", config.DefaultBranch))
+			fmt.Fprintf(&sb, " (default branch: %s)", config.DefaultBranch)
 		}
 		sb.WriteString("\n")
 	}

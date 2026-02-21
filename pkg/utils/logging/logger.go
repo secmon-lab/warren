@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/m-mizutani/clog"
+	"github.com/m-mizutani/clog/hooks"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/masq"
 )
@@ -60,7 +61,7 @@ func New(w io.Writer, level slog.Level, format Format, stacktrace bool) *slog.Lo
 		masq.WithFieldName("Authorization"),
 	)
 
-	attrHook := clog.GoerrHook
+	attrHook := hooks.GoErr()
 	if !stacktrace {
 		attrHook = goerrNoStacktrace
 	}

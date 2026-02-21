@@ -168,9 +168,7 @@ func (a *agent) formatHistory(history *gollem.History) string {
 	for i, msg := range history.Messages {
 		buf.WriteString(strings.Repeat("=", 80))
 		buf.WriteString("\n")
-		buf.WriteString("Message ")
-		buf.WriteString(fmt.Sprintf("%d", i+1))
-		buf.WriteString(" (")
+		fmt.Fprintf(&buf, "Message %d (", i+1)
 		buf.WriteString(string(msg.Role))
 		buf.WriteString("):\n")
 
