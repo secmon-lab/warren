@@ -17,6 +17,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/graph-gophers/dataloader/v7 v7.1.3
 	github.com/lestrrat-go/jwx/v2 v2.1.6
+	github.com/likexian/whois v1.15.7
 	github.com/m-mizutani/clog v0.2.1
 	github.com/m-mizutani/fireconf v0.1.1
 	github.com/m-mizutani/goerr/v2 v2.0.1
