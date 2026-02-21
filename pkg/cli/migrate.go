@@ -10,6 +10,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/urfave/cli/v3"
 	"google.golang.org/api/iterator"
 )
@@ -102,7 +103,7 @@ func waitForIndexesReady(ctx context.Context, projectID, databaseID string, cfg 
 	if err != nil {
 		return goerr.Wrap(err, "failed to create firestore admin client")
 	}
-	defer adminClient.Close()
+	defer safe.Close(ctx, adminClient)
 
 	// Collect the collection names we care about.
 	var collections []string
