@@ -33,7 +33,7 @@ export interface CommentsResponse {
   totalCount: number;
 }
 
-export type AlertStatus = "UNBOUND" | "DECLINED";
+export type { AlertStatus } from "@/lib/graphql/generated";
 
 export interface Alert {
   id: string;
@@ -42,7 +42,7 @@ export interface Alert {
   schema: string;
   data: string;
   attributes: AlertAttribute[];
-  status: AlertStatus;
+  status: import("@/lib/graphql/generated").AlertStatus;
   createdAt: string;
   ticket?: Ticket;
   tags?: string[];

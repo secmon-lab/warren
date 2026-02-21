@@ -119,12 +119,12 @@ func buildAlertBlocks(a alert.Alert) []slack.Block {
 				model.ActionIDBindAlert.String(),
 				a.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Bind to ticket", false, false),
-			).WithStyle(slack.StyleDanger),
+			).WithStyle(slack.StyleDefault),
 			slack.NewButtonBlockElement(
 				model.ActionIDDeclineAlert.String(),
 				a.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Decline", false, false),
-			).WithStyle(slack.StyleDefault),
+			).WithStyle(slack.StyleDanger),
 		)
 	}
 

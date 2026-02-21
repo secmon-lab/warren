@@ -129,22 +129,20 @@ export default function AlertsPage() {
 
       {/* Status filter tabs */}
       <div className="flex gap-2">
-        <Button
-          variant={statusFilter === "UNBOUND" ? "default" : "outline"}
-          size="sm"
-          onClick={() => handleStatusChange("UNBOUND")}
-        >
-          <AlertTriangle className="h-4 w-4 mr-1" />
-          New
-        </Button>
-        <Button
-          variant={statusFilter === "DECLINED" ? "default" : "outline"}
-          size="sm"
-          onClick={() => handleStatusChange("DECLINED")}
-        >
-          <Ban className="h-4 w-4 mr-1" />
-          Declined
-        </Button>
+        {[
+          { status: "UNBOUND" as AlertStatus, label: "New", icon: AlertTriangle },
+          { status: "DECLINED" as AlertStatus, label: "Declined", icon: Ban },
+        ].map(({ status, label, icon: Icon }) => (
+          <Button
+            key={status}
+            variant={statusFilter === status ? "default" : "outline"}
+            size="sm"
+            onClick={() => handleStatusChange(status)}
+          >
+            <Icon className="h-4 w-4 mr-1" />
+            {label}
+          </Button>
+        ))}
       </div>
 
       {sortedAlerts.length === 0 ? (
