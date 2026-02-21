@@ -135,8 +135,8 @@ export const GET_ALERT = gql`
 `;
 
 export const GET_ALERTS = gql`
-  query GetAlerts($offset: Int, $limit: Int) {
-    alerts(offset: $offset, limit: $limit) {
+  query GetAlerts($offset: Int, $limit: Int, $status: AlertStatus) {
+    alerts(offset: $offset, limit: $limit, status: $status) {
       alerts {
         id
         title
@@ -149,6 +149,7 @@ export const GET_ALERTS = gql`
           link
           auto
         }
+        status
         createdAt
         tags
         tagObjects {
@@ -172,6 +173,7 @@ export const GET_DASHBOARD = gql`
     dashboard {
       openTicketsCount
       unboundAlertsCount
+      declinedAlertsCount
       openTickets {
         id
         status

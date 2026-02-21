@@ -40,6 +40,11 @@ type Comment {
   updatedAt: String!
 }
 
+enum AlertStatus {
+  UNBOUND
+  DECLINED
+}
+
 type Alert {
   id: ID!
   title: String!
@@ -47,6 +52,7 @@ type Alert {
   schema: String!
   data: String!
   attributes: [AlertAttribute!]!
+  status: AlertStatus!
   createdAt: String!
   ticket: Ticket
   tags: [String!]!
@@ -104,6 +110,7 @@ type AlertsResponse {
 type DashboardStats {
   openTicketsCount: Int!
   unboundAlertsCount: Int!
+  declinedAlertsCount: Int!
   openTickets: [Ticket!]!
   unboundAlerts: [Alert!]!
 }
@@ -161,7 +168,7 @@ type Query {
   ): TicketsResponse!
   ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
   alert(id: ID!): Alert
-  alerts(offset: Int, limit: Int): AlertsResponse!
+  alerts(offset: Int, limit: Int, status: AlertStatus): AlertsResponse!
   unboundAlerts(
     threshold: Float
     keyword: String

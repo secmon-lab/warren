@@ -75,8 +75,10 @@ func (id ActionID) String() string {
 
 const (
 	// For alert
-	ActionIDAckAlert  ActionID = "ack_alert"
-	ActionIDBindAlert ActionID = "bind_alert"
+	ActionIDAckAlert     ActionID = "ack_alert"
+	ActionIDBindAlert    ActionID = "bind_alert"
+	ActionIDDeclineAlert ActionID = "decline_alert"
+	ActionIDReopenAlert  ActionID = "reopen_alert"
 
 	// For list
 	ActionIDAckList  ActionID = "ack_list"

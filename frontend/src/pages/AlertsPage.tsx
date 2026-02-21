@@ -12,8 +12,8 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { GET_ALERTS, GET_TAGS } from "@/lib/graphql/queries";
-import { Alert, TagMetadata } from "@/lib/types";
-import { AlertTriangle, Tag } from "lucide-react";
+import { Alert, AlertStatus, TagMetadata } from "@/lib/types";
+import { AlertTriangle, Tag, Ban } from "lucide-react";
 import { generateTagColor } from "@/lib/tag-colors";
 
 interface AlertsData {
@@ -26,7 +26,13 @@ interface AlertsData {
 export default function AlertsPage() {
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<AlertStatus>("UNBOUND");
   const ITEMS_PER_PAGE = 10;
+
+  const handleStatusChange = (newStatus: AlertStatus) => {
+    setStatusFilter(newStatus);
+    setCurrentPage(1);
+  };
 
   const {
     data: alertsData,
@@ -36,6 +42,7 @@ export default function AlertsPage() {
     variables: {
       offset: (currentPage - 1) * ITEMS_PER_PAGE,
       limit: ITEMS_PER_PAGE,
+      status: statusFilter,
     },
   });
 
@@ -113,11 +120,31 @@ export default function AlertsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Alerts</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Alerts</h1>
           <p className="text-muted-foreground">
-            Monitor and manage new security alerts
+            Monitor and manage security alerts
           </p>
         </div>
+      </div>
+
+      {/* Status filter tabs */}
+      <div className="flex gap-2">
+        <Button
+          variant={statusFilter === "UNBOUND" ? "default" : "outline"}
+          size="sm"
+          onClick={() => handleStatusChange("UNBOUND")}
+        >
+          <AlertTriangle className="h-4 w-4 mr-1" />
+          New
+        </Button>
+        <Button
+          variant={statusFilter === "DECLINED" ? "default" : "outline"}
+          size="sm"
+          onClick={() => handleStatusChange("DECLINED")}
+        >
+          <Ban className="h-4 w-4 mr-1" />
+          Declined
+        </Button>
       </div>
 
       {sortedAlerts.length === 0 ? (
@@ -141,6 +168,11 @@ export default function AlertsPage() {
                     <Badge variant="outline" className="text-xs">
                       {alert.schema}
                     </Badge>
+                    {alert.status === "DECLINED" && (
+                      <Badge variant="destructive" className="text-xs">
+                        Declined
+                      </Badge>
+                    )}
                     {alert.ticket && (
                       <Badge variant="secondary" className="text-xs">
                         Assigned

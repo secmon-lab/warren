@@ -17,19 +17,26 @@ import (
 	"github.com/slack-go/slack"
 )
 
-func buildAlertBlocks(alert alert.Alert) []slack.Block {
-	ack := "⏳"
-	if alert.TicketID != types.EmptyTicketID {
-		ack = "✅"
+func buildAlertBlocks(a alert.Alert) []slack.Block {
+	a.Normalize()
+
+	var statusIcon string
+	switch {
+	case a.TicketID != types.EmptyTicketID:
+		statusIcon = "✅"
+	case a.Status == alert.AlertStatusDeclined:
+		statusIcon = "🚫"
+	default:
+		statusIcon = "⏳"
 	}
 
 	lines := []string{
-		"*ID:* `" + alert.ID.String() + "`",
-		"*Schema:* `" + alert.Schema.String() + "`",
-		"*Ack:* " + ack,
+		"*ID:* `" + a.ID.String() + "`",
+		"*Schema:* `" + a.Schema.String() + "`",
+		"*Ack:* " + statusIcon,
 	}
 
-	title := "❗ " + alert.Title
+	title := "❗ " + a.Title
 	titleBytes := []byte(title)
 	if len(titleBytes) > 140 {
 		// Find the position to cut that doesn't break UTF-8 characters
@@ -44,8 +51,8 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 	}
 
 	description := "_no description_"
-	if alert.Description != "" {
-		description = alert.Description
+	if a.Description != "" {
+		description = a.Description
 	}
 
 	blocks := []slack.Block{
@@ -69,9 +76,9 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 		slack.NewDividerBlock(),
 	}...)
 
-	if len(alert.Attributes) > 0 {
-		fields := make([]*slack.TextBlockObject, 0, len(alert.Attributes)*2)
-		for _, attr := range alert.Attributes {
+	if len(a.Attributes) > 0 {
+		fields := make([]*slack.TextBlockObject, 0, len(a.Attributes)*2)
+		for _, attr := range a.Attributes {
 			var value string
 			if attr.Link != "" {
 				value = "<" + attr.Link + "|" + attr.Value + ">"
@@ -84,24 +91,40 @@ func buildAlertBlocks(alert alert.Alert) []slack.Block {
 		}
 		blocks = append(blocks, slack.NewSectionBlock(nil, fields, nil))
 	}
-	// Add action buttons
-	buttons := []slack.BlockElement{}
 
-	if alert.TicketID == types.EmptyTicketID {
+	// Add action buttons based on alert state
+	var buttons []slack.BlockElement
+
+	switch {
+	case a.TicketID != types.EmptyTicketID:
+		// Bound to ticket: no buttons
+	case a.Status == alert.AlertStatusDeclined:
+		// Declined: Re-open button only
+		buttons = append(buttons,
+			slack.NewButtonBlockElement(
+				model.ActionIDReopenAlert.String(),
+				a.ID.String(),
+				slack.NewTextBlockObject("plain_text", "Re-open", false, false),
+			).WithStyle(slack.StyleDefault),
+		)
+	default:
+		// Unbound: Ack + Bind + Decline buttons
 		buttons = append(buttons,
 			slack.NewButtonBlockElement(
 				model.ActionIDAckAlert.String(),
-				alert.ID.String(),
+				a.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Acknowledge", false, false),
 			).WithStyle(slack.StylePrimary),
-		)
-
-		buttons = append(buttons,
 			slack.NewButtonBlockElement(
 				model.ActionIDBindAlert.String(),
-				alert.ID.String(),
+				a.ID.String(),
 				slack.NewTextBlockObject("plain_text", "Bind to ticket", false, false),
 			).WithStyle(slack.StyleDanger),
+			slack.NewButtonBlockElement(
+				model.ActionIDDeclineAlert.String(),
+				a.ID.String(),
+				slack.NewTextBlockObject("plain_text", "Decline", false, false),
+			).WithStyle(slack.StyleDefault),
 		)
 	}
 

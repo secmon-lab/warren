@@ -131,9 +131,10 @@ func (r *Memory) GetAlertWithoutTicket(ctx context.Context, offset, limit int) (
 	defer r.mu.RUnlock()
 
 	var alerts alert.Alerts
-	for _, alert := range r.alerts {
-		if alert.TicketID == types.EmptyTicketID {
-			alerts = append(alerts, alert)
+	for _, a := range r.alerts {
+		a.Normalize()
+		if a.TicketID == types.EmptyTicketID && (a.Status == alert.AlertStatusUnbound || a.Status == "") {
+			alerts = append(alerts, a)
 		}
 	}
 
@@ -161,13 +162,73 @@ func (r *Memory) CountAlertsWithoutTicket(ctx context.Context) (int, error) {
 	defer r.mu.RUnlock()
 
 	count := 0
-	for _, alert := range r.alerts {
-		if alert.TicketID == types.EmptyTicketID {
+	for _, a := range r.alerts {
+		a.Normalize()
+		if a.TicketID == types.EmptyTicketID && (a.Status == alert.AlertStatusUnbound || a.Status == "") {
 			count++
 		}
 	}
 
 	return count, nil
+}
+
+func (r *Memory) GetDeclinedAlerts(ctx context.Context, offset, limit int) (alert.Alerts, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var alerts alert.Alerts
+	for _, a := range r.alerts {
+		a.Normalize()
+		if a.TicketID == types.EmptyTicketID && a.Status == alert.AlertStatusDeclined {
+			alerts = append(alerts, a)
+		}
+	}
+
+	// Apply offset
+	if offset >= len(alerts) {
+		return alert.Alerts{}, nil
+	}
+	if offset > 0 {
+		alerts = alerts[offset:]
+	}
+
+	// Apply limit
+	if limit > 0 && limit < len(alerts) {
+		alerts = alerts[:limit]
+	}
+
+	if alerts == nil {
+		return alert.Alerts{}, nil
+	}
+	return alerts, nil
+}
+
+func (r *Memory) CountDeclinedAlerts(ctx context.Context) (int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	count := 0
+	for _, a := range r.alerts {
+		a.Normalize()
+		if a.TicketID == types.EmptyTicketID && a.Status == alert.AlertStatusDeclined {
+			count++
+		}
+	}
+
+	return count, nil
+}
+
+func (r *Memory) UpdateAlertStatus(ctx context.Context, alertID types.AlertID, status alert.AlertStatus) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	a, ok := r.alerts[alertID]
+	if !ok {
+		return goerr.New("alert not found", goerr.V("alert_id", alertID))
+	}
+
+	a.Status = status
+	return nil
 }
 
 func (r *Memory) GetAlertsBySpan(ctx context.Context, begin, end time.Time) (alert.Alerts, error) {

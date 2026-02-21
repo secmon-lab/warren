@@ -58,6 +58,12 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, slac
 	case slack.ActionIDEditTicket:
 		return uc.showEditTicketModal(ctx, slackUser, slackThread, types.TicketID(value), triggerID)
 
+	case slack.ActionIDDeclineAlert:
+		return uc.slackActionDeclineAlert(ctx, slackUser, slackThread, types.AlertID(value))
+
+	case slack.ActionIDReopenAlert:
+		return uc.slackActionReopenAlert(ctx, slackUser, slackThread, types.AlertID(value))
+
 	case slack.ActionIDEscalate:
 		return uc.handleEscalateAction(ctx, slackUser, slackThread, value)
 	}
@@ -89,6 +95,12 @@ func (uc *UseCases) slackActionAckAlert(ctx context.Context, user slack.User, sl
 		return goerr.Wrap(err, "failed to get alert")
 	} else if targetAlert == nil {
 		return goerr.New("alert not found")
+	}
+
+	targetAlert.Normalize()
+	if targetAlert.Status == alert.AlertStatusDeclined {
+		msg.Notify(ctx, "🚫 This alert has been declined. Please Re-open it first before acknowledging.")
+		return nil
 	}
 
 	return uc.ackAlerts(ctx, user, slackThread, alert.Alerts{targetAlert})
@@ -142,6 +154,12 @@ func (uc *UseCases) slackActionBindAlert(ctx context.Context, targetAlertID type
 		return goerr.Wrap(err, "failed to get alert")
 	} else if targetAlert == nil {
 		return goerr.New("alert not found")
+	}
+
+	targetAlert.Normalize()
+	if targetAlert.Status == alert.AlertStatusDeclined {
+		msg.Notify(ctx, "🚫 This alert has been declined. Please Re-open it first before binding to a ticket.")
+		return nil
 	}
 
 	nearestTickets, err := uc.repository.FindNearestTicketsWithSpan(ctx, targetAlert.Embedding, clock.Now(ctx).Add(-72*time.Hour), clock.Now(ctx), 10)
@@ -387,5 +405,61 @@ func (uc *UseCases) handleEscalateAction(ctx context.Context, slackUser slack.Us
 	}
 
 	logger.Info("notice escalated successfully", "notice_id", noticeID)
+	return nil
+}
+
+func (uc *UseCases) slackActionDeclineAlert(ctx context.Context, slackUser slack.User, slackThread slack.Thread, targetAlertID types.AlertID) error {
+	targetAlert, err := uc.repository.GetAlert(ctx, targetAlertID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alert", goerr.V("alert_id", targetAlertID))
+	} else if targetAlert == nil {
+		return goerr.New("alert not found", goerr.V("alert_id", targetAlertID))
+	}
+
+	// Update status to declined
+	if err := uc.repository.UpdateAlertStatus(ctx, targetAlertID, alert.AlertStatusDeclined); err != nil {
+		return goerr.Wrap(err, "failed to decline alert", goerr.V("alert_id", targetAlertID))
+	}
+
+	// Update the Slack message to show declined state
+	targetAlert.Status = alert.AlertStatusDeclined
+	if targetAlert.HasSlackThread() && uc.slackService != nil {
+		alertThread := uc.slackService.NewThread(*targetAlert.SlackThread)
+		if err := alertThread.UpdateAlert(ctx, *targetAlert); err != nil {
+			logging.From(ctx).Warn("failed to update alert Slack display", "error", err, "alert_id", targetAlertID)
+		}
+	}
+
+	// Post to thread that user declined
+	msg.Notify(ctx, "🚫 Declined by %s", slackUser.Name)
+
+	return nil
+}
+
+func (uc *UseCases) slackActionReopenAlert(ctx context.Context, slackUser slack.User, slackThread slack.Thread, targetAlertID types.AlertID) error {
+	targetAlert, err := uc.repository.GetAlert(ctx, targetAlertID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get alert", goerr.V("alert_id", targetAlertID))
+	} else if targetAlert == nil {
+		return goerr.New("alert not found", goerr.V("alert_id", targetAlertID))
+	}
+
+	// Update status back to unbound
+	if err := uc.repository.UpdateAlertStatus(ctx, targetAlertID, alert.AlertStatusUnbound); err != nil {
+		return goerr.Wrap(err, "failed to reopen alert", goerr.V("alert_id", targetAlertID))
+	}
+
+	// Update the Slack message to show unbound state
+	targetAlert.Status = alert.AlertStatusUnbound
+	if targetAlert.HasSlackThread() && uc.slackService != nil {
+		alertThread := uc.slackService.NewThread(*targetAlert.SlackThread)
+		if err := alertThread.UpdateAlert(ctx, *targetAlert); err != nil {
+			logging.From(ctx).Warn("failed to update alert Slack display", "error", err, "alert_id", targetAlertID)
+		}
+	}
+
+	// Post to thread that user re-opened
+	msg.Notify(ctx, "🔄 Re-opened by %s", slackUser.Name)
+
 	return nil
 }

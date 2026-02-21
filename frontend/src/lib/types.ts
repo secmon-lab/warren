@@ -33,6 +33,8 @@ export interface CommentsResponse {
   totalCount: number;
 }
 
+export type AlertStatus = "UNBOUND" | "DECLINED";
+
 export interface Alert {
   id: string;
   title: string;
@@ -40,6 +42,7 @@ export interface Alert {
   schema: string;
   data: string;
   attributes: AlertAttribute[];
+  status: AlertStatus;
   createdAt: string;
   ticket?: Ticket;
   tags?: string[];

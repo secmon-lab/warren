@@ -2636,6 +2636,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			CountAlertsWithoutTicketFunc: func(ctx context.Context) (int, error) {
 //				panic("mock out the CountAlertsWithoutTicket method")
 //			},
+//			CountDeclinedAlertsFunc: func(ctx context.Context) (int, error) {
+//				panic("mock out the CountDeclinedAlerts method")
+//			},
 //			CountTicketCommentsFunc: func(ctx context.Context, ticketID types.TicketID) (int, error) {
 //				panic("mock out the CountTicketComments method")
 //			},
@@ -2701,6 +2704,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			GetAlertsWithInvalidEmbeddingFunc: func(ctx context.Context) (alert.Alerts, error) {
 //				panic("mock out the GetAlertsWithInvalidEmbedding method")
+//			},
+//			GetDeclinedAlertsFunc: func(ctx context.Context, offset int, limit int) (alert.Alerts, error) {
+//				panic("mock out the GetDeclinedAlerts method")
 //			},
 //			GetKnowledgeFunc: func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) (*knowledge.Knowledge, error) {
 //				panic("mock out the GetKnowledge method")
@@ -2852,6 +2858,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			UnbindAlertFromTicketFunc: func(ctx context.Context, alertID types.AlertID) error {
 //				panic("mock out the UnbindAlertFromTicket method")
 //			},
+//			UpdateAlertStatusFunc: func(ctx context.Context, alertID types.AlertID, status alert.AlertStatus) error {
+//				panic("mock out the UpdateAlertStatus method")
+//			},
 //			UpdateMemoryScoreBatchFunc: func(ctx context.Context, agentID string, updates map[types.AgentMemoryID]struct{Score float64; LastUsedAt time.Time}) error {
 //				panic("mock out the UpdateMemoryScoreBatch method")
 //			},
@@ -2897,6 +2906,9 @@ type RepositoryMock struct {
 
 	// CountAlertsWithoutTicketFunc mocks the CountAlertsWithoutTicket method.
 	CountAlertsWithoutTicketFunc func(ctx context.Context) (int, error)
+
+	// CountDeclinedAlertsFunc mocks the CountDeclinedAlerts method.
+	CountDeclinedAlertsFunc func(ctx context.Context) (int, error)
 
 	// CountTicketCommentsFunc mocks the CountTicketComments method.
 	CountTicketCommentsFunc func(ctx context.Context, ticketID types.TicketID) (int, error)
@@ -2963,6 +2975,9 @@ type RepositoryMock struct {
 
 	// GetAlertsWithInvalidEmbeddingFunc mocks the GetAlertsWithInvalidEmbedding method.
 	GetAlertsWithInvalidEmbeddingFunc func(ctx context.Context) (alert.Alerts, error)
+
+	// GetDeclinedAlertsFunc mocks the GetDeclinedAlerts method.
+	GetDeclinedAlertsFunc func(ctx context.Context, offset int, limit int) (alert.Alerts, error)
 
 	// GetKnowledgeFunc mocks the GetKnowledge method.
 	GetKnowledgeFunc func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) (*knowledge.Knowledge, error)
@@ -3114,6 +3129,9 @@ type RepositoryMock struct {
 	// UnbindAlertFromTicketFunc mocks the UnbindAlertFromTicket method.
 	UnbindAlertFromTicketFunc func(ctx context.Context, alertID types.AlertID) error
 
+	// UpdateAlertStatusFunc mocks the UpdateAlertStatus method.
+	UpdateAlertStatusFunc func(ctx context.Context, alertID types.AlertID, status alert.AlertStatus) error
+
 	// UpdateMemoryScoreBatchFunc mocks the UpdateMemoryScoreBatch method.
 	UpdateMemoryScoreBatchFunc func(ctx context.Context, agentID string, updates map[types.AgentMemoryID]struct {
 		Score      float64
@@ -3197,6 +3215,11 @@ type RepositoryMock struct {
 		}
 		// CountAlertsWithoutTicket holds details about calls to the CountAlertsWithoutTicket method.
 		CountAlertsWithoutTicket []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
+		// CountDeclinedAlerts holds details about calls to the CountDeclinedAlerts method.
+		CountDeclinedAlerts []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
@@ -3369,6 +3392,15 @@ type RepositoryMock struct {
 		GetAlertsWithInvalidEmbedding []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+		}
+		// GetDeclinedAlerts holds details about calls to the GetDeclinedAlerts method.
+		GetDeclinedAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Offset is the offset argument value.
+			Offset int
+			// Limit is the limit argument value.
+			Limit int
 		}
 		// GetKnowledge holds details about calls to the GetKnowledge method.
 		GetKnowledge []struct {
@@ -3754,6 +3786,15 @@ type RepositoryMock struct {
 			// AlertID is the alertID argument value.
 			AlertID types.AlertID
 		}
+		// UpdateAlertStatus holds details about calls to the UpdateAlertStatus method.
+		UpdateAlertStatus []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// AlertID is the alertID argument value.
+			AlertID types.AlertID
+			// Status is the status argument value.
+			Status alert.AlertStatus
+		}
 		// UpdateMemoryScoreBatch holds details about calls to the UpdateMemoryScoreBatch method.
 		UpdateMemoryScoreBatch []struct {
 			// Ctx is the ctx argument value.
@@ -3791,6 +3832,7 @@ type RepositoryMock struct {
 	lockCalculateKnowledgeSize         sync.RWMutex
 	lockCountActivities                sync.RWMutex
 	lockCountAlertsWithoutTicket       sync.RWMutex
+	lockCountDeclinedAlerts            sync.RWMutex
 	lockCountTicketComments            sync.RWMutex
 	lockCountTicketsByStatus           sync.RWMutex
 	lockCreateNotice                   sync.RWMutex
@@ -3813,6 +3855,7 @@ type RepositoryMock struct {
 	lockGetAlertsBySpan                sync.RWMutex
 	lockGetAlertsByThread              sync.RWMutex
 	lockGetAlertsWithInvalidEmbedding  sync.RWMutex
+	lockGetDeclinedAlerts              sync.RWMutex
 	lockGetKnowledge                   sync.RWMutex
 	lockGetKnowledgeByCommit           sync.RWMutex
 	lockGetKnowledges                  sync.RWMutex
@@ -3863,6 +3906,7 @@ type RepositoryMock struct {
 	lockSearchAlerts                   sync.RWMutex
 	lockSearchMemoriesByEmbedding      sync.RWMutex
 	lockUnbindAlertFromTicket          sync.RWMutex
+	lockUpdateAlertStatus              sync.RWMutex
 	lockUpdateMemoryScoreBatch         sync.RWMutex
 	lockUpdateNotice                   sync.RWMutex
 	lockUpdateTag                      sync.RWMutex
@@ -4264,6 +4308,42 @@ func (mock *RepositoryMock) CountAlertsWithoutTicketCalls() []struct {
 	mock.lockCountAlertsWithoutTicket.RLock()
 	calls = mock.calls.CountAlertsWithoutTicket
 	mock.lockCountAlertsWithoutTicket.RUnlock()
+	return calls
+}
+
+// CountDeclinedAlerts calls CountDeclinedAlertsFunc.
+func (mock *RepositoryMock) CountDeclinedAlerts(ctx context.Context) (int, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockCountDeclinedAlerts.Lock()
+	mock.calls.CountDeclinedAlerts = append(mock.calls.CountDeclinedAlerts, callInfo)
+	mock.lockCountDeclinedAlerts.Unlock()
+	if mock.CountDeclinedAlertsFunc == nil {
+		var (
+			nOut   int
+			errOut error
+		)
+		return nOut, errOut
+	}
+	return mock.CountDeclinedAlertsFunc(ctx)
+}
+
+// CountDeclinedAlertsCalls gets all the calls that were made to CountDeclinedAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.CountDeclinedAlertsCalls())
+func (mock *RepositoryMock) CountDeclinedAlertsCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockCountDeclinedAlerts.RLock()
+	calls = mock.calls.CountDeclinedAlerts
+	mock.lockCountDeclinedAlerts.RUnlock()
 	return calls
 }
 
@@ -5171,6 +5251,50 @@ func (mock *RepositoryMock) GetAlertsWithInvalidEmbeddingCalls() []struct {
 	mock.lockGetAlertsWithInvalidEmbedding.RLock()
 	calls = mock.calls.GetAlertsWithInvalidEmbedding
 	mock.lockGetAlertsWithInvalidEmbedding.RUnlock()
+	return calls
+}
+
+// GetDeclinedAlerts calls GetDeclinedAlertsFunc.
+func (mock *RepositoryMock) GetDeclinedAlerts(ctx context.Context, offset int, limit int) (alert.Alerts, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Offset int
+		Limit  int
+	}{
+		Ctx:    ctx,
+		Offset: offset,
+		Limit:  limit,
+	}
+	mock.lockGetDeclinedAlerts.Lock()
+	mock.calls.GetDeclinedAlerts = append(mock.calls.GetDeclinedAlerts, callInfo)
+	mock.lockGetDeclinedAlerts.Unlock()
+	if mock.GetDeclinedAlertsFunc == nil {
+		var (
+			alertsOut alert.Alerts
+			errOut    error
+		)
+		return alertsOut, errOut
+	}
+	return mock.GetDeclinedAlertsFunc(ctx, offset, limit)
+}
+
+// GetDeclinedAlertsCalls gets all the calls that were made to GetDeclinedAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.GetDeclinedAlertsCalls())
+func (mock *RepositoryMock) GetDeclinedAlertsCalls() []struct {
+	Ctx    context.Context
+	Offset int
+	Limit  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Offset int
+		Limit  int
+	}
+	mock.lockGetDeclinedAlerts.RLock()
+	calls = mock.calls.GetDeclinedAlerts
+	mock.lockGetDeclinedAlerts.RUnlock()
 	return calls
 }
 
@@ -7223,6 +7347,49 @@ func (mock *RepositoryMock) UnbindAlertFromTicketCalls() []struct {
 	mock.lockUnbindAlertFromTicket.RLock()
 	calls = mock.calls.UnbindAlertFromTicket
 	mock.lockUnbindAlertFromTicket.RUnlock()
+	return calls
+}
+
+// UpdateAlertStatus calls UpdateAlertStatusFunc.
+func (mock *RepositoryMock) UpdateAlertStatus(ctx context.Context, alertID types.AlertID, status alert.AlertStatus) error {
+	callInfo := struct {
+		Ctx     context.Context
+		AlertID types.AlertID
+		Status  alert.AlertStatus
+	}{
+		Ctx:     ctx,
+		AlertID: alertID,
+		Status:  status,
+	}
+	mock.lockUpdateAlertStatus.Lock()
+	mock.calls.UpdateAlertStatus = append(mock.calls.UpdateAlertStatus, callInfo)
+	mock.lockUpdateAlertStatus.Unlock()
+	if mock.UpdateAlertStatusFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.UpdateAlertStatusFunc(ctx, alertID, status)
+}
+
+// UpdateAlertStatusCalls gets all the calls that were made to UpdateAlertStatus.
+// Check the length with:
+//
+//	len(mockedRepository.UpdateAlertStatusCalls())
+func (mock *RepositoryMock) UpdateAlertStatusCalls() []struct {
+	Ctx     context.Context
+	AlertID types.AlertID
+	Status  alert.AlertStatus
+} {
+	var calls []struct {
+		Ctx     context.Context
+		AlertID types.AlertID
+		Status  alert.AlertStatus
+	}
+	mock.lockUpdateAlertStatus.RLock()
+	calls = mock.calls.UpdateAlertStatus
+	mock.lockUpdateAlertStatus.RUnlock()
 	return calls
 }
 
