@@ -236,6 +236,11 @@ export default function Dashboard() {
                     <CardTitle className="text-lg font-semibold text-amber-900">New Alerts</CardTitle>
                     <p className="text-sm text-amber-600">
                       {dashboardLoading ? "..." : dashboardData?.dashboard.unboundAlertsCount || 0} alerts need attention
+                      {!dashboardLoading && (dashboardData?.dashboard.declinedAlertsCount ?? 0) > 0 && (
+                        <span className="text-muted-foreground ml-2">
+                          ({dashboardData?.dashboard.declinedAlertsCount} declined)
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>

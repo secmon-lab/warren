@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"time"
 
@@ -27,12 +28,50 @@ const (
 	DefaultAlertDescription = "(no description)"
 )
 
+// AlertStatus represents the processing status of an alert
+type AlertStatus string
+
+const (
+	AlertStatusUnbound  AlertStatus = "unbound"
+	AlertStatusDeclined AlertStatus = "declined"
+)
+
+// MarshalGQL implements the graphql.Marshaler interface for GraphQL enum serialization.
+func (s AlertStatus) MarshalGQL(w io.Writer) {
+	var gqlValue string
+	switch s {
+	case AlertStatusDeclined:
+		gqlValue = "DECLINED"
+	default:
+		gqlValue = "UNBOUND"
+	}
+	_, _ = io.WriteString(w, `"`+gqlValue+`"`)
+}
+
+// UnmarshalGQL implements the graphql.Unmarshaler interface for GraphQL enum deserialization.
+func (s *AlertStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("AlertStatus must be a string")
+	}
+	switch str {
+	case "UNBOUND":
+		*s = AlertStatusUnbound
+	case "DECLINED":
+		*s = AlertStatusDeclined
+	default:
+		return fmt.Errorf("%s is not a valid AlertStatus", str)
+	}
+	return nil
+}
+
 // Alert represents an event of a potential security incident. This model is designed to be immutable. An Alert can be linked to at most one ticket.
 type Alert struct {
 	ID       types.AlertID     `json:"id"`
 	TicketID types.TicketID    `json:"ticket_id"`
 	Schema   types.AlertSchema `json:"schema"`
 	Data     any               `json:"data"`
+	Status   AlertStatus       `json:"status"`
 
 	// Topic is the namespace for domain knowledge (defaults to Schema if not set by policy)
 	Topic types.KnowledgeTopic `json:"topic"`
@@ -44,6 +83,14 @@ type Alert struct {
 	SlackMessageID string             `json:"slack_message_id"`
 	Embedding      firestore.Vector32 `json:"-"`
 	TagIDs         map[string]bool    `json:"tag_ids"`
+}
+
+// Normalize fills in default values for backward compatibility.
+// Empty Status (from pre-existing Firestore data) is treated as AlertStatusUnbound.
+func (a *Alert) Normalize() {
+	if a.Status == "" {
+		a.Status = AlertStatusUnbound
+	}
 }
 
 // HasSlackThread returns true if the alert has a valid Slack thread
@@ -93,6 +140,7 @@ func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metad
 		ID:        types.NewAlertID(),
 		TicketID:  types.EmptyTicketID,
 		Schema:    schema,
+		Status:    AlertStatusUnbound,
 		CreatedAt: clock.Now(ctx),
 		Metadata:  metadata,
 		Data:      data,

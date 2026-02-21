@@ -278,7 +278,9 @@ func (r *Firestore) SearchAlerts(ctx context.Context, path, op string, value any
 }
 
 func (r *Firestore) GetAlertWithoutTicket(ctx context.Context, offset, limit int) (alert.Alerts, error) {
-	query := r.db.Collection(collectionAlerts).Where("TicketID", "==", "")
+	query := r.db.Collection(collectionAlerts).
+		Where("TicketID", "==", "").
+		Where("Status", "in", []string{string(alert.AlertStatusUnbound), ""})
 
 	// Apply offset and limit to the query
 	if offset > 0 {
@@ -304,6 +306,7 @@ func (r *Firestore) GetAlertWithoutTicket(ctx context.Context, offset, limit int
 		if err := doc.DataTo(&v); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to alert")
 		}
+		v.Normalize()
 		alerts = append(alerts, &v)
 	}
 
@@ -311,7 +314,9 @@ func (r *Firestore) GetAlertWithoutTicket(ctx context.Context, offset, limit int
 }
 
 func (r *Firestore) CountAlertsWithoutTicket(ctx context.Context) (int, error) {
-	query := r.db.Collection(collectionAlerts).Where("TicketID", "==", "")
+	query := r.db.Collection(collectionAlerts).
+		Where("TicketID", "==", "").
+		Where("Status", "in", []string{string(alert.AlertStatusUnbound), ""})
 
 	result, err := query.NewAggregationQuery().WithCount("total").Get(ctx)
 	if err != nil {
@@ -319,6 +324,70 @@ func (r *Firestore) CountAlertsWithoutTicket(ctx context.Context) (int, error) {
 	}
 
 	return extractCountFromAggregationResult(result, "total")
+}
+
+func (r *Firestore) GetDeclinedAlerts(ctx context.Context, offset, limit int) (alert.Alerts, error) {
+	query := r.db.Collection(collectionAlerts).
+		Where("TicketID", "==", "").
+		Where("Status", "==", string(alert.AlertStatusDeclined))
+
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	iter := query.Documents(ctx)
+
+	var alerts alert.Alerts
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get next alert")
+		}
+
+		var v alert.Alert
+		if err := doc.DataTo(&v); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to alert")
+		}
+		v.Normalize()
+		alerts = append(alerts, &v)
+	}
+
+	return alerts, nil
+}
+
+func (r *Firestore) CountDeclinedAlerts(ctx context.Context) (int, error) {
+	query := r.db.Collection(collectionAlerts).
+		Where("TicketID", "==", "").
+		Where("Status", "==", string(alert.AlertStatusDeclined))
+
+	result, err := query.NewAggregationQuery().WithCount("total").Get(ctx)
+	if err != nil {
+		return 0, goerr.Wrap(err, "failed to count declined alerts")
+	}
+
+	return extractCountFromAggregationResult(result, "total")
+}
+
+func (r *Firestore) UpdateAlertStatus(ctx context.Context, alertID types.AlertID, status alert.AlertStatus) error {
+	alertDoc := r.db.Collection(collectionAlerts).Doc(alertID.String())
+	_, err := alertDoc.Update(ctx, []firestore.Update{
+		{
+			Path:  "Status",
+			Value: string(status),
+		},
+	})
+	if err != nil {
+		return r.eb.Wrap(err, "failed to update alert status",
+			goerr.TV(errutil.AlertIDKey, alertID),
+			goerr.T(errutil.TagDatabase))
+	}
+	return nil
 }
 
 func (r *Firestore) BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {

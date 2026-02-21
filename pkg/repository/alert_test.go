@@ -744,3 +744,157 @@ func TestGetAlertWithoutTicketPagination(t *testing.T) {
 
 	t.Run("Firestore", runTest(newFirestoreClient(t)))
 }
+
+func TestAlertDeclineAndReopen(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+		thread := newTestThread()
+
+		// Create 3 alerts: will be used for decline testing
+		alert1 := newTestAlert(&thread)
+		alert2 := newTestAlert(&thread)
+		alert3 := newTestAlert(&thread)
+
+		gt.NoError(t, repo.PutAlert(ctx, alert1))
+		gt.NoError(t, repo.PutAlert(ctx, alert2))
+		gt.NoError(t, repo.PutAlert(ctx, alert3))
+
+		// Initial state: all alerts should be unbound
+		unboundAlerts, err := repo.GetAlertWithoutTicket(ctx, 0, 0)
+		gt.NoError(t, err)
+		gt.Array(t, unboundAlerts).Any(func(a *alert.Alert) bool { return a.ID == alert1.ID })
+		gt.Array(t, unboundAlerts).Any(func(a *alert.Alert) bool { return a.ID == alert2.ID })
+		gt.Array(t, unboundAlerts).Any(func(a *alert.Alert) bool { return a.ID == alert3.ID })
+
+		initialUnboundCount, err := repo.CountAlertsWithoutTicket(ctx)
+		gt.NoError(t, err)
+
+		// No declined alerts initially
+		declinedAlerts, err := repo.GetDeclinedAlerts(ctx, 0, 0)
+		gt.NoError(t, err)
+		for _, a := range declinedAlerts {
+			gt.Value(t, a.ID).NotEqual(alert1.ID)
+			gt.Value(t, a.ID).NotEqual(alert2.ID)
+			gt.Value(t, a.ID).NotEqual(alert3.ID)
+		}
+
+		declinedCount, err := repo.CountDeclinedAlerts(ctx)
+		gt.NoError(t, err)
+		initialDeclinedCount := declinedCount
+
+		// Decline alert1
+		gt.NoError(t, repo.UpdateAlertStatus(ctx, alert1.ID, alert.AlertStatusDeclined))
+
+		// Verify alert1 is now declined
+		got, err := repo.GetAlert(ctx, alert1.ID)
+		gt.NoError(t, err)
+		gt.Value(t, got.Status).Equal(alert.AlertStatusDeclined)
+
+		// alert1 should no longer appear in unbound alerts
+		unboundAlerts, err = repo.GetAlertWithoutTicket(ctx, 0, 0)
+		gt.NoError(t, err)
+		for _, a := range unboundAlerts {
+			gt.Value(t, a.ID).NotEqual(alert1.ID)
+		}
+
+		// Unbound count should decrease by 1
+		newUnboundCount, err := repo.CountAlertsWithoutTicket(ctx)
+		gt.NoError(t, err)
+		gt.Value(t, newUnboundCount).Equal(initialUnboundCount - 1)
+
+		// alert1 should appear in declined alerts
+		declinedAlerts, err = repo.GetDeclinedAlerts(ctx, 0, 0)
+		gt.NoError(t, err)
+		gt.Array(t, declinedAlerts).Any(func(a *alert.Alert) bool { return a.ID == alert1.ID })
+
+		// Declined count should increase by 1
+		declinedCount, err = repo.CountDeclinedAlerts(ctx)
+		gt.NoError(t, err)
+		gt.Value(t, declinedCount).Equal(initialDeclinedCount + 1)
+
+		// Decline alert2 as well
+		gt.NoError(t, repo.UpdateAlertStatus(ctx, alert2.ID, alert.AlertStatusDeclined))
+
+		declinedCount, err = repo.CountDeclinedAlerts(ctx)
+		gt.NoError(t, err)
+		gt.Value(t, declinedCount).Equal(initialDeclinedCount + 2)
+
+		// Re-open alert1 (set back to unbound)
+		gt.NoError(t, repo.UpdateAlertStatus(ctx, alert1.ID, alert.AlertStatusUnbound))
+
+		// alert1 should be back in unbound alerts
+		unboundAlerts, err = repo.GetAlertWithoutTicket(ctx, 0, 0)
+		gt.NoError(t, err)
+		gt.Array(t, unboundAlerts).Any(func(a *alert.Alert) bool { return a.ID == alert1.ID })
+
+		// alert1 should no longer be in declined alerts
+		declinedAlerts, err = repo.GetDeclinedAlerts(ctx, 0, 0)
+		gt.NoError(t, err)
+		for _, a := range declinedAlerts {
+			gt.Value(t, a.ID).NotEqual(alert1.ID)
+		}
+
+		// Declined count should decrease by 1
+		declinedCount, err = repo.CountDeclinedAlerts(ctx)
+		gt.NoError(t, err)
+		gt.Value(t, declinedCount).Equal(initialDeclinedCount + 1)
+
+		// Verify alert status after re-open
+		got, err = repo.GetAlert(ctx, alert1.ID)
+		gt.NoError(t, err)
+		gt.Value(t, got.Status).Equal(alert.AlertStatusUnbound)
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+func TestGetDeclinedAlertsPagination(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+		thread := newTestThread()
+
+		// Create 5 alerts and decline them all
+		var declinedIDs []types.AlertID
+		for range 5 {
+			a := newTestAlert(&thread)
+			gt.NoError(t, repo.PutAlert(ctx, a))
+			gt.NoError(t, repo.UpdateAlertStatus(ctx, a.ID, alert.AlertStatusDeclined))
+			declinedIDs = append(declinedIDs, a.ID)
+		}
+
+		// Get all declined alerts
+		allDeclined, err := repo.GetDeclinedAlerts(ctx, 0, 0)
+		gt.NoError(t, err)
+		for _, id := range declinedIDs {
+			gt.Array(t, allDeclined).Any(func(a *alert.Alert) bool { return a.ID == id })
+		}
+
+		// Get with limit
+		limited, err := repo.GetDeclinedAlerts(ctx, 0, 3)
+		gt.NoError(t, err)
+		gt.Array(t, limited).Length(3)
+
+		// Get with offset beyond available
+		empty, err := repo.GetDeclinedAlerts(ctx, len(allDeclined)+100, 5)
+		gt.NoError(t, err)
+		gt.Array(t, empty).Length(0)
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}

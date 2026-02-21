@@ -109,10 +109,11 @@ type DBSCANParameters struct {
 }
 
 type DashboardStats struct {
-	OpenTicketsCount   int              `json:"openTicketsCount"`
-	UnboundAlertsCount int              `json:"unboundAlertsCount"`
-	OpenTickets        []*ticket.Ticket `json:"openTickets"`
-	UnboundAlerts      []*alert.Alert   `json:"unboundAlerts"`
+	OpenTicketsCount    int              `json:"openTicketsCount"`
+	UnboundAlertsCount  int              `json:"unboundAlertsCount"`
+	DeclinedAlertsCount int              `json:"declinedAlertsCount"`
+	OpenTickets         []*ticket.Ticket `json:"openTickets"`
+	UnboundAlerts       []*alert.Alert   `json:"unboundAlerts"`
 }
 
 type Knowledge struct {

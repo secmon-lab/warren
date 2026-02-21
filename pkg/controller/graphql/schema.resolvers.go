@@ -850,13 +850,31 @@ func (r *queryResolver) Alert(ctx context.Context, id string) (*alert.Alert, err
 }
 
 // Alerts is the resolver for the alerts field.
-func (r *queryResolver) Alerts(ctx context.Context, offset *int, limit *int) (*graphql1.AlertsResponse, error) {
+func (r *queryResolver) Alerts(ctx context.Context, offset *int, limit *int, status *alert.AlertStatus) (*graphql1.AlertsResponse, error) {
 	var offsetVal, limitVal int
 	if offset != nil {
 		offsetVal = *offset
 	}
 	if limit != nil {
 		limitVal = *limit
+	}
+
+	// Default (nil) returns UNBOUND for backward compatibility
+	if status != nil && *status == alert.AlertStatusDeclined {
+		alerts, err := r.repo.GetDeclinedAlerts(ctx, offsetVal, limitVal)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to list declined alerts")
+		}
+
+		totalCount, err := r.repo.CountDeclinedAlerts(ctx)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to count declined alerts")
+		}
+
+		return &graphql1.AlertsResponse{
+			Alerts:     alerts,
+			TotalCount: totalCount,
+		}, nil
 	}
 
 	alerts, err := r.repo.GetAlertWithoutTicket(ctx, offsetVal, limitVal)
@@ -928,11 +946,18 @@ func (r *queryResolver) Dashboard(ctx context.Context) (*graphql1.DashboardStats
 		return nil, goerr.Wrap(err, "failed to get unbound alerts")
 	}
 
+	// Get declined alerts count
+	declinedAlertsCount, err := r.repo.CountDeclinedAlerts(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to count declined alerts")
+	}
+
 	return &graphql1.DashboardStats{
-		OpenTicketsCount:   openTicketsCount,
-		UnboundAlertsCount: unboundAlertsCount,
-		OpenTickets:        openTickets,
-		UnboundAlerts:      unboundAlerts,
+		OpenTicketsCount:    openTicketsCount,
+		UnboundAlertsCount:  unboundAlertsCount,
+		DeclinedAlertsCount: declinedAlertsCount,
+		OpenTickets:         openTickets,
+		UnboundAlerts:       unboundAlerts,
 	}, nil
 }
 

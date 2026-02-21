@@ -96,6 +96,7 @@ type ComplexityRoot struct {
 		Description func(childComplexity int) int
 		ID          func(childComplexity int) int
 		Schema      func(childComplexity int) int
+		Status      func(childComplexity int) int
 		TagObjects  func(childComplexity int) int
 		Tags        func(childComplexity int) int
 		Ticket      func(childComplexity int) int
@@ -155,10 +156,11 @@ type ComplexityRoot struct {
 	}
 
 	DashboardStats struct {
-		OpenTickets        func(childComplexity int) int
-		OpenTicketsCount   func(childComplexity int) int
-		UnboundAlerts      func(childComplexity int) int
-		UnboundAlertsCount func(childComplexity int) int
+		DeclinedAlertsCount func(childComplexity int) int
+		OpenTickets         func(childComplexity int) int
+		OpenTicketsCount    func(childComplexity int) int
+		UnboundAlerts       func(childComplexity int) int
+		UnboundAlertsCount  func(childComplexity int) int
 	}
 
 	Finding struct {
@@ -203,7 +205,7 @@ type ComplexityRoot struct {
 		Activities             func(childComplexity int, offset *int, limit *int) int
 		Alert                  func(childComplexity int, id string) int
 		AlertClusters          func(childComplexity int, limit *int, offset *int, minClusterSize *int, eps *float64, minSamples *int, keyword *string) int
-		Alerts                 func(childComplexity int, offset *int, limit *int) int
+		Alerts                 func(childComplexity int, offset *int, limit *int, status *alert.AlertStatus) int
 		AvailableTagColorNames func(childComplexity int) int
 		AvailableTagColors     func(childComplexity int) int
 		ClusterAlerts          func(childComplexity int, clusterID string, keyword *string, limit *int, offset *int) int
@@ -312,6 +314,7 @@ type AlertResolver interface {
 	Schema(ctx context.Context, obj *alert.Alert) (string, error)
 	Data(ctx context.Context, obj *alert.Alert) (string, error)
 	Attributes(ctx context.Context, obj *alert.Alert) ([]*graphql1.AlertAttribute, error)
+
 	CreatedAt(ctx context.Context, obj *alert.Alert) (string, error)
 	Ticket(ctx context.Context, obj *alert.Alert) (*ticket.Ticket, error)
 
@@ -354,7 +357,7 @@ type QueryResolver interface {
 	SimilarTicketsForAlert(ctx context.Context, alertID string, threshold float64, offset *int, limit *int) (*graphql1.TicketsResponse, error)
 	TicketComments(ctx context.Context, ticketID string, offset *int, limit *int) (*graphql1.CommentsResponse, error)
 	Alert(ctx context.Context, id string) (*alert.Alert, error)
-	Alerts(ctx context.Context, offset *int, limit *int) (*graphql1.AlertsResponse, error)
+	Alerts(ctx context.Context, offset *int, limit *int, status *alert.AlertStatus) (*graphql1.AlertsResponse, error)
 	UnboundAlerts(ctx context.Context, threshold *float64, keyword *string, ticketID *string, offset *int, limit *int) (*graphql1.AlertsResponse, error)
 	Dashboard(ctx context.Context) (*graphql1.DashboardStats, error)
 	Activities(ctx context.Context, offset *int, limit *int) (*graphql1.ActivitiesResponse, error)
@@ -613,6 +616,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Alert.Schema(childComplexity), true
+	case "Alert.status":
+		if e.ComplexityRoot.Alert.Status == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Alert.Status(childComplexity), true
 	case "Alert.tagObjects":
 		if e.ComplexityRoot.Alert.TagObjects == nil {
 			break
@@ -814,6 +823,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.DBSCANParameters.MinSamples(childComplexity), true
 
+	case "DashboardStats.declinedAlertsCount":
+		if e.ComplexityRoot.DashboardStats.DeclinedAlertsCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DashboardStats.DeclinedAlertsCount(childComplexity), true
 	case "DashboardStats.openTickets":
 		if e.ComplexityRoot.DashboardStats.OpenTickets == nil {
 			break
@@ -1134,7 +1149,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.Alerts(childComplexity, args["offset"].(*int), args["limit"].(*int)), true
+		return e.ComplexityRoot.Query.Alerts(childComplexity, args["offset"].(*int), args["limit"].(*int), args["status"].(*alert.AlertStatus)), true
 	case "Query.availableTagColorNames":
 		if e.ComplexityRoot.Query.AvailableTagColorNames == nil {
 			break
@@ -1768,6 +1783,11 @@ type Comment {
   updatedAt: String!
 }
 
+enum AlertStatus {
+  UNBOUND
+  DECLINED
+}
+
 type Alert {
   id: ID!
   title: String!
@@ -1775,6 +1795,7 @@ type Alert {
   schema: String!
   data: String!
   attributes: [AlertAttribute!]!
+  status: AlertStatus!
   createdAt: String!
   ticket: Ticket
   tags: [String!]!
@@ -1832,6 +1853,7 @@ type AlertsResponse {
 type DashboardStats {
   openTicketsCount: Int!
   unboundAlertsCount: Int!
+  declinedAlertsCount: Int!
   openTickets: [Ticket!]!
   unboundAlerts: [Alert!]!
 }
@@ -1889,7 +1911,7 @@ type Query {
   ): TicketsResponse!
   ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
   alert(id: ID!): Alert
-  alerts(offset: Int, limit: Int): AlertsResponse!
+  alerts(offset: Int, limit: Int, status: AlertStatus): AlertsResponse!
   unboundAlerts(
     threshold: Float
     keyword: String
@@ -2401,6 +2423,11 @@ func (ec *executionContext) field_Query_alerts_args(ctx context.Context, rawArgs
 		return nil, err
 	}
 	args["limit"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "status", ec.unmarshalOAlertStatus2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐAlertStatus)
+	if err != nil {
+		return nil, err
+	}
+	args["status"] = arg2
 	return args, nil
 }
 
@@ -3148,6 +3175,8 @@ func (ec *executionContext) fieldContext_Activity_alert(_ context.Context, field
 				return ec.fieldContext_Alert_data(ctx, field)
 			case "attributes":
 				return ec.fieldContext_Alert_attributes(ctx, field)
+			case "status":
+				return ec.fieldContext_Alert_status(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
@@ -3848,6 +3877,35 @@ func (ec *executionContext) fieldContext_Alert_attributes(_ context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _Alert_status(ctx context.Context, field graphql.CollectedField, obj *alert.Alert) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Alert_status,
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		ec.marshalNAlertStatus2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐAlertStatus,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Alert_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Alert",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type AlertStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Alert_createdAt(ctx context.Context, field graphql.CollectedField, obj *alert.Alert) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4193,6 +4251,8 @@ func (ec *executionContext) fieldContext_AlertCluster_centerAlert(_ context.Cont
 				return ec.fieldContext_Alert_data(ctx, field)
 			case "attributes":
 				return ec.fieldContext_Alert_attributes(ctx, field)
+			case "status":
+				return ec.fieldContext_Alert_status(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
@@ -4244,6 +4304,8 @@ func (ec *executionContext) fieldContext_AlertCluster_alerts(_ context.Context, 
 				return ec.fieldContext_Alert_data(ctx, field)
 			case "attributes":
 				return ec.fieldContext_Alert_attributes(ctx, field)
+			case "status":
+				return ec.fieldContext_Alert_status(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
@@ -4382,6 +4444,8 @@ func (ec *executionContext) fieldContext_AlertsConnection_alerts(_ context.Conte
 				return ec.fieldContext_Alert_data(ctx, field)
 			case "attributes":
 				return ec.fieldContext_Alert_attributes(ctx, field)
+			case "status":
+				return ec.fieldContext_Alert_status(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
@@ -4462,6 +4526,8 @@ func (ec *executionContext) fieldContext_AlertsResponse_alerts(_ context.Context
 				return ec.fieldContext_Alert_data(ctx, field)
 			case "attributes":
 				return ec.fieldContext_Alert_attributes(ctx, field)
+			case "status":
+				return ec.fieldContext_Alert_status(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
@@ -4585,6 +4651,8 @@ func (ec *executionContext) fieldContext_ClusteringSummary_noiseAlerts(_ context
 				return ec.fieldContext_Alert_data(ctx, field)
 			case "attributes":
 				return ec.fieldContext_Alert_attributes(ctx, field)
+			case "status":
+				return ec.fieldContext_Alert_status(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
@@ -5032,6 +5100,35 @@ func (ec *executionContext) fieldContext_DashboardStats_unboundAlertsCount(_ con
 	return fc, nil
 }
 
+func (ec *executionContext) _DashboardStats_declinedAlertsCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.DashboardStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DashboardStats_declinedAlertsCount,
+		func(ctx context.Context) (any, error) {
+			return obj.DeclinedAlertsCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DashboardStats_declinedAlertsCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DashboardStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _DashboardStats_openTickets(ctx context.Context, field graphql.CollectedField, obj *graphql1.DashboardStats) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5139,6 +5236,8 @@ func (ec *executionContext) fieldContext_DashboardStats_unboundAlerts(_ context.
 				return ec.fieldContext_Alert_data(ctx, field)
 			case "attributes":
 				return ec.fieldContext_Alert_attributes(ctx, field)
+			case "status":
+				return ec.fieldContext_Alert_status(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
@@ -6186,6 +6285,8 @@ func (ec *executionContext) fieldContext_Mutation_updateAlertTags(ctx context.Co
 				return ec.fieldContext_Alert_data(ctx, field)
 			case "attributes":
 				return ec.fieldContext_Alert_attributes(ctx, field)
+			case "status":
+				return ec.fieldContext_Alert_status(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
@@ -6921,6 +7022,8 @@ func (ec *executionContext) fieldContext_Query_alert(ctx context.Context, field 
 				return ec.fieldContext_Alert_data(ctx, field)
 			case "attributes":
 				return ec.fieldContext_Alert_attributes(ctx, field)
+			case "status":
+				return ec.fieldContext_Alert_status(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
@@ -6955,7 +7058,7 @@ func (ec *executionContext) _Query_alerts(ctx context.Context, field graphql.Col
 		ec.fieldContext_Query_alerts,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().Alerts(ctx, fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+			return ec.Resolvers.Query().Alerts(ctx, fc.Args["offset"].(*int), fc.Args["limit"].(*int), fc.Args["status"].(*alert.AlertStatus))
 		},
 		nil,
 		ec.marshalNAlertsResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAlertsResponse,
@@ -7069,6 +7172,8 @@ func (ec *executionContext) fieldContext_Query_dashboard(_ context.Context, fiel
 				return ec.fieldContext_DashboardStats_openTicketsCount(ctx, field)
 			case "unboundAlertsCount":
 				return ec.fieldContext_DashboardStats_unboundAlertsCount(ctx, field)
+			case "declinedAlertsCount":
+				return ec.fieldContext_DashboardStats_declinedAlertsCount(ctx, field)
 			case "openTickets":
 				return ec.fieldContext_DashboardStats_openTickets(ctx, field)
 			case "unboundAlerts":
@@ -8788,6 +8893,8 @@ func (ec *executionContext) fieldContext_Ticket_alerts(_ context.Context, field 
 				return ec.fieldContext_Alert_data(ctx, field)
 			case "attributes":
 				return ec.fieldContext_Alert_attributes(ctx, field)
+			case "status":
+				return ec.fieldContext_Alert_status(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Alert_createdAt(ctx, field)
 			case "ticket":
@@ -11630,6 +11737,11 @@ func (ec *executionContext) _Alert(ctx context.Context, sel ast.SelectionSet, ob
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "status":
+			out.Values[i] = ec._Alert_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "createdAt":
 			field := field
 
@@ -12339,6 +12451,11 @@ func (ec *executionContext) _DashboardStats(ctx context.Context, sel ast.Selecti
 			}
 		case "unboundAlertsCount":
 			out.Values[i] = ec._DashboardStats_unboundAlertsCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "declinedAlertsCount":
+			out.Values[i] = ec._DashboardStats_declinedAlertsCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -14759,6 +14876,16 @@ func (ec *executionContext) marshalNAlertCluster2ᚖgithubᚗcomᚋsecmonᚑlab�
 	return ec._AlertCluster(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNAlertStatus2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐAlertStatus(ctx context.Context, v any) (alert.AlertStatus, error) {
+	var res alert.AlertStatus
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNAlertStatus2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐAlertStatus(ctx context.Context, sel ast.SelectionSet, v alert.AlertStatus) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) marshalNAlertsConnection2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐAlertsConnection(ctx context.Context, sel ast.SelectionSet, v graphql1.AlertsConnection) graphql.Marshaler {
 	return ec._AlertsConnection(ctx, sel, &v)
 }
@@ -15395,6 +15522,22 @@ func (ec *executionContext) marshalOAlert2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarre
 		return graphql.Null
 	}
 	return ec._Alert(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOAlertStatus2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐAlertStatus(ctx context.Context, v any) (*alert.AlertStatus, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(alert.AlertStatus)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOAlertStatus2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐAlertStatus(ctx context.Context, sel ast.SelectionSet, v *alert.AlertStatus) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v any) (bool, error) {
