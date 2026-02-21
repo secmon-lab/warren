@@ -260,6 +260,10 @@ github.com/lestrrat-go/option v1.0.1 h1:oAzP2fvZGQKWkvHa1/SAcFolBEca1oN+mQ7eooNB
 github.com/lestrrat-go/option v1.0.1/go.mod h1:5ZHFbivi4xwXxhxY9XHDe2FHo6/Z7WWmtT7T5nBBp3I=
 github.com/lestrrat-go/option/v2 v2.0.0 h1:XxrcaJESE1fokHy3FpaQ/cXW8ZsIdWcdFzzLOcID3Ss=
 github.com/lestrrat-go/option/v2 v2.0.0/go.mod h1:oSySsmzMoR0iRzCDCaUfsCzxQHUEuhOViQObyy7S6Vg=
+github.com/likexian/gokit v0.25.16 h1:wwBeUIN/OdoPp6t00xTnZE8Di/+s969Bl5N2Kw6bzP8=
+github.com/likexian/gokit v0.25.16/go.mod h1:Wqd4f+iifV0qxA1N3MqePJTUsmRy/lpst9/yXriDx/4=
+github.com/likexian/whois v1.15.7 h1:sajjDhi2bVD71AHJhjV7jLYxN92H4AWhTwxM8hmj7c0=
+github.com/likexian/whois v1.15.7/go.mod h1:kdPQtYb+7SQVftBEbCblDadUkycN7Mg1k1/Li/rwvmc=
 github.com/m-mizutani/clog v0.2.1 h1:aVOANOeAcHW5HLeGvqepX4zQwkvSbtuBOGH7cyn3AmM=
 github.com/m-mizutani/clog v0.2.1/go.mod h1:pMkePlZ5rNTS8Yzljdqud3sLZ5TTDNs+hiC7vEZhGXo=
 github.com/m-mizutani/fireconf v0.1.1 h1:AV0XzAAUrOdMWY+qJcLWw/mJo0GmVIoawL9RWSmUapo=
