@@ -73,7 +73,7 @@ func setupTicketTestService(t *testing.T) (*command.Service, *mock.RepositoryMoc
 		},
 	}
 
-	repo.GetTicketsByStatusFunc = func(ctx context.Context, statuses []types.TicketStatus, offset, limit int) ([]*ticket.Ticket, error) {
+	repo.GetTicketsByStatusFunc = func(ctx context.Context, statuses []types.TicketStatus, keyword, assigneeID string, offset, limit int) ([]*ticket.Ticket, error) {
 		var result []*ticket.Ticket
 		for _, t := range tickets {
 			if slices.Contains(statuses, t.Status) {

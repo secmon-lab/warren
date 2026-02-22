@@ -2,7 +2,6 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   Home,
   List,
-  Kanban,
   AlertTriangle,
   GitBranch,
   Settings,
@@ -32,11 +31,6 @@ const navigation = [
     name: "Clusters",
     href: "/clusters",
     icon: GitBranch,
-  },
-  {
-    name: "Board",
-    href: "/board",
-    icon: Kanban,
   },
   {
     name: "Knowledge",

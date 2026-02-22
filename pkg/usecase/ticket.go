@@ -19,6 +19,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	slacksvc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
@@ -465,76 +466,122 @@ func (uc *UseCases) UpdateTicket(ctx context.Context, ticketID types.TicketID, t
 	return uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
 }
 
-// UpdateTicketStatus updates a ticket's status
-func (uc *UseCases) UpdateTicketStatus(ctx context.Context, ticketID types.TicketID, status types.TicketStatus) (*ticket.Ticket, error) {
-	// Use batch update to ensure proper activity creation
-	if err := uc.repository.BatchUpdateTicketsStatus(ctx, []types.TicketID{ticketID}, status); err != nil {
-		return nil, goerr.Wrap(err, "failed to update ticket status")
-	}
-
-	// Get the updated ticket
-	updatedTicket, err := uc.repository.GetTicket(ctx, ticketID)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get updated ticket")
-	}
-
-	// Trace ticket status change
-	msg.Trace(ctx, "🎫 Ticket status updated: %s",
-		status)
-
-	// Update Slack post if ticket has a Slack thread
-	if err := uc.syncTicketToSlack(ctx, updatedTicket); err != nil {
-		// Log error but don't fail the update
-		msg.Trace(ctx, "💥 Failed to sync ticket to Slack (ticket %s): %s", updatedTicket.ID, err.Error())
-	}
-
-	return updatedTicket, nil
-}
-
-// UpdateTicketConclusion updates a ticket's conclusion and reason
-func (uc *UseCases) UpdateTicketConclusion(ctx context.Context, ticketID types.TicketID, conclusion types.AlertConclusion, reason string) (*ticket.Ticket, error) {
-	updateFunc := func(ctx context.Context, ticket *ticket.Ticket) error {
-		// Only allow updating conclusion for resolved tickets
-		if ticket.Status != types.TicketStatusResolved {
-			return goerr.New("can only update conclusion for resolved tickets",
+// ResolveTicket resolves a ticket with a conclusion and reason.
+// Sets Status=resolved, ResolvedAt=now, and records the conclusion/reason.
+func (uc *UseCases) ResolveTicket(ctx context.Context, ticketID types.TicketID, conclusion types.AlertConclusion, reason string) (*ticket.Ticket, error) {
+	updateFunc := func(ctx context.Context, t *ticket.Ticket) error {
+		if t.Status == types.TicketStatusResolved {
+			return goerr.New("ticket is already resolved",
 				goerr.V("ticket_id", ticketID),
-				goerr.V("current_status", ticket.Status))
+				goerr.V("current_status", t.Status),
+				goerr.T(errutil.TagInvalidState))
 		}
-
-		// Update conclusion and reason
-		ticket.Conclusion = conclusion
-		ticket.Reason = reason
+		now := clock.Now(ctx)
+		t.Status = types.TicketStatusResolved
+		t.Conclusion = conclusion
+		t.Reason = reason
+		t.ResolvedAt = &now
+		t.ArchivedAt = nil
 		return nil
 	}
 
 	return uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
 }
 
-// UpdateMultipleTicketsStatus updates multiple tickets' status
-func (uc *UseCases) UpdateMultipleTicketsStatus(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) ([]*ticket.Ticket, error) {
-	// Batch update status in repository
-	if err := uc.repository.BatchUpdateTicketsStatus(ctx, ticketIDs, status); err != nil {
-		return nil, goerr.Wrap(err, "failed to batch update tickets status")
-	}
-
-	// Retrieve updated tickets
-	tickets, err := uc.repository.BatchGetTickets(ctx, ticketIDs)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get updated tickets")
-	}
-
-	// Trace batch status update
-	msg.Trace(ctx, "🎫 Batch updated %d tickets to status %s", len(tickets), status)
-
-	// Update Slack posts for tickets that have Slack threads
-	for _, t := range tickets {
-		if err := uc.syncTicketToSlack(ctx, t); err != nil {
-			// Log error but don't fail the update
-			msg.Trace(ctx, "💥 Failed to sync ticket to Slack (ticket %s): %s", t.ID, err.Error())
+// ReopenTicket reopens a resolved or archived ticket back to open.
+// Clears ResolvedAt, ArchivedAt, Conclusion, and Reason.
+func (uc *UseCases) ReopenTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
+	updateFunc := func(ctx context.Context, t *ticket.Ticket) error {
+		if t.Status == types.TicketStatusOpen {
+			return goerr.New("ticket is already open",
+				goerr.V("ticket_id", ticketID),
+				goerr.V("current_status", t.Status),
+				goerr.T(errutil.TagInvalidState))
 		}
+		t.Status = types.TicketStatusOpen
+		t.ResolvedAt = nil
+		t.ArchivedAt = nil
+		t.Conclusion = ""
+		t.Reason = ""
+		return nil
 	}
 
-	return tickets, nil
+	return uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
+}
+
+// ArchiveTicket archives a resolved ticket.
+// Requires the ticket to be in resolved state.
+func (uc *UseCases) ArchiveTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
+	updateFunc := func(ctx context.Context, t *ticket.Ticket) error {
+		if t.Status != types.TicketStatusResolved {
+			return goerr.New("ticket must be resolved before archiving",
+				goerr.V("ticket_id", ticketID),
+				goerr.V("current_status", t.Status),
+				goerr.T(errutil.TagInvalidState))
+		}
+		now := clock.Now(ctx)
+		// Back-fill ResolvedAt for tickets resolved before this field was introduced.
+		if t.ResolvedAt == nil {
+			t.ResolvedAt = &now
+		}
+		t.Status = types.TicketStatusArchived
+		t.ArchivedAt = &now
+		return nil
+	}
+
+	return uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
+}
+
+// ArchiveTickets archives multiple resolved tickets.
+func (uc *UseCases) ArchiveTickets(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error) {
+	results := make([]*ticket.Ticket, 0, len(ticketIDs))
+	for _, id := range ticketIDs {
+		t, err := uc.ArchiveTicket(ctx, id)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to archive ticket", goerr.V("ticket_id", id))
+		}
+		results = append(results, t)
+	}
+
+	msg.Trace(ctx, "🎫 Archived %d tickets", len(results))
+	return results, nil
+}
+
+// UnarchiveTicket moves an archived ticket back to resolved state.
+// Clears ArchivedAt but preserves ResolvedAt.
+func (uc *UseCases) UnarchiveTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
+	updateFunc := func(ctx context.Context, t *ticket.Ticket) error {
+		if t.Status != types.TicketStatusArchived {
+			return goerr.New("ticket is not archived",
+				goerr.V("ticket_id", ticketID),
+				goerr.V("current_status", t.Status),
+				goerr.T(errutil.TagInvalidState))
+		}
+		t.Status = types.TicketStatusResolved
+		t.ArchivedAt = nil
+		return nil
+	}
+
+	return uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
+}
+
+// UpdateTicketConclusion updates a ticket's conclusion and reason
+func (uc *UseCases) UpdateTicketConclusion(ctx context.Context, ticketID types.TicketID, conclusion types.AlertConclusion, reason string) (*ticket.Ticket, error) {
+	updateFunc := func(ctx context.Context, t *ticket.Ticket) error {
+		// Only allow updating conclusion for resolved tickets
+		if t.Status != types.TicketStatusResolved {
+			return goerr.New("can only update conclusion for resolved tickets",
+				goerr.V("ticket_id", ticketID),
+				goerr.V("current_status", t.Status))
+		}
+
+		// Update conclusion and reason
+		t.Conclusion = conclusion
+		t.Reason = reason
+		return nil
+	}
+
+	return uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
 }
 
 // CreateTicketFromAlerts creates a ticket from one or more alerts (used by both Slack and Web UI)

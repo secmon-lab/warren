@@ -51,21 +51,18 @@ type TicketStatus string
 
 const (
 	TicketStatusOpen     TicketStatus = "open"
-	TicketStatusPending  TicketStatus = "pending"
 	TicketStatusResolved TicketStatus = "resolved"
 	TicketStatusArchived TicketStatus = "archived"
 )
 
 var ticketStatusLabels = map[TicketStatus]string{
 	TicketStatusOpen:     "🔍 Open",
-	TicketStatusPending:  "🕒 Pending",
 	TicketStatusResolved: "✅️ Resolved",
 	TicketStatusArchived: "📦 Archived",
 }
 
 var ticketStatusIcons = map[TicketStatus]string{
 	TicketStatusOpen:     "🔍",
-	TicketStatusPending:  "🕒",
 	TicketStatusResolved: "✅️",
 	TicketStatusArchived: "📦",
 }
@@ -84,7 +81,7 @@ func (s TicketStatus) Icon() string {
 
 func (s TicketStatus) Validate() error {
 	switch s {
-	case TicketStatusOpen, TicketStatusPending, TicketStatusResolved, TicketStatusArchived:
+	case TicketStatusOpen, TicketStatusResolved, TicketStatusArchived:
 		return nil
 	}
 	return goerr.New("invalid ticket Ticketstatus", goerr.V("Ticketstatus", s))

@@ -15,6 +15,8 @@ export interface Ticket {
   slackLink?: string;
   createdAt: string;
   updatedAt: string;
+  resolvedAt?: string;
+  archivedAt?: string;
   isTest: boolean;
   tags?: string[];
   tagObjects?: { id: string; name: string }[];
@@ -69,18 +71,16 @@ export interface Finding {
   recommendation: string;
 }
 
-export type TicketStatus = "open" | "pending" | "resolved" | "archived";
+export type TicketStatus = "open" | "resolved" | "archived";
 
 export const TICKET_STATUS_LABELS = {
   open: "🔍 Open",
-  pending: "🕒 Pending",
   resolved: "✅️ Resolved",
   archived: "📦 Archived",
 } as const;
 
 export const TICKET_STATUS_COLORS = {
   open: "bg-blue-100 text-blue-800",
-  pending: "bg-yellow-100 text-yellow-800",
   resolved: "bg-green-100 text-green-800",
   archived: "bg-gray-100 text-gray-800",
 } as const;

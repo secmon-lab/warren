@@ -9,8 +9,18 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Pagination,
   PaginationContent,
@@ -26,19 +36,15 @@ import {
 } from "@/components/ui/collapsible";
 import { UserWithAvatar } from "@/components/ui/user-name";
 import { ResolveInfo } from "@/components/ui/resolve-info";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useErrorToast, useSuccessToast } from "@/hooks/use-toast";
-import { useConfirm } from "@/hooks/use-confirm";
 import { TagSelector } from "@/components/ui/tag-selector";
 import {
   GET_TICKET,
   GET_TICKET_ALERTS,
-  UPDATE_TICKET_STATUS,
+  RESOLVE_TICKET,
+  REOPEN_TICKET,
+  ARCHIVE_TICKET,
+  UNARCHIVE_TICKET,
   UPDATE_TICKET_TAGS,
   GET_TAGS,
 } from "@/lib/graphql/queries";
@@ -47,6 +53,9 @@ import {
   TicketStatus,
   TICKET_STATUS_LABELS,
   TICKET_STATUS_COLORS,
+  AlertConclusion,
+  ALERT_CONCLUSION_LABELS,
+  ALERT_CONCLUSION_DESCRIPTIONS,
   Alert,
   TagMetadata,
 } from "@/lib/types";
@@ -70,6 +79,7 @@ import {
   Copy,
   Pencil,
   Tag,
+  RotateCcw,
 } from "lucide-react";
 import { EditConclusionModal } from "@/components/ui/edit-conclusion-modal";
 import { EditTicketModal } from "@/components/EditTicketModal";
@@ -92,6 +102,9 @@ export default function TicketDetailPage() {
   const [isEditConclusionModalOpen, setIsEditConclusionModalOpen] =
     useState(false);
   const [isSalvageModalOpen, setIsSalvageModalOpen] = useState(false);
+  const [isResolveModalOpen, setIsResolveModalOpen] = useState(false);
+  const [resolveConclusion, setResolveConclusion] = useState<AlertConclusion | "">("");
+  const [resolveReason, setResolveReason] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   
   // Initialize chat open state from localStorage
@@ -103,7 +116,6 @@ export default function TicketDetailPage() {
 
   const errorToast = useErrorToast();
   const successToast = useSuccessToast();
-  const confirm = useConfirm();
 
   // Handle opening chat and persisting state
   const handleStartChat = () => {
@@ -144,7 +156,16 @@ export default function TicketDetailPage() {
     }
   }, [id]);
 
-  const [updateTicketStatus] = useMutation(UPDATE_TICKET_STATUS, {
+  const [resolveTicket] = useMutation(RESOLVE_TICKET, {
+    refetchQueries: [{ query: GET_TICKET, variables: { id } }],
+  });
+  const [reopenTicket] = useMutation(REOPEN_TICKET, {
+    refetchQueries: [{ query: GET_TICKET, variables: { id } }],
+  });
+  const [archiveTicket] = useMutation(ARCHIVE_TICKET, {
+    refetchQueries: [{ query: GET_TICKET, variables: { id } }],
+  });
+  const [unarchiveTicket] = useMutation(UNARCHIVE_TICKET, {
     refetchQueries: [{ query: GET_TICKET, variables: { id } }],
   });
 
@@ -222,23 +243,44 @@ export default function TicketDetailPage() {
     setSelectedAlert(alert);
   };
 
-  const handleStatusChange = async (newStatus: TicketStatus) => {
+  const handleResolveOpen = () => {
+    setResolveConclusion("");
+    setResolveReason("");
+    setIsResolveModalOpen(true);
+  };
+
+  const handleResolveSubmit = async () => {
+    if (!ticket || !resolveConclusion) return;
+
+    setIsUpdatingStatus(true);
+    try {
+      await resolveTicket({
+        variables: {
+          id: ticket.id,
+          conclusion: resolveConclusion,
+          reason: resolveReason,
+        },
+      });
+      successToast("Ticket resolved successfully");
+      setIsResolveModalOpen(false);
+    } catch (error) {
+      console.error("Failed to resolve ticket:", error);
+      errorToast("Failed to resolve ticket");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleReopen = async () => {
     if (!ticket || isUpdatingStatus) return;
 
     setIsUpdatingStatus(true);
     try {
-      await updateTicketStatus({
-        variables: {
-          id: ticket.id,
-          status: newStatus,
-        },
-      });
-      successToast(
-        `Ticket status updated to ${TICKET_STATUS_LABELS[newStatus]}`
-      );
+      await reopenTicket({ variables: { id: ticket.id } });
+      successToast("Ticket reopened successfully");
     } catch (error) {
-      console.error("Failed to update ticket status:", error);
-      errorToast("Failed to update ticket status");
+      console.error("Failed to reopen ticket:", error);
+      errorToast("Failed to reopen ticket");
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -247,23 +289,9 @@ export default function TicketDetailPage() {
   const handleArchive = async () => {
     if (!ticket || isUpdatingStatus) return;
 
-    const confirmed = await confirm({
-      title: "Archive Ticket",
-      description: "Are you sure you want to archive this ticket?",
-      confirmText: "Archive",
-      variant: "destructive",
-    });
-
-    if (!confirmed) return;
-
     setIsUpdatingStatus(true);
     try {
-      await updateTicketStatus({
-        variables: {
-          id: ticket.id,
-          status: "archived",
-        },
-      });
+      await archiveTicket({ variables: { id: ticket.id } });
       successToast("Ticket archived successfully");
     } catch (error) {
       console.error("Failed to archive ticket:", error);
@@ -277,26 +305,13 @@ export default function TicketDetailPage() {
   const handleUnarchive = async () => {
     if (!ticket || isUpdatingStatus) return;
 
-    const confirmed = await confirm({
-      title: "Unarchive Ticket",
-      description: "Are you sure you want to unarchive this ticket?",
-      confirmText: "Unarchive",
-    });
-
-    if (!confirmed) return;
-
     setIsUpdatingStatus(true);
     try {
-      await updateTicketStatus({
-        variables: {
-          id: ticket.id,
-          status: "open",
-        },
-      });
-      successToast("Ticket restored successfully");
+      await unarchiveTicket({ variables: { id: ticket.id } });
+      successToast("Ticket unarchived successfully");
     } catch (error) {
-      console.error("Failed to restore ticket:", error);
-      errorToast("Failed to restore ticket");
+      console.error("Failed to unarchive ticket:", error);
+      errorToast("Failed to unarchive ticket");
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -833,46 +848,49 @@ export default function TicketDetailPage() {
 
               {/* Status Management */}
               <div className="space-y-2">
-                <span className="text-sm font-medium">Status</span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    className={TICKET_STATUS_COLORS[ticket.status as TicketStatus]}
+                    variant="secondary">
+                    {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
+                  </Badge>
+                </div>
+
+                {ticket.status === "open" && (
+                  <Button
+                    size="sm"
+                    onClick={handleResolveOpen}
+                    disabled={isUpdatingStatus}
+                    className="w-full">
+                    <Check className="h-4 w-4 mr-2" />
+                    Resolve
+                  </Button>
+                )}
+
+                {ticket.status === "resolved" && (
+                  <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      className="w-full justify-start"
-                      disabled={isUpdatingStatus}>
-                      <Badge
-                        className={
-                          TICKET_STATUS_COLORS[ticket.status as TicketStatus]
-                        }
-                        variant="secondary">
-                        {TICKET_STATUS_LABELS[ticket.status as TicketStatus]}
-                      </Badge>
+                      size="sm"
+                      onClick={handleReopen}
+                      disabled={isUpdatingStatus}
+                      className="flex-1">
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      Reopen
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-full">
-                    {(["open", "pending", "resolved"] as TicketStatus[]).map(
-                      (status) => (
-                        <DropdownMenuItem
-                          key={status}
-                          onClick={() => handleStatusChange(status)}
-                          disabled={ticket.status === status}>
-                          <Badge
-                            className={TICKET_STATUS_COLORS[status]}
-                            variant="secondary">
-                            {TICKET_STATUS_LABELS[status]}
-                          </Badge>
-                        </DropdownMenuItem>
-                      )
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleArchive}
+                      disabled={isUpdatingStatus}
+                      className="flex-1">
+                      <Archive className="h-4 w-4 mr-1" />
+                      Archive
+                    </Button>
+                  </div>
+                )}
 
-              <Separator />
-
-              {/* Archive/Unarchive */}
-              <div className="space-y-2">
-                {ticket.status === "archived" ? (
+                {ticket.status === "archived" && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -881,16 +899,6 @@ export default function TicketDetailPage() {
                     className="w-full">
                     <ArchiveRestore className="h-4 w-4 mr-2" />
                     Unarchive
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleArchive}
-                    disabled={isUpdatingStatus}
-                    className="w-full">
-                    <Archive className="h-4 w-4 mr-2" />
-                    Archive
                   </Button>
                 )}
               </div>
@@ -1066,6 +1074,78 @@ export default function TicketDetailPage() {
                 )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Resolve Modal */}
+      <Dialog open={isResolveModalOpen} onOpenChange={(open) => { if (!isUpdatingStatus) setIsResolveModalOpen(open); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Resolve Ticket</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <Label htmlFor="resolve-conclusion" className="text-sm font-medium">
+                Conclusion <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={resolveConclusion}
+                onValueChange={(value) => setResolveConclusion(value as AlertConclusion)}
+                disabled={isUpdatingStatus}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a conclusion..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(ALERT_CONCLUSION_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {resolveConclusion && (
+                <div className="bg-muted/50 rounded-lg p-3 border">
+                  <p className="text-sm text-muted-foreground">
+                    {ALERT_CONCLUSION_DESCRIPTIONS[resolveConclusion as AlertConclusion]}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="space-y-3">
+              <Label htmlFor="resolve-reason" className="text-sm font-medium">
+                Reason
+              </Label>
+              <Textarea
+                id="resolve-reason"
+                placeholder="Add detailed reasoning, context, or additional information..."
+                value={resolveReason}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setResolveReason(e.target.value)}
+                disabled={isUpdatingStatus}
+                rows={4}
+                className="resize-none"
+              />
+              <p className="text-xs text-muted-foreground">
+                Provide context for this conclusion to help future analysis.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsResolveModalOpen(false)}
+              disabled={isUpdatingStatus}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleResolveSubmit}
+              disabled={isUpdatingStatus || !resolveConclusion}
+              className="min-w-[80px]"
+            >
+              {isUpdatingStatus ? "Resolving..." : "Resolve"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

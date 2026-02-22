@@ -21,6 +21,8 @@ type Ticket {
   slackLink: String
   createdAt: String!
   updatedAt: String!
+  resolvedAt: String
+  archivedAt: String
   isTest: Boolean!
   tags: [String!]!
   tagObjects: [TagObject!]!
@@ -153,7 +155,7 @@ type AlertsConnection {
 
 type Query {
   ticket(id: ID!): Ticket
-  tickets(statuses: [String!], offset: Int, limit: Int): TicketsResponse!
+  tickets(statuses: [String!], keyword: String, assigneeID: String, offset: Int, limit: Int): TicketsResponse!
   similarTickets(
     ticketId: ID!
     threshold: Float!
@@ -198,8 +200,11 @@ type Query {
 }
 
 type Mutation {
-  updateTicketStatus(id: ID!, status: String!): Ticket!
-  updateMultipleTicketsStatus(ids: [ID!]!, status: String!): [Ticket!]!
+  resolveTicket(id: ID!, conclusion: String!, reason: String!): Ticket!
+  reopenTicket(id: ID!): Ticket!
+  archiveTicket(id: ID!): Ticket!
+  archiveTickets(ids: [ID!]!): [Ticket!]!
+  unarchiveTicket(id: ID!): Ticket!
   updateTicketConclusion(id: ID!, conclusion: String!, reason: String!): Ticket!
   updateTicket(id: ID!, title: String!, description: String): Ticket!
   createTicket(title: String!, description: String!, isTest: Boolean): Ticket!

@@ -190,32 +190,43 @@ func (r *knowledgeResolver) Author(ctx context.Context, obj *graphql1.Knowledge)
 	return GetUser(ctx, obj.AuthorID)
 }
 
-// UpdateTicketStatus is the resolver for the updateTicketStatus field.
-func (r *mutationResolver) UpdateTicketStatus(ctx context.Context, id string, status string) (*ticket.Ticket, error) {
-	// Validate status
-	ticketStatus := types.TicketStatus(status)
-	if err := ticketStatus.Validate(); err != nil {
-		return nil, goerr.Wrap(err, "invalid ticket status", goerr.V("status", status))
+// ResolveTicket is the resolver for the resolveTicket field.
+func (r *mutationResolver) ResolveTicket(ctx context.Context, id string, conclusion string, reason string) (*ticket.Ticket, error) {
+	alertConclusion := types.AlertConclusion(conclusion)
+	if err := alertConclusion.Validate(); err != nil {
+		return nil, goerr.Wrap(err, "invalid conclusion", goerr.V("conclusion", conclusion))
 	}
 
-	// Call the use case to update ticket status with Slack notification
-	updatedTicket, err := r.uc.UpdateTicketStatus(ctx, types.TicketID(id), ticketStatus)
+	updatedTicket, err := r.uc.ResolveTicket(ctx, types.TicketID(id), alertConclusion, reason)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to update ticket status")
+		return nil, goerr.Wrap(err, "failed to resolve ticket")
 	}
 
 	return updatedTicket, nil
 }
 
-// UpdateMultipleTicketsStatus is the resolver for the updateMultipleTicketsStatus field.
-func (r *mutationResolver) UpdateMultipleTicketsStatus(ctx context.Context, ids []string, status string) ([]*ticket.Ticket, error) {
-	// Status validation
-	ticketStatus := types.TicketStatus(status)
-	if err := ticketStatus.Validate(); err != nil {
-		return nil, goerr.Wrap(err, "invalid ticket status", goerr.V("status", status))
+// ReopenTicket is the resolver for the reopenTicket field.
+func (r *mutationResolver) ReopenTicket(ctx context.Context, id string) (*ticket.Ticket, error) {
+	updatedTicket, err := r.uc.ReopenTicket(ctx, types.TicketID(id))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to reopen ticket")
 	}
 
-	// Convert and validate ticket IDs
+	return updatedTicket, nil
+}
+
+// ArchiveTicket is the resolver for the archiveTicket field.
+func (r *mutationResolver) ArchiveTicket(ctx context.Context, id string) (*ticket.Ticket, error) {
+	updatedTicket, err := r.uc.ArchiveTicket(ctx, types.TicketID(id))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to archive ticket")
+	}
+
+	return updatedTicket, nil
+}
+
+// ArchiveTickets is the resolver for the archiveTickets field.
+func (r *mutationResolver) ArchiveTickets(ctx context.Context, ids []string) ([]*ticket.Ticket, error) {
 	ticketIDs := make([]types.TicketID, len(ids))
 	for i, id := range ids {
 		ticketID := types.TicketID(id)
@@ -225,13 +236,22 @@ func (r *mutationResolver) UpdateMultipleTicketsStatus(ctx context.Context, ids 
 		ticketIDs[i] = ticketID
 	}
 
-	// Call the use case to update multiple tickets status with Slack notification
-	tickets, err := r.uc.UpdateMultipleTicketsStatus(ctx, ticketIDs, ticketStatus)
+	tickets, err := r.uc.ArchiveTickets(ctx, ticketIDs)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to update multiple tickets status")
+		return nil, goerr.Wrap(err, "failed to archive tickets")
 	}
 
 	return tickets, nil
+}
+
+// UnarchiveTicket is the resolver for the unarchiveTicket field.
+func (r *mutationResolver) UnarchiveTicket(ctx context.Context, id string) (*ticket.Ticket, error) {
+	updatedTicket, err := r.uc.UnarchiveTicket(ctx, types.TicketID(id))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to unarchive ticket")
+	}
+
+	return updatedTicket, nil
 }
 
 // UpdateTicketConclusion is the resolver for the updateTicketConclusion field.
@@ -665,7 +685,7 @@ func (r *queryResolver) Ticket(ctx context.Context, id string) (*ticket.Ticket, 
 }
 
 // Tickets is the resolver for the tickets field.
-func (r *queryResolver) Tickets(ctx context.Context, statuses []string, offset *int, limit *int) (*graphql1.TicketsResponse, error) {
+func (r *queryResolver) Tickets(ctx context.Context, statuses []string, keyword *string, assigneeID *string, offset *int, limit *int) (*graphql1.TicketsResponse, error) {
 	var ticketStatuses []types.TicketStatus
 	for _, s := range statuses {
 		status := types.TicketStatus(s)
@@ -683,12 +703,20 @@ func (r *queryResolver) Tickets(ctx context.Context, statuses []string, offset *
 		limitVal = *limit
 	}
 
-	tickets, err := r.repo.GetTicketsByStatus(ctx, ticketStatuses, offsetVal, limitVal)
+	var keywordVal, assigneeIDVal string
+	if keyword != nil {
+		keywordVal = *keyword
+	}
+	if assigneeID != nil {
+		assigneeIDVal = *assigneeID
+	}
+
+	tickets, err := r.repo.GetTicketsByStatus(ctx, ticketStatuses, keywordVal, assigneeIDVal, offsetVal, limitVal)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list tickets")
 	}
 
-	totalCount, err := r.repo.CountTicketsByStatus(ctx, ticketStatuses)
+	totalCount, err := r.repo.CountTicketsByStatus(ctx, ticketStatuses, keywordVal, assigneeIDVal)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to count tickets")
 	}
@@ -923,12 +951,12 @@ func (r *queryResolver) UnboundAlerts(ctx context.Context, threshold *float64, k
 // Dashboard is the resolver for the dashboard field.
 func (r *queryResolver) Dashboard(ctx context.Context) (*graphql1.DashboardStats, error) {
 	// Get open tickets count and list
-	openTickets, err := r.repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 5)
+	openTickets, err := r.repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, "", "", 0, 5)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get open tickets")
 	}
 
-	openTicketsCount, err := r.repo.CountTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen})
+	openTicketsCount, err := r.repo.CountTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, "", "")
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to count open tickets")
 	}
@@ -1563,6 +1591,24 @@ func (r *ticketResolver) CreatedAt(ctx context.Context, obj *ticket.Ticket) (str
 // UpdatedAt is the resolver for the updatedAt field.
 func (r *ticketResolver) UpdatedAt(ctx context.Context, obj *ticket.Ticket) (string, error) {
 	return obj.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
+}
+
+// ResolvedAt is the resolver for the resolvedAt field.
+func (r *ticketResolver) ResolvedAt(ctx context.Context, obj *ticket.Ticket) (*string, error) {
+	if obj.ResolvedAt == nil {
+		return nil, nil
+	}
+	s := obj.ResolvedAt.Format("2006-01-02T15:04:05Z07:00")
+	return &s, nil
+}
+
+// ArchivedAt is the resolver for the archivedAt field.
+func (r *ticketResolver) ArchivedAt(ctx context.Context, obj *ticket.Ticket) (*string, error) {
+	if obj.ArchivedAt == nil {
+		return nil, nil
+	}
+	s := obj.ArchivedAt.Format("2006-01-02T15:04:05Z07:00")
+	return &s, nil
 }
 
 // Tags is the resolver for the tags field.

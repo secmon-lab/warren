@@ -105,7 +105,7 @@ func TestCreateManualTicket(t *testing.T) {
 	}))
 }
 
-func TestUpdateTicketStatus(t *testing.T) {
+func TestTicketStatusActions(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
 
@@ -128,12 +128,54 @@ func TestUpdateTicketStatus(t *testing.T) {
 	ticket, err := uc.CreateManualTicket(ctx, "Test Title", "Test Description", user)
 	gt.NoError(t, err)
 	gt.Value(t, ticket).NotNil()
+	gt.Value(t, ticket.Status).Equal(types.TicketStatusOpen)
 
-	// Test updating ticket status
-	updatedTicket, err := uc.UpdateTicketStatus(ctx, ticket.ID, types.TicketStatus("resolved"))
+	// Test resolve ticket
+	resolved, err := uc.ResolveTicket(ctx, ticket.ID, types.AlertConclusion("true_positive"), "test reason")
 	gt.NoError(t, err)
-	gt.Value(t, updatedTicket).NotNil()
-	gt.Value(t, updatedTicket.Status).Equal(types.TicketStatus("resolved"))
+	gt.Value(t, resolved).NotNil()
+	gt.Value(t, resolved.Status).Equal(types.TicketStatusResolved)
+	gt.Value(t, resolved.Conclusion).Equal(types.AlertConclusion("true_positive"))
+	gt.Value(t, resolved.Reason).Equal("test reason")
+	gt.Value(t, resolved.ResolvedAt).NotNil()
+	gt.Value(t, resolved.ArchivedAt).Nil()
+
+	// Test archive ticket (requires resolved)
+	archived, err := uc.ArchiveTicket(ctx, ticket.ID)
+	gt.NoError(t, err)
+	gt.Value(t, archived).NotNil()
+	gt.Value(t, archived.Status).Equal(types.TicketStatusArchived)
+	gt.Value(t, archived.ArchivedAt).NotNil()
+	gt.Value(t, archived.ResolvedAt).NotNil() // preserved
+
+	// Test unarchive ticket (back to resolved)
+	unarchived, err := uc.UnarchiveTicket(ctx, ticket.ID)
+	gt.NoError(t, err)
+	gt.Value(t, unarchived).NotNil()
+	gt.Value(t, unarchived.Status).Equal(types.TicketStatusResolved)
+	gt.Value(t, unarchived.ArchivedAt).Nil()
+	gt.Value(t, unarchived.ResolvedAt).NotNil() // preserved
+
+	// Test reopen ticket
+	reopened, err := uc.ReopenTicket(ctx, ticket.ID)
+	gt.NoError(t, err)
+	gt.Value(t, reopened).NotNil()
+	gt.Value(t, reopened.Status).Equal(types.TicketStatusOpen)
+	gt.Value(t, reopened.ResolvedAt).Nil()
+	gt.Value(t, reopened.ArchivedAt).Nil()
+	gt.Value(t, reopened.Conclusion).Equal(types.AlertConclusion(""))
+	gt.Value(t, reopened.Reason).Equal("")
+
+	// Test error: cannot archive open ticket
+	_, err = uc.ArchiveTicket(ctx, ticket.ID)
+	gt.Error(t, err)
+
+	// Test error: cannot resolve already-resolved ticket
+	resolved2, err := uc.ResolveTicket(ctx, ticket.ID, types.AlertConclusion("false_positive"), "")
+	gt.NoError(t, err) // First resolve is OK
+
+	_, err = uc.ResolveTicket(ctx, resolved2.ID, types.AlertConclusion("false_positive"), "")
+	gt.Error(t, err) // Second resolve should error
 }
 
 func TestUpdateTicketConclusion(t *testing.T) {
@@ -208,11 +250,12 @@ func TestUpdateTicketSlackIntegration(t *testing.T) {
 	gt.Value(t, updatedTicket.Metadata.TitleSource).Equal(types.SourceHuman)
 	gt.Value(t, updatedTicket.Metadata.DescriptionSource).Equal(types.SourceHuman)
 
-	// Test updating ticket status
-	updatedTicket, err = uc.UpdateTicketStatus(ctx, ticket.ID, types.TicketStatus("resolved"))
+	// Test resolving ticket (conclusion required)
+	updatedTicket, err = uc.ResolveTicket(ctx, ticket.ID, types.AlertConclusion("true_positive"), "Test conclusion reason")
 	gt.NoError(t, err)
 	gt.Value(t, updatedTicket).NotNil()
-	gt.Value(t, updatedTicket.Status).Equal(types.TicketStatus("resolved"))
+	gt.Value(t, updatedTicket.Status).Equal(types.TicketStatusResolved)
+	gt.Value(t, updatedTicket.ResolvedAt).NotNil()
 
 	// Test updating ticket conclusion (requires resolved status)
 	updatedTicket, err = uc.UpdateTicketConclusion(ctx, ticket.ID, types.AlertConclusion("true_positive"), "Test conclusion reason")
@@ -220,17 +263,6 @@ func TestUpdateTicketSlackIntegration(t *testing.T) {
 	gt.Value(t, updatedTicket).NotNil()
 	gt.Value(t, updatedTicket.Conclusion).Equal(types.AlertConclusion("true_positive"))
 	gt.Value(t, updatedTicket.Reason).Equal("Test conclusion reason")
-
-	// Test updating multiple tickets status
-	// Create another ticket for batch testing
-	ticket2, err := uc.CreateManualTicket(ctx, "Test Title 2", "Test Description 2", user)
-	gt.NoError(t, err)
-
-	tickets, err := uc.UpdateMultipleTicketsStatus(ctx, []types.TicketID{ticket.ID, ticket2.ID}, types.TicketStatus("open"))
-	gt.NoError(t, err)
-	gt.Array(t, tickets).Length(2)
-	gt.Value(t, tickets[0].Status).Equal(types.TicketStatus("open"))
-	gt.Value(t, tickets[1].Status).Equal(types.TicketStatus("open"))
 }
 
 func TestCreateTicketFromAlerts(t *testing.T) {

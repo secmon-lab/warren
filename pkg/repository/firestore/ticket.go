@@ -2,6 +2,8 @@ package firestore
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -38,6 +40,7 @@ func (r *Firestore) GetTicket(ctx context.Context, ticketID types.TicketID) (*ti
 			goerr.T(errutil.TagInternal))
 	}
 
+	t.NormalizeLegacyStatus()
 	return &t, nil
 }
 
@@ -264,6 +267,7 @@ func (r *Firestore) GetTicketByThread(ctx context.Context, thread slack.Thread) 
 		return nil, goerr.Wrap(err, "failed to convert data to ticket")
 	}
 
+	t.NormalizeLegacyStatus()
 	return &t, nil
 }
 
@@ -291,6 +295,7 @@ func (r *Firestore) BatchGetTickets(ctx context.Context, ticketIDs []types.Ticke
 			return nil, goerr.Wrap(err, "failed to convert data to ticket", goerr.V("doc.ref.id", doc.Ref.ID))
 		}
 
+		t.NormalizeLegacyStatus()
 		tickets = append(tickets, &t)
 	}
 
@@ -327,6 +332,7 @@ func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32,
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
 		}
 
+		t.NormalizeLegacyStatus()
 		// Only add tickets that have embeddings
 		if len(t.Embedding) > 0 {
 			tickets = append(tickets, &t)
@@ -336,28 +342,100 @@ func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32,
 	return tickets, nil
 }
 
-func (r *Firestore) GetTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, offset, limit int) ([]*ticket.Ticket, error) {
-	// If no statuses specified, query all tickets
-	var query firestore.Query
+// fetchAllTicketsByStatus retrieves all tickets matching the given statuses from Firestore
+// without applying offset/limit (used when Go-side filtering is needed).
+func (r *Firestore) fetchAllTicketsByStatus(ctx context.Context, statuses []types.TicketStatus) ([]*ticket.Ticket, error) {
+	var q firestore.Query
 	if len(statuses) > 0 {
-		// Use "in" operator to match any of the specified statuses
-		query = r.db.Collection(collectionTickets).Where("Status", "in", statuses)
+		q = r.db.Collection(collectionTickets).Where("Status", "in", statuses)
 	} else {
-		query = r.db.Collection(collectionTickets).Query
+		q = r.db.Collection(collectionTickets).Query
+	}
+	q = q.OrderBy("CreatedAt", firestore.Desc)
+
+	var tickets []*ticket.Ticket
+	iter := q.Documents(ctx)
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to get ticket documents")
+		}
+		var t ticket.Ticket
+		if err := doc.DataTo(&t); err != nil {
+			return nil, goerr.Wrap(err, "failed to convert data to ticket")
+		}
+		t.NormalizeLegacyStatus()
+		tickets = append(tickets, &t)
+	}
+	return tickets, nil
+}
+
+func filterTickets(tickets []*ticket.Ticket, keyword, assigneeID string) []*ticket.Ticket {
+	if keyword == "" && assigneeID == "" {
+		return tickets
+	}
+	kw := strings.ToLower(keyword)
+	var result []*ticket.Ticket
+	for _, t := range tickets {
+		if assigneeID != "" {
+			if t.Assignee == nil || string(t.Assignee.ID) != assigneeID {
+				continue
+			}
+		}
+		if kw != "" {
+			if !strings.Contains(strings.ToLower(t.Title), kw) &&
+				!strings.Contains(strings.ToLower(t.Description), kw) {
+				continue
+			}
+		}
+		result = append(result, t)
+	}
+	return result
+}
+
+func (r *Firestore) GetTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, keyword, assigneeID string, offset, limit int) ([]*ticket.Ticket, error) {
+	// When extra filters are needed, fetch all matching tickets and filter in Go.
+	if keyword != "" || assigneeID != "" {
+		all, err := r.fetchAllTicketsByStatus(ctx, statuses)
+		if err != nil {
+			return nil, err
+		}
+		filtered := filterTickets(all, keyword, assigneeID)
+		sort.Slice(filtered, func(i, j int) bool {
+			return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
+		})
+		if offset > 0 {
+			if offset >= len(filtered) {
+				return []*ticket.Ticket{}, nil
+			}
+			filtered = filtered[offset:]
+		}
+		if limit > 0 && limit < len(filtered) {
+			filtered = filtered[:limit]
+		}
+		return filtered, nil
 	}
 
-	// Order by CreatedAt in descending order (newest first)
-	query = query.OrderBy("CreatedAt", firestore.Desc)
-
+	// Fast path: delegate offset/limit to Firestore.
+	var q firestore.Query
+	if len(statuses) > 0 {
+		q = r.db.Collection(collectionTickets).Where("Status", "in", statuses)
+	} else {
+		q = r.db.Collection(collectionTickets).Query
+	}
+	q = q.OrderBy("CreatedAt", firestore.Desc)
 	if offset > 0 {
-		query = query.Offset(offset)
+		q = q.Offset(offset)
 	}
 	if limit > 0 {
-		query = query.Limit(limit)
+		q = q.Limit(limit)
 	}
 
 	var tickets []*ticket.Ticket
-	iter := query.Documents(ctx)
+	iter := q.Documents(ctx)
 	for {
 		doc, err := iter.Next()
 		if err != nil {
@@ -366,35 +444,38 @@ func (r *Firestore) GetTicketsByStatus(ctx context.Context, statuses []types.Tic
 			}
 			return nil, goerr.Wrap(err, "failed to get offset documents")
 		}
-
 		var t ticket.Ticket
 		if err := doc.DataTo(&t); err != nil {
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
 		}
-
+		t.NormalizeLegacyStatus()
 		tickets = append(tickets, &t)
 	}
-
 	return tickets, nil
 }
 
-func (r *Firestore) CountTicketsByStatus(ctx context.Context, statuses []types.TicketStatus) (int, error) {
-	// If no statuses specified, count all tickets
-	var query firestore.Query
-	if len(statuses) > 0 {
-		// Use "in" operator to match any of the specified statuses
-		query = r.db.Collection(collectionTickets).Where("Status", "in", statuses)
-	} else {
-		query = r.db.Collection(collectionTickets).Query
+func (r *Firestore) CountTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, keyword, assigneeID string) (int, error) {
+	// When extra filters are needed, fetch all and count in Go.
+	if keyword != "" || assigneeID != "" {
+		all, err := r.fetchAllTicketsByStatus(ctx, statuses)
+		if err != nil {
+			return 0, err
+		}
+		return len(filterTickets(all, keyword, assigneeID)), nil
 	}
 
-	// Use the count aggregation query for efficiency
-	countQuery := query.NewAggregationQuery().WithCount("count")
+	// Fast path: use Firestore aggregation.
+	var q firestore.Query
+	if len(statuses) > 0 {
+		q = r.db.Collection(collectionTickets).Where("Status", "in", statuses)
+	} else {
+		q = r.db.Collection(collectionTickets).Query
+	}
+	countQuery := q.NewAggregationQuery().WithCount("count")
 	result, err := countQuery.Get(ctx)
 	if err != nil {
 		return 0, goerr.Wrap(err, "failed to get ticket count")
 	}
-
 	return extractCountFromAggregationResult(result, "count")
 }
 
@@ -420,6 +501,7 @@ func (r *Firestore) GetTicketsBySpan(ctx context.Context, begin, end time.Time) 
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
 		}
 
+		t.NormalizeLegacyStatus()
 		tickets = append(tickets, &t)
 	}
 
@@ -445,6 +527,7 @@ func (r *Firestore) GetTicketsWithInvalidEmbedding(ctx context.Context) ([]*tick
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
 		}
 
+		t.NormalizeLegacyStatus()
 		// Check if embedding is invalid (nil, empty, or zero vector)
 		if isInvalidEmbedding(t.Embedding) {
 			tickets = append(tickets, &t)
@@ -482,6 +565,7 @@ func (r *Firestore) FindNearestTicketsWithSpan(ctx context.Context, embedding []
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
 		}
 
+		t.NormalizeLegacyStatus()
 		tickets = append(tickets, &t)
 	}
 
@@ -519,6 +603,7 @@ func (r *Firestore) GetTicketsByStatusAndSpan(ctx context.Context, status types.
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
 		}
 
+		t.NormalizeLegacyStatus()
 		tickets = append(tickets, &t)
 	}
 
@@ -665,6 +750,7 @@ func (r *Firestore) QueryTickets(ctx context.Context, query string, offset, limi
 			return nil, goerr.Wrap(err, "failed to convert data to ticket")
 		}
 
+		t.NormalizeLegacyStatus()
 		tickets = append(tickets, &t)
 	}
 
@@ -676,5 +762,5 @@ func (r *Firestore) GetTicketsByIDs(ctx context.Context, ticketIDs []types.Ticke
 }
 
 func (r *Firestore) GetAllTickets(ctx context.Context, offset, limit int) ([]*ticket.Ticket, error) {
-	return r.GetTicketsByStatus(ctx, nil, offset, limit)
+	return r.GetTicketsByStatus(ctx, nil, "", "", offset, limit)
 }

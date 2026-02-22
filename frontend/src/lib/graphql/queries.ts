@@ -1,8 +1,8 @@
 import { gql } from "@apollo/client";
 
 export const GET_TICKETS = gql`
-  query GetTickets($statuses: [String!], $offset: Int, $limit: Int) {
-    tickets(statuses: $statuses, offset: $offset, limit: $limit) {
+  query GetTickets($statuses: [String!], $keyword: String, $assigneeID: String, $offset: Int, $limit: Int) {
+    tickets(statuses: $statuses, keyword: $keyword, assigneeID: $assigneeID, offset: $offset, limit: $limit) {
       tickets {
         id
         status
@@ -248,13 +248,16 @@ export const GET_TICKET_COMMENTS = gql`
   }
 `;
 
-export const UPDATE_TICKET_STATUS = gql`
-  mutation UpdateTicketStatus($id: ID!, $status: String!) {
-    updateTicketStatus(id: $id, status: $status) {
+export const RESOLVE_TICKET = gql`
+  mutation ResolveTicket($id: ID!, $conclusion: String!, $reason: String!) {
+    resolveTicket(id: $id, conclusion: $conclusion, reason: $reason) {
       id
       status
       title
       description
+      conclusion
+      reason
+      resolvedAt
       isTest
       assignee {
         id
@@ -266,13 +269,77 @@ export const UPDATE_TICKET_STATUS = gql`
   }
 `;
 
-export const UPDATE_MULTIPLE_TICKETS_STATUS = gql`
-  mutation UpdateMultipleTicketsStatus($ids: [ID!]!, $status: String!) {
-    updateMultipleTicketsStatus(ids: $ids, status: $status) {
+export const REOPEN_TICKET = gql`
+  mutation ReopenTicket($id: ID!) {
+    reopenTicket(id: $id) {
       id
       status
       title
       description
+      conclusion
+      reason
+      resolvedAt
+      archivedAt
+      isTest
+      assignee {
+        id
+        name
+      }
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const ARCHIVE_TICKET = gql`
+  mutation ArchiveTicket($id: ID!) {
+    archiveTicket(id: $id) {
+      id
+      status
+      title
+      description
+      resolvedAt
+      archivedAt
+      isTest
+      assignee {
+        id
+        name
+      }
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const ARCHIVE_TICKETS = gql`
+  mutation ArchiveTickets($ids: [ID!]!) {
+    archiveTickets(ids: $ids) {
+      id
+      status
+      title
+      description
+      resolvedAt
+      archivedAt
+      isTest
+      assignee {
+        id
+        name
+      }
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const UNARCHIVE_TICKET = gql`
+  mutation UnarchiveTicket($id: ID!) {
+    unarchiveTicket(id: $id) {
+      id
+      status
+      title
+      description
+      resolvedAt
+      archivedAt
       isTest
       assignee {
         id
