@@ -2,7 +2,6 @@ package firestore
 
 import (
 	"context"
-	"sort"
 	"strings"
 	"time"
 
@@ -342,17 +341,44 @@ func (r *Firestore) FindNearestTickets(ctx context.Context, embedding []float32,
 	return tickets, nil
 }
 
-// fetchAllTicketsByStatus retrieves all tickets matching the given statuses from Firestore
-// without applying offset/limit (used when Go-side filtering is needed).
-func (r *Firestore) fetchAllTicketsByStatus(ctx context.Context, statuses []types.TicketStatus) ([]*ticket.Ticket, error) {
+// buildTicketBaseQuery builds a Firestore query filtered by statuses and assigneeID.
+// Composite index required when both status and Assignee.ID are specified:
+//
+//	Collection: tickets, Fields: Status (ASC), Assignee.ID (ASC), CreatedAt (DESC)
+func (r *Firestore) buildTicketBaseQuery(statuses []types.TicketStatus, assigneeID string) firestore.Query {
 	var q firestore.Query
 	if len(statuses) > 0 {
 		q = r.db.Collection(collectionTickets).Where("Status", "in", statuses)
 	} else {
 		q = r.db.Collection(collectionTickets).Query
 	}
-	q = q.OrderBy("CreatedAt", firestore.Desc)
+	if assigneeID != "" {
+		q = q.Where("Assignee.ID", "==", assigneeID)
+	}
+	return q
+}
 
+// filterTicketsByKeyword filters tickets in-memory by keyword (title or description).
+// This is only needed for keyword search since Firestore does not support
+// full-text CONTAINS queries natively.
+func filterTicketsByKeyword(tickets []*ticket.Ticket, keyword string) []*ticket.Ticket {
+	if keyword == "" {
+		return tickets
+	}
+	kw := strings.ToLower(keyword)
+	var result []*ticket.Ticket
+	for _, t := range tickets {
+		if strings.Contains(strings.ToLower(t.Title), kw) ||
+			strings.Contains(strings.ToLower(t.Description), kw) {
+			result = append(result, t)
+		}
+	}
+	return result
+}
+
+// fetchAllByQuery retrieves all documents for the given query without offset/limit.
+func (r *Firestore) fetchAllByQuery(ctx context.Context, q firestore.Query) ([]*ticket.Ticket, error) {
+	q = q.OrderBy("CreatedAt", firestore.Desc)
 	var tickets []*ticket.Ticket
 	iter := q.Documents(ctx)
 	for {
@@ -373,40 +399,16 @@ func (r *Firestore) fetchAllTicketsByStatus(ctx context.Context, statuses []type
 	return tickets, nil
 }
 
-func filterTickets(tickets []*ticket.Ticket, keyword, assigneeID string) []*ticket.Ticket {
-	if keyword == "" && assigneeID == "" {
-		return tickets
-	}
-	kw := strings.ToLower(keyword)
-	var result []*ticket.Ticket
-	for _, t := range tickets {
-		if assigneeID != "" {
-			if t.Assignee == nil || string(t.Assignee.ID) != assigneeID {
-				continue
-			}
-		}
-		if kw != "" {
-			if !strings.Contains(strings.ToLower(t.Title), kw) &&
-				!strings.Contains(strings.ToLower(t.Description), kw) {
-				continue
-			}
-		}
-		result = append(result, t)
-	}
-	return result
-}
-
 func (r *Firestore) GetTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, keyword, assigneeID string, offset, limit int) ([]*ticket.Ticket, error) {
-	// When extra filters are needed, fetch all matching tickets and filter in Go.
-	if keyword != "" || assigneeID != "" {
-		all, err := r.fetchAllTicketsByStatus(ctx, statuses)
+	q := r.buildTicketBaseQuery(statuses, assigneeID)
+
+	// keyword requires Go-side filtering: fetch all DB-filtered docs first.
+	if keyword != "" {
+		all, err := r.fetchAllByQuery(ctx, q)
 		if err != nil {
 			return nil, err
 		}
-		filtered := filterTickets(all, keyword, assigneeID)
-		sort.Slice(filtered, func(i, j int) bool {
-			return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
-		})
+		filtered := filterTicketsByKeyword(all, keyword)
 		if offset > 0 {
 			if offset >= len(filtered) {
 				return []*ticket.Ticket{}, nil
@@ -419,13 +421,7 @@ func (r *Firestore) GetTicketsByStatus(ctx context.Context, statuses []types.Tic
 		return filtered, nil
 	}
 
-	// Fast path: delegate offset/limit to Firestore.
-	var q firestore.Query
-	if len(statuses) > 0 {
-		q = r.db.Collection(collectionTickets).Where("Status", "in", statuses)
-	} else {
-		q = r.db.Collection(collectionTickets).Query
-	}
+	// Fast path: push ordering and pagination entirely to Firestore.
 	q = q.OrderBy("CreatedAt", firestore.Desc)
 	if offset > 0 {
 		q = q.Offset(offset)
@@ -455,22 +451,18 @@ func (r *Firestore) GetTicketsByStatus(ctx context.Context, statuses []types.Tic
 }
 
 func (r *Firestore) CountTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, keyword, assigneeID string) (int, error) {
-	// When extra filters are needed, fetch all and count in Go.
-	if keyword != "" || assigneeID != "" {
-		all, err := r.fetchAllTicketsByStatus(ctx, statuses)
+	q := r.buildTicketBaseQuery(statuses, assigneeID)
+
+	// keyword requires Go-side counting.
+	if keyword != "" {
+		all, err := r.fetchAllByQuery(ctx, q)
 		if err != nil {
 			return 0, err
 		}
-		return len(filterTickets(all, keyword, assigneeID)), nil
+		return len(filterTicketsByKeyword(all, keyword)), nil
 	}
 
 	// Fast path: use Firestore aggregation.
-	var q firestore.Query
-	if len(statuses) > 0 {
-		q = r.db.Collection(collectionTickets).Where("Status", "in", statuses)
-	} else {
-		q = r.db.Collection(collectionTickets).Query
-	}
 	countQuery := q.NewAggregationQuery().WithCount("count")
 	result, err := countQuery.Get(ctx)
 	if err != nil {
