@@ -39,8 +39,7 @@ type UseCases struct {
 	traceRepository trace.Repository
 
 	// use cases
-	ClusteringUC *ClusteringUseCase
-	TagUC        *TagUseCase
+	TagUC *TagUseCase
 
 	// configs
 	timeSpan        time.Duration
@@ -207,9 +206,6 @@ func New(opts ...Option) *UseCases {
 	if u.consoleNotifier == nil {
 		u.consoleNotifier = notifier.NewConsoleNotifier()
 	}
-
-	// Initialize clustering use case
-	u.ClusteringUC = NewClusteringUseCase(u.repository)
 
 	// Initialize tag use case if tag service is available
 	if u.tagService != nil {

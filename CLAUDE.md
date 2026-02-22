@@ -119,14 +119,6 @@ The application follows Domain-Driven Design (DDD) with clean architecture:
 - In-memory storage for testing/development
 - `pkg/repository/` - Repository pattern implementations
 
-#### Alert Clustering
-- `pkg/domain/service/clustering/` - DBSCAN clustering algorithm implementation
-- `pkg/usecase/clustering.go` - Clustering use case with caching
-- Uses cosine distance on alert embeddings for similarity
-- Configurable DBSCAN parameters (eps, minSamples)
-- WebUI at `/clusters` for visualizing and managing alert clusters
-- Supports creating tickets from clusters and binding clusters to existing tickets
-
 #### Agent Memory Scoring (Experimental)
 - `pkg/service/memory/scoring.go` - Quality-based memory ranking and pruning
 - `pkg/service/memory/feedback.go` - LLM-based feedback collection
@@ -166,7 +158,6 @@ The application follows Domain-Driven Design (DDD) with clean architecture:
 - `interfaces.PolicyClient` - Policy evaluation using OPA
 - `interfaces.StorageClient` - Cloud storage abstraction
 - `interfaces.Notifier` - Event notification abstraction for alert pipeline events
-- `clustering.Service` - Alert clustering service interface
 
 #### Event Notification System
 The alert processing pipeline uses an event-driven notification pattern:

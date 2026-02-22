@@ -12,7 +12,6 @@ import TicketsPage from "@/pages/TicketsPage";
 import TicketDetailPage from "@/pages/TicketDetailPage";
 import AlertsPage from "@/pages/AlertsPage";
 import AlertDetailPage from "@/pages/AlertDetailPage";
-import ClusteringPage from "@/pages/ClusteringPage";
 import KnowledgePage from "@/pages/KnowledgePage";
 import KnowledgeTopicPage from "@/pages/KnowledgeTopicPage";
 import SessionDetailPage from "@/pages/SessionDetailPage";
@@ -31,7 +30,6 @@ function AuthenticatedApp() {
         <Route path="/tickets/:id" element={<TicketDetailPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/alerts/:id" element={<AlertDetailPage />} />
-        <Route path="/clusters" element={<ClusteringPage />} />
         <Route path="/knowledge" element={<KnowledgePage />} />
         <Route path="/knowledge/:topic" element={<KnowledgeTopicPage />} />
         <Route path="/sessions/:id" element={<SessionDetailPage />} />

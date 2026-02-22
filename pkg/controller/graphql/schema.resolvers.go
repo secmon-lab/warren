@@ -21,8 +21,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/service/clustering"
-	"github.com/secmon-lab/warren/pkg/usecase"
 )
 
 // User is the resolver for the user field.
@@ -1057,105 +1055,6 @@ func (r *queryResolver) Activities(ctx context.Context, offset *int, limit *int)
 
 	return &graphql1.ActivitiesResponse{
 		Activities: graphqlActivities,
-		TotalCount: totalCount,
-	}, nil
-}
-
-// AlertClusters is the resolver for the alertClusters field.
-func (r *queryResolver) AlertClusters(ctx context.Context, limit *int, offset *int, minClusterSize *int, eps *float64, minSamples *int, keyword *string) (*graphql1.ClusteringSummary, error) {
-	// Authentication check
-	token, err := auth.TokenFromContext(ctx)
-	if err != nil {
-		return nil, goerr.Wrap(err, "authentication required")
-	}
-	_ = token // For now, just check authentication
-
-	// Set default values
-	l := 50
-	if limit != nil {
-		l = *limit
-	}
-	o := 0
-	if offset != nil {
-		o = *offset
-	}
-	mcs := 1
-	if minClusterSize != nil {
-		mcs = *minClusterSize
-	}
-
-	// Set DBSCAN parameters with defaults
-	epsVal := 0.15 // Default adjusted for cosine distance
-	if eps != nil {
-		epsVal = *eps
-	}
-	minSamplesVal := 2
-	if minSamples != nil {
-		minSamplesVal = *minSamples
-	}
-
-	// Get keyword if provided
-	kw := ""
-	if keyword != nil {
-		kw = *keyword
-	}
-
-	// Call clustering use case
-	params := usecase.GetClustersParams{
-		MinClusterSize: mcs,
-		Limit:          l,
-		Offset:         o,
-		Keyword:        kw,
-		DBSCANParams: clustering.DBSCANParams{
-			Eps:        epsVal,
-			MinSamples: minSamplesVal,
-		},
-	}
-
-	summary, err := r.uc.ClusteringUC.GetAlertClusters(ctx, params)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get alert clusters")
-	}
-
-	// Convert to GraphQL model
-	result, err := r.convertToGraphQLClusteringSummary(ctx, summary)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to convert clustering summary")
-	}
-	return result, nil
-}
-
-// ClusterAlerts is the resolver for the clusterAlerts field.
-func (r *queryResolver) ClusterAlerts(ctx context.Context, clusterID string, keyword *string, limit *int, offset *int) (*graphql1.AlertsConnection, error) {
-	// Authentication check
-	token, err := auth.TokenFromContext(ctx)
-	if err != nil {
-		return nil, goerr.Wrap(err, "authentication required")
-	}
-	_ = token
-
-	// Set default values
-	l := 50
-	if limit != nil {
-		l = *limit
-	}
-	o := 0
-	if offset != nil {
-		o = *offset
-	}
-	kw := ""
-	if keyword != nil {
-		kw = *keyword
-	}
-
-	// Call clustering use case
-	alerts, totalCount, err := r.uc.ClusteringUC.GetClusterAlerts(ctx, clusterID, kw, l, o)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get cluster alerts")
-	}
-
-	return &graphql1.AlertsConnection{
-		Alerts:     alerts,
 		TotalCount: totalCount,
 	}, nil
 }
