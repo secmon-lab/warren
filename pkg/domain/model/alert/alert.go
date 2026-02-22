@@ -234,6 +234,10 @@ func CosineSimilarity(a, b []float32) float64 {
 		magnitudeB += float64(b[i]) * float64(b[i])
 	}
 
+	if magnitudeA == 0 || magnitudeB == 0 {
+		return 0
+	}
+
 	return dotProduct / (math.Sqrt(magnitudeA) * math.Sqrt(magnitudeB))
 }
 
@@ -249,6 +253,10 @@ func (x *Alert) CosineSimilarity(other []float32) float64 {
 		dotProduct += float64(x.Embedding[i]) * float64(other[i])
 		magnitudeA += float64(x.Embedding[i]) * float64(x.Embedding[i])
 		magnitudeB += float64(other[i]) * float64(other[i])
+	}
+
+	if magnitudeA == 0 || magnitudeB == 0 {
+		return 0
 	}
 
 	return dotProduct / (math.Sqrt(magnitudeA) * math.Sqrt(magnitudeB))
