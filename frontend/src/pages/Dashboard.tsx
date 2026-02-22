@@ -151,8 +151,8 @@ export default function Dashboard() {
         {/* Left Section - Tickets and Alerts */}
         <div className="lg:col-span-2 space-y-6">
           {/* Open Tickets Section */}
-          <Card>
-            <CardHeader className="pb-4">
+          <Card className="gap-2">
+            <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Ticket className="h-5 w-5 text-blue-600" />
@@ -219,8 +219,8 @@ export default function Dashboard() {
           </Card>
 
           {/* New Alerts Section */}
-          <Card>
-            <CardHeader className="pb-4">
+          <Card className="gap-2">
+            <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <AlertTriangle className="h-5 w-5 text-amber-600" />
@@ -281,8 +281,8 @@ export default function Dashboard() {
 
         {/* Right Section - Activity Feed */}
         <div className="lg:col-span-1">
-          <Card className="h-full">
-            <CardHeader className="pb-4">
+          <Card className="h-full gap-2">
+            <CardHeader>
               <div className="flex items-center gap-3">
                 <Activity className="h-5 w-5 text-muted-foreground" />
                 <CardTitle className="text-lg font-semibold">Activity Feed</CardTitle>
