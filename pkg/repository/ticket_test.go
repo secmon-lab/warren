@@ -451,7 +451,7 @@ func TestGetTicketsByStatus(t *testing.T) {
 			},
 			{
 				ID:        types.NewTicketID(),
-				Status:    types.TicketStatusPending,
+				Status:    types.TicketStatusArchived,
 				CreatedAt: time.Date(2024, 1, 1, 11, 0, 0, 0, time.UTC),
 				SlackThread: &slack.Thread{
 					ChannelID: thread.ChannelID,
@@ -477,15 +477,15 @@ func TestGetTicketsByStatus(t *testing.T) {
 		}
 
 		t.Run("investigating tickets", func(t *testing.T) {
-			result, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 0)
+			result, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, "", "", 0, 0)
 			gt.NoError(t, err)
 			filtered := filterByIDs(result, []types.TicketID{tickets[0].ID})
 			gt.Array(t, filtered).Length(1)
 			gt.Value(t, filtered[0].ID).Equal(tickets[0].ID)
 		})
 
-		t.Run("pending tickets", func(t *testing.T) {
-			result, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusPending}, 0, 0)
+		t.Run("archived tickets", func(t *testing.T) {
+			result, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusArchived}, "", "", 0, 0)
 			gt.NoError(t, err)
 			filtered := filterByIDs(result, []types.TicketID{tickets[1].ID})
 			gt.Array(t, filtered).Length(1)
@@ -493,7 +493,7 @@ func TestGetTicketsByStatus(t *testing.T) {
 		})
 
 		t.Run("resolved tickets", func(t *testing.T) {
-			result, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusResolved}, 0, 0)
+			result, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusResolved}, "", "", 0, 0)
 			gt.NoError(t, err)
 			filtered := filterByIDs(result, []types.TicketID{tickets[2].ID})
 			gt.Array(t, filtered).Length(1)
@@ -503,31 +503,31 @@ func TestGetTicketsByStatus(t *testing.T) {
 		t.Run("multiple statuses", func(t *testing.T) {
 			result, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{
 				types.TicketStatusOpen,
-				types.TicketStatusPending,
-			}, 0, 0)
+				types.TicketStatusArchived,
+			}, "", "", 0, 0)
 			gt.NoError(t, err)
 			filtered := filterByIDs(result, []types.TicketID{tickets[0].ID, tickets[1].ID})
 			gt.Array(t, filtered).Length(2)
 		})
 
 		t.Run("all tickets", func(t *testing.T) {
-			result, err := repo.GetTicketsByStatus(ctx, nil, 0, 0)
+			result, err := repo.GetTicketsByStatus(ctx, nil, "", "", 0, 0)
 			gt.NoError(t, err)
 			filtered := filterByIDs(result, []types.TicketID{tickets[0].ID, tickets[1].ID, tickets[2].ID})
 			gt.Array(t, filtered).Length(3)
 		})
 
 		t.Run("with limit", func(t *testing.T) {
-			result, err := repo.GetTicketsByStatus(ctx, nil, 0, 2)
+			result, err := repo.GetTicketsByStatus(ctx, nil, "", "", 0, 2)
 			gt.NoError(t, err)
 			gt.Array(t, result).Length(2)
 		})
 
 		t.Run("with offset", func(t *testing.T) {
-			result1, err := repo.GetTicketsByStatus(ctx, nil, 1, 0)
+			result1, err := repo.GetTicketsByStatus(ctx, nil, "", "", 1, 0)
 			gt.NoError(t, err)
 			gt.Array(t, result1).Longer(0)
-			result2, err := repo.GetTicketsByStatus(ctx, nil, 2, 0)
+			result2, err := repo.GetTicketsByStatus(ctx, nil, "", "", 2, 0)
 			gt.NoError(t, err)
 			gt.Array(t, result2).Longer(0)
 			gt.Array(t, result2).All(func(v *ticketmodel.Ticket) bool {
@@ -536,7 +536,7 @@ func TestGetTicketsByStatus(t *testing.T) {
 		})
 
 		t.Run("with offset and limit", func(t *testing.T) {
-			result, err := repo.GetTicketsByStatus(ctx, nil, 1, 1)
+			result, err := repo.GetTicketsByStatus(ctx, nil, "", "", 1, 1)
 			gt.NoError(t, err)
 			gt.Array(t, result).Length(1)
 		})
@@ -581,7 +581,7 @@ func TestGetTicketsBySpan(t *testing.T) {
 			},
 			{
 				ID:        types.NewTicketID(),
-				Status:    types.TicketStatusPending,
+				Status:    types.TicketStatusArchived,
 				CreatedAt: time.Date(2024, 1, 1, 11, 0, 0, 0, time.UTC),
 				SlackThread: &slack.Thread{
 					ChannelID: thread.ChannelID,
@@ -855,7 +855,7 @@ func TestCountTicketsByStatus(t *testing.T) {
 			},
 			{
 				ID:        types.NewTicketID(),
-				Status:    types.TicketStatusPending,
+				Status:    types.TicketStatusArchived,
 				CreatedAt: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
 				SlackThread: &slack.Thread{
 					ChannelID: thread.ChannelID,
@@ -881,19 +881,19 @@ func TestCountTicketsByStatus(t *testing.T) {
 		}
 
 		t.Run("count open tickets", func(t *testing.T) {
-			count, err := repo.CountTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen})
+			count, err := repo.CountTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, "", "")
 			gt.NoError(t, err)
 			gt.Number(t, count).GreaterOrEqual(0) // Should return at least 0 (may have existing data in Firestore)
 		})
 
 		t.Run("count pending tickets", func(t *testing.T) {
-			count, err := repo.CountTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusPending})
+			count, err := repo.CountTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusArchived}, "", "")
 			gt.NoError(t, err)
 			gt.Number(t, count).GreaterOrEqual(0) // Should return at least 0 (may have existing data in Firestore)
 		})
 
 		t.Run("count resolved tickets", func(t *testing.T) {
-			count, err := repo.CountTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusResolved})
+			count, err := repo.CountTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusResolved}, "", "")
 			gt.NoError(t, err)
 			gt.Number(t, count).GreaterOrEqual(0) // Should return at least 0 (may have existing data in Firestore)
 		})
@@ -901,14 +901,14 @@ func TestCountTicketsByStatus(t *testing.T) {
 		t.Run("count multiple statuses", func(t *testing.T) {
 			count, err := repo.CountTicketsByStatus(ctx, []types.TicketStatus{
 				types.TicketStatusOpen,
-				types.TicketStatusPending,
-			})
+				types.TicketStatusArchived,
+			}, "", "")
 			gt.NoError(t, err)
 			gt.Number(t, count).GreaterOrEqual(0) // Should return at least 0 (may have existing data in Firestore)
 		})
 
 		t.Run("count all tickets", func(t *testing.T) {
-			count, err := repo.CountTicketsByStatus(ctx, nil)
+			count, err := repo.CountTicketsByStatus(ctx, nil, "", "")
 			gt.NoError(t, err)
 			gt.Number(t, count).GreaterOrEqual(0) // Should return at least 0 (may have existing data in Firestore)
 		})

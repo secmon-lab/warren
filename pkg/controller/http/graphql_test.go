@@ -328,7 +328,7 @@ func setupGraphQLTestData(t *testing.T) *repository.Memory {
 	}
 	ticket2 := ticket.Ticket{
 		ID:        ticketID2,
-		Status:    types.TicketStatusPending,
+		Status:    types.TicketStatusOpen,
 		CreatedAt: time.Now(),
 		Metadata: ticket.Metadata{
 			Title: "Test Ticket 2",

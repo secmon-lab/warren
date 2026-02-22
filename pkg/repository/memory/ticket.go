@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -308,26 +309,43 @@ func (r *Memory) FindNearestTickets(ctx context.Context, embedding []float32, li
 	return tickets, nil
 }
 
-func (r *Memory) GetTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, offset, limit int) ([]*ticket.Ticket, error) {
+func ticketMatchesFilter(t *ticket.Ticket, statuses []types.TicketStatus, keyword, assigneeID string) bool {
+	if len(statuses) > 0 {
+		matched := false
+		for _, status := range statuses {
+			if t.Status == status {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	if assigneeID != "" {
+		if t.Assignee == nil || string(t.Assignee.ID) != assigneeID {
+			return false
+		}
+	}
+	if keyword != "" {
+		kw := strings.ToLower(keyword)
+		if !strings.Contains(strings.ToLower(t.Title), kw) &&
+			!strings.Contains(strings.ToLower(t.Description), kw) {
+			return false
+		}
+	}
+	return true
+}
+
+func (r *Memory) GetTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, keyword, assigneeID string, offset, limit int) ([]*ticket.Ticket, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	var tickets []*ticket.Ticket
 	for _, t := range r.tickets {
-		// Filter by status if specified
-		if len(statuses) > 0 {
-			matched := false
-			for _, status := range statuses {
-				if t.Status == status {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				continue
-			}
+		if ticketMatchesFilter(t, statuses, keyword, assigneeID) {
+			tickets = append(tickets, t)
 		}
-		tickets = append(tickets, t)
 	}
 
 	// Sort tickets by CreatedAt in descending order (newest first)
@@ -349,26 +367,15 @@ func (r *Memory) GetTicketsByStatus(ctx context.Context, statuses []types.Ticket
 	return tickets, nil
 }
 
-func (r *Memory) CountTicketsByStatus(ctx context.Context, statuses []types.TicketStatus) (int, error) {
+func (r *Memory) CountTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, keyword, assigneeID string) (int, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	count := 0
 	for _, t := range r.tickets {
-		// Filter by status if specified
-		if len(statuses) > 0 {
-			matched := false
-			for _, status := range statuses {
-				if t.Status == status {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				continue
-			}
+		if ticketMatchesFilter(t, statuses, keyword, assigneeID) {
+			count++
 		}
-		count++
 	}
 
 	return count, nil

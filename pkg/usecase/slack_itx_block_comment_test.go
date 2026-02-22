@@ -153,7 +153,7 @@ func TestTicketCreation_NewThread_WithInitialComment(t *testing.T) {
 	gt.Value(t, postMessageCount >= 3).Equal(true)
 
 	// Verify ticket was created
-	tickets, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 0)
+	tickets, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, "", "", 0, 0)
 	gt.NoError(t, err)
 	gt.Array(t, tickets).Length(1)
 }

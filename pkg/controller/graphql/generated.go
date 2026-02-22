@@ -184,21 +184,24 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		ArchiveKnowledge            func(childComplexity int, topic string, slug string) int
-		BindAlertsToTicket          func(childComplexity int, ticketID string, alertIds []string) int
-		CreateKnowledge             func(childComplexity int, input graphql1.CreateKnowledgeInput) int
-		CreateTag                   func(childComplexity int, name string) int
-		CreateTicket                func(childComplexity int, title string, description string, isTest *bool) int
-		CreateTicketFromAlerts      func(childComplexity int, alertIds []string, title *string, description *string) int
-		DeleteTag                   func(childComplexity int, id string) int
-		UpdateAlertTags             func(childComplexity int, alertID string, tagIds []string) int
-		UpdateKnowledge             func(childComplexity int, input graphql1.UpdateKnowledgeInput) int
-		UpdateMultipleTicketsStatus func(childComplexity int, ids []string, status string) int
-		UpdateTag                   func(childComplexity int, input graphql1.UpdateTagInput) int
-		UpdateTicket                func(childComplexity int, id string, title string, description *string) int
-		UpdateTicketConclusion      func(childComplexity int, id string, conclusion string, reason string) int
-		UpdateTicketStatus          func(childComplexity int, id string, status string) int
-		UpdateTicketTags            func(childComplexity int, ticketID string, tagIds []string) int
+		ArchiveKnowledge       func(childComplexity int, topic string, slug string) int
+		ArchiveTicket          func(childComplexity int, id string) int
+		ArchiveTickets         func(childComplexity int, ids []string) int
+		BindAlertsToTicket     func(childComplexity int, ticketID string, alertIds []string) int
+		CreateKnowledge        func(childComplexity int, input graphql1.CreateKnowledgeInput) int
+		CreateTag              func(childComplexity int, name string) int
+		CreateTicket           func(childComplexity int, title string, description string, isTest *bool) int
+		CreateTicketFromAlerts func(childComplexity int, alertIds []string, title *string, description *string) int
+		DeleteTag              func(childComplexity int, id string) int
+		ReopenTicket           func(childComplexity int, id string) int
+		ResolveTicket          func(childComplexity int, id string, conclusion string, reason string) int
+		UnarchiveTicket        func(childComplexity int, id string) int
+		UpdateAlertTags        func(childComplexity int, alertID string, tagIds []string) int
+		UpdateKnowledge        func(childComplexity int, input graphql1.UpdateKnowledgeInput) int
+		UpdateTag              func(childComplexity int, input graphql1.UpdateTagInput) int
+		UpdateTicket           func(childComplexity int, id string, title string, description *string) int
+		UpdateTicketConclusion func(childComplexity int, id string, conclusion string, reason string) int
+		UpdateTicketTags       func(childComplexity int, ticketID string, tagIds []string) int
 	}
 
 	Query struct {
@@ -223,7 +226,7 @@ type ComplexityRoot struct {
 		Ticket                 func(childComplexity int, id string) int
 		TicketComments         func(childComplexity int, ticketID string, offset *int, limit *int) int
 		TicketSessions         func(childComplexity int, ticketID string) int
-		Tickets                func(childComplexity int, statuses []string, offset *int, limit *int) int
+		Tickets                func(childComplexity int, statuses []string, keyword *string, assigneeID *string, offset *int, limit *int) int
 		UnboundAlerts          func(childComplexity int, threshold *float64, keyword *string, ticketID *string, offset *int, limit *int) int
 	}
 
@@ -267,6 +270,7 @@ type ComplexityRoot struct {
 		Alerts          func(childComplexity int) int
 		AlertsCount     func(childComplexity int) int
 		AlertsPaginated func(childComplexity int, offset *int, limit *int) int
+		ArchivedAt      func(childComplexity int) int
 		Assignee        func(childComplexity int) int
 		Comments        func(childComplexity int) int
 		CommentsCount   func(childComplexity int) int
@@ -277,6 +281,7 @@ type ComplexityRoot struct {
 		ID              func(childComplexity int) int
 		IsTest          func(childComplexity int) int
 		Reason          func(childComplexity int) int
+		ResolvedAt      func(childComplexity int) int
 		SlackLink       func(childComplexity int) int
 		Status          func(childComplexity int) int
 		Summary         func(childComplexity int) int
@@ -334,8 +339,11 @@ type KnowledgeResolver interface {
 	Author(ctx context.Context, obj *graphql1.Knowledge) (*graphql1.User, error)
 }
 type MutationResolver interface {
-	UpdateTicketStatus(ctx context.Context, id string, status string) (*ticket.Ticket, error)
-	UpdateMultipleTicketsStatus(ctx context.Context, ids []string, status string) ([]*ticket.Ticket, error)
+	ResolveTicket(ctx context.Context, id string, conclusion string, reason string) (*ticket.Ticket, error)
+	ReopenTicket(ctx context.Context, id string) (*ticket.Ticket, error)
+	ArchiveTicket(ctx context.Context, id string) (*ticket.Ticket, error)
+	ArchiveTickets(ctx context.Context, ids []string) ([]*ticket.Ticket, error)
+	UnarchiveTicket(ctx context.Context, id string) (*ticket.Ticket, error)
 	UpdateTicketConclusion(ctx context.Context, id string, conclusion string, reason string) (*ticket.Ticket, error)
 	UpdateTicket(ctx context.Context, id string, title string, description *string) (*ticket.Ticket, error)
 	CreateTicket(ctx context.Context, title string, description string, isTest *bool) (*ticket.Ticket, error)
@@ -352,7 +360,7 @@ type MutationResolver interface {
 }
 type QueryResolver interface {
 	Ticket(ctx context.Context, id string) (*ticket.Ticket, error)
-	Tickets(ctx context.Context, statuses []string, offset *int, limit *int) (*graphql1.TicketsResponse, error)
+	Tickets(ctx context.Context, statuses []string, keyword *string, assigneeID *string, offset *int, limit *int) (*graphql1.TicketsResponse, error)
 	SimilarTickets(ctx context.Context, ticketID string, threshold float64, offset *int, limit *int) (*graphql1.TicketsResponse, error)
 	SimilarTicketsForAlert(ctx context.Context, alertID string, threshold float64, offset *int, limit *int) (*graphql1.TicketsResponse, error)
 	TicketComments(ctx context.Context, ticketID string, offset *int, limit *int) (*graphql1.CommentsResponse, error)
@@ -393,6 +401,8 @@ type TicketResolver interface {
 	SlackLink(ctx context.Context, obj *ticket.Ticket) (*string, error)
 	CreatedAt(ctx context.Context, obj *ticket.Ticket) (string, error)
 	UpdatedAt(ctx context.Context, obj *ticket.Ticket) (string, error)
+	ResolvedAt(ctx context.Context, obj *ticket.Ticket) (*string, error)
+	ArchivedAt(ctx context.Context, obj *ticket.Ticket) (*string, error)
 
 	Tags(ctx context.Context, obj *ticket.Ticket) ([]string, error)
 	TagObjects(ctx context.Context, obj *ticket.Ticket) ([]*graphql1.TagObject, error)
@@ -951,6 +961,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.ArchiveKnowledge(childComplexity, args["topic"].(string), args["slug"].(string)), true
+	case "Mutation.archiveTicket":
+		if e.ComplexityRoot.Mutation.ArchiveTicket == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_archiveTicket_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ArchiveTicket(childComplexity, args["id"].(string)), true
+	case "Mutation.archiveTickets":
+		if e.ComplexityRoot.Mutation.ArchiveTickets == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_archiveTickets_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ArchiveTickets(childComplexity, args["ids"].([]string)), true
 	case "Mutation.bindAlertsToTicket":
 		if e.ComplexityRoot.Mutation.BindAlertsToTicket == nil {
 			break
@@ -1017,6 +1049,39 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteTag(childComplexity, args["id"].(string)), true
+	case "Mutation.reopenTicket":
+		if e.ComplexityRoot.Mutation.ReopenTicket == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_reopenTicket_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ReopenTicket(childComplexity, args["id"].(string)), true
+	case "Mutation.resolveTicket":
+		if e.ComplexityRoot.Mutation.ResolveTicket == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_resolveTicket_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ResolveTicket(childComplexity, args["id"].(string), args["conclusion"].(string), args["reason"].(string)), true
+	case "Mutation.unarchiveTicket":
+		if e.ComplexityRoot.Mutation.UnarchiveTicket == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_unarchiveTicket_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UnarchiveTicket(childComplexity, args["id"].(string)), true
 	case "Mutation.updateAlertTags":
 		if e.ComplexityRoot.Mutation.UpdateAlertTags == nil {
 			break
@@ -1039,17 +1104,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.UpdateKnowledge(childComplexity, args["input"].(graphql1.UpdateKnowledgeInput)), true
-	case "Mutation.updateMultipleTicketsStatus":
-		if e.ComplexityRoot.Mutation.UpdateMultipleTicketsStatus == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_updateMultipleTicketsStatus_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.ComplexityRoot.Mutation.UpdateMultipleTicketsStatus(childComplexity, args["ids"].([]string), args["status"].(string)), true
 	case "Mutation.updateTag":
 		if e.ComplexityRoot.Mutation.UpdateTag == nil {
 			break
@@ -1083,17 +1137,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.UpdateTicketConclusion(childComplexity, args["id"].(string), args["conclusion"].(string), args["reason"].(string)), true
-	case "Mutation.updateTicketStatus":
-		if e.ComplexityRoot.Mutation.UpdateTicketStatus == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_updateTicketStatus_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.ComplexityRoot.Mutation.UpdateTicketStatus(childComplexity, args["id"].(string), args["status"].(string)), true
 	case "Mutation.updateTicketTags":
 		if e.ComplexityRoot.Mutation.UpdateTicketTags == nil {
 			break
@@ -1323,7 +1366,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.Tickets(childComplexity, args["statuses"].([]string), args["offset"].(*int), args["limit"].(*int)), true
+		return e.ComplexityRoot.Query.Tickets(childComplexity, args["statuses"].([]string), args["keyword"].(*string), args["assigneeID"].(*string), args["offset"].(*int), args["limit"].(*int)), true
 	case "Query.unboundAlerts":
 		if e.ComplexityRoot.Query.UnboundAlerts == nil {
 			break
@@ -1507,6 +1550,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Ticket.AlertsPaginated(childComplexity, args["offset"].(*int), args["limit"].(*int)), true
+	case "Ticket.archivedAt":
+		if e.ComplexityRoot.Ticket.ArchivedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Ticket.ArchivedAt(childComplexity), true
 	case "Ticket.assignee":
 		if e.ComplexityRoot.Ticket.Assignee == nil {
 			break
@@ -1567,6 +1616,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Ticket.Reason(childComplexity), true
+	case "Ticket.resolvedAt":
+		if e.ComplexityRoot.Ticket.ResolvedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Ticket.ResolvedAt(childComplexity), true
 	case "Ticket.slackLink":
 		if e.ComplexityRoot.Ticket.SlackLink == nil {
 			break
@@ -1764,6 +1819,8 @@ type Ticket {
   slackLink: String
   createdAt: String!
   updatedAt: String!
+  resolvedAt: String
+  archivedAt: String
   isTest: Boolean!
   tags: [String!]!
   tagObjects: [TagObject!]!
@@ -1896,7 +1953,7 @@ type AlertsConnection {
 
 type Query {
   ticket(id: ID!): Ticket
-  tickets(statuses: [String!], offset: Int, limit: Int): TicketsResponse!
+  tickets(statuses: [String!], keyword: String, assigneeID: String, offset: Int, limit: Int): TicketsResponse!
   similarTickets(
     ticketId: ID!
     threshold: Float!
@@ -1941,8 +1998,11 @@ type Query {
 }
 
 type Mutation {
-  updateTicketStatus(id: ID!, status: String!): Ticket!
-  updateMultipleTicketsStatus(ids: [ID!]!, status: String!): [Ticket!]!
+  resolveTicket(id: ID!, conclusion: String!, reason: String!): Ticket!
+  reopenTicket(id: ID!): Ticket!
+  archiveTicket(id: ID!): Ticket!
+  archiveTickets(ids: [ID!]!): [Ticket!]!
+  unarchiveTicket(id: ID!): Ticket!
   updateTicketConclusion(id: ID!, conclusion: String!, reason: String!): Ticket!
   updateTicket(id: ID!, title: String!, description: String): Ticket!
   createTicket(title: String!, description: String!, isTest: Boolean): Ticket!
@@ -2117,6 +2177,28 @@ func (ec *executionContext) field_Mutation_archiveKnowledge_args(ctx context.Con
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_archiveTicket_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_archiveTickets_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "ids", ec.unmarshalNID2ᚕstringᚄ)
+	if err != nil {
+		return nil, err
+	}
+	args["ids"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_bindAlertsToTicket_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2208,6 +2290,49 @@ func (ec *executionContext) field_Mutation_deleteTag_args(ctx context.Context, r
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_reopenTicket_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_resolveTicket_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "conclusion", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["conclusion"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "reason", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["reason"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_unarchiveTicket_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_updateAlertTags_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2232,22 +2357,6 @@ func (ec *executionContext) field_Mutation_updateKnowledge_args(ctx context.Cont
 		return nil, err
 	}
 	args["input"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_updateMultipleTicketsStatus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "ids", ec.unmarshalNID2ᚕstringᚄ)
-	if err != nil {
-		return nil, err
-	}
-	args["ids"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "status", ec.unmarshalNString2string)
-	if err != nil {
-		return nil, err
-	}
-	args["status"] = arg1
 	return args, nil
 }
 
@@ -2280,22 +2389,6 @@ func (ec *executionContext) field_Mutation_updateTicketConclusion_args(ctx conte
 		return nil, err
 	}
 	args["reason"] = arg2
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_updateTicketStatus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
-	if err != nil {
-		return nil, err
-	}
-	args["id"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "status", ec.unmarshalNString2string)
-	if err != nil {
-		return nil, err
-	}
-	args["status"] = arg1
 	return args, nil
 }
 
@@ -2676,16 +2769,26 @@ func (ec *executionContext) field_Query_tickets_args(ctx context.Context, rawArg
 		return nil, err
 	}
 	args["statuses"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalOInt2ᚖint)
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "keyword", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["offset"] = arg1
-	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	args["keyword"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "assigneeID", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["limit"] = arg2
+	args["assigneeID"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg4
 	return args, nil
 }
 
@@ -3250,6 +3353,10 @@ func (ec *executionContext) fieldContext_Activity_ticket(_ context.Context, fiel
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
 			case "tags":
@@ -3993,6 +4100,10 @@ func (ec *executionContext) fieldContext_Alert_ticket(_ context.Context, field g
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
 			case "tags":
@@ -5187,6 +5298,10 @@ func (ec *executionContext) fieldContext_DashboardStats_openTickets(_ context.Co
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
 			case "tags":
@@ -5667,15 +5782,15 @@ func (ec *executionContext) fieldContext_Knowledge_state(_ context.Context, fiel
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_updateTicketStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_resolveTicket(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_Mutation_updateTicketStatus,
+		ec.fieldContext_Mutation_resolveTicket,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().UpdateTicketStatus(ctx, fc.Args["id"].(string), fc.Args["status"].(string))
+			return ec.Resolvers.Mutation().ResolveTicket(ctx, fc.Args["id"].(string), fc.Args["conclusion"].(string), fc.Args["reason"].(string))
 		},
 		nil,
 		ec.marshalNTicket2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐTicket,
@@ -5684,7 +5799,7 @@ func (ec *executionContext) _Mutation_updateTicketStatus(ctx context.Context, fi
 	)
 }
 
-func (ec *executionContext) fieldContext_Mutation_updateTicketStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_resolveTicket(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -5726,6 +5841,10 @@ func (ec *executionContext) fieldContext_Mutation_updateTicketStatus(ctx context
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
 			case "tags":
@@ -5743,22 +5862,196 @@ func (ec *executionContext) fieldContext_Mutation_updateTicketStatus(ctx context
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_updateTicketStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Mutation_resolveTicket_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_updateMultipleTicketsStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_reopenTicket(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_Mutation_updateMultipleTicketsStatus,
+		ec.fieldContext_Mutation_reopenTicket,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().UpdateMultipleTicketsStatus(ctx, fc.Args["ids"].([]string), fc.Args["status"].(string))
+			return ec.Resolvers.Mutation().ReopenTicket(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalNTicket2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐTicket,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_reopenTicket(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Ticket_id(ctx, field)
+			case "status":
+				return ec.fieldContext_Ticket_status(ctx, field)
+			case "title":
+				return ec.fieldContext_Ticket_title(ctx, field)
+			case "description":
+				return ec.fieldContext_Ticket_description(ctx, field)
+			case "summary":
+				return ec.fieldContext_Ticket_summary(ctx, field)
+			case "assignee":
+				return ec.fieldContext_Ticket_assignee(ctx, field)
+			case "alerts":
+				return ec.fieldContext_Ticket_alerts(ctx, field)
+			case "alertsPaginated":
+				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
+			case "comments":
+				return ec.fieldContext_Ticket_comments(ctx, field)
+			case "alertsCount":
+				return ec.fieldContext_Ticket_alertsCount(ctx, field)
+			case "commentsCount":
+				return ec.fieldContext_Ticket_commentsCount(ctx, field)
+			case "conclusion":
+				return ec.fieldContext_Ticket_conclusion(ctx, field)
+			case "reason":
+				return ec.fieldContext_Ticket_reason(ctx, field)
+			case "finding":
+				return ec.fieldContext_Ticket_finding(ctx, field)
+			case "slackLink":
+				return ec.fieldContext_Ticket_slackLink(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Ticket_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
+			case "isTest":
+				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
+			case "tagObjects":
+				return ec.fieldContext_Ticket_tagObjects(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_reopenTicket_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_archiveTicket(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_archiveTicket,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ArchiveTicket(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalNTicket2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐTicket,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_archiveTicket(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Ticket_id(ctx, field)
+			case "status":
+				return ec.fieldContext_Ticket_status(ctx, field)
+			case "title":
+				return ec.fieldContext_Ticket_title(ctx, field)
+			case "description":
+				return ec.fieldContext_Ticket_description(ctx, field)
+			case "summary":
+				return ec.fieldContext_Ticket_summary(ctx, field)
+			case "assignee":
+				return ec.fieldContext_Ticket_assignee(ctx, field)
+			case "alerts":
+				return ec.fieldContext_Ticket_alerts(ctx, field)
+			case "alertsPaginated":
+				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
+			case "comments":
+				return ec.fieldContext_Ticket_comments(ctx, field)
+			case "alertsCount":
+				return ec.fieldContext_Ticket_alertsCount(ctx, field)
+			case "commentsCount":
+				return ec.fieldContext_Ticket_commentsCount(ctx, field)
+			case "conclusion":
+				return ec.fieldContext_Ticket_conclusion(ctx, field)
+			case "reason":
+				return ec.fieldContext_Ticket_reason(ctx, field)
+			case "finding":
+				return ec.fieldContext_Ticket_finding(ctx, field)
+			case "slackLink":
+				return ec.fieldContext_Ticket_slackLink(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Ticket_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
+			case "isTest":
+				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
+			case "tagObjects":
+				return ec.fieldContext_Ticket_tagObjects(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_archiveTicket_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_archiveTickets(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_archiveTickets,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ArchiveTickets(ctx, fc.Args["ids"].([]string))
 		},
 		nil,
 		ec.marshalNTicket2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐTicketᚄ,
@@ -5767,7 +6060,7 @@ func (ec *executionContext) _Mutation_updateMultipleTicketsStatus(ctx context.Co
 	)
 }
 
-func (ec *executionContext) fieldContext_Mutation_updateMultipleTicketsStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_archiveTickets(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -5809,6 +6102,10 @@ func (ec *executionContext) fieldContext_Mutation_updateMultipleTicketsStatus(ct
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
 			case "tags":
@@ -5826,7 +6123,94 @@ func (ec *executionContext) fieldContext_Mutation_updateMultipleTicketsStatus(ct
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_updateMultipleTicketsStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Mutation_archiveTickets_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_unarchiveTicket(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_unarchiveTicket,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UnarchiveTicket(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalNTicket2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐTicket,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_unarchiveTicket(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Ticket_id(ctx, field)
+			case "status":
+				return ec.fieldContext_Ticket_status(ctx, field)
+			case "title":
+				return ec.fieldContext_Ticket_title(ctx, field)
+			case "description":
+				return ec.fieldContext_Ticket_description(ctx, field)
+			case "summary":
+				return ec.fieldContext_Ticket_summary(ctx, field)
+			case "assignee":
+				return ec.fieldContext_Ticket_assignee(ctx, field)
+			case "alerts":
+				return ec.fieldContext_Ticket_alerts(ctx, field)
+			case "alertsPaginated":
+				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
+			case "comments":
+				return ec.fieldContext_Ticket_comments(ctx, field)
+			case "alertsCount":
+				return ec.fieldContext_Ticket_alertsCount(ctx, field)
+			case "commentsCount":
+				return ec.fieldContext_Ticket_commentsCount(ctx, field)
+			case "conclusion":
+				return ec.fieldContext_Ticket_conclusion(ctx, field)
+			case "reason":
+				return ec.fieldContext_Ticket_reason(ctx, field)
+			case "finding":
+				return ec.fieldContext_Ticket_finding(ctx, field)
+			case "slackLink":
+				return ec.fieldContext_Ticket_slackLink(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Ticket_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
+			case "isTest":
+				return ec.fieldContext_Ticket_isTest(ctx, field)
+			case "tags":
+				return ec.fieldContext_Ticket_tags(ctx, field)
+			case "tagObjects":
+				return ec.fieldContext_Ticket_tagObjects(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_unarchiveTicket_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -5892,6 +6276,10 @@ func (ec *executionContext) fieldContext_Mutation_updateTicketConclusion(ctx con
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
 			case "tags":
@@ -5975,6 +6363,10 @@ func (ec *executionContext) fieldContext_Mutation_updateTicket(ctx context.Conte
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
 			case "tags":
@@ -6058,6 +6450,10 @@ func (ec *executionContext) fieldContext_Mutation_createTicket(ctx context.Conte
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
 			case "tags":
@@ -6141,6 +6537,10 @@ func (ec *executionContext) fieldContext_Mutation_createTicketFromAlerts(ctx con
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
 			case "tags":
@@ -6224,6 +6624,10 @@ func (ec *executionContext) fieldContext_Mutation_bindAlertsToTicket(ctx context
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
 			case "tags":
@@ -6372,6 +6776,10 @@ func (ec *executionContext) fieldContext_Mutation_updateTicketTags(ctx context.C
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
 			case "tags":
@@ -6773,6 +7181,10 @@ func (ec *executionContext) fieldContext_Query_ticket(ctx context.Context, field
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
 			case "tags":
@@ -6805,7 +7217,7 @@ func (ec *executionContext) _Query_tickets(ctx context.Context, field graphql.Co
 		ec.fieldContext_Query_tickets,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().Tickets(ctx, fc.Args["statuses"].([]string), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+			return ec.Resolvers.Query().Tickets(ctx, fc.Args["statuses"].([]string), fc.Args["keyword"].(*string), fc.Args["assigneeID"].(*string), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
 		},
 		nil,
 		ec.marshalNTicketsResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐTicketsResponse,
@@ -9240,6 +9652,64 @@ func (ec *executionContext) fieldContext_Ticket_updatedAt(_ context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _Ticket_resolvedAt(ctx context.Context, field graphql.CollectedField, obj *ticket.Ticket) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Ticket_resolvedAt,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Ticket().ResolvedAt(ctx, obj)
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Ticket_resolvedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Ticket",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Ticket_archivedAt(ctx context.Context, field graphql.CollectedField, obj *ticket.Ticket) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Ticket_archivedAt,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Ticket().ArchivedAt(ctx, obj)
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Ticket_archivedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Ticket",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Ticket_isTest(ctx context.Context, field graphql.CollectedField, obj *ticket.Ticket) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9391,6 +9861,10 @@ func (ec *executionContext) fieldContext_TicketsResponse_tickets(_ context.Conte
 				return ec.fieldContext_Ticket_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Ticket_updatedAt(ctx, field)
+			case "resolvedAt":
+				return ec.fieldContext_Ticket_resolvedAt(ctx, field)
+			case "archivedAt":
+				return ec.fieldContext_Ticket_archivedAt(ctx, field)
 			case "isTest":
 				return ec.fieldContext_Ticket_isTest(ctx, field)
 			case "tags":
@@ -12711,16 +13185,37 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Mutation")
-		case "updateTicketStatus":
+		case "resolveTicket":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_updateTicketStatus(ctx, field)
+				return ec._Mutation_resolveTicket(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "updateMultipleTicketsStatus":
+		case "reopenTicket":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_updateMultipleTicketsStatus(ctx, field)
+				return ec._Mutation_reopenTicket(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "archiveTicket":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_archiveTicket(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "archiveTickets":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_archiveTickets(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "unarchiveTicket":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_unarchiveTicket(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -14082,6 +14577,72 @@ func (ec *executionContext) _Ticket(ctx context.Context, sel ast.SelectionSet, o
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "resolvedAt":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Ticket_resolvedAt(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "archivedAt":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Ticket_archivedAt(ctx, field, obj)
 				return res
 			}
 

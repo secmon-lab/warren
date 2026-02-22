@@ -46,6 +46,13 @@ Warren is an AI agent and Slack-based security alert management tool. It process
 - **NEVER check error messages using `strings.Contains(err.Error(), ...)`**
 - **ALWAYS use `errors.Is(err, targetErr)` or `errors.As(err, &target)` for error type checking**
 - Error discrimination must be done by error types, not by parsing error messages
+- **ALWAYS tag errors with `goerr.T(errutil.TagXxx)` from `pkg/utils/errutil`** to enable proper HTTP status mapping and observability:
+  - Business logic state violations (wrong status, invalid transition): `errutil.TagInvalidState`
+  - Input validation failures: `errutil.TagValidation`
+  - Resource not found: `errutil.TagNotFound`
+  - Permission denied: `errutil.TagForbidden`
+  - Duplicate resource: `errutil.TagDuplicateResource`
+  - Example: `goerr.New("ticket must be resolved before archiving", goerr.V("id", id), goerr.T(errutil.TagInvalidState))`
 
 ### Resource Cleanup
 - **ALWAYS use `safe.Close(ctx, closer)` from `pkg/utils/safe`** to close `io.Closer` resources
@@ -225,6 +232,8 @@ When making changes, before finishing the task, always:
 - Run `golangci-lint run ./...` to check lint error
 - Run `gosec -exclude-generated -quiet ./...` to check security issue
 - Run tests to ensure no impact on other code
+
+**NEVER run `go build` to verify code.** Use `go vet ./...` instead to check for compile errors.
 
 ### Language
 

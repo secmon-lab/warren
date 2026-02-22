@@ -37,6 +37,9 @@ type Ticket struct {
 	Conclusion types.AlertConclusion `json:"conclusion"`
 	Reason     string                `json:"reason"`
 
+	ResolvedAt *time.Time `json:"resolved_at"`
+	ArchivedAt *time.Time `json:"archived_at"`
+
 	Finding  *Finding    `json:"finding"`
 	Assignee *slack.User `json:"assignee"`
 
@@ -44,6 +47,14 @@ type Ticket struct {
 
 	Embedding firestore.Vector32 `json:"-"`
 	TagIDs    map[string]bool    `json:"tag_ids"`
+}
+
+// NormalizeLegacyStatus migrates legacy "pending" status to "open" for backward compatibility.
+// This handles existing Firestore data created before the pending status was removed.
+func (t *Ticket) NormalizeLegacyStatus() {
+	if string(t.Status) == "pending" {
+		t.Status = types.TicketStatusOpen
+	}
 }
 
 // HasSlackThread returns true if the ticket has a valid Slack thread

@@ -74,7 +74,7 @@ func TestTicketResolver(t *testing.T) {
 
 	t.Run("GetTickets", func(t *testing.T) {
 		status := "open"
-		got, err := resolver.Query().Tickets(ctx, []string{status}, nil, nil)
+		got, err := resolver.Query().Tickets(ctx, []string{status}, nil, nil, nil, nil)
 		gt.NoError(t, err)
 		gt.Array(t, got.Tickets).Length(1)
 		gt.Value(t, got.Tickets[0].ID).Equal(testTicket.ID)
@@ -105,7 +105,7 @@ func TestTicketResolver(t *testing.T) {
 
 		t.Run("with limit", func(t *testing.T) {
 			limit := 2
-			got, err := resolver.Query().Tickets(ctx, nil, nil, &limit)
+			got, err := resolver.Query().Tickets(ctx, nil, nil, nil, nil, &limit)
 			gt.NoError(t, err)
 			gt.Array(t, got.Tickets).Length(2)
 			gt.Value(t, got.TotalCount).Equal(3)
@@ -113,7 +113,7 @@ func TestTicketResolver(t *testing.T) {
 
 		t.Run("with offset", func(t *testing.T) {
 			offset := 1
-			got, err := resolver.Query().Tickets(ctx, nil, &offset, nil)
+			got, err := resolver.Query().Tickets(ctx, nil, nil, nil, &offset, nil)
 			gt.NoError(t, err)
 			gt.Array(t, got.Tickets).Length(2)
 			gt.Value(t, got.TotalCount).Equal(3)
@@ -122,25 +122,32 @@ func TestTicketResolver(t *testing.T) {
 		t.Run("with offset and limit", func(t *testing.T) {
 			offset := 1
 			limit := 1
-			got, err := resolver.Query().Tickets(ctx, nil, &offset, &limit)
+			got, err := resolver.Query().Tickets(ctx, nil, nil, nil, &offset, &limit)
 			gt.NoError(t, err)
 			gt.Array(t, got.Tickets).Length(1)
 			gt.Value(t, got.TotalCount).Equal(3)
 		})
 
 		t.Run("with multiple statuses", func(t *testing.T) {
-			got, err := resolver.Query().Tickets(ctx, []string{"open", "pending"}, nil, nil)
+			got, err := resolver.Query().Tickets(ctx, []string{"open", "resolved"}, nil, nil, nil, nil)
 			gt.NoError(t, err)
-			gt.Array(t, got.Tickets).Length(2)
-			gt.Value(t, got.TotalCount).Equal(2)
+			gt.Array(t, got.Tickets).Length(3)
+			gt.Value(t, got.TotalCount).Equal(3)
 		})
 	})
 
-	t.Run("UpdateTicketStatus", func(t *testing.T) {
-		newStatus := types.TicketStatus("resolved")
-		got, err := resolver.Mutation().UpdateTicketStatus(ctx, string(testTicket.ID), string(newStatus))
+	t.Run("ResolveTicket", func(t *testing.T) {
+		got, err := resolver.Mutation().ResolveTicket(ctx, string(testTicket.ID), "true_positive", "test reason")
 		gt.NoError(t, err)
-		gt.Value(t, got.Status).Equal(newStatus)
+		gt.Value(t, got.Status).Equal(types.TicketStatusResolved)
+		gt.Value(t, got.ResolvedAt).NotNil()
+	})
+
+	t.Run("ReopenTicket", func(t *testing.T) {
+		got, err := resolver.Mutation().ReopenTicket(ctx, string(testTicket.ID))
+		gt.NoError(t, err)
+		gt.Value(t, got.Status).Equal(types.TicketStatusOpen)
+		gt.Value(t, got.ResolvedAt).Nil()
 	})
 }
 

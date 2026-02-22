@@ -135,7 +135,7 @@ func TestSlackActionAckAlert(t *testing.T) {
 	gt.NoError(t, err)
 
 	// Verify ticket was created
-	tickets, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 0)
+	tickets, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, "", "", 0, 0)
 	gt.NoError(t, err)
 	gt.Array(t, tickets).Length(1)
 
@@ -304,7 +304,7 @@ func TestSlackActionAckList(t *testing.T) {
 	gt.NoError(t, err)
 
 	// Verify ticket was created
-	tickets, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 0)
+	tickets, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, "", "", 0, 0)
 	gt.NoError(t, err)
 	gt.Array(t, tickets).Length(1)
 
@@ -729,7 +729,7 @@ func TestSlackActionAckAlert_MultipleAlertLists(t *testing.T) {
 	gt.NoError(t, err)
 
 	// Verify ticket was created
-	tickets, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 0)
+	tickets, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, "", "", 0, 0)
 	gt.NoError(t, err)
 	gt.Array(t, tickets).Length(1)
 
@@ -878,7 +878,7 @@ func TestSlackActionAckAlert_SingleAlertList(t *testing.T) {
 	gt.NoError(t, err)
 
 	// Verify ticket was created
-	tickets, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, 0, 0)
+	tickets, err := repo.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusOpen}, "", "", 0, 0)
 	gt.NoError(t, err)
 	gt.Array(t, tickets).Length(1)
 

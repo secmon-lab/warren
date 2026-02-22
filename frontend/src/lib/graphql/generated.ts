@@ -193,19 +193,22 @@ export type MemorySortField =
 export type Mutation = {
   __typename?: 'Mutation';
   archiveKnowledge: Scalars['Boolean']['output'];
+  archiveTicket: Ticket;
+  archiveTickets: Array<Ticket>;
   bindAlertsToTicket: Ticket;
   createKnowledge: Knowledge;
   createTag: TagMetadata;
   createTicket: Ticket;
   createTicketFromAlerts: Ticket;
   deleteTag: Scalars['Boolean']['output'];
+  reopenTicket: Ticket;
+  resolveTicket: Ticket;
+  unarchiveTicket: Ticket;
   updateAlertTags: Alert;
   updateKnowledge: Knowledge;
-  updateMultipleTicketsStatus: Array<Ticket>;
   updateTag: TagMetadata;
   updateTicket: Ticket;
   updateTicketConclusion: Ticket;
-  updateTicketStatus: Ticket;
   updateTicketTags: Ticket;
 };
 
@@ -213,6 +216,16 @@ export type Mutation = {
 export type MutationArchiveKnowledgeArgs = {
   slug: Scalars['String']['input'];
   topic: Scalars['String']['input'];
+};
+
+
+export type MutationArchiveTicketArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationArchiveTicketsArgs = {
+  ids: Array<Scalars['ID']['input']>;
 };
 
 
@@ -251,6 +264,23 @@ export type MutationDeleteTagArgs = {
 };
 
 
+export type MutationReopenTicketArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationResolveTicketArgs = {
+  conclusion: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+};
+
+
+export type MutationUnarchiveTicketArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type MutationUpdateAlertTagsArgs = {
   alertId: Scalars['ID']['input'];
   tagIds: Array<Scalars['ID']['input']>;
@@ -259,12 +289,6 @@ export type MutationUpdateAlertTagsArgs = {
 
 export type MutationUpdateKnowledgeArgs = {
   input: UpdateKnowledgeInput;
-};
-
-
-export type MutationUpdateMultipleTicketsStatusArgs = {
-  ids: Array<Scalars['ID']['input']>;
-  status: Scalars['String']['input'];
 };
 
 
@@ -284,12 +308,6 @@ export type MutationUpdateTicketConclusionArgs = {
   conclusion: Scalars['String']['input'];
   id: Scalars['ID']['input'];
   reason: Scalars['String']['input'];
-};
-
-
-export type MutationUpdateTicketStatusArgs = {
-  id: Scalars['ID']['input'];
-  status: Scalars['String']['input'];
 };
 
 
@@ -436,6 +454,8 @@ export type QueryTicketSessionsArgs = {
 
 
 export type QueryTicketsArgs = {
+  assigneeID?: InputMaybe<Scalars['String']['input']>;
+  keyword?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   statuses?: InputMaybe<Array<Scalars['String']['input']>>;
@@ -499,6 +519,7 @@ export type Ticket = {
   alerts: Array<Alert>;
   alertsCount: Scalars['Int']['output'];
   alertsPaginated: AlertsResponse;
+  archivedAt?: Maybe<Scalars['String']['output']>;
   assignee?: Maybe<User>;
   comments: Array<Comment>;
   commentsCount: Scalars['Int']['output'];
@@ -509,6 +530,7 @@ export type Ticket = {
   id: Scalars['ID']['output'];
   isTest: Scalars['Boolean']['output'];
   reason?: Maybe<Scalars['String']['output']>;
+  resolvedAt?: Maybe<Scalars['String']['output']>;
   slackLink?: Maybe<Scalars['String']['output']>;
   status: Scalars['String']['output'];
   summary: Scalars['String']['output'];
@@ -559,6 +581,8 @@ export type User = {
 
 export type GetTicketsQueryVariables = Exact<{
   statuses?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
+  keyword?: InputMaybe<Scalars['String']['input']>;
+  assigneeID?: InputMaybe<Scalars['String']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
 }>;
@@ -620,21 +644,42 @@ export type GetTicketCommentsQueryVariables = Exact<{
 
 export type GetTicketCommentsQuery = { __typename?: 'Query', ticketComments: { __typename?: 'CommentsResponse', totalCount: number, comments: Array<{ __typename?: 'Comment', id: string, content: string, createdAt: string, updatedAt: string, user?: { __typename?: 'User', id: string, name: string } | null }> } };
 
-export type UpdateTicketStatusMutationVariables = Exact<{
+export type ResolveTicketMutationVariables = Exact<{
   id: Scalars['ID']['input'];
-  status: Scalars['String']['input'];
+  conclusion: Scalars['String']['input'];
+  reason: Scalars['String']['input'];
 }>;
 
 
-export type UpdateTicketStatusMutation = { __typename?: 'Mutation', updateTicketStatus: { __typename?: 'Ticket', id: string, status: string, title: string, description: string, isTest: boolean, createdAt: string, updatedAt: string, assignee?: { __typename?: 'User', id: string, name: string } | null } };
+export type ResolveTicketMutation = { __typename?: 'Mutation', resolveTicket: { __typename?: 'Ticket', id: string, status: string, title: string, description: string, conclusion?: string | null, reason?: string | null, resolvedAt?: string | null, isTest: boolean, createdAt: string, updatedAt: string, assignee?: { __typename?: 'User', id: string, name: string } | null } };
 
-export type UpdateMultipleTicketsStatusMutationVariables = Exact<{
+export type ReopenTicketMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type ReopenTicketMutation = { __typename?: 'Mutation', reopenTicket: { __typename?: 'Ticket', id: string, status: string, title: string, description: string, conclusion?: string | null, reason?: string | null, resolvedAt?: string | null, archivedAt?: string | null, isTest: boolean, createdAt: string, updatedAt: string, assignee?: { __typename?: 'User', id: string, name: string } | null } };
+
+export type ArchiveTicketMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type ArchiveTicketMutation = { __typename?: 'Mutation', archiveTicket: { __typename?: 'Ticket', id: string, status: string, title: string, description: string, resolvedAt?: string | null, archivedAt?: string | null, isTest: boolean, createdAt: string, updatedAt: string, assignee?: { __typename?: 'User', id: string, name: string } | null } };
+
+export type ArchiveTicketsMutationVariables = Exact<{
   ids: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
-  status: Scalars['String']['input'];
 }>;
 
 
-export type UpdateMultipleTicketsStatusMutation = { __typename?: 'Mutation', updateMultipleTicketsStatus: Array<{ __typename?: 'Ticket', id: string, status: string, title: string, description: string, isTest: boolean, createdAt: string, updatedAt: string, assignee?: { __typename?: 'User', id: string, name: string } | null }> };
+export type ArchiveTicketsMutation = { __typename?: 'Mutation', archiveTickets: Array<{ __typename?: 'Ticket', id: string, status: string, title: string, description: string, resolvedAt?: string | null, archivedAt?: string | null, isTest: boolean, createdAt: string, updatedAt: string, assignee?: { __typename?: 'User', id: string, name: string } | null }> };
+
+export type UnarchiveTicketMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type UnarchiveTicketMutation = { __typename?: 'Mutation', unarchiveTicket: { __typename?: 'Ticket', id: string, status: string, title: string, description: string, resolvedAt?: string | null, archivedAt?: string | null, isTest: boolean, createdAt: string, updatedAt: string, assignee?: { __typename?: 'User', id: string, name: string } | null } };
 
 export type UpdateTicketConclusionMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -872,7 +917,7 @@ export type GetAgentMemoryQueryVariables = Exact<{
 export type GetAgentMemoryQuery = { __typename?: 'Query', getAgentMemory?: { __typename?: 'AgentMemory', id: string, agentID: string, query: string, claim: string, score: number, createdAt: string, lastUsedAt?: string | null } | null };
 
 
-export const GetTicketsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTickets"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"statuses"},"value":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"commentsCount"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
+export const GetTicketsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTickets"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"assigneeID"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"statuses"},"value":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}},{"kind":"Argument","name":{"kind":"Name","value":"assigneeID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"assigneeID"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"commentsCount"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
 
 /**
  * __useGetTicketsQuery__
@@ -887,6 +932,8 @@ export const GetTicketsDocument = {"kind":"Document","definitions":[{"kind":"Ope
  * const { data, loading, error } = useGetTicketsQuery({
  *   variables: {
  *      statuses: // value for 'statuses'
+ *      keyword: // value for 'keyword'
+ *      assigneeID: // value for 'assigneeID'
  *      offset: // value for 'offset'
  *      limit: // value for 'limit'
  *   },
@@ -1176,62 +1223,143 @@ export type GetTicketCommentsQueryHookResult = ReturnType<typeof useGetTicketCom
 export type GetTicketCommentsLazyQueryHookResult = ReturnType<typeof useGetTicketCommentsLazyQuery>;
 export type GetTicketCommentsSuspenseQueryHookResult = ReturnType<typeof useGetTicketCommentsSuspenseQuery>;
 export type GetTicketCommentsQueryResult = Apollo.QueryResult<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>;
-export const UpdateTicketStatusDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateTicketStatus"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"status"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateTicketStatus"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"status"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
-export type UpdateTicketStatusMutationFn = Apollo.MutationFunction<UpdateTicketStatusMutation, UpdateTicketStatusMutationVariables>;
+export const ResolveTicketDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ResolveTicket"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"conclusion"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"reason"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"resolveTicket"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"conclusion"},"value":{"kind":"Variable","name":{"kind":"Name","value":"conclusion"}}},{"kind":"Argument","name":{"kind":"Name","value":"reason"},"value":{"kind":"Variable","name":{"kind":"Name","value":"reason"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"resolvedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+export type ResolveTicketMutationFn = Apollo.MutationFunction<ResolveTicketMutation, ResolveTicketMutationVariables>;
 
 /**
- * __useUpdateTicketStatusMutation__
+ * __useResolveTicketMutation__
  *
- * To run a mutation, you first call `useUpdateTicketStatusMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useUpdateTicketStatusMutation` returns a tuple that includes:
+ * To run a mutation, you first call `useResolveTicketMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useResolveTicketMutation` returns a tuple that includes:
  * - A mutate function that you can call at any time to execute the mutation
  * - An object with fields that represent the current status of the mutation's execution
  *
  * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
  *
  * @example
- * const [updateTicketStatusMutation, { data, loading, error }] = useUpdateTicketStatusMutation({
+ * const [resolveTicketMutation, { data, loading, error }] = useResolveTicketMutation({
  *   variables: {
  *      id: // value for 'id'
- *      status: // value for 'status'
+ *      conclusion: // value for 'conclusion'
+ *      reason: // value for 'reason'
  *   },
  * });
  */
-export function useUpdateTicketStatusMutation(baseOptions?: Apollo.MutationHookOptions<UpdateTicketStatusMutation, UpdateTicketStatusMutationVariables>) {
+export function useResolveTicketMutation(baseOptions?: Apollo.MutationHookOptions<ResolveTicketMutation, ResolveTicketMutationVariables>) {
         const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<UpdateTicketStatusMutation, UpdateTicketStatusMutationVariables>(UpdateTicketStatusDocument, options);
+        return Apollo.useMutation<ResolveTicketMutation, ResolveTicketMutationVariables>(ResolveTicketDocument, options);
       }
-export type UpdateTicketStatusMutationHookResult = ReturnType<typeof useUpdateTicketStatusMutation>;
-export type UpdateTicketStatusMutationResult = Apollo.MutationResult<UpdateTicketStatusMutation>;
-export type UpdateTicketStatusMutationOptions = Apollo.BaseMutationOptions<UpdateTicketStatusMutation, UpdateTicketStatusMutationVariables>;
-export const UpdateMultipleTicketsStatusDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateMultipleTicketsStatus"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ids"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"status"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateMultipleTicketsStatus"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ids"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ids"}}},{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"status"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
-export type UpdateMultipleTicketsStatusMutationFn = Apollo.MutationFunction<UpdateMultipleTicketsStatusMutation, UpdateMultipleTicketsStatusMutationVariables>;
+export type ResolveTicketMutationHookResult = ReturnType<typeof useResolveTicketMutation>;
+export type ResolveTicketMutationResult = Apollo.MutationResult<ResolveTicketMutation>;
+export type ResolveTicketMutationOptions = Apollo.BaseMutationOptions<ResolveTicketMutation, ResolveTicketMutationVariables>;
+export const ReopenTicketDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ReopenTicket"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"reopenTicket"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"resolvedAt"}},{"kind":"Field","name":{"kind":"Name","value":"archivedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+export type ReopenTicketMutationFn = Apollo.MutationFunction<ReopenTicketMutation, ReopenTicketMutationVariables>;
 
 /**
- * __useUpdateMultipleTicketsStatusMutation__
+ * __useReopenTicketMutation__
  *
- * To run a mutation, you first call `useUpdateMultipleTicketsStatusMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useUpdateMultipleTicketsStatusMutation` returns a tuple that includes:
+ * To run a mutation, you first call `useReopenTicketMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useReopenTicketMutation` returns a tuple that includes:
  * - A mutate function that you can call at any time to execute the mutation
  * - An object with fields that represent the current status of the mutation's execution
  *
  * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
  *
  * @example
- * const [updateMultipleTicketsStatusMutation, { data, loading, error }] = useUpdateMultipleTicketsStatusMutation({
+ * const [reopenTicketMutation, { data, loading, error }] = useReopenTicketMutation({
  *   variables: {
- *      ids: // value for 'ids'
- *      status: // value for 'status'
+ *      id: // value for 'id'
  *   },
  * });
  */
-export function useUpdateMultipleTicketsStatusMutation(baseOptions?: Apollo.MutationHookOptions<UpdateMultipleTicketsStatusMutation, UpdateMultipleTicketsStatusMutationVariables>) {
+export function useReopenTicketMutation(baseOptions?: Apollo.MutationHookOptions<ReopenTicketMutation, ReopenTicketMutationVariables>) {
         const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<UpdateMultipleTicketsStatusMutation, UpdateMultipleTicketsStatusMutationVariables>(UpdateMultipleTicketsStatusDocument, options);
+        return Apollo.useMutation<ReopenTicketMutation, ReopenTicketMutationVariables>(ReopenTicketDocument, options);
       }
-export type UpdateMultipleTicketsStatusMutationHookResult = ReturnType<typeof useUpdateMultipleTicketsStatusMutation>;
-export type UpdateMultipleTicketsStatusMutationResult = Apollo.MutationResult<UpdateMultipleTicketsStatusMutation>;
-export type UpdateMultipleTicketsStatusMutationOptions = Apollo.BaseMutationOptions<UpdateMultipleTicketsStatusMutation, UpdateMultipleTicketsStatusMutationVariables>;
+export type ReopenTicketMutationHookResult = ReturnType<typeof useReopenTicketMutation>;
+export type ReopenTicketMutationResult = Apollo.MutationResult<ReopenTicketMutation>;
+export type ReopenTicketMutationOptions = Apollo.BaseMutationOptions<ReopenTicketMutation, ReopenTicketMutationVariables>;
+export const ArchiveTicketDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ArchiveTicket"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"archiveTicket"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"resolvedAt"}},{"kind":"Field","name":{"kind":"Name","value":"archivedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+export type ArchiveTicketMutationFn = Apollo.MutationFunction<ArchiveTicketMutation, ArchiveTicketMutationVariables>;
+
+/**
+ * __useArchiveTicketMutation__
+ *
+ * To run a mutation, you first call `useArchiveTicketMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useArchiveTicketMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [archiveTicketMutation, { data, loading, error }] = useArchiveTicketMutation({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useArchiveTicketMutation(baseOptions?: Apollo.MutationHookOptions<ArchiveTicketMutation, ArchiveTicketMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ArchiveTicketMutation, ArchiveTicketMutationVariables>(ArchiveTicketDocument, options);
+      }
+export type ArchiveTicketMutationHookResult = ReturnType<typeof useArchiveTicketMutation>;
+export type ArchiveTicketMutationResult = Apollo.MutationResult<ArchiveTicketMutation>;
+export type ArchiveTicketMutationOptions = Apollo.BaseMutationOptions<ArchiveTicketMutation, ArchiveTicketMutationVariables>;
+export const ArchiveTicketsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ArchiveTickets"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ids"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"archiveTickets"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ids"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ids"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"resolvedAt"}},{"kind":"Field","name":{"kind":"Name","value":"archivedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+export type ArchiveTicketsMutationFn = Apollo.MutationFunction<ArchiveTicketsMutation, ArchiveTicketsMutationVariables>;
+
+/**
+ * __useArchiveTicketsMutation__
+ *
+ * To run a mutation, you first call `useArchiveTicketsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useArchiveTicketsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [archiveTicketsMutation, { data, loading, error }] = useArchiveTicketsMutation({
+ *   variables: {
+ *      ids: // value for 'ids'
+ *   },
+ * });
+ */
+export function useArchiveTicketsMutation(baseOptions?: Apollo.MutationHookOptions<ArchiveTicketsMutation, ArchiveTicketsMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ArchiveTicketsMutation, ArchiveTicketsMutationVariables>(ArchiveTicketsDocument, options);
+      }
+export type ArchiveTicketsMutationHookResult = ReturnType<typeof useArchiveTicketsMutation>;
+export type ArchiveTicketsMutationResult = Apollo.MutationResult<ArchiveTicketsMutation>;
+export type ArchiveTicketsMutationOptions = Apollo.BaseMutationOptions<ArchiveTicketsMutation, ArchiveTicketsMutationVariables>;
+export const UnarchiveTicketDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UnarchiveTicket"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"unarchiveTicket"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"resolvedAt"}},{"kind":"Field","name":{"kind":"Name","value":"archivedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+export type UnarchiveTicketMutationFn = Apollo.MutationFunction<UnarchiveTicketMutation, UnarchiveTicketMutationVariables>;
+
+/**
+ * __useUnarchiveTicketMutation__
+ *
+ * To run a mutation, you first call `useUnarchiveTicketMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUnarchiveTicketMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [unarchiveTicketMutation, { data, loading, error }] = useUnarchiveTicketMutation({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useUnarchiveTicketMutation(baseOptions?: Apollo.MutationHookOptions<UnarchiveTicketMutation, UnarchiveTicketMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UnarchiveTicketMutation, UnarchiveTicketMutationVariables>(UnarchiveTicketDocument, options);
+      }
+export type UnarchiveTicketMutationHookResult = ReturnType<typeof useUnarchiveTicketMutation>;
+export type UnarchiveTicketMutationResult = Apollo.MutationResult<UnarchiveTicketMutation>;
+export type UnarchiveTicketMutationOptions = Apollo.BaseMutationOptions<UnarchiveTicketMutation, UnarchiveTicketMutationVariables>;
 export const UpdateTicketConclusionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateTicketConclusion"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"conclusion"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"reason"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateTicketConclusion"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"conclusion"},"value":{"kind":"Variable","name":{"kind":"Name","value":"conclusion"}}},{"kind":"Argument","name":{"kind":"Name","value":"reason"},"value":{"kind":"Variable","name":{"kind":"Name","value":"reason"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
 export type UpdateTicketConclusionMutationFn = Apollo.MutationFunction<UpdateTicketConclusionMutation, UpdateTicketConclusionMutationVariables>;
 

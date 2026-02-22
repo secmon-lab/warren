@@ -14,6 +14,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/user"
@@ -302,9 +303,11 @@ func (uc *UseCases) handleSlackInteractionViewSubmissionResolveTicket(ctx contex
 		logger.Debug("comment field not provided, using empty string")
 	}
 
+	now := clock.Now(ctx)
 	target.Conclusion = conclusion
 	target.Reason = reason
 	target.Status = types.TicketStatusResolved
+	target.ResolvedAt = &now
 
 	// Handle tag selection if available (supports both checkbox and multi-select)
 	if block, ok := values[slack.BlockIDTicketTags.String()]; ok {

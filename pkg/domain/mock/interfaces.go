@@ -2642,7 +2642,7 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			CountTicketCommentsFunc: func(ctx context.Context, ticketID types.TicketID) (int, error) {
 //				panic("mock out the CountTicketComments method")
 //			},
-//			CountTicketsByStatusFunc: func(ctx context.Context, statuses []types.TicketStatus) (int, error) {
+//			CountTicketsByStatusFunc: func(ctx context.Context, statuses []types.TicketStatus, keyword string, assigneeID string) (int, error) {
 //				panic("mock out the CountTicketsByStatus method")
 //			},
 //			CreateNoticeFunc: func(ctx context.Context, noticeMoqParam *notice.Notice) error {
@@ -2768,7 +2768,7 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetTicketsBySpanFunc: func(ctx context.Context, begin time.Time, end time.Time) ([]*ticket.Ticket, error) {
 //				panic("mock out the GetTicketsBySpan method")
 //			},
-//			GetTicketsByStatusFunc: func(ctx context.Context, statuses []types.TicketStatus, offset int, limit int) ([]*ticket.Ticket, error) {
+//			GetTicketsByStatusFunc: func(ctx context.Context, statuses []types.TicketStatus, keyword string, assigneeID string, offset int, limit int) ([]*ticket.Ticket, error) {
 //				panic("mock out the GetTicketsByStatus method")
 //			},
 //			GetTicketsByStatusAndSpanFunc: func(ctx context.Context, status types.TicketStatus, begin time.Time, end time.Time) ([]*ticket.Ticket, error) {
@@ -2914,7 +2914,7 @@ type RepositoryMock struct {
 	CountTicketCommentsFunc func(ctx context.Context, ticketID types.TicketID) (int, error)
 
 	// CountTicketsByStatusFunc mocks the CountTicketsByStatus method.
-	CountTicketsByStatusFunc func(ctx context.Context, statuses []types.TicketStatus) (int, error)
+	CountTicketsByStatusFunc func(ctx context.Context, statuses []types.TicketStatus, keyword string, assigneeID string) (int, error)
 
 	// CreateNoticeFunc mocks the CreateNotice method.
 	CreateNoticeFunc func(ctx context.Context, noticeMoqParam *notice.Notice) error
@@ -3040,7 +3040,7 @@ type RepositoryMock struct {
 	GetTicketsBySpanFunc func(ctx context.Context, begin time.Time, end time.Time) ([]*ticket.Ticket, error)
 
 	// GetTicketsByStatusFunc mocks the GetTicketsByStatus method.
-	GetTicketsByStatusFunc func(ctx context.Context, statuses []types.TicketStatus, offset int, limit int) ([]*ticket.Ticket, error)
+	GetTicketsByStatusFunc func(ctx context.Context, statuses []types.TicketStatus, keyword string, assigneeID string, offset int, limit int) ([]*ticket.Ticket, error)
 
 	// GetTicketsByStatusAndSpanFunc mocks the GetTicketsByStatusAndSpan method.
 	GetTicketsByStatusAndSpanFunc func(ctx context.Context, status types.TicketStatus, begin time.Time, end time.Time) ([]*ticket.Ticket, error)
@@ -3236,6 +3236,10 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Statuses is the statuses argument value.
 			Statuses []types.TicketStatus
+			// Keyword is the keyword argument value.
+			Keyword string
+			// AssigneeID is the assigneeID argument value.
+			AssigneeID string
 		}
 		// CreateNotice holds details about calls to the CreateNotice method.
 		CreateNotice []struct {
@@ -3566,6 +3570,10 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Statuses is the statuses argument value.
 			Statuses []types.TicketStatus
+			// Keyword is the keyword argument value.
+			Keyword string
+			// AssigneeID is the assigneeID argument value.
+			AssigneeID string
 			// Offset is the offset argument value.
 			Offset int
 			// Limit is the limit argument value.
@@ -4388,13 +4396,17 @@ func (mock *RepositoryMock) CountTicketCommentsCalls() []struct {
 }
 
 // CountTicketsByStatus calls CountTicketsByStatusFunc.
-func (mock *RepositoryMock) CountTicketsByStatus(ctx context.Context, statuses []types.TicketStatus) (int, error) {
+func (mock *RepositoryMock) CountTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, keyword string, assigneeID string) (int, error) {
 	callInfo := struct {
-		Ctx      context.Context
-		Statuses []types.TicketStatus
+		Ctx        context.Context
+		Statuses   []types.TicketStatus
+		Keyword    string
+		AssigneeID string
 	}{
-		Ctx:      ctx,
-		Statuses: statuses,
+		Ctx:        ctx,
+		Statuses:   statuses,
+		Keyword:    keyword,
+		AssigneeID: assigneeID,
 	}
 	mock.lockCountTicketsByStatus.Lock()
 	mock.calls.CountTicketsByStatus = append(mock.calls.CountTicketsByStatus, callInfo)
@@ -4406,7 +4418,7 @@ func (mock *RepositoryMock) CountTicketsByStatus(ctx context.Context, statuses [
 		)
 		return nOut, errOut
 	}
-	return mock.CountTicketsByStatusFunc(ctx, statuses)
+	return mock.CountTicketsByStatusFunc(ctx, statuses, keyword, assigneeID)
 }
 
 // CountTicketsByStatusCalls gets all the calls that were made to CountTicketsByStatus.
@@ -4414,12 +4426,16 @@ func (mock *RepositoryMock) CountTicketsByStatus(ctx context.Context, statuses [
 //
 //	len(mockedRepository.CountTicketsByStatusCalls())
 func (mock *RepositoryMock) CountTicketsByStatusCalls() []struct {
-	Ctx      context.Context
-	Statuses []types.TicketStatus
+	Ctx        context.Context
+	Statuses   []types.TicketStatus
+	Keyword    string
+	AssigneeID string
 } {
 	var calls []struct {
-		Ctx      context.Context
-		Statuses []types.TicketStatus
+		Ctx        context.Context
+		Statuses   []types.TicketStatus
+		Keyword    string
+		AssigneeID string
 	}
 	mock.lockCountTicketsByStatus.RLock()
 	calls = mock.calls.CountTicketsByStatus
@@ -6135,17 +6151,21 @@ func (mock *RepositoryMock) GetTicketsBySpanCalls() []struct {
 }
 
 // GetTicketsByStatus calls GetTicketsByStatusFunc.
-func (mock *RepositoryMock) GetTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, offset int, limit int) ([]*ticket.Ticket, error) {
+func (mock *RepositoryMock) GetTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, keyword string, assigneeID string, offset int, limit int) ([]*ticket.Ticket, error) {
 	callInfo := struct {
-		Ctx      context.Context
-		Statuses []types.TicketStatus
-		Offset   int
-		Limit    int
+		Ctx        context.Context
+		Statuses   []types.TicketStatus
+		Keyword    string
+		AssigneeID string
+		Offset     int
+		Limit      int
 	}{
-		Ctx:      ctx,
-		Statuses: statuses,
-		Offset:   offset,
-		Limit:    limit,
+		Ctx:        ctx,
+		Statuses:   statuses,
+		Keyword:    keyword,
+		AssigneeID: assigneeID,
+		Offset:     offset,
+		Limit:      limit,
 	}
 	mock.lockGetTicketsByStatus.Lock()
 	mock.calls.GetTicketsByStatus = append(mock.calls.GetTicketsByStatus, callInfo)
@@ -6157,7 +6177,7 @@ func (mock *RepositoryMock) GetTicketsByStatus(ctx context.Context, statuses []t
 		)
 		return ticketsOut, errOut
 	}
-	return mock.GetTicketsByStatusFunc(ctx, statuses, offset, limit)
+	return mock.GetTicketsByStatusFunc(ctx, statuses, keyword, assigneeID, offset, limit)
 }
 
 // GetTicketsByStatusCalls gets all the calls that were made to GetTicketsByStatus.
@@ -6165,16 +6185,20 @@ func (mock *RepositoryMock) GetTicketsByStatus(ctx context.Context, statuses []t
 //
 //	len(mockedRepository.GetTicketsByStatusCalls())
 func (mock *RepositoryMock) GetTicketsByStatusCalls() []struct {
-	Ctx      context.Context
-	Statuses []types.TicketStatus
-	Offset   int
-	Limit    int
+	Ctx        context.Context
+	Statuses   []types.TicketStatus
+	Keyword    string
+	AssigneeID string
+	Offset     int
+	Limit      int
 } {
 	var calls []struct {
-		Ctx      context.Context
-		Statuses []types.TicketStatus
-		Offset   int
-		Limit    int
+		Ctx        context.Context
+		Statuses   []types.TicketStatus
+		Keyword    string
+		AssigneeID string
+		Offset     int
+		Limit      int
 	}
 	mock.lockGetTicketsByStatus.RLock()
 	calls = mock.calls.GetTicketsByStatus
