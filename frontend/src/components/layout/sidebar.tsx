@@ -3,7 +3,6 @@ import {
   Home,
   List,
   AlertTriangle,
-  GitBranch,
   Settings,
   BookOpen,
   Brain,
@@ -26,11 +25,6 @@ const navigation = [
     name: "Alerts",
     href: "/alerts",
     icon: AlertTriangle,
-  },
-  {
-    name: "Clusters",
-    href: "/clusters",
-    icon: GitBranch,
   },
   {
     name: "Knowledge",

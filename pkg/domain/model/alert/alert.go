@@ -220,6 +220,23 @@ func (x *Finding) Validate() error {
 	return nil
 }
 
+func CosineSimilarity(a, b []float32) float64 {
+	if len(a) != len(b) {
+		return 0
+	}
+
+	var dotProduct float64
+	var magnitudeA, magnitudeB float64
+
+	for i := range a {
+		dotProduct += float64(a[i]) * float64(b[i])
+		magnitudeA += float64(a[i]) * float64(a[i])
+		magnitudeB += float64(b[i]) * float64(b[i])
+	}
+
+	return dotProduct / (math.Sqrt(magnitudeA) * math.Sqrt(magnitudeB))
+}
+
 func (x *Alert) CosineSimilarity(other []float32) float64 {
 	if len(x.Embedding) == 0 || len(other) == 0 {
 		return 0

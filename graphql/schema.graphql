@@ -117,28 +117,6 @@ type DashboardStats {
   unboundAlerts: [Alert!]!
 }
 
-type AlertCluster {
-  id: ID!
-  centerAlert: Alert!
-  alerts: [Alert!]!
-  size: Int!
-  keywords: [String!]
-  createdAt: String!
-}
-
-type ClusteringSummary {
-  clusters: [AlertCluster!]!
-  noiseAlerts: [Alert!]!
-  parameters: DBSCANParameters!
-  computedAt: String!
-  totalCount: Int!
-}
-
-type DBSCANParameters {
-  eps: Float!
-  minSamples: Int!
-}
-
 type TagMetadata {
   id: ID!
   name: String!
@@ -146,11 +124,6 @@ type TagMetadata {
   color: String!
   createdAt: String!
   updatedAt: String!
-}
-
-type AlertsConnection {
-  alerts: [Alert!]!
-  totalCount: Int!
 }
 
 type Query {
@@ -180,20 +153,6 @@ type Query {
   ): AlertsResponse!
   dashboard: DashboardStats!
   activities(offset: Int, limit: Int): ActivitiesResponse!
-  alertClusters(
-    limit: Int
-    offset: Int
-    minClusterSize: Int
-    eps: Float
-    minSamples: Int
-    keyword: String
-  ): ClusteringSummary!
-  clusterAlerts(
-    clusterID: ID!
-    keyword: String
-    limit: Int
-    offset: Int
-  ): AlertsConnection!
   tags: [TagMetadata!]!
   availableTagColors: [String!]!
   availableTagColorNames: [String!]!
