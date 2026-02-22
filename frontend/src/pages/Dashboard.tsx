@@ -175,11 +175,11 @@ export default function Dashboard() {
               {dashboardLoading ? (
                 <div className="text-sm text-muted-foreground">Loading...</div>
               ) : dashboardData?.dashboard?.openTickets && dashboardData.dashboard.openTickets.length > 0 ? (
-                <div className="divide-y">
+                <div className="space-y-2">
                   {dashboardData.dashboard.openTickets.slice(0, 5).map((ticket) => (
                     <div
                       key={ticket.id}
-                      className="py-3 px-2 cursor-pointer hover:bg-muted/50 transition-colors rounded-md -mx-2"
+                      className="py-3 px-3 cursor-pointer bg-muted/50 hover:bg-muted transition-colors rounded-lg"
                       onClick={() => handleTicketClick(ticket.id)}
                     >
                       <div className="space-y-1.5">
@@ -248,11 +248,11 @@ export default function Dashboard() {
               {dashboardLoading ? (
                 <div className="text-sm text-muted-foreground">Loading...</div>
               ) : dashboardData?.dashboard?.unboundAlerts && dashboardData.dashboard.unboundAlerts.length > 0 ? (
-                <div className="divide-y">
+                <div className="space-y-2">
                   {dashboardData.dashboard.unboundAlerts.slice(0, 5).map((alert) => (
                     <div
                       key={alert.id}
-                      className="py-3 px-2 cursor-pointer hover:bg-muted/50 transition-colors rounded-md -mx-2"
+                      className="py-3 px-3 cursor-pointer bg-muted/50 hover:bg-muted transition-colors rounded-lg"
                       onClick={() => handleAlertClick(alert.id)}
                     >
                       <div className="space-y-1.5">
@@ -294,12 +294,12 @@ export default function Dashboard() {
                 <div className="text-sm text-muted-foreground">Loading...</div>
               ) : activitiesData?.activities?.activities && activitiesData.activities.activities.length > 0 ? (
                 <>
-                  <div className="divide-y">
+                  <div className="space-y-2">
                     {activitiesData.activities.activities.map((activity) => {
                       return (
                         <div
                           key={activity.id}
-                          className="py-3 px-2 cursor-pointer hover:bg-muted/50 transition-colors rounded-md -mx-2"
+                          className="py-3 px-3 cursor-pointer bg-muted/50 hover:bg-muted transition-colors rounded-lg"
                           onClick={() => handleActivityClick(activity)}
                         >
                           <div className="flex items-start gap-3">
