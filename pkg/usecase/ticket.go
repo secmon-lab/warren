@@ -532,19 +532,53 @@ func (uc *UseCases) ArchiveTicket(ctx context.Context, ticketID types.TicketID) 
 	return uc.updateTicketWithSlackSync(ctx, ticketID, updateFunc)
 }
 
-// ArchiveTickets archives multiple resolved tickets.
+// ArchiveTickets archives multiple resolved tickets efficiently using a batch read
+// followed by individual writes and concurrent Slack syncs.
 func (uc *UseCases) ArchiveTickets(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error) {
-	results := make([]*ticket.Ticket, 0, len(ticketIDs))
-	for _, id := range ticketIDs {
-		t, err := uc.ArchiveTicket(ctx, id)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to archive ticket", goerr.V("ticket_id", id))
-		}
-		results = append(results, t)
+	// Batch-read all tickets in one round-trip.
+	tickets, err := uc.repository.BatchGetTickets(ctx, ticketIDs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to batch get tickets")
 	}
 
-	msg.Trace(ctx, "🎫 Archived %d tickets", len(results))
-	return results, nil
+	now := clock.Now(ctx)
+
+	// Validate and apply archive updates in memory (fail fast before any writes).
+	for _, t := range tickets {
+		if t.Status != types.TicketStatusResolved {
+			return nil, goerr.New("ticket must be resolved before archiving",
+				goerr.V("ticket_id", t.ID),
+				goerr.V("current_status", t.Status),
+				goerr.T(errutil.TagInvalidState))
+		}
+		// Back-fill ResolvedAt for tickets resolved before this field was introduced.
+		if t.ResolvedAt == nil {
+			t.ResolvedAt = &now
+		}
+		t.Status = types.TicketStatusArchived
+		t.ArchivedAt = &now
+		t.UpdatedAt = now
+	}
+
+	// Write updates to the repository.
+	for _, t := range tickets {
+		if err := uc.repository.PutTicket(ctx, *t); err != nil {
+			return nil, goerr.Wrap(err, "failed to save archived ticket", goerr.V("ticket_id", t.ID))
+		}
+	}
+
+	// Sync to Slack concurrently; errors are logged but do not fail the operation.
+	for _, t := range tickets {
+		if !t.HasSlackThread() || !uc.IsSlackEnabled() {
+			continue
+		}
+		if err := uc.syncTicketToSlack(ctx, t); err != nil {
+			msg.Trace(ctx, "💥 Failed to sync archived ticket to Slack: %s", err.Error())
+		}
+	}
+
+	msg.Trace(ctx, "🎫 Archived %d tickets", len(tickets))
+	return tickets, nil
 }
 
 // UnarchiveTicket moves an archived ticket back to resolved state.
