@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@apollo/client";
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useConfirm } from "@/hooks/use-confirm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +59,7 @@ export default function TicketsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState<ActiveTab>("active");
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const confirm = useConfirm();
 
   // Filter state
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "resolved">("all");
@@ -146,6 +148,13 @@ export default function TicketsPage() {
   const handleArchiveAllResolved = async () => {
     const ids = resolvedTickets.map(t => t.id);
     if (ids.length === 0) return;
+    const ok = await confirm({
+      title: "Archive All Resolved",
+      description: `Archive ${ids.length} resolved ticket${ids.length > 1 ? "s" : ""}? This cannot be undone easily.`,
+      confirmText: "Archive",
+      variant: "destructive",
+    });
+    if (!ok) return;
     await archiveTickets({ variables: { ids } });
     await refetch();
   };
