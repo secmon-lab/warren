@@ -18,6 +18,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -1018,5 +1019,86 @@ func TestAuthorizeAgentRequest(t *testing.T) {
 		err = uc.AuthorizeAgentRequest(ctxWithUser, "test message")
 		gt.Error(t, err)
 		gt.S(t, err.Error()).Contains("agent request not authorized")
+	})
+}
+
+func TestGenerateChatSystemPrompt(t *testing.T) {
+	t.Run("renders all template variables", func(t *testing.T) {
+		ctx := lang.With(t.Context(), lang.Japanese)
+		target := &ticket.Ticket{
+			ID:    types.NewTicketID(),
+			Topic: "aws-guardduty",
+		}
+
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 5, "", nil, "U12345678")
+		gt.NoError(t, err)
+
+		// Verify requester_id is rendered in mention format
+		gt.S(t, result).Contains("<@U12345678>")
+
+		// Verify lang is rendered
+		gt.S(t, result).Contains("ja")
+
+		// Verify alert count is rendered
+		gt.S(t, result).Contains("5 alerts total")
+
+		// Verify ticket JSON is embedded
+		gt.S(t, result).Contains(string(target.ID))
+
+		// Verify key sections exist
+		gt.S(t, result).Contains("Fundamental Principle")
+		gt.S(t, result).Contains("Facts vs. Hypotheses")
+		gt.S(t, result).Contains("Confirmation Bias")
+		gt.S(t, result).Contains("Severity Assessment Discipline")
+		gt.S(t, result).Contains("Asking Users for Information")
+	})
+
+	t.Run("renders with knowledges", func(t *testing.T) {
+		ctx := lang.With(t.Context(), lang.English)
+		target := &ticket.Ticket{
+			ID:    types.NewTicketID(),
+			Topic: "aws-guardduty",
+		}
+		knowledges := []*knowledge.Knowledge{
+			{
+				Name:    "GuardDuty Basics",
+				Content: "GuardDuty monitors AWS accounts for suspicious activity.",
+			},
+		}
+
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 3, "", knowledges, "U99999999")
+		gt.NoError(t, err)
+
+		gt.S(t, result).Contains("Domain Knowledge")
+		gt.S(t, result).Contains("GuardDuty Basics")
+		gt.S(t, result).Contains("GuardDuty monitors AWS accounts")
+	})
+
+	t.Run("renders with additional instructions", func(t *testing.T) {
+		ctx := lang.With(t.Context(), lang.English)
+		target := &ticket.Ticket{
+			ID: types.NewTicketID(),
+		}
+
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "Use BigQuery for log analysis", nil, "UABC")
+		gt.NoError(t, err)
+
+		gt.S(t, result).Contains("Additional Instructions")
+		gt.S(t, result).Contains("Use BigQuery for log analysis")
+	})
+
+	t.Run("renders with empty requester_id", func(t *testing.T) {
+		ctx := lang.With(t.Context(), lang.English)
+		target := &ticket.Ticket{
+			ID: types.NewTicketID(),
+		}
+
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "")
+		gt.NoError(t, err)
+
+		// Should render without error even with empty requester_id
+		gt.S(t, result).Contains("Asking Users for Information")
+		// Empty mention renders as <@>
+		gt.S(t, result).Contains("<@>")
 	})
 }

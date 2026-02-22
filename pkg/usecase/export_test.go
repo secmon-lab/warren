@@ -71,6 +71,7 @@ func (uc *AuthUseCase) TestGetCache() *TestAuthCache {
 }
 
 var ToolCallToText = toolCallToText
+var GenerateChatSystemPrompt = generateChatSystemPrompt
 
 // GenerateInitialTicketComment exports the private generateInitialTicketComment method for testing
 func (uc *UseCases) GenerateInitialTicketCommentForTest(ctx context.Context, ticketData *ticket.Ticket, alerts alert.Alerts) (string, error) {

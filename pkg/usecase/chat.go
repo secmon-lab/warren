@@ -44,6 +44,18 @@ var (
 	ErrSessionAborted = goerr.New("session aborted by user")
 )
 
+func generateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertCount int, additionalInstructions string, knowledges []*knowledge.Knowledge, requesterID string) (string, error) {
+	return prompt.GenerateWithStruct(ctx, chatSystemPromptTemplate, map[string]any{
+		"ticket":                  target,
+		"total":                   alertCount,
+		"additional_instructions": additionalInstructions,
+		"knowledges":              knowledges,
+		"topic":                   target.Topic,
+		"lang":                    lang.From(ctx),
+		"requester_id":            requesterID,
+	})
+}
+
 func (x *UseCases) setupChatMessageFuncs(ctx context.Context, repo interfaces.Repository, sess *session.Session, target *ticket.Ticket) (msg.NotifyFunc, msg.TraceFunc, msg.TraceFunc, msg.WarnFunc) {
 	threadSvc := x.slackService.NewThread(*target.SlackThread)
 
@@ -332,14 +344,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	}
 
 	// Generate system prompt first (before creating agent)
-	systemPrompt, err := prompt.GenerateWithStruct(ctx, chatSystemPromptTemplate, map[string]any{
-		"ticket":                  target,
-		"total":                   len(alerts),
-		"additional_instructions": additionalInstructions,
-		"knowledges":              knowledges,
-		"topic":                   target.Topic,
-		"lang":                    lang.From(ctx),
-	})
+	systemPrompt, err := generateChatSystemPrompt(ctx, target, len(alerts), additionalInstructions, knowledges, string(userID))
 	if err != nil {
 		return goerr.Wrap(err, "failed to build system prompt")
 	}
