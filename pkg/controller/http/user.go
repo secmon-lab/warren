@@ -45,8 +45,8 @@ func userProfileHandler(uc interfaces.ApiUsecases) http.HandlerFunc {
 			return
 		}
 
-		response := map[string]string{
-			"profile": profile,
+		response := UserProfile{
+			Name: profile,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
