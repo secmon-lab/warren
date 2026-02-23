@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -10,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/secmon-lab/warren/pkg/utils/slackctx"
 )
 
 // agent represents a Slack Search Sub-Agent (private).
@@ -99,6 +101,14 @@ func (a *agent) createMiddleware() func(gollem.SubAgentHandler) gollem.SubAgentH
 				log.Debug("Memories found", "count", len(memories))
 			}
 
+			// Inject Slack context from parent if available
+			if thread := slackctx.ThreadFrom(ctx); thread != nil && thread.ChannelID != "" {
+				args["_slack_context"] = fmt.Sprintf(
+					"Current Slack context: channel_id=%s, thread_ts=%s, team_id=%s",
+					thread.ChannelID, thread.ThreadID, thread.TeamID,
+				)
+			}
+
 			// Inject memory context and limit into args
 			if len(memories) > 0 {
 				args["_memory_context"] = formatMemoryContext(memories)
@@ -152,6 +162,7 @@ func (a *agent) createMiddleware() func(gollem.SubAgentHandler) gollem.SubAgentH
 			delete(result.Data, "_original_request")
 			delete(result.Data, "_memories")
 			delete(result.Data, "_memory_context")
+			delete(result.Data, "_slack_context")
 			delete(result.Data, "_limit")
 
 			return result, nil
