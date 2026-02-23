@@ -15,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
+	"github.com/secmon-lab/warren/pkg/domain/model/refine"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
@@ -2732,6 +2733,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetOrCreateTagByNameFunc: func(ctx context.Context, name string, description string, color string, createdBy string) (*tag.Tag, error) {
 //				panic("mock out the GetOrCreateTagByName method")
 //			},
+//			GetRefineGroupFunc: func(ctx context.Context, groupID types.RefineGroupID) (*refine.Group, error) {
+//				panic("mock out the GetRefineGroup method")
+//			},
 //			GetSessionFunc: func(ctx context.Context, sessionID types.SessionID) (*session.Session, error) {
 //				panic("mock out the GetSession method")
 //			},
@@ -2815,6 +2819,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			PutKnowledgeFunc: func(ctx context.Context, k *knowledge.Knowledge) error {
 //				panic("mock out the PutKnowledge method")
+//			},
+//			PutRefineGroupFunc: func(ctx context.Context, group *refine.Group) error {
+//				panic("mock out the PutRefineGroup method")
 //			},
 //			PutSessionFunc: func(ctx context.Context, sessionMoqParam *session.Session) error {
 //				panic("mock out the PutSession method")
@@ -3003,6 +3010,9 @@ type RepositoryMock struct {
 	// GetOrCreateTagByNameFunc mocks the GetOrCreateTagByName method.
 	GetOrCreateTagByNameFunc func(ctx context.Context, name string, description string, color string, createdBy string) (*tag.Tag, error)
 
+	// GetRefineGroupFunc mocks the GetRefineGroup method.
+	GetRefineGroupFunc func(ctx context.Context, groupID types.RefineGroupID) (*refine.Group, error)
+
 	// GetSessionFunc mocks the GetSession method.
 	GetSessionFunc func(ctx context.Context, sessionID types.SessionID) (*session.Session, error)
 
@@ -3086,6 +3096,9 @@ type RepositoryMock struct {
 
 	// PutKnowledgeFunc mocks the PutKnowledge method.
 	PutKnowledgeFunc func(ctx context.Context, k *knowledge.Knowledge) error
+
+	// PutRefineGroupFunc mocks the PutRefineGroup method.
+	PutRefineGroupFunc func(ctx context.Context, group *refine.Group) error
 
 	// PutSessionFunc mocks the PutSession method.
 	PutSessionFunc func(ctx context.Context, sessionMoqParam *session.Session) error
@@ -3474,6 +3487,13 @@ type RepositoryMock struct {
 			// CreatedBy is the createdBy argument value.
 			CreatedBy string
 		}
+		// GetRefineGroup holds details about calls to the GetRefineGroup method.
+		GetRefineGroup []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// GroupID is the groupID argument value.
+			GroupID types.RefineGroupID
+		}
 		// GetSession holds details about calls to the GetSession method.
 		GetSession []struct {
 			// Ctx is the ctx argument value.
@@ -3684,6 +3704,13 @@ type RepositoryMock struct {
 			// K is the k argument value.
 			K *knowledge.Knowledge
 		}
+		// PutRefineGroup holds details about calls to the PutRefineGroup method.
+		PutRefineGroup []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Group is the group argument value.
+			Group *refine.Group
+		}
 		// PutSession holds details about calls to the PutSession method.
 		PutSession []struct {
 			// Ctx is the ctx argument value.
@@ -3872,6 +3899,7 @@ type RepositoryMock struct {
 	lockGetLatestHistory               sync.RWMutex
 	lockGetNotice                      sync.RWMutex
 	lockGetOrCreateTagByName           sync.RWMutex
+	lockGetRefineGroup                 sync.RWMutex
 	lockGetSession                     sync.RWMutex
 	lockGetSessionMessages             sync.RWMutex
 	lockGetSessionsByTicket            sync.RWMutex
@@ -3900,6 +3928,7 @@ type RepositoryMock struct {
 	lockPutAlertList                   sync.RWMutex
 	lockPutHistory                     sync.RWMutex
 	lockPutKnowledge                   sync.RWMutex
+	lockPutRefineGroup                 sync.RWMutex
 	lockPutSession                     sync.RWMutex
 	lockPutSessionMessage              sync.RWMutex
 	lockPutTicket                      sync.RWMutex
@@ -5658,6 +5687,46 @@ func (mock *RepositoryMock) GetOrCreateTagByNameCalls() []struct {
 	return calls
 }
 
+// GetRefineGroup calls GetRefineGroupFunc.
+func (mock *RepositoryMock) GetRefineGroup(ctx context.Context, groupID types.RefineGroupID) (*refine.Group, error) {
+	callInfo := struct {
+		Ctx     context.Context
+		GroupID types.RefineGroupID
+	}{
+		Ctx:     ctx,
+		GroupID: groupID,
+	}
+	mock.lockGetRefineGroup.Lock()
+	mock.calls.GetRefineGroup = append(mock.calls.GetRefineGroup, callInfo)
+	mock.lockGetRefineGroup.Unlock()
+	if mock.GetRefineGroupFunc == nil {
+		var (
+			groupOut *refine.Group
+			errOut   error
+		)
+		return groupOut, errOut
+	}
+	return mock.GetRefineGroupFunc(ctx, groupID)
+}
+
+// GetRefineGroupCalls gets all the calls that were made to GetRefineGroup.
+// Check the length with:
+//
+//	len(mockedRepository.GetRefineGroupCalls())
+func (mock *RepositoryMock) GetRefineGroupCalls() []struct {
+	Ctx     context.Context
+	GroupID types.RefineGroupID
+} {
+	var calls []struct {
+		Ctx     context.Context
+		GroupID types.RefineGroupID
+	}
+	mock.lockGetRefineGroup.RLock()
+	calls = mock.calls.GetRefineGroup
+	mock.lockGetRefineGroup.RUnlock()
+	return calls
+}
+
 // GetSession calls GetSessionFunc.
 func (mock *RepositoryMock) GetSession(ctx context.Context, sessionID types.SessionID) (*session.Session, error) {
 	callInfo := struct {
@@ -6799,6 +6868,45 @@ func (mock *RepositoryMock) PutKnowledgeCalls() []struct {
 	mock.lockPutKnowledge.RLock()
 	calls = mock.calls.PutKnowledge
 	mock.lockPutKnowledge.RUnlock()
+	return calls
+}
+
+// PutRefineGroup calls PutRefineGroupFunc.
+func (mock *RepositoryMock) PutRefineGroup(ctx context.Context, group *refine.Group) error {
+	callInfo := struct {
+		Ctx   context.Context
+		Group *refine.Group
+	}{
+		Ctx:   ctx,
+		Group: group,
+	}
+	mock.lockPutRefineGroup.Lock()
+	mock.calls.PutRefineGroup = append(mock.calls.PutRefineGroup, callInfo)
+	mock.lockPutRefineGroup.Unlock()
+	if mock.PutRefineGroupFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutRefineGroupFunc(ctx, group)
+}
+
+// PutRefineGroupCalls gets all the calls that were made to PutRefineGroup.
+// Check the length with:
+//
+//	len(mockedRepository.PutRefineGroupCalls())
+func (mock *RepositoryMock) PutRefineGroupCalls() []struct {
+	Ctx   context.Context
+	Group *refine.Group
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Group *refine.Group
+	}
+	mock.lockPutRefineGroup.RLock()
+	calls = mock.calls.PutRefineGroup
+	mock.lockPutRefineGroup.RUnlock()
 	return calls
 }
 
