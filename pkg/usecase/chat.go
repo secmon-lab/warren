@@ -202,6 +202,11 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	logger = logger.With("session_id", ssn.ID)
 	ctx = logging.With(ctx, logger)
 
+	// Set Slack thread in context for sub-agents to access
+	if target.SlackThread != nil {
+		ctx = slackctx.WithThread(ctx, *target.SlackThread)
+	}
+
 	// Setup message functions only if Slack is enabled
 	planFunc := func(ctx context.Context, msg string) {
 	}
