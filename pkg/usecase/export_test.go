@@ -7,7 +7,9 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 // Export private types and functions for testing
@@ -72,6 +74,11 @@ func (uc *AuthUseCase) TestGetCache() *TestAuthCache {
 
 var ToolCallToText = toolCallToText
 var GenerateChatSystemPrompt = generateChatSystemPrompt
+
+// CollectThreadComments exports the private collectThreadComments method for testing
+func (uc *UseCases) CollectThreadComments(ctx context.Context, ticketID types.TicketID, currentSession *session.Session) []ticket.Comment {
+	return uc.collectThreadComments(ctx, ticketID, currentSession)
+}
 
 // GenerateInitialTicketComment exports the private generateInitialTicketComment method for testing
 func (uc *UseCases) GenerateInitialTicketCommentForTest(ctx context.Context, ticketData *ticket.Ticket, alerts alert.Alerts) (string, error) {

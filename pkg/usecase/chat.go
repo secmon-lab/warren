@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
@@ -44,7 +46,7 @@ var (
 	ErrSessionAborted = goerr.New("session aborted by user")
 )
 
-func generateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertCount int, additionalInstructions string, knowledges []*knowledge.Knowledge, requesterID string) (string, error) {
+func generateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertCount int, additionalInstructions string, knowledges []*knowledge.Knowledge, requesterID string, threadComments []ticket.Comment) (string, error) {
 	return prompt.GenerateWithStruct(ctx, chatSystemPromptTemplate, map[string]any{
 		"ticket":                  target,
 		"total":                   alertCount,
@@ -53,7 +55,77 @@ func generateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertC
 		"topic":                   target.Topic,
 		"lang":                    lang.From(ctx),
 		"requester_id":            requesterID,
+		"thread_comments":         threadComments,
 	})
+}
+
+// collectThreadComments retrieves thread comments posted between the previous session and the current session.
+// It uses session timestamps for deduplication: only comments posted after the previous completed session
+// and before the current session are included. Failures are handled gracefully (returns empty slice).
+func (x *UseCases) collectThreadComments(ctx context.Context, ticketID types.TicketID, currentSession *session.Session) []ticket.Comment {
+	logger := logging.From(ctx)
+
+	const maxThreadComments = 50
+
+	// Get all sessions for this ticket
+	sessions, err := x.repository.GetSessionsByTicket(ctx, ticketID)
+	if err != nil {
+		logger.Warn("failed to get sessions for thread comments", "error", err, "ticket_id", ticketID)
+		return nil
+	}
+
+	// Find the previous completed session (the one just before currentSession by CreatedAt)
+	var prevSessionCreatedAt time.Time // zero value means no previous session (first session)
+	for _, s := range sessions {
+		if s.ID == currentSession.ID {
+			continue
+		}
+		if s.Status != types.SessionStatusCompleted {
+			continue
+		}
+		if s.CreatedAt.Before(currentSession.CreatedAt) && s.CreatedAt.After(prevSessionCreatedAt) {
+			prevSessionCreatedAt = s.CreatedAt
+		}
+	}
+
+	logger.Debug("collectThreadComments",
+		"ticket_id", ticketID,
+		"total_sessions", len(sessions),
+		"prev_session_created_at", prevSessionCreatedAt,
+		"current_session_created_at", currentSession.CreatedAt,
+	)
+
+	// Get all comments for this ticket
+	comments, err := x.repository.GetTicketComments(ctx, ticketID)
+	if err != nil {
+		logger.Warn("failed to get ticket comments for thread context", "error", err, "ticket_id", ticketID)
+		return nil
+	}
+
+	// Filter comments: prevSessionCreatedAt < comment.CreatedAt < currentSession.CreatedAt
+	var filtered []ticket.Comment
+	for _, c := range comments {
+		if c.CreatedAt.After(prevSessionCreatedAt) && c.CreatedAt.Before(currentSession.CreatedAt) {
+			filtered = append(filtered, c)
+		}
+	}
+
+	logger.Debug("collectThreadComments filtered",
+		"total_comments", len(comments),
+		"filtered_count", len(filtered),
+	)
+
+	// Sort by CreatedAt ASC for chronological order in prompt
+	sort.Slice(filtered, func(i, j int) bool {
+		return filtered[i].CreatedAt.Before(filtered[j].CreatedAt)
+	})
+
+	// Apply limit (keep the most recent ones)
+	if len(filtered) > maxThreadComments {
+		filtered = filtered[len(filtered)-maxThreadComments:]
+	}
+
+	return filtered
 }
 
 func (x *UseCases) setupChatMessageFuncs(ctx context.Context, repo interfaces.Repository, sess *session.Session, target *ticket.Ticket) (msg.NotifyFunc, msg.TraceFunc, msg.TraceFunc, msg.WarnFunc) {
@@ -343,8 +415,11 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		}
 	}
 
+	// Collect thread comments from between sessions for context
+	threadComments := x.collectThreadComments(ctx, target.ID, ssn)
+
 	// Generate system prompt first (before creating agent)
-	systemPrompt, err := generateChatSystemPrompt(ctx, target, len(alerts), additionalInstructions, knowledges, string(userID))
+	systemPrompt, err := generateChatSystemPrompt(ctx, target, len(alerts), additionalInstructions, knowledges, string(userID), threadComments)
 	if err != nil {
 		return goerr.Wrap(err, "failed to build system prompt")
 	}
@@ -383,7 +458,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		gollem.WithToolSets(tools...),
 		gollem.WithSubAgents(gollemSubAgents...),
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
-		gollem.WithLogger(logging.From(ctx)),
+		// gollem.WithLogger(logging.From(ctx)),
 		gollem.WithSystemPrompt(systemPrompt),
 	}
 

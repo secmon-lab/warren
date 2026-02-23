@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
@@ -20,6 +21,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
@@ -1030,7 +1033,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			Topic: "aws-guardduty",
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 5, "", nil, "U12345678")
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 5, "", nil, "U12345678", nil)
 		gt.NoError(t, err)
 
 		// Verify requester_id is rendered in mention format
@@ -1066,7 +1069,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			},
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 3, "", knowledges, "U99999999")
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 3, "", knowledges, "U99999999", nil)
 		gt.NoError(t, err)
 
 		gt.S(t, result).Contains("Domain Knowledge")
@@ -1080,7 +1083,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			ID: types.NewTicketID(),
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "Use BigQuery for log analysis", nil, "UABC")
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "Use BigQuery for log analysis", nil, "UABC", nil)
 		gt.NoError(t, err)
 
 		gt.S(t, result).Contains("Additional Instructions")
@@ -1093,12 +1096,257 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			ID: types.NewTicketID(),
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "")
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "", nil)
 		gt.NoError(t, err)
 
 		// Should render without error even with empty requester_id
 		gt.S(t, result).Contains("Asking Users for Information")
 		// Empty mention renders as <@>
 		gt.S(t, result).Contains("<@>")
+	})
+
+	t.Run("renders with thread comments", func(t *testing.T) {
+		ctx := lang.With(t.Context(), lang.English)
+		target := &ticket.Ticket{
+			ID: types.NewTicketID(),
+		}
+
+		comments := []ticket.Comment{
+			{
+				Comment:   "I checked the logs and found suspicious activity",
+				User:      &slack.User{ID: "U001", Name: "Alice"},
+				CreatedAt: time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC),
+			},
+			{
+				Comment:   "The IP belongs to a known VPN provider",
+				User:      &slack.User{ID: "U002", Name: "Bob"},
+				CreatedAt: time.Date(2025, 1, 15, 10, 35, 0, 0, time.UTC),
+			},
+		}
+
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", comments)
+		gt.NoError(t, err)
+
+		gt.S(t, result).Contains("Recent Thread Conversations")
+		gt.S(t, result).Contains("Alice")
+		gt.S(t, result).Contains("I checked the logs and found suspicious activity")
+		gt.S(t, result).Contains("Bob")
+		gt.S(t, result).Contains("The IP belongs to a known VPN provider")
+		gt.S(t, result).Contains("2025-01-15 10:30:00")
+	})
+
+	t.Run("hides thread comments section when empty", func(t *testing.T) {
+		ctx := lang.With(t.Context(), lang.English)
+		target := &ticket.Ticket{
+			ID: types.NewTicketID(),
+		}
+
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil)
+		gt.NoError(t, err)
+
+		gt.S(t, result).NotContains("Recent Thread Conversations")
+	})
+}
+
+func TestCollectThreadComments(t *testing.T) {
+	ctx := t.Context()
+
+	t.Run("collects comments between previous and current session", func(t *testing.T) {
+		mockRepo := repository.NewMemory()
+		uc := usecase.New(usecase.WithRepository(mockRepo))
+
+		ticketID := types.NewTicketID()
+
+		// Create a previous completed session
+		prevSession := &session.Session{
+			ID:        types.NewSessionID(),
+			TicketID:  ticketID,
+			Status:    types.SessionStatusCompleted,
+			CreatedAt: time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC),
+			UpdatedAt: time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC),
+		}
+		gt.NoError(t, mockRepo.PutSession(ctx, prevSession))
+
+		// Create the current session
+		currentSession := &session.Session{
+			ID:        types.NewSessionID(),
+			TicketID:  ticketID,
+			Status:    types.SessionStatusRunning,
+			CreatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
+			UpdatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
+		}
+		gt.NoError(t, mockRepo.PutSession(ctx, currentSession))
+
+		// Comment before previous session (should be excluded)
+		oldComment := ticket.Comment{
+			ID:        types.NewCommentID(),
+			TicketID:  ticketID,
+			Comment:   "old comment",
+			User:      &slack.User{ID: "U001", Name: "Alice"},
+			CreatedAt: time.Date(2025, 1, 15, 9, 0, 0, 0, time.UTC),
+		}
+		gt.NoError(t, mockRepo.PutTicketComment(ctx, oldComment))
+
+		// Comment between sessions (should be included)
+		midComment := ticket.Comment{
+			ID:        types.NewCommentID(),
+			TicketID:  ticketID,
+			Comment:   "mid comment",
+			User:      &slack.User{ID: "U002", Name: "Bob"},
+			CreatedAt: time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC),
+		}
+		gt.NoError(t, mockRepo.PutTicketComment(ctx, midComment))
+
+		// Comment after current session (should be excluded)
+		futureComment := ticket.Comment{
+			ID:        types.NewCommentID(),
+			TicketID:  ticketID,
+			Comment:   "future comment",
+			User:      &slack.User{ID: "U003", Name: "Charlie"},
+			CreatedAt: time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC),
+		}
+		gt.NoError(t, mockRepo.PutTicketComment(ctx, futureComment))
+
+		result := uc.CollectThreadComments(ctx, ticketID, currentSession)
+		gt.A(t, result).Length(1)
+		gt.V(t, result[0].Comment).Equal("mid comment")
+		gt.V(t, result[0].User.Name).Equal("Bob")
+	})
+
+	t.Run("first session includes all comments before current session", func(t *testing.T) {
+		mockRepo := repository.NewMemory()
+		uc := usecase.New(usecase.WithRepository(mockRepo))
+
+		ticketID := types.NewTicketID()
+
+		// Create only the current session (no previous session)
+		currentSession := &session.Session{
+			ID:        types.NewSessionID(),
+			TicketID:  ticketID,
+			Status:    types.SessionStatusRunning,
+			CreatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
+			UpdatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
+		}
+		gt.NoError(t, mockRepo.PutSession(ctx, currentSession))
+
+		// Comments before current session (all should be included)
+		comment1 := ticket.Comment{
+			ID:        types.NewCommentID(),
+			TicketID:  ticketID,
+			Comment:   "first comment",
+			User:      &slack.User{ID: "U001", Name: "Alice"},
+			CreatedAt: time.Date(2025, 1, 15, 9, 0, 0, 0, time.UTC),
+		}
+		gt.NoError(t, mockRepo.PutTicketComment(ctx, comment1))
+
+		comment2 := ticket.Comment{
+			ID:        types.NewCommentID(),
+			TicketID:  ticketID,
+			Comment:   "second comment",
+			User:      &slack.User{ID: "U002", Name: "Bob"},
+			CreatedAt: time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC),
+		}
+		gt.NoError(t, mockRepo.PutTicketComment(ctx, comment2))
+
+		result := uc.CollectThreadComments(ctx, ticketID, currentSession)
+		gt.A(t, result).Length(2)
+		// Should be in chronological order (ASC)
+		gt.V(t, result[0].Comment).Equal("first comment")
+		gt.V(t, result[1].Comment).Equal("second comment")
+	})
+
+	t.Run("returns empty when no comments exist", func(t *testing.T) {
+		mockRepo := repository.NewMemory()
+		uc := usecase.New(usecase.WithRepository(mockRepo))
+
+		ticketID := types.NewTicketID()
+		currentSession := &session.Session{
+			ID:        types.NewSessionID(),
+			TicketID:  ticketID,
+			Status:    types.SessionStatusRunning,
+			CreatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
+			UpdatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
+		}
+		gt.NoError(t, mockRepo.PutSession(ctx, currentSession))
+
+		result := uc.CollectThreadComments(ctx, ticketID, currentSession)
+		gt.A(t, result).Length(0)
+	})
+
+	t.Run("graceful degradation on session fetch failure", func(t *testing.T) {
+		mockRepo := &mock.RepositoryMock{
+			GetSessionsByTicketFunc: func(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error) {
+				return nil, goerr.New("database error")
+			},
+		}
+		uc := usecase.New(usecase.WithRepository(mockRepo))
+
+		ticketID := types.NewTicketID()
+		currentSession := &session.Session{
+			ID:        types.NewSessionID(),
+			TicketID:  ticketID,
+			Status:    types.SessionStatusRunning,
+			CreatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
+		}
+
+		result := uc.CollectThreadComments(ctx, ticketID, currentSession)
+		gt.V(t, result).Nil()
+	})
+
+	t.Run("graceful degradation on comment fetch failure", func(t *testing.T) {
+		mockRepo := &mock.RepositoryMock{
+			GetSessionsByTicketFunc: func(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error) {
+				return []*session.Session{}, nil
+			},
+			GetTicketCommentsFunc: func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
+				return nil, goerr.New("database error")
+			},
+		}
+		uc := usecase.New(usecase.WithRepository(mockRepo))
+
+		ticketID := types.NewTicketID()
+		currentSession := &session.Session{
+			ID:        types.NewSessionID(),
+			TicketID:  ticketID,
+			Status:    types.SessionStatusRunning,
+			CreatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
+		}
+
+		result := uc.CollectThreadComments(ctx, ticketID, currentSession)
+		gt.V(t, result).Nil()
+	})
+
+	t.Run("limits to 50 comments", func(t *testing.T) {
+		mockRepo := repository.NewMemory()
+		uc := usecase.New(usecase.WithRepository(mockRepo))
+
+		ticketID := types.NewTicketID()
+
+		currentSession := &session.Session{
+			ID:        types.NewSessionID(),
+			TicketID:  ticketID,
+			Status:    types.SessionStatusRunning,
+			CreatedAt: time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC),
+			UpdatedAt: time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC),
+		}
+		gt.NoError(t, mockRepo.PutSession(ctx, currentSession))
+
+		// Create 60 comments
+		for i := range 60 {
+			comment := ticket.Comment{
+				ID:        types.NewCommentID(),
+				TicketID:  ticketID,
+				Comment:   fmt.Sprintf("comment %d", i),
+				User:      &slack.User{ID: "U001", Name: "Alice"},
+				CreatedAt: time.Date(2025, 1, 15, 10, i, 0, 0, time.UTC),
+			}
+			gt.NoError(t, mockRepo.PutTicketComment(ctx, comment))
+		}
+
+		result := uc.CollectThreadComments(ctx, ticketID, currentSession)
+		gt.A(t, result).Length(50)
+		// Should keep the most recent 50 (comments 10-59)
+		gt.V(t, result[0].Comment).Equal("comment 10")
+		gt.V(t, result[49].Comment).Equal("comment 59")
 	})
 }
