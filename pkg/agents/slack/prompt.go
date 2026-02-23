@@ -24,7 +24,7 @@ func newPromptTemplate() (*gollem.PromptTemplate, error) {
 	return gollem.NewPromptTemplate(
 		// Template can use _memory_context, _slack_context, and request
 		// _memory_context and _slack_context are injected by middleware (not visible to LLM as parameters)
-		"{{if ._slack_context}}## Current Slack Context\n{{._slack_context}}\nYou are being invoked from within this Slack context. When the user refers to \"this channel\" or \"here\", they mean the channel above. You can use `in:<#channel_id>` syntax to scope your searches.\n\n{{end}}{{if ._memory_context}}{{._memory_context}}\n\n{{end}}{{.request}}",
+		"{{if ._slack_context}}## Current Slack Context\n{{._slack_context}}\nYou are being invoked from within this Slack context. When the user refers to \"this channel\" or \"here\", they mean the channel above. You can use the channel ID to scope your searches, for example: `in:C12345678`.\n\n{{end}}{{if ._memory_context}}{{._memory_context}}\n\n{{end}}{{.request}}",
 		map[string]*gollem.Parameter{
 			// Only define parameters that LLM should know about
 			"request": {
