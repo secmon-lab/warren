@@ -19,6 +19,7 @@ Warren is an AI-powered security alert management platform that streamlines inci
 | [Knowledge Management](./knowledge.md) | Managing organizational security knowledge | All users |
 | [Integration Guide](./integration.md) | API reference and external system integration | System administrators |
 | [Policy Guide](./policy.md) | Writing and managing Rego policies | System administrators |
+| [Experimental Features](./experimental.md) | Experimental features (Refine) | All users |
 
 ## Quick Start Paths
 

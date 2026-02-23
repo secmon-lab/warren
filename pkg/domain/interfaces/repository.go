@@ -10,6 +10,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
+	"github.com/secmon-lab/warren/pkg/domain/model/refine"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
@@ -154,6 +155,10 @@ type Repository interface {
 	// ListAllAgentIDs returns all agent IDs that have memories with their counts and latest memory timestamp
 	// Used for the agent summary list in the UI
 	ListAllAgentIDs(ctx context.Context) ([]*AgentSummary, error)
+
+	// Refine group management
+	PutRefineGroup(ctx context.Context, group *refine.Group) error
+	GetRefineGroup(ctx context.Context, groupID types.RefineGroupID) (*refine.Group, error)
 
 	// Session management
 	PutSession(ctx context.Context, session *session.Session) error

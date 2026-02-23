@@ -66,6 +66,9 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, slac
 
 	case slack.ActionIDEscalate:
 		return uc.handleEscalateAction(ctx, slackUser, slackThread, value)
+
+	case slack.ActionIDCreateTicketFromRefine:
+		return uc.handleCreateTicketFromRefine(ctx, slackUser, slackThread, types.RefineGroupID(value))
 	}
 
 	return nil

@@ -91,6 +91,9 @@ const (
 
 	// For notice
 	ActionIDEscalate ActionID = "escalate"
+
+	// For refine
+	ActionIDCreateTicketFromRefine ActionID = "create_ticket_from_refine"
 )
 
 type Mention struct {

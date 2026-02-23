@@ -10,6 +10,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
+	"github.com/secmon-lab/warren/pkg/domain/model/refine"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -32,6 +33,7 @@ type Memory struct {
 	activities     map[types.ActivityID]*activity.Activity
 	tagsV2         map[string]*tag.Tag // New ID-based tags
 	notices        map[types.NoticeID]*notice.Notice
+	refineGroups   map[types.RefineGroupID]*refine.Group
 	agentMemories  map[types.AgentMemoryID]*memory.AgentMemory
 
 	// Session management
@@ -60,6 +62,7 @@ func New() *Memory {
 		activities:     make(map[types.ActivityID]*activity.Activity),
 		tagsV2:         make(map[string]*tag.Tag),
 		notices:        make(map[types.NoticeID]*notice.Notice),
+		refineGroups:   make(map[types.RefineGroupID]*refine.Group),
 		agentMemories:  make(map[types.AgentMemoryID]*memory.AgentMemory),
 		session:        newSessionStore(),
 		knowledge:      newKnowledgeStore(),
