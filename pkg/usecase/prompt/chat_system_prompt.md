@@ -177,7 +177,7 @@ When sub-agents return `records`, that IS your result. Empty `records` = nothing
 The following messages were posted in this ticket's Slack thread by team members since your last interaction. Use this context to understand the ongoing discussion.
 
 {{ range .thread_comments }}
-**{{ .User.Name }}** ({{ .CreatedAt.Format "2006-01-02 15:04:05" }}):
+*{{ .User.Name }}* ({{ .CreatedAt.Format "2006-01-02 15:04:05" }}):
 {{ .Comment }}
 {{ end }}
 {{- end }}
