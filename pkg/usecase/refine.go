@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -65,14 +66,22 @@ func (uc *UseCases) Refine(ctx context.Context) error {
 
 	logger := logging.From(ctx)
 
+	var errs []error
+
 	logger.Info("starting refine: reviewing open tickets")
 	if err := uc.reviewOpenTickets(ctx); err != nil {
 		logger.Error("failed to review open tickets", "error", err)
+		errs = append(errs, goerr.Wrap(err, "failed to review open tickets"))
 	}
 
 	logger.Info("starting refine: consolidating unbound alerts")
 	if err := uc.consolidateUnboundAlerts(ctx); err != nil {
 		logger.Error("failed to consolidate unbound alerts", "error", err)
+		errs = append(errs, goerr.Wrap(err, "failed to consolidate unbound alerts"))
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
 	logger.Info("refine completed")
