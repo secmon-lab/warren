@@ -169,6 +169,19 @@ When sub-agents return `records`, that IS your result. Empty `records` = nothing
 • Second finding
 ```
 
+{{- if .thread_comments }}
+-----------------------
+
+# Recent Thread Conversations
+
+The following messages were posted in this ticket's Slack thread by team members since your last interaction. Use this context to understand the ongoing discussion.
+
+{{ range .thread_comments }}
+**{{ .User.Name }}** ({{ .CreatedAt.Format "2006-01-02 15:04:05" }}):
+{{ .Comment }}
+{{ end }}
+{{- end }}
+
 {{- if .knowledges }}
 -----------------------
 
