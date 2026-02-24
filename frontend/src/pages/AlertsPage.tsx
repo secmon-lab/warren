@@ -68,10 +68,12 @@ export default function AlertsPage() {
     (tagsData?.tags || []).map((t: TagMetadata) => [t.name, t])
   );
 
+  const refetchQueries = [{ query: GET_ALERTS, variables: { offset: (currentPage - 1) * ITEMS_PER_PAGE, limit: ITEMS_PER_PAGE, status: statusFilter } }];
+
   const [declineAlerts, { loading: decliningAlerts }] = useMutation(
     DECLINE_ALERTS,
     {
-      refetchQueries: [{ query: GET_ALERTS, variables: { offset: (currentPage - 1) * ITEMS_PER_PAGE, limit: ITEMS_PER_PAGE, status: statusFilter } }],
+      refetchQueries,
       onCompleted: (data) => {
         const count = data.declineAlerts.length;
         toast({
@@ -93,7 +95,7 @@ export default function AlertsPage() {
   const [createTicketFromAlerts, { loading: creatingTicket }] = useMutation(
     CREATE_TICKET_FROM_ALERTS,
     {
-      refetchQueries: [{ query: GET_ALERTS, variables: { offset: (currentPage - 1) * ITEMS_PER_PAGE, limit: ITEMS_PER_PAGE, status: statusFilter } }],
+      refetchQueries,
       onCompleted: (data) => {
         toast({
           title: "Ticket created",
