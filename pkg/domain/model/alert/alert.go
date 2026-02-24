@@ -86,9 +86,9 @@ type Alert struct {
 }
 
 // Normalize fills in default values for backward compatibility.
-// Empty Status (from pre-existing Firestore data) is treated as AlertStatusActive.
+// Empty or legacy "unbound" Status (from pre-v0.10.0 Firestore data) is treated as AlertStatusActive.
 func (a *Alert) Normalize() {
-	if a.Status == "" {
+	if a.Status == "" || a.Status == "unbound" {
 		a.Status = AlertStatusActive
 	}
 }
