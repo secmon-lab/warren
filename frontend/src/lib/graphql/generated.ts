@@ -93,7 +93,7 @@ export type AlertAttribute = {
 
 export type AlertStatus =
   | 'DECLINED'
-  | 'UNBOUND';
+  | 'ACTIVE';
 
 export type AlertsResponse = {
   __typename?: 'AlertsResponse';

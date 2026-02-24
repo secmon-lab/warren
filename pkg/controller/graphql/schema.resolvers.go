@@ -885,7 +885,7 @@ func (r *queryResolver) Alerts(ctx context.Context, offset *int, limit *int, sta
 		limitVal = *limit
 	}
 
-	// Default (nil) returns UNBOUND for backward compatibility
+	// Default (nil) returns ACTIVE for backward compatibility
 	if status != nil && *status == alert.AlertStatusDeclined {
 		alerts, err := r.repo.GetDeclinedAlerts(ctx, offsetVal, limitVal)
 		if err != nil {

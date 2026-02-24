@@ -150,7 +150,7 @@ func TestRefine_ConsolidateUnboundAlerts_NotEnoughAlerts(t *testing.T) {
 	a := alert.Alert{
 		ID:        types.NewAlertID(),
 		Schema:    "test-schema",
-		Status:    alert.AlertStatusUnbound,
+		Status:    alert.AlertStatusActive,
 		CreatedAt: time.Now(),
 		Data:      map[string]any{"key": "value"},
 		Metadata: alert.Metadata{
@@ -181,7 +181,7 @@ func TestRefine_ConsolidateUnboundAlerts_WithGroups(t *testing.T) {
 		a := alert.Alert{
 			ID:        types.NewAlertID(),
 			Schema:    "test-schema",
-			Status:    alert.AlertStatusUnbound,
+			Status:    alert.AlertStatusActive,
 			CreatedAt: time.Now(),
 			Data:      map[string]any{"source_ip": "192.168.1.1"},
 			Metadata: alert.Metadata{
@@ -251,7 +251,7 @@ func TestRefine_ConsolidateUnboundAlerts_NoGroups(t *testing.T) {
 		a := alert.Alert{
 			ID:        types.NewAlertID(),
 			Schema:    "test-schema",
-			Status:    alert.AlertStatusUnbound,
+			Status:    alert.AlertStatusActive,
 			CreatedAt: time.Now(),
 			Data:      map[string]any{"key": "value"},
 			Metadata: alert.Metadata{
@@ -304,7 +304,7 @@ func TestHandleCreateTicketFromRefine(t *testing.T) {
 		a := alert.Alert{
 			ID:        id,
 			Schema:    "test-schema",
-			Status:    alert.AlertStatusUnbound,
+			Status:    alert.AlertStatusActive,
 			CreatedAt: time.Now(),
 			Data:      map[string]any{"key": "value"},
 			Metadata: alert.Metadata{

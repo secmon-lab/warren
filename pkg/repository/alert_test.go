@@ -820,7 +820,7 @@ func TestAlertDeclineAndReopen(t *testing.T) {
 		gt.Value(t, declinedCount).Equal(initialDeclinedCount + 2)
 
 		// Re-open alert1 (set back to unbound)
-		gt.NoError(t, repo.UpdateAlertStatus(ctx, alert1.ID, alert.AlertStatusUnbound))
+		gt.NoError(t, repo.UpdateAlertStatus(ctx, alert1.ID, alert.AlertStatusActive))
 
 		// alert1 should be back in unbound alerts
 		unboundAlerts, err = repo.GetAlertWithoutTicket(ctx, 0, 0)
@@ -842,7 +842,7 @@ func TestAlertDeclineAndReopen(t *testing.T) {
 		// Verify alert status after re-open
 		got, err = repo.GetAlert(ctx, alert1.ID)
 		gt.NoError(t, err)
-		gt.Value(t, got.Status).Equal(alert.AlertStatusUnbound)
+		gt.Value(t, got.Status).Equal(alert.AlertStatusActive)
 	}
 
 	t.Run("Memory", func(t *testing.T) {

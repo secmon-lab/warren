@@ -447,13 +447,13 @@ func (uc *UseCases) slackActionReopenAlert(ctx context.Context, slackUser slack.
 		return goerr.New("alert not found", goerr.V("alert_id", targetAlertID))
 	}
 
-	// Update status back to unbound
-	if err := uc.repository.UpdateAlertStatus(ctx, targetAlertID, alert.AlertStatusUnbound); err != nil {
+	// Update status back to active
+	if err := uc.repository.UpdateAlertStatus(ctx, targetAlertID, alert.AlertStatusActive); err != nil {
 		return goerr.Wrap(err, "failed to reopen alert", goerr.V("alert_id", targetAlertID))
 	}
 
-	// Update the Slack message to show unbound state
-	targetAlert.Status = alert.AlertStatusUnbound
+	// Update the Slack message to show active state
+	targetAlert.Status = alert.AlertStatusActive
 	if targetAlert.HasSlackThread() && uc.slackService != nil {
 		alertThread := uc.slackService.NewThread(*targetAlert.SlackThread)
 		if err := alertThread.UpdateAlert(ctx, *targetAlert); err != nil {

@@ -1694,7 +1694,7 @@ type Comment {
 }
 
 enum AlertStatus {
-  UNBOUND
+  ACTIVE
   DECLINED
 }
 

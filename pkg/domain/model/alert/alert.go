@@ -32,7 +32,7 @@ const (
 type AlertStatus string
 
 const (
-	AlertStatusUnbound  AlertStatus = "unbound"
+	AlertStatusActive   AlertStatus = "active"
 	AlertStatusDeclined AlertStatus = "declined"
 )
 
@@ -43,7 +43,7 @@ func (s AlertStatus) MarshalGQL(w io.Writer) {
 	case AlertStatusDeclined:
 		gqlValue = "DECLINED"
 	default:
-		gqlValue = "UNBOUND"
+		gqlValue = "ACTIVE"
 	}
 	_, _ = io.WriteString(w, `"`+gqlValue+`"`)
 }
@@ -55,8 +55,8 @@ func (s *AlertStatus) UnmarshalGQL(v any) error {
 		return fmt.Errorf("AlertStatus must be a string")
 	}
 	switch str {
-	case "UNBOUND":
-		*s = AlertStatusUnbound
+	case "ACTIVE":
+		*s = AlertStatusActive
 	case "DECLINED":
 		*s = AlertStatusDeclined
 	default:
@@ -86,10 +86,10 @@ type Alert struct {
 }
 
 // Normalize fills in default values for backward compatibility.
-// Empty Status (from pre-existing Firestore data) is treated as AlertStatusUnbound.
+// Empty or legacy "unbound" Status (from pre-v0.10.0 Firestore data) is treated as AlertStatusActive.
 func (a *Alert) Normalize() {
-	if a.Status == "" {
-		a.Status = AlertStatusUnbound
+	if a.Status == "" || a.Status == "unbound" {
+		a.Status = AlertStatusActive
 	}
 }
 
@@ -140,7 +140,7 @@ func New(ctx context.Context, schema types.AlertSchema, data any, metadata Metad
 		ID:        types.NewAlertID(),
 		TicketID:  types.EmptyTicketID,
 		Schema:    schema,
-		Status:    AlertStatusUnbound,
+		Status:    AlertStatusActive,
 		CreatedAt: clock.Now(ctx),
 		Metadata:  metadata,
 		Data:      data,
