@@ -92,8 +92,8 @@ export type AlertAttribute = {
 };
 
 export type AlertStatus =
-  | 'DECLINED'
-  | 'ACTIVE';
+  | 'ACTIVE'
+  | 'DECLINED';
 
 export type AlertsResponse = {
   __typename?: 'AlertsResponse';
@@ -169,6 +169,7 @@ export type Mutation = {
   createTag: TagMetadata;
   createTicket: Ticket;
   createTicketFromAlerts: Ticket;
+  declineAlerts: Array<Alert>;
   deleteTag: Scalars['Boolean']['output'];
   reopenTicket: Ticket;
   resolveTicket: Ticket;
@@ -225,6 +226,11 @@ export type MutationCreateTicketFromAlertsArgs = {
   alertIds: Array<Scalars['ID']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   title?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type MutationDeclineAlertsArgs = {
+  ids: Array<Scalars['ID']['input']>;
 };
 
 
@@ -756,6 +762,13 @@ export type UpdateTicketTagsMutationVariables = Exact<{
 
 
 export type UpdateTicketTagsMutation = { __typename?: 'Mutation', updateTicketTags: { __typename?: 'Ticket', id: string, title: string, tags: Array<string>, tagObjects: Array<{ __typename?: 'TagObject', id: string, name: string }> } };
+
+export type DeclineAlertsMutationVariables = Exact<{
+  ids: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
+}>;
+
+
+export type DeclineAlertsMutation = { __typename?: 'Mutation', declineAlerts: Array<{ __typename?: 'Alert', id: string, status: AlertStatus, title: string }> };
 
 export type GetKnowledgeTopicsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1797,6 +1810,33 @@ export function useUpdateTicketTagsMutation(baseOptions?: Apollo.MutationHookOpt
 export type UpdateTicketTagsMutationHookResult = ReturnType<typeof useUpdateTicketTagsMutation>;
 export type UpdateTicketTagsMutationResult = Apollo.MutationResult<UpdateTicketTagsMutation>;
 export type UpdateTicketTagsMutationOptions = Apollo.BaseMutationOptions<UpdateTicketTagsMutation, UpdateTicketTagsMutationVariables>;
+export const DeclineAlertsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeclineAlerts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ids"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"declineAlerts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ids"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ids"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}}]}}]}}]} as unknown as DocumentNode;
+export type DeclineAlertsMutationFn = Apollo.MutationFunction<DeclineAlertsMutation, DeclineAlertsMutationVariables>;
+
+/**
+ * __useDeclineAlertsMutation__
+ *
+ * To run a mutation, you first call `useDeclineAlertsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeclineAlertsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [declineAlertsMutation, { data, loading, error }] = useDeclineAlertsMutation({
+ *   variables: {
+ *      ids: // value for 'ids'
+ *   },
+ * });
+ */
+export function useDeclineAlertsMutation(baseOptions?: Apollo.MutationHookOptions<DeclineAlertsMutation, DeclineAlertsMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<DeclineAlertsMutation, DeclineAlertsMutationVariables>(DeclineAlertsDocument, options);
+      }
+export type DeclineAlertsMutationHookResult = ReturnType<typeof useDeclineAlertsMutation>;
+export type DeclineAlertsMutationResult = Apollo.MutationResult<DeclineAlertsMutation>;
+export type DeclineAlertsMutationOptions = Apollo.BaseMutationOptions<DeclineAlertsMutation, DeclineAlertsMutationVariables>;
 export const GetKnowledgeTopicsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetKnowledgeTopics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"knowledgeTopics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"topic"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}}]}}]} as unknown as DocumentNode;
 
 /**

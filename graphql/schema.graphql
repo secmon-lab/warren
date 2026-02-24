@@ -178,6 +178,7 @@ type Mutation {
   createTag(name: String!): TagMetadata!
   deleteTag(id: ID!): Boolean!
   updateTag(input: UpdateTagInput!): TagMetadata!
+  declineAlerts(ids: [ID!]!): [Alert!]!
 }
 
 input UpdateTagInput {
