@@ -398,20 +398,28 @@ func (uc *UseCases) EscalateNotice(ctx context.Context, noticeID types.NoticeID)
 
 // DeclineAlerts declines multiple alerts by updating their status to declined.
 func (uc *UseCases) DeclineAlerts(ctx context.Context, alertIDs []types.AlertID) ([]*alert.Alert, error) {
+	alerts, err := uc.repository.BatchGetAlerts(ctx, alertIDs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to batch get alerts")
+	}
+
+	if len(alerts) != len(alertIDs) {
+		foundIDs := make(map[types.AlertID]bool, len(alerts))
+		for _, a := range alerts {
+			foundIDs[a.ID] = true
+		}
+		for _, id := range alertIDs {
+			if !foundIDs[id] {
+				return nil, goerr.New("alert not found", goerr.V("alert_id", id))
+			}
+		}
+	}
+
 	var results []*alert.Alert
-	for _, alertID := range alertIDs {
-		a, err := uc.repository.GetAlert(ctx, alertID)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get alert", goerr.V("alert_id", alertID))
+	for _, a := range alerts {
+		if err := uc.repository.UpdateAlertStatus(ctx, a.ID, alert.AlertStatusDeclined); err != nil {
+			return nil, goerr.Wrap(err, "failed to decline alert", goerr.V("alert_id", a.ID))
 		}
-		if a == nil {
-			return nil, goerr.New("alert not found", goerr.V("alert_id", alertID))
-		}
-
-		if err := uc.repository.UpdateAlertStatus(ctx, alertID, alert.AlertStatusDeclined); err != nil {
-			return nil, goerr.Wrap(err, "failed to decline alert", goerr.V("alert_id", alertID))
-		}
-
 		a.Status = alert.AlertStatusDeclined
 		results = append(results, a)
 	}
