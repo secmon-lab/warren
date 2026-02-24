@@ -26,7 +26,7 @@ interface AlertsData {
 export default function AlertsPage() {
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<AlertStatus>("UNBOUND");
+  const [statusFilter, setStatusFilter] = useState<AlertStatus>("ACTIVE");
   const ITEMS_PER_PAGE = 10;
 
   const handleStatusChange = (newStatus: AlertStatus) => {
@@ -130,7 +130,7 @@ export default function AlertsPage() {
       {/* Status filter tabs */}
       <div className="flex gap-2">
         {[
-          { status: "UNBOUND" as AlertStatus, label: "New", icon: AlertTriangle },
+          { status: "ACTIVE" as AlertStatus, label: "New", icon: AlertTriangle },
           { status: "DECLINED" as AlertStatus, label: "Declined", icon: Ban },
         ].map(({ status, label, icon: Icon }) => (
           <Button

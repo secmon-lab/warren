@@ -280,7 +280,7 @@ func (r *Firestore) SearchAlerts(ctx context.Context, path, op string, value any
 func (r *Firestore) GetAlertWithoutTicket(ctx context.Context, offset, limit int) (alert.Alerts, error) {
 	query := r.db.Collection(collectionAlerts).
 		Where("TicketID", "==", "").
-		Where("Status", "in", []string{string(alert.AlertStatusUnbound), ""})
+		Where("Status", "in", []string{string(alert.AlertStatusActive), "unbound", ""})
 
 	// Apply offset and limit to the query
 	if offset > 0 {
@@ -316,7 +316,7 @@ func (r *Firestore) GetAlertWithoutTicket(ctx context.Context, offset, limit int
 func (r *Firestore) CountAlertsWithoutTicket(ctx context.Context) (int, error) {
 	query := r.db.Collection(collectionAlerts).
 		Where("TicketID", "==", "").
-		Where("Status", "in", []string{string(alert.AlertStatusUnbound), ""})
+		Where("Status", "in", []string{string(alert.AlertStatusActive), "unbound", ""})
 
 	result, err := query.NewAggregationQuery().WithCount("total").Get(ctx)
 	if err != nil {

@@ -133,7 +133,7 @@ func (r *Memory) GetAlertWithoutTicket(ctx context.Context, offset, limit int) (
 	var alerts alert.Alerts
 	for _, a := range r.alerts {
 		a.Normalize()
-		if a.TicketID == types.EmptyTicketID && (a.Status == alert.AlertStatusUnbound || a.Status == "") {
+		if a.TicketID == types.EmptyTicketID && (a.Status == alert.AlertStatusActive || a.Status == "") {
 			alerts = append(alerts, a)
 		}
 	}
@@ -164,7 +164,7 @@ func (r *Memory) CountAlertsWithoutTicket(ctx context.Context) (int, error) {
 	count := 0
 	for _, a := range r.alerts {
 		a.Normalize()
-		if a.TicketID == types.EmptyTicketID && (a.Status == alert.AlertStatusUnbound || a.Status == "") {
+		if a.TicketID == types.EmptyTicketID && (a.Status == alert.AlertStatusActive || a.Status == "") {
 			count++
 		}
 	}
