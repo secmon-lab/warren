@@ -688,6 +688,16 @@ export const UPDATE_TICKET_TAGS = gql`
   }
 `;
 
+export const DECLINE_ALERTS = gql`
+  mutation DeclineAlerts($ids: [ID!]!) {
+    declineAlerts(ids: $ids) {
+      id
+      status
+      title
+    }
+  }
+`;
+
 export const GET_KNOWLEDGE_TOPICS = gql`
   query GetKnowledgeTopics {
     knowledgeTopics {

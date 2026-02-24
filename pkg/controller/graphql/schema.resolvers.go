@@ -510,6 +510,21 @@ func (r *mutationResolver) UpdateTag(ctx context.Context, input graphql1.UpdateT
 	}, nil
 }
 
+// DeclineAlerts is the resolver for the declineAlerts field.
+func (r *mutationResolver) DeclineAlerts(ctx context.Context, ids []string) ([]*alert.Alert, error) {
+	alertIDs := make([]types.AlertID, len(ids))
+	for i, id := range ids {
+		alertIDs[i] = types.AlertID(id)
+	}
+
+	results, err := r.uc.DeclineAlerts(ctx, alertIDs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to decline alerts")
+	}
+
+	return results, nil
+}
+
 // CreateKnowledge is the resolver for the createKnowledge field.
 func (r *mutationResolver) CreateKnowledge(ctx context.Context, input graphql1.CreateKnowledgeInput) (*graphql1.Knowledge, error) {
 	// Extract user information from authentication context

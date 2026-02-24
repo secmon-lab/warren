@@ -395,3 +395,26 @@ func (uc *UseCases) EscalateNotice(ctx context.Context, noticeID types.NoticeID)
 	logger.Info("notice escalated to alert", "notice_id", noticeID, "alert_id", escalatedAlert.ID)
 	return &escalatedAlert, nil
 }
+
+// DeclineAlerts declines multiple alerts by updating their status to declined.
+func (uc *UseCases) DeclineAlerts(ctx context.Context, alertIDs []types.AlertID) ([]*alert.Alert, error) {
+	var results []*alert.Alert
+	for _, alertID := range alertIDs {
+		a, err := uc.repository.GetAlert(ctx, alertID)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to get alert", goerr.V("alert_id", alertID))
+		}
+		if a == nil {
+			return nil, goerr.New("alert not found", goerr.V("alert_id", alertID))
+		}
+
+		if err := uc.repository.UpdateAlertStatus(ctx, alertID, alert.AlertStatusDeclined); err != nil {
+			return nil, goerr.Wrap(err, "failed to decline alert", goerr.V("alert_id", alertID))
+		}
+
+		a.Status = alert.AlertStatusDeclined
+		results = append(results, a)
+	}
+
+	return results, nil
+}

@@ -165,6 +165,7 @@ type ComplexityRoot struct {
 		CreateTag              func(childComplexity int, name string) int
 		CreateTicket           func(childComplexity int, title string, description string, isTest *bool) int
 		CreateTicketFromAlerts func(childComplexity int, alertIds []string, title *string, description *string) int
+		DeclineAlerts          func(childComplexity int, ids []string) int
 		DeleteTag              func(childComplexity int, id string) int
 		ReopenTicket           func(childComplexity int, id string) int
 		ResolveTicket          func(childComplexity int, id string, conclusion string, reason string) int
@@ -325,6 +326,7 @@ type MutationResolver interface {
 	CreateTag(ctx context.Context, name string) (*graphql1.TagMetadata, error)
 	DeleteTag(ctx context.Context, id string) (bool, error)
 	UpdateTag(ctx context.Context, input graphql1.UpdateTagInput) (*graphql1.TagMetadata, error)
+	DeclineAlerts(ctx context.Context, ids []string) ([]*alert.Alert, error)
 	CreateKnowledge(ctx context.Context, input graphql1.CreateKnowledgeInput) (*graphql1.Knowledge, error)
 	UpdateKnowledge(ctx context.Context, input graphql1.UpdateKnowledgeInput) (*graphql1.Knowledge, error)
 	ArchiveKnowledge(ctx context.Context, topic string, slug string) (bool, error)
@@ -913,6 +915,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateTicketFromAlerts(childComplexity, args["alertIds"].([]string), args["title"].(*string), args["description"].(*string)), true
+	case "Mutation.declineAlerts":
+		if e.ComplexityRoot.Mutation.DeclineAlerts == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_declineAlerts_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeclineAlerts(childComplexity, args["ids"].([]string)), true
 	case "Mutation.deleteTag":
 		if e.ComplexityRoot.Mutation.DeleteTag == nil {
 			break
@@ -1829,6 +1842,7 @@ type Mutation {
   createTag(name: String!): TagMetadata!
   deleteTag(id: ID!): Boolean!
   updateTag(input: UpdateTagInput!): TagMetadata!
+  declineAlerts(ids: [ID!]!): [Alert!]!
 }
 
 input UpdateTagInput {
@@ -2088,6 +2102,17 @@ func (ec *executionContext) field_Mutation_createTicket_args(ctx context.Context
 		return nil, err
 	}
 	args["isTest"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_declineAlerts_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "ids", ec.unmarshalNID2ᚕstringᚄ)
+	if err != nil {
+		return nil, err
+	}
+	args["ids"] = arg0
 	return args, nil
 }
 
@@ -6148,6 +6173,71 @@ func (ec *executionContext) fieldContext_Mutation_updateTag(ctx context.Context,
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateTag_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_declineAlerts(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_declineAlerts,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeclineAlerts(ctx, fc.Args["ids"].([]string))
+		},
+		nil,
+		ec.marshalNAlert2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐAlertᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_declineAlerts(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Alert_id(ctx, field)
+			case "title":
+				return ec.fieldContext_Alert_title(ctx, field)
+			case "description":
+				return ec.fieldContext_Alert_description(ctx, field)
+			case "schema":
+				return ec.fieldContext_Alert_schema(ctx, field)
+			case "data":
+				return ec.fieldContext_Alert_data(ctx, field)
+			case "attributes":
+				return ec.fieldContext_Alert_attributes(ctx, field)
+			case "status":
+				return ec.fieldContext_Alert_status(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Alert_createdAt(ctx, field)
+			case "ticket":
+				return ec.fieldContext_Alert_ticket(ctx, field)
+			case "tags":
+				return ec.fieldContext_Alert_tags(ctx, field)
+			case "tagObjects":
+				return ec.fieldContext_Alert_tagObjects(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Alert", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_declineAlerts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -12177,6 +12267,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateTag":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateTag(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "declineAlerts":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_declineAlerts(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
