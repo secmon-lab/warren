@@ -367,7 +367,7 @@ func TestInternalTool_SearchEvents_Immediate(t *testing.T) {
 
 			w.Header().Set("Content-Type", "application/json")
 			err = json.NewEncoder(w).Encode(map[string]any{
-				"id":               "job-123",
+				"id":                "job-123",
 				"hashedQueryOnView": "abc",
 			})
 			gt.NoError(t, err)
