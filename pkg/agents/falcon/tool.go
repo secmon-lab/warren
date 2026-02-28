@@ -15,6 +15,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
@@ -205,6 +206,7 @@ func (t *internalTool) doRequest(ctx context.Context, method, path string, body 
 	var apiErr *apiError
 	if errors.As(err, &apiErr) && apiErr.statusCode == http.StatusUnauthorized {
 		log.Debug("Received 401, clearing token and retrying")
+		msg.Trace(ctx, "🔄 Received 401, refreshing token and retrying...")
 		t.tokenProvider.clearToken()
 		return t.doRequestOnce(ctx, method, path, body)
 	}
@@ -285,12 +287,21 @@ func (t *internalTool) doRequestOnce(ctx context.Context, method, path string, b
 
 // searchIncidents searches for incident IDs using FQL filters.
 func (t *internalTool) searchIncidents(ctx context.Context, args map[string]any) (map[string]any, error) {
+	filter, _ := args["filter"].(string)
+	msg.Trace(ctx, "🔍 Searching incidents (filter: `%s`)", filter)
+
 	path := "/incidents/queries/incidents/v1"
 	params := buildQueryParams(args, "filter", "sort", "limit", "offset")
 	if params != "" {
 		path += "?" + params
 	}
-	return t.doRequest(ctx, http.MethodGet, path, nil)
+	result, err := t.doRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		msg.Trace(ctx, "❌ Incident search failed: %v", err)
+		return nil, err
+	}
+	msg.Trace(ctx, "✅ Incident search completed")
+	return result, nil
 }
 
 // getIncidents retrieves incident details by IDs.
@@ -300,16 +311,26 @@ func (t *internalTool) getIncidents(ctx context.Context, args map[string]any) (m
 		return nil, goerr.New("ids is required")
 	}
 
+	msg.Trace(ctx, "📋 Retrieving incident details (ids: `%s`)", ids)
 	body := map[string]any{
 		"ids": splitAndTrim(ids),
 	}
-	return t.doRequest(ctx, http.MethodPost, "/incidents/entities/incidents/GET/v1", body)
+	result, err := t.doRequest(ctx, http.MethodPost, "/incidents/entities/incidents/GET/v1", body)
+	if err != nil {
+		msg.Trace(ctx, "❌ Failed to retrieve incidents: %v", err)
+		return nil, err
+	}
+	msg.Trace(ctx, "✅ Retrieved incident details")
+	return result, nil
 }
 
 // searchAlerts searches and retrieves alert details using FQL filters.
 func (t *internalTool) searchAlerts(ctx context.Context, args map[string]any) (map[string]any, error) {
+	filter, _ := args["filter"].(string)
+	msg.Trace(ctx, "🔍 Searching alerts (filter: `%s`)", filter)
+
 	body := make(map[string]any)
-	if filter, ok := args["filter"].(string); ok && filter != "" {
+	if filter != "" {
 		body["filter"] = filter
 	}
 	if sort, ok := args["sort"].(string); ok && sort != "" {
@@ -321,7 +342,13 @@ func (t *internalTool) searchAlerts(ctx context.Context, args map[string]any) (m
 	if after, ok := args["after"].(string); ok && after != "" {
 		body["after"] = after
 	}
-	return t.doRequest(ctx, http.MethodPost, "/alerts/combined/alerts/v1", body)
+	result, err := t.doRequest(ctx, http.MethodPost, "/alerts/combined/alerts/v1", body)
+	if err != nil {
+		msg.Trace(ctx, "❌ Alert search failed: %v", err)
+		return nil, err
+	}
+	msg.Trace(ctx, "✅ Alert search completed")
+	return result, nil
 }
 
 // getAlerts retrieves alert details by composite IDs.
@@ -331,20 +358,36 @@ func (t *internalTool) getAlerts(ctx context.Context, args map[string]any) (map[
 		return nil, goerr.New("composite_ids is required")
 	}
 
+	msg.Trace(ctx, "📋 Retrieving alert details (ids: `%s`)", compositeIDs)
 	body := map[string]any{
 		"composite_ids": splitAndTrim(compositeIDs),
 	}
-	return t.doRequest(ctx, http.MethodPost, "/alerts/entities/alerts/v2", body)
+	result, err := t.doRequest(ctx, http.MethodPost, "/alerts/entities/alerts/v2", body)
+	if err != nil {
+		msg.Trace(ctx, "❌ Failed to retrieve alerts: %v", err)
+		return nil, err
+	}
+	msg.Trace(ctx, "✅ Retrieved alert details")
+	return result, nil
 }
 
 // searchBehaviors searches for behavior IDs using FQL filters.
 func (t *internalTool) searchBehaviors(ctx context.Context, args map[string]any) (map[string]any, error) {
+	filter, _ := args["filter"].(string)
+	msg.Trace(ctx, "🔍 Searching behaviors (filter: `%s`)", filter)
+
 	path := "/incidents/queries/behaviors/v1"
 	params := buildQueryParams(args, "filter", "limit", "offset")
 	if params != "" {
 		path += "?" + params
 	}
-	return t.doRequest(ctx, http.MethodGet, path, nil)
+	result, err := t.doRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		msg.Trace(ctx, "❌ Behavior search failed: %v", err)
+		return nil, err
+	}
+	msg.Trace(ctx, "✅ Behavior search completed")
+	return result, nil
 }
 
 // getBehaviors retrieves behavior details by IDs.
@@ -354,20 +397,36 @@ func (t *internalTool) getBehaviors(ctx context.Context, args map[string]any) (m
 		return nil, goerr.New("ids is required")
 	}
 
+	msg.Trace(ctx, "📋 Retrieving behavior details (ids: `%s`)", ids)
 	body := map[string]any{
 		"ids": splitAndTrim(ids),
 	}
-	return t.doRequest(ctx, http.MethodPost, "/incidents/entities/behaviors/GET/v1", body)
+	result, err := t.doRequest(ctx, http.MethodPost, "/incidents/entities/behaviors/GET/v1", body)
+	if err != nil {
+		msg.Trace(ctx, "❌ Failed to retrieve behaviors: %v", err)
+		return nil, err
+	}
+	msg.Trace(ctx, "✅ Retrieved behavior details")
+	return result, nil
 }
 
 // getCrowdScores retrieves CrowdScore values.
 func (t *internalTool) getCrowdScores(ctx context.Context, args map[string]any) (map[string]any, error) {
+	filter, _ := args["filter"].(string)
+	msg.Trace(ctx, "📊 Retrieving CrowdScores (filter: `%s`)", filter)
+
 	path := "/incidents/combined/crowdscores/v1"
 	params := buildQueryParams(args, "filter")
 	if params != "" {
 		path += "?" + params
 	}
-	return t.doRequest(ctx, http.MethodGet, path, nil)
+	result, err := t.doRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		msg.Trace(ctx, "❌ CrowdScore retrieval failed: %v", err)
+		return nil, err
+	}
+	msg.Trace(ctx, "✅ CrowdScores retrieved")
+	return result, nil
 }
 
 // searchEvents runs a CQL query via the Next-Gen SIEM Search API.
@@ -400,9 +459,11 @@ func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (m
 	}
 
 	// Step 1: Create query job
+	msg.Trace(ctx, "🔍 Searching events (query: `%s`, repo: `%s`)", queryString, repository)
 	jobPath := fmt.Sprintf("/humio/api/v1/repositories/%s/queryjobs", repository)
 	jobResp, err := t.doRequest(ctx, http.MethodPost, jobPath, body)
 	if err != nil {
+		msg.Trace(ctx, "❌ Failed to create event search job: %v", err)
 		return nil, goerr.Wrap(err, "failed to create event search query job",
 			goerr.V("repository", repository),
 			goerr.V("query", queryString),
@@ -411,12 +472,14 @@ func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (m
 
 	jobID, ok := jobResp["id"].(string)
 	if !ok || jobID == "" {
+		msg.Trace(ctx, "❌ No job ID returned from event search")
 		return nil, goerr.New("no job ID returned from query job creation",
 			goerr.V("response", jobResp),
 		)
 	}
 
 	log.Debug("Event search query job created", "job_id", jobID, "repository", repository)
+	msg.Trace(ctx, "⏳ Event search job created (job_id: `%s`), polling for results...", jobID)
 
 	// Step 2: Poll for results until done
 	resultPath := fmt.Sprintf("/humio/api/v1/repositories/%s/queryjobs/%s", repository, jobID)
@@ -438,6 +501,7 @@ func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (m
 
 		pollResp, err := t.doRequest(ctx, http.MethodGet, resultPath, nil)
 		if err != nil {
+			msg.Trace(ctx, "❌ Failed to poll event search results (attempt %d): %v", i+1, err)
 			return nil, goerr.Wrap(err, "failed to poll event search results",
 				goerr.V("job_id", jobID),
 				goerr.V("poll_attempt", i+1),
@@ -456,6 +520,7 @@ func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (m
 				"total_events", len(allEvents),
 				"polls", i+1,
 			)
+			msg.Trace(ctx, "✅ Event search completed: %d events retrieved", len(allEvents))
 
 			result := map[string]any{
 				"done":       true,
@@ -483,6 +548,7 @@ func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (m
 		"job_id", jobID,
 		"total_events", len(allEvents),
 	)
+	msg.Trace(ctx, "⚠️ Event search reached poll limit, returning %d partial results", len(allEvents))
 
 	return map[string]any{
 		"done":       false,
