@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Falcon agent enables Warren to query CrowdStrike Falcon for security incidents, alerts, behaviors, and CrowdScores. This is a **read-only** agent — it does not modify any data in your Falcon environment.
+The Falcon agent enables Warren to query CrowdStrike Falcon for security incidents, alerts, behaviors, CrowdScores, and EDR telemetry events. This is a **read-only** agent — it does not modify any data in your Falcon environment.
 
 ## Prerequisites
 
@@ -23,8 +23,9 @@ The Falcon agent enables Warren to query CrowdStrike Falcon for security inciden
 |---|---|---|
 | **Incidents** | Read | Search and retrieve incident details, behaviors |
 | **Alerts** | Read | Search and retrieve alert details, aggregates |
+| **NGSIEM** | Read + Write | Search EDR telemetry events via Next-Gen SIEM API |
 
-> **Note:** Only **Read** permission is required. Do not grant Write permission unless needed for other integrations.
+> **Note:** The NGSIEM scope requires both Read and Write permissions because the Search API uses Write to create query jobs and Read to retrieve results. Despite requiring Write permission, this agent only performs read operations (search queries) — it does not modify any data.
 
 ## Cloud Regions
 
@@ -115,6 +116,14 @@ The agent exposes the following read-only tools to the LLM:
 |---|---|
 | `falcon_get_crowdscores` | Get CrowdScore values for your environment |
 
+### Events (EDR Telemetry)
+
+| Tool | Description |
+|---|---|
+| `falcon_search_events` | Search raw EDR events using CQL (process executions, network connections, DNS, file writes, etc.) |
+
+> **Note:** Event search uses the Next-Gen SIEM Search API, which runs queries asynchronously. The tool handles job creation and polling internally — results are returned once the search completes.
+
 ## Troubleshooting
 
 ### Agent not appearing in available tools
@@ -129,11 +138,12 @@ Verify that both `WARREN_AGENT_FALCON_CLIENT_ID` and `WARREN_AGENT_FALCON_CLIENT
 
 ### 403 Forbidden errors
 
-- Verify the API client has the required scopes (`Incidents: Read`, `Alerts: Read`)
+- Verify the API client has the required scopes (`Incidents: Read`, `Alerts: Read`, `NGSIEM: Read + Write`)
 - Check that the API client is active and not expired
 
 ### Empty results
 
 - Verify FQL filter syntax (values must be quoted, e.g., `status:'new'` not `status:new`)
+- For event search, verify CQL syntax (e.g., `aid=abc123`, `#event_simpleName=ProcessRollup2`)
 - Check the time range — CrowdStrike may have data retention limits
 - Use simpler filters first, then refine
