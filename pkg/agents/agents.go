@@ -6,6 +6,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/agents/bigquery"
+	"github.com/secmon-lab/warren/pkg/agents/falcon"
 	"github.com/secmon-lab/warren/pkg/agents/slack"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
@@ -16,6 +17,7 @@ import (
 // To add a new agent, simply append its Factory to this list.
 var All = []AgentFactory{
 	&bigquery.Factory{},
+	&falcon.Factory{},
 	&slack.Factory{},
 }
 
