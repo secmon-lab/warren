@@ -394,7 +394,7 @@ func newLLMClient(t *testing.T) gollem.LLMClient {
 		t.Skip("TEST_GEMINI_LOCATION is not set")
 	}
 
-	client, err := gemini.New(t.Context(), projectID, location, gemini.WithModel("gemini-2.0-flash"))
+	client, err := gemini.New(t.Context(), projectID, location, gemini.WithModel("gemini-2.5-flash"))
 	gt.NoError(t, err)
 	return client
 }
