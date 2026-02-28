@@ -297,7 +297,7 @@ func (t *internalTool) searchIncidents(ctx context.Context, args map[string]any)
 	}
 	result, err := t.doRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
-		msg.Trace(ctx, "❌ Incident search failed: %v", err)
+		msg.Warn(ctx, "⚠️ *[Falcon]* Incident search failed (filter: `%s`): %v", filter, err)
 		return nil, err
 	}
 	msg.Trace(ctx, "✅ Incident search completed")
@@ -317,7 +317,7 @@ func (t *internalTool) getIncidents(ctx context.Context, args map[string]any) (m
 	}
 	result, err := t.doRequest(ctx, http.MethodPost, "/incidents/entities/incidents/GET/v1", body)
 	if err != nil {
-		msg.Trace(ctx, "❌ Failed to retrieve incidents: %v", err)
+		msg.Warn(ctx, "⚠️ *[Falcon]* Failed to retrieve incidents (ids: `%s`): %v", ids, err)
 		return nil, err
 	}
 	msg.Trace(ctx, "✅ Retrieved incident details")
@@ -344,7 +344,7 @@ func (t *internalTool) searchAlerts(ctx context.Context, args map[string]any) (m
 	}
 	result, err := t.doRequest(ctx, http.MethodPost, "/alerts/combined/alerts/v1", body)
 	if err != nil {
-		msg.Trace(ctx, "❌ Alert search failed: %v", err)
+		msg.Warn(ctx, "⚠️ *[Falcon]* Alert search failed (filter: `%s`): %v", filter, err)
 		return nil, err
 	}
 	msg.Trace(ctx, "✅ Alert search completed")
@@ -364,7 +364,7 @@ func (t *internalTool) getAlerts(ctx context.Context, args map[string]any) (map[
 	}
 	result, err := t.doRequest(ctx, http.MethodPost, "/alerts/entities/alerts/v2", body)
 	if err != nil {
-		msg.Trace(ctx, "❌ Failed to retrieve alerts: %v", err)
+		msg.Warn(ctx, "⚠️ *[Falcon]* Failed to retrieve alerts (ids: `%s`): %v", compositeIDs, err)
 		return nil, err
 	}
 	msg.Trace(ctx, "✅ Retrieved alert details")
@@ -383,7 +383,7 @@ func (t *internalTool) searchBehaviors(ctx context.Context, args map[string]any)
 	}
 	result, err := t.doRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
-		msg.Trace(ctx, "❌ Behavior search failed: %v", err)
+		msg.Warn(ctx, "⚠️ *[Falcon]* Behavior search failed (filter: `%s`): %v", filter, err)
 		return nil, err
 	}
 	msg.Trace(ctx, "✅ Behavior search completed")
@@ -403,7 +403,7 @@ func (t *internalTool) getBehaviors(ctx context.Context, args map[string]any) (m
 	}
 	result, err := t.doRequest(ctx, http.MethodPost, "/incidents/entities/behaviors/GET/v1", body)
 	if err != nil {
-		msg.Trace(ctx, "❌ Failed to retrieve behaviors: %v", err)
+		msg.Warn(ctx, "⚠️ *[Falcon]* Failed to retrieve behaviors (ids: `%s`): %v", ids, err)
 		return nil, err
 	}
 	msg.Trace(ctx, "✅ Retrieved behavior details")
@@ -422,7 +422,7 @@ func (t *internalTool) getCrowdScores(ctx context.Context, args map[string]any) 
 	}
 	result, err := t.doRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
-		msg.Trace(ctx, "❌ CrowdScore retrieval failed: %v", err)
+		msg.Warn(ctx, "⚠️ *[Falcon]* CrowdScore retrieval failed (filter: `%s`): %v", filter, err)
 		return nil, err
 	}
 	msg.Trace(ctx, "✅ CrowdScores retrieved")
@@ -463,7 +463,7 @@ func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (m
 	jobPath := fmt.Sprintf("/humio/api/v1/repositories/%s/queryjobs", repository)
 	jobResp, err := t.doRequest(ctx, http.MethodPost, jobPath, body)
 	if err != nil {
-		msg.Trace(ctx, "❌ Failed to create event search job: %v", err)
+		msg.Warn(ctx, "⚠️ *[Falcon]* Failed to create event search job (query: `%s`): %v", queryString, err)
 		return nil, goerr.Wrap(err, "failed to create event search query job",
 			goerr.V("repository", repository),
 			goerr.V("query", queryString),
@@ -472,7 +472,7 @@ func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (m
 
 	jobID, ok := jobResp["id"].(string)
 	if !ok || jobID == "" {
-		msg.Trace(ctx, "❌ No job ID returned from event search")
+		msg.Warn(ctx, "⚠️ *[Falcon]* No job ID returned from event search (query: `%s`)", queryString)
 		return nil, goerr.New("no job ID returned from query job creation",
 			goerr.V("response", jobResp),
 		)
@@ -501,7 +501,7 @@ func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (m
 
 		pollResp, err := t.doRequest(ctx, http.MethodGet, resultPath, nil)
 		if err != nil {
-			msg.Trace(ctx, "❌ Failed to poll event search results (attempt %d): %v", i+1, err)
+			msg.Warn(ctx, "⚠️ *[Falcon]* Failed to poll event search results (job: `%s`, attempt %d): %v", jobID, i+1, err)
 			return nil, goerr.Wrap(err, "failed to poll event search results",
 				goerr.V("job_id", jobID),
 				goerr.V("poll_attempt", i+1),
