@@ -53,7 +53,6 @@ func generateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertC
 	}
 
 	return prompt.GenerateWithStruct(ctx, chatSystemPromptTemplate, map[string]any{
-		"ticket":                  target,
 		"ticket_json":             "```json\n" + string(ticketJSON) + "\n```",
 		"total":                   alertCount,
 		"additional_instructions": additionalInstructions,
