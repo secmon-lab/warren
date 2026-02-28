@@ -42,9 +42,9 @@ func (a *agent) extractRecords(ctx context.Context, originalRequest string, sess
 		return nil, goerr.Wrap(err, "failed to append session history")
 	}
 
-	// Build extraction request with original user request
+	// Build extraction request with original user request wrapped in XML tags to prevent prompt injection
 	extractionRequest := fmt.Sprintf(
-		"Original user request: %s\n\n"+
+		"Original user request: <user_request>%s</user_request>\n\n"+
 			"Based on the conversation history above, extract the Falcon API records. "+
 			"Return a JSON object with a 'records' field containing an array of records. "+
 			"Each record MUST be a complete JSON object with ALL field names and values from the API responses. "+

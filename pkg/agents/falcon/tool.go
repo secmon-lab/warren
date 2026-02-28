@@ -267,13 +267,11 @@ func (t *internalTool) doRequestOnce(ctx context.Context, method, path string, b
 		log.Warn("Falcon API request failed",
 			"status", resp.StatusCode,
 			"path", path,
-			"body", string(respBody),
 		)
 		return nil, goerr.Wrap(&apiError{statusCode: resp.StatusCode, body: string(respBody)},
 			"Falcon API request failed",
 			goerr.V("status", resp.StatusCode),
 			goerr.V("path", path),
-			goerr.V("body", string(respBody)),
 		)
 	}
 
@@ -560,20 +558,20 @@ func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (m
 
 // buildQueryParams constructs URL query parameters from tool arguments.
 func buildQueryParams(args map[string]any, keys ...string) string {
-	var parts []string
+	params := url.Values{}
 	for _, key := range keys {
 		if val, ok := args[key]; ok {
 			switch v := val.(type) {
 			case string:
 				if v != "" {
-					parts = append(parts, fmt.Sprintf("%s=%s", key, url.QueryEscape(v)))
+					params.Set(key, v)
 				}
 			case float64:
-				parts = append(parts, fmt.Sprintf("%s=%d", key, int(v)))
+				params.Set(key, fmt.Sprintf("%d", int(v)))
 			}
 		}
 	}
-	return strings.Join(parts, "&")
+	return params.Encode()
 }
 
 // splitAndTrim splits a comma-separated string and trims whitespace from each element.

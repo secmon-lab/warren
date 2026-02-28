@@ -109,7 +109,6 @@ func (tp *tokenProvider) refreshToken(ctx context.Context) error {
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		log.Warn("CrowdStrike OAuth2 token request failed",
 			"status", resp.StatusCode,
-			"body", string(body),
 		)
 		return goerr.New("OAuth2 token request failed",
 			goerr.V("status", resp.StatusCode),
