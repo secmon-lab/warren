@@ -224,6 +224,7 @@ func (e *apiError) Error() string {
 
 // doRequestOnce performs a single authenticated HTTP request.
 func (t *internalTool) doRequestOnce(ctx context.Context, method, path string, body any) (map[string]any, error) {
+	log := logging.From(ctx)
 	token, err := t.tokenProvider.getToken(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get auth token")
@@ -261,6 +262,11 @@ func (t *internalTool) doRequestOnce(ctx context.Context, method, path string, b
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Warn("Falcon API request failed",
+			"status", resp.StatusCode,
+			"path", path,
+			"body", string(respBody),
+		)
 		return nil, goerr.Wrap(&apiError{statusCode: resp.StatusCode, body: string(respBody)},
 			"Falcon API request failed",
 			goerr.V("status", resp.StatusCode),

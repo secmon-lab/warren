@@ -73,7 +73,10 @@ func (tp *tokenProvider) clearToken() {
 // refreshToken acquires a new OAuth2 token from the CrowdStrike API.
 func (tp *tokenProvider) refreshToken(ctx context.Context) error {
 	log := logging.From(ctx)
-	log.Debug("Refreshing CrowdStrike OAuth2 token")
+	log.Debug("Refreshing CrowdStrike OAuth2 token",
+		"base_url", tp.baseURL,
+		"client_id", tp.clientID,
+	)
 
 	form := url.Values{
 		"client_id":     {tp.clientID},
@@ -104,6 +107,10 @@ func (tp *tokenProvider) refreshToken(ctx context.Context) error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		log.Warn("CrowdStrike OAuth2 token request failed",
+			"status", resp.StatusCode,
+			"body", string(body),
+		)
 		return goerr.New("OAuth2 token request failed",
 			goerr.V("status", resp.StatusCode),
 			goerr.V("body", string(body)),

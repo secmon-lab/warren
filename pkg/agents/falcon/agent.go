@@ -2,6 +2,7 @@ package falcon
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -129,6 +130,17 @@ func (a *agent) createMiddleware() func(gollem.SubAgentHandler) gollem.SubAgentH
 				result.Data["records"] = records
 			}
 
+			// If no records were extracted, check if the response indicates a complete failure
+			// (e.g., authentication errors preventing all API calls)
+			if records == nil || len(records) == 0 {
+				if textResp, ok := result.Data["response"].(string); ok && textResp != "" && containsErrorIndicators(textResp) {
+					log.Warn("Falcon sub-agent returned no records with error response", "response", textResp)
+					return gollem.SubAgentResult{}, goerr.New("Falcon API query failed: all operations returned errors",
+						goerr.V("response", textResp),
+					)
+				}
+			}
+
 			// Clean up internal fields
 			delete(result.Data, "_original_request")
 			delete(result.Data, "_memories")
@@ -137,4 +149,26 @@ func (a *agent) createMiddleware() func(gollem.SubAgentHandler) gollem.SubAgentH
 			return result, nil
 		}
 	}
+}
+
+// containsErrorIndicators checks if a response text indicates that all API operations
+// failed due to authentication or connectivity issues.
+func containsErrorIndicators(text string) bool {
+	lower := strings.ToLower(text)
+	indicators := []string{
+		"authentication error",
+		"oauth2 token request failed",
+		"token request failed",
+		"credentials are not configured",
+		"credentials have expired",
+		"credentials may no longer be valid",
+		"api endpoint is unreachable",
+		"api credentials",
+	}
+	for _, indicator := range indicators {
+		if strings.Contains(lower, indicator) {
+			return true
+		}
+	}
+	return false
 }

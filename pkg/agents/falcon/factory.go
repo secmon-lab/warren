@@ -70,7 +70,11 @@ func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, rep
 		memoryService: memory.New("query_falcon", llmClient, repo),
 	}
 
-	logging.From(ctx).Info("CrowdStrike Falcon Agent configured", "base_url", baseURL)
+	logging.From(ctx).Info("CrowdStrike Falcon Agent configured",
+		"base_url", baseURL,
+		"client_id", f.clientID,
+		"client_secret_length", len(f.clientSecret),
+	)
 
 	subAgent, err := a.subAgent()
 	if err != nil {
