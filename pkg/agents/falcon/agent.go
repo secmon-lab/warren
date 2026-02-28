@@ -26,11 +26,15 @@ func (a *agent) name() string {
 }
 
 func (a *agent) description() string {
-	return "Query CrowdStrike Falcon for security incidents, alerts, behaviors, and CrowdScores. " +
-		"This tool delegates to a specialized Falcon agent that will understand your request, " +
-		"query the Falcon API comprehensively, and return structured data. " +
-		"The agent will include actual incident/alert/behavior data as raw records. " +
-		"You should use this data to answer the user's question."
+	return "Query CrowdStrike Falcon (EDR) for endpoint security data. " +
+		"Supports: incidents (status, tactics, hosts, scores), " +
+		"alerts (severity, MITRE ATT&CK tactics/techniques, hostname, file hash, command line), " +
+		"behaviors (detection patterns, dispositions), " +
+		"CrowdScores (environment threat level), " +
+		"and raw EDR events (process executions, network connections, DNS requests, file writes). " +
+		"Accepts FQL filters (e.g. status:'new', severity:>50, hostname:'*web*') and " +
+		"CQL queries for event search. " +
+		"Returns raw API records as structured JSON."
 }
 
 // subAgent creates a gollem.SubAgent.
