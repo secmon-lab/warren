@@ -66,21 +66,38 @@ func (a *agent) extractRecords(ctx context.Context, originalRequest string, sess
 		return []map[string]any{}, nil
 	}
 
-	// Parse JSON response - try wrapper object first, then direct array
+	// Parse JSON response - try multiple formats the LLM might return
+	rawJSON := []byte(resp.Texts[0])
+
+	// 1. Try wrapper object: {"records": [...]}
 	var response struct {
 		Records []map[string]any `json:"records"`
 	}
-	if err := json.Unmarshal([]byte(resp.Texts[0]), &response); err == nil && response.Records != nil {
+	if err := json.Unmarshal(rawJSON, &response); err == nil && response.Records != nil {
 		log.Debug("Successfully extracted records from wrapper object", "count", len(response.Records))
 		return response.Records, nil
 	}
 
-	// Fallback: try parsing as direct array
+	// 2. Try direct array: [...]
 	var records []map[string]any
-	if err := json.Unmarshal([]byte(resp.Texts[0]), &records); err != nil {
-		return nil, goerr.Wrap(err, "failed to parse JSON response", goerr.V("response", resp.Texts[0]))
+	if err := json.Unmarshal(rawJSON, &records); err == nil {
+		log.Debug("Successfully extracted records from array", "count", len(records))
+		return records, nil
 	}
 
-	log.Debug("Successfully extracted records from array", "count", len(records))
-	return records, nil
+	// 3. Try single object: {...} (LLM sometimes returns a single record without wrapping in array)
+	var single map[string]any
+	if err := json.Unmarshal(rawJSON, &single); err == nil {
+		// Check if it's a wrapper with "records" as a single object
+		if rec, ok := single["records"]; ok {
+			if recMap, ok := rec.(map[string]any); ok {
+				log.Debug("Successfully extracted single record from wrapper object")
+				return []map[string]any{recMap}, nil
+			}
+		}
+		log.Debug("Successfully extracted single record object")
+		return []map[string]any{single}, nil
+	}
+
+	return nil, goerr.New("failed to parse JSON response", goerr.V("response", resp.Texts[0]))
 }
