@@ -106,7 +106,7 @@ func (tp *tokenProvider) refreshToken(ctx context.Context) error {
 		return goerr.Wrap(err, "failed to read token response body")
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		log.Warn("CrowdStrike OAuth2 token request failed",
 			"status", resp.StatusCode,
 			"body", string(body),

@@ -132,7 +132,7 @@ func (a *agent) createMiddleware() func(gollem.SubAgentHandler) gollem.SubAgentH
 
 			// If no records were extracted, check if the response indicates a complete failure
 			// (e.g., authentication errors preventing all API calls)
-			if records == nil || len(records) == 0 {
+			if len(records) == 0 {
 				if textResp, ok := result.Data["response"].(string); ok && textResp != "" && containsErrorIndicators(textResp) {
 					log.Warn("Falcon sub-agent returned no records with error response", "response", textResp)
 					return gollem.SubAgentResult{}, goerr.New("Falcon API query failed: all operations returned errors",
