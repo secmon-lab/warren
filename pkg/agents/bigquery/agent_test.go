@@ -151,7 +151,7 @@ func TestAgent_ExtractRecords_WithRealLLM(t *testing.T) {
 	ctx := context.Background()
 
 	// Create real Gemini client
-	llmClient, err := gemini.New(ctx, projectID, location, gemini.WithModel("gemini-2.0-flash-exp"))
+	llmClient, err := gemini.New(ctx, projectID, location, gemini.WithModel("gemini-2.5-flash"))
 	gt.NoError(t, err)
 
 	// Create in-memory repository
@@ -208,8 +208,8 @@ func TestAgent_ExtractRecords_WithRealLLM(t *testing.T) {
 
 	// Test extractRecords with the session containing results
 	records, err := agent.ExportedExtractRecords(ctx, userQuery, session)
-	gt.NoError(t, err)
-	gt.V(t, len(records)).NotEqual(0)
+	gt.NoError(t, err).Required()
+	gt.N(t, len(records)).Greater(0).Required()
 
 	t.Logf("Successfully extracted %d records", len(records))
 	t.Logf("Sample record: %+v", records[0])

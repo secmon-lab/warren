@@ -25,7 +25,7 @@ type AgentMemory struct {
 	// QueryEmbedding is the vector embedding of Query for semantic search
 	// Generated automatically by Memory Service when saving
 	// Must use firestore.Vector32 type for Firestore vector search to work
-	QueryEmbedding firestore.Vector32
+	QueryEmbedding firestore.Vector32 `json:"-"`
 
 	// Claim is a specific, self-contained insight learned from execution
 	// MUST be understandable without knowing the original query or task context

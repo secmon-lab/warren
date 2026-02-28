@@ -1,6 +1,7 @@
 package memory_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -103,6 +104,28 @@ func TestAgentMemory_Validate(t *testing.T) {
 		err := m.Validate()
 		gt.NoError(t, err)
 	})
+}
+
+func TestAgentMemory_QueryEmbeddingExcludedFromJSON(t *testing.T) {
+	mem := &memory.AgentMemory{
+		ID:             types.AgentMemoryID("mem-json-test"),
+		AgentID:        "bigquery",
+		Query:          "test query",
+		QueryEmbedding: firestore.Vector32{0.1, 0.2, 0.3},
+		Claim:          "test claim",
+		Score:          1.0,
+		CreatedAt:      time.Now(),
+	}
+
+	data, err := json.Marshal(mem)
+	gt.NoError(t, err)
+
+	var decoded map[string]any
+	gt.NoError(t, json.Unmarshal(data, &decoded))
+
+	// QueryEmbedding should not be present in JSON output
+	_, exists := decoded["QueryEmbedding"]
+	gt.V(t, exists).Equal(false)
 }
 
 func TestAgentMemory_Structure(t *testing.T) {

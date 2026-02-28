@@ -55,9 +55,7 @@ When your analysis requires information that cannot be obtained through availabl
 
 A ticket represents a security incident investigation. In this session, you will investigate the following ticket:
 
-```json
-{{ .ticket }}
-```
+{{ .ticket_json }}
 
 ## Alert
 

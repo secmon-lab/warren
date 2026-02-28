@@ -47,8 +47,14 @@ var (
 )
 
 func generateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertCount int, additionalInstructions string, knowledges []*knowledge.Knowledge, requesterID string, threadComments []ticket.Comment) (string, error) {
+	ticketJSON, err := json.MarshalIndent(target, "", "  ")
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to marshal ticket to JSON")
+	}
+
 	return prompt.GenerateWithStruct(ctx, chatSystemPromptTemplate, map[string]any{
 		"ticket":                  target,
+		"ticket_json":             "```json\n" + string(ticketJSON) + "\n```",
 		"total":                   alertCount,
 		"additional_instructions": additionalInstructions,
 		"knowledges":              knowledges,
