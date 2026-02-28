@@ -43,7 +43,7 @@ func TestInternalTool_SpecCount(t *testing.T) {
 	tool := falcon.NewInternalToolForTest("id", "secret", "http://localhost")
 	count, err := tool.SpecCount(context.Background())
 	gt.NoError(t, err)
-	gt.Equal(t, count, 7)
+	gt.Equal(t, count, 8)
 }
 
 func TestInternalTool_SearchIncidents(t *testing.T) {

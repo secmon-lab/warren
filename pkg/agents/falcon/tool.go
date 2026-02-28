@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -493,7 +494,7 @@ func buildQueryParams(args map[string]any, keys ...string) string {
 			switch v := val.(type) {
 			case string:
 				if v != "" {
-					parts = append(parts, fmt.Sprintf("%s=%s", key, v))
+					parts = append(parts, fmt.Sprintf("%s=%s", key, url.QueryEscape(v)))
 				}
 			case float64:
 				parts = append(parts, fmt.Sprintf("%s=%d", key, int(v)))
