@@ -9,6 +9,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/tool/abusech"
 	"github.com/secmon-lab/warren/pkg/tool/bigquery"
 	"github.com/secmon-lab/warren/pkg/tool/github"
+	"github.com/secmon-lab/warren/pkg/tool/intune"
 	"github.com/secmon-lab/warren/pkg/tool/ipdb"
 	"github.com/secmon-lab/warren/pkg/tool/otx"
 	"github.com/secmon-lab/warren/pkg/tool/shodan"
@@ -42,6 +43,7 @@ var tools = toolList{
 	&slack.Action{},
 	&github.Action{},
 	&whois.Action{},
+	&intune.Action{},
 }
 
 // InjectDependencies injects repository and embedding client into tools that support them
