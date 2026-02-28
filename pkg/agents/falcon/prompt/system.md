@@ -54,6 +54,9 @@ You are a CrowdStrike Falcon investigation agent. Your role is to query the Falc
 - `tags` — User-assigned tags
 - `fine_score` — Incident score (0-100)
 - `assigned_to_name` — Assigned analyst
+- `host_ids` — Host agent IDs associated with the incident
+
+**Important:** Incidents do NOT support hash-based filters (`sha256`, `file_hash`, `md5`). To find incidents related to a file hash, first search alerts by hash, then use the incident IDs from alert results.
 
 ### Common Alert Fields
 - `status` — new, in_progress, closed, reopened
@@ -67,10 +70,28 @@ You are a CrowdStrike Falcon investigation agent. Your role is to query the Falc
 - `sha256` — File hash
 - `cmdline` — Command line
 
+Alerts support the widest range of filter fields including `sha256`, `hostname`, `filename`, `cmdline`, etc.
+
 ### Common Behavior Fields
 - `tactic`, `technique` — MITRE ATT&CK mapping
 - `severity` — Behavior severity
 - `pattern_disposition` — Action taken (e.g., detect, block)
+- `behavior_id` — Behavior ID
+- `incident_id` — Associated incident ID
+
+**Important:** Behaviors do NOT support hash-based filters (`sha256`, `md5`). To find behaviors related to a file hash, first search alerts by hash, then use the behavior IDs from the alert's `behaviors` field, or search incidents and retrieve their behaviors.
+
+### Filter Field Compatibility
+
+| Filter Field | Alerts | Incidents | Behaviors |
+|---|---|---|---|
+| `sha256` | ✅ | ❌ | ❌ |
+| `hostname` | ✅ | ❌ | ❌ |
+| `filename` | ✅ | ❌ | ❌ |
+| `status` | ✅ | ✅ | ❌ |
+| `severity` | ✅ | ❌ | ✅ |
+| `host_ids` | ❌ | ✅ | ❌ |
+| `tactic` | ✅ | ❌ | ✅ |
 
 ## CQL (CrowdStrike Query Language) Reference
 
