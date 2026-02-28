@@ -30,7 +30,7 @@ func setupTestServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server, 
 			"token_type":   "Bearer",
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		gt.NoError(t, json.NewEncoder(w).Encode(resp))
 	}))
 	t.Cleanup(tokenServer.Close)
 
@@ -41,8 +41,8 @@ func TestIntune_DevicesByUser(t *testing.T) {
 	graphServer, tokenServer := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		gt.Value(t, r.Header.Get("Authorization")).Equal("Bearer test-token")
 
-		switch {
-		case r.URL.Path == "/deviceManagement/managedDevices":
+		switch r.URL.Path {
+		case "/deviceManagement/managedDevices":
 			resp := map[string]any{
 				"value": []any{
 					map[string]any{
@@ -57,9 +57,9 @@ func TestIntune_DevicesByUser(t *testing.T) {
 					},
 				},
 			}
-			json.NewEncoder(w).Encode(resp)
+			gt.NoError(t, json.NewEncoder(w).Encode(resp))
 
-		case r.URL.Path == "/auditLogs/signIns":
+		case "/auditLogs/signIns":
 			resp := map[string]any{
 				"value": []any{
 					map[string]any{
@@ -69,7 +69,7 @@ func TestIntune_DevicesByUser(t *testing.T) {
 					},
 				},
 			}
-			json.NewEncoder(w).Encode(resp)
+			gt.NoError(t, json.NewEncoder(w).Encode(resp))
 
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -122,18 +122,12 @@ func TestIntune_DevicesByUser(t *testing.T) {
 
 func TestIntune_DevicesByUser_NoDevices(t *testing.T) {
 	graphServer, tokenServer := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/deviceManagement/managedDevices":
-			resp := map[string]any{
-				"value": []any{},
-			}
-			json.NewEncoder(w).Encode(resp)
+		switch r.URL.Path {
+		case "/deviceManagement/managedDevices":
+			gt.NoError(t, json.NewEncoder(w).Encode(map[string]any{"value": []any{}}))
 
-		case r.URL.Path == "/auditLogs/signIns":
-			resp := map[string]any{
-				"value": []any{},
-			}
-			json.NewEncoder(w).Encode(resp)
+		case "/auditLogs/signIns":
+			gt.NoError(t, json.NewEncoder(w).Encode(map[string]any{"value": []any{}}))
 
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -172,8 +166,8 @@ func TestIntune_DevicesByUser_NoDevices(t *testing.T) {
 
 func TestIntune_DevicesByUser_MultipleDevices(t *testing.T) {
 	graphServer, tokenServer := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/deviceManagement/managedDevices":
+		switch r.URL.Path {
+		case "/deviceManagement/managedDevices":
 			resp := map[string]any{
 				"value": []any{
 					map[string]any{
@@ -188,11 +182,10 @@ func TestIntune_DevicesByUser_MultipleDevices(t *testing.T) {
 					},
 				},
 			}
-			json.NewEncoder(w).Encode(resp)
+			gt.NoError(t, json.NewEncoder(w).Encode(resp))
 
-		case r.URL.Path == "/auditLogs/signIns":
-			resp := map[string]any{"value": []any{}}
-			json.NewEncoder(w).Encode(resp)
+		case "/auditLogs/signIns":
+			gt.NoError(t, json.NewEncoder(w).Encode(map[string]any{"value": []any{}}))
 
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -236,8 +229,8 @@ func TestIntune_DevicesByUser_MultipleDevices(t *testing.T) {
 
 func TestIntune_DevicesByHostname(t *testing.T) {
 	graphServer, tokenServer := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/deviceManagement/managedDevices":
+		switch r.URL.Path {
+		case "/deviceManagement/managedDevices":
 			resp := map[string]any{
 				"value": []any{
 					map[string]any{
@@ -248,9 +241,9 @@ func TestIntune_DevicesByHostname(t *testing.T) {
 					},
 				},
 			}
-			json.NewEncoder(w).Encode(resp)
+			gt.NoError(t, json.NewEncoder(w).Encode(resp))
 
-		case r.URL.Path == "/auditLogs/signIns":
+		case "/auditLogs/signIns":
 			resp := map[string]any{
 				"value": []any{
 					map[string]any{
@@ -259,7 +252,7 @@ func TestIntune_DevicesByHostname(t *testing.T) {
 					},
 				},
 			}
-			json.NewEncoder(w).Encode(resp)
+			gt.NoError(t, json.NewEncoder(w).Encode(resp))
 
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -311,8 +304,7 @@ func TestIntune_DevicesByHostname(t *testing.T) {
 func TestIntune_DevicesByHostname_NoDevices(t *testing.T) {
 	graphServer, tokenServer := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/deviceManagement/managedDevices" {
-			resp := map[string]any{"value": []any{}}
-			json.NewEncoder(w).Encode(resp)
+			gt.NoError(t, json.NewEncoder(w).Encode(map[string]any{"value": []any{}}))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -355,11 +347,13 @@ func TestIntune_TokenRetryOn401(t *testing.T) {
 	callCount := 0
 
 	graphServer, _ := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/deviceManagement/managedDevices" {
+		switch r.URL.Path {
+		case "/deviceManagement/managedDevices":
 			callCount++
 			if callCount == 1 {
 				w.WriteHeader(http.StatusUnauthorized)
-				w.Write([]byte(`{"error":{"code":"InvalidAuthenticationToken"}}`))
+				_, err := w.Write([]byte(`{"error":{"code":"InvalidAuthenticationToken"}}`))
+				gt.NoError(t, err)
 				return
 			}
 			resp := map[string]any{
@@ -370,17 +364,14 @@ func TestIntune_TokenRetryOn401(t *testing.T) {
 					},
 				},
 			}
-			json.NewEncoder(w).Encode(resp)
-			return
-		}
+			gt.NoError(t, json.NewEncoder(w).Encode(resp))
 
-		if r.URL.Path == "/auditLogs/signIns" {
-			resp := map[string]any{"value": []any{}}
-			json.NewEncoder(w).Encode(resp)
-			return
-		}
+		case "/auditLogs/signIns":
+			gt.NoError(t, json.NewEncoder(w).Encode(map[string]any{"value": []any{}}))
 
-		w.WriteHeader(http.StatusNotFound)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
 	})
 
 	// Custom token server that tracks calls
@@ -391,7 +382,7 @@ func TestIntune_TokenRetryOn401(t *testing.T) {
 			"access_token": "new-token",
 			"expires_in":   3600,
 		}
-		json.NewEncoder(w).Encode(resp)
+		gt.NoError(t, json.NewEncoder(w).Encode(resp))
 	}))
 	t.Cleanup(tokenServer.Close)
 
@@ -429,8 +420,8 @@ func TestIntune_TokenRetryOn401(t *testing.T) {
 
 func TestIntune_SignInLogFailure_Fallback(t *testing.T) {
 	graphServer, tokenServer := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/deviceManagement/managedDevices":
+		switch r.URL.Path {
+		case "/deviceManagement/managedDevices":
 			resp := map[string]any{
 				"value": []any{
 					map[string]any{
@@ -440,11 +431,12 @@ func TestIntune_SignInLogFailure_Fallback(t *testing.T) {
 					},
 				},
 			}
-			json.NewEncoder(w).Encode(resp)
+			gt.NoError(t, json.NewEncoder(w).Encode(resp))
 
-		case r.URL.Path == "/auditLogs/signIns":
+		case "/auditLogs/signIns":
 			w.WriteHeader(http.StatusForbidden)
-			w.Write([]byte(`{"error":{"code":"Authorization_RequestDenied"}}`))
+			_, err := w.Write([]byte(`{"error":{"code":"Authorization_RequestDenied"}}`))
+			gt.NoError(t, err)
 
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -491,7 +483,8 @@ func TestIntune_TokenRequestFailure(t *testing.T) {
 
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":"invalid_client","error_description":"Invalid client credentials"}`))
+		_, err := w.Write([]byte(`{"error":"invalid_client","error_description":"Invalid client credentials"}`))
+		gt.NoError(t, err)
 	}))
 	t.Cleanup(tokenServer.Close)
 
