@@ -3,8 +3,10 @@ package falcon_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/m-mizutani/gt"
@@ -348,6 +350,143 @@ func TestInternalTool_TokenRetryOn401(t *testing.T) {
 	gt.Equal(t, len(resources), 1)
 	gt.Equal(t, resources[0], "inc:retry:123")
 	gt.Equal(t, callCount, 2)
+}
+
+func TestInternalTool_SearchEvents_Immediate(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/queryjobs") {
+			// Create query job
+			gt.Equal(t, r.Header.Get("Content-Type"), "application/json")
+
+			var body map[string]any
+			err := json.NewDecoder(r.Body).Decode(&body)
+			gt.NoError(t, err)
+			gt.Equal(t, body["queryString"], "aid=test123")
+			gt.Equal(t, body["start"], "1d")
+			gt.Equal(t, body["end"], "now")
+
+			w.Header().Set("Content-Type", "application/json")
+			err = json.NewEncoder(w).Encode(map[string]any{
+				"id":               "job-123",
+				"hashedQueryOnView": "abc",
+			})
+			gt.NoError(t, err)
+			return
+		}
+
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/queryjobs/job-123") {
+			// Get results — immediately done
+			w.Header().Set("Content-Type", "application/json")
+			err := json.NewEncoder(w).Encode(map[string]any{
+				"done":      true,
+				"cancelled": false,
+				"events": []map[string]any{
+					{
+						"timestamp":         "1736264422005",
+						"#event_simpleName": "ProcessRollup2",
+						"aid":               "test123",
+						"ComputerName":      "workstation1",
+						"FileName":          "cmd.exe",
+					},
+				},
+			})
+			gt.NoError(t, err)
+			return
+		}
+
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+	})
+	defer srv.Close()
+
+	tool := falcon.NewInternalToolForTest("id", "secret", srv.URL)
+	result, err := tool.Run(context.Background(), "falcon_search_events", map[string]any{
+		"query_string": "aid=test123",
+	})
+	gt.NoError(t, err)
+
+	done, ok := result["done"].(bool)
+	gt.True(t, ok)
+	gt.True(t, done)
+
+	events, ok := result["events"].([]any)
+	gt.True(t, ok)
+	gt.Equal(t, len(events), 1)
+}
+
+func TestInternalTool_SearchEvents_WithPolling(t *testing.T) {
+	var pollCount int
+
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/queryjobs") {
+			w.Header().Set("Content-Type", "application/json")
+			err := json.NewEncoder(w).Encode(map[string]any{
+				"id": "job-poll",
+			})
+			gt.NoError(t, err)
+			return
+		}
+
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/queryjobs/job-poll") {
+			pollCount++
+			w.Header().Set("Content-Type", "application/json")
+
+			if pollCount < 3 {
+				// Not done yet, return partial results
+				err := json.NewEncoder(w).Encode(map[string]any{
+					"done":      false,
+					"cancelled": false,
+					"events": []map[string]any{
+						{"aid": "test", "event": fmt.Sprintf("event-%d", pollCount)},
+					},
+				})
+				gt.NoError(t, err)
+				return
+			}
+
+			// Done on third poll
+			err := json.NewEncoder(w).Encode(map[string]any{
+				"done":      true,
+				"cancelled": false,
+				"events": []map[string]any{
+					{"aid": "test", "event": "event-final"},
+				},
+			})
+			gt.NoError(t, err)
+			return
+		}
+
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+	})
+	defer srv.Close()
+
+	tool := falcon.NewInternalToolForTest("id", "secret", srv.URL)
+	result, err := tool.Run(context.Background(), "falcon_search_events", map[string]any{
+		"query_string": "aid=test",
+		"repository":   "investigate_view",
+		"start":        "7d",
+		"end":          "now",
+	})
+	gt.NoError(t, err)
+
+	done, ok := result["done"].(bool)
+	gt.True(t, ok)
+	gt.True(t, done)
+
+	// Should have accumulated events from all polls
+	events, ok := result["events"].([]any)
+	gt.True(t, ok)
+	gt.Equal(t, len(events), 3) // 1 from poll 1 + 1 from poll 2 + 1 from final
+	gt.Equal(t, pollCount, 3)
+
+	repo, ok := result["repository"].(string)
+	gt.True(t, ok)
+	gt.Equal(t, repo, "investigate_view")
+}
+
+func TestInternalTool_SearchEvents_MissingQueryString(t *testing.T) {
+	tool := falcon.NewInternalToolForTest("id", "secret", "http://localhost")
+	_, err := tool.Run(context.Background(), "falcon_search_events", map[string]any{})
+	gt.Error(t, err)
 }
 
 func TestInternalTool_APIError(t *testing.T) {

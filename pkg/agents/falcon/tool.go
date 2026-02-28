@@ -140,6 +140,29 @@ func (t *internalTool) Specs(_ context.Context) ([]gollem.ToolSpec, error) {
 				},
 			},
 		},
+		{
+			Name:        "falcon_search_events",
+			Description: "Search EDR telemetry events using CrowdStrike Query Language (CQL). This uses the Next-Gen SIEM Search API to query raw event data (process executions, network connections, file writes, DNS requests, etc.). The search runs asynchronously and this tool automatically polls until results are ready.",
+			Parameters: map[string]*gollem.Parameter{
+				"query_string": {
+					Type:        gollem.TypeString,
+					Description: "CQL query string (e.g., \"aid=abc123\", \"#event_simpleName=ProcessRollup2 AND FileName=cmd.exe\", \"ComputerName=workstation1 | tail(100)\")",
+					Required:    true,
+				},
+				"repository": {
+					Type:        gollem.TypeString,
+					Description: "Repository to search. Values: \"search-all\" (all data, default), \"investigate_view\" (Falcon EDR), \"third-party\" (third-party data), \"falcon_for_it_view\" (IT Automation), \"forensics_view\" (Forensics)",
+				},
+				"start": {
+					Type:        gollem.TypeString,
+					Description: "Start time for the search (e.g., \"1d\" for last 1 day, \"24h\" for last 24 hours, \"2025-01-01T00:00:00Z\" for absolute time). Default: \"1d\"",
+				},
+				"end": {
+					Type:        gollem.TypeString,
+					Description: "End time for the search (e.g., \"now\", \"2025-01-02T00:00:00Z\"). Default: \"now\"",
+				},
+			},
+		},
 	}, nil
 }
 
@@ -159,6 +182,8 @@ func (t *internalTool) Run(ctx context.Context, name string, args map[string]any
 		return t.getBehaviors(ctx, args)
 	case "falcon_get_crowdscores":
 		return t.getCrowdScores(ctx, args)
+	case "falcon_search_events":
+		return t.searchEvents(ctx, args)
 	default:
 		return nil, goerr.New("unknown tool name", goerr.V("name", name))
 	}
@@ -336,6 +361,128 @@ func (t *internalTool) getCrowdScores(ctx context.Context, args map[string]any) 
 		path += "?" + params
 	}
 	return t.doRequest(ctx, http.MethodGet, path, nil)
+}
+
+// searchEvents runs a CQL query via the Next-Gen SIEM Search API.
+// It creates a query job and polls until the job completes, returning all events.
+func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (map[string]any, error) {
+	log := logging.From(ctx)
+
+	queryString, ok := args["query_string"].(string)
+	if !ok || queryString == "" {
+		return nil, goerr.New("query_string is required")
+	}
+
+	repository := "search-all"
+	if repo, ok := args["repository"].(string); ok && repo != "" {
+		repository = repo
+	}
+
+	body := map[string]any{
+		"queryString": queryString,
+	}
+	if start, ok := args["start"].(string); ok && start != "" {
+		body["start"] = start
+	} else {
+		body["start"] = "1d"
+	}
+	if end, ok := args["end"].(string); ok && end != "" {
+		body["end"] = end
+	} else {
+		body["end"] = "now"
+	}
+
+	// Step 1: Create query job
+	jobPath := fmt.Sprintf("/humio/api/v1/repositories/%s/queryjobs", repository)
+	jobResp, err := t.doRequest(ctx, http.MethodPost, jobPath, body)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to create event search query job",
+			goerr.V("repository", repository),
+			goerr.V("query", queryString),
+		)
+	}
+
+	jobID, ok := jobResp["id"].(string)
+	if !ok || jobID == "" {
+		return nil, goerr.New("no job ID returned from query job creation",
+			goerr.V("response", jobResp),
+		)
+	}
+
+	log.Debug("Event search query job created", "job_id", jobID, "repository", repository)
+
+	// Step 2: Poll for results until done
+	resultPath := fmt.Sprintf("/humio/api/v1/repositories/%s/queryjobs/%s", repository, jobID)
+	const (
+		maxPolls     = 60
+		pollInterval = 2 * time.Second
+	)
+
+	var allEvents []any
+
+	for i := range maxPolls {
+		if i > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, goerr.Wrap(ctx.Err(), "context canceled while polling event search")
+			case <-time.After(pollInterval):
+			}
+		}
+
+		pollResp, err := t.doRequest(ctx, http.MethodGet, resultPath, nil)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to poll event search results",
+				goerr.V("job_id", jobID),
+				goerr.V("poll_attempt", i+1),
+			)
+		}
+
+		// Collect events from this poll
+		if events, ok := pollResp["events"].([]any); ok {
+			allEvents = append(allEvents, events...)
+		}
+
+		// Check if done
+		if done, ok := pollResp["done"].(bool); ok && done {
+			log.Debug("Event search completed",
+				"job_id", jobID,
+				"total_events", len(allEvents),
+				"polls", i+1,
+			)
+
+			result := map[string]any{
+				"done":       true,
+				"events":     allEvents,
+				"repository": repository,
+			}
+
+			// Include metadata if available
+			if meta, ok := pollResp["metadataResult"]; ok {
+				result["metadata"] = meta
+			}
+
+			return result, nil
+		}
+
+		log.Debug("Event search still running, polling...",
+			"job_id", jobID,
+			"poll_attempt", i+1,
+			"events_so_far", len(allEvents),
+		)
+	}
+
+	// Return partial results if max polls reached
+	log.Warn("Event search reached max poll limit, returning partial results",
+		"job_id", jobID,
+		"total_events", len(allEvents),
+	)
+
+	return map[string]any{
+		"done":       false,
+		"events":     allEvents,
+		"repository": repository,
+		"warning":    "Search did not complete within the polling limit. Partial results returned.",
+	}, nil
 }
 
 // buildQueryParams constructs URL query parameters from tool arguments.
