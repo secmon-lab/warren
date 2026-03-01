@@ -19,6 +19,20 @@ servers:
     headers:
       Authorization: "Bearer YOUR_DB_TOKEN"
 
+  # Example with credential helper (e.g., Google IAP-protected server)
+  # The helper command is executed to dynamically generate HTTP headers.
+  # Its stdout must be JSON: {"headers": {...}, "expires_at": "RFC3339"}
+  - name: "iap-protected-server"
+    type: "http"
+    url: "https://iap-protected.example.com/mcp"
+    headers:
+      Content-Type: "application/json"
+    helper:
+      command: "./scripts/iap-token.sh"
+      args: ["https://iap-protected.example.com"]
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: "/path/to/sa-key.json"
+
 # Local MCP servers (typically stdio-based)
 local:
   # Example stdio MCP server (local executable)
@@ -58,3 +72,5 @@ local:
 # - Set disabled: true to temporarily disable a server
 # - Local servers are typically stdio-based for security and reliability
 # - Remote servers can use sse or http for network-based services
+# - Credential helpers (helper field) can dynamically generate headers for sse/http servers
+#   See doc/mcp.md for details

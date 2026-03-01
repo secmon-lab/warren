@@ -3,16 +3,26 @@ package config
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"os"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/mcp"
+	helpertransport "github.com/secmon-lab/warren/pkg/service/mcp"
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 )
 
 const Version = "1.0.0"
+
+// CommandConfig represents a common command execution configuration
+// shared between local MCP servers and credential helpers.
+type CommandConfig struct {
+	Command string            `yaml:"command"`
+	Args    []string          `yaml:"args,omitempty"`
+	Env     map[string]string `yaml:"env,omitempty"`
+}
 
 // MCPServerConfig represents configuration for a remote MCP server
 type MCPServerConfig struct {
@@ -20,16 +30,15 @@ type MCPServerConfig struct {
 	Type     string            `yaml:"type"` // "sse" or "http"
 	URL      string            `yaml:"url"`
 	Headers  map[string]string `yaml:"headers,omitempty"`
+	Helper   *CommandConfig    `yaml:"helper,omitempty"`
 	Disabled bool              `yaml:"disabled,omitempty"`
 }
 
 // MCPLocalConfig represents configuration for a local MCP server
 type MCPLocalConfig struct {
-	Name     string            `yaml:"name"`
-	Command  string            `yaml:"command"`
-	Args     []string          `yaml:"args,omitempty"`
-	Env      map[string]string `yaml:"env,omitempty"`
-	Disabled bool              `yaml:"disabled,omitempty"`
+	Name          string `yaml:"name"`
+	CommandConfig `yaml:",inline"`
+	Disabled      bool `yaml:"disabled,omitempty"`
 }
 
 // MCPConfig represents MCP configuration
@@ -129,7 +138,10 @@ func (x *MCPConfig) createMCPServerClient(ctx context.Context, serverCfg MCPServ
 		}
 
 		var opts []mcp.SSEOption
-		if len(serverCfg.Headers) > 0 {
+		if serverCfg.Helper != nil {
+			httpClient := buildHelperHTTPClient(serverCfg.Helper, serverCfg.Headers)
+			opts = append(opts, mcp.WithSSEClient(httpClient))
+		} else if len(serverCfg.Headers) > 0 {
 			opts = append(opts, mcp.WithSSEHeaders(serverCfg.Headers))
 		}
 		opts = append(opts, mcp.WithSSEClientInfo("warren", Version))
@@ -142,7 +154,10 @@ func (x *MCPConfig) createMCPServerClient(ctx context.Context, serverCfg MCPServ
 		}
 
 		var opts []mcp.StreamableHTTPOption
-		if len(serverCfg.Headers) > 0 {
+		if serverCfg.Helper != nil {
+			httpClient := buildHelperHTTPClient(serverCfg.Helper, serverCfg.Headers)
+			opts = append(opts, mcp.WithStreamableHTTPClient(httpClient))
+		} else if len(serverCfg.Headers) > 0 {
 			opts = append(opts, mcp.WithStreamableHTTPHeaders(serverCfg.Headers))
 		}
 		opts = append(opts, mcp.WithStreamableHTTPClientInfo("warren", Version))
@@ -162,6 +177,19 @@ func (x *MCPConfig) createMCPServerClient(ctx context.Context, serverCfg MCPServ
 	}
 
 	return client, nil
+}
+
+// buildHelperHTTPClient creates an *http.Client with HelperTransport
+// that dynamically injects headers from a credential helper command.
+func buildHelperHTTPClient(helper *CommandConfig, staticHeaders map[string]string) *http.Client {
+	cfg := helpertransport.HelperConfig{
+		Command: helper.Command,
+		Args:    helper.Args,
+		Env:     helper.Env,
+	}
+
+	transport := helpertransport.NewHelperTransport(cfg, staticHeaders, nil)
+	return &http.Client{Transport: transport}
 }
 
 // createMCPLocalClient creates a local MCP client from local configuration
