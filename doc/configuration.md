@@ -142,6 +142,8 @@ warren test \
 
 ### MCP Configuration (YAML)
 
+For full MCP documentation including credential helpers, see [MCP Configuration](mcp.md).
+
 ```yaml
 # mcp-config.yaml
 servers:
@@ -150,7 +152,7 @@ servers:
     url: "https://tools.example.com/mcp"
     headers:
       Authorization: "Bearer ${MCP_API_KEY}"
-    
+
   - name: "local-scanner"
     type: "stdio"
     command: "/usr/local/bin/scanner"
