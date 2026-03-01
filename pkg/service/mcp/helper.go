@@ -143,7 +143,6 @@ func (t *HelperTransport) runHelper(ctx context.Context) error {
 	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
 		return goerr.Wrap(err, "failed to parse credential helper output as JSON",
 			goerr.V("command", t.cfg.Command),
-			goerr.V("stdout", stdout.String()),
 		)
 	}
 

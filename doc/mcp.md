@@ -146,6 +146,11 @@ Here is an example helper script for Google Identity-Aware Proxy:
 # scripts/iap-token.sh
 # Usage: ./iap-token.sh <target-audience>
 
+if [ -z "$1" ]; then
+  echo "Usage: $0 <target-audience>" >&2
+  exit 1
+fi
+
 TARGET_AUDIENCE="$1"
 TOKEN=$(gcloud auth print-identity-token --audiences="$TARGET_AUDIENCE" 2>/dev/null)
 
