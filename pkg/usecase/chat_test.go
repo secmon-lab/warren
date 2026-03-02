@@ -1033,7 +1033,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			Topic: "aws-guardduty",
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 5, "", nil, "U12345678", nil)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 5, "", nil, "U12345678", nil, "")
 		gt.NoError(t, err)
 
 		// Verify requester_id is rendered in mention format
@@ -1069,7 +1069,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			},
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 3, "", knowledges, "U99999999", nil)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 3, "", knowledges, "U99999999", nil, "")
 		gt.NoError(t, err)
 
 		gt.S(t, result).Contains("Domain Knowledge")
@@ -1083,7 +1083,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			ID: types.NewTicketID(),
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "Use BigQuery for log analysis", nil, "UABC", nil)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "Use BigQuery for log analysis", nil, "UABC", nil, "")
 		gt.NoError(t, err)
 
 		gt.S(t, result).Contains("Additional Instructions")
@@ -1096,7 +1096,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			ID: types.NewTicketID(),
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "", nil)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "", nil, "")
 		gt.NoError(t, err)
 
 		// Should render without error even with empty requester_id
@@ -1124,7 +1124,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			},
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", comments)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", comments, "")
 		gt.NoError(t, err)
 
 		gt.S(t, result).Contains("Recent Thread Conversations")
@@ -1141,10 +1141,37 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			ID: types.NewTicketID(),
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, "")
 		gt.NoError(t, err)
 
 		gt.S(t, result).NotContains("Recent Thread Conversations")
+	})
+
+	t.Run("renders with user system prompt", func(t *testing.T) {
+		ctx := lang.With(t.Context(), lang.English)
+		target := &ticket.Ticket{
+			ID: types.NewTicketID(),
+		}
+
+		userPrompt := "## Environment\nThis is a production environment.\n\n## Response Policy\nAlways escalate critical findings."
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, userPrompt)
+		gt.NoError(t, err)
+
+		gt.S(t, result).Contains("User System Prompt")
+		gt.S(t, result).Contains("This is a production environment.")
+		gt.S(t, result).Contains("Always escalate critical findings.")
+	})
+
+	t.Run("hides user system prompt section when empty", func(t *testing.T) {
+		ctx := lang.With(t.Context(), lang.English)
+		target := &ticket.Ticket{
+			ID: types.NewTicketID(),
+		}
+
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, "")
+		gt.NoError(t, err)
+
+		gt.S(t, result).NotContains("User System Prompt")
 	})
 }
 

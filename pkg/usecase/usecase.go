@@ -42,13 +42,14 @@ type UseCases struct {
 	TagUC *TagUseCase
 
 	// configs
-	timeSpan        time.Duration
-	actionLimit     int
-	findingLimit    int
-	storagePrefix   string
-	strictAlert     bool
-	noAuthorization bool
-	frontendURL     string
+	timeSpan         time.Duration
+	actionLimit      int
+	findingLimit     int
+	storagePrefix    string
+	strictAlert      bool
+	noAuthorization  bool
+	frontendURL      string
+	userSystemPrompt string
 
 	// GenAI
 	promptService interfaces.PromptService
@@ -176,6 +177,12 @@ func WithPromptService(promptService interfaces.PromptService) Option {
 func WithFrontendURL(frontendURL string) Option {
 	return func(u *UseCases) {
 		u.frontendURL = frontendURL
+	}
+}
+
+func WithUserSystemPrompt(prompt string) Option {
+	return func(u *UseCases) {
+		u.userSystemPrompt = prompt
 	}
 }
 

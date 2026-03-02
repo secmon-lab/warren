@@ -46,7 +46,7 @@ var (
 	ErrSessionAborted = goerr.New("session aborted by user")
 )
 
-func generateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertCount int, additionalInstructions string, knowledges []*knowledge.Knowledge, requesterID string, threadComments []ticket.Comment) (string, error) {
+func generateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertCount int, additionalInstructions string, knowledges []*knowledge.Knowledge, requesterID string, threadComments []ticket.Comment, userSystemPrompt string) (string, error) {
 	ticketJSON, err := json.MarshalIndent(target, "", "  ")
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to marshal ticket to JSON")
@@ -61,6 +61,7 @@ func generateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertC
 		"lang":                    lang.From(ctx),
 		"requester_id":            requesterID,
 		"thread_comments":         threadComments,
+		"user_system_prompt":      userSystemPrompt,
 	})
 }
 
@@ -429,7 +430,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	threadComments := x.collectThreadComments(ctx, target.ID, ssn)
 
 	// Generate system prompt first (before creating agent)
-	systemPrompt, err := generateChatSystemPrompt(ctx, target, len(alerts), additionalInstructions, knowledges, string(userID), threadComments)
+	systemPrompt, err := generateChatSystemPrompt(ctx, target, len(alerts), additionalInstructions, knowledges, string(userID), threadComments, x.userSystemPrompt)
 	if err != nil {
 		return goerr.Wrap(err, "failed to build system prompt")
 	}

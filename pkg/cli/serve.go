@@ -51,23 +51,24 @@ func generateFrontendURL(addr string) string {
 
 func cmdServe() *cli.Command {
 	var (
-		addr             string
-		enableGraphQL    bool
-		enableGraphiQL   bool
-		noAuthorization  bool
-		strictAlert      bool
-		wsAllowedOrigins []string
-		webUICfg         config.WebUI
-		policyCfg        config.Policy
-		genaiCfg         config.GenAI
-		sentryCfg        config.Sentry
-		slackCfg         config.Slack
-		llmCfg           config.LLMCfg
-		firestoreCfg     config.Firestore
-		storageCfg       config.Storage
-		mcpCfg           config.MCPConfig
-		asyncCfg         config.AsyncAlertHook
-		traceCfg         config.Trace
+		addr                string
+		enableGraphQL       bool
+		enableGraphiQL      bool
+		noAuthorization     bool
+		strictAlert         bool
+		wsAllowedOrigins    []string
+		webUICfg            config.WebUI
+		policyCfg           config.Policy
+		genaiCfg            config.GenAI
+		sentryCfg           config.Sentry
+		slackCfg            config.Slack
+		llmCfg              config.LLMCfg
+		firestoreCfg        config.Firestore
+		storageCfg          config.Storage
+		mcpCfg              config.MCPConfig
+		asyncCfg            config.AsyncAlertHook
+		traceCfg            config.Trace
+		userSystemPromptCfg config.UserSystemPrompt
 	)
 
 	flags := joinFlags(
@@ -132,6 +133,7 @@ func cmdServe() *cli.Command {
 		asyncCfg.Flags(),
 		agents.AllFlags(),
 		traceCfg.Flags(),
+		userSystemPromptCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -266,6 +268,12 @@ func cmdServe() *cli.Command {
 				return goerr.Wrap(err, "failed to configure agents")
 			}
 
+			// Configure user system prompt
+			userSystemPrompt, err := userSystemPromptCfg.Configure()
+			if err != nil {
+				return goerr.Wrap(err, "failed to configure user system prompt")
+			}
+
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
@@ -276,6 +284,7 @@ func cmdServe() *cli.Command {
 				usecase.WithStrictAlert(strictAlert),
 				usecase.WithNoAuthorization(noAuthorization),
 				usecase.WithTagService(tagService),
+				usecase.WithUserSystemPrompt(userSystemPrompt),
 			}
 
 			// Add storage prefix if configured

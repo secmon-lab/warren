@@ -194,6 +194,14 @@ The following domain knowledge is available for topic '{{ .topic }}':
 {{ end }}
 {{- end }}
 
+{{ if .user_system_prompt }}
+-----------------------
+
+# User System Prompt
+
+{{ .user_system_prompt }}
+{{- end }}
+
 {{ if .additional_instructions }}
 -----------------------
 
