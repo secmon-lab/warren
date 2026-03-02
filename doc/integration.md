@@ -571,6 +571,9 @@ export WARREN_GITHUB_APP_ID="your-github-app-id"
 export WARREN_GITHUB_APP_INSTALLATION_ID="your-installation-id"
 export WARREN_GITHUB_APP_PRIVATE_KEY="your-private-key-pem-content"
 export WARREN_GITHUB_APP_CONFIG="path/to/repos.yaml"
+export WARREN_INTUNE_TENANT_ID="your-azure-ad-tenant-id"
+export WARREN_INTUNE_CLIENT_ID="your-azure-ad-client-id"
+export WARREN_INTUNE_CLIENT_SECRET="your-azure-ad-client-secret"
 ```
 
 Or use command-line flags:
@@ -582,7 +585,10 @@ warren serve \
   --github-app-id="12345" \
   --github-app-installation-id="67890" \
   --github-app-private-key="$(<private-key.pem)" \
-  --github-app-config="github-repos.yaml"
+  --github-app-config="github-repos.yaml" \
+  --intune-tenant-id="your-tenant-id" \
+  --intune-client-id="your-client-id" \
+  --intune-client-secret="your-client-secret"
 ```
 
 ### Available Integrations
@@ -622,6 +628,12 @@ warren serve \
 - Confidence scores
 - Attack categories
 - Geographic data
+
+#### Microsoft Intune
+- Managed device lookup by user email or hostname
+- Device compliance state, OS, encryption status
+- Sign-in IP address history from Azure AD audit logs
+- See [Intune tool setup guide](../pkg/tool/intune/README.md) for Azure AD app registration steps
 
 ### GitHub App Integration
 
