@@ -156,7 +156,7 @@ func (t *internalTool) Specs(_ context.Context) ([]gollem.ToolSpec, error) {
 				},
 				"limit": {
 					Type:        gollem.TypeNumber,
-					Description: "Maximum number of IDs to return (default: 100)",
+					Description: "Maximum number of IDs to return (default: 100, max: 5000)",
 				},
 				"offset": {
 					Type:        gollem.TypeString,
@@ -170,7 +170,7 @@ func (t *internalTool) Specs(_ context.Context) ([]gollem.ToolSpec, error) {
 			Parameters: map[string]*gollem.Parameter{
 				"ids": {
 					Type:        gollem.TypeString,
-					Description: "Comma-separated device IDs (e.g., \"abc123def456,ghi789jkl012\")",
+					Description: "Comma-separated device IDs (up to 5000, e.g., \"abc123def456,ghi789jkl012\")",
 					Required:    true,
 				},
 			},
