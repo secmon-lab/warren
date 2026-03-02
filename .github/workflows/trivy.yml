@@ -29,6 +29,7 @@ jobs:
           format: "sarif"
           output: "trivy-results.sarif"
           exit-code: 1
+          version: "v0.69.2"
         env:
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
 
