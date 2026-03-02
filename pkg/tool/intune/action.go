@@ -28,10 +28,17 @@ type Action struct {
 	clientSecret  string
 	baseURL       string
 	tokenEndpoint string
+	httpClient    *http.Client
 
 	mu          sync.Mutex
 	accessToken string
 	tokenExpiry time.Time
+}
+
+// sanitizeODataValue escapes single quotes in OData filter values
+// to prevent OData injection attacks.
+func sanitizeODataValue(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
 }
 
 var _ interfaces.Tool = &Action{}
@@ -86,6 +93,7 @@ func (x *Action) Configure(ctx context.Context) error {
 	if x.baseURL == "" {
 		x.baseURL = "https://graph.microsoft.com/v1.0"
 	}
+	x.httpClient = &http.Client{}
 	return nil
 }
 
@@ -149,14 +157,15 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 }
 
 func (x *Action) searchDevicesByUser(ctx context.Context, upn string) (map[string]any, error) {
-	filter := fmt.Sprintf("userPrincipalName eq '%s'", upn)
+	sanitizedUPN := sanitizeODataValue(upn)
+	filter := fmt.Sprintf("userPrincipalName eq '%s'", sanitizedUPN)
 	devices, err := x.queryManagedDevices(ctx, filter)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to query managed devices by user",
 			goerr.V("upn", upn))
 	}
 
-	signIns := x.fetchSignInLogs(ctx, fmt.Sprintf("userPrincipalName eq '%s'", upn))
+	signIns := x.fetchSignInLogs(ctx, fmt.Sprintf("userPrincipalName eq '%s'", sanitizedUPN))
 
 	return map[string]any{
 		"devices":       devices,
@@ -166,7 +175,7 @@ func (x *Action) searchDevicesByUser(ctx context.Context, upn string) (map[strin
 }
 
 func (x *Action) searchDevicesByHostname(ctx context.Context, deviceName string) (map[string]any, error) {
-	filter := fmt.Sprintf("deviceName eq '%s'", deviceName)
+	filter := fmt.Sprintf("deviceName eq '%s'", sanitizeODataValue(deviceName))
 	devices, err := x.queryManagedDevices(ctx, filter)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to query managed devices by hostname",
@@ -177,7 +186,7 @@ func (x *Action) searchDevicesByHostname(ctx context.Context, deviceName string)
 	if len(devices) > 0 {
 		if first, ok := devices[0].(map[string]any); ok {
 			if upn, ok := first["userPrincipalName"].(string); ok && upn != "" {
-				signIns = x.fetchSignInLogs(ctx, fmt.Sprintf("userPrincipalName eq '%s'", upn))
+				signIns = x.fetchSignInLogs(ctx, fmt.Sprintf("userPrincipalName eq '%s'", sanitizeODataValue(upn)))
 			}
 		}
 	}
@@ -284,8 +293,7 @@ func (x *Action) doGraphRequest(ctx context.Context, endpoint string) ([]byte, i
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := x.httpClient.Do(req)
 	if err != nil {
 		return nil, 0, goerr.Wrap(err, "failed to send request")
 	}
@@ -327,8 +335,7 @@ func (x *Action) fetchToken(ctx context.Context) (string, error) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := x.httpClient.Do(req)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to send token request")
 	}

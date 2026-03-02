@@ -49,8 +49,8 @@ This is a **read-only** tool — it does not modify any data in your Intune envi
 
 ```bash
 export WARREN_INTUNE_TENANT_ID="your-azure-ad-tenant-id"
-export WARREN_INTUNE_CLIENT_ID="your-application-client-id"
-export WARREN_INTUNE_CLIENT_SECRET="your-client-secret-value"
+export WARREN_INTUNE_CLIENT_ID="your-client-id"
+export WARREN_INTUNE_CLIENT_SECRET="your-client-secret"
 # Optional: override Graph API base URL (default: https://graph.microsoft.com/v1.0)
 # export WARREN_INTUNE_BASE_URL="https://graph.microsoft.com/v1.0"
 ```
