@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -43,7 +44,7 @@ func TestInternalTool_SpecCount(t *testing.T) {
 	tool := falcon.NewInternalToolForTest("id", "secret", "http://localhost")
 	count, err := tool.SpecCount(context.Background())
 	gt.NoError(t, err)
-	gt.Equal(t, count, 8)
+	gt.Equal(t, count, 10)
 }
 
 func TestInternalTool_SearchIncidents(t *testing.T) {
@@ -489,6 +490,105 @@ func TestInternalTool_SearchEvents_MissingQueryString(t *testing.T) {
 	gt.Error(t, err)
 }
 
+func TestInternalTool_SearchDevices(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gt.Equal(t, r.Method, http.MethodGet)
+		gt.True(t, r.URL.Path == "/devices/queries/devices-scroll/v1")
+		gt.Equal(t, r.URL.Query().Get("filter"), "platform_name:'Windows'")
+		gt.Equal(t, r.URL.Query().Get("limit"), "5")
+
+		w.Header().Set("Content-Type", "application/json")
+		resp := map[string]any{
+			"resources": []string{"device-abc123", "device-def456"},
+			"meta": map[string]any{
+				"pagination": map[string]any{
+					"total":  2,
+					"offset": "",
+				},
+			},
+		}
+		err := json.NewEncoder(w).Encode(resp)
+		gt.NoError(t, err)
+	})
+	defer srv.Close()
+
+	tool := falcon.NewInternalToolForTest("id", "secret", srv.URL)
+	result, err := tool.Run(context.Background(), "falcon_search_devices", map[string]any{
+		"filter": "platform_name:'Windows'",
+		"limit":  float64(5),
+	})
+	gt.NoError(t, err)
+
+	resources, ok := result["resources"].([]any)
+	gt.True(t, ok)
+	gt.Equal(t, len(resources), 2)
+	gt.Equal(t, resources[0], "device-abc123")
+	gt.Equal(t, resources[1], "device-def456")
+}
+
+func TestInternalTool_GetDevices(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gt.Equal(t, r.Method, http.MethodPost)
+		gt.Equal(t, r.URL.Path, "/devices/entities/devices/v2")
+		gt.Equal(t, r.Header.Get("Content-Type"), "application/json")
+
+		var body map[string]any
+		err := json.NewDecoder(r.Body).Decode(&body)
+		gt.NoError(t, err)
+
+		ids, ok := body["ids"].([]any)
+		gt.True(t, ok)
+		gt.Equal(t, len(ids), 2)
+		gt.Equal(t, ids[0], "device-abc123")
+		gt.Equal(t, ids[1], "device-def456")
+
+		w.Header().Set("Content-Type", "application/json")
+		resp := map[string]any{
+			"resources": []map[string]any{
+				{
+					"device_id":     "device-abc123",
+					"hostname":      "web-server-01",
+					"platform_name": "Windows",
+					"os_version":    "Windows 11",
+					"external_ip":   "203.0.113.10",
+					"local_ip":      "10.0.0.5",
+					"status":        "normal",
+					"agent_version": "7.10.18207.0",
+				},
+				{
+					"device_id":     "device-def456",
+					"hostname":      "db-server-02",
+					"platform_name": "Linux",
+					"os_version":    "RHEL 9.2",
+					"external_ip":   "203.0.113.11",
+					"local_ip":      "10.0.0.6",
+					"status":        "normal",
+					"agent_version": "7.10.18207.0",
+				},
+			},
+		}
+		err = json.NewEncoder(w).Encode(resp)
+		gt.NoError(t, err)
+	})
+	defer srv.Close()
+
+	tool := falcon.NewInternalToolForTest("id", "secret", srv.URL)
+	result, err := tool.Run(context.Background(), "falcon_get_devices", map[string]any{
+		"ids": "device-abc123, device-def456",
+	})
+	gt.NoError(t, err)
+
+	resources, ok := result["resources"].([]any)
+	gt.True(t, ok)
+	gt.Equal(t, len(resources), 2)
+}
+
+func TestInternalTool_GetDevices_MissingIDs(t *testing.T) {
+	tool := falcon.NewInternalToolForTest("id", "secret", "http://localhost")
+	_, err := tool.Run(context.Background(), "falcon_get_devices", map[string]any{})
+	gt.Error(t, err)
+}
+
 func TestInternalTool_APIError(t *testing.T) {
 	srv := newTestServer(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
@@ -500,4 +600,75 @@ func TestInternalTool_APIError(t *testing.T) {
 	tool := falcon.NewInternalToolForTest("id", "secret", srv.URL)
 	_, err := tool.Run(context.Background(), "falcon_search_incidents", map[string]any{})
 	gt.Error(t, err)
+}
+
+func newE2EInternalTool(t *testing.T) *falcon.InternalToolForTest {
+	t.Helper()
+
+	clientID := os.Getenv("TEST_AGENT_FALCON_CLIENT_ID")
+	clientSecret := os.Getenv("TEST_AGENT_FALCON_CLIENT_SECRET")
+	if clientID == "" || clientSecret == "" {
+		t.Skip("TEST_AGENT_FALCON_CLIENT_ID and TEST_AGENT_FALCON_CLIENT_SECRET are not set")
+	}
+
+	baseURL := os.Getenv("TEST_AGENT_FALCON_BASE_URL")
+	if baseURL == "" {
+		baseURL = "https://api.crowdstrike.com"
+	}
+
+	return falcon.NewInternalToolForTest(clientID, clientSecret, baseURL)
+}
+
+func TestInternalTool_E2E_SearchDevices(t *testing.T) {
+	tool := newE2EInternalTool(t)
+
+	result, err := tool.Run(context.Background(), "falcon_search_devices", map[string]any{
+		"limit": float64(5),
+	})
+	gt.NoError(t, err)
+
+	resources, ok := result["resources"].([]any)
+	gt.True(t, ok)
+	gt.True(t, len(resources) > 0)
+}
+
+func TestInternalTool_E2E_GetDevices(t *testing.T) {
+	tool := newE2EInternalTool(t)
+
+	// First, search for device IDs
+	searchResult, err := tool.Run(context.Background(), "falcon_search_devices", map[string]any{
+		"limit": float64(2),
+	})
+	gt.NoError(t, err)
+
+	resources, ok := searchResult["resources"].([]any)
+	gt.True(t, ok)
+	gt.True(t, len(resources) > 0)
+
+	// Build comma-separated IDs from search results
+	var ids []string
+	for _, r := range resources {
+		if id, ok := r.(string); ok {
+			ids = append(ids, id)
+		}
+	}
+	gt.True(t, len(ids) > 0)
+
+	// Get device details
+	getResult, err := tool.Run(context.Background(), "falcon_get_devices", map[string]any{
+		"ids": strings.Join(ids, ","),
+	})
+	gt.NoError(t, err)
+
+	devices, ok := getResult["resources"].([]any)
+	gt.True(t, ok)
+	gt.Equal(t, len(devices), len(ids))
+
+	// Verify first device has expected fields
+	device, ok := devices[0].(map[string]any)
+	gt.True(t, ok)
+	_, hasHostname := device["hostname"]
+	gt.True(t, hasHostname)
+	_, hasDeviceID := device["device_id"]
+	gt.True(t, hasDeviceID)
 }

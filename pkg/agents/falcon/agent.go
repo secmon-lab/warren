@@ -30,6 +30,7 @@ func (a *agent) description() string {
 		"Supports: incidents (status, tactics, hosts, scores), " +
 		"alerts (severity, MITRE ATT&CK tactics/techniques, hostname, file hash, command line), " +
 		"behaviors (detection patterns, dispositions), " +
+		"devices/hosts (hostname, IP, OS, sensor version, containment status), " +
 		"CrowdScores (environment threat level), " +
 		"and raw EDR events (process executions, network connections, DNS requests, file writes). " +
 		"Accepts FQL filters (e.g. status:'new', severity:>50, hostname:'*web*') and " +

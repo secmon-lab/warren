@@ -143,6 +143,39 @@ func (t *internalTool) Specs(_ context.Context) ([]gollem.ToolSpec, error) {
 			},
 		},
 		{
+			Name:        "falcon_search_devices",
+			Description: "Search for device (host) IDs using FQL filters. Returns a list of device IDs that can be used with falcon_get_devices to retrieve full host details including OS, IP addresses, sensor version, and containment status.",
+			Parameters: map[string]*gollem.Parameter{
+				"filter": {
+					Type:        gollem.TypeString,
+					Description: "FQL filter expression (e.g., \"hostname:'*web*'\", \"platform_name:'Windows'\", \"last_seen:>='2025-01-01'\", \"external_ip:'10.0.0.*'\")",
+				},
+				"sort": {
+					Type:        gollem.TypeString,
+					Description: "Sort expression (e.g., \"hostname.asc\", \"last_seen.desc\")",
+				},
+				"limit": {
+					Type:        gollem.TypeNumber,
+					Description: "Maximum number of IDs to return (default: 100, max: 5000)",
+				},
+				"offset": {
+					Type:        gollem.TypeString,
+					Description: "Pagination offset token from a previous response",
+				},
+			},
+		},
+		{
+			Name:        "falcon_get_devices",
+			Description: "Get detailed device (host) information by device IDs. Returns full host details including hostname, OS, IP addresses, sensor version, tags, and containment status.",
+			Parameters: map[string]*gollem.Parameter{
+				"ids": {
+					Type:        gollem.TypeString,
+					Description: "Comma-separated device IDs (up to 5000, e.g., \"abc123def456,ghi789jkl012\")",
+					Required:    true,
+				},
+			},
+		},
+		{
 			Name:        "falcon_search_events",
 			Description: "Search EDR telemetry events using CrowdStrike Query Language (CQL). This uses the Next-Gen SIEM Search API to query raw event data (process executions, network connections, file writes, DNS requests, etc.). The search runs asynchronously and this tool automatically polls until results are ready.",
 			Parameters: map[string]*gollem.Parameter{
@@ -182,6 +215,10 @@ func (t *internalTool) Run(ctx context.Context, name string, args map[string]any
 		return t.searchBehaviors(ctx, args)
 	case "falcon_get_behaviors":
 		return t.getBehaviors(ctx, args)
+	case "falcon_search_devices":
+		return t.searchDevices(ctx, args)
+	case "falcon_get_devices":
+		return t.getDevices(ctx, args)
 	case "falcon_get_crowdscores":
 		return t.getCrowdScores(ctx, args)
 	case "falcon_search_events":
@@ -405,6 +442,45 @@ func (t *internalTool) getBehaviors(ctx context.Context, args map[string]any) (m
 		return nil, err
 	}
 	msg.Trace(ctx, "✅ Retrieved behavior details")
+	return result, nil
+}
+
+// searchDevices searches for device (host) IDs using FQL filters.
+func (t *internalTool) searchDevices(ctx context.Context, args map[string]any) (map[string]any, error) {
+	filter, _ := args["filter"].(string)
+	msg.Trace(ctx, "🔍 Searching devices (filter: `%s`)", filter)
+
+	path := "/devices/queries/devices-scroll/v1"
+	params := buildQueryParams(args, "filter", "sort", "limit", "offset")
+	if params != "" {
+		path += "?" + params
+	}
+	result, err := t.doRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		msg.Warn(ctx, "⚠️ *[Falcon]* Device search failed (filter: `%s`): %v", filter, err)
+		return nil, err
+	}
+	msg.Trace(ctx, "✅ Device search completed")
+	return result, nil
+}
+
+// getDevices retrieves device (host) details by IDs.
+func (t *internalTool) getDevices(ctx context.Context, args map[string]any) (map[string]any, error) {
+	ids, ok := args["ids"].(string)
+	if !ok || ids == "" {
+		return nil, goerr.New("ids is required")
+	}
+
+	msg.Trace(ctx, "📋 Retrieving device details (ids: `%s`)", ids)
+	body := map[string]any{
+		"ids": splitAndTrim(ids),
+	}
+	result, err := t.doRequest(ctx, http.MethodPost, "/devices/entities/devices/v2", body)
+	if err != nil {
+		msg.Warn(ctx, "⚠️ *[Falcon]* Failed to retrieve devices (ids: `%s`): %v", ids, err)
+		return nil, err
+	}
+	msg.Trace(ctx, "✅ Retrieved device details")
 	return result, nil
 }
 
