@@ -24,14 +24,15 @@ import (
 
 func cmdChat() *cli.Command {
 	var (
-		ticketID        types.TicketID
-		noAuthorization bool
-		firestoreDB     config.Firestore
-		llmCfg          config.LLMCfg
-		policyCfg       config.Policy
-		storageCfg      config.Storage
-		mcpCfg          config.MCPConfig
-		traceCfg        config.Trace
+		ticketID            types.TicketID
+		noAuthorization     bool
+		firestoreDB         config.Firestore
+		llmCfg              config.LLMCfg
+		policyCfg           config.Policy
+		storageCfg          config.Storage
+		mcpCfg              config.MCPConfig
+		traceCfg            config.Trace
+		userSystemPromptCfg config.UserSystemPrompt
 
 		query string
 	)
@@ -68,6 +69,7 @@ func cmdChat() *cli.Command {
 		mcpCfg.Flags(),
 		agents.AllFlags(),
 		traceCfg.Flags(),
+		userSystemPromptCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -167,6 +169,12 @@ func cmdChat() *cli.Command {
 					"recommendation", "This should only be used in development environments")
 			}
 
+			// Configure user system prompt
+			userSystemPrompt, err := userSystemPromptCfg.Configure()
+			if err != nil {
+				return goerr.Wrap(err, "failed to configure user system prompt")
+			}
+
 			// Create usecase options
 			ucOptions := []usecase.Option{
 				usecase.WithRepository(repo),
@@ -176,6 +184,7 @@ func cmdChat() *cli.Command {
 				usecase.WithTools(allToolSets),
 				usecase.WithSubAgents(subAgents),
 				usecase.WithNoAuthorization(noAuthorization),
+				usecase.WithUserSystemPrompt(userSystemPrompt),
 			}
 
 			// Configure trace repository if trace bucket is set
