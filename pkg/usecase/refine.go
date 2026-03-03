@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
@@ -21,8 +22,11 @@ import (
 	slackSDK "github.com/slack-go/slack"
 )
 
-//go:embed prompt/refine_ticket_review.md
-var refineTicketReviewPromptTemplate string
+//go:embed prompt/refine_ticket_review_plan.md
+var refineTicketReviewPlanPromptTemplate string
+
+//go:embed prompt/refine_ticket_review_exec.md
+var refineTicketReviewExecPromptTemplate string
 
 //go:embed prompt/refine_alert_summary.md
 var refineAlertSummaryPromptTemplate string
@@ -32,11 +36,16 @@ var refineAlertConsolidationPromptTemplate string
 
 const maxUnboundAlerts = 100
 
-// LLM response types
+// LLM response types for Plan phase
 
-type ticketReviewResult struct {
-	Message string `json:"message"`
-	Reason  string `json:"reason"`
+type ticketReviewPlan struct {
+	Tasks []ticketReviewTask `json:"tasks"`
+}
+
+type ticketReviewTask struct {
+	Type        string `json:"type"`        // "investigate" | "notify" | "recommend"
+	Description string `json:"description"` // what needs to be done
+	Reason      string `json:"reason"`      // why this action is needed
 }
 
 type alertSummaryResult struct {
@@ -126,60 +135,150 @@ func (uc *UseCases) reviewSingleTicket(ctx context.Context, t *ticket.Ticket) er
 		return goerr.Wrap(err, "failed to get alerts for ticket", goerr.V("ticket_id", t.ID))
 	}
 
-	// Build assignee string
+	// Build assignee info
 	assignee := ""
+	assigneeID := ""
 	if t.Assignee != nil {
 		assignee = t.Assignee.Name
+		assigneeID = t.Assignee.ID
 	}
 
-	// Generate prompt
-	reviewPrompt, err := prompt.GenerateWithStruct(ctx, refineTicketReviewPromptTemplate, map[string]any{
+	templateData := map[string]any{
 		"title":       t.Title,
 		"description": t.Description,
 		"status":      t.Status.String(),
 		"created_at":  t.CreatedAt.Format("2006-01-02 15:04"),
 		"assignee":    assignee,
+		"assignee_id": assigneeID,
 		"alerts":      alerts,
 		"comments":    comments,
 		"now":         clock.Now(ctx).Format("2006-01-02 15:04"),
 		"lang":        lang.From(ctx),
-	})
-	if err != nil {
-		return goerr.Wrap(err, "failed to generate ticket review prompt")
 	}
 
-	// Ask LLM
-	result, err := llm.Ask[ticketReviewResult](ctx, uc.llmClient, reviewPrompt)
+	// Phase 1: Plan — ask LLM what actions are needed
+	planPrompt, err := prompt.GenerateWithStruct(ctx, refineTicketReviewPlanPromptTemplate, templateData)
 	if err != nil {
-		return goerr.Wrap(err, "failed to get ticket review from LLM", goerr.V("ticket_id", t.ID))
+		return goerr.Wrap(err, "failed to generate ticket review plan prompt")
 	}
 
-	logger.Info("ticket review result",
+	plan, err := llm.Ask[ticketReviewPlan](ctx, uc.llmClient, planPrompt)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get ticket review plan from LLM", goerr.V("ticket_id", t.ID))
+	}
+
+	logger.Info("ticket review plan",
 		"ticket_id", t.ID,
-		"has_message", result.Message != "",
-		"reason", result.Reason,
+		"task_count", len(plan.Tasks),
 	)
 
-	if result.Message == "" {
+	if len(plan.Tasks) == 0 {
+		logger.Info("no action needed for ticket", "ticket_id", t.ID)
 		return nil
 	}
 
-	// Post follow-up message to ticket's Slack thread
-	if uc.slackService != nil && t.SlackThread != nil {
-		threadSvc := uc.slackService.NewThread(*t.SlackThread)
-		if err := threadSvc.PostComment(ctx, result.Message); err != nil {
-			logger.Error("failed to post refine comment to ticket thread",
-				"ticket_id", t.ID, "error", err)
-		}
-	} else {
-		// Console output for CLI mode
-		logger.Info("refine follow-up",
-			"ticket_id", t.ID,
-			"message", result.Message,
-		)
+	// Phase 2: Execute — run agent with tools to carry out the plan
+	execPrompt, err := prompt.GenerateWithStruct(ctx, refineTicketReviewExecPromptTemplate, templateData)
+	if err != nil {
+		return goerr.Wrap(err, "failed to generate ticket review exec prompt")
 	}
 
+	// Build user prompt from the plan tasks
+	planJSON, err := json.Marshal(plan)
+	if err != nil {
+		return goerr.Wrap(err, "failed to marshal plan")
+	}
+	userPrompt := fmt.Sprintf("Execute the following plan:\n\n%s", string(planJSON))
+
+	// Build agent options
+	var options []gollem.Option
+	options = append(options, gollem.WithSystemPrompt(execPrompt))
+	options = append(options, gollem.WithLoopLimit(20))
+
+	// Add existing tools
+	if len(uc.tools) > 0 {
+		options = append(options, gollem.WithToolSets(uc.tools...))
+	}
+
+	// Add sub-agents
+	if len(uc.subAgents) > 0 {
+		gollemSubAgents := make([]*gollem.SubAgent, len(uc.subAgents))
+		for i, sa := range uc.subAgents {
+			gollemSubAgents[i] = sa.Inner()
+		}
+		options = append(options, gollem.WithSubAgents(gollemSubAgents...))
+	}
+
+	// Add slack_post_message tool
+	slackTool := newSlackPostMessageTool(uc, t)
+	options = append(options, gollem.WithToolSets(slackTool))
+
+	agent := gollem.New(uc.llmClient, options...)
+	_, err = agent.Execute(ctx, gollem.Text(userPrompt))
+	if err != nil {
+		return goerr.Wrap(err, "failed to execute ticket review agent", goerr.V("ticket_id", t.ID))
+	}
+
+	logger.Info("ticket review execution completed", "ticket_id", t.ID)
 	return nil
+}
+
+// slackPostMessageTool implements gollem.ToolSet for posting messages to a ticket's Slack thread.
+type slackPostMessageTool struct {
+	uc     *UseCases
+	ticket *ticket.Ticket
+}
+
+func newSlackPostMessageTool(uc *UseCases, t *ticket.Ticket) *slackPostMessageTool {
+	return &slackPostMessageTool{uc: uc, ticket: t}
+}
+
+// Specs implements gollem.ToolSet.
+func (t *slackPostMessageTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
+	return []gollem.ToolSpec{
+		{
+			Name:        "slack_post_message",
+			Description: "Post a message to the ticket's Slack thread. Use Slack mrkdwn format. For mentions, use <@USER_ID> format.",
+			Parameters: map[string]*gollem.Parameter{
+				"message": {
+					Type:        gollem.TypeString,
+					Description: "The message to post in the ticket's Slack thread. Supports Slack mrkdwn format. Use <@USER_ID> for mentions.",
+					Required:    true,
+				},
+			},
+		},
+	}, nil
+}
+
+// Run implements gollem.ToolSet.
+func (t *slackPostMessageTool) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
+	if name != "slack_post_message" {
+		return nil, goerr.New("unknown tool", goerr.V("name", name))
+	}
+
+	message, ok := args["message"].(string)
+	if !ok || message == "" {
+		return map[string]any{"error": "message parameter is required and must be a non-empty string"}, nil
+	}
+
+	logger := logging.From(ctx)
+
+	if t.uc.slackService != nil && t.ticket.SlackThread != nil {
+		threadSvc := t.uc.slackService.NewThread(*t.ticket.SlackThread)
+		if err := threadSvc.PostComment(ctx, message); err != nil {
+			logger.Error("failed to post refine message to ticket thread",
+				"ticket_id", t.ticket.ID, "error", err)
+			return map[string]any{"error": fmt.Sprintf("failed to post message: %v", err)}, nil
+		}
+		return map[string]any{"status": "posted"}, nil
+	}
+
+	// CLI mode fallback
+	logger.Info("refine follow-up",
+		"ticket_id", t.ticket.ID,
+		"message", message,
+	)
+	return map[string]any{"status": "logged (CLI mode)"}, nil
 }
 
 // consolidateUnboundAlerts finds unbound alerts that can be grouped and proposes consolidation.
