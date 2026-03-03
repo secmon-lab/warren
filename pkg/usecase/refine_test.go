@@ -3,6 +3,7 @@ package usecase_test
 import (
 	"context"
 	"encoding/json"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -32,6 +33,27 @@ func newMockLLMWithResponse(responseJSON string) *mock.LLMClientMock {
 	}
 }
 
+// newMockLLMWithSequence creates a mock LLM that returns different responses for each NewSession call.
+func newMockLLMWithSequence(responses []string) *mock.LLMClientMock {
+	var callCount atomic.Int64
+	return &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			idx := int(callCount.Add(1)) - 1
+			response := responses[idx%len(responses)]
+			return &mock.LLMSessionMock{
+				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{response},
+					}, nil
+				},
+				AppendHistoryFunc: func(history *gollem.History) error {
+					return nil
+				},
+			}, nil
+		},
+	}
+}
+
 func TestRefine_NoLLMClient(t *testing.T) {
 	uc := usecase.New()
 	err := uc.Refine(context.Background())
@@ -40,7 +62,7 @@ func TestRefine_NoLLMClient(t *testing.T) {
 
 func TestRefine_NoOpenTickets(t *testing.T) {
 	repo := repository.NewMemory()
-	llmMock := newMockLLMWithResponse(`{"message": "", "reason": "no tickets"}`)
+	llmMock := newMockLLMWithResponse(`{"tasks": []}`)
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
@@ -67,8 +89,8 @@ func TestRefine_ReviewOpenTicket_NoAction(t *testing.T) {
 	}
 	gt.NoError(t, repo.PutTicket(ctx, ticketData))
 
-	// LLM says "do not act"
-	llmMock := newMockLLMWithResponse(`{"message": "", "reason": "recent activity detected"}`)
+	// Phase 1 (Plan) returns empty tasks → skip Phase 2
+	llmMock := newMockLLMWithResponse(`{"tasks": []}`)
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
@@ -78,7 +100,7 @@ func TestRefine_ReviewOpenTicket_NoAction(t *testing.T) {
 	err := uc.Refine(ctx)
 	gt.NoError(t, err)
 
-	// Verify LLM was called (for ticket review)
+	// Verify LLM was called once for Plan phase only
 	gt.V(t, len(llmMock.NewSessionCalls())).Equal(1)
 }
 
@@ -98,8 +120,11 @@ func TestRefine_ReviewOpenTicket_WithAction(t *testing.T) {
 	}
 	gt.NoError(t, repo.PutTicket(ctx, ticketData))
 
-	// LLM says "act"
-	llmMock := newMockLLMWithResponse(`{"message": "Please check on this ticket", "reason": "no activity for 3 days"}`)
+	// Phase 1 (Plan) returns tasks, Phase 2 (Execute) returns completion text
+	llmMock := newMockLLMWithSequence([]string{
+		`{"tasks": [{"type": "notify", "description": "Remind team", "reason": "no activity for 3 days"}]}`,
+		`Done. I have reviewed the ticket and posted a reminder.`,
+	})
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
@@ -109,11 +134,11 @@ func TestRefine_ReviewOpenTicket_WithAction(t *testing.T) {
 	err := uc.Refine(ctx)
 	gt.NoError(t, err)
 
-	// Verify LLM was called
-	gt.V(t, len(llmMock.NewSessionCalls())).Equal(1)
+	// Verify LLM was called twice: Phase 1 (Plan) + Phase 2 (Execute)
+	gt.V(t, len(llmMock.NewSessionCalls())).Equal(2)
 }
 
-func TestRefine_ReviewOpenTicket_WithActionButEmptyMessage(t *testing.T) {
+func TestRefine_ReviewOpenTicket_EmptyTasks(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
 
@@ -129,15 +154,15 @@ func TestRefine_ReviewOpenTicket_WithActionButEmptyMessage(t *testing.T) {
 	}
 	gt.NoError(t, repo.PutTicket(ctx, ticketData))
 
-	// LLM returns empty message
-	llmMock := newMockLLMWithResponse(`{"message": "", "reason": ""}`)
+	// Phase 1 (Plan) returns empty tasks
+	llmMock := newMockLLMWithResponse(`{"tasks": []}`)
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
 		usecase.WithLLMClient(llmMock),
 	)
 
-	// Should not error with empty message
+	// Should not error with empty tasks
 	err := uc.Refine(ctx)
 	gt.NoError(t, err)
 }
@@ -160,7 +185,7 @@ func TestRefine_ConsolidateUnboundAlerts_NotEnoughAlerts(t *testing.T) {
 	}
 	gt.NoError(t, repo.PutAlert(ctx, a))
 
-	llmMock := newMockLLMWithResponse(`{"message": "", "reason": ""}`)
+	llmMock := newMockLLMWithResponse(`{"tasks": []}`)
 
 	uc := usecase.New(
 		usecase.WithRepository(repo),
@@ -197,23 +222,23 @@ func TestRefine_ConsolidateUnboundAlerts_WithGroups(t *testing.T) {
 		alertIDs[i] = a.ID
 	}
 
-	// Multi-step LLM responses: ticket review (0 tickets), then alert summaries (3x), then consolidation
-	callCount := 0
+	// Multi-step LLM responses: alert summaries (3x), then consolidation
+	var callCount atomic.Int64
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
 				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
-					callCount++
+					idx := int(callCount.Add(1))
 					var response string
-					if callCount <= 3 {
+					if idx <= 3 {
 						// Alert summary responses
-						response = `{"alert_id": "` + alertIDs[callCount-1].String() + `", "title": "Brute Force", "identities": ["192.168.1.1"], "parameters": ["ssh"], "context": "network", "root_cause": "brute force"}`
+						response = `{"alert_id": "` + alertIDs[idx-1].String() + `", "title": "Brute Force", "identities": ["192.168.1.1"], "parameters": ["ssh"], "context": "network", "root_cause": "brute force"}`
 					} else {
 						// Consolidation response
 						consolidation := map[string]any{
 							"groups": []map[string]any{
 								{
-									"reason":           "same source IP brute force",
+									"reason":           "Same source IP 192.168.1.1 performing SSH brute force",
 									"primary_alert_id": alertIDs[0].String(),
 									"alert_ids":        []string{alertIDs[0].String(), alertIDs[1].String(), alertIDs[2].String()},
 								},
@@ -263,14 +288,14 @@ func TestRefine_ConsolidateUnboundAlerts_NoGroups(t *testing.T) {
 	}
 
 	// Multi-step responses: 2 summaries + empty consolidation
-	callCount := 0
+	var callCount atomic.Int64
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
 				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
-					callCount++
+					idx := int(callCount.Add(1))
 					var response string
-					if callCount <= 2 {
+					if idx <= 2 {
 						response = `{"alert_id": "test", "title": "Alert", "identities": [], "parameters": [], "context": "test", "root_cause": "unknown"}`
 					} else {
 						response = `{"groups": []}`
