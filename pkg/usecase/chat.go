@@ -454,7 +454,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	traceMW := gollem.ContentBlockMiddleware(func(next gollem.ContentBlockHandler) gollem.ContentBlockHandler {
 		return func(ctx context.Context, req *gollem.ContentRequest) (*gollem.ContentResponse, error) {
 			resp, err := next(ctx, req)
-			if err == nil && len(resp.Texts) > 0 {
+			if err == nil && resp != nil && len(resp.Texts) > 0 {
 				for _, text := range resp.Texts {
 					msg.Trace(ctx, "💭 %s", text)
 				}
