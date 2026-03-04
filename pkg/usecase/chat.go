@@ -450,10 +450,24 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 		repository: x.repository,
 	}
 
+	// Trace middleware for LLM response display - applied to both main agent and planexec internal calls
+	traceMW := gollem.ContentBlockMiddleware(func(next gollem.ContentBlockHandler) gollem.ContentBlockHandler {
+		return func(ctx context.Context, req *gollem.ContentRequest) (*gollem.ContentResponse, error) {
+			resp, err := next(ctx, req)
+			if err == nil && resp != nil && len(resp.Texts) > 0 {
+				for _, text := range resp.Texts {
+					msg.Trace(ctx, "💭 %s", text)
+				}
+			}
+			return resp, err
+		}
+	})
+
 	// Create Plan & Execute strategy
 	strategy := planexec.New(x.llmClient,
 		planexec.WithHooks(hooks),
 		planexec.WithMaxIterations(30),
+		planexec.WithMiddleware(traceMW),
 	)
 
 	// Extract inner gollem.SubAgents for passing to gollem API
@@ -486,20 +500,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	agentOpts = append(agentOpts,
 		// Compaction middleware for automatic history compression
 		gollem.WithContentBlockMiddleware(llm.NewCompactionMiddleware(x.llmClient, logging.From(ctx))),
-		// Trace middleware for message display
-		gollem.WithContentBlockMiddleware(
-			func(next gollem.ContentBlockHandler) gollem.ContentBlockHandler {
-				return func(ctx context.Context, req *gollem.ContentRequest) (*gollem.ContentResponse, error) {
-					resp, err := next(ctx, req)
-					if err == nil && len(resp.Texts) > 0 {
-						for _, text := range resp.Texts {
-							msg.Trace(ctx, "💭 %s", text)
-						}
-					}
-					return resp, err
-				}
-			},
-		),
+		gollem.WithContentBlockMiddleware(traceMW),
 		gollem.WithToolMiddleware(func(next gollem.ToolHandler) gollem.ToolHandler {
 			return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
 				// Check if session is aborted before executing tool
