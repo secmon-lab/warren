@@ -17,6 +17,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/notifier"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/tag"
+	chatUC "github.com/secmon-lab/warren/pkg/usecase/chat"
 )
 
 var (
@@ -39,7 +40,8 @@ type UseCases struct {
 	traceRepository trace.Repository
 
 	// use cases
-	TagUC *TagUseCase
+	ChatUC interfaces.ChatUseCase
+	TagUC  *TagUseCase
 
 	// configs
 	timeSpan         time.Duration
@@ -186,6 +188,13 @@ func WithUserSystemPrompt(prompt string) Option {
 	}
 }
 
+// WithChatUseCase sets a custom ChatUseCase implementation, overriding the default PlanExecChat.
+func WithChatUseCase(chatUseCase interfaces.ChatUseCase) Option {
+	return func(u *UseCases) {
+		u.ChatUC = chatUseCase
+	}
+}
+
 type dummyPolicyClient struct{}
 
 func (c *dummyPolicyClient) Query(ctx context.Context, query string, data, result any, queryOptions ...opaq.QueryOption) error {
@@ -212,6 +221,22 @@ func New(opts ...Option) *UseCases {
 	// Initialize console notifier for pipeline events
 	if u.consoleNotifier == nil {
 		u.consoleNotifier = notifier.NewConsoleNotifier()
+	}
+
+	// Initialize chat use case (only if not already set via WithChatUseCase)
+	if u.ChatUC == nil {
+		chatOpts := []chatUC.Option{
+			chatUC.WithSlackService(u.slackService),
+			chatUC.WithTools(u.tools),
+			chatUC.WithSubAgents(u.subAgents),
+			chatUC.WithStorageClient(u.storageClient),
+			chatUC.WithStoragePrefix(u.storagePrefix),
+			chatUC.WithNoAuthorization(u.noAuthorization),
+			chatUC.WithFrontendURL(u.frontendURL),
+			chatUC.WithUserSystemPrompt(u.userSystemPrompt),
+			chatUC.WithTraceRepository(u.traceRepository),
+		}
+		u.ChatUC = chatUC.NewPlanExecChat(u.repository, u.llmClient, u.policyClient, chatOpts...)
 	}
 
 	// Initialize tag use case if tag service is available
