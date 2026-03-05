@@ -2,6 +2,7 @@ package command_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -79,9 +80,12 @@ func TestPurgeCommand(t *testing.T) {
 			}, false, "", nil
 		}
 
+		var mu sync.Mutex
 		deletedMessages := []string{}
 		slackClient.DeleteMessageContextFunc = func(ctx context.Context, channelID, timestamp string) (string, string, error) {
+			mu.Lock()
 			deletedMessages = append(deletedMessages, timestamp)
+			mu.Unlock()
 			return channelID, timestamp, nil
 		}
 
@@ -153,9 +157,12 @@ func TestPurgeCommand(t *testing.T) {
 			}, false, "", nil
 		}
 
+		var mu sync.Mutex
 		deletedMessages := []string{}
 		slackClient.DeleteMessageContextFunc = func(ctx context.Context, channelID, timestamp string) (string, string, error) {
+			mu.Lock()
 			deletedMessages = append(deletedMessages, timestamp)
+			mu.Unlock()
 			return channelID, timestamp, nil
 		}
 
