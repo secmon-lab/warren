@@ -373,8 +373,6 @@ func (c *ChatUseCase) authorizeAgentRequest(ctx context.Context, message string)
 
 // executeAgent handles context preparation, agent construction, execution, and result processing.
 func (c *ChatUseCase) executeAgent(ctx context.Context, target *ticket.Ticket, ssn *session.Session, message string, planFunc func(context.Context, string), finalStatus *types.SessionStatus) error {
-	logger := logging.From(ctx)
-
 	// Setup finding update function
 	slackUpdateFunc := func(ctx context.Context, t *ticket.Ticket) error {
 		if c.slackService == nil || !t.HasSlackThread() || t.Finding == nil {
@@ -400,16 +398,6 @@ func (c *ChatUseCase) executeAgent(ctx context.Context, target *ticket.Ticket, s
 	}
 
 	effectiveTopic := c.resolveEffectiveTopic(ctx, target, alerts)
-
-	// Set topic for existing knowledge tool if present
-	for _, tool := range c.tools {
-		if kt, ok := tool.(*knowledgeTool.Knowledge); ok {
-			kt.SetTopic(effectiveTopic)
-			defer kt.SetTopic("")
-			logger.Debug("set topic for knowledge tool", "topic", effectiveTopic)
-			break
-		}
-	}
 
 	kt := knowledgeTool.New(c.repository, effectiveTopic)
 	tools := append(c.tools, baseAction, kt)
