@@ -39,7 +39,8 @@ type UseCases struct {
 	traceRepository trace.Repository
 
 	// use cases
-	TagUC *TagUseCase
+	ChatUC *ChatUseCase
+	TagUC  *TagUseCase
 
 	// configs
 	timeSpan         time.Duration
@@ -213,6 +214,20 @@ func New(opts ...Option) *UseCases {
 	if u.consoleNotifier == nil {
 		u.consoleNotifier = notifier.NewConsoleNotifier()
 	}
+
+	// Initialize chat use case
+	chatOpts := []ChatOption{
+		WithChatSlackService(u.slackService),
+		WithChatTools(u.tools),
+		WithChatSubAgents(u.subAgents),
+		WithChatStorageClient(u.storageClient),
+		WithChatStoragePrefix(u.storagePrefix),
+		WithChatNoAuthorization(u.noAuthorization),
+		WithChatFrontendURL(u.frontendURL),
+		WithChatUserSystemPrompt(u.userSystemPrompt),
+		WithChatTraceRepository(u.traceRepository),
+	}
+	u.ChatUC = NewChatUseCase(u.repository, u.llmClient, u.policyClient, chatOpts...)
 
 	// Initialize tag use case if tag service is available
 	if u.tagService != nil {
