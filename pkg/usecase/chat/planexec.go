@@ -1,22 +1,18 @@
-package usecase
+package chat
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
-	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
-	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -36,9 +32,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
-// ChatUseCase encapsulates the chat processing workflow.
-// It can be configured with different strategies and middleware via ChatOption.
-type ChatUseCase struct {
+// PlanExecChat implements interfaces.ChatUseCase with the Plan & Execute strategy.
+type PlanExecChat struct {
 	// required dependencies
 	repository   interfaces.Repository
 	llmClient    gollem.LLMClient
@@ -61,82 +56,82 @@ type ChatUseCase struct {
 	traceRepository  trace.Repository
 }
 
-// ChatOption configures a ChatUseCase.
-type ChatOption func(*ChatUseCase)
+// Option configures a PlanExecChat.
+type Option func(*PlanExecChat)
 
-// WithChatStrategyFactory sets the strategy factory for agent execution.
-func WithChatStrategyFactory(f StrategyFactory) ChatOption {
-	return func(c *ChatUseCase) {
+// WithStrategyFactory sets the strategy factory for agent execution.
+func WithStrategyFactory(f StrategyFactory) Option {
+	return func(c *PlanExecChat) {
 		c.strategyFactory = f
 	}
 }
 
-// WithChatSlackService sets the Slack service for message routing.
-func WithChatSlackService(svc *slackService.Service) ChatOption {
-	return func(c *ChatUseCase) {
+// WithSlackService sets the Slack service for message routing.
+func WithSlackService(svc *slackService.Service) Option {
+	return func(c *PlanExecChat) {
 		c.slackService = svc
 	}
 }
 
-// WithChatTools sets the tool sets available to the agent.
-func WithChatTools(tools []gollem.ToolSet) ChatOption {
-	return func(c *ChatUseCase) {
+// WithTools sets the tool sets available to the agent.
+func WithTools(tools []gollem.ToolSet) Option {
+	return func(c *PlanExecChat) {
 		c.tools = append(c.tools, tools...)
 	}
 }
 
-// WithChatSubAgents sets the sub-agents available to the agent.
-func WithChatSubAgents(subAgents []*agent.SubAgent) ChatOption {
-	return func(c *ChatUseCase) {
+// WithSubAgents sets the sub-agents available to the agent.
+func WithSubAgents(subAgents []*agent.SubAgent) Option {
+	return func(c *PlanExecChat) {
 		c.subAgents = append(c.subAgents, subAgents...)
 	}
 }
 
-// WithChatStorageClient sets the storage client for history persistence.
-func WithChatStorageClient(client interfaces.StorageClient) ChatOption {
-	return func(c *ChatUseCase) {
+// WithStorageClient sets the storage client for history persistence.
+func WithStorageClient(client interfaces.StorageClient) Option {
+	return func(c *PlanExecChat) {
 		c.storageClient = client
 	}
 }
 
-// WithChatStoragePrefix sets the storage prefix for history paths.
-func WithChatStoragePrefix(prefix string) ChatOption {
-	return func(c *ChatUseCase) {
+// WithStoragePrefix sets the storage prefix for history paths.
+func WithStoragePrefix(prefix string) Option {
+	return func(c *PlanExecChat) {
 		c.storagePrefix = prefix
 	}
 }
 
-// WithChatNoAuthorization disables policy-based authorization checks.
-func WithChatNoAuthorization(noAuthz bool) ChatOption {
-	return func(c *ChatUseCase) {
+// WithNoAuthorization disables policy-based authorization checks.
+func WithNoAuthorization(noAuthz bool) Option {
+	return func(c *PlanExecChat) {
 		c.noAuthorization = noAuthz
 	}
 }
 
-// WithChatFrontendURL sets the frontend URL for session links.
-func WithChatFrontendURL(url string) ChatOption {
-	return func(c *ChatUseCase) {
+// WithFrontendURL sets the frontend URL for session links.
+func WithFrontendURL(url string) Option {
+	return func(c *PlanExecChat) {
 		c.frontendURL = url
 	}
 }
 
-// WithChatUserSystemPrompt sets the user system prompt.
-func WithChatUserSystemPrompt(prompt string) ChatOption {
-	return func(c *ChatUseCase) {
+// WithUserSystemPrompt sets the user system prompt.
+func WithUserSystemPrompt(prompt string) Option {
+	return func(c *PlanExecChat) {
 		c.userSystemPrompt = prompt
 	}
 }
 
-// WithChatTraceRepository sets the trace repository for execution tracing.
-func WithChatTraceRepository(repo trace.Repository) ChatOption {
-	return func(c *ChatUseCase) {
+// WithTraceRepository sets the trace repository for execution tracing.
+func WithTraceRepository(repo trace.Repository) Option {
+	return func(c *PlanExecChat) {
 		c.traceRepository = repo
 	}
 }
 
-// NewChatUseCase creates a new ChatUseCase with the given dependencies and options.
-func NewChatUseCase(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient interfaces.PolicyClient, opts ...ChatOption) *ChatUseCase {
-	uc := &ChatUseCase{
+// NewPlanExecChat creates a new PlanExecChat with the given dependencies and options.
+func NewPlanExecChat(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient interfaces.PolicyClient, opts ...Option) *PlanExecChat {
+	c := &PlanExecChat{
 		repository:      repo,
 		llmClient:       llmClient,
 		policyClient:    policyClient,
@@ -144,15 +139,15 @@ func NewChatUseCase(repo interfaces.Repository, llmClient gollem.LLMClient, poli
 	}
 
 	for _, opt := range opts {
-		opt(uc)
+		opt(c)
 	}
 
-	return uc
+	return c
 }
 
 // Execute processes a chat message for the specified ticket.
 // This is the main orchestrator that coordinates all phases of chat processing.
-func (c *ChatUseCase) Execute(ctx context.Context, target *ticket.Ticket, message string) error {
+func (c *PlanExecChat) Execute(ctx context.Context, target *ticket.Ticket, message string) error {
 	logger := logging.From(ctx)
 
 	// Phase 1: Session setup
@@ -181,7 +176,7 @@ func (c *ChatUseCase) Execute(ctx context.Context, target *ticket.Ticket, messag
 }
 
 // createSession creates and persists a new chat session.
-func (c *ChatUseCase) createSession(ctx context.Context, target *ticket.Ticket, message string) (*session.Session, context.Context) {
+func (c *PlanExecChat) createSession(ctx context.Context, target *ticket.Ticket, message string) (*session.Session, context.Context) {
 	userID := types.UserID(user.FromContext(ctx))
 	slackURL := slackctx.SlackURL(ctx)
 
@@ -202,7 +197,7 @@ func (c *ChatUseCase) createSession(ctx context.Context, target *ticket.Ticket, 
 }
 
 // setupMessageRouting configures Slack/CLI message routing functions in the context.
-func (c *ChatUseCase) setupMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket) (func(context.Context, string), context.Context) {
+func (c *PlanExecChat) setupMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket) (func(context.Context, string), context.Context) {
 	planFunc := func(ctx context.Context, msg string) {}
 
 	if c.slackService != nil && target.SlackThread != nil {
@@ -221,7 +216,7 @@ func (c *ChatUseCase) setupMessageRouting(ctx context.Context, ssn *session.Sess
 }
 
 // setupSlackMessageFuncs creates Slack message routing functions for notify, trace, plan, and warn.
-func (c *ChatUseCase) setupSlackMessageFuncs(ctx context.Context, sess *session.Session, target *ticket.Ticket) (msg.NotifyFunc, msg.TraceFunc, msg.TraceFunc, msg.WarnFunc) {
+func (c *PlanExecChat) setupSlackMessageFuncs(ctx context.Context, sess *session.Session, target *ticket.Ticket) (msg.NotifyFunc, msg.TraceFunc, msg.TraceFunc, msg.WarnFunc) {
 	threadSvc := c.slackService.NewThread(*target.SlackThread)
 
 	notifyFunc := func(ctx context.Context, message string) {
@@ -267,7 +262,7 @@ func (c *ChatUseCase) setupSlackMessageFuncs(ctx context.Context, sess *session.
 }
 
 // setupStatusCheck embeds a session abort check function in the context.
-func (c *ChatUseCase) setupStatusCheck(ctx context.Context, ssn *session.Session) context.Context {
+func (c *PlanExecChat) setupStatusCheck(ctx context.Context, ssn *session.Session) context.Context {
 	statusCheckFunc := func(ctx context.Context) error {
 		s, err := c.repository.GetSession(ctx, ssn.ID)
 		if err != nil {
@@ -282,7 +277,7 @@ func (c *ChatUseCase) setupStatusCheck(ctx context.Context, ssn *session.Session
 }
 
 // finishSession updates session status and posts session actions on completion.
-func (c *ChatUseCase) finishSession(ctx context.Context, ssn *session.Session, target *ticket.Ticket, finalStatus *types.SessionStatus, logger interface{ Error(string, ...any) }) {
+func (c *PlanExecChat) finishSession(ctx context.Context, ssn *session.Session, target *ticket.Ticket, finalStatus *types.SessionStatus, logger interface{ Error(string, ...any) }) {
 	if r := recover(); r != nil {
 		*finalStatus = types.SessionStatusAborted
 		ssn.UpdateStatus(ctx, *finalStatus)
@@ -318,11 +313,11 @@ func (c *ChatUseCase) finishSession(ctx context.Context, ssn *session.Session, t
 
 // authorize checks policy-based authorization for agent execution.
 // Returns (true, nil) if authorized, (false, nil) if denied (notification already sent), or (false, err) on error.
-func (c *ChatUseCase) authorize(ctx context.Context, message string) (bool, error) {
-	if err := c.authorizeAgentRequest(ctx, message); err != nil {
-		if errors.Is(err, errAgentAuthPolicyNotDefined) {
+func (c *PlanExecChat) authorize(ctx context.Context, message string) (bool, error) {
+	if err := AuthorizeAgentRequest(ctx, c.policyClient, c.noAuthorization, message); err != nil {
+		if errors.Is(err, ErrAgentAuthPolicyNotDefined) {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nAgent execution policy is not defined. Please configure the `auth.agent` policy or use `--no-authorization` flag for development.\n\nSee: https://docs.warren.secmon-lab.com/policy.md#agent-execution-authorization")
-		} else if errors.Is(err, errAgentAuthDenied) {
+		} else if errors.Is(err, ErrAgentAuthDenied) {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nYou are not authorized to execute agent requests. Please contact your administrator if you believe this is an error.")
 		} else {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nFailed to check authorization. Please contact your administrator.")
@@ -333,46 +328,8 @@ func (c *ChatUseCase) authorize(ctx context.Context, message string) (bool, erro
 	return true, nil
 }
 
-// authorizeAgentRequest checks policy-based authorization.
-func (c *ChatUseCase) authorizeAgentRequest(ctx context.Context, message string) error {
-	logger := logging.From(ctx)
-
-	if c.noAuthorization {
-		logger.Debug("agent authorization check bypassed due to --no-authorization flag")
-		return nil
-	}
-
-	authCtx := auth.BuildAgentContext(ctx, message)
-
-	var result struct {
-		Allow bool `json:"allow"`
-	}
-
-	query := "data.auth.agent"
-	err := c.policyClient.Query(ctx, query, authCtx, &result, opaq.WithPrintHook(func(ctx context.Context, loc opaq.PrintLocation, msg string) error {
-		logger.Debug("[rego] "+msg, "loc", loc)
-		return nil
-	}))
-	if err != nil {
-		if errors.Is(err, opaq.ErrNoEvalResult) {
-			logger.Warn("agent authorization policy not defined, denying by default")
-			return goerr.Wrap(errAgentAuthPolicyNotDefined, "agent authorization policy not defined")
-		}
-		return goerr.Wrap(err, "failed to evaluate agent authorization policy")
-	}
-
-	logger.Debug("agent authorization result", "input", authCtx, "output", result)
-
-	if !result.Allow {
-		logger.Warn("agent authorization failed", "message", message)
-		return goerr.Wrap(errAgentAuthDenied, "agent request denied by policy", goerr.V("message", message))
-	}
-
-	return nil
-}
-
 // executeAgent handles context preparation, agent construction, execution, and result processing.
-func (c *ChatUseCase) executeAgent(ctx context.Context, target *ticket.Ticket, ssn *session.Session, message string, planFunc func(context.Context, string), finalStatus *types.SessionStatus) error {
+func (c *PlanExecChat) executeAgent(ctx context.Context, target *ticket.Ticket, ssn *session.Session, message string, planFunc func(context.Context, string), finalStatus *types.SessionStatus) error {
 	// Setup finding update function
 	slackUpdateFunc := func(ctx context.Context, t *ticket.Ticket) error {
 		if c.slackService == nil || !t.HasSlackThread() || t.Finding == nil {
@@ -424,9 +381,9 @@ func (c *ChatUseCase) executeAgent(ctx context.Context, target *ticket.Ticket, s
 	})
 
 	// Build and execute agent
-	agent := c.buildAgent(ctx, strategy, history, tools, systemPrompt, requestID)
+	gollemAgent := c.buildAgent(ctx, strategy, history, tools, systemPrompt, requestID)
 
-	result, executionErr := agent.Execute(ctx, gollem.Text(message))
+	result, executionErr := gollemAgent.Execute(ctx, gollem.Text(message))
 	if executionErr != nil {
 		*finalStatus = types.SessionStatusAborted
 
@@ -446,11 +403,11 @@ func (c *ChatUseCase) executeAgent(ctx context.Context, target *ticket.Ticket, s
 	c.handleResult(ctx, result, target, ssn)
 
 	// Save history
-	return c.saveHistory(ctx, agent, target, storageSvc)
+	return c.saveHistory(ctx, gollemAgent, target, storageSvc)
 }
 
 // loadHistory loads the chat history for the ticket.
-func (c *ChatUseCase) loadHistory(ctx context.Context, target *ticket.Ticket, storageSvc *storage.Service) (*gollem.History, error) {
+func (c *PlanExecChat) loadHistory(ctx context.Context, target *ticket.Ticket, storageSvc *storage.Service) (*gollem.History, error) {
 	logger := logging.From(ctx)
 
 	historyRecord, err := c.repository.GetLatestHistory(ctx, target.ID)
@@ -482,7 +439,7 @@ func (c *ChatUseCase) loadHistory(ctx context.Context, target *ticket.Ticket, st
 }
 
 // resolveEffectiveTopic determines the effective topic, falling back to schema if needed.
-func (c *ChatUseCase) resolveEffectiveTopic(ctx context.Context, target *ticket.Ticket, alerts []*alert.Alert) types.KnowledgeTopic {
+func (c *PlanExecChat) resolveEffectiveTopic(ctx context.Context, target *ticket.Ticket, alerts []*alert.Alert) types.KnowledgeTopic {
 	logger := logging.From(ctx)
 	effectiveTopic := target.Topic
 
@@ -499,7 +456,7 @@ func (c *ChatUseCase) resolveEffectiveTopic(ctx context.Context, target *ticket.
 }
 
 // buildSystemPrompt generates the system prompt with all context.
-func (c *ChatUseCase) buildSystemPrompt(ctx context.Context, target *ticket.Ticket, ssn *session.Session, tools []gollem.ToolSet, alerts []*alert.Alert, effectiveTopic types.KnowledgeTopic) (string, error) {
+func (c *PlanExecChat) buildSystemPrompt(ctx context.Context, target *ticket.Ticket, ssn *session.Session, tools []gollem.ToolSet, alerts []*alert.Alert, effectiveTopic types.KnowledgeTopic) (string, error) {
 	logger := logging.From(ctx)
 	userID := types.UserID(user.FromContext(ctx))
 
@@ -542,74 +499,13 @@ func (c *ChatUseCase) buildSystemPrompt(ctx context.Context, target *ticket.Tick
 	}
 
 	// Collect thread comments
-	threadComments := c.collectThreadComments(ctx, target.ID, ssn)
+	threadComments := CollectThreadComments(ctx, c.repository, target.ID, ssn)
 
-	return generateChatSystemPrompt(ctx, target, len(alerts), additionalInstructions, knowledges, string(userID), threadComments, c.userSystemPrompt)
-}
-
-// collectThreadComments retrieves thread comments posted between the previous session and the current session.
-func (c *ChatUseCase) collectThreadComments(ctx context.Context, ticketID types.TicketID, currentSession *session.Session) []ticket.Comment {
-	logger := logging.From(ctx)
-
-	const maxThreadComments = 50
-
-	sessions, err := c.repository.GetSessionsByTicket(ctx, ticketID)
-	if err != nil {
-		logger.Warn("failed to get sessions for thread comments", "error", err, "ticket_id", ticketID)
-		return nil
-	}
-
-	var prevSessionCreatedAt time.Time
-	for _, s := range sessions {
-		if s.ID == currentSession.ID {
-			continue
-		}
-		if s.Status != types.SessionStatusCompleted {
-			continue
-		}
-		if s.CreatedAt.Before(currentSession.CreatedAt) && s.CreatedAt.After(prevSessionCreatedAt) {
-			prevSessionCreatedAt = s.CreatedAt
-		}
-	}
-
-	logger.Debug("collectThreadComments",
-		"ticket_id", ticketID,
-		"total_sessions", len(sessions),
-		"prev_session_created_at", prevSessionCreatedAt,
-		"current_session_created_at", currentSession.CreatedAt,
-	)
-
-	comments, err := c.repository.GetTicketComments(ctx, ticketID)
-	if err != nil {
-		logger.Warn("failed to get ticket comments for thread context", "error", err, "ticket_id", ticketID)
-		return nil
-	}
-
-	var filtered []ticket.Comment
-	for _, co := range comments {
-		if co.CreatedAt.After(prevSessionCreatedAt) && co.CreatedAt.Before(currentSession.CreatedAt) {
-			filtered = append(filtered, co)
-		}
-	}
-
-	logger.Debug("collectThreadComments filtered",
-		"total_comments", len(comments),
-		"filtered_count", len(filtered),
-	)
-
-	sort.Slice(filtered, func(i, j int) bool {
-		return filtered[i].CreatedAt.Before(filtered[j].CreatedAt)
-	})
-
-	if len(filtered) > maxThreadComments {
-		filtered = filtered[len(filtered)-maxThreadComments:]
-	}
-
-	return filtered
+	return GenerateChatSystemPrompt(ctx, target, len(alerts), additionalInstructions, knowledges, string(userID), threadComments, c.userSystemPrompt)
 }
 
 // buildAgent constructs the gollem agent with strategy, tools, and middleware.
-func (c *ChatUseCase) buildAgent(ctx context.Context, strategy gollem.Strategy, history *gollem.History, tools []gollem.ToolSet, systemPrompt string, requestID string) *gollem.Agent {
+func (c *PlanExecChat) buildAgent(ctx context.Context, strategy gollem.Strategy, history *gollem.History, tools []gollem.ToolSet, systemPrompt string, requestID string) *gollem.Agent {
 	logger := logging.From(ctx)
 
 	gollemSubAgents := make([]*gollem.SubAgent, len(c.subAgents))
@@ -648,7 +544,7 @@ func (c *ChatUseCase) buildAgent(ctx context.Context, strategy gollem.Strategy, 
 				}
 
 				if !base.IgnorableTool(req.Tool.Name) {
-					message := toolCallToText(ctx, c.llmClient, req.ToolSpec, req.Tool)
+					message := ToolCallToText(ctx, c.llmClient, req.ToolSpec, req.Tool)
 					msg.Trace(ctx, "🤖 %s", message)
 					logger.Debug("execute tool", "tool", req.Tool.Name, "args", req.Tool.Arguments)
 				}
@@ -669,7 +565,7 @@ func (c *ChatUseCase) buildAgent(ctx context.Context, strategy gollem.Strategy, 
 }
 
 // handleResult processes the agent execution result and posts to Slack.
-func (c *ChatUseCase) handleResult(ctx context.Context, result *gollem.ExecuteResponse, target *ticket.Ticket, ssn *session.Session) {
+func (c *PlanExecChat) handleResult(ctx context.Context, result *gollem.ExecuteResponse, target *ticket.Ticket, ssn *session.Session) {
 	if result == nil || result.IsEmpty() {
 		return
 	}
@@ -711,10 +607,10 @@ func (c *ChatUseCase) handleResult(ctx context.Context, result *gollem.ExecuteRe
 }
 
 // saveHistory saves the updated chat history after agent execution.
-func (c *ChatUseCase) saveHistory(ctx context.Context, agent *gollem.Agent, target *ticket.Ticket, storageSvc *storage.Service) error {
+func (c *PlanExecChat) saveHistory(ctx context.Context, gollemAgent *gollem.Agent, target *ticket.Ticket, storageSvc *storage.Service) error {
 	logger := logging.From(ctx)
 
-	agentSession := agent.Session()
+	agentSession := gollemAgent.Session()
 	if agentSession == nil {
 		logger.Warn("agent session is nil after execution")
 		return nil

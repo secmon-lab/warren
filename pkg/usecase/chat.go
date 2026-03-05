@@ -3,47 +3,17 @@ package usecase
 import (
 	"context"
 	_ "embed"
-	"encoding/json"
-	"fmt"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/utils/errutil"
+	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat"
 )
-
-//go:embed prompt/chat_system_prompt.md
-var chatSystemPromptTemplate string
-
-var (
-	// ErrSessionAborted is returned when a session is aborted by user request
-	ErrSessionAborted = goerr.New("session aborted by user")
-)
-
-func generateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertCount int, additionalInstructions string, knowledges []*knowledge.Knowledge, requesterID string, threadComments []ticket.Comment, userSystemPrompt string) (string, error) {
-	ticketJSON, err := json.MarshalIndent(target, "", "  ")
-	if err != nil {
-		return "", goerr.Wrap(err, "failed to marshal ticket to JSON")
-	}
-
-	return prompt.GenerateWithStruct(ctx, chatSystemPromptTemplate, map[string]any{
-		"ticket_json":             "```json\n" + string(ticketJSON) + "\n```",
-		"total":                   alertCount,
-		"additional_instructions": additionalInstructions,
-		"knowledges":              knowledges,
-		"topic":                   target.Topic,
-		"lang":                    lang.From(ctx),
-		"requester_id":            requesterID,
-		"thread_comments":         threadComments,
-		"user_system_prompt":      userSystemPrompt,
-	})
-}
 
 // Chat processes a chat message for the specified ticket.
 // It delegates to ChatUC (ChatUseCase) for the actual processing.
@@ -51,62 +21,18 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 	return x.ChatUC.Execute(ctx, target, message)
 }
 
-// collectThreadComments delegates to ChatUC for backward compatibility.
+// collectThreadComments delegates to the chat package exported function.
 func (x *UseCases) collectThreadComments(ctx context.Context, ticketID types.TicketID, currentSession *session.Session) []ticket.Comment {
-	return x.ChatUC.collectThreadComments(ctx, ticketID, currentSession)
+	return chatpkg.CollectThreadComments(ctx, x.repository, ticketID, currentSession)
 }
 
-// authorizeAgentRequest delegates to ChatUC for backward compatibility.
+// authorizeAgentRequest delegates to the chat package exported function.
 func (x *UseCases) authorizeAgentRequest(ctx context.Context, message string) error {
-	return x.ChatUC.authorizeAgentRequest(ctx, message)
+	return chatpkg.AuthorizeAgentRequest(ctx, x.policyClient, x.noAuthorization, message)
 }
-
-//go:embed prompt/tool_call_to_text.md
-var toolCallToTextPromptTemplate string
 
 //go:embed prompt/ticket_comment.md
 var ticketCommentPromptTemplate string
-
-func toolCallToText(ctx context.Context, llmClient gollem.LLMClient, spec *gollem.ToolSpec, call *gollem.FunctionCall) string {
-	eb := goerr.NewBuilder(
-		goerr.V("tool", call.Name),
-		goerr.V("spec", spec),
-	)
-	defaultMsg := fmt.Sprintf("⚡ Execute Tool: `%s`", call.Name)
-	if spec == nil {
-		errutil.Handle(ctx, eb.New("tool not found"))
-		return defaultMsg
-	}
-
-	p, err := prompt.Generate(ctx, toolCallToTextPromptTemplate, map[string]any{
-		"spec":      spec,
-		"tool_call": call,
-		"lang":      lang.From(ctx),
-	})
-	if err != nil {
-		errutil.Handle(ctx, eb.Wrap(err, "failed to generate prompt"))
-		return defaultMsg
-	}
-
-	session, err := llmClient.NewSession(ctx)
-	if err != nil {
-		errutil.Handle(ctx, eb.Wrap(err, "failed to create session"))
-		return defaultMsg
-	}
-
-	response, err := session.GenerateContent(ctx, gollem.Text(p))
-	if err != nil {
-		errutil.Handle(ctx, eb.Wrap(err, "failed to generate content"))
-		return defaultMsg
-	}
-
-	if len(response.Texts) == 0 {
-		errutil.Handle(ctx, eb.New("no response"))
-		return defaultMsg
-	}
-
-	return response.Texts[0]
-}
 
 // generateInitialTicketComment generates an LLM-based initial comment for a ticket
 func (x *UseCases) generateInitialTicketComment(ctx context.Context, ticketData *ticket.Ticket, alerts alert.Alerts) (string, error) {

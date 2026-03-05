@@ -17,6 +17,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/notifier"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/tag"
+	chatUC "github.com/secmon-lab/warren/pkg/usecase/chat"
 )
 
 var (
@@ -39,7 +40,7 @@ type UseCases struct {
 	traceRepository trace.Repository
 
 	// use cases
-	ChatUC *ChatUseCase
+	ChatUC interfaces.ChatUseCase
 	TagUC  *TagUseCase
 
 	// configs
@@ -187,6 +188,13 @@ func WithUserSystemPrompt(prompt string) Option {
 	}
 }
 
+// WithChatUseCase sets a custom ChatUseCase implementation, overriding the default PlanExecChat.
+func WithChatUseCase(chatUseCase interfaces.ChatUseCase) Option {
+	return func(u *UseCases) {
+		u.ChatUC = chatUseCase
+	}
+}
+
 type dummyPolicyClient struct{}
 
 func (c *dummyPolicyClient) Query(ctx context.Context, query string, data, result any, queryOptions ...opaq.QueryOption) error {
@@ -215,19 +223,21 @@ func New(opts ...Option) *UseCases {
 		u.consoleNotifier = notifier.NewConsoleNotifier()
 	}
 
-	// Initialize chat use case
-	chatOpts := []ChatOption{
-		WithChatSlackService(u.slackService),
-		WithChatTools(u.tools),
-		WithChatSubAgents(u.subAgents),
-		WithChatStorageClient(u.storageClient),
-		WithChatStoragePrefix(u.storagePrefix),
-		WithChatNoAuthorization(u.noAuthorization),
-		WithChatFrontendURL(u.frontendURL),
-		WithChatUserSystemPrompt(u.userSystemPrompt),
-		WithChatTraceRepository(u.traceRepository),
+	// Initialize chat use case (only if not already set via WithChatUseCase)
+	if u.ChatUC == nil {
+		chatOpts := []chatUC.Option{
+			chatUC.WithSlackService(u.slackService),
+			chatUC.WithTools(u.tools),
+			chatUC.WithSubAgents(u.subAgents),
+			chatUC.WithStorageClient(u.storageClient),
+			chatUC.WithStoragePrefix(u.storagePrefix),
+			chatUC.WithNoAuthorization(u.noAuthorization),
+			chatUC.WithFrontendURL(u.frontendURL),
+			chatUC.WithUserSystemPrompt(u.userSystemPrompt),
+			chatUC.WithTraceRepository(u.traceRepository),
+		}
+		u.ChatUC = chatUC.NewPlanExecChat(u.repository, u.llmClient, u.policyClient, chatOpts...)
 	}
-	u.ChatUC = NewChatUseCase(u.repository, u.llmClient, u.policyClient, chatOpts...)
 
 	// Initialize tag use case if tag service is available
 	if u.tagService != nil {
