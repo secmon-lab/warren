@@ -90,10 +90,11 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	}
 
 	// Add content block middleware for tracing LLM responses
+	traceState := &taskTraceState{}
 	agentOpts = append(agentOpts,
 		gollem.WithContentBlockMiddleware(llm.NewCompactionMiddleware(c.llmClient, logging.From(ctx))),
-		gollem.WithContentBlockMiddleware(newTaskTraceMW(taskCtx)),
-		gollem.WithToolMiddleware(newTaskToolMiddleware(taskCtx, c.llmClient)),
+		gollem.WithContentBlockMiddleware(newTaskTraceMW(taskCtx, traceState)),
+		gollem.WithToolMiddleware(newTaskToolMiddleware(taskCtx, traceState)),
 	)
 
 	// Create and execute agent
@@ -219,15 +220,37 @@ func filterSubAgents(allAgents []*agent.SubAgent, allowedNames []string) []*agen
 	return filtered
 }
 
-// newTaskTraceMW creates a content block middleware that traces LLM text responses for a task.
-func newTaskTraceMW(taskCtx context.Context) gollem.ContentBlockMiddleware {
+// taskTraceState holds shared state between content block and tool middlewares
+// to display LLM thinking text alongside tool execution.
+type taskTraceState struct {
+	// pendingThinking holds LLM text that was returned together with function calls.
+	// It is consumed by the next tool execution trace.
+	pendingThinking string
+}
+
+// newTaskTraceMW creates a content block middleware that captures LLM text responses.
+// When the response contains both text and function calls, the text is stored as
+// pending thinking and displayed alongside the next tool execution.
+// When the response contains only text (no function calls), it is traced immediately.
+func newTaskTraceMW(taskCtx context.Context, state *taskTraceState) gollem.ContentBlockMiddleware {
 	return gollem.ContentBlockMiddleware(func(next gollem.ContentBlockHandler) gollem.ContentBlockHandler {
 		return func(ctx context.Context, req *gollem.ContentRequest) (*gollem.ContentResponse, error) {
 			resp, err := next(ctx, req)
-			if err == nil && resp != nil && len(resp.Texts) > 0 {
-				for _, text := range resp.Texts {
-					msg.Trace(taskCtx, "💭 %s", text)
-				}
+			if err != nil || resp == nil || len(resp.Texts) == 0 {
+				return resp, err
+			}
+
+			combined := resp.Texts[0]
+			for _, t := range resp.Texts[1:] {
+				combined += "\n" + t
+			}
+
+			if len(resp.FunctionCalls) > 0 {
+				// Text came with function calls — store for tool middleware to display
+				state.pendingThinking = combined
+			} else {
+				// Text only — trace immediately
+				msg.Trace(taskCtx, "💭 %s", combined)
 			}
 			return resp, err
 		}
@@ -235,7 +258,9 @@ func newTaskTraceMW(taskCtx context.Context) gollem.ContentBlockMiddleware {
 }
 
 // newTaskToolMiddleware creates a tool middleware with status check and tracing for a task.
-func newTaskToolMiddleware(taskCtx context.Context, llmClient gollem.LLMClient) gollem.ToolMiddleware {
+// If there is pending thinking text from the content block middleware, it is prepended
+// to the tool execution trace message.
+func newTaskToolMiddleware(taskCtx context.Context, state *taskTraceState) gollem.ToolMiddleware {
 	return func(next gollem.ToolHandler) gollem.ToolHandler {
 		return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
 			if err := ssnutil.CheckStatus(ctx); err != nil {
@@ -245,7 +270,12 @@ func newTaskToolMiddleware(taskCtx context.Context, llmClient gollem.LLMClient) 
 			}
 
 			if !base.IgnorableTool(req.Tool.Name) {
-				msg.Trace(taskCtx, "🤖 Execute: `%s`", req.Tool.Name)
+				if state.pendingThinking != "" {
+					msg.Trace(taskCtx, "💭 %s\n🤖 Execute: `%s`", state.pendingThinking, req.Tool.Name)
+					state.pendingThinking = ""
+				} else {
+					msg.Trace(taskCtx, "🤖 Execute: `%s`", req.Tool.Name)
+				}
 			}
 
 			resp, err := next(ctx, req)

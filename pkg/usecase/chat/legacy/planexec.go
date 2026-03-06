@@ -502,6 +502,7 @@ func (c *PlanExecChat) buildAgent(ctx context.Context, strategy gollem.Strategy,
 		recorder := trace.New(
 			trace.WithTraceID(requestID),
 			trace.WithRepository(c.traceRepository),
+			trace.WithStackTrace(),
 		)
 		agentOpts = append(agentOpts, gollem.WithTrace(recorder))
 	}

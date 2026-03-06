@@ -173,6 +173,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		recorder = trace.New(
 			trace.WithTraceID(requestID),
 			trace.WithRepository(c.traceRepository),
+			trace.WithStackTrace(),
 		)
 		ctx = trace.WithHandler(ctx, recorder)
 		defer func() {
