@@ -3,6 +3,7 @@ package swarm
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/m-mizutani/gollem"
@@ -66,7 +67,7 @@ func (c *SwarmChat) postTaskResults(ctx context.Context, tasks []TaskPlan, resul
 			continue
 		}
 		summary := truncateResult(result.Result, 200)
-		blockText := fmt.Sprintf("📋 *[%s]*\n\n%s", tasks[i].Title, summary)
+		blockText := fmt.Sprintf("📋 *[%s]*\n\n%s", escapeSlackMrkdwn(tasks[i].Title), summary)
 		if err := threadSvc.PostContextBlock(ctx, blockText); err != nil {
 			logging.From(ctx).Error("failed to post task completion context block", "error", err)
 		}
@@ -176,7 +177,8 @@ func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Se
 
 	// Post initial "waiting" message immediately
 	completed := false
-	initialMsg := fmt.Sprintf("🕐 *[%s]*\n> Waiting...", taskTitle)
+	escaped := escapeSlackMrkdwn(taskTitle)
+	initialMsg := fmt.Sprintf("🕐 *[%s]*\n\nWaiting...", escaped)
 	updateFunc := threadSvc.NewUpdatableMessage(ctx, initialMsg)
 
 	taskTraceFunc := func(ctx context.Context, message string) {
@@ -184,7 +186,7 @@ func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Se
 		if completed {
 			emoji = "✅"
 		}
-		prefixed := fmt.Sprintf("%s *[%s]*\n> %s", emoji, taskTitle, message)
+		prefixed := fmt.Sprintf("%s *[%s]*\n\n%s", emoji, escaped, message)
 		m := session.NewMessage(ctx, ssn.ID, session.MessageTypeTrace, prefixed)
 		if err := c.repository.PutSessionMessage(ctx, m); err != nil {
 			errutil.Handle(ctx, err)
@@ -331,4 +333,12 @@ func truncateResult(s string, maxLen int) string {
 		return s
 	}
 	return string(runes[:maxLen]) + "..."
+}
+
+// escapeSlackMrkdwn escapes special characters for Slack mrkdwn format.
+func escapeSlackMrkdwn(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	return s
 }

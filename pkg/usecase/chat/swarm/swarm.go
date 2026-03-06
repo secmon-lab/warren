@@ -141,7 +141,7 @@ func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, message 
 	ctx = c.setupStatusCheck(ctx, ssn)
 
 	finalStatus := types.SessionStatusCompleted
-	defer c.finishSession(ctx, ssn, target, &finalStatus, logger)
+	defer c.finishSession(ctx, ssn, target, &finalStatus)
 
 	// Phase 4: Authorization
 	authorized, err := c.authorize(ctx, message)
@@ -428,7 +428,8 @@ func (c *SwarmChat) setupStatusCheck(ctx context.Context, ssn *session.Session) 
 }
 
 // finishSession updates session status and posts session actions on completion.
-func (c *SwarmChat) finishSession(ctx context.Context, ssn *session.Session, target *ticket.Ticket, finalStatus *types.SessionStatus, logger interface{ Error(string, ...any) }) {
+func (c *SwarmChat) finishSession(ctx context.Context, ssn *session.Session, target *ticket.Ticket, finalStatus *types.SessionStatus) {
+	logger := logging.From(ctx)
 	if r := recover(); r != nil {
 		*finalStatus = types.SessionStatusAborted
 		ssn.UpdateStatus(ctx, *finalStatus)
