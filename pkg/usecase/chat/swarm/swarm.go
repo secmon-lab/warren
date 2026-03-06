@@ -2,22 +2,20 @@ package swarm
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
-	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
-	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
@@ -182,7 +180,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 
 	// Load history
 	storageSvc := storage.New(c.storageClient, storage.WithPrefix(c.storagePrefix))
-	history, err := c.loadHistory(ctx, target, storageSvc)
+	history, err := chat.LoadHistory(ctx, c.repository, target.ID, storageSvc)
 	if err != nil {
 		return err
 	}
@@ -249,7 +247,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 
 	// Direct response (no tasks)
 	if len(planResult.Tasks) == 0 {
-		return c.saveHistory(ctx, planSession, target, storageSvc)
+		return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
 	}
 
 	// Execute phases
@@ -293,7 +291,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 
 	msg.Notify(ctx, "💬 %s", finalResp)
 
-	return c.saveHistory(ctx, planSession, target, storageSvc)
+	return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
 }
 
 // phaseResult stores the results of a single phase execution.
@@ -436,10 +434,10 @@ func (c *SwarmChat) finishSession(ctx context.Context, ssn *session.Session, tar
 
 // authorize checks policy-based authorization for agent execution.
 func (c *SwarmChat) authorize(ctx context.Context, message string) (bool, error) {
-	if err := authorizeAgentRequest(ctx, c.policyClient, c.noAuthorization, message); err != nil {
-		if errors.Is(err, ErrAgentAuthPolicyNotDefined) {
+	if err := chat.AuthorizeAgentRequest(ctx, c.policyClient, c.noAuthorization, message); err != nil {
+		if errors.Is(err, chat.ErrAgentAuthPolicyNotDefined) {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nAgent execution policy is not defined. Please configure the `auth.agent` policy or use `--no-authorization` flag for development.\n\nSee: https://docs.warren.secmon-lab.com/policy.md#agent-execution-authorization")
-		} else if errors.Is(err, ErrAgentAuthDenied) {
+		} else if errors.Is(err, chat.ErrAgentAuthDenied) {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nYou are not authorized to execute agent requests. Please contact your administrator if you believe this is an error.")
 		} else {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nFailed to check authorization. Please contact your administrator.")
@@ -450,118 +448,11 @@ func (c *SwarmChat) authorize(ctx context.Context, message string) (bool, error)
 	return true, nil
 }
 
-// authorizeAgentRequest checks policy-based authorization for agent execution.
-func authorizeAgentRequest(ctx context.Context, policyClient interfaces.PolicyClient, noAuthz bool, message string) error {
-	logger := logging.From(ctx)
-
-	if noAuthz {
-		logger.Debug("agent authorization check bypassed due to --no-authorization flag")
-		return nil
-	}
-
-	authCtx := auth.BuildAgentContext(ctx, message)
-
-	var result struct {
-		Allow bool `json:"allow"`
-	}
-
-	query := "data.auth.agent"
-	err := policyClient.Query(ctx, query, authCtx, &result, opaq.WithPrintHook(func(ctx context.Context, loc opaq.PrintLocation, msg string) error {
-		logger.Debug("[rego] "+msg, "loc", loc)
-		return nil
-	}))
-	if err != nil {
-		if errors.Is(err, opaq.ErrNoEvalResult) {
-			logger.Warn("agent authorization policy not defined, denying by default")
-			return goerr.Wrap(ErrAgentAuthPolicyNotDefined, "agent authorization policy not defined")
-		}
-		return goerr.Wrap(err, "failed to evaluate agent authorization policy")
-	}
-
-	logger.Debug("agent authorization result", "input", authCtx, "output", result)
-
-	if !result.Allow {
-		logger.Warn("agent authorization failed", "message", message)
-		return goerr.Wrap(ErrAgentAuthDenied, "agent request denied by policy", goerr.V("message", message))
-	}
-
-	return nil
-}
-
-// loadHistory loads the chat history for the ticket.
-func (c *SwarmChat) loadHistory(ctx context.Context, target *ticket.Ticket, storageSvc *storage.Service) (*gollem.History, error) {
-	logger := logging.From(ctx)
-
-	historyRecord, err := c.repository.GetLatestHistory(ctx, target.ID)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get latest history")
-	}
-
-	if historyRecord == nil {
-		return nil, nil
-	}
-
-	history, err := storageSvc.GetHistory(ctx, target.ID, historyRecord.ID)
-	if err != nil {
-		msg.Notify(ctx, "⚠️ Failed to load chat history, starting fresh: %s", err.Error())
-		logger.Warn("failed to get history data, starting with new history", "error", err)
-		return nil, nil
-	}
-
-	if history != nil && (history.Version <= 0 || history.ToCount() <= 0) {
-		msg.Notify(ctx, "⚠️ Chat history incompatible (version=%d, messages=%d), starting fresh", history.Version, history.ToCount())
-		logger.Warn("history incompatible, starting with new history",
-			"version", history.Version,
-			"message_count", history.ToCount(),
-			"history_id", historyRecord.ID)
-		return nil, nil
-	}
-
-	return history, nil
-}
-
-// saveHistory saves the updated chat history after execution.
-func (c *SwarmChat) saveHistory(ctx context.Context, planSession gollem.Session, target *ticket.Ticket, storageSvc *storage.Service) error {
-	logger := logging.From(ctx)
-
+// saveSessionHistory extracts history from a gollem Session and saves it via the shared SaveHistory function.
+func (c *SwarmChat) saveSessionHistory(ctx context.Context, planSession gollem.Session, ticketID types.TicketID, storageSvc *storage.Service) error {
 	newHistory, err := planSession.History()
 	if err != nil {
 		return goerr.Wrap(err, "failed to get history from planning session")
 	}
-	if newHistory == nil {
-		return goerr.New("history is nil after execution")
-	}
-
-	logger.Debug("saving chat history",
-		"history_version", newHistory.Version,
-		"message_count", newHistory.ToCount())
-
-	if newHistory.ToCount() <= 0 {
-		logger.Warn("history has no messages, but saving anyway to maintain consistency",
-			"version", newHistory.Version,
-			"message_count", newHistory.ToCount(),
-			"ticket_id", target.ID)
-	}
-
-	if newHistory.Version > 0 && c.storageClient != nil {
-		newRecord := ticket.NewHistory(ctx, target.ID)
-
-		if err := storageSvc.PutHistory(ctx, target.ID, newRecord.ID, newHistory); err != nil {
-			msg.Notify(ctx, "💥 Failed to save chat history: %s", err.Error())
-			return goerr.Wrap(err, "failed to put history")
-		}
-
-		if err := c.repository.PutHistory(ctx, target.ID, &newRecord); err != nil {
-			logger := logging.From(ctx)
-			if data, jsonErr := json.Marshal(&newRecord); jsonErr == nil {
-				logger.Error("failed to save history", "error", err, "history", string(data))
-			}
-			msg.Notify(ctx, "💥 Failed to save chat record: %s", err.Error())
-			return goerr.Wrap(err, "failed to put history", goerr.V("history", &newRecord))
-		}
-
-		logger.Debug("history saved", "history_id", newRecord.ID, "ticket_id", target.ID)
-	}
-
-	return nil
+	return chat.SaveHistory(ctx, c.repository, c.storageClient, storageSvc, ticketID, newHistory)
 }

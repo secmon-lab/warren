@@ -20,6 +20,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
@@ -314,10 +315,10 @@ func (c *PlanExecChat) finishSession(ctx context.Context, ssn *session.Session, 
 // authorize checks policy-based authorization for agent execution.
 // Returns (true, nil) if authorized, (false, nil) if denied (notification already sent), or (false, err) on error.
 func (c *PlanExecChat) authorize(ctx context.Context, message string) (bool, error) {
-	if err := AuthorizeAgentRequest(ctx, c.policyClient, c.noAuthorization, message); err != nil {
-		if errors.Is(err, ErrAgentAuthPolicyNotDefined) {
+	if err := chat.AuthorizeAgentRequest(ctx, c.policyClient, c.noAuthorization, message); err != nil {
+		if errors.Is(err, chat.ErrAgentAuthPolicyNotDefined) {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nAgent execution policy is not defined. Please configure the `auth.agent` policy or use `--no-authorization` flag for development.\n\nSee: https://docs.warren.secmon-lab.com/policy.md#agent-execution-authorization")
-		} else if errors.Is(err, ErrAgentAuthDenied) {
+		} else if errors.Is(err, chat.ErrAgentAuthDenied) {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nYou are not authorized to execute agent requests. Please contact your administrator if you believe this is an error.")
 		} else {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nFailed to check authorization. Please contact your administrator.")
@@ -408,34 +409,7 @@ func (c *PlanExecChat) executeAgent(ctx context.Context, target *ticket.Ticket, 
 
 // loadHistory loads the chat history for the ticket.
 func (c *PlanExecChat) loadHistory(ctx context.Context, target *ticket.Ticket, storageSvc *storage.Service) (*gollem.History, error) {
-	logger := logging.From(ctx)
-
-	historyRecord, err := c.repository.GetLatestHistory(ctx, target.ID)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get latest history")
-	}
-
-	if historyRecord == nil {
-		return nil, nil
-	}
-
-	history, err := storageSvc.GetHistory(ctx, target.ID, historyRecord.ID)
-	if err != nil {
-		msg.Notify(ctx, "⚠️ Failed to load chat history, starting fresh: %s", err.Error())
-		logger.Warn("failed to get history data, starting with new history", "error", err)
-		return nil, nil
-	}
-
-	if history != nil && (history.Version <= 0 || history.ToCount() <= 0) {
-		msg.Notify(ctx, "⚠️ Chat history incompatible (version=%d, messages=%d), starting fresh", history.Version, history.ToCount())
-		logger.Warn("history incompatible, starting with new history",
-			"version", history.Version,
-			"message_count", history.ToCount(),
-			"history_id", historyRecord.ID)
-		return nil, nil
-	}
-
-	return history, nil
+	return chat.LoadHistory(ctx, c.repository, target.ID, storageSvc)
 }
 
 // resolveEffectiveTopic determines the effective topic, falling back to schema if needed.

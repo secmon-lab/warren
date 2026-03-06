@@ -149,7 +149,7 @@ Task agents and their sub-agent calls (Falcon, BigQuery, etc.) are nested under 
 | Sub-agent assignment | All sub-agents available | Per-task sub-agent filtering |
 | Slack progress | Single trace message | Per-task context blocks |
 | Error isolation | Agent stops on error | Failed tasks don't affect others |
-| History | Maintained across sessions | Maintained via planning session |
+| History | Maintained across sessions | History managed by planner; tasks are stateless |
 | Memory integration | N/A | Searches past insights for planning |
 
 ## Configuration Reference

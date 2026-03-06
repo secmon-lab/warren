@@ -10,6 +10,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	chatcommon "github.com/secmon-lab/warren/pkg/usecase/chat"
 	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat/legacy"
 )
 
@@ -100,7 +101,7 @@ func (uc *UseCases) AuthorizeAgentRequest(ctx context.Context, message string) e
 }
 
 // ErrAgentAuthPolicyNotDefined exports the chat package error for testing
-var ErrAgentAuthPolicyNotDefined = chatpkg.ErrAgentAuthPolicyNotDefined
+var ErrAgentAuthPolicyNotDefined = chatcommon.ErrAgentAuthPolicyNotDefined
 
 // ErrSessionAborted exports the chat package error for testing
 var ErrSessionAborted = chatpkg.ErrSessionAborted

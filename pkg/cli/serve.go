@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollem/trace"
 
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
 	traceAdapter "github.com/secmon-lab/warren/pkg/adapter/trace"
@@ -322,13 +323,14 @@ func cmdServe() *cli.Command {
 			}
 
 			// Configure trace repository if trace bucket is set
+			var safeTraceRepo trace.Repository
 			if traceCfg.IsConfigured() {
 				traceRepo, err := traceCfg.Configure(ctx)
 				if err != nil {
 					return goerr.Wrap(err, "failed to configure trace repository")
 				}
-				safeRepo := traceAdapter.NewSafe(traceRepo, logging.From(ctx))
-				ucOptions = append(ucOptions, usecase.WithTraceRepository(safeRepo))
+				safeTraceRepo = traceAdapter.NewSafe(traceRepo, logging.From(ctx))
+				ucOptions = append(ucOptions, usecase.WithTraceRepository(safeTraceRepo))
 				logging.From(ctx).Info("Trace recording enabled", "trace", traceCfg.LogValue())
 			}
 
@@ -350,13 +352,8 @@ func cmdServe() *cli.Command {
 				if storageCfg.IsConfigured() && storageCfg.Prefix() != "" {
 					swarmOpts = append(swarmOpts, swarm.WithStoragePrefix(storageCfg.Prefix()))
 				}
-				if traceCfg.IsConfigured() {
-					traceRepo, err := traceCfg.Configure(ctx)
-					if err != nil {
-						return goerr.Wrap(err, "failed to configure trace repository for swarm")
-					}
-					safeRepo := traceAdapter.NewSafe(traceRepo, logging.From(ctx))
-					swarmOpts = append(swarmOpts, swarm.WithTraceRepository(safeRepo))
+				if safeTraceRepo != nil {
+					swarmOpts = append(swarmOpts, swarm.WithTraceRepository(safeTraceRepo))
 				}
 				swarmChat := swarm.New(repo, llmClient, policyClient, swarmOpts...)
 				ucOptions = append(ucOptions, usecase.WithChatUseCase(swarmChat))
