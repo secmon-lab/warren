@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat"
+	legacychat "github.com/secmon-lab/warren/pkg/usecase/chat/legacy"
 )
 
 // Chat processes a chat message for the specified ticket.
@@ -23,7 +24,7 @@ func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message stri
 
 // collectThreadComments delegates to the chat package exported function.
 func (x *UseCases) collectThreadComments(ctx context.Context, ticketID types.TicketID, currentSession *session.Session) []ticket.Comment {
-	return chatpkg.CollectThreadComments(ctx, x.repository, ticketID, currentSession)
+	return legacychat.CollectThreadComments(ctx, x.repository, ticketID, currentSession)
 }
 
 // authorizeAgentRequest delegates to the chat package exported function.

@@ -93,9 +93,21 @@ func New(w io.Writer, level slog.Level, format Format, stacktrace bool) *slog.Lo
 
 	case FormatJSON:
 		handler = slog.NewJSONHandler(w, &slog.HandlerOptions{
-			AddSource:   true,
-			Level:       level,
-			ReplaceAttr: filter,
+			AddSource: true,
+			Level:     level,
+			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+				// Map slog field names to Cloud Logging structured log fields.
+				// Cloud Logging expects "severity" for log level and "message" for the log message.
+				// See: https://cloud.google.com/logging/docs/structured-logging
+				if a.Key == slog.LevelKey {
+					a.Key = "severity"
+				}
+				if a.Key == slog.MessageKey {
+					a.Key = "message"
+				}
+				// Apply masq filter for secret redaction
+				return filter(groups, a)
+			},
 		})
 
 	default:

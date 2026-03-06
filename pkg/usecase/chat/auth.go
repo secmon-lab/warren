@@ -11,6 +11,14 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
+var (
+	// ErrAgentAuthPolicyNotDefined is returned when agent authorization policy is not defined
+	ErrAgentAuthPolicyNotDefined = errors.New("agent authorization policy not defined")
+
+	// ErrAgentAuthDenied is returned when agent authorization is denied
+	ErrAgentAuthDenied = errors.New("agent request not authorized")
+)
+
 // AuthorizeAgentRequest checks policy-based authorization for agent execution.
 func AuthorizeAgentRequest(ctx context.Context, policyClient interfaces.PolicyClient, noAuthz bool, message string) error {
 	logger := logging.From(ctx)

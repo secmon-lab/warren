@@ -53,10 +53,10 @@ func Warn(ctx context.Context, format string, args ...any) {
 	}
 }
 
-func WithContext(original context.Context) context.Context {
-	ctx := original
-	ctx = context.WithValue(ctx, ctxNotifyFuncKey{}, original.Value(ctxNotifyFuncKey{}))
-	ctx = context.WithValue(ctx, ctxTraceFuncKey{}, original.Value(ctxTraceFuncKey{}))
-	ctx = context.WithValue(ctx, ctxWarnFuncKey{}, original.Value(ctxWarnFuncKey{}))
-	return ctx
+// CopyTo copies msg handler functions from src context to dst context.
+func CopyTo(dst context.Context, src context.Context) context.Context {
+	dst = context.WithValue(dst, ctxNotifyFuncKey{}, src.Value(ctxNotifyFuncKey{}))
+	dst = context.WithValue(dst, ctxTraceFuncKey{}, src.Value(ctxTraceFuncKey{}))
+	dst = context.WithValue(dst, ctxWarnFuncKey{}, src.Value(ctxWarnFuncKey{}))
+	return dst
 }

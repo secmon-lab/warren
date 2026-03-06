@@ -55,8 +55,14 @@ func (x *Controller) HandleSlackAppMention(ctx context.Context, apiEvent *slacke
 
 	slackMsg := slack_model.NewMessage(ctx, apiEvent)
 	if slackMsg == nil {
+		logger.Debug("slack app mention: message is nil, skipping")
 		return nil
 	}
+
+	logger.Debug("slack app mention: dispatching async handler",
+		"channel", event.Channel,
+		"user", event.User,
+	)
 
 	dispatch(ctx, func(ctx context.Context) error {
 		return x.event.HandleSlackAppMention(ctx, *slackMsg)
