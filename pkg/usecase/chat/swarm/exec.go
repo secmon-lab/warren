@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
@@ -66,8 +67,14 @@ func (c *SwarmChat) postTaskResults(ctx context.Context, tasks []TaskPlan, resul
 		if result == nil || result.Result == "" {
 			continue
 		}
-		summary := truncateResult(result.Result, 200)
-		blockText := fmt.Sprintf("📋 *[%s]*\n\n%s", escapeSlackMrkdwn(tasks[i].Title), summary)
+		const slackTextObjectMaxLen = 3000
+		prefix := fmt.Sprintf("📋 *[%s]*\n\n", escapeSlackMrkdwn(tasks[i].Title))
+		maxResultLen := slackTextObjectMaxLen - len(prefix)
+		if maxResultLen < 0 {
+			maxResultLen = 0
+		}
+		summary := truncateResult(result.Result, maxResultLen)
+		blockText := prefix + summary
 		if err := threadSvc.PostContextBlock(ctx, blockText); err != nil {
 			logging.From(ctx).Error("failed to post task completion context block", "error", err)
 		}
@@ -326,13 +333,27 @@ func newTaskToolMiddleware(taskCtx context.Context, state *taskTraceState) golle
 	}
 }
 
-// truncateResult truncates a string to maxLen runes, appending "..." if truncated.
-func truncateResult(s string, maxLen int) string {
-	runes := []rune(s)
-	if len(runes) <= maxLen {
+// truncateResult truncates a string so that its byte length does not exceed maxBytes.
+// If truncated, "..." is appended (included within the maxBytes budget).
+// Truncation is performed at rune boundaries to avoid breaking multi-byte characters.
+func truncateResult(s string, maxBytes int) string {
+	if len(s) <= maxBytes {
 		return s
 	}
-	return string(runes[:maxLen]) + "..."
+	const ellipsis = "..."
+	budget := maxBytes - len(ellipsis)
+	if budget < 0 {
+		budget = 0
+	}
+	used := 0
+	for _, r := range s {
+		runeBytes := utf8.RuneLen(r)
+		if used+runeBytes > budget {
+			break
+		}
+		used += runeBytes
+	}
+	return s[:used] + ellipsis
 }
 
 // escapeSlackMrkdwn escapes special characters for Slack mrkdwn format.
