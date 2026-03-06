@@ -27,9 +27,17 @@ func Dispatch(ctx context.Context, handler func(ctx context.Context) error) {
 			}
 		}()
 
+		logging.From(newCtx).Debug("async dispatch: goroutine started",
+			"request_id", request_id.FromContext(newCtx),
+		)
+
 		if err := handler(newCtx); err != nil {
 			errutil.Handle(newCtx, err)
 		}
+
+		logging.From(newCtx).Debug("async dispatch: goroutine finished",
+			"request_id", request_id.FromContext(newCtx),
+		)
 	}()
 }
 

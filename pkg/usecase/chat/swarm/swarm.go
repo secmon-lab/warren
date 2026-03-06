@@ -123,12 +123,19 @@ func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient in
 // Execute processes a chat message for the specified ticket using parallel task execution.
 func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, message string) error {
 	logger := logging.From(ctx)
+	logger.Debug("swarm execute: start",
+		"ticket_id", target.ID,
+		"request_id", request_id.FromContext(ctx),
+	)
 
 	// Phase 1: Session setup
 	ssn, ctx := c.createSession(ctx, target, message)
+	logger = logging.From(ctx) // refresh logger with session_id
+	logger.Debug("swarm execute: session created", "session_id", ssn.ID)
 
 	// Phase 2: Message routing setup
 	ctx = c.setupMessageRouting(ctx, ssn, target)
+	logger.Debug("swarm execute: message routing set up")
 
 	// Phase 3: Session status tracking
 	ctx = c.setupStatusCheck(ctx, ssn)
@@ -142,8 +149,10 @@ func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, message 
 		return err
 	}
 	if !authorized {
+		logger.Debug("swarm execute: not authorized, returning")
 		return nil
 	}
+	logger.Debug("swarm execute: authorized, starting swarm")
 
 	// Phase 5: Swarm execution
 	return c.executeSwarm(ctx, target, ssn, message, &finalStatus)
@@ -159,7 +168,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 	if requestID == "" {
 		requestID = "unknown"
 	}
-	logger.Info("trace repository check", "has_trace_repo", c.traceRepository != nil, "request_id", requestID)
+	logger.Debug("swarm executeSwarm: start", "has_trace_repo", c.traceRepository != nil, "request_id", requestID)
 	if c.traceRepository != nil {
 		recorder = trace.New(
 			trace.WithTraceID(requestID),
@@ -168,13 +177,14 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		ctx = trace.WithHandler(ctx, recorder)
 		defer func() {
 			traceData := recorder.Trace()
-			logger.Info("finishing trace recorder",
+			logger.Debug("swarm executeSwarm: finishing trace",
 				"has_trace", traceData != nil,
 				"request_id", requestID,
 			)
 			if err := recorder.Finish(ctx); err != nil {
 				logger.Error("failed to finish trace", "error", err)
 			}
+			logger.Debug("swarm executeSwarm: trace finished")
 		}()
 	}
 
@@ -298,6 +308,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 
 	msg.Notify(ctx, "💬 %s", finalResp)
 
+	logger.Debug("swarm executeSwarm: completed, saving history")
 	return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
 }
 
