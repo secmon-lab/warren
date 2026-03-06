@@ -45,7 +45,7 @@ func Dispatch(ctx context.Context, handler func(ctx context.Context) error) {
 func newBackgroundContext(ctx context.Context) context.Context {
 	newCtx := context.Background()
 	newCtx = logging.With(newCtx, logging.From(ctx))
-	newCtx = msg.WithContext(newCtx)
+	newCtx = msg.CopyTo(newCtx, ctx)
 	newCtx = lang.With(newCtx, lang.From(ctx))
 	if userID := user.FromContext(ctx); userID != "" {
 		newCtx = user.WithUserID(newCtx, userID)

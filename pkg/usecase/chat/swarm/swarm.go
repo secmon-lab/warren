@@ -359,7 +359,7 @@ func (c *SwarmChat) setupMessageRouting(ctx context.Context, ssn *session.Sessio
 		}
 		verb := verbs[rand.IntN(len(verbs))]
 		threadSvc := c.slackService.NewThread(*target.SlackThread)
-		if err := threadSvc.PostContextBlock(ctx, fmt.Sprintf("%s ... (ID: %s)", verb, requestID)); err != nil {
+		if err := threadSvc.PostContextBlock(ctx, fmt.Sprintf("%s ... (ID: `%s`)", verb, requestID)); err != nil {
 			logging.From(ctx).Error("failed to post request ID", "error", err)
 		}
 	}
