@@ -21,7 +21,7 @@ jobs:
           ref: ${{ github.head_ref }}
 
       - id: scan
-        name: Run Trivy vulnerability scanner in repo mode
+        name: Run Trivy vulnerability scanner (SARIF)
         uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
         with:
           scan-type: "fs"
@@ -33,9 +33,15 @@ jobs:
         env:
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
 
-      - name: Display vulnerabilities found
+      - name: Display vulnerabilities (table)
         if: failure() && steps.scan.outcome == 'failure'
-        run: trivy fs --format table --ignore-unfixed .
+        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
+        with:
+          scan-type: "fs"
+          ignore-unfixed: true
+          format: "table"
+          exit-code: 0
+          version: "v0.69.2"
         env:
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
 
