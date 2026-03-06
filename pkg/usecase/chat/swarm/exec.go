@@ -44,9 +44,9 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	}
 
 	// Create task-specific trace message routing
-	taskCtx := c.setupTaskMessageRouting(ctx, ssn, target, task.Title)
+	taskCtx, markCompleted := c.setupTaskMessageRouting(ctx, ssn, target, task.Title)
 
-	msg.Trace(taskCtx, "🚀 Starting: %s", task.Title)
+	msg.Trace(taskCtx, "Starting...")
 
 	// Generate task system prompt
 	taskPrompt, err := generateTaskPrompt(ctx, task)
@@ -56,10 +56,10 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 		return result
 	}
 
-	// Filter tools for this task
+	// Filter tools for this task (all tools including base must be explicitly planned)
 	filteredTools := filterToolSets(ctx, c.tools, task.Tools)
 
-	// Add base action tool for ticket operations
+	// Add base action tool only if any warren_* tools are in the task's tool list
 	slackUpdateFunc := func(ctx context.Context, t *ticket.Ticket) error {
 		if c.slackService == nil || !t.HasSlackThread() || t.Finding == nil {
 			return nil
@@ -68,7 +68,9 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 		return threadSvc.PostFinding(ctx, t.Finding)
 	}
 	baseAction := base.New(c.repository, target.ID, base.WithSlackUpdate(slackUpdateFunc), base.WithLLMClient(c.llmClient))
-	filteredTools = append(filteredTools, baseAction)
+	if filtered := filterToolSets(ctx, []gollem.ToolSet{baseAction}, task.Tools); len(filtered) > 0 {
+		filteredTools = append(filteredTools, baseAction)
+	}
 
 	// Filter sub-agents for this task
 	filteredSubAgents := filterSubAgents(c.subAgents, task.SubAgents)
@@ -114,22 +116,29 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 		result.Result = resp.String()
 	}
 
-	msg.Trace(taskCtx, "✅ Completed: %s", task.Title)
+	markCompleted()
+	msg.Trace(taskCtx, "Completed")
 	return result
 }
 
 // setupTaskMessageRouting creates task-specific msg routing with title-prefixed trace.
-func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket, taskTitle string) context.Context {
+// Returns the new context and a function to mark the task as completed (changes emoji).
+func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket, taskTitle string) (context.Context, func()) {
 	if c.slackService == nil || target.SlackThread == nil {
-		return ctx
+		return ctx, func() {}
 	}
 
 	threadSvc := c.slackService.NewThread(*target.SlackThread)
 
 	// Create a dedicated updatable message for this task
 	var updateFunc func(context.Context, string)
+	completed := false
 	taskTraceFunc := func(ctx context.Context, message string) {
-		prefixed := fmt.Sprintf("*[%s]* %s", taskTitle, message)
+		emoji := "⏳"
+		if completed {
+			emoji = "✅"
+		}
+		prefixed := fmt.Sprintf("%s *[%s]*\n%s", emoji, taskTitle, message)
 		m := session.NewMessage(ctx, ssn.ID, session.MessageTypeTrace, prefixed)
 		if err := c.repository.PutSessionMessage(ctx, m); err != nil {
 			errutil.Handle(ctx, err)
@@ -141,6 +150,9 @@ func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Se
 			updateFunc(ctx, prefixed)
 		}
 	}
+	markCompleted := func() {
+		completed = true
+	}
 
 	// Notify and warn use the task trace function to prefix messages
 	notifyFunc := func(ctx context.Context, message string) {
@@ -150,7 +162,7 @@ func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Se
 		taskTraceFunc(ctx, "⚠️ "+message)
 	}
 
-	return msg.With(ctx, notifyFunc, taskTraceFunc, warnFunc)
+	return msg.With(ctx, notifyFunc, taskTraceFunc, warnFunc), markCompleted
 }
 
 // filterToolSets filters tool sets to only include tools matching the given names.

@@ -19,6 +19,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/storage"
+	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
@@ -128,7 +129,7 @@ func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, message 
 	ssn, ctx := c.createSession(ctx, target, message)
 
 	// Phase 2: Message routing setup
-	planFunc, ctx := c.setupMessageRouting(ctx, ssn, target)
+	ctx = c.setupMessageRouting(ctx, ssn, target)
 
 	// Phase 3: Session status tracking
 	ctx = c.setupStatusCheck(ctx, ssn)
@@ -146,11 +147,11 @@ func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, message 
 	}
 
 	// Phase 5: Swarm execution
-	return c.executeSwarm(ctx, target, ssn, message, planFunc, &finalStatus)
+	return c.executeSwarm(ctx, target, ssn, message, &finalStatus)
 }
 
 // executeSwarm orchestrates the swarm execution: plan → parallel exec → replan → loop → final response.
-func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn *session.Session, message string, planFunc func(context.Context, string), finalStatus *types.SessionStatus) error {
+func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn *session.Session, message string, finalStatus *types.SessionStatus) error {
 	logger := logging.From(ctx)
 
 	// Setup trace recorder
@@ -203,12 +204,17 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		}
 	}
 
-	// Build planning context
+	// Build planning context (include base tool specs so planner can assign them)
+	baseAction := base.New(c.repository, target.ID)
+	allTools := make([]gollem.ToolSet, 0, len(c.tools)+1)
+	allTools = append(allTools, c.tools...)
+	allTools = append(allTools, baseAction)
+
 	planCtx := &planningContext{
 		message:       message,
 		ticket:        target,
 		alerts:        alerts,
-		tools:         c.tools,
+		tools:         allTools,
 		subAgents:     c.subAgents,
 		memoryContext: memoryContext,
 		userPrompt:    c.userSystemPrompt,
@@ -255,9 +261,6 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 			break
 		}
 
-		// Update plan progress
-		planFunc(ctx, c.formatPlanProgress(requestID, phase, currentTasks, allResults))
-
 		// Execute all tasks in parallel
 		results := c.executePhase(ctx, currentTasks, target, ssn, planCtx)
 		allResults = append(allResults, &phaseResult{
@@ -265,9 +268,6 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 			tasks:   currentTasks,
 			results: results,
 		})
-
-		// Update plan progress with completion
-		planFunc(ctx, c.formatPlanProgress(requestID, phase, currentTasks, allResults))
 
 		// Replan
 		replanResult, err := c.replan(ctx, planSession, planCtx, allResults, phase)
@@ -292,7 +292,6 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 	}
 
 	msg.Notify(ctx, "💬 %s", finalResp)
-	planFunc(ctx, fmt.Sprintf("✅ Completed (Request ID: %s)", requestID))
 
 	return c.saveHistory(ctx, planSession, target, storageSvc)
 }
@@ -325,26 +324,27 @@ func (c *SwarmChat) createSession(ctx context.Context, target *ticket.Ticket, me
 }
 
 // setupMessageRouting configures Slack/CLI message routing functions in the context.
-func (c *SwarmChat) setupMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket) (func(context.Context, string), context.Context) {
-	planFunc := func(ctx context.Context, msg string) {}
-
+func (c *SwarmChat) setupMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket) context.Context {
 	if c.slackService != nil && target.SlackThread != nil {
-		notifyFunc, traceFunc, pf, warnFunc := c.setupSlackMessageFuncs(ctx, ssn, target)
+		notifyFunc, traceFunc, warnFunc := c.setupSlackMessageFuncs(ctx, ssn, target)
 		ctx = msg.With(ctx, notifyFunc, traceFunc, warnFunc)
-		planFunc = pf
 
+		// Post request ID as a non-updatable context block immediately
 		requestID := request_id.FromContext(ctx)
 		if requestID == "" {
 			requestID = "unknown"
 		}
-		planFunc(ctx, fmt.Sprintf("🚀 Thinking... (Request ID: %s)", requestID))
+		threadSvc := c.slackService.NewThread(*target.SlackThread)
+		if err := threadSvc.PostComment(ctx, fmt.Sprintf("🚀 Request received (ID: %s)", requestID)); err != nil {
+			logging.From(ctx).Error("failed to post request ID", "error", err)
+		}
 	}
 
-	return planFunc, ctx
+	return ctx
 }
 
-// setupSlackMessageFuncs creates Slack message routing functions for notify, trace, plan, and warn.
-func (c *SwarmChat) setupSlackMessageFuncs(ctx context.Context, sess *session.Session, target *ticket.Ticket) (msg.NotifyFunc, msg.TraceFunc, msg.TraceFunc, msg.WarnFunc) {
+// setupSlackMessageFuncs creates Slack message routing functions for notify, trace, and warn.
+func (c *SwarmChat) setupSlackMessageFuncs(ctx context.Context, sess *session.Session, target *ticket.Ticket) (msg.NotifyFunc, msg.TraceFunc, msg.WarnFunc) {
 	threadSvc := c.slackService.NewThread(*target.SlackThread)
 
 	notifyFunc := func(ctx context.Context, message string) {
@@ -357,24 +357,19 @@ func (c *SwarmChat) setupSlackMessageFuncs(ctx context.Context, sess *session.Se
 		}
 	}
 
-	createUpdatableMessageFunc := func(msgType session.MessageType) msg.TraceFunc {
-		var updateFunc func(context.Context, string)
-		return func(ctx context.Context, message string) {
-			m := session.NewMessage(ctx, sess.ID, msgType, message)
-			if err := c.repository.PutSessionMessage(ctx, m); err != nil {
-				errutil.Handle(ctx, err)
-			}
+	var traceUpdateFunc func(context.Context, string)
+	traceFunc := func(ctx context.Context, message string) {
+		m := session.NewMessage(ctx, sess.ID, session.MessageTypeTrace, message)
+		if err := c.repository.PutSessionMessage(ctx, m); err != nil {
+			errutil.Handle(ctx, err)
+		}
 
-			if updateFunc == nil {
-				updateFunc = threadSvc.NewUpdatableMessage(ctx, message)
-			} else {
-				updateFunc(ctx, message)
-			}
+		if traceUpdateFunc == nil {
+			traceUpdateFunc = threadSvc.NewUpdatableMessage(ctx, message)
+		} else {
+			traceUpdateFunc(ctx, message)
 		}
 	}
-
-	traceFunc := createUpdatableMessageFunc(session.MessageTypeTrace)
-	planFunc := createUpdatableMessageFunc(session.MessageTypePlan)
 
 	warnFunc := func(ctx context.Context, message string) {
 		m := session.NewMessage(ctx, sess.ID, session.MessageTypeWarning, message)
@@ -386,7 +381,7 @@ func (c *SwarmChat) setupSlackMessageFuncs(ctx context.Context, sess *session.Se
 		}
 	}
 
-	return notifyFunc, traceFunc, planFunc, warnFunc
+	return notifyFunc, traceFunc, warnFunc
 }
 
 // setupStatusCheck embeds a session abort check function in the context.
@@ -569,40 +564,4 @@ func (c *SwarmChat) saveHistory(ctx context.Context, planSession gollem.Session,
 	}
 
 	return nil
-}
-
-// formatPlanProgress formats the plan progress for display.
-func (c *SwarmChat) formatPlanProgress(requestID string, currentPhase int, currentTasks []TaskPlan, completedPhases []*phaseResult) string {
-	var b []byte
-	b = fmt.Appendf(b, "⟳ Working... (Request ID: %s)\n", requestID)
-	b = fmt.Appendf(b, "*Phase %d*\n\n", currentPhase)
-
-	// Show completed phases
-	for _, pr := range completedPhases {
-		b = fmt.Appendf(b, "*Phase %d - Completed*\n", pr.phase)
-		for _, r := range pr.results {
-			if r.Error != nil {
-				b = fmt.Appendf(b, "❌ ~%s~ (error)\n", r.Title)
-			} else {
-				b = fmt.Appendf(b, "✅ ~%s~\n", r.Title)
-			}
-		}
-		b = append(b, '\n')
-	}
-
-	// Show current phase tasks (if not already in completedPhases)
-	isCurrentPhaseCompleted := false
-	for _, pr := range completedPhases {
-		if pr.phase == currentPhase {
-			isCurrentPhaseCompleted = true
-			break
-		}
-	}
-	if !isCurrentPhaseCompleted {
-		for _, t := range currentTasks {
-			b = fmt.Appendf(b, "⟳ %s\n", t.Title)
-		}
-	}
-
-	return string(b)
 }
