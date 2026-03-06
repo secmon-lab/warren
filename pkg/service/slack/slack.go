@@ -900,6 +900,21 @@ func (x *ThreadService) PostContextBlock(ctx context.Context, text string) error
 	return nil
 }
 
+// PostDivider posts a divider block to the thread.
+func (x *ThreadService) PostDivider(ctx context.Context) error {
+	_, _, err := x.client.PostMessageContext(
+		ctx,
+		x.channelID,
+		slack.MsgOptionBlocks(slack.NewDividerBlock()),
+		slack.MsgOptionTS(x.threadID),
+	)
+	if err != nil {
+		return goerr.Wrap(err, "failed to post divider to slack")
+	}
+
+	return nil
+}
+
 func buildFindingBlocks(finding ticket.Finding) []slack.Block {
 	return []slack.Block{
 		slack.NewHeaderBlock(

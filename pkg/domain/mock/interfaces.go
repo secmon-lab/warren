@@ -952,6 +952,9 @@ func (mock *SlackClientMock) UploadFileV2ContextCalls() []struct {
 //			PostContextBlockFunc: func(ctx context.Context, text string) error {
 //				panic("mock out the PostContextBlock method")
 //			},
+//			PostDividerFunc: func(ctx context.Context) error {
+//				panic("mock out the PostDivider method")
+//			},
 //			PostFindingFunc: func(ctx context.Context, finding *ticket.Finding) error {
 //				panic("mock out the PostFinding method")
 //			},
@@ -1027,6 +1030,9 @@ type SlackThreadServiceMock struct {
 
 	// PostContextBlockFunc mocks the PostContextBlock method.
 	PostContextBlockFunc func(ctx context.Context, text string) error
+
+	// PostDividerFunc mocks the PostDivider method.
+	PostDividerFunc func(ctx context.Context) error
 
 	// PostFindingFunc mocks the PostFinding method.
 	PostFindingFunc func(ctx context.Context, finding *ticket.Finding) error
@@ -1147,6 +1153,11 @@ type SlackThreadServiceMock struct {
 			// Text is the text argument value.
 			Text string
 		}
+		// PostDivider holds details about calls to the PostDivider method.
+		PostDivider []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// PostFinding holds details about calls to the PostFinding method.
 		PostFinding []struct {
 			// Ctx is the ctx argument value.
@@ -1237,6 +1248,7 @@ type SlackThreadServiceMock struct {
 	lockPostComment              sync.RWMutex
 	lockPostCommentWithMessageID sync.RWMutex
 	lockPostContextBlock         sync.RWMutex
+	lockPostDivider              sync.RWMutex
 	lockPostFinding              sync.RWMutex
 	lockPostLinkToTicket         sync.RWMutex
 	lockPostResolveDetails       sync.RWMutex
@@ -1745,6 +1757,41 @@ func (mock *SlackThreadServiceMock) PostContextBlockCalls() []struct {
 	mock.lockPostContextBlock.RLock()
 	calls = mock.calls.PostContextBlock
 	mock.lockPostContextBlock.RUnlock()
+	return calls
+}
+
+// PostDivider calls PostDividerFunc.
+func (mock *SlackThreadServiceMock) PostDivider(ctx context.Context) error {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockPostDivider.Lock()
+	mock.calls.PostDivider = append(mock.calls.PostDivider, callInfo)
+	mock.lockPostDivider.Unlock()
+	if mock.PostDividerFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PostDividerFunc(ctx)
+}
+
+// PostDividerCalls gets all the calls that were made to PostDivider.
+// Check the length with:
+//
+//	len(mockedSlackThreadService.PostDividerCalls())
+func (mock *SlackThreadServiceMock) PostDividerCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockPostDivider.RLock()
+	calls = mock.calls.PostDivider
+	mock.lockPostDivider.RUnlock()
 	return calls
 }
 

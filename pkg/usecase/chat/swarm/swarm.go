@@ -285,6 +285,9 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 			results: results,
 		})
 
+		// Post divider after task execution and results
+		c.postDivider(ctx, target)
+
 		// Replan
 		replanResult, err := c.replan(ctx, planSession, planCtx, allResults, phase)
 		if err != nil {
@@ -298,6 +301,9 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 	if len(currentTasks) > 0 {
 		msg.Warn(ctx, "⚠️ Maximum phase limit (%d) reached. Proceeding to final response.", c.maxPhases)
 	}
+
+	// Post divider before final response
+	c.postDivider(ctx, target)
 
 	// Generate final response
 	finalResp, err := c.generateFinalResponse(ctx, planSession, planCtx, allResults)

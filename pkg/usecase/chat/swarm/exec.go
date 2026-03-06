@@ -19,32 +19,52 @@ import (
 )
 
 // executePhase runs all tasks in parallel and waits for all to complete.
+// All task messages are posted upfront as "waiting" before any execution begins.
 func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *ticket.Ticket, ssn *session.Session, pc *planningContext) []*TaskResult {
 	results := make([]*TaskResult, len(tasks))
-	var wg sync.WaitGroup
 
+	// Pre-create all task message routings (posts "waiting" messages to Slack)
+	type taskRouting struct {
+		ctx           context.Context
+		markCompleted func()
+	}
+	routings := make([]taskRouting, len(tasks))
+	for i, task := range tasks {
+		taskCtx, markCompleted := c.setupTaskMessageRouting(ctx, ssn, target, task.Title)
+		routings[i] = taskRouting{ctx: taskCtx, markCompleted: markCompleted}
+	}
+
+	var wg sync.WaitGroup
 	for i, task := range tasks {
 		wg.Add(1)
-		go func(idx int, t TaskPlan) {
+		go func(idx int, t TaskPlan, r taskRouting) {
 			defer wg.Done()
-			results[idx] = c.executeTask(ctx, t, target, ssn)
-		}(i, task)
+			results[idx] = c.executeTask(ctx, t, target, ssn, r.ctx, r.markCompleted)
+		}(i, task, routings[i])
 	}
 
 	wg.Wait()
 	return results
 }
 
+// postDivider posts a divider to the Slack thread if available.
+func (c *SwarmChat) postDivider(ctx context.Context, target *ticket.Ticket) {
+	if c.slackService == nil || target.SlackThread == nil {
+		return
+	}
+	threadSvc := c.slackService.NewThread(*target.SlackThread)
+	if err := threadSvc.PostDivider(ctx); err != nil {
+		logging.From(ctx).Error("failed to post divider", "error", err)
+	}
+}
+
 // executeTask executes a single task with its own agent and trace context.
-func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *ticket.Ticket, ssn *session.Session) *TaskResult {
+func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *ticket.Ticket, ssn *session.Session, taskCtx context.Context, markCompleted func()) *TaskResult {
 	logger := logging.From(ctx)
 	result := &TaskResult{
 		TaskID: task.ID,
 		Title:  task.Title,
 	}
-
-	// Create task-specific trace message routing
-	taskCtx, markCompleted := c.setupTaskMessageRouting(ctx, ssn, target, task.Title)
 
 	msg.Trace(taskCtx, "Starting...")
 
@@ -129,6 +149,7 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 }
 
 // setupTaskMessageRouting creates task-specific msg routing with title-prefixed trace.
+// The initial "Waiting..." message is posted immediately so all task messages appear upfront.
 // Returns the new context and a function to mark the task as completed (changes emoji).
 func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket, taskTitle string) (context.Context, func()) {
 	if c.slackService == nil || target.SlackThread == nil {
@@ -137,9 +158,11 @@ func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Se
 
 	threadSvc := c.slackService.NewThread(*target.SlackThread)
 
-	// Create a dedicated updatable message for this task
-	var updateFunc func(context.Context, string)
+	// Post initial "waiting" message immediately
 	completed := false
+	initialMsg := fmt.Sprintf("🕐 *[%s]*\n> Waiting...", taskTitle)
+	updateFunc := threadSvc.NewUpdatableMessage(ctx, initialMsg)
+
 	taskTraceFunc := func(ctx context.Context, message string) {
 		emoji := "⏳"
 		if completed {
@@ -151,11 +174,7 @@ func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Se
 			errutil.Handle(ctx, err)
 		}
 
-		if updateFunc == nil {
-			updateFunc = threadSvc.NewUpdatableMessage(ctx, prefixed)
-		} else {
-			updateFunc(ctx, prefixed)
-		}
+		updateFunc(ctx, prefixed)
 	}
 	markCompleted := func() {
 		completed = true

@@ -29,3 +29,4 @@ Your response MUST be raw data only. Just list what you found. No analysis, no s
 - If a tool call fails, try alternative approaches before giving up
 - Your response will be displayed in Slack. Use Slack mrkdwn format (NOT standard Markdown).
 - Do NOT use table format — Slack does not support tables. Use bullet lists or code blocks instead.
+- Do NOT use horizontal rules (`---`, `***`, `___`) — they are not rendered in Slack.
