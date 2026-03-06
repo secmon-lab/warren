@@ -45,6 +45,10 @@ func (m *mockThreadService) PostContextBlock(ctx context.Context, text string) e
 	return nil
 }
 
+func (m *mockThreadService) PostDivider(ctx context.Context) error {
+	return nil
+}
+
 func (m *mockThreadService) PostSessionActions(ctx context.Context, ticketID types.TicketID, ticketStatus types.TicketStatus, sessionURL string) error {
 	return nil
 }
