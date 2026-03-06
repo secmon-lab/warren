@@ -27,4 +27,5 @@ Your response MUST be raw data only. Just list what you found. No analysis, no s
 - Execute the task completely using the available tools and sub-agents
 - Be thorough in your investigation — collect all relevant data
 - If a tool call fails, try alternative approaches before giving up
-- Use Slack markdown format for any text output (*bold*, `code`, etc.)
+- Your response will be displayed in Slack. Use Slack mrkdwn format (NOT standard Markdown).
+- Do NOT use table format — Slack does not support tables. Use bullet lists or code blocks instead.
