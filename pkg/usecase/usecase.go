@@ -17,7 +17,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/notifier"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/tag"
-	chatUC "github.com/secmon-lab/warren/pkg/usecase/chat"
+	chatUC "github.com/secmon-lab/warren/pkg/usecase/chat/legacy"
 )
 
 var (

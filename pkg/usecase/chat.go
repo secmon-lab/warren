@@ -12,7 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat"
+	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat/legacy"
 )
 
 // Chat processes a chat message for the specified ticket.

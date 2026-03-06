@@ -93,6 +93,7 @@ Warren uses the following precedence for configuration (highest to lowest):
 | Environment Variable | CLI Flag | Default | Description |
 |---------------------|----------|---------|-------------|
 | `WARREN_LANG` | `--lang` | `en` | Response language (en, ja, etc.) |
+| `WARREN_CHAT_STRATEGY` | `--chat-strategy` | `legacy` | Chat execution strategy (`legacy` or `swarm`). See [Chat Strategy Guide](./chat.md) |
 | `WARREN_MCP_CONFIG` | `--mcp-config` | - | Path to MCP config YAML |
 
 ## Command-Specific Options

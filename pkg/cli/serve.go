@@ -24,6 +24,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/prompt"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
+	"github.com/secmon-lab/warren/pkg/usecase/chat/swarm"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
@@ -69,6 +70,7 @@ func cmdServe() *cli.Command {
 		asyncCfg            config.AsyncAlertHook
 		traceCfg            config.Trace
 		userSystemPromptCfg config.UserSystemPrompt
+		chatStrategy        string
 	)
 
 	flags := joinFlags(
@@ -118,6 +120,14 @@ func cmdServe() *cli.Command {
 				Category:    "WebSocket",
 				Sources:     cli.EnvVars("WARREN_WS_ALLOWED_ORIGINS"),
 				Destination: &wsAllowedOrigins,
+			},
+			&cli.StringFlag{
+				Name:        "chat-strategy",
+				Usage:       "Chat execution strategy: 'legacy' (plan & execute) or 'swarm' (parallel task execution)",
+				Category:    "Chat",
+				Sources:     cli.EnvVars("WARREN_CHAT_STRATEGY"),
+				Value:       "legacy",
+				Destination: &chatStrategy,
 			},
 		},
 		webUICfg.Flags(),
@@ -320,6 +330,39 @@ func cmdServe() *cli.Command {
 				safeRepo := traceAdapter.NewSafe(traceRepo, logging.From(ctx))
 				ucOptions = append(ucOptions, usecase.WithTraceRepository(safeRepo))
 				logging.From(ctx).Info("Trace recording enabled", "trace", traceCfg.LogValue())
+			}
+
+			// Configure chat strategy
+			if chatStrategy == "swarm" {
+				swarmOpts := []swarm.Option{
+					swarm.WithTools(toolSets),
+					swarm.WithSubAgents(subAgents),
+					swarm.WithStorageClient(storageClient),
+					swarm.WithNoAuthorization(noAuthorization),
+					swarm.WithUserSystemPrompt(userSystemPrompt),
+				}
+				if slackSvc != nil {
+					swarmOpts = append(swarmOpts, swarm.WithSlackService(slackSvc))
+				}
+				if webUICfg.GetFrontendURL() != "" {
+					swarmOpts = append(swarmOpts, swarm.WithFrontendURL(webUICfg.GetFrontendURL()))
+				}
+				if storageCfg.IsConfigured() && storageCfg.Prefix() != "" {
+					swarmOpts = append(swarmOpts, swarm.WithStoragePrefix(storageCfg.Prefix()))
+				}
+				if traceCfg.IsConfigured() {
+					traceRepo, err := traceCfg.Configure(ctx)
+					if err != nil {
+						return goerr.Wrap(err, "failed to configure trace repository for swarm")
+					}
+					safeRepo := traceAdapter.NewSafe(traceRepo, logging.From(ctx))
+					swarmOpts = append(swarmOpts, swarm.WithTraceRepository(safeRepo))
+				}
+				swarmChat := swarm.New(repo, llmClient, policyClient, swarmOpts...)
+				ucOptions = append(ucOptions, usecase.WithChatUseCase(swarmChat))
+				logging.From(ctx).Info("Chat strategy: swarm (parallel task execution)")
+			} else {
+				logging.From(ctx).Info("Chat strategy: legacy (plan & execute)")
 			}
 
 			uc := usecase.New(ucOptions...)
