@@ -118,7 +118,7 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	if c.slackService != nil && target.SlackThread != nil && result.Result != "" {
 		threadSvc := c.slackService.NewThread(*target.SlackThread)
 		summary := truncateResult(result.Result, 200)
-		blockText := fmt.Sprintf("✅ *[%s]* %s", task.Title, summary)
+		blockText := fmt.Sprintf("📋 *[%s]* %s", task.Title, summary)
 		if err := threadSvc.PostContextBlock(taskCtx, blockText); err != nil {
 			logging.From(taskCtx).Error("failed to post task completion context block", "error", err)
 		}
