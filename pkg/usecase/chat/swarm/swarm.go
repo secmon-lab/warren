@@ -159,6 +159,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 	if requestID == "" {
 		requestID = "unknown"
 	}
+	logger.Info("trace repository check", "has_trace_repo", c.traceRepository != nil, "request_id", requestID)
 	if c.traceRepository != nil {
 		recorder = trace.New(
 			trace.WithTraceID(requestID),
@@ -166,6 +167,11 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		)
 		ctx = trace.WithHandler(ctx, recorder)
 		defer func() {
+			traceData := recorder.Trace()
+			logger.Info("finishing trace recorder",
+				"has_trace", traceData != nil,
+				"request_id", requestID,
+			)
 			if err := recorder.Finish(ctx); err != nil {
 				logger.Error("failed to finish trace", "error", err)
 			}
@@ -312,7 +318,7 @@ func (c *SwarmChat) createSession(ctx context.Context, target *ticket.Ticket, me
 		logging.From(ctx).Error("failed to save session", "error", err)
 	}
 
-	logger := logging.From(ctx).With("session_id", ssn.ID)
+	logger := logging.From(ctx).With("session_id", ssn.ID, "request_id", request_id.FromContext(ctx))
 	ctx = logging.With(ctx, logger)
 
 	if target.SlackThread != nil {

@@ -60,14 +60,9 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	filteredTools := filterToolSets(ctx, c.tools, task.Tools)
 
 	// Add base action tool only if any warren_* tools are in the task's tool list
-	slackUpdateFunc := func(ctx context.Context, t *ticket.Ticket) error {
-		if c.slackService == nil || !t.HasSlackThread() || t.Finding == nil {
-			return nil
-		}
-		threadSvc := c.slackService.NewThread(*t.SlackThread)
-		return threadSvc.PostFinding(ctx, t.Finding)
-	}
-	baseAction := base.New(c.repository, target.ID, base.WithSlackUpdate(slackUpdateFunc), base.WithLLMClient(c.llmClient))
+	// Note: SlackUpdate (PostFinding) is intentionally omitted in swarm mode.
+	// Individual task results are posted as context blocks instead.
+	baseAction := base.New(c.repository, target.ID, base.WithLLMClient(c.llmClient))
 	if filtered := filterToolSets(ctx, []gollem.ToolSet{baseAction}, task.Tools); len(filtered) > 0 {
 		filteredTools = append(filteredTools, baseAction)
 	}
@@ -118,6 +113,17 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 
 	markCompleted()
 	msg.Trace(taskCtx, "Completed")
+
+	// Post individual task completion as a context block
+	if c.slackService != nil && target.SlackThread != nil && result.Result != "" {
+		threadSvc := c.slackService.NewThread(*target.SlackThread)
+		summary := truncateResult(result.Result, 200)
+		blockText := fmt.Sprintf("✅ *[%s]* %s", task.Title, summary)
+		if err := threadSvc.PostContextBlock(taskCtx, blockText); err != nil {
+			logging.From(taskCtx).Error("failed to post task completion context block", "error", err)
+		}
+	}
+
 	return result
 }
 
@@ -251,4 +257,13 @@ func newTaskToolMiddleware(taskCtx context.Context, llmClient gollem.LLMClient) 
 			return resp, err
 		}
 	}
+}
+
+// truncateResult truncates a string to maxLen runes, appending "..." if truncated.
+func truncateResult(s string, maxLen int) string {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
+		return s
+	}
+	return string(runes[:maxLen]) + "..."
 }
