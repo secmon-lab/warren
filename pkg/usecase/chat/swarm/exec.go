@@ -20,6 +20,7 @@ import (
 
 // executePhase runs all tasks in parallel and waits for all to complete.
 // All task messages are posted upfront as "waiting" before any execution begins.
+// After all tasks complete, a divider is posted followed by task result context blocks.
 func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *ticket.Ticket, ssn *session.Session, pc *planningContext) []*TaskResult {
 	results := make([]*TaskResult, len(tasks))
 
@@ -44,7 +45,32 @@ func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *
 	}
 
 	wg.Wait()
+
+	// Post divider between task execution messages and task result blocks
+	c.postDivider(ctx, target)
+
+	// Post task result context blocks
+	c.postTaskResults(ctx, tasks, results, target)
+
 	return results
+}
+
+// postTaskResults posts task result context blocks to Slack.
+func (c *SwarmChat) postTaskResults(ctx context.Context, tasks []TaskPlan, results []*TaskResult, target *ticket.Ticket) {
+	if c.slackService == nil || target.SlackThread == nil {
+		return
+	}
+	threadSvc := c.slackService.NewThread(*target.SlackThread)
+	for i, result := range results {
+		if result == nil || result.Result == "" {
+			continue
+		}
+		summary := truncateResult(result.Result, 200)
+		blockText := fmt.Sprintf("📋 *[%s]*\n\n%s", tasks[i].Title, summary)
+		if err := threadSvc.PostContextBlock(ctx, blockText); err != nil {
+			logging.From(ctx).Error("failed to post task completion context block", "error", err)
+		}
+	}
 }
 
 // postDivider posts a divider to the Slack thread if available.
@@ -134,16 +160,6 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 
 	markCompleted()
 	msg.Trace(taskCtx, "Completed")
-
-	// Post individual task completion as a context block
-	if c.slackService != nil && target.SlackThread != nil && result.Result != "" {
-		threadSvc := c.slackService.NewThread(*target.SlackThread)
-		summary := truncateResult(result.Result, 200)
-		blockText := fmt.Sprintf("📋 *[%s]*\n%s", task.Title, summary)
-		if err := threadSvc.PostContextBlock(taskCtx, blockText); err != nil {
-			logging.From(taskCtx).Error("failed to post task completion context block", "error", err)
-		}
-	}
 
 	return result
 }

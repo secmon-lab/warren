@@ -285,9 +285,6 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 			results: results,
 		})
 
-		// Post divider after task execution and results
-		c.postDivider(ctx, target)
-
 		// Replan
 		replanResult, err := c.replan(ctx, planSession, planCtx, allResults, phase)
 		if err != nil {
