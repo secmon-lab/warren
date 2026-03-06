@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
@@ -327,13 +328,21 @@ func (c *SwarmChat) setupMessageRouting(ctx context.Context, ssn *session.Sessio
 		notifyFunc, traceFunc, warnFunc := c.setupSlackMessageFuncs(ctx, ssn, target)
 		ctx = msg.With(ctx, notifyFunc, traceFunc, warnFunc)
 
-		// Post request ID as a non-updatable context block immediately
+		// Post request ID as a context block immediately
 		requestID := request_id.FromContext(ctx)
 		if requestID == "" {
 			requestID = "unknown"
 		}
+		verbs := []string{
+			"Investigating", "Analyzing", "Processing", "Inspecting",
+			"Examining", "Scanning", "Assessing", "Evaluating",
+			"Reviewing", "Probing", "Surveying", "Diagnosing",
+			"Exploring", "Scrutinizing", "Correlating", "Parsing",
+			"Decoding", "Interpreting", "Triaging", "Resolving",
+		}
+		verb := verbs[rand.IntN(len(verbs))]
 		threadSvc := c.slackService.NewThread(*target.SlackThread)
-		if err := threadSvc.PostComment(ctx, fmt.Sprintf("🚀 Request received (ID: %s)", requestID)); err != nil {
+		if err := threadSvc.PostContextBlock(ctx, fmt.Sprintf("%s ... (ID: %s)", verb, requestID)); err != nil {
 			logging.From(ctx).Error("failed to post request ID", "error", err)
 		}
 	}

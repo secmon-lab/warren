@@ -138,7 +138,7 @@ func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Se
 		if completed {
 			emoji = "✅"
 		}
-		prefixed := fmt.Sprintf("%s *[%s]*\n%s", emoji, taskTitle, message)
+		prefixed := fmt.Sprintf("%s *[%s]*\n> %s", emoji, taskTitle, message)
 		m := session.NewMessage(ctx, ssn.ID, session.MessageTypeTrace, prefixed)
 		if err := c.repository.PutSessionMessage(ctx, m); err != nil {
 			errutil.Handle(ctx, err)
