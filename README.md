@@ -68,7 +68,7 @@ A React-based dashboard for alert management, ticket workflow with structured fi
   <img src="./doc/images/dashboard2.png" width="600" alt="Warren Dashboard" />
 </p>
 
-Each investigation feeds back into the system: **agent memory** captures patterns, a **tag system** (`#refine`, `#double-check`) flags cases needing policy updates, and **resolved tickets** with structured conclusions build organizational knowledge that benefits the entire team.
+Each investigation feeds back into the system: **agent memory** captures patterns, a **tag system** classifies alerts for workflow tracking, and **resolved tickets** with structured conclusions build organizational knowledge that benefits the entire team.
 
 ## Quick Start
 
@@ -97,24 +97,57 @@ Visit http://127.0.0.1:8080 to access the dashboard.
 
 ## Integrations
 
-| Category | Services |
-|---|---|
-| **Alert Sources** | AWS GuardDuty, Suricata, SIEM webhooks, any JSON via raw webhook |
-| **Threat Intel** | VirusTotal, AlienVault OTX, URLScan, Shodan, AbuseIPDB |
-| **Data Sources** | BigQuery, Slack message search, CrowdStrike Falcon |
-| **Collaboration** | Slack (native bot with interactive components), GraphQL API |
-| **Infrastructure** | Google Cloud (Vertex AI, Firestore), Docker, Kubernetes |
+### Alert Ingestion
+
+- **Webhook (raw JSON)** — any HTTP POST with JSON body
+- **Google Cloud Pub/Sub** — subscribe to alert topics
+- **AWS SNS** — receive alerts via SNS HTTP endpoint
+
+### Threat Intelligence Tools
+
+- [**VirusTotal**](./pkg/tool/vt/README.md) — IP, domain, file hash, URL reputation lookup
+- [**AlienVault OTX**](./pkg/tool/otx/README.md) — IPv4/IPv6, domain, hostname, file hash indicators
+- [**URLScan.io**](./pkg/tool/urlscan/README.md) — submit and analyze suspicious URLs
+- [**Shodan**](./pkg/tool/shodan/README.md) — internet-facing host, domain, and device search
+- [**AbuseIPDB**](./pkg/tool/ipdb/README.md) — IP address reputation scoring
+- [**abuse.ch MalwareBazaar**](./pkg/tool/abusech/README.md) — malware hash lookup
+- [**WHOIS**](./pkg/tool/whois/README.md) — domain and IP registration lookup
+
+### Code & Device Tools
+
+- [**GitHub App**](./pkg/tool/github/README.md) — code search, issue search, file content retrieval
+- [**Microsoft Intune**](./pkg/tool/intune/README.md) — device compliance status, sign-in history
+- [**Slack Message Search**](./pkg/tool/slack/README.md) — search workspace messages for context
+
+### Sub-Agents
+
+- [**BigQuery Agent**](./pkg/agents/bigquery/README.md) — query security log data via natural language
+- [**CrowdStrike Falcon Agent**](./pkg/agents/falcon/README.md) — query EDR incidents, alerts, and endpoint events
+- [**Slack Search Agent**](./pkg/agents/slack/README.md) — search and summarize Slack conversations
+
+### Collaboration & UI
+
+- **Slack** — native bot with interactive buttons, thread-based investigation, real-time progress traces
+- **Web UI** — React dashboard for alert management, ticket workflow, AI chat
+- **GraphQL API** — programmatic access to alerts, tickets, knowledge
+
+### Infrastructure
+
+- **Vertex AI (Gemini)** — LLM for alert analysis, metadata generation, agent orchestration
+- **Cloud Firestore** — persistent storage for alerts, tickets, knowledge, agent memory
+- **Cloud Run** — serverless deployment
+- **Cloud Storage** — alert data archival
+- **MCP** — extend agent tools via [Model Context Protocol](./doc/operation/mcp.md)
 
 ## Documentation
 
-- [Getting Started](./doc/getting_started.md) - Your first alert in 5 minutes
-- [User Guide](./doc/user_guide.md) - Day-to-day operations
-- [Policy Guide](./doc/policy.md) - Custom detection and enrichment rules
-- [Architecture](./doc/model.md) - Technical deep dive
-
-## Contributing
-
-We welcome contributions! See [Contributing Guide](./doc/contributing.md)
+| Category | Documents |
+|----------|-----------|
+| **Start Here** | [Getting Started](./doc/getting-started.md) — Your first alert in 5 minutes |
+| **Concepts** | [Core Concepts](./doc/concepts.md) — Alerts, tickets, pipeline, clustering |
+| **Operations** | [Alert Investigation](./doc/operation/alert-investigation.md) · [Policy Guide](./doc/operation/policy.md) · [Knowledge Management](./doc/operation/knowledge.md) · [MCP Integration](./doc/operation/mcp.md) |
+| **Deployment** | [GCP Setup](./doc/deployment/gcp.md) · [Slack Integration](./doc/deployment/slack.md) |
+| **Reference** | [Configuration](./doc/reference/configuration.md) · [API & Webhooks](./doc/reference/api.md) |
 
 ## License
 
