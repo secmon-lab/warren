@@ -6,6 +6,14 @@ AI-native security alert management — not just AI-assisted, but built from the
   <img src="./doc/images/logo3.png" height="128" />
 </p>
 
+<p align="center">
+  <img src="./doc/images/concept.png" width="700" alt="Warren: AI Security Alert Triage" />
+</p>
+
+1. **Alert ingestion** — Security products (GuardDuty, SIEM, EDR, etc.) send alerts to Warren via webhook
+2. **AI triage** — LLM generates a summary, queries threat intelligence for enrichment, and assigns severity
+3. **Investigation** — Enriched alerts appear in Slack or the Web UI as tickets. Team members review them and can chat with the AI agent to dig deeper using integrated tools and data sources
+
 ## Why Warren?
 
 Security teams drown in alerts. Analysts spend most of their time on repetitive triage — classifying, enriching, and closing alerts that turn out to be noise.

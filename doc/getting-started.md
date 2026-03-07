@@ -2,35 +2,15 @@
 
 Welcome to Warren! This guide helps you get Warren up and running in 5 minutes using Docker.
 
-## Warren at a Glance
+## What Warren Does
 
-Warren is an AI-powered security alert management platform. Here's how it works:
+Warren is an AI-powered security alert triage system. The core flow is:
 
-```mermaid
-flowchart LR
-    A[Alert Sources / Security Products] -->|Webhook| B[Alert Pipeline]
-    B -->|Ingest Policy| C[Alert]
-    C -->|AI Enrichment| D[Ticket]
-    D -->|Slack / Web UI| E[Investigation]
-    E -->|AI Agent + Tools| F[Resolution]
+1. **Alert ingestion** — Security products (GuardDuty, SIEM, etc.) send alerts to Warren via webhook
+2. **AI triage** — Warren uses LLM to generate a summary, queries threat intelligence for enrichment, and assigns severity
+3. **Investigation** — Enriched alerts appear in Slack or the Web UI as tickets. Team members review them and can chat with the AI agent to dig deeper using integrated tools and data sources
 
-    style A fill:#f9f,stroke:#333
-    style C fill:#ff6b6b
-    style D fill:#51cf66
-    style F fill:#339af0
-```
-
-**Key Concepts:**
-- **Alert**: A security event from your monitoring systems
-- **Ticket**: A container for investigating one or more related alerts
-- **Policy**: Rego rules that transform, enrich, and triage alerts
-- **Agent**: AI assistant that analyzes alerts using threat intelligence tools
-
-**What's Required:**
-- **Vertex AI (Gemini)**: Required — powers AI analysis and metadata generation
-- **Firestore**: Required for production — stores alerts, tickets, and knowledge (in-memory for quick start)
-- **Slack**: Optional — enables team collaboration and real-time notifications
-- **Threat Intelligence APIs**: Optional — VirusTotal, OTX, Shodan, etc.
+![Warren Concept](./images/concept.png)
 
 ## Prerequisites
 
