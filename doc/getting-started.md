@@ -8,7 +8,7 @@ Warren is an AI-powered security alert management platform. Here's how it works:
 
 ```mermaid
 flowchart LR
-    A[Security Tools] -->|Webhook| B[Alert Pipeline]
+    A[Alert Sources / Security Products] -->|Webhook| B[Alert Pipeline]
     B -->|Ingest Policy| C[Alert]
     C -->|AI Enrichment| D[Ticket]
     D -->|Slack / Web UI| E[Investigation]
