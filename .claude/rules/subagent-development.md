@@ -1,3 +1,8 @@
+---
+paths:
+  - "pkg/agents/**"
+---
+
 # Sub-Agent Development Rules
 
 ## Package Structure
