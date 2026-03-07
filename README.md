@@ -62,7 +62,11 @@ Policies are written in **Rego** and deployable without code changes. Alerts arr
 
 ### Web UI & Continuous Improvement
 
-A React-based dashboard provides **DBSCAN clustering** on embedding vectors to visually group related alerts, ticket workflow with structured findings, and interactive AI chat.
+A React-based dashboard for alert management, ticket workflow with structured findings, and interactive AI chat.
+
+<p align="center">
+  <img src="./doc/images/dashboard2.png" width="600" alt="Warren Dashboard" />
+</p>
 
 Each investigation feeds back into the system: **agent memory** captures patterns, a **tag system** (`#refine`, `#double-check`) flags cases needing policy updates, and **resolved tickets** with structured conclusions build organizational knowledge that benefits the entire team.
 
