@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
@@ -16,9 +17,9 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
-	"github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
+	"github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
@@ -162,6 +163,13 @@ func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, message 
 func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn *session.Session, message string, finalStatus *types.SessionStatus) error {
 	logger := logging.From(ctx)
 
+	// Preserve a non-cancelled context for finishSession cleanup (Slack posts, DB updates)
+	cleanupCtx := context.WithoutCancel(ctx)
+
+	// Start background session monitor for abort detection
+	ctx, stopMonitor := c.startSessionMonitor(ctx, ssn.ID)
+	defer stopMonitor()
+
 	// Setup trace recorder
 	var recorder *trace.Recorder
 	requestID := request_id.FromContext(ctx)
@@ -182,7 +190,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 				"has_trace", traceData != nil,
 				"request_id", requestID,
 			)
-			if err := recorder.Finish(ctx); err != nil {
+			if err := recorder.Finish(cleanupCtx); err != nil {
 				logger.Error("failed to finish trace", "error", err)
 			}
 			logger.Debug("swarm executeSwarm: trace finished")
@@ -253,6 +261,12 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 	// Planning phase
 	planResult, err := c.plan(ctx, planSession, planCtx)
 	if err != nil {
+		// Check if planning failure was due to abort
+		if ctx.Err() != nil {
+			*finalStatus = types.SessionStatusAborted
+			msg.Notify(cleanupCtx, "🛑 Execution aborted by user request.")
+			return ErrSessionAborted
+		}
 		*finalStatus = types.SessionStatusAborted
 		msg.Notify(ctx, "💥 Planning failed: %s", err.Error())
 		return goerr.Wrap(err, "planning failed")
@@ -285,9 +299,22 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 			results: results,
 		})
 
+		// Check for context cancellation (abort detected by monitor)
+		if ctx.Err() != nil {
+			*finalStatus = types.SessionStatusAborted
+			msg.Notify(cleanupCtx, "🛑 Execution aborted by user request.")
+			return ErrSessionAborted
+		}
+
 		// Replan
 		replanResult, err := c.replan(ctx, planSession, planCtx, allResults, phase)
 		if err != nil {
+			// Check if replan failure was due to abort
+			if ctx.Err() != nil {
+				*finalStatus = types.SessionStatusAborted
+				msg.Notify(cleanupCtx, "🛑 Execution aborted by user request.")
+				return ErrSessionAborted
+			}
 			logger.Error("replan failed", "error", err, "phase", phase)
 			break
 		}
@@ -305,6 +332,12 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 	// Generate final response
 	finalResp, err := c.generateFinalResponse(ctx, planSession, planCtx, allResults)
 	if err != nil {
+		// Check if failure was due to abort
+		if ctx.Err() != nil {
+			*finalStatus = types.SessionStatusAborted
+			msg.Notify(cleanupCtx, "🛑 Execution aborted by user request.")
+			return ErrSessionAborted
+		}
 		*finalStatus = types.SessionStatusAborted
 		msg.Notify(ctx, "💥 Failed to generate final response: %s", err.Error())
 		return goerr.Wrap(err, "failed to generate final response")
@@ -486,4 +519,45 @@ func (c *SwarmChat) saveSessionHistory(ctx context.Context, planSession gollem.S
 		return goerr.Wrap(err, "failed to get history from planning session")
 	}
 	return chat.SaveHistory(ctx, c.repository, c.storageClient, storageSvc, ticketID, newHistory)
+}
+
+// startSessionMonitor starts a background goroutine that polls session status
+// and cancels the context when the session is aborted. This enables immediate
+// cancellation of in-flight operations (LLM calls, tool executions) when abort
+// is requested, complementing the existing checkpoint-based status checks.
+func (c *SwarmChat) startSessionMonitor(ctx context.Context, sessionID types.SessionID) (context.Context, func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		logger := logging.From(ctx)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				s, err := c.repository.GetSession(ctx, sessionID)
+				if err != nil {
+					logger.Warn("session monitor: failed to get session status", "error", err, "session_id", sessionID)
+					continue
+				}
+				if s != nil && s.Status == types.SessionStatusAborted {
+					logger.Info("session monitor: abort detected, cancelling context", "session_id", sessionID)
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+
+	stop := func() {
+		cancel()
+		<-done
+	}
+	return ctx, stop
 }
