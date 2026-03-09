@@ -33,21 +33,22 @@ const defaultMaxPhases = 10
 
 // SwarmChat implements interfaces.ChatUseCase with parallel task execution.
 type SwarmChat struct {
-	repository       interfaces.Repository
-	llmClient        gollem.LLMClient
-	policyClient     interfaces.PolicyClient
-	storageClient    interfaces.StorageClient
-	slackService     *slackService.Service
-	memoryService    *memory.Service
-	tools            []gollem.ToolSet
-	subAgents        []*agent.SubAgent
-	storagePrefix    string
-	noAuthorization  bool
-	frontendURL      string
-	userSystemPrompt string
-	traceRepository      trace.Repository
-	maxPhases            int
-	monitorPollInterval  time.Duration
+	repository          interfaces.Repository
+	llmClient           gollem.LLMClient
+	policyClient        interfaces.PolicyClient
+	storageClient       interfaces.StorageClient
+	slackService        *slackService.Service
+	memoryService       *memory.Service
+	tools               []gollem.ToolSet
+	subAgents           []*agent.SubAgent
+	storagePrefix       string
+	noAuthorization     bool
+	frontendURL         string
+	userSystemPrompt    string
+	traceRepository     trace.Repository
+	maxPhases           int
+	monitorPollInterval time.Duration
+	budgetStrategy      BudgetStrategy
 }
 
 // Option configures a SwarmChat.
@@ -111,6 +112,12 @@ func WithMaxPhases(n int) Option {
 // WithMonitorPollInterval sets the session monitor polling interval.
 func WithMonitorPollInterval(d time.Duration) Option {
 	return func(c *SwarmChat) { c.monitorPollInterval = d }
+}
+
+// WithBudgetStrategy sets the budget strategy for task execution.
+// When nil (default), budget tracking is disabled and tools execute without limits.
+func WithBudgetStrategy(s BudgetStrategy) Option {
+	return func(c *SwarmChat) { c.budgetStrategy = s }
 }
 
 // New creates a new SwarmChat with the given dependencies and options.

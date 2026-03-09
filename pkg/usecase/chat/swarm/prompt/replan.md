@@ -45,3 +45,12 @@ Each task must have:
 - `description`: Detailed instructions
 - `tools`: Array of tool names
 - `sub_agents`: Array of sub-agent names
+
+# Budget-Exceeded Tasks
+
+If any tasks were terminated due to budget exhaustion, their results contain handover information about what was accomplished and what remains.
+When replanning budget-exceeded tasks:
+- Break the remaining work into smaller, more focused tasks
+- Prioritize the most critical remaining investigation items
+- Each new task should have a clear, achievable scope within budget constraints
+- Avoid recreating the same broad task — specify exactly what data to collect

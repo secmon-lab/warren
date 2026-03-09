@@ -22,8 +22,9 @@ type ReplanResult struct {
 
 // TaskResult holds the outcome of a single task execution.
 type TaskResult struct {
-	TaskID string
-	Title  string
-	Result string
-	Error  error
+	TaskID         string
+	Title          string
+	Result         string
+	Error          error
+	BudgetExceeded bool // true if the task was terminated due to budget exhaustion
 }

@@ -123,8 +123,25 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	// Filter sub-agents for this task
 	filteredSubAgents := filterSubAgents(c.subAgents, task.SubAgents)
 	gollemSubAgents := make([]*gollem.SubAgent, len(filteredSubAgents))
-	for i, sa := range filteredSubAgents {
-		gollemSubAgents[i] = sa.Inner()
+
+	// Setup budget tracker if strategy is configured
+	var tracker *BudgetTracker
+	if c.budgetStrategy != nil {
+		tracker = newBudgetTracker(c.budgetStrategy)
+		budgetMW := newBudgetToolMiddleware(tracker)
+
+		// Inject budget middleware into sub-agents' child agents
+		for i, sa := range filteredSubAgents {
+			inner := sa.Inner()
+			gollem.WithSubAgentOptions(
+				gollem.WithToolMiddleware(budgetMW),
+			)(inner)
+			gollemSubAgents[i] = inner
+		}
+	} else {
+		for i, sa := range filteredSubAgents {
+			gollemSubAgents[i] = sa.Inner()
+		}
 	}
 
 	// Build agent options
@@ -147,8 +164,13 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	agentOpts = append(agentOpts,
 		gollem.WithContentBlockMiddleware(llm.NewCompactionMiddleware(c.llmClient, logging.From(ctx))),
 		gollem.WithContentBlockMiddleware(newTaskTraceMW(taskCtx, traceState)),
-		gollem.WithToolMiddleware(newTaskToolMiddleware(taskCtx, traceState)),
 	)
+
+	// Add budget middleware before task tool middleware (so it can block execution)
+	if tracker != nil {
+		agentOpts = append(agentOpts, gollem.WithToolMiddleware(newBudgetToolMiddleware(tracker)))
+	}
+	agentOpts = append(agentOpts, gollem.WithToolMiddleware(newTaskToolMiddleware(taskCtx, traceState)))
 
 	// Create and execute agent
 	gollemAgent := gollem.New(c.llmClient, agentOpts...)
@@ -158,6 +180,20 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 		result.Error = err
 		msg.Trace(taskCtx, "❌ Task failed: %s", err.Error())
 		logger.Error("task execution failed", "task_id", task.ID, "error", err)
+		return result
+	}
+
+	// Check if budget was exceeded and generate handover info
+	if tracker != nil && tracker.status() == BudgetHardLimit {
+		result.BudgetExceeded = true
+		handover := tracker.GenerateHandoverInfo()
+		if resp != nil && !resp.IsEmpty() {
+			result.Result = resp.String() + "\n\n" + handover
+		} else {
+			result.Result = handover
+		}
+		msg.Trace(taskCtx, "⚠️ Budget exceeded — task terminated with handover info")
+		markCompleted()
 		return result
 	}
 
