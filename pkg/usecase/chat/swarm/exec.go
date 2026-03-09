@@ -73,7 +73,7 @@ func (c *SwarmChat) postTaskResult(ctx context.Context, task TaskPlan, result *T
 		if maxResultLen < 0 {
 			maxResultLen = 0
 		}
-		blockText = prefix + truncateResult(result.Result, maxResultLen)
+		blockText = prefix + truncateResult(escapeSlackMrkdwn(result.Result), maxResultLen)
 	}
 	if err := threadSvc.PostContextBlock(ctx, blockText); err != nil {
 		logging.From(ctx).Error("failed to post task completion context block", "error", err)
@@ -192,7 +192,7 @@ func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Se
 		if completed {
 			emoji = "✅"
 		}
-		prefixed := fmt.Sprintf("%s *[%s]*\n\n> %s", emoji, escaped, message)
+		prefixed := fmt.Sprintf("%s *[%s]*\n\n> %s", emoji, escaped, escapeSlackMrkdwn(message))
 		m := session.NewMessage(ctx, ssn.ID, session.MessageTypeTrace, prefixed)
 		if err := c.repository.PutSessionMessage(ctx, m); err != nil {
 			errutil.Handle(ctx, err)

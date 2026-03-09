@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
@@ -522,7 +523,9 @@ func TestStartSessionMonitor_AbortDetection(t *testing.T) {
 	}
 	gt.NoError(t, repo.PutSession(ctx, ssn))
 
-	chatUC := swarm.New(repo, nil, nil)
+	chatUC := swarm.New(repo, nil, nil,
+		swarm.WithMonitorPollInterval(10*time.Millisecond),
+	)
 
 	monitorCtx, stop := chatUC.StartSessionMonitor(ctx, ssn.ID)
 	defer stop()
@@ -534,13 +537,15 @@ func TestStartSessionMonitor_AbortDetection(t *testing.T) {
 	ssn.Status = types.SessionStatusAborted
 	gt.NoError(t, repo.PutSession(ctx, ssn))
 
-	// Wait for monitor to detect abort (ticker is 10s, so we need to wait)
-	// Use a shorter approach: just call stop and check context
-	// The monitor checks every 10s, so in tests we rely on the stop() cancellation path
-	stop()
+	// Wait for the monitor goroutine to detect the abort and cancel the context
+	select {
+	case <-monitorCtx.Done():
+		// Success: monitor detected the abort
+	case <-time.After(1 * time.Second):
+		t.Fatal("context was not canceled by monitor")
+	}
 
-	// After stop(), context should be cancelled
-	gt.Value(t, monitorCtx.Err()).NotEqual(nil)
+	gt.Value(t, monitorCtx.Err()).Equal(context.Canceled)
 }
 
 func TestStartSessionMonitor_NormalCompletion(t *testing.T) {
