@@ -170,7 +170,15 @@ func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, message 
 	logger.Debug("swarm execute: authorized, starting swarm")
 
 	// Phase 5: Swarm execution
-	return c.executeSwarm(ctx, target, ssn, message, &finalStatus)
+	if err := c.executeSwarm(ctx, target, ssn, message, &finalStatus); err != nil {
+		// Session abort and context cancellation are expected outcomes
+		// when a user aborts the session, not errors to report.
+		if errors.Is(err, ErrSessionAborted) || errors.Is(err, context.Canceled) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // executeSwarm orchestrates the swarm execution: plan → parallel exec → replan → loop → final response.
