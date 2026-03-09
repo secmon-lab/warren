@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
@@ -14,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
@@ -508,6 +510,84 @@ func containsString(slice []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func TestStartSessionMonitor_AbortDetection(t *testing.T) {
+	ctx := setupTestContext(t)
+	repo := repository.NewMemory()
+
+	// Create a session
+	ssn := &session.Session{
+		ID:     types.NewSessionID(),
+		Status: types.SessionStatusRunning,
+	}
+	gt.NoError(t, repo.PutSession(ctx, ssn))
+
+	chatUC := swarm.New(repo, nil, nil,
+		swarm.WithMonitorPollInterval(10*time.Millisecond),
+	)
+
+	monitorCtx, stop := chatUC.StartSessionMonitor(ctx, ssn.ID)
+	defer stop()
+
+	// Verify context is not cancelled initially
+	gt.Value(t, monitorCtx.Err()).Equal(nil)
+
+	// Simulate abort by updating session status
+	ssn.Status = types.SessionStatusAborted
+	gt.NoError(t, repo.PutSession(ctx, ssn))
+
+	// Wait for the monitor goroutine to detect the abort and cancel the context
+	select {
+	case <-monitorCtx.Done():
+		// Success: monitor detected the abort
+	case <-time.After(1 * time.Second):
+		t.Fatal("context was not canceled by monitor")
+	}
+
+	gt.Value(t, monitorCtx.Err()).Equal(context.Canceled)
+}
+
+func TestStartSessionMonitor_NormalCompletion(t *testing.T) {
+	ctx := setupTestContext(t)
+	repo := repository.NewMemory()
+
+	// Create a running session
+	ssn := &session.Session{
+		ID:     types.NewSessionID(),
+		Status: types.SessionStatusRunning,
+	}
+	gt.NoError(t, repo.PutSession(ctx, ssn))
+
+	chatUC := swarm.New(repo, nil, nil)
+
+	monitorCtx, stop := chatUC.StartSessionMonitor(ctx, ssn.ID)
+
+	// stop() should cancel context and goroutine should terminate cleanly
+	stop()
+
+	// Context should be cancelled after stop
+	gt.Value(t, monitorCtx.Err()).NotEqual(nil)
+}
+
+func TestStartSessionMonitor_DBErrorContinuesMonitoring(t *testing.T) {
+	ctx := setupTestContext(t)
+	repo := repository.NewMemory()
+
+	// Create a session - the session doesn't exist in DB, so GetSession returns nil
+	// This simulates a DB error scenario where session is not found
+	nonExistentID := types.NewSessionID()
+
+	chatUC := swarm.New(repo, nil, nil)
+
+	monitorCtx, stop := chatUC.StartSessionMonitor(ctx, nonExistentID)
+	defer stop()
+
+	// Context should still be active (monitor continues despite nil session)
+	gt.Value(t, monitorCtx.Err()).Equal(nil)
+
+	// Clean stop
+	stop()
 }
 
 // Ensure imports are used.

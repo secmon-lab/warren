@@ -22,7 +22,7 @@ import (
 
 // executePhase runs all tasks in parallel and waits for all to complete.
 // All task messages are posted upfront as "waiting" before any execution begins.
-// After all tasks complete, a divider is posted followed by task result context blocks.
+// Each task's result context block is posted immediately upon completion.
 func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *ticket.Ticket, ssn *session.Session, pc *planningContext) []*TaskResult {
 	results := make([]*TaskResult, len(tasks))
 
@@ -43,41 +43,40 @@ func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *
 		go func(idx int, t TaskPlan, r taskRouting) {
 			defer wg.Done()
 			results[idx] = c.executeTask(ctx, t, target, ssn, r.ctx, r.markCompleted)
+			// Post result context block immediately upon task completion
+			c.postTaskResult(ctx, t, results[idx], target)
 		}(i, task, routings[i])
 	}
 
 	wg.Wait()
 
-	// Post divider between task execution messages and task result blocks
-	c.postDivider(ctx, target)
-
-	// Post task result context blocks
-	c.postTaskResults(ctx, tasks, results, target)
-
 	return results
 }
 
-// postTaskResults posts task result context blocks to Slack.
-func (c *SwarmChat) postTaskResults(ctx context.Context, tasks []TaskPlan, results []*TaskResult, target *ticket.Ticket) {
+// postTaskResult posts a single task result context block to Slack.
+func (c *SwarmChat) postTaskResult(ctx context.Context, task TaskPlan, result *TaskResult, target *ticket.Ticket) {
 	if c.slackService == nil || target.SlackThread == nil {
 		return
 	}
+	if result == nil {
+		return
+	}
 	threadSvc := c.slackService.NewThread(*target.SlackThread)
-	for i, result := range results {
-		if result == nil || result.Result == "" {
-			continue
-		}
+	escaped := escapeSlackMrkdwn(task.Title)
+	var blockText string
+	if result.Result == "" {
+		blockText = fmt.Sprintf("📋 *[%s]*\n\n_(no result)_", escaped)
+	} else {
 		const slackTextObjectMaxLen = 3000
-		prefix := fmt.Sprintf("📋 *[%s]*\n\n", escapeSlackMrkdwn(tasks[i].Title))
+		prefix := fmt.Sprintf("📋 *[%s]*\n\n", escaped)
 		maxResultLen := slackTextObjectMaxLen - len(prefix)
 		if maxResultLen < 0 {
 			maxResultLen = 0
 		}
-		summary := truncateResult(result.Result, maxResultLen)
-		blockText := prefix + summary
-		if err := threadSvc.PostContextBlock(ctx, blockText); err != nil {
-			logging.From(ctx).Error("failed to post task completion context block", "error", err)
-		}
+		blockText = prefix + truncateResult(escapeSlackMrkdwn(result.Result), maxResultLen)
+	}
+	if err := threadSvc.PostContextBlock(ctx, blockText); err != nil {
+		logging.From(ctx).Error("failed to post task completion context block", "error", err)
 	}
 }
 
@@ -193,7 +192,7 @@ func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Se
 		if completed {
 			emoji = "✅"
 		}
-		prefixed := fmt.Sprintf("%s *[%s]*\n\n%s", emoji, escaped, message)
+		prefixed := fmt.Sprintf("%s *[%s]*\n\n> %s", emoji, escaped, escapeSlackMrkdwn(message))
 		m := session.NewMessage(ctx, ssn.ID, session.MessageTypeTrace, prefixed)
 		if err := c.repository.PutSessionMessage(ctx, m); err != nil {
 			errutil.Handle(ctx, err)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
@@ -16,9 +17,9 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
-	"github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
+	"github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
@@ -44,8 +45,9 @@ type SwarmChat struct {
 	noAuthorization  bool
 	frontendURL      string
 	userSystemPrompt string
-	traceRepository  trace.Repository
-	maxPhases        int
+	traceRepository      trace.Repository
+	maxPhases            int
+	monitorPollInterval  time.Duration
 }
 
 // Option configures a SwarmChat.
@@ -106,13 +108,19 @@ func WithMaxPhases(n int) Option {
 	return func(c *SwarmChat) { c.maxPhases = n }
 }
 
+// WithMonitorPollInterval sets the session monitor polling interval.
+func WithMonitorPollInterval(d time.Duration) Option {
+	return func(c *SwarmChat) { c.monitorPollInterval = d }
+}
+
 // New creates a new SwarmChat with the given dependencies and options.
 func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient interfaces.PolicyClient, opts ...Option) *SwarmChat {
 	c := &SwarmChat{
-		repository:   repo,
-		llmClient:    llmClient,
-		policyClient: policyClient,
-		maxPhases:    defaultMaxPhases,
+		repository:          repo,
+		llmClient:           llmClient,
+		policyClient:        policyClient,
+		maxPhases:           defaultMaxPhases,
+		monitorPollInterval: 10 * time.Second,
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -162,6 +170,13 @@ func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, message 
 func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn *session.Session, message string, finalStatus *types.SessionStatus) error {
 	logger := logging.From(ctx)
 
+	// Preserve a non-cancelled context for finishSession cleanup (Slack posts, DB updates)
+	cleanupCtx := context.WithoutCancel(ctx)
+
+	// Start background session monitor for abort detection
+	ctx, stopMonitor := c.startSessionMonitor(ctx, ssn.ID)
+	defer stopMonitor()
+
 	// Setup trace recorder
 	var recorder *trace.Recorder
 	requestID := request_id.FromContext(ctx)
@@ -182,7 +197,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 				"has_trace", traceData != nil,
 				"request_id", requestID,
 			)
-			if err := recorder.Finish(ctx); err != nil {
+			if err := recorder.Finish(cleanupCtx); err != nil {
 				logger.Error("failed to finish trace", "error", err)
 			}
 			logger.Debug("swarm executeSwarm: trace finished")
@@ -253,6 +268,9 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 	// Planning phase
 	planResult, err := c.plan(ctx, planSession, planCtx)
 	if err != nil {
+		if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
+			return abortErr
+		}
 		*finalStatus = types.SessionStatusAborted
 		msg.Notify(ctx, "💥 Planning failed: %s", err.Error())
 		return goerr.Wrap(err, "planning failed")
@@ -285,9 +303,17 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 			results: results,
 		})
 
+		// Check for context cancellation (abort detected by monitor)
+		if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
+			return abortErr
+		}
+
 		// Replan
 		replanResult, err := c.replan(ctx, planSession, planCtx, allResults, phase)
 		if err != nil {
+			if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
+				return abortErr
+			}
 			logger.Error("replan failed", "error", err, "phase", phase)
 			break
 		}
@@ -305,6 +331,9 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 	// Generate final response
 	finalResp, err := c.generateFinalResponse(ctx, planSession, planCtx, allResults)
 	if err != nil {
+		if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
+			return abortErr
+		}
 		*finalStatus = types.SessionStatusAborted
 		msg.Notify(ctx, "💥 Failed to generate final response: %s", err.Error())
 		return goerr.Wrap(err, "failed to generate final response")
@@ -486,4 +515,57 @@ func (c *SwarmChat) saveSessionHistory(ctx context.Context, planSession gollem.S
 		return goerr.Wrap(err, "failed to get history from planning session")
 	}
 	return chat.SaveHistory(ctx, c.repository, c.storageClient, storageSvc, ticketID, newHistory)
+}
+
+// checkAborted checks if the context has been cancelled (e.g. by the session
+// monitor detecting an abort) and, if so, sets finalStatus and notifies via
+// cleanupCtx. Returns ErrSessionAborted when aborted, nil otherwise.
+func checkAborted(ctx context.Context, cleanupCtx context.Context, finalStatus *types.SessionStatus) error {
+	if ctx.Err() != nil {
+		*finalStatus = types.SessionStatusAborted
+		msg.Notify(cleanupCtx, "🛑 Execution aborted by user request.")
+		return ErrSessionAborted
+	}
+	return nil
+}
+
+// startSessionMonitor starts a background goroutine that polls session status
+// and cancels the context when the session is aborted. This enables immediate
+// cancellation of in-flight operations (LLM calls, tool executions) when abort
+// is requested, complementing the existing checkpoint-based status checks.
+func (c *SwarmChat) startSessionMonitor(ctx context.Context, sessionID types.SessionID) (context.Context, func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(c.monitorPollInterval)
+		defer ticker.Stop()
+
+		logger := logging.From(ctx)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				s, err := c.repository.GetSession(ctx, sessionID)
+				if err != nil {
+					logger.Warn("session monitor: failed to get session status", "error", err, "session_id", sessionID)
+					continue
+				}
+				if s != nil && s.Status == types.SessionStatusAborted {
+					logger.Info("session monitor: abort detected, cancelling context", "session_id", sessionID)
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+
+	stop := func() {
+		cancel()
+		<-done
+	}
+	return ctx, stop
 }
