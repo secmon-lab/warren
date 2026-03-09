@@ -165,9 +165,9 @@ func formatCompletedResults(allResults []*phaseResult) string {
 			if r.Error != nil {
 				fmt.Fprintf(&b, "**Status**: Failed\n**Error**: %s\n\n", r.Error.Error())
 			} else if r.BudgetExceeded {
-				fmt.Fprintf(&b, "**Status**: Budget Exceeded (terminated early)\n**Result**:\n%s\n\n", r.Result)
+				fmt.Fprintf(&b, "**Status**: Budget Exceeded (terminated early)\n**Result**:\n<task-output>\n%s\n</task-output>\n\n", r.Result)
 			} else {
-				fmt.Fprintf(&b, "**Status**: Completed\n**Result**:\n%s\n\n", r.Result)
+				fmt.Fprintf(&b, "**Status**: Completed\n**Result**:\n<task-output>\n%s\n</task-output>\n\n", r.Result)
 			}
 		}
 	}

@@ -79,6 +79,9 @@ func newBudgetTracker(strategy BudgetStrategy) *BudgetTracker {
 
 // BeforeToolCall consumes budget before tool execution and returns the current status.
 func (t *BudgetTracker) BeforeToolCall(toolName string, elapsed time.Duration) BudgetStatus {
+	if t.softLimitHit {
+		t.callsAfterSoft++
+	}
 	t.toolCalls++
 
 	cost := t.strategy.BeforeToolCall(ToolCallContext{
@@ -96,6 +99,10 @@ func (t *BudgetTracker) BeforeToolCall(toolName string, elapsed time.Duration) B
 		Cost:      cost,
 		Timestamp: t.startTime.Add(elapsed),
 	})
+
+	if !t.softLimitHit && t.remaining <= 0 {
+		t.softLimitHit = true
+	}
 
 	return t.status()
 }
@@ -117,12 +124,15 @@ func (t *BudgetTracker) AfterToolCall(toolName string, elapsed time.Duration, re
 			t.toolHistory[len(t.toolHistory)-1].Cost += additionalCost
 		}
 	}
+
+	if !t.softLimitHit && t.remaining <= 0 {
+		t.softLimitHit = true
+	}
 }
 
-// status returns the current budget status.
+// status returns the current budget status without side effects.
 func (t *BudgetTracker) status() BudgetStatus {
 	if t.softLimitHit {
-		t.callsAfterSoft++
 		if t.callsAfterSoft > t.strategy.HardLimitMargin() {
 			return BudgetHardLimit
 		}
@@ -130,7 +140,6 @@ func (t *BudgetTracker) status() BudgetStatus {
 	}
 
 	if t.remaining <= 0 {
-		t.softLimitHit = true
 		return BudgetSoftLimit
 	}
 
@@ -147,7 +156,11 @@ func (t *BudgetTracker) GenerateHandoverInfo() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Budget Exceeded — Task Handover\n\n")
 	fmt.Fprintf(&b, "This task was terminated because the action budget was exhausted.\n\n")
-	fmt.Fprintf(&b, "**Budget**: %.1f/%.1f (%.0f%% consumed)\n", t.remaining, t.initialBudget, (1-t.remaining/t.initialBudget)*100)
+	var consumedPct float64
+	if t.initialBudget > 0 {
+		consumedPct = (1 - t.remaining/t.initialBudget) * 100
+	}
+	fmt.Fprintf(&b, "**Budget**: %.1f/%.1f (%.0f%% consumed)\n", t.remaining, t.initialBudget, consumedPct)
 	fmt.Fprintf(&b, "**Tool calls**: %d\n", t.toolCalls)
 	if len(t.toolHistory) > 0 {
 		elapsed := t.toolHistory[len(t.toolHistory)-1].Timestamp.Sub(t.startTime)
