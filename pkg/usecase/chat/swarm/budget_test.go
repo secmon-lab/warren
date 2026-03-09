@@ -287,6 +287,83 @@ func TestBudgetToolMiddleware_SoftLimit(t *testing.T) {
 	gt.V(t, resp.Result["_budget_warning"]).NotNil()
 }
 
+func TestBudgetToolMiddleware_SharedTrackerAcrossParentAndSubAgent(t *testing.T) {
+	strategy := &mockBudgetStrategy{
+		initialBudget:   100.0,
+		beforeCost:      25.0,
+		afterCost:       0.0,
+		hardLimitMargin: 1,
+	}
+	tracker := swarm.NewBudgetTracker(strategy)
+
+	// Create two middleware instances from the same tracker,
+	// simulating the pattern in exec.go where:
+	// - parentMW is added to the parent agent (line 171)
+	// - subAgentMW is injected into sub-agents' child agents (line 131)
+	parentMW := swarm.NewBudgetToolMiddleware(tracker)
+	subAgentMW := swarm.NewBudgetToolMiddleware(tracker)
+
+	passthrough := func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
+		return &gollem.ToolExecResponse{
+			Result: map[string]any{"data": "ok"},
+		}, nil
+	}
+
+	parentHandler := parentMW(passthrough)
+	subAgentHandler := subAgentMW(passthrough)
+
+	ctx := context.Background()
+
+	// Parent tool call: 100 - 25 = 75
+	resp, err := parentHandler(ctx, &gollem.ToolExecRequest{
+		Tool: &gollem.FunctionCall{Name: "parent_tool"},
+	})
+	gt.NoError(t, err)
+	gt.V(t, resp.Result["_budget_info"]).NotNil()
+	gt.Equal(t, tracker.Remaining(), 75.0)
+
+	// Sub-agent internal tool call: 75 - 25 = 50 (shared budget)
+	resp, err = subAgentHandler(ctx, &gollem.ToolExecRequest{
+		Tool: &gollem.FunctionCall{Name: "bigquery_query"},
+	})
+	gt.NoError(t, err)
+	gt.Equal(t, tracker.Remaining(), 50.0)
+
+	// Another parent tool call: 50 - 25 = 25
+	resp, err = parentHandler(ctx, &gollem.ToolExecRequest{
+		Tool: &gollem.FunctionCall{Name: "parent_tool"},
+	})
+	gt.NoError(t, err)
+	gt.Equal(t, tracker.Remaining(), 25.0)
+
+	// Sub-agent tool call: 25 - 25 = 0 → SoftLimit
+	resp, err = subAgentHandler(ctx, &gollem.ToolExecRequest{
+		Tool: &gollem.FunctionCall{Name: "bigquery_query"},
+	})
+	gt.NoError(t, err)
+	gt.V(t, resp.Result["_budget_warning"]).NotNil() // soft limit warning
+	gt.Equal(t, tracker.Remaining(), 0.0)
+
+	// One more sub-agent call after soft: still allowed (margin=1)
+	resp, err = subAgentHandler(ctx, &gollem.ToolExecRequest{
+		Tool: &gollem.FunctionCall{Name: "bigquery_query"},
+	})
+	gt.NoError(t, err)
+
+	// Next call triggers hard limit regardless of caller (parent or sub-agent)
+	subAgentCalled := false
+	hardLimitHandler := subAgentMW(func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
+		subAgentCalled = true
+		return &gollem.ToolExecResponse{Result: map[string]any{}}, nil
+	})
+	resp, err = hardLimitHandler(ctx, &gollem.ToolExecRequest{
+		Tool: &gollem.FunctionCall{Name: "bigquery_query"},
+	})
+	gt.NoError(t, err)
+	gt.B(t, subAgentCalled).False() // tool should be blocked
+	gt.V(t, resp.Result["error"]).NotNil()
+}
+
 func TestBudgetToolMiddleware_HardLimit(t *testing.T) {
 	strategy := &mockBudgetStrategy{
 		initialBudget:   10.0,
