@@ -31,6 +31,14 @@ type ToolCallContext struct {
 	Error       error
 }
 
+// BudgetState holds a snapshot of the current budget state for strategy decisions.
+type BudgetState struct {
+	CallsAfterSoft int
+	TotalCalls     int
+	Remaining      float64
+	Elapsed        time.Duration
+}
+
 // BudgetStrategy defines the budget consumption logic.
 type BudgetStrategy interface {
 	// InitialBudget returns the total budget for a task.
@@ -42,8 +50,9 @@ type BudgetStrategy interface {
 	// AfterToolCall returns additional budget cost based on the tool execution result.
 	AfterToolCall(ctx ToolCallContext) float64
 
-	// HardLimitMargin returns the number of additional tool calls allowed after soft limit.
-	HardLimitMargin() int
+	// ShouldExit determines whether tool execution must be forcibly stopped.
+	// Called after the soft limit has been hit to decide if the task should be terminated.
+	ShouldExit(state BudgetState) bool
 }
 
 // ToolRecord records a single tool execution for handover information.
@@ -133,7 +142,12 @@ func (t *BudgetTracker) AfterToolCall(toolName string, elapsed time.Duration, re
 // status returns the current budget status without side effects.
 func (t *BudgetTracker) status() BudgetStatus {
 	if t.softLimitHit {
-		if t.callsAfterSoft > t.strategy.HardLimitMargin() {
+		if t.strategy.ShouldExit(BudgetState{
+			CallsAfterSoft: t.callsAfterSoft,
+			TotalCalls:     t.toolCalls,
+			Remaining:      t.remaining,
+			Elapsed:        time.Since(t.startTime),
+		}) {
 			return BudgetHardLimit
 		}
 		return BudgetSoftLimit
@@ -225,9 +239,9 @@ func (s *DefaultBudgetStrategy) AfterToolCall(_ ToolCallContext) float64 {
 	return 0
 }
 
-// HardLimitMargin returns 3 (allow 3 more tool calls after soft limit).
-func (s *DefaultBudgetStrategy) HardLimitMargin() int {
-	return 3
+// ShouldExit returns true when more than 3 tool calls have been made after the soft limit.
+func (s *DefaultBudgetStrategy) ShouldExit(state BudgetState) bool {
+	return state.CallsAfterSoft > 3
 }
 
 // newBudgetToolMiddleware creates a gollem.ToolMiddleware that enforces budget limits.
@@ -278,14 +292,10 @@ func appendBudgetInfo(resp *gollem.ToolExecResponse, tracker *BudgetTracker, sta
 			tracker.remaining, tracker.initialBudget, tracker.toolCalls,
 		)
 	case BudgetSoftLimit:
-		margin := tracker.strategy.HardLimitMargin() - tracker.callsAfterSoft
-		if margin < 0 {
-			margin = 0
-		}
 		elapsed := time.Since(tracker.startTime).Truncate(time.Second)
 		resp.Result["_budget_warning"] = fmt.Sprintf(
-			"[⚠️ ACTION BUDGET EXHAUSTED (%.1f/%.1f). You have used %d tool calls in %s. Wrap up immediately: summarize your findings and end your response. You have at most %d more tool calls before forced termination.]",
-			tracker.remaining, tracker.initialBudget, tracker.toolCalls, elapsed, margin,
+			"[⚠️ ACTION BUDGET EXHAUSTED (%.1f/%.1f). You have used %d tool calls in %s. Wrap up immediately: summarize your findings and end your response. Forced termination may occur at any time.]",
+			tracker.remaining, tracker.initialBudget, tracker.toolCalls, elapsed,
 		)
 	}
 }

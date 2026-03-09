@@ -21,7 +21,9 @@ type mockBudgetStrategy struct {
 func (s *mockBudgetStrategy) InitialBudget() float64                         { return s.initialBudget }
 func (s *mockBudgetStrategy) BeforeToolCall(_ swarm.ToolCallContext) float64 { return s.beforeCost }
 func (s *mockBudgetStrategy) AfterToolCall(_ swarm.ToolCallContext) float64  { return s.afterCost }
-func (s *mockBudgetStrategy) HardLimitMargin() int                           { return s.hardLimitMargin }
+func (s *mockBudgetStrategy) ShouldExit(state swarm.BudgetState) bool {
+	return state.CallsAfterSoft > s.hardLimitMargin
+}
 
 func TestDefaultBudgetStrategy_InitialBudget(t *testing.T) {
 	s := swarm.NewDefaultBudgetStrategy()
@@ -104,9 +106,13 @@ func TestDefaultBudgetStrategy_AfterToolCall(t *testing.T) {
 	gt.Equal(t, cost, 0.0)
 }
 
-func TestDefaultBudgetStrategy_HardLimitMargin(t *testing.T) {
+func TestDefaultBudgetStrategy_ShouldExit(t *testing.T) {
 	s := swarm.NewDefaultBudgetStrategy()
-	gt.Equal(t, s.HardLimitMargin(), 3)
+
+	// 3 calls after soft: should not exit yet
+	gt.B(t, s.ShouldExit(swarm.BudgetState{CallsAfterSoft: 3})).False()
+	// 4 calls after soft: should exit
+	gt.B(t, s.ShouldExit(swarm.BudgetState{CallsAfterSoft: 4})).True()
 }
 
 func TestBudgetTracker_BasicConsumption(t *testing.T) {
