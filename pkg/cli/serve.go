@@ -72,6 +72,7 @@ func cmdServe() *cli.Command {
 		traceCfg            config.Trace
 		userSystemPromptCfg config.UserSystemPrompt
 		chatStrategy        string
+		budgetStrategy      string
 	)
 
 	flags := joinFlags(
@@ -129,6 +130,14 @@ func cmdServe() *cli.Command {
 				Sources:     cli.EnvVars("WARREN_CHAT_STRATEGY"),
 				Value:       "legacy",
 				Destination: &chatStrategy,
+			},
+			&cli.StringFlag{
+				Name:        "budget-strategy",
+				Usage:       "Budget strategy for task execution: 'none' (unlimited) or 'default' (action budget)",
+				Category:    "Chat",
+				Sources:     cli.EnvVars("WARREN_BUDGET_STRATEGY"),
+				Value:       "none",
+				Destination: &budgetStrategy,
 			},
 		},
 		webUICfg.Flags(),
@@ -355,6 +364,18 @@ func cmdServe() *cli.Command {
 				if safeTraceRepo != nil {
 					swarmOpts = append(swarmOpts, swarm.WithTraceRepository(safeTraceRepo))
 				}
+
+				// Configure budget strategy
+				switch budgetStrategy {
+				case "default":
+					swarmOpts = append(swarmOpts, swarm.WithBudgetStrategy(swarm.NewDefaultBudgetStrategy()))
+					logging.From(ctx).Info("Budget strategy: default (action budget enabled)")
+				case "none":
+					// budgetStrategy remains nil (budget disabled)
+				default:
+					return goerr.New("unknown budget strategy", goerr.V("strategy", budgetStrategy))
+				}
+
 				swarmChat := swarm.New(repo, llmClient, policyClient, swarmOpts...)
 				ucOptions = append(ucOptions, usecase.WithChatUseCase(swarmChat))
 				logging.From(ctx).Info("Chat strategy: swarm (parallel task execution)")

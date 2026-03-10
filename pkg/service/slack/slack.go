@@ -900,8 +900,6 @@ func (x *ThreadService) PostContextBlock(ctx context.Context, text string) error
 	return nil
 }
 
-
-
 // PostDivider posts a divider block to the thread.
 func (x *ThreadService) PostDivider(ctx context.Context) error {
 	_, _, err := x.client.PostMessageContext(

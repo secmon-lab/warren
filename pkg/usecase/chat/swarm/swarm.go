@@ -33,21 +33,22 @@ const defaultMaxPhases = 10
 
 // SwarmChat implements interfaces.ChatUseCase with parallel task execution.
 type SwarmChat struct {
-	repository       interfaces.Repository
-	llmClient        gollem.LLMClient
-	policyClient     interfaces.PolicyClient
-	storageClient    interfaces.StorageClient
-	slackService     *slackService.Service
-	memoryService    *memory.Service
-	tools            []gollem.ToolSet
-	subAgents        []*agent.SubAgent
-	storagePrefix    string
-	noAuthorization  bool
-	frontendURL      string
-	userSystemPrompt string
-	traceRepository      trace.Repository
-	maxPhases            int
-	monitorPollInterval  time.Duration
+	repository          interfaces.Repository
+	llmClient           gollem.LLMClient
+	policyClient        interfaces.PolicyClient
+	storageClient       interfaces.StorageClient
+	slackService        *slackService.Service
+	memoryService       *memory.Service
+	tools               []gollem.ToolSet
+	subAgents           []*agent.SubAgent
+	storagePrefix       string
+	noAuthorization     bool
+	frontendURL         string
+	userSystemPrompt    string
+	traceRepository     trace.Repository
+	maxPhases           int
+	monitorPollInterval time.Duration
+	budgetStrategy      BudgetStrategy
 }
 
 // Option configures a SwarmChat.
@@ -113,6 +114,12 @@ func WithMonitorPollInterval(d time.Duration) Option {
 	return func(c *SwarmChat) { c.monitorPollInterval = d }
 }
 
+// WithBudgetStrategy sets the budget strategy for task execution.
+// When nil (default), budget tracking is disabled and tools execute without limits.
+func WithBudgetStrategy(s BudgetStrategy) Option {
+	return func(c *SwarmChat) { c.budgetStrategy = s }
+}
+
 // New creates a new SwarmChat with the given dependencies and options.
 func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient interfaces.PolicyClient, opts ...Option) *SwarmChat {
 	c := &SwarmChat{
@@ -163,7 +170,15 @@ func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, message 
 	logger.Debug("swarm execute: authorized, starting swarm")
 
 	// Phase 5: Swarm execution
-	return c.executeSwarm(ctx, target, ssn, message, &finalStatus)
+	if err := c.executeSwarm(ctx, target, ssn, message, &finalStatus); err != nil {
+		// Session abort and context cancellation are expected outcomes
+		// when a user aborts the session, not errors to report.
+		if errors.Is(err, ErrSessionAborted) || errors.Is(err, context.Canceled) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // executeSwarm orchestrates the swarm execution: plan → parallel exec → replan → loop → final response.
@@ -276,6 +291,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		return goerr.Wrap(err, "planning failed")
 	}
 
+
 	// Post initial message
 	if planResult.Message != "" {
 		msg.Notify(ctx, "💬 %s", planResult.Message)
@@ -315,6 +331,17 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 				return abortErr
 			}
 			logger.Error("replan failed", "error", err, "phase", phase)
+			break
+		}
+
+		// Post replan message if present
+		if replanResult.Message != "" {
+			msg.Notify(ctx, "💬 %s", replanResult.Message)
+		}
+
+		// If the replan asks a question, post it and stop the loop
+		if replanResult.Question != "" {
+			msg.Notify(ctx, "❓ %s", replanResult.Question)
 			break
 		}
 
