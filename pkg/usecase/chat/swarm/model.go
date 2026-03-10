@@ -2,11 +2,12 @@ package swarm
 
 // TaskPlan represents a single task in the parallel execution plan.
 type TaskPlan struct {
-	ID          string   `json:"id"`
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	Tools       []string `json:"tools"`
-	SubAgents   []string `json:"sub_agents"`
+	ID                 string   `json:"id"`
+	Title              string   `json:"title"`
+	Description        string   `json:"description"`
+	AcceptanceCriteria string `json:"acceptance_criteria"`
+	Tools              []string `json:"tools"`
+	SubAgents          []string `json:"sub_agents"`
 }
 
 // PlanResult represents the LLM planning response.
@@ -17,7 +18,9 @@ type PlanResult struct {
 
 // ReplanResult represents the LLM replan response.
 type ReplanResult struct {
-	Tasks []TaskPlan `json:"tasks"`
+	Message  string     `json:"message,omitempty"`
+	Tasks    []TaskPlan `json:"tasks"`
+	Question string     `json:"question,omitempty"`
 }
 
 // TaskResult holds the outcome of a single task execution.

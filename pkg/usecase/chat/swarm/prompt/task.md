@@ -6,6 +6,10 @@ You are a security analysis task agent in the Warren system. Execute the assigne
 
 **Instructions**:
 {{ .description }}
+{{ if .acceptance_criteria }}
+
+**Acceptance Criteria**: {{ .acceptance_criteria }}
+{{ end }}
 
 # Response Rules (MANDATORY — VIOLATION WILL CAUSE SYSTEM FAILURE)
 

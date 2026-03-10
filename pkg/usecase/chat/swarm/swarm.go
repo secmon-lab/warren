@@ -291,6 +291,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		return goerr.Wrap(err, "planning failed")
 	}
 
+
 	// Post initial message
 	if planResult.Message != "" {
 		msg.Notify(ctx, "💬 %s", planResult.Message)
@@ -330,6 +331,17 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 				return abortErr
 			}
 			logger.Error("replan failed", "error", err, "phase", phase)
+			break
+		}
+
+		// Post replan message if present
+		if replanResult.Message != "" {
+			msg.Notify(ctx, "💬 %s", replanResult.Message)
+		}
+
+		// If the replan asks a question, post it and stop the loop
+		if replanResult.Question != "" {
+			msg.Notify(ctx, "❓ %s", replanResult.Question)
 			break
 		}
 

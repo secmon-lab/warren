@@ -75,8 +75,9 @@ func generateReplanPrompt(ctx context.Context, pc *planningContext, allResults [
 // generateTaskPrompt generates the system prompt for a task agent.
 func generateTaskPrompt(ctx context.Context, task TaskPlan) (string, error) {
 	return prompt.Generate(ctx, taskPromptTemplate, map[string]any{
-		"title":       task.Title,
-		"description": task.Description,
+		"title":               task.Title,
+		"description":         task.Description,
+		"acceptance_criteria": task.AcceptanceCriteria,
 	})
 }
 
@@ -197,6 +198,11 @@ var taskSchema = &gollem.Parameter{
 		"id":          {Type: gollem.TypeString, Description: "Unique task ID", Required: true},
 		"title":       {Type: gollem.TypeString, Description: "Short task title", Required: true},
 		"description": {Type: gollem.TypeString, Description: "Detailed task instructions", Required: true},
+		"acceptance_criteria": {
+			Type:        gollem.TypeString,
+			Description: "A clear, measurable condition that defines when this task is considered complete",
+			Required:    true,
+		},
 		"tools": {
 			Type:        gollem.TypeArray,
 			Items:       &gollem.Parameter{Type: gollem.TypeString},
@@ -228,11 +234,19 @@ var planSchema = &gollem.Parameter{
 var replanSchema = &gollem.Parameter{
 	Type: gollem.TypeObject,
 	Properties: map[string]*gollem.Parameter{
+		"message": {
+			Type:        gollem.TypeString,
+			Description: "Status update message about progress and next steps, shown to the user before the next phase",
+		},
 		"tasks": {
 			Type:        gollem.TypeArray,
 			Items:       taskSchema,
 			Description: "New tasks for the next phase (empty = proceed to final response)",
 			Required:    true,
+		},
+		"question": {
+			Type:        gollem.TypeString,
+			Description: "Optional question to ask the user when guidance is needed. Must include numbered choices. If set, tasks must be empty.",
 		},
 	},
 }
