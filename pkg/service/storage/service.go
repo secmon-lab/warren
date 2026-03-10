@@ -132,6 +132,9 @@ func (s *Service) GetLatestHistory(ctx context.Context, ticketID types.TicketID)
 			goerr.V("path", path),
 			goerr.V("ticket_id", ticketID))
 	}
+	if r == nil {
+		return nil, nil
+	}
 	defer safe.Close(ctx, r)
 
 	var history gollem.History
