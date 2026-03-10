@@ -128,29 +128,22 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	// Create history repository for latest.json auto-save
 	historyRepo := storage.NewHistoryRepoFromContext(ctx, storageSvc, target.ID)
 
-	// Setup budget tracker if strategy is configured
+	// Setup budget tracker and sub-agent options
 	var tracker *BudgetTracker
+	subAgentOpts := []gollem.Option{
+		gollem.WithHistoryRepository(historyRepo, string(target.ID)),
+	}
 	if c.budgetStrategy != nil {
 		tracker = newBudgetTracker(c.budgetStrategy)
 		budgetMW := newBudgetToolMiddleware(tracker)
+		subAgentOpts = append(subAgentOpts, gollem.WithToolMiddleware(budgetMW))
+	}
 
-		// Inject budget middleware and history repository into sub-agents' child agents
-		for i, sa := range filteredSubAgents {
-			inner := sa.Inner()
-			gollem.WithSubAgentOptions(
-				gollem.WithToolMiddleware(budgetMW),
-				gollem.WithHistoryRepository(historyRepo, string(target.ID)),
-			)(inner)
-			gollemSubAgents[i] = inner
-		}
-	} else {
-		for i, sa := range filteredSubAgents {
-			inner := sa.Inner()
-			gollem.WithSubAgentOptions(
-				gollem.WithHistoryRepository(historyRepo, string(target.ID)),
-			)(inner)
-			gollemSubAgents[i] = inner
-		}
+	// Inject options into sub-agents' child agents
+	for i, sa := range filteredSubAgents {
+		inner := sa.Inner()
+		gollem.WithSubAgentOptions(subAgentOpts...)(inner)
+		gollemSubAgents[i] = inner
 	}
 
 	// Build agent options
