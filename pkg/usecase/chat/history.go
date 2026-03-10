@@ -15,9 +15,23 @@ import (
 )
 
 // LoadHistory loads the chat history for a ticket from storage.
+// It first tries to load from latest.json, falling back to history/{id}.json.
 func LoadHistory(ctx context.Context, repo interfaces.Repository, ticketID types.TicketID, storageSvc *storage.Service) (*gollem.History, error) {
 	logger := logging.From(ctx)
 
+	// Try latest.json first
+	if history, err := storageSvc.GetLatestHistory(ctx, ticketID); err != nil {
+		logger.Warn("failed to load latest history, falling back to history record", "error", err)
+	} else if history != nil {
+		if history.Version > 0 && history.ToCount() > 0 {
+			logger.Debug("loaded history from latest.json", "version", history.Version, "message_count", history.ToCount())
+			return history, nil
+		}
+		logger.Warn("latest history incompatible, falling back to history record",
+			"version", history.Version, "message_count", history.ToCount())
+	}
+
+	// Fallback to history/{id}.json
 	historyRecord, err := repo.GetLatestHistory(ctx, ticketID)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get latest history")

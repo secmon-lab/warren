@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
@@ -39,6 +41,10 @@ func WithPrefix(prefix string) Option {
 
 func pathToHistory(prefix string, ticketID types.TicketID, historyID types.HistoryID) string {
 	return fmt.Sprintf("%s%s/ticket/%s/history/%s.json", prefix, StorageSchemaVersion, ticketID, historyID)
+}
+
+func pathToLatestHistory(prefix string, ticketID types.TicketID) string {
+	return fmt.Sprintf("%s%s/ticket/%s/latest.json", prefix, StorageSchemaVersion, ticketID)
 }
 
 func (s *Service) PutHistory(ctx context.Context, ticketID types.TicketID, historyID types.HistoryID, history *gollem.History) error {
@@ -84,4 +90,100 @@ func (s *Service) GetHistory(ctx context.Context, ticketID types.TicketID, histo
 	}
 
 	return &history, nil
+}
+
+// PutLatestHistory saves the history as the latest snapshot for the given ticket.
+// The object at latest.json is overwritten on each call.
+func (s *Service) PutLatestHistory(ctx context.Context, ticketID types.TicketID, history *gollem.History) error {
+	if s.storageClient == nil {
+		return nil
+	}
+
+	path := pathToLatestHistory(s.prefix, ticketID)
+
+	w := s.storageClient.PutObject(ctx, path)
+
+	if err := json.NewEncoder(w).Encode(history); err != nil {
+		return goerr.Wrap(err, "failed to save latest history",
+			goerr.V("path", path),
+			goerr.V("ticket_id", ticketID))
+	}
+
+	if err := w.Close(); err != nil {
+		return goerr.Wrap(err, "failed to close latest history",
+			goerr.V("path", path),
+			goerr.V("ticket_id", ticketID))
+	}
+
+	return nil
+}
+
+// GetLatestHistory retrieves the latest history snapshot for the given ticket.
+// Returns nil History and nil error if the storage client is not configured.
+func (s *Service) GetLatestHistory(ctx context.Context, ticketID types.TicketID) (*gollem.History, error) {
+	if s.storageClient == nil {
+		return nil, nil
+	}
+
+	path := pathToLatestHistory(s.prefix, ticketID)
+
+	r, err := s.storageClient.GetObject(ctx, path)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get latest history",
+			goerr.V("path", path),
+			goerr.V("ticket_id", ticketID))
+	}
+	defer safe.Close(ctx, r)
+
+	var history gollem.History
+	if err := json.NewDecoder(r).Decode(&history); err != nil {
+		return nil, goerr.Wrap(err, "failed to unmarshal latest history",
+			goerr.V("path", path),
+			goerr.V("ticket_id", ticketID))
+	}
+
+	return &history, nil
+}
+
+// HistoryRepo implements gollem.HistoryRepository using the storage service.
+// It persists the latest history snapshot for a ticket, keyed by ticket ID.
+// Save errors are logged but not returned to avoid interrupting agent execution.
+type HistoryRepo struct {
+	svc      *Service
+	ticketID types.TicketID
+	logger   *slog.Logger
+}
+
+// NewHistoryRepo creates a new HistoryRepo for the given ticket.
+func NewHistoryRepo(svc *Service, ticketID types.TicketID, logger *slog.Logger) *HistoryRepo {
+	return &HistoryRepo{
+		svc:      svc,
+		ticketID: ticketID,
+		logger:   logger,
+	}
+}
+
+// Load retrieves the latest history for the ticket.
+// Returns nil History and nil error if not found.
+func (r *HistoryRepo) Load(ctx context.Context, _ string) (*gollem.History, error) {
+	history, err := r.svc.GetLatestHistory(ctx, r.ticketID)
+	if err != nil {
+		r.logger.Warn("failed to load latest history from repository", "error", err, "ticket_id", r.ticketID)
+		return nil, nil
+	}
+	return history, nil
+}
+
+// Save persists the history as the latest snapshot for the ticket.
+// Errors are logged but not returned to avoid interrupting agent execution.
+func (r *HistoryRepo) Save(ctx context.Context, _ string, history *gollem.History) error {
+	if err := r.svc.PutLatestHistory(ctx, r.ticketID, history); err != nil {
+		r.logger.Warn("failed to save latest history to repository", "error", err, "ticket_id", r.ticketID)
+	}
+	return nil
+}
+
+// NewHistoryRepoFromContext creates a new HistoryRepo using the logger from the context.
+func NewHistoryRepoFromContext(ctx context.Context, svc *Service, ticketID types.TicketID) *HistoryRepo {
+	return NewHistoryRepo(svc, ticketID, logging.From(ctx))
 }

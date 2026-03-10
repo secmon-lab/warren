@@ -290,7 +290,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		msg.Notify(ctx, "💥 Planning failed: %s", err.Error())
 		return goerr.Wrap(err, "planning failed")
 	}
-
+	c.saveLatestHistory(ctx, planSession, target.ID, storageSvc)
 
 	// Post initial message
 	if planResult.Message != "" {
@@ -312,7 +312,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		}
 
 		// Execute all tasks in parallel
-		results := c.executePhase(ctx, currentTasks, target, ssn, planCtx)
+		results := c.executePhase(ctx, currentTasks, target, ssn, planCtx, storageSvc)
 		allResults = append(allResults, &phaseResult{
 			phase:   phase,
 			tasks:   currentTasks,
@@ -321,18 +321,21 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 
 		// Check for context cancellation (abort detected by monitor)
 		if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
+			c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
 			return abortErr
 		}
 
 		// Replan
 		replanResult, err := c.replan(ctx, planSession, planCtx, allResults, phase)
 		if err != nil {
+			c.saveLatestHistory(ctx, planSession, target.ID, storageSvc)
 			if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
 				return abortErr
 			}
 			logger.Error("replan failed", "error", err, "phase", phase)
 			break
 		}
+		c.saveLatestHistory(ctx, planSession, target.ID, storageSvc)
 
 		// Post replan message if present
 		if replanResult.Message != "" {
@@ -358,6 +361,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 	// Generate final response
 	finalResp, err := c.generateFinalResponse(ctx, planSession, planCtx, allResults)
 	if err != nil {
+		c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
 		if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
 			return abortErr
 		}
@@ -365,6 +369,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		msg.Notify(ctx, "💥 Failed to generate final response: %s", err.Error())
 		return goerr.Wrap(err, "failed to generate final response")
 	}
+	c.saveLatestHistory(ctx, planSession, target.ID, storageSvc)
 
 	msg.Notify(ctx, "💬 %s", finalResp)
 
@@ -533,6 +538,23 @@ func (c *SwarmChat) authorize(ctx context.Context, message string) (bool, error)
 		return false, nil
 	}
 	return true, nil
+}
+
+// saveLatestHistory saves the current planning session history as the latest snapshot.
+// Errors are logged but do not interrupt execution.
+func (c *SwarmChat) saveLatestHistory(ctx context.Context, planSession gollem.Session, ticketID types.TicketID, storageSvc *storage.Service) {
+	logger := logging.From(ctx)
+	history, err := planSession.History()
+	if err != nil {
+		logger.Warn("failed to get history for latest save", "error", err)
+		return
+	}
+	if history == nil {
+		return
+	}
+	if err := storageSvc.PutLatestHistory(ctx, ticketID, history); err != nil {
+		logger.Warn("failed to save latest history", "error", err, "ticket_id", ticketID)
+	}
 }
 
 // saveSessionHistory extracts history from a gollem Session and saves it via the shared SaveHistory function.
