@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/types"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
@@ -147,19 +146,17 @@ func (s *Service) GetLatestHistory(ctx context.Context, ticketID types.TicketID)
 
 // HistoryRepo implements gollem.HistoryRepository using the storage service.
 // It persists the latest history snapshot for a ticket, keyed by ticket ID.
-// Save errors are logged but not returned to avoid interrupting agent execution.
+// Save errors are handled via errutil but not returned to avoid interrupting agent execution.
 type HistoryRepo struct {
 	svc      *Service
 	ticketID types.TicketID
-	logger   *slog.Logger
 }
 
 // NewHistoryRepo creates a new HistoryRepo for the given ticket.
-func NewHistoryRepo(svc *Service, ticketID types.TicketID, logger *slog.Logger) *HistoryRepo {
+func NewHistoryRepo(svc *Service, ticketID types.TicketID) *HistoryRepo {
 	return &HistoryRepo{
 		svc:      svc,
 		ticketID: ticketID,
-		logger:   logger,
 	}
 }
 
@@ -168,22 +165,22 @@ func NewHistoryRepo(svc *Service, ticketID types.TicketID, logger *slog.Logger) 
 func (r *HistoryRepo) Load(ctx context.Context, _ string) (*gollem.History, error) {
 	history, err := r.svc.GetLatestHistory(ctx, r.ticketID)
 	if err != nil {
-		r.logger.Warn("failed to load latest history from repository", "error", err, "ticket_id", r.ticketID)
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to load latest history from repository", goerr.V("ticket_id", r.ticketID)))
 		return nil, nil
 	}
 	return history, nil
 }
 
 // Save persists the history as the latest snapshot for the ticket.
-// Errors are logged but not returned to avoid interrupting agent execution.
+// Errors are handled via errutil but not returned to avoid interrupting agent execution.
 func (r *HistoryRepo) Save(ctx context.Context, _ string, history *gollem.History) error {
 	if err := r.svc.PutLatestHistory(ctx, r.ticketID, history); err != nil {
-		r.logger.Warn("failed to save latest history to repository", "error", err, "ticket_id", r.ticketID)
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to save latest history to repository", goerr.V("ticket_id", r.ticketID)))
 	}
 	return nil
 }
 
-// NewHistoryRepoFromContext creates a new HistoryRepo using the logger from the context.
-func NewHistoryRepoFromContext(ctx context.Context, svc *Service, ticketID types.TicketID) *HistoryRepo {
-	return NewHistoryRepo(svc, ticketID, logging.From(ctx))
+// NewHistoryRepoFromContext creates a new HistoryRepo for the given ticket.
+func NewHistoryRepoFromContext(_ context.Context, svc *Service, ticketID types.TicketID) *HistoryRepo {
+	return NewHistoryRepo(svc, ticketID)
 }

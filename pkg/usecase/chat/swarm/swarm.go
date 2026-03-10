@@ -541,19 +541,18 @@ func (c *SwarmChat) authorize(ctx context.Context, message string) (bool, error)
 }
 
 // saveLatestHistory saves the current planning session history as the latest snapshot.
-// Errors are logged but do not interrupt execution.
+// Errors are handled via errutil but do not interrupt execution.
 func (c *SwarmChat) saveLatestHistory(ctx context.Context, planSession gollem.Session, ticketID types.TicketID, storageSvc *storage.Service) {
-	logger := logging.From(ctx)
 	history, err := planSession.History()
 	if err != nil {
-		logger.Warn("failed to get history for latest save", "error", err)
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to get history for latest save"))
 		return
 	}
 	if history == nil {
 		return
 	}
 	if err := storageSvc.PutLatestHistory(ctx, ticketID, history); err != nil {
-		logger.Warn("failed to save latest history", "error", err, "ticket_id", ticketID)
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to save latest history", goerr.V("ticket_id", ticketID)))
 	}
 }
 

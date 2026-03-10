@@ -2,7 +2,6 @@ package storage_test
 
 import (
 	"context"
-	"log/slog"
 	"testing"
 
 	"github.com/m-mizutani/gollem"
@@ -74,9 +73,7 @@ func TestHistoryRepo_LoadAndSave(t *testing.T) {
 	mockStorage := adapter.NewMock()
 	svc := storage.New(mockStorage)
 	ticketID := types.TicketID("ticket-repo")
-	logger := slog.Default()
-
-	repo := storage.NewHistoryRepo(svc, ticketID, logger)
+	repo := storage.NewHistoryRepo(svc, ticketID)
 
 	// Load returns nil when no history exists
 	loaded, err := repo.Load(ctx, string(ticketID))
@@ -105,9 +102,7 @@ func TestHistoryRepo_SaveErrorDoesNotReturn(t *testing.T) {
 	mockStorage := adapter.NewMock()
 	svc := storage.New(mockStorage)
 	ticketID := types.TicketID("ticket-err")
-	logger := slog.Default()
-
-	repo := storage.NewHistoryRepo(svc, ticketID, logger)
+	repo := storage.NewHistoryRepo(svc, ticketID)
 
 	history := &gollem.History{
 		Version:  gollem.HistoryVersion,
