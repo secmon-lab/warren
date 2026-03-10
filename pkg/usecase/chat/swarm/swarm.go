@@ -266,10 +266,17 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		userPrompt:    c.userSystemPrompt,
 	}
 
+	// Generate system prompt once (shared across plan/replan/final sessions)
+	systemPrompt, err := generateSystemPrompt(ctx, planCtx)
+	if err != nil {
+		return goerr.Wrap(err, "failed to generate system prompt")
+	}
+
 	// Create planning session with history
 	planSession, err := c.llmClient.NewSession(ctx,
 		gollem.WithSessionContentType(gollem.ContentTypeJSON),
 		gollem.WithSessionResponseSchema(planSchema),
+		gollem.WithSessionSystemPrompt(systemPrompt),
 	)
 	if err != nil {
 		return goerr.Wrap(err, "failed to create planning session")
@@ -326,7 +333,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		}
 
 		// Replan
-		replanResult, err := c.replan(ctx, planSession, planCtx, allResults, phase)
+		replanResult, err := c.replan(ctx, planSession, planCtx, allResults, phase, systemPrompt)
 		if err != nil {
 			c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
 			if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
@@ -359,7 +366,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 	c.postDivider(ctx, target)
 
 	// Generate final response
-	finalResp, err := c.generateFinalResponse(ctx, planSession, planCtx, allResults)
+	finalResp, err := c.generateFinalResponse(ctx, planSession, planCtx, allResults, systemPrompt)
 	if err != nil {
 		c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
 		if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {

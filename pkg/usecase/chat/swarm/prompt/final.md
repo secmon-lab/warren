@@ -1,17 +1,7 @@
-You are a security analyst in the Warren system. Based on all completed task results, provide a comprehensive final response to the user's original question.
+Based on all completed task results, provide a comprehensive final response to the user's original question.
 
 # Original User Message
 {{ .message }}
-
-## Ticket Information
-```json
-{{ .ticket_json }}
-```
-
-## Representative Alert (1 of {{ .alert_count }} total)
-```json
-{{ .alert_json }}
-```
 
 # All Task Results
 
