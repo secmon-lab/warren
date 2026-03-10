@@ -323,14 +323,14 @@ func TestBudgetToolMiddleware_SharedTrackerAcrossParentAndSubAgent(t *testing.T)
 	gt.Equal(t, tracker.Remaining(), 75.0)
 
 	// Sub-agent internal tool call: 75 - 25 = 50 (shared budget)
-	resp, err = subAgentHandler(ctx, &gollem.ToolExecRequest{
+	_, err = subAgentHandler(ctx, &gollem.ToolExecRequest{
 		Tool: &gollem.FunctionCall{Name: "bigquery_query"},
 	})
 	gt.NoError(t, err)
 	gt.Equal(t, tracker.Remaining(), 50.0)
 
 	// Another parent tool call: 50 - 25 = 25
-	resp, err = parentHandler(ctx, &gollem.ToolExecRequest{
+	_, err = parentHandler(ctx, &gollem.ToolExecRequest{
 		Tool: &gollem.FunctionCall{Name: "parent_tool"},
 	})
 	gt.NoError(t, err)
@@ -345,7 +345,7 @@ func TestBudgetToolMiddleware_SharedTrackerAcrossParentAndSubAgent(t *testing.T)
 	gt.Equal(t, tracker.Remaining(), 0.0)
 
 	// One more sub-agent call after soft: still allowed (margin=1)
-	resp, err = subAgentHandler(ctx, &gollem.ToolExecRequest{
+	_, err = subAgentHandler(ctx, &gollem.ToolExecRequest{
 		Tool: &gollem.FunctionCall{Name: "bigquery_query"},
 	})
 	gt.NoError(t, err)
