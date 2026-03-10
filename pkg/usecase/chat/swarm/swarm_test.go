@@ -12,6 +12,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opaq"
+	adapter "github.com/secmon-lab/warren/pkg/adapter/storage"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -19,6 +20,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
+	storage_svc "github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/usecase/chat/swarm"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
@@ -48,7 +50,10 @@ func setupTestContext(t *testing.T) context.Context {
 func newMockSession() *mock.LLMSessionMock {
 	return &mock.LLMSessionMock{
 		HistoryFunc: func() (*gollem.History, error) {
-			return &gollem.History{Version: 1}, nil
+			return &gollem.History{
+				Version:  gollem.HistoryVersion,
+				Messages: []gollem.Message{{Role: gollem.RoleUser}},
+			}, nil
 		},
 		AppendHistoryFunc: func(h *gollem.History) error {
 			return nil
@@ -588,6 +593,211 @@ func TestStartSessionMonitor_DBErrorContinuesMonitoring(t *testing.T) {
 
 	// Clean stop
 	stop()
+}
+
+func TestSwarmChat_LatestHistorySavedOnDirectResponse(t *testing.T) {
+	ctx := setupTestContext(t)
+	repo := repository.NewMemory()
+	testTicket := setupTicketAndAlert(t, ctx, repo)
+	mockStorage := adapter.NewMock()
+
+	mockLLM := &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			ssn := newMockSession()
+			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				return &gollem.Response{
+					Texts: []string{`{"message": "Direct response.", "tasks": []}`},
+				}, nil
+			}
+			return ssn, nil
+		},
+	}
+
+	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
+		swarm.WithNoAuthorization(true),
+		swarm.WithStorageClient(mockStorage),
+	)
+
+	gt.NoError(t, chatUC.Execute(ctx, testTicket, "Hello"))
+
+	// Verify latest.json was saved
+	storageSvc := storage_svc.New(mockStorage)
+	latest, err := storageSvc.GetLatestHistory(ctx, testTicket.ID)
+	gt.NoError(t, err)
+	gt.V(t, latest).NotNil()
+}
+
+func TestSwarmChat_LatestHistorySavedAfterReplan(t *testing.T) {
+	ctx := setupTestContext(t)
+	repo := repository.NewMemory()
+	testTicket := setupTicketAndAlert(t, ctx, repo)
+	mockStorage := adapter.NewMock()
+
+	var mu sync.Mutex
+	callCount := 0
+	mockLLM := &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			ssn := newMockSession()
+			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				mu.Lock()
+				callCount++
+				cc := callCount
+				mu.Unlock()
+
+				for _, inp := range input {
+					if text, ok := inp.(gollem.Text); ok {
+						inputStr := string(text)
+						if cc == 1 {
+							return &gollem.Response{
+								Texts: []string{`{
+									"message": "Working...",
+									"tasks": [{"id": "t1", "title": "Task", "description": "Do it", "tools": [], "sub_agents": []}]
+								}`},
+							}, nil
+						}
+						if strings.Contains(inputStr, "Phase") || strings.Contains(inputStr, "Completed Task Results") {
+							return &gollem.Response{
+								Texts: []string{`{"tasks": []}`},
+							}, nil
+						}
+						return &gollem.Response{Texts: []string{"Done."}}, nil
+					}
+				}
+				return &gollem.Response{Texts: []string{"OK"}}, nil
+			}
+			return ssn, nil
+		},
+	}
+
+	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
+		swarm.WithNoAuthorization(true),
+		swarm.WithStorageClient(mockStorage),
+	)
+
+	gt.NoError(t, chatUC.Execute(ctx, testTicket, "Analyze"))
+
+	// Verify latest.json was saved (saved after plan, replan, and final response)
+	storageSvc := storage_svc.New(mockStorage)
+	latest, err := storageSvc.GetLatestHistory(ctx, testTicket.ID)
+	gt.NoError(t, err)
+	gt.V(t, latest).NotNil()
+}
+
+func TestSwarmChat_LatestHistorySavedOnAbort(t *testing.T) {
+	ctx := setupTestContext(t)
+	repo := repository.NewMemory()
+	testTicket := setupTicketAndAlert(t, ctx, repo)
+	mockStorage := adapter.NewMock()
+
+	var mu sync.Mutex
+	callCount := 0
+	mockLLM := &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			ssn := newMockSession()
+			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				mu.Lock()
+				callCount++
+				cc := callCount
+				mu.Unlock()
+
+				// First call: plan with tasks
+				if cc == 1 {
+					return &gollem.Response{
+						Texts: []string{`{
+							"message": "Working...",
+							"tasks": [{"id": "t1", "title": "Slow Task", "description": "Takes time", "tools": [], "sub_agents": []}]
+						}`},
+					}, nil
+				}
+
+				// Task agent: simulate slow execution, return error for cancelled ctx
+				if cc == 2 {
+					return &gollem.Response{Texts: []string{"Task done."}}, nil
+				}
+
+				// Replan: return error to simulate abort detection
+				return nil, context.Canceled
+			}
+			return ssn, nil
+		},
+	}
+
+	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
+		swarm.WithNoAuthorization(true),
+		swarm.WithStorageClient(mockStorage),
+		swarm.WithMonitorPollInterval(10*time.Millisecond),
+	)
+
+	// Execute — plan succeeds and latest is saved,
+	// but replan may fail or be aborted
+	_ = chatUC.Execute(ctx, testTicket, "Slow analysis")
+
+	// Verify latest.json was saved at least after the planning phase
+	storageSvc := storage_svc.New(mockStorage)
+	latest, err := storageSvc.GetLatestHistory(ctx, testTicket.ID)
+	gt.NoError(t, err)
+	gt.V(t, latest).NotNil()
+}
+
+func TestSwarmChat_LatestHistorySavedOnReplanError(t *testing.T) {
+	ctx := setupTestContext(t)
+	repo := repository.NewMemory()
+	testTicket := setupTicketAndAlert(t, ctx, repo)
+	mockStorage := adapter.NewMock()
+
+	var mu sync.Mutex
+	callCount := 0
+	mockLLM := &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			ssn := newMockSession()
+			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				mu.Lock()
+				callCount++
+				cc := callCount
+				mu.Unlock()
+
+				for _, inp := range input {
+					if text, ok := inp.(gollem.Text); ok {
+						inputStr := string(text)
+
+						// Plan: return tasks
+						if cc == 1 {
+							return &gollem.Response{
+								Texts: []string{`{
+									"message": "Working...",
+									"tasks": [{"id": "t1", "title": "Task", "description": "Do it", "tools": [], "sub_agents": []}]
+								}`},
+							}, nil
+						}
+
+						// Replan: return error
+						if strings.Contains(inputStr, "Phase") || strings.Contains(inputStr, "Completed Task Results") {
+							return nil, goerr.New("simulated replan error")
+						}
+
+						// Task agent
+						return &gollem.Response{Texts: []string{"Done."}}, nil
+					}
+				}
+				return &gollem.Response{Texts: []string{"OK"}}, nil
+			}
+			return ssn, nil
+		},
+	}
+
+	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
+		swarm.WithNoAuthorization(true),
+		swarm.WithStorageClient(mockStorage),
+	)
+
+	// Execute completes (replan error is logged, proceeds to final response)
+	_ = chatUC.Execute(ctx, testTicket, "Test replan error")
+
+	// Verify latest.json was saved at least after the planning phase
+	storageSvc := storage_svc.New(mockStorage)
+	latest, err := storageSvc.GetLatestHistory(ctx, testTicket.ID)
+	gt.NoError(t, err)
+	gt.V(t, latest).NotNil()
 }
 
 // Ensure imports are used.

@@ -5,7 +5,7 @@ type TaskPlan struct {
 	ID                 string   `json:"id"`
 	Title              string   `json:"title"`
 	Description        string   `json:"description"`
-	AcceptanceCriteria string `json:"acceptance_criteria"`
+	AcceptanceCriteria string   `json:"acceptance_criteria"`
 	Tools              []string `json:"tools"`
 	SubAgents          []string `json:"sub_agents"`
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/service/llm"
+	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -23,7 +24,7 @@ import (
 // executePhase runs all tasks in parallel and waits for all to complete.
 // All task messages are posted upfront as "waiting" before any execution begins.
 // Each task's result context block is posted immediately upon completion.
-func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *ticket.Ticket, ssn *session.Session, pc *planningContext) []*TaskResult {
+func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *ticket.Ticket, ssn *session.Session, pc *planningContext, storageSvc *storage.Service) []*TaskResult {
 	results := make([]*TaskResult, len(tasks))
 
 	// Pre-create all task message routings (posts "waiting" messages to Slack)
@@ -42,7 +43,7 @@ func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *
 		wg.Add(1)
 		go func(idx int, t TaskPlan, r taskRouting) {
 			defer wg.Done()
-			results[idx] = c.executeTask(ctx, t, target, ssn, r.ctx, r.markCompleted)
+			results[idx] = c.executeTask(ctx, t, target, ssn, r.ctx, r.markCompleted, storageSvc)
 			// Post result context block immediately upon task completion
 			c.postTaskResult(ctx, t, results[idx], target)
 		}(i, task, routings[i])
@@ -92,7 +93,7 @@ func (c *SwarmChat) postDivider(ctx context.Context, target *ticket.Ticket) {
 }
 
 // executeTask executes a single task with its own agent and trace context.
-func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *ticket.Ticket, ssn *session.Session, taskCtx context.Context, markCompleted func()) *TaskResult {
+func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *ticket.Ticket, ssn *session.Session, taskCtx context.Context, markCompleted func(), storageSvc *storage.Service) *TaskResult {
 	logger := logging.From(ctx)
 	result := &TaskResult{
 		TaskID: task.ID,
@@ -124,23 +125,31 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	filteredSubAgents := filterSubAgents(c.subAgents, task.SubAgents)
 	gollemSubAgents := make([]*gollem.SubAgent, len(filteredSubAgents))
 
+	// Create history repository for latest.json auto-save
+	historyRepo := storage.NewHistoryRepoFromContext(ctx, storageSvc, target.ID)
+
 	// Setup budget tracker if strategy is configured
 	var tracker *BudgetTracker
 	if c.budgetStrategy != nil {
 		tracker = newBudgetTracker(c.budgetStrategy)
 		budgetMW := newBudgetToolMiddleware(tracker)
 
-		// Inject budget middleware into sub-agents' child agents
+		// Inject budget middleware and history repository into sub-agents' child agents
 		for i, sa := range filteredSubAgents {
 			inner := sa.Inner()
 			gollem.WithSubAgentOptions(
 				gollem.WithToolMiddleware(budgetMW),
+				gollem.WithHistoryRepository(historyRepo, string(target.ID)),
 			)(inner)
 			gollemSubAgents[i] = inner
 		}
 	} else {
 		for i, sa := range filteredSubAgents {
-			gollemSubAgents[i] = sa.Inner()
+			inner := sa.Inner()
+			gollem.WithSubAgentOptions(
+				gollem.WithHistoryRepository(historyRepo, string(target.ID)),
+			)(inner)
+			gollemSubAgents[i] = inner
 		}
 	}
 
@@ -150,6 +159,7 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 		gollem.WithSubAgents(gollemSubAgents...),
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithSystemPrompt(taskPrompt),
+		gollem.WithHistoryRepository(historyRepo, string(target.ID)),
 	}
 
 	// Setup trace handler for this task
