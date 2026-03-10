@@ -328,7 +328,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		// Replan
 		replanResult, err := c.replan(ctx, planSession, planCtx, allResults, phase)
 		if err != nil {
-			c.saveLatestHistory(ctx, planSession, target.ID, storageSvc)
+			c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
 			if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
 				return abortErr
 			}
