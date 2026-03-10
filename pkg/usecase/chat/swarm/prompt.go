@@ -12,6 +12,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
+	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -34,20 +36,24 @@ var finalPromptTemplate string
 
 // planningContext holds the shared context for planning operations.
 type planningContext struct {
-	message       string
-	ticket        *ticket.Ticket
-	alerts        []*alert.Alert
-	tools         []gollem.ToolSet
-	subAgents     []*agent.SubAgent
-	memoryContext string
-	userPrompt    string
+	message        string
+	ticket         *ticket.Ticket
+	alerts         []*alert.Alert
+	tools          []gollem.ToolSet
+	subAgents      []*agent.SubAgent
+	memoryContext  string
+	userPrompt     string
+	lang           lang.Lang
+	requesterID    string
+	threadComments []ticket.Comment
+	knowledges     []*knowledge.Knowledge
 }
 
 // generateSystemPrompt generates the shared system prompt containing static context.
 func generateSystemPrompt(ctx context.Context, pc *planningContext) (string, error) {
 	ticketJSON, alertJSON, alertCount := marshalContext(pc)
 
-	return prompt.Generate(ctx, systemPromptTemplate, map[string]any{
+	return prompt.GenerateWithStruct(ctx, systemPromptTemplate, map[string]any{
 		"ticket_json":           ticketJSON,
 		"alert_json":            alertJSON,
 		"alert_count":           alertCount,
@@ -55,6 +61,11 @@ func generateSystemPrompt(ctx context.Context, pc *planningContext) (string, err
 		"subagents_description": describeSubAgents(pc.subAgents),
 		"memory_context":        pc.memoryContext,
 		"user_prompt":           pc.userPrompt,
+		"lang":                  pc.lang,
+		"requester_id":          pc.requesterID,
+		"thread_comments":       pc.threadComments,
+		"knowledges":            pc.knowledges,
+		"topic":                 pc.ticket.Topic,
 	})
 }
 
@@ -85,9 +96,11 @@ func generateTaskPrompt(ctx context.Context, task TaskPlan) (string, error) {
 
 // generateFinalPrompt generates the final response user message prompt.
 func generateFinalPrompt(ctx context.Context, pc *planningContext, allResults []*phaseResult) (string, error) {
-	return prompt.Generate(ctx, finalPromptTemplate, map[string]any{
+	return prompt.GenerateWithStruct(ctx, finalPromptTemplate, map[string]any{
 		"message":           pc.message,
 		"completed_results": formatCompletedResults(allResults),
+		"lang":              pc.lang,
+		"requester_id":      pc.requesterID,
 	})
 }
 

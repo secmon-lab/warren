@@ -12,6 +12,7 @@ import (
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
+	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -256,14 +257,27 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 	allTools = append(allTools, c.tools...)
 	allTools = append(allTools, baseAction)
 
+	// Collect thread comments
+	threadComments := chat.CollectThreadComments(ctx, c.repository, target.ID, ssn)
+
+	// Collect domain knowledges
+	knowledges, err := c.repository.GetKnowledges(ctx, target.Topic)
+	if err != nil {
+		logger.Warn("failed to get knowledges", "error", err, "topic", target.Topic)
+	}
+
 	planCtx := &planningContext{
-		message:       message,
-		ticket:        target,
-		alerts:        alerts,
-		tools:         allTools,
-		subAgents:     c.subAgents,
-		memoryContext: memoryContext,
-		userPrompt:    c.userSystemPrompt,
+		message:        message,
+		ticket:         target,
+		alerts:         alerts,
+		tools:          allTools,
+		subAgents:      c.subAgents,
+		memoryContext:  memoryContext,
+		userPrompt:     c.userSystemPrompt,
+		lang:           lang.From(ctx),
+		requesterID:    string(types.UserID(user.FromContext(ctx))),
+		threadComments: threadComments,
+		knowledges:     knowledges,
 	}
 
 	// Generate system prompt once (shared across plan/replan/final sessions)
