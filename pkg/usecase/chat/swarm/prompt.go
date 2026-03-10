@@ -17,6 +17,9 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 )
 
+//go:embed prompt/system.md
+var systemPromptTemplate string
+
 //go:embed prompt/plan.md
 var planPromptTemplate string
 
@@ -40,12 +43,11 @@ type planningContext struct {
 	userPrompt    string
 }
 
-// generatePlanPrompt generates the planning system prompt.
-func generatePlanPrompt(ctx context.Context, pc *planningContext) (string, error) {
+// generateSystemPrompt generates the shared system prompt containing static context.
+func generateSystemPrompt(ctx context.Context, pc *planningContext) (string, error) {
 	ticketJSON, alertJSON, alertCount := marshalContext(pc)
 
-	return prompt.Generate(ctx, planPromptTemplate, map[string]any{
-		"message":               pc.message,
+	return prompt.Generate(ctx, systemPromptTemplate, map[string]any{
 		"ticket_json":           ticketJSON,
 		"alert_json":            alertJSON,
 		"alert_count":           alertCount,
@@ -56,19 +58,19 @@ func generatePlanPrompt(ctx context.Context, pc *planningContext) (string, error
 	})
 }
 
-// generateReplanPrompt generates the replan prompt with completed results.
-func generateReplanPrompt(ctx context.Context, pc *planningContext, allResults []*phaseResult, currentPhase int) (string, error) {
-	ticketJSON, alertJSON, alertCount := marshalContext(pc)
+// generatePlanPrompt generates the planning user message prompt.
+func generatePlanPrompt(ctx context.Context, pc *planningContext) (string, error) {
+	return prompt.Generate(ctx, planPromptTemplate, map[string]any{
+		"message": pc.message,
+	})
+}
 
+// generateReplanPrompt generates the replan user message prompt with completed results.
+func generateReplanPrompt(ctx context.Context, pc *planningContext, allResults []*phaseResult, currentPhase int) (string, error) {
 	return prompt.Generate(ctx, replanPromptTemplate, map[string]any{
-		"message":               pc.message,
-		"ticket_json":           ticketJSON,
-		"alert_json":            alertJSON,
-		"alert_count":           alertCount,
-		"tools_description":     describeTools(ctx, pc.tools),
-		"subagents_description": describeSubAgents(pc.subAgents),
-		"completed_results":     formatCompletedResults(allResults),
-		"current_phase":         currentPhase,
+		"message":           pc.message,
+		"completed_results": formatCompletedResults(allResults),
+		"current_phase":     currentPhase,
 	})
 }
 
@@ -81,15 +83,10 @@ func generateTaskPrompt(ctx context.Context, task TaskPlan) (string, error) {
 	})
 }
 
-// generateFinalPrompt generates the final response prompt.
+// generateFinalPrompt generates the final response user message prompt.
 func generateFinalPrompt(ctx context.Context, pc *planningContext, allResults []*phaseResult) (string, error) {
-	ticketJSON, alertJSON, alertCount := marshalContext(pc)
-
 	return prompt.Generate(ctx, finalPromptTemplate, map[string]any{
 		"message":           pc.message,
-		"ticket_json":       ticketJSON,
-		"alert_json":        alertJSON,
-		"alert_count":       alertCount,
 		"completed_results": formatCompletedResults(allResults),
 	})
 }

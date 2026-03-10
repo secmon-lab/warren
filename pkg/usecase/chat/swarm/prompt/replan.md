@@ -1,23 +1,7 @@
-You are a security operations planning agent for the Warren system. Previous task phases have completed. Review the results and decide what to do next.
+Previous task phases have completed. Review the results and decide what to do next.
 
 # Original User Message
 {{ .message }}
-
-## Ticket Information
-```json
-{{ .ticket_json }}
-```
-
-## Representative Alert (1 of {{ .alert_count }} total)
-```json
-{{ .alert_json }}
-```
-
-## Available Tools
-{{ .tools_description }}
-
-## Available Sub-Agents
-{{ .subagents_description }}
 
 # Completed Task Results
 

@@ -48,7 +48,7 @@ func (c *SwarmChat) plan(ctx context.Context, session gollem.Session, pc *planni
 }
 
 // replan evaluates completed results and determines next steps.
-func (c *SwarmChat) replan(ctx context.Context, session gollem.Session, pc *planningContext, allResults []*phaseResult, currentPhase int) (*ReplanResult, error) {
+func (c *SwarmChat) replan(ctx context.Context, session gollem.Session, pc *planningContext, allResults []*phaseResult, currentPhase int, systemPrompt string) (*ReplanResult, error) {
 	logger := logging.From(ctx)
 
 	// Generate replan prompt
@@ -70,6 +70,7 @@ func (c *SwarmChat) replan(ctx context.Context, session gollem.Session, pc *plan
 	replanSession, err := c.llmClient.NewSession(ctx,
 		gollem.WithSessionContentType(gollem.ContentTypeJSON),
 		gollem.WithSessionResponseSchema(replanSchema),
+		gollem.WithSessionSystemPrompt(systemPrompt),
 	)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to create replan session")
@@ -104,7 +105,7 @@ func (c *SwarmChat) replan(ctx context.Context, session gollem.Session, pc *plan
 }
 
 // generateFinalResponse generates the final response after all tasks are done.
-func (c *SwarmChat) generateFinalResponse(ctx context.Context, session gollem.Session, pc *planningContext, allResults []*phaseResult) (string, error) {
+func (c *SwarmChat) generateFinalResponse(ctx context.Context, session gollem.Session, pc *planningContext, allResults []*phaseResult, systemPrompt string) (string, error) {
 	logger := logging.From(ctx)
 
 	finalPrompt, err := generateFinalPrompt(ctx, pc, allResults)
@@ -122,7 +123,9 @@ func (c *SwarmChat) generateFinalResponse(ctx context.Context, session gollem.Se
 	logger.Debug("generating final response")
 
 	// Create a text session for the final response (not JSON)
-	finalSession, err := c.llmClient.NewSession(ctx)
+	finalSession, err := c.llmClient.NewSession(ctx,
+		gollem.WithSessionSystemPrompt(systemPrompt),
+	)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to create final response session")
 	}
