@@ -125,14 +125,13 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	filteredSubAgents := filterSubAgents(c.subAgents, task.SubAgents)
 	gollemSubAgents := make([]*gollem.SubAgent, len(filteredSubAgents))
 
-	// Create history repository for latest.json auto-save
-	historyRepo := storage.NewHistoryRepoFromContext(ctx, storageSvc, target.ID)
-
 	// Setup budget tracker and sub-agent options
+	// Note: Sub-agents do NOT get WithHistoryRepository because they are
+	// stateless single-use tools. Sharing the same HistoryRepo/ticketID would
+	// cause child agents to load the parent's conversation history, leading to
+	// "tool_use without tool_result" errors from the Claude API.
 	var tracker *BudgetTracker
-	subAgentOpts := []gollem.Option{
-		gollem.WithHistoryRepository(historyRepo, string(target.ID)),
-	}
+	var subAgentOpts []gollem.Option
 	if c.budgetStrategy != nil {
 		tracker = newBudgetTracker(c.budgetStrategy)
 		budgetMW := newBudgetToolMiddleware(tracker)
@@ -152,7 +151,6 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 		gollem.WithSubAgents(gollemSubAgents...),
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithSystemPrompt(taskPrompt),
-		gollem.WithHistoryRepository(historyRepo, string(target.ID)),
 	}
 
 	// Setup trace handler for this task
