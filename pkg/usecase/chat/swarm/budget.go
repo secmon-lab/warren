@@ -189,6 +189,66 @@ func (t *BudgetTracker) GenerateHandoverInfo() string {
 	return b.String()
 }
 
+// budgetTrackerCtxKeyType is a context key type for budget tracker.
+type budgetTrackerCtxKeyType struct{}
+
+// withBudgetTracker stores a BudgetTracker in the context.
+func withBudgetTracker(ctx context.Context, tracker *BudgetTracker) context.Context {
+	return context.WithValue(ctx, budgetTrackerCtxKeyType{}, tracker)
+}
+
+// budgetTrackerFrom retrieves a BudgetTracker from the context.
+// Returns nil if no tracker is present.
+func budgetTrackerFrom(ctx context.Context) *BudgetTracker {
+	v, _ := ctx.Value(budgetTrackerCtxKeyType{}).(*BudgetTracker)
+	return v
+}
+
+// newContextAwareBudgetMiddleware creates a gollem.ToolMiddleware that reads
+// the BudgetTracker from the context on each invocation. This allows a single
+// middleware instance to be shared across tasks while each task provides its
+// own tracker via the context.
+// If no tracker is found in the context, the middleware passes through.
+func newContextAwareBudgetMiddleware() gollem.ToolMiddleware {
+	return func(next gollem.ToolHandler) gollem.ToolHandler {
+		return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
+			tracker := budgetTrackerFrom(ctx)
+			if tracker == nil {
+				// No tracker in context — pass through (budget disabled)
+				return next(ctx, req)
+			}
+
+			elapsed := time.Since(tracker.startTime)
+			status := tracker.BeforeToolCall(req.Tool.Name, elapsed)
+
+			// Hard limit: block tool execution
+			if status == BudgetHardLimit {
+				return &gollem.ToolExecResponse{
+					Result: map[string]any{
+						"error": "ACTION BUDGET HARD LIMIT REACHED. Tool execution blocked. Your response will be used as handover information for the next task.",
+					},
+				}, nil
+			}
+
+			// Execute the tool
+			resp, err := next(ctx, req)
+
+			// After tool call: consume additional cost based on results
+			if resp != nil {
+				tracker.AfterToolCall(req.Tool.Name, time.Since(tracker.startTime), resp.Result, resp.Error)
+			}
+
+			// Append budget info to response
+			if resp != nil && err == nil {
+				currentStatus := tracker.status()
+				appendBudgetInfo(resp, tracker, currentStatus)
+			}
+
+			return resp, err
+		}
+	}
+}
+
 // subAgentToolNames contains tool names for sub-agent invocations.
 // These have zero cost because their internal tool calls are tracked individually.
 var subAgentToolNames = map[string]bool{

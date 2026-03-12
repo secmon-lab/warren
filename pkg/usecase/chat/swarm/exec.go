@@ -125,24 +125,19 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	filteredSubAgents := filterSubAgents(c.subAgents, task.SubAgents)
 	gollemSubAgents := make([]*gollem.SubAgent, len(filteredSubAgents))
 
-	// Setup budget tracker and sub-agent options
-	// Note: Task agents and their sub-agents do not get WithHistoryRepository
-	// as they are stateless, single-use tools in the swarm. Sharing the main
-	// history would cause them to load the parent's conversation, leading to
-	// context confusion and API errors like "tool_use without tool_result".
+	// Setup budget tracker.
+	// The context-aware budget middleware was already injected into sub-agents
+	// at construction time (swarm.New). Here we just create a per-task tracker
+	// and store it in the context so both the parent agent's middleware and the
+	// sub-agents' context-aware middleware share the same tracker.
 	var tracker *BudgetTracker
-	var subAgentOpts []gollem.Option
 	if c.budgetStrategy != nil {
 		tracker = newBudgetTracker(c.budgetStrategy)
-		budgetMW := newBudgetToolMiddleware(tracker)
-		subAgentOpts = append(subAgentOpts, gollem.WithToolMiddleware(budgetMW))
+		taskCtx = withBudgetTracker(taskCtx, tracker)
 	}
 
-	// Inject options into sub-agents' child agents
 	for i, sa := range filteredSubAgents {
-		inner := sa.Inner()
-		gollem.WithSubAgentOptions(subAgentOpts...)(inner)
-		gollemSubAgents[i] = inner
+		gollemSubAgents[i] = sa.Inner()
 	}
 
 	// Build agent options

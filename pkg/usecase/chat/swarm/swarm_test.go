@@ -800,6 +800,191 @@ func TestSwarmChat_LatestHistorySavedOnReplanError(t *testing.T) {
 	gt.V(t, latest).NotNil()
 }
 
+func TestSwarmChat_BudgetMiddlewareNotAccumulated(t *testing.T) {
+	// Regression test: verify that budget middleware is NOT accumulated across tasks.
+	// Before the fix, each executeTask call would append a new budget middleware
+	// to the shared SubAgent instance, causing stale trackers from previous tasks
+	// to block tool execution in subsequent tasks.
+	//
+	// This test runs two phases (each with one task). The budget is set so that
+	// each task's tracker is exhausted after a few tool calls. If the bug exists,
+	// the second task's tool calls would be blocked by the stale tracker from phase 1.
+	ctx := setupTestContext(t)
+	repo := repository.NewMemory()
+	testTicket := setupTicketAndAlert(t, ctx, repo)
+
+	var mu sync.Mutex
+	sessionCount := 0
+	toolCallCount := 0
+
+	mockLLM := &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			mu.Lock()
+			sessionCount++
+			ssnNum := sessionCount
+			mu.Unlock()
+
+			ssn := newMockSession()
+			localCallCount := 0
+
+			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				localCallCount++
+
+				switch {
+				// Session 1: planning session → plan prompt
+				case ssnNum == 1 && localCallCount == 1:
+					return &gollem.Response{
+						Texts: []string{`{
+							"message": "Starting analysis",
+							"tasks": [
+								{"id": "t1", "title": "Task 1", "description": "First task", "tools": ["test_tool"], "sub_agents": []}
+							]
+						}`},
+					}, nil
+
+				// Session 2: task 1 agent → first call produces tool call
+				case ssnNum == 2 && localCallCount == 1:
+					return &gollem.Response{
+						FunctionCalls: []*gollem.FunctionCall{{Name: "test_tool", Arguments: map[string]any{}}},
+					}, nil
+				case ssnNum == 2 && localCallCount == 2:
+					return &gollem.Response{
+						Texts: []string{"Task 1 done."},
+					}, nil
+
+				// Session 3: replan session → schedule task 2
+				case ssnNum == 3 && localCallCount == 1:
+					return &gollem.Response{
+						Texts: []string{`{
+							"tasks": [
+								{"id": "t2", "title": "Task 2", "description": "Second task", "tools": ["test_tool"], "sub_agents": []}
+							]
+						}`},
+					}, nil
+
+				// Session 4: task 2 agent → produces tool call
+				case ssnNum == 4 && localCallCount == 1:
+					return &gollem.Response{
+						FunctionCalls: []*gollem.FunctionCall{{Name: "test_tool", Arguments: map[string]any{}}},
+					}, nil
+				case ssnNum == 4 && localCallCount == 2:
+					return &gollem.Response{
+						Texts: []string{"Task 2 done."},
+					}, nil
+
+				// Session 5: replan session → no more tasks
+				case ssnNum == 5 && localCallCount == 1:
+					return &gollem.Response{
+						Texts: []string{`{"tasks": []}`},
+					}, nil
+
+				// Session 6: final response session
+				case ssnNum == 6:
+					return &gollem.Response{
+						Texts: []string{"All tasks completed."},
+					}, nil
+				}
+
+				return &gollem.Response{Texts: []string{"OK"}}, nil
+			}
+			return ssn, nil
+		},
+	}
+
+	// Budget: each tool call costs 30 out of 100 total.
+	// Task 1 and Task 2 each make 1 tool call, consuming 30 each.
+	// If trackers are independent, each task starts at 100 and ends at 70.
+	// If the accumulation bug exists, task 2 would inherit task 1's depleted state.
+	budgetStrategy := &recordingBudgetStrategy{
+		initialBudget:   100.0,
+		beforeCost:      30.0,
+		hardLimitMargin: 3,
+	}
+
+	// Track tool executions
+	testToolSet := &trackingToolSet{
+		name: "test_tool",
+		runFunc: func() {
+			mu.Lock()
+			toolCallCount++
+			mu.Unlock()
+		},
+	}
+
+	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
+		swarm.WithNoAuthorization(true),
+		swarm.WithMaxPhases(3),
+		swarm.WithBudgetStrategy(budgetStrategy),
+		swarm.WithTools([]gollem.ToolSet{testToolSet}),
+	)
+
+	err := chatUC.Execute(ctx, testTicket, "Analyze with budget")
+	gt.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Both tasks must have executed their tool calls
+	gt.N[int](t, toolCallCount).Greater(1)
+
+	// Verify budget consumption was recorded correctly
+	budgetStrategy.mu.Lock()
+	calls := budgetStrategy.calls
+	budgetStrategy.mu.Unlock()
+
+	// There should be at least 2 calls (1 per task)
+	gt.N[int](t, len(calls)).GreaterOrEqual(2)
+
+	// Each call should have CallCount == 1, proving each task got a fresh tracker.
+	// If the accumulation bug existed, the second task's call would have CallCount > 1
+	// because the stale tracker from task 1 would carry over its state.
+	for i, call := range calls {
+		gt.N[int](t, call.CallCount).
+			Describef("call[%d]: CallCount should be 1 (fresh tracker per task), got %d", i, call.CallCount).
+			Equal(1)
+	}
+}
+
+// recordingBudgetStrategy records each BeforeToolCall invocation for assertions.
+type recordingBudgetStrategy struct {
+	mu              sync.Mutex
+	initialBudget   float64
+	beforeCost      float64
+	hardLimitMargin int
+	calls           []swarm.ToolCallContext
+}
+
+func (s *recordingBudgetStrategy) InitialBudget() float64 { return s.initialBudget }
+func (s *recordingBudgetStrategy) BeforeToolCall(ctx swarm.ToolCallContext) float64 {
+	s.mu.Lock()
+	s.calls = append(s.calls, ctx)
+	s.mu.Unlock()
+	return s.beforeCost
+}
+func (s *recordingBudgetStrategy) AfterToolCall(_ swarm.ToolCallContext) float64 { return 0 }
+func (s *recordingBudgetStrategy) ShouldExit(state swarm.BudgetState) bool {
+	return state.CallsAfterSoft > s.hardLimitMargin
+}
+
+// trackingToolSet implements gollem.ToolSet with a callback to track tool executions.
+type trackingToolSet struct {
+	name    string
+	runFunc func()
+}
+
+func (m *trackingToolSet) Specs(_ context.Context) ([]gollem.ToolSpec, error) {
+	return []gollem.ToolSpec{
+		{Name: m.name, Description: "Tracking tool: " + m.name},
+	}, nil
+}
+
+func (m *trackingToolSet) Run(_ context.Context, _ string, _ map[string]any) (map[string]any, error) {
+	if m.runFunc != nil {
+		m.runFunc()
+	}
+	return map[string]any{"result": "ok"}, nil
+}
+
 // Ensure imports are used.
 var (
 	_ = goerr.New
