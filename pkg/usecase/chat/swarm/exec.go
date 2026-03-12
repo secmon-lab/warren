@@ -126,10 +126,10 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	gollemSubAgents := make([]*gollem.SubAgent, len(filteredSubAgents))
 
 	// Setup budget tracker and sub-agent options
-	// Note: Sub-agents do NOT get WithHistoryRepository because they are
-	// stateless single-use tools. Sharing the same HistoryRepo/ticketID would
-	// cause child agents to load the parent's conversation history, leading to
-	// "tool_use without tool_result" errors from the Claude API.
+	// Note: Task agents and their sub-agents do not get WithHistoryRepository
+	// as they are stateless, single-use tools in the swarm. Sharing the main
+	// history would cause them to load the parent's conversation, leading to
+	// context confusion and API errors like "tool_use without tool_result".
 	var tracker *BudgetTracker
 	var subAgentOpts []gollem.Option
 	if c.budgetStrategy != nil {
