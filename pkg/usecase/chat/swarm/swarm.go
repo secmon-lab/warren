@@ -133,6 +133,18 @@ func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient in
 	for _, opt := range opts {
 		opt(c)
 	}
+
+	// Inject context-aware budget middleware into all sub-agents once.
+	// Each task will provide its own BudgetTracker via the context,
+	// avoiding the accumulation bug where append-only SubAgentOptions
+	// would stack stale trackers from previous tasks.
+	if c.budgetStrategy != nil {
+		contextAwareMW := newContextAwareBudgetMiddleware()
+		for _, sa := range c.subAgents {
+			gollem.WithSubAgentOptions(gollem.WithToolMiddleware(contextAwareMW))(sa.Inner())
+		}
+	}
+
 	return c
 }
 

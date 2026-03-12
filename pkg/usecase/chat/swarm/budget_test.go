@@ -364,6 +364,124 @@ func TestBudgetToolMiddleware_SharedTrackerAcrossParentAndSubAgent(t *testing.T)
 	gt.V(t, resp.Result["error"]).NotNil()
 }
 
+func TestContextAwareBudgetMiddleware_ReadsTrackerFromContext(t *testing.T) {
+	strategy := &mockBudgetStrategy{
+		initialBudget:   100.0,
+		beforeCost:      10.0,
+		afterCost:       0.0,
+		hardLimitMargin: 3,
+	}
+	tracker := swarm.NewBudgetTracker(strategy)
+	mw := swarm.NewContextAwareBudgetMiddleware()
+
+	handler := mw(func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
+		return &gollem.ToolExecResponse{
+			Result: map[string]any{"data": "test"},
+		}, nil
+	})
+
+	ctx := swarm.WithBudgetTracker(context.Background(), tracker)
+	resp, err := handler(ctx, &gollem.ToolExecRequest{
+		Tool: &gollem.FunctionCall{Name: "test_tool"},
+	})
+
+	gt.NoError(t, err)
+	gt.V(t, resp.Result["_budget_info"]).NotNil()
+	gt.Equal(t, tracker.Remaining(), 90.0)
+}
+
+func TestContextAwareBudgetMiddleware_NoTrackerInContext(t *testing.T) {
+	mw := swarm.NewContextAwareBudgetMiddleware()
+
+	toolCalled := false
+	handler := mw(func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
+		toolCalled = true
+		return &gollem.ToolExecResponse{
+			Result: map[string]any{"data": "test"},
+		}, nil
+	})
+
+	// No tracker in context — should pass through
+	resp, err := handler(context.Background(), &gollem.ToolExecRequest{
+		Tool: &gollem.FunctionCall{Name: "test_tool"},
+	})
+
+	gt.NoError(t, err)
+	gt.B(t, toolCalled).True()
+	// No budget info should be added
+	gt.V(t, resp.Result["_budget_info"]).Nil()
+	gt.V(t, resp.Result["_budget_warning"]).Nil()
+}
+
+func TestContextAwareBudgetMiddleware_DifferentTrackersPerTask(t *testing.T) {
+	strategy := &mockBudgetStrategy{
+		initialBudget:   20.0,
+		beforeCost:      10.0,
+		afterCost:       0.0,
+		hardLimitMargin: 0, // hard limit immediately after soft
+	}
+
+	mw := swarm.NewContextAwareBudgetMiddleware()
+
+	passthrough := func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
+		return &gollem.ToolExecResponse{
+			Result: map[string]any{"data": "ok"},
+		}, nil
+	}
+	handler := mw(passthrough)
+
+	// === Task 1: exhaust the budget ===
+	tracker1 := swarm.NewBudgetTracker(strategy)
+	ctx1 := swarm.WithBudgetTracker(context.Background(), tracker1)
+
+	// Call 1: 20 - 10 = 10 (OK)
+	resp, err := handler(ctx1, &gollem.ToolExecRequest{
+		Tool: &gollem.FunctionCall{Name: "tool1"},
+	})
+	gt.NoError(t, err)
+	gt.V(t, resp.Result["_budget_info"]).NotNil()
+
+	// Call 2: 10 - 10 = 0 (SoftLimit)
+	resp, err = handler(ctx1, &gollem.ToolExecRequest{
+		Tool: &gollem.FunctionCall{Name: "tool1"},
+	})
+	gt.NoError(t, err)
+	gt.V(t, resp.Result["_budget_warning"]).NotNil()
+
+	// Call 3: HardLimit (margin=0, 1st call after soft)
+	toolCalled := false
+	hardHandler := mw(func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
+		toolCalled = true
+		return &gollem.ToolExecResponse{Result: map[string]any{}}, nil
+	})
+	resp, err = hardHandler(ctx1, &gollem.ToolExecRequest{
+		Tool: &gollem.FunctionCall{Name: "tool1"},
+	})
+	gt.NoError(t, err)
+	gt.B(t, toolCalled).False() // blocked by hard limit
+	gt.V(t, resp.Result["error"]).NotNil()
+
+	// === Task 2: new tracker, same middleware — should work fine ===
+	tracker2 := swarm.NewBudgetTracker(strategy)
+	ctx2 := swarm.WithBudgetTracker(context.Background(), tracker2)
+
+	// This call must succeed with the fresh tracker, NOT be blocked by tracker1
+	toolCalled = false
+	freshHandler := mw(func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
+		toolCalled = true
+		return &gollem.ToolExecResponse{
+			Result: map[string]any{"data": "fresh"},
+		}, nil
+	})
+	resp, err = freshHandler(ctx2, &gollem.ToolExecRequest{
+		Tool: &gollem.FunctionCall{Name: "tool1"},
+	})
+	gt.NoError(t, err)
+	gt.B(t, toolCalled).True() // tool should execute successfully
+	gt.V(t, resp.Result["_budget_info"]).NotNil()
+	gt.Equal(t, tracker2.Remaining(), 10.0) // 20 - 10 = 10
+}
+
 func TestBudgetToolMiddleware_HardLimit(t *testing.T) {
 	strategy := &mockBudgetStrategy{
 		initialBudget:   10.0,
