@@ -217,34 +217,7 @@ func newContextAwareBudgetMiddleware() gollem.ToolMiddleware {
 				// No tracker in context — pass through (budget disabled)
 				return next(ctx, req)
 			}
-
-			elapsed := time.Since(tracker.startTime)
-			status := tracker.BeforeToolCall(req.Tool.Name, elapsed)
-
-			// Hard limit: block tool execution
-			if status == BudgetHardLimit {
-				return &gollem.ToolExecResponse{
-					Result: map[string]any{
-						"error": "ACTION BUDGET HARD LIMIT REACHED. Tool execution blocked. Your response will be used as handover information for the next task.",
-					},
-				}, nil
-			}
-
-			// Execute the tool
-			resp, err := next(ctx, req)
-
-			// After tool call: consume additional cost based on results
-			if resp != nil {
-				tracker.AfterToolCall(req.Tool.Name, time.Since(tracker.startTime), resp.Result, resp.Error)
-			}
-
-			// Append budget info to response
-			if resp != nil && err == nil {
-				currentStatus := tracker.status()
-				appendBudgetInfo(resp, tracker, currentStatus)
-			}
-
-			return resp, err
+			return executeBudgetedToolCall(ctx, req, tracker, next)
 		}
 	}
 }
@@ -304,37 +277,45 @@ func (s *DefaultBudgetStrategy) ShouldExit(state BudgetState) bool {
 	return state.CallsAfterSoft > 3
 }
 
-// newBudgetToolMiddleware creates a gollem.ToolMiddleware that enforces budget limits.
+// executeBudgetedToolCall runs a tool call through budget tracking: consume budget
+// before execution, block on hard limit, consume additional cost after execution,
+// and append budget info to the response.
+func executeBudgetedToolCall(ctx context.Context, req *gollem.ToolExecRequest, tracker *BudgetTracker, next gollem.ToolHandler) (*gollem.ToolExecResponse, error) {
+	elapsed := time.Since(tracker.startTime)
+	status := tracker.BeforeToolCall(req.Tool.Name, elapsed)
+
+	// Hard limit: block tool execution
+	if status == BudgetHardLimit {
+		return &gollem.ToolExecResponse{
+			Result: map[string]any{
+				"error": "ACTION BUDGET HARD LIMIT REACHED. Tool execution blocked. Your response will be used as handover information for the next task.",
+			},
+		}, nil
+	}
+
+	// Execute the tool
+	resp, err := next(ctx, req)
+
+	// After tool call: consume additional cost based on results
+	if resp != nil {
+		tracker.AfterToolCall(req.Tool.Name, time.Since(tracker.startTime), resp.Result, resp.Error)
+	}
+
+	// Append budget info to response
+	if resp != nil && err == nil {
+		currentStatus := tracker.status()
+		appendBudgetInfo(resp, tracker, currentStatus)
+	}
+
+	return resp, err
+}
+
+// newBudgetToolMiddleware creates a gollem.ToolMiddleware that enforces budget limits
+// using a fixed tracker provided at creation time.
 func newBudgetToolMiddleware(tracker *BudgetTracker) gollem.ToolMiddleware {
 	return func(next gollem.ToolHandler) gollem.ToolHandler {
 		return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
-			elapsed := time.Since(tracker.startTime)
-			status := tracker.BeforeToolCall(req.Tool.Name, elapsed)
-
-			// Hard limit: block tool execution
-			if status == BudgetHardLimit {
-				return &gollem.ToolExecResponse{
-					Result: map[string]any{
-						"error": "ACTION BUDGET HARD LIMIT REACHED. Tool execution blocked. Your response will be used as handover information for the next task.",
-					},
-				}, nil
-			}
-
-			// Execute the tool
-			resp, err := next(ctx, req)
-
-			// After tool call: consume additional cost based on results
-			if resp != nil {
-				tracker.AfterToolCall(req.Tool.Name, time.Since(tracker.startTime), resp.Result, resp.Error)
-			}
-
-			// Append budget info to response
-			if resp != nil && err == nil {
-				currentStatus := tracker.status()
-				appendBudgetInfo(resp, tracker, currentStatus)
-			}
-
-			return resp, err
+			return executeBudgetedToolCall(ctx, req, tracker, next)
 		}
 	}
 }
