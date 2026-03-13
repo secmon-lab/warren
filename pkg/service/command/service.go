@@ -10,8 +10,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/service/command/abort"
 	"github.com/secmon-lab/warren/pkg/service/command/core"
-	cmdrefine "github.com/secmon-lab/warren/pkg/service/command/refine"
-	"github.com/secmon-lab/warren/pkg/service/command/repair"
 	"github.com/secmon-lab/warren/pkg/service/command/ticket"
 )
 
@@ -25,9 +23,9 @@ func New(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.Sla
 	}
 }
 
-func NewWithUseCase(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService, ticketUC core.TicketUseCase, slackClient interfaces.SlackClient, refineUC core.RefineUseCase) *Service {
+func NewWithUseCase(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService, ticketUC core.TicketUseCase, slackClient interfaces.SlackClient) *Service {
 	return &Service{
-		clients: core.NewClientsWithSlack(repo, llm, thread, ticketUC, slackClient, refineUC),
+		clients: core.NewClientsWithSlack(repo, llm, thread, ticketUC, slackClient),
 	}
 }
 
@@ -41,11 +39,8 @@ func (x *Service) Execute(ctx context.Context, msg *slack.Message, input string)
 	commands := map[string]Command{
 		"t":      ticket.Create,
 		"ticket": ticket.Create,
-		"repair": repair.Run,
 		"purge":  purge,
 		"abort":  abort.Execute,
-		"refine": cmdrefine.Run,
-		"r":      cmdrefine.Run,
 	}
 
 	cmd, remaining := messageToArgs(input)

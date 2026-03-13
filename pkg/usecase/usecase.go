@@ -273,6 +273,6 @@ func (uc *UseCases) executeSlackCommand(ctx context.Context, slackMsg *slack.Mes
 	// Use concrete slack service to create ThreadService through interface
 	threadService := uc.slackService.NewThread(thread)
 
-	cmdSvc := command.NewWithUseCase(uc.repository, uc.llmClient, threadService, uc, uc.slackService.GetClient(), uc)
+	cmdSvc := command.NewWithUseCase(uc.repository, uc.llmClient, threadService, uc, uc.slackService.GetClient())
 	return cmdSvc.Execute(ctx, slackMsg, commandStr)
 }
