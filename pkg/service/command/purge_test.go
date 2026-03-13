@@ -90,7 +90,7 @@ func TestPurgeCommand(t *testing.T) {
 		}
 
 		// Create command service
-		cmdSvc := command.NewWithUseCase(repo, nil, threadService, nil, slackClient, nil)
+		cmdSvc := command.NewWithUseCase(repo, nil, threadService, nil, slackClient)
 
 		// Execute purge command
 		msg := &slack.Message{}
@@ -167,7 +167,7 @@ func TestPurgeCommand(t *testing.T) {
 		}
 
 		// Create service
-		cmdSvc := command.NewWithUseCase(repo, nil, threadService, nil, slackClient, nil)
+		cmdSvc := command.NewWithUseCase(repo, nil, threadService, nil, slackClient)
 
 		// Execute purge command
 		msg := &slack.Message{}
@@ -222,7 +222,7 @@ func TestPurgeCommand(t *testing.T) {
 		}
 
 		// Create service
-		cmdSvc := command.NewWithUseCase(repo, nil, threadService, nil, slackClient, nil)
+		cmdSvc := command.NewWithUseCase(repo, nil, threadService, nil, slackClient)
 
 		// Execute purge command
 		msg := &slack.Message{}

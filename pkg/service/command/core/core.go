@@ -17,17 +17,11 @@ type TicketUseCase interface {
 	CreateTicketFromConversation(ctx context.Context, thread slack.Thread, user *slack.User, userContext string) (*ticket.Ticket, error)
 }
 
-// RefineUseCase defines methods for refine operations
-type RefineUseCase interface {
-	Refine(ctx context.Context) error
-}
-
 type Clients struct {
 	repo        interfaces.Repository
 	llm         gollem.LLMClient
 	thread      interfaces.SlackThreadService
 	ticketUC    TicketUseCase
-	refineUC    RefineUseCase
 	slackClient interfaces.SlackClient
 }
 
@@ -48,14 +42,13 @@ func NewClientsWithUseCase(repo interfaces.Repository, llm gollem.LLMClient, thr
 	}
 }
 
-func NewClientsWithSlack(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService, ticketUC TicketUseCase, slackClient interfaces.SlackClient, refineUC RefineUseCase) *Clients {
+func NewClientsWithSlack(repo interfaces.Repository, llm gollem.LLMClient, thread interfaces.SlackThreadService, ticketUC TicketUseCase, slackClient interfaces.SlackClient) *Clients {
 	return &Clients{
 		repo:        repo,
 		llm:         llm,
 		thread:      thread,
 		ticketUC:    ticketUC,
 		slackClient: slackClient,
-		refineUC:    refineUC,
 	}
 }
 
@@ -77,10 +70,6 @@ func (s *Clients) TicketUseCase() TicketUseCase {
 
 func (s *Clients) SlackClient() interfaces.SlackClient {
 	return s.slackClient
-}
-
-func (s *Clients) RefineUseCase() RefineUseCase {
-	return s.refineUC
 }
 
 func ParseTime(timeStr string) (time.Time, error) {
