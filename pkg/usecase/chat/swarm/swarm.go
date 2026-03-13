@@ -459,7 +459,7 @@ func (c *SwarmChat) setupMessageRouting(ctx context.Context, ssn *session.Sessio
 			"Exploring", "Scrutinizing", "Correlating", "Parsing",
 			"Decoding", "Interpreting", "Triaging", "Resolving",
 		}
-		verb := verbs[rand.IntN(len(verbs))]
+		verb := verbs[rand.IntN(len(verbs))] // #nosec G404 -- not security-sensitive, just picking a random UI verb
 		threadSvc := c.slackService.NewThread(*target.SlackThread)
 		if err := threadSvc.PostContextBlock(ctx, fmt.Sprintf("%s ... (ID: `%s`)", verb, requestID)); err != nil {
 			logging.From(ctx).Error("failed to post request ID", "error", err)
