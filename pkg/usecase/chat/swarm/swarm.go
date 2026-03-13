@@ -139,15 +139,14 @@ func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient in
 	// - CompactionMiddleware: prevents "prompt is too long" errors when sub-agents
 	//   accumulate large tool results (e.g. falcon_search_events returning ~1MB).
 	// - Budget middleware: context-aware tracker per task (avoids accumulation bug).
-	compactionMW := llm.NewCompactionMiddleware(c.llmClient, logging.Default())
+	subAgentOpts := []gollem.Option{
+		gollem.WithContentBlockMiddleware(llm.NewCompactionMiddleware(c.llmClient, logging.Default())),
+	}
+	if c.budgetStrategy != nil {
+		subAgentOpts = append(subAgentOpts, gollem.WithToolMiddleware(newContextAwareBudgetMiddleware()))
+	}
 	for _, sa := range c.subAgents {
-		opts := []gollem.Option{
-			gollem.WithContentBlockMiddleware(compactionMW),
-		}
-		if c.budgetStrategy != nil {
-			opts = append(opts, gollem.WithToolMiddleware(newContextAwareBudgetMiddleware()))
-		}
-		gollem.WithSubAgentOptions(opts...)(sa.Inner())
+		gollem.WithSubAgentOptions(subAgentOpts...)(sa.Inner())
 	}
 
 	return c
