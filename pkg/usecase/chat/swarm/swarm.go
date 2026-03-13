@@ -16,6 +16,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/storage"
@@ -134,15 +135,18 @@ func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient in
 		opt(c)
 	}
 
-	// Inject context-aware budget middleware into all sub-agents once.
-	// Each task will provide its own BudgetTracker via the context,
-	// avoiding the accumulation bug where append-only SubAgentOptions
-	// would stack stale trackers from previous tasks.
+	// Inject cross-cutting middleware into all sub-agents once at construction time.
+	// - CompactionMiddleware: prevents "prompt is too long" errors when sub-agents
+	//   accumulate large tool results (e.g. falcon_search_events returning ~1MB).
+	// - Budget middleware: context-aware tracker per task (avoids accumulation bug).
+	subAgentOpts := []gollem.Option{
+		gollem.WithContentBlockMiddleware(llm.NewCompactionMiddleware(c.llmClient, logging.Default())),
+	}
 	if c.budgetStrategy != nil {
-		contextAwareMW := newContextAwareBudgetMiddleware()
-		for _, sa := range c.subAgents {
-			gollem.WithSubAgentOptions(gollem.WithToolMiddleware(contextAwareMW))(sa.Inner())
-		}
+		subAgentOpts = append(subAgentOpts, gollem.WithToolMiddleware(newContextAwareBudgetMiddleware()))
+	}
+	for _, sa := range c.subAgents {
+		gollem.WithSubAgentOptions(subAgentOpts...)(sa.Inner())
 	}
 
 	return c
