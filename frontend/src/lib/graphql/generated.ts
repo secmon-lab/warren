@@ -397,6 +397,8 @@ export type QueryDiagnosisIssuesArgs = {
   diagnosisID: Scalars['ID']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+  ruleID?: InputMaybe<Scalars['String']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -940,6 +942,8 @@ export type GetDiagnosisIssuesQueryVariables = Exact<{
   diagnosisID: Scalars['ID']['input'];
   offset?: InputMaybe<Scalars['Int']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
+  ruleID?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
@@ -2400,7 +2404,7 @@ export type GetDiagnosisQueryHookResult = ReturnType<typeof useGetDiagnosisQuery
 export type GetDiagnosisLazyQueryHookResult = ReturnType<typeof useGetDiagnosisLazyQuery>;
 export type GetDiagnosisSuspenseQueryHookResult = ReturnType<typeof useGetDiagnosisSuspenseQuery>;
 export type GetDiagnosisQueryResult = Apollo.QueryResult<GetDiagnosisQuery, GetDiagnosisQueryVariables>;
-export const GetDiagnosisIssuesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDiagnosisIssues"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"diagnosisID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"diagnosisIssues"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"diagnosisID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"diagnosisID"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"issues"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"diagnosisID"}},{"kind":"Field","name":{"kind":"Name","value":"ruleID"}},{"kind":"Field","name":{"kind":"Name","value":"targetID"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"fixedAt"}},{"kind":"Field","name":{"kind":"Name","value":"failReason"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
+export const GetDiagnosisIssuesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDiagnosisIssues"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"diagnosisID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"status"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ruleID"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"diagnosisIssues"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"diagnosisID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"diagnosisID"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"status"}}},{"kind":"Argument","name":{"kind":"Name","value":"ruleID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ruleID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"issues"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"diagnosisID"}},{"kind":"Field","name":{"kind":"Name","value":"ruleID"}},{"kind":"Field","name":{"kind":"Name","value":"targetID"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"fixedAt"}},{"kind":"Field","name":{"kind":"Name","value":"failReason"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
 
 /**
  * __useGetDiagnosisIssuesQuery__
@@ -2417,6 +2421,8 @@ export const GetDiagnosisIssuesDocument = {"kind":"Document","definitions":[{"ki
  *      diagnosisID: // value for 'diagnosisID'
  *      offset: // value for 'offset'
  *      limit: // value for 'limit'
+ *      status: // value for 'status'
+ *      ruleID: // value for 'ruleID'
  *   },
  * });
  */

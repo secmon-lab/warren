@@ -100,11 +100,20 @@ func (r *Firestore) PutDiagnosisIssue(ctx context.Context, issue *diagnosis.Issu
 }
 
 // ListDiagnosisIssues returns paginated issues for a diagnosis ordered by CreatedAt ASC.
-func (r *Firestore) ListDiagnosisIssues(ctx context.Context, diagnosisID types.DiagnosisID, offset, limit int) ([]*diagnosis.Issue, int, error) {
+// status and ruleID are optional server-side filters.
+func (r *Firestore) ListDiagnosisIssues(ctx context.Context, diagnosisID types.DiagnosisID, offset, limit int, issueStatus *diagnosis.IssueStatus, ruleID *diagnosis.RuleID) ([]*diagnosis.Issue, int, error) {
 	col := r.db.Collection(collectionDiagnoses).Doc(diagnosisID.String()).Collection(subcollectionIssues)
 
-	// Count total
-	aggResult, err := col.NewAggregationQuery().WithCount("total").Get(ctx)
+	q := col.Query
+	if issueStatus != nil {
+		q = q.Where("Status", "==", string(*issueStatus))
+	}
+	if ruleID != nil {
+		q = q.Where("RuleID", "==", string(*ruleID))
+	}
+
+	// Count matching total
+	aggResult, err := q.NewAggregationQuery().WithCount("total").Get(ctx)
 	if err != nil {
 		return nil, 0, r.eb.Wrap(err, "failed to count diagnosis issues", goerr.V("diagnosis_id", diagnosisID))
 	}
@@ -114,7 +123,7 @@ func (r *Firestore) ListDiagnosisIssues(ctx context.Context, diagnosisID types.D
 	}
 
 	// Fetch paginated
-	iter := col.OrderBy("CreatedAt", firestore.Asc).
+	iter := q.OrderBy("CreatedAt", firestore.Asc).
 		Offset(offset).
 		Limit(limit).
 		Documents(ctx)
@@ -181,6 +190,71 @@ func (r *Firestore) CountDiagnosisIssues(ctx context.Context, diagnosisID types.
 			goerr.V("diagnosis_id", diagnosisID))
 	}
 	return extractCountFromAggregationResult(aggResult, "total")
+}
+
+// GetDiagnosisIssueCounts returns all status counts for a diagnosis using 3 concurrent aggregation queries.
+func (r *Firestore) GetDiagnosisIssueCounts(ctx context.Context, diagnosisID types.DiagnosisID) (diagnosis.IssueCounts, error) {
+	col := r.db.Collection(collectionDiagnoses).Doc(diagnosisID.String()).Collection(subcollectionIssues)
+
+	type countResult struct {
+		status diagnosis.IssueStatus
+		count  int
+		err    error
+	}
+
+	statuses := []diagnosis.IssueStatus{
+		diagnosis.IssueStatusPending,
+		diagnosis.IssueStatusFixed,
+		diagnosis.IssueStatusFailed,
+	}
+
+	ch := make(chan countResult, len(statuses))
+	for _, s := range statuses {
+		s := s
+		go func() {
+			q := col.Where("Status", "==", string(s))
+			aggResult, err := q.NewAggregationQuery().WithCount("total").Get(ctx)
+			if err != nil {
+				ch <- countResult{status: s, err: err}
+				return
+			}
+			n, err := extractCountFromAggregationResult(aggResult, "total")
+			ch <- countResult{status: s, count: n, err: err}
+		}()
+	}
+
+	var counts diagnosis.IssueCounts
+	for range statuses {
+		res := <-ch
+		if res.err != nil {
+			return diagnosis.IssueCounts{}, r.eb.Wrap(res.err, "failed to count diagnosis issues by status",
+				goerr.V("diagnosis_id", diagnosisID),
+				goerr.V("status", res.status))
+		}
+		switch res.status {
+		case diagnosis.IssueStatusPending:
+			counts.Pending = res.count
+		case diagnosis.IssueStatusFixed:
+			counts.Fixed = res.count
+		case diagnosis.IssueStatusFailed:
+			counts.Failed = res.count
+		}
+	}
+	counts.Total = counts.Pending + counts.Fixed + counts.Failed
+	return counts, nil
+}
+
+// BatchGetDiagnosisIssueCounts returns issue counts for multiple diagnoses.
+func (r *Firestore) BatchGetDiagnosisIssueCounts(ctx context.Context, diagnosisIDs []types.DiagnosisID) (map[types.DiagnosisID]diagnosis.IssueCounts, error) {
+	result := make(map[types.DiagnosisID]diagnosis.IssueCounts, len(diagnosisIDs))
+	for _, id := range diagnosisIDs {
+		counts, err := r.GetDiagnosisIssueCounts(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		result[id] = counts
+	}
+	return result, nil
 }
 
 // ListPendingDiagnosisIssues returns all pending issues for a diagnosis.

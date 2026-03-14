@@ -222,7 +222,7 @@ type ComplexityRoot struct {
 		Dashboard              func(childComplexity int) int
 		Diagnoses              func(childComplexity int, offset *int, limit *int) int
 		Diagnosis              func(childComplexity int, id string) int
-		DiagnosisIssues        func(childComplexity int, diagnosisID string, offset *int, limit *int) int
+		DiagnosisIssues        func(childComplexity int, diagnosisID string, offset *int, limit *int, status *string, ruleID *string) int
 		GetAgentMemory         func(childComplexity int, agentID string, memoryID string) int
 		KnowledgeTopics        func(childComplexity int) int
 		KnowledgesByTopic      func(childComplexity int, topic string) int
@@ -395,7 +395,7 @@ type QueryResolver interface {
 	GetAgentMemory(ctx context.Context, agentID string, memoryID string) (*graphql1.AgentMemory, error)
 	Diagnoses(ctx context.Context, offset *int, limit *int) (*graphql1.DiagnosesResponse, error)
 	Diagnosis(ctx context.Context, id string) (*graphql1.Diagnosis, error)
-	DiagnosisIssues(ctx context.Context, diagnosisID string, offset *int, limit *int) (*graphql1.DiagnosisIssuesResponse, error)
+	DiagnosisIssues(ctx context.Context, diagnosisID string, offset *int, limit *int, status *string, ruleID *string) (*graphql1.DiagnosisIssuesResponse, error)
 }
 type SessionResolver interface {
 	User(ctx context.Context, obj *graphql1.Session) (*graphql1.User, error)
@@ -1310,7 +1310,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.DiagnosisIssues(childComplexity, args["diagnosisID"].(string), args["offset"].(*int), args["limit"].(*int)), true
+		return e.ComplexityRoot.Query.DiagnosisIssues(childComplexity, args["diagnosisID"].(string), args["offset"].(*int), args["limit"].(*int), args["status"].(*string), args["ruleID"].(*string)), true
 	case "Query.getAgentMemory":
 		if e.ComplexityRoot.Query.GetAgentMemory == nil {
 			break
@@ -2235,7 +2235,7 @@ type DiagnosesResponse {
 extend type Query {
   diagnoses(offset: Int, limit: Int): DiagnosesResponse!
   diagnosis(id: ID!): Diagnosis
-  diagnosisIssues(diagnosisID: ID!, offset: Int, limit: Int): DiagnosisIssuesResponse!
+  diagnosisIssues(diagnosisID: ID!, offset: Int, limit: Int, status: String, ruleID: String): DiagnosisIssuesResponse!
 }
 
 extend type Mutation {
@@ -2638,6 +2638,16 @@ func (ec *executionContext) field_Query_diagnosisIssues_args(ctx context.Context
 		return nil, err
 	}
 	args["limit"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "status", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["status"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "ruleID", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["ruleID"] = arg4
 	return args, nil
 }
 
@@ -8658,7 +8668,7 @@ func (ec *executionContext) _Query_diagnosisIssues(ctx context.Context, field gr
 		ec.fieldContext_Query_diagnosisIssues,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().DiagnosisIssues(ctx, fc.Args["diagnosisID"].(string), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+			return ec.Resolvers.Query().DiagnosisIssues(ctx, fc.Args["diagnosisID"].(string), fc.Args["offset"].(*int), fc.Args["limit"].(*int), fc.Args["status"].(*string), fc.Args["ruleID"].(*string))
 		},
 		nil,
 		ec.marshalNDiagnosisIssuesResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosisIssuesResponse,

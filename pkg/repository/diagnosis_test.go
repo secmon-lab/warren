@@ -198,7 +198,7 @@ func TestDiagnosisIssueCRUD(t *testing.T) {
 					gt.NoError(t, repo.PutDiagnosisIssue(ctx, &issue)).Required()
 				}
 
-				issues, total, err := repo.ListDiagnosisIssues(ctx, listDiagID, 0, 10)
+				issues, total, err := repo.ListDiagnosisIssues(ctx, listDiagID, 0, 10, nil, nil)
 				gt.NoError(t, err).Required()
 				gt.Number(t, total).Equal(3)
 				gt.Number(t, len(issues)).Equal(3)

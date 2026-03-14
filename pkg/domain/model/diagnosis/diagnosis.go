@@ -61,6 +61,14 @@ func NewIssue(diagnosisID types.DiagnosisID, ruleID RuleID, targetID, descriptio
 	}
 }
 
+// IssueCounts holds aggregated issue counts for a diagnosis broken down by status.
+type IssueCounts struct {
+	Total   int
+	Pending int
+	Fixed   int
+	Failed  int
+}
+
 // Diagnosis represents a single diagnosis run header.
 // Count fields are not stored here; they are derived from subcollection aggregation queries.
 type Diagnosis struct {

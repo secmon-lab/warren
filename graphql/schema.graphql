@@ -348,7 +348,7 @@ type DiagnosesResponse {
 extend type Query {
   diagnoses(offset: Int, limit: Int): DiagnosesResponse!
   diagnosis(id: ID!): Diagnosis
-  diagnosisIssues(diagnosisID: ID!, offset: Int, limit: Int): DiagnosisIssuesResponse!
+  diagnosisIssues(diagnosisID: ID!, offset: Int, limit: Int, status: String, ruleID: String): DiagnosisIssuesResponse!
 }
 
 extend type Mutation {

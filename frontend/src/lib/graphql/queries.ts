@@ -927,8 +927,8 @@ export const GET_DIAGNOSIS = gql`
 `;
 
 export const GET_DIAGNOSIS_ISSUES = gql`
-  query GetDiagnosisIssues($diagnosisID: ID!, $offset: Int, $limit: Int) {
-    diagnosisIssues(diagnosisID: $diagnosisID, offset: $offset, limit: $limit) {
+  query GetDiagnosisIssues($diagnosisID: ID!, $offset: Int, $limit: Int, $status: String, $ruleID: String) {
+    diagnosisIssues(diagnosisID: $diagnosisID, offset: $offset, limit: $limit, status: $status, ruleID: $ruleID) {
       issues {
         id
         diagnosisID

@@ -7,6 +7,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	diagnosismodel "github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
+	ticketpkg "github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
@@ -34,27 +35,50 @@ func (r *BindingMismatchRule) Check(ctx context.Context, repo interfaces.Reposit
 		return nil, goerr.Wrap(err, "failed to get all alerts")
 	}
 
+	// Collect unique ticket IDs referenced by alerts to avoid N+1 queries.
+	ticketIDSet := make(map[types.TicketID]struct{})
+	for _, a := range alerts {
+		if a.TicketID != types.EmptyTicketID {
+			ticketIDSet[a.TicketID] = struct{}{}
+		}
+	}
+
+	ticketIDs := make([]types.TicketID, 0, len(ticketIDSet))
+	for id := range ticketIDSet {
+		ticketIDs = append(ticketIDs, id)
+	}
+
+	tickets, err := repo.BatchGetTickets(ctx, ticketIDs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to batch get tickets")
+	}
+
+	ticketMap := make(map[types.TicketID]*ticketpkg.Ticket, len(tickets))
+	for _, t := range tickets {
+		if t != nil {
+			ticketMap[t.ID] = t
+		}
+	}
+
+	now := clock.Now(ctx)
 	var issues []diagnosismodel.Issue
 	for _, a := range alerts {
 		if a.TicketID == types.EmptyTicketID {
 			continue
 		}
 
-		t, err := repo.GetTicket(ctx, a.TicketID)
-		if err != nil {
-			if isNotFound(err) {
-				// Alert points to a non-existent ticket
-				issue := diagnosismodel.NewIssue(
-					types.EmptyDiagnosisID,
-					RuleIDBindingMismatch,
-					string(a.ID),
-					fmt.Sprintf("Alert %q references non-existent ticket %q", a.ID, a.TicketID),
-				)
-				issue.CreatedAt = clock.Now(ctx)
-				issues = append(issues, issue)
-				continue
-			}
-			return nil, goerr.Wrap(err, "failed to get ticket", goerr.V("ticket_id", a.TicketID))
+		t, ok := ticketMap[a.TicketID]
+		if !ok {
+			// Alert points to a non-existent ticket
+			issue := diagnosismodel.NewIssue(
+				types.EmptyDiagnosisID,
+				RuleIDBindingMismatch,
+				string(a.ID),
+				fmt.Sprintf("Alert %q references non-existent ticket %q", a.ID, a.TicketID),
+			)
+			issue.CreatedAt = now
+			issues = append(issues, issue)
+			continue
 		}
 
 		// Check if the ticket's AlertIDs contains this alert
@@ -72,7 +96,7 @@ func (r *BindingMismatchRule) Check(ctx context.Context, repo interfaces.Reposit
 				string(a.ID),
 				fmt.Sprintf("Alert %q references ticket %q, but ticket does not list this alert in its AlertIDs", a.ID, a.TicketID),
 			)
-			issue.CreatedAt = clock.Now(ctx)
+			issue.CreatedAt = now
 			issues = append(issues, issue)
 		}
 	}

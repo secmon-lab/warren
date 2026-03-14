@@ -72,9 +72,9 @@ func TestCountDiagnosisIssues(t *testing.T) {
 	diag, err := uc.RunDiagnosis(ctx)
 	gt.NoError(t, err)
 
-	total, pending, fixed, failed, err := uc.CountDiagnosisIssues(ctx, diag.ID)
+	counts, err := uc.CountDiagnosisIssues(ctx, diag.ID)
 	gt.NoError(t, err)
-	gt.Value(t, total).Equal(pending + fixed + failed)
+	gt.Value(t, counts.Total).Equal(counts.Pending + counts.Fixed + counts.Failed)
 }
 
 func TestFixDiagnosis_NoPendingIssues(t *testing.T) {
@@ -109,7 +109,7 @@ func TestGetDiagnosisIssues(t *testing.T) {
 	diag, err := uc.RunDiagnosis(ctx)
 	gt.NoError(t, err)
 
-	issues, total, err := uc.GetDiagnosisIssues(ctx, diag.ID, 0, 100)
+	issues, total, err := uc.GetDiagnosisIssues(ctx, diag.ID, 0, 100, nil, nil)
 	gt.NoError(t, err)
 	gt.Value(t, total).Equal(len(issues))
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	diagnosismodel "github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -694,7 +695,11 @@ func (r *mutationResolver) RunDiagnosis(ctx context.Context) (*graphql1.Diagnosi
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to run diagnosis")
 	}
-	return r.diagnosisToGraphQL(ctx, diag)
+	counts, err := r.uc.CountDiagnosisIssues(ctx, diag.ID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to count diagnosis issues", goerr.V("id", diag.ID))
+	}
+	return diagnosisToGraphQL(diag, counts), nil
 }
 
 // FixDiagnosis is the resolver for the fixDiagnosis field.
@@ -704,7 +709,11 @@ func (r *mutationResolver) FixDiagnosis(ctx context.Context, id string) (*graphq
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to fix diagnosis", goerr.V("id", id))
 	}
-	return r.diagnosisToGraphQL(ctx, diag)
+	counts, err := r.uc.CountDiagnosisIssues(ctx, diag.ID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to count diagnosis issues", goerr.V("id", id))
+	}
+	return diagnosisToGraphQL(diag, counts), nil
 }
 
 // Ticket is the resolver for the ticket field.
@@ -1404,13 +1413,19 @@ func (r *queryResolver) Diagnoses(ctx context.Context, offset *int, limit *int) 
 		return nil, goerr.Wrap(err, "failed to list diagnoses")
 	}
 
+	// Batch-fetch issue counts to avoid N+1 queries.
+	ids := make([]types.DiagnosisID, len(diagnoses))
+	for i, d := range diagnoses {
+		ids[i] = d.ID
+	}
+	countsMap, err := r.uc.BatchCountDiagnosisIssues(ctx, ids)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to batch count diagnosis issues")
+	}
+
 	gqlDiagnoses := make([]*graphql1.Diagnosis, 0, len(diagnoses))
 	for _, d := range diagnoses {
-		gd, err := r.diagnosisToGraphQL(ctx, d)
-		if err != nil {
-			return nil, err
-		}
-		gqlDiagnoses = append(gqlDiagnoses, gd)
+		gqlDiagnoses = append(gqlDiagnoses, diagnosisToGraphQL(d, countsMap[d.ID]))
 	}
 
 	return &graphql1.DiagnosesResponse{
@@ -1428,11 +1443,15 @@ func (r *queryResolver) Diagnosis(ctx context.Context, id string) (*graphql1.Dia
 	if diag == nil {
 		return nil, nil
 	}
-	return r.diagnosisToGraphQL(ctx, diag)
+	counts, err := r.uc.CountDiagnosisIssues(ctx, diag.ID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to count diagnosis issues", goerr.V("id", id))
+	}
+	return diagnosisToGraphQL(diag, counts), nil
 }
 
 // DiagnosisIssues is the resolver for the diagnosisIssues field.
-func (r *queryResolver) DiagnosisIssues(ctx context.Context, diagnosisID string, offset *int, limit *int) (*graphql1.DiagnosisIssuesResponse, error) {
+func (r *queryResolver) DiagnosisIssues(ctx context.Context, diagnosisID string, offset *int, limit *int, status *string, ruleID *string) (*graphql1.DiagnosisIssuesResponse, error) {
 	offsetVal := 0
 	if offset != nil {
 		offsetVal = *offset
@@ -1442,7 +1461,18 @@ func (r *queryResolver) DiagnosisIssues(ctx context.Context, diagnosisID string,
 		limitVal = *limit
 	}
 
-	issues, total, err := r.uc.GetDiagnosisIssues(ctx, types.DiagnosisID(diagnosisID), offsetVal, limitVal)
+	var statusFilter *diagnosismodel.IssueStatus
+	if status != nil && *status != "" {
+		s := diagnosismodel.IssueStatus(*status)
+		statusFilter = &s
+	}
+	var ruleIDFilter *diagnosismodel.RuleID
+	if ruleID != nil && *ruleID != "" {
+		rid := diagnosismodel.RuleID(*ruleID)
+		ruleIDFilter = &rid
+	}
+
+	issues, total, err := r.uc.GetDiagnosisIssues(ctx, types.DiagnosisID(diagnosisID), offsetVal, limitVal, statusFilter, ruleIDFilter)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list diagnosis issues", goerr.V("diagnosis_id", diagnosisID))
 	}

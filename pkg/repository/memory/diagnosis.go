@@ -75,13 +75,20 @@ func (r *Memory) PutDiagnosisIssue(_ context.Context, issue *diagnosis.Issue) er
 }
 
 // ListDiagnosisIssues returns paginated issues for a diagnosis ordered by CreatedAt ASC.
-func (r *Memory) ListDiagnosisIssues(_ context.Context, diagnosisID types.DiagnosisID, offset, limit int) ([]*diagnosis.Issue, int, error) {
+// status and ruleID are optional server-side filters.
+func (r *Memory) ListDiagnosisIssues(_ context.Context, diagnosisID types.DiagnosisID, offset, limit int, status *diagnosis.IssueStatus, ruleID *diagnosis.RuleID) ([]*diagnosis.Issue, int, error) {
 	r.diagnosisMu.RLock()
 	defer r.diagnosisMu.RUnlock()
 
 	issueMap := r.diagnosisIssues[diagnosisID]
 	all := make([]*diagnosis.Issue, 0, len(issueMap))
 	for _, iss := range issueMap {
+		if status != nil && iss.Status != *status {
+			continue
+		}
+		if ruleID != nil && iss.RuleID != *ruleID {
+			continue
+		}
 		cp := *iss
 		all = append(all, &cp)
 	}
@@ -136,6 +143,39 @@ func (r *Memory) CountDiagnosisIssues(_ context.Context, diagnosisID types.Diagn
 		}
 	}
 	return count, nil
+}
+
+// GetDiagnosisIssueCounts returns all status counts for a diagnosis in a single pass.
+func (r *Memory) GetDiagnosisIssueCounts(_ context.Context, diagnosisID types.DiagnosisID) (diagnosis.IssueCounts, error) {
+	r.diagnosisMu.RLock()
+	defer r.diagnosisMu.RUnlock()
+
+	var counts diagnosis.IssueCounts
+	for _, iss := range r.diagnosisIssues[diagnosisID] {
+		counts.Total++
+		switch iss.Status {
+		case diagnosis.IssueStatusPending:
+			counts.Pending++
+		case diagnosis.IssueStatusFixed:
+			counts.Fixed++
+		case diagnosis.IssueStatusFailed:
+			counts.Failed++
+		}
+	}
+	return counts, nil
+}
+
+// BatchGetDiagnosisIssueCounts returns issue counts for multiple diagnoses in one call.
+func (r *Memory) BatchGetDiagnosisIssueCounts(ctx context.Context, diagnosisIDs []types.DiagnosisID) (map[types.DiagnosisID]diagnosis.IssueCounts, error) {
+	result := make(map[types.DiagnosisID]diagnosis.IssueCounts, len(diagnosisIDs))
+	for _, id := range diagnosisIDs {
+		counts, err := r.GetDiagnosisIssueCounts(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		result[id] = counts
+	}
+	return result, nil
 }
 
 // ListPendingDiagnosisIssues returns all pending issues for a diagnosis.

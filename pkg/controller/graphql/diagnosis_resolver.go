@@ -1,30 +1,22 @@
 package graphql
 
 import (
-	"context"
-
-	goerr "github.com/m-mizutani/goerr/v2"
 	diagnosismodel "github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
 )
 
-// diagnosisToGraphQL converts a domain Diagnosis to a GraphQL Diagnosis, fetching issue counts.
-func (r *Resolver) diagnosisToGraphQL(ctx context.Context, d *diagnosismodel.Diagnosis) (*graphql1.Diagnosis, error) {
-	total, pending, fixed, failed, err := r.uc.CountDiagnosisIssues(ctx, d.ID)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to count diagnosis issues", goerr.V("id", d.ID))
-	}
-
+// diagnosisToGraphQL converts a domain Diagnosis to a GraphQL Diagnosis using pre-fetched counts.
+func diagnosisToGraphQL(d *diagnosismodel.Diagnosis, counts diagnosismodel.IssueCounts) *graphql1.Diagnosis {
 	return &graphql1.Diagnosis{
 		ID:           string(d.ID),
 		Status:       string(d.Status),
-		TotalCount:   total,
-		PendingCount: pending,
-		FixedCount:   fixed,
-		FailedCount:  failed,
+		TotalCount:   counts.Total,
+		PendingCount: counts.Pending,
+		FixedCount:   counts.Fixed,
+		FailedCount:  counts.Failed,
 		CreatedAt:    d.CreatedAt.Format("2006/01/02 15:04:05"),
 		UpdatedAt:    d.UpdatedAt.Format("2006/01/02 15:04:05"),
-	}, nil
+	}
 }
 
 // issueToGraphQL converts a domain Issue to a GraphQL DiagnosisIssue.

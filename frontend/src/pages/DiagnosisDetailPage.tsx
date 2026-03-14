@@ -28,6 +28,16 @@ import { useToast } from "@/hooks/use-toast";
 
 const ITEMS_PER_PAGE = 50;
 
+const KNOWN_RULE_IDS = [
+  "missing_alert_embedding",
+  "missing_ticket_embedding",
+  "legacy_alert_status",
+  "legacy_ticket_status",
+  "binding_mismatch",
+  "orphaned_tag_id",
+  "missing_alert_metadata",
+];
+
 function issueStatusBadgeVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
   switch (status) {
     case "pending":
@@ -87,6 +97,8 @@ export default function DiagnosisDetailPage() {
         diagnosisID: id!,
         offset: (currentPage - 1) * ITEMS_PER_PAGE,
         limit: ITEMS_PER_PAGE,
+        status: statusFilter !== "all" ? statusFilter : undefined,
+        ruleID: ruleFilter !== "all" ? ruleFilter : undefined,
       },
       skip: !id,
     });
@@ -103,22 +115,21 @@ export default function DiagnosisDetailPage() {
   });
 
   const diagnosis = diagnosisData?.diagnosis;
-  const allIssues = issuesData?.diagnosisIssues?.issues ?? [];
+  const issues = issuesData?.diagnosisIssues?.issues ?? [];
   const totalCount = issuesData?.diagnosisIssues?.totalCount ?? 0;
-
-  // Client-side filter (on current page)
-  const filteredIssues = allIssues.filter((issue) => {
-    const statusMatch = statusFilter === "all" || issue.status === statusFilter;
-    const ruleMatch = ruleFilter === "all" || issue.ruleID === ruleFilter;
-    return statusMatch && ruleMatch;
-  });
-
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
-  // Collect unique ruleIDs for filter dropdown
-  const ruleIDs = Array.from(new Set(allIssues.map((i) => i.ruleID))).sort();
-
   const canFix = diagnosis?.status === "pending" || diagnosis?.status === "partially_fixed";
+
+  function handleStatusChange(v: string) {
+    setStatusFilter(v);
+    setCurrentPage(1);
+  }
+
+  function handleRuleChange(v: string) {
+    setRuleFilter(v);
+    setCurrentPage(1);
+  }
 
   return (
     <div className="container mx-auto p-6">
@@ -189,9 +200,9 @@ export default function DiagnosisDetailPage() {
         </Card>
       )}
 
-      {/* Filters */}
+      {/* Filters — applied server-side so they cover all pages */}
       <div className="flex gap-4 mb-4">
-        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
+        <Select value={statusFilter} onValueChange={handleStatusChange}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -203,13 +214,13 @@ export default function DiagnosisDetailPage() {
           </SelectContent>
         </Select>
 
-        <Select value={ruleFilter} onValueChange={(v) => { setRuleFilter(v); setCurrentPage(1); }}>
+        <Select value={ruleFilter} onValueChange={handleRuleChange}>
           <SelectTrigger className="w-56">
             <SelectValue placeholder="Rule" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Rules</SelectItem>
-            {ruleIDs.map((ruleID) => (
+            {KNOWN_RULE_IDS.map((ruleID) => (
               <SelectItem key={ruleID} value={ruleID}>
                 {ruleID}
               </SelectItem>
@@ -229,42 +240,39 @@ export default function DiagnosisDetailPage() {
             </Card>
           ))}
         </div>
-      ) : filteredIssues.length === 0 ? (
+      ) : issues.length === 0 ? (
         <Card>
           <CardContent className="py-12">
             <p className="text-center text-muted-foreground">
-              {allIssues.length === 0 ? "No issues found for this diagnosis." : "No issues match the current filters."}
+              {totalCount === 0 && statusFilter === "all" && ruleFilter === "all"
+                ? "No issues found for this diagnosis."
+                : "No issues match the current filters."}
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {filteredIssues.map((issue) => (
-            <Card key={issue.id}>
-              <CardContent className="py-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        {issue.ruleID}
-                      </Badge>
-                      <span className="text-sm font-medium truncate">{issue.targetID}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{issue.description}</p>
-                    {issue.failReason && (
-                      <p className="text-xs text-red-500 mt-1">Reason: {issue.failReason}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Created: {issue.createdAt}
-                      {issue.fixedAt && <> &nbsp;·&nbsp; Fixed: {issue.fixedAt}</>}
-                    </p>
-                  </div>
-                  <Badge variant={issueStatusBadgeVariant(issue.status)} className="shrink-0">
-                    {issue.status}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
+        <div className="border rounded-lg divide-y">
+          {issues.map((issue) => (
+            <div key={issue.id} className="flex items-center gap-3 px-4 py-2 hover:bg-muted/40 text-sm">
+              <Badge variant="outline" className="text-xs shrink-0 font-mono">
+                {issue.ruleID}
+              </Badge>
+              <span className="font-mono text-xs text-muted-foreground shrink-0 hidden sm:block">
+                {issue.targetID.slice(0, 8)}…
+              </span>
+              <span className="flex-1 min-w-0 truncate text-muted-foreground" title={issue.description}>
+                {issue.description}
+                {issue.failReason && (
+                  <span className="text-red-500 ml-2">({issue.failReason})</span>
+                )}
+              </span>
+              <span className="text-xs text-muted-foreground shrink-0 hidden md:block">
+                {issue.fixedAt ?? issue.createdAt}
+              </span>
+              <Badge variant={issueStatusBadgeVariant(issue.status)} className="shrink-0 text-xs">
+                {issue.status}
+              </Badge>
+            </div>
           ))}
         </div>
       )}

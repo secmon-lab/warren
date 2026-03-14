@@ -218,13 +218,18 @@ type Repository interface {
 	// PutDiagnosisIssue saves or updates a single issue.
 	PutDiagnosisIssue(ctx context.Context, issue *diagnosis.Issue) error
 	// ListDiagnosisIssues returns a paginated list of issues for a diagnosis.
-	// Returns the issues, total count, and any error.
-	ListDiagnosisIssues(ctx context.Context, diagnosisID types.DiagnosisID, offset, limit int) ([]*diagnosis.Issue, int, error)
+	// status and ruleID are optional server-side filters (nil means no filter).
+	// Returns the issues, total matching count, and any error.
+	ListDiagnosisIssues(ctx context.Context, diagnosisID types.DiagnosisID, offset, limit int, status *diagnosis.IssueStatus, ruleID *diagnosis.RuleID) ([]*diagnosis.Issue, int, error)
 	// GetDiagnosisIssue retrieves a specific issue by diagnosisID and issueID.
 	GetDiagnosisIssue(ctx context.Context, diagnosisID types.DiagnosisID, issueID string) (*diagnosis.Issue, error)
 	// CountDiagnosisIssues returns the number of issues for a diagnosis.
 	// If status is nil, counts all issues; otherwise counts only issues with the given status.
 	CountDiagnosisIssues(ctx context.Context, diagnosisID types.DiagnosisID, status *diagnosis.IssueStatus) (int, error)
+	// GetDiagnosisIssueCounts returns all status counts for a diagnosis in a single operation.
+	GetDiagnosisIssueCounts(ctx context.Context, diagnosisID types.DiagnosisID) (diagnosis.IssueCounts, error)
+	// BatchGetDiagnosisIssueCounts returns issue counts for multiple diagnoses.
+	BatchGetDiagnosisIssueCounts(ctx context.Context, diagnosisIDs []types.DiagnosisID) (map[types.DiagnosisID]diagnosis.IssueCounts, error)
 	// ListPendingDiagnosisIssues returns all pending issues for a diagnosis (no pagination).
 	ListPendingDiagnosisIssues(ctx context.Context, diagnosisID types.DiagnosisID) ([]*diagnosis.Issue, error)
 }

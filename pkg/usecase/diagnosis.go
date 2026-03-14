@@ -139,29 +139,19 @@ func (u *UseCases) GetDiagnosis(ctx context.Context, id types.DiagnosisID) (*dia
 }
 
 // GetDiagnosisIssues returns paginated issues for a diagnosis.
-func (u *UseCases) GetDiagnosisIssues(ctx context.Context, id types.DiagnosisID, offset, limit int) ([]*diagnosismodel.Issue, int, error) {
-	return u.repository.ListDiagnosisIssues(ctx, id, offset, limit)
+// status and ruleID are optional filters.
+func (u *UseCases) GetDiagnosisIssues(ctx context.Context, id types.DiagnosisID, offset, limit int, status *diagnosismodel.IssueStatus, ruleID *diagnosismodel.RuleID) ([]*diagnosismodel.Issue, int, error) {
+	return u.repository.ListDiagnosisIssues(ctx, id, offset, limit, status, ruleID)
 }
 
-// CountDiagnosisIssues returns issue counts for a diagnosis, broken down by status.
-func (u *UseCases) CountDiagnosisIssues(ctx context.Context, id types.DiagnosisID) (total, pending, fixed, failed int, err error) {
-	total, err = u.repository.CountDiagnosisIssues(ctx, id, nil)
-	if err != nil {
-		return
-	}
-	pStatus := diagnosismodel.IssueStatusPending
-	pending, err = u.repository.CountDiagnosisIssues(ctx, id, &pStatus)
-	if err != nil {
-		return
-	}
-	fxStatus := diagnosismodel.IssueStatusFixed
-	fixed, err = u.repository.CountDiagnosisIssues(ctx, id, &fxStatus)
-	if err != nil {
-		return
-	}
-	flStatus := diagnosismodel.IssueStatusFailed
-	failed, err = u.repository.CountDiagnosisIssues(ctx, id, &flStatus)
-	return
+// CountDiagnosisIssues returns issue counts for a diagnosis using a single repository call.
+func (u *UseCases) CountDiagnosisIssues(ctx context.Context, id types.DiagnosisID) (diagnosismodel.IssueCounts, error) {
+	return u.repository.GetDiagnosisIssueCounts(ctx, id)
+}
+
+// BatchCountDiagnosisIssues returns issue counts for multiple diagnoses in one call.
+func (u *UseCases) BatchCountDiagnosisIssues(ctx context.Context, ids []types.DiagnosisID) (map[types.DiagnosisID]diagnosismodel.IssueCounts, error) {
+	return u.repository.BatchGetDiagnosisIssueCounts(ctx, ids)
 }
 
 // buildDiagnosisRules constructs the list of all registered diagnosis rules.
@@ -193,8 +183,9 @@ type DiagnosisUsecases interface {
 	FixDiagnosis(ctx context.Context, id types.DiagnosisID) (*diagnosismodel.Diagnosis, error)
 	GetDiagnoses(ctx context.Context, offset, limit int) ([]*diagnosismodel.Diagnosis, int, error)
 	GetDiagnosis(ctx context.Context, id types.DiagnosisID) (*diagnosismodel.Diagnosis, error)
-	GetDiagnosisIssues(ctx context.Context, id types.DiagnosisID, offset, limit int) ([]*diagnosismodel.Issue, int, error)
-	CountDiagnosisIssues(ctx context.Context, id types.DiagnosisID) (total, pending, fixed, failed int, err error)
+	GetDiagnosisIssues(ctx context.Context, id types.DiagnosisID, offset, limit int, status *diagnosismodel.IssueStatus, ruleID *diagnosismodel.RuleID) ([]*diagnosismodel.Issue, int, error)
+	CountDiagnosisIssues(ctx context.Context, id types.DiagnosisID) (diagnosismodel.IssueCounts, error)
+	BatchCountDiagnosisIssues(ctx context.Context, ids []types.DiagnosisID) (map[types.DiagnosisID]diagnosismodel.IssueCounts, error)
 }
 
 var _ DiagnosisUsecases = &UseCases{}
