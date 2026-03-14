@@ -55,6 +55,8 @@ function diagnosisStatusBadgeVariant(status: string): "default" | "secondary" | 
   switch (status) {
     case "pending":
       return "secondary";
+    case "healthy":
+      return "outline";
     case "fixed":
       return "default";
     case "partially_fixed":
@@ -68,6 +70,8 @@ function diagnosisStatusLabel(status: string): string {
   switch (status) {
     case "pending":
       return "Pending";
+    case "healthy":
+      return "Healthy";
     case "fixed":
       return "Fixed";
     case "partially_fixed":
