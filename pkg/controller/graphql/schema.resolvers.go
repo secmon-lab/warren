@@ -688,6 +688,25 @@ func (r *mutationResolver) ArchiveKnowledge(ctx context.Context, topic string, s
 	return true, nil
 }
 
+// RunDiagnosis is the resolver for the runDiagnosis field.
+func (r *mutationResolver) RunDiagnosis(ctx context.Context) (*graphql1.Diagnosis, error) {
+	diag, err := r.uc.RunDiagnosis(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to run diagnosis")
+	}
+	return r.diagnosisToGraphQL(ctx, diag)
+}
+
+// FixDiagnosis is the resolver for the fixDiagnosis field.
+func (r *mutationResolver) FixDiagnosis(ctx context.Context, id string) (*graphql1.Diagnosis, error) {
+	diagID := types.DiagnosisID(id)
+	diag, err := r.uc.FixDiagnosis(ctx, diagID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to fix diagnosis", goerr.V("id", id))
+	}
+	return r.diagnosisToGraphQL(ctx, diag)
+}
+
 // Ticket is the resolver for the ticket field.
 func (r *queryResolver) Ticket(ctx context.Context, id string) (*ticket.Ticket, error) {
 	t, err := r.repo.GetTicket(ctx, types.TicketID(id))
@@ -1367,6 +1386,76 @@ func (r *queryResolver) GetAgentMemory(ctx context.Context, agentID string, memo
 	}
 
 	return memoryToGraphQL(mem), nil
+}
+
+// Diagnoses is the resolver for the diagnoses field.
+func (r *queryResolver) Diagnoses(ctx context.Context, offset *int, limit *int) (*graphql1.DiagnosesResponse, error) {
+	offsetVal := 0
+	if offset != nil {
+		offsetVal = *offset
+	}
+	limitVal := 20
+	if limit != nil {
+		limitVal = *limit
+	}
+
+	diagnoses, total, err := r.uc.GetDiagnoses(ctx, offsetVal, limitVal)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to list diagnoses")
+	}
+
+	gqlDiagnoses := make([]*graphql1.Diagnosis, 0, len(diagnoses))
+	for _, d := range diagnoses {
+		gd, err := r.diagnosisToGraphQL(ctx, d)
+		if err != nil {
+			return nil, err
+		}
+		gqlDiagnoses = append(gqlDiagnoses, gd)
+	}
+
+	return &graphql1.DiagnosesResponse{
+		Diagnoses:  gqlDiagnoses,
+		TotalCount: total,
+	}, nil
+}
+
+// Diagnosis is the resolver for the diagnosis field.
+func (r *queryResolver) Diagnosis(ctx context.Context, id string) (*graphql1.Diagnosis, error) {
+	diag, err := r.uc.GetDiagnosis(ctx, types.DiagnosisID(id))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get diagnosis", goerr.V("id", id))
+	}
+	if diag == nil {
+		return nil, nil
+	}
+	return r.diagnosisToGraphQL(ctx, diag)
+}
+
+// DiagnosisIssues is the resolver for the diagnosisIssues field.
+func (r *queryResolver) DiagnosisIssues(ctx context.Context, diagnosisID string, offset *int, limit *int) (*graphql1.DiagnosisIssuesResponse, error) {
+	offsetVal := 0
+	if offset != nil {
+		offsetVal = *offset
+	}
+	limitVal := 50
+	if limit != nil {
+		limitVal = *limit
+	}
+
+	issues, total, err := r.uc.GetDiagnosisIssues(ctx, types.DiagnosisID(diagnosisID), offsetVal, limitVal)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to list diagnosis issues", goerr.V("diagnosis_id", diagnosisID))
+	}
+
+	gqlIssues := make([]*graphql1.DiagnosisIssue, 0, len(issues))
+	for _, iss := range issues {
+		gqlIssues = append(gqlIssues, issueToGraphQL(iss))
+	}
+
+	return &graphql1.DiagnosisIssuesResponse{
+		Issues:     gqlIssues,
+		TotalCount: total,
+	}, nil
 }
 
 // User is the resolver for the user field.

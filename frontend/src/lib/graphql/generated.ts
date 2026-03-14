@@ -132,6 +132,43 @@ export type DashboardStats = {
   unboundAlertsCount: Scalars['Int']['output'];
 };
 
+export type DiagnosesResponse = {
+  __typename?: 'DiagnosesResponse';
+  diagnoses: Array<Diagnosis>;
+  totalCount: Scalars['Int']['output'];
+};
+
+export type Diagnosis = {
+  __typename?: 'Diagnosis';
+  createdAt: Scalars['String']['output'];
+  failedCount: Scalars['Int']['output'];
+  fixedCount: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  pendingCount: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+  totalCount: Scalars['Int']['output'];
+  updatedAt: Scalars['String']['output'];
+};
+
+export type DiagnosisIssue = {
+  __typename?: 'DiagnosisIssue';
+  createdAt: Scalars['String']['output'];
+  description: Scalars['String']['output'];
+  diagnosisID: Scalars['ID']['output'];
+  failReason?: Maybe<Scalars['String']['output']>;
+  fixedAt?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  ruleID: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  targetID: Scalars['String']['output'];
+};
+
+export type DiagnosisIssuesResponse = {
+  __typename?: 'DiagnosisIssuesResponse';
+  issues: Array<DiagnosisIssue>;
+  totalCount: Scalars['Int']['output'];
+};
+
 export type Finding = {
   __typename?: 'Finding';
   reason: Scalars['String']['output'];
@@ -171,8 +208,10 @@ export type Mutation = {
   createTicketFromAlerts: Ticket;
   declineAlerts: Array<Alert>;
   deleteTag: Scalars['Boolean']['output'];
+  fixDiagnosis: Diagnosis;
   reopenTicket: Ticket;
   resolveTicket: Ticket;
+  runDiagnosis: Diagnosis;
   unarchiveTicket: Ticket;
   updateAlertTags: Alert;
   updateKnowledge: Knowledge;
@@ -239,6 +278,11 @@ export type MutationDeleteTagArgs = {
 };
 
 
+export type MutationFixDiagnosisArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type MutationReopenTicketArgs = {
   id: Scalars['ID']['input'];
 };
@@ -299,6 +343,9 @@ export type Query = {
   availableTagColorNames: Array<Scalars['String']['output']>;
   availableTagColors: Array<Scalars['String']['output']>;
   dashboard: DashboardStats;
+  diagnoses: DiagnosesResponse;
+  diagnosis?: Maybe<Diagnosis>;
+  diagnosisIssues: DiagnosisIssuesResponse;
   getAgentMemory?: Maybe<AgentMemory>;
   knowledgeTopics: Array<TopicSummary>;
   knowledgesByTopic: Array<Knowledge>;
@@ -332,6 +379,24 @@ export type QueryAlertsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<AlertStatus>;
+};
+
+
+export type QueryDiagnosesArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryDiagnosisArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryDiagnosisIssuesArgs = {
+  diagnosisID: Scalars['ID']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -855,6 +920,42 @@ export type GetAgentMemoryQueryVariables = Exact<{
 
 
 export type GetAgentMemoryQuery = { __typename?: 'Query', getAgentMemory?: { __typename?: 'AgentMemory', id: string, agentID: string, query: string, claim: string, score: number, createdAt: string, lastUsedAt?: string | null } | null };
+
+export type GetDiagnosesQueryVariables = Exact<{
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type GetDiagnosesQuery = { __typename?: 'Query', diagnoses: { __typename?: 'DiagnosesResponse', totalCount: number, diagnoses: Array<{ __typename?: 'Diagnosis', id: string, status: string, totalCount: number, pendingCount: number, fixedCount: number, failedCount: number, createdAt: string, updatedAt: string }> } };
+
+export type GetDiagnosisQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type GetDiagnosisQuery = { __typename?: 'Query', diagnosis?: { __typename?: 'Diagnosis', id: string, status: string, totalCount: number, pendingCount: number, fixedCount: number, failedCount: number, createdAt: string, updatedAt: string } | null };
+
+export type GetDiagnosisIssuesQueryVariables = Exact<{
+  diagnosisID: Scalars['ID']['input'];
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type GetDiagnosisIssuesQuery = { __typename?: 'Query', diagnosisIssues: { __typename?: 'DiagnosisIssuesResponse', totalCount: number, issues: Array<{ __typename?: 'DiagnosisIssue', id: string, diagnosisID: string, ruleID: string, targetID: string, description: string, status: string, fixedAt?: string | null, failReason?: string | null, createdAt: string }> } };
+
+export type RunDiagnosisMutationVariables = Exact<{ [key: string]: never; }>;
+
+
+export type RunDiagnosisMutation = { __typename?: 'Mutation', runDiagnosis: { __typename?: 'Diagnosis', id: string, status: string, createdAt: string } };
+
+export type FixDiagnosisMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type FixDiagnosisMutation = { __typename?: 'Mutation', fixDiagnosis: { __typename?: 'Diagnosis', id: string, status: string, totalCount: number, pendingCount: number, fixedCount: number, failedCount: number, updatedAt: string } };
 
 
 export const GetTicketsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTickets"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"assigneeID"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"statuses"},"value":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}},{"kind":"Argument","name":{"kind":"Name","value":"assigneeID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"assigneeID"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"commentsCount"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
@@ -2224,3 +2325,170 @@ export type GetAgentMemoryQueryHookResult = ReturnType<typeof useGetAgentMemoryQ
 export type GetAgentMemoryLazyQueryHookResult = ReturnType<typeof useGetAgentMemoryLazyQuery>;
 export type GetAgentMemorySuspenseQueryHookResult = ReturnType<typeof useGetAgentMemorySuspenseQuery>;
 export type GetAgentMemoryQueryResult = Apollo.QueryResult<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>;
+export const GetDiagnosesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDiagnoses"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"diagnoses"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"diagnoses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"pendingCount"}},{"kind":"Field","name":{"kind":"Name","value":"fixedCount"}},{"kind":"Field","name":{"kind":"Name","value":"failedCount"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useGetDiagnosesQuery__
+ *
+ * To run a query within a React component, call `useGetDiagnosesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDiagnosesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDiagnosesQuery({
+ *   variables: {
+ *      offset: // value for 'offset'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useGetDiagnosesQuery(baseOptions?: Apollo.QueryHookOptions<GetDiagnosesQuery, GetDiagnosesQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetDiagnosesQuery, GetDiagnosesQueryVariables>(GetDiagnosesDocument, options);
+      }
+export function useGetDiagnosesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetDiagnosesQuery, GetDiagnosesQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetDiagnosesQuery, GetDiagnosesQueryVariables>(GetDiagnosesDocument, options);
+        }
+// @ts-ignore
+export function useGetDiagnosesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetDiagnosesQuery, GetDiagnosesQueryVariables>): Apollo.UseSuspenseQueryResult<GetDiagnosesQuery, GetDiagnosesQueryVariables>;
+export function useGetDiagnosesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetDiagnosesQuery, GetDiagnosesQueryVariables>): Apollo.UseSuspenseQueryResult<GetDiagnosesQuery | undefined, GetDiagnosesQueryVariables>;
+export function useGetDiagnosesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetDiagnosesQuery, GetDiagnosesQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetDiagnosesQuery, GetDiagnosesQueryVariables>(GetDiagnosesDocument, options);
+        }
+export type GetDiagnosesQueryHookResult = ReturnType<typeof useGetDiagnosesQuery>;
+export type GetDiagnosesLazyQueryHookResult = ReturnType<typeof useGetDiagnosesLazyQuery>;
+export type GetDiagnosesSuspenseQueryHookResult = ReturnType<typeof useGetDiagnosesSuspenseQuery>;
+export type GetDiagnosesQueryResult = Apollo.QueryResult<GetDiagnosesQuery, GetDiagnosesQueryVariables>;
+export const GetDiagnosisDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDiagnosis"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"diagnosis"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"pendingCount"}},{"kind":"Field","name":{"kind":"Name","value":"fixedCount"}},{"kind":"Field","name":{"kind":"Name","value":"failedCount"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useGetDiagnosisQuery__
+ *
+ * To run a query within a React component, call `useGetDiagnosisQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDiagnosisQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDiagnosisQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useGetDiagnosisQuery(baseOptions: Apollo.QueryHookOptions<GetDiagnosisQuery, GetDiagnosisQueryVariables> & ({ variables: GetDiagnosisQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetDiagnosisQuery, GetDiagnosisQueryVariables>(GetDiagnosisDocument, options);
+      }
+export function useGetDiagnosisLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetDiagnosisQuery, GetDiagnosisQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetDiagnosisQuery, GetDiagnosisQueryVariables>(GetDiagnosisDocument, options);
+        }
+// @ts-ignore
+export function useGetDiagnosisSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetDiagnosisQuery, GetDiagnosisQueryVariables>): Apollo.UseSuspenseQueryResult<GetDiagnosisQuery, GetDiagnosisQueryVariables>;
+export function useGetDiagnosisSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetDiagnosisQuery, GetDiagnosisQueryVariables>): Apollo.UseSuspenseQueryResult<GetDiagnosisQuery | undefined, GetDiagnosisQueryVariables>;
+export function useGetDiagnosisSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetDiagnosisQuery, GetDiagnosisQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetDiagnosisQuery, GetDiagnosisQueryVariables>(GetDiagnosisDocument, options);
+        }
+export type GetDiagnosisQueryHookResult = ReturnType<typeof useGetDiagnosisQuery>;
+export type GetDiagnosisLazyQueryHookResult = ReturnType<typeof useGetDiagnosisLazyQuery>;
+export type GetDiagnosisSuspenseQueryHookResult = ReturnType<typeof useGetDiagnosisSuspenseQuery>;
+export type GetDiagnosisQueryResult = Apollo.QueryResult<GetDiagnosisQuery, GetDiagnosisQueryVariables>;
+export const GetDiagnosisIssuesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDiagnosisIssues"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"diagnosisID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"diagnosisIssues"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"diagnosisID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"diagnosisID"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"issues"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"diagnosisID"}},{"kind":"Field","name":{"kind":"Name","value":"ruleID"}},{"kind":"Field","name":{"kind":"Name","value":"targetID"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"fixedAt"}},{"kind":"Field","name":{"kind":"Name","value":"failReason"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useGetDiagnosisIssuesQuery__
+ *
+ * To run a query within a React component, call `useGetDiagnosisIssuesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDiagnosisIssuesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDiagnosisIssuesQuery({
+ *   variables: {
+ *      diagnosisID: // value for 'diagnosisID'
+ *      offset: // value for 'offset'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useGetDiagnosisIssuesQuery(baseOptions: Apollo.QueryHookOptions<GetDiagnosisIssuesQuery, GetDiagnosisIssuesQueryVariables> & ({ variables: GetDiagnosisIssuesQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetDiagnosisIssuesQuery, GetDiagnosisIssuesQueryVariables>(GetDiagnosisIssuesDocument, options);
+      }
+export function useGetDiagnosisIssuesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetDiagnosisIssuesQuery, GetDiagnosisIssuesQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetDiagnosisIssuesQuery, GetDiagnosisIssuesQueryVariables>(GetDiagnosisIssuesDocument, options);
+        }
+// @ts-ignore
+export function useGetDiagnosisIssuesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetDiagnosisIssuesQuery, GetDiagnosisIssuesQueryVariables>): Apollo.UseSuspenseQueryResult<GetDiagnosisIssuesQuery, GetDiagnosisIssuesQueryVariables>;
+export function useGetDiagnosisIssuesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetDiagnosisIssuesQuery, GetDiagnosisIssuesQueryVariables>): Apollo.UseSuspenseQueryResult<GetDiagnosisIssuesQuery | undefined, GetDiagnosisIssuesQueryVariables>;
+export function useGetDiagnosisIssuesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetDiagnosisIssuesQuery, GetDiagnosisIssuesQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetDiagnosisIssuesQuery, GetDiagnosisIssuesQueryVariables>(GetDiagnosisIssuesDocument, options);
+        }
+export type GetDiagnosisIssuesQueryHookResult = ReturnType<typeof useGetDiagnosisIssuesQuery>;
+export type GetDiagnosisIssuesLazyQueryHookResult = ReturnType<typeof useGetDiagnosisIssuesLazyQuery>;
+export type GetDiagnosisIssuesSuspenseQueryHookResult = ReturnType<typeof useGetDiagnosisIssuesSuspenseQuery>;
+export type GetDiagnosisIssuesQueryResult = Apollo.QueryResult<GetDiagnosisIssuesQuery, GetDiagnosisIssuesQueryVariables>;
+export const RunDiagnosisDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RunDiagnosis"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"runDiagnosis"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode;
+export type RunDiagnosisMutationFn = Apollo.MutationFunction<RunDiagnosisMutation, RunDiagnosisMutationVariables>;
+
+/**
+ * __useRunDiagnosisMutation__
+ *
+ * To run a mutation, you first call `useRunDiagnosisMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRunDiagnosisMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [runDiagnosisMutation, { data, loading, error }] = useRunDiagnosisMutation({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useRunDiagnosisMutation(baseOptions?: Apollo.MutationHookOptions<RunDiagnosisMutation, RunDiagnosisMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<RunDiagnosisMutation, RunDiagnosisMutationVariables>(RunDiagnosisDocument, options);
+      }
+export type RunDiagnosisMutationHookResult = ReturnType<typeof useRunDiagnosisMutation>;
+export type RunDiagnosisMutationResult = Apollo.MutationResult<RunDiagnosisMutation>;
+export type RunDiagnosisMutationOptions = Apollo.BaseMutationOptions<RunDiagnosisMutation, RunDiagnosisMutationVariables>;
+export const FixDiagnosisDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"FixDiagnosis"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"fixDiagnosis"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"pendingCount"}},{"kind":"Field","name":{"kind":"Name","value":"fixedCount"}},{"kind":"Field","name":{"kind":"Name","value":"failedCount"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+export type FixDiagnosisMutationFn = Apollo.MutationFunction<FixDiagnosisMutation, FixDiagnosisMutationVariables>;
+
+/**
+ * __useFixDiagnosisMutation__
+ *
+ * To run a mutation, you first call `useFixDiagnosisMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useFixDiagnosisMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [fixDiagnosisMutation, { data, loading, error }] = useFixDiagnosisMutation({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useFixDiagnosisMutation(baseOptions?: Apollo.MutationHookOptions<FixDiagnosisMutation, FixDiagnosisMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<FixDiagnosisMutation, FixDiagnosisMutationVariables>(FixDiagnosisDocument, options);
+      }
+export type FixDiagnosisMutationHookResult = ReturnType<typeof useFixDiagnosisMutation>;
+export type FixDiagnosisMutationResult = Apollo.MutationResult<FixDiagnosisMutation>;
+export type FixDiagnosisMutationOptions = Apollo.BaseMutationOptions<FixDiagnosisMutation, FixDiagnosisMutationVariables>;

@@ -136,6 +136,39 @@ type ComplexityRoot struct {
 		UnboundAlertsCount  func(childComplexity int) int
 	}
 
+	DiagnosesResponse struct {
+		Diagnoses  func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
+	Diagnosis struct {
+		CreatedAt    func(childComplexity int) int
+		FailedCount  func(childComplexity int) int
+		FixedCount   func(childComplexity int) int
+		ID           func(childComplexity int) int
+		PendingCount func(childComplexity int) int
+		Status       func(childComplexity int) int
+		TotalCount   func(childComplexity int) int
+		UpdatedAt    func(childComplexity int) int
+	}
+
+	DiagnosisIssue struct {
+		CreatedAt   func(childComplexity int) int
+		Description func(childComplexity int) int
+		DiagnosisID func(childComplexity int) int
+		FailReason  func(childComplexity int) int
+		FixedAt     func(childComplexity int) int
+		ID          func(childComplexity int) int
+		RuleID      func(childComplexity int) int
+		Status      func(childComplexity int) int
+		TargetID    func(childComplexity int) int
+	}
+
+	DiagnosisIssuesResponse struct {
+		Issues     func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
 	Finding struct {
 		Reason         func(childComplexity int) int
 		Recommendation func(childComplexity int) int
@@ -167,8 +200,10 @@ type ComplexityRoot struct {
 		CreateTicketFromAlerts func(childComplexity int, alertIds []string, title *string, description *string) int
 		DeclineAlerts          func(childComplexity int, ids []string) int
 		DeleteTag              func(childComplexity int, id string) int
+		FixDiagnosis           func(childComplexity int, id string) int
 		ReopenTicket           func(childComplexity int, id string) int
 		ResolveTicket          func(childComplexity int, id string, conclusion string, reason string) int
+		RunDiagnosis           func(childComplexity int) int
 		UnarchiveTicket        func(childComplexity int, id string) int
 		UpdateAlertTags        func(childComplexity int, alertID string, tagIds []string) int
 		UpdateKnowledge        func(childComplexity int, input graphql1.UpdateKnowledgeInput) int
@@ -185,6 +220,9 @@ type ComplexityRoot struct {
 		AvailableTagColorNames func(childComplexity int) int
 		AvailableTagColors     func(childComplexity int) int
 		Dashboard              func(childComplexity int) int
+		Diagnoses              func(childComplexity int, offset *int, limit *int) int
+		Diagnosis              func(childComplexity int, id string) int
+		DiagnosisIssues        func(childComplexity int, diagnosisID string, offset *int, limit *int) int
 		GetAgentMemory         func(childComplexity int, agentID string, memoryID string) int
 		KnowledgeTopics        func(childComplexity int) int
 		KnowledgesByTopic      func(childComplexity int, topic string) int
@@ -330,6 +368,8 @@ type MutationResolver interface {
 	CreateKnowledge(ctx context.Context, input graphql1.CreateKnowledgeInput) (*graphql1.Knowledge, error)
 	UpdateKnowledge(ctx context.Context, input graphql1.UpdateKnowledgeInput) (*graphql1.Knowledge, error)
 	ArchiveKnowledge(ctx context.Context, topic string, slug string) (bool, error)
+	RunDiagnosis(ctx context.Context) (*graphql1.Diagnosis, error)
+	FixDiagnosis(ctx context.Context, id string) (*graphql1.Diagnosis, error)
 }
 type QueryResolver interface {
 	Ticket(ctx context.Context, id string) (*ticket.Ticket, error)
@@ -353,6 +393,9 @@ type QueryResolver interface {
 	ListAgentSummaries(ctx context.Context, offset *int, limit *int, keyword *string) (*graphql1.AgentSummariesResponse, error)
 	ListAgentMemories(ctx context.Context, agentID string, offset *int, limit *int, sortBy *graphql1.MemorySortField, sortOrder *graphql1.SortOrder, keyword *string, minScore *float64, maxScore *float64) (*graphql1.AgentMemoriesResponse, error)
 	GetAgentMemory(ctx context.Context, agentID string, memoryID string) (*graphql1.AgentMemory, error)
+	Diagnoses(ctx context.Context, offset *int, limit *int) (*graphql1.DiagnosesResponse, error)
+	Diagnosis(ctx context.Context, id string) (*graphql1.Diagnosis, error)
+	DiagnosisIssues(ctx context.Context, diagnosisID string, offset *int, limit *int) (*graphql1.DiagnosisIssuesResponse, error)
 }
 type SessionResolver interface {
 	User(ctx context.Context, obj *graphql1.Session) (*graphql1.User, error)
@@ -741,6 +784,136 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.DashboardStats.UnboundAlertsCount(childComplexity), true
 
+	case "DiagnosesResponse.diagnoses":
+		if e.ComplexityRoot.DiagnosesResponse.Diagnoses == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DiagnosesResponse.Diagnoses(childComplexity), true
+	case "DiagnosesResponse.totalCount":
+		if e.ComplexityRoot.DiagnosesResponse.TotalCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DiagnosesResponse.TotalCount(childComplexity), true
+
+	case "Diagnosis.createdAt":
+		if e.ComplexityRoot.Diagnosis.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Diagnosis.CreatedAt(childComplexity), true
+	case "Diagnosis.failedCount":
+		if e.ComplexityRoot.Diagnosis.FailedCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Diagnosis.FailedCount(childComplexity), true
+	case "Diagnosis.fixedCount":
+		if e.ComplexityRoot.Diagnosis.FixedCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Diagnosis.FixedCount(childComplexity), true
+	case "Diagnosis.id":
+		if e.ComplexityRoot.Diagnosis.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Diagnosis.ID(childComplexity), true
+	case "Diagnosis.pendingCount":
+		if e.ComplexityRoot.Diagnosis.PendingCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Diagnosis.PendingCount(childComplexity), true
+	case "Diagnosis.status":
+		if e.ComplexityRoot.Diagnosis.Status == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Diagnosis.Status(childComplexity), true
+	case "Diagnosis.totalCount":
+		if e.ComplexityRoot.Diagnosis.TotalCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Diagnosis.TotalCount(childComplexity), true
+	case "Diagnosis.updatedAt":
+		if e.ComplexityRoot.Diagnosis.UpdatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Diagnosis.UpdatedAt(childComplexity), true
+
+	case "DiagnosisIssue.createdAt":
+		if e.ComplexityRoot.DiagnosisIssue.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DiagnosisIssue.CreatedAt(childComplexity), true
+	case "DiagnosisIssue.description":
+		if e.ComplexityRoot.DiagnosisIssue.Description == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DiagnosisIssue.Description(childComplexity), true
+	case "DiagnosisIssue.diagnosisID":
+		if e.ComplexityRoot.DiagnosisIssue.DiagnosisID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DiagnosisIssue.DiagnosisID(childComplexity), true
+	case "DiagnosisIssue.failReason":
+		if e.ComplexityRoot.DiagnosisIssue.FailReason == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DiagnosisIssue.FailReason(childComplexity), true
+	case "DiagnosisIssue.fixedAt":
+		if e.ComplexityRoot.DiagnosisIssue.FixedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DiagnosisIssue.FixedAt(childComplexity), true
+	case "DiagnosisIssue.id":
+		if e.ComplexityRoot.DiagnosisIssue.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DiagnosisIssue.ID(childComplexity), true
+	case "DiagnosisIssue.ruleID":
+		if e.ComplexityRoot.DiagnosisIssue.RuleID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DiagnosisIssue.RuleID(childComplexity), true
+	case "DiagnosisIssue.status":
+		if e.ComplexityRoot.DiagnosisIssue.Status == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DiagnosisIssue.Status(childComplexity), true
+	case "DiagnosisIssue.targetID":
+		if e.ComplexityRoot.DiagnosisIssue.TargetID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DiagnosisIssue.TargetID(childComplexity), true
+
+	case "DiagnosisIssuesResponse.issues":
+		if e.ComplexityRoot.DiagnosisIssuesResponse.Issues == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DiagnosisIssuesResponse.Issues(childComplexity), true
+	case "DiagnosisIssuesResponse.totalCount":
+		if e.ComplexityRoot.DiagnosisIssuesResponse.TotalCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DiagnosisIssuesResponse.TotalCount(childComplexity), true
+
 	case "Finding.reason":
 		if e.ComplexityRoot.Finding.Reason == nil {
 			break
@@ -937,6 +1110,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteTag(childComplexity, args["id"].(string)), true
+	case "Mutation.fixDiagnosis":
+		if e.ComplexityRoot.Mutation.FixDiagnosis == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_fixDiagnosis_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.FixDiagnosis(childComplexity, args["id"].(string)), true
 	case "Mutation.reopenTicket":
 		if e.ComplexityRoot.Mutation.ReopenTicket == nil {
 			break
@@ -959,6 +1143,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.ResolveTicket(childComplexity, args["id"].(string), args["conclusion"].(string), args["reason"].(string)), true
+	case "Mutation.runDiagnosis":
+		if e.ComplexityRoot.Mutation.RunDiagnosis == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Mutation.RunDiagnosis(childComplexity), true
 	case "Mutation.unarchiveTicket":
 		if e.ComplexityRoot.Mutation.UnarchiveTicket == nil {
 			break
@@ -1088,6 +1278,39 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Dashboard(childComplexity), true
+	case "Query.diagnoses":
+		if e.ComplexityRoot.Query.Diagnoses == nil {
+			break
+		}
+
+		args, err := ec.field_Query_diagnoses_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.Diagnoses(childComplexity, args["offset"].(*int), args["limit"].(*int)), true
+	case "Query.diagnosis":
+		if e.ComplexityRoot.Query.Diagnosis == nil {
+			break
+		}
+
+		args, err := ec.field_Query_diagnosis_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.Diagnosis(childComplexity, args["id"].(string)), true
+	case "Query.diagnosisIssues":
+		if e.ComplexityRoot.Query.DiagnosisIssues == nil {
+			break
+		}
+
+		args, err := ec.field_Query_diagnosisIssues_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.DiagnosisIssues(childComplexity, args["diagnosisID"].(string), args["offset"].(*int), args["limit"].(*int)), true
 	case "Query.getAgentMemory":
 		if e.ComplexityRoot.Query.GetAgentMemory == nil {
 			break
@@ -1975,6 +2198,51 @@ extend type Query {
   getAgentMemory(agentID: String!, memoryID: ID!): AgentMemory
 }
 
+type DiagnosisIssue {
+  id: ID!
+  diagnosisID: ID!
+  ruleID: String!
+  targetID: String!
+  description: String!
+  status: String!
+  fixedAt: String
+  failReason: String
+  createdAt: String!
+}
+
+type DiagnosisIssuesResponse {
+  issues: [DiagnosisIssue!]!
+  totalCount: Int!
+}
+
+# Issue counts are derived from subcollection aggregation queries (not stored in this object).
+type Diagnosis {
+  id: ID!
+  status: String!
+  totalCount: Int!
+  pendingCount: Int!
+  fixedCount: Int!
+  failedCount: Int!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type DiagnosesResponse {
+  diagnoses: [Diagnosis!]!
+  totalCount: Int!
+}
+
+extend type Query {
+  diagnoses(offset: Int, limit: Int): DiagnosesResponse!
+  diagnosis(id: ID!): Diagnosis
+  diagnosisIssues(diagnosisID: ID!, offset: Int, limit: Int): DiagnosisIssuesResponse!
+}
+
+extend type Mutation {
+  runDiagnosis: Diagnosis!
+  fixDiagnosis(id: ID!): Diagnosis!
+}
+
 schema {
   query: Query
   mutation: Mutation
@@ -2117,6 +2385,17 @@ func (ec *executionContext) field_Mutation_declineAlerts_args(ctx context.Contex
 }
 
 func (ec *executionContext) field_Mutation_deleteTag_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_fixDiagnosis_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
@@ -2322,6 +2601,54 @@ func (ec *executionContext) field_Query_alerts_args(ctx context.Context, rawArgs
 		return nil, err
 	}
 	args["status"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_diagnoses_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_diagnosisIssues_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "diagnosisID", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["diagnosisID"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_diagnosis_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -4592,6 +4919,653 @@ func (ec *executionContext) fieldContext_DashboardStats_unboundAlerts(_ context.
 	return fc, nil
 }
 
+func (ec *executionContext) _DiagnosesResponse_diagnoses(ctx context.Context, field graphql.CollectedField, obj *graphql1.DiagnosesResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DiagnosesResponse_diagnoses,
+		func(ctx context.Context) (any, error) {
+			return obj.Diagnoses, nil
+		},
+		nil,
+		ec.marshalNDiagnosis2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosisᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DiagnosesResponse_diagnoses(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DiagnosesResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Diagnosis_id(ctx, field)
+			case "status":
+				return ec.fieldContext_Diagnosis_status(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_Diagnosis_totalCount(ctx, field)
+			case "pendingCount":
+				return ec.fieldContext_Diagnosis_pendingCount(ctx, field)
+			case "fixedCount":
+				return ec.fieldContext_Diagnosis_fixedCount(ctx, field)
+			case "failedCount":
+				return ec.fieldContext_Diagnosis_failedCount(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Diagnosis_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Diagnosis_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Diagnosis", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DiagnosesResponse_totalCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.DiagnosesResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DiagnosesResponse_totalCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DiagnosesResponse_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DiagnosesResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Diagnosis_id(ctx context.Context, field graphql.CollectedField, obj *graphql1.Diagnosis) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Diagnosis_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Diagnosis_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Diagnosis",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Diagnosis_status(ctx context.Context, field graphql.CollectedField, obj *graphql1.Diagnosis) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Diagnosis_status,
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Diagnosis_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Diagnosis",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Diagnosis_totalCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.Diagnosis) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Diagnosis_totalCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Diagnosis_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Diagnosis",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Diagnosis_pendingCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.Diagnosis) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Diagnosis_pendingCount,
+		func(ctx context.Context) (any, error) {
+			return obj.PendingCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Diagnosis_pendingCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Diagnosis",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Diagnosis_fixedCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.Diagnosis) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Diagnosis_fixedCount,
+		func(ctx context.Context) (any, error) {
+			return obj.FixedCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Diagnosis_fixedCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Diagnosis",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Diagnosis_failedCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.Diagnosis) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Diagnosis_failedCount,
+		func(ctx context.Context) (any, error) {
+			return obj.FailedCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Diagnosis_failedCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Diagnosis",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Diagnosis_createdAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.Diagnosis) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Diagnosis_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Diagnosis_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Diagnosis",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Diagnosis_updatedAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.Diagnosis) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Diagnosis_updatedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Diagnosis_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Diagnosis",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DiagnosisIssue_id(ctx context.Context, field graphql.CollectedField, obj *graphql1.DiagnosisIssue) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DiagnosisIssue_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DiagnosisIssue_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DiagnosisIssue",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DiagnosisIssue_diagnosisID(ctx context.Context, field graphql.CollectedField, obj *graphql1.DiagnosisIssue) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DiagnosisIssue_diagnosisID,
+		func(ctx context.Context) (any, error) {
+			return obj.DiagnosisID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DiagnosisIssue_diagnosisID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DiagnosisIssue",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DiagnosisIssue_ruleID(ctx context.Context, field graphql.CollectedField, obj *graphql1.DiagnosisIssue) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DiagnosisIssue_ruleID,
+		func(ctx context.Context) (any, error) {
+			return obj.RuleID, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DiagnosisIssue_ruleID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DiagnosisIssue",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DiagnosisIssue_targetID(ctx context.Context, field graphql.CollectedField, obj *graphql1.DiagnosisIssue) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DiagnosisIssue_targetID,
+		func(ctx context.Context) (any, error) {
+			return obj.TargetID, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DiagnosisIssue_targetID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DiagnosisIssue",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DiagnosisIssue_description(ctx context.Context, field graphql.CollectedField, obj *graphql1.DiagnosisIssue) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DiagnosisIssue_description,
+		func(ctx context.Context) (any, error) {
+			return obj.Description, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DiagnosisIssue_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DiagnosisIssue",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DiagnosisIssue_status(ctx context.Context, field graphql.CollectedField, obj *graphql1.DiagnosisIssue) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DiagnosisIssue_status,
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DiagnosisIssue_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DiagnosisIssue",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DiagnosisIssue_fixedAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.DiagnosisIssue) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DiagnosisIssue_fixedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.FixedAt, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_DiagnosisIssue_fixedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DiagnosisIssue",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DiagnosisIssue_failReason(ctx context.Context, field graphql.CollectedField, obj *graphql1.DiagnosisIssue) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DiagnosisIssue_failReason,
+		func(ctx context.Context) (any, error) {
+			return obj.FailReason, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_DiagnosisIssue_failReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DiagnosisIssue",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DiagnosisIssue_createdAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.DiagnosisIssue) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DiagnosisIssue_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DiagnosisIssue_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DiagnosisIssue",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DiagnosisIssuesResponse_issues(ctx context.Context, field graphql.CollectedField, obj *graphql1.DiagnosisIssuesResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DiagnosisIssuesResponse_issues,
+		func(ctx context.Context) (any, error) {
+			return obj.Issues, nil
+		},
+		nil,
+		ec.marshalNDiagnosisIssue2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosisIssueᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DiagnosisIssuesResponse_issues(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DiagnosisIssuesResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_DiagnosisIssue_id(ctx, field)
+			case "diagnosisID":
+				return ec.fieldContext_DiagnosisIssue_diagnosisID(ctx, field)
+			case "ruleID":
+				return ec.fieldContext_DiagnosisIssue_ruleID(ctx, field)
+			case "targetID":
+				return ec.fieldContext_DiagnosisIssue_targetID(ctx, field)
+			case "description":
+				return ec.fieldContext_DiagnosisIssue_description(ctx, field)
+			case "status":
+				return ec.fieldContext_DiagnosisIssue_status(ctx, field)
+			case "fixedAt":
+				return ec.fieldContext_DiagnosisIssue_fixedAt(ctx, field)
+			case "failReason":
+				return ec.fieldContext_DiagnosisIssue_failReason(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_DiagnosisIssue_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DiagnosisIssue", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DiagnosisIssuesResponse_totalCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.DiagnosisIssuesResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DiagnosisIssuesResponse_totalCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DiagnosisIssuesResponse_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DiagnosisIssuesResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Finding_severity(ctx context.Context, field graphql.CollectedField, obj *ticket.Finding) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6411,6 +7385,112 @@ func (ec *executionContext) fieldContext_Mutation_archiveKnowledge(ctx context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_runDiagnosis(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_runDiagnosis,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Mutation().RunDiagnosis(ctx)
+		},
+		nil,
+		ec.marshalNDiagnosis2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosis,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_runDiagnosis(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Diagnosis_id(ctx, field)
+			case "status":
+				return ec.fieldContext_Diagnosis_status(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_Diagnosis_totalCount(ctx, field)
+			case "pendingCount":
+				return ec.fieldContext_Diagnosis_pendingCount(ctx, field)
+			case "fixedCount":
+				return ec.fieldContext_Diagnosis_fixedCount(ctx, field)
+			case "failedCount":
+				return ec.fieldContext_Diagnosis_failedCount(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Diagnosis_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Diagnosis_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Diagnosis", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_fixDiagnosis(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_fixDiagnosis,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().FixDiagnosis(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalNDiagnosis2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosis,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_fixDiagnosis(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Diagnosis_id(ctx, field)
+			case "status":
+				return ec.fieldContext_Diagnosis_status(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_Diagnosis_totalCount(ctx, field)
+			case "pendingCount":
+				return ec.fieldContext_Diagnosis_pendingCount(ctx, field)
+			case "fixedCount":
+				return ec.fieldContext_Diagnosis_fixedCount(ctx, field)
+			case "failedCount":
+				return ec.fieldContext_Diagnosis_failedCount(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Diagnosis_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Diagnosis_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Diagnosis", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_fixDiagnosis_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_ticket(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -7458,6 +8538,159 @@ func (ec *executionContext) fieldContext_Query_getAgentMemory(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_getAgentMemory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_diagnoses(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_diagnoses,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().Diagnoses(ctx, fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+		},
+		nil,
+		ec.marshalNDiagnosesResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosesResponse,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_diagnoses(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "diagnoses":
+				return ec.fieldContext_DiagnosesResponse_diagnoses(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_DiagnosesResponse_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DiagnosesResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_diagnoses_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_diagnosis(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_diagnosis,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().Diagnosis(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalODiagnosis2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosis,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_diagnosis(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Diagnosis_id(ctx, field)
+			case "status":
+				return ec.fieldContext_Diagnosis_status(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_Diagnosis_totalCount(ctx, field)
+			case "pendingCount":
+				return ec.fieldContext_Diagnosis_pendingCount(ctx, field)
+			case "fixedCount":
+				return ec.fieldContext_Diagnosis_fixedCount(ctx, field)
+			case "failedCount":
+				return ec.fieldContext_Diagnosis_failedCount(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Diagnosis_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Diagnosis_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Diagnosis", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_diagnosis_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_diagnosisIssues(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_diagnosisIssues,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().DiagnosisIssues(ctx, fc.Args["diagnosisID"].(string), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+		},
+		nil,
+		ec.marshalNDiagnosisIssuesResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosisIssuesResponse,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_diagnosisIssues(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "issues":
+				return ec.fieldContext_DiagnosisIssuesResponse_issues(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_DiagnosisIssuesResponse_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DiagnosisIssuesResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_diagnosisIssues_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -11947,6 +13180,241 @@ func (ec *executionContext) _DashboardStats(ctx context.Context, sel ast.Selecti
 	return out
 }
 
+var diagnosesResponseImplementors = []string{"DiagnosesResponse"}
+
+func (ec *executionContext) _DiagnosesResponse(ctx context.Context, sel ast.SelectionSet, obj *graphql1.DiagnosesResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, diagnosesResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DiagnosesResponse")
+		case "diagnoses":
+			out.Values[i] = ec._DiagnosesResponse_diagnoses(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._DiagnosesResponse_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var diagnosisImplementors = []string{"Diagnosis"}
+
+func (ec *executionContext) _Diagnosis(ctx context.Context, sel ast.SelectionSet, obj *graphql1.Diagnosis) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, diagnosisImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Diagnosis")
+		case "id":
+			out.Values[i] = ec._Diagnosis_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._Diagnosis_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._Diagnosis_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pendingCount":
+			out.Values[i] = ec._Diagnosis_pendingCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "fixedCount":
+			out.Values[i] = ec._Diagnosis_fixedCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "failedCount":
+			out.Values[i] = ec._Diagnosis_failedCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._Diagnosis_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._Diagnosis_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var diagnosisIssueImplementors = []string{"DiagnosisIssue"}
+
+func (ec *executionContext) _DiagnosisIssue(ctx context.Context, sel ast.SelectionSet, obj *graphql1.DiagnosisIssue) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, diagnosisIssueImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DiagnosisIssue")
+		case "id":
+			out.Values[i] = ec._DiagnosisIssue_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "diagnosisID":
+			out.Values[i] = ec._DiagnosisIssue_diagnosisID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "ruleID":
+			out.Values[i] = ec._DiagnosisIssue_ruleID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "targetID":
+			out.Values[i] = ec._DiagnosisIssue_targetID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "description":
+			out.Values[i] = ec._DiagnosisIssue_description(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._DiagnosisIssue_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "fixedAt":
+			out.Values[i] = ec._DiagnosisIssue_fixedAt(ctx, field, obj)
+		case "failReason":
+			out.Values[i] = ec._DiagnosisIssue_failReason(ctx, field, obj)
+		case "createdAt":
+			out.Values[i] = ec._DiagnosisIssue_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var diagnosisIssuesResponseImplementors = []string{"DiagnosisIssuesResponse"}
+
+func (ec *executionContext) _DiagnosisIssuesResponse(ctx context.Context, sel ast.SelectionSet, obj *graphql1.DiagnosisIssuesResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, diagnosisIssuesResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DiagnosisIssuesResponse")
+		case "issues":
+			out.Values[i] = ec._DiagnosisIssuesResponse_issues(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._DiagnosisIssuesResponse_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var findingImplementors = []string{"Finding"}
 
 func (ec *executionContext) _Finding(ctx context.Context, sel ast.SelectionSet, obj *ticket.Finding) graphql.Marshaler {
@@ -12295,6 +13763,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "archiveKnowledge":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_archiveKnowledge(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "runDiagnosis":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_runDiagnosis(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "fixDiagnosis":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_fixDiagnosis(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -12782,6 +14264,69 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_getAgentMemory(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "diagnoses":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_diagnoses(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "diagnosis":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_diagnosis(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "diagnosisIssues":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_diagnosisIssues(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
@@ -14454,6 +15999,90 @@ func (ec *executionContext) marshalNDashboardStats2ᚖgithubᚗcomᚋsecmonᚑla
 	return ec._DashboardStats(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNDiagnosesResponse2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosesResponse(ctx context.Context, sel ast.SelectionSet, v graphql1.DiagnosesResponse) graphql.Marshaler {
+	return ec._DiagnosesResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNDiagnosesResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosesResponse(ctx context.Context, sel ast.SelectionSet, v *graphql1.DiagnosesResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._DiagnosesResponse(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNDiagnosis2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosis(ctx context.Context, sel ast.SelectionSet, v graphql1.Diagnosis) graphql.Marshaler {
+	return ec._Diagnosis(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNDiagnosis2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosisᚄ(ctx context.Context, sel ast.SelectionSet, v []*graphql1.Diagnosis) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNDiagnosis2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosis(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNDiagnosis2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosis(ctx context.Context, sel ast.SelectionSet, v *graphql1.Diagnosis) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Diagnosis(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNDiagnosisIssue2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosisIssueᚄ(ctx context.Context, sel ast.SelectionSet, v []*graphql1.DiagnosisIssue) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNDiagnosisIssue2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosisIssue(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNDiagnosisIssue2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosisIssue(ctx context.Context, sel ast.SelectionSet, v *graphql1.DiagnosisIssue) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._DiagnosisIssue(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNDiagnosisIssuesResponse2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosisIssuesResponse(ctx context.Context, sel ast.SelectionSet, v graphql1.DiagnosisIssuesResponse) graphql.Marshaler {
+	return ec._DiagnosisIssuesResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNDiagnosisIssuesResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosisIssuesResponse(ctx context.Context, sel ast.SelectionSet, v *graphql1.DiagnosisIssuesResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._DiagnosisIssuesResponse(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v any) (float64, error) {
 	res, err := graphql.UnmarshalFloat(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -15009,6 +16638,13 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	_ = ctx
 	res := graphql.MarshalBoolean(*v)
 	return res
+}
+
+func (ec *executionContext) marshalODiagnosis2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐDiagnosis(ctx context.Context, sel ast.SelectionSet, v *graphql1.Diagnosis) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Diagnosis(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOFinding2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐFinding(ctx context.Context, sel ast.SelectionSet, v *ticket.Finding) graphql.Marshaler {

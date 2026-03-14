@@ -19,6 +19,8 @@ import SettingsPage from "@/pages/SettingsPage";
 import AgentMemoryListPage from "@/pages/AgentMemoryListPage";
 import AgentMemoriesPage from "@/pages/AgentMemoriesPage";
 import AgentMemoryDetailPage from "@/pages/AgentMemoryDetailPage";
+import DiagnosisPage from "@/pages/DiagnosisPage";
+import DiagnosisDetailPage from "@/pages/DiagnosisDetailPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 
 function AuthenticatedApp() {
@@ -36,6 +38,8 @@ function AuthenticatedApp() {
         <Route path="/memory" element={<AgentMemoryListPage />} />
         <Route path="/memory/:agentId" element={<AgentMemoriesPage />} />
         <Route path="/memory/:agentId/:memoryId" element={<AgentMemoryDetailPage />} />
+        <Route path="/diagnosis" element={<DiagnosisPage />} />
+        <Route path="/diagnosis/:id" element={<DiagnosisDetailPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

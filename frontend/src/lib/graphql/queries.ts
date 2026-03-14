@@ -892,3 +892,79 @@ export const GET_AGENT_MEMORY = gql`
     }
   }
 `;
+
+export const GET_DIAGNOSES = gql`
+  query GetDiagnoses($offset: Int, $limit: Int) {
+    diagnoses(offset: $offset, limit: $limit) {
+      diagnoses {
+        id
+        status
+        totalCount
+        pendingCount
+        fixedCount
+        failedCount
+        createdAt
+        updatedAt
+      }
+      totalCount
+    }
+  }
+`;
+
+export const GET_DIAGNOSIS = gql`
+  query GetDiagnosis($id: ID!) {
+    diagnosis(id: $id) {
+      id
+      status
+      totalCount
+      pendingCount
+      fixedCount
+      failedCount
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const GET_DIAGNOSIS_ISSUES = gql`
+  query GetDiagnosisIssues($diagnosisID: ID!, $offset: Int, $limit: Int) {
+    diagnosisIssues(diagnosisID: $diagnosisID, offset: $offset, limit: $limit) {
+      issues {
+        id
+        diagnosisID
+        ruleID
+        targetID
+        description
+        status
+        fixedAt
+        failReason
+        createdAt
+      }
+      totalCount
+    }
+  }
+`;
+
+export const RUN_DIAGNOSIS = gql`
+  mutation RunDiagnosis {
+    runDiagnosis {
+      id
+      status
+      createdAt
+    }
+  }
+`;
+
+export const FIX_DIAGNOSIS = gql`
+  mutation FixDiagnosis($id: ID!) {
+    fixDiagnosis(id: $id) {
+      id
+      status
+      totalCount
+      pendingCount
+      fixedCount
+      failedCount
+      updatedAt
+    }
+  }
+`;

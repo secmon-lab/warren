@@ -452,6 +452,21 @@ func (r *Memory) UnbindAlertFromTicket(ctx context.Context, alertID types.AlertI
 	return nil
 }
 
+// GetAllAlerts returns all alerts for full-scan diagnosis checks.
+func (r *Memory) GetAllAlerts(_ context.Context) (alert.Alerts, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var alerts alert.Alerts
+	for _, a := range r.alerts {
+		alerts = append(alerts, a)
+	}
+	if alerts == nil {
+		return alert.Alerts{}, nil
+	}
+	return alerts, nil
+}
+
 func cosineSimilarity(a, b []float32) float32 {
 	var dot, normA, normB float32
 	for i := range a {
