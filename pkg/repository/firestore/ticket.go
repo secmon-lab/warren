@@ -753,6 +753,24 @@ func (r *Firestore) GetTicketsByIDs(ctx context.Context, ticketIDs []types.Ticke
 	return r.BatchGetTickets(ctx, ticketIDs)
 }
 
-func (r *Firestore) GetAllTickets(ctx context.Context, offset, limit int) ([]*ticket.Ticket, error) {
-	return r.GetTicketsByStatus(ctx, nil, "", "", offset, limit)
+// GetAllTickets returns all tickets for full-scan diagnosis checks.
+func (r *Firestore) GetAllTickets(ctx context.Context) ([]*ticket.Ticket, error) {
+	iter := r.db.Collection(collectionTickets).Documents(ctx)
+
+	var tickets []*ticket.Ticket
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, r.eb.Wrap(err, "failed to iterate tickets")
+		}
+		var t ticket.Ticket
+		if err := doc.DataTo(&t); err != nil {
+			return nil, r.eb.Wrap(err, "failed to unmarshal ticket", goerr.V("id", doc.Ref.ID))
+		}
+		tickets = append(tickets, &t)
+	}
+	return tickets, nil
 }

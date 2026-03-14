@@ -733,35 +733,25 @@ func (r *Firestore) GetAlertsByIDs(ctx context.Context, alertIDs []types.AlertID
 	return r.BatchGetAlerts(ctx, alertIDs)
 }
 
-func (r *Firestore) GetAllAlerts(ctx context.Context, offset, limit int) (alert.Alerts, error) {
-	query := r.db.Collection(collectionAlerts).OrderBy("CreatedAt", firestore.Desc)
-
-	if offset > 0 {
-		query = query.Offset(offset)
-	}
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
-
-	iter := query.Documents(ctx)
+// GetAllAlerts returns all alerts for full-scan diagnosis checks.
+func (r *Firestore) GetAllAlerts(ctx context.Context) (alert.Alerts, error) {
+	iter := r.db.Collection(collectionAlerts).Documents(ctx)
 
 	var alerts alert.Alerts
 	for {
 		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			return nil, goerr.Wrap(err, "failed to get next alert")
+		if err == iterator.Done {
+			break
 		}
-
+		if err != nil {
+			return nil, r.eb.Wrap(err, "failed to iterate alerts")
+		}
 		var v alert.Alert
 		if err := doc.DataTo(&v); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to alert")
+			return nil, r.eb.Wrap(err, "failed to unmarshal alert", goerr.V("id", doc.Ref.ID))
 		}
 		alerts = append(alerts, &v)
 	}
-
 	return alerts, nil
 }
 

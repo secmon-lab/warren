@@ -89,6 +89,39 @@ type DashboardStats struct {
 	UnboundAlerts       []*alert.Alert   `json:"unboundAlerts"`
 }
 
+type DiagnosesResponse struct {
+	Diagnoses  []*Diagnosis `json:"diagnoses"`
+	TotalCount int          `json:"totalCount"`
+}
+
+type Diagnosis struct {
+	ID           string `json:"id"`
+	Status       string `json:"status"`
+	TotalCount   int    `json:"totalCount"`
+	PendingCount int    `json:"pendingCount"`
+	FixedCount   int    `json:"fixedCount"`
+	FailedCount  int    `json:"failedCount"`
+	CreatedAt    string `json:"createdAt"`
+	UpdatedAt    string `json:"updatedAt"`
+}
+
+type DiagnosisIssue struct {
+	ID          string  `json:"id"`
+	DiagnosisID string  `json:"diagnosisID"`
+	RuleID      string  `json:"ruleID"`
+	TargetID    string  `json:"targetID"`
+	Description string  `json:"description"`
+	Status      string  `json:"status"`
+	FixedAt     *string `json:"fixedAt,omitempty"`
+	FailReason  *string `json:"failReason,omitempty"`
+	CreatedAt   string  `json:"createdAt"`
+}
+
+type DiagnosisIssuesResponse struct {
+	Issues     []*DiagnosisIssue `json:"issues"`
+	TotalCount int               `json:"totalCount"`
+}
+
 type Knowledge struct {
 	Slug      string `json:"slug"`
 	Name      string `json:"name"`

@@ -12,6 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
@@ -2660,6 +2661,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			BatchGetAlertsFunc: func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
 //				panic("mock out the BatchGetAlerts method")
 //			},
+//			BatchGetDiagnosisIssueCountsFunc: func(ctx context.Context, diagnosisIDs []types.DiagnosisID) (map[types.DiagnosisID]diagnosis.IssueCounts, error) {
+//				panic("mock out the BatchGetDiagnosisIssueCounts method")
+//			},
 //			BatchGetTicketsFunc: func(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error) {
 //				panic("mock out the BatchGetTickets method")
 //			},
@@ -2686,6 +2690,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			CountDeclinedAlertsFunc: func(ctx context.Context) (int, error) {
 //				panic("mock out the CountDeclinedAlerts method")
+//			},
+//			CountDiagnosisIssuesFunc: func(ctx context.Context, diagnosisID types.DiagnosisID, status *diagnosis.IssueStatus) (int, error) {
+//				panic("mock out the CountDiagnosisIssues method")
 //			},
 //			CountTicketCommentsFunc: func(ctx context.Context, ticketID types.TicketID) (int, error) {
 //				panic("mock out the CountTicketComments method")
@@ -2753,8 +2760,23 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetAlertsWithInvalidEmbeddingFunc: func(ctx context.Context) (alert.Alerts, error) {
 //				panic("mock out the GetAlertsWithInvalidEmbedding method")
 //			},
+//			GetAllAlertsFunc: func(ctx context.Context) (alert.Alerts, error) {
+//				panic("mock out the GetAllAlerts method")
+//			},
+//			GetAllTicketsFunc: func(ctx context.Context) ([]*ticket.Ticket, error) {
+//				panic("mock out the GetAllTickets method")
+//			},
 //			GetDeclinedAlertsFunc: func(ctx context.Context, offset int, limit int) (alert.Alerts, error) {
 //				panic("mock out the GetDeclinedAlerts method")
+//			},
+//			GetDiagnosisFunc: func(ctx context.Context, id types.DiagnosisID) (*diagnosis.Diagnosis, error) {
+//				panic("mock out the GetDiagnosis method")
+//			},
+//			GetDiagnosisIssueFunc: func(ctx context.Context, diagnosisID types.DiagnosisID, issueID string) (*diagnosis.Issue, error) {
+//				panic("mock out the GetDiagnosisIssue method")
+//			},
+//			GetDiagnosisIssueCountsFunc: func(ctx context.Context, diagnosisID types.DiagnosisID) (diagnosis.IssueCounts, error) {
+//				panic("mock out the GetDiagnosisIssueCounts method")
 //			},
 //			GetKnowledgeFunc: func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) (*knowledge.Knowledge, error) {
 //				panic("mock out the GetKnowledge method")
@@ -2846,11 +2868,20 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			ListAllTagsFunc: func(ctx context.Context) ([]*tag.Tag, error) {
 //				panic("mock out the ListAllTags method")
 //			},
+//			ListDiagnosesFunc: func(ctx context.Context, offset int, limit int) ([]*diagnosis.Diagnosis, int, error) {
+//				panic("mock out the ListDiagnoses method")
+//			},
+//			ListDiagnosisIssuesFunc: func(ctx context.Context, diagnosisID types.DiagnosisID, offset int, limit int, status *diagnosis.IssueStatus, ruleID *diagnosis.RuleID) ([]*diagnosis.Issue, int, error) {
+//				panic("mock out the ListDiagnosisIssues method")
+//			},
 //			ListKnowledgeSlugsFunc: func(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.SlugInfo, error) {
 //				panic("mock out the ListKnowledgeSlugs method")
 //			},
 //			ListKnowledgeTopicsFunc: func(ctx context.Context) ([]*knowledge.TopicSummary, error) {
 //				panic("mock out the ListKnowledgeTopics method")
+//			},
+//			ListPendingDiagnosisIssuesFunc: func(ctx context.Context, diagnosisID types.DiagnosisID) ([]*diagnosis.Issue, error) {
+//				panic("mock out the ListPendingDiagnosisIssues method")
 //			},
 //			PutActivityFunc: func(ctx context.Context, activityMoqParam *activity.Activity) error {
 //				panic("mock out the PutActivity method")
@@ -2860,6 +2891,12 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			PutAlertListFunc: func(ctx context.Context, list *alert.List) error {
 //				panic("mock out the PutAlertList method")
+//			},
+//			PutDiagnosisFunc: func(ctx context.Context, d *diagnosis.Diagnosis) error {
+//				panic("mock out the PutDiagnosis method")
+//			},
+//			PutDiagnosisIssueFunc: func(ctx context.Context, issue *diagnosis.Issue) error {
+//				panic("mock out the PutDiagnosisIssue method")
 //			},
 //			PutHistoryFunc: func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
 //				panic("mock out the PutHistory method")
@@ -2937,6 +2974,9 @@ type RepositoryMock struct {
 	// BatchGetAlertsFunc mocks the BatchGetAlerts method.
 	BatchGetAlertsFunc func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
 
+	// BatchGetDiagnosisIssueCountsFunc mocks the BatchGetDiagnosisIssueCounts method.
+	BatchGetDiagnosisIssueCountsFunc func(ctx context.Context, diagnosisIDs []types.DiagnosisID) (map[types.DiagnosisID]diagnosis.IssueCounts, error)
+
 	// BatchGetTicketsFunc mocks the BatchGetTickets method.
 	BatchGetTicketsFunc func(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error)
 
@@ -2963,6 +3003,9 @@ type RepositoryMock struct {
 
 	// CountDeclinedAlertsFunc mocks the CountDeclinedAlerts method.
 	CountDeclinedAlertsFunc func(ctx context.Context) (int, error)
+
+	// CountDiagnosisIssuesFunc mocks the CountDiagnosisIssues method.
+	CountDiagnosisIssuesFunc func(ctx context.Context, diagnosisID types.DiagnosisID, status *diagnosis.IssueStatus) (int, error)
 
 	// CountTicketCommentsFunc mocks the CountTicketComments method.
 	CountTicketCommentsFunc func(ctx context.Context, ticketID types.TicketID) (int, error)
@@ -3030,8 +3073,23 @@ type RepositoryMock struct {
 	// GetAlertsWithInvalidEmbeddingFunc mocks the GetAlertsWithInvalidEmbedding method.
 	GetAlertsWithInvalidEmbeddingFunc func(ctx context.Context) (alert.Alerts, error)
 
+	// GetAllAlertsFunc mocks the GetAllAlerts method.
+	GetAllAlertsFunc func(ctx context.Context) (alert.Alerts, error)
+
+	// GetAllTicketsFunc mocks the GetAllTickets method.
+	GetAllTicketsFunc func(ctx context.Context) ([]*ticket.Ticket, error)
+
 	// GetDeclinedAlertsFunc mocks the GetDeclinedAlerts method.
 	GetDeclinedAlertsFunc func(ctx context.Context, offset int, limit int) (alert.Alerts, error)
+
+	// GetDiagnosisFunc mocks the GetDiagnosis method.
+	GetDiagnosisFunc func(ctx context.Context, id types.DiagnosisID) (*diagnosis.Diagnosis, error)
+
+	// GetDiagnosisIssueFunc mocks the GetDiagnosisIssue method.
+	GetDiagnosisIssueFunc func(ctx context.Context, diagnosisID types.DiagnosisID, issueID string) (*diagnosis.Issue, error)
+
+	// GetDiagnosisIssueCountsFunc mocks the GetDiagnosisIssueCounts method.
+	GetDiagnosisIssueCountsFunc func(ctx context.Context, diagnosisID types.DiagnosisID) (diagnosis.IssueCounts, error)
 
 	// GetKnowledgeFunc mocks the GetKnowledge method.
 	GetKnowledgeFunc func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) (*knowledge.Knowledge, error)
@@ -3123,11 +3181,20 @@ type RepositoryMock struct {
 	// ListAllTagsFunc mocks the ListAllTags method.
 	ListAllTagsFunc func(ctx context.Context) ([]*tag.Tag, error)
 
+	// ListDiagnosesFunc mocks the ListDiagnoses method.
+	ListDiagnosesFunc func(ctx context.Context, offset int, limit int) ([]*diagnosis.Diagnosis, int, error)
+
+	// ListDiagnosisIssuesFunc mocks the ListDiagnosisIssues method.
+	ListDiagnosisIssuesFunc func(ctx context.Context, diagnosisID types.DiagnosisID, offset int, limit int, status *diagnosis.IssueStatus, ruleID *diagnosis.RuleID) ([]*diagnosis.Issue, int, error)
+
 	// ListKnowledgeSlugsFunc mocks the ListKnowledgeSlugs method.
 	ListKnowledgeSlugsFunc func(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.SlugInfo, error)
 
 	// ListKnowledgeTopicsFunc mocks the ListKnowledgeTopics method.
 	ListKnowledgeTopicsFunc func(ctx context.Context) ([]*knowledge.TopicSummary, error)
+
+	// ListPendingDiagnosisIssuesFunc mocks the ListPendingDiagnosisIssues method.
+	ListPendingDiagnosisIssuesFunc func(ctx context.Context, diagnosisID types.DiagnosisID) ([]*diagnosis.Issue, error)
 
 	// PutActivityFunc mocks the PutActivity method.
 	PutActivityFunc func(ctx context.Context, activityMoqParam *activity.Activity) error
@@ -3137,6 +3204,12 @@ type RepositoryMock struct {
 
 	// PutAlertListFunc mocks the PutAlertList method.
 	PutAlertListFunc func(ctx context.Context, list *alert.List) error
+
+	// PutDiagnosisFunc mocks the PutDiagnosis method.
+	PutDiagnosisFunc func(ctx context.Context, d *diagnosis.Diagnosis) error
+
+	// PutDiagnosisIssueFunc mocks the PutDiagnosisIssue method.
+	PutDiagnosisIssueFunc func(ctx context.Context, issue *diagnosis.Issue) error
 
 	// PutHistoryFunc mocks the PutHistory method.
 	PutHistoryFunc func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error
@@ -3222,6 +3295,13 @@ type RepositoryMock struct {
 			// AlertIDs is the alertIDs argument value.
 			AlertIDs []types.AlertID
 		}
+		// BatchGetDiagnosisIssueCounts holds details about calls to the BatchGetDiagnosisIssueCounts method.
+		BatchGetDiagnosisIssueCounts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// DiagnosisIDs is the diagnosisIDs argument value.
+			DiagnosisIDs []types.DiagnosisID
+		}
 		// BatchGetTickets holds details about calls to the BatchGetTickets method.
 		BatchGetTickets []struct {
 			// Ctx is the ctx argument value.
@@ -3282,6 +3362,15 @@ type RepositoryMock struct {
 		CountDeclinedAlerts []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+		}
+		// CountDiagnosisIssues holds details about calls to the CountDiagnosisIssues method.
+		CountDiagnosisIssues []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// DiagnosisID is the diagnosisID argument value.
+			DiagnosisID types.DiagnosisID
+			// Status is the status argument value.
+			Status *diagnosis.IssueStatus
 		}
 		// CountTicketComments holds details about calls to the CountTicketComments method.
 		CountTicketComments []struct {
@@ -3457,6 +3546,16 @@ type RepositoryMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
+		// GetAllAlerts holds details about calls to the GetAllAlerts method.
+		GetAllAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
+		// GetAllTickets holds details about calls to the GetAllTickets method.
+		GetAllTickets []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// GetDeclinedAlerts holds details about calls to the GetDeclinedAlerts method.
 		GetDeclinedAlerts []struct {
 			// Ctx is the ctx argument value.
@@ -3465,6 +3564,29 @@ type RepositoryMock struct {
 			Offset int
 			// Limit is the limit argument value.
 			Limit int
+		}
+		// GetDiagnosis holds details about calls to the GetDiagnosis method.
+		GetDiagnosis []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID types.DiagnosisID
+		}
+		// GetDiagnosisIssue holds details about calls to the GetDiagnosisIssue method.
+		GetDiagnosisIssue []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// DiagnosisID is the diagnosisID argument value.
+			DiagnosisID types.DiagnosisID
+			// IssueID is the issueID argument value.
+			IssueID string
+		}
+		// GetDiagnosisIssueCounts holds details about calls to the GetDiagnosisIssueCounts method.
+		GetDiagnosisIssueCounts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// DiagnosisID is the diagnosisID argument value.
+			DiagnosisID types.DiagnosisID
 		}
 		// GetKnowledge holds details about calls to the GetKnowledge method.
 		GetKnowledge []struct {
@@ -3702,6 +3824,30 @@ type RepositoryMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
+		// ListDiagnoses holds details about calls to the ListDiagnoses method.
+		ListDiagnoses []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Offset is the offset argument value.
+			Offset int
+			// Limit is the limit argument value.
+			Limit int
+		}
+		// ListDiagnosisIssues holds details about calls to the ListDiagnosisIssues method.
+		ListDiagnosisIssues []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// DiagnosisID is the diagnosisID argument value.
+			DiagnosisID types.DiagnosisID
+			// Offset is the offset argument value.
+			Offset int
+			// Limit is the limit argument value.
+			Limit int
+			// Status is the status argument value.
+			Status *diagnosis.IssueStatus
+			// RuleID is the ruleID argument value.
+			RuleID *diagnosis.RuleID
+		}
 		// ListKnowledgeSlugs holds details about calls to the ListKnowledgeSlugs method.
 		ListKnowledgeSlugs []struct {
 			// Ctx is the ctx argument value.
@@ -3713,6 +3859,13 @@ type RepositoryMock struct {
 		ListKnowledgeTopics []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+		}
+		// ListPendingDiagnosisIssues holds details about calls to the ListPendingDiagnosisIssues method.
+		ListPendingDiagnosisIssues []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// DiagnosisID is the diagnosisID argument value.
+			DiagnosisID types.DiagnosisID
 		}
 		// PutActivity holds details about calls to the PutActivity method.
 		PutActivity []struct {
@@ -3734,6 +3887,20 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// List is the list argument value.
 			List *alert.List
+		}
+		// PutDiagnosis holds details about calls to the PutDiagnosis method.
+		PutDiagnosis []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// D is the d argument value.
+			D *diagnosis.Diagnosis
+		}
+		// PutDiagnosisIssue holds details about calls to the PutDiagnosisIssue method.
+		PutDiagnosisIssue []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Issue is the issue argument value.
+			Issue *diagnosis.Issue
 		}
 		// PutHistory holds details about calls to the PutHistory method.
 		PutHistory []struct {
@@ -3906,6 +4073,7 @@ type RepositoryMock struct {
 	}
 	lockArchiveKnowledge               sync.RWMutex
 	lockBatchGetAlerts                 sync.RWMutex
+	lockBatchGetDiagnosisIssueCounts   sync.RWMutex
 	lockBatchGetTickets                sync.RWMutex
 	lockBatchPutAlerts                 sync.RWMutex
 	lockBatchSaveAgentMemories         sync.RWMutex
@@ -3915,6 +4083,7 @@ type RepositoryMock struct {
 	lockCountActivities                sync.RWMutex
 	lockCountAlertsWithoutTicket       sync.RWMutex
 	lockCountDeclinedAlerts            sync.RWMutex
+	lockCountDiagnosisIssues           sync.RWMutex
 	lockCountTicketComments            sync.RWMutex
 	lockCountTicketsByStatus           sync.RWMutex
 	lockCreateNotice                   sync.RWMutex
@@ -3937,7 +4106,12 @@ type RepositoryMock struct {
 	lockGetAlertsBySpan                sync.RWMutex
 	lockGetAlertsByThread              sync.RWMutex
 	lockGetAlertsWithInvalidEmbedding  sync.RWMutex
+	lockGetAllAlerts                   sync.RWMutex
+	lockGetAllTickets                  sync.RWMutex
 	lockGetDeclinedAlerts              sync.RWMutex
+	lockGetDiagnosis                   sync.RWMutex
+	lockGetDiagnosisIssue              sync.RWMutex
+	lockGetDiagnosisIssueCounts        sync.RWMutex
 	lockGetKnowledge                   sync.RWMutex
 	lockGetKnowledgeByCommit           sync.RWMutex
 	lockGetKnowledges                  sync.RWMutex
@@ -3968,11 +4142,16 @@ type RepositoryMock struct {
 	lockListAgentMemoriesWithOptions   sync.RWMutex
 	lockListAllAgentIDs                sync.RWMutex
 	lockListAllTags                    sync.RWMutex
+	lockListDiagnoses                  sync.RWMutex
+	lockListDiagnosisIssues            sync.RWMutex
 	lockListKnowledgeSlugs             sync.RWMutex
 	lockListKnowledgeTopics            sync.RWMutex
+	lockListPendingDiagnosisIssues     sync.RWMutex
 	lockPutActivity                    sync.RWMutex
 	lockPutAlert                       sync.RWMutex
 	lockPutAlertList                   sync.RWMutex
+	lockPutDiagnosis                   sync.RWMutex
+	lockPutDiagnosisIssue              sync.RWMutex
 	lockPutHistory                     sync.RWMutex
 	lockPutKnowledge                   sync.RWMutex
 	lockPutRefineGroup                 sync.RWMutex
@@ -4076,6 +4255,46 @@ func (mock *RepositoryMock) BatchGetAlertsCalls() []struct {
 	mock.lockBatchGetAlerts.RLock()
 	calls = mock.calls.BatchGetAlerts
 	mock.lockBatchGetAlerts.RUnlock()
+	return calls
+}
+
+// BatchGetDiagnosisIssueCounts calls BatchGetDiagnosisIssueCountsFunc.
+func (mock *RepositoryMock) BatchGetDiagnosisIssueCounts(ctx context.Context, diagnosisIDs []types.DiagnosisID) (map[types.DiagnosisID]diagnosis.IssueCounts, error) {
+	callInfo := struct {
+		Ctx          context.Context
+		DiagnosisIDs []types.DiagnosisID
+	}{
+		Ctx:          ctx,
+		DiagnosisIDs: diagnosisIDs,
+	}
+	mock.lockBatchGetDiagnosisIssueCounts.Lock()
+	mock.calls.BatchGetDiagnosisIssueCounts = append(mock.calls.BatchGetDiagnosisIssueCounts, callInfo)
+	mock.lockBatchGetDiagnosisIssueCounts.Unlock()
+	if mock.BatchGetDiagnosisIssueCountsFunc == nil {
+		var (
+			diagnosisIDToIssueCountsOut map[types.DiagnosisID]diagnosis.IssueCounts
+			errOut                      error
+		)
+		return diagnosisIDToIssueCountsOut, errOut
+	}
+	return mock.BatchGetDiagnosisIssueCountsFunc(ctx, diagnosisIDs)
+}
+
+// BatchGetDiagnosisIssueCountsCalls gets all the calls that were made to BatchGetDiagnosisIssueCounts.
+// Check the length with:
+//
+//	len(mockedRepository.BatchGetDiagnosisIssueCountsCalls())
+func (mock *RepositoryMock) BatchGetDiagnosisIssueCountsCalls() []struct {
+	Ctx          context.Context
+	DiagnosisIDs []types.DiagnosisID
+} {
+	var calls []struct {
+		Ctx          context.Context
+		DiagnosisIDs []types.DiagnosisID
+	}
+	mock.lockBatchGetDiagnosisIssueCounts.RLock()
+	calls = mock.calls.BatchGetDiagnosisIssueCounts
+	mock.lockBatchGetDiagnosisIssueCounts.RUnlock()
 	return calls
 }
 
@@ -4428,6 +4647,50 @@ func (mock *RepositoryMock) CountDeclinedAlertsCalls() []struct {
 	mock.lockCountDeclinedAlerts.RLock()
 	calls = mock.calls.CountDeclinedAlerts
 	mock.lockCountDeclinedAlerts.RUnlock()
+	return calls
+}
+
+// CountDiagnosisIssues calls CountDiagnosisIssuesFunc.
+func (mock *RepositoryMock) CountDiagnosisIssues(ctx context.Context, diagnosisID types.DiagnosisID, status *diagnosis.IssueStatus) (int, error) {
+	callInfo := struct {
+		Ctx         context.Context
+		DiagnosisID types.DiagnosisID
+		Status      *diagnosis.IssueStatus
+	}{
+		Ctx:         ctx,
+		DiagnosisID: diagnosisID,
+		Status:      status,
+	}
+	mock.lockCountDiagnosisIssues.Lock()
+	mock.calls.CountDiagnosisIssues = append(mock.calls.CountDiagnosisIssues, callInfo)
+	mock.lockCountDiagnosisIssues.Unlock()
+	if mock.CountDiagnosisIssuesFunc == nil {
+		var (
+			nOut   int
+			errOut error
+		)
+		return nOut, errOut
+	}
+	return mock.CountDiagnosisIssuesFunc(ctx, diagnosisID, status)
+}
+
+// CountDiagnosisIssuesCalls gets all the calls that were made to CountDiagnosisIssues.
+// Check the length with:
+//
+//	len(mockedRepository.CountDiagnosisIssuesCalls())
+func (mock *RepositoryMock) CountDiagnosisIssuesCalls() []struct {
+	Ctx         context.Context
+	DiagnosisID types.DiagnosisID
+	Status      *diagnosis.IssueStatus
+} {
+	var calls []struct {
+		Ctx         context.Context
+		DiagnosisID types.DiagnosisID
+		Status      *diagnosis.IssueStatus
+	}
+	mock.lockCountDiagnosisIssues.RLock()
+	calls = mock.calls.CountDiagnosisIssues
+	mock.lockCountDiagnosisIssues.RUnlock()
 	return calls
 }
 
@@ -5346,6 +5609,78 @@ func (mock *RepositoryMock) GetAlertsWithInvalidEmbeddingCalls() []struct {
 	return calls
 }
 
+// GetAllAlerts calls GetAllAlertsFunc.
+func (mock *RepositoryMock) GetAllAlerts(ctx context.Context) (alert.Alerts, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockGetAllAlerts.Lock()
+	mock.calls.GetAllAlerts = append(mock.calls.GetAllAlerts, callInfo)
+	mock.lockGetAllAlerts.Unlock()
+	if mock.GetAllAlertsFunc == nil {
+		var (
+			alertsOut alert.Alerts
+			errOut    error
+		)
+		return alertsOut, errOut
+	}
+	return mock.GetAllAlertsFunc(ctx)
+}
+
+// GetAllAlertsCalls gets all the calls that were made to GetAllAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.GetAllAlertsCalls())
+func (mock *RepositoryMock) GetAllAlertsCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockGetAllAlerts.RLock()
+	calls = mock.calls.GetAllAlerts
+	mock.lockGetAllAlerts.RUnlock()
+	return calls
+}
+
+// GetAllTickets calls GetAllTicketsFunc.
+func (mock *RepositoryMock) GetAllTickets(ctx context.Context) ([]*ticket.Ticket, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockGetAllTickets.Lock()
+	mock.calls.GetAllTickets = append(mock.calls.GetAllTickets, callInfo)
+	mock.lockGetAllTickets.Unlock()
+	if mock.GetAllTicketsFunc == nil {
+		var (
+			ticketsOut []*ticket.Ticket
+			errOut     error
+		)
+		return ticketsOut, errOut
+	}
+	return mock.GetAllTicketsFunc(ctx)
+}
+
+// GetAllTicketsCalls gets all the calls that were made to GetAllTickets.
+// Check the length with:
+//
+//	len(mockedRepository.GetAllTicketsCalls())
+func (mock *RepositoryMock) GetAllTicketsCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockGetAllTickets.RLock()
+	calls = mock.calls.GetAllTickets
+	mock.lockGetAllTickets.RUnlock()
+	return calls
+}
+
 // GetDeclinedAlerts calls GetDeclinedAlertsFunc.
 func (mock *RepositoryMock) GetDeclinedAlerts(ctx context.Context, offset int, limit int) (alert.Alerts, error) {
 	callInfo := struct {
@@ -5387,6 +5722,130 @@ func (mock *RepositoryMock) GetDeclinedAlertsCalls() []struct {
 	mock.lockGetDeclinedAlerts.RLock()
 	calls = mock.calls.GetDeclinedAlerts
 	mock.lockGetDeclinedAlerts.RUnlock()
+	return calls
+}
+
+// GetDiagnosis calls GetDiagnosisFunc.
+func (mock *RepositoryMock) GetDiagnosis(ctx context.Context, id types.DiagnosisID) (*diagnosis.Diagnosis, error) {
+	callInfo := struct {
+		Ctx context.Context
+		ID  types.DiagnosisID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockGetDiagnosis.Lock()
+	mock.calls.GetDiagnosis = append(mock.calls.GetDiagnosis, callInfo)
+	mock.lockGetDiagnosis.Unlock()
+	if mock.GetDiagnosisFunc == nil {
+		var (
+			diagnosisOut *diagnosis.Diagnosis
+			errOut       error
+		)
+		return diagnosisOut, errOut
+	}
+	return mock.GetDiagnosisFunc(ctx, id)
+}
+
+// GetDiagnosisCalls gets all the calls that were made to GetDiagnosis.
+// Check the length with:
+//
+//	len(mockedRepository.GetDiagnosisCalls())
+func (mock *RepositoryMock) GetDiagnosisCalls() []struct {
+	Ctx context.Context
+	ID  types.DiagnosisID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  types.DiagnosisID
+	}
+	mock.lockGetDiagnosis.RLock()
+	calls = mock.calls.GetDiagnosis
+	mock.lockGetDiagnosis.RUnlock()
+	return calls
+}
+
+// GetDiagnosisIssue calls GetDiagnosisIssueFunc.
+func (mock *RepositoryMock) GetDiagnosisIssue(ctx context.Context, diagnosisID types.DiagnosisID, issueID string) (*diagnosis.Issue, error) {
+	callInfo := struct {
+		Ctx         context.Context
+		DiagnosisID types.DiagnosisID
+		IssueID     string
+	}{
+		Ctx:         ctx,
+		DiagnosisID: diagnosisID,
+		IssueID:     issueID,
+	}
+	mock.lockGetDiagnosisIssue.Lock()
+	mock.calls.GetDiagnosisIssue = append(mock.calls.GetDiagnosisIssue, callInfo)
+	mock.lockGetDiagnosisIssue.Unlock()
+	if mock.GetDiagnosisIssueFunc == nil {
+		var (
+			issueOut *diagnosis.Issue
+			errOut   error
+		)
+		return issueOut, errOut
+	}
+	return mock.GetDiagnosisIssueFunc(ctx, diagnosisID, issueID)
+}
+
+// GetDiagnosisIssueCalls gets all the calls that were made to GetDiagnosisIssue.
+// Check the length with:
+//
+//	len(mockedRepository.GetDiagnosisIssueCalls())
+func (mock *RepositoryMock) GetDiagnosisIssueCalls() []struct {
+	Ctx         context.Context
+	DiagnosisID types.DiagnosisID
+	IssueID     string
+} {
+	var calls []struct {
+		Ctx         context.Context
+		DiagnosisID types.DiagnosisID
+		IssueID     string
+	}
+	mock.lockGetDiagnosisIssue.RLock()
+	calls = mock.calls.GetDiagnosisIssue
+	mock.lockGetDiagnosisIssue.RUnlock()
+	return calls
+}
+
+// GetDiagnosisIssueCounts calls GetDiagnosisIssueCountsFunc.
+func (mock *RepositoryMock) GetDiagnosisIssueCounts(ctx context.Context, diagnosisID types.DiagnosisID) (diagnosis.IssueCounts, error) {
+	callInfo := struct {
+		Ctx         context.Context
+		DiagnosisID types.DiagnosisID
+	}{
+		Ctx:         ctx,
+		DiagnosisID: diagnosisID,
+	}
+	mock.lockGetDiagnosisIssueCounts.Lock()
+	mock.calls.GetDiagnosisIssueCounts = append(mock.calls.GetDiagnosisIssueCounts, callInfo)
+	mock.lockGetDiagnosisIssueCounts.Unlock()
+	if mock.GetDiagnosisIssueCountsFunc == nil {
+		var (
+			issueCountsOut diagnosis.IssueCounts
+			errOut         error
+		)
+		return issueCountsOut, errOut
+	}
+	return mock.GetDiagnosisIssueCountsFunc(ctx, diagnosisID)
+}
+
+// GetDiagnosisIssueCountsCalls gets all the calls that were made to GetDiagnosisIssueCounts.
+// Check the length with:
+//
+//	len(mockedRepository.GetDiagnosisIssueCountsCalls())
+func (mock *RepositoryMock) GetDiagnosisIssueCountsCalls() []struct {
+	Ctx         context.Context
+	DiagnosisID types.DiagnosisID
+} {
+	var calls []struct {
+		Ctx         context.Context
+		DiagnosisID types.DiagnosisID
+	}
+	mock.lockGetDiagnosisIssueCounts.RLock()
+	calls = mock.calls.GetDiagnosisIssueCounts
+	mock.lockGetDiagnosisIssueCounts.RUnlock()
 	return calls
 }
 
@@ -6643,6 +7102,108 @@ func (mock *RepositoryMock) ListAllTagsCalls() []struct {
 	return calls
 }
 
+// ListDiagnoses calls ListDiagnosesFunc.
+func (mock *RepositoryMock) ListDiagnoses(ctx context.Context, offset int, limit int) ([]*diagnosis.Diagnosis, int, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Offset int
+		Limit  int
+	}{
+		Ctx:    ctx,
+		Offset: offset,
+		Limit:  limit,
+	}
+	mock.lockListDiagnoses.Lock()
+	mock.calls.ListDiagnoses = append(mock.calls.ListDiagnoses, callInfo)
+	mock.lockListDiagnoses.Unlock()
+	if mock.ListDiagnosesFunc == nil {
+		var (
+			diagnosissOut []*diagnosis.Diagnosis
+			nOut          int
+			errOut        error
+		)
+		return diagnosissOut, nOut, errOut
+	}
+	return mock.ListDiagnosesFunc(ctx, offset, limit)
+}
+
+// ListDiagnosesCalls gets all the calls that were made to ListDiagnoses.
+// Check the length with:
+//
+//	len(mockedRepository.ListDiagnosesCalls())
+func (mock *RepositoryMock) ListDiagnosesCalls() []struct {
+	Ctx    context.Context
+	Offset int
+	Limit  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Offset int
+		Limit  int
+	}
+	mock.lockListDiagnoses.RLock()
+	calls = mock.calls.ListDiagnoses
+	mock.lockListDiagnoses.RUnlock()
+	return calls
+}
+
+// ListDiagnosisIssues calls ListDiagnosisIssuesFunc.
+func (mock *RepositoryMock) ListDiagnosisIssues(ctx context.Context, diagnosisID types.DiagnosisID, offset int, limit int, status *diagnosis.IssueStatus, ruleID *diagnosis.RuleID) ([]*diagnosis.Issue, int, error) {
+	callInfo := struct {
+		Ctx         context.Context
+		DiagnosisID types.DiagnosisID
+		Offset      int
+		Limit       int
+		Status      *diagnosis.IssueStatus
+		RuleID      *diagnosis.RuleID
+	}{
+		Ctx:         ctx,
+		DiagnosisID: diagnosisID,
+		Offset:      offset,
+		Limit:       limit,
+		Status:      status,
+		RuleID:      ruleID,
+	}
+	mock.lockListDiagnosisIssues.Lock()
+	mock.calls.ListDiagnosisIssues = append(mock.calls.ListDiagnosisIssues, callInfo)
+	mock.lockListDiagnosisIssues.Unlock()
+	if mock.ListDiagnosisIssuesFunc == nil {
+		var (
+			issuesOut []*diagnosis.Issue
+			nOut      int
+			errOut    error
+		)
+		return issuesOut, nOut, errOut
+	}
+	return mock.ListDiagnosisIssuesFunc(ctx, diagnosisID, offset, limit, status, ruleID)
+}
+
+// ListDiagnosisIssuesCalls gets all the calls that were made to ListDiagnosisIssues.
+// Check the length with:
+//
+//	len(mockedRepository.ListDiagnosisIssuesCalls())
+func (mock *RepositoryMock) ListDiagnosisIssuesCalls() []struct {
+	Ctx         context.Context
+	DiagnosisID types.DiagnosisID
+	Offset      int
+	Limit       int
+	Status      *diagnosis.IssueStatus
+	RuleID      *diagnosis.RuleID
+} {
+	var calls []struct {
+		Ctx         context.Context
+		DiagnosisID types.DiagnosisID
+		Offset      int
+		Limit       int
+		Status      *diagnosis.IssueStatus
+		RuleID      *diagnosis.RuleID
+	}
+	mock.lockListDiagnosisIssues.RLock()
+	calls = mock.calls.ListDiagnosisIssues
+	mock.lockListDiagnosisIssues.RUnlock()
+	return calls
+}
+
 // ListKnowledgeSlugs calls ListKnowledgeSlugsFunc.
 func (mock *RepositoryMock) ListKnowledgeSlugs(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.SlugInfo, error) {
 	callInfo := struct {
@@ -6716,6 +7277,46 @@ func (mock *RepositoryMock) ListKnowledgeTopicsCalls() []struct {
 	mock.lockListKnowledgeTopics.RLock()
 	calls = mock.calls.ListKnowledgeTopics
 	mock.lockListKnowledgeTopics.RUnlock()
+	return calls
+}
+
+// ListPendingDiagnosisIssues calls ListPendingDiagnosisIssuesFunc.
+func (mock *RepositoryMock) ListPendingDiagnosisIssues(ctx context.Context, diagnosisID types.DiagnosisID) ([]*diagnosis.Issue, error) {
+	callInfo := struct {
+		Ctx         context.Context
+		DiagnosisID types.DiagnosisID
+	}{
+		Ctx:         ctx,
+		DiagnosisID: diagnosisID,
+	}
+	mock.lockListPendingDiagnosisIssues.Lock()
+	mock.calls.ListPendingDiagnosisIssues = append(mock.calls.ListPendingDiagnosisIssues, callInfo)
+	mock.lockListPendingDiagnosisIssues.Unlock()
+	if mock.ListPendingDiagnosisIssuesFunc == nil {
+		var (
+			issuesOut []*diagnosis.Issue
+			errOut    error
+		)
+		return issuesOut, errOut
+	}
+	return mock.ListPendingDiagnosisIssuesFunc(ctx, diagnosisID)
+}
+
+// ListPendingDiagnosisIssuesCalls gets all the calls that were made to ListPendingDiagnosisIssues.
+// Check the length with:
+//
+//	len(mockedRepository.ListPendingDiagnosisIssuesCalls())
+func (mock *RepositoryMock) ListPendingDiagnosisIssuesCalls() []struct {
+	Ctx         context.Context
+	DiagnosisID types.DiagnosisID
+} {
+	var calls []struct {
+		Ctx         context.Context
+		DiagnosisID types.DiagnosisID
+	}
+	mock.lockListPendingDiagnosisIssues.RLock()
+	calls = mock.calls.ListPendingDiagnosisIssues
+	mock.lockListPendingDiagnosisIssues.RUnlock()
 	return calls
 }
 
@@ -6833,6 +7434,84 @@ func (mock *RepositoryMock) PutAlertListCalls() []struct {
 	mock.lockPutAlertList.RLock()
 	calls = mock.calls.PutAlertList
 	mock.lockPutAlertList.RUnlock()
+	return calls
+}
+
+// PutDiagnosis calls PutDiagnosisFunc.
+func (mock *RepositoryMock) PutDiagnosis(ctx context.Context, d *diagnosis.Diagnosis) error {
+	callInfo := struct {
+		Ctx context.Context
+		D   *diagnosis.Diagnosis
+	}{
+		Ctx: ctx,
+		D:   d,
+	}
+	mock.lockPutDiagnosis.Lock()
+	mock.calls.PutDiagnosis = append(mock.calls.PutDiagnosis, callInfo)
+	mock.lockPutDiagnosis.Unlock()
+	if mock.PutDiagnosisFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutDiagnosisFunc(ctx, d)
+}
+
+// PutDiagnosisCalls gets all the calls that were made to PutDiagnosis.
+// Check the length with:
+//
+//	len(mockedRepository.PutDiagnosisCalls())
+func (mock *RepositoryMock) PutDiagnosisCalls() []struct {
+	Ctx context.Context
+	D   *diagnosis.Diagnosis
+} {
+	var calls []struct {
+		Ctx context.Context
+		D   *diagnosis.Diagnosis
+	}
+	mock.lockPutDiagnosis.RLock()
+	calls = mock.calls.PutDiagnosis
+	mock.lockPutDiagnosis.RUnlock()
+	return calls
+}
+
+// PutDiagnosisIssue calls PutDiagnosisIssueFunc.
+func (mock *RepositoryMock) PutDiagnosisIssue(ctx context.Context, issue *diagnosis.Issue) error {
+	callInfo := struct {
+		Ctx   context.Context
+		Issue *diagnosis.Issue
+	}{
+		Ctx:   ctx,
+		Issue: issue,
+	}
+	mock.lockPutDiagnosisIssue.Lock()
+	mock.calls.PutDiagnosisIssue = append(mock.calls.PutDiagnosisIssue, callInfo)
+	mock.lockPutDiagnosisIssue.Unlock()
+	if mock.PutDiagnosisIssueFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutDiagnosisIssueFunc(ctx, issue)
+}
+
+// PutDiagnosisIssueCalls gets all the calls that were made to PutDiagnosisIssue.
+// Check the length with:
+//
+//	len(mockedRepository.PutDiagnosisIssueCalls())
+func (mock *RepositoryMock) PutDiagnosisIssueCalls() []struct {
+	Ctx   context.Context
+	Issue *diagnosis.Issue
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Issue *diagnosis.Issue
+	}
+	mock.lockPutDiagnosisIssue.RLock()
+	calls = mock.calls.PutDiagnosisIssue
+	mock.lockPutDiagnosisIssue.RUnlock()
 	return calls
 }
 

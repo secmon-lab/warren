@@ -490,3 +490,19 @@ func (r *Memory) BatchUpdateTicketsStatus(ctx context.Context, ticketIDs []types
 
 	return nil
 }
+
+// GetAllTickets returns all tickets for full-scan diagnosis checks.
+func (r *Memory) GetAllTickets(_ context.Context) ([]*ticket.Ticket, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var tickets []*ticket.Ticket
+	for _, t := range r.tickets {
+		cp := *t
+		tickets = append(tickets, &cp)
+	}
+	if tickets == nil {
+		return []*ticket.Ticket{}, nil
+	}
+	return tickets, nil
+}

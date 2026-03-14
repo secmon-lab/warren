@@ -7,6 +7,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
+	"github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
@@ -88,6 +89,11 @@ type Repository interface {
 	GetAlertWithoutEmbedding(ctx context.Context) (alert.Alerts, error)
 	GetAlertsWithInvalidEmbedding(ctx context.Context) (alert.Alerts, error)
 	GetTicketsWithInvalidEmbedding(ctx context.Context) ([]*ticket.Ticket, error)
+
+	// GetAllAlerts returns all alert records. Used by diagnosis rules for full-scan checks.
+	GetAllAlerts(ctx context.Context) (alert.Alerts, error)
+	// GetAllTickets returns all ticket records. Used by diagnosis rules for full-scan checks.
+	GetAllTickets(ctx context.Context) ([]*ticket.Ticket, error)
 
 	// For authentication management
 	PutToken(ctx context.Context, token *auth.Token) error
@@ -198,4 +204,32 @@ type Repository interface {
 
 	// ListKnowledgeTopics returns all topics with their knowledge counts (non-archived only)
 	ListKnowledgeTopics(ctx context.Context) ([]*knowledge.TopicSummary, error)
+
+	// Diagnosis management
+	// PutDiagnosis saves or updates a diagnosis header record.
+	PutDiagnosis(ctx context.Context, d *diagnosis.Diagnosis) error
+	// GetDiagnosis retrieves a diagnosis by ID.
+	GetDiagnosis(ctx context.Context, id types.DiagnosisID) (*diagnosis.Diagnosis, error)
+	// ListDiagnoses returns a paginated list of diagnoses ordered by CreatedAt DESC.
+	// Returns the diagnoses, total count, and any error.
+	ListDiagnoses(ctx context.Context, offset, limit int) ([]*diagnosis.Diagnosis, int, error)
+
+	// Diagnosis issue management (subcollection: diagnoses/{id}/issues/{issueID})
+	// PutDiagnosisIssue saves or updates a single issue.
+	PutDiagnosisIssue(ctx context.Context, issue *diagnosis.Issue) error
+	// ListDiagnosisIssues returns a paginated list of issues for a diagnosis.
+	// status and ruleID are optional server-side filters (nil means no filter).
+	// Returns the issues, total matching count, and any error.
+	ListDiagnosisIssues(ctx context.Context, diagnosisID types.DiagnosisID, offset, limit int, status *diagnosis.IssueStatus, ruleID *diagnosis.RuleID) ([]*diagnosis.Issue, int, error)
+	// GetDiagnosisIssue retrieves a specific issue by diagnosisID and issueID.
+	GetDiagnosisIssue(ctx context.Context, diagnosisID types.DiagnosisID, issueID string) (*diagnosis.Issue, error)
+	// CountDiagnosisIssues returns the number of issues for a diagnosis.
+	// If status is nil, counts all issues; otherwise counts only issues with the given status.
+	CountDiagnosisIssues(ctx context.Context, diagnosisID types.DiagnosisID, status *diagnosis.IssueStatus) (int, error)
+	// GetDiagnosisIssueCounts returns all status counts for a diagnosis in a single operation.
+	GetDiagnosisIssueCounts(ctx context.Context, diagnosisID types.DiagnosisID) (diagnosis.IssueCounts, error)
+	// BatchGetDiagnosisIssueCounts returns issue counts for multiple diagnoses.
+	BatchGetDiagnosisIssueCounts(ctx context.Context, diagnosisIDs []types.DiagnosisID) (map[types.DiagnosisID]diagnosis.IssueCounts, error)
+	// ListPendingDiagnosisIssues returns all pending issues for a diagnosis (no pagination).
+	ListPendingDiagnosisIssues(ctx context.Context, diagnosisID types.DiagnosisID) ([]*diagnosis.Issue, error)
 }

@@ -311,6 +311,51 @@ extend type Query {
   getAgentMemory(agentID: String!, memoryID: ID!): AgentMemory
 }
 
+type DiagnosisIssue {
+  id: ID!
+  diagnosisID: ID!
+  ruleID: String!
+  targetID: String!
+  description: String!
+  status: String!
+  fixedAt: String
+  failReason: String
+  createdAt: String!
+}
+
+type DiagnosisIssuesResponse {
+  issues: [DiagnosisIssue!]!
+  totalCount: Int!
+}
+
+# Issue counts are derived from subcollection aggregation queries (not stored in this object).
+type Diagnosis {
+  id: ID!
+  status: String!
+  totalCount: Int!
+  pendingCount: Int!
+  fixedCount: Int!
+  failedCount: Int!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type DiagnosesResponse {
+  diagnoses: [Diagnosis!]!
+  totalCount: Int!
+}
+
+extend type Query {
+  diagnoses(offset: Int, limit: Int): DiagnosesResponse!
+  diagnosis(id: ID!): Diagnosis
+  diagnosisIssues(diagnosisID: ID!, offset: Int, limit: Int, status: String, ruleID: String): DiagnosisIssuesResponse!
+}
+
+extend type Mutation {
+  runDiagnosis: Diagnosis!
+  fixDiagnosis(id: ID!): Diagnosis!
+}
+
 schema {
   query: Query
   mutation: Mutation
