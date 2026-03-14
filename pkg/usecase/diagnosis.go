@@ -48,6 +48,15 @@ func (u *UseCases) RunDiagnosis(ctx context.Context) (*diagnosismodel.Diagnosis,
 	}
 
 	logger.Info("diagnosis completed", "total_issues", totalIssues)
+
+	if totalIssues == 0 {
+		diag.Status = diagnosismodel.DiagnosisStatusHealthy
+		diag.UpdatedAt = clock.Now(ctx)
+		if err := u.repository.PutDiagnosis(ctx, diag); err != nil {
+			return nil, goerr.Wrap(err, "failed to update diagnosis status to healthy")
+		}
+	}
+
 	return diag, nil
 }
 

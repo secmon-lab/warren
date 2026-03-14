@@ -20,7 +20,7 @@ func TestRunDiagnosis_Basic(t *testing.T) {
 	gt.NoError(t, err)
 	gt.Value(t, diag).NotNil()
 	gt.Value(t, string(diag.ID)).NotEqual("")
-	gt.Value(t, string(diag.Status)).Equal(string(diagnosismodel.DiagnosisStatusPending))
+	gt.Value(t, string(diag.Status)).Equal(string(diagnosismodel.DiagnosisStatusHealthy))
 
 	// Verify the diagnosis was persisted
 	stored, err := repo.GetDiagnosis(ctx, diag.ID)
