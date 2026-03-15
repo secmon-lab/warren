@@ -11,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
+	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 )
@@ -18,11 +19,14 @@ import (
 //go:embed prompt/chat_system_prompt.md
 var chatSystemPromptTemplate string
 
+//go:embed prompt/ticketless_system_prompt.md
+var ticketlessSystemPromptTemplate string
+
 //go:embed prompt/tool_call_to_text.md
 var toolCallToTextPromptTemplate string
 
 // GenerateChatSystemPrompt generates the chat system prompt from template and parameters.
-func GenerateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertCount int, additionalInstructions string, knowledges []*knowledge.Knowledge, requesterID string, threadComments []ticket.Comment, userSystemPrompt string) (string, error) {
+func GenerateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertCount int, additionalInstructions string, knowledges []*knowledge.Knowledge, requesterID string, threadComments []ticket.Comment, userSystemPrompt string, historyMessages []model.HistoryMessage) (string, error) {
 	ticketJSON, err := json.MarshalIndent(target, "", "  ")
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to marshal ticket to JSON")
@@ -37,6 +41,19 @@ func GenerateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertC
 		"lang":                    lang.From(ctx),
 		"requester_id":            requesterID,
 		"thread_comments":         threadComments,
+		"user_system_prompt":      userSystemPrompt,
+		"history_messages":        historyMessages,
+	})
+}
+
+// GenerateTicketlessSystemPrompt generates the system prompt for ticketless chat.
+func GenerateTicketlessSystemPrompt(ctx context.Context, historyMessages []model.HistoryMessage, additionalInstructions string, knowledges []*knowledge.Knowledge, requesterID string, userSystemPrompt string) (string, error) {
+	return prompt.GenerateWithStruct(ctx, ticketlessSystemPromptTemplate, map[string]any{
+		"history_messages":        historyMessages,
+		"additional_instructions": additionalInstructions,
+		"knowledges":              knowledges,
+		"lang":                    lang.From(ctx),
+		"requester_id":            requesterID,
 		"user_system_prompt":      userSystemPrompt,
 	})
 }

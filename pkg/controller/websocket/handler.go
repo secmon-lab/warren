@@ -468,7 +468,7 @@ func (h *Handler) handleChatMessage(client *Client, message *websocket_model.Cha
 			// Setup context with WebSocket-specific message handlers
 			asyncCtx = msg.With(asyncCtx, notifyFunc, traceFunc, warnFunc)
 
-			if err := h.useCases.Chat(asyncCtx, ticket, message.Content); err != nil {
+			if err := h.useCases.Chat(asyncCtx, ticket, nil, message.Content); err != nil {
 				logger.Error("failed to process chat message",
 					"error", err,
 					"ticket_id", client.ticketID,

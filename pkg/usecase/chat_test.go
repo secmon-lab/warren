@@ -154,7 +154,7 @@ func TestHandlePrompt(t *testing.T) {
 	gt.NoError(t, mockRepo.BatchPutAlerts(ctx, alerts))
 
 	ticketID := types.NewTicketID()
-	err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID, AlertIDs: []types.AlertID{alerts[0].ID, alerts[1].ID}}, "Analyze the security alerts and provide a summary")
+	err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID, AlertIDs: []types.AlertID{alerts[0].ID, alerts[1].ID}}, nil, "Analyze the security alerts and provide a summary")
 	gt.NoError(t, err)
 
 	latestHistory, err := mockRepo.GetLatestHistory(ctx, ticketID)
@@ -184,7 +184,7 @@ func TestHandlePrompt(t *testing.T) {
 		})
 	}
 
-	err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "prompt:2")
+	err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "prompt:2")
 	gt.NoError(t, err)
 
 	latestHistory, err = mockRepo.GetLatestHistory(ctx, ticketID)
@@ -263,7 +263,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "test message")
 		gt.NoError(t, err)
 	})
 
@@ -291,7 +291,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "test message")
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})
@@ -319,7 +319,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "test message")
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})
@@ -378,7 +378,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "test message")
 		// Should succeed without calling policy
 		gt.NoError(t, err)
 	})
@@ -556,7 +556,7 @@ func TestChatErrorNotifications(t *testing.T) {
 		}
 
 		// This should not return an error, but should send notification about history loading failure
-		err := uc.Chat(ctx, targetTicket, "test query")
+		err := uc.Chat(ctx, targetTicket, nil, "test query")
 		gt.NoError(t, err)
 
 		// Assert notification was sent about history loading failure
@@ -620,7 +620,7 @@ func TestChatErrorNotifications(t *testing.T) {
 		}
 
 		// This should return an error due to agent execution failure
-		err := uc.Chat(ctx, targetTicket, "test query")
+		err := uc.Chat(ctx, targetTicket, nil, "test query")
 		gt.Error(t, err)
 		gt.S(t, err.Error()).Contains("failed to execute agent")
 
@@ -721,7 +721,7 @@ func TestChatErrorNotifications(t *testing.T) {
 		}
 
 		// This should return an error due to history save failure
-		err := uc.Chat(ctx, targetTicket, "test query")
+		err := uc.Chat(ctx, targetTicket, nil, "test query")
 		gt.Error(t, err)
 
 		// Check if there are any error notifications about saving
@@ -787,7 +787,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "test message")
 		gt.NoError(t, err)
 	})
 
@@ -808,7 +808,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "test message")
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})
@@ -865,7 +865,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.Chat(ctxWithUser, &ticket.Ticket{ID: ticketID}, "test message")
+		err = uc.Chat(ctxWithUser, &ticket.Ticket{ID: ticketID}, nil, "test message")
 		gt.NoError(t, err)
 	})
 
@@ -892,7 +892,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.Chat(ctxWithUser, &ticket.Ticket{ID: ticketID}, "test message")
+		err = uc.Chat(ctxWithUser, &ticket.Ticket{ID: ticketID}, nil, "test message")
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})
@@ -912,7 +912,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "test message")
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})
@@ -1033,7 +1033,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			Topic: "aws-guardduty",
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 5, "", nil, "U12345678", nil, "")
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 5, "", nil, "U12345678", nil, "", nil)
 		gt.NoError(t, err)
 
 		// Verify requester_id is rendered in mention format
@@ -1069,7 +1069,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			},
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 3, "", knowledges, "U99999999", nil, "")
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 3, "", knowledges, "U99999999", nil, "", nil)
 		gt.NoError(t, err)
 
 		gt.S(t, result).Contains("Domain Knowledge")
@@ -1083,7 +1083,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			ID: types.NewTicketID(),
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "Use BigQuery for log analysis", nil, "UABC", nil, "")
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "Use BigQuery for log analysis", nil, "UABC", nil, "", nil)
 		gt.NoError(t, err)
 
 		gt.S(t, result).Contains("Additional Instructions")
@@ -1096,7 +1096,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			ID: types.NewTicketID(),
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "", nil, "")
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "", nil, "", nil)
 		gt.NoError(t, err)
 
 		// Should render without error even with empty requester_id
@@ -1124,7 +1124,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			},
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", comments, "")
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", comments, "", nil)
 		gt.NoError(t, err)
 
 		gt.S(t, result).Contains("Recent Thread Conversations")
@@ -1141,7 +1141,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			ID: types.NewTicketID(),
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, "")
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, "", nil)
 		gt.NoError(t, err)
 
 		gt.S(t, result).NotContains("Recent Thread Conversations")
@@ -1154,7 +1154,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 		}
 
 		userPrompt := "## Environment\nThis is a production environment.\n\n## Response Policy\nAlways escalate critical findings."
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, userPrompt)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, userPrompt, nil)
 		gt.NoError(t, err)
 
 		gt.S(t, result).Contains("User System Prompt")
@@ -1168,7 +1168,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			ID: types.NewTicketID(),
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, "")
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, "", nil)
 		gt.NoError(t, err)
 
 		gt.S(t, result).NotContains("User System Prompt")

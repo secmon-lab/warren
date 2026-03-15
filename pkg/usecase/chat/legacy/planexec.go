@@ -147,8 +147,8 @@ func NewPlanExecChat(repo interfaces.Repository, llmClient gollem.LLMClient, pol
 }
 
 // Execute processes a chat message for the specified ticket.
-// This is the main orchestrator that coordinates all phases of chat processing.
-func (c *PlanExecChat) Execute(ctx context.Context, target *ticket.Ticket, message string) error {
+// For ticketless chat, target has empty ID and slackHistory provides conversation context.
+func (c *PlanExecChat) Execute(ctx context.Context, target *ticket.Ticket, slackHistory []slack.HistoryMessage, message string) error {
 	logger := logging.From(ctx)
 
 	// Phase 1: Session setup
@@ -173,7 +173,7 @@ func (c *PlanExecChat) Execute(ctx context.Context, target *ticket.Ticket, messa
 	}
 
 	// Phase 5: Context preparation & agent execution
-	return c.executeAgent(ctx, target, ssn, message, planFunc, &finalStatus)
+	return c.executeAgent(ctx, target, ssn, message, planFunc, &finalStatus, slackHistory)
 }
 
 // createSession creates and persists a new chat session.
@@ -293,7 +293,8 @@ func (c *PlanExecChat) finishSession(ctx context.Context, ssn *session.Session, 
 		logger.Error("failed to update final session status", "error", err, "status", *finalStatus)
 	}
 
-	if *finalStatus == types.SessionStatusCompleted && c.slackService != nil && target.SlackThread != nil {
+	// Skip session actions for ticketless chat (no ticket to act on)
+	if target.ID != "" && *finalStatus == types.SessionStatusCompleted && c.slackService != nil && target.SlackThread != nil {
 		threadSvc := c.slackService.NewThread(*target.SlackThread)
 
 		var sessionURL string
@@ -330,40 +331,56 @@ func (c *PlanExecChat) authorize(ctx context.Context, message string) (bool, err
 }
 
 // executeAgent handles context preparation, agent construction, execution, and result processing.
-func (c *PlanExecChat) executeAgent(ctx context.Context, target *ticket.Ticket, ssn *session.Session, message string, planFunc func(context.Context, string), finalStatus *types.SessionStatus) error {
-	// Setup finding update function
-	slackUpdateFunc := func(ctx context.Context, t *ticket.Ticket) error {
-		if c.slackService == nil || !t.HasSlackThread() || t.Finding == nil {
-			return nil
-		}
-		threadSvc := c.slackService.NewThread(*t.SlackThread)
-		return threadSvc.PostFinding(ctx, t.Finding)
-	}
+// When slackHistory is non-nil, the execution runs in ticketless mode (no base tool, no history, ticketless prompt).
+func (c *PlanExecChat) executeAgent(ctx context.Context, target *ticket.Ticket, ssn *session.Session, message string, planFunc func(context.Context, string), finalStatus *types.SessionStatus, slackHistory []slack.HistoryMessage) error {
+	ticketless := target.ID == ""
 
-	baseAction := base.New(c.repository, target.ID, base.WithSlackUpdate(slackUpdateFunc), base.WithLLMClient(c.llmClient))
-
-	// Load history
+	var tools []gollem.ToolSet
+	var history *gollem.History
+	var systemPrompt string
 	storageSvc := storage.New(c.storageClient, storage.WithPrefix(c.storagePrefix))
-	history, err := c.loadHistory(ctx, target, storageSvc)
-	if err != nil {
-		return err
-	}
 
-	// Load alerts and prepare tools
-	alerts, err := c.repository.BatchGetAlerts(ctx, target.AlertIDs)
-	if err != nil {
-		return goerr.Wrap(err, "failed to get alerts")
-	}
+	if ticketless {
+		// Ticketless: knowledge tool with dynamic topic, no base tool
+		kt := knowledgeTool.New(c.repository, "")
+		tools = append(c.tools, kt)
 
-	effectiveTopic := c.resolveEffectiveTopic(ctx, target, alerts)
+		// Build ticketless system prompt
+		var err error
+		systemPrompt, err = c.buildTicketlessSystemPrompt(ctx, tools, slackHistory)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Ticket-bound: base tool + knowledge tool, load history and alerts
+		slackUpdateFunc := func(ctx context.Context, t *ticket.Ticket) error {
+			if c.slackService == nil || !t.HasSlackThread() || t.Finding == nil {
+				return nil
+			}
+			threadSvc := c.slackService.NewThread(*t.SlackThread)
+			return threadSvc.PostFinding(ctx, t.Finding)
+		}
+		baseAction := base.New(c.repository, target.ID, base.WithSlackUpdate(slackUpdateFunc), base.WithLLMClient(c.llmClient))
 
-	kt := knowledgeTool.New(c.repository, effectiveTopic)
-	tools := append(c.tools, baseAction, kt)
+		var err error
+		history, err = c.loadHistory(ctx, target, storageSvc)
+		if err != nil {
+			return err
+		}
 
-	// Build system prompt
-	systemPrompt, err := c.buildSystemPrompt(ctx, target, ssn, tools, alerts, effectiveTopic)
-	if err != nil {
-		return err
+		alerts, err := c.repository.BatchGetAlerts(ctx, target.AlertIDs)
+		if err != nil {
+			return goerr.Wrap(err, "failed to get alerts")
+		}
+
+		effectiveTopic := c.resolveEffectiveTopic(ctx, target, alerts)
+		kt := knowledgeTool.New(c.repository, effectiveTopic)
+		tools = append(c.tools, baseAction, kt)
+
+		systemPrompt, err = c.buildSystemPrompt(ctx, target, ssn, tools, alerts, effectiveTopic, slackHistory)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Get request ID
@@ -382,7 +399,9 @@ func (c *PlanExecChat) executeAgent(ctx context.Context, target *ticket.Ticket, 
 	})
 
 	// Build and execute agent
-	gollemAgent := c.buildAgent(ctx, strategy, history, tools, systemPrompt, requestID)
+	// Skip trace LLM middleware for ticketless to avoid leaking planexec's
+	// internal JSON responses (e.g. {needs_plan, direct_response}) to Slack.
+	gollemAgent := c.buildAgent(ctx, strategy, history, tools, systemPrompt, requestID, buildAgentOption{skipTraceLLM: ticketless})
 
 	result, executionErr := gollemAgent.Execute(ctx, gollem.Text(message))
 	if executionErr != nil {
@@ -401,10 +420,54 @@ func (c *PlanExecChat) executeAgent(ctx context.Context, target *ticket.Ticket, 
 	}
 
 	// Handle result
-	c.handleResult(ctx, result, target, ssn)
+	if ticketless {
+		// Ticketless: just notify, no ticket comment
+		if result != nil && !result.IsEmpty() {
+			msg.Notify(ctx, "💬 %s", result.String())
+		}
+	} else {
+		c.handleResult(ctx, result, target, ssn)
+	}
 
-	// Save history
-	return c.saveHistory(ctx, gollemAgent, target, storageSvc)
+	// Save history (skip for ticketless)
+	if !ticketless {
+		return c.saveHistory(ctx, gollemAgent, target, storageSvc)
+	}
+	return nil
+}
+
+// buildTicketlessSystemPrompt generates the system prompt for ticketless chat.
+func (c *PlanExecChat) buildTicketlessSystemPrompt(ctx context.Context, tools []gollem.ToolSet, slackHistory []slack.HistoryMessage) (string, error) {
+	logger := logging.From(ctx)
+	userID := types.UserID(user.FromContext(ctx))
+
+	// Collect tool prompts
+	var toolPrompts []string
+	for _, toolSet := range tools {
+		if tool, ok := toolSet.(interfaces.Tool); ok {
+			additionalPrompt, err := tool.Prompt(ctx)
+			if err != nil {
+				logger.Warn("failed to get prompt from tool", "tool", tool, "error", err)
+				continue
+			}
+			if additionalPrompt != "" {
+				toolPrompts = append(toolPrompts, additionalPrompt)
+			}
+		}
+	}
+
+	for _, sa := range c.subAgents {
+		if ph := sa.PromptHint(); ph != "" {
+			toolPrompts = append(toolPrompts, ph)
+		}
+	}
+
+	var additionalInstructions string
+	if len(toolPrompts) > 0 {
+		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
+	}
+
+	return GenerateTicketlessSystemPrompt(ctx, slackHistory, additionalInstructions, nil, string(userID), c.userSystemPrompt)
 }
 
 // loadHistory loads the chat history for the ticket.
@@ -430,7 +493,7 @@ func (c *PlanExecChat) resolveEffectiveTopic(ctx context.Context, target *ticket
 }
 
 // buildSystemPrompt generates the system prompt with all context.
-func (c *PlanExecChat) buildSystemPrompt(ctx context.Context, target *ticket.Ticket, ssn *session.Session, tools []gollem.ToolSet, alerts []*alert.Alert, effectiveTopic types.KnowledgeTopic) (string, error) {
+func (c *PlanExecChat) buildSystemPrompt(ctx context.Context, target *ticket.Ticket, ssn *session.Session, tools []gollem.ToolSet, alerts []*alert.Alert, effectiveTopic types.KnowledgeTopic, slackHistory []slack.HistoryMessage) (string, error) {
 	logger := logging.From(ctx)
 	userID := types.UserID(user.FromContext(ctx))
 
@@ -475,19 +538,27 @@ func (c *PlanExecChat) buildSystemPrompt(ctx context.Context, target *ticket.Tic
 	// Collect thread comments
 	threadComments := CollectThreadComments(ctx, c.repository, target.ID, ssn)
 
-	return GenerateChatSystemPrompt(ctx, target, len(alerts), additionalInstructions, knowledges, string(userID), threadComments, c.userSystemPrompt)
+	return GenerateChatSystemPrompt(ctx, target, len(alerts), additionalInstructions, knowledges, string(userID), threadComments, c.userSystemPrompt, slackHistory)
+}
+
+// buildAgentOption holds optional configuration for buildAgent.
+type buildAgentOption struct {
+	skipTraceLLM bool
 }
 
 // buildAgent constructs the gollem agent with strategy, tools, and middleware.
-func (c *PlanExecChat) buildAgent(ctx context.Context, strategy gollem.Strategy, history *gollem.History, tools []gollem.ToolSet, systemPrompt string, requestID string) *gollem.Agent {
+func (c *PlanExecChat) buildAgent(ctx context.Context, strategy gollem.Strategy, history *gollem.History, tools []gollem.ToolSet, systemPrompt string, requestID string, opts ...buildAgentOption) *gollem.Agent {
 	logger := logging.From(ctx)
+
+	var opt buildAgentOption
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
 
 	gollemSubAgents := make([]*gollem.SubAgent, len(c.subAgents))
 	for i, sa := range c.subAgents {
 		gollemSubAgents[i] = sa.Inner()
 	}
-
-	traceMW := newTraceLLMMiddleware()
 
 	agentOpts := []gollem.Option{
 		gollem.WithStrategy(strategy),
@@ -509,7 +580,17 @@ func (c *PlanExecChat) buildAgent(ctx context.Context, strategy gollem.Strategy,
 
 	agentOpts = append(agentOpts,
 		gollem.WithContentBlockMiddleware(llm.NewCompactionMiddleware(c.llmClient, logging.From(ctx))),
-		gollem.WithContentBlockMiddleware(traceMW),
+	)
+
+	// The trace LLM middleware posts every LLM text response (including planexec's
+	// internal JSON like {needs_plan, direct_response}) to Slack. Skip it for
+	// ticketless chat where those intermediate responses should not be visible.
+	if !opt.skipTraceLLM {
+		traceMW := newTraceLLMMiddleware()
+		agentOpts = append(agentOpts, gollem.WithContentBlockMiddleware(traceMW))
+	}
+
+	agentOpts = append(agentOpts,
 		gollem.WithToolMiddleware(func(next gollem.ToolHandler) gollem.ToolHandler {
 			return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
 				if err := ssnutil.CheckStatus(ctx); err != nil {
