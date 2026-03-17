@@ -16,11 +16,15 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
+	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 )
 
 //go:embed prompt/system.md
 var systemPromptTemplate string
+
+//go:embed prompt/ticketless_system.md
+var ticketlessSystemPromptTemplate string
 
 //go:embed prompt/plan.md
 var planPromptTemplate string
@@ -47,6 +51,7 @@ type planningContext struct {
 	requesterID    string
 	threadComments []ticket.Comment
 	knowledges     []*knowledge.Knowledge
+	slackHistory   []model.HistoryMessage
 }
 
 // generateSystemPrompt generates the shared system prompt containing static context.
@@ -66,6 +71,7 @@ func generateSystemPrompt(ctx context.Context, pc *planningContext) (string, err
 		"thread_comments":       pc.threadComments,
 		"knowledges":            pc.knowledges,
 		"topic":                 pc.ticket.Topic,
+		"history_messages":      pc.slackHistory,
 	})
 }
 
@@ -101,6 +107,33 @@ func generateFinalPrompt(ctx context.Context, pc *planningContext, allResults []
 		"completed_results": formatCompletedResults(allResults),
 		"lang":              pc.lang,
 		"requester_id":      pc.requesterID,
+	})
+}
+
+// ticketlessPlanningContext holds the shared context for ticketless planning operations.
+type ticketlessPlanningContext struct {
+	message       string
+	tools         []gollem.ToolSet
+	subAgents     []*agent.SubAgent
+	memoryContext string
+	userPrompt    string
+	lang          lang.Lang
+	requesterID   string
+	knowledges    []*knowledge.Knowledge
+	history       []model.HistoryMessage
+}
+
+// generateTicketlessSystemPrompt generates the system prompt for ticketless chat.
+func generateTicketlessSystemPrompt(ctx context.Context, pc *ticketlessPlanningContext) (string, error) {
+	return prompt.GenerateWithStruct(ctx, ticketlessSystemPromptTemplate, map[string]any{
+		"history_messages":      pc.history,
+		"tools_description":     describeTools(ctx, pc.tools),
+		"subagents_description": describeSubAgents(pc.subAgents),
+		"memory_context":        pc.memoryContext,
+		"user_prompt":           pc.userPrompt,
+		"lang":                  pc.lang,
+		"requester_id":          pc.requesterID,
+		"knowledges":            pc.knowledges,
 	})
 }
 

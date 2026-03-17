@@ -45,6 +45,15 @@ Respond in **{{ .lang }}**.
 There are {{ .alert_count }} alerts total. The remaining alerts can be retrieved using the `warren_get_alerts` tool.
 {{ end }}
 
+{{ if .history_messages }}
+## Channel Context
+
+The following recent messages from the Slack channel provide additional context:
+{{ range .history_messages }}
+*{{ .UserName }}* ({{ .Timestamp.Format "2006-01-02 15:04:05" }}):
+{{ .Text }}
+{{ end }}
+{{ end }}
 ## Available Tools
 {{ .tools_description }}
 

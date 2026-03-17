@@ -10,6 +10,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
+	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat"
@@ -17,9 +18,9 @@ import (
 )
 
 // Chat processes a chat message for the specified ticket.
-// It delegates to ChatUC (ChatUseCase) for the actual processing.
-func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, message string) error {
-	return x.ChatUC.Execute(ctx, target, message)
+// For ticketless chat, pass a placeholder ticket (empty ID) with slackHistory.
+func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, slackHistory []slack.HistoryMessage, message string) error {
+	return x.ChatUC.Execute(ctx, target, slackHistory, message)
 }
 
 // collectThreadComments delegates to the chat package exported function.

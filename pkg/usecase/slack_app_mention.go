@@ -6,6 +6,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/service/command"
 	"github.com/secmon-lab/warren/pkg/utils/authctx"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -68,15 +69,6 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 			return nil
 		}
 
-		ticket, err := uc.repository.GetTicketByThread(ctx, slackMsg.Thread())
-		if err != nil {
-			return goerr.Wrap(err, "failed to get ticket by slack thread")
-		}
-		if ticket == nil {
-			msg.Notify(ctx, "😣 Please create a ticket first. I will not work without a ticket.")
-			return nil
-		}
-
 		// Setup Slack-specific message handlers using msg.With
 		threadSvc := uc.slackService.NewThread(slackMsg.Thread())
 
@@ -97,8 +89,27 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 		slackURL := slackMsg.SlackURL()
 		ctx = slackctx.WithSlackURL(ctx, slackURL)
 
-		// Pass user-enriched context to chat function
-		return uc.Chat(ctx, ticket, mention.Message)
+		// Get Slack history for conversation context (both ticket-bound and ticketless)
+		history, err := uc.slackService.GetMessageHistory(ctx, &slackMsg)
+		if err != nil {
+			logger.Warn("failed to get slack history", "error", err)
+			history = nil
+		}
+
+		existingTicket, err := uc.repository.GetTicketByThread(ctx, slackMsg.Thread())
+		if err != nil {
+			return goerr.Wrap(err, "failed to get ticket by slack thread")
+		}
+
+		if existingTicket != nil {
+			return uc.Chat(ctx, existingTicket, history, mention.Message)
+		}
+
+		// Ticketless chat
+		ctx = slackctx.WithThread(ctx, slackMsg.Thread())
+		thread := slackMsg.Thread()
+		placeholderTicket := &ticket.Ticket{SlackThread: &thread}
+		return uc.Chat(ctx, placeholderTicket, history, mention.Message)
 	}
 
 	return nil

@@ -56,6 +56,11 @@ func (x *Knowledge) LogValue() slog.Value {
 }
 
 func (x *Knowledge) Prompt(ctx context.Context) (string, error) {
+	topicInfo := "Current topic: `" + x.topic.String() + "`"
+	if x.topic == "" {
+		topicInfo = "Topic is dynamic: specify the `topic` parameter in each command. Use a specific topic name if known, or `general` for general-purpose knowledge."
+	}
+
 	return `## Knowledge Management
 
 **CRITICAL**: Save/store/remember requests MUST use tools, not just words.
@@ -82,7 +87,7 @@ Agent: {"needs_plan": true, "tasks": [{"description": "Use knowledge_save..."}]}
 3. Save/update: ` + "`knowledge_save`" + `
 4. Confirm with commit ID
 
-Current topic: ` + "`" + x.topic.String() + "`", nil
+` + topicInfo, nil
 }
 
 const (
@@ -93,11 +98,19 @@ const (
 )
 
 func (x *Knowledge) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
+	topicParam := &gollem.Parameter{
+		Type:        gollem.TypeString,
+		Description: "Knowledge topic to operate on. Use a specific topic name if known, or 'general' for general-purpose knowledge.",
+		Required:    x.topic == "",
+	}
+
 	return []gollem.ToolSpec{
 		{
 			Name:        cmdListKnowledgeSlugs,
 			Description: "List all knowledge slugs and names in the current topic. Use this to see what knowledges are available before retrieving or updating them.",
-			Parameters:  map[string]*gollem.Parameter{},
+			Parameters: map[string]*gollem.Parameter{
+				"topic": topicParam,
+			},
 		},
 		{
 			Name:        cmdGetKnowledges,
@@ -107,6 +120,7 @@ func (x *Knowledge) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Type:        gollem.TypeString,
 					Description: "Optional. Specific knowledge slug to retrieve. If omitted, all knowledges are retrieved.",
 				},
+				"topic": topicParam,
 			},
 		},
 		{
@@ -128,6 +142,7 @@ func (x *Knowledge) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "The knowledge content",
 					Required:    true,
 				},
+				"topic": topicParam,
 			},
 		},
 		{
@@ -139,15 +154,29 @@ func (x *Knowledge) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 					Description: "Slug of the knowledge to archive",
 					Required:    true,
 				},
+				"topic": topicParam,
 			},
 		},
 	}, nil
 }
 
+// resolveTopic returns the effective topic. If a fixed topic is set (ticket-bound chat),
+// it takes precedence. Otherwise, the topic from the command arguments is used,
+// falling back to "general".
+func (x *Knowledge) resolveTopic(args map[string]any) types.KnowledgeTopic {
+	if x.topic != "" {
+		return x.topic
+	}
+	if topic, ok := args["topic"].(string); ok && topic != "" {
+		return types.KnowledgeTopic(topic)
+	}
+	return types.KnowledgeTopic("general")
+}
+
 func (x *Knowledge) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
 	switch name {
 	case cmdListKnowledgeSlugs:
-		return x.listSlugs(ctx)
+		return x.listSlugs(ctx, args)
 	case cmdGetKnowledges:
 		return x.getKnowledges(ctx, args)
 	case cmdSaveKnowledge:
@@ -159,8 +188,8 @@ func (x *Knowledge) Run(ctx context.Context, name string, args map[string]any) (
 	}
 }
 
-func (x *Knowledge) listSlugs(ctx context.Context) (map[string]any, error) {
-	slugs, err := x.svc.ListSlugs(ctx, x.topic)
+func (x *Knowledge) listSlugs(ctx context.Context, args map[string]any) (map[string]any, error) {
+	slugs, err := x.svc.ListSlugs(ctx, x.resolveTopic(args))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list knowledge slugs")
 	}
@@ -174,10 +203,11 @@ func (x *Knowledge) listSlugs(ctx context.Context) (map[string]any, error) {
 
 func (x *Knowledge) getKnowledges(ctx context.Context, args map[string]any) (map[string]any, error) {
 	slug, _ := args["slug"].(string)
+	topic := x.resolveTopic(args)
 
 	if slug != "" {
 		// Get specific knowledge
-		k, err := x.svc.GetKnowledge(ctx, x.topic, types.KnowledgeSlug(slug))
+		k, err := x.svc.GetKnowledge(ctx, topic, types.KnowledgeSlug(slug))
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to get knowledge")
 		}
@@ -199,7 +229,7 @@ func (x *Knowledge) getKnowledges(ctx context.Context, args map[string]any) (map
 	}
 
 	// Get all knowledges
-	knowledges, err := x.svc.GetKnowledges(ctx, x.topic)
+	knowledges, err := x.svc.GetKnowledges(ctx, topic)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get knowledges")
 	}
@@ -228,7 +258,7 @@ func (x *Knowledge) saveKnowledge(ctx context.Context, args map[string]any) (map
 	}
 
 	// Author is always system when updated by agent
-	commitID, err := x.svc.SaveKnowledge(ctx, x.topic, types.KnowledgeSlug(slug), name, content, types.SystemUserID)
+	commitID, err := x.svc.SaveKnowledge(ctx, x.resolveTopic(args), types.KnowledgeSlug(slug), name, content, types.SystemUserID)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to save knowledge")
 	}
@@ -249,7 +279,7 @@ func (x *Knowledge) archiveKnowledge(ctx context.Context, args map[string]any) (
 		return nil, goerr.New("slug is required")
 	}
 
-	if err := x.svc.ArchiveKnowledge(ctx, x.topic, types.KnowledgeSlug(slug)); err != nil {
+	if err := x.svc.ArchiveKnowledge(ctx, x.resolveTopic(args), types.KnowledgeSlug(slug)); err != nil {
 		return nil, goerr.Wrap(err, "failed to archive knowledge")
 	}
 

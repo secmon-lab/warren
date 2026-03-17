@@ -167,6 +167,19 @@ When sub-agents return `records`, that IS your result. Empty `records` = nothing
 • Second finding
 ```
 
+{{- if .history_messages }}
+-----------------------
+
+# Channel Context
+
+The following recent messages from the Slack channel provide additional context:
+
+{{ range .history_messages }}
+*{{ .UserName }}* ({{ .Timestamp.Format "2006-01-02 15:04:05" }}):
+{{ .Text }}
+{{ end }}
+{{- end }}
+
 {{- if .thread_comments }}
 -----------------------
 

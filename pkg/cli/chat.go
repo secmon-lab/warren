@@ -218,7 +218,7 @@ func runSingleQuery(ctx context.Context, uc *usecase.UseCases, ticket *ticket.Ti
 	// Setup message handlers for CLI output
 	ctx = setupCLIMessageHandlers(ctx)
 
-	if err := uc.Chat(ctx, ticket, query); err != nil {
+	if err := uc.Chat(ctx, ticket, nil, query); err != nil {
 		return goerr.Wrap(err, "failed to process query")
 	}
 
@@ -264,7 +264,7 @@ func runInteractiveMode(ctx context.Context, uc *usecase.UseCases, ticket *ticke
 			break
 		}
 
-		if err := uc.Chat(ctx, ticket, message); err != nil {
+		if err := uc.Chat(ctx, ticket, nil, message); err != nil {
 			fmt.Printf("❌ Error: %s\n", err.Error())
 			logger.Error("Chat error", "error", err)
 		}

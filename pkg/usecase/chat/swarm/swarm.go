@@ -12,8 +12,11 @@ import (
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
+	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
+	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/llm"
@@ -153,7 +156,8 @@ func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient in
 }
 
 // Execute processes a chat message for the specified ticket using parallel task execution.
-func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, message string) error {
+// For ticketless chat, target has empty ID and slackHistory provides conversation context.
+func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, slackHistory []model.HistoryMessage, message string) error {
 	logger := logging.From(ctx)
 	logger.Debug("swarm execute: start",
 		"ticket_id", target.ID,
@@ -187,7 +191,7 @@ func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, message 
 	logger.Debug("swarm execute: authorized, starting swarm")
 
 	// Phase 5: Swarm execution
-	if err := c.executeSwarm(ctx, target, ssn, message, &finalStatus); err != nil {
+	if err := c.executeSwarm(ctx, target, ssn, message, &finalStatus, slackHistory); err != nil {
 		// Session abort and context cancellation are expected outcomes
 		// when a user aborts the session, not errors to report.
 		if errors.Is(err, ErrSessionAborted) || errors.Is(err, context.Canceled) {
@@ -199,7 +203,9 @@ func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, message 
 }
 
 // executeSwarm orchestrates the swarm execution: plan → parallel exec → replan → loop → final response.
-func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn *session.Session, message string, finalStatus *types.SessionStatus) error {
+// When slackHistory is non-nil, the execution runs in ticketless mode (no base tool, no history persistence, ticketless system prompt).
+func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn *session.Session, message string, finalStatus *types.SessionStatus, slackHistory []model.HistoryMessage) error {
+	ticketless := target.ID == ""
 	logger := logging.From(ctx)
 
 	// Preserve a non-cancelled context for finishSession cleanup (Slack posts, DB updates)
@@ -243,17 +249,25 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		defer handler.EndAgentExecute(ctx, nil)
 	}
 
-	// Load history
+	// Load history (skip for ticketless - no persistent conversation)
 	storageSvc := storage.New(c.storageClient, storage.WithPrefix(c.storagePrefix))
-	history, err := chat.LoadHistory(ctx, c.repository, target.ID, storageSvc)
-	if err != nil {
-		return err
+	var history *gollem.History
+	if !ticketless {
+		var err error
+		history, err = chat.LoadHistory(ctx, c.repository, target.ID, storageSvc)
+		if err != nil {
+			return err
+		}
 	}
 
-	// Load alerts for planning context
-	alerts, err := c.repository.BatchGetAlerts(ctx, target.AlertIDs)
-	if err != nil {
-		return goerr.Wrap(err, "failed to get alerts")
+	// Load alerts for planning context (empty for ticketless)
+	var alerts []*alert.Alert
+	if !ticketless {
+		var err error
+		alerts, err = c.repository.BatchGetAlerts(ctx, target.AlertIDs)
+		if err != nil {
+			return goerr.Wrap(err, "failed to get alerts")
+		}
 	}
 
 	// Search agent memories
@@ -267,19 +281,28 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		}
 	}
 
-	// Build planning context (include base tool specs so planner can assign them)
-	baseAction := base.New(c.repository, target.ID)
+	// Build tools (skip base tool for ticketless - it requires ticket ID)
 	allTools := make([]gollem.ToolSet, 0, len(c.tools)+1)
 	allTools = append(allTools, c.tools...)
-	allTools = append(allTools, baseAction)
+	if !ticketless {
+		baseAction := base.New(c.repository, target.ID)
+		allTools = append(allTools, baseAction)
+	}
 
-	// Collect thread comments
-	threadComments := chat.CollectThreadComments(ctx, c.repository, target.ID, ssn)
+	// Collect thread comments (empty for ticketless)
+	var threadComments []ticket.Comment
+	if !ticketless {
+		threadComments = chat.CollectThreadComments(ctx, c.repository, target.ID, ssn)
+	}
 
-	// Collect domain knowledges
-	knowledges, err := c.repository.GetKnowledges(ctx, target.Topic)
-	if err != nil {
-		logger.Warn("failed to get knowledges", "error", err, "topic", target.Topic)
+	// Collect domain knowledges (empty for ticketless - no topic)
+	var knowledges []*knowledge.Knowledge
+	if !ticketless && target.Topic != "" {
+		var err error
+		knowledges, err = c.repository.GetKnowledges(ctx, target.Topic)
+		if err != nil {
+			logger.Warn("failed to get knowledges", "error", err, "topic", target.Topic)
+		}
 	}
 
 	planCtx := &planningContext{
@@ -294,12 +317,34 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		requesterID:    string(types.UserID(user.FromContext(ctx))),
 		threadComments: threadComments,
 		knowledges:     knowledges,
+		slackHistory:   slackHistory,
 	}
 
 	// Generate system prompt once (shared across plan/replan/final sessions)
-	systemPrompt, err := generateSystemPrompt(ctx, planCtx)
-	if err != nil {
-		return goerr.Wrap(err, "failed to generate system prompt")
+	var systemPrompt string
+	if ticketless {
+		tlpc := &ticketlessPlanningContext{
+			message:       message,
+			tools:         allTools,
+			subAgents:     c.subAgents,
+			memoryContext: memoryContext,
+			userPrompt:    c.userSystemPrompt,
+			lang:          lang.From(ctx),
+			requesterID:   string(types.UserID(user.FromContext(ctx))),
+			knowledges:    knowledges,
+			history:       slackHistory,
+		}
+		var err error
+		systemPrompt, err = generateTicketlessSystemPrompt(ctx, tlpc)
+		if err != nil {
+			return goerr.Wrap(err, "failed to generate ticketless system prompt")
+		}
+	} else {
+		var err error
+		systemPrompt, err = generateSystemPrompt(ctx, planCtx)
+		if err != nil {
+			return goerr.Wrap(err, "failed to generate system prompt")
+		}
 	}
 
 	// Create planning session with history
@@ -327,7 +372,9 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		msg.Notify(ctx, "💥 Planning failed: %s", err.Error())
 		return goerr.Wrap(err, "planning failed")
 	}
-	c.saveLatestHistory(ctx, planSession, target.ID, storageSvc)
+	if !ticketless {
+		c.saveLatestHistory(ctx, planSession, target.ID, storageSvc)
+	}
 
 	// Post initial message
 	if planResult.Message != "" {
@@ -336,7 +383,10 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 
 	// Direct response (no tasks)
 	if len(planResult.Tasks) == 0 {
-		return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
+		if !ticketless {
+			return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
+		}
+		return nil
 	}
 
 	// Execute phases
@@ -358,21 +408,27 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 
 		// Check for context cancellation (abort detected by monitor)
 		if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
-			c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
+			if !ticketless {
+				c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
+			}
 			return abortErr
 		}
 
 		// Replan
 		replanResult, err := c.replan(ctx, planSession, planCtx, allResults, phase, systemPrompt)
 		if err != nil {
-			c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
+			if !ticketless {
+				c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
+			}
 			if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
 				return abortErr
 			}
 			logger.Error("replan failed", "error", err, "phase", phase)
 			break
 		}
-		c.saveLatestHistory(ctx, planSession, target.ID, storageSvc)
+		if !ticketless {
+			c.saveLatestHistory(ctx, planSession, target.ID, storageSvc)
+		}
 
 		// Post replan message if present
 		if replanResult.Message != "" {
@@ -398,7 +454,9 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 	// Generate final response
 	finalResp, err := c.generateFinalResponse(ctx, planSession, planCtx, allResults, systemPrompt)
 	if err != nil {
-		c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
+		if !ticketless {
+			c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
+		}
 		if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
 			return abortErr
 		}
@@ -406,12 +464,17 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		msg.Notify(ctx, "💥 Failed to generate final response: %s", err.Error())
 		return goerr.Wrap(err, "failed to generate final response")
 	}
-	c.saveLatestHistory(ctx, planSession, target.ID, storageSvc)
+	if !ticketless {
+		c.saveLatestHistory(ctx, planSession, target.ID, storageSvc)
+	}
 
 	msg.Notify(ctx, "💬 %s", finalResp)
 
-	logger.Debug("swarm executeSwarm: completed, saving history")
-	return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
+	if !ticketless {
+		logger.Debug("swarm executeSwarm: completed, saving history")
+		return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
+	}
+	return nil
 }
 
 // phaseResult stores the results of a single phase execution.
@@ -542,7 +605,8 @@ func (c *SwarmChat) finishSession(ctx context.Context, ssn *session.Session, tar
 		logger.Error("failed to update final session status", "error", err, "status", *finalStatus)
 	}
 
-	if *finalStatus == types.SessionStatusCompleted && c.slackService != nil && target.SlackThread != nil {
+	// Skip session actions for ticketless chat (no ticket to act on)
+	if target.ID != "" && *finalStatus == types.SessionStatusCompleted && c.slackService != nil && target.SlackThread != nil {
 		threadSvc := c.slackService.NewThread(*target.SlackThread)
 
 		var sessionURL string
