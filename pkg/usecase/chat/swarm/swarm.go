@@ -435,12 +435,6 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 			msg.Notify(ctx, "💬 %s", replanResult.Message)
 		}
 
-		// If the replan asks a question, post it and stop the loop
-		if replanResult.Question != "" {
-			msg.Notify(ctx, "❓ %s", replanResult.Question)
-			break
-		}
-
 		currentTasks = replanResult.Tasks
 	}
 

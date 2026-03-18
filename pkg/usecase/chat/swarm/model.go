@@ -18,9 +18,8 @@ type PlanResult struct {
 
 // ReplanResult represents the LLM replan response.
 type ReplanResult struct {
-	Message  string     `json:"message,omitempty"`
-	Tasks    []TaskPlan `json:"tasks"`
-	Question string     `json:"question,omitempty"`
+	Message string     `json:"message,omitempty"`
+	Tasks   []TaskPlan `json:"tasks"`
 }
 
 // TaskResult holds the outcome of a single task execution.

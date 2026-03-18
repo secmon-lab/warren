@@ -18,14 +18,13 @@ Current phase: {{ .current_phase }}
 5. If sufficient information is gathered (all acceptance criteria met), return an empty tasks array to proceed to final response generation
 6. If any tasks failed, decide whether to retry with a different approach or proceed without that information
 7. Each new task must specify which tools and sub-agents it needs
-8. **Asking the user**: If execution is difficult (e.g., all approaches have failed, results are inconclusive) or there are multiple viable approaches and you cannot determine which is most appropriate, you MAY ask the user a question instead of creating tasks. When asking a question, you MUST provide concrete choices for the user to select from.
+8. If execution is difficult (e.g., all approaches have failed, results are inconclusive), try a different approach or proceed with the best available information.
 
 # Response Format
 
 Respond with a JSON object containing:
 - `message`: (optional) A status update message to show the user about progress so far and what will be done next. Shown in Slack before the next phase begins.
 - `tasks`: Array of new tasks for the next phase (empty array = proceed to final response)
-- `question`: (optional) A question to ask the user when you need guidance. If set, `tasks` must be empty. The question must include numbered choices for the user to pick from. Format: state the situation briefly, then list choices as "1. ...\n2. ...\n3. ..." etc.
 
 Each task must have:
 - `id`: Unique identifier
