@@ -287,10 +287,6 @@ var replanSchema = &gollem.Parameter{
 			Description: "New tasks for the next phase (empty = proceed to final response)",
 			Required:    true,
 		},
-		"question": {
-			Type:        gollem.TypeString,
-			Description: "Optional question to ask the user when guidance is needed. Must include numbered choices. If set, tasks must be empty.",
-		},
 	},
 }
 
