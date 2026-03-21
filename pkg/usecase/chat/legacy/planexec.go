@@ -12,8 +12,7 @@ import (
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
+	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -22,7 +21,6 @@ import (
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
-	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
 	"github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -146,9 +144,10 @@ func NewPlanExecChat(repo interfaces.Repository, llmClient gollem.LLMClient, pol
 	return c
 }
 
-// Execute processes a chat message for the specified ticket.
-// For ticketless chat, target has empty ID and slackHistory provides conversation context.
-func (c *PlanExecChat) Execute(ctx context.Context, target *ticket.Ticket, slackHistory []slack.HistoryMessage, message string) error {
+// Execute processes a chat message using the Plan & Execute strategy.
+// The ChatContext must be pre-built by the caller with all necessary data.
+func (c *PlanExecChat) Execute(ctx context.Context, message string, chatCtx chatModel.ChatContext) error {
+	target := chatCtx.Ticket
 	logger := logging.From(ctx)
 
 	// Phase 1: Session setup
@@ -172,8 +171,8 @@ func (c *PlanExecChat) Execute(ctx context.Context, target *ticket.Ticket, slack
 		return nil
 	}
 
-	// Phase 5: Context preparation & agent execution
-	return c.executeAgent(ctx, target, ssn, message, planFunc, &finalStatus, slackHistory)
+	// Phase 5: Agent execution
+	return c.executeAgent(ctx, ssn, message, planFunc, &finalStatus, &chatCtx)
 }
 
 // createSession creates and persists a new chat session.
@@ -330,54 +329,25 @@ func (c *PlanExecChat) authorize(ctx context.Context, message string) (bool, err
 	return true, nil
 }
 
-// executeAgent handles context preparation, agent construction, execution, and result processing.
-// When slackHistory is non-nil, the execution runs in ticketless mode (no base tool, no history, ticketless prompt).
-func (c *PlanExecChat) executeAgent(ctx context.Context, target *ticket.Ticket, ssn *session.Session, message string, planFunc func(context.Context, string), finalStatus *types.SessionStatus, slackHistory []slack.HistoryMessage) error {
-	ticketless := target.ID == ""
+// executeAgent handles agent construction, execution, and result processing.
+func (c *PlanExecChat) executeAgent(ctx context.Context, ssn *session.Session, message string, planFunc func(context.Context, string), finalStatus *types.SessionStatus, chatCtx *chatModel.ChatContext) error {
+	target := chatCtx.Ticket
+	ticketless := chatCtx.IsTicketless()
 
-	var tools []gollem.ToolSet
-	var history *gollem.History
-	var systemPrompt string
+	tools := chatCtx.Tools
+	history := chatCtx.History
 	storageSvc := storage.New(c.storageClient, storage.WithPrefix(c.storagePrefix))
 
+	var systemPrompt string
 	if ticketless {
-		// Ticketless: knowledge tool with dynamic topic, no base tool
-		kt := knowledgeTool.New(c.repository, "")
-		tools = append(c.tools, kt)
-
-		// Build ticketless system prompt
 		var err error
-		systemPrompt, err = c.buildTicketlessSystemPrompt(ctx, tools, slackHistory)
+		systemPrompt, err = c.buildTicketlessSystemPrompt(ctx, tools, chatCtx.SlackHistory)
 		if err != nil {
 			return err
 		}
 	} else {
-		// Ticket-bound: base tool + knowledge tool, load history and alerts
-		slackUpdateFunc := func(ctx context.Context, t *ticket.Ticket) error {
-			if c.slackService == nil || !t.HasSlackThread() || t.Finding == nil {
-				return nil
-			}
-			threadSvc := c.slackService.NewThread(*t.SlackThread)
-			return threadSvc.PostFinding(ctx, t.Finding)
-		}
-		baseAction := base.New(c.repository, target.ID, base.WithSlackUpdate(slackUpdateFunc), base.WithLLMClient(c.llmClient))
-
 		var err error
-		history, err = c.loadHistory(ctx, target, storageSvc)
-		if err != nil {
-			return err
-		}
-
-		alerts, err := c.repository.BatchGetAlerts(ctx, target.AlertIDs)
-		if err != nil {
-			return goerr.Wrap(err, "failed to get alerts")
-		}
-
-		effectiveTopic := c.resolveEffectiveTopic(ctx, target, alerts)
-		kt := knowledgeTool.New(c.repository, effectiveTopic)
-		tools = append(c.tools, baseAction, kt)
-
-		systemPrompt, err = c.buildSystemPrompt(ctx, target, ssn, tools, alerts, effectiveTopic, slackHistory)
+		systemPrompt, err = c.buildSystemPrompt(ctx, target, ssn, tools, chatCtx)
 		if err != nil {
 			return err
 		}
@@ -470,30 +440,8 @@ func (c *PlanExecChat) buildTicketlessSystemPrompt(ctx context.Context, tools []
 	return GenerateTicketlessSystemPrompt(ctx, slackHistory, additionalInstructions, nil, string(userID), c.userSystemPrompt)
 }
 
-// loadHistory loads the chat history for the ticket.
-func (c *PlanExecChat) loadHistory(ctx context.Context, target *ticket.Ticket, storageSvc *storage.Service) (*gollem.History, error) {
-	return chat.LoadHistory(ctx, c.repository, target.ID, storageSvc)
-}
-
-// resolveEffectiveTopic determines the effective topic, falling back to schema if needed.
-func (c *PlanExecChat) resolveEffectiveTopic(ctx context.Context, target *ticket.Ticket, alerts []*alert.Alert) types.KnowledgeTopic {
-	logger := logging.From(ctx)
-	effectiveTopic := target.Topic
-
-	if effectiveTopic == "" && len(alerts) > 0 {
-		effectiveTopic = types.KnowledgeTopic(alerts[0].Schema)
-		logger.Warn("ticket topic is empty, falling back to schema",
-			"ticket_id", target.ID,
-			"schema", alerts[0].Schema,
-			"topic", effectiveTopic)
-		msg.Notify(ctx, "⚠️ Ticket topic is empty, using schema `%s` as topic", alerts[0].Schema)
-	}
-
-	return effectiveTopic
-}
-
-// buildSystemPrompt generates the system prompt with all context.
-func (c *PlanExecChat) buildSystemPrompt(ctx context.Context, target *ticket.Ticket, ssn *session.Session, tools []gollem.ToolSet, alerts []*alert.Alert, effectiveTopic types.KnowledgeTopic, slackHistory []slack.HistoryMessage) (string, error) {
+// buildSystemPrompt generates the system prompt with all context from ChatContext.
+func (c *PlanExecChat) buildSystemPrompt(ctx context.Context, target *ticket.Ticket, _ *session.Session, tools []gollem.ToolSet, chatCtx *chatModel.ChatContext) (string, error) {
 	logger := logging.From(ctx)
 	userID := types.UserID(user.FromContext(ctx))
 
@@ -524,21 +472,7 @@ func (c *PlanExecChat) buildSystemPrompt(ctx context.Context, target *ticket.Tic
 		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
 	}
 
-	// Get knowledges
-	knowledges := []*knowledge.Knowledge{}
-	if target.Topic != "" {
-		retrieved, err := c.repository.GetKnowledges(ctx, target.Topic)
-		if err != nil {
-			logger.Warn("failed to get knowledges", "error", err, "topic", target.Topic)
-		} else if retrieved != nil {
-			knowledges = retrieved
-		}
-	}
-
-	// Collect thread comments
-	threadComments := CollectThreadComments(ctx, c.repository, target.ID, ssn)
-
-	return GenerateChatSystemPrompt(ctx, target, len(alerts), additionalInstructions, knowledges, string(userID), threadComments, c.userSystemPrompt, slackHistory)
+	return GenerateChatSystemPrompt(ctx, target, len(chatCtx.Alerts), additionalInstructions, chatCtx.Knowledges, string(userID), chatCtx.ThreadComments, c.userSystemPrompt, chatCtx.SlackHistory)
 }
 
 // buildAgentOption holds optional configuration for buildAgent.

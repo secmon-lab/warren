@@ -82,7 +82,7 @@ var GenerateChatSystemPrompt = chatpkg.GenerateChatSystemPrompt
 
 // CollectThreadComments exports the chat package's CollectThreadComments for testing
 func (uc *UseCases) CollectThreadComments(ctx context.Context, ticketID types.TicketID, currentSession *session.Session) []ticket.Comment {
-	return uc.collectThreadComments(ctx, ticketID, currentSession)
+	return chatcommon.CollectThreadComments(ctx, uc.repository, ticketID, currentSession)
 }
 
 // GenerateInitialTicketComment exports the private generateInitialTicketComment method for testing
@@ -95,9 +95,9 @@ func (uc *UseCases) HandleNotice(ctx context.Context, alert *alert.Alert, channe
 	return uc.handleNotice(ctx, alert, channel, nil, notifier)
 }
 
-// AuthorizeAgentRequest exports the private authorizeAgentRequest method for testing
+// AuthorizeAgentRequest exports the chat package's AuthorizeAgentRequest for testing
 func (uc *UseCases) AuthorizeAgentRequest(ctx context.Context, message string) error {
-	return uc.authorizeAgentRequest(ctx, message)
+	return chatcommon.AuthorizeAgentRequest(ctx, uc.policyClient, uc.noAuthorization, message)
 }
 
 // ErrAgentAuthPolicyNotDefined exports the chat package error for testing

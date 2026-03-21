@@ -13,10 +13,28 @@ import (
 )
 
 // CollectThreadComments retrieves thread comments posted between sessions.
+// If currentSession is nil, it collects recent comments without session-based filtering.
 func CollectThreadComments(ctx context.Context, repo interfaces.Repository, ticketID types.TicketID, currentSession *session.Session) []ticket.Comment {
 	logger := logging.From(ctx)
 
 	const maxThreadComments = 50
+
+	comments, err := repo.GetTicketComments(ctx, ticketID)
+	if err != nil {
+		logger.Warn("failed to get ticket comments for thread context", "error", err, "ticket_id", ticketID)
+		return nil
+	}
+
+	// If no current session, return the most recent comments (no session-based filtering)
+	if currentSession == nil {
+		sort.Slice(comments, func(i, j int) bool {
+			return comments[i].CreatedAt.Before(comments[j].CreatedAt)
+		})
+		if len(comments) > maxThreadComments {
+			comments = comments[len(comments)-maxThreadComments:]
+		}
+		return comments
+	}
 
 	sessions, err := repo.GetSessionsByTicket(ctx, ticketID)
 	if err != nil {
@@ -43,12 +61,6 @@ func CollectThreadComments(ctx context.Context, repo interfaces.Repository, tick
 		"prev_session_created_at", prevSessionCreatedAt,
 		"current_session_created_at", currentSession.CreatedAt,
 	)
-
-	comments, err := repo.GetTicketComments(ctx, ticketID)
-	if err != nil {
-		logger.Warn("failed to get ticket comments for thread context", "error", err, "ticket_id", ticketID)
-		return nil
-	}
 
 	var filtered []ticket.Comment
 	for _, co := range comments {

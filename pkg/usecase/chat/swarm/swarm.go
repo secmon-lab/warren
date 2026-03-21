@@ -12,18 +12,15 @@ import (
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
-	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
+	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
-	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/storage"
-	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -155,9 +152,10 @@ func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient in
 	return c
 }
 
-// Execute processes a chat message for the specified ticket using parallel task execution.
-// For ticketless chat, target has empty ID and slackHistory provides conversation context.
-func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, slackHistory []model.HistoryMessage, message string) error {
+// Execute processes a chat message using parallel task execution.
+// The ChatContext must be pre-built by the caller with all necessary data.
+func (c *SwarmChat) Execute(ctx context.Context, message string, chatCtx chatModel.ChatContext) error {
+	target := chatCtx.Ticket
 	logger := logging.From(ctx)
 	logger.Debug("swarm execute: start",
 		"ticket_id", target.ID,
@@ -191,7 +189,7 @@ func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, slackHis
 	logger.Debug("swarm execute: authorized, starting swarm")
 
 	// Phase 5: Swarm execution
-	if err := c.executeSwarm(ctx, target, ssn, message, &finalStatus, slackHistory); err != nil {
+	if err := c.executeSwarm(ctx, ssn, message, &finalStatus, &chatCtx); err != nil {
 		// Session abort and context cancellation are expected outcomes
 		// when a user aborts the session, not errors to report.
 		if errors.Is(err, ErrSessionAborted) || errors.Is(err, context.Canceled) {
@@ -203,9 +201,9 @@ func (c *SwarmChat) Execute(ctx context.Context, target *ticket.Ticket, slackHis
 }
 
 // executeSwarm orchestrates the swarm execution: plan → parallel exec → replan → loop → final response.
-// When slackHistory is non-nil, the execution runs in ticketless mode (no base tool, no history persistence, ticketless system prompt).
-func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn *session.Session, message string, finalStatus *types.SessionStatus, slackHistory []model.HistoryMessage) error {
-	ticketless := target.ID == ""
+func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, message string, finalStatus *types.SessionStatus, chatCtx *chatModel.ChatContext) error {
+	target := chatCtx.Ticket
+	ticketless := chatCtx.IsTicketless()
 	logger := logging.From(ctx)
 
 	// Preserve a non-cancelled context for finishSession cleanup (Slack posts, DB updates)
@@ -249,75 +247,22 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		defer handler.EndAgentExecute(ctx, nil)
 	}
 
-	// Load history (skip for ticketless - no persistent conversation)
 	storageSvc := storage.New(c.storageClient, storage.WithPrefix(c.storagePrefix))
-	var history *gollem.History
-	if !ticketless {
-		var err error
-		history, err = chat.LoadHistory(ctx, c.repository, target.ID, storageSvc)
-		if err != nil {
-			return err
-		}
-	}
 
-	// Load alerts for planning context (empty for ticketless)
-	var alerts []*alert.Alert
-	if !ticketless {
-		var err error
-		alerts, err = c.repository.BatchGetAlerts(ctx, target.AlertIDs)
-		if err != nil {
-			return goerr.Wrap(err, "failed to get alerts")
-		}
-	}
-
-	// Search agent memories
-	var memoryContext string
-	if c.memoryService != nil {
-		memories, memErr := c.memoryService.SearchAndSelectMemories(ctx, message, 16)
-		if memErr != nil {
-			logger.Warn("failed to search agent memories", "error", memErr)
-		} else if len(memories) > 0 {
-			memoryContext = formatMemories(memories)
-		}
-	}
-
-	// Build tools (skip base tool for ticketless - it requires ticket ID)
-	allTools := make([]gollem.ToolSet, 0, len(c.tools)+1)
-	allTools = append(allTools, c.tools...)
-	if !ticketless {
-		baseAction := base.New(c.repository, target.ID)
-		allTools = append(allTools, baseAction)
-	}
-
-	// Collect thread comments (empty for ticketless)
-	var threadComments []ticket.Comment
-	if !ticketless {
-		threadComments = chat.CollectThreadComments(ctx, c.repository, target.ID, ssn)
-	}
-
-	// Collect domain knowledges (empty for ticketless - no topic)
-	var knowledges []*knowledge.Knowledge
-	if !ticketless && target.Topic != "" {
-		var err error
-		knowledges, err = c.repository.GetKnowledges(ctx, target.Topic)
-		if err != nil {
-			logger.Warn("failed to get knowledges", "error", err, "topic", target.Topic)
-		}
-	}
-
+	// Build planning context from ChatContext
 	planCtx := &planningContext{
 		message:        message,
 		ticket:         target,
-		alerts:         alerts,
-		tools:          allTools,
+		alerts:         chatCtx.Alerts,
+		tools:          chatCtx.Tools,
 		subAgents:      c.subAgents,
-		memoryContext:  memoryContext,
+		memoryContext:  chatCtx.MemoryContext,
 		userPrompt:     c.userSystemPrompt,
 		lang:           lang.From(ctx),
 		requesterID:    string(types.UserID(user.FromContext(ctx))),
-		threadComments: threadComments,
-		knowledges:     knowledges,
-		slackHistory:   slackHistory,
+		threadComments: chatCtx.ThreadComments,
+		knowledges:     chatCtx.Knowledges,
+		slackHistory:   chatCtx.SlackHistory,
 	}
 
 	// Generate system prompt once (shared across plan/replan/final sessions)
@@ -325,14 +270,14 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 	if ticketless {
 		tlpc := &ticketlessPlanningContext{
 			message:       message,
-			tools:         allTools,
+			tools:         chatCtx.Tools,
 			subAgents:     c.subAgents,
-			memoryContext: memoryContext,
+			memoryContext: chatCtx.MemoryContext,
 			userPrompt:    c.userSystemPrompt,
 			lang:          lang.From(ctx),
 			requesterID:   string(types.UserID(user.FromContext(ctx))),
-			knowledges:    knowledges,
-			history:       slackHistory,
+			knowledges:    chatCtx.Knowledges,
+			history:       chatCtx.SlackHistory,
 		}
 		var err error
 		systemPrompt, err = generateTicketlessSystemPrompt(ctx, tlpc)
@@ -356,8 +301,8 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 	if err != nil {
 		return goerr.Wrap(err, "failed to create planning session")
 	}
-	if history != nil {
-		if err := planSession.AppendHistory(history); err != nil {
+	if chatCtx.History != nil {
+		if err := planSession.AppendHistory(chatCtx.History); err != nil {
 			logger.Warn("failed to append history to planning session", "error", err)
 		}
 	}
@@ -399,7 +344,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, target *ticket.Ticket, ssn
 		}
 
 		// Execute all tasks in parallel
-		results := c.executePhase(ctx, currentTasks, target, ssn, planCtx, storageSvc)
+		results := c.executePhase(ctx, currentTasks, target, ssn)
 		allResults = append(allResults, &phaseResult{
 			phase:   phase,
 			tasks:   currentTasks,

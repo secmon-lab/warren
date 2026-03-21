@@ -7,30 +7,155 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
-	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/service/storage"
+	"github.com/secmon-lab/warren/pkg/tool/base"
 	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat"
-	legacychat "github.com/secmon-lab/warren/pkg/usecase/chat/legacy"
+	"github.com/secmon-lab/warren/pkg/usecase/chat/swarm"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/slackctx"
 )
 
-// Chat processes a chat message for the specified ticket.
-// For ticketless chat, pass a placeholder ticket (empty ID) with slackHistory.
-func (x *UseCases) Chat(ctx context.Context, target *ticket.Ticket, slackHistory []slack.HistoryMessage, message string) error {
-	return x.ChatUC.Execute(ctx, target, slackHistory, message)
+// ChatFromWebSocket processes a chat message from a WebSocket connection.
+// It fetches the ticket by ID, builds a ChatContext, and delegates to ChatUC.
+func (x *UseCases) ChatFromWebSocket(ctx context.Context, ticketID types.TicketID, message string) error {
+	t, err := x.repository.GetTicket(ctx, ticketID)
+	if err != nil {
+		return goerr.Wrap(err, "failed to get ticket")
+	}
+	if t == nil {
+		return goerr.New("ticket not found")
+	}
+
+	chatCtx, err := x.buildChatContext(ctx, t, nil, message)
+	if err != nil {
+		return err
+	}
+
+	return x.ChatUC.Execute(ctx, message, chatCtx)
 }
 
-// collectThreadComments delegates to the chat package exported function.
-func (x *UseCases) collectThreadComments(ctx context.Context, ticketID types.TicketID, currentSession *session.Session) []ticket.Comment {
-	return legacychat.CollectThreadComments(ctx, x.repository, ticketID, currentSession)
+// ChatFromSlack processes a chat message from a Slack app mention.
+// It resolves the ticket from the Slack thread (or creates a ticketless context),
+// fetches Slack history, builds a ChatContext, and delegates to ChatUC.
+func (x *UseCases) ChatFromSlack(ctx context.Context, slackMsg *slack.Message, mentionMessage string) error {
+	logger := logging.From(ctx)
+
+	// Get Slack history for conversation context
+	var history []slack.HistoryMessage
+	if x.slackService != nil {
+		var err error
+		history, err = x.slackService.GetMessageHistory(ctx, slackMsg)
+		if err != nil {
+			logger.Warn("failed to get slack history", "error", err)
+		}
+	}
+
+	// Try to find existing ticket by thread
+	existingTicket, err := x.repository.GetTicketByThread(ctx, slackMsg.Thread())
+	if err != nil {
+		return goerr.Wrap(err, "failed to get ticket by slack thread")
+	}
+
+	if existingTicket != nil {
+		chatCtx, err := x.buildChatContext(ctx, existingTicket, history, mentionMessage)
+		if err != nil {
+			return err
+		}
+		return x.ChatUC.Execute(ctx, mentionMessage, chatCtx)
+	}
+
+	// Ticketless chat
+	ctx = slackctx.WithThread(ctx, slackMsg.Thread())
+	thread := slackMsg.Thread()
+	placeholderTicket := &ticket.Ticket{SlackThread: &thread}
+
+	chatCtx, err := x.buildChatContext(ctx, placeholderTicket, history, mentionMessage)
+	if err != nil {
+		return err
+	}
+	return x.ChatUC.Execute(ctx, mentionMessage, chatCtx)
 }
 
-// authorizeAgentRequest delegates to the chat package exported function.
-func (x *UseCases) authorizeAgentRequest(ctx context.Context, message string) error {
-	return chatpkg.AuthorizeAgentRequest(ctx, x.policyClient, x.noAuthorization, message)
+// ChatFromCLI processes a chat message from the CLI.
+// The ticket is already constructed by the CLI layer.
+func (x *UseCases) ChatFromCLI(ctx context.Context, t *ticket.Ticket, message string) error {
+	chatCtx, err := x.buildChatContext(ctx, t, nil, message)
+	if err != nil {
+		return err
+	}
+	return x.ChatUC.Execute(ctx, message, chatCtx)
+}
+
+// buildChatContext fetches all data needed for chat execution and assembles a ChatContext.
+func (x *UseCases) buildChatContext(ctx context.Context, t *ticket.Ticket, slackHistory []slack.HistoryMessage, message string) (chatModel.ChatContext, error) {
+	logger := logging.From(ctx)
+	ticketless := t.ID == ""
+
+	chatCtx := chatModel.ChatContext{
+		Ticket:       t,
+		SlackHistory: slackHistory,
+	}
+
+	// Fetch alerts (skip for ticketless)
+	if !ticketless {
+		alerts, err := x.repository.BatchGetAlerts(ctx, t.AlertIDs)
+		if err != nil {
+			return chatCtx, goerr.Wrap(err, "failed to get alerts")
+		}
+		chatCtx.Alerts = alerts
+	}
+
+	// Search agent memories
+	if x.memoryService != nil {
+		memories, memErr := x.memoryService.SearchAndSelectMemories(ctx, message, 16)
+		if memErr != nil {
+			logger.Warn("failed to search agent memories", "error", memErr)
+		} else if len(memories) > 0 {
+			chatCtx.MemoryContext = swarm.FormatMemories(memories)
+		}
+	}
+
+	// Build tools
+	allTools := make([]gollem.ToolSet, 0, len(x.tools)+1)
+	allTools = append(allTools, x.tools...)
+	if !ticketless {
+		baseAction := base.New(x.repository, t.ID)
+		allTools = append(allTools, baseAction)
+	}
+	chatCtx.Tools = allTools
+
+	// Collect thread comments (skip for ticketless)
+	if !ticketless {
+		chatCtx.ThreadComments = chatpkg.CollectThreadComments(ctx, x.repository, t.ID, nil)
+	}
+
+	// Collect domain knowledges (skip for ticketless without topic)
+	if !ticketless && t.Topic != "" {
+		knowledges, err := x.repository.GetKnowledges(ctx, t.Topic)
+		if err != nil {
+			logger.Warn("failed to get knowledges", "error", err, "topic", t.Topic)
+		} else {
+			chatCtx.Knowledges = knowledges
+		}
+	}
+
+	// Load history (skip for ticketless)
+	if !ticketless {
+		storageSvc := storage.New(x.storageClient, storage.WithPrefix(x.storagePrefix))
+		history, err := chatpkg.LoadHistory(ctx, x.repository, t.ID, storageSvc)
+		if err != nil {
+			return chatCtx, err
+		}
+		chatCtx.History = history
+	}
+
+	return chatCtx, nil
 }
 
 //go:embed prompt/ticket_comment.md
