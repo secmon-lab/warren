@@ -12,12 +12,16 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+	"github.com/secmon-lab/warren/pkg/domain/types"
+	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
 	"github.com/secmon-lab/warren/pkg/service/llm"
+	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	ssnutil "github.com/secmon-lab/warren/pkg/utils/session"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 // executePhase runs all tasks in parallel and waits for all to complete.
@@ -28,13 +32,14 @@ func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *
 
 	// Pre-create all task message routings (posts "waiting" messages to Slack)
 	type taskRouting struct {
-		ctx           context.Context
-		markCompleted func()
+		ctx               context.Context
+		markCompleted     func()
+		updatableBlockMsg *slackService.UpdatableBlockMessage
 	}
 	routings := make([]taskRouting, len(tasks))
 	for i, task := range tasks {
-		taskCtx, markCompleted := c.setupTaskMessageRouting(ctx, ssn, target, task.Title)
-		routings[i] = taskRouting{ctx: taskCtx, markCompleted: markCompleted}
+		taskCtx, markCompleted, ubm := c.setupTaskMessageRouting(ctx, ssn, target, task.Title)
+		routings[i] = taskRouting{ctx: taskCtx, markCompleted: markCompleted, updatableBlockMsg: ubm}
 	}
 
 	var wg sync.WaitGroup
@@ -42,7 +47,7 @@ func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *
 		wg.Add(1)
 		go func(idx int, t TaskPlan, r taskRouting) {
 			defer wg.Done()
-			results[idx] = c.executeTask(ctx, t, target, r.ctx, r.markCompleted)
+			results[idx] = c.executeTask(ctx, t, target, r.ctx, r.markCompleted, r.updatableBlockMsg)
 			// Post result context block immediately upon task completion
 			c.postTaskResult(ctx, t, results[idx], target)
 		}(i, task, routings[i])
@@ -92,7 +97,7 @@ func (c *SwarmChat) postDivider(ctx context.Context, target *ticket.Ticket) {
 }
 
 // executeTask executes a single task with its own agent and trace context.
-func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *ticket.Ticket, taskCtx context.Context, markCompleted func()) *TaskResult {
+func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *ticket.Ticket, taskCtx context.Context, markCompleted func(), updatableBlockMsg *slackService.UpdatableBlockMessage) *TaskResult {
 	logger := logging.From(ctx)
 	result := &TaskResult{
 		TaskID: task.ID,
@@ -165,6 +170,26 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	if tracker != nil {
 		agentOpts = append(agentOpts, gollem.WithToolMiddleware(newBudgetToolMiddleware(tracker)))
 	}
+
+	// Add HITL middleware if configured
+	if len(c.hitlTools) > 0 {
+		approvalSet := make(map[string]bool, len(c.hitlTools))
+		for _, t := range c.hitlTools {
+			approvalSet[t] = true
+		}
+		hitlSvc := hitlService.New(c.repository)
+		presenter := buildHITLPresenter(updatableBlockMsg, task.Title, user.FromContext(ctx))
+		if presenter != nil {
+			agentOpts = append(agentOpts, gollem.WithToolMiddleware(newHITLMiddleware(hitlConfig{
+				requireApproval: approvalSet,
+				service:         hitlSvc,
+				presenter:       presenter,
+				userID:          user.FromContext(ctx),
+				sessionID:       types.SessionID(""), // will be set from context if needed
+			})))
+		}
+	}
+
 	agentOpts = append(agentOpts, gollem.WithToolMiddleware(newTaskToolMiddleware(taskCtx, traceState)))
 
 	// Create and execute agent
@@ -204,19 +229,20 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 
 // setupTaskMessageRouting creates task-specific msg routing with title-prefixed trace.
 // The initial "Waiting..." message is posted immediately so all task messages appear upfront.
-// Returns the new context and a function to mark the task as completed (changes emoji).
-func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket, taskTitle string) (context.Context, func()) {
+// Returns the new context, a function to mark the task as completed (changes emoji),
+// and an UpdatableBlockMessage for HITL integration (nil if Slack is not configured).
+func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket, taskTitle string) (context.Context, func(), *slackService.UpdatableBlockMessage) {
 	if c.slackService == nil || target.SlackThread == nil {
-		return ctx, func() {}
+		return ctx, func() {}, nil
 	}
 
-	threadSvc := c.slackService.NewThread(*target.SlackThread)
+	threadSvc := c.slackService.NewThread(*target.SlackThread).(*slackService.ThreadService)
 
 	// Post initial "waiting" message immediately
 	completed := false
 	escaped := escapeSlackMrkdwn(taskTitle)
 	initialMsg := fmt.Sprintf("🕐 *[%s]*\n\nWaiting...", escaped)
-	updateFunc := threadSvc.NewUpdatableMessage(ctx, initialMsg)
+	ubm := threadSvc.NewUpdatableBlockMessage(ctx, initialMsg)
 
 	taskTraceFunc := func(ctx context.Context, message string) {
 		emoji := "⏳"
@@ -229,7 +255,7 @@ func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Se
 			errutil.Handle(ctx, err)
 		}
 
-		updateFunc(ctx, prefixed)
+		ubm.UpdateText(ctx, prefixed)
 	}
 	markCompleted := func() {
 		completed = true
@@ -243,7 +269,7 @@ func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Se
 		taskTraceFunc(ctx, "⚠️ "+message)
 	}
 
-	return msg.With(ctx, notifyFunc, taskTraceFunc, warnFunc), markCompleted
+	return msg.With(ctx, notifyFunc, taskTraceFunc, warnFunc), markCompleted, ubm
 }
 
 // filterToolSets filters tool sets to only include tools matching the given names.

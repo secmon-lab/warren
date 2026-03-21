@@ -6,6 +6,7 @@ package http_test
 import (
 	"context"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"sync"
@@ -28,6 +29,9 @@ import (
 //			},
 //			HandleAlertFunc: func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 //				panic("mock out the HandleAlert method")
+//			},
+//			HandleHITLActionFunc: func(ctx context.Context, user slack_model.User, requestID types.HITLRequestID, status hitl.Status, comment string) error {
+//				panic("mock out the HandleHITLAction method")
 //			},
 //			HandleSalvageRefreshFunc: func(ctx context.Context, user slack_model.User, metadata string, values slack_model.StateValue, viewID string) error {
 //				panic("mock out the HandleSalvageRefresh method")
@@ -62,6 +66,9 @@ type UseCaseMock struct {
 
 	// HandleAlertFunc mocks the HandleAlert method.
 	HandleAlertFunc func(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error)
+
+	// HandleHITLActionFunc mocks the HandleHITLAction method.
+	HandleHITLActionFunc func(ctx context.Context, user slack_model.User, requestID types.HITLRequestID, status hitl.Status, comment string) error
 
 	// HandleSalvageRefreshFunc mocks the HandleSalvageRefresh method.
 	HandleSalvageRefreshFunc func(ctx context.Context, user slack_model.User, metadata string, values slack_model.StateValue, viewID string) error
@@ -109,6 +116,19 @@ type UseCaseMock struct {
 			Schema types.AlertSchema
 			// AlertData is the alertData argument value.
 			AlertData any
+		}
+		// HandleHITLAction holds details about calls to the HandleHITLAction method.
+		HandleHITLAction []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// User is the user argument value.
+			User slack_model.User
+			// RequestID is the requestID argument value.
+			RequestID types.HITLRequestID
+			// Status is the status argument value.
+			Status hitl.Status
+			// Comment is the comment argument value.
+			Comment string
 		}
 		// HandleSalvageRefresh holds details about calls to the HandleSalvageRefresh method.
 		HandleSalvageRefresh []struct {
@@ -170,6 +190,7 @@ type UseCaseMock struct {
 	lockGetUserIcon                          sync.RWMutex
 	lockGetUserProfile                       sync.RWMutex
 	lockHandleAlert                          sync.RWMutex
+	lockHandleHITLAction                     sync.RWMutex
 	lockHandleSalvageRefresh                 sync.RWMutex
 	lockHandleSlackAppMention                sync.RWMutex
 	lockHandleSlackInteractionBlockActions   sync.RWMutex
@@ -339,6 +360,57 @@ func (mock *UseCaseMock) HandleAlertCalls() []struct {
 	mock.lockHandleAlert.RLock()
 	calls = mock.calls.HandleAlert
 	mock.lockHandleAlert.RUnlock()
+	return calls
+}
+
+// HandleHITLAction calls HandleHITLActionFunc.
+func (mock *UseCaseMock) HandleHITLAction(ctx context.Context, user slack_model.User, requestID types.HITLRequestID, status hitl.Status, comment string) error {
+	callInfo := struct {
+		Ctx       context.Context
+		User      slack_model.User
+		RequestID types.HITLRequestID
+		Status    hitl.Status
+		Comment   string
+	}{
+		Ctx:       ctx,
+		User:      user,
+		RequestID: requestID,
+		Status:    status,
+		Comment:   comment,
+	}
+	mock.lockHandleHITLAction.Lock()
+	mock.calls.HandleHITLAction = append(mock.calls.HandleHITLAction, callInfo)
+	mock.lockHandleHITLAction.Unlock()
+	if mock.HandleHITLActionFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.HandleHITLActionFunc(ctx, user, requestID, status, comment)
+}
+
+// HandleHITLActionCalls gets all the calls that were made to HandleHITLAction.
+// Check the length with:
+//
+//	len(mockedUseCase.HandleHITLActionCalls())
+func (mock *UseCaseMock) HandleHITLActionCalls() []struct {
+	Ctx       context.Context
+	User      slack_model.User
+	RequestID types.HITLRequestID
+	Status    hitl.Status
+	Comment   string
+} {
+	var calls []struct {
+		Ctx       context.Context
+		User      slack_model.User
+		RequestID types.HITLRequestID
+		Status    hitl.Status
+		Comment   string
+	}
+	mock.lockHandleHITLAction.RLock()
+	calls = mock.calls.HandleHITLAction
+	mock.lockHandleHITLAction.RUnlock()
 	return calls
 }
 

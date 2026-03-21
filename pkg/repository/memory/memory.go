@@ -48,6 +48,9 @@ type Memory struct {
 	// Knowledge management
 	knowledge *knowledgeStore
 
+	// HITL management
+	hitl *hitlStore
+
 	// Call counter for tracking method invocations
 	callCounts map[string]int
 	callMu     sync.RWMutex
@@ -74,6 +77,7 @@ func New() *Memory {
 		diagnosisIssues: make(map[types.DiagnosisID]map[string]*diagnosis.Issue),
 		session:         newSessionStore(),
 		knowledge:       newKnowledgeStore(),
+		hitl:            newHITLStore(),
 		callCounts:      make(map[string]int),
 		eb:              goerr.NewBuilder(goerr.TV(errutil.RepositoryKey, "memory")),
 	}

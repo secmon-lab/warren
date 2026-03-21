@@ -51,6 +51,7 @@ type SwarmChat struct {
 	maxPhases           int
 	monitorPollInterval time.Duration
 	budgetStrategy      BudgetStrategy
+	hitlTools           []string
 }
 
 // Option configures a SwarmChat.
@@ -120,6 +121,11 @@ func WithMonitorPollInterval(d time.Duration) Option {
 // When nil (default), budget tracking is disabled and tools execute without limits.
 func WithBudgetStrategy(s BudgetStrategy) Option {
 	return func(c *SwarmChat) { c.budgetStrategy = s }
+}
+
+// WithHITLTools sets the tool names that require human approval before execution.
+func WithHITLTools(tools []string) Option {
+	return func(c *SwarmChat) { c.hitlTools = tools }
 }
 
 // New creates a new SwarmChat with the given dependencies and options.
