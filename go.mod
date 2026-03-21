@@ -34,7 +34,7 @@ require (
 	github.com/vektah/gqlparser/v2 v2.5.32
 	google.golang.org/api v0.267.0
 	google.golang.org/genai v1.47.0
-	google.golang.org/grpc v1.79.1
+	google.golang.org/grpc v1.79.3
 	gopkg.in/yaml.v3 v3.0.1
 )
 
