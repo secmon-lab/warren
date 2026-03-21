@@ -125,7 +125,14 @@ func (x *UseCases) buildChatContext(ctx context.Context, t *ticket.Ticket, slack
 	allTools := make([]gollem.ToolSet, 0, len(x.tools)+1)
 	allTools = append(allTools, x.tools...)
 	if !ticketless {
-		baseAction := base.New(x.repository, t.ID)
+		slackUpdateFunc := func(ctx context.Context, updatedTicket *ticket.Ticket) error {
+			if x.slackService == nil || !updatedTicket.HasSlackThread() || updatedTicket.Finding == nil {
+				return nil
+			}
+			threadSvc := x.slackService.NewThread(*updatedTicket.SlackThread)
+			return threadSvc.PostFinding(ctx, updatedTicket.Finding)
+		}
+		baseAction := base.New(x.repository, t.ID, base.WithSlackUpdate(slackUpdateFunc), base.WithLLMClient(x.llmClient))
 		allTools = append(allTools, baseAction)
 	}
 	chatCtx.Tools = allTools
