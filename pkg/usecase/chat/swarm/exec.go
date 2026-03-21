@@ -13,7 +13,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/service/llm"
-	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -24,7 +23,7 @@ import (
 // executePhase runs all tasks in parallel and waits for all to complete.
 // All task messages are posted upfront as "waiting" before any execution begins.
 // Each task's result context block is posted immediately upon completion.
-func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *ticket.Ticket, ssn *session.Session, pc *planningContext, storageSvc *storage.Service) []*TaskResult {
+func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *ticket.Ticket, ssn *session.Session) []*TaskResult {
 	results := make([]*TaskResult, len(tasks))
 
 	// Pre-create all task message routings (posts "waiting" messages to Slack)
@@ -43,7 +42,7 @@ func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *
 		wg.Add(1)
 		go func(idx int, t TaskPlan, r taskRouting) {
 			defer wg.Done()
-			results[idx] = c.executeTask(ctx, t, target, ssn, r.ctx, r.markCompleted, storageSvc)
+			results[idx] = c.executeTask(ctx, t, target, r.ctx, r.markCompleted)
 			// Post result context block immediately upon task completion
 			c.postTaskResult(ctx, t, results[idx], target)
 		}(i, task, routings[i])
@@ -93,7 +92,7 @@ func (c *SwarmChat) postDivider(ctx context.Context, target *ticket.Ticket) {
 }
 
 // executeTask executes a single task with its own agent and trace context.
-func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *ticket.Ticket, ssn *session.Session, taskCtx context.Context, markCompleted func(), storageSvc *storage.Service) *TaskResult {
+func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *ticket.Ticket, taskCtx context.Context, markCompleted func()) *TaskResult {
 	logger := logging.From(ctx)
 	result := &TaskResult{
 		TaskID: task.ID,

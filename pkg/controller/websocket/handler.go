@@ -393,15 +393,6 @@ func (h *Handler) handleChatMessage(client *Client, message *websocket_model.Cha
 		"user_id", client.userID,
 		"content", message.Content)
 
-	// Get the ticket to process the chat message
-	ticket, err := h.repository.GetTicket(ctx, client.ticketID)
-	if err != nil {
-		return goerr.Wrap(err, "failed to get ticket")
-	}
-	if ticket == nil {
-		return goerr.New("ticket not found")
-	}
-
 	// Create user info for the message
 	wsUser := &websocket_model.User{
 		ID:   client.userID,
@@ -468,7 +459,7 @@ func (h *Handler) handleChatMessage(client *Client, message *websocket_model.Cha
 			// Setup context with WebSocket-specific message handlers
 			asyncCtx = msg.With(asyncCtx, notifyFunc, traceFunc, warnFunc)
 
-			if err := h.useCases.Chat(asyncCtx, ticket, nil, message.Content); err != nil {
+			if err := h.useCases.ChatFromWebSocket(asyncCtx, client.ticketID, message.Content); err != nil {
 				logger.Error("failed to process chat message",
 					"error", err,
 					"ticket_id", client.ticketID,

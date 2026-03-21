@@ -38,4 +38,3 @@ func ThreadFrom(ctx context.Context) *slack.Thread {
 	}
 	return nil
 }
-

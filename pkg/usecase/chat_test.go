@@ -154,7 +154,7 @@ func TestHandlePrompt(t *testing.T) {
 	gt.NoError(t, mockRepo.BatchPutAlerts(ctx, alerts))
 
 	ticketID := types.NewTicketID()
-	err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID, AlertIDs: []types.AlertID{alerts[0].ID, alerts[1].ID}}, nil, "Analyze the security alerts and provide a summary")
+	err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID, AlertIDs: []types.AlertID{alerts[0].ID, alerts[1].ID}}, "Analyze the security alerts and provide a summary")
 	gt.NoError(t, err)
 
 	latestHistory, err := mockRepo.GetLatestHistory(ctx, ticketID)
@@ -184,7 +184,7 @@ func TestHandlePrompt(t *testing.T) {
 		})
 	}
 
-	err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "prompt:2")
+	err = uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "prompt:2")
 	gt.NoError(t, err)
 
 	latestHistory, err = mockRepo.GetLatestHistory(ctx, ticketID)
@@ -263,7 +263,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "test message")
+		err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message")
 		gt.NoError(t, err)
 	})
 
@@ -291,7 +291,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "test message")
+		err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message")
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})
@@ -319,7 +319,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "test message")
+		err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message")
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})
@@ -378,7 +378,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err := uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "test message")
+		err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message")
 		// Should succeed without calling policy
 		gt.NoError(t, err)
 	})
@@ -556,7 +556,7 @@ func TestChatErrorNotifications(t *testing.T) {
 		}
 
 		// This should not return an error, but should send notification about history loading failure
-		err := uc.Chat(ctx, targetTicket, nil, "test query")
+		err := uc.ChatFromCLI(ctx, targetTicket, "test query")
 		gt.NoError(t, err)
 
 		// Assert notification was sent about history loading failure
@@ -620,7 +620,7 @@ func TestChatErrorNotifications(t *testing.T) {
 		}
 
 		// This should return an error due to agent execution failure
-		err := uc.Chat(ctx, targetTicket, nil, "test query")
+		err := uc.ChatFromCLI(ctx, targetTicket, "test query")
 		gt.Error(t, err)
 		gt.S(t, err.Error()).Contains("failed to execute agent")
 
@@ -721,7 +721,7 @@ func TestChatErrorNotifications(t *testing.T) {
 		}
 
 		// This should return an error due to history save failure
-		err := uc.Chat(ctx, targetTicket, nil, "test query")
+		err := uc.ChatFromCLI(ctx, targetTicket, "test query")
 		gt.Error(t, err)
 
 		// Check if there are any error notifications about saving
@@ -787,7 +787,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "test message")
+		err = uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message")
 		gt.NoError(t, err)
 	})
 
@@ -808,7 +808,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "test message")
+		err = uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message")
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})
@@ -865,7 +865,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.Chat(ctxWithUser, &ticket.Ticket{ID: ticketID}, nil, "test message")
+		err = uc.ChatFromCLI(ctxWithUser, &ticket.Ticket{ID: ticketID}, "test message")
 		gt.NoError(t, err)
 	})
 
@@ -892,7 +892,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.Chat(ctxWithUser, &ticket.Ticket{ID: ticketID}, nil, "test message")
+		err = uc.ChatFromCLI(ctxWithUser, &ticket.Ticket{ID: ticketID}, "test message")
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})
@@ -912,7 +912,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.Chat(ctx, &ticket.Ticket{ID: ticketID}, nil, "test message")
+		err = uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message")
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})

@@ -6,7 +6,6 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/service/command"
 	"github.com/secmon-lab/warren/pkg/utils/authctx"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -89,27 +88,7 @@ func (uc *UseCases) HandleSlackAppMention(ctx context.Context, slackMsg slack.Me
 		slackURL := slackMsg.SlackURL()
 		ctx = slackctx.WithSlackURL(ctx, slackURL)
 
-		// Get Slack history for conversation context (both ticket-bound and ticketless)
-		history, err := uc.slackService.GetMessageHistory(ctx, &slackMsg)
-		if err != nil {
-			logger.Warn("failed to get slack history", "error", err)
-			history = nil
-		}
-
-		existingTicket, err := uc.repository.GetTicketByThread(ctx, slackMsg.Thread())
-		if err != nil {
-			return goerr.Wrap(err, "failed to get ticket by slack thread")
-		}
-
-		if existingTicket != nil {
-			return uc.Chat(ctx, existingTicket, history, mention.Message)
-		}
-
-		// Ticketless chat
-		ctx = slackctx.WithThread(ctx, slackMsg.Thread())
-		thread := slackMsg.Thread()
-		placeholderTicket := &ticket.Ticket{SlackThread: &thread}
-		return uc.Chat(ctx, placeholderTicket, history, mention.Message)
+		return uc.ChatFromSlack(ctx, &slackMsg, mention.Message)
 	}
 
 	return nil

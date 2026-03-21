@@ -221,8 +221,8 @@ func formatCompletedResults(allResults []*phaseResult) string {
 	return b.String()
 }
 
-// formatMemories formats agent memories for inclusion in planning prompt.
-func formatMemories(memories []*memory.AgentMemory) string {
+// FormatMemories formats agent memories for inclusion in planning prompt.
+func FormatMemories(memories []*memory.AgentMemory) string {
 	if len(memories) == 0 {
 		return ""
 	}

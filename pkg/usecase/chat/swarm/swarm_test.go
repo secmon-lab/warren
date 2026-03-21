@@ -16,6 +16,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -100,7 +101,7 @@ func TestSwarmChat_DirectResponse(t *testing.T) {
 		swarm.WithNoAuthorization(true),
 	)
 
-	err := chatUC.Execute(ctx, testTicket, nil, "What is the meaning of life?")
+	err := chatUC.Execute(ctx, "What is the meaning of life?", chatModel.ChatContext{Ticket: testTicket})
 	gt.NoError(t, err)
 }
 
@@ -159,7 +160,7 @@ func TestSwarmChat_SinglePhaseWithTasks(t *testing.T) {
 		swarm.WithNoAuthorization(true),
 	)
 
-	err := chatUC.Execute(ctx, testTicket, nil, "Analyze this alert")
+	err := chatUC.Execute(ctx, "Analyze this alert", chatModel.ChatContext{Ticket: testTicket})
 	gt.NoError(t, err)
 }
 
@@ -201,7 +202,7 @@ func TestSwarmChat_MaxPhasesLimit(t *testing.T) {
 		swarm.WithMaxPhases(2),
 	)
 
-	err := chatUC.Execute(ctx, testTicket, nil, "Do something")
+	err := chatUC.Execute(ctx, "Do something", chatModel.ChatContext{Ticket: testTicket})
 	gt.NoError(t, err)
 }
 
@@ -256,7 +257,7 @@ func TestSwarmChat_ParallelExecution(t *testing.T) {
 		swarm.WithNoAuthorization(true),
 	)
 
-	err := chatUC.Execute(ctx, testTicket, nil, "Analyze all indicators")
+	err := chatUC.Execute(ctx, "Analyze all indicators", chatModel.ChatContext{Ticket: testTicket})
 	gt.NoError(t, err)
 }
 
@@ -318,7 +319,7 @@ func TestSwarmChat_ErrorIsolation(t *testing.T) {
 	)
 
 	// Execute should complete without error even though one task failed
-	err := chatUC.Execute(ctx, testTicket, nil, "Test error isolation")
+	err := chatUC.Execute(ctx, "Test error isolation", chatModel.ChatContext{Ticket: testTicket})
 	gt.NoError(t, err)
 }
 
@@ -459,7 +460,7 @@ func TestSwarmChat_MultiPhaseReplan(t *testing.T) {
 		swarm.WithNoAuthorization(true),
 	)
 
-	err := chatUC.Execute(ctx, testTicket, nil, "Run multi-phase analysis")
+	err := chatUC.Execute(ctx, "Run multi-phase analysis", chatModel.ChatContext{Ticket: testTicket})
 	gt.NoError(t, err)
 }
 
@@ -489,7 +490,7 @@ func TestSwarmChat_AuthorizationDenied(t *testing.T) {
 
 	chatUC := swarm.New(repo, mockLLM, denyPolicy)
 
-	err := chatUC.Execute(ctx, testTicket, nil, "Analyze this")
+	err := chatUC.Execute(ctx, "Analyze this", chatModel.ChatContext{Ticket: testTicket})
 	gt.NoError(t, err)
 }
 
@@ -618,7 +619,7 @@ func TestSwarmChat_LatestHistorySavedOnDirectResponse(t *testing.T) {
 		swarm.WithStorageClient(mockStorage),
 	)
 
-	gt.NoError(t, chatUC.Execute(ctx, testTicket, nil, "Hello"))
+	gt.NoError(t, chatUC.Execute(ctx, "Hello", chatModel.ChatContext{Ticket: testTicket}))
 
 	// Verify latest.json was saved
 	storageSvc := storage_svc.New(mockStorage)
@@ -674,7 +675,7 @@ func TestSwarmChat_LatestHistorySavedAfterReplan(t *testing.T) {
 		swarm.WithStorageClient(mockStorage),
 	)
 
-	gt.NoError(t, chatUC.Execute(ctx, testTicket, nil, "Analyze"))
+	gt.NoError(t, chatUC.Execute(ctx, "Analyze", chatModel.ChatContext{Ticket: testTicket}))
 
 	// Verify latest.json was saved (saved after plan, replan, and final response)
 	storageSvc := storage_svc.New(mockStorage)
@@ -730,7 +731,7 @@ func TestSwarmChat_LatestHistorySavedOnAbort(t *testing.T) {
 
 	// Execute — plan succeeds and latest is saved,
 	// but replan may fail or be aborted
-	_ = chatUC.Execute(ctx, testTicket, nil, "Slow analysis")
+	_ = chatUC.Execute(ctx, "Slow analysis", chatModel.ChatContext{Ticket: testTicket})
 
 	// Verify latest.json was saved at least after the planning phase
 	storageSvc := storage_svc.New(mockStorage)
@@ -791,7 +792,7 @@ func TestSwarmChat_LatestHistorySavedOnReplanError(t *testing.T) {
 	)
 
 	// Execute completes (replan error is logged, proceeds to final response)
-	_ = chatUC.Execute(ctx, testTicket, nil, "Test replan error")
+	_ = chatUC.Execute(ctx, "Test replan error", chatModel.ChatContext{Ticket: testTicket})
 
 	// Verify latest.json was saved at least after the planning phase
 	storageSvc := storage_svc.New(mockStorage)
@@ -918,7 +919,7 @@ func TestSwarmChat_BudgetMiddlewareNotAccumulated(t *testing.T) {
 		swarm.WithTools([]gollem.ToolSet{testToolSet}),
 	)
 
-	err := chatUC.Execute(ctx, testTicket, nil, "Analyze with budget")
+	err := chatUC.Execute(ctx, "Analyze with budget", chatModel.ChatContext{Ticket: testTicket})
 	gt.NoError(t, err)
 
 	mu.Lock()
