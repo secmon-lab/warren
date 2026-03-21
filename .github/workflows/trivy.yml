@@ -22,7 +22,7 @@ jobs:
 
       - id: scan
         name: Run Trivy vulnerability scanner (SARIF)
-        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.34.1
         with:
           scan-type: "fs"
           ignore-unfixed: true
@@ -35,7 +35,7 @@ jobs:
 
       - name: Display vulnerabilities (table)
         if: failure() && steps.scan.outcome == 'failure'
-        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.34.1
         with:
           scan-type: "fs"
           ignore-unfixed: true
