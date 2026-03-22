@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/command"
+	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	"github.com/secmon-lab/warren/pkg/service/notifier"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
@@ -29,6 +30,7 @@ type UseCases struct {
 	slackService    *slackService.Service
 	tagService      *tag.Service
 	memoryService   *memory.Service
+	hitlService     *hitlService.Service
 	llmClient       gollem.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
@@ -221,6 +223,11 @@ func New(opts ...Option) *UseCases {
 	// Initialize console notifier for pipeline events
 	if u.consoleNotifier == nil {
 		u.consoleNotifier = notifier.NewConsoleNotifier()
+	}
+
+	// Initialize HITL service
+	if u.hitlService == nil {
+		u.hitlService = hitlService.New(u.repository)
 	}
 
 	// Initialize chat use case (only if not already set via WithChatUseCase)

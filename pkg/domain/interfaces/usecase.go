@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
@@ -19,6 +20,7 @@ type SlackInteractionUsecases interface {
 	HandleSlackInteractionViewSubmission(ctx context.Context, user slack.User, callbackID slack.CallbackID, metadata string, values slack.StateValue) error
 	HandleSlackInteractionBlockActions(ctx context.Context, user slack.User, slackThread slack.Thread, actionID slack.ActionID, value, triggerID string) error
 	HandleSalvageRefresh(ctx context.Context, user slack.User, metadata string, values slack.StateValue, viewID string) error
+	HandleHITLAction(ctx context.Context, user slack.User, requestID types.HITLRequestID, status hitl.Status, comment string) error
 }
 
 type AlertUsecases interface {

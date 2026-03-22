@@ -1311,7 +1311,6 @@ func (x *Service) GetUserProfile(ctx context.Context, userID string) (string, er
 	x.profileCacheMutex.RLock()
 	if cached, exists := x.profileCache[userID]; exists && time.Now().Before(cached.ExpiresAt) {
 		x.profileCacheMutex.RUnlock()
-		logger.Debug("returning cached user profile", "user_id", userID)
 		return cached.Name, nil
 	}
 	x.profileCacheMutex.RUnlock()
@@ -1332,7 +1331,6 @@ func (x *Service) GetUserProfile(ctx context.Context, userID string) (string, er
 	x.profileCacheMutex.RLock()
 	if cached, exists := x.profileCache[userID]; exists && time.Now().Before(cached.ExpiresAt) {
 		x.profileCacheMutex.RUnlock()
-		logger.Debug("returning cached user profile after lock", "user_id", userID)
 		return cached.Name, nil
 	}
 	x.profileCacheMutex.RUnlock()

@@ -376,7 +376,10 @@ func cmdServe() *cli.Command {
 					return goerr.New("unknown budget strategy", goerr.V("strategy", budgetStrategy))
 				}
 
-				swarmChat := swarm.New(repo, llmClient, policyClient, swarmOpts...)
+				// Configure HITL tools that require human approval
+			swarmOpts = append(swarmOpts, swarm.WithHITLTools([]string{"web_fetch"}))
+
+			swarmChat := swarm.New(repo, llmClient, policyClient, swarmOpts...)
 				ucOptions = append(ucOptions, usecase.WithChatUseCase(swarmChat))
 				logging.From(ctx).Info("Chat strategy: swarm (parallel task execution)")
 			} else {

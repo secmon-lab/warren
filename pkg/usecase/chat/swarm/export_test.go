@@ -6,7 +6,9 @@ import (
 
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
+	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	hitlSvc "github.com/secmon-lab/warren/pkg/service/hitl"
 )
 
 // NewBudgetTracker exposes newBudgetTracker for testing.
@@ -57,4 +59,24 @@ func FilterSubAgents(allAgents []*agent.SubAgent, allowedNames []string) []*agen
 // StartSessionMonitor exposes startSessionMonitor for testing.
 func (c *SwarmChat) StartSessionMonitor(ctx context.Context, sessionID types.SessionID) (context.Context, func()) {
 	return c.startSessionMonitor(ctx, sessionID)
+}
+
+// HITLConfig exposes hitlConfig for testing.
+type HITLConfig = hitlConfig
+
+// NewHITLMiddleware exposes newHITLMiddleware for testing.
+func NewHITLMiddleware(cfg HITLConfig) gollem.ToolMiddleware {
+	return newHITLMiddleware(cfg)
+}
+
+// NewHITLConfig creates an hitlConfig for testing.
+func NewHITLConfig(requireApproval map[string]bool, service *hitlSvc.Service, presenter hitlSvc.Presenter, userID string, sessionID types.SessionID, slackThread *slackModel.Thread) HITLConfig {
+	return hitlConfig{
+		requireApproval: requireApproval,
+		service:         service,
+		presenter:       presenter,
+		userID:          userID,
+		sessionID:       sessionID,
+		slackThread:     slackThread,
+	}
 }

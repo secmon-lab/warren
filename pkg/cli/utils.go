@@ -16,6 +16,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/tool/slack"
 	"github.com/secmon-lab/warren/pkg/tool/urlscan"
 	"github.com/secmon-lab/warren/pkg/tool/vt"
+	"github.com/secmon-lab/warren/pkg/tool/webfetch"
 	"github.com/secmon-lab/warren/pkg/tool/whois"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/urfave/cli/v3"
@@ -44,6 +45,7 @@ var tools = toolList{
 	&github.Action{},
 	&whois.Action{},
 	&intune.Action{},
+	&webfetch.Action{},
 }
 
 // InjectDependencies injects repository and embedding client into tools that support them

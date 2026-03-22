@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/async"
 	"github.com/secmon-lab/warren/pkg/utils/authctx"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
@@ -174,6 +176,25 @@ func (x *Controller) handleSlackInteractionBlockActions(ctx context.Context, int
 	for _, action := range interaction.ActionCallback.BlockActions {
 		actionID := action.ActionID
 		value := action.Value
+
+		// Handle HITL actions with state values for comment extraction
+		if actionID == slack_model.ActionIDHITLApprove.String() || actionID == slack_model.ActionIDHITLDeny.String() {
+			status := hitl.StatusApproved
+			if actionID == slack_model.ActionIDHITLDeny.String() {
+				status = hitl.StatusDenied
+			}
+
+			var comment string
+			if stateValues := interaction.BlockActionState; stateValues != nil {
+				if block, ok := stateValues.Values[slack_model.BlockIDHITLComment.String()]; ok {
+					if commentAction, ok := block[slack_model.BlockActionIDHITLComment.String()]; ok {
+						comment = commentAction.Value
+					}
+				}
+			}
+
+			return x.interaction.HandleHITLAction(ctx, user, types.HITLRequestID(value), status, comment)
+		}
 
 		// Handle overflow menu actions (e.g., notice actions)
 		// Overflow menu uses action.SelectedOption.Value in format "actionType:parameter"

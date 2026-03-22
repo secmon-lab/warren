@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
+	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
@@ -2778,6 +2779,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetDiagnosisIssueCountsFunc: func(ctx context.Context, diagnosisID types.DiagnosisID) (diagnosis.IssueCounts, error) {
 //				panic("mock out the GetDiagnosisIssueCounts method")
 //			},
+//			GetHITLRequestFunc: func(ctx context.Context, id types.HITLRequestID) (*hitl.Request, error) {
+//				panic("mock out the GetHITLRequest method")
+//			},
 //			GetKnowledgeFunc: func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) (*knowledge.Knowledge, error) {
 //				panic("mock out the GetKnowledge method")
 //			},
@@ -2898,6 +2902,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			PutDiagnosisIssueFunc: func(ctx context.Context, issue *diagnosis.Issue) error {
 //				panic("mock out the PutDiagnosisIssue method")
 //			},
+//			PutHITLRequestFunc: func(ctx context.Context, req *hitl.Request) error {
+//				panic("mock out the PutHITLRequest method")
+//			},
 //			PutHistoryFunc: func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
 //				panic("mock out the PutHistory method")
 //			},
@@ -2952,6 +2959,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			UpdateAlertStatusFunc: func(ctx context.Context, alertID types.AlertID, status alert.AlertStatus) error {
 //				panic("mock out the UpdateAlertStatus method")
 //			},
+//			UpdateHITLRequestStatusFunc: func(ctx context.Context, id types.HITLRequestID, status hitl.Status, respondedBy string, response map[string]any) error {
+//				panic("mock out the UpdateHITLRequestStatus method")
+//			},
 //			UpdateMemoryScoreBatchFunc: func(ctx context.Context, agentID string, updates map[types.AgentMemoryID]struct{Score float64; LastUsedAt time.Time}) error {
 //				panic("mock out the UpdateMemoryScoreBatch method")
 //			},
@@ -2960,6 +2970,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			UpdateTagFunc: func(ctx context.Context, tagMoqParam *tag.Tag) error {
 //				panic("mock out the UpdateTag method")
+//			},
+//			WatchHITLRequestFunc: func(ctx context.Context, id types.HITLRequestID) (<-chan *hitl.Request, <-chan error) {
+//				panic("mock out the WatchHITLRequest method")
 //			},
 //		}
 //
@@ -3091,6 +3104,9 @@ type RepositoryMock struct {
 	// GetDiagnosisIssueCountsFunc mocks the GetDiagnosisIssueCounts method.
 	GetDiagnosisIssueCountsFunc func(ctx context.Context, diagnosisID types.DiagnosisID) (diagnosis.IssueCounts, error)
 
+	// GetHITLRequestFunc mocks the GetHITLRequest method.
+	GetHITLRequestFunc func(ctx context.Context, id types.HITLRequestID) (*hitl.Request, error)
+
 	// GetKnowledgeFunc mocks the GetKnowledge method.
 	GetKnowledgeFunc func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) (*knowledge.Knowledge, error)
 
@@ -3211,6 +3227,9 @@ type RepositoryMock struct {
 	// PutDiagnosisIssueFunc mocks the PutDiagnosisIssue method.
 	PutDiagnosisIssueFunc func(ctx context.Context, issue *diagnosis.Issue) error
 
+	// PutHITLRequestFunc mocks the PutHITLRequest method.
+	PutHITLRequestFunc func(ctx context.Context, req *hitl.Request) error
+
 	// PutHistoryFunc mocks the PutHistory method.
 	PutHistoryFunc func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error
 
@@ -3265,6 +3284,9 @@ type RepositoryMock struct {
 	// UpdateAlertStatusFunc mocks the UpdateAlertStatus method.
 	UpdateAlertStatusFunc func(ctx context.Context, alertID types.AlertID, status alert.AlertStatus) error
 
+	// UpdateHITLRequestStatusFunc mocks the UpdateHITLRequestStatus method.
+	UpdateHITLRequestStatusFunc func(ctx context.Context, id types.HITLRequestID, status hitl.Status, respondedBy string, response map[string]any) error
+
 	// UpdateMemoryScoreBatchFunc mocks the UpdateMemoryScoreBatch method.
 	UpdateMemoryScoreBatchFunc func(ctx context.Context, agentID string, updates map[types.AgentMemoryID]struct {
 		Score      float64
@@ -3276,6 +3298,9 @@ type RepositoryMock struct {
 
 	// UpdateTagFunc mocks the UpdateTag method.
 	UpdateTagFunc func(ctx context.Context, tagMoqParam *tag.Tag) error
+
+	// WatchHITLRequestFunc mocks the WatchHITLRequest method.
+	WatchHITLRequestFunc func(ctx context.Context, id types.HITLRequestID) (<-chan *hitl.Request, <-chan error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -3587,6 +3612,13 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// DiagnosisID is the diagnosisID argument value.
 			DiagnosisID types.DiagnosisID
+		}
+		// GetHITLRequest holds details about calls to the GetHITLRequest method.
+		GetHITLRequest []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID types.HITLRequestID
 		}
 		// GetKnowledge holds details about calls to the GetKnowledge method.
 		GetKnowledge []struct {
@@ -3902,6 +3934,13 @@ type RepositoryMock struct {
 			// Issue is the issue argument value.
 			Issue *diagnosis.Issue
 		}
+		// PutHITLRequest holds details about calls to the PutHITLRequest method.
+		PutHITLRequest []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Req is the req argument value.
+			Req *hitl.Request
+		}
 		// PutHistory holds details about calls to the PutHistory method.
 		PutHistory []struct {
 			// Ctx is the ctx argument value.
@@ -4044,6 +4083,19 @@ type RepositoryMock struct {
 			// Status is the status argument value.
 			Status alert.AlertStatus
 		}
+		// UpdateHITLRequestStatus holds details about calls to the UpdateHITLRequestStatus method.
+		UpdateHITLRequestStatus []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID types.HITLRequestID
+			// Status is the status argument value.
+			Status hitl.Status
+			// RespondedBy is the respondedBy argument value.
+			RespondedBy string
+			// Response is the response argument value.
+			Response map[string]any
+		}
 		// UpdateMemoryScoreBatch holds details about calls to the UpdateMemoryScoreBatch method.
 		UpdateMemoryScoreBatch []struct {
 			// Ctx is the ctx argument value.
@@ -4069,6 +4121,13 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// TagMoqParam is the tagMoqParam argument value.
 			TagMoqParam *tag.Tag
+		}
+		// WatchHITLRequest holds details about calls to the WatchHITLRequest method.
+		WatchHITLRequest []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID types.HITLRequestID
 		}
 	}
 	lockArchiveKnowledge               sync.RWMutex
@@ -4112,6 +4171,7 @@ type RepositoryMock struct {
 	lockGetDiagnosis                   sync.RWMutex
 	lockGetDiagnosisIssue              sync.RWMutex
 	lockGetDiagnosisIssueCounts        sync.RWMutex
+	lockGetHITLRequest                 sync.RWMutex
 	lockGetKnowledge                   sync.RWMutex
 	lockGetKnowledgeByCommit           sync.RWMutex
 	lockGetKnowledges                  sync.RWMutex
@@ -4152,6 +4212,7 @@ type RepositoryMock struct {
 	lockPutAlertList                   sync.RWMutex
 	lockPutDiagnosis                   sync.RWMutex
 	lockPutDiagnosisIssue              sync.RWMutex
+	lockPutHITLRequest                 sync.RWMutex
 	lockPutHistory                     sync.RWMutex
 	lockPutKnowledge                   sync.RWMutex
 	lockPutRefineGroup                 sync.RWMutex
@@ -4170,9 +4231,11 @@ type RepositoryMock struct {
 	lockSearchMemoriesByEmbedding      sync.RWMutex
 	lockUnbindAlertFromTicket          sync.RWMutex
 	lockUpdateAlertStatus              sync.RWMutex
+	lockUpdateHITLRequestStatus        sync.RWMutex
 	lockUpdateMemoryScoreBatch         sync.RWMutex
 	lockUpdateNotice                   sync.RWMutex
 	lockUpdateTag                      sync.RWMutex
+	lockWatchHITLRequest               sync.RWMutex
 }
 
 // ArchiveKnowledge calls ArchiveKnowledgeFunc.
@@ -5849,6 +5912,46 @@ func (mock *RepositoryMock) GetDiagnosisIssueCountsCalls() []struct {
 	return calls
 }
 
+// GetHITLRequest calls GetHITLRequestFunc.
+func (mock *RepositoryMock) GetHITLRequest(ctx context.Context, id types.HITLRequestID) (*hitl.Request, error) {
+	callInfo := struct {
+		Ctx context.Context
+		ID  types.HITLRequestID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockGetHITLRequest.Lock()
+	mock.calls.GetHITLRequest = append(mock.calls.GetHITLRequest, callInfo)
+	mock.lockGetHITLRequest.Unlock()
+	if mock.GetHITLRequestFunc == nil {
+		var (
+			requestOut *hitl.Request
+			errOut     error
+		)
+		return requestOut, errOut
+	}
+	return mock.GetHITLRequestFunc(ctx, id)
+}
+
+// GetHITLRequestCalls gets all the calls that were made to GetHITLRequest.
+// Check the length with:
+//
+//	len(mockedRepository.GetHITLRequestCalls())
+func (mock *RepositoryMock) GetHITLRequestCalls() []struct {
+	Ctx context.Context
+	ID  types.HITLRequestID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  types.HITLRequestID
+	}
+	mock.lockGetHITLRequest.RLock()
+	calls = mock.calls.GetHITLRequest
+	mock.lockGetHITLRequest.RUnlock()
+	return calls
+}
+
 // GetKnowledge calls GetKnowledgeFunc.
 func (mock *RepositoryMock) GetKnowledge(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) (*knowledge.Knowledge, error) {
 	callInfo := struct {
@@ -7515,6 +7618,45 @@ func (mock *RepositoryMock) PutDiagnosisIssueCalls() []struct {
 	return calls
 }
 
+// PutHITLRequest calls PutHITLRequestFunc.
+func (mock *RepositoryMock) PutHITLRequest(ctx context.Context, req *hitl.Request) error {
+	callInfo := struct {
+		Ctx context.Context
+		Req *hitl.Request
+	}{
+		Ctx: ctx,
+		Req: req,
+	}
+	mock.lockPutHITLRequest.Lock()
+	mock.calls.PutHITLRequest = append(mock.calls.PutHITLRequest, callInfo)
+	mock.lockPutHITLRequest.Unlock()
+	if mock.PutHITLRequestFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutHITLRequestFunc(ctx, req)
+}
+
+// PutHITLRequestCalls gets all the calls that were made to PutHITLRequest.
+// Check the length with:
+//
+//	len(mockedRepository.PutHITLRequestCalls())
+func (mock *RepositoryMock) PutHITLRequestCalls() []struct {
+	Ctx context.Context
+	Req *hitl.Request
+} {
+	var calls []struct {
+		Ctx context.Context
+		Req *hitl.Request
+	}
+	mock.lockPutHITLRequest.RLock()
+	calls = mock.calls.PutHITLRequest
+	mock.lockPutHITLRequest.RUnlock()
+	return calls
+}
+
 // PutHistory calls PutHistoryFunc.
 func (mock *RepositoryMock) PutHistory(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
 	callInfo := struct {
@@ -8251,6 +8393,57 @@ func (mock *RepositoryMock) UpdateAlertStatusCalls() []struct {
 	return calls
 }
 
+// UpdateHITLRequestStatus calls UpdateHITLRequestStatusFunc.
+func (mock *RepositoryMock) UpdateHITLRequestStatus(ctx context.Context, id types.HITLRequestID, status hitl.Status, respondedBy string, response map[string]any) error {
+	callInfo := struct {
+		Ctx         context.Context
+		ID          types.HITLRequestID
+		Status      hitl.Status
+		RespondedBy string
+		Response    map[string]any
+	}{
+		Ctx:         ctx,
+		ID:          id,
+		Status:      status,
+		RespondedBy: respondedBy,
+		Response:    response,
+	}
+	mock.lockUpdateHITLRequestStatus.Lock()
+	mock.calls.UpdateHITLRequestStatus = append(mock.calls.UpdateHITLRequestStatus, callInfo)
+	mock.lockUpdateHITLRequestStatus.Unlock()
+	if mock.UpdateHITLRequestStatusFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.UpdateHITLRequestStatusFunc(ctx, id, status, respondedBy, response)
+}
+
+// UpdateHITLRequestStatusCalls gets all the calls that were made to UpdateHITLRequestStatus.
+// Check the length with:
+//
+//	len(mockedRepository.UpdateHITLRequestStatusCalls())
+func (mock *RepositoryMock) UpdateHITLRequestStatusCalls() []struct {
+	Ctx         context.Context
+	ID          types.HITLRequestID
+	Status      hitl.Status
+	RespondedBy string
+	Response    map[string]any
+} {
+	var calls []struct {
+		Ctx         context.Context
+		ID          types.HITLRequestID
+		Status      hitl.Status
+		RespondedBy string
+		Response    map[string]any
+	}
+	mock.lockUpdateHITLRequestStatus.RLock()
+	calls = mock.calls.UpdateHITLRequestStatus
+	mock.lockUpdateHITLRequestStatus.RUnlock()
+	return calls
+}
+
 // UpdateMemoryScoreBatch calls UpdateMemoryScoreBatchFunc.
 func (mock *RepositoryMock) UpdateMemoryScoreBatch(ctx context.Context, agentID string, updates map[types.AgentMemoryID]struct {
 	Score      float64
@@ -8381,6 +8574,46 @@ func (mock *RepositoryMock) UpdateTagCalls() []struct {
 	mock.lockUpdateTag.RLock()
 	calls = mock.calls.UpdateTag
 	mock.lockUpdateTag.RUnlock()
+	return calls
+}
+
+// WatchHITLRequest calls WatchHITLRequestFunc.
+func (mock *RepositoryMock) WatchHITLRequest(ctx context.Context, id types.HITLRequestID) (<-chan *hitl.Request, <-chan error) {
+	callInfo := struct {
+		Ctx context.Context
+		ID  types.HITLRequestID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockWatchHITLRequest.Lock()
+	mock.calls.WatchHITLRequest = append(mock.calls.WatchHITLRequest, callInfo)
+	mock.lockWatchHITLRequest.Unlock()
+	if mock.WatchHITLRequestFunc == nil {
+		var (
+			requestChOut <-chan *hitl.Request
+			errChOut     <-chan error
+		)
+		return requestChOut, errChOut
+	}
+	return mock.WatchHITLRequestFunc(ctx, id)
+}
+
+// WatchHITLRequestCalls gets all the calls that were made to WatchHITLRequest.
+// Check the length with:
+//
+//	len(mockedRepository.WatchHITLRequestCalls())
+func (mock *RepositoryMock) WatchHITLRequestCalls() []struct {
+	Ctx context.Context
+	ID  types.HITLRequestID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  types.HITLRequestID
+	}
+	mock.lockWatchHITLRequest.RLock()
+	calls = mock.calls.WatchHITLRequest
+	mock.lockWatchHITLRequest.RUnlock()
 	return calls
 }
 
@@ -9290,6 +9523,9 @@ func (mock *SlackEventUsecasesMock) HandleSlackMessageCalls() []struct {
 //
 //		// make and configure a mocked interfaces.SlackInteractionUsecases
 //		mockedSlackInteractionUsecases := &SlackInteractionUsecasesMock{
+//			HandleHITLActionFunc: func(ctx context.Context, user slack.User, requestID types.HITLRequestID, status hitl.Status, comment string) error {
+//				panic("mock out the HandleHITLAction method")
+//			},
 //			HandleSalvageRefreshFunc: func(ctx context.Context, user slack.User, metadata string, values slack.StateValue, viewID string) error {
 //				panic("mock out the HandleSalvageRefresh method")
 //			},
@@ -9306,6 +9542,9 @@ func (mock *SlackEventUsecasesMock) HandleSlackMessageCalls() []struct {
 //
 //	}
 type SlackInteractionUsecasesMock struct {
+	// HandleHITLActionFunc mocks the HandleHITLAction method.
+	HandleHITLActionFunc func(ctx context.Context, user slack.User, requestID types.HITLRequestID, status hitl.Status, comment string) error
+
 	// HandleSalvageRefreshFunc mocks the HandleSalvageRefresh method.
 	HandleSalvageRefreshFunc func(ctx context.Context, user slack.User, metadata string, values slack.StateValue, viewID string) error
 
@@ -9317,6 +9556,19 @@ type SlackInteractionUsecasesMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// HandleHITLAction holds details about calls to the HandleHITLAction method.
+		HandleHITLAction []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// User is the user argument value.
+			User slack.User
+			// RequestID is the requestID argument value.
+			RequestID types.HITLRequestID
+			// Status is the status argument value.
+			Status hitl.Status
+			// Comment is the comment argument value.
+			Comment string
+		}
 		// HandleSalvageRefresh holds details about calls to the HandleSalvageRefresh method.
 		HandleSalvageRefresh []struct {
 			// Ctx is the ctx argument value.
@@ -9359,9 +9611,61 @@ type SlackInteractionUsecasesMock struct {
 			Values slack.StateValue
 		}
 	}
+	lockHandleHITLAction                     sync.RWMutex
 	lockHandleSalvageRefresh                 sync.RWMutex
 	lockHandleSlackInteractionBlockActions   sync.RWMutex
 	lockHandleSlackInteractionViewSubmission sync.RWMutex
+}
+
+// HandleHITLAction calls HandleHITLActionFunc.
+func (mock *SlackInteractionUsecasesMock) HandleHITLAction(ctx context.Context, user slack.User, requestID types.HITLRequestID, status hitl.Status, comment string) error {
+	callInfo := struct {
+		Ctx       context.Context
+		User      slack.User
+		RequestID types.HITLRequestID
+		Status    hitl.Status
+		Comment   string
+	}{
+		Ctx:       ctx,
+		User:      user,
+		RequestID: requestID,
+		Status:    status,
+		Comment:   comment,
+	}
+	mock.lockHandleHITLAction.Lock()
+	mock.calls.HandleHITLAction = append(mock.calls.HandleHITLAction, callInfo)
+	mock.lockHandleHITLAction.Unlock()
+	if mock.HandleHITLActionFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.HandleHITLActionFunc(ctx, user, requestID, status, comment)
+}
+
+// HandleHITLActionCalls gets all the calls that were made to HandleHITLAction.
+// Check the length with:
+//
+//	len(mockedSlackInteractionUsecases.HandleHITLActionCalls())
+func (mock *SlackInteractionUsecasesMock) HandleHITLActionCalls() []struct {
+	Ctx       context.Context
+	User      slack.User
+	RequestID types.HITLRequestID
+	Status    hitl.Status
+	Comment   string
+} {
+	var calls []struct {
+		Ctx       context.Context
+		User      slack.User
+		RequestID types.HITLRequestID
+		Status    hitl.Status
+		Comment   string
+	}
+	mock.lockHandleHITLAction.RLock()
+	calls = mock.calls.HandleHITLAction
+	mock.lockHandleHITLAction.RUnlock()
+	return calls
 }
 
 // HandleSalvageRefresh calls HandleSalvageRefreshFunc.

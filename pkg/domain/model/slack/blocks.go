@@ -45,6 +45,7 @@ const (
 	BlockIDTicketTags       BlockID = "ticket_tags_block"
 	BlockIDSalvageThreshold BlockID = "salvage_threshold_block"
 	BlockIDSalvageKeyword   BlockID = "salvage_keyword_block"
+	BlockIDHITLComment      BlockID = "hitl_comment_block"
 )
 
 // ActionID in block
@@ -65,6 +66,7 @@ const (
 	BlockActionIDSalvageRefresh   BlockActionID = "salvage_refresh_button"
 	BlockActionIDTicketTitle      BlockActionID = "ticket_title_input"
 	BlockActionIDTicketDesc       BlockActionID = "ticket_description_input"
+	BlockActionIDHITLComment      BlockActionID = "hitl_comment_input"
 )
 
 type ActionID string
@@ -94,6 +96,10 @@ const (
 
 	// For refine
 	ActionIDCreateTicketFromRefine ActionID = "create_ticket_from_refine"
+
+	// For HITL
+	ActionIDHITLApprove ActionID = "hitl_approve"
+	ActionIDHITLDeny    ActionID = "hitl_deny"
 )
 
 type Mention struct {

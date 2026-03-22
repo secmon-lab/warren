@@ -8,6 +8,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
+	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
@@ -232,4 +233,15 @@ type Repository interface {
 	BatchGetDiagnosisIssueCounts(ctx context.Context, diagnosisIDs []types.DiagnosisID) (map[types.DiagnosisID]diagnosis.IssueCounts, error)
 	// ListPendingDiagnosisIssues returns all pending issues for a diagnosis (no pagination).
 	ListPendingDiagnosisIssues(ctx context.Context, diagnosisID types.DiagnosisID) ([]*diagnosis.Issue, error)
+
+	// HITL request management
+	PutHITLRequest(ctx context.Context, req *hitl.Request) error
+	GetHITLRequest(ctx context.Context, id types.HITLRequestID) (*hitl.Request, error)
+	UpdateHITLRequestStatus(ctx context.Context, id types.HITLRequestID, status hitl.Status, respondedBy string, response map[string]any) error
+
+	// WatchHITLRequest watches for changes to a HITL request document.
+	// Returns a channel that receives the updated request when status changes.
+	// The channel is closed when the context is cancelled or an error occurs.
+	// The error channel receives any errors during watching.
+	WatchHITLRequest(ctx context.Context, id types.HITLRequestID) (<-chan *hitl.Request, <-chan error)
 }

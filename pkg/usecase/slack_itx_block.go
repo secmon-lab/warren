@@ -10,6 +10,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	hitlModel "github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -72,6 +73,15 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, slac
 	}
 
 	return nil
+}
+
+// HandleHITLAction processes a HITL approval/denial from a Slack button click.
+func (uc *UseCases) HandleHITLAction(ctx context.Context, slackUser slack.User, requestID types.HITLRequestID, status hitlModel.Status, comment string) error {
+	response := map[string]any{}
+	if comment != "" {
+		response["comment"] = comment
+	}
+	return uc.hitlService.Respond(ctx, requestID, status, slackUser.ID, response)
 }
 
 func (uc *UseCases) ackAlerts(ctx context.Context, user slack.User, slackThread slack.Thread, alerts alert.Alerts) error {
