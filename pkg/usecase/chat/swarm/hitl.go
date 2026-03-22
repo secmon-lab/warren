@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -31,6 +32,16 @@ func newHITLMiddleware(cfg hitlConfig) gollem.ToolMiddleware {
 		return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
 			if !cfg.requireApproval[req.Tool.Name] {
 				return next(ctx, req)
+			}
+
+			// Block execution if no presenter is available.
+			// HITL-required tools must not bypass approval just because
+			// the transport (Slack, CLI, etc.) is not configured.
+			if cfg.presenter == nil {
+				return &gollem.ToolExecResponse{
+					Error: goerr.New("tool requires human approval but no HITL presenter is available",
+						goerr.V("tool", req.Tool.Name)),
+				}, nil
 			}
 
 			// Build HITL request

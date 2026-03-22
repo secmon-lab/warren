@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
@@ -14,7 +15,10 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-const maxResponseBody = 1024 * 1024 // 1MB
+const (
+	maxResponseBody  = 1024 * 1024    // 1MB
+	defaultTimeout   = 30 * time.Second
+)
 
 type fetchFunc func(ctx context.Context, url string) (string, error)
 
@@ -90,7 +94,7 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	if fn == nil {
 		c := x.client
 		if c == nil {
-			c = http.DefaultClient
+			c = &http.Client{Timeout: defaultTimeout}
 		}
 		fn = defaultFetch(c)
 	}

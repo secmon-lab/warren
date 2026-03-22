@@ -78,6 +78,9 @@ func (r *Firestore) WatchHITLRequest(ctx context.Context, id types.HITLRequestID
 		defer close(ch)
 		defer close(errCh)
 
+		const maxRetries = 3
+		retries := 0
+
 		ref := r.db.Collection(collectionHITLRequests).Doc(id.String())
 		snapIter := ref.Snapshots(ctx)
 		defer snapIter.Stop()
@@ -88,11 +91,24 @@ func (r *Firestore) WatchHITLRequest(ctx context.Context, id types.HITLRequestID
 				if ctx.Err() != nil {
 					return
 				}
-				errCh <- goerr.Wrap(err, "snapshot iterator error",
-					goerr.V("id", id),
-					goerr.T(errutil.TagDatabase))
-				return
+
+				retries++
+				if retries > maxRetries {
+					errCh <- goerr.Wrap(err, "snapshot iterator failed after retries",
+						goerr.V("id", id),
+						goerr.V("retries", maxRetries),
+						goerr.T(errutil.TagDatabase))
+					return
+				}
+
+				// Retry: stop current iterator and create a new one
+				snapIter.Stop()
+				snapIter = ref.Snapshots(ctx)
+				continue
 			}
+
+			// Reset retry counter on successful read
+			retries = 0
 
 			if !snap.Exists() {
 				continue

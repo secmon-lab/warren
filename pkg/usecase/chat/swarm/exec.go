@@ -11,8 +11,8 @@ import (
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
+	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
-	"github.com/secmon-lab/warren/pkg/domain/types"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
@@ -47,7 +47,7 @@ func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *
 		wg.Add(1)
 		go func(idx int, t TaskPlan, r taskRouting) {
 			defer wg.Done()
-			results[idx] = c.executeTask(ctx, t, target, r.ctx, r.markCompleted, r.updatableBlockMsg)
+			results[idx] = c.executeTask(ctx, t, target, ssn, r.ctx, r.markCompleted, r.updatableBlockMsg)
 			// Post result context block immediately upon task completion
 			c.postTaskResult(ctx, t, results[idx], target)
 		}(i, task, routings[i])
@@ -97,7 +97,7 @@ func (c *SwarmChat) postDivider(ctx context.Context, target *ticket.Ticket) {
 }
 
 // executeTask executes a single task with its own agent and trace context.
-func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *ticket.Ticket, taskCtx context.Context, markCompleted func(), updatableBlockMsg *slackService.UpdatableBlockMessage) *TaskResult {
+func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *ticket.Ticket, ssn *session.Session, taskCtx context.Context, markCompleted func(), updatableBlockMsg *slackService.UpdatableBlockMessage) *TaskResult {
 	logger := logging.From(ctx)
 	result := &TaskResult{
 		TaskID: task.ID,
@@ -171,23 +171,34 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 		agentOpts = append(agentOpts, gollem.WithToolMiddleware(newBudgetToolMiddleware(tracker)))
 	}
 
-	// Add HITL middleware if configured
+	// Add HITL middleware if configured.
+	// The middleware is always added when hitlTools is set, regardless of whether
+	// a Slack presenter is available. If no presenter is available, the middleware
+	// blocks tool execution to prevent bypassing the approval policy.
 	if len(c.hitlTools) > 0 {
 		approvalSet := make(map[string]bool, len(c.hitlTools))
 		for _, t := range c.hitlTools {
 			approvalSet[t] = true
 		}
 		hitlSvc := hitlService.New(c.repository)
-		presenter := buildHITLPresenter(updatableBlockMsg, task.Title, user.FromContext(ctx))
-		if presenter != nil {
-			agentOpts = append(agentOpts, gollem.WithToolMiddleware(newHITLMiddleware(hitlConfig{
-				requireApproval: approvalSet,
-				service:         hitlSvc,
-				presenter:       presenter,
-				userID:          user.FromContext(ctx),
-				sessionID:       types.SessionID(""), // will be set from context if needed
-			})))
+		var presenter hitlService.Presenter
+		if updatableBlockMsg != nil {
+			presenter = buildHITLPresenter(updatableBlockMsg, task.Title, user.FromContext(ctx))
 		}
+
+		var slackThread *slackModel.Thread
+		if target.SlackThread != nil {
+			slackThread = target.SlackThread
+		}
+
+		agentOpts = append(agentOpts, gollem.WithToolMiddleware(newHITLMiddleware(hitlConfig{
+			requireApproval: approvalSet,
+			service:         hitlSvc,
+			presenter:       presenter,
+			userID:          user.FromContext(ctx),
+			sessionID:       ssn.ID,
+			slackThread:     slackThread,
+		})))
 	}
 
 	agentOpts = append(agentOpts, gollem.WithToolMiddleware(newTaskToolMiddleware(taskCtx, traceState)))
