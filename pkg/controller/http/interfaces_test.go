@@ -5,6 +5,7 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
@@ -57,6 +58,13 @@ func (u *useCaseInterface) HandleSlackInteractionViewSubmission(ctx context.Cont
 func (u *useCaseInterface) HandleSalvageRefresh(ctx context.Context, user slack.User, metadata string, values slack.StateValue, viewID string) error {
 	if u.SlackInteractionUsecases != nil {
 		return u.SlackInteractionUsecases.HandleSalvageRefresh(ctx, user, metadata, values, viewID)
+	}
+	return nil
+}
+
+func (u *useCaseInterface) HandleHITLAction(ctx context.Context, user slack.User, requestID types.HITLRequestID, status hitl.Status, comment string) error {
+	if u.SlackInteractionUsecases != nil {
+		return u.SlackInteractionUsecases.HandleHITLAction(ctx, user, requestID, status, comment)
 	}
 	return nil
 }
