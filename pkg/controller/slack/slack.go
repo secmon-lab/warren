@@ -177,23 +177,25 @@ func (x *Controller) handleSlackInteractionBlockActions(ctx context.Context, int
 		actionID := action.ActionID
 		value := action.Value
 
-		// Handle HITL actions with state values for comment extraction
+		// Handle HITL actions with state values for comment/answer extraction
 		if actionID == slack_model.ActionIDHITLApprove.String() || actionID == slack_model.ActionIDHITLDeny.String() {
 			status := hitl.StatusApproved
 			if actionID == slack_model.ActionIDHITLDeny.String() {
 				status = hitl.StatusDenied
 			}
 
-			var comment string
-			if stateValues := interaction.BlockActionState; stateValues != nil {
-				if block, ok := stateValues.Values[slack_model.BlockIDHITLComment.String()]; ok {
-					if commentAction, ok := block[slack_model.BlockActionIDHITLComment.String()]; ok {
-						comment = commentAction.Value
-					}
-				}
-			}
+			response := extractHITLResponse(interaction.BlockActionState)
+			return x.interaction.HandleHITLAction(ctx, user, types.HITLRequestID(value), status, response)
+		}
 
-			return x.interaction.HandleHITLAction(ctx, user, types.HITLRequestID(value), status, comment)
+		// Handle HITL question submit
+		if actionID == slack_model.ActionIDHITLSubmitAnswer.String() {
+			response := extractHITLResponse(interaction.BlockActionState)
+			if _, ok := response["answer"]; !ok {
+				logger.Warn("HITL submit answer without selection, ignoring")
+				return nil
+			}
+			return x.interaction.HandleHITLAction(ctx, user, types.HITLRequestID(value), hitl.StatusApproved, response)
 		}
 
 		// Handle overflow menu actions (e.g., notice actions)
@@ -214,6 +216,34 @@ func (x *Controller) handleSlackInteractionBlockActions(ctx context.Context, int
 	}
 
 	return nil
+}
+
+// extractHITLResponse extracts answer and comment from Slack block action state values.
+func extractHITLResponse(state *slack.BlockActionStates) map[string]any {
+	response := map[string]any{}
+	if state == nil {
+		return response
+	}
+
+	// Extract radio button answer (for questions)
+	if block, ok := state.Values[slack_model.BlockIDHITLAnswer.String()]; ok {
+		if answerAction, ok := block[slack_model.BlockActionIDHITLAnswer.String()]; ok {
+			if answerAction.SelectedOption.Value != "" {
+				response["answer"] = answerAction.SelectedOption.Value
+			}
+		}
+	}
+
+	// Extract comment
+	if block, ok := state.Values[slack_model.BlockIDHITLComment.String()]; ok {
+		if commentAction, ok := block[slack_model.BlockActionIDHITLComment.String()]; ok {
+			if commentAction.Value != "" {
+				response["comment"] = commentAction.Value
+			}
+		}
+	}
+
+	return response
 }
 
 func (x *Controller) handleSlackInteractionViewSubmission(ctx context.Context, interaction slack.InteractionCallback) error {

@@ -176,3 +176,50 @@ func TestHITLMiddleware_Timeout(t *testing.T) {
 	gt.Value(t, resp.Error != nil).Equal(true)
 	gt.Value(t, toolExecuted.Load()).Equal(false)
 }
+
+func TestHandleQuestion_AnswerFlow(t *testing.T) {
+	repo := memory.New()
+	presenter := &testPresenter{}
+	sessionID := types.NewSessionID()
+
+	q := &swarm.Question{
+		Question: "Is 10.0.0.5 an internal IP?",
+		Options:  []string{"Yes, VPN GW", "No", "None of the above"},
+		Reason:   "Cannot determine from tool output",
+	}
+
+	svc := hitlSvc.New(repo, hitlSvc.WithTimeout(10*time.Second))
+
+	// Respond after the presenter receives the request
+	go func() {
+		for presenter.presented.Load() == nil {
+			time.Sleep(50 * time.Millisecond)
+		}
+		hitlReq := presenter.presented.Load()
+		_ = svc.Respond(t.Context(), hitlReq.ID, hitl.StatusApproved, "U67890", map[string]any{
+			"answer":  "Yes, VPN GW",
+			"comment": "Tokyo DC",
+		})
+	}()
+
+	result, err := swarm.ExecHandleQuestion(t.Context(), repo, presenter, q, sessionID, "U12345")
+	gt.NoError(t, err).Required()
+	gt.Value(t, result.Question).Equal("Is 10.0.0.5 an internal IP?")
+	gt.Array(t, result.Options).Length(3).Required()
+	gt.Value(t, result.Answer).Equal("Yes, VPN GW")
+	gt.Value(t, result.Comment).Equal("Tokyo DC")
+}
+
+func TestHandleQuestion_NilPresenter_Fails(t *testing.T) {
+	repo := memory.New()
+	sessionID := types.NewSessionID()
+
+	q := &swarm.Question{
+		Question: "Is this allowed?",
+		Options:  []string{"Yes", "No"},
+		Reason:   "Policy unclear",
+	}
+
+	_, err := swarm.ExecHandleQuestion(t.Context(), repo, nil, q, sessionID, "U12345")
+	gt.Error(t, err)
+}

@@ -17,9 +17,18 @@ type PlanResult struct {
 }
 
 // ReplanResult represents the LLM replan response.
+// If Question is non-nil, it takes priority over Tasks (Tasks are ignored).
 type ReplanResult struct {
-	Message string     `json:"message,omitempty"`
-	Tasks   []TaskPlan `json:"tasks"`
+	Message  string     `json:"message,omitempty"`
+	Tasks    []TaskPlan `json:"tasks"`
+	Question *Question  `json:"question,omitempty"`
+}
+
+// Question represents a question to ask the security operator.
+type Question struct {
+	Question string   `json:"question"` // The question text
+	Options  []string `json:"options"`  // Answer choices (required)
+	Reason   string   `json:"reason"`   // Why this question is needed
 }
 
 // TaskResult holds the outcome of a single task execution.

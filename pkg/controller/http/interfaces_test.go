@@ -62,9 +62,9 @@ func (u *useCaseInterface) HandleSalvageRefresh(ctx context.Context, user slack.
 	return nil
 }
 
-func (u *useCaseInterface) HandleHITLAction(ctx context.Context, user slack.User, requestID types.HITLRequestID, status hitl.Status, comment string) error {
+func (u *useCaseInterface) HandleHITLAction(ctx context.Context, user slack.User, requestID types.HITLRequestID, status hitl.Status, response map[string]any) error {
 	if u.SlackInteractionUsecases != nil {
-		return u.SlackInteractionUsecases.HandleHITLAction(ctx, user, requestID, status, comment)
+		return u.SlackInteractionUsecases.HandleHITLAction(ctx, user, requestID, status, response)
 	}
 	return nil
 }

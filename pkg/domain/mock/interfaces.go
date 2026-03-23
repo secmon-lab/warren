@@ -9523,7 +9523,7 @@ func (mock *SlackEventUsecasesMock) HandleSlackMessageCalls() []struct {
 //
 //		// make and configure a mocked interfaces.SlackInteractionUsecases
 //		mockedSlackInteractionUsecases := &SlackInteractionUsecasesMock{
-//			HandleHITLActionFunc: func(ctx context.Context, user slack.User, requestID types.HITLRequestID, status hitl.Status, comment string) error {
+//			HandleHITLActionFunc: func(ctx context.Context, user slack.User, requestID types.HITLRequestID, status hitl.Status, response map[string]any) error {
 //				panic("mock out the HandleHITLAction method")
 //			},
 //			HandleSalvageRefreshFunc: func(ctx context.Context, user slack.User, metadata string, values slack.StateValue, viewID string) error {
@@ -9543,7 +9543,7 @@ func (mock *SlackEventUsecasesMock) HandleSlackMessageCalls() []struct {
 //	}
 type SlackInteractionUsecasesMock struct {
 	// HandleHITLActionFunc mocks the HandleHITLAction method.
-	HandleHITLActionFunc func(ctx context.Context, user slack.User, requestID types.HITLRequestID, status hitl.Status, comment string) error
+	HandleHITLActionFunc func(ctx context.Context, user slack.User, requestID types.HITLRequestID, status hitl.Status, response map[string]any) error
 
 	// HandleSalvageRefreshFunc mocks the HandleSalvageRefresh method.
 	HandleSalvageRefreshFunc func(ctx context.Context, user slack.User, metadata string, values slack.StateValue, viewID string) error
@@ -9566,8 +9566,8 @@ type SlackInteractionUsecasesMock struct {
 			RequestID types.HITLRequestID
 			// Status is the status argument value.
 			Status hitl.Status
-			// Comment is the comment argument value.
-			Comment string
+			// Response is the response argument value.
+			Response map[string]any
 		}
 		// HandleSalvageRefresh holds details about calls to the HandleSalvageRefresh method.
 		HandleSalvageRefresh []struct {
@@ -9618,19 +9618,19 @@ type SlackInteractionUsecasesMock struct {
 }
 
 // HandleHITLAction calls HandleHITLActionFunc.
-func (mock *SlackInteractionUsecasesMock) HandleHITLAction(ctx context.Context, user slack.User, requestID types.HITLRequestID, status hitl.Status, comment string) error {
+func (mock *SlackInteractionUsecasesMock) HandleHITLAction(ctx context.Context, user slack.User, requestID types.HITLRequestID, status hitl.Status, response map[string]any) error {
 	callInfo := struct {
 		Ctx       context.Context
 		User      slack.User
 		RequestID types.HITLRequestID
 		Status    hitl.Status
-		Comment   string
+		Response  map[string]any
 	}{
 		Ctx:       ctx,
 		User:      user,
 		RequestID: requestID,
 		Status:    status,
-		Comment:   comment,
+		Response:  response,
 	}
 	mock.lockHandleHITLAction.Lock()
 	mock.calls.HandleHITLAction = append(mock.calls.HandleHITLAction, callInfo)
@@ -9641,7 +9641,7 @@ func (mock *SlackInteractionUsecasesMock) HandleHITLAction(ctx context.Context, 
 		)
 		return errOut
 	}
-	return mock.HandleHITLActionFunc(ctx, user, requestID, status, comment)
+	return mock.HandleHITLActionFunc(ctx, user, requestID, status, response)
 }
 
 // HandleHITLActionCalls gets all the calls that were made to HandleHITLAction.
@@ -9653,14 +9653,14 @@ func (mock *SlackInteractionUsecasesMock) HandleHITLActionCalls() []struct {
 	User      slack.User
 	RequestID types.HITLRequestID
 	Status    hitl.Status
-	Comment   string
+	Response  map[string]any
 } {
 	var calls []struct {
 		Ctx       context.Context
 		User      slack.User
 		RequestID types.HITLRequestID
 		Status    hitl.Status
-		Comment   string
+		Response  map[string]any
 	}
 	mock.lockHandleHITLAction.RLock()
 	calls = mock.calls.HandleHITLAction

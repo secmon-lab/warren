@@ -113,6 +113,79 @@ func TestService_RequestAndWait_Timeout(t *testing.T) {
 	gt.Error(t, err)
 }
 
+func TestService_Question_AnswerWithSelection(t *testing.T) {
+	repo := memory.New()
+	svc := hitl.New(repo, hitl.WithTimeout(10*time.Second))
+	presenter := &mockPresenter{}
+
+	req := &hitlModel.Request{
+		ID:        types.NewHITLRequestID(),
+		SessionID: types.NewSessionID(),
+		Type:      hitlModel.RequestTypeQuestion,
+		Payload:   hitlModel.NewQuestionPayload("Is this IP internal?", []string{"Yes, VPN GW", "Yes, dev server", "No", "None of the above"}),
+		Status:    hitlModel.StatusPending,
+		UserID:    "U12345",
+		CreatedAt: time.Now(),
+		SlackThread: slack.Thread{
+			ChannelID: "C123",
+			ThreadID:  "1234.5678",
+		},
+	}
+
+	// Simulate user selecting an option with a comment
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		_ = svc.Respond(t.Context(), req.ID, hitlModel.StatusApproved, "U67890", map[string]any{
+			"answer":  "Yes, VPN GW",
+			"comment": "Tokyo DC VPN exit",
+		})
+	}()
+
+	result, err := svc.RequestAndWait(t.Context(), req, presenter)
+	gt.NoError(t, err).Required()
+	gt.Value(t, result.Status).Equal(hitlModel.StatusApproved)
+	gt.Value(t, result.ResponseAnswer()).Equal("Yes, VPN GW")
+	gt.Value(t, result.ResponseComment()).Equal("Tokyo DC VPN exit")
+
+	// Verify presenter received correct question data
+	gt.Value(t, presenter.presented.Type).Equal(hitlModel.RequestTypeQuestion)
+	q := presenter.presented.QuestionData()
+	gt.Value(t, q.Question).Equal("Is this IP internal?")
+	gt.Array(t, q.Options).Length(4).Required()
+}
+
+func TestService_Question_AnswerWithoutComment(t *testing.T) {
+	repo := memory.New()
+	svc := hitl.New(repo, hitl.WithTimeout(10*time.Second))
+	presenter := &mockPresenter{}
+
+	req := &hitlModel.Request{
+		ID:        types.NewHITLRequestID(),
+		SessionID: types.NewSessionID(),
+		Type:      hitlModel.RequestTypeQuestion,
+		Payload:   hitlModel.NewQuestionPayload("Approved pentest?", []string{"Yes", "No", "None of the above"}),
+		Status:    hitlModel.StatusPending,
+		UserID:    "U12345",
+		CreatedAt: time.Now(),
+		SlackThread: slack.Thread{
+			ChannelID: "C123",
+			ThreadID:  "1234.5678",
+		},
+	}
+
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		_ = svc.Respond(t.Context(), req.ID, hitlModel.StatusApproved, "U67890", map[string]any{
+			"answer": "No",
+		})
+	}()
+
+	result, err := svc.RequestAndWait(t.Context(), req, presenter)
+	gt.NoError(t, err).Required()
+	gt.Value(t, result.ResponseAnswer()).Equal("No")
+	gt.Value(t, result.ResponseComment()).Equal("")
+}
+
 func TestService_Respond(t *testing.T) {
 	repo := memory.New()
 	svc := hitl.New(repo)
