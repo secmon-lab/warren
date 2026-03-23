@@ -108,7 +108,29 @@ func (u *UseCases) fixDiagnosisAsync(id types.DiagnosisID, pendingIssues []*diag
 
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("panic in fixDiagnosisAsync", "diagnosis_id", id, "panic", r)
+			errutil.Handle(ctx, goerr.New("panic in fixDiagnosisAsync",
+				goerr.V("diagnosis_id", id),
+				goerr.V("panic", r),
+				goerr.T(errutil.TagInternal),
+			))
+
+			// Update status to partially_fixed to avoid being stuck in "fixing" forever
+			diag, err := u.repository.GetDiagnosis(ctx, id)
+			if err != nil {
+				errutil.Handle(ctx, goerr.Wrap(err, "failed to get diagnosis after panic",
+					goerr.V("diagnosis_id", id),
+					goerr.T(errutil.TagDatabase),
+				))
+				return
+			}
+			diag.Status = diagnosismodel.DiagnosisStatusPartiallyFixed
+			diag.UpdatedAt = clock.Now(ctx)
+			if err := u.repository.PutDiagnosis(ctx, diag); err != nil {
+				errutil.Handle(ctx, goerr.Wrap(err, "failed to update diagnosis status after panic",
+					goerr.V("diagnosis_id", id),
+					goerr.T(errutil.TagDatabase),
+				))
+			}
 		}
 	}()
 
@@ -125,7 +147,10 @@ func (u *UseCases) fixDiagnosisAsync(id types.DiagnosisID, pendingIssues []*diag
 			issue.FailReason = "unknown rule ID"
 			issue.FixedAt = &now
 			if err := u.repository.PutDiagnosisIssue(ctx, issue); err != nil {
-				logger.Warn("failed to update issue status", "issue_id", issue.ID, "error", err)
+				errutil.Handle(ctx, goerr.Wrap(err, "failed to update issue status",
+					goerr.V("issue_id", issue.ID),
+					goerr.T(errutil.TagDatabase),
+				))
 			}
 			failedCount++
 			continue
@@ -135,7 +160,11 @@ func (u *UseCases) fixDiagnosisAsync(id types.DiagnosisID, pendingIssues []*diag
 		now := clock.Now(ctx)
 		issue.FixedAt = &now
 		if fixErr != nil {
-			logger.Warn("fix failed", "rule", issue.RuleID, "issue_id", issue.ID, "error", fixErr)
+			errutil.Handle(ctx, goerr.Wrap(fixErr, "fix failed",
+				goerr.V("rule", issue.RuleID),
+				goerr.V("issue_id", issue.ID),
+				goerr.T(errutil.TagInternal),
+			))
 			issue.Status = diagnosismodel.IssueStatusFailed
 			issue.FailReason = fixErr.Error()
 			failedCount++
@@ -145,7 +174,10 @@ func (u *UseCases) fixDiagnosisAsync(id types.DiagnosisID, pendingIssues []*diag
 		}
 
 		if err := u.repository.PutDiagnosisIssue(ctx, issue); err != nil {
-			logger.Error("failed to update issue status", "issue_id", issue.ID, "error", err)
+			errutil.Handle(ctx, goerr.Wrap(err, "failed to update issue status",
+				goerr.V("issue_id", issue.ID),
+				goerr.T(errutil.TagDatabase),
+			))
 			continue
 		}
 	}
@@ -153,7 +185,10 @@ func (u *UseCases) fixDiagnosisAsync(id types.DiagnosisID, pendingIssues []*diag
 	// Update diagnosis status
 	diag, err := u.repository.GetDiagnosis(ctx, id)
 	if err != nil {
-		logger.Error("failed to get diagnosis for status update", "id", id, "error", err)
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to get diagnosis for status update",
+			goerr.V("id", id),
+			goerr.T(errutil.TagDatabase),
+		))
 		return
 	}
 
@@ -165,7 +200,10 @@ func (u *UseCases) fixDiagnosisAsync(id types.DiagnosisID, pendingIssues []*diag
 	diag.UpdatedAt = clock.Now(ctx)
 
 	if err := u.repository.PutDiagnosis(ctx, diag); err != nil {
-		logger.Error("failed to update diagnosis status", "id", id, "error", err)
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to update diagnosis status",
+			goerr.V("id", id),
+			goerr.T(errutil.TagDatabase),
+		))
 		return
 	}
 

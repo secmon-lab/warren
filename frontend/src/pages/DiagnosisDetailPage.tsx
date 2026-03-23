@@ -146,14 +146,9 @@ export default function DiagnosisDetailPage() {
         toast({ title: "Fix completed", description: msg });
       }
     }
-  }, [isFixing, diagnosis?.status]);
+  }, [diagnosis?.status]);
 
   const [fixDiagnosis, { loading: fixMutationLoading }] = useFixDiagnosisMutation({
-    onCompleted: () => {
-      // Polling will be started by the useEffect when status becomes "fixing"
-      startDiagnosisPolling(POLL_INTERVAL_MS);
-      startIssuesPolling(POLL_INTERVAL_MS);
-    },
     onError: (err) => {
       toast({ title: "Fix failed", description: err.message, variant: "destructive" });
     },
