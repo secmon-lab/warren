@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 const ITEMS_PER_PAGE = 50;
+const POLL_INTERVAL_MS = 3000;
 
 const KNOWN_RULE_IDS = [
   "missing_alert_embedding",
@@ -55,6 +56,8 @@ function diagnosisStatusBadgeVariant(status: string): "default" | "secondary" | 
   switch (status) {
     case "pending":
       return "secondary";
+    case "fixing":
+      return "secondary";
     case "healthy":
       return "outline";
     case "fixed":
@@ -70,6 +73,8 @@ function diagnosisStatusLabel(status: string): string {
   switch (status) {
     case "pending":
       return "Pending";
+    case "fixing":
+      return "Fixing...";
     case "healthy":
       return "Healthy";
     case "fixed":
@@ -89,41 +94,79 @@ export default function DiagnosisDetailPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [ruleFilter, setRuleFilter] = useState<string>("all");
 
-  const { data: diagnosisData, loading: diagnosisLoading, refetch: refetchDiagnosis } =
-    useGetDiagnosisQuery({
-      variables: { id: id! },
-      skip: !id,
-    });
+  // Track whether we were previously in fixing state to show completion toast
+  const wasFixingRef = useRef(false);
 
-  const { data: issuesData, loading: issuesLoading, refetch: refetchIssues } =
-    useGetDiagnosisIssuesQuery({
-      variables: {
-        diagnosisID: id!,
-        offset: (currentPage - 1) * ITEMS_PER_PAGE,
-        limit: ITEMS_PER_PAGE,
-        status: statusFilter !== "all" ? statusFilter : undefined,
-        ruleID: ruleFilter !== "all" ? ruleFilter : undefined,
-      },
-      skip: !id,
-    });
+  const {
+    data: diagnosisData,
+    loading: diagnosisLoading,
+    startPolling: startDiagnosisPolling,
+    stopPolling: stopDiagnosisPolling,
+  } = useGetDiagnosisQuery({
+    variables: { id: id! },
+    skip: !id,
+  });
 
-  const [fixDiagnosis, { loading: fixing }] = useFixDiagnosisMutation({
+  const {
+    data: issuesData,
+    loading: issuesLoading,
+    startPolling: startIssuesPolling,
+    stopPolling: stopIssuesPolling,
+  } = useGetDiagnosisIssuesQuery({
+    variables: {
+      diagnosisID: id!,
+      offset: (currentPage - 1) * ITEMS_PER_PAGE,
+      limit: ITEMS_PER_PAGE,
+      status: statusFilter !== "all" ? statusFilter : undefined,
+      ruleID: ruleFilter !== "all" ? ruleFilter : undefined,
+    },
+    skip: !id,
+  });
+
+  const diagnosis = diagnosisData?.diagnosis;
+  const isFixing = diagnosis?.status === "fixing";
+
+  // Start/stop polling based on fixing status
+  useEffect(() => {
+    if (isFixing) {
+      wasFixingRef.current = true;
+      startDiagnosisPolling(POLL_INTERVAL_MS);
+      startIssuesPolling(POLL_INTERVAL_MS);
+    } else {
+      stopDiagnosisPolling();
+      stopIssuesPolling();
+
+      // Show completion toast when transitioning from fixing to done
+      if (wasFixingRef.current && diagnosis) {
+        wasFixingRef.current = false;
+        const msg =
+          diagnosis.status === "fixed"
+            ? "All issues have been fixed successfully."
+            : "Fix completed with some failures.";
+        toast({ title: "Fix completed", description: msg });
+      }
+    }
+  }, [isFixing, diagnosis?.status]);
+
+  const [fixDiagnosis, { loading: fixMutationLoading }] = useFixDiagnosisMutation({
     onCompleted: () => {
-      toast({ title: "Fix completed", description: "All pending issues have been processed." });
-      refetchDiagnosis();
-      refetchIssues();
+      // Polling will be started by the useEffect when status becomes "fixing"
+      startDiagnosisPolling(POLL_INTERVAL_MS);
+      startIssuesPolling(POLL_INTERVAL_MS);
     },
     onError: (err) => {
       toast({ title: "Fix failed", description: err.message, variant: "destructive" });
     },
   });
 
-  const diagnosis = diagnosisData?.diagnosis;
   const issues = issuesData?.diagnosisIssues?.issues ?? [];
   const totalCount = issuesData?.diagnosisIssues?.totalCount ?? 0;
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
-  const canFix = diagnosis?.status === "pending" || diagnosis?.status === "partially_fixed";
+  const canFix =
+    !isFixing &&
+    (diagnosis?.status === "pending" || diagnosis?.status === "partially_fixed");
+  const fixing = isFixing || fixMutationLoading;
 
   function handleStatusChange(v: string) {
     setStatusFilter(v);
@@ -165,6 +208,7 @@ export default function DiagnosisDetailPage() {
               <span className="font-mono text-sm text-muted-foreground">{diagnosis.id}</span>
               <div className="flex items-center gap-3">
                 <Badge variant={diagnosisStatusBadgeVariant(diagnosis.status)}>
+                  {fixing && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
                   {diagnosisStatusLabel(diagnosis.status)}
                 </Badge>
                 {canFix && (
@@ -173,11 +217,7 @@ export default function DiagnosisDetailPage() {
                     onClick={() => fixDiagnosis({ variables: { id: id! } })}
                     disabled={fixing}
                   >
-                    {fixing ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Wrench className="mr-2 h-4 w-4" />
-                    )}
+                    <Wrench className="mr-2 h-4 w-4" />
                     Fix All
                   </Button>
                 )}

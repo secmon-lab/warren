@@ -8,6 +8,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	diagnosisrule "github.com/secmon-lab/warren/pkg/usecase/diagnosis"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
@@ -60,12 +61,21 @@ func (u *UseCases) RunDiagnosis(ctx context.Context) (*diagnosismodel.Diagnosis,
 	return diag, nil
 }
 
-// FixDiagnosis executes Fix for all pending issues in the given diagnosis.
-// It updates each issue's status and the diagnosis overall status.
+// FixDiagnosis starts Fix for all pending issues in the given diagnosis asynchronously.
+// It sets the status to "fixing" and returns immediately. The actual fix processing
+// runs in a background goroutine to avoid gateway timeouts.
 func (u *UseCases) FixDiagnosis(ctx context.Context, id types.DiagnosisID) (*diagnosismodel.Diagnosis, error) {
 	diag, err := u.repository.GetDiagnosis(ctx, id)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get diagnosis", goerr.V("id", id))
+	}
+
+	// Prevent duplicate fix execution
+	if diag.Status == diagnosismodel.DiagnosisStatusFixing {
+		return nil, goerr.New("diagnosis is already being fixed",
+			goerr.V("id", id),
+			goerr.T(errutil.TagConflict),
+		)
 	}
 
 	pendingIssues, err := u.repository.ListPendingDiagnosisIssues(ctx, id)
@@ -77,17 +87,39 @@ func (u *UseCases) FixDiagnosis(ctx context.Context, id types.DiagnosisID) (*dia
 		return diag, nil
 	}
 
-	// Build rule dispatch map
+	// Set status to fixing and persist before starting background work
+	diag.Status = diagnosismodel.DiagnosisStatusFixing
+	diag.UpdatedAt = clock.Now(ctx)
+	if err := u.repository.PutDiagnosis(ctx, diag); err != nil {
+		return nil, goerr.Wrap(err, "failed to update diagnosis status to fixing", goerr.V("id", id))
+	}
+
+	// Run fix processing in background goroutine
+	go u.fixDiagnosisAsync(id, pendingIssues)
+
+	return diag, nil
+}
+
+// fixDiagnosisAsync executes the actual fix processing in a background goroutine.
+// It uses context.Background() to avoid being cancelled by the HTTP request lifecycle.
+func (u *UseCases) fixDiagnosisAsync(id types.DiagnosisID, pendingIssues []*diagnosismodel.Issue) {
+	ctx := context.Background()
+	logger := logging.From(ctx)
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("panic in fixDiagnosisAsync", "diagnosis_id", id, "panic", r)
+		}
+	}()
+
 	dispatch := u.buildRuleDispatch()
 
-	logger := logging.From(ctx)
 	fixedCount := 0
 	failedCount := 0
 
 	for _, issue := range pendingIssues {
 		rule, ok := dispatch[issue.RuleID]
 		if !ok {
-			// Unknown rule - mark as failed
 			now := clock.Now(ctx)
 			issue.Status = diagnosismodel.IssueStatusFailed
 			issue.FailReason = "unknown rule ID"
@@ -113,11 +145,18 @@ func (u *UseCases) FixDiagnosis(ctx context.Context, id types.DiagnosisID) (*dia
 		}
 
 		if err := u.repository.PutDiagnosisIssue(ctx, issue); err != nil {
-			return nil, goerr.Wrap(err, "failed to update issue status", goerr.V("issue_id", issue.ID))
+			logger.Error("failed to update issue status", "issue_id", issue.ID, "error", err)
+			continue
 		}
 	}
 
 	// Update diagnosis status
+	diag, err := u.repository.GetDiagnosis(ctx, id)
+	if err != nil {
+		logger.Error("failed to get diagnosis for status update", "id", id, "error", err)
+		return
+	}
+
 	if failedCount == 0 {
 		diag.Status = diagnosismodel.DiagnosisStatusFixed
 	} else {
@@ -126,11 +165,11 @@ func (u *UseCases) FixDiagnosis(ctx context.Context, id types.DiagnosisID) (*dia
 	diag.UpdatedAt = clock.Now(ctx)
 
 	if err := u.repository.PutDiagnosis(ctx, diag); err != nil {
-		return nil, goerr.Wrap(err, "failed to update diagnosis status", goerr.V("id", id))
+		logger.Error("failed to update diagnosis status", "id", id, "error", err)
+		return
 	}
 
-	logger.Info("fix completed", "fixed", fixedCount, "failed", failedCount)
-	return diag, nil
+	logger.Info("fix completed", "diagnosis_id", id, "fixed", fixedCount, "failed", failedCount)
 }
 
 // GetDiagnoses returns a paginated list of diagnoses.

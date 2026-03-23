@@ -31,6 +31,7 @@ type DiagnosisStatus string
 
 const (
 	DiagnosisStatusPending        DiagnosisStatus = "pending"
+	DiagnosisStatusFixing         DiagnosisStatus = "fixing"
 	DiagnosisStatusHealthy        DiagnosisStatus = "healthy"
 	DiagnosisStatusFixed          DiagnosisStatus = "fixed"
 	DiagnosisStatusPartiallyFixed DiagnosisStatus = "partially_fixed"
