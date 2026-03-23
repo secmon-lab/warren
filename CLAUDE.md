@@ -46,13 +46,17 @@ Warren is an AI agent and Slack-based security alert management tool. It process
 - **NEVER check error messages using `strings.Contains(err.Error(), ...)`**
 - **ALWAYS use `errors.Is(err, targetErr)` or `errors.As(err, &target)` for error type checking**
 - Error discrimination must be done by error types, not by parsing error messages
-- **ALWAYS tag errors with `goerr.T(errutil.TagXxx)` from `pkg/utils/errutil`** to enable proper HTTP status mapping and observability:
-  - Business logic state violations (wrong status, invalid transition): `errutil.TagInvalidState`
-  - Input validation failures: `errutil.TagValidation`
-  - Resource not found: `errutil.TagNotFound`
-  - Permission denied: `errutil.TagForbidden`
-  - Duplicate resource: `errutil.TagDuplicateResource`
+- **ALWAYS tag errors with `goerr.T(errutil.TagXxx)` from `pkg/utils/errutil`** to enable proper HTTP status mapping and observability. **Every `goerr.New` or `goerr.Wrap` that represents a classifiable error MUST include a tag. Never create errors without considering which tag applies.**
+  - Client errors: `errutil.TagNotFound` (404), `errutil.TagValidation` (400), `errutil.TagUnauthorized` (401), `errutil.TagForbidden` (403), `errutil.TagConflict` (409), `errutil.TagRateLimit` (429)
+  - Server errors: `errutil.TagInternal` (500), `errutil.TagExternal` (502/503), `errutil.TagTimeout` (504), `errutil.TagDatabase` (500)
+  - Business logic: `errutil.TagInvalidState`, `errutil.TagDuplicateResource`, `errutil.TagQuotaExceeded`, `errutil.TagResourceLocked`
+  - External services: `errutil.TagSlackError`, `errutil.TagGitHubError`, `errutil.TagLLMError`, `errutil.TagInvalidLLMResponse`
+  - See full list in `pkg/utils/errutil/tags.go`
   - Example: `goerr.New("ticket must be resolved before archiving", goerr.V("id", id), goerr.T(errutil.TagInvalidState))`
+- **ALWAYS use `errutil.Handle(ctx, err)` for error logging in background goroutines and fire-and-forget paths** instead of raw `logger.Error(...)` / `logger.Warn(...)`. `errutil.Handle` provides structured logging + Sentry reporting + request ID propagation in one call.
+  - BAD: `logger.Error("something failed", "error", err)`
+  - GOOD: `errutil.Handle(ctx, goerr.Wrap(err, "something failed", goerr.V("key", val), goerr.T(errutil.TagDatabase)))`
+  - This applies to any error that is not returned to the caller (goroutines, deferred cleanup, panic recovery, etc.)
 
 ### Resource Cleanup
 - **ALWAYS use `safe.Close(ctx, closer)` from `pkg/utils/safe`** to close `io.Closer` resources
