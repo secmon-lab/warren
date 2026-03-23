@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	maxResponseBody  = 1024 * 1024    // 1MB
-	defaultTimeout   = 30 * time.Second
+	maxResponseBody = 1024 * 1024 // 1MB
+	defaultTimeout  = 30 * time.Second
 )
 
 type fetchFunc func(ctx context.Context, url string) (string, error)

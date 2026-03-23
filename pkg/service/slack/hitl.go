@@ -161,3 +161,92 @@ func (p *HITLPresenter) Present(ctx context.Context, req *hitl.Request) error {
 
 	return nil
 }
+
+// QuestionPresenter implements hitl.Presenter for question interactions.
+// It updates a Slack message with question text, radio button options, and a submit button.
+type QuestionPresenter struct {
+	msg       *UpdatableBlockMessage
+	taskTitle string
+	userID    string
+}
+
+// NewQuestionPresenter creates a new Slack question presenter.
+func NewQuestionPresenter(msg *UpdatableBlockMessage, taskTitle, userID string) *QuestionPresenter {
+	return &QuestionPresenter{
+		msg:       msg,
+		taskTitle: taskTitle,
+		userID:    userID,
+	}
+}
+
+// Present updates the Slack message with question blocks.
+func (p *QuestionPresenter) Present(ctx context.Context, req *hitl.Request) error {
+	blocks := BuildQuestionBlocks(p.taskTitle, p.userID, req)
+	p.msg.UpdateBlocks(ctx, blocks)
+
+	logging.From(ctx).Info("HITL question presented",
+		"request_id", req.ID,
+		"task_title", p.taskTitle,
+		"user_id", p.userID,
+	)
+
+	return nil
+}
+
+// BuildQuestionBlocks constructs Slack blocks for a HITL question.
+func BuildQuestionBlocks(taskTitle, userID string, req *hitl.Request) []slack.Block {
+	q := req.QuestionData()
+
+	headerText := fmt.Sprintf("⏳ Question *[%s]*\n\n> ❓ <@%s> %s",
+		escapeSlackMrkdwn(taskTitle), userID, escapeSlackMrkdwn(q.Question))
+
+	// Build radio button options
+	optionBlocks := make([]*slack.OptionBlockObject, len(q.Options))
+	for i, opt := range q.Options {
+		optionBlocks[i] = slack.NewOptionBlockObject(
+			opt,
+			slack.NewTextBlockObject(slack.PlainTextType, opt, false, false),
+			nil,
+		)
+	}
+
+	radioButtons := slack.NewRadioButtonsBlockElement(
+		model.BlockActionIDHITLAnswer.String(),
+		optionBlocks...,
+	)
+
+	blocks := []slack.Block{
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.MarkdownType, headerText, false, false),
+			nil, nil,
+		),
+		slack.NewInputBlock(
+			model.BlockIDHITLAnswer.String(),
+			slack.NewTextBlockObject(slack.PlainTextType, "Select an answer", false, false),
+			nil,
+			radioButtons,
+		),
+		slack.NewInputBlock(
+			model.BlockIDHITLComment.String(),
+			slack.NewTextBlockObject(slack.PlainTextType, "Additional comment (optional)", false, false),
+			nil,
+			slack.NewPlainTextInputBlockElement(
+				slack.NewTextBlockObject(slack.PlainTextType, "Enter comment...", false, false),
+				model.BlockActionIDHITLComment.String(),
+			),
+		),
+		slack.NewActionBlock(
+			"hitl_actions",
+			slack.NewButtonBlockElement(
+				model.ActionIDHITLSubmitAnswer.String(),
+				req.ID.String(),
+				slack.NewTextBlockObject(slack.PlainTextType, "Submit 📨", false, false),
+			).WithStyle(slack.StylePrimary),
+		),
+	}
+
+	// Make comment input optional
+	blocks[2].(*slack.InputBlock).Optional = true
+
+	return blocks
+}

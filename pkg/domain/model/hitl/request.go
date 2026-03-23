@@ -13,6 +13,8 @@ type RequestType string
 const (
 	// RequestTypeToolApproval is used when an agent tool requires human approval before execution.
 	RequestTypeToolApproval RequestType = "tool_approval"
+	// RequestTypeQuestion is used when the orchestrator asks a question to the security operator.
+	RequestTypeQuestion RequestType = "question"
 )
 
 // Status represents the current state of a HITL request.
@@ -77,6 +79,54 @@ func (r *Request) ResponseComment() string {
 		return ""
 	}
 	if v, ok := r.Response["comment"].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// QuestionPayload is the typed payload for RequestTypeQuestion.
+type QuestionPayload struct {
+	Question string
+	Options  []string
+}
+
+// NewQuestionPayload creates a Payload map for question requests.
+func NewQuestionPayload(question string, options []string) map[string]any {
+	return map[string]any{
+		"question": question,
+		"options":  options,
+	}
+}
+
+// QuestionData extracts a QuestionPayload from the request.
+func (r *Request) QuestionData() QuestionPayload {
+	p := QuestionPayload{}
+	if r.Payload == nil {
+		return p
+	}
+	if v, ok := r.Payload["question"].(string); ok {
+		p.Question = v
+	}
+	// Handle both []string (direct) and []any (from Firestore deserialization)
+	switch v := r.Payload["options"].(type) {
+	case []string:
+		p.Options = v
+	case []any:
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				p.Options = append(p.Options, s)
+			}
+		}
+	}
+	return p
+}
+
+// ResponseAnswer extracts the selected option from the response map.
+func (r *Request) ResponseAnswer() string {
+	if r.Response == nil {
+		return ""
+	}
+	if v, ok := r.Response["answer"].(string); ok {
 		return v
 	}
 	return ""

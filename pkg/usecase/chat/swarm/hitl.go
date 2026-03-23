@@ -49,7 +49,7 @@ func newHITLMiddleware(cfg hitlConfig) gollem.ToolMiddleware {
 				ID:        types.NewHITLRequestID(),
 				SessionID: cfg.sessionID,
 				Type:      hitl.RequestTypeToolApproval,
-				Payload: hitl.NewToolApprovalPayload(req.Tool.Name, req.Tool.Arguments),
+				Payload:   hitl.NewToolApprovalPayload(req.Tool.Name, req.Tool.Arguments),
 				Status:    hitl.StatusPending,
 				UserID:    cfg.userID,
 				CreatedAt: time.Now(),

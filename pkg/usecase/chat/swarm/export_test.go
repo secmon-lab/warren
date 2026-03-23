@@ -4,8 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
+	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	hitlSvc "github.com/secmon-lab/warren/pkg/service/hitl"
@@ -79,4 +82,40 @@ func NewHITLConfig(requireApproval map[string]bool, service *hitlSvc.Service, pr
 		sessionID:       sessionID,
 		slackThread:     slackThread,
 	}
+}
+
+// QuestionResult exposes questionResult for testing.
+type QuestionResult = questionResult
+
+// ExecHandleQuestion simulates the core question flow without Slack dependency.
+// It creates an HITL request, presents it via the given presenter, waits for a response,
+// and returns the question result. This mirrors what handleQuestion does internally.
+func ExecHandleQuestion(ctx context.Context, repo interfaces.Repository, presenter hitlSvc.Presenter, q *Question, sessionID types.SessionID, userID string) (*QuestionResult, error) {
+	if presenter == nil {
+		return nil, goerr.New("question requires a presenter but none is available")
+	}
+
+	svc := hitlSvc.New(repo)
+
+	hitlReq := &hitl.Request{
+		ID:        types.NewHITLRequestID(),
+		SessionID: sessionID,
+		Type:      hitl.RequestTypeQuestion,
+		Payload:   hitl.NewQuestionPayload(q.Question, q.Options),
+		Status:    hitl.StatusPending,
+		UserID:    userID,
+		CreatedAt: time.Now(),
+	}
+
+	result, err := svc.RequestAndWait(ctx, hitlReq, presenter)
+	if err != nil {
+		return nil, err
+	}
+
+	return &questionResult{
+		Question: q.Question,
+		Options:  q.Options,
+		Answer:   result.ResponseAnswer(),
+		Comment:  result.ResponseComment(),
+	}, nil
 }

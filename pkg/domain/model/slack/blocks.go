@@ -46,6 +46,7 @@ const (
 	BlockIDSalvageThreshold BlockID = "salvage_threshold_block"
 	BlockIDSalvageKeyword   BlockID = "salvage_keyword_block"
 	BlockIDHITLComment      BlockID = "hitl_comment_block"
+	BlockIDHITLAnswer       BlockID = "hitl_answer_block"
 )
 
 // ActionID in block
@@ -67,6 +68,7 @@ const (
 	BlockActionIDTicketTitle      BlockActionID = "ticket_title_input"
 	BlockActionIDTicketDesc       BlockActionID = "ticket_description_input"
 	BlockActionIDHITLComment      BlockActionID = "hitl_comment_input"
+	BlockActionIDHITLAnswer       BlockActionID = "hitl_answer_input"
 )
 
 type ActionID string
@@ -98,8 +100,9 @@ const (
 	ActionIDCreateTicketFromRefine ActionID = "create_ticket_from_refine"
 
 	// For HITL
-	ActionIDHITLApprove ActionID = "hitl_approve"
-	ActionIDHITLDeny    ActionID = "hitl_deny"
+	ActionIDHITLApprove      ActionID = "hitl_approve"
+	ActionIDHITLDeny         ActionID = "hitl_deny"
+	ActionIDHITLSubmitAnswer ActionID = "hitl_submit_answer"
 )
 
 type Mention struct {

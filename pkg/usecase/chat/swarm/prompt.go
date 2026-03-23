@@ -204,6 +204,21 @@ func formatCompletedResults(allResults []*phaseResult) string {
 	var b strings.Builder
 	for _, pr := range allResults {
 		fmt.Fprintf(&b, "## Phase %d\n\n", pr.phase)
+
+		// Format question result if this phase was a question
+		if pr.questionResult != nil {
+			qr := pr.questionResult
+			fmt.Fprintf(&b, "### Question Asked to Operator\n")
+			fmt.Fprintf(&b, "**Question**: %s\n", qr.Question)
+			fmt.Fprintf(&b, "**Options**: %s\n", strings.Join(qr.Options, ", "))
+			fmt.Fprintf(&b, "**Selected**: %s\n", qr.Answer)
+			if qr.Comment != "" {
+				fmt.Fprintf(&b, "**Comment**: %s\n", qr.Comment)
+			}
+			fmt.Fprintln(&b)
+			continue
+		}
+
 		for i, r := range pr.results {
 			fmt.Fprintf(&b, "### Task: %s (ID: %s)\n", pr.tasks[i].Title, pr.tasks[i].ID)
 			if r.Error != nil {
@@ -274,6 +289,30 @@ var planSchema = &gollem.Parameter{
 	},
 }
 
+var questionSchema = &gollem.Parameter{
+	Type: gollem.TypeObject,
+	Properties: map[string]*gollem.Parameter{
+		"question": {
+			Type:        gollem.TypeString,
+			Description: "The question to ask the security operator",
+			Required:    true,
+		},
+		"options": {
+			Type: gollem.TypeArray,
+			Items: &gollem.Parameter{
+				Type: gollem.TypeString,
+			},
+			Description: "Answer choices for the operator to select from. Must be specific and comprehensive. The last option MUST always be 'None of the above' or equivalent.",
+			Required:    true,
+		},
+		"reason": {
+			Type:        gollem.TypeString,
+			Description: "Why this question is needed — what information gap it fills",
+			Required:    true,
+		},
+	},
+}
+
 var replanSchema = &gollem.Parameter{
 	Type: gollem.TypeObject,
 	Properties: map[string]*gollem.Parameter{
@@ -286,6 +325,11 @@ var replanSchema = &gollem.Parameter{
 			Items:       taskSchema,
 			Description: "New tasks for the next phase (empty = proceed to final response)",
 			Required:    true,
+		},
+		"question": {
+			Type:        gollem.TypeObject,
+			Description: "Ask the security operator a question. Use ONLY as a last resort after exhausting all available tools. If set, tasks are ignored — the question is asked first, then replanning occurs with the answer. The question MUST include concrete answer choices (options). Do NOT set this if the information can be obtained through tools (BigQuery, VirusTotal, WHOIS, etc.).",
+			Properties:  questionSchema.Properties,
 		},
 	},
 }

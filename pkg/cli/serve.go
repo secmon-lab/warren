@@ -377,9 +377,9 @@ func cmdServe() *cli.Command {
 				}
 
 				// Configure HITL tools that require human approval
-			swarmOpts = append(swarmOpts, swarm.WithHITLTools([]string{"web_fetch"}))
+				swarmOpts = append(swarmOpts, swarm.WithHITLTools([]string{"web_fetch"}))
 
-			swarmChat := swarm.New(repo, llmClient, policyClient, swarmOpts...)
+				swarmChat := swarm.New(repo, llmClient, policyClient, swarmOpts...)
 				ucOptions = append(ucOptions, usecase.WithChatUseCase(swarmChat))
 				logging.From(ctx).Info("Chat strategy: swarm (parallel task execution)")
 			} else {

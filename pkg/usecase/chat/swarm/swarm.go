@@ -13,10 +13,12 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
+	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
@@ -344,9 +346,49 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 	var allResults []*phaseResult
 	currentTasks := planResult.Tasks
 
+	questionPending := false // true when we need to replan after a question
 	for phase := 1; phase <= c.maxPhases; phase++ {
-		if len(currentTasks) == 0 {
+		if len(currentTasks) == 0 && !questionPending {
 			break
+		}
+
+		// Skip task execution if we're replanning after a question
+		if questionPending {
+			questionPending = false
+			// Replan with the question answer already in allResults
+			replanResult, err := c.replan(ctx, planSession, planCtx, allResults, phase, systemPrompt)
+			if err != nil {
+				if !ticketless {
+					c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
+				}
+				logger.Error("replan after question failed", "error", err, "phase", phase)
+				break
+			}
+			if !ticketless {
+				c.saveLatestHistory(ctx, planSession, target.ID, storageSvc)
+			}
+			if replanResult.Message != "" {
+				msg.Notify(ctx, "💬 %s", replanResult.Message)
+			}
+
+			// Handle question again if needed (recursive questions)
+			if replanResult.Question != nil {
+				questionResult, qErr := c.handleQuestion(ctx, replanResult.Question, target, ssn)
+				if qErr != nil {
+					logger.Error("question failed", "error", qErr, "phase", phase)
+					msg.Warn(ctx, "⚠️ Question failed: %s", qErr.Error())
+					break
+				}
+				allResults = append(allResults, &phaseResult{
+					phase:          phase,
+					questionResult: questionResult,
+				})
+				questionPending = true
+				continue
+			}
+
+			currentTasks = replanResult.Tasks
+			continue
 		}
 
 		// Execute all tasks in parallel
@@ -384,6 +426,26 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 		// Post replan message if present
 		if replanResult.Message != "" {
 			msg.Notify(ctx, "💬 %s", replanResult.Message)
+		}
+
+		// Handle question (takes priority over tasks)
+		if replanResult.Question != nil {
+			questionResult, err := c.handleQuestion(ctx, replanResult.Question, target, ssn)
+			if err != nil {
+				logger.Error("question failed", "error", err, "phase", phase)
+				msg.Warn(ctx, "⚠️ Question failed: %s", err.Error())
+				break
+			}
+
+			// Add question result to allResults for next replan
+			allResults = append(allResults, &phaseResult{
+				phase:          phase,
+				questionResult: questionResult,
+			})
+
+			// Continue to next replan iteration with the answer
+			questionPending = true
+			continue
 		}
 
 		currentTasks = replanResult.Tasks
@@ -424,9 +486,71 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 
 // phaseResult stores the results of a single phase execution.
 type phaseResult struct {
-	phase   int
-	tasks   []TaskPlan
-	results []*TaskResult
+	phase          int
+	tasks          []TaskPlan
+	results        []*TaskResult
+	questionResult *questionResult // non-nil if this phase was a question
+}
+
+// questionResult holds the outcome of a question asked to the user.
+type questionResult struct {
+	Question string
+	Options  []string
+	Answer   string
+	Comment  string
+}
+
+// handleQuestion asks a question to the user via HITL service and returns the result.
+func (c *SwarmChat) handleQuestion(ctx context.Context, q *Question, target *ticket.Ticket, ssn *session.Session) (*questionResult, error) {
+	logger := logging.From(ctx)
+	logger.Info("asking question to user",
+		"question", q.Question,
+		"options", q.Options,
+		"reason", q.Reason,
+	)
+
+	hitlSvc := hitlService.New(c.repository)
+
+	hitlReq := &hitl.Request{
+		ID:        types.NewHITLRequestID(),
+		SessionID: ssn.ID,
+		Type:      hitl.RequestTypeQuestion,
+		Payload:   hitl.NewQuestionPayload(q.Question, q.Options),
+		Status:    hitl.StatusPending,
+		UserID:    user.FromContext(ctx),
+		CreatedAt: time.Now(),
+	}
+	if target.SlackThread != nil {
+		hitlReq.SlackThread = *target.SlackThread
+	}
+
+	// Build presenter
+	var presenter hitlService.Presenter
+	if c.slackService != nil && target.SlackThread != nil {
+		threadSvc := c.slackService.NewThread(*target.SlackThread).(*slackService.ThreadService)
+		// Use the session title or a generic title for the question message
+		initialMsg := fmt.Sprintf("❓ *Question*\n\n%s", q.Question)
+		ubm := threadSvc.NewUpdatableBlockMessage(ctx, initialMsg)
+		presenter = slackService.NewQuestionPresenter(ubm, "Correlating ...", user.FromContext(ctx))
+	}
+
+	if presenter == nil {
+		return nil, goerr.New("question requires a presenter but none is available")
+	}
+
+	msg.Notify(ctx, "❓ %s", q.Reason)
+
+	result, err := hitlSvc.RequestAndWait(ctx, hitlReq, presenter)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get question answer")
+	}
+
+	return &questionResult{
+		Question: q.Question,
+		Options:  q.Options,
+		Answer:   result.ResponseAnswer(),
+		Comment:  result.ResponseComment(),
+	}, nil
 }
 
 // createSession creates and persists a new chat session.

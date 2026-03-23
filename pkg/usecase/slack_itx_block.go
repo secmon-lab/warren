@@ -75,12 +75,8 @@ func (uc *UseCases) HandleSlackInteractionBlockActions(ctx context.Context, slac
 	return nil
 }
 
-// HandleHITLAction processes a HITL approval/denial from a Slack button click.
-func (uc *UseCases) HandleHITLAction(ctx context.Context, slackUser slack.User, requestID types.HITLRequestID, status hitlModel.Status, comment string) error {
-	response := map[string]any{}
-	if comment != "" {
-		response["comment"] = comment
-	}
+// HandleHITLAction processes a HITL response (approval/denial/answer) from a Slack button click.
+func (uc *UseCases) HandleHITLAction(ctx context.Context, slackUser slack.User, requestID types.HITLRequestID, status hitlModel.Status, response map[string]any) error {
 	return uc.hitlService.Respond(ctx, requestID, status, slackUser.ID, response)
 }
 
