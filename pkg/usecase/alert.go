@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -461,7 +462,8 @@ func (uc *UseCases) sendThrottleWarning(ctx context.Context) {
 	}
 
 	channelID := uc.slackService.DefaultChannelID()
-	message := "<!channel> :warning: Alert circuit breaker activated. Incoming alerts are being queued due to rate limiting. Check the Web UI to manage queued alerts."
+	queueURL := uc.frontendURL + "/queue"
+	message := fmt.Sprintf("<!channel> :warning: Alert circuit breaker activated. Incoming alerts are being queued due to rate limiting. <%s|Manage queued alerts>", queueURL)
 
 	_, _, err := uc.slackService.GetClient().PostMessageContext(
 		ctx,
