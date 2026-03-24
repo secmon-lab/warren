@@ -39,6 +39,13 @@ Warren is an AI agent and Slack-based security alert management tool. It process
 - Complexity is not an excuse - implement everything thoroughly
 - Long code is acceptable - incomplete code is NOT
 
+### Test Requirements
+- **EVERY code change MUST be accompanied by tests that verify the change**
+- When adding new functionality, write tests that cover the new behavior
+- When fixing a bug, write a test that reproduces the bug and verifies the fix
+- When refactoring, ensure existing tests still pass and add tests if coverage gaps are found
+- Do NOT consider a task complete until tests are written and passing
+
 ### Error Handling
 - Use `github.com/m-mizutani/goerr/v2` for error handling
 - Must wrap errors with `goerr.Wrap` to maintain error context
