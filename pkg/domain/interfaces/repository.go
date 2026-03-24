@@ -258,8 +258,12 @@ type Repository interface {
 	GetReprocessJob(ctx context.Context, id types.ReprocessJobID) (*alert.ReprocessJob, error)
 
 	// Alert throttle management (sliding window rate limiting)
+	// CheckAlertThrottle checks whether throttle slots are available (read-only).
+	// Does NOT consume a slot. Used for optimistic early rejection before pipeline.
+	CheckAlertThrottle(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error)
+
 	// AcquireAlertThrottleSlot atomically checks and consumes a throttle slot.
-	// window is the sliding window duration, limit is the max alerts per window.
-	// Returns the throttle result indicating whether the alert is allowed and whether Slack notification is needed.
+	// Returns the result indicating whether the slot was acquired and whether notification is needed.
+	// Used after pipeline completion for each non-discarded alert.
 	AcquireAlertThrottleSlot(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error)
 }

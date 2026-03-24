@@ -159,23 +159,16 @@ func (r *Memory) GetReprocessJob(ctx context.Context, id types.ReprocessJobID) (
 	return &jobCopy, nil
 }
 
-// AcquireAlertThrottleSlot atomically checks and consumes a throttle slot using sliding window.
-func (r *Memory) AcquireAlertThrottleSlot(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error) {
-	r.throttleMu.Lock()
-	defer r.throttleMu.Unlock()
-
-	now := clock.Now(ctx)
-	cutoff := now.Add(-window)
-	bucketKey := toBucketKey(now)
-
-	// Initialize throttle if nil
+// countActiveSlots removes expired buckets and returns the total count of active slots.
+// Must be called with throttleMu held.
+func (r *Memory) countActiveSlots(now time.Time, window time.Duration) int {
 	if r.alertThrottle == nil {
 		r.alertThrottle = &alert.AlertThrottle{
 			Buckets: make(map[string]int),
 		}
 	}
 
-	// Remove expired buckets and count remaining
+	cutoff := now.Add(-window)
 	total := 0
 	for k, v := range r.alertThrottle.Buckets {
 		t, err := parseBucketKey(k)
@@ -189,14 +182,46 @@ func (r *Memory) AcquireAlertThrottleSlot(ctx context.Context, window time.Durat
 			total += v
 		}
 	}
+	return total
+}
+
+// CheckAlertThrottle checks whether throttle slots are available (read-only).
+// Does NOT consume a slot.
+func (r *Memory) CheckAlertThrottle(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error) {
+	r.throttleMu.Lock()
+	defer r.throttleMu.Unlock()
+
+	now := clock.Now(ctx)
+	total := r.countActiveSlots(now, window)
 
 	if total < limit {
-		// Slot available: increment bucket and allow
-		r.alertThrottle.Buckets[bucketKey] += 1
 		return &alert.ThrottleResult{Allowed: true, ShouldNotify: false}, nil
 	}
 
 	// Slot exhausted: check if notification is needed
+	shouldNotify := false
+	if r.alertThrottle.NotifiedAt.IsZero() || now.Sub(r.alertThrottle.NotifiedAt) >= window {
+		r.alertThrottle.NotifiedAt = now
+		shouldNotify = true
+	}
+
+	return &alert.ThrottleResult{Allowed: false, ShouldNotify: shouldNotify}, nil
+}
+
+// AcquireAlertThrottleSlot atomically checks and consumes a throttle slot.
+func (r *Memory) AcquireAlertThrottleSlot(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error) {
+	r.throttleMu.Lock()
+	defer r.throttleMu.Unlock()
+
+	now := clock.Now(ctx)
+	total := r.countActiveSlots(now, window)
+
+	if total < limit {
+		bucketKey := toBucketKey(now)
+		r.alertThrottle.Buckets[bucketKey] += 1
+		return &alert.ThrottleResult{Allowed: true, ShouldNotify: false}, nil
+	}
+
 	shouldNotify := false
 	if r.alertThrottle.NotifiedAt.IsZero() || now.Sub(r.alertThrottle.NotifiedAt) >= window {
 		r.alertThrottle.NotifiedAt = now

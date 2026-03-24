@@ -194,56 +194,102 @@ type firestoreThrottle struct {
 	NotifiedAt time.Time      `firestore:"notified_at"`
 }
 
+// readThrottle reads the throttle document from Firestore transaction and cleans expired buckets.
+func readThrottle(tx *firestore.Transaction, docRef *firestore.DocumentRef, window time.Duration) (firestoreThrottle, int, error) {
+	doc, err := tx.Get(docRef)
+
+	var throttle firestoreThrottle
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			throttle = firestoreThrottle{
+				Buckets: make(map[string]int),
+			}
+		} else {
+			return firestoreThrottle{}, 0, goerr.Wrap(err, "failed to get throttle document")
+		}
+	} else {
+		if err := doc.DataTo(&throttle); err != nil {
+			return firestoreThrottle{}, 0, goerr.Wrap(err, "failed to decode throttle document")
+		}
+		if throttle.Buckets == nil {
+			throttle.Buckets = make(map[string]int)
+		}
+	}
+
+	now := time.Now().UTC()
+	cutoff := now.Add(-window)
+
+	total := 0
+	keysToDelete := make([]string, 0)
+	for k, v := range throttle.Buckets {
+		t, parseErr := parseBucketKey(k)
+		if parseErr != nil {
+			keysToDelete = append(keysToDelete, k)
+			continue
+		}
+		if t.Before(cutoff) {
+			keysToDelete = append(keysToDelete, k)
+		} else {
+			total += v
+		}
+	}
+	for _, k := range keysToDelete {
+		delete(throttle.Buckets, k)
+	}
+
+	return throttle, total, nil
+}
+
+// CheckAlertThrottle checks whether throttle slots are available using Firestore transaction.
+// Updates NotifiedAt if notification is needed, but does NOT consume a slot.
+func (r *Firestore) CheckAlertThrottle(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error) {
+	docRef := r.db.Collection(collectionThrottle).Doc(docAlertThrottle)
+
+	var result alert.ThrottleResult
+	err := r.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		throttle, total, err := readThrottle(tx, docRef, window)
+		if err != nil {
+			return err
+		}
+
+		if total < limit {
+			// Clean up expired buckets
+			result = alert.ThrottleResult{Allowed: true, ShouldNotify: false}
+			return tx.Set(docRef, throttle)
+		}
+
+		now := time.Now().UTC()
+		shouldNotify := false
+		if throttle.NotifiedAt.IsZero() || now.Sub(throttle.NotifiedAt) >= window {
+			throttle.NotifiedAt = now
+			shouldNotify = true
+		}
+		result = alert.ThrottleResult{Allowed: false, ShouldNotify: shouldNotify}
+		return tx.Set(docRef, throttle)
+	})
+
+	if err != nil {
+		return nil, r.eb.Wrap(err, "failed to check alert throttle")
+	}
+
+	return &result, nil
+}
+
 // AcquireAlertThrottleSlot atomically checks and consumes a throttle slot using Firestore transaction.
 func (r *Firestore) AcquireAlertThrottleSlot(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error) {
 	docRef := r.db.Collection(collectionThrottle).Doc(docAlertThrottle)
 
 	var result alert.ThrottleResult
 	err := r.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
-		doc, err := tx.Get(docRef)
-
-		var throttle firestoreThrottle
+		throttle, total, err := readThrottle(tx, docRef, window)
 		if err != nil {
-			if status.Code(err) == codes.NotFound {
-				throttle = firestoreThrottle{
-					Buckets: make(map[string]int),
-				}
-			} else {
-				return goerr.Wrap(err, "failed to get throttle document")
-			}
-		} else {
-			if err := doc.DataTo(&throttle); err != nil {
-				return goerr.Wrap(err, "failed to decode throttle document")
-			}
-			if throttle.Buckets == nil {
-				throttle.Buckets = make(map[string]int)
-			}
+			return err
 		}
 
 		now := time.Now().UTC()
-		cutoff := now.Add(-window)
-		bucketKey := toBucketKey(now)
-
-		// Remove expired buckets and count remaining
-		total := 0
-		keysToDelete := make([]string, 0)
-		for k, v := range throttle.Buckets {
-			t, parseErr := parseBucketKey(k)
-			if parseErr != nil {
-				keysToDelete = append(keysToDelete, k)
-				continue
-			}
-			if t.Before(cutoff) {
-				keysToDelete = append(keysToDelete, k)
-			} else {
-				total += v
-			}
-		}
-		for _, k := range keysToDelete {
-			delete(throttle.Buckets, k)
-		}
 
 		if total < limit {
+			bucketKey := toBucketKey(now)
 			throttle.Buckets[bucketKey] += 1
 			result = alert.ThrottleResult{Allowed: true, ShouldNotify: false}
 		} else {
@@ -261,6 +307,5 @@ func (r *Firestore) AcquireAlertThrottleSlot(ctx context.Context, window time.Du
 	if err != nil {
 		return nil, r.eb.Wrap(err, "failed to acquire alert throttle slot")
 	}
-
 	return &result, nil
 }

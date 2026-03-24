@@ -2686,6 +2686,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			CalculateKnowledgeSizeFunc: func(ctx context.Context, topic types.KnowledgeTopic) (int, error) {
 //				panic("mock out the CalculateKnowledgeSize method")
 //			},
+//			CheckAlertThrottleFunc: func(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error) {
+//				panic("mock out the CheckAlertThrottle method")
+//			},
 //			CountActivitiesFunc: func(ctx context.Context) (int, error) {
 //				panic("mock out the CountActivities method")
 //			},
@@ -3037,6 +3040,9 @@ type RepositoryMock struct {
 
 	// CalculateKnowledgeSizeFunc mocks the CalculateKnowledgeSize method.
 	CalculateKnowledgeSizeFunc func(ctx context.Context, topic types.KnowledgeTopic) (int, error)
+
+	// CheckAlertThrottleFunc mocks the CheckAlertThrottle method.
+	CheckAlertThrottleFunc func(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error)
 
 	// CountActivitiesFunc mocks the CountActivities method.
 	CountActivitiesFunc func(ctx context.Context) (int, error)
@@ -3435,6 +3441,15 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Topic is the topic argument value.
 			Topic types.KnowledgeTopic
+		}
+		// CheckAlertThrottle holds details about calls to the CheckAlertThrottle method.
+		CheckAlertThrottle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Window is the window argument value.
+			Window time.Duration
+			// Limit is the limit argument value.
+			Limit int
 		}
 		// CountActivities holds details about calls to the CountActivities method.
 		CountActivities []struct {
@@ -4263,6 +4278,7 @@ type RepositoryMock struct {
 	lockBatchUpdateTicketsStatus       sync.RWMutex
 	lockBindAlertsToTicket             sync.RWMutex
 	lockCalculateKnowledgeSize         sync.RWMutex
+	lockCheckAlertThrottle             sync.RWMutex
 	lockCountActivities                sync.RWMutex
 	lockCountAlertsWithoutTicket       sync.RWMutex
 	lockCountDeclinedAlerts            sync.RWMutex
@@ -4778,6 +4794,50 @@ func (mock *RepositoryMock) CalculateKnowledgeSizeCalls() []struct {
 	mock.lockCalculateKnowledgeSize.RLock()
 	calls = mock.calls.CalculateKnowledgeSize
 	mock.lockCalculateKnowledgeSize.RUnlock()
+	return calls
+}
+
+// CheckAlertThrottle calls CheckAlertThrottleFunc.
+func (mock *RepositoryMock) CheckAlertThrottle(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Window time.Duration
+		Limit  int
+	}{
+		Ctx:    ctx,
+		Window: window,
+		Limit:  limit,
+	}
+	mock.lockCheckAlertThrottle.Lock()
+	mock.calls.CheckAlertThrottle = append(mock.calls.CheckAlertThrottle, callInfo)
+	mock.lockCheckAlertThrottle.Unlock()
+	if mock.CheckAlertThrottleFunc == nil {
+		var (
+			throttleResultOut *alert.ThrottleResult
+			errOut            error
+		)
+		return throttleResultOut, errOut
+	}
+	return mock.CheckAlertThrottleFunc(ctx, window, limit)
+}
+
+// CheckAlertThrottleCalls gets all the calls that were made to CheckAlertThrottle.
+// Check the length with:
+//
+//	len(mockedRepository.CheckAlertThrottleCalls())
+func (mock *RepositoryMock) CheckAlertThrottleCalls() []struct {
+	Ctx    context.Context
+	Window time.Duration
+	Limit  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Window time.Duration
+		Limit  int
+	}
+	mock.lockCheckAlertThrottle.RLock()
+	calls = mock.calls.CheckAlertThrottle
+	mock.lockCheckAlertThrottle.RUnlock()
 	return calls
 }
 

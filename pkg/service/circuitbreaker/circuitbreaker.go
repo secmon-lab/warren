@@ -39,9 +39,24 @@ func (s *Service) IsEnabled() bool {
 	return s.config.Enabled
 }
 
-// TryAcquire attempts to acquire a throttle slot.
-// Returns the throttle result indicating whether the alert can be processed.
-func (s *Service) TryAcquire(ctx context.Context) (*alert.ThrottleResult, error) {
+// CheckThrottle checks whether throttle slots are available (read-only).
+// Does NOT consume a slot. Call ConsumeSlot after pipeline completion for non-discarded alerts.
+func (s *Service) CheckThrottle(ctx context.Context) (*alert.ThrottleResult, error) {
+	if !s.config.Enabled {
+		return &alert.ThrottleResult{Allowed: true, ShouldNotify: false}, nil
+	}
+
+	result, err := s.repo.CheckAlertThrottle(ctx, s.config.Window, s.config.Limit)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to check throttle")
+	}
+
+	return result, nil
+}
+
+// AcquireSlot atomically checks and consumes a throttle slot.
+// Used after pipeline completion for each non-discarded alert.
+func (s *Service) AcquireSlot(ctx context.Context) (*alert.ThrottleResult, error) {
 	if !s.config.Enabled {
 		return &alert.ThrottleResult{Allowed: true, ShouldNotify: false}, nil
 	}
@@ -50,7 +65,6 @@ func (s *Service) TryAcquire(ctx context.Context) (*alert.ThrottleResult, error)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to acquire throttle slot")
 	}
-
 	return result, nil
 }
 

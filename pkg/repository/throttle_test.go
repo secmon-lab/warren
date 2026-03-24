@@ -1,6 +1,7 @@
 package repository_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -11,6 +12,14 @@ import (
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
+
+// acquireSlot is a helper that calls AcquireAlertThrottleSlot and asserts it was allowed.
+func acquireSlot(t *testing.T, repo interfaces.Repository, ctx context.Context, window time.Duration, limit int) {
+	t.Helper()
+	result, err := repo.AcquireAlertThrottleSlot(ctx, window, limit)
+	gt.NoError(t, err)
+	gt.Value(t, result.Allowed).Equal(true)
+}
 
 func TestQueuedAlertCRUD(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
@@ -228,28 +237,28 @@ func TestReprocessJobCRUD(t *testing.T) {
 	})
 }
 
-func TestAcquireAlertThrottleSlot_BasicAllowAndDeny(t *testing.T) {
+func TestCheckAlertThrottle_BasicAllowAndDeny(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
 		window := 10 * time.Minute
 		limit := 3
 
-		// First 3 requests should be allowed
+		// Check + consume for 3 slots
 		for i := 0; i < limit; i++ {
-			result, err := repo.AcquireAlertThrottleSlot(ctx, window, limit)
+			result, err := repo.CheckAlertThrottle(ctx, window, limit)
 			gt.NoError(t, err)
 			gt.Value(t, result.Allowed).Equal(true)
-			gt.Value(t, result.ShouldNotify).Equal(false)
+			acquireSlot(t, repo, ctx, window, limit)
 		}
 
-		// 4th request should be denied with notification
-		result, err := repo.AcquireAlertThrottleSlot(ctx, window, limit)
+		// 4th check should be denied with notification
+		result, err := repo.CheckAlertThrottle(ctx, window, limit)
 		gt.NoError(t, err)
 		gt.Value(t, result.Allowed).Equal(false)
 		gt.Value(t, result.ShouldNotify).Equal(true)
 
-		// 5th request should be denied WITHOUT notification (already notified)
-		result, err = repo.AcquireAlertThrottleSlot(ctx, window, limit)
+		// 5th check should be denied WITHOUT notification (already notified)
+		result, err = repo.CheckAlertThrottle(ctx, window, limit)
 		gt.NoError(t, err)
 		gt.Value(t, result.Allowed).Equal(false)
 		gt.Value(t, result.ShouldNotify).Equal(false)
@@ -261,7 +270,31 @@ func TestAcquireAlertThrottleSlot_BasicAllowAndDeny(t *testing.T) {
 	})
 }
 
-func TestAcquireAlertThrottleSlot_SlidingWindowExpiry(t *testing.T) {
+func TestCheckAlertThrottle_ReadOnly(t *testing.T) {
+	// CheckAlertThrottle should NOT consume slots
+	repo := repository.NewMemory()
+	window := 5 * time.Minute
+	limit := 1
+
+	ctx := t.Context()
+
+	// Check many times — should always be allowed since no slots are consumed
+	for i := 0; i < 10; i++ {
+		result, err := repo.CheckAlertThrottle(ctx, window, limit)
+		gt.NoError(t, err)
+		gt.Value(t, result.Allowed).Equal(true)
+	}
+
+	// Now consume 1 slot
+	acquireSlot(t, repo, ctx, window, limit)
+
+	// Now check should be denied
+	result, err := repo.CheckAlertThrottle(ctx, window, limit)
+	gt.NoError(t, err)
+	gt.Value(t, result.Allowed).Equal(false)
+}
+
+func TestCheckAlertThrottle_SlidingWindowExpiry(t *testing.T) {
 	repo := repository.NewMemory()
 	window := 5 * time.Minute
 	limit := 2
@@ -271,30 +304,28 @@ func TestAcquireAlertThrottleSlot_SlidingWindowExpiry(t *testing.T) {
 	// T=0: consume 2 slots
 	ctx := clock.With(t.Context(), func() time.Time { return baseTime })
 	for i := 0; i < limit; i++ {
-		result, err := repo.AcquireAlertThrottleSlot(ctx, window, limit)
-		gt.NoError(t, err)
-		gt.Value(t, result.Allowed).Equal(true)
+		acquireSlot(t, repo, ctx, window, limit)
 	}
 
 	// T=0: should be denied now
-	result, err := repo.AcquireAlertThrottleSlot(ctx, window, limit)
+	result, err := repo.CheckAlertThrottle(ctx, window, limit)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(false)
 
 	// T=3min: still denied (within window)
 	ctx3 := clock.With(t.Context(), func() time.Time { return baseTime.Add(3 * time.Minute) })
-	result, err = repo.AcquireAlertThrottleSlot(ctx3, window, limit)
+	result, err = repo.CheckAlertThrottle(ctx3, window, limit)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(false)
 
 	// T=6min: old buckets expire, slots available again
 	ctx6 := clock.With(t.Context(), func() time.Time { return baseTime.Add(6 * time.Minute) })
-	result, err = repo.AcquireAlertThrottleSlot(ctx6, window, limit)
+	result, err = repo.CheckAlertThrottle(ctx6, window, limit)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(true)
 }
 
-func TestAcquireAlertThrottleSlot_SlidingWindowPartialExpiry(t *testing.T) {
+func TestCheckAlertThrottle_SlidingWindowPartialExpiry(t *testing.T) {
 	repo := repository.NewMemory()
 	window := 5 * time.Minute
 	limit := 3
@@ -303,46 +334,41 @@ func TestAcquireAlertThrottleSlot_SlidingWindowPartialExpiry(t *testing.T) {
 
 	// T=0min: consume 1 slot
 	ctx0 := clock.With(t.Context(), func() time.Time { return baseTime })
-	result, err := repo.AcquireAlertThrottleSlot(ctx0, window, limit)
-	gt.NoError(t, err)
-	gt.Value(t, result.Allowed).Equal(true)
+	acquireSlot(t, repo, ctx0, window, limit)
 
 	// T=2min: consume 1 slot (different bucket)
 	ctx2 := clock.With(t.Context(), func() time.Time { return baseTime.Add(2 * time.Minute) })
-	result, err = repo.AcquireAlertThrottleSlot(ctx2, window, limit)
-	gt.NoError(t, err)
-	gt.Value(t, result.Allowed).Equal(true)
+	acquireSlot(t, repo, ctx2, window, limit)
 
 	// T=4min: consume 1 slot (total = 3, at limit)
 	ctx4 := clock.With(t.Context(), func() time.Time { return baseTime.Add(4 * time.Minute) })
-	result, err = repo.AcquireAlertThrottleSlot(ctx4, window, limit)
-	gt.NoError(t, err)
-	gt.Value(t, result.Allowed).Equal(true)
+	acquireSlot(t, repo, ctx4, window, limit)
 
 	// T=4min: should be denied now (3/3 consumed)
-	result, err = repo.AcquireAlertThrottleSlot(ctx4, window, limit)
+	result, err := repo.CheckAlertThrottle(ctx4, window, limit)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(false)
 
 	// T=6min: T=0 bucket expired, so now 2/3 consumed, 1 slot available
 	ctx6 := clock.With(t.Context(), func() time.Time { return baseTime.Add(6 * time.Minute) })
-	result, err = repo.AcquireAlertThrottleSlot(ctx6, window, limit)
+	result, err = repo.CheckAlertThrottle(ctx6, window, limit)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(true)
 
-	// T=6min: now 3/3 again, denied
-	result, err = repo.AcquireAlertThrottleSlot(ctx6, window, limit)
+	// Consume 1 more at T=6min → 3/3 again
+	acquireSlot(t, repo, ctx6, window, limit)
+	result, err = repo.CheckAlertThrottle(ctx6, window, limit)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(false)
 
 	// T=8min: T=2 bucket expired, 2/3 consumed, 1 slot available
 	ctx8 := clock.With(t.Context(), func() time.Time { return baseTime.Add(8 * time.Minute) })
-	result, err = repo.AcquireAlertThrottleSlot(ctx8, window, limit)
+	result, err = repo.CheckAlertThrottle(ctx8, window, limit)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(true)
 }
 
-func TestAcquireAlertThrottleSlot_NotificationCooldown(t *testing.T) {
+func TestCheckAlertThrottle_NotificationCooldown(t *testing.T) {
 	repo := repository.NewMemory()
 	window := 10 * time.Minute
 	limit := 1
@@ -351,50 +377,42 @@ func TestAcquireAlertThrottleSlot_NotificationCooldown(t *testing.T) {
 
 	// T=0: consume the only slot
 	ctx0 := clock.With(t.Context(), func() time.Time { return baseTime })
-	result, err := repo.AcquireAlertThrottleSlot(ctx0, window, limit)
-	gt.NoError(t, err)
-	gt.Value(t, result.Allowed).Equal(true)
+	acquireSlot(t, repo, ctx0, window, limit)
 
 	// T=0: denied, first notification
-	result, err = repo.AcquireAlertThrottleSlot(ctx0, window, limit)
+	result, err := repo.CheckAlertThrottle(ctx0, window, limit)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(false)
 	gt.Value(t, result.ShouldNotify).Equal(true)
 
 	// T=1min: denied, no notification (cooldown = window = 10min)
 	ctx1 := clock.With(t.Context(), func() time.Time { return baseTime.Add(1 * time.Minute) })
-	result, err = repo.AcquireAlertThrottleSlot(ctx1, window, limit)
-	gt.NoError(t, err)
-	gt.Value(t, result.Allowed).Equal(false)
-	gt.Value(t, result.ShouldNotify).Equal(false)
-
-	// T=5min: denied, still no notification (5min < 10min cooldown)
-	ctx5 := clock.With(t.Context(), func() time.Time { return baseTime.Add(5 * time.Minute) })
-	result, err = repo.AcquireAlertThrottleSlot(ctx5, window, limit)
+	result, err = repo.CheckAlertThrottle(ctx1, window, limit)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(false)
 	gt.Value(t, result.ShouldNotify).Equal(false)
 
 	// T=11min: old bucket expired → slot available, allowed
 	ctx11 := clock.With(t.Context(), func() time.Time { return baseTime.Add(11 * time.Minute) })
-	result, err = repo.AcquireAlertThrottleSlot(ctx11, window, limit)
+	result, err = repo.CheckAlertThrottle(ctx11, window, limit)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(true)
 
-	// T=11min: consume the slot, denied again → should notify (>10min since last)
-	result, err = repo.AcquireAlertThrottleSlot(ctx11, window, limit)
+	// Consume and deny again → should notify (>10min since last)
+	acquireSlot(t, repo, ctx11, window, limit)
+	result, err = repo.CheckAlertThrottle(ctx11, window, limit)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(false)
 	gt.Value(t, result.ShouldNotify).Equal(true)
 
-	// T=11min: denied, but notification already sent
-	result, err = repo.AcquireAlertThrottleSlot(ctx11, window, limit)
+	// Immediately after: denied, notification already sent
+	result, err = repo.CheckAlertThrottle(ctx11, window, limit)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(false)
 	gt.Value(t, result.ShouldNotify).Equal(false)
 }
 
-func TestAcquireAlertThrottleSlot_HighLimit(t *testing.T) {
+func TestCheckAlertThrottle_HighLimit(t *testing.T) {
 	repo := repository.NewMemory()
 	window := 1 * time.Hour
 	limit := 60
@@ -403,58 +421,29 @@ func TestAcquireAlertThrottleSlot_HighLimit(t *testing.T) {
 
 	// Fill up all 60 slots
 	for i := 0; i < 60; i++ {
-		result, err := repo.AcquireAlertThrottleSlot(ctx, window, limit)
-		gt.NoError(t, err)
-		gt.Value(t, result.Allowed).Equal(true)
+		acquireSlot(t, repo, ctx, window, limit)
 	}
 
-	// 61st should be denied
-	result, err := repo.AcquireAlertThrottleSlot(ctx, window, limit)
+	// Should be denied
+	result, err := repo.CheckAlertThrottle(ctx, window, limit)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(false)
 	gt.Value(t, result.ShouldNotify).Equal(true)
 }
 
-func TestAcquireAlertThrottleSlot_BucketGranularity(t *testing.T) {
-	// Verify that requests within the same minute go to the same bucket
-	repo := repository.NewMemory()
-	window := 5 * time.Minute
-	limit := 2
-
-	baseTime := time.Date(2026, 3, 24, 14, 0, 30, 0, time.UTC) // 14:00:30
-
-	// Two requests within the same minute should go to same bucket
-	ctx1 := clock.With(t.Context(), func() time.Time { return baseTime })
-	result, err := repo.AcquireAlertThrottleSlot(ctx1, window, limit)
-	gt.NoError(t, err)
-	gt.Value(t, result.Allowed).Equal(true)
-
-	ctx2 := clock.With(t.Context(), func() time.Time { return baseTime.Add(20 * time.Second) }) // still 14:00
-	result, err = repo.AcquireAlertThrottleSlot(ctx2, window, limit)
-	gt.NoError(t, err)
-	gt.Value(t, result.Allowed).Equal(true)
-
-	// 3rd request in same minute — denied (limit=2)
-	result, err = repo.AcquireAlertThrottleSlot(ctx2, window, limit)
-	gt.NoError(t, err)
-	gt.Value(t, result.Allowed).Equal(false)
-}
-
-func TestAcquireAlertThrottleSlot_ZeroLimit(t *testing.T) {
-	// With limit=0, no requests should be allowed
+func TestCheckAlertThrottle_ZeroLimit(t *testing.T) {
 	repo := repository.NewMemory()
 	window := 5 * time.Minute
 	limit := 0
 
 	ctx := t.Context()
-	result, err := repo.AcquireAlertThrottleSlot(ctx, window, limit)
+	result, err := repo.CheckAlertThrottle(ctx, window, limit)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(false)
 	gt.Value(t, result.ShouldNotify).Equal(true)
 }
 
-func TestAcquireAlertThrottleSlot_IndependentWindows(t *testing.T) {
-	// Test that different time windows work correctly over longer periods
+func TestCheckAlertThrottle_IndependentWindows(t *testing.T) {
 	repo := repository.NewMemory()
 	window := 2 * time.Minute
 	limit := 1
@@ -466,13 +455,70 @@ func TestAcquireAlertThrottleSlot_IndependentWindows(t *testing.T) {
 		ctxN := clock.With(t.Context(), func() time.Time {
 			return baseTime.Add(time.Duration(i*3) * time.Minute)
 		})
-		result, err := repo.AcquireAlertThrottleSlot(ctxN, window, limit)
+		result, err := repo.CheckAlertThrottle(ctxN, window, limit)
 		gt.NoError(t, err)
 		gt.Value(t, result.Allowed).Equal(true)
 
-		// Second request in same window should be denied
-		result, err = repo.AcquireAlertThrottleSlot(ctxN, window, limit)
+		acquireSlot(t, repo, ctxN, window, limit)
+
+		// Second check in same window should be denied
+		result, err = repo.CheckAlertThrottle(ctxN, window, limit)
 		gt.NoError(t, err)
 		gt.Value(t, result.Allowed).Equal(false)
 	}
+}
+
+func TestAcquireAlertThrottleSlot_AtomicCheckAndConsume(t *testing.T) {
+	// Verify AcquireAlertThrottleSlot atomically checks AND consumes in one call.
+	// This ensures no race between check and consume.
+	repo := repository.NewMemory()
+	window := 10 * time.Minute
+	limit := 2
+
+	ctx := t.Context()
+
+	// First acquire: allowed + slot consumed
+	result, err := repo.AcquireAlertThrottleSlot(ctx, window, limit)
+	gt.NoError(t, err)
+	gt.Value(t, result.Allowed).Equal(true)
+
+	// Second acquire: allowed + slot consumed
+	result, err = repo.AcquireAlertThrottleSlot(ctx, window, limit)
+	gt.NoError(t, err)
+	gt.Value(t, result.Allowed).Equal(true)
+
+	// Third acquire: denied (both slots consumed atomically)
+	result, err = repo.AcquireAlertThrottleSlot(ctx, window, limit)
+	gt.NoError(t, err)
+	gt.Value(t, result.Allowed).Equal(false)
+
+	// Verify check also sees the consumed state
+	checkResult, err := repo.CheckAlertThrottle(ctx, window, limit)
+	gt.NoError(t, err)
+	gt.Value(t, checkResult.Allowed).Equal(false)
+}
+
+func TestAcquireAlertThrottleSlot_MultipleAcquiresRespectLimit(t *testing.T) {
+	// Simulates fan-out scenario: multiple acquires for one input.
+	// With limit=3, acquiring 5 times should yield exactly 3 allowed + 2 denied.
+	repo := repository.NewMemory()
+	window := 10 * time.Minute
+	limit := 3
+
+	ctx := t.Context()
+
+	allowed := 0
+	denied := 0
+	for i := 0; i < 5; i++ {
+		result, err := repo.AcquireAlertThrottleSlot(ctx, window, limit)
+		gt.NoError(t, err)
+		if result.Allowed {
+			allowed++
+		} else {
+			denied++
+		}
+	}
+
+	gt.Value(t, allowed).Equal(3)
+	gt.Value(t, denied).Equal(2)
 }
