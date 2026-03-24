@@ -7,6 +7,7 @@ import {
   BookOpen,
   Brain,
   Stethoscope,
+  Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,11 @@ const navigation = [
     name: "Alerts",
     href: "/alerts",
     icon: AlertTriangle,
+  },
+  {
+    name: "Queue",
+    href: "/queue",
+    icon: Inbox,
   },
   {
     name: "Knowledge",

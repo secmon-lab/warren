@@ -22,6 +22,7 @@ import (
 	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/service/circuitbreaker"
 	"github.com/secmon-lab/warren/pkg/service/prompt"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -71,6 +72,7 @@ func cmdServe() *cli.Command {
 		asyncCfg            config.AsyncAlertHook
 		traceCfg            config.Trace
 		userSystemPromptCfg config.UserSystemPrompt
+		cbCfg               config.CircuitBreaker
 		chatStrategy        string
 		budgetStrategy      string
 	)
@@ -154,6 +156,7 @@ func cmdServe() *cli.Command {
 		agents.AllFlags(),
 		traceCfg.Flags(),
 		userSystemPromptCfg.Flags(),
+		cbCfg.Flags(),
 	)
 
 	return &cli.Command{
@@ -341,6 +344,15 @@ func cmdServe() *cli.Command {
 				safeTraceRepo = traceAdapter.NewSafe(traceRepo, logging.From(ctx))
 				ucOptions = append(ucOptions, usecase.WithTraceRepository(safeTraceRepo))
 				logging.From(ctx).Info("Trace recording enabled", "trace", traceCfg.LogValue())
+			}
+
+			// Configure circuit breaker if enabled
+			if cbCfg.Enabled {
+				cbSvc := circuitbreaker.New(repo, cbCfg.ToConfig())
+				ucOptions = append(ucOptions, usecase.WithCircuitBreaker(cbSvc))
+				logging.From(ctx).Info("Circuit breaker enabled",
+					"window", cbCfg.Window,
+					"limit", cbCfg.Limit)
 			}
 
 			// Configure chat strategy

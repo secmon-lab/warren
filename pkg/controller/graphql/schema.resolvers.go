@@ -716,6 +716,27 @@ func (r *mutationResolver) FixDiagnosis(ctx context.Context, id string) (*graphq
 	return diagnosisToGraphQL(diag, counts), nil
 }
 
+// ReprocessQueuedAlert is the resolver for the reprocessQueuedAlert field.
+func (r *mutationResolver) ReprocessQueuedAlert(ctx context.Context, id string) (*alert.ReprocessJob, error) {
+	job, err := r.uc.ReprocessQueuedAlert(ctx, types.QueuedAlertID(id))
+	if err != nil {
+		return nil, err
+	}
+	return job, nil
+}
+
+// DiscardQueuedAlerts is the resolver for the discardQueuedAlerts field.
+func (r *mutationResolver) DiscardQueuedAlerts(ctx context.Context, ids []string) (bool, error) {
+	queuedAlertIDs := make([]types.QueuedAlertID, len(ids))
+	for i, id := range ids {
+		queuedAlertIDs[i] = types.QueuedAlertID(id)
+	}
+	if err := r.uc.DiscardQueuedAlerts(ctx, queuedAlertIDs); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // Ticket is the resolver for the ticket field.
 func (r *queryResolver) Ticket(ctx context.Context, id string) (*ticket.Ticket, error) {
 	t, err := r.repo.GetTicket(ctx, types.TicketID(id))
@@ -1021,10 +1042,17 @@ func (r *queryResolver) Dashboard(ctx context.Context) (*graphql1.DashboardStats
 		return nil, goerr.Wrap(err, "failed to count declined alerts")
 	}
 
+	// Get queued alerts count
+	queuedAlertsCount, err := r.repo.CountQueuedAlerts(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to count queued alerts")
+	}
+
 	return &graphql1.DashboardStats{
 		OpenTicketsCount:    openTicketsCount,
 		UnboundAlertsCount:  unboundAlertsCount,
 		DeclinedAlertsCount: declinedAlertsCount,
+		QueuedAlertsCount:   queuedAlertsCount,
 		OpenTickets:         openTickets,
 		UnboundAlerts:       unboundAlerts,
 	}, nil
@@ -1488,6 +1516,108 @@ func (r *queryResolver) DiagnosisIssues(ctx context.Context, diagnosisID string,
 	}, nil
 }
 
+// QueuedAlerts is the resolver for the queuedAlerts field.
+func (r *queryResolver) QueuedAlerts(ctx context.Context, keyword *string, offset *int, limit *int) (*graphql1.QueuedAlertsResponse, error) {
+	offsetVal := 0
+	if offset != nil {
+		offsetVal = *offset
+	}
+	limitVal := 20
+	if limit != nil {
+		limitVal = *limit
+	}
+
+	var alerts []*alert.QueuedAlert
+	var totalCount int
+	var err error
+
+	if keyword != nil && *keyword != "" {
+		alerts, totalCount, err = r.repo.SearchQueuedAlerts(ctx, *keyword, offsetVal, limitVal)
+	} else {
+		alerts, err = r.repo.ListQueuedAlerts(ctx, offsetVal, limitVal)
+		if err == nil {
+			totalCount, err = r.repo.CountQueuedAlerts(ctx)
+		}
+	}
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to list queued alerts")
+	}
+
+	return &graphql1.QueuedAlertsResponse{
+		Alerts:     alerts,
+		TotalCount: totalCount,
+	}, nil
+}
+
+// ReprocessJob is the resolver for the reprocessJob field.
+func (r *queryResolver) ReprocessJob(ctx context.Context, id string) (*alert.ReprocessJob, error) {
+	job, err := r.repo.GetReprocessJob(ctx, types.ReprocessJobID(id))
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get reprocess job", goerr.V("id", id))
+	}
+	return job, nil
+}
+
+// ID is the resolver for the id field.
+func (r *queuedAlertResolver) ID(ctx context.Context, obj *alert.QueuedAlert) (string, error) {
+	return string(obj.ID), nil
+}
+
+// Schema is the resolver for the schema field.
+func (r *queuedAlertResolver) Schema(ctx context.Context, obj *alert.QueuedAlert) (string, error) {
+	return string(obj.Schema), nil
+}
+
+// Data is the resolver for the data field.
+func (r *queuedAlertResolver) Data(ctx context.Context, obj *alert.QueuedAlert) (string, error) {
+	jsonBytes, err := json.Marshal(obj.Data)
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to marshal queued alert data to JSON")
+	}
+	return string(jsonBytes), nil
+}
+
+// CreatedAt is the resolver for the createdAt field.
+func (r *queuedAlertResolver) CreatedAt(ctx context.Context, obj *alert.QueuedAlert) (string, error) {
+	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
+}
+
+// ID is the resolver for the id field.
+func (r *reprocessJobResolver) ID(ctx context.Context, obj *alert.ReprocessJob) (string, error) {
+	return string(obj.ID), nil
+}
+
+// QueuedAlertID is the resolver for the queuedAlertID field.
+func (r *reprocessJobResolver) QueuedAlertID(ctx context.Context, obj *alert.ReprocessJob) (string, error) {
+	return string(obj.QueuedAlertID), nil
+}
+
+// Status is the resolver for the status field.
+func (r *reprocessJobResolver) Status(ctx context.Context, obj *alert.ReprocessJob) (graphql1.ReprocessJobStatus, error) {
+	switch obj.Status {
+	case types.ReprocessJobStatusPending:
+		return graphql1.ReprocessJobStatusPending, nil
+	case types.ReprocessJobStatusRunning:
+		return graphql1.ReprocessJobStatusRunning, nil
+	case types.ReprocessJobStatusCompleted:
+		return graphql1.ReprocessJobStatusCompleted, nil
+	case types.ReprocessJobStatusFailed:
+		return graphql1.ReprocessJobStatusFailed, nil
+	default:
+		return graphql1.ReprocessJobStatusPending, nil
+	}
+}
+
+// CreatedAt is the resolver for the createdAt field.
+func (r *reprocessJobResolver) CreatedAt(ctx context.Context, obj *alert.ReprocessJob) (string, error) {
+	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
+}
+
+// UpdatedAt is the resolver for the updatedAt field.
+func (r *reprocessJobResolver) UpdatedAt(ctx context.Context, obj *alert.ReprocessJob) (string, error) {
+	return obj.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
+}
+
 // User is the resolver for the user field.
 func (r *sessionResolver) User(ctx context.Context, obj *graphql1.Session) (*graphql1.User, error) {
 	if obj.UserID == nil || *obj.UserID == "" {
@@ -1705,6 +1835,12 @@ func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
+// QueuedAlert returns QueuedAlertResolver implementation.
+func (r *Resolver) QueuedAlert() QueuedAlertResolver { return &queuedAlertResolver{r} }
+
+// ReprocessJob returns ReprocessJobResolver implementation.
+func (r *Resolver) ReprocessJob() ReprocessJobResolver { return &reprocessJobResolver{r} }
+
 // Session returns SessionResolver implementation.
 func (r *Resolver) Session() SessionResolver { return &sessionResolver{r} }
 
@@ -1718,5 +1854,7 @@ type findingResolver struct{ *Resolver }
 type knowledgeResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type queuedAlertResolver struct{ *Resolver }
+type reprocessJobResolver struct{ *Resolver }
 type sessionResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }

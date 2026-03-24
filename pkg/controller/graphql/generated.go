@@ -36,6 +36,8 @@ type ResolverRoot interface {
 	Knowledge() KnowledgeResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
+	QueuedAlert() QueuedAlertResolver
+	ReprocessJob() ReprocessJobResolver
 	Session() SessionResolver
 	Ticket() TicketResolver
 }
@@ -132,6 +134,7 @@ type ComplexityRoot struct {
 		DeclinedAlertsCount func(childComplexity int) int
 		OpenTickets         func(childComplexity int) int
 		OpenTicketsCount    func(childComplexity int) int
+		QueuedAlertsCount   func(childComplexity int) int
 		UnboundAlerts       func(childComplexity int) int
 		UnboundAlertsCount  func(childComplexity int) int
 	}
@@ -200,8 +203,10 @@ type ComplexityRoot struct {
 		CreateTicketFromAlerts func(childComplexity int, alertIds []string, title *string, description *string) int
 		DeclineAlerts          func(childComplexity int, ids []string) int
 		DeleteTag              func(childComplexity int, id string) int
+		DiscardQueuedAlerts    func(childComplexity int, ids []string) int
 		FixDiagnosis           func(childComplexity int, id string) int
 		ReopenTicket           func(childComplexity int, id string) int
+		ReprocessQueuedAlert   func(childComplexity int, id string) int
 		ResolveTicket          func(childComplexity int, id string, conclusion string, reason string) int
 		RunDiagnosis           func(childComplexity int) int
 		UnarchiveTicket        func(childComplexity int, id string) int
@@ -228,6 +233,8 @@ type ComplexityRoot struct {
 		KnowledgesByTopic      func(childComplexity int, topic string) int
 		ListAgentMemories      func(childComplexity int, agentID string, offset *int, limit *int, sortBy *graphql1.MemorySortField, sortOrder *graphql1.SortOrder, keyword *string, minScore *float64, maxScore *float64) int
 		ListAgentSummaries     func(childComplexity int, offset *int, limit *int, keyword *string) int
+		QueuedAlerts           func(childComplexity int, keyword *string, offset *int, limit *int) int
+		ReprocessJob           func(childComplexity int, id string) int
 		Session                func(childComplexity int, id string) int
 		SessionMessages        func(childComplexity int, sessionID string) int
 		SimilarTickets         func(childComplexity int, ticketID string, threshold float64, offset *int, limit *int) int
@@ -238,6 +245,28 @@ type ComplexityRoot struct {
 		TicketSessions         func(childComplexity int, ticketID string) int
 		Tickets                func(childComplexity int, statuses []string, keyword *string, assigneeID *string, offset *int, limit *int) int
 		UnboundAlerts          func(childComplexity int, threshold *float64, keyword *string, ticketID *string, offset *int, limit *int) int
+	}
+
+	QueuedAlert struct {
+		CreatedAt func(childComplexity int) int
+		Data      func(childComplexity int) int
+		ID        func(childComplexity int) int
+		Schema    func(childComplexity int) int
+		Title     func(childComplexity int) int
+	}
+
+	QueuedAlertsResponse struct {
+		Alerts     func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
+	ReprocessJob struct {
+		CreatedAt     func(childComplexity int) int
+		Error         func(childComplexity int) int
+		ID            func(childComplexity int) int
+		QueuedAlertID func(childComplexity int) int
+		Status        func(childComplexity int) int
+		UpdatedAt     func(childComplexity int) int
 	}
 
 	Session struct {
@@ -370,6 +399,8 @@ type MutationResolver interface {
 	ArchiveKnowledge(ctx context.Context, topic string, slug string) (bool, error)
 	RunDiagnosis(ctx context.Context) (*graphql1.Diagnosis, error)
 	FixDiagnosis(ctx context.Context, id string) (*graphql1.Diagnosis, error)
+	ReprocessQueuedAlert(ctx context.Context, id string) (*alert.ReprocessJob, error)
+	DiscardQueuedAlerts(ctx context.Context, ids []string) (bool, error)
 }
 type QueryResolver interface {
 	Ticket(ctx context.Context, id string) (*ticket.Ticket, error)
@@ -396,6 +427,23 @@ type QueryResolver interface {
 	Diagnoses(ctx context.Context, offset *int, limit *int) (*graphql1.DiagnosesResponse, error)
 	Diagnosis(ctx context.Context, id string) (*graphql1.Diagnosis, error)
 	DiagnosisIssues(ctx context.Context, diagnosisID string, offset *int, limit *int, status *string, ruleID *string) (*graphql1.DiagnosisIssuesResponse, error)
+	QueuedAlerts(ctx context.Context, keyword *string, offset *int, limit *int) (*graphql1.QueuedAlertsResponse, error)
+	ReprocessJob(ctx context.Context, id string) (*alert.ReprocessJob, error)
+}
+type QueuedAlertResolver interface {
+	ID(ctx context.Context, obj *alert.QueuedAlert) (string, error)
+	Schema(ctx context.Context, obj *alert.QueuedAlert) (string, error)
+
+	Data(ctx context.Context, obj *alert.QueuedAlert) (string, error)
+	CreatedAt(ctx context.Context, obj *alert.QueuedAlert) (string, error)
+}
+type ReprocessJobResolver interface {
+	ID(ctx context.Context, obj *alert.ReprocessJob) (string, error)
+	QueuedAlertID(ctx context.Context, obj *alert.ReprocessJob) (string, error)
+	Status(ctx context.Context, obj *alert.ReprocessJob) (graphql1.ReprocessJobStatus, error)
+
+	CreatedAt(ctx context.Context, obj *alert.ReprocessJob) (string, error)
+	UpdatedAt(ctx context.Context, obj *alert.ReprocessJob) (string, error)
 }
 type SessionResolver interface {
 	User(ctx context.Context, obj *graphql1.Session) (*graphql1.User, error)
@@ -771,6 +819,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.DashboardStats.OpenTicketsCount(childComplexity), true
+	case "DashboardStats.queuedAlertsCount":
+		if e.ComplexityRoot.DashboardStats.QueuedAlertsCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DashboardStats.QueuedAlertsCount(childComplexity), true
 	case "DashboardStats.unboundAlerts":
 		if e.ComplexityRoot.DashboardStats.UnboundAlerts == nil {
 			break
@@ -1110,6 +1164,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteTag(childComplexity, args["id"].(string)), true
+	case "Mutation.discardQueuedAlerts":
+		if e.ComplexityRoot.Mutation.DiscardQueuedAlerts == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_discardQueuedAlerts_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DiscardQueuedAlerts(childComplexity, args["ids"].([]string)), true
 	case "Mutation.fixDiagnosis":
 		if e.ComplexityRoot.Mutation.FixDiagnosis == nil {
 			break
@@ -1132,6 +1197,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.ReopenTicket(childComplexity, args["id"].(string)), true
+	case "Mutation.reprocessQueuedAlert":
+		if e.ComplexityRoot.Mutation.ReprocessQueuedAlert == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_reprocessQueuedAlert_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ReprocessQueuedAlert(childComplexity, args["id"].(string)), true
 	case "Mutation.resolveTicket":
 		if e.ComplexityRoot.Mutation.ResolveTicket == nil {
 			break
@@ -1362,6 +1438,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.ListAgentSummaries(childComplexity, args["offset"].(*int), args["limit"].(*int), args["keyword"].(*string)), true
+	case "Query.queuedAlerts":
+		if e.ComplexityRoot.Query.QueuedAlerts == nil {
+			break
+		}
+
+		args, err := ec.field_Query_queuedAlerts_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.QueuedAlerts(childComplexity, args["keyword"].(*string), args["offset"].(*int), args["limit"].(*int)), true
+	case "Query.reprocessJob":
+		if e.ComplexityRoot.Query.ReprocessJob == nil {
+			break
+		}
+
+		args, err := ec.field_Query_reprocessJob_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ReprocessJob(childComplexity, args["id"].(string)), true
 	case "Query.session":
 		if e.ComplexityRoot.Query.Session == nil {
 			break
@@ -1467,6 +1565,87 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.UnboundAlerts(childComplexity, args["threshold"].(*float64), args["keyword"].(*string), args["ticketId"].(*string), args["offset"].(*int), args["limit"].(*int)), true
+
+	case "QueuedAlert.createdAt":
+		if e.ComplexityRoot.QueuedAlert.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.QueuedAlert.CreatedAt(childComplexity), true
+	case "QueuedAlert.data":
+		if e.ComplexityRoot.QueuedAlert.Data == nil {
+			break
+		}
+
+		return e.ComplexityRoot.QueuedAlert.Data(childComplexity), true
+	case "QueuedAlert.id":
+		if e.ComplexityRoot.QueuedAlert.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.QueuedAlert.ID(childComplexity), true
+	case "QueuedAlert.schema":
+		if e.ComplexityRoot.QueuedAlert.Schema == nil {
+			break
+		}
+
+		return e.ComplexityRoot.QueuedAlert.Schema(childComplexity), true
+	case "QueuedAlert.title":
+		if e.ComplexityRoot.QueuedAlert.Title == nil {
+			break
+		}
+
+		return e.ComplexityRoot.QueuedAlert.Title(childComplexity), true
+
+	case "QueuedAlertsResponse.alerts":
+		if e.ComplexityRoot.QueuedAlertsResponse.Alerts == nil {
+			break
+		}
+
+		return e.ComplexityRoot.QueuedAlertsResponse.Alerts(childComplexity), true
+	case "QueuedAlertsResponse.totalCount":
+		if e.ComplexityRoot.QueuedAlertsResponse.TotalCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.QueuedAlertsResponse.TotalCount(childComplexity), true
+
+	case "ReprocessJob.createdAt":
+		if e.ComplexityRoot.ReprocessJob.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReprocessJob.CreatedAt(childComplexity), true
+	case "ReprocessJob.error":
+		if e.ComplexityRoot.ReprocessJob.Error == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReprocessJob.Error(childComplexity), true
+	case "ReprocessJob.id":
+		if e.ComplexityRoot.ReprocessJob.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReprocessJob.ID(childComplexity), true
+	case "ReprocessJob.queuedAlertID":
+		if e.ComplexityRoot.ReprocessJob.QueuedAlertID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReprocessJob.QueuedAlertID(childComplexity), true
+	case "ReprocessJob.status":
+		if e.ComplexityRoot.ReprocessJob.Status == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReprocessJob.Status(childComplexity), true
+	case "ReprocessJob.updatedAt":
+		if e.ComplexityRoot.ReprocessJob.UpdatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReprocessJob.UpdatedAt(childComplexity), true
 
 	case "Session.createdAt":
 		if e.ComplexityRoot.Session.CreatedAt == nil {
@@ -2000,6 +2179,7 @@ type DashboardStats {
   openTicketsCount: Int!
   unboundAlertsCount: Int!
   declinedAlertsCount: Int!
+  queuedAlertsCount: Int!
   openTickets: [Ticket!]!
   unboundAlerts: [Alert!]!
 }
@@ -2243,6 +2423,45 @@ extend type Mutation {
   fixDiagnosis(id: ID!): Diagnosis!
 }
 
+type QueuedAlert {
+  id: ID!
+  schema: String!
+  title: String!
+  data: String!
+  createdAt: String!
+}
+
+type QueuedAlertsResponse {
+  alerts: [QueuedAlert!]!
+  totalCount: Int!
+}
+
+enum ReprocessJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+type ReprocessJob {
+  id: ID!
+  queuedAlertID: ID!
+  status: ReprocessJobStatus!
+  error: String
+  createdAt: String!
+  updatedAt: String!
+}
+
+extend type Query {
+  queuedAlerts(keyword: String, offset: Int, limit: Int): QueuedAlertsResponse!
+  reprocessJob(id: ID!): ReprocessJob
+}
+
+extend type Mutation {
+  reprocessQueuedAlert(id: ID!): ReprocessJob!
+  discardQueuedAlerts(ids: [ID!]!): Boolean!
+}
+
 schema {
   query: Query
   mutation: Mutation
@@ -2395,6 +2614,17 @@ func (ec *executionContext) field_Mutation_deleteTag_args(ctx context.Context, r
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_discardQueuedAlerts_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "ids", ec.unmarshalNID2ᚕstringᚄ)
+	if err != nil {
+		return nil, err
+	}
+	args["ids"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_fixDiagnosis_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2407,6 +2637,17 @@ func (ec *executionContext) field_Mutation_fixDiagnosis_args(ctx context.Context
 }
 
 func (ec *executionContext) field_Mutation_reopenTicket_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_reprocessQueuedAlert_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
@@ -2753,6 +2994,38 @@ func (ec *executionContext) field_Query_listAgentSummaries_args(ctx context.Cont
 		return nil, err
 	}
 	args["keyword"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_queuedAlerts_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "keyword", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["keyword"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_reprocessJob_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -4789,6 +5062,35 @@ func (ec *executionContext) _DashboardStats_declinedAlertsCount(ctx context.Cont
 }
 
 func (ec *executionContext) fieldContext_DashboardStats_declinedAlertsCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DashboardStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DashboardStats_queuedAlertsCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.DashboardStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DashboardStats_queuedAlertsCount,
+		func(ctx context.Context) (any, error) {
+			return obj.QueuedAlertsCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DashboardStats_queuedAlertsCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "DashboardStats",
 		Field:      field,
@@ -7501,6 +7803,102 @@ func (ec *executionContext) fieldContext_Mutation_fixDiagnosis(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_reprocessQueuedAlert(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_reprocessQueuedAlert,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ReprocessQueuedAlert(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalNReprocessJob2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessJob,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_reprocessQueuedAlert(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ReprocessJob_id(ctx, field)
+			case "queuedAlertID":
+				return ec.fieldContext_ReprocessJob_queuedAlertID(ctx, field)
+			case "status":
+				return ec.fieldContext_ReprocessJob_status(ctx, field)
+			case "error":
+				return ec.fieldContext_ReprocessJob_error(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ReprocessJob_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ReprocessJob_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ReprocessJob", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_reprocessQueuedAlert_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_discardQueuedAlerts(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_discardQueuedAlerts,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DiscardQueuedAlerts(ctx, fc.Args["ids"].([]string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_discardQueuedAlerts(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_discardQueuedAlerts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_ticket(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -7965,6 +8363,8 @@ func (ec *executionContext) fieldContext_Query_dashboard(_ context.Context, fiel
 				return ec.fieldContext_DashboardStats_unboundAlertsCount(ctx, field)
 			case "declinedAlertsCount":
 				return ec.fieldContext_DashboardStats_declinedAlertsCount(ctx, field)
+			case "queuedAlertsCount":
+				return ec.fieldContext_DashboardStats_queuedAlertsCount(ctx, field)
 			case "openTickets":
 				return ec.fieldContext_DashboardStats_openTickets(ctx, field)
 			case "unboundAlerts":
@@ -8707,6 +9107,108 @@ func (ec *executionContext) fieldContext_Query_diagnosisIssues(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_queuedAlerts(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_queuedAlerts,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().QueuedAlerts(ctx, fc.Args["keyword"].(*string), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+		},
+		nil,
+		ec.marshalNQueuedAlertsResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐQueuedAlertsResponse,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_queuedAlerts(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "alerts":
+				return ec.fieldContext_QueuedAlertsResponse_alerts(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_QueuedAlertsResponse_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type QueuedAlertsResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_queuedAlerts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_reprocessJob(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_reprocessJob,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ReprocessJob(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalOReprocessJob2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessJob,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_reprocessJob(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ReprocessJob_id(ctx, field)
+			case "queuedAlertID":
+				return ec.fieldContext_ReprocessJob_queuedAlertID(ctx, field)
+			case "status":
+				return ec.fieldContext_ReprocessJob_status(ctx, field)
+			case "error":
+				return ec.fieldContext_ReprocessJob_error(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ReprocessJob_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ReprocessJob_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ReprocessJob", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_reprocessJob_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8810,6 +9312,395 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 				return ec.fieldContext___Schema_directives(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type __Schema", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _QueuedAlert_id(ctx context.Context, field graphql.CollectedField, obj *alert.QueuedAlert) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_QueuedAlert_id,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.QueuedAlert().ID(ctx, obj)
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_QueuedAlert_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "QueuedAlert",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _QueuedAlert_schema(ctx context.Context, field graphql.CollectedField, obj *alert.QueuedAlert) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_QueuedAlert_schema,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.QueuedAlert().Schema(ctx, obj)
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_QueuedAlert_schema(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "QueuedAlert",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _QueuedAlert_title(ctx context.Context, field graphql.CollectedField, obj *alert.QueuedAlert) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_QueuedAlert_title,
+		func(ctx context.Context) (any, error) {
+			return obj.Title, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_QueuedAlert_title(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "QueuedAlert",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _QueuedAlert_data(ctx context.Context, field graphql.CollectedField, obj *alert.QueuedAlert) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_QueuedAlert_data,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.QueuedAlert().Data(ctx, obj)
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_QueuedAlert_data(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "QueuedAlert",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _QueuedAlert_createdAt(ctx context.Context, field graphql.CollectedField, obj *alert.QueuedAlert) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_QueuedAlert_createdAt,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.QueuedAlert().CreatedAt(ctx, obj)
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_QueuedAlert_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "QueuedAlert",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _QueuedAlertsResponse_alerts(ctx context.Context, field graphql.CollectedField, obj *graphql1.QueuedAlertsResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_QueuedAlertsResponse_alerts,
+		func(ctx context.Context) (any, error) {
+			return obj.Alerts, nil
+		},
+		nil,
+		ec.marshalNQueuedAlert2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐQueuedAlertᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_QueuedAlertsResponse_alerts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "QueuedAlertsResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_QueuedAlert_id(ctx, field)
+			case "schema":
+				return ec.fieldContext_QueuedAlert_schema(ctx, field)
+			case "title":
+				return ec.fieldContext_QueuedAlert_title(ctx, field)
+			case "data":
+				return ec.fieldContext_QueuedAlert_data(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_QueuedAlert_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type QueuedAlert", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _QueuedAlertsResponse_totalCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.QueuedAlertsResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_QueuedAlertsResponse_totalCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_QueuedAlertsResponse_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "QueuedAlertsResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReprocessJob_id(ctx context.Context, field graphql.CollectedField, obj *alert.ReprocessJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReprocessJob_id,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.ReprocessJob().ID(ctx, obj)
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReprocessJob_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReprocessJob",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReprocessJob_queuedAlertID(ctx context.Context, field graphql.CollectedField, obj *alert.ReprocessJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReprocessJob_queuedAlertID,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.ReprocessJob().QueuedAlertID(ctx, obj)
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReprocessJob_queuedAlertID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReprocessJob",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReprocessJob_status(ctx context.Context, field graphql.CollectedField, obj *alert.ReprocessJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReprocessJob_status,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.ReprocessJob().Status(ctx, obj)
+		},
+		nil,
+		ec.marshalNReprocessJobStatus2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐReprocessJobStatus,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReprocessJob_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReprocessJob",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ReprocessJobStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReprocessJob_error(ctx context.Context, field graphql.CollectedField, obj *alert.ReprocessJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReprocessJob_error,
+		func(ctx context.Context) (any, error) {
+			return obj.Error, nil
+		},
+		nil,
+		ec.marshalOString2string,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReprocessJob_error(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReprocessJob",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReprocessJob_createdAt(ctx context.Context, field graphql.CollectedField, obj *alert.ReprocessJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReprocessJob_createdAt,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.ReprocessJob().CreatedAt(ctx, obj)
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReprocessJob_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReprocessJob",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReprocessJob_updatedAt(ctx context.Context, field graphql.CollectedField, obj *alert.ReprocessJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReprocessJob_updatedAt,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.ReprocessJob().UpdatedAt(ctx, obj)
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReprocessJob_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReprocessJob",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -13157,6 +14048,11 @@ func (ec *executionContext) _DashboardStats(ctx context.Context, sel ast.Selecti
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "queuedAlertsCount":
+			out.Values[i] = ec._DashboardStats_queuedAlertsCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "openTickets":
 			out.Values[i] = ec._DashboardStats_openTickets(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -13791,6 +14687,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "reprocessQueuedAlert":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_reprocessQueuedAlert(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "discardQueuedAlerts":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_discardQueuedAlerts(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -14346,6 +15256,47 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "queuedAlerts":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_queuedAlerts(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "reprocessJob":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_reprocessJob(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -14354,6 +15305,449 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___schema(ctx, field)
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var queuedAlertImplementors = []string{"QueuedAlert"}
+
+func (ec *executionContext) _QueuedAlert(ctx context.Context, sel ast.SelectionSet, obj *alert.QueuedAlert) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, queuedAlertImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("QueuedAlert")
+		case "id":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._QueuedAlert_id(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "schema":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._QueuedAlert_schema(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "title":
+			out.Values[i] = ec._QueuedAlert_title(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "data":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._QueuedAlert_data(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "createdAt":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._QueuedAlert_createdAt(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var queuedAlertsResponseImplementors = []string{"QueuedAlertsResponse"}
+
+func (ec *executionContext) _QueuedAlertsResponse(ctx context.Context, sel ast.SelectionSet, obj *graphql1.QueuedAlertsResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, queuedAlertsResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("QueuedAlertsResponse")
+		case "alerts":
+			out.Values[i] = ec._QueuedAlertsResponse_alerts(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._QueuedAlertsResponse_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var reprocessJobImplementors = []string{"ReprocessJob"}
+
+func (ec *executionContext) _ReprocessJob(ctx context.Context, sel ast.SelectionSet, obj *alert.ReprocessJob) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, reprocessJobImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ReprocessJob")
+		case "id":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ReprocessJob_id(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "queuedAlertID":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ReprocessJob_queuedAlertID(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "status":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ReprocessJob_status(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "error":
+			out.Values[i] = ec._ReprocessJob_error(ctx, field, obj)
+		case "createdAt":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ReprocessJob_createdAt(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "updatedAt":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ReprocessJob_updatedAt(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -16201,6 +17595,70 @@ func (ec *executionContext) marshalNKnowledge2ᚖgithubᚗcomᚋsecmonᚑlabᚋw
 	return ec._Knowledge(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNQueuedAlert2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐQueuedAlertᚄ(ctx context.Context, sel ast.SelectionSet, v []*alert.QueuedAlert) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNQueuedAlert2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐQueuedAlert(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNQueuedAlert2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐQueuedAlert(ctx context.Context, sel ast.SelectionSet, v *alert.QueuedAlert) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._QueuedAlert(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNQueuedAlertsResponse2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐQueuedAlertsResponse(ctx context.Context, sel ast.SelectionSet, v graphql1.QueuedAlertsResponse) graphql.Marshaler {
+	return ec._QueuedAlertsResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNQueuedAlertsResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐQueuedAlertsResponse(ctx context.Context, sel ast.SelectionSet, v *graphql1.QueuedAlertsResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._QueuedAlertsResponse(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNReprocessJob2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessJob(ctx context.Context, sel ast.SelectionSet, v alert.ReprocessJob) graphql.Marshaler {
+	return ec._ReprocessJob(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNReprocessJob2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessJob(ctx context.Context, sel ast.SelectionSet, v *alert.ReprocessJob) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ReprocessJob(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNReprocessJobStatus2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐReprocessJobStatus(ctx context.Context, v any) (graphql1.ReprocessJobStatus, error) {
+	var res graphql1.ReprocessJobStatus
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNReprocessJobStatus2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐReprocessJobStatus(ctx context.Context, sel ast.SelectionSet, v graphql1.ReprocessJobStatus) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) marshalNSession2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐSessionᚄ(ctx context.Context, sel ast.SelectionSet, v []*graphql1.Session) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -16732,6 +18190,13 @@ func (ec *executionContext) marshalOMemorySortField2ᚖgithubᚗcomᚋsecmonᚑl
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOReprocessJob2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessJob(ctx context.Context, sel ast.SelectionSet, v *alert.ReprocessJob) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ReprocessJob(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOSession2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐSession(ctx context.Context, sel ast.SelectionSet, v *graphql1.Session) graphql.Marshaler {

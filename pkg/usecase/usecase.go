@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/command"
+	cbService "github.com/secmon-lab/warren/pkg/service/circuitbreaker"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
 	"github.com/secmon-lab/warren/pkg/service/memory"
 	"github.com/secmon-lab/warren/pkg/service/notifier"
@@ -31,6 +32,7 @@ type UseCases struct {
 	tagService      *tag.Service
 	memoryService   *memory.Service
 	hitlService     *hitlService.Service
+	cbService       *cbService.Service
 	llmClient       gollem.LLMClient
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
@@ -187,6 +189,12 @@ func WithFrontendURL(frontendURL string) Option {
 func WithUserSystemPrompt(prompt string) Option {
 	return func(u *UseCases) {
 		u.userSystemPrompt = prompt
+	}
+}
+
+func WithCircuitBreaker(service *cbService.Service) Option {
+	return func(u *UseCases) {
+		u.cbService = service
 	}
 }
 

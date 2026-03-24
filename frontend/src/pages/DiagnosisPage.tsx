@@ -24,8 +24,6 @@ function statusBadgeVariant(status: string): "default" | "secondary" | "destruct
   switch (status) {
     case "pending":
       return "secondary";
-    case "fixing":
-      return "secondary";
     case "healthy":
       return "outline";
     case "fixed":
@@ -41,8 +39,6 @@ function statusLabel(status: string): string {
   switch (status) {
     case "pending":
       return "Pending";
-    case "fixing":
-      return "Fixing...";
     case "healthy":
       return "Healthy";
     case "fixed":
@@ -144,7 +140,6 @@ export default function DiagnosisPage() {
                 <CardTitle className="flex items-center justify-between text-base">
                   <span className="font-mono text-sm text-muted-foreground">{diag.id}</span>
                   <Badge variant={statusBadgeVariant(diag.status)}>
-                    {diag.status === "fixing" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
                     {statusLabel(diag.status)}
                   </Badge>
                 </CardTitle>

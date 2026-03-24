@@ -51,6 +51,12 @@ type Memory struct {
 	// HITL management
 	hitl *hitlStore
 
+	// Circuit breaker / throttle management
+	throttleMu     sync.RWMutex
+	queuedAlerts   map[types.QueuedAlertID]*alert.QueuedAlert
+	reprocessJobs  map[types.ReprocessJobID]*alert.ReprocessJob
+	alertThrottle  *alert.AlertThrottle
+
 	// Call counter for tracking method invocations
 	callCounts map[string]int
 	callMu     sync.RWMutex
@@ -78,6 +84,8 @@ func New() *Memory {
 		session:         newSessionStore(),
 		knowledge:       newKnowledgeStore(),
 		hitl:            newHITLStore(),
+		queuedAlerts:    make(map[types.QueuedAlertID]*alert.QueuedAlert),
+		reprocessJobs:   make(map[types.ReprocessJobID]*alert.ReprocessJob),
 		callCounts:      make(map[string]int),
 		eb:              goerr.NewBuilder(goerr.TV(errutil.RepositoryKey, "memory")),
 	}
