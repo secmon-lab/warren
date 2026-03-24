@@ -13,6 +13,7 @@ import (
 	notifierSvc "github.com/secmon-lab/warren/pkg/service/notifier"
 	slackSDK "github.com/slack-go/slack"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
@@ -36,13 +37,13 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, a
 		throttleResult, err := uc.cbService.TryAcquire(ctx)
 		if err != nil {
 			// On throttle failure, fall through to normal processing (don't lose alerts)
-			logger.Warn("circuit breaker throttle check failed, processing normally", "error", err)
+			errutil.Handle(ctx, goerr.Wrap(err, "circuit breaker throttle check failed, processing normally"))
 		} else if !throttleResult.Allowed {
 			// Alert is throttled: enqueue it
 			qa, enqueueErr := uc.cbService.EnqueueAlert(ctx, schema, alertData, "", "")
 			if enqueueErr != nil {
 				// If queueing fails, fall through to normal processing
-				logger.Warn("failed to enqueue throttled alert, processing normally", "error", enqueueErr)
+				errutil.Handle(ctx, goerr.Wrap(enqueueErr, "failed to enqueue throttled alert, processing normally"))
 			} else {
 				logger.Info("alert throttled and queued", "queued_alert_id", qa.ID, "schema", schema)
 
@@ -459,7 +460,6 @@ func (uc *UseCases) sendThrottleWarning(ctx context.Context) {
 		return
 	}
 
-	logger := logging.From(ctx)
 	channelID := uc.slackService.DefaultChannelID()
 	message := "<!channel> :warning: Alert circuit breaker activated. Incoming alerts are being queued due to rate limiting. Check the Web UI to manage queued alerts."
 
@@ -469,7 +469,7 @@ func (uc *UseCases) sendThrottleWarning(ctx context.Context) {
 		slackSDK.MsgOptionText(message, false),
 	)
 	if err != nil {
-		logger.Error("failed to send circuit breaker warning to Slack", "error", err, "channel", channelID)
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to send circuit breaker warning to Slack", goerr.V("channel", channelID)))
 	}
 }
 

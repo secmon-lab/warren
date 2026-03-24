@@ -9,6 +9,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
@@ -109,31 +110,31 @@ func (s *Service) ReprocessAlert(ctx context.Context, queuedAlertID types.Queued
 		job.Status = types.ReprocessJobStatusRunning
 		job.UpdatedAt = time.Now()
 		if err := s.repo.PutReprocessJob(bgCtx, job); err != nil {
-			logger.Error("failed to update reprocess job to running", "error", err, "job_id", job.ID)
+			errutil.Handle(bgCtx, goerr.Wrap(err, "failed to update reprocess job to running", goerr.V("job_id", job.ID)))
 			return
 		}
 
 		// Execute the reprocessing
 		if err := processFunc(bgCtx, qa.Schema, qa.Data); err != nil {
-			logger.Error("reprocess job failed", "error", err, "job_id", job.ID, "queued_alert_id", queuedAlertID)
+			errutil.Handle(bgCtx, goerr.Wrap(err, "reprocess job failed", goerr.V("job_id", job.ID), goerr.V("queued_alert_id", queuedAlertID)))
 			job.Status = types.ReprocessJobStatusFailed
 			job.Error = err.Error()
 			job.UpdatedAt = time.Now()
 			if putErr := s.repo.PutReprocessJob(bgCtx, job); putErr != nil {
-				logger.Error("failed to update reprocess job to failed", "error", putErr, "job_id", job.ID)
+				errutil.Handle(bgCtx, goerr.Wrap(putErr, "failed to update reprocess job to failed", goerr.V("job_id", job.ID)))
 			}
 			return
 		}
 
 		// Success: delete queued alert and update job
 		if err := s.repo.DeleteQueuedAlerts(bgCtx, []types.QueuedAlertID{queuedAlertID}); err != nil {
-			logger.Error("failed to delete queued alert after reprocess", "error", err, "queued_alert_id", queuedAlertID)
+			errutil.Handle(bgCtx, goerr.Wrap(err, "failed to delete queued alert after reprocess", goerr.V("queued_alert_id", queuedAlertID)))
 		}
 
 		job.Status = types.ReprocessJobStatusCompleted
 		job.UpdatedAt = time.Now()
 		if err := s.repo.PutReprocessJob(bgCtx, job); err != nil {
-			logger.Error("failed to update reprocess job to completed", "error", err, "job_id", job.ID)
+			errutil.Handle(bgCtx, goerr.Wrap(err, "failed to update reprocess job to completed", goerr.V("job_id", job.ID)))
 		}
 
 		logger.Info("reprocess job completed", "job_id", job.ID, "queued_alert_id", queuedAlertID)
