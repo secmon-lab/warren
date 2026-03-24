@@ -2656,6 +2656,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //
 //		// make and configure a mocked interfaces.Repository
 //		mockedRepository := &RepositoryMock{
+//			AcquireAlertThrottleSlotFunc: func(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error) {
+//				panic("mock out the AcquireAlertThrottleSlot method")
+//			},
 //			ArchiveKnowledgeFunc: func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) error {
 //				panic("mock out the ArchiveKnowledge method")
 //			},
@@ -2695,6 +2698,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			CountDiagnosisIssuesFunc: func(ctx context.Context, diagnosisID types.DiagnosisID, status *diagnosis.IssueStatus) (int, error) {
 //				panic("mock out the CountDiagnosisIssues method")
 //			},
+//			CountQueuedAlertsFunc: func(ctx context.Context) (int, error) {
+//				panic("mock out the CountQueuedAlerts method")
+//			},
 //			CountTicketCommentsFunc: func(ctx context.Context, ticketID types.TicketID) (int, error) {
 //				panic("mock out the CountTicketComments method")
 //			},
@@ -2709,6 +2715,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			DeleteAgentMemoriesBatchFunc: func(ctx context.Context, agentID string, memoryIDs []types.AgentMemoryID) (int, error) {
 //				panic("mock out the DeleteAgentMemoriesBatch method")
+//			},
+//			DeleteQueuedAlertsFunc: func(ctx context.Context, ids []types.QueuedAlertID) error {
+//				panic("mock out the DeleteQueuedAlerts method")
 //			},
 //			DeleteSessionFunc: func(ctx context.Context, sessionID types.SessionID) error {
 //				panic("mock out the DeleteSession method")
@@ -2806,8 +2815,14 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetOrCreateTagByNameFunc: func(ctx context.Context, name string, description string, color string, createdBy string) (*tag.Tag, error) {
 //				panic("mock out the GetOrCreateTagByName method")
 //			},
+//			GetQueuedAlertFunc: func(ctx context.Context, id types.QueuedAlertID) (*alert.QueuedAlert, error) {
+//				panic("mock out the GetQueuedAlert method")
+//			},
 //			GetRefineGroupFunc: func(ctx context.Context, groupID types.RefineGroupID) (*refine.Group, error) {
 //				panic("mock out the GetRefineGroup method")
+//			},
+//			GetReprocessJobFunc: func(ctx context.Context, id types.ReprocessJobID) (*alert.ReprocessJob, error) {
+//				panic("mock out the GetReprocessJob method")
 //			},
 //			GetSessionFunc: func(ctx context.Context, sessionID types.SessionID) (*session.Session, error) {
 //				panic("mock out the GetSession method")
@@ -2887,6 +2902,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			ListPendingDiagnosisIssuesFunc: func(ctx context.Context, diagnosisID types.DiagnosisID) ([]*diagnosis.Issue, error) {
 //				panic("mock out the ListPendingDiagnosisIssues method")
 //			},
+//			ListQueuedAlertsFunc: func(ctx context.Context, offset int, limit int) ([]*alert.QueuedAlert, error) {
+//				panic("mock out the ListQueuedAlerts method")
+//			},
 //			PutActivityFunc: func(ctx context.Context, activityMoqParam *activity.Activity) error {
 //				panic("mock out the PutActivity method")
 //			},
@@ -2911,8 +2929,14 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			PutKnowledgeFunc: func(ctx context.Context, k *knowledge.Knowledge) error {
 //				panic("mock out the PutKnowledge method")
 //			},
+//			PutQueuedAlertFunc: func(ctx context.Context, qa *alert.QueuedAlert) error {
+//				panic("mock out the PutQueuedAlert method")
+//			},
 //			PutRefineGroupFunc: func(ctx context.Context, group *refine.Group) error {
 //				panic("mock out the PutRefineGroup method")
+//			},
+//			PutReprocessJobFunc: func(ctx context.Context, job *alert.ReprocessJob) error {
+//				panic("mock out the PutReprocessJob method")
 //			},
 //			PutSessionFunc: func(ctx context.Context, sessionMoqParam *session.Session) error {
 //				panic("mock out the PutSession method")
@@ -2953,6 +2977,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			SearchMemoriesByEmbeddingFunc: func(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error) {
 //				panic("mock out the SearchMemoriesByEmbedding method")
 //			},
+//			SearchQueuedAlertsFunc: func(ctx context.Context, keyword string, offset int, limit int) ([]*alert.QueuedAlert, int, error) {
+//				panic("mock out the SearchQueuedAlerts method")
+//			},
 //			UnbindAlertFromTicketFunc: func(ctx context.Context, alertID types.AlertID) error {
 //				panic("mock out the UnbindAlertFromTicket method")
 //			},
@@ -2981,6 +3008,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //
 //	}
 type RepositoryMock struct {
+	// AcquireAlertThrottleSlotFunc mocks the AcquireAlertThrottleSlot method.
+	AcquireAlertThrottleSlotFunc func(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error)
+
 	// ArchiveKnowledgeFunc mocks the ArchiveKnowledge method.
 	ArchiveKnowledgeFunc func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) error
 
@@ -3020,6 +3050,9 @@ type RepositoryMock struct {
 	// CountDiagnosisIssuesFunc mocks the CountDiagnosisIssues method.
 	CountDiagnosisIssuesFunc func(ctx context.Context, diagnosisID types.DiagnosisID, status *diagnosis.IssueStatus) (int, error)
 
+	// CountQueuedAlertsFunc mocks the CountQueuedAlerts method.
+	CountQueuedAlertsFunc func(ctx context.Context) (int, error)
+
 	// CountTicketCommentsFunc mocks the CountTicketComments method.
 	CountTicketCommentsFunc func(ctx context.Context, ticketID types.TicketID) (int, error)
 
@@ -3034,6 +3067,9 @@ type RepositoryMock struct {
 
 	// DeleteAgentMemoriesBatchFunc mocks the DeleteAgentMemoriesBatch method.
 	DeleteAgentMemoriesBatchFunc func(ctx context.Context, agentID string, memoryIDs []types.AgentMemoryID) (int, error)
+
+	// DeleteQueuedAlertsFunc mocks the DeleteQueuedAlerts method.
+	DeleteQueuedAlertsFunc func(ctx context.Context, ids []types.QueuedAlertID) error
 
 	// DeleteSessionFunc mocks the DeleteSession method.
 	DeleteSessionFunc func(ctx context.Context, sessionID types.SessionID) error
@@ -3131,8 +3167,14 @@ type RepositoryMock struct {
 	// GetOrCreateTagByNameFunc mocks the GetOrCreateTagByName method.
 	GetOrCreateTagByNameFunc func(ctx context.Context, name string, description string, color string, createdBy string) (*tag.Tag, error)
 
+	// GetQueuedAlertFunc mocks the GetQueuedAlert method.
+	GetQueuedAlertFunc func(ctx context.Context, id types.QueuedAlertID) (*alert.QueuedAlert, error)
+
 	// GetRefineGroupFunc mocks the GetRefineGroup method.
 	GetRefineGroupFunc func(ctx context.Context, groupID types.RefineGroupID) (*refine.Group, error)
+
+	// GetReprocessJobFunc mocks the GetReprocessJob method.
+	GetReprocessJobFunc func(ctx context.Context, id types.ReprocessJobID) (*alert.ReprocessJob, error)
 
 	// GetSessionFunc mocks the GetSession method.
 	GetSessionFunc func(ctx context.Context, sessionID types.SessionID) (*session.Session, error)
@@ -3212,6 +3254,9 @@ type RepositoryMock struct {
 	// ListPendingDiagnosisIssuesFunc mocks the ListPendingDiagnosisIssues method.
 	ListPendingDiagnosisIssuesFunc func(ctx context.Context, diagnosisID types.DiagnosisID) ([]*diagnosis.Issue, error)
 
+	// ListQueuedAlertsFunc mocks the ListQueuedAlerts method.
+	ListQueuedAlertsFunc func(ctx context.Context, offset int, limit int) ([]*alert.QueuedAlert, error)
+
 	// PutActivityFunc mocks the PutActivity method.
 	PutActivityFunc func(ctx context.Context, activityMoqParam *activity.Activity) error
 
@@ -3236,8 +3281,14 @@ type RepositoryMock struct {
 	// PutKnowledgeFunc mocks the PutKnowledge method.
 	PutKnowledgeFunc func(ctx context.Context, k *knowledge.Knowledge) error
 
+	// PutQueuedAlertFunc mocks the PutQueuedAlert method.
+	PutQueuedAlertFunc func(ctx context.Context, qa *alert.QueuedAlert) error
+
 	// PutRefineGroupFunc mocks the PutRefineGroup method.
 	PutRefineGroupFunc func(ctx context.Context, group *refine.Group) error
+
+	// PutReprocessJobFunc mocks the PutReprocessJob method.
+	PutReprocessJobFunc func(ctx context.Context, job *alert.ReprocessJob) error
 
 	// PutSessionFunc mocks the PutSession method.
 	PutSessionFunc func(ctx context.Context, sessionMoqParam *session.Session) error
@@ -3278,6 +3329,9 @@ type RepositoryMock struct {
 	// SearchMemoriesByEmbeddingFunc mocks the SearchMemoriesByEmbedding method.
 	SearchMemoriesByEmbeddingFunc func(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error)
 
+	// SearchQueuedAlertsFunc mocks the SearchQueuedAlerts method.
+	SearchQueuedAlertsFunc func(ctx context.Context, keyword string, offset int, limit int) ([]*alert.QueuedAlert, int, error)
+
 	// UnbindAlertFromTicketFunc mocks the UnbindAlertFromTicket method.
 	UnbindAlertFromTicketFunc func(ctx context.Context, alertID types.AlertID) error
 
@@ -3304,6 +3358,15 @@ type RepositoryMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AcquireAlertThrottleSlot holds details about calls to the AcquireAlertThrottleSlot method.
+		AcquireAlertThrottleSlot []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Window is the window argument value.
+			Window time.Duration
+			// Limit is the limit argument value.
+			Limit int
+		}
 		// ArchiveKnowledge holds details about calls to the ArchiveKnowledge method.
 		ArchiveKnowledge []struct {
 			// Ctx is the ctx argument value.
@@ -3397,6 +3460,11 @@ type RepositoryMock struct {
 			// Status is the status argument value.
 			Status *diagnosis.IssueStatus
 		}
+		// CountQueuedAlerts holds details about calls to the CountQueuedAlerts method.
+		CountQueuedAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// CountTicketComments holds details about calls to the CountTicketComments method.
 		CountTicketComments []struct {
 			// Ctx is the ctx argument value.
@@ -3437,6 +3505,13 @@ type RepositoryMock struct {
 			AgentID string
 			// MemoryIDs is the memoryIDs argument value.
 			MemoryIDs []types.AgentMemoryID
+		}
+		// DeleteQueuedAlerts holds details about calls to the DeleteQueuedAlerts method.
+		DeleteQueuedAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Ids is the ids argument value.
+			Ids []types.QueuedAlertID
 		}
 		// DeleteSession holds details about calls to the DeleteSession method.
 		DeleteSession []struct {
@@ -3688,12 +3763,26 @@ type RepositoryMock struct {
 			// CreatedBy is the createdBy argument value.
 			CreatedBy string
 		}
+		// GetQueuedAlert holds details about calls to the GetQueuedAlert method.
+		GetQueuedAlert []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID types.QueuedAlertID
+		}
 		// GetRefineGroup holds details about calls to the GetRefineGroup method.
 		GetRefineGroup []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// GroupID is the groupID argument value.
 			GroupID types.RefineGroupID
+		}
+		// GetReprocessJob holds details about calls to the GetReprocessJob method.
+		GetReprocessJob []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID types.ReprocessJobID
 		}
 		// GetSession holds details about calls to the GetSession method.
 		GetSession []struct {
@@ -3899,6 +3988,15 @@ type RepositoryMock struct {
 			// DiagnosisID is the diagnosisID argument value.
 			DiagnosisID types.DiagnosisID
 		}
+		// ListQueuedAlerts holds details about calls to the ListQueuedAlerts method.
+		ListQueuedAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Offset is the offset argument value.
+			Offset int
+			// Limit is the limit argument value.
+			Limit int
+		}
 		// PutActivity holds details about calls to the PutActivity method.
 		PutActivity []struct {
 			// Ctx is the ctx argument value.
@@ -3957,12 +4055,26 @@ type RepositoryMock struct {
 			// K is the k argument value.
 			K *knowledge.Knowledge
 		}
+		// PutQueuedAlert holds details about calls to the PutQueuedAlert method.
+		PutQueuedAlert []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Qa is the qa argument value.
+			Qa *alert.QueuedAlert
+		}
 		// PutRefineGroup holds details about calls to the PutRefineGroup method.
 		PutRefineGroup []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Group is the group argument value.
 			Group *refine.Group
+		}
+		// PutReprocessJob holds details about calls to the PutReprocessJob method.
+		PutReprocessJob []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Job is the job argument value.
+			Job *alert.ReprocessJob
 		}
 		// PutSession holds details about calls to the PutSession method.
 		PutSession []struct {
@@ -4067,6 +4179,17 @@ type RepositoryMock struct {
 			// Limit is the limit argument value.
 			Limit int
 		}
+		// SearchQueuedAlerts holds details about calls to the SearchQueuedAlerts method.
+		SearchQueuedAlerts []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Keyword is the keyword argument value.
+			Keyword string
+			// Offset is the offset argument value.
+			Offset int
+			// Limit is the limit argument value.
+			Limit int
+		}
 		// UnbindAlertFromTicket holds details about calls to the UnbindAlertFromTicket method.
 		UnbindAlertFromTicket []struct {
 			// Ctx is the ctx argument value.
@@ -4130,6 +4253,7 @@ type RepositoryMock struct {
 			ID types.HITLRequestID
 		}
 	}
+	lockAcquireAlertThrottleSlot       sync.RWMutex
 	lockArchiveKnowledge               sync.RWMutex
 	lockBatchGetAlerts                 sync.RWMutex
 	lockBatchGetDiagnosisIssueCounts   sync.RWMutex
@@ -4143,11 +4267,13 @@ type RepositoryMock struct {
 	lockCountAlertsWithoutTicket       sync.RWMutex
 	lockCountDeclinedAlerts            sync.RWMutex
 	lockCountDiagnosisIssues           sync.RWMutex
+	lockCountQueuedAlerts              sync.RWMutex
 	lockCountTicketComments            sync.RWMutex
 	lockCountTicketsByStatus           sync.RWMutex
 	lockCreateNotice                   sync.RWMutex
 	lockCreateTagWithID                sync.RWMutex
 	lockDeleteAgentMemoriesBatch       sync.RWMutex
+	lockDeleteQueuedAlerts             sync.RWMutex
 	lockDeleteSession                  sync.RWMutex
 	lockDeleteTagByID                  sync.RWMutex
 	lockDeleteToken                    sync.RWMutex
@@ -4180,7 +4306,9 @@ type RepositoryMock struct {
 	lockGetLatestHistory               sync.RWMutex
 	lockGetNotice                      sync.RWMutex
 	lockGetOrCreateTagByName           sync.RWMutex
+	lockGetQueuedAlert                 sync.RWMutex
 	lockGetRefineGroup                 sync.RWMutex
+	lockGetReprocessJob                sync.RWMutex
 	lockGetSession                     sync.RWMutex
 	lockGetSessionMessages             sync.RWMutex
 	lockGetSessionsByTicket            sync.RWMutex
@@ -4207,6 +4335,7 @@ type RepositoryMock struct {
 	lockListKnowledgeSlugs             sync.RWMutex
 	lockListKnowledgeTopics            sync.RWMutex
 	lockListPendingDiagnosisIssues     sync.RWMutex
+	lockListQueuedAlerts               sync.RWMutex
 	lockPutActivity                    sync.RWMutex
 	lockPutAlert                       sync.RWMutex
 	lockPutAlertList                   sync.RWMutex
@@ -4215,7 +4344,9 @@ type RepositoryMock struct {
 	lockPutHITLRequest                 sync.RWMutex
 	lockPutHistory                     sync.RWMutex
 	lockPutKnowledge                   sync.RWMutex
+	lockPutQueuedAlert                 sync.RWMutex
 	lockPutRefineGroup                 sync.RWMutex
+	lockPutReprocessJob                sync.RWMutex
 	lockPutSession                     sync.RWMutex
 	lockPutSessionMessage              sync.RWMutex
 	lockPutTicket                      sync.RWMutex
@@ -4229,6 +4360,7 @@ type RepositoryMock struct {
 	lockSaveAgentMemory                sync.RWMutex
 	lockSearchAlerts                   sync.RWMutex
 	lockSearchMemoriesByEmbedding      sync.RWMutex
+	lockSearchQueuedAlerts             sync.RWMutex
 	lockUnbindAlertFromTicket          sync.RWMutex
 	lockUpdateAlertStatus              sync.RWMutex
 	lockUpdateHITLRequestStatus        sync.RWMutex
@@ -4236,6 +4368,50 @@ type RepositoryMock struct {
 	lockUpdateNotice                   sync.RWMutex
 	lockUpdateTag                      sync.RWMutex
 	lockWatchHITLRequest               sync.RWMutex
+}
+
+// AcquireAlertThrottleSlot calls AcquireAlertThrottleSlotFunc.
+func (mock *RepositoryMock) AcquireAlertThrottleSlot(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Window time.Duration
+		Limit  int
+	}{
+		Ctx:    ctx,
+		Window: window,
+		Limit:  limit,
+	}
+	mock.lockAcquireAlertThrottleSlot.Lock()
+	mock.calls.AcquireAlertThrottleSlot = append(mock.calls.AcquireAlertThrottleSlot, callInfo)
+	mock.lockAcquireAlertThrottleSlot.Unlock()
+	if mock.AcquireAlertThrottleSlotFunc == nil {
+		var (
+			throttleResultOut *alert.ThrottleResult
+			errOut            error
+		)
+		return throttleResultOut, errOut
+	}
+	return mock.AcquireAlertThrottleSlotFunc(ctx, window, limit)
+}
+
+// AcquireAlertThrottleSlotCalls gets all the calls that were made to AcquireAlertThrottleSlot.
+// Check the length with:
+//
+//	len(mockedRepository.AcquireAlertThrottleSlotCalls())
+func (mock *RepositoryMock) AcquireAlertThrottleSlotCalls() []struct {
+	Ctx    context.Context
+	Window time.Duration
+	Limit  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Window time.Duration
+		Limit  int
+	}
+	mock.lockAcquireAlertThrottleSlot.RLock()
+	calls = mock.calls.AcquireAlertThrottleSlot
+	mock.lockAcquireAlertThrottleSlot.RUnlock()
+	return calls
 }
 
 // ArchiveKnowledge calls ArchiveKnowledgeFunc.
@@ -4757,6 +4933,42 @@ func (mock *RepositoryMock) CountDiagnosisIssuesCalls() []struct {
 	return calls
 }
 
+// CountQueuedAlerts calls CountQueuedAlertsFunc.
+func (mock *RepositoryMock) CountQueuedAlerts(ctx context.Context) (int, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockCountQueuedAlerts.Lock()
+	mock.calls.CountQueuedAlerts = append(mock.calls.CountQueuedAlerts, callInfo)
+	mock.lockCountQueuedAlerts.Unlock()
+	if mock.CountQueuedAlertsFunc == nil {
+		var (
+			nOut   int
+			errOut error
+		)
+		return nOut, errOut
+	}
+	return mock.CountQueuedAlertsFunc(ctx)
+}
+
+// CountQueuedAlertsCalls gets all the calls that were made to CountQueuedAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.CountQueuedAlertsCalls())
+func (mock *RepositoryMock) CountQueuedAlertsCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockCountQueuedAlerts.RLock()
+	calls = mock.calls.CountQueuedAlerts
+	mock.lockCountQueuedAlerts.RUnlock()
+	return calls
+}
+
 // CountTicketComments calls CountTicketCommentsFunc.
 func (mock *RepositoryMock) CountTicketComments(ctx context.Context, ticketID types.TicketID) (int, error) {
 	callInfo := struct {
@@ -4964,6 +5176,45 @@ func (mock *RepositoryMock) DeleteAgentMemoriesBatchCalls() []struct {
 	mock.lockDeleteAgentMemoriesBatch.RLock()
 	calls = mock.calls.DeleteAgentMemoriesBatch
 	mock.lockDeleteAgentMemoriesBatch.RUnlock()
+	return calls
+}
+
+// DeleteQueuedAlerts calls DeleteQueuedAlertsFunc.
+func (mock *RepositoryMock) DeleteQueuedAlerts(ctx context.Context, ids []types.QueuedAlertID) error {
+	callInfo := struct {
+		Ctx context.Context
+		Ids []types.QueuedAlertID
+	}{
+		Ctx: ctx,
+		Ids: ids,
+	}
+	mock.lockDeleteQueuedAlerts.Lock()
+	mock.calls.DeleteQueuedAlerts = append(mock.calls.DeleteQueuedAlerts, callInfo)
+	mock.lockDeleteQueuedAlerts.Unlock()
+	if mock.DeleteQueuedAlertsFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.DeleteQueuedAlertsFunc(ctx, ids)
+}
+
+// DeleteQueuedAlertsCalls gets all the calls that were made to DeleteQueuedAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.DeleteQueuedAlertsCalls())
+func (mock *RepositoryMock) DeleteQueuedAlertsCalls() []struct {
+	Ctx context.Context
+	Ids []types.QueuedAlertID
+} {
+	var calls []struct {
+		Ctx context.Context
+		Ids []types.QueuedAlertID
+	}
+	mock.lockDeleteQueuedAlerts.RLock()
+	calls = mock.calls.DeleteQueuedAlerts
+	mock.lockDeleteQueuedAlerts.RUnlock()
 	return calls
 }
 
@@ -6296,6 +6547,46 @@ func (mock *RepositoryMock) GetOrCreateTagByNameCalls() []struct {
 	return calls
 }
 
+// GetQueuedAlert calls GetQueuedAlertFunc.
+func (mock *RepositoryMock) GetQueuedAlert(ctx context.Context, id types.QueuedAlertID) (*alert.QueuedAlert, error) {
+	callInfo := struct {
+		Ctx context.Context
+		ID  types.QueuedAlertID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockGetQueuedAlert.Lock()
+	mock.calls.GetQueuedAlert = append(mock.calls.GetQueuedAlert, callInfo)
+	mock.lockGetQueuedAlert.Unlock()
+	if mock.GetQueuedAlertFunc == nil {
+		var (
+			queuedAlertOut *alert.QueuedAlert
+			errOut         error
+		)
+		return queuedAlertOut, errOut
+	}
+	return mock.GetQueuedAlertFunc(ctx, id)
+}
+
+// GetQueuedAlertCalls gets all the calls that were made to GetQueuedAlert.
+// Check the length with:
+//
+//	len(mockedRepository.GetQueuedAlertCalls())
+func (mock *RepositoryMock) GetQueuedAlertCalls() []struct {
+	Ctx context.Context
+	ID  types.QueuedAlertID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  types.QueuedAlertID
+	}
+	mock.lockGetQueuedAlert.RLock()
+	calls = mock.calls.GetQueuedAlert
+	mock.lockGetQueuedAlert.RUnlock()
+	return calls
+}
+
 // GetRefineGroup calls GetRefineGroupFunc.
 func (mock *RepositoryMock) GetRefineGroup(ctx context.Context, groupID types.RefineGroupID) (*refine.Group, error) {
 	callInfo := struct {
@@ -6333,6 +6624,46 @@ func (mock *RepositoryMock) GetRefineGroupCalls() []struct {
 	mock.lockGetRefineGroup.RLock()
 	calls = mock.calls.GetRefineGroup
 	mock.lockGetRefineGroup.RUnlock()
+	return calls
+}
+
+// GetReprocessJob calls GetReprocessJobFunc.
+func (mock *RepositoryMock) GetReprocessJob(ctx context.Context, id types.ReprocessJobID) (*alert.ReprocessJob, error) {
+	callInfo := struct {
+		Ctx context.Context
+		ID  types.ReprocessJobID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockGetReprocessJob.Lock()
+	mock.calls.GetReprocessJob = append(mock.calls.GetReprocessJob, callInfo)
+	mock.lockGetReprocessJob.Unlock()
+	if mock.GetReprocessJobFunc == nil {
+		var (
+			reprocessJobOut *alert.ReprocessJob
+			errOut          error
+		)
+		return reprocessJobOut, errOut
+	}
+	return mock.GetReprocessJobFunc(ctx, id)
+}
+
+// GetReprocessJobCalls gets all the calls that were made to GetReprocessJob.
+// Check the length with:
+//
+//	len(mockedRepository.GetReprocessJobCalls())
+func (mock *RepositoryMock) GetReprocessJobCalls() []struct {
+	Ctx context.Context
+	ID  types.ReprocessJobID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  types.ReprocessJobID
+	}
+	mock.lockGetReprocessJob.RLock()
+	calls = mock.calls.GetReprocessJob
+	mock.lockGetReprocessJob.RUnlock()
 	return calls
 }
 
@@ -7423,6 +7754,50 @@ func (mock *RepositoryMock) ListPendingDiagnosisIssuesCalls() []struct {
 	return calls
 }
 
+// ListQueuedAlerts calls ListQueuedAlertsFunc.
+func (mock *RepositoryMock) ListQueuedAlerts(ctx context.Context, offset int, limit int) ([]*alert.QueuedAlert, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		Offset int
+		Limit  int
+	}{
+		Ctx:    ctx,
+		Offset: offset,
+		Limit:  limit,
+	}
+	mock.lockListQueuedAlerts.Lock()
+	mock.calls.ListQueuedAlerts = append(mock.calls.ListQueuedAlerts, callInfo)
+	mock.lockListQueuedAlerts.Unlock()
+	if mock.ListQueuedAlertsFunc == nil {
+		var (
+			queuedAlertsOut []*alert.QueuedAlert
+			errOut          error
+		)
+		return queuedAlertsOut, errOut
+	}
+	return mock.ListQueuedAlertsFunc(ctx, offset, limit)
+}
+
+// ListQueuedAlertsCalls gets all the calls that were made to ListQueuedAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.ListQueuedAlertsCalls())
+func (mock *RepositoryMock) ListQueuedAlertsCalls() []struct {
+	Ctx    context.Context
+	Offset int
+	Limit  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Offset int
+		Limit  int
+	}
+	mock.lockListQueuedAlerts.RLock()
+	calls = mock.calls.ListQueuedAlerts
+	mock.lockListQueuedAlerts.RUnlock()
+	return calls
+}
+
 // PutActivity calls PutActivityFunc.
 func (mock *RepositoryMock) PutActivity(ctx context.Context, activityMoqParam *activity.Activity) error {
 	callInfo := struct {
@@ -7739,6 +8114,45 @@ func (mock *RepositoryMock) PutKnowledgeCalls() []struct {
 	return calls
 }
 
+// PutQueuedAlert calls PutQueuedAlertFunc.
+func (mock *RepositoryMock) PutQueuedAlert(ctx context.Context, qa *alert.QueuedAlert) error {
+	callInfo := struct {
+		Ctx context.Context
+		Qa  *alert.QueuedAlert
+	}{
+		Ctx: ctx,
+		Qa:  qa,
+	}
+	mock.lockPutQueuedAlert.Lock()
+	mock.calls.PutQueuedAlert = append(mock.calls.PutQueuedAlert, callInfo)
+	mock.lockPutQueuedAlert.Unlock()
+	if mock.PutQueuedAlertFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutQueuedAlertFunc(ctx, qa)
+}
+
+// PutQueuedAlertCalls gets all the calls that were made to PutQueuedAlert.
+// Check the length with:
+//
+//	len(mockedRepository.PutQueuedAlertCalls())
+func (mock *RepositoryMock) PutQueuedAlertCalls() []struct {
+	Ctx context.Context
+	Qa  *alert.QueuedAlert
+} {
+	var calls []struct {
+		Ctx context.Context
+		Qa  *alert.QueuedAlert
+	}
+	mock.lockPutQueuedAlert.RLock()
+	calls = mock.calls.PutQueuedAlert
+	mock.lockPutQueuedAlert.RUnlock()
+	return calls
+}
+
 // PutRefineGroup calls PutRefineGroupFunc.
 func (mock *RepositoryMock) PutRefineGroup(ctx context.Context, group *refine.Group) error {
 	callInfo := struct {
@@ -7775,6 +8189,45 @@ func (mock *RepositoryMock) PutRefineGroupCalls() []struct {
 	mock.lockPutRefineGroup.RLock()
 	calls = mock.calls.PutRefineGroup
 	mock.lockPutRefineGroup.RUnlock()
+	return calls
+}
+
+// PutReprocessJob calls PutReprocessJobFunc.
+func (mock *RepositoryMock) PutReprocessJob(ctx context.Context, job *alert.ReprocessJob) error {
+	callInfo := struct {
+		Ctx context.Context
+		Job *alert.ReprocessJob
+	}{
+		Ctx: ctx,
+		Job: job,
+	}
+	mock.lockPutReprocessJob.Lock()
+	mock.calls.PutReprocessJob = append(mock.calls.PutReprocessJob, callInfo)
+	mock.lockPutReprocessJob.Unlock()
+	if mock.PutReprocessJobFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutReprocessJobFunc(ctx, job)
+}
+
+// PutReprocessJobCalls gets all the calls that were made to PutReprocessJob.
+// Check the length with:
+//
+//	len(mockedRepository.PutReprocessJobCalls())
+func (mock *RepositoryMock) PutReprocessJobCalls() []struct {
+	Ctx context.Context
+	Job *alert.ReprocessJob
+} {
+	var calls []struct {
+		Ctx context.Context
+		Job *alert.ReprocessJob
+	}
+	mock.lockPutReprocessJob.RLock()
+	calls = mock.calls.PutReprocessJob
+	mock.lockPutReprocessJob.RUnlock()
 	return calls
 }
 
@@ -8308,6 +8761,55 @@ func (mock *RepositoryMock) SearchMemoriesByEmbeddingCalls() []struct {
 	mock.lockSearchMemoriesByEmbedding.RLock()
 	calls = mock.calls.SearchMemoriesByEmbedding
 	mock.lockSearchMemoriesByEmbedding.RUnlock()
+	return calls
+}
+
+// SearchQueuedAlerts calls SearchQueuedAlertsFunc.
+func (mock *RepositoryMock) SearchQueuedAlerts(ctx context.Context, keyword string, offset int, limit int) ([]*alert.QueuedAlert, int, error) {
+	callInfo := struct {
+		Ctx     context.Context
+		Keyword string
+		Offset  int
+		Limit   int
+	}{
+		Ctx:     ctx,
+		Keyword: keyword,
+		Offset:  offset,
+		Limit:   limit,
+	}
+	mock.lockSearchQueuedAlerts.Lock()
+	mock.calls.SearchQueuedAlerts = append(mock.calls.SearchQueuedAlerts, callInfo)
+	mock.lockSearchQueuedAlerts.Unlock()
+	if mock.SearchQueuedAlertsFunc == nil {
+		var (
+			queuedAlertsOut []*alert.QueuedAlert
+			nOut            int
+			errOut          error
+		)
+		return queuedAlertsOut, nOut, errOut
+	}
+	return mock.SearchQueuedAlertsFunc(ctx, keyword, offset, limit)
+}
+
+// SearchQueuedAlertsCalls gets all the calls that were made to SearchQueuedAlerts.
+// Check the length with:
+//
+//	len(mockedRepository.SearchQueuedAlertsCalls())
+func (mock *RepositoryMock) SearchQueuedAlertsCalls() []struct {
+	Ctx     context.Context
+	Keyword string
+	Offset  int
+	Limit   int
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Keyword string
+		Offset  int
+		Limit   int
+	}
+	mock.lockSearchQueuedAlerts.RLock()
+	calls = mock.calls.SearchQueuedAlerts
+	mock.lockSearchQueuedAlerts.RUnlock()
 	return calls
 }
 

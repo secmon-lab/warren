@@ -113,6 +113,7 @@ type DashboardStats {
   openTicketsCount: Int!
   unboundAlertsCount: Int!
   declinedAlertsCount: Int!
+  queuedAlertsCount: Int!
   openTickets: [Ticket!]!
   unboundAlerts: [Alert!]!
 }
@@ -354,6 +355,45 @@ extend type Query {
 extend type Mutation {
   runDiagnosis: Diagnosis!
   fixDiagnosis(id: ID!): Diagnosis!
+}
+
+type QueuedAlert {
+  id: ID!
+  schema: String!
+  title: String!
+  data: String!
+  createdAt: String!
+}
+
+type QueuedAlertsResponse {
+  alerts: [QueuedAlert!]!
+  totalCount: Int!
+}
+
+enum ReprocessJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+type ReprocessJob {
+  id: ID!
+  queuedAlertID: ID!
+  status: ReprocessJobStatus!
+  error: String
+  createdAt: String!
+  updatedAt: String!
+}
+
+extend type Query {
+  queuedAlerts(keyword: String, offset: Int, limit: Int): QueuedAlertsResponse!
+  reprocessJob(id: ID!): ReprocessJob
+}
+
+extend type Mutation {
+  reprocessQueuedAlert(id: ID!): ReprocessJob!
+  discardQueuedAlerts(ids: [ID!]!): Boolean!
 }
 
 schema {

@@ -233,6 +233,11 @@ export default function Dashboard() {
                       ({dashboardData?.dashboard.declinedAlertsCount} declined)
                     </span>
                   )}
+                  {!dashboardLoading && ((dashboardData?.dashboard as Record<string, unknown>)?.queuedAlertsCount as number ?? 0) > 0 && (
+                    <Badge variant="destructive" className="text-xs">
+                      {(dashboardData?.dashboard as Record<string, unknown>)?.queuedAlertsCount as number} queued
+                    </Badge>
+                  )}
                 </div>
                 <Button
                   variant="ghost"

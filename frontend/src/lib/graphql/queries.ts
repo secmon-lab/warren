@@ -174,6 +174,7 @@ export const GET_DASHBOARD = gql`
       openTicketsCount
       unboundAlertsCount
       declinedAlertsCount
+      queuedAlertsCount
       openTickets {
         id
         status
@@ -966,5 +967,51 @@ export const FIX_DIAGNOSIS = gql`
       failedCount
       updatedAt
     }
+  }
+`;
+
+export const GET_QUEUED_ALERTS = gql`
+  query GetQueuedAlerts($keyword: String, $offset: Int, $limit: Int) {
+    queuedAlerts(keyword: $keyword, offset: $offset, limit: $limit) {
+      alerts {
+        id
+        schema
+        title
+        data
+        createdAt
+      }
+      totalCount
+    }
+  }
+`;
+
+export const GET_REPROCESS_JOB = gql`
+  query GetReprocessJob($id: ID!) {
+    reprocessJob(id: $id) {
+      id
+      queuedAlertID
+      status
+      error
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const REPROCESS_QUEUED_ALERT = gql`
+  mutation ReprocessQueuedAlert($id: ID!) {
+    reprocessQueuedAlert(id: $id) {
+      id
+      queuedAlertID
+      status
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const DISCARD_QUEUED_ALERTS = gql`
+  mutation DiscardQueuedAlerts($ids: [ID!]!) {
+    discardQueuedAlerts(ids: $ids)
   }
 `;

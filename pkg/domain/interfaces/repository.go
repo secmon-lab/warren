@@ -244,4 +244,22 @@ type Repository interface {
 	// The channel is closed when the context is cancelled or an error occurs.
 	// The error channel receives any errors during watching.
 	WatchHITLRequest(ctx context.Context, id types.HITLRequestID) (<-chan *hitl.Request, <-chan error)
+
+	// Queued alert management (circuit breaker)
+	PutQueuedAlert(ctx context.Context, qa *alert.QueuedAlert) error
+	GetQueuedAlert(ctx context.Context, id types.QueuedAlertID) (*alert.QueuedAlert, error)
+	ListQueuedAlerts(ctx context.Context, offset, limit int) ([]*alert.QueuedAlert, error)
+	DeleteQueuedAlerts(ctx context.Context, ids []types.QueuedAlertID) error
+	CountQueuedAlerts(ctx context.Context) (int, error)
+	SearchQueuedAlerts(ctx context.Context, keyword string, offset, limit int) ([]*alert.QueuedAlert, int, error)
+
+	// Reprocess job management
+	PutReprocessJob(ctx context.Context, job *alert.ReprocessJob) error
+	GetReprocessJob(ctx context.Context, id types.ReprocessJobID) (*alert.ReprocessJob, error)
+
+	// Alert throttle management (sliding window rate limiting)
+	// AcquireAlertThrottleSlot atomically checks and consumes a throttle slot.
+	// window is the sliding window duration, limit is the max alerts per window.
+	// Returns the throttle result indicating whether the alert is allowed and whether Slack notification is needed.
+	AcquireAlertThrottleSlot(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error)
 }

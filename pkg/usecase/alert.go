@@ -11,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	notifierSvc "github.com/secmon-lab/warren/pkg/service/notifier"
+	slackSDK "github.com/slack-go/slack"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
@@ -29,6 +30,31 @@ func putAlertWithLogging(ctx context.Context, repo interfaces.Repository, alert 
 
 func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, alertData any) ([]*alert.Alert, error) {
 	logger := logging.From(ctx)
+
+	// Circuit breaker check: throttle alert intake if enabled
+	if uc.cbService != nil && uc.cbService.IsEnabled() {
+		throttleResult, err := uc.cbService.TryAcquire(ctx)
+		if err != nil {
+			// On throttle failure, fall through to normal processing (don't lose alerts)
+			logger.Warn("circuit breaker throttle check failed, processing normally", "error", err)
+		} else if !throttleResult.Allowed {
+			// Alert is throttled: enqueue it
+			qa, enqueueErr := uc.cbService.EnqueueAlert(ctx, schema, alertData, "", "")
+			if enqueueErr != nil {
+				// If queueing fails, fall through to normal processing
+				logger.Warn("failed to enqueue throttled alert, processing normally", "error", enqueueErr)
+			} else {
+				logger.Info("alert throttled and queued", "queued_alert_id", qa.ID, "schema", schema)
+
+				// Send Slack @channel warning if needed
+				if throttleResult.ShouldNotify {
+					uc.sendThrottleWarning(ctx)
+				}
+
+				return nil, nil
+			}
+		}
+	}
 
 	// Create notifier based on whether Slack is available
 	// If Slack is available, use SlackNotifier which buffers events
@@ -425,4 +451,45 @@ func (uc *UseCases) DeclineAlerts(ctx context.Context, alertIDs []types.AlertID)
 	}
 
 	return results, nil
+}
+
+// sendThrottleWarning sends a @channel warning to Slack when alert throttle is activated.
+func (uc *UseCases) sendThrottleWarning(ctx context.Context) {
+	if uc.slackService == nil {
+		return
+	}
+
+	logger := logging.From(ctx)
+	channelID := uc.slackService.DefaultChannelID()
+	message := "<!channel> :warning: Alert circuit breaker activated. Incoming alerts are being queued due to rate limiting. Check the Web UI to manage queued alerts."
+
+	_, _, err := uc.slackService.GetClient().PostMessageContext(
+		ctx,
+		channelID,
+		slackSDK.MsgOptionText(message, false),
+	)
+	if err != nil {
+		logger.Error("failed to send circuit breaker warning to Slack", "error", err, "channel", channelID)
+	}
+}
+
+// ReprocessQueuedAlert creates a background job to reprocess a queued alert.
+func (uc *UseCases) ReprocessQueuedAlert(ctx context.Context, queuedAlertID types.QueuedAlertID) (*alert.ReprocessJob, error) {
+	if uc.cbService == nil {
+		return nil, goerr.New("circuit breaker service not configured")
+	}
+
+	return uc.cbService.ReprocessAlert(ctx, queuedAlertID, func(bgCtx context.Context, schema types.AlertSchema, data any) error {
+		_, err := uc.HandleAlert(bgCtx, schema, data)
+		return err
+	})
+}
+
+// DiscardQueuedAlerts removes queued alerts without processing.
+func (uc *UseCases) DiscardQueuedAlerts(ctx context.Context, ids []types.QueuedAlertID) error {
+	if uc.cbService == nil {
+		return goerr.New("circuit breaker service not configured")
+	}
+
+	return uc.cbService.DiscardAlerts(ctx, ids)
 }

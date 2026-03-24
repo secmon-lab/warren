@@ -85,6 +85,7 @@ type DashboardStats struct {
 	OpenTicketsCount    int              `json:"openTicketsCount"`
 	UnboundAlertsCount  int              `json:"unboundAlertsCount"`
 	DeclinedAlertsCount int              `json:"declinedAlertsCount"`
+	QueuedAlertsCount   int              `json:"queuedAlertsCount"`
 	OpenTickets         []*ticket.Ticket `json:"openTickets"`
 	UnboundAlerts       []*alert.Alert   `json:"unboundAlerts"`
 }
@@ -139,6 +140,11 @@ type Mutation struct {
 }
 
 type Query struct {
+}
+
+type QueuedAlertsResponse struct {
+	Alerts     []*alert.QueuedAlert `json:"alerts"`
+	TotalCount int                  `json:"totalCount"`
 }
 
 type Session struct {
@@ -259,6 +265,65 @@ func (e *MemorySortField) UnmarshalJSON(b []byte) error {
 }
 
 func (e MemorySortField) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type ReprocessJobStatus string
+
+const (
+	ReprocessJobStatusPending   ReprocessJobStatus = "PENDING"
+	ReprocessJobStatusRunning   ReprocessJobStatus = "RUNNING"
+	ReprocessJobStatusCompleted ReprocessJobStatus = "COMPLETED"
+	ReprocessJobStatusFailed    ReprocessJobStatus = "FAILED"
+)
+
+var AllReprocessJobStatus = []ReprocessJobStatus{
+	ReprocessJobStatusPending,
+	ReprocessJobStatusRunning,
+	ReprocessJobStatusCompleted,
+	ReprocessJobStatusFailed,
+}
+
+func (e ReprocessJobStatus) IsValid() bool {
+	switch e {
+	case ReprocessJobStatusPending, ReprocessJobStatusRunning, ReprocessJobStatusCompleted, ReprocessJobStatusFailed:
+		return true
+	}
+	return false
+}
+
+func (e ReprocessJobStatus) String() string {
+	return string(e)
+}
+
+func (e *ReprocessJobStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ReprocessJobStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ReprocessJobStatus", str)
+	}
+	return nil
+}
+
+func (e ReprocessJobStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ReprocessJobStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ReprocessJobStatus) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil
