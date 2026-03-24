@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useLazyQuery } from "@apollo/client";
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,7 +18,7 @@ import {
   DISCARD_QUEUED_ALERTS,
   GET_REPROCESS_JOB,
 } from "@/lib/graphql/queries";
-import { Search, Trash2, RefreshCw, Loader2 } from "lucide-react";
+import { Search, Trash2, RefreshCw, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useToast } from "@/hooks/use-toast";
 
@@ -45,6 +45,7 @@ export default function QueuedAlertsPage() {
   const [searchKeyword, setSearchKeyword] = useState("");
   const [appliedKeyword, setAppliedKeyword] = useState("");
   const [reprocessingJobId, setReprocessingJobId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const ITEMS_PER_PAGE = 20;
 
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -190,6 +191,25 @@ export default function QueuedAlertsPage() {
     return `${datePart} ${timePart}`;
   };
 
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const getDataPreview = useMemo(() => (data: string): string => {
+    try {
+      const parsed = JSON.parse(data);
+      const flat = JSON.stringify(parsed);
+      return flat.length > 120 ? flat.slice(0, 120) + "..." : flat;
+    } catch {
+      return data.length > 120 ? data.slice(0, 120) + "..." : data;
+    }
+  }, []);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -274,51 +294,80 @@ export default function QueuedAlertsPage() {
             <span className="text-sm text-muted-foreground">Select all on this page</span>
           </div>
 
-          {alerts.map((qa) => (
-            <div
-              key={qa.id}
-              className="bg-card text-card-foreground rounded-xl border shadow-sm overflow-hidden"
-            >
-              <div className="px-4 py-4">
-                <div className="flex items-start gap-3">
-                  <div className="pt-0.5">
-                    <Checkbox
-                      checked={selectedIds.has(qa.id)}
-                      onCheckedChange={() => toggleSelect(qa.id)}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="outline" className="text-xs">
-                        {qa.schema}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        {formatDate(qa.createdAt)}
-                      </span>
+          {alerts.map((qa) => {
+            const isExpanded = expandedIds.has(qa.id);
+            return (
+              <div
+                key={qa.id}
+                className="bg-card text-card-foreground rounded-xl border shadow-sm overflow-hidden"
+              >
+                <div className="px-4 py-3">
+                  <div className="flex items-start gap-3">
+                    <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(qa.id)}
+                        onCheckedChange={() => toggleSelect(qa.id)}
+                      />
                     </div>
-                    <h3 className="text-base font-semibold mb-1 line-clamp-1">
-                      {qa.title || "(no title)"}
-                    </h3>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleReprocess(qa.id)}
-                      disabled={reprocessingJobId !== null}
+                    <div
+                      className="flex-1 min-w-0 cursor-pointer"
+                      onClick={() => toggleExpand(qa.id)}
                     >
-                      {reprocessingJobId !== null ? (
-                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4 mr-1" />
+                      <div className="flex items-center gap-2 mb-1">
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        )}
+                        <Badge variant="outline" className="text-xs">
+                          {qa.schema}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          {formatDate(qa.createdAt)}
+                        </span>
+                      </div>
+                      {!isExpanded && (
+                        <p className="text-sm text-muted-foreground font-mono truncate pl-8">
+                          {getDataPreview(qa.data)}
+                        </p>
                       )}
-                      Reprocess
-                    </Button>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleReprocess(qa.id);
+                        }}
+                        disabled={reprocessingJobId !== null}
+                      >
+                        {reprocessingJobId !== null ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4 mr-1" />
+                        )}
+                        Reprocess
+                      </Button>
+                    </div>
                   </div>
+                  {isExpanded && (
+                    <div className="mt-2 ml-8">
+                      <pre className="text-xs bg-muted p-3 rounded-lg overflow-auto max-h-96 whitespace-pre-wrap break-all">
+                        {(() => {
+                          try {
+                            return JSON.stringify(JSON.parse(qa.data), null, 2);
+                          } catch {
+                            return qa.data;
+                          }
+                        })()}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
