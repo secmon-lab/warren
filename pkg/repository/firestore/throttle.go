@@ -138,6 +138,9 @@ func matchesQueuedAlertKeyword(qa *alert.QueuedAlert, lowerKeyword string) bool 
 	if strings.Contains(strings.ToLower(qa.Title), lowerKeyword) {
 		return true
 	}
+	if strings.Contains(strings.ToLower(string(qa.Schema)), lowerKeyword) {
+		return true
+	}
 	dataBytes, err := json.Marshal(qa.Data)
 	if err != nil {
 		return false

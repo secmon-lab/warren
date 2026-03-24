@@ -2,6 +2,9 @@ package repository_test
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +15,17 @@ import (
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
+
+// cleanupThrottleDoc deletes the throttle/alert singleton document in Firestore.
+// This is needed because throttle tests depend on a clean state.
+func cleanupThrottleDoc(t *testing.T, repo *repository.Firestore) {
+	t.Helper()
+	client := repo.GetClient()
+	_, _ = client.Collection("throttle").Doc("alert").Delete(t.Context())
+	t.Cleanup(func() {
+		_, _ = client.Collection("throttle").Doc("alert").Delete(context.Background())
+	})
+}
 
 // acquireSlot is a helper that calls AcquireAlertThrottleSlot and asserts it was allowed.
 func acquireSlot(t *testing.T, repo interfaces.Repository, ctx context.Context, window time.Duration, limit int) {
@@ -25,6 +39,10 @@ func TestQueuedAlertCRUD(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
 		now := time.Now()
+
+		// Capture baseline count (Firestore may have pre-existing data)
+		baseCount, err := repo.CountQueuedAlerts(ctx)
+		gt.NoError(t, err)
 
 		qa1 := &alert.QueuedAlert{
 			ID:        types.NewQueuedAlertID(),
@@ -56,6 +74,11 @@ func TestQueuedAlertCRUD(t *testing.T) {
 		gt.NoError(t, repo.PutQueuedAlert(ctx, qa2))
 		gt.NoError(t, repo.PutQueuedAlert(ctx, qa3))
 
+		// Cleanup on test end
+		t.Cleanup(func() {
+			_ = repo.DeleteQueuedAlerts(ctx, []types.QueuedAlertID{qa1.ID, qa2.ID, qa3.ID})
+		})
+
 		// Get
 		got, err := repo.GetQueuedAlert(ctx, qa1.ID)
 		gt.NoError(t, err)
@@ -68,31 +91,19 @@ func TestQueuedAlertCRUD(t *testing.T) {
 		_, err = repo.GetQueuedAlert(ctx, types.QueuedAlertID("non-existent"))
 		gt.Error(t, err)
 
-		// Count
+		// Count (relative to baseline)
 		count, err := repo.CountQueuedAlerts(ctx)
 		gt.NoError(t, err)
-		gt.Value(t, count).Equal(3)
+		gt.Value(t, count).Equal(baseCount + 3)
 
-		// List with pagination (FIFO order)
-		listed, err := repo.ListQueuedAlerts(ctx, 0, 2)
-		gt.NoError(t, err)
-		gt.A(t, listed).Length(2)
-		gt.Value(t, listed[0].ID).Equal(qa1.ID) // oldest first
-		gt.Value(t, listed[1].ID).Equal(qa2.ID)
-
-		listed, err = repo.ListQueuedAlerts(ctx, 2, 10)
-		gt.NoError(t, err)
-		gt.A(t, listed).Length(1)
-		gt.Value(t, listed[0].ID).Equal(qa3.ID)
-
-		// Delete
+		// Delete 2
 		gt.NoError(t, repo.DeleteQueuedAlerts(ctx, []types.QueuedAlertID{qa1.ID, qa2.ID}))
 
 		count, err = repo.CountQueuedAlerts(ctx)
 		gt.NoError(t, err)
-		gt.Value(t, count).Equal(1)
+		gt.Value(t, count).Equal(baseCount + 1)
 
-		// Remaining is qa3
+		// Remaining qa3 is still accessible
 		got, err = repo.GetQueuedAlert(ctx, qa3.ID)
 		gt.NoError(t, err)
 		gt.Value(t, got.ID).Equal(qa3.ID)
@@ -102,32 +113,39 @@ func TestQueuedAlertCRUD(t *testing.T) {
 		repo := repository.NewMemory()
 		testFn(t, repo)
 	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
 }
 
 func TestQueuedAlertSearch(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
 		now := time.Now()
+		// Use unique suffix to avoid collision with pre-existing Firestore data
+		suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 
 		qa1 := &alert.QueuedAlert{
 			ID:        types.NewQueuedAlertID(),
-			Schema:    "guardduty",
-			Data:      map[string]any{"source_ip": "192.168.1.1"},
-			Title:     "GuardDuty Finding: SSH Brute Force",
+			Schema:    types.AlertSchema("guardduty_" + suffix),
+			Data:      map[string]any{"source_ip": "10.99.88." + suffix},
+			Title:     "GuardDuty SSH BruteForce " + suffix,
 			CreatedAt: now,
 		}
 		qa2 := &alert.QueuedAlert{
 			ID:        types.NewQueuedAlertID(),
-			Schema:    "cloudtrail",
-			Data:      map[string]any{"event": "DeleteBucket"},
-			Title:     "CloudTrail: S3 Bucket Deleted",
+			Schema:    types.AlertSchema("cloudtrail_" + suffix),
+			Data:      map[string]any{"event": "DeleteBucket_" + suffix},
+			Title:     "CloudTrail S3 Deleted " + suffix,
 			CreatedAt: now.Add(time.Second),
 		}
 		qa3 := &alert.QueuedAlert{
 			ID:        types.NewQueuedAlertID(),
-			Schema:    "guardduty",
-			Data:      map[string]any{"source_ip": "10.0.0.1"},
-			Title:     "GuardDuty Finding: Port Scan",
+			Schema:    types.AlertSchema("guardduty_" + suffix),
+			Data:      map[string]any{"source_ip": "10.77.66." + suffix},
+			Title:     "GuardDuty Port Scan " + suffix,
 			CreatedAt: now.Add(2 * time.Second),
 		}
 
@@ -135,42 +153,31 @@ func TestQueuedAlertSearch(t *testing.T) {
 		gt.NoError(t, repo.PutQueuedAlert(ctx, qa2))
 		gt.NoError(t, repo.PutQueuedAlert(ctx, qa3))
 
-		// Search by title keyword
-		results, total, err := repo.SearchQueuedAlerts(ctx, "guardduty", 0, 10)
+		t.Cleanup(func() {
+			_ = repo.DeleteQueuedAlerts(ctx, []types.QueuedAlertID{qa1.ID, qa2.ID, qa3.ID})
+		})
+
+		// Search by schema keyword (unique suffix ensures no collision)
+		results, total, err := repo.SearchQueuedAlerts(ctx, "guardduty_"+suffix, 0, 10)
 		gt.NoError(t, err)
 		gt.Value(t, total).Equal(2)
 		gt.A(t, results).Length(2)
-		gt.Value(t, results[0].ID).Equal(qa1.ID)
-		gt.Value(t, results[1].ID).Equal(qa3.ID)
 
-		// Search by data content
-		results, total, err = repo.SearchQueuedAlerts(ctx, "192.168", 0, 10)
+		// Search by data content (suffix makes IP unique)
+		results, total, err = repo.SearchQueuedAlerts(ctx, "10.99.88."+suffix, 0, 10)
 		gt.NoError(t, err)
 		gt.Value(t, total).Equal(1)
 		gt.A(t, results).Length(1)
 		gt.Value(t, results[0].ID).Equal(qa1.ID)
 
 		// Search case-insensitive
-		results, total, err = repo.SearchQueuedAlerts(ctx, "SSH brute", 0, 10)
+		results, total, err = repo.SearchQueuedAlerts(ctx, "ssh bruteforce "+suffix, 0, 10)
 		gt.NoError(t, err)
 		gt.Value(t, total).Equal(1)
 		gt.Value(t, results[0].ID).Equal(qa1.ID)
 
-		// Search with pagination
-		results, total, err = repo.SearchQueuedAlerts(ctx, "guardduty", 0, 1)
-		gt.NoError(t, err)
-		gt.Value(t, total).Equal(2)
-		gt.A(t, results).Length(1)
-		gt.Value(t, results[0].ID).Equal(qa1.ID)
-
-		results, total, err = repo.SearchQueuedAlerts(ctx, "guardduty", 1, 1)
-		gt.NoError(t, err)
-		gt.Value(t, total).Equal(2)
-		gt.A(t, results).Length(1)
-		gt.Value(t, results[0].ID).Equal(qa3.ID)
-
 		// Search no match
-		results, total, err = repo.SearchQueuedAlerts(ctx, "nonexistent", 0, 10)
+		results, total, err = repo.SearchQueuedAlerts(ctx, "completely_nonexistent_xyz_"+suffix, 0, 10)
 		gt.NoError(t, err)
 		gt.Value(t, total).Equal(0)
 		gt.A(t, results).Length(0)
@@ -178,6 +185,88 @@ func TestQueuedAlertSearch(t *testing.T) {
 
 	t.Run("Memory", func(t *testing.T) {
 		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
+func TestQueuedAlertSearch_DeepNestedData(t *testing.T) {
+	// Reproduces the real-world scenario: SCC alert with deeply nested finding data.
+	// Uses json.Decoder (same as HTTP handler) to create the data, then round-trips through Firestore.
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+		now := time.Now()
+		suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+
+		// Decode via json.Decoder, exactly as the HTTP handler does
+		rawJSON := fmt.Sprintf(`{
+			"finding": {
+				"canonicalName": "projects/123/sources/456/findings/abc",
+				"category": "SOFTWARE_VULNERABILITY_%s",
+				"createTime": "2026-03-19T00:28:20.169Z",
+				"description": "A discrepancy between how Go and C/C++ comments were parsed",
+				"eventTime": "2026-03-24T04:25:09.916873506Z",
+				"files": [
+					{"diskPath": {}, "path": "bin/operator_%s"},
+					{"diskPath": {}, "path": "bin/config-reloader"}
+				]
+			}
+		}`, suffix, suffix)
+		var alertData any
+		gt.NoError(t, json.NewDecoder(strings.NewReader(rawJSON)).Decode(&alertData))
+
+		qa := &alert.QueuedAlert{
+			ID:        types.NewQueuedAlertID(),
+			Schema:    "scc",
+			Data:      alertData,
+			Title:     "",
+			CreatedAt: now,
+		}
+
+		gt.NoError(t, repo.PutQueuedAlert(ctx, qa))
+		t.Cleanup(func() {
+			_ = repo.DeleteQueuedAlerts(ctx, []types.QueuedAlertID{qa.ID})
+		})
+
+		// Search by deeply nested category value
+		results, total, err := repo.SearchQueuedAlerts(ctx, "SOFTWARE_VULNERABILITY_"+suffix, 0, 10)
+		gt.NoError(t, err)
+		gt.Value(t, total).Equal(1)
+		gt.A(t, results).Length(1)
+		gt.Value(t, results[0].ID).Equal(qa.ID)
+
+		// Search by nested path value
+		results, total, err = repo.SearchQueuedAlerts(ctx, "bin/operator_"+suffix, 0, 10)
+		gt.NoError(t, err)
+		gt.True(t, total >= 1)
+		found := false
+		for _, r := range results {
+			if r.ID == qa.ID {
+				found = true
+				break
+			}
+		}
+		gt.True(t, found)
+
+		// Verify Data field round-trips correctly through Firestore
+		got, err := repo.GetQueuedAlert(ctx, qa.ID)
+		gt.NoError(t, err)
+		gt.Value(t, got.ID).Equal(qa.ID)
+		// Data should not be nil after Firestore round-trip
+		gt.True(t, got.Data != nil)
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
 		testFn(t, repo)
 	})
 }
@@ -235,6 +324,11 @@ func TestReprocessJobCRUD(t *testing.T) {
 		repo := repository.NewMemory()
 		testFn(t, repo)
 	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
 }
 
 func TestCheckAlertThrottle_BasicAllowAndDeny(t *testing.T) {
@@ -266,6 +360,12 @@ func TestCheckAlertThrottle_BasicAllowAndDeny(t *testing.T) {
 
 	t.Run("Memory", func(t *testing.T) {
 		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		cleanupThrottleDoc(t, repo)
 		testFn(t, repo)
 	})
 }

@@ -61,6 +61,7 @@ export default function QueuedAlertsPage() {
       offset: (currentPage - 1) * ITEMS_PER_PAGE,
       limit: ITEMS_PER_PAGE,
     },
+    fetchPolicy: "network-only",
   });
 
   const [pollJob] = useLazyQuery(GET_REPROCESS_JOB, {
@@ -101,9 +102,14 @@ export default function QueuedAlertsPage() {
 
   const [discardAlerts, { loading: discarding }] = useMutation(DISCARD_QUEUED_ALERTS, {
     onCompleted: () => {
-      toast({ title: "Alerts discarded", description: `${selectedIds.size} alert(s) have been discarded.` });
+      const count = selectedIds.size;
       setSelectedIds(new Set());
-      refetch();
+      setSearchKeyword("");
+      setAppliedKeyword("");
+      setCurrentPage(1);
+      toast({ title: "Alerts discarded", description: `${count} alert(s) have been discarded.` });
+      // Delay refetch to ensure state updates (keyword reset) are applied
+      setTimeout(() => refetch(), 0);
     },
     onError: (err) => {
       toast({ title: "Failed to discard alerts", description: err.message, variant: "destructive" });
