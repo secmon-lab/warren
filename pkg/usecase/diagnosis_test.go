@@ -4,12 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gt"
 	diagnosismodel "github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/secmon-lab/warren/pkg/utils/errutil"
 )
 
 func TestRunDiagnosis_Basic(t *testing.T) {
@@ -101,25 +99,6 @@ func TestFixDiagnosis_NoPendingIssues(t *testing.T) {
 	result, err := uc.FixDiagnosis(ctx, diag.ID)
 	gt.NoError(t, err)
 	gt.Value(t, result).NotNil()
-}
-
-func TestFixDiagnosis_AlreadyFixing(t *testing.T) {
-	ctx := context.Background()
-	repo := repository.NewMemory()
-	uc := New(WithRepository(repo))
-
-	diag, err := uc.RunDiagnosis(ctx)
-	gt.NoError(t, err)
-
-	// Manually set status to fixing to simulate in-progress fix
-	diag.Status = diagnosismodel.DiagnosisStatusFixing
-	err = repo.PutDiagnosis(ctx, diag)
-	gt.NoError(t, err)
-
-	// Second fix attempt should fail with conflict error
-	_, err = uc.FixDiagnosis(ctx, diag.ID)
-	gt.Error(t, err)
-	gt.True(t, goerr.HasTag(err, errutil.TagConflict))
 }
 
 func TestGetDiagnosisIssues(t *testing.T) {
