@@ -97,10 +97,13 @@ func (s *Service) ReprocessAlert(ctx context.Context, queuedAlertID types.Queued
 		return nil, goerr.Wrap(err, "failed to create reprocess job")
 	}
 
-	// Run processing in background goroutine
+	// Run processing in background goroutine.
+	// Use context.Background() intentionally: the HTTP request context may be cancelled
+	// after the response is sent, but this background job must continue to completion.
+	// Propagate the logger from the request context for observability.
 	go func() {
-		bgCtx := context.Background()
-		logger := logging.From(ctx)
+		bgCtx := logging.With(context.Background(), logging.From(ctx))
+		logger := logging.From(bgCtx)
 
 		// Update status to running
 		job.Status = types.ReprocessJobStatusRunning

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -255,13 +254,6 @@ func (r *Firestore) AcquireAlertThrottleSlot(ctx context.Context, window time.Du
 			}
 			result = alert.ThrottleResult{Allowed: false, ShouldNotify: shouldNotify}
 		}
-
-		// Sort bucket keys to maintain consistent ordering
-		keys := make([]string, 0, len(throttle.Buckets))
-		for k := range throttle.Buckets {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
 
 		return tx.Set(docRef, throttle)
 	})
