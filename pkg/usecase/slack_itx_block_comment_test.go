@@ -63,7 +63,7 @@ func TestTicketCreation_NewThread_WithInitialComment(t *testing.T) {
 			}
 			return "test-channel", "test-thread-" + string(rune(time.Now().UnixNano())), nil
 		},
-		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+		UploadFileContextFunc: func(ctx context.Context, params slack_sdk.UploadFileParameters) (*slack_sdk.FileSummary, error) {
 			return &slack_sdk.FileSummary{}, nil
 		},
 		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {

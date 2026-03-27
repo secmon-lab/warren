@@ -36,7 +36,7 @@ type SlackClient interface {
 	GetTeamInfo() (*slackSDK.TeamInfo, error)
 	OpenView(triggerID string, view slackSDK.ModalViewRequest) (*slackSDK.ViewResponse, error)
 	UpdateView(view slackSDK.ModalViewRequest, externalID, hash, viewID string) (*slackSDK.ViewResponse, error)
-	UploadFileV2Context(ctx context.Context, params slackSDK.UploadFileV2Parameters) (*slackSDK.FileSummary, error)
+	UploadFileContext(ctx context.Context, params slackSDK.UploadFileParameters) (*slackSDK.FileSummary, error)
 	GetUserInfo(userID string) (*slackSDK.User, error)
 	GetUsersInfo(users ...string) (*[]slackSDK.User, error)
 	GetConversationInfo(input *slackSDK.GetConversationInfoInput) (*slackSDK.Channel, error)
