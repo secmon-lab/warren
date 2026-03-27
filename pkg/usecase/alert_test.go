@@ -43,7 +43,7 @@ func TestHandleAlert_NoSimilarAlert(t *testing.T) {
 			postAlertCalled = true
 			return "test-channel", "test-thread", nil
 		},
-		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+		UploadFileContextFunc: func(ctx context.Context, params slack_sdk.UploadFileParameters) (*slack_sdk.FileSummary, error) {
 			return &slack_sdk.FileSummary{}, nil
 		},
 		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
@@ -592,7 +592,7 @@ func TestHandleAlert_DefaultPolicyMode(t *testing.T) {
 		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
 			return "test-channel", "test-thread", nil
 		},
-		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+		UploadFileContextFunc: func(ctx context.Context, params slack_sdk.UploadFileParameters) (*slack_sdk.FileSummary, error) {
 			return &slack_sdk.FileSummary{}, nil
 		},
 		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
@@ -697,7 +697,7 @@ func TestHandleAlert_ExistingPolicyUnchanged(t *testing.T) {
 		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
 			return "test-channel", "test-thread", nil
 		},
-		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+		UploadFileContextFunc: func(ctx context.Context, params slack_sdk.UploadFileParameters) (*slack_sdk.FileSummary, error) {
 			return &slack_sdk.FileSummary{}, nil
 		},
 		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
@@ -786,7 +786,7 @@ func TestHandleAlert_PolicyWithTags(t *testing.T) {
 		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
 			return "test-channel", "test-thread", nil
 		},
-		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+		UploadFileContextFunc: func(ctx context.Context, params slack_sdk.UploadFileParameters) (*slack_sdk.FileSummary, error) {
 			return &slack_sdk.FileSummary{}, nil
 		},
 		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
@@ -910,7 +910,7 @@ func TestHandleAlert_PolicyWithNewAndExistingTags(t *testing.T) {
 		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
 			return "test-channel", "test-thread", nil
 		},
-		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+		UploadFileContextFunc: func(ctx context.Context, params slack_sdk.UploadFileParameters) (*slack_sdk.FileSummary, error) {
 			return &slack_sdk.FileSummary{}, nil
 		},
 		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
@@ -1035,7 +1035,7 @@ func TestHandleAlert_PolicyTagDuplicationPrevention(t *testing.T) {
 		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
 			return "test-channel", "test-thread", nil
 		},
-		UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+		UploadFileContextFunc: func(ctx context.Context, params slack_sdk.UploadFileParameters) (*slack_sdk.FileSummary, error) {
 			return &slack_sdk.FileSummary{}, nil
 		},
 		AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
@@ -1213,7 +1213,7 @@ func TestHandleNotice(t *testing.T) {
 			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
 				return channelID, "test-timestamp", nil
 			},
-			UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			UploadFileContextFunc: func(ctx context.Context, params slack_sdk.UploadFileParameters) (*slack_sdk.FileSummary, error) {
 				return &slack_sdk.FileSummary{}, nil
 			},
 			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
@@ -1264,7 +1264,7 @@ func TestHandleNotice(t *testing.T) {
 		gt.Equal(t, postCalls[0].ChannelID, "test-channel")
 
 		// Verify file upload was called for original alert data
-		uploadCalls := slackMock.UploadFileV2ContextCalls()
+		uploadCalls := slackMock.UploadFileContextCalls()
 		gt.Array(t, uploadCalls).Length(1)
 		gt.Equal(t, uploadCalls[0].Params.Channel, "test-channel")
 	})
@@ -1284,7 +1284,7 @@ func TestHandleNotice(t *testing.T) {
 			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
 				return channelID, "test-timestamp", nil
 			},
-			UploadFileV2ContextFunc: func(ctx context.Context, params slack_sdk.UploadFileV2Parameters) (*slack_sdk.FileSummary, error) {
+			UploadFileContextFunc: func(ctx context.Context, params slack_sdk.UploadFileParameters) (*slack_sdk.FileSummary, error) {
 				return &slack_sdk.FileSummary{}, nil
 			},
 			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
@@ -1322,7 +1322,7 @@ func TestHandleNotice(t *testing.T) {
 		gt.Equal(t, postCalls[0].ChannelID, "#test-channel")
 
 		// Verify file upload was called (since testAlert has Data nil, this won't be called)
-		uploadCalls := slackMock.UploadFileV2ContextCalls()
+		uploadCalls := slackMock.UploadFileContextCalls()
 		gt.Array(t, uploadCalls).Length(0)
 	})
 }

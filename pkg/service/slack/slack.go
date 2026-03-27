@@ -555,7 +555,7 @@ func (x *ThreadService) AttachFile(ctx context.Context, title, fileName string, 
 		return nil
 	}
 
-	_, err := x.client.UploadFileV2Context(ctx, slack.UploadFileV2Parameters{
+	_, err := x.client.UploadFileContext(ctx, slack.UploadFileParameters{
 		Channel:         x.channelID,
 		Reader:          bytes.NewReader(data),
 		FileSize:        len(data),
@@ -1484,7 +1484,7 @@ func (x *Service) PostNoticeThreadDetails(ctx context.Context, channelID, thread
 			return goerr.Wrap(err, "failed to encode alert data")
 		}
 
-		_, err = x.client.UploadFileV2Context(ctx, slack.UploadFileV2Parameters{
+		_, err = x.client.UploadFileContext(ctx, slack.UploadFileParameters{
 			Channel:         channelID,
 			Reader:          bytes.NewReader(buf.Bytes()),
 			FileSize:        buf.Len(),

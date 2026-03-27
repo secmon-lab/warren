@@ -80,8 +80,8 @@ import (
 //			UpdateViewFunc: func(view slackSDK.ModalViewRequest, externalID string, hash string, viewID string) (*slackSDK.ViewResponse, error) {
 //				panic("mock out the UpdateView method")
 //			},
-//			UploadFileV2ContextFunc: func(ctx context.Context, params slackSDK.UploadFileV2Parameters) (*slackSDK.FileSummary, error) {
-//				panic("mock out the UploadFileV2Context method")
+//			UploadFileContextFunc: func(ctx context.Context, params slackSDK.UploadFileParameters) (*slackSDK.FileSummary, error) {
+//				panic("mock out the UploadFileContext method")
 //			},
 //		}
 //
@@ -135,8 +135,8 @@ type SlackClientMock struct {
 	// UpdateViewFunc mocks the UpdateView method.
 	UpdateViewFunc func(view slackSDK.ModalViewRequest, externalID string, hash string, viewID string) (*slackSDK.ViewResponse, error)
 
-	// UploadFileV2ContextFunc mocks the UploadFileV2Context method.
-	UploadFileV2ContextFunc func(ctx context.Context, params slackSDK.UploadFileV2Parameters) (*slackSDK.FileSummary, error)
+	// UploadFileContextFunc mocks the UploadFileContext method.
+	UploadFileContextFunc func(ctx context.Context, params slackSDK.UploadFileParameters) (*slackSDK.FileSummary, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -243,12 +243,12 @@ type SlackClientMock struct {
 			// ViewID is the viewID argument value.
 			ViewID string
 		}
-		// UploadFileV2Context holds details about calls to the UploadFileV2Context method.
-		UploadFileV2Context []struct {
+		// UploadFileContext holds details about calls to the UploadFileContext method.
+		UploadFileContext []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Params is the params argument value.
-			Params slackSDK.UploadFileV2Parameters
+			Params slackSDK.UploadFileParameters
 		}
 	}
 	lockAuthTest                      sync.RWMutex
@@ -266,7 +266,7 @@ type SlackClientMock struct {
 	lockSearchMessagesContext         sync.RWMutex
 	lockUpdateMessageContext          sync.RWMutex
 	lockUpdateView                    sync.RWMutex
-	lockUploadFileV2Context           sync.RWMutex
+	lockUploadFileContext             sync.RWMutex
 }
 
 // AuthTest calls AuthTestFunc.
@@ -869,43 +869,43 @@ func (mock *SlackClientMock) UpdateViewCalls() []struct {
 	return calls
 }
 
-// UploadFileV2Context calls UploadFileV2ContextFunc.
-func (mock *SlackClientMock) UploadFileV2Context(ctx context.Context, params slackSDK.UploadFileV2Parameters) (*slackSDK.FileSummary, error) {
+// UploadFileContext calls UploadFileContextFunc.
+func (mock *SlackClientMock) UploadFileContext(ctx context.Context, params slackSDK.UploadFileParameters) (*slackSDK.FileSummary, error) {
 	callInfo := struct {
 		Ctx    context.Context
-		Params slackSDK.UploadFileV2Parameters
+		Params slackSDK.UploadFileParameters
 	}{
 		Ctx:    ctx,
 		Params: params,
 	}
-	mock.lockUploadFileV2Context.Lock()
-	mock.calls.UploadFileV2Context = append(mock.calls.UploadFileV2Context, callInfo)
-	mock.lockUploadFileV2Context.Unlock()
-	if mock.UploadFileV2ContextFunc == nil {
+	mock.lockUploadFileContext.Lock()
+	mock.calls.UploadFileContext = append(mock.calls.UploadFileContext, callInfo)
+	mock.lockUploadFileContext.Unlock()
+	if mock.UploadFileContextFunc == nil {
 		var (
 			fileSummaryOut *slackSDK.FileSummary
 			errOut         error
 		)
 		return fileSummaryOut, errOut
 	}
-	return mock.UploadFileV2ContextFunc(ctx, params)
+	return mock.UploadFileContextFunc(ctx, params)
 }
 
-// UploadFileV2ContextCalls gets all the calls that were made to UploadFileV2Context.
+// UploadFileContextCalls gets all the calls that were made to UploadFileContext.
 // Check the length with:
 //
-//	len(mockedSlackClient.UploadFileV2ContextCalls())
-func (mock *SlackClientMock) UploadFileV2ContextCalls() []struct {
+//	len(mockedSlackClient.UploadFileContextCalls())
+func (mock *SlackClientMock) UploadFileContextCalls() []struct {
 	Ctx    context.Context
-	Params slackSDK.UploadFileV2Parameters
+	Params slackSDK.UploadFileParameters
 } {
 	var calls []struct {
 		Ctx    context.Context
-		Params slackSDK.UploadFileV2Parameters
+		Params slackSDK.UploadFileParameters
 	}
-	mock.lockUploadFileV2Context.RLock()
-	calls = mock.calls.UploadFileV2Context
-	mock.lockUploadFileV2Context.RUnlock()
+	mock.lockUploadFileContext.RLock()
+	calls = mock.calls.UploadFileContext
+	mock.lockUploadFileContext.RUnlock()
 	return calls
 }
 
