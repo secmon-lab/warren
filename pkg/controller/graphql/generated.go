@@ -12823,6 +12823,10 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 func (ec *executionContext) unmarshalInputCreateKnowledgeInput(ctx context.Context, obj any) (graphql1.CreateKnowledgeInput, error) {
 	var it graphql1.CreateKnowledgeInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -12870,6 +12874,10 @@ func (ec *executionContext) unmarshalInputCreateKnowledgeInput(ctx context.Conte
 
 func (ec *executionContext) unmarshalInputUpdateKnowledgeInput(ctx context.Context, obj any) (graphql1.UpdateKnowledgeInput, error) {
 	var it graphql1.UpdateKnowledgeInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -12917,6 +12925,10 @@ func (ec *executionContext) unmarshalInputUpdateKnowledgeInput(ctx context.Conte
 
 func (ec *executionContext) unmarshalInputUpdateTagInput(ctx context.Context, obj any) (graphql1.UpdateTagInput, error) {
 	var it graphql1.UpdateTagInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v

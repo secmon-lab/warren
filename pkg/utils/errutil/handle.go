@@ -31,8 +31,12 @@ func Handle(ctx context.Context, err error) {
 			scope.SetTag("request_id", reqID)
 		}
 
+		values := map[string]any{}
 		for k, v := range goerr.Values(err) {
-			scope.SetExtra(k, v)
+			values[k] = v
+		}
+		if len(values) > 0 {
+			scope.SetContext("goerr_values", values)
 		}
 	})
 	evID := hub.CaptureException(err)
