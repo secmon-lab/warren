@@ -182,12 +182,12 @@ func migrateIndexes(ctx context.Context, projectID, databaseID string, dryRun bo
 		opts = append(opts, fireconf.WithDryRun(true))
 	}
 
-	client, err := fireconf.NewClient(ctx, projectID, databaseID, opts...)
+	client, err := fireconf.New(ctx, projectID, databaseID, indexConfig, opts...)
 	if err != nil {
 		return goerr.Wrap(err, "failed to create fireconf client")
 	}
 
-	if err := client.Migrate(ctx, indexConfig); err != nil {
+	if err := client.Migrate(ctx); err != nil {
 		return goerr.Wrap(err, "failed to migrate indexes")
 	}
 
