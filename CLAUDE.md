@@ -46,6 +46,14 @@ Warren is an AI agent and Slack-based security alert management tool. It process
 - When refactoring, ensure existing tests still pass and add tests if coverage gaps are found
 - Do NOT consider a task complete until tests are written and passing
 
+### Frontend Test Requirements
+- **EVERY frontend feature addition or modification MUST include corresponding E2E tests**
+- E2E tests are located in `frontend/e2e/tests/` using Playwright
+- Page Objects are in `frontend/e2e/pages/` — add or update them as needed
+- Use semantic locators (`getByRole`, `getByText`, `data-testid`) instead of CSS class selectors
+- Do NOT use `waitForLoadState("networkidle")` — rely on Playwright's auto-waiting
+- Do NOT consider a frontend task complete until E2E tests covering the new/changed behavior are written
+
 ### Error Handling
 - Use `github.com/m-mizutani/goerr/v2` for error handling
 - Must wrap errors with `goerr.Wrap` to maintain error context

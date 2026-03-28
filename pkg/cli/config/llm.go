@@ -87,7 +87,6 @@ func (x *LLMCfg) Flags() []cli.Flag {
 		&cli.StringFlag{
 			Name:        "gemini-project-id",
 			Usage:       "GCP Project ID for Vertex AI",
-			Required:    true,
 			Destination: &x.geminiProjectID,
 			Category:    "Gemini",
 			Sources:     cli.EnvVars("WARREN_GEMINI_PROJECT_ID"),
@@ -134,6 +133,10 @@ func (x LLMCfg) LogValue() slog.Value {
 
 // Configure creates and returns an LLM client, preferring Claude if configured
 func (x *LLMCfg) Configure(ctx context.Context) (gollem.LLMClient, error) {
+	if x.geminiProjectID == "" && x.claudeProjectID == "" {
+		return nil, goerr.New("at least one LLM must be configured: set --gemini-project-id or --claude-project-id (or use --disable-llm to skip)")
+	}
+
 	// If Claude is configured, Gemini is required for embeddings
 	if x.claudeProjectID != "" {
 		if x.geminiProjectID == "" {

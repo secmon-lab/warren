@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
 
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
@@ -58,6 +59,7 @@ func cmdServe() *cli.Command {
 		enableGraphQL       bool
 		enableGraphiQL      bool
 		noAuthorization     bool
+		disableLLM          bool
 		strictAlert         bool
 		wsAllowedOrigins    []string
 		webUICfg            config.WebUI
@@ -109,6 +111,13 @@ func cmdServe() *cli.Command {
 				Category:    "Security",
 				Sources:     cli.EnvVars("WARREN_NO_AUTHORIZATION"),
 				Destination: &noAuthorization,
+			},
+			&cli.BoolFlag{
+				Name:        "disable-llm",
+				Usage:       "Disable LLM initialization and use no-op clients (for E2E testing)",
+				Category:    "LLM",
+				Sources:     cli.EnvVars("WARREN_DISABLE_LLM"),
+				Destination: &disableLLM,
 			},
 			&cli.BoolFlag{
 				Name:        "strict-alert",
@@ -206,10 +215,18 @@ func cmdServe() *cli.Command {
 				return goerr.New("--strict-alert requires at least one policy file to be specified")
 			}
 
-			// Configure LLM client (automatically selects Claude if available, otherwise Gemini)
-			llmClient, err := llmCfg.Configure(ctx)
-			if err != nil {
-				return err
+			// Configure LLM client
+			var llmClient gollem.LLMClient
+			if disableLLM {
+				logging.From(ctx).Warn("⚠️  LLM is disabled, using no-op client",
+					"recommendation", "Only use --disable-llm for E2E testing")
+				llmClient = config.NewNoopLLMClient()
+			} else {
+				var err error
+				llmClient, err = llmCfg.Configure(ctx)
+				if err != nil {
+					return err
+				}
 			}
 
 			if err := sentryCfg.Configure(); err != nil {
@@ -252,10 +269,16 @@ func cmdServe() *cli.Command {
 				storageClient = client
 			}
 
-			// Create embedding client using unified LLM configuration
-			embeddingAdapter, err := llmCfg.ConfigureEmbeddingClient(ctx)
-			if err != nil {
-				return err
+			// Create embedding client
+			var embeddingAdapter interfaces.EmbeddingClient
+			if disableLLM {
+				embeddingAdapter = config.NewNoopEmbeddingClient()
+			} else {
+				var err error
+				embeddingAdapter, err = llmCfg.ConfigureEmbeddingClient(ctx)
+				if err != nil {
+					return err
+				}
 			}
 
 			// Inject dependencies into tools that support them
