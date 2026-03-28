@@ -68,6 +68,9 @@ func askWithValidation[T any](ctx context.Context, llm gollem.LLMClient, prompt 
 	}
 	if schema, err := gollem.ToSchema(zero); err == nil {
 		sessionOpts = append(sessionOpts, gollem.WithSessionResponseSchema(schema))
+	} else {
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to generate schema from type",
+			goerr.V("type", fmt.Sprintf("%T", zero))))
 	}
 
 	ssn, err := llm.NewSession(ctx, sessionOpts...)
