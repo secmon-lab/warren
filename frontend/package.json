@@ -9,7 +9,12 @@
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "codegen": "graphql-codegen --config codegen.ts",
-    "codegen:watch": "graphql-codegen --config codegen.ts --watch"
+    "codegen:watch": "graphql-codegen --config codegen.ts --watch",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@apollo/client": "^3.13.8",
@@ -65,6 +70,7 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.33.1",
-    "vite": "^6.0.1"
+    "vite": "^6.0.1",
+    "@playwright/test": "^1.51.0"
   }
 }
