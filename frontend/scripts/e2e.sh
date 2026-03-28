@@ -7,11 +7,15 @@ FRONTEND_DIR="$PROJECT_ROOT/frontend"
 
 # Cleanup on exit
 BACKEND_PID=""
+WARREN_BIN=""
 cleanup() {
   if [ -n "$BACKEND_PID" ]; then
     echo "Stopping backend server (PID: $BACKEND_PID)..."
     kill "$BACKEND_PID" 2>/dev/null || true
     wait "$BACKEND_PID" 2>/dev/null || true
+  fi
+  if [ -n "$WARREN_BIN" ] && [ -f "$WARREN_BIN" ]; then
+    rm -f "$WARREN_BIN"
   fi
 }
 trap cleanup EXIT
@@ -37,13 +41,16 @@ find_port() {
 E2E_PORT=$(find_port)
 echo "==> Using port $E2E_PORT"
 
-# Start backend server
-echo "==> Starting backend server..."
+# Build and start backend server
+echo "==> Building backend..."
 cd "$PROJECT_ROOT"
+WARREN_BIN=$(mktemp "${TMPDIR:-/tmp}/warren-e2e.XXXXXX")
+go build -o "$WARREN_BIN" .
 
+echo "==> Starting backend server..."
 MAX_RETRIES=3
 for i in $(seq 1 $MAX_RETRIES); do
-  go run . serve \
+  "$WARREN_BIN" serve \
     --addr="127.0.0.1:$E2E_PORT" \
     --no-authn \
     --no-authz \
