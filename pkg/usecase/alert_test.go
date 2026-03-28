@@ -15,10 +15,12 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
+	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/service/circuitbreaker"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -1325,4 +1327,141 @@ func TestHandleNotice(t *testing.T) {
 		uploadCalls := slackMock.UploadFileContextCalls()
 		gt.Array(t, uploadCalls).Length(0)
 	})
+}
+
+func TestHandleAlert_CircuitBreaker_DiscardConsumeSlot(t *testing.T) {
+	// Discarded alerts should consume circuit breaker slots because they passed ingest
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	// Policy that returns an alert via ingest, then discards via triage
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			switch r := result.(type) {
+			case *alert.QueryOutput:
+				r.Alerts = []alert.Metadata{
+					{Title: "Will Be Discarded", Description: "This alert passes ingest but gets discarded"},
+				}
+			case *policy.TriagePolicyResult:
+				r.Publish = types.PublishTypeDiscard
+			}
+			return nil
+		},
+	}
+
+	cbSvc := circuitbreaker.New(repo, circuitbreaker.Config{
+		Enabled: true,
+		Window:  10 * time.Minute,
+		Limit:   2,
+	})
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithPolicyClient(policyMock),
+		usecase.WithCircuitBreaker(cbSvc),
+	)
+
+	// Send 2 alerts that will be discarded — each should consume a slot
+	_, err := uc.HandleAlert(ctx, "test.schema", map[string]any{"key": "val1"})
+	gt.NoError(t, err)
+	_, err = uc.HandleAlert(ctx, "test.schema", map[string]any{"key": "val2"})
+	gt.NoError(t, err)
+
+	// Slots should be consumed even though alerts were discarded
+	result, err := cbSvc.CheckThrottle(ctx)
+	gt.NoError(t, err)
+	gt.Value(t, result.Allowed).Equal(false)
+}
+
+func TestHandleAlert_CircuitBreaker_IngestRejectedNoSlot(t *testing.T) {
+	// Alerts rejected by ingest (0 results) should NOT consume circuit breaker slots
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	// Policy that returns 0 alerts from ingest (rejected)
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			if queryResult, ok := result.(*alert.QueryOutput); ok {
+				queryResult.Alerts = []alert.Metadata{} // Empty = rejected by ingest
+			}
+			return nil
+		},
+	}
+
+	cbSvc := circuitbreaker.New(repo, circuitbreaker.Config{
+		Enabled: true,
+		Window:  10 * time.Minute,
+		Limit:   1,
+	})
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithPolicyClient(policyMock),
+		usecase.WithCircuitBreaker(cbSvc),
+	)
+
+	// Send multiple alerts that are all rejected by ingest
+	for range 5 {
+		_, err := uc.HandleAlert(ctx, "test.schema", map[string]any{"key": "val"})
+		gt.NoError(t, err)
+	}
+
+	// Slots should still be available — nothing passed ingest
+	result, err := cbSvc.CheckThrottle(ctx)
+	gt.NoError(t, err)
+	gt.Value(t, result.Allowed).Equal(true)
+}
+
+func TestHandleAlert_CircuitBreaker_ThrottleAfterPipeline(t *testing.T) {
+	// When slots run out during post-pipeline acquisition, the alert is queued
+	ctx := context.Background()
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	policyMock := &mock.PolicyClientMock{
+		QueryFunc: func(ctx context.Context, query string, data any, result any, queryOptions ...opaq.QueryOption) error {
+			switch r := result.(type) {
+			case *alert.QueryOutput:
+				r.Alerts = []alert.Metadata{
+					{Title: "Alert", Description: "Passes ingest"},
+				}
+			case *policy.TriagePolicyResult:
+				r.Publish = types.PublishTypeDiscard
+			}
+			return nil
+		},
+	}
+
+	cbSvc := circuitbreaker.New(repo, circuitbreaker.Config{
+		Enabled: true,
+		Window:  10 * time.Minute,
+		Limit:   1,
+	})
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithPolicyClient(policyMock),
+		usecase.WithCircuitBreaker(cbSvc),
+	)
+
+	// First alert consumes the only slot
+	_, err := uc.HandleAlert(ctx, "test.schema", map[string]any{"key": "val1"})
+	gt.NoError(t, err)
+
+	// Second alert: pre-pipeline check denies, alert is queued
+	_, err = uc.HandleAlert(ctx, "test.schema", map[string]any{"key": "val2"})
+	gt.NoError(t, err)
+
+	// Verify the alert was queued
+	count, err := repo.CountQueuedAlerts(ctx)
+	gt.NoError(t, err)
+	gt.Value(t, count).Equal(1)
 }

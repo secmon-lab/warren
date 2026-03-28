@@ -285,28 +285,17 @@ func TestService_EndToEnd_CheckThenAcquire(t *testing.T) {
 	gt.Value(t, count).Equal(0)
 }
 
-func TestService_DiscardedAlerts_DontConsumeSlots(t *testing.T) {
+func TestService_AllIngestPassedAlerts_ConsumeSlots(t *testing.T) {
 	svc, _ := newTestService(2)
 	ctx := t.Context()
 
-	// Check 5 times without acquiring (simulating 5 discarded alerts)
-	for i := 0; i < 5; i++ {
-		result, err := svc.CheckThrottle(ctx)
-		gt.NoError(t, err)
-		gt.Value(t, result.Allowed).Equal(true)
-	}
-
-	// Slots should still be available since nothing was acquired
-	result, err := svc.CheckThrottle(ctx)
-	gt.NoError(t, err)
-	gt.Value(t, result.Allowed).Equal(true)
-
-	// Now acquire 2 slots (non-discarded alerts)
+	// All alerts that pass ingest consume slots, regardless of triage result.
+	// Acquire 2 slots (could be discard, notice, or alert — doesn't matter)
 	acquireSlot(t, svc, ctx)
 	acquireSlot(t, svc, ctx)
 
 	// Now should be throttled
-	result, err = svc.CheckThrottle(ctx)
+	result, err := svc.CheckThrottle(ctx)
 	gt.NoError(t, err)
 	gt.Value(t, result.Allowed).Equal(false)
 }
