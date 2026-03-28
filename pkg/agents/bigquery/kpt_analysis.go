@@ -64,25 +64,26 @@ func (a *agent) generateKPTAnalysis(
 	prompt := a.buildKPTPrompt(query, resp, execErr, duration, session)
 	logger.Debug("KPT prompt built", "prompt", prompt)
 
-	// Generate analysis using LLM (create new session for KPT analysis)
-	kptSession, err := a.llmClient.NewSession(ctx)
-	if err != nil {
-		return []string{}, []string{}, []string{}, goerr.Wrap(err, "failed to create LLM session for KPT analysis", goerr.Tag(tagKPTAnalysisFallback))
-	}
-
-	llmResp, err := kptSession.GenerateContent(ctx, gollem.Text(prompt))
+	// Generate analysis using gollem.Query for structured JSON response
+	queryResp, err := gollem.Query[kptAnalysisResponse](ctx, a.llmClient, prompt)
 	if err != nil {
 		return []string{}, []string{}, []string{}, goerr.Wrap(err, "failed to generate KPT analysis", goerr.Tag(tagKPTAnalysisFallback))
 	}
 
-	if llmResp == nil || len(llmResp.Texts) == 0 {
-		return []string{}, []string{}, []string{}, goerr.New("empty response from LLM for KPT analysis", goerr.Tag(tagKPTAnalysisFallback))
-	}
+	analysis := queryResp.Data
 
-	// Parse LLM response
-	successes, problems, improvements, err := a.parseKPTResponse(llmResp.Texts[0])
-	if err != nil {
-		return []string{}, []string{}, []string{}, goerr.Wrap(err, "failed to parse KPT analysis response", goerr.Tag(tagKPTAnalysisFallback))
+	// Ensure arrays are initialized (not nil)
+	successes := analysis.Successes
+	if successes == nil {
+		successes = []string{}
+	}
+	problems := analysis.Problems
+	if problems == nil {
+		problems = []string{}
+	}
+	improvements := analysis.Improvements
+	if improvements == nil {
+		improvements = []string{}
 	}
 
 	logger.Debug("KPT analysis generated successfully",
@@ -219,33 +220,4 @@ func (a *agent) formatHistory(history *gollem.History) string {
 	buf.WriteString("\n")
 
 	return buf.String()
-}
-
-// parseKPTResponse parses the LLM response into KPT components
-func (a *agent) parseKPTResponse(responseText string) ([]string, []string, []string, error) {
-	// Clean up response text (remove markdown code blocks if present)
-	responseText = strings.TrimSpace(responseText)
-	responseText = strings.TrimPrefix(responseText, "```json")
-	responseText = strings.TrimPrefix(responseText, "```")
-	responseText = strings.TrimSuffix(responseText, "```")
-	responseText = strings.TrimSpace(responseText)
-
-	// Parse JSON
-	var analysis kptAnalysisResponse
-	if err := json.Unmarshal([]byte(responseText), &analysis); err != nil {
-		return nil, nil, nil, goerr.Wrap(err, "failed to parse KPT analysis JSON")
-	}
-
-	// Ensure arrays are initialized (not nil)
-	if analysis.Successes == nil {
-		analysis.Successes = []string{}
-	}
-	if analysis.Problems == nil {
-		analysis.Problems = []string{}
-	}
-	if analysis.Improvements == nil {
-		analysis.Improvements = []string{}
-	}
-
-	return analysis.Successes, analysis.Problems, analysis.Improvements, nil
 }

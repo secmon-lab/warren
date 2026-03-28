@@ -127,36 +127,12 @@ func (s *Service) generateReflection(
 		"memory_count", len(usedMemories),
 		"history_messages", historyCount)
 
-	// Convert to gollem schema for session creation
-	gollemSchema, err := gollem.ToSchema(reflectionResponse{})
+	// Generate reflection using gollem.Query for structured JSON response
+	queryResp, err := gollem.Query[reflectionResponse](ctx, s.llmClient, promptText)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to generate gollem schema")
+		return nil, goerr.Wrap(err, "failed to generate reflection")
 	}
-
-	// Create a new session for reflection generation
-	session, err := s.llmClient.NewSession(ctx,
-		gollem.WithSessionContentType(gollem.ContentTypeJSON),
-		gollem.WithSessionResponseSchema(gollemSchema),
-	)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create reflection session")
-	}
-
-	// Generate reflection
-	response, err := session.GenerateContent(ctx, gollem.Text(promptText))
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to generate reflection content")
-	}
-
-	// Parse response
-	if len(response.Texts) == 0 {
-		return nil, goerr.New("no response text from LLM")
-	}
-
-	var resp reflectionResponse
-	if err := json.Unmarshal([]byte(response.Texts[0]), &resp); err != nil {
-		return nil, goerr.Wrap(err, "failed to unmarshal reflection response", goerr.V("text", response.Texts[0]))
-	}
+	resp := *queryResp.Data
 
 	// Convert string IDs to types.AgentMemoryID
 	helpfulMemories := make([]types.AgentMemoryID, 0, len(resp.HelpfulMemories))
