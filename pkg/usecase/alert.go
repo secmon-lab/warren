@@ -82,8 +82,13 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, a
 		for i, alertResult := range pipelineResults {
 			result, err := uc.cbService.AcquireSlot(ctx)
 			if err != nil {
-				errutil.Handle(ctx, goerr.Wrap(err, "failed to acquire throttle slot, processing normally"))
-				break
+				// On error, queue the alert to avoid losing it
+				errutil.Handle(ctx, goerr.Wrap(err, "failed to acquire throttle slot, queueing alert"))
+				_, enqueueErr := uc.cbService.EnqueueAlert(ctx, schema, alertData, alertResult.Alert.Title, alertResult.Alert.Channel)
+				if enqueueErr != nil {
+					errutil.Handle(ctx, goerr.Wrap(enqueueErr, "failed to enqueue alert after slot error"))
+				}
+				return nil, nil
 			}
 			if !result.Allowed {
 				// Slot denied: queue the raw alert and stop processing all results
@@ -94,8 +99,7 @@ func (uc *UseCases) HandleAlert(ctx context.Context, schema types.AlertSchema, a
 
 				_, enqueueErr := uc.cbService.EnqueueAlert(ctx, schema, alertData, alertResult.Alert.Title, alertResult.Alert.Channel)
 				if enqueueErr != nil {
-					errutil.Handle(ctx, goerr.Wrap(enqueueErr, "failed to enqueue throttled alert, processing normally"))
-					break
+					errutil.Handle(ctx, goerr.Wrap(enqueueErr, "failed to enqueue throttled alert"))
 				}
 
 				if result.ShouldNotify {
