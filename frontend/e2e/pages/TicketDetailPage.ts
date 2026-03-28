@@ -15,7 +15,7 @@ export class TicketDetailPage extends BasePage {
   }
 
   get ticketTitle() {
-    return this.page.locator("h1.text-3xl");
+    return this.page.getByRole("heading", { level: 1 });
   }
 
   get editButton() {

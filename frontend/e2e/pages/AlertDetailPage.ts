@@ -15,7 +15,7 @@ export class AlertDetailPage extends BasePage {
   }
 
   get alertTitle() {
-    return this.page.locator(".text-2xl");
+    return this.page.locator('[data-slot="card-title"]');
   }
 
   get attributesCard() {

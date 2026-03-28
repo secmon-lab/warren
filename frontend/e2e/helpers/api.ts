@@ -42,13 +42,17 @@ export async function createTicketViaAPI(
     { title, description, isTest }
   );
 
-  if (result.errors) {
+  if (result.errors && result.errors.length > 0) {
+    const errorMessages = result.errors.map((e) => e.message).join(", ");
+    throw new Error(`GraphQL error creating ticket: ${errorMessages}`);
+  }
+  if (!result.data?.createTicket) {
     throw new Error(
-      `GraphQL error creating ticket: ${result.errors[0].message}`
+      "GraphQL error creating ticket: response did not include ticket data"
     );
   }
 
-  return result.data!.createTicket;
+  return result.data.createTicket;
 }
 
 export async function resolveTicketViaAPI(
@@ -68,9 +72,8 @@ export async function resolveTicketViaAPI(
     { id: ticketId, conclusion, reason }
   );
 
-  if (result.errors) {
-    throw new Error(
-      `GraphQL error resolving ticket: ${result.errors[0].message}`
-    );
+  if (result.errors && result.errors.length > 0) {
+    const errorMessages = result.errors.map((e) => e.message).join(", ");
+    throw new Error(`GraphQL error resolving ticket: ${errorMessages}`);
   }
 }

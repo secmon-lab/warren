@@ -23,7 +23,6 @@ test.describe("Queued Alerts", () => {
     // Search with empty result
     await queuePage.searchInput.fill("nonexistent");
     await queuePage.searchButton.click();
-    await page.waitForLoadState("networkidle");
     await expect(queuePage.noQueuedAlertsMessage).toBeVisible();
   });
 });

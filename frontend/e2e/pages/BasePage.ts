@@ -1,10 +1,12 @@
-import { type Page, type Locator } from "@playwright/test";
+import { type Page, type Locator, type TestInfo } from "@playwright/test";
 
 export class BasePage {
   readonly page: Page;
+  readonly testInfo?: TestInfo;
 
-  constructor(page: Page) {
+  constructor(page: Page, testInfo?: TestInfo) {
     this.page = page;
+    this.testInfo = testInfo;
   }
 
   async goto(path: string) {
@@ -17,7 +19,10 @@ export class BasePage {
   }
 
   async screenshot(name: string) {
-    await this.page.screenshot({ path: `e2e/test-results/${name}.png` });
+    const path = this.testInfo
+      ? this.testInfo.outputPath(`${name}.png`)
+      : `test-results/${name}.png`;
+    await this.page.screenshot({ path });
   }
 
   async waitForVisible(locator: Locator) {

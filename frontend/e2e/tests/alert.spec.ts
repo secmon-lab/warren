@@ -29,12 +29,10 @@ test.describe("Alerts", () => {
 
     // Click Declined tab
     await alertList.declinedTab.click();
-    await page.waitForLoadState("networkidle");
     await expect(alertList.noAlertsMessage).toBeVisible();
 
     // Click New tab
     await alertList.newTab.click();
-    await page.waitForLoadState("networkidle");
     await expect(alertList.noAlertsMessage).toBeVisible();
   });
 });

@@ -11,39 +11,6 @@ test.describe("Navigation", () => {
     await expect(dashboard.newAlertsCard).toBeVisible();
   });
 
-  test("should navigate to tickets page via sidebar", async ({
-    authenticatedPage: page,
-  }) => {
-    const dashboard = new DashboardPage(page);
-    await dashboard.navigateTo("tickets");
-    await expect(page).toHaveURL(/\/tickets$/);
-    await expect(
-      page.getByRole("heading", { name: "Tickets" })
-    ).toBeVisible();
-  });
-
-  test("should navigate to alerts page via sidebar", async ({
-    authenticatedPage: page,
-  }) => {
-    const dashboard = new DashboardPage(page);
-    await dashboard.navigateTo("alerts");
-    await expect(page).toHaveURL(/\/alerts$/);
-    await expect(
-      page.getByRole("heading", { name: "Alerts" })
-    ).toBeVisible();
-  });
-
-  test("should navigate to queue page via sidebar", async ({
-    authenticatedPage: page,
-  }) => {
-    const dashboard = new DashboardPage(page);
-    await dashboard.navigateTo("queue");
-    await expect(page).toHaveURL(/\/queue$/);
-    await expect(
-      page.getByRole("heading", { name: "Queued Alerts" })
-    ).toBeVisible();
-  });
-
   test("should navigate to all sidebar pages", async ({
     authenticatedPage: page,
   }) => {
