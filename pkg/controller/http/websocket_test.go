@@ -120,27 +120,22 @@ func TestHTTPServer_WithoutWebSocketHandler(t *testing.T) {
 	gt.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
-	// When WebSocket handler is not configured, the /ws route doesn't exist
-	// In this case, the request falls through to the SPA handler which returns index.html
-	// So we get 200 OK instead of 404. This is correct behavior.
-	gt.Value(t, resp.StatusCode).Equal(http.StatusOK)
-
-	// Verify that the response is actually the index.html content
 	body, err := io.ReadAll(resp.Body)
 	gt.NoError(t, err)
 	bodyStr := string(body)
 
-	// Log the response for debugging if it's not HTML
-	if !strings.Contains(bodyStr, "<!DOCTYPE html>") {
-		maxLen := 500
-		if len(bodyStr) < maxLen {
-			maxLen = len(bodyStr)
-		}
-		t.Logf("Unexpected response body (first %d chars): %s", maxLen, bodyStr[:maxLen])
+	// When WebSocket handler is not configured, the /ws route doesn't exist.
+	// Behavior depends on whether frontend assets are built:
+	// - With frontend built: falls through to SPA handler → 200 with index.html
+	// - Without frontend built: no SPA handler registered → 404
+	if strings.Contains(bodyStr, "<!DOCTYPE html>") {
+		// SPA handler is registered (frontend built)
+		gt.Value(t, resp.StatusCode).Equal(http.StatusOK)
+		gt.True(t, strings.Contains(bodyStr, "<title>Warren Security Monitor</title>"))
+	} else {
+		// SPA handler is not registered (frontend not built)
+		gt.Value(t, resp.StatusCode).Equal(http.StatusNotFound)
 	}
-
-	gt.True(t, strings.Contains(bodyStr, "<!DOCTYPE html>"))
-	gt.True(t, strings.Contains(bodyStr, "<title>Warren Security Monitor</title>"))
 }
 
 func TestHTTPServer_WebSocketEndpoint_NonExistentTicket(t *testing.T) {
