@@ -166,7 +166,7 @@ func (x *UseCases) generateInitialTicketComment(ctx context.Context, ticketData 
 		return "", goerr.Wrap(err, "failed to create LLM session")
 	}
 
-	response, err := session.GenerateContent(ctx, gollem.Text(commentPrompt))
+	response, err := session.Generate(ctx, []gollem.Input{gollem.Text(commentPrompt)})
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to generate comment")
 	}

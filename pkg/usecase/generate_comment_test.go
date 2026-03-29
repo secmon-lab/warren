@@ -63,7 +63,7 @@ func TestGenerateInitialTicketComment(t *testing.T) {
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{"お疲れさまです！このチケットについて一緒に調査してみませんか？🔍 何か気になる点があれば気軽に共有してください。"},
 					}, nil
@@ -130,7 +130,7 @@ func TestGenerateInitialTicketComment_English(t *testing.T) {
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{"Thanks for creating this ticket! Let's investigate this network anomaly together. 🔍 Feel free to share any initial observations."},
 					}, nil
@@ -188,7 +188,7 @@ func TestGenerateInitialTicketComment_LLMError(t *testing.T) {
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return nil, goerr.New("LLM generation failed")
 				},
 			}, nil
@@ -238,7 +238,7 @@ func TestGenerateInitialTicketComment_EmptyResponse(t *testing.T) {
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{}, // Empty response
 					}, nil

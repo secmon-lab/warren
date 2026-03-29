@@ -280,7 +280,7 @@ func TestCreateTicketFromAlerts(t *testing.T) {
 		},
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{`{"title": "Test Title", "description": "Test Description", "summary": "Test Summary"}`},
 					}, nil

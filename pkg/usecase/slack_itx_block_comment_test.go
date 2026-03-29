@@ -87,7 +87,7 @@ func TestTicketCreation_NewThread_WithInitialComment(t *testing.T) {
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					// Check if this is for ticket metadata or comment generation
 					inputText := ""
 					for _, inp := range input {

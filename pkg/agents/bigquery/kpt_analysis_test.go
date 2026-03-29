@@ -21,7 +21,7 @@ func TestGenerateKPTAnalysis_Success(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{`{
 							"successes": [
@@ -64,7 +64,7 @@ func TestGenerateKPTAnalysis_Failure(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{`{
 							"successes": [],
@@ -140,7 +140,7 @@ func TestGenerateKPTAnalysis_InvalidJSON(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{"This is not valid JSON"},
 					}, nil
@@ -175,7 +175,7 @@ func TestGenerateKPTAnalysis_WithJSONResponse(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{`{
 							"successes": ["Test success"],

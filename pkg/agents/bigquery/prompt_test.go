@@ -6,7 +6,6 @@ import (
 
 	"github.com/m-mizutani/gt"
 	bqagent "github.com/secmon-lab/warren/pkg/agents/bigquery"
-	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 )
 
 func TestBuildSystemPrompt(t *testing.T) {
@@ -138,55 +137,3 @@ func TestDynamicDescription(t *testing.T) {
 	gt.S(t, desc).Contains("Available tables:")
 }
 
-func TestFormatMemoryContext(t *testing.T) {
-	t.Run("empty memories", func(t *testing.T) {
-		result := bqagent.ExportedFormatMemoryContext(nil)
-		gt.V(t, result).Equal("")
-
-		result = bqagent.ExportedFormatMemoryContext([]*memory.AgentMemory{})
-		gt.V(t, result).Equal("")
-	})
-
-	t.Run("single memory", func(t *testing.T) {
-		memories := []*memory.AgentMemory{
-			{
-				ID:      "mem-1",
-				AgentID: "bigquery",
-				Claim:   "Test claim A",
-			},
-		}
-		result := bqagent.ExportedFormatMemoryContext(memories)
-		gt.V(t, result).NotEqual("")
-		gt.S(t, result).Contains("Past Experiences")
-		gt.S(t, result).Contains("Experience A")
-		gt.S(t, result).Contains("Test claim A")
-	})
-
-	t.Run("multiple memories", func(t *testing.T) {
-		memories := []*memory.AgentMemory{
-			{
-				ID:      "mem-1",
-				AgentID: "bigquery",
-				Claim:   "First claim",
-			},
-			{
-				ID:      "mem-2",
-				AgentID: "bigquery",
-				Claim:   "Second claim",
-			},
-			{
-				ID:      "mem-3",
-				AgentID: "bigquery",
-				Claim:   "Third claim",
-			},
-		}
-		result := bqagent.ExportedFormatMemoryContext(memories)
-		gt.V(t, result).NotEqual("")
-		gt.S(t, result).Contains("Experience A")
-		gt.S(t, result).Contains("Experience B")
-		gt.S(t, result).Contains("Experience C")
-		gt.S(t, result).Contains("First claim")
-		gt.S(t, result).Contains("Second claim")
-		gt.S(t, result).Contains("Third claim")
-	})
-}

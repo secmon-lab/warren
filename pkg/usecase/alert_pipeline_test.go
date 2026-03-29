@@ -54,7 +54,7 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		mockLLM := &gollem_mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
 				return &gollem_mock.SessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						return &gollem.Response{
 							Texts: []string{`{"severity": "high"}`},
 						}, nil
@@ -107,7 +107,7 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		mockLLM := &gollem_mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
 				return &gollem_mock.SessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						return &gollem.Response{
 							Texts: []string{"analysis result"},
 						}, nil
@@ -217,7 +217,7 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 		mockLLM := &gollem_mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
 				return &gollem_mock.SessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						return &gollem.Response{
 							Texts: []string{"Auto-generated ID test result"},
 						}, nil

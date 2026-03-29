@@ -53,7 +53,7 @@ func TestAskWithValidation_RetryPreservesContext(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					callCount++
 					switch callCount {
 					case 1:
@@ -94,7 +94,7 @@ func TestAskWithValidation_ExhaustsRetries(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					callCount++
 					// Always return a value that fails validation
 					return &gollem.Response{Texts: []string{`{"value": "bad"}`}}, nil
@@ -131,7 +131,7 @@ func TestAskWithValidation_UsesSessionForConversationContext(t *testing.T) {
 		NewSessionFunc: func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
 			sessionCreateCount++
 			return &mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					generateCount++
 					if generateCount == 1 {
 						// First: valid JSON but validation fails (too few items)

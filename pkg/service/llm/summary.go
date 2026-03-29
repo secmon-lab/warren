@@ -109,7 +109,7 @@ Specific instructions regarding the analysis policy and the type of information 
 		return "", err
 	}
 
-	resp, err := ssn.GenerateContent(ctx, gollem.Text(userPrompt))
+	resp, err := ssn.Generate(ctx, []gollem.Input{gollem.Text(userPrompt)})
 	if err != nil {
 		return "", err
 	}
@@ -155,7 +155,7 @@ More detailed instructions regarding the report structure or specific analytical
 		return "", err
 	}
 
-	resp, err := ssn.GenerateContent(ctx, gollem.Text(userPrompt))
+	resp, err := ssn.Generate(ctx, []gollem.Input{gollem.Text(userPrompt)})
 	if err != nil {
 		return "", err
 	}

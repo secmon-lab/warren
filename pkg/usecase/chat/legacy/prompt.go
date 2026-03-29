@@ -83,7 +83,7 @@ func ToolCallToText(ctx context.Context, llmClient gollem.LLMClient, spec *golle
 		return defaultMsg
 	}
 
-	response, err := session.GenerateContent(ctx, gollem.Text(p))
+	response, err := session.Generate(ctx, []gollem.Input{gollem.Text(p)})
 	if err != nil {
 		errutil.Handle(ctx, eb.Wrap(err, "failed to generate content"))
 		return defaultMsg

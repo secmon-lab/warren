@@ -70,7 +70,7 @@ func TestHandlePrompt(t *testing.T) {
 			sessionGenCount := 0
 
 			session := &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					sessionGenCount++
 					genContentCount++
 
@@ -219,7 +219,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		mockLLM := &mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 				return &mock.LLMSessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						// Mock plan creation and execution responses
 						for _, inp := range input {
 							if text, ok := inp.(gollem.Text); ok {
@@ -343,7 +343,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		mockLLM := &mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 				return &mock.LLMSessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						for _, inp := range input {
 							if text, ok := inp.(gollem.Text); ok {
 								inputStr := string(text)
@@ -503,7 +503,7 @@ func TestChatErrorNotifications(t *testing.T) {
 		mockLLM := &mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 				return &mock.LLMSessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						// Mock plan creation and execution responses
 						for _, inp := range input {
 							if text, ok := inp.(gollem.Text); ok {
@@ -596,7 +596,7 @@ func TestChatErrorNotifications(t *testing.T) {
 		mockLLM := &mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 				return &mock.LLMSessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						// Fail during plan creation
 						return nil, goerr.New("LLM service temporarily unavailable")
 					},
@@ -669,7 +669,7 @@ func TestChatErrorNotifications(t *testing.T) {
 		mockLLM := &mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 				return &mock.LLMSessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						// Mock plan creation and execution responses
 						for _, inp := range input {
 							if text, ok := inp.(gollem.Text); ok {
@@ -754,7 +754,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		mockLLM := &mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 				return &mock.LLMSessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						for _, inp := range input {
 							if text, ok := inp.(gollem.Text); ok {
 								inputStr := string(text)
@@ -826,7 +826,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		mockLLM := &mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 				return &mock.LLMSessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						for _, inp := range input {
 							if text, ok := inp.(gollem.Text); ok {
 								inputStr := string(text)
