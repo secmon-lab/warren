@@ -105,7 +105,7 @@ func WithTraceRepository(repo trace.Repository) Option {
 	return func(c *SwarmChat) { c.traceRepository = repo }
 }
 
-// WithKnowledgeService sets the knowledge v2 service for introspection.
+// WithKnowledgeService sets the knowledge v2 service for reflection.
 func WithKnowledgeService(svc *svcknowledge.Service) Option {
 	return func(c *SwarmChat) { c.knowledgeService = svc }
 }
@@ -474,8 +474,8 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 
 	msg.Notify(ctx, "💬 %s", finalResp)
 
-	// Trigger fact knowledge introspection in background
-	c.triggerFactIntrospection(ctx, buildIntrospectionSummary(allResults), target)
+	// Trigger fact knowledge reflection in background
+	c.triggerFactReflection(ctx, buildReflectionSummary(allResults), target)
 
 	if !ticketless {
 		logger.Debug("swarm executeSwarm: completed, saving history")
@@ -484,8 +484,8 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 	return nil
 }
 
-// buildIntrospectionSummary aggregates all task results into a text summary for introspection.
-func buildIntrospectionSummary(allResults []*phaseResult) string {
+// buildReflectionSummary aggregates all task results into a text summary for reflection.
+func buildReflectionSummary(allResults []*phaseResult) string {
 	var sb strings.Builder
 	for _, pr := range allResults {
 		for i, r := range pr.results {

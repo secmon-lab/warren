@@ -23,7 +23,7 @@ type Service struct {
 // ServiceOption configures a Service.
 type ServiceOption func(*Service)
 
-// WithTraceRepository sets the trace repository for introspection tracing.
+// WithTraceRepository sets the trace repository for reflection tracing.
 func WithTraceRepository(repo trace.Repository) ServiceOption {
 	return func(s *Service) {
 		s.traceRepository = repo

@@ -22,7 +22,7 @@ type Mode int
 const (
 	// ModeReadOnly provides search + tag list only (for plan/child agent).
 	ModeReadOnly Mode = iota
-	// ModeReadWrite provides search + save + delete + tag management (for introspection agent).
+	// ModeReadWrite provides search + save + delete + tag management (for reflection agent).
 	ModeReadWrite
 )
 

@@ -15,38 +15,38 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
-//go:embed prompt/introspection_fact.md
-var introspectionFactPrompt string
+//go:embed prompt/reflection_fact.md
+var reflectionFactPrompt string
 
-//go:embed prompt/introspection_technique.md
-var introspectionTechniquePrompt string
+//go:embed prompt/reflection_technique.md
+var reflectionTechniquePrompt string
 
-// IntrospectionInput holds the input for the knowledge introspection agent.
-type IntrospectionInput struct {
+// ReflectionInput holds the input for the knowledge reflection agent.
+type ReflectionInput struct {
 	Category types.KnowledgeCategory
 
 	// ExecutionSummary is a text summary of the execution history.
 	// This is provided instead of raw History to avoid gollem type coupling.
 	ExecutionSummary string
 
-	// Set only for ticket resolve introspection
+	// Set only for ticket resolve reflection
 	Ticket   *ticket.Ticket
 	TicketID types.TicketID
 }
 
-// RunIntrospection launches a background introspection agent that extracts
+// RunReflection launches a background reflection agent that extracts
 // knowledge from the given execution summary and saves it to the knowledge store.
 // The toolSet must be a knowledge tool in ModeReadWrite for the target category.
 // Caller is responsible for creating the tool to avoid import cycles.
-func (s *Service) RunIntrospection(ctx context.Context, llmClient gollem.LLMClient, toolSet gollem.ToolSet, input *IntrospectionInput) error {
+func (s *Service) RunReflection(ctx context.Context, llmClient gollem.LLMClient, toolSet gollem.ToolSet, input *ReflectionInput) error {
 	logger := logging.From(ctx)
 
 	if input == nil {
-		logger.Debug("knowledge introspection skipped: nil input")
+		logger.Debug("knowledge reflection skipped: nil input")
 		return nil
 	}
 	if input.ExecutionSummary == "" {
-		logger.Debug("knowledge introspection skipped: empty execution summary",
+		logger.Debug("knowledge reflection skipped: empty execution summary",
 			"category", input.Category,
 		)
 		return nil
@@ -56,17 +56,17 @@ func (s *Service) RunIntrospection(ctx context.Context, llmClient gollem.LLMClie
 	var systemPrompt string
 	switch input.Category {
 	case types.KnowledgeCategoryFact:
-		systemPrompt = introspectionFactPrompt
+		systemPrompt = reflectionFactPrompt
 	case types.KnowledgeCategoryTechnique:
-		systemPrompt = introspectionTechniquePrompt
+		systemPrompt = reflectionTechniquePrompt
 	default:
-		return goerr.New("unsupported category for introspection", goerr.V("category", input.Category))
+		return goerr.New("unsupported category for reflection", goerr.V("category", input.Category))
 	}
 
 	// Append existing tags to prompt so agent reuses them
 	existingTags, err := s.ListTags(ctx)
 	if err != nil {
-		logger.Warn("failed to list existing tags for introspection prompt", "error", err)
+		logger.Warn("failed to list existing tags for reflection prompt", "error", err)
 	}
 	if len(existingTags) > 0 {
 		systemPrompt += "\n\n## Existing Tags\n"
@@ -89,7 +89,7 @@ func (s *Service) RunIntrospection(ctx context.Context, llmClient gollem.LLMClie
 	// Append ticket context to prompt if available
 	if input.Ticket != nil {
 		systemPrompt += "\n\n## Ticket Context\n"
-		systemPrompt += "This introspection is triggered by a ticket resolve.\n"
+		systemPrompt += "This reflection is triggered by a ticket resolve.\n"
 		systemPrompt += "Conclusion: " + string(input.Ticket.Conclusion) + "\n"
 		systemPrompt += "Reason: " + input.Ticket.Reason + "\n"
 		if input.Ticket.Finding != nil {
@@ -99,7 +99,7 @@ func (s *Service) RunIntrospection(ctx context.Context, llmClient gollem.LLMClie
 		}
 	}
 
-	logger.Debug("knowledge introspection: building agent",
+	logger.Debug("knowledge reflection: building agent",
 		"category", input.Category,
 		"system_prompt_length", len(systemPrompt),
 		"has_ticket_context", input.Ticket != nil,
@@ -110,8 +110,8 @@ func (s *Service) RunIntrospection(ctx context.Context, llmClient gollem.LLMClie
 		gollem.WithToolSets(toolSet),
 		gollem.WithSystemPrompt(systemPrompt),
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
-		gollem.WithToolMiddleware(newIntrospectionToolMiddleware()),
-		gollem.WithContentBlockMiddleware(newIntrospectionContentBlockMiddleware()),
+		gollem.WithToolMiddleware(newReflectionToolMiddleware()),
+		gollem.WithContentBlockMiddleware(newReflectionContentBlockMiddleware()),
 	}
 
 	// Add trace recorder if trace repository is configured
@@ -124,13 +124,13 @@ func (s *Service) RunIntrospection(ctx context.Context, llmClient gollem.LLMClie
 			trace.WithStackTrace(),
 			trace.WithMetadata(trace.TraceMetadata{
 				Labels: map[string]string{
-					"type":     "introspection",
+					"type":     "reflection",
 					"category": string(input.Category),
 				},
 			}),
 		)
 		opts = append(opts, gollem.WithTrace(recorder))
-		logger.Info("knowledge introspection trace enabled",
+		logger.Info("knowledge reflection trace enabled",
 			"trace_id", traceID,
 			"category", input.Category,
 		)
@@ -142,7 +142,7 @@ func (s *Service) RunIntrospection(ctx context.Context, llmClient gollem.LLMClie
 	summaryLen := len(input.ExecutionSummary)
 	hasTicket := input.Ticket != nil
 
-	logger.Info("knowledge introspection started",
+	logger.Info("knowledge reflection started",
 		"category", input.Category,
 		"summary_length", summaryLen,
 		"has_ticket", hasTicket,
@@ -151,14 +151,14 @@ func (s *Service) RunIntrospection(ctx context.Context, llmClient gollem.LLMClie
 	// Execute in background
 	go func() {
 		bgCtx := context.WithoutCancel(ctx)
-		logger.Debug("knowledge introspection: executing agent",
+		logger.Debug("knowledge reflection: executing agent",
 			"category", input.Category,
 			"summary_length", summaryLen,
 		)
 
 		resp, err := agent.Execute(bgCtx, gollem.Text(input.ExecutionSummary))
 		if err != nil {
-			logger.Error("knowledge introspection failed",
+			logger.Error("knowledge reflection failed",
 				"category", input.Category,
 				"summary_length", summaryLen,
 				"error", err,
@@ -168,13 +168,13 @@ func (s *Service) RunIntrospection(ctx context.Context, llmClient gollem.LLMClie
 			if resp != nil && !resp.IsEmpty() {
 				respText = resp.String()
 			}
-			logger.Info("knowledge introspection completed",
+			logger.Info("knowledge reflection completed",
 				"category", input.Category,
 				"summary_length", summaryLen,
 				"response_length", len(respText),
 			)
 			if respText != "" {
-				logger.Debug("knowledge introspection: agent response",
+				logger.Debug("knowledge reflection: agent response",
 					"category", input.Category,
 					"response", respText,
 				)
@@ -184,7 +184,7 @@ func (s *Service) RunIntrospection(ctx context.Context, llmClient gollem.LLMClie
 		// Finish trace recording
 		if recorder != nil {
 			if err := recorder.Finish(bgCtx); err != nil {
-				logger.Error("knowledge introspection: failed to finish trace", "error", err)
+				logger.Error("knowledge reflection: failed to finish trace", "error", err)
 			}
 		}
 	}()
@@ -192,26 +192,26 @@ func (s *Service) RunIntrospection(ctx context.Context, llmClient gollem.LLMClie
 	return nil
 }
 
-// newIntrospectionToolMiddleware creates a gollem ToolMiddleware that logs all tool calls.
-func newIntrospectionToolMiddleware() gollem.ToolMiddleware {
+// newReflectionToolMiddleware creates a gollem ToolMiddleware that logs all tool calls.
+func newReflectionToolMiddleware() gollem.ToolMiddleware {
 	return func(next gollem.ToolHandler) gollem.ToolHandler {
 		return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
 			logger := logging.From(ctx)
 			argsJSON, _ := json.Marshal(req.Tool.Arguments)
-			logger.Debug("knowledge introspection: tool call",
+			logger.Debug("knowledge reflection: tool call",
 				"tool", req.Tool.Name,
 				"args", string(argsJSON),
 			)
 
 			resp, err := next(ctx, req)
 			if err != nil {
-				logger.Debug("knowledge introspection: tool call failed",
+				logger.Debug("knowledge reflection: tool call failed",
 					"tool", req.Tool.Name,
 					"error", err,
 				)
 			} else if resp != nil {
 				resultJSON, _ := json.Marshal(resp.Result)
-				logger.Debug("knowledge introspection: tool call result",
+				logger.Debug("knowledge reflection: tool call result",
 					"tool", req.Tool.Name,
 					"result", string(resultJSON),
 				)
@@ -221,23 +221,23 @@ func newIntrospectionToolMiddleware() gollem.ToolMiddleware {
 	}
 }
 
-// newIntrospectionContentBlockMiddleware creates a gollem ContentBlockMiddleware
-// that logs LLM messages during introspection.
-func newIntrospectionContentBlockMiddleware() gollem.ContentBlockMiddleware {
+// newReflectionContentBlockMiddleware creates a gollem ContentBlockMiddleware
+// that logs LLM messages during reflection.
+func newReflectionContentBlockMiddleware() gollem.ContentBlockMiddleware {
 	return func(next gollem.ContentBlockHandler) gollem.ContentBlockHandler {
 		return func(ctx context.Context, req *gollem.ContentRequest) (*gollem.ContentResponse, error) {
 			logger := logging.From(ctx)
-			logger.Debug("knowledge introspection: LLM generate",
+			logger.Debug("knowledge reflection: LLM generate",
 				"input_count", len(req.Inputs),
 			)
 
 			resp, err := next(ctx, req)
 			if err != nil {
-				logger.Debug("knowledge introspection: LLM generate failed",
+				logger.Debug("knowledge reflection: LLM generate failed",
 					"error", err,
 				)
 			} else if resp != nil {
-				logger.Debug("knowledge introspection: LLM response",
+				logger.Debug("knowledge reflection: LLM response",
 					"texts", resp.Texts,
 					"function_calls_count", len(resp.FunctionCalls),
 					"input_tokens", resp.InputToken,

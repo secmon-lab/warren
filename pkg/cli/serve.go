@@ -387,7 +387,7 @@ func cmdServe() *cli.Command {
 					"limit", cbCfg.Limit)
 			}
 
-			// Create knowledge service for introspection and GraphQL
+			// Create knowledge service for reflection and GraphQL
 			var knowledgeOpts []svcknowledge.ServiceOption
 			if safeTraceRepo != nil {
 				knowledgeOpts = append(knowledgeOpts, svcknowledge.WithTraceRepository(safeTraceRepo))
