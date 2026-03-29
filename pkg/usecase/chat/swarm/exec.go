@@ -239,13 +239,13 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	msg.Trace(taskCtx, "Completed")
 
 	// Trigger technique knowledge reflection in background
-	c.triggerTechniqueReflection(ctx, result)
+	c.triggerTechniqueReflection(ctx, taskCtx, result)
 
 	return result
 }
 
 // triggerTechniqueReflection runs background knowledge reflection for a completed task.
-func (c *SwarmChat) triggerTechniqueReflection(ctx context.Context, result *TaskResult) {
+func (c *SwarmChat) triggerTechniqueReflection(ctx context.Context, taskCtx context.Context, result *TaskResult) {
 	logger := logging.From(ctx)
 
 	if c.knowledgeService == nil {
@@ -274,6 +274,14 @@ func (c *SwarmChat) triggerTechniqueReflection(ctx context.Context, result *Task
 	input := &svcknowledge.ReflectionInput{
 		Category:         types.KnowledgeCategoryTechnique,
 		ExecutionSummary: result.Result,
+		OnComplete: func(bgCtx context.Context, traceID string) {
+			suffix := "reflection done"
+			if traceID != "" {
+				suffix = fmt.Sprintf("reflection ID `%s`", traceID)
+			}
+			// Use bgCtx (non-cancelled) with taskCtx's msg routing
+			msg.Trace(msg.CopyTo(bgCtx, taskCtx), "Completed (%s)", suffix)
+		},
 	}
 
 	if err := c.knowledgeService.RunReflection(ctx, c.llmClient, tool, input); err != nil {
@@ -303,6 +311,19 @@ func (c *SwarmChat) triggerFactReflection(ctx context.Context, summary string, t
 	input := &svcknowledge.ReflectionInput{
 		Category:         types.KnowledgeCategoryFact,
 		ExecutionSummary: summary,
+		OnComplete: func(bgCtx context.Context, traceID string) {
+			if c.slackService == nil || t == nil || t.SlackThread == nil {
+				return
+			}
+			threadSvc := c.slackService.NewThread(*t.SlackThread)
+			suffix := "reflection done"
+			if traceID != "" {
+				suffix = fmt.Sprintf("reflection ID `%s`", traceID)
+			}
+			if err := threadSvc.PostContextBlock(bgCtx, fmt.Sprintf("📝 Fact knowledge %s", suffix)); err != nil {
+				logging.From(bgCtx).Warn("failed to post fact reflection result", "error", err)
+			}
+		},
 	}
 	if t != nil {
 		input.Ticket = t

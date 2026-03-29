@@ -311,7 +311,7 @@ func (x *Tool) search(ctx context.Context, args map[string]any) (map[string]any,
 		return nil, goerr.Wrap(err, "failed to search knowledge")
 	}
 
-	msg.Trace(ctx, "Found %d knowledge entries", len(results))
+	msg.Trace(ctx, "🔍 Found %d knowledge entries", len(results))
 
 	return map[string]any{
 		"results": formatKnowledgeList(results),
@@ -344,7 +344,7 @@ func (x *Tool) save(ctx context.Context, args map[string]any) (map[string]any, e
 		return nil, goerr.Wrap(err, "failed to save knowledge")
 	}
 
-	msg.Trace(ctx, "Saved knowledge '%s' (ID: %s)", title, k.ID)
+	msg.Trace(ctx, "💾 Saved knowledge '%s' (ID: `%s`)", title, k.ID)
 
 	return map[string]any{
 		"success": true,
@@ -366,7 +366,7 @@ func (x *Tool) delete(ctx context.Context, args map[string]any) (map[string]any,
 		return nil, goerr.Wrap(err, "failed to delete knowledge")
 	}
 
-	msg.Trace(ctx, "Deleted knowledge (ID: %s)", id)
+	msg.Trace(ctx, "🗑️ Deleted knowledge (ID: `%s`)", id)
 
 	return map[string]any{"success": true}, nil
 }
@@ -488,7 +488,7 @@ func (x *Tool) tagCreate(ctx context.Context, args map[string]any) (map[string]a
 		return nil, goerr.Wrap(err, "failed to create tag")
 	}
 
-	msg.Trace(ctx, "Created tag '%s' (ID: %s)", name, tag.ID)
+	msg.Trace(ctx, "🏷️ Created tag '%s' (ID: `%s`)", name, tag.ID)
 
 	return map[string]any{"success": true, "id": tag.ID.String()}, nil
 }
@@ -519,7 +519,7 @@ func (x *Tool) tagDelete(ctx context.Context, args map[string]any) (map[string]a
 		return nil, goerr.Wrap(err, "failed to delete tag")
 	}
 
-	msg.Trace(ctx, "Deleted tag (ID: %s)", id)
+	msg.Trace(ctx, "🗑️ Deleted tag (ID: `%s`)", id)
 
 	return map[string]any{"success": true}, nil
 }
@@ -535,7 +535,7 @@ func (x *Tool) tagMerge(ctx context.Context, args map[string]any) (map[string]an
 		return nil, goerr.Wrap(err, "failed to merge tags")
 	}
 
-	msg.Trace(ctx, "Merged tag %s into %s", oldID, newID)
+	msg.Trace(ctx, "🔀 Merged tag `%s` into `%s`", oldID, newID)
 
 	return map[string]any{"success": true}, nil
 }

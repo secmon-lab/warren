@@ -32,6 +32,11 @@ type ReflectionInput struct {
 	// Set only for ticket resolve reflection
 	Ticket   *ticket.Ticket
 	TicketID types.TicketID
+
+	// OnComplete is called when the background reflection finishes.
+	// ctx is a non-cancelled context safe for I/O operations.
+	// traceID is the trace ID used for the reflection execution (empty if tracing is not configured).
+	OnComplete func(ctx context.Context, traceID string)
 }
 
 // RunReflection launches a background reflection agent that extracts
@@ -116,8 +121,9 @@ func (s *Service) RunReflection(ctx context.Context, llmClient gollem.LLMClient,
 
 	// Add trace recorder if trace repository is configured
 	var recorder *trace.Recorder
+	var traceID string
 	if s.traceRepository != nil {
-		traceID := uuid.Must(uuid.NewV7()).String()
+		traceID = uuid.Must(uuid.NewV7()).String()
 		recorder = trace.New(
 			trace.WithTraceID(traceID),
 			trace.WithRepository(s.traceRepository),
@@ -186,6 +192,11 @@ func (s *Service) RunReflection(ctx context.Context, llmClient gollem.LLMClient,
 			if err := recorder.Finish(bgCtx); err != nil {
 				logger.Error("knowledge reflection: failed to finish trace", "error", err)
 			}
+		}
+
+		// Notify caller of completion
+		if input.OnComplete != nil {
+			input.OnComplete(bgCtx, traceID)
 		}
 	}()
 

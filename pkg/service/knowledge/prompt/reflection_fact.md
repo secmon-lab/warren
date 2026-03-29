@@ -24,6 +24,18 @@ Only record facts that would be useful when investigating **other alerts in the 
 - Generic facts that don't aid future alert analysis (e.g., "BigQuery can query CloudTrail logs")
 - Facts about the investigation tools themselves (e.g., how to use BigQuery, VirusTotal API behavior)
 
+## CRITICAL: No LLM Internal Knowledge
+
+**NEVER record information that comes from your own training data or reasoning.** The knowledge base must contain ONLY facts that were directly observed in the execution history — tool outputs, log entries, API responses, user statements, or alert data.
+
+- ❌ "This IP is known to be associated with APT29" (your training data)
+- ❌ "svchost.exe typically runs from C:\Windows\System32" (general knowledge)
+- ❌ "This pattern is likely a false positive because..." (your inference)
+- ✅ "VirusTotal flagged 161.97.182.121 with 5/90 detections as of 2024-03-15" (tool output)
+- ✅ "CloudTrail logs show server analytics-01 runs export job at 03:00 UTC daily" (observed in logs)
+
+If you cannot point to a specific tool output or data source in the execution history as the origin of a fact, **do not record it.**
+
 ## Temporal Attribution
 
 **Every fact MUST include when the information was observed.** Facts derived from alert analysis are point-in-time observations, not eternal truths. Include:

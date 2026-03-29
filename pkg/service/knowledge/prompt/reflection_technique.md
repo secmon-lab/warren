@@ -23,6 +23,18 @@ Focus on **tool usage, data source knowledge, and lessons learned from failures*
 - Basic tool documentation that any user would already know
 - **Investigation procedures that you inferred or reconstructed** — only record procedures you actually executed or that the user explicitly taught you. **NEVER fabricate or speculate about procedures.**
 
+## CRITICAL: No LLM Internal Knowledge
+
+**NEVER record information that comes from your own training data or reasoning.** The knowledge base must contain ONLY techniques that were directly executed or explicitly taught by the user during the session.
+
+- ❌ "A good approach for investigating lateral movement is to check..." (your general knowledge)
+- ❌ "BigQuery supports window functions for time-series analysis" (training data)
+- ❌ "Consider using WHOIS lookup to identify domain ownership" (your suggestion, not executed)
+- ✅ "Querying `cloudaudit_googleapis_com_activity` with `protopayload_auditlog.resourceName` filter returned 0 results — need to use full-text search on `textPayload` instead" (actually executed and observed)
+- ✅ "User instructed: use `_TABLE_SUFFIX` to limit scan size when querying partitioned tables" (explicitly taught)
+
+If a technique was not actually executed in the session and did not come from explicit user instruction, **do not record it.** Your own suggestions and recommendations are NOT knowledge — only observed outcomes and user-provided instructions are.
+
 ## Strict Honesty Policy
 
 - **ONLY record techniques that were actually used in the execution history or explicitly provided by the user.**
