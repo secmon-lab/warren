@@ -2,11 +2,8 @@ package falcon
 
 import (
 	_ "embed"
-	"fmt"
-	"strings"
 
 	"github.com/m-mizutani/gollem"
-	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 )
 
 //go:embed prompt/system.md
@@ -20,7 +17,7 @@ func buildSystemPrompt() string {
 // newPromptTemplate creates a PromptTemplate for the SubAgent.
 func newPromptTemplate() (*gollem.PromptTemplate, error) {
 	return gollem.NewPromptTemplate(
-		"{{if ._memory_context}}{{._memory_context}}\n\n{{end}}{{.request}}",
+		"{{.request}}",
 		map[string]*gollem.Parameter{
 			"request": {
 				Type:        gollem.TypeString,
@@ -29,24 +26,4 @@ func newPromptTemplate() (*gollem.PromptTemplate, error) {
 			},
 		},
 	)
-}
-
-// formatMemoryContext formats memories for injection into the prompt.
-func formatMemoryContext(memories []*memory.AgentMemory) string {
-	if len(memories) == 0 {
-		return ""
-	}
-
-	var buf strings.Builder
-	buf.WriteString("# Past Experiences\n\n")
-	buf.WriteString("You have access to relevant past experiences that may help with this task:\n\n")
-
-	for i, mem := range memories {
-		letter := string(rune('A' + i))
-		fmt.Fprintf(&buf, "## Experience %s\n", letter)
-		fmt.Fprintf(&buf, "**Claim:** %s\n", mem.Claim)
-		buf.WriteString("\n")
-	}
-
-	return buf.String()
 }

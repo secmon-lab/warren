@@ -19,7 +19,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
+
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -70,7 +70,7 @@ func TestHandlePrompt(t *testing.T) {
 			sessionGenCount := 0
 
 			session := &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					sessionGenCount++
 					genContentCount++
 
@@ -219,7 +219,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		mockLLM := &mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 				return &mock.LLMSessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						// Mock plan creation and execution responses
 						for _, inp := range input {
 							if text, ok := inp.(gollem.Text); ok {
@@ -343,7 +343,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		mockLLM := &mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 				return &mock.LLMSessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						for _, inp := range input {
 							if text, ok := inp.(gollem.Text); ok {
 								inputStr := string(text)
@@ -503,7 +503,7 @@ func TestChatErrorNotifications(t *testing.T) {
 		mockLLM := &mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 				return &mock.LLMSessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						// Mock plan creation and execution responses
 						for _, inp := range input {
 							if text, ok := inp.(gollem.Text); ok {
@@ -596,7 +596,7 @@ func TestChatErrorNotifications(t *testing.T) {
 		mockLLM := &mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 				return &mock.LLMSessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						// Fail during plan creation
 						return nil, goerr.New("LLM service temporarily unavailable")
 					},
@@ -669,7 +669,7 @@ func TestChatErrorNotifications(t *testing.T) {
 		mockLLM := &mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 				return &mock.LLMSessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						// Mock plan creation and execution responses
 						for _, inp := range input {
 							if text, ok := inp.(gollem.Text); ok {
@@ -754,7 +754,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		mockLLM := &mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 				return &mock.LLMSessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						for _, inp := range input {
 							if text, ok := inp.(gollem.Text); ok {
 								inputStr := string(text)
@@ -826,7 +826,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		mockLLM := &mock.LLMClientMock{
 			NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 				return &mock.LLMSessionMock{
-					GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 						for _, inp := range input {
 							if text, ok := inp.(gollem.Text); ok {
 								inputStr := string(text)
@@ -1033,7 +1033,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			Topic: "aws-guardduty",
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 5, "", nil, "U12345678", nil, "", nil)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 5, "", "U12345678", nil, "", nil)
 		gt.NoError(t, err)
 
 		// Verify requester_id is rendered in mention format
@@ -1056,25 +1056,18 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 		gt.S(t, result).Contains("Asking Users for Information")
 	})
 
-	t.Run("renders with knowledges", func(t *testing.T) {
+	t.Run("knowledge injection is removed (now via tool search)", func(t *testing.T) {
 		ctx := lang.With(t.Context(), lang.English)
 		target := &ticket.Ticket{
 			ID:    types.NewTicketID(),
 			Topic: "aws-guardduty",
 		}
-		knowledges := []*knowledge.Knowledge{
-			{
-				Name:    "GuardDuty Basics",
-				Content: "GuardDuty monitors AWS accounts for suspicious activity.",
-			},
-		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 3, "", knowledges, "U99999999", nil, "", nil)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 3, "", "U99999999", nil, "", nil)
 		gt.NoError(t, err)
 
-		gt.S(t, result).Contains("Domain Knowledge")
-		gt.S(t, result).Contains("GuardDuty Basics")
-		gt.S(t, result).Contains("GuardDuty monitors AWS accounts")
+		// Knowledge is no longer injected into prompt — accessed via tool search
+		gt.S(t, result).NotContains("Domain Knowledge")
 	})
 
 	t.Run("renders with additional instructions", func(t *testing.T) {
@@ -1083,7 +1076,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			ID: types.NewTicketID(),
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "Use BigQuery for log analysis", nil, "UABC", nil, "", nil)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "Use BigQuery for log analysis", "UABC", nil, "", nil)
 		gt.NoError(t, err)
 
 		gt.S(t, result).Contains("Additional Instructions")
@@ -1096,7 +1089,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			ID: types.NewTicketID(),
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "", nil, "", nil)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", "", nil, "", nil)
 		gt.NoError(t, err)
 
 		// Should render without error even with empty requester_id
@@ -1124,7 +1117,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			},
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", comments, "", nil)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", "U001", comments, "", nil)
 		gt.NoError(t, err)
 
 		gt.S(t, result).Contains("Recent Thread Conversations")
@@ -1141,7 +1134,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			ID: types.NewTicketID(),
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, "", nil)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", "U001", nil, "", nil)
 		gt.NoError(t, err)
 
 		gt.S(t, result).NotContains("Recent Thread Conversations")
@@ -1154,7 +1147,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 		}
 
 		userPrompt := "## Environment\nThis is a production environment.\n\n## Response Policy\nAlways escalate critical findings."
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, userPrompt, nil)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", "U001", nil, userPrompt, nil)
 		gt.NoError(t, err)
 
 		gt.S(t, result).Contains("User System Prompt")
@@ -1168,7 +1161,7 @@ func TestGenerateChatSystemPrompt(t *testing.T) {
 			ID: types.NewTicketID(),
 		}
 
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, "", nil)
+		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", "U001", nil, "", nil)
 		gt.NoError(t, err)
 
 		gt.S(t, result).NotContains("User System Prompt")

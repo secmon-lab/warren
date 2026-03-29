@@ -189,49 +189,6 @@ input UpdateTagInput {
   description: String
 }
 
-input CreateKnowledgeInput {
-  topic: String!
-  slug: String!
-  name: String!
-  content: String!
-}
-
-input UpdateKnowledgeInput {
-  topic: String!
-  slug: String!
-  name: String!
-  content: String!
-}
-
-type Knowledge {
-  slug: String!
-  name: String!
-  topic: String!
-  content: String!
-  commitID: String!
-  authorID: String!
-  author: User!
-  createdAt: String!
-  updatedAt: String!
-  state: String!
-}
-
-type TopicSummary {
-  topic: String!
-  count: Int!
-}
-
-extend type Query {
-  knowledgeTopics: [TopicSummary!]!
-  knowledgesByTopic(topic: String!): [Knowledge!]!
-}
-
-extend type Mutation {
-  createKnowledge(input: CreateKnowledgeInput!): Knowledge!
-  updateKnowledge(input: UpdateKnowledgeInput!): Knowledge!
-  archiveKnowledge(topic: String!, slug: String!): Boolean!
-}
-
 type Session {
   id: ID!
   ticketID: ID!
@@ -260,56 +217,9 @@ extend type Query {
   sessionMessages(sessionId: ID!): [SessionMessage!]!
 }
 
-type AgentMemory {
-  id: ID!
-  agentID: String!
-  query: String!
-  claim: String!
-  score: Float!
-  createdAt: String!
-  lastUsedAt: String
-}
-
-type AgentSummary {
-  agentID: String!
-  memoriesCount: Int!
-  latestMemoryAt: String
-}
-
-type AgentMemoriesResponse {
-  memories: [AgentMemory!]!
-  totalCount: Int!
-}
-
-type AgentSummariesResponse {
-  agents: [AgentSummary!]!
-  totalCount: Int!
-}
-
-enum MemorySortField {
-  SCORE
-  CREATED_AT
-  LAST_USED_AT
-}
-
 enum SortOrder {
   ASC
   DESC
-}
-
-extend type Query {
-  listAgentSummaries(offset: Int, limit: Int, keyword: String): AgentSummariesResponse!
-  listAgentMemories(
-    agentID: String!
-    offset: Int
-    limit: Int
-    sortBy: MemorySortField
-    sortOrder: SortOrder
-    keyword: String
-    minScore: Float
-    maxScore: Float
-  ): AgentMemoriesResponse!
-  getAgentMemory(agentID: String!, memoryID: ID!): AgentMemory
 }
 
 type DiagnosisIssue {
@@ -394,6 +304,85 @@ extend type Query {
 extend type Mutation {
   reprocessQueuedAlert(id: ID!): ReprocessJob!
   discardQueuedAlerts(ids: [ID!]!): Boolean!
+}
+
+# Knowledge: topic-based knowledge store
+type Knowledge {
+  id: ID!
+  category: String!
+  title: String!
+  claim: String!
+  tags: [KnowledgeTag!]!
+  authorID: String!
+  author: User!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type KnowledgeLog {
+  id: ID!
+  knowledgeID: ID!
+  title: String!
+  claim: String!
+  authorID: String!
+  author: User!
+  ticketID: String
+  message: String!
+  createdAt: String!
+}
+
+type KnowledgeTag {
+  id: ID!
+  name: String!
+  description: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+input CreateKnowledgeInput {
+  category: String!
+  title: String!
+  claim: String!
+  tags: [ID!]!
+  message: String!
+  ticketID: String
+}
+
+input UpdateKnowledgeInput {
+  id: ID!
+  title: String!
+  claim: String!
+  tags: [ID!]!
+  message: String!
+  ticketID: String
+}
+
+input CreateKnowledgeTagInput {
+  name: String!
+  description: String
+}
+
+input UpdateKnowledgeTagInput {
+  id: ID!
+  name: String!
+  description: String
+}
+
+extend type Query {
+  knowledges(category: String, tags: [ID!], keyword: String): [Knowledge!]!
+  knowledge(id: ID!): Knowledge
+  knowledgeLogs(knowledgeID: ID!): [KnowledgeLog!]!
+  knowledgeTags: [KnowledgeTag!]!
+}
+
+extend type Mutation {
+  createKnowledge(input: CreateKnowledgeInput!): Knowledge!
+  updateKnowledge(input: UpdateKnowledgeInput!): Knowledge!
+  deleteKnowledge(id: ID!, reason: String!): Boolean!
+  createKnowledgeTag(input: CreateKnowledgeTagInput!): KnowledgeTag!
+  updateKnowledgeTag(input: UpdateKnowledgeTagInput!): KnowledgeTag!
+  deleteKnowledgeTag(id: ID!): Boolean!
+  mergeKnowledgeTags(oldID: ID!, newID: ID!): Boolean!
 }
 
 schema {

@@ -174,6 +174,11 @@ func (u *UseCases) buildDiagnosisRules() []diagnosisrule.Rule {
 		diagnosisrule.NewOrphanedTagIDRule(),
 		diagnosisrule.NewMissingAlertMetadataRule(u.llmClient),
 	}
+
+	if u.knowledgeSvc != nil {
+		rules = append(rules, diagnosisrule.NewLegacyKnowledgeRule(u.knowledgeSvc))
+	}
+
 	return rules
 }
 

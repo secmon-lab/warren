@@ -28,7 +28,7 @@ test.describe("Navigation", () => {
       {
         target: "knowledge" as const,
         url: /\/knowledge$/,
-        heading: "Knowledge",
+        heading: "Knowledge Base",
       },
       { target: "settings" as const, url: /\/settings$/, heading: "Settings" },
     ];

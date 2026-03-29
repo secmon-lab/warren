@@ -36,6 +36,7 @@ const KNOWN_RULE_IDS = [
   "binding_mismatch",
   "orphaned_tag_id",
   "missing_alert_metadata",
+  "legacy_knowledge",
 ];
 
 function issueStatusBadgeVariant(status: string): "default" | "secondary" | "destructive" | "outline" {

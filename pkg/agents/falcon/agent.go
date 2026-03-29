@@ -8,17 +8,15 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/service/memory"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
 // agent represents a CrowdStrike Falcon Sub-Agent (private).
 type agent struct {
-	internalTool  gollem.ToolSet
-	llmClient     gollem.LLMClient
-	repo          interfaces.Repository
-	memoryService *memory.Service
+	internalTool gollem.ToolSet
+	llmClient    gollem.LLMClient
+	repo         interfaces.Repository
 }
 
 func (a *agent) name() string {
@@ -82,22 +80,7 @@ func (a *agent) createMiddleware() func(gollem.SubAgentHandler) gollem.SubAgentH
 
 			startTime := time.Now()
 
-			// Pre-execution: Memory search
-			log.Debug("Searching for relevant memories", "agent_id", "query_falcon", "limit", 16)
-			memories, err := a.memoryService.SearchAndSelectMemories(ctx, request, 16)
-			if err != nil {
-				log.Warn("memory search failed, continuing without memories", "error", err)
-				memories = nil
-			} else {
-				log.Debug("Memories found", "count", len(memories))
-			}
-
-			// Inject memory context into args
-			if len(memories) > 0 {
-				args["_memory_context"] = formatMemoryContext(memories)
-			}
 			args["_original_request"] = request
-			args["_memories"] = memories
 
 			// Execute internal agent
 			result, err := next(ctx, args)
@@ -106,17 +89,6 @@ func (a *agent) createMiddleware() func(gollem.SubAgentHandler) gollem.SubAgentH
 
 			if err != nil {
 				return gollem.SubAgentResult{}, err
-			}
-
-			// Post-execution: Memory extraction (non-critical)
-			history, err := result.Session.History()
-			if err != nil {
-				log.Warn("failed to get history", "error", err)
-			} else {
-				if err := a.memoryService.ExtractAndSaveMemories(ctx, request, memories, history); err != nil {
-					log.Warn("memory extraction failed", "error", err)
-					msg.Warn(ctx, "⚠️ *Warning:* Failed to save execution memories")
-				}
 			}
 
 			// Record extraction (critical)

@@ -178,7 +178,6 @@ func validateGoogleIDToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			logging.From(r.Context()).Debug("no Authorization header found")
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -434,7 +433,6 @@ func authorizeWithPolicy(policy interfaces.PolicyClient, noAuthorization bool) f
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Bypass authorization check if --no-authorization flag is set
 			if noAuthorization {
-				logging.From(r.Context()).Debug("authorization check bypassed due to --no-authorization flag")
 				next.ServeHTTP(w, r)
 				return
 			}

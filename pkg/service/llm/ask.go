@@ -80,7 +80,7 @@ func askWithValidation[T any](ctx context.Context, llm gollem.LLMClient, prompt 
 
 	currentPrompt := prompt
 	for i := 0; i < config.maxRetry; i++ {
-		resp, err := ssn.GenerateContent(ctx, gollem.Text(currentPrompt))
+		resp, err := ssn.Generate(ctx, []gollem.Input{gollem.Text(currentPrompt)})
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to send message")
 		}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"strings"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
@@ -19,8 +20,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/service/llm"
-	"github.com/secmon-lab/warren/pkg/service/memory"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/usecase/chat"
@@ -42,7 +43,7 @@ type SwarmChat struct {
 	policyClient        interfaces.PolicyClient
 	storageClient       interfaces.StorageClient
 	slackService        *slackService.Service
-	memoryService       *memory.Service
+	knowledgeService    *svcknowledge.Service
 	tools               []gollem.ToolSet
 	subAgents           []*agent.SubAgent
 	storagePrefix       string
@@ -104,9 +105,9 @@ func WithTraceRepository(repo trace.Repository) Option {
 	return func(c *SwarmChat) { c.traceRepository = repo }
 }
 
-// WithMemoryService sets the memory service for agent memory integration.
-func WithMemoryService(svc *memory.Service) Option {
-	return func(c *SwarmChat) { c.memoryService = svc }
+// WithKnowledgeService sets the knowledge v2 service for reflection.
+func WithKnowledgeService(svc *svcknowledge.Service) Option {
+	return func(c *SwarmChat) { c.knowledgeService = svc }
 }
 
 // WithMaxPhases sets the maximum number of execution phases.
@@ -264,12 +265,10 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 		alerts:         chatCtx.Alerts,
 		tools:          chatCtx.Tools,
 		subAgents:      c.subAgents,
-		memoryContext:  chatCtx.MemoryContext,
 		userPrompt:     c.userSystemPrompt,
 		lang:           lang.From(ctx),
 		requesterID:    string(types.UserID(user.FromContext(ctx))),
 		threadComments: chatCtx.ThreadComments,
-		knowledges:     chatCtx.Knowledges,
 		slackHistory:   chatCtx.SlackHistory,
 	}
 
@@ -277,15 +276,13 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 	var systemPrompt string
 	if ticketless {
 		tlpc := &ticketlessPlanningContext{
-			message:       message,
-			tools:         chatCtx.Tools,
-			subAgents:     c.subAgents,
-			memoryContext: chatCtx.MemoryContext,
-			userPrompt:    c.userSystemPrompt,
-			lang:          lang.From(ctx),
-			requesterID:   string(types.UserID(user.FromContext(ctx))),
-			knowledges:    chatCtx.Knowledges,
-			history:       chatCtx.SlackHistory,
+			message:     message,
+			tools:       chatCtx.Tools,
+			subAgents:   c.subAgents,
+			userPrompt:  c.userSystemPrompt,
+			lang:        lang.From(ctx),
+			requesterID: string(types.UserID(user.FromContext(ctx))),
+			history:     chatCtx.SlackHistory,
 		}
 		var err error
 		systemPrompt, err = generateTicketlessSystemPrompt(ctx, tlpc)
@@ -477,11 +474,32 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 
 	msg.Notify(ctx, "💬 %s", finalResp)
 
+	// Trigger fact knowledge reflection in background
+	c.triggerFactReflection(ctx, buildReflectionSummary(allResults), target)
+
 	if !ticketless {
 		logger.Debug("swarm executeSwarm: completed, saving history")
 		return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
 	}
 	return nil
+}
+
+// buildReflectionSummary aggregates all task results into a text summary for reflection.
+func buildReflectionSummary(allResults []*phaseResult) string {
+	var sb strings.Builder
+	for _, pr := range allResults {
+		for i, r := range pr.results {
+			if r == nil || r.Result == "" {
+				continue
+			}
+			title := ""
+			if i < len(pr.tasks) {
+				title = pr.tasks[i].Title
+			}
+			fmt.Fprintf(&sb, "## Task: %s\n%s\n\n", title, r.Result)
+		}
+	}
+	return sb.String()
 }
 
 // phaseResult stores the results of a single phase execution.

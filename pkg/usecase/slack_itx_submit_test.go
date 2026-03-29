@@ -40,7 +40,7 @@ func TestGenerateResolveMessage(t *testing.T) {
 			llmMock := &mock.LLMClientMock{
 				NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 					return &mock.LLMSessionMock{
-						GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+						GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 							if tc.llmError != nil {
 								return nil, tc.llmError
 							}
@@ -354,7 +354,7 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithTags(t *testing.T
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{"🎉 Great work resolving this incident!"},
 					}, nil
@@ -509,7 +509,7 @@ func TestHandleSlackInteractionViewSubmissionResolveTicket_WithoutTags(t *testin
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{"🎉 Resolution complete!"},
 					}, nil
@@ -671,7 +671,7 @@ func TestSlackInteractionViewSubmissionResolveTicket_TagMerging(t *testing.T) {
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{"🎉 Great work resolving this ticket!"},
 					}, nil
@@ -796,7 +796,7 @@ func TestSlackInteractionViewSubmissionResolveTicket_TagDuplicationFix(t *testin
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{"🎉 Bug fix verified!"},
 					}, nil

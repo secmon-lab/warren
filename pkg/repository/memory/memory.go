@@ -52,10 +52,10 @@ type Memory struct {
 	hitl *hitlStore
 
 	// Circuit breaker / throttle management
-	throttleMu     sync.RWMutex
-	queuedAlerts   map[types.QueuedAlertID]*alert.QueuedAlert
-	reprocessJobs  map[types.ReprocessJobID]*alert.ReprocessJob
-	alertThrottle  *alert.AlertThrottle
+	throttleMu    sync.RWMutex
+	queuedAlerts  map[types.QueuedAlertID]*alert.QueuedAlert
+	reprocessJobs map[types.ReprocessJobID]*alert.ReprocessJob
+	alertThrottle *alert.AlertThrottle
 
 	// Call counter for tracking method invocations
 	callCounts map[string]int
