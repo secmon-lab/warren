@@ -7,6 +7,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	knowledgeModel "github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -14,16 +15,31 @@ import (
 
 // Service provides knowledge management operations.
 type Service struct {
-	repo           interfaces.Repository
-	embeddingModel interfaces.EmbeddingClient
+	repo            interfaces.Repository
+	embeddingModel  interfaces.EmbeddingClient
+	traceRepository trace.Repository
+}
+
+// ServiceOption configures a Service.
+type ServiceOption func(*Service)
+
+// WithTraceRepository sets the trace repository for introspection tracing.
+func WithTraceRepository(repo trace.Repository) ServiceOption {
+	return func(s *Service) {
+		s.traceRepository = repo
+	}
 }
 
 // New creates a new knowledge service.
-func New(repo interfaces.Repository, embeddingModel interfaces.EmbeddingClient) *Service {
-	return &Service{
+func New(repo interfaces.Repository, embeddingModel interfaces.EmbeddingClient, opts ...ServiceOption) *Service {
+	s := &Service{
 		repo:           repo,
 		embeddingModel: embeddingModel,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // SaveKnowledge creates or updates a knowledge entry, recording a log.

@@ -388,7 +388,11 @@ func cmdServe() *cli.Command {
 			}
 
 			// Create knowledge service for introspection and GraphQL
-			knowledgeSvc := svcknowledge.New(repo, embeddingAdapter)
+			var knowledgeOpts []svcknowledge.ServiceOption
+			if safeTraceRepo != nil {
+				knowledgeOpts = append(knowledgeOpts, svcknowledge.WithTraceRepository(safeTraceRepo))
+			}
+			knowledgeSvc := svcknowledge.New(repo, embeddingAdapter, knowledgeOpts...)
 
 			// Configure chat strategy
 			if chatStrategy == "swarm" {

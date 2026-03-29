@@ -5,8 +5,10 @@ import (
 	_ "embed"
 	"encoding/json"
 
+	"github.com/google/uuid"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -112,6 +114,28 @@ func (s *Service) RunIntrospection(ctx context.Context, llmClient gollem.LLMClie
 		gollem.WithContentBlockMiddleware(newIntrospectionContentBlockMiddleware()),
 	}
 
+	// Add trace recorder if trace repository is configured
+	var recorder *trace.Recorder
+	if s.traceRepository != nil {
+		traceID := uuid.Must(uuid.NewV7()).String()
+		recorder = trace.New(
+			trace.WithTraceID(traceID),
+			trace.WithRepository(s.traceRepository),
+			trace.WithStackTrace(),
+			trace.WithMetadata(trace.TraceMetadata{
+				Labels: map[string]string{
+					"type":     "introspection",
+					"category": string(input.Category),
+				},
+			}),
+		)
+		opts = append(opts, gollem.WithTrace(recorder))
+		logger.Info("knowledge introspection trace enabled",
+			"trace_id", traceID,
+			"category", input.Category,
+		)
+	}
+
 	// Create agent
 	agent := gollem.New(llmClient, opts...)
 
@@ -154,6 +178,13 @@ func (s *Service) RunIntrospection(ctx context.Context, llmClient gollem.LLMClie
 					"category", input.Category,
 					"response", respText,
 				)
+			}
+		}
+
+		// Finish trace recording
+		if recorder != nil {
+			if err := recorder.Finish(bgCtx); err != nil {
+				logger.Error("knowledge introspection: failed to finish trace", "error", err)
 			}
 		}
 	}()
