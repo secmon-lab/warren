@@ -77,7 +77,6 @@ test.describe("Knowledge", () => {
     authenticatedPage: page,
   }) => {
     await page.goto("/knowledge/new");
-    await page.waitForLoadState("networkidle");
 
     // Category selector
     await expect(page.getByRole("button", { name: "fact" })).toBeVisible();

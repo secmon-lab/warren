@@ -27,6 +27,19 @@ type AgentSummary struct {
 	LatestMemoryAt time.Time
 }
 
+// LegacyKnowledge represents an old-format knowledge entry for migration.
+// Old knowledge was stored in: topics/{topic}/knowledges/{slug}/commits/{commitID}/
+type LegacyKnowledge struct {
+	Topic     string
+	Slug      string
+	Name      string
+	Content   string
+	Author    string
+	State     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 // AgentMemoryListOptions contains filtering, sorting, and pagination options for listing agent memories
 type AgentMemoryListOptions struct {
 	Offset   int
@@ -254,6 +267,11 @@ type Repository interface {
 	GetKnowledgeLog(ctx context.Context, knowledgeID types.KnowledgeID, logID types.KnowledgeLogID) (*knowledge.KnowledgeLog, error)
 	ListKnowledgeLogs(ctx context.Context, knowledgeID types.KnowledgeID) ([]*knowledge.KnowledgeLog, error)
 	PutKnowledgeLog(ctx context.Context, log *knowledge.KnowledgeLog) error
+
+	// Legacy knowledge migration
+	// ListLegacyKnowledges returns all old-format knowledge entries from the topics collection.
+	// Returns empty slice if no legacy data exists.
+	ListLegacyKnowledges(ctx context.Context) ([]*LegacyKnowledge, error)
 
 	// Knowledge v2 tag management (collection: knowledge_tags)
 	GetKnowledgeTag(ctx context.Context, id types.KnowledgeTagID) (*knowledge.KnowledgeTag, error)

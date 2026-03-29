@@ -67,6 +67,7 @@ export default function KnowledgePage() {
         {tags.map((tag: { id: string; name: string }) => (
           <button
             key={tag.id}
+            data-testid="knowledge-tag-button"
             onClick={() => toggleTag(tag.id)}
             className={`rounded-full px-3 py-1 text-xs font-medium ${
               selectedTagIds.includes(tag.id)
@@ -102,6 +103,7 @@ export default function KnowledgePage() {
           <Link
             key={k.id}
             to={`/knowledge/${k.id}`}
+            data-testid="knowledge-item"
             className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 cursor-pointer transition-colors"
           >
             <div className="flex-1 min-w-0">

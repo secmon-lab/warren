@@ -16,6 +16,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	policySvc "github.com/secmon-lab/warren/pkg/service/policy"
+	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
 
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
@@ -280,11 +281,17 @@ func (uc *UseCases) executePromptTask(ctx context.Context, alert *alert.Alert, t
 
 	// Add tools if available
 	if len(uc.tools) > 0 {
-
 		options = append(options, gollem.WithToolSets(uc.tools...))
 		logger.Debug("agent has tools available",
 			"task_id", task.ID,
 			"tools_count", len(uc.tools))
+	}
+
+	// Add knowledge search tool if knowledge service is configured
+	if uc.knowledgeSvc != nil {
+		factTool := knowledgeTool.New(uc.knowledgeSvc, types.KnowledgeCategoryFact, knowledgeTool.ModeReadOnly)
+		options = append(options, gollem.WithToolSets(factTool))
+		logger.Debug("knowledge search tool added", "task_id", task.ID)
 	}
 	if task.Format == types.GenAIContentFormatJSON {
 		options = append(options, gollem.WithContentType(gollem.ContentTypeJSON))

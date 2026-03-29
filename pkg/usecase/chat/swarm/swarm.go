@@ -20,8 +20,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
-	"github.com/secmon-lab/warren/pkg/service/llm"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
+	"github.com/secmon-lab/warren/pkg/service/llm"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/usecase/chat"
@@ -43,7 +43,7 @@ type SwarmChat struct {
 	policyClient        interfaces.PolicyClient
 	storageClient       interfaces.StorageClient
 	slackService        *slackService.Service
-	knowledgeService  *svcknowledge.Service
+	knowledgeService    *svcknowledge.Service
 	tools               []gollem.ToolSet
 	subAgents           []*agent.SubAgent
 	storagePrefix       string
@@ -276,13 +276,13 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 	var systemPrompt string
 	if ticketless {
 		tlpc := &ticketlessPlanningContext{
-			message:       message,
-			tools:         chatCtx.Tools,
-			subAgents:     c.subAgents,
-			userPrompt:    c.userSystemPrompt,
-			lang:          lang.From(ctx),
-			requesterID:   string(types.UserID(user.FromContext(ctx))),
-			history:       chatCtx.SlackHistory,
+			message:     message,
+			tools:       chatCtx.Tools,
+			subAgents:   c.subAgents,
+			userPrompt:  c.userSystemPrompt,
+			lang:        lang.From(ctx),
+			requesterID: string(types.UserID(user.FromContext(ctx))),
+			history:     chatCtx.SlackHistory,
 		}
 		var err error
 		systemPrompt, err = generateTicketlessSystemPrompt(ctx, tlpc)

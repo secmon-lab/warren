@@ -38,6 +38,10 @@ The following messages provide context from the Slack channel:
 {{ end }}
 {{- end }}
 
+## Knowledge Base
+
+Before starting your work, **search the knowledge base** using `knowledge_search` for relevant prior knowledge. Use `knowledge_tag_list` first to see available tags, then search with relevant tags and keywords from the user's question.
+
 ## Available Tools
 {{ .tools_description }}
 

@@ -2908,6 +2908,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			ListKnowledgesByCategoryAndTagsFunc: func(ctx context.Context, category types.KnowledgeCategory, tagIDs []types.KnowledgeTagID) ([]*knowledge.Knowledge, error) {
 //				panic("mock out the ListKnowledgesByCategoryAndTags method")
 //			},
+//			ListLegacyKnowledgesFunc: func(ctx context.Context) ([]*interfaces.LegacyKnowledge, error) {
+//				panic("mock out the ListLegacyKnowledges method")
+//			},
 //			ListPendingDiagnosisIssuesFunc: func(ctx context.Context, diagnosisID types.DiagnosisID) ([]*diagnosis.Issue, error) {
 //				panic("mock out the ListPendingDiagnosisIssues method")
 //			},
@@ -3274,6 +3277,9 @@ type RepositoryMock struct {
 
 	// ListKnowledgesByCategoryAndTagsFunc mocks the ListKnowledgesByCategoryAndTags method.
 	ListKnowledgesByCategoryAndTagsFunc func(ctx context.Context, category types.KnowledgeCategory, tagIDs []types.KnowledgeTagID) ([]*knowledge.Knowledge, error)
+
+	// ListLegacyKnowledgesFunc mocks the ListLegacyKnowledges method.
+	ListLegacyKnowledgesFunc func(ctx context.Context) ([]*interfaces.LegacyKnowledge, error)
 
 	// ListPendingDiagnosisIssuesFunc mocks the ListPendingDiagnosisIssues method.
 	ListPendingDiagnosisIssuesFunc func(ctx context.Context, diagnosisID types.DiagnosisID) ([]*diagnosis.Issue, error)
@@ -4028,6 +4034,11 @@ type RepositoryMock struct {
 			// TagIDs is the tagIDs argument value.
 			TagIDs []types.KnowledgeTagID
 		}
+		// ListLegacyKnowledges holds details about calls to the ListLegacyKnowledges method.
+		ListLegacyKnowledges []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// ListPendingDiagnosisIssues holds details about calls to the ListPendingDiagnosisIssues method.
 		ListPendingDiagnosisIssues []struct {
 			// Ctx is the ctx argument value.
@@ -4398,6 +4409,7 @@ type RepositoryMock struct {
 	lockListKnowledgeLogs               sync.RWMutex
 	lockListKnowledgeTags               sync.RWMutex
 	lockListKnowledgesByCategoryAndTags sync.RWMutex
+	lockListLegacyKnowledges            sync.RWMutex
 	lockListPendingDiagnosisIssues      sync.RWMutex
 	lockListQueuedAlerts                sync.RWMutex
 	lockPutActivity                     sync.RWMutex
@@ -7888,6 +7900,42 @@ func (mock *RepositoryMock) ListKnowledgesByCategoryAndTagsCalls() []struct {
 	mock.lockListKnowledgesByCategoryAndTags.RLock()
 	calls = mock.calls.ListKnowledgesByCategoryAndTags
 	mock.lockListKnowledgesByCategoryAndTags.RUnlock()
+	return calls
+}
+
+// ListLegacyKnowledges calls ListLegacyKnowledgesFunc.
+func (mock *RepositoryMock) ListLegacyKnowledges(ctx context.Context) ([]*interfaces.LegacyKnowledge, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockListLegacyKnowledges.Lock()
+	mock.calls.ListLegacyKnowledges = append(mock.calls.ListLegacyKnowledges, callInfo)
+	mock.lockListLegacyKnowledges.Unlock()
+	if mock.ListLegacyKnowledgesFunc == nil {
+		var (
+			legacyKnowledgesOut []*interfaces.LegacyKnowledge
+			errOut              error
+		)
+		return legacyKnowledgesOut, errOut
+	}
+	return mock.ListLegacyKnowledgesFunc(ctx)
+}
+
+// ListLegacyKnowledgesCalls gets all the calls that were made to ListLegacyKnowledges.
+// Check the length with:
+//
+//	len(mockedRepository.ListLegacyKnowledgesCalls())
+func (mock *RepositoryMock) ListLegacyKnowledgesCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockListLegacyKnowledges.RLock()
+	calls = mock.calls.ListLegacyKnowledges
+	mock.lockListLegacyKnowledges.RUnlock()
 	return calls
 }
 

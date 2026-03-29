@@ -15,6 +15,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
+	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
 	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/slackctx"
@@ -125,14 +126,18 @@ func (x *UseCases) buildChatContext(ctx context.Context, t *ticket.Ticket, slack
 		baseAction := base.New(x.repository, t.ID, base.WithSlackUpdate(slackUpdateFunc), base.WithLLMClient(x.llmClient))
 		allTools = append(allTools, baseAction)
 	}
+	// Add knowledge search tool if knowledge service is configured
+	if x.knowledgeSvc != nil {
+		factTool := knowledgeTool.New(x.knowledgeSvc, types.KnowledgeCategoryFact, knowledgeTool.ModeReadOnly)
+		allTools = append(allTools, factTool)
+	}
+
 	chatCtx.Tools = allTools
 
 	// Collect thread comments (skip for ticketless)
 	if !ticketless {
 		chatCtx.ThreadComments = chatpkg.CollectThreadComments(ctx, x.repository, t.ID, nil)
 	}
-
-	// Knowledge is now accessed via tool search (knowledge v2), not prompt injection.
 
 	// Load history (skip for ticketless)
 	if !ticketless {

@@ -5,6 +5,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
@@ -207,4 +208,9 @@ func (r *Memory) DeleteKnowledgeTag(_ context.Context, id types.KnowledgeTagID) 
 
 	delete(r.knowledge.tags, id)
 	return nil
+}
+
+// ListLegacyKnowledges returns nil for the memory repository since it has no legacy data.
+func (r *Memory) ListLegacyKnowledges(_ context.Context) ([]*interfaces.LegacyKnowledge, error) {
+	return nil, nil
 }

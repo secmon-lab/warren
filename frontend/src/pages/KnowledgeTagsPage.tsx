@@ -6,8 +6,10 @@ import {
   UPDATE_KNOWLEDGE_TAG,
   DELETE_KNOWLEDGE_TAG,
 } from "@/lib/graphql/queries";
+import { useConfirm } from "@/hooks/use-confirm";
 
 export default function KnowledgeTagsPage() {
+  const confirm = useConfirm();
   const { data, loading, refetch } = useQuery(GET_KNOWLEDGE_TAGS);
   const tags = data?.knowledgeTags || [];
 
@@ -44,7 +46,13 @@ export default function KnowledgeTagsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this tag?")) return;
+    const confirmed = await confirm({
+      title: "Delete Tag",
+      description: "Are you sure you want to delete this tag?",
+      confirmText: "Delete",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
     await deleteTag({ variables: { id } });
     refetch();
   };

@@ -3,9 +3,11 @@ package firestore
 import (
 	"context"
 	"sort"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"google.golang.org/grpc/codes"
@@ -242,4 +244,103 @@ func (r *Firestore) DeleteKnowledgeTag(ctx context.Context, id types.KnowledgeTa
 		return goerr.Wrap(err, "failed to delete knowledge tag", goerr.V("id", id))
 	}
 	return nil
+}
+
+// Legacy knowledge migration
+
+const collectionTopics = "topics"
+
+type legacyCommitDoc struct {
+	Slug      string    `firestore:"Slug"`
+	Name      string    `firestore:"Name"`
+	Content   string    `firestore:"Content"`
+	CommitID  string    `firestore:"CommitID"`
+	Author    string    `firestore:"Author"`
+	CreatedAt time.Time `firestore:"CreatedAt"`
+	UpdatedAt time.Time `firestore:"UpdatedAt"`
+}
+
+type legacySlugDoc struct {
+	State string `firestore:"State"`
+}
+
+// ListLegacyKnowledges reads old-format knowledge entries from the topics collection.
+// Structure: topics/{topic}/knowledges/{slug}/commits/{commitID}
+// For each topic -> for each slug -> get latest commit (by CreatedAt DESC, limit 1).
+// Only includes active entries (State == "active").
+func (r *Firestore) ListLegacyKnowledges(ctx context.Context) ([]*interfaces.LegacyKnowledge, error) {
+	// Iterate all topic documents
+	topicsIter := r.db.Collection(collectionTopics).Documents(ctx)
+	defer topicsIter.Stop()
+
+	var result []*interfaces.LegacyKnowledge
+
+	for {
+		topicDoc, err := topicsIter.Next()
+		if err != nil {
+			break
+		}
+		topicName := topicDoc.Ref.ID
+
+		// Iterate all slug documents under this topic
+		slugsIter := r.db.Collection(collectionTopics).Doc(topicName).
+			Collection("knowledges").Documents(ctx)
+
+		for {
+			slugDoc, err := slugsIter.Next()
+			if err != nil {
+				break
+			}
+			slugName := slugDoc.Ref.ID
+
+			// Read slug doc to get State
+			var slugData legacySlugDoc
+			if err := slugDoc.DataTo(&slugData); err != nil {
+				slugsIter.Stop()
+				return nil, goerr.Wrap(err, "failed to decode legacy slug doc",
+					goerr.V("topic", topicName), goerr.V("slug", slugName))
+			}
+
+			// Only include active entries
+			if slugData.State != "active" {
+				continue
+			}
+
+			// Get latest commit (order by CreatedAt DESC, limit 1)
+			commitsIter := r.db.Collection(collectionTopics).Doc(topicName).
+				Collection("knowledges").Doc(slugName).
+				Collection("commits").
+				OrderBy("CreatedAt", firestore.Desc).
+				Limit(1).
+				Documents(ctx)
+
+			commitDoc, err := commitsIter.Next()
+			commitsIter.Stop()
+			if err != nil {
+				// No commits found for this slug, skip
+				continue
+			}
+
+			var commit legacyCommitDoc
+			if err := commitDoc.DataTo(&commit); err != nil {
+				slugsIter.Stop()
+				return nil, goerr.Wrap(err, "failed to decode legacy commit doc",
+					goerr.V("topic", topicName), goerr.V("slug", slugName))
+			}
+
+			result = append(result, &interfaces.LegacyKnowledge{
+				Topic:     topicName,
+				Slug:      slugName,
+				Name:      commit.Name,
+				Content:   commit.Content,
+				Author:    commit.Author,
+				State:     slugData.State,
+				CreatedAt: commit.CreatedAt,
+				UpdatedAt: commit.UpdatedAt,
+			})
+		}
+		slugsIter.Stop()
+	}
+
+	return result, nil
 }

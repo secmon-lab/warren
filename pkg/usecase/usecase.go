@@ -16,6 +16,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/command"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
 
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/service/notifier"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/tag"
@@ -41,6 +42,7 @@ type UseCases struct {
 	tools           []gollem.ToolSet
 	subAgents       []*agent.SubAgent
 	traceRepository trace.Repository
+	knowledgeSvc    *svcknowledge.Service
 
 	// use cases
 	ChatUC interfaces.ChatUseCase
@@ -188,6 +190,12 @@ func WithUserSystemPrompt(prompt string) Option {
 func WithCircuitBreaker(service *cbService.Service) Option {
 	return func(u *UseCases) {
 		u.cbService = service
+	}
+}
+
+func WithKnowledgeService(svc *svcknowledge.Service) Option {
+	return func(u *UseCases) {
+		u.knowledgeSvc = svc
 	}
 }
 

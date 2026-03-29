@@ -24,11 +24,11 @@ export class KnowledgeListPage extends BasePage {
   }
 
   get tagButtons() {
-    return this.page.locator("button.rounded-full");
+    return this.page.getByTestId("knowledge-tag-button");
   }
 
   get knowledgeItems() {
-    return this.page.locator(".border.rounded-md.divide-y > a");
+    return this.page.getByTestId("knowledge-item");
   }
 
   async selectCategory(category: "fact" | "technique") {

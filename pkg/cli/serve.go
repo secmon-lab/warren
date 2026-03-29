@@ -329,6 +329,24 @@ func cmdServe() *cli.Command {
 				return goerr.Wrap(err, "failed to configure user system prompt")
 			}
 
+			// Configure trace repository if trace bucket is set
+			var safeTraceRepo trace.Repository
+			if traceCfg.IsConfigured() {
+				traceRepo, err := traceCfg.Configure(ctx)
+				if err != nil {
+					return goerr.Wrap(err, "failed to configure trace repository")
+				}
+				safeTraceRepo = traceAdapter.NewSafe(traceRepo, logging.From(ctx))
+				logging.From(ctx).Info("Trace recording enabled", "trace", traceCfg.LogValue())
+			}
+
+			// Create knowledge service for reflection and GraphQL
+			var knowledgeOpts []svcknowledge.ServiceOption
+			if safeTraceRepo != nil {
+				knowledgeOpts = append(knowledgeOpts, svcknowledge.WithTraceRepository(safeTraceRepo))
+			}
+			knowledgeSvc := svcknowledge.New(repo, embeddingAdapter, knowledgeOpts...)
+
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
@@ -340,6 +358,19 @@ func cmdServe() *cli.Command {
 				usecase.WithNoAuthorization(noAuthorization),
 				usecase.WithTagService(tagService),
 				usecase.WithUserSystemPrompt(userSystemPrompt),
+				usecase.WithKnowledgeService(knowledgeSvc),
+			}
+
+			if safeTraceRepo != nil {
+				ucOptions = append(ucOptions, usecase.WithTraceRepository(safeTraceRepo))
+			}
+
+			if cbCfg.Enabled {
+				cbSvc := circuitbreaker.New(repo, cbCfg.ToConfig())
+				ucOptions = append(ucOptions, usecase.WithCircuitBreaker(cbSvc))
+				logging.From(ctx).Info("Circuit breaker enabled",
+					"window", cbCfg.Window,
+					"limit", cbCfg.Limit)
 			}
 
 			// Add storage prefix if configured
@@ -365,34 +396,6 @@ func cmdServe() *cli.Command {
 			if webUICfg.GetFrontendURL() != "" {
 				ucOptions = append(ucOptions, usecase.WithFrontendURL(webUICfg.GetFrontendURL()))
 			}
-
-			// Configure trace repository if trace bucket is set
-			var safeTraceRepo trace.Repository
-			if traceCfg.IsConfigured() {
-				traceRepo, err := traceCfg.Configure(ctx)
-				if err != nil {
-					return goerr.Wrap(err, "failed to configure trace repository")
-				}
-				safeTraceRepo = traceAdapter.NewSafe(traceRepo, logging.From(ctx))
-				ucOptions = append(ucOptions, usecase.WithTraceRepository(safeTraceRepo))
-				logging.From(ctx).Info("Trace recording enabled", "trace", traceCfg.LogValue())
-			}
-
-			// Configure circuit breaker if enabled
-			if cbCfg.Enabled {
-				cbSvc := circuitbreaker.New(repo, cbCfg.ToConfig())
-				ucOptions = append(ucOptions, usecase.WithCircuitBreaker(cbSvc))
-				logging.From(ctx).Info("Circuit breaker enabled",
-					"window", cbCfg.Window,
-					"limit", cbCfg.Limit)
-			}
-
-			// Create knowledge service for reflection and GraphQL
-			var knowledgeOpts []svcknowledge.ServiceOption
-			if safeTraceRepo != nil {
-				knowledgeOpts = append(knowledgeOpts, svcknowledge.WithTraceRepository(safeTraceRepo))
-			}
-			knowledgeSvc := svcknowledge.New(repo, embeddingAdapter, knowledgeOpts...)
 
 			// Configure chat strategy
 			if chatStrategy == "swarm" {

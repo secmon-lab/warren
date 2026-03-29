@@ -106,13 +106,13 @@ func generateFinalPrompt(ctx context.Context, pc *planningContext, allResults []
 
 // ticketlessPlanningContext holds the shared context for ticketless planning operations.
 type ticketlessPlanningContext struct {
-	message       string
-	tools         []gollem.ToolSet
-	subAgents     []*agent.SubAgent
-	userPrompt    string
-	lang          lang.Lang
-	requesterID   string
-	history       []model.HistoryMessage
+	message     string
+	tools       []gollem.ToolSet
+	subAgents   []*agent.SubAgent
+	userPrompt  string
+	lang        lang.Lang
+	requesterID string
+	history     []model.HistoryMessage
 }
 
 // generateTicketlessSystemPrompt generates the system prompt for ticketless chat.
