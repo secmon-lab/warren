@@ -8,20 +8,19 @@ package graphql
 import (
 	"context"
 	"encoding/json"
-	"sort"
+	"fmt"
 	"strings"
-	"time"
 
 	goerr "github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	diagnosismodel "github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
-	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
+	knowledgeModel "github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 // User is the resolver for the user field.
@@ -182,10 +181,8 @@ func (r *findingResolver) Severity(ctx context.Context, obj *ticket.Finding) (st
 // Author is the resolver for the author field.
 func (r *knowledgeResolver) Author(ctx context.Context, obj *graphql1.Knowledge) (*graphql1.User, error) {
 	if obj.AuthorID == "" {
-		return nil, nil
+		return &graphql1.User{ID: "system", Name: "system"}, nil
 	}
-
-	// Use DataLoader to efficiently fetch user from Slack
 	return GetUser(ctx, obj.AuthorID)
 }
 
@@ -526,169 +523,6 @@ func (r *mutationResolver) DeclineAlerts(ctx context.Context, ids []string) ([]*
 	return results, nil
 }
 
-// CreateKnowledge is the resolver for the createKnowledge field.
-func (r *mutationResolver) CreateKnowledge(ctx context.Context, input graphql1.CreateKnowledgeInput) (*graphql1.Knowledge, error) {
-	// Extract user information from authentication context
-	token, err := auth.TokenFromContext(ctx)
-	if err != nil {
-		return nil, goerr.Wrap(err, "authentication required")
-	}
-
-	// Convert and validate input
-	topicTyped := types.KnowledgeTopic(input.Topic)
-	if err := topicTyped.Validate(); err != nil {
-		return nil, goerr.Wrap(err, "invalid topic", goerr.V("topic", input.Topic))
-	}
-
-	slugTyped := types.KnowledgeSlug(input.Slug)
-	if err := slugTyped.Validate(); err != nil {
-		return nil, goerr.Wrap(err, "invalid slug", goerr.V("slug", input.Slug))
-	}
-
-	// Check if knowledge already exists
-	existing, err := r.repo.GetKnowledge(ctx, topicTyped, slugTyped)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to check existing knowledge")
-	}
-	if existing != nil {
-		return nil, goerr.New("knowledge already exists", goerr.V("topic", input.Topic), goerr.V("slug", input.Slug))
-	}
-
-	// Create new knowledge
-	now := time.Now()
-	author := types.UserID(token.Sub)
-
-	k := &knowledge.Knowledge{
-		Slug:      slugTyped,
-		Name:      input.Name,
-		Topic:     topicTyped,
-		Content:   input.Content,
-		CommitID:  knowledge.GenerateCommitID(now, author, input.Content),
-		Author:    author,
-		CreatedAt: now,
-		UpdatedAt: now,
-		State:     types.KnowledgeStateActive,
-	}
-
-	// Validate knowledge
-	if err := k.Validate(); err != nil {
-		return nil, goerr.Wrap(err, "invalid knowledge")
-	}
-
-	// Save to repository
-	if err := r.repo.PutKnowledge(ctx, k); err != nil {
-		return nil, goerr.Wrap(err, "failed to create knowledge")
-	}
-
-	// Convert to GraphQL model
-	return &graphql1.Knowledge{
-		Slug:      k.Slug.String(),
-		Name:      k.Name,
-		Topic:     k.Topic.String(),
-		Content:   k.Content,
-		CommitID:  k.CommitID,
-		AuthorID:  k.Author.String(),
-		CreatedAt: k.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: k.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		State:     k.State.String(),
-	}, nil
-}
-
-// UpdateKnowledge is the resolver for the updateKnowledge field.
-func (r *mutationResolver) UpdateKnowledge(ctx context.Context, input graphql1.UpdateKnowledgeInput) (*graphql1.Knowledge, error) {
-	// Extract user information from authentication context
-	token, err := auth.TokenFromContext(ctx)
-	if err != nil {
-		return nil, goerr.Wrap(err, "authentication required")
-	}
-
-	// Convert and validate input
-	topicTyped := types.KnowledgeTopic(input.Topic)
-	if err := topicTyped.Validate(); err != nil {
-		return nil, goerr.Wrap(err, "invalid topic", goerr.V("topic", input.Topic))
-	}
-
-	slugTyped := types.KnowledgeSlug(input.Slug)
-	if err := slugTyped.Validate(); err != nil {
-		return nil, goerr.Wrap(err, "invalid slug", goerr.V("slug", input.Slug))
-	}
-
-	// Get existing knowledge
-	existing, err := r.repo.GetKnowledge(ctx, topicTyped, slugTyped)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get existing knowledge")
-	}
-	if existing == nil {
-		return nil, goerr.New("knowledge not found", goerr.V("topic", input.Topic), goerr.V("slug", input.Slug))
-	}
-
-	// Create updated knowledge with new commit
-	now := time.Now()
-	author := types.UserID(token.Sub)
-
-	k := &knowledge.Knowledge{
-		Slug:      slugTyped,
-		Name:      input.Name,
-		Topic:     topicTyped,
-		Content:   input.Content,
-		CommitID:  knowledge.GenerateCommitID(now, author, input.Content),
-		Author:    author,
-		CreatedAt: existing.CreatedAt, // Preserve original creation time
-		UpdatedAt: now,
-		State:     types.KnowledgeStateActive,
-	}
-
-	// Validate knowledge
-	if err := k.Validate(); err != nil {
-		return nil, goerr.Wrap(err, "invalid knowledge")
-	}
-
-	// Save new version to repository
-	if err := r.repo.PutKnowledge(ctx, k); err != nil {
-		return nil, goerr.Wrap(err, "failed to update knowledge")
-	}
-
-	// Convert to GraphQL model
-	return &graphql1.Knowledge{
-		Slug:      k.Slug.String(),
-		Name:      k.Name,
-		Topic:     k.Topic.String(),
-		Content:   k.Content,
-		CommitID:  k.CommitID,
-		AuthorID:  k.Author.String(),
-		CreatedAt: k.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: k.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		State:     k.State.String(),
-	}, nil
-}
-
-// ArchiveKnowledge is the resolver for the archiveKnowledge field.
-func (r *mutationResolver) ArchiveKnowledge(ctx context.Context, topic string, slug string) (bool, error) {
-	// Extract user information from authentication context
-	_, err := auth.TokenFromContext(ctx)
-	if err != nil {
-		return false, goerr.Wrap(err, "authentication required")
-	}
-
-	// Convert and validate input
-	topicTyped := types.KnowledgeTopic(topic)
-	if err := topicTyped.Validate(); err != nil {
-		return false, goerr.Wrap(err, "invalid topic", goerr.V("topic", topic))
-	}
-
-	slugTyped := types.KnowledgeSlug(slug)
-	if err := slugTyped.Validate(); err != nil {
-		return false, goerr.Wrap(err, "invalid slug", goerr.V("slug", slug))
-	}
-
-	// Archive the knowledge
-	if err := r.repo.ArchiveKnowledge(ctx, topicTyped, slugTyped); err != nil {
-		return false, goerr.Wrap(err, "failed to archive knowledge")
-	}
-
-	return true, nil
-}
-
 // RunDiagnosis is the resolver for the runDiagnosis field.
 func (r *mutationResolver) RunDiagnosis(ctx context.Context) (*graphql1.Diagnosis, error) {
 	diag, err := r.uc.RunDiagnosis(ctx)
@@ -732,6 +566,134 @@ func (r *mutationResolver) DiscardQueuedAlerts(ctx context.Context, ids []string
 		queuedAlertIDs[i] = types.QueuedAlertID(id)
 	}
 	if err := r.uc.DiscardQueuedAlerts(ctx, queuedAlertIDs); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// CreateKnowledge is the resolver for the createKnowledge field.
+func (r *mutationResolver) CreateKnowledge(ctx context.Context, input graphql1.CreateKnowledgeInput) (*graphql1.Knowledge, error) {
+	svc := r.knowledgeSvc
+	if svc == nil {
+		return nil, fmt.Errorf("knowledge service not configured")
+	}
+	tagIDs := make([]types.KnowledgeTagID, len(input.Tags))
+	for i, t := range input.Tags {
+		tagIDs[i] = types.KnowledgeTagID(t)
+	}
+	var ticketID types.TicketID
+	if input.TicketID != nil {
+		ticketID = types.TicketID(*input.TicketID)
+	}
+	k := &knowledgeModel.Knowledge{
+		Category: types.KnowledgeCategory(input.Category),
+		Title:    input.Title,
+		Claim:    input.Claim,
+		Tags:     tagIDs,
+		Author:   authFromContext(ctx),
+	}
+	if err := svc.SaveKnowledge(ctx, k, input.Message, ticketID); err != nil {
+		return nil, err
+	}
+	return knowledgeToGraphQL(ctx, r.Resolver, k), nil
+}
+
+// UpdateKnowledge is the resolver for the updateKnowledge field.
+func (r *mutationResolver) UpdateKnowledge(ctx context.Context, input graphql1.UpdateKnowledgeInput) (*graphql1.Knowledge, error) {
+	svc := r.knowledgeSvc
+	if svc == nil {
+		return nil, fmt.Errorf("knowledge service not configured")
+	}
+	existing, err := svc.GetKnowledge(ctx, types.KnowledgeID(input.ID))
+	if err != nil {
+		return nil, err
+	}
+	if existing == nil {
+		return nil, fmt.Errorf("knowledge not found: %s", input.ID)
+	}
+	tagIDs := make([]types.KnowledgeTagID, len(input.Tags))
+	for i, t := range input.Tags {
+		tagIDs[i] = types.KnowledgeTagID(t)
+	}
+	var ticketID types.TicketID
+	if input.TicketID != nil {
+		ticketID = types.TicketID(*input.TicketID)
+	}
+	existing.Title = input.Title
+	existing.Claim = input.Claim
+	existing.Tags = tagIDs
+	existing.Author = authFromContext(ctx)
+	if err := svc.SaveKnowledge(ctx, existing, input.Message, ticketID); err != nil {
+		return nil, err
+	}
+	return knowledgeToGraphQL(ctx, r.Resolver, existing), nil
+}
+
+// DeleteKnowledge is the resolver for the deleteKnowledge field.
+func (r *mutationResolver) DeleteKnowledge(ctx context.Context, id string, reason string) (bool, error) {
+	svc := r.knowledgeSvc
+	if svc == nil {
+		return false, fmt.Errorf("knowledge service not configured")
+	}
+	if err := svc.DeleteKnowledge(ctx, types.KnowledgeID(id), reason, authFromContext(ctx), ""); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// CreateKnowledgeTag is the resolver for the createKnowledgeTag field.
+func (r *mutationResolver) CreateKnowledgeTag(ctx context.Context, input graphql1.CreateKnowledgeTagInput) (*graphql1.KnowledgeTag, error) {
+	svc := r.knowledgeSvc
+	if svc == nil {
+		return nil, fmt.Errorf("knowledge service not configured")
+	}
+	desc := ""
+	if input.Description != nil {
+		desc = *input.Description
+	}
+	tag, err := svc.CreateTag(ctx, input.Name, desc)
+	if err != nil {
+		return nil, err
+	}
+	return knowledgeTagToGraphQL(tag), nil
+}
+
+// UpdateKnowledgeTag is the resolver for the updateKnowledgeTag field.
+func (r *mutationResolver) UpdateKnowledgeTag(ctx context.Context, input graphql1.UpdateKnowledgeTagInput) (*graphql1.KnowledgeTag, error) {
+	svc := r.knowledgeSvc
+	if svc == nil {
+		return nil, fmt.Errorf("knowledge service not configured")
+	}
+	desc := ""
+	if input.Description != nil {
+		desc = *input.Description
+	}
+	tag, err := svc.UpdateTag(ctx, types.KnowledgeTagID(input.ID), input.Name, desc)
+	if err != nil {
+		return nil, err
+	}
+	return knowledgeTagToGraphQL(tag), nil
+}
+
+// DeleteKnowledgeTag is the resolver for the deleteKnowledgeTag field.
+func (r *mutationResolver) DeleteKnowledgeTag(ctx context.Context, id string) (bool, error) {
+	svc := r.knowledgeSvc
+	if svc == nil {
+		return false, fmt.Errorf("knowledge service not configured")
+	}
+	if err := svc.DeleteTag(ctx, types.KnowledgeTagID(id)); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// MergeKnowledgeTags is the resolver for the mergeKnowledgeTags field.
+func (r *mutationResolver) MergeKnowledgeTags(ctx context.Context, oldID string, newID string) (bool, error) {
+	svc := r.knowledgeSvc
+	if svc == nil {
+		return false, fmt.Errorf("knowledge service not configured")
+	}
+	if err := svc.MergeTags(ctx, types.KnowledgeTagID(oldID), types.KnowledgeTagID(newID)); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -1132,14 +1094,20 @@ func (r *queryResolver) Activities(ctx context.Context, offset *int, limit *int)
 
 // Tags is the resolver for the tags field.
 func (r *queryResolver) Tags(ctx context.Context) ([]*graphql1.TagMetadata, error) {
+	logging.From(ctx).Info("Tags resolver called", "uc_nil", r.uc == nil)
+	if r.uc == nil {
+		return nil, goerr.New("use cases not configured")
+	}
 	if r.uc.TagUC == nil {
 		return nil, goerr.New("tag service not configured")
 	}
 
 	tags, err := r.uc.TagUC.ListTags(ctx)
 	if err != nil {
+		logging.From(ctx).Error("Tags resolver: ListTags failed", "error", err)
 		return nil, goerr.Wrap(err, "failed to list tags")
 	}
+	logging.From(ctx).Info("Tags resolver: ListTags returned", "count", len(tags))
 
 	result := make([]*graphql1.TagMetadata, len(tags))
 	for i, tag := range tags {
@@ -1187,51 +1155,6 @@ func (r *queryResolver) AvailableTagColorNames(ctx context.Context) ([]string, e
 	}
 
 	return names, nil
-}
-
-// KnowledgeTopics is the resolver for the knowledgeTopics field.
-func (r *queryResolver) KnowledgeTopics(ctx context.Context) ([]*graphql1.TopicSummary, error) {
-	topicSummaries, err := r.repo.ListKnowledgeTopics(ctx)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to list knowledge topics")
-	}
-
-	// Convert to GraphQL model
-	result := make([]*graphql1.TopicSummary, len(topicSummaries))
-	for i, ts := range topicSummaries {
-		result[i] = &graphql1.TopicSummary{
-			Topic: ts.Topic.String(),
-			Count: ts.Count,
-		}
-	}
-
-	return result, nil
-}
-
-// KnowledgesByTopic is the resolver for the knowledgesByTopic field.
-func (r *queryResolver) KnowledgesByTopic(ctx context.Context, topic string) ([]*graphql1.Knowledge, error) {
-	knowledges, err := r.repo.GetKnowledges(ctx, types.KnowledgeTopic(topic))
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get knowledges by topic", goerr.V("topic", topic))
-	}
-
-	// Convert to GraphQL model
-	result := make([]*graphql1.Knowledge, len(knowledges))
-	for i, k := range knowledges {
-		result[i] = &graphql1.Knowledge{
-			Slug:      k.Slug.String(),
-			Name:      k.Name,
-			Topic:     k.Topic.String(),
-			Content:   k.Content,
-			CommitID:  k.CommitID,
-			AuthorID:  k.Author.String(),
-			CreatedAt: k.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt: k.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			State:     k.State.String(),
-		}
-	}
-
-	return result, nil
 }
 
 // TicketSessions is the resolver for the ticketSessions field.
@@ -1285,144 +1208,6 @@ func (r *queryResolver) SessionMessages(ctx context.Context, sessionID string) (
 	}
 
 	return result, nil
-}
-
-// ListAgentSummaries is the resolver for the listAgentSummaries field.
-func (r *queryResolver) ListAgentSummaries(ctx context.Context, offset *int, limit *int, keyword *string) (*graphql1.AgentSummariesResponse, error) {
-	// Get all agent summaries with counts and latest timestamps in a single query
-	summaries, err := r.repo.ListAllAgentIDs(ctx)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to list agent IDs")
-	}
-
-	// Filter by keyword if provided
-	if keyword != nil && *keyword != "" {
-		kw := strings.ToLower(*keyword)
-		filtered := make([]*interfaces.AgentSummary, 0)
-		for _, summary := range summaries {
-			if strings.Contains(strings.ToLower(summary.AgentID), kw) {
-				filtered = append(filtered, summary)
-			}
-		}
-		summaries = filtered
-	}
-
-	// Sort by agentID alphabetically
-	sort.Slice(summaries, func(i, j int) bool {
-		return summaries[i].AgentID < summaries[j].AgentID
-	})
-
-	totalCount := len(summaries)
-
-	// Apply pagination
-	offsetVal := 0
-	if offset != nil {
-		offsetVal = *offset
-	}
-	limitVal := 20 // default
-	if limit != nil {
-		limitVal = *limit
-	}
-
-	// Calculate pagination range
-	start := offsetVal
-	if start > len(summaries) {
-		start = len(summaries)
-	}
-	end := start + limitVal
-	if end > len(summaries) {
-		end = len(summaries)
-	}
-
-	pagedSummaries := summaries[start:end]
-
-	// Convert to GraphQL response
-	agents := make([]*graphql1.AgentSummary, len(pagedSummaries))
-	for i, summary := range pagedSummaries {
-		var latestMemoryAt *string
-		if !summary.LatestMemoryAt.IsZero() {
-			timestamp := summary.LatestMemoryAt.Format("2006-01-02T15:04:05Z07:00")
-			latestMemoryAt = &timestamp
-		}
-
-		agents[i] = &graphql1.AgentSummary{
-			AgentID:        summary.AgentID,
-			MemoriesCount:  summary.Count,
-			LatestMemoryAt: latestMemoryAt,
-		}
-	}
-
-	return &graphql1.AgentSummariesResponse{
-		Agents:     agents,
-		TotalCount: totalCount,
-	}, nil
-}
-
-// ListAgentMemories is the resolver for the listAgentMemories field.
-func (r *queryResolver) ListAgentMemories(ctx context.Context, agentID string, offset *int, limit *int, sortBy *graphql1.MemorySortField, sortOrder *graphql1.SortOrder, keyword *string, minScore *float64, maxScore *float64) (*graphql1.AgentMemoriesResponse, error) {
-	// Build options
-	opts := interfaces.AgentMemoryListOptions{
-		Offset:   0,
-		Limit:    20,
-		SortBy:   "created_at",
-		SortDesc: true,
-		Keyword:  keyword,
-		MinScore: minScore,
-		MaxScore: maxScore,
-	}
-
-	if offset != nil {
-		opts.Offset = *offset
-	}
-	if limit != nil {
-		opts.Limit = *limit
-	}
-
-	// Map GraphQL sort field to repository sort field
-	if sortBy != nil {
-		switch *sortBy {
-		case graphql1.MemorySortFieldScore:
-			opts.SortBy = "score"
-		case graphql1.MemorySortFieldCreatedAt:
-			opts.SortBy = "created_at"
-		case graphql1.MemorySortFieldLastUsedAt:
-			opts.SortBy = "last_used_at"
-		}
-	}
-
-	// Map GraphQL sort order
-	if sortOrder != nil {
-		opts.SortDesc = *sortOrder == graphql1.SortOrderDesc
-	}
-
-	// Use repository method for filtering, sorting, and pagination
-	pagedMemories, totalCount, err := r.repo.ListAgentMemoriesWithOptions(ctx, agentID, opts)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to list agent memories", goerr.V("agent_id", agentID))
-	}
-
-	// Convert to GraphQL response
-	memories := make([]*graphql1.AgentMemory, len(pagedMemories))
-	for i, mem := range pagedMemories {
-		memories[i] = memoryToGraphQL(mem)
-	}
-
-	return &graphql1.AgentMemoriesResponse{
-		Memories:   memories,
-		TotalCount: totalCount,
-	}, nil
-}
-
-// GetAgentMemory is the resolver for the getAgentMemory field.
-func (r *queryResolver) GetAgentMemory(ctx context.Context, agentID string, memoryID string) (*graphql1.AgentMemory, error) {
-	mem, err := r.repo.GetAgentMemory(ctx, agentID, types.AgentMemoryID(memoryID))
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get agent memory",
-			goerr.V("agent_id", agentID),
-			goerr.V("memory_id", memoryID))
-	}
-
-	return memoryToGraphQL(mem), nil
 }
 
 // Diagnoses is the resolver for the diagnoses field.
@@ -1556,6 +1341,116 @@ func (r *queryResolver) ReprocessJob(ctx context.Context, id string) (*alert.Rep
 		return nil, goerr.Wrap(err, "failed to get reprocess job", goerr.V("id", id))
 	}
 	return job, nil
+}
+
+// Knowledges is the resolver for the knowledges field.
+func (r *queryResolver) Knowledges(ctx context.Context, category *string, tags []string, keyword *string) ([]*graphql1.Knowledge, error) {
+	if r.knowledgeSvc == nil {
+		return nil, fmt.Errorf("knowledge service not configured")
+	}
+
+	// Fetch all knowledges (Web UI listing)
+	all, err := r.repo.ListAllKnowledges(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter by category if specified
+	if category != nil && *category != "" {
+		filtered := make([]*knowledgeModel.Knowledge, 0)
+		for _, k := range all {
+			if string(k.Category) == *category {
+				filtered = append(filtered, k)
+			}
+		}
+		all = filtered
+	}
+
+	// Filter by tags if specified
+	if len(tags) > 0 {
+		tagSet := make(map[string]bool, len(tags))
+		for _, t := range tags {
+			tagSet[t] = true
+		}
+		filtered := make([]*knowledgeModel.Knowledge, 0)
+		for _, k := range all {
+			for _, t := range k.Tags {
+				if tagSet[t.String()] {
+					filtered = append(filtered, k)
+					break
+				}
+			}
+		}
+		all = filtered
+	}
+
+	// Filter by keyword (partial match on title and claim)
+	if keyword != nil && *keyword != "" {
+		kw := strings.ToLower(*keyword)
+		filtered := make([]*knowledgeModel.Knowledge, 0)
+		for _, k := range all {
+			if strings.Contains(strings.ToLower(k.Title), kw) || strings.Contains(strings.ToLower(k.Claim), kw) {
+				filtered = append(filtered, k)
+			}
+		}
+		all = filtered
+	}
+
+	result := make([]*graphql1.Knowledge, len(all))
+	for i, k := range all {
+		result[i] = knowledgeToGraphQL(ctx, r.Resolver, k)
+	}
+	return result, nil
+}
+
+// Knowledge is the resolver for the knowledge field.
+func (r *queryResolver) Knowledge(ctx context.Context, id string) (*graphql1.Knowledge, error) {
+	svc := r.knowledgeSvc
+	if svc == nil {
+		return nil, fmt.Errorf("knowledge service not configured")
+	}
+	k, err := svc.GetKnowledge(ctx, types.KnowledgeID(id))
+	if err != nil {
+		return nil, err
+	}
+	if k == nil {
+		return nil, nil
+	}
+	return knowledgeToGraphQL(ctx, r.Resolver, k), nil
+}
+
+// KnowledgeLogs is the resolver for the knowledgeLogs field.
+func (r *queryResolver) KnowledgeLogs(ctx context.Context, knowledgeID string) ([]*graphql1.KnowledgeLog, error) {
+	svc := r.knowledgeSvc
+	if svc == nil {
+		return nil, fmt.Errorf("knowledge service not configured")
+	}
+	logs, err := svc.ListKnowledgeLogs(ctx, types.KnowledgeID(knowledgeID))
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*graphql1.KnowledgeLog, len(logs))
+	for i, l := range logs {
+		result[i] = knowledgeLogToGraphQL(l)
+	}
+	return result, nil
+}
+
+// KnowledgeTags is the resolver for the knowledgeTags field.
+func (r *queryResolver) KnowledgeTags(ctx context.Context) ([]*graphql1.KnowledgeTag, error) {
+	svc := r.knowledgeSvc
+	if svc == nil {
+		return nil, fmt.Errorf("knowledge service not configured")
+	}
+	tags, err := svc.ListTags(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*graphql1.KnowledgeTag, len(tags))
+	for i, t := range tags {
+		result[i] = knowledgeTagToGraphQL(t)
+	}
+	return result, nil
 }
 
 // ID is the resolver for the id field.

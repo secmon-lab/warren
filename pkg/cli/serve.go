@@ -27,6 +27,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/prompt"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/usecase/chat/swarm"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
@@ -59,6 +60,7 @@ func cmdServe() *cli.Command {
 		enableGraphQL       bool
 		enableGraphiQL      bool
 		noAuthorization     bool
+		disableHTTPLogger   bool
 		disableLLM          bool
 		strictAlert         bool
 		wsAllowedOrigins    []string
@@ -111,6 +113,13 @@ func cmdServe() *cli.Command {
 				Category:    "Security",
 				Sources:     cli.EnvVars("WARREN_NO_AUTHORIZATION"),
 				Destination: &noAuthorization,
+			},
+			&cli.BoolFlag{
+				Name:        "disable-http-logger",
+				Usage:       "Disable HTTP access logging (both access log and detailed access log)",
+				Category:    "Logging",
+				Sources:     cli.EnvVars("WARREN_DISABLE_HTTP_LOGGER"),
+				Destination: &disableHTTPLogger,
 			},
 			&cli.BoolFlag{
 				Name:        "disable-llm",
@@ -378,6 +387,9 @@ func cmdServe() *cli.Command {
 					"limit", cbCfg.Limit)
 			}
 
+			// Create knowledge service for introspection and GraphQL
+			knowledgeSvc := svcknowledge.New(repo, embeddingAdapter)
+
 			// Configure chat strategy
 			if chatStrategy == "swarm" {
 				swarmOpts := []swarm.Option{
@@ -399,6 +411,8 @@ func cmdServe() *cli.Command {
 				if safeTraceRepo != nil {
 					swarmOpts = append(swarmOpts, swarm.WithTraceRepository(safeTraceRepo))
 				}
+
+				swarmOpts = append(swarmOpts, swarm.WithKnowledgeService(knowledgeSvc))
 
 				// Configure budget strategy
 				switch budgetStrategy {
@@ -426,6 +440,13 @@ func cmdServe() *cli.Command {
 			// Build HTTP server options
 			serverOptions := []server.Options{
 				server.WithPolicy(policyClient),
+				server.WithKnowledgeService(knowledgeSvc),
+				server.WithDisableHTTPLogger(disableHTTPLogger),
+			}
+
+			if disableHTTPLogger {
+				logging.From(ctx).Warn("HTTP access logging is DISABLED",
+					"flag", "--disable-http-logger")
 			}
 
 			// Add no-authorization option if specified

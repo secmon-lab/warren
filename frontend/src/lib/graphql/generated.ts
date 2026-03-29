@@ -38,36 +38,6 @@ export type Activity = {
   userID?: Maybe<Scalars['String']['output']>;
 };
 
-export type AgentMemoriesResponse = {
-  __typename?: 'AgentMemoriesResponse';
-  memories: Array<AgentMemory>;
-  totalCount: Scalars['Int']['output'];
-};
-
-export type AgentMemory = {
-  __typename?: 'AgentMemory';
-  agentID: Scalars['String']['output'];
-  claim: Scalars['String']['output'];
-  createdAt: Scalars['String']['output'];
-  id: Scalars['ID']['output'];
-  lastUsedAt?: Maybe<Scalars['String']['output']>;
-  query: Scalars['String']['output'];
-  score: Scalars['Float']['output'];
-};
-
-export type AgentSummariesResponse = {
-  __typename?: 'AgentSummariesResponse';
-  agents: Array<AgentSummary>;
-  totalCount: Scalars['Int']['output'];
-};
-
-export type AgentSummary = {
-  __typename?: 'AgentSummary';
-  agentID: Scalars['String']['output'];
-  latestMemoryAt?: Maybe<Scalars['String']['output']>;
-  memoriesCount: Scalars['Int']['output'];
-};
-
 export type Alert = {
   __typename?: 'Alert';
   attributes: Array<AlertAttribute>;
@@ -117,10 +87,17 @@ export type CommentsResponse = {
 };
 
 export type CreateKnowledgeInput = {
-  content: Scalars['String']['input'];
+  category: Scalars['String']['input'];
+  claim: Scalars['String']['input'];
+  message: Scalars['String']['input'];
+  tags: Array<Scalars['ID']['input']>;
+  ticketID?: InputMaybe<Scalars['String']['input']>;
+  title: Scalars['String']['input'];
+};
+
+export type CreateKnowledgeTagInput = {
+  description?: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
-  slug: Scalars['String']['input'];
-  topic: Scalars['String']['input'];
 };
 
 export type DashboardStats = {
@@ -128,6 +105,7 @@ export type DashboardStats = {
   declinedAlertsCount: Scalars['Int']['output'];
   openTickets: Array<Ticket>;
   openTicketsCount: Scalars['Int']['output'];
+  queuedAlertsCount: Scalars['Int']['output'];
   unboundAlerts: Array<Alert>;
   unboundAlertsCount: Scalars['Int']['output'];
 };
@@ -181,50 +159,66 @@ export type Knowledge = {
   __typename?: 'Knowledge';
   author: User;
   authorID: Scalars['String']['output'];
-  commitID: Scalars['String']['output'];
-  content: Scalars['String']['output'];
+  category: Scalars['String']['output'];
+  claim: Scalars['String']['output'];
   createdAt: Scalars['String']['output'];
-  name: Scalars['String']['output'];
-  slug: Scalars['String']['output'];
-  state: Scalars['String']['output'];
-  topic: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  tags: Array<KnowledgeTag>;
+  title: Scalars['String']['output'];
   updatedAt: Scalars['String']['output'];
 };
 
-export type MemorySortField =
-  | 'CREATED_AT'
-  | 'LAST_USED_AT'
-  | 'SCORE';
+export type KnowledgeLog = {
+  __typename?: 'KnowledgeLog';
+  author: User;
+  authorID: Scalars['String']['output'];
+  claim: Scalars['String']['output'];
+  createdAt: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  knowledgeID: Scalars['ID']['output'];
+  message: Scalars['String']['output'];
+  ticketID?: Maybe<Scalars['String']['output']>;
+  title: Scalars['String']['output'];
+};
+
+export type KnowledgeTag = {
+  __typename?: 'KnowledgeTag';
+  createdAt: Scalars['String']['output'];
+  description: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  updatedAt: Scalars['String']['output'];
+};
 
 export type Mutation = {
   __typename?: 'Mutation';
-  archiveKnowledge: Scalars['Boolean']['output'];
   archiveTicket: Ticket;
   archiveTickets: Array<Ticket>;
   bindAlertsToTicket: Ticket;
   createKnowledge: Knowledge;
+  createKnowledgeTag: KnowledgeTag;
   createTag: TagMetadata;
   createTicket: Ticket;
   createTicketFromAlerts: Ticket;
   declineAlerts: Array<Alert>;
+  deleteKnowledge: Scalars['Boolean']['output'];
+  deleteKnowledgeTag: Scalars['Boolean']['output'];
   deleteTag: Scalars['Boolean']['output'];
+  discardQueuedAlerts: Scalars['Boolean']['output'];
   fixDiagnosis: Diagnosis;
+  mergeKnowledgeTags: Scalars['Boolean']['output'];
   reopenTicket: Ticket;
+  reprocessQueuedAlert: ReprocessJob;
   resolveTicket: Ticket;
   runDiagnosis: Diagnosis;
   unarchiveTicket: Ticket;
   updateAlertTags: Alert;
   updateKnowledge: Knowledge;
+  updateKnowledgeTag: KnowledgeTag;
   updateTag: TagMetadata;
   updateTicket: Ticket;
   updateTicketConclusion: Ticket;
   updateTicketTags: Ticket;
-};
-
-
-export type MutationArchiveKnowledgeArgs = {
-  slug: Scalars['String']['input'];
-  topic: Scalars['String']['input'];
 };
 
 
@@ -246,6 +240,11 @@ export type MutationBindAlertsToTicketArgs = {
 
 export type MutationCreateKnowledgeArgs = {
   input: CreateKnowledgeInput;
+};
+
+
+export type MutationCreateKnowledgeTagArgs = {
+  input: CreateKnowledgeTagInput;
 };
 
 
@@ -273,8 +272,24 @@ export type MutationDeclineAlertsArgs = {
 };
 
 
+export type MutationDeleteKnowledgeArgs = {
+  id: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+};
+
+
+export type MutationDeleteKnowledgeTagArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type MutationDeleteTagArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type MutationDiscardQueuedAlertsArgs = {
+  ids: Array<Scalars['ID']['input']>;
 };
 
 
@@ -283,7 +298,18 @@ export type MutationFixDiagnosisArgs = {
 };
 
 
+export type MutationMergeKnowledgeTagsArgs = {
+  newID: Scalars['ID']['input'];
+  oldID: Scalars['ID']['input'];
+};
+
+
 export type MutationReopenTicketArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationReprocessQueuedAlertArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -308,6 +334,11 @@ export type MutationUpdateAlertTagsArgs = {
 
 export type MutationUpdateKnowledgeArgs = {
   input: UpdateKnowledgeInput;
+};
+
+
+export type MutationUpdateKnowledgeTagArgs = {
+  input: UpdateKnowledgeTagInput;
 };
 
 
@@ -346,11 +377,12 @@ export type Query = {
   diagnoses: DiagnosesResponse;
   diagnosis?: Maybe<Diagnosis>;
   diagnosisIssues: DiagnosisIssuesResponse;
-  getAgentMemory?: Maybe<AgentMemory>;
-  knowledgeTopics: Array<TopicSummary>;
-  knowledgesByTopic: Array<Knowledge>;
-  listAgentMemories: AgentMemoriesResponse;
-  listAgentSummaries: AgentSummariesResponse;
+  knowledge?: Maybe<Knowledge>;
+  knowledgeLogs: Array<KnowledgeLog>;
+  knowledgeTags: Array<KnowledgeTag>;
+  knowledges: Array<Knowledge>;
+  queuedAlerts: QueuedAlertsResponse;
+  reprocessJob?: Maybe<ReprocessJob>;
   session?: Maybe<Session>;
   sessionMessages: Array<SessionMessage>;
   similarTickets: TicketsResponse;
@@ -402,33 +434,32 @@ export type QueryDiagnosisIssuesArgs = {
 };
 
 
-export type QueryGetAgentMemoryArgs = {
-  agentID: Scalars['String']['input'];
-  memoryID: Scalars['ID']['input'];
+export type QueryKnowledgeArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
-export type QueryKnowledgesByTopicArgs = {
-  topic: Scalars['String']['input'];
+export type QueryKnowledgeLogsArgs = {
+  knowledgeID: Scalars['ID']['input'];
 };
 
 
-export type QueryListAgentMemoriesArgs = {
-  agentID: Scalars['String']['input'];
+export type QueryKnowledgesArgs = {
+  category?: InputMaybe<Scalars['String']['input']>;
   keyword?: InputMaybe<Scalars['String']['input']>;
-  limit?: InputMaybe<Scalars['Int']['input']>;
-  maxScore?: InputMaybe<Scalars['Float']['input']>;
-  minScore?: InputMaybe<Scalars['Float']['input']>;
-  offset?: InputMaybe<Scalars['Int']['input']>;
-  sortBy?: InputMaybe<MemorySortField>;
-  sortOrder?: InputMaybe<SortOrder>;
+  tags?: InputMaybe<Array<Scalars['ID']['input']>>;
 };
 
 
-export type QueryListAgentSummariesArgs = {
+export type QueryQueuedAlertsArgs = {
   keyword?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryReprocessJobArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -491,6 +522,37 @@ export type QueryUnboundAlertsArgs = {
   threshold?: InputMaybe<Scalars['Float']['input']>;
   ticketId?: InputMaybe<Scalars['ID']['input']>;
 };
+
+export type QueuedAlert = {
+  __typename?: 'QueuedAlert';
+  createdAt: Scalars['String']['output'];
+  data: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  schema: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+};
+
+export type QueuedAlertsResponse = {
+  __typename?: 'QueuedAlertsResponse';
+  alerts: Array<QueuedAlert>;
+  totalCount: Scalars['Int']['output'];
+};
+
+export type ReprocessJob = {
+  __typename?: 'ReprocessJob';
+  createdAt: Scalars['String']['output'];
+  error?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  queuedAlertID: Scalars['ID']['output'];
+  status: ReprocessJobStatus;
+  updatedAt: Scalars['String']['output'];
+};
+
+export type ReprocessJobStatus =
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'PENDING'
+  | 'RUNNING';
 
 export type Session = {
   __typename?: 'Session';
@@ -574,17 +636,19 @@ export type TicketsResponse = {
   totalCount: Scalars['Int']['output'];
 };
 
-export type TopicSummary = {
-  __typename?: 'TopicSummary';
-  count: Scalars['Int']['output'];
-  topic: Scalars['String']['output'];
+export type UpdateKnowledgeInput = {
+  claim: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
+  message: Scalars['String']['input'];
+  tags: Array<Scalars['ID']['input']>;
+  ticketID?: InputMaybe<Scalars['String']['input']>;
+  title: Scalars['String']['input'];
 };
 
-export type UpdateKnowledgeInput = {
-  content: Scalars['String']['input'];
+export type UpdateKnowledgeTagInput = {
+  description?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
   name: Scalars['String']['input'];
-  slug: Scalars['String']['input'];
-  topic: Scalars['String']['input'];
 };
 
 export type UpdateTagInput = {
@@ -647,7 +711,7 @@ export type GetAlertsQuery = { __typename?: 'Query', alerts: { __typename?: 'Ale
 export type GetDashboardQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetDashboardQuery = { __typename?: 'Query', dashboard: { __typename?: 'DashboardStats', openTicketsCount: number, unboundAlertsCount: number, declinedAlertsCount: number, openTickets: Array<{ __typename?: 'Ticket', id: string, status: string, title: string, description: string, isTest: boolean, createdAt: string, updatedAt: string, assignee?: { __typename?: 'User', id: string, name: string } | null }>, unboundAlerts: Array<{ __typename?: 'Alert', id: string, title: string, description?: string | null, schema: string, createdAt: string }> } };
+export type GetDashboardQuery = { __typename?: 'Query', dashboard: { __typename?: 'DashboardStats', openTicketsCount: number, unboundAlertsCount: number, declinedAlertsCount: number, queuedAlertsCount: number, openTickets: Array<{ __typename?: 'Ticket', id: string, status: string, title: string, description: string, isTest: boolean, createdAt: string, updatedAt: string, assignee?: { __typename?: 'User', id: string, name: string } | null }>, unboundAlerts: Array<{ __typename?: 'Alert', id: string, title: string, description?: string | null, schema: string, createdAt: string }> } };
 
 export type GetActivitiesQueryVariables = Exact<{
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -837,39 +901,84 @@ export type DeclineAlertsMutationVariables = Exact<{
 
 export type DeclineAlertsMutation = { __typename?: 'Mutation', declineAlerts: Array<{ __typename?: 'Alert', id: string, status: AlertStatus, title: string }> };
 
-export type GetKnowledgeTopicsQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type GetKnowledgeTopicsQuery = { __typename?: 'Query', knowledgeTopics: Array<{ __typename?: 'TopicSummary', topic: string, count: number }> };
-
-export type GetKnowledgesByTopicQueryVariables = Exact<{
-  topic: Scalars['String']['input'];
+export type GetKnowledgesQueryVariables = Exact<{
+  category?: InputMaybe<Scalars['String']['input']>;
+  tags?: InputMaybe<Array<Scalars['ID']['input']> | Scalars['ID']['input']>;
+  keyword?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
-export type GetKnowledgesByTopicQuery = { __typename?: 'Query', knowledgesByTopic: Array<{ __typename?: 'Knowledge', slug: string, name: string, topic: string, content: string, commitID: string, authorID: string, createdAt: string, updatedAt: string, state: string, author: { __typename?: 'User', id: string, name: string, icon?: string | null } }> };
+export type GetKnowledgesQuery = { __typename?: 'Query', knowledges: Array<{ __typename?: 'Knowledge', id: string, category: string, title: string, claim: string, authorID: string, createdAt: string, updatedAt: string, tags: Array<{ __typename?: 'KnowledgeTag', id: string, name: string, description: string }>, author: { __typename?: 'User', id: string, name: string, icon?: string | null } }> };
+
+export type GetKnowledgeQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type GetKnowledgeQuery = { __typename?: 'Query', knowledge?: { __typename?: 'Knowledge', id: string, category: string, title: string, claim: string, authorID: string, createdAt: string, updatedAt: string, tags: Array<{ __typename?: 'KnowledgeTag', id: string, name: string, description: string }>, author: { __typename?: 'User', id: string, name: string, icon?: string | null } } | null };
+
+export type GetKnowledgeLogsQueryVariables = Exact<{
+  knowledgeID: Scalars['ID']['input'];
+}>;
+
+
+export type GetKnowledgeLogsQuery = { __typename?: 'Query', knowledgeLogs: Array<{ __typename?: 'KnowledgeLog', id: string, knowledgeID: string, title: string, claim: string, authorID: string, ticketID?: string | null, message: string, createdAt: string, author: { __typename?: 'User', id: string, name: string, icon?: string | null } }> };
+
+export type GetKnowledgeTagsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetKnowledgeTagsQuery = { __typename?: 'Query', knowledgeTags: Array<{ __typename?: 'KnowledgeTag', id: string, name: string, description: string, createdAt: string, updatedAt: string }> };
 
 export type CreateKnowledgeMutationVariables = Exact<{
   input: CreateKnowledgeInput;
 }>;
 
 
-export type CreateKnowledgeMutation = { __typename?: 'Mutation', createKnowledge: { __typename?: 'Knowledge', slug: string, name: string, topic: string, content: string, commitID: string, authorID: string, createdAt: string, updatedAt: string, state: string, author: { __typename?: 'User', id: string, name: string, icon?: string | null } } };
+export type CreateKnowledgeMutation = { __typename?: 'Mutation', createKnowledge: { __typename?: 'Knowledge', id: string, category: string, title: string, claim: string, createdAt: string, updatedAt: string, tags: Array<{ __typename?: 'KnowledgeTag', id: string, name: string }> } };
 
 export type UpdateKnowledgeMutationVariables = Exact<{
   input: UpdateKnowledgeInput;
 }>;
 
 
-export type UpdateKnowledgeMutation = { __typename?: 'Mutation', updateKnowledge: { __typename?: 'Knowledge', slug: string, name: string, topic: string, content: string, commitID: string, authorID: string, createdAt: string, updatedAt: string, state: string, author: { __typename?: 'User', id: string, name: string, icon?: string | null } } };
+export type UpdateKnowledgeMutation = { __typename?: 'Mutation', updateKnowledge: { __typename?: 'Knowledge', id: string, category: string, title: string, claim: string, createdAt: string, updatedAt: string, tags: Array<{ __typename?: 'KnowledgeTag', id: string, name: string }> } };
 
-export type ArchiveKnowledgeMutationVariables = Exact<{
-  topic: Scalars['String']['input'];
-  slug: Scalars['String']['input'];
+export type DeleteKnowledgeMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
 }>;
 
 
-export type ArchiveKnowledgeMutation = { __typename?: 'Mutation', archiveKnowledge: boolean };
+export type DeleteKnowledgeMutation = { __typename?: 'Mutation', deleteKnowledge: boolean };
+
+export type CreateKnowledgeTagMutationVariables = Exact<{
+  input: CreateKnowledgeTagInput;
+}>;
+
+
+export type CreateKnowledgeTagMutation = { __typename?: 'Mutation', createKnowledgeTag: { __typename?: 'KnowledgeTag', id: string, name: string, description: string } };
+
+export type UpdateKnowledgeTagMutationVariables = Exact<{
+  input: UpdateKnowledgeTagInput;
+}>;
+
+
+export type UpdateKnowledgeTagMutation = { __typename?: 'Mutation', updateKnowledgeTag: { __typename?: 'KnowledgeTag', id: string, name: string, description: string } };
+
+export type DeleteKnowledgeTagMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type DeleteKnowledgeTagMutation = { __typename?: 'Mutation', deleteKnowledgeTag: boolean };
+
+export type MergeKnowledgeTagsMutationVariables = Exact<{
+  oldID: Scalars['ID']['input'];
+  newID: Scalars['ID']['input'];
+}>;
+
+
+export type MergeKnowledgeTagsMutation = { __typename?: 'Mutation', mergeKnowledgeTags: boolean };
 
 export type GetTicketSessionsQueryVariables = Exact<{
   ticketId: Scalars['ID']['input'];
@@ -891,37 +1000,6 @@ export type GetSessionMessagesQueryVariables = Exact<{
 
 
 export type GetSessionMessagesQuery = { __typename?: 'Query', sessionMessages: Array<{ __typename?: 'SessionMessage', id: string, sessionID: string, type: string, content: string, createdAt: string, updatedAt: string }> };
-
-export type ListAgentSummariesQueryVariables = Exact<{
-  offset?: InputMaybe<Scalars['Int']['input']>;
-  limit?: InputMaybe<Scalars['Int']['input']>;
-  keyword?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type ListAgentSummariesQuery = { __typename?: 'Query', listAgentSummaries: { __typename?: 'AgentSummariesResponse', totalCount: number, agents: Array<{ __typename?: 'AgentSummary', agentID: string, memoriesCount: number, latestMemoryAt?: string | null }> } };
-
-export type ListAgentMemoriesQueryVariables = Exact<{
-  agentID: Scalars['String']['input'];
-  offset?: InputMaybe<Scalars['Int']['input']>;
-  limit?: InputMaybe<Scalars['Int']['input']>;
-  sortBy?: InputMaybe<MemorySortField>;
-  sortOrder?: InputMaybe<SortOrder>;
-  keyword?: InputMaybe<Scalars['String']['input']>;
-  minScore?: InputMaybe<Scalars['Float']['input']>;
-  maxScore?: InputMaybe<Scalars['Float']['input']>;
-}>;
-
-
-export type ListAgentMemoriesQuery = { __typename?: 'Query', listAgentMemories: { __typename?: 'AgentMemoriesResponse', totalCount: number, memories: Array<{ __typename?: 'AgentMemory', id: string, agentID: string, query: string, claim: string, score: number, createdAt: string, lastUsedAt?: string | null }> } };
-
-export type GetAgentMemoryQueryVariables = Exact<{
-  agentID: Scalars['String']['input'];
-  memoryID: Scalars['ID']['input'];
-}>;
-
-
-export type GetAgentMemoryQuery = { __typename?: 'Query', getAgentMemory?: { __typename?: 'AgentMemory', id: string, agentID: string, query: string, claim: string, score: number, createdAt: string, lastUsedAt?: string | null } | null };
 
 export type GetDiagnosesQueryVariables = Exact<{
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -960,6 +1038,36 @@ export type FixDiagnosisMutationVariables = Exact<{
 
 
 export type FixDiagnosisMutation = { __typename?: 'Mutation', fixDiagnosis: { __typename?: 'Diagnosis', id: string, status: string, totalCount: number, pendingCount: number, fixedCount: number, failedCount: number, updatedAt: string } };
+
+export type GetQueuedAlertsQueryVariables = Exact<{
+  keyword?: InputMaybe<Scalars['String']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type GetQueuedAlertsQuery = { __typename?: 'Query', queuedAlerts: { __typename?: 'QueuedAlertsResponse', totalCount: number, alerts: Array<{ __typename?: 'QueuedAlert', id: string, schema: string, title: string, data: string, createdAt: string }> } };
+
+export type GetReprocessJobQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type GetReprocessJobQuery = { __typename?: 'Query', reprocessJob?: { __typename?: 'ReprocessJob', id: string, queuedAlertID: string, status: ReprocessJobStatus, error?: string | null, createdAt: string, updatedAt: string } | null };
+
+export type ReprocessQueuedAlertMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type ReprocessQueuedAlertMutation = { __typename?: 'Mutation', reprocessQueuedAlert: { __typename?: 'ReprocessJob', id: string, queuedAlertID: string, status: ReprocessJobStatus, createdAt: string, updatedAt: string } };
+
+export type DiscardQueuedAlertsMutationVariables = Exact<{
+  ids: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
+}>;
+
+
+export type DiscardQueuedAlertsMutation = { __typename?: 'Mutation', discardQueuedAlerts: boolean };
 
 
 export const GetTicketsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTickets"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"assigneeID"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"statuses"},"value":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}},{"kind":"Argument","name":{"kind":"Name","value":"assigneeID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"assigneeID"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"commentsCount"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
@@ -1155,7 +1263,7 @@ export type GetAlertsQueryHookResult = ReturnType<typeof useGetAlertsQuery>;
 export type GetAlertsLazyQueryHookResult = ReturnType<typeof useGetAlertsLazyQuery>;
 export type GetAlertsSuspenseQueryHookResult = ReturnType<typeof useGetAlertsSuspenseQuery>;
 export type GetAlertsQueryResult = Apollo.QueryResult<GetAlertsQuery, GetAlertsQueryVariables>;
-export const GetDashboardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDashboard"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"dashboard"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"openTicketsCount"}},{"kind":"Field","name":{"kind":"Name","value":"unboundAlertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"declinedAlertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"openTickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"unboundAlerts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"schema"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]}}]} as unknown as DocumentNode;
+export const GetDashboardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDashboard"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"dashboard"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"openTicketsCount"}},{"kind":"Field","name":{"kind":"Name","value":"unboundAlertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"declinedAlertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"queuedAlertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"openTickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"unboundAlerts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"schema"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]}}]} as unknown as DocumentNode;
 
 /**
  * __useGetDashboardQuery__
@@ -1942,80 +2050,156 @@ export function useDeclineAlertsMutation(baseOptions?: Apollo.MutationHookOption
 export type DeclineAlertsMutationHookResult = ReturnType<typeof useDeclineAlertsMutation>;
 export type DeclineAlertsMutationResult = Apollo.MutationResult<DeclineAlertsMutation>;
 export type DeclineAlertsMutationOptions = Apollo.BaseMutationOptions<DeclineAlertsMutation, DeclineAlertsMutationVariables>;
-export const GetKnowledgeTopicsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetKnowledgeTopics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"knowledgeTopics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"topic"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}}]}}]} as unknown as DocumentNode;
+export const GetKnowledgesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetKnowledges"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"category"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"tags"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"knowledges"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"category"},"value":{"kind":"Variable","name":{"kind":"Name","value":"category"}}},{"kind":"Argument","name":{"kind":"Name","value":"tags"},"value":{"kind":"Variable","name":{"kind":"Name","value":"tags"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"claim"}},{"kind":"Field","name":{"kind":"Name","value":"tags"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}}]}},{"kind":"Field","name":{"kind":"Name","value":"authorID"}},{"kind":"Field","name":{"kind":"Name","value":"author"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
 
 /**
- * __useGetKnowledgeTopicsQuery__
+ * __useGetKnowledgesQuery__
  *
- * To run a query within a React component, call `useGetKnowledgeTopicsQuery` and pass it any options that fit your needs.
- * When your component renders, `useGetKnowledgeTopicsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * To run a query within a React component, call `useGetKnowledgesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetKnowledgesQuery` returns an object from Apollo Client that contains loading, error, and data properties
  * you can use to render your UI.
  *
  * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
  *
  * @example
- * const { data, loading, error } = useGetKnowledgeTopicsQuery({
+ * const { data, loading, error } = useGetKnowledgesQuery({
  *   variables: {
+ *      category: // value for 'category'
+ *      tags: // value for 'tags'
+ *      keyword: // value for 'keyword'
  *   },
  * });
  */
-export function useGetKnowledgeTopicsQuery(baseOptions?: Apollo.QueryHookOptions<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>) {
+export function useGetKnowledgesQuery(baseOptions?: Apollo.QueryHookOptions<GetKnowledgesQuery, GetKnowledgesQueryVariables>) {
         const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>(GetKnowledgeTopicsDocument, options);
+        return Apollo.useQuery<GetKnowledgesQuery, GetKnowledgesQueryVariables>(GetKnowledgesDocument, options);
       }
-export function useGetKnowledgeTopicsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>) {
+export function useGetKnowledgesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetKnowledgesQuery, GetKnowledgesQueryVariables>) {
           const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>(GetKnowledgeTopicsDocument, options);
+          return Apollo.useLazyQuery<GetKnowledgesQuery, GetKnowledgesQueryVariables>(GetKnowledgesDocument, options);
         }
 // @ts-ignore
-export function useGetKnowledgeTopicsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>;
-export function useGetKnowledgeTopicsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgeTopicsQuery | undefined, GetKnowledgeTopicsQueryVariables>;
-export function useGetKnowledgeTopicsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>) {
+export function useGetKnowledgesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetKnowledgesQuery, GetKnowledgesQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgesQuery, GetKnowledgesQueryVariables>;
+export function useGetKnowledgesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgesQuery, GetKnowledgesQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgesQuery | undefined, GetKnowledgesQueryVariables>;
+export function useGetKnowledgesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgesQuery, GetKnowledgesQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>(GetKnowledgeTopicsDocument, options);
+          return Apollo.useSuspenseQuery<GetKnowledgesQuery, GetKnowledgesQueryVariables>(GetKnowledgesDocument, options);
         }
-export type GetKnowledgeTopicsQueryHookResult = ReturnType<typeof useGetKnowledgeTopicsQuery>;
-export type GetKnowledgeTopicsLazyQueryHookResult = ReturnType<typeof useGetKnowledgeTopicsLazyQuery>;
-export type GetKnowledgeTopicsSuspenseQueryHookResult = ReturnType<typeof useGetKnowledgeTopicsSuspenseQuery>;
-export type GetKnowledgeTopicsQueryResult = Apollo.QueryResult<GetKnowledgeTopicsQuery, GetKnowledgeTopicsQueryVariables>;
-export const GetKnowledgesByTopicDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetKnowledgesByTopic"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"topic"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"knowledgesByTopic"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"topic"},"value":{"kind":"Variable","name":{"kind":"Name","value":"topic"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"topic"}},{"kind":"Field","name":{"kind":"Name","value":"content"}},{"kind":"Field","name":{"kind":"Name","value":"commitID"}},{"kind":"Field","name":{"kind":"Name","value":"authorID"}},{"kind":"Field","name":{"kind":"Name","value":"author"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"state"}}]}}]}}]} as unknown as DocumentNode;
+export type GetKnowledgesQueryHookResult = ReturnType<typeof useGetKnowledgesQuery>;
+export type GetKnowledgesLazyQueryHookResult = ReturnType<typeof useGetKnowledgesLazyQuery>;
+export type GetKnowledgesSuspenseQueryHookResult = ReturnType<typeof useGetKnowledgesSuspenseQuery>;
+export type GetKnowledgesQueryResult = Apollo.QueryResult<GetKnowledgesQuery, GetKnowledgesQueryVariables>;
+export const GetKnowledgeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetKnowledge"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"knowledge"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"claim"}},{"kind":"Field","name":{"kind":"Name","value":"tags"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}}]}},{"kind":"Field","name":{"kind":"Name","value":"authorID"}},{"kind":"Field","name":{"kind":"Name","value":"author"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
 
 /**
- * __useGetKnowledgesByTopicQuery__
+ * __useGetKnowledgeQuery__
  *
- * To run a query within a React component, call `useGetKnowledgesByTopicQuery` and pass it any options that fit your needs.
- * When your component renders, `useGetKnowledgesByTopicQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * To run a query within a React component, call `useGetKnowledgeQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetKnowledgeQuery` returns an object from Apollo Client that contains loading, error, and data properties
  * you can use to render your UI.
  *
  * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
  *
  * @example
- * const { data, loading, error } = useGetKnowledgesByTopicQuery({
+ * const { data, loading, error } = useGetKnowledgeQuery({
  *   variables: {
- *      topic: // value for 'topic'
+ *      id: // value for 'id'
  *   },
  * });
  */
-export function useGetKnowledgesByTopicQuery(baseOptions: Apollo.QueryHookOptions<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables> & ({ variables: GetKnowledgesByTopicQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+export function useGetKnowledgeQuery(baseOptions: Apollo.QueryHookOptions<GetKnowledgeQuery, GetKnowledgeQueryVariables> & ({ variables: GetKnowledgeQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
         const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>(GetKnowledgesByTopicDocument, options);
+        return Apollo.useQuery<GetKnowledgeQuery, GetKnowledgeQueryVariables>(GetKnowledgeDocument, options);
       }
-export function useGetKnowledgesByTopicLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>) {
+export function useGetKnowledgeLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetKnowledgeQuery, GetKnowledgeQueryVariables>) {
           const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>(GetKnowledgesByTopicDocument, options);
+          return Apollo.useLazyQuery<GetKnowledgeQuery, GetKnowledgeQueryVariables>(GetKnowledgeDocument, options);
         }
 // @ts-ignore
-export function useGetKnowledgesByTopicSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>;
-export function useGetKnowledgesByTopicSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgesByTopicQuery | undefined, GetKnowledgesByTopicQueryVariables>;
-export function useGetKnowledgesByTopicSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>) {
+export function useGetKnowledgeSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetKnowledgeQuery, GetKnowledgeQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgeQuery, GetKnowledgeQueryVariables>;
+export function useGetKnowledgeSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgeQuery, GetKnowledgeQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgeQuery | undefined, GetKnowledgeQueryVariables>;
+export function useGetKnowledgeSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgeQuery, GetKnowledgeQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>(GetKnowledgesByTopicDocument, options);
+          return Apollo.useSuspenseQuery<GetKnowledgeQuery, GetKnowledgeQueryVariables>(GetKnowledgeDocument, options);
         }
-export type GetKnowledgesByTopicQueryHookResult = ReturnType<typeof useGetKnowledgesByTopicQuery>;
-export type GetKnowledgesByTopicLazyQueryHookResult = ReturnType<typeof useGetKnowledgesByTopicLazyQuery>;
-export type GetKnowledgesByTopicSuspenseQueryHookResult = ReturnType<typeof useGetKnowledgesByTopicSuspenseQuery>;
-export type GetKnowledgesByTopicQueryResult = Apollo.QueryResult<GetKnowledgesByTopicQuery, GetKnowledgesByTopicQueryVariables>;
-export const CreateKnowledgeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateKnowledge"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateKnowledgeInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createKnowledge"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"topic"}},{"kind":"Field","name":{"kind":"Name","value":"content"}},{"kind":"Field","name":{"kind":"Name","value":"commitID"}},{"kind":"Field","name":{"kind":"Name","value":"authorID"}},{"kind":"Field","name":{"kind":"Name","value":"author"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"state"}}]}}]}}]} as unknown as DocumentNode;
+export type GetKnowledgeQueryHookResult = ReturnType<typeof useGetKnowledgeQuery>;
+export type GetKnowledgeLazyQueryHookResult = ReturnType<typeof useGetKnowledgeLazyQuery>;
+export type GetKnowledgeSuspenseQueryHookResult = ReturnType<typeof useGetKnowledgeSuspenseQuery>;
+export type GetKnowledgeQueryResult = Apollo.QueryResult<GetKnowledgeQuery, GetKnowledgeQueryVariables>;
+export const GetKnowledgeLogsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetKnowledgeLogs"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"knowledgeID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"knowledgeLogs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"knowledgeID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"knowledgeID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"knowledgeID"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"claim"}},{"kind":"Field","name":{"kind":"Name","value":"authorID"}},{"kind":"Field","name":{"kind":"Name","value":"author"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}}]}},{"kind":"Field","name":{"kind":"Name","value":"ticketID"}},{"kind":"Field","name":{"kind":"Name","value":"message"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useGetKnowledgeLogsQuery__
+ *
+ * To run a query within a React component, call `useGetKnowledgeLogsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetKnowledgeLogsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetKnowledgeLogsQuery({
+ *   variables: {
+ *      knowledgeID: // value for 'knowledgeID'
+ *   },
+ * });
+ */
+export function useGetKnowledgeLogsQuery(baseOptions: Apollo.QueryHookOptions<GetKnowledgeLogsQuery, GetKnowledgeLogsQueryVariables> & ({ variables: GetKnowledgeLogsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetKnowledgeLogsQuery, GetKnowledgeLogsQueryVariables>(GetKnowledgeLogsDocument, options);
+      }
+export function useGetKnowledgeLogsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetKnowledgeLogsQuery, GetKnowledgeLogsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetKnowledgeLogsQuery, GetKnowledgeLogsQueryVariables>(GetKnowledgeLogsDocument, options);
+        }
+// @ts-ignore
+export function useGetKnowledgeLogsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetKnowledgeLogsQuery, GetKnowledgeLogsQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgeLogsQuery, GetKnowledgeLogsQueryVariables>;
+export function useGetKnowledgeLogsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgeLogsQuery, GetKnowledgeLogsQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgeLogsQuery | undefined, GetKnowledgeLogsQueryVariables>;
+export function useGetKnowledgeLogsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgeLogsQuery, GetKnowledgeLogsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetKnowledgeLogsQuery, GetKnowledgeLogsQueryVariables>(GetKnowledgeLogsDocument, options);
+        }
+export type GetKnowledgeLogsQueryHookResult = ReturnType<typeof useGetKnowledgeLogsQuery>;
+export type GetKnowledgeLogsLazyQueryHookResult = ReturnType<typeof useGetKnowledgeLogsLazyQuery>;
+export type GetKnowledgeLogsSuspenseQueryHookResult = ReturnType<typeof useGetKnowledgeLogsSuspenseQuery>;
+export type GetKnowledgeLogsQueryResult = Apollo.QueryResult<GetKnowledgeLogsQuery, GetKnowledgeLogsQueryVariables>;
+export const GetKnowledgeTagsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetKnowledgeTags"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"knowledgeTags"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useGetKnowledgeTagsQuery__
+ *
+ * To run a query within a React component, call `useGetKnowledgeTagsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetKnowledgeTagsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetKnowledgeTagsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetKnowledgeTagsQuery(baseOptions?: Apollo.QueryHookOptions<GetKnowledgeTagsQuery, GetKnowledgeTagsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetKnowledgeTagsQuery, GetKnowledgeTagsQueryVariables>(GetKnowledgeTagsDocument, options);
+      }
+export function useGetKnowledgeTagsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetKnowledgeTagsQuery, GetKnowledgeTagsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetKnowledgeTagsQuery, GetKnowledgeTagsQueryVariables>(GetKnowledgeTagsDocument, options);
+        }
+// @ts-ignore
+export function useGetKnowledgeTagsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetKnowledgeTagsQuery, GetKnowledgeTagsQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgeTagsQuery, GetKnowledgeTagsQueryVariables>;
+export function useGetKnowledgeTagsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgeTagsQuery, GetKnowledgeTagsQueryVariables>): Apollo.UseSuspenseQueryResult<GetKnowledgeTagsQuery | undefined, GetKnowledgeTagsQueryVariables>;
+export function useGetKnowledgeTagsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetKnowledgeTagsQuery, GetKnowledgeTagsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetKnowledgeTagsQuery, GetKnowledgeTagsQueryVariables>(GetKnowledgeTagsDocument, options);
+        }
+export type GetKnowledgeTagsQueryHookResult = ReturnType<typeof useGetKnowledgeTagsQuery>;
+export type GetKnowledgeTagsLazyQueryHookResult = ReturnType<typeof useGetKnowledgeTagsLazyQuery>;
+export type GetKnowledgeTagsSuspenseQueryHookResult = ReturnType<typeof useGetKnowledgeTagsSuspenseQuery>;
+export type GetKnowledgeTagsQueryResult = Apollo.QueryResult<GetKnowledgeTagsQuery, GetKnowledgeTagsQueryVariables>;
+export const CreateKnowledgeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateKnowledge"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateKnowledgeInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createKnowledge"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"claim"}},{"kind":"Field","name":{"kind":"Name","value":"tags"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
 export type CreateKnowledgeMutationFn = Apollo.MutationFunction<CreateKnowledgeMutation, CreateKnowledgeMutationVariables>;
 
 /**
@@ -2042,7 +2226,7 @@ export function useCreateKnowledgeMutation(baseOptions?: Apollo.MutationHookOpti
 export type CreateKnowledgeMutationHookResult = ReturnType<typeof useCreateKnowledgeMutation>;
 export type CreateKnowledgeMutationResult = Apollo.MutationResult<CreateKnowledgeMutation>;
 export type CreateKnowledgeMutationOptions = Apollo.BaseMutationOptions<CreateKnowledgeMutation, CreateKnowledgeMutationVariables>;
-export const UpdateKnowledgeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateKnowledge"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateKnowledgeInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateKnowledge"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"topic"}},{"kind":"Field","name":{"kind":"Name","value":"content"}},{"kind":"Field","name":{"kind":"Name","value":"commitID"}},{"kind":"Field","name":{"kind":"Name","value":"authorID"}},{"kind":"Field","name":{"kind":"Name","value":"author"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"state"}}]}}]}}]} as unknown as DocumentNode;
+export const UpdateKnowledgeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateKnowledge"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateKnowledgeInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateKnowledge"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"claim"}},{"kind":"Field","name":{"kind":"Name","value":"tags"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
 export type UpdateKnowledgeMutationFn = Apollo.MutationFunction<UpdateKnowledgeMutation, UpdateKnowledgeMutationVariables>;
 
 /**
@@ -2069,34 +2253,143 @@ export function useUpdateKnowledgeMutation(baseOptions?: Apollo.MutationHookOpti
 export type UpdateKnowledgeMutationHookResult = ReturnType<typeof useUpdateKnowledgeMutation>;
 export type UpdateKnowledgeMutationResult = Apollo.MutationResult<UpdateKnowledgeMutation>;
 export type UpdateKnowledgeMutationOptions = Apollo.BaseMutationOptions<UpdateKnowledgeMutation, UpdateKnowledgeMutationVariables>;
-export const ArchiveKnowledgeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ArchiveKnowledge"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"topic"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"slug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"archiveKnowledge"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"topic"},"value":{"kind":"Variable","name":{"kind":"Name","value":"topic"}}},{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"slug"}}}]}]}}]} as unknown as DocumentNode;
-export type ArchiveKnowledgeMutationFn = Apollo.MutationFunction<ArchiveKnowledgeMutation, ArchiveKnowledgeMutationVariables>;
+export const DeleteKnowledgeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteKnowledge"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"reason"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteKnowledge"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"reason"},"value":{"kind":"Variable","name":{"kind":"Name","value":"reason"}}}]}]}}]} as unknown as DocumentNode;
+export type DeleteKnowledgeMutationFn = Apollo.MutationFunction<DeleteKnowledgeMutation, DeleteKnowledgeMutationVariables>;
 
 /**
- * __useArchiveKnowledgeMutation__
+ * __useDeleteKnowledgeMutation__
  *
- * To run a mutation, you first call `useArchiveKnowledgeMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useArchiveKnowledgeMutation` returns a tuple that includes:
+ * To run a mutation, you first call `useDeleteKnowledgeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteKnowledgeMutation` returns a tuple that includes:
  * - A mutate function that you can call at any time to execute the mutation
  * - An object with fields that represent the current status of the mutation's execution
  *
  * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
  *
  * @example
- * const [archiveKnowledgeMutation, { data, loading, error }] = useArchiveKnowledgeMutation({
+ * const [deleteKnowledgeMutation, { data, loading, error }] = useDeleteKnowledgeMutation({
  *   variables: {
- *      topic: // value for 'topic'
- *      slug: // value for 'slug'
+ *      id: // value for 'id'
+ *      reason: // value for 'reason'
  *   },
  * });
  */
-export function useArchiveKnowledgeMutation(baseOptions?: Apollo.MutationHookOptions<ArchiveKnowledgeMutation, ArchiveKnowledgeMutationVariables>) {
+export function useDeleteKnowledgeMutation(baseOptions?: Apollo.MutationHookOptions<DeleteKnowledgeMutation, DeleteKnowledgeMutationVariables>) {
         const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<ArchiveKnowledgeMutation, ArchiveKnowledgeMutationVariables>(ArchiveKnowledgeDocument, options);
+        return Apollo.useMutation<DeleteKnowledgeMutation, DeleteKnowledgeMutationVariables>(DeleteKnowledgeDocument, options);
       }
-export type ArchiveKnowledgeMutationHookResult = ReturnType<typeof useArchiveKnowledgeMutation>;
-export type ArchiveKnowledgeMutationResult = Apollo.MutationResult<ArchiveKnowledgeMutation>;
-export type ArchiveKnowledgeMutationOptions = Apollo.BaseMutationOptions<ArchiveKnowledgeMutation, ArchiveKnowledgeMutationVariables>;
+export type DeleteKnowledgeMutationHookResult = ReturnType<typeof useDeleteKnowledgeMutation>;
+export type DeleteKnowledgeMutationResult = Apollo.MutationResult<DeleteKnowledgeMutation>;
+export type DeleteKnowledgeMutationOptions = Apollo.BaseMutationOptions<DeleteKnowledgeMutation, DeleteKnowledgeMutationVariables>;
+export const CreateKnowledgeTagDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateKnowledgeTag"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateKnowledgeTagInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createKnowledgeTag"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}}]}}]}}]} as unknown as DocumentNode;
+export type CreateKnowledgeTagMutationFn = Apollo.MutationFunction<CreateKnowledgeTagMutation, CreateKnowledgeTagMutationVariables>;
+
+/**
+ * __useCreateKnowledgeTagMutation__
+ *
+ * To run a mutation, you first call `useCreateKnowledgeTagMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateKnowledgeTagMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createKnowledgeTagMutation, { data, loading, error }] = useCreateKnowledgeTagMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCreateKnowledgeTagMutation(baseOptions?: Apollo.MutationHookOptions<CreateKnowledgeTagMutation, CreateKnowledgeTagMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CreateKnowledgeTagMutation, CreateKnowledgeTagMutationVariables>(CreateKnowledgeTagDocument, options);
+      }
+export type CreateKnowledgeTagMutationHookResult = ReturnType<typeof useCreateKnowledgeTagMutation>;
+export type CreateKnowledgeTagMutationResult = Apollo.MutationResult<CreateKnowledgeTagMutation>;
+export type CreateKnowledgeTagMutationOptions = Apollo.BaseMutationOptions<CreateKnowledgeTagMutation, CreateKnowledgeTagMutationVariables>;
+export const UpdateKnowledgeTagDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateKnowledgeTag"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateKnowledgeTagInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateKnowledgeTag"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}}]}}]}}]} as unknown as DocumentNode;
+export type UpdateKnowledgeTagMutationFn = Apollo.MutationFunction<UpdateKnowledgeTagMutation, UpdateKnowledgeTagMutationVariables>;
+
+/**
+ * __useUpdateKnowledgeTagMutation__
+ *
+ * To run a mutation, you first call `useUpdateKnowledgeTagMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateKnowledgeTagMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateKnowledgeTagMutation, { data, loading, error }] = useUpdateKnowledgeTagMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateKnowledgeTagMutation(baseOptions?: Apollo.MutationHookOptions<UpdateKnowledgeTagMutation, UpdateKnowledgeTagMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateKnowledgeTagMutation, UpdateKnowledgeTagMutationVariables>(UpdateKnowledgeTagDocument, options);
+      }
+export type UpdateKnowledgeTagMutationHookResult = ReturnType<typeof useUpdateKnowledgeTagMutation>;
+export type UpdateKnowledgeTagMutationResult = Apollo.MutationResult<UpdateKnowledgeTagMutation>;
+export type UpdateKnowledgeTagMutationOptions = Apollo.BaseMutationOptions<UpdateKnowledgeTagMutation, UpdateKnowledgeTagMutationVariables>;
+export const DeleteKnowledgeTagDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteKnowledgeTag"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteKnowledgeTag"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}]}}]} as unknown as DocumentNode;
+export type DeleteKnowledgeTagMutationFn = Apollo.MutationFunction<DeleteKnowledgeTagMutation, DeleteKnowledgeTagMutationVariables>;
+
+/**
+ * __useDeleteKnowledgeTagMutation__
+ *
+ * To run a mutation, you first call `useDeleteKnowledgeTagMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteKnowledgeTagMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteKnowledgeTagMutation, { data, loading, error }] = useDeleteKnowledgeTagMutation({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useDeleteKnowledgeTagMutation(baseOptions?: Apollo.MutationHookOptions<DeleteKnowledgeTagMutation, DeleteKnowledgeTagMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<DeleteKnowledgeTagMutation, DeleteKnowledgeTagMutationVariables>(DeleteKnowledgeTagDocument, options);
+      }
+export type DeleteKnowledgeTagMutationHookResult = ReturnType<typeof useDeleteKnowledgeTagMutation>;
+export type DeleteKnowledgeTagMutationResult = Apollo.MutationResult<DeleteKnowledgeTagMutation>;
+export type DeleteKnowledgeTagMutationOptions = Apollo.BaseMutationOptions<DeleteKnowledgeTagMutation, DeleteKnowledgeTagMutationVariables>;
+export const MergeKnowledgeTagsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"MergeKnowledgeTags"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"oldID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"newID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"mergeKnowledgeTags"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"oldID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"oldID"}}},{"kind":"Argument","name":{"kind":"Name","value":"newID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"newID"}}}]}]}}]} as unknown as DocumentNode;
+export type MergeKnowledgeTagsMutationFn = Apollo.MutationFunction<MergeKnowledgeTagsMutation, MergeKnowledgeTagsMutationVariables>;
+
+/**
+ * __useMergeKnowledgeTagsMutation__
+ *
+ * To run a mutation, you first call `useMergeKnowledgeTagsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useMergeKnowledgeTagsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [mergeKnowledgeTagsMutation, { data, loading, error }] = useMergeKnowledgeTagsMutation({
+ *   variables: {
+ *      oldID: // value for 'oldID'
+ *      newID: // value for 'newID'
+ *   },
+ * });
+ */
+export function useMergeKnowledgeTagsMutation(baseOptions?: Apollo.MutationHookOptions<MergeKnowledgeTagsMutation, MergeKnowledgeTagsMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<MergeKnowledgeTagsMutation, MergeKnowledgeTagsMutationVariables>(MergeKnowledgeTagsDocument, options);
+      }
+export type MergeKnowledgeTagsMutationHookResult = ReturnType<typeof useMergeKnowledgeTagsMutation>;
+export type MergeKnowledgeTagsMutationResult = Apollo.MutationResult<MergeKnowledgeTagsMutation>;
+export type MergeKnowledgeTagsMutationOptions = Apollo.BaseMutationOptions<MergeKnowledgeTagsMutation, MergeKnowledgeTagsMutationVariables>;
 export const GetTicketSessionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTicketSessions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ticketSessions"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ticketId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"ticketID"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"userID"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}}]}},{"kind":"Field","name":{"kind":"Name","value":"query"}},{"kind":"Field","name":{"kind":"Name","value":"slackURL"}},{"kind":"Field","name":{"kind":"Name","value":"intent"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
 
 /**
@@ -2208,127 +2501,6 @@ export type GetSessionMessagesQueryHookResult = ReturnType<typeof useGetSessionM
 export type GetSessionMessagesLazyQueryHookResult = ReturnType<typeof useGetSessionMessagesLazyQuery>;
 export type GetSessionMessagesSuspenseQueryHookResult = ReturnType<typeof useGetSessionMessagesSuspenseQuery>;
 export type GetSessionMessagesQueryResult = Apollo.QueryResult<GetSessionMessagesQuery, GetSessionMessagesQueryVariables>;
-export const ListAgentSummariesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListAgentSummaries"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"listAgentSummaries"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"agents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"agentID"}},{"kind":"Field","name":{"kind":"Name","value":"memoriesCount"}},{"kind":"Field","name":{"kind":"Name","value":"latestMemoryAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
-
-/**
- * __useListAgentSummariesQuery__
- *
- * To run a query within a React component, call `useListAgentSummariesQuery` and pass it any options that fit your needs.
- * When your component renders, `useListAgentSummariesQuery` returns an object from Apollo Client that contains loading, error, and data properties
- * you can use to render your UI.
- *
- * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
- *
- * @example
- * const { data, loading, error } = useListAgentSummariesQuery({
- *   variables: {
- *      offset: // value for 'offset'
- *      limit: // value for 'limit'
- *      keyword: // value for 'keyword'
- *   },
- * });
- */
-export function useListAgentSummariesQuery(baseOptions?: Apollo.QueryHookOptions<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>(ListAgentSummariesDocument, options);
-      }
-export function useListAgentSummariesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>(ListAgentSummariesDocument, options);
-        }
-// @ts-ignore
-export function useListAgentSummariesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>): Apollo.UseSuspenseQueryResult<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>;
-export function useListAgentSummariesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>): Apollo.UseSuspenseQueryResult<ListAgentSummariesQuery | undefined, ListAgentSummariesQueryVariables>;
-export function useListAgentSummariesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>(ListAgentSummariesDocument, options);
-        }
-export type ListAgentSummariesQueryHookResult = ReturnType<typeof useListAgentSummariesQuery>;
-export type ListAgentSummariesLazyQueryHookResult = ReturnType<typeof useListAgentSummariesLazyQuery>;
-export type ListAgentSummariesSuspenseQueryHookResult = ReturnType<typeof useListAgentSummariesSuspenseQuery>;
-export type ListAgentSummariesQueryResult = Apollo.QueryResult<ListAgentSummariesQuery, ListAgentSummariesQueryVariables>;
-export const ListAgentMemoriesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListAgentMemories"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"agentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"sortBy"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"MemorySortField"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"sortOrder"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"SortOrder"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"minScore"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Float"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"maxScore"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Float"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"listAgentMemories"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"agentID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"agentID"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"sortBy"},"value":{"kind":"Variable","name":{"kind":"Name","value":"sortBy"}}},{"kind":"Argument","name":{"kind":"Name","value":"sortOrder"},"value":{"kind":"Variable","name":{"kind":"Name","value":"sortOrder"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}},{"kind":"Argument","name":{"kind":"Name","value":"minScore"},"value":{"kind":"Variable","name":{"kind":"Name","value":"minScore"}}},{"kind":"Argument","name":{"kind":"Name","value":"maxScore"},"value":{"kind":"Variable","name":{"kind":"Name","value":"maxScore"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"memories"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"agentID"}},{"kind":"Field","name":{"kind":"Name","value":"query"}},{"kind":"Field","name":{"kind":"Name","value":"claim"}},{"kind":"Field","name":{"kind":"Name","value":"score"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"lastUsedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
-
-/**
- * __useListAgentMemoriesQuery__
- *
- * To run a query within a React component, call `useListAgentMemoriesQuery` and pass it any options that fit your needs.
- * When your component renders, `useListAgentMemoriesQuery` returns an object from Apollo Client that contains loading, error, and data properties
- * you can use to render your UI.
- *
- * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
- *
- * @example
- * const { data, loading, error } = useListAgentMemoriesQuery({
- *   variables: {
- *      agentID: // value for 'agentID'
- *      offset: // value for 'offset'
- *      limit: // value for 'limit'
- *      sortBy: // value for 'sortBy'
- *      sortOrder: // value for 'sortOrder'
- *      keyword: // value for 'keyword'
- *      minScore: // value for 'minScore'
- *      maxScore: // value for 'maxScore'
- *   },
- * });
- */
-export function useListAgentMemoriesQuery(baseOptions: Apollo.QueryHookOptions<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables> & ({ variables: ListAgentMemoriesQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>(ListAgentMemoriesDocument, options);
-      }
-export function useListAgentMemoriesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>(ListAgentMemoriesDocument, options);
-        }
-// @ts-ignore
-export function useListAgentMemoriesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>): Apollo.UseSuspenseQueryResult<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>;
-export function useListAgentMemoriesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>): Apollo.UseSuspenseQueryResult<ListAgentMemoriesQuery | undefined, ListAgentMemoriesQueryVariables>;
-export function useListAgentMemoriesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>(ListAgentMemoriesDocument, options);
-        }
-export type ListAgentMemoriesQueryHookResult = ReturnType<typeof useListAgentMemoriesQuery>;
-export type ListAgentMemoriesLazyQueryHookResult = ReturnType<typeof useListAgentMemoriesLazyQuery>;
-export type ListAgentMemoriesSuspenseQueryHookResult = ReturnType<typeof useListAgentMemoriesSuspenseQuery>;
-export type ListAgentMemoriesQueryResult = Apollo.QueryResult<ListAgentMemoriesQuery, ListAgentMemoriesQueryVariables>;
-export const GetAgentMemoryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAgentMemory"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"agentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"memoryID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getAgentMemory"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"agentID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"agentID"}}},{"kind":"Argument","name":{"kind":"Name","value":"memoryID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"memoryID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"agentID"}},{"kind":"Field","name":{"kind":"Name","value":"query"}},{"kind":"Field","name":{"kind":"Name","value":"claim"}},{"kind":"Field","name":{"kind":"Name","value":"score"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"lastUsedAt"}}]}}]}}]} as unknown as DocumentNode;
-
-/**
- * __useGetAgentMemoryQuery__
- *
- * To run a query within a React component, call `useGetAgentMemoryQuery` and pass it any options that fit your needs.
- * When your component renders, `useGetAgentMemoryQuery` returns an object from Apollo Client that contains loading, error, and data properties
- * you can use to render your UI.
- *
- * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
- *
- * @example
- * const { data, loading, error } = useGetAgentMemoryQuery({
- *   variables: {
- *      agentID: // value for 'agentID'
- *      memoryID: // value for 'memoryID'
- *   },
- * });
- */
-export function useGetAgentMemoryQuery(baseOptions: Apollo.QueryHookOptions<GetAgentMemoryQuery, GetAgentMemoryQueryVariables> & ({ variables: GetAgentMemoryQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>(GetAgentMemoryDocument, options);
-      }
-export function useGetAgentMemoryLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>) {
-          const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>(GetAgentMemoryDocument, options);
-        }
-// @ts-ignore
-export function useGetAgentMemorySuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>): Apollo.UseSuspenseQueryResult<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>;
-export function useGetAgentMemorySuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>): Apollo.UseSuspenseQueryResult<GetAgentMemoryQuery | undefined, GetAgentMemoryQueryVariables>;
-export function useGetAgentMemorySuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>) {
-          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>(GetAgentMemoryDocument, options);
-        }
-export type GetAgentMemoryQueryHookResult = ReturnType<typeof useGetAgentMemoryQuery>;
-export type GetAgentMemoryLazyQueryHookResult = ReturnType<typeof useGetAgentMemoryLazyQuery>;
-export type GetAgentMemorySuspenseQueryHookResult = ReturnType<typeof useGetAgentMemorySuspenseQuery>;
-export type GetAgentMemoryQueryResult = Apollo.QueryResult<GetAgentMemoryQuery, GetAgentMemoryQueryVariables>;
 export const GetDiagnosesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetDiagnoses"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"diagnoses"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"diagnoses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"pendingCount"}},{"kind":"Field","name":{"kind":"Name","value":"fixedCount"}},{"kind":"Field","name":{"kind":"Name","value":"failedCount"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
 
 /**
@@ -2498,3 +2670,133 @@ export function useFixDiagnosisMutation(baseOptions?: Apollo.MutationHookOptions
 export type FixDiagnosisMutationHookResult = ReturnType<typeof useFixDiagnosisMutation>;
 export type FixDiagnosisMutationResult = Apollo.MutationResult<FixDiagnosisMutation>;
 export type FixDiagnosisMutationOptions = Apollo.BaseMutationOptions<FixDiagnosisMutation, FixDiagnosisMutationVariables>;
+export const GetQueuedAlertsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetQueuedAlerts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"queuedAlerts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"alerts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"schema"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"data"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useGetQueuedAlertsQuery__
+ *
+ * To run a query within a React component, call `useGetQueuedAlertsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetQueuedAlertsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetQueuedAlertsQuery({
+ *   variables: {
+ *      keyword: // value for 'keyword'
+ *      offset: // value for 'offset'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useGetQueuedAlertsQuery(baseOptions?: Apollo.QueryHookOptions<GetQueuedAlertsQuery, GetQueuedAlertsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetQueuedAlertsQuery, GetQueuedAlertsQueryVariables>(GetQueuedAlertsDocument, options);
+      }
+export function useGetQueuedAlertsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetQueuedAlertsQuery, GetQueuedAlertsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetQueuedAlertsQuery, GetQueuedAlertsQueryVariables>(GetQueuedAlertsDocument, options);
+        }
+// @ts-ignore
+export function useGetQueuedAlertsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetQueuedAlertsQuery, GetQueuedAlertsQueryVariables>): Apollo.UseSuspenseQueryResult<GetQueuedAlertsQuery, GetQueuedAlertsQueryVariables>;
+export function useGetQueuedAlertsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetQueuedAlertsQuery, GetQueuedAlertsQueryVariables>): Apollo.UseSuspenseQueryResult<GetQueuedAlertsQuery | undefined, GetQueuedAlertsQueryVariables>;
+export function useGetQueuedAlertsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetQueuedAlertsQuery, GetQueuedAlertsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetQueuedAlertsQuery, GetQueuedAlertsQueryVariables>(GetQueuedAlertsDocument, options);
+        }
+export type GetQueuedAlertsQueryHookResult = ReturnType<typeof useGetQueuedAlertsQuery>;
+export type GetQueuedAlertsLazyQueryHookResult = ReturnType<typeof useGetQueuedAlertsLazyQuery>;
+export type GetQueuedAlertsSuspenseQueryHookResult = ReturnType<typeof useGetQueuedAlertsSuspenseQuery>;
+export type GetQueuedAlertsQueryResult = Apollo.QueryResult<GetQueuedAlertsQuery, GetQueuedAlertsQueryVariables>;
+export const GetReprocessJobDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetReprocessJob"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"reprocessJob"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"queuedAlertID"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useGetReprocessJobQuery__
+ *
+ * To run a query within a React component, call `useGetReprocessJobQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetReprocessJobQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetReprocessJobQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useGetReprocessJobQuery(baseOptions: Apollo.QueryHookOptions<GetReprocessJobQuery, GetReprocessJobQueryVariables> & ({ variables: GetReprocessJobQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetReprocessJobQuery, GetReprocessJobQueryVariables>(GetReprocessJobDocument, options);
+      }
+export function useGetReprocessJobLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetReprocessJobQuery, GetReprocessJobQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetReprocessJobQuery, GetReprocessJobQueryVariables>(GetReprocessJobDocument, options);
+        }
+// @ts-ignore
+export function useGetReprocessJobSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetReprocessJobQuery, GetReprocessJobQueryVariables>): Apollo.UseSuspenseQueryResult<GetReprocessJobQuery, GetReprocessJobQueryVariables>;
+export function useGetReprocessJobSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetReprocessJobQuery, GetReprocessJobQueryVariables>): Apollo.UseSuspenseQueryResult<GetReprocessJobQuery | undefined, GetReprocessJobQueryVariables>;
+export function useGetReprocessJobSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetReprocessJobQuery, GetReprocessJobQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetReprocessJobQuery, GetReprocessJobQueryVariables>(GetReprocessJobDocument, options);
+        }
+export type GetReprocessJobQueryHookResult = ReturnType<typeof useGetReprocessJobQuery>;
+export type GetReprocessJobLazyQueryHookResult = ReturnType<typeof useGetReprocessJobLazyQuery>;
+export type GetReprocessJobSuspenseQueryHookResult = ReturnType<typeof useGetReprocessJobSuspenseQuery>;
+export type GetReprocessJobQueryResult = Apollo.QueryResult<GetReprocessJobQuery, GetReprocessJobQueryVariables>;
+export const ReprocessQueuedAlertDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ReprocessQueuedAlert"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"reprocessQueuedAlert"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"queuedAlertID"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+export type ReprocessQueuedAlertMutationFn = Apollo.MutationFunction<ReprocessQueuedAlertMutation, ReprocessQueuedAlertMutationVariables>;
+
+/**
+ * __useReprocessQueuedAlertMutation__
+ *
+ * To run a mutation, you first call `useReprocessQueuedAlertMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useReprocessQueuedAlertMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [reprocessQueuedAlertMutation, { data, loading, error }] = useReprocessQueuedAlertMutation({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useReprocessQueuedAlertMutation(baseOptions?: Apollo.MutationHookOptions<ReprocessQueuedAlertMutation, ReprocessQueuedAlertMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ReprocessQueuedAlertMutation, ReprocessQueuedAlertMutationVariables>(ReprocessQueuedAlertDocument, options);
+      }
+export type ReprocessQueuedAlertMutationHookResult = ReturnType<typeof useReprocessQueuedAlertMutation>;
+export type ReprocessQueuedAlertMutationResult = Apollo.MutationResult<ReprocessQueuedAlertMutation>;
+export type ReprocessQueuedAlertMutationOptions = Apollo.BaseMutationOptions<ReprocessQueuedAlertMutation, ReprocessQueuedAlertMutationVariables>;
+export const DiscardQueuedAlertsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DiscardQueuedAlerts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ids"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"discardQueuedAlerts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ids"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ids"}}}]}]}}]} as unknown as DocumentNode;
+export type DiscardQueuedAlertsMutationFn = Apollo.MutationFunction<DiscardQueuedAlertsMutation, DiscardQueuedAlertsMutationVariables>;
+
+/**
+ * __useDiscardQueuedAlertsMutation__
+ *
+ * To run a mutation, you first call `useDiscardQueuedAlertsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDiscardQueuedAlertsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [discardQueuedAlertsMutation, { data, loading, error }] = useDiscardQueuedAlertsMutation({
+ *   variables: {
+ *      ids: // value for 'ids'
+ *   },
+ * });
+ */
+export function useDiscardQueuedAlertsMutation(baseOptions?: Apollo.MutationHookOptions<DiscardQueuedAlertsMutation, DiscardQueuedAlertsMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<DiscardQueuedAlertsMutation, DiscardQueuedAlertsMutationVariables>(DiscardQueuedAlertsDocument, options);
+      }
+export type DiscardQueuedAlertsMutationHookResult = ReturnType<typeof useDiscardQueuedAlertsMutation>;
+export type DiscardQueuedAlertsMutationResult = Apollo.MutationResult<DiscardQueuedAlertsMutation>;
+export type DiscardQueuedAlertsMutationOptions = Apollo.BaseMutationOptions<DiscardQueuedAlertsMutation, DiscardQueuedAlertsMutationVariables>;

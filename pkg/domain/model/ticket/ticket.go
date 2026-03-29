@@ -9,7 +9,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
+
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -155,7 +155,6 @@ func (x *Finding) Validate() error {
 
 type AlertRepository interface {
 	BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
-	GetKnowledges(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.Knowledge, error)
 }
 
 //go:embed prompt/ticket_meta.md
@@ -191,15 +190,6 @@ func (x *Ticket) FillMetadata(ctx context.Context, llmClient gollem.LLMClient, a
 		"summary": summary,
 		"schema":  prompt.ToSchema(Metadata{}),
 		"lang":    lang.From(ctx),
-	}
-
-	// Add knowledges if topic is set
-	if x.Topic != "" {
-		knowledges, err := alertRepo.GetKnowledges(ctx, x.Topic)
-		if err == nil && len(knowledges) > 0 {
-			params["knowledges"] = knowledges
-			params["topic"] = x.Topic
-		}
 	}
 
 	metaPrompt, err := prompt.Generate(ctx, ticketMetaPrompt, params)

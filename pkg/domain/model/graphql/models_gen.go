@@ -31,32 +31,6 @@ type Activity struct {
 	Ticket    *ticket.Ticket `json:"ticket,omitempty"`
 }
 
-type AgentMemoriesResponse struct {
-	Memories   []*AgentMemory `json:"memories"`
-	TotalCount int            `json:"totalCount"`
-}
-
-type AgentMemory struct {
-	ID         string  `json:"id"`
-	AgentID    string  `json:"agentID"`
-	Query      string  `json:"query"`
-	Claim      string  `json:"claim"`
-	Score      float64 `json:"score"`
-	CreatedAt  string  `json:"createdAt"`
-	LastUsedAt *string `json:"lastUsedAt,omitempty"`
-}
-
-type AgentSummariesResponse struct {
-	Agents     []*AgentSummary `json:"agents"`
-	TotalCount int             `json:"totalCount"`
-}
-
-type AgentSummary struct {
-	AgentID        string  `json:"agentID"`
-	MemoriesCount  int     `json:"memoriesCount"`
-	LatestMemoryAt *string `json:"latestMemoryAt,omitempty"`
-}
-
 type AlertAttribute struct {
 	Key   string  `json:"key"`
 	Value string  `json:"value"`
@@ -75,10 +49,17 @@ type CommentsResponse struct {
 }
 
 type CreateKnowledgeInput struct {
-	Topic   string `json:"topic"`
-	Slug    string `json:"slug"`
-	Name    string `json:"name"`
-	Content string `json:"content"`
+	Category string   `json:"category"`
+	Title    string   `json:"title"`
+	Claim    string   `json:"claim"`
+	Tags     []string `json:"tags"`
+	Message  string   `json:"message"`
+	TicketID *string  `json:"ticketID,omitempty"`
+}
+
+type CreateKnowledgeTagInput struct {
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
 }
 
 type DashboardStats struct {
@@ -124,16 +105,35 @@ type DiagnosisIssuesResponse struct {
 }
 
 type Knowledge struct {
-	Slug      string `json:"slug"`
-	Name      string `json:"name"`
-	Topic     string `json:"topic"`
-	Content   string `json:"content"`
-	CommitID  string `json:"commitID"`
-	AuthorID  string `json:"authorID"`
-	Author    *User  `json:"author"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
-	State     string `json:"state"`
+	ID        string          `json:"id"`
+	Category  string          `json:"category"`
+	Title     string          `json:"title"`
+	Claim     string          `json:"claim"`
+	Tags      []*KnowledgeTag `json:"tags"`
+	AuthorID  string          `json:"authorID"`
+	Author    *User           `json:"author"`
+	CreatedAt string          `json:"createdAt"`
+	UpdatedAt string          `json:"updatedAt"`
+}
+
+type KnowledgeLog struct {
+	ID          string  `json:"id"`
+	KnowledgeID string  `json:"knowledgeID"`
+	Title       string  `json:"title"`
+	Claim       string  `json:"claim"`
+	AuthorID    string  `json:"authorID"`
+	Author      *User   `json:"author"`
+	TicketID    *string `json:"ticketID,omitempty"`
+	Message     string  `json:"message"`
+	CreatedAt   string  `json:"createdAt"`
+}
+
+type KnowledgeTag struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
 }
 
 type Mutation struct {
@@ -188,16 +188,19 @@ type TicketsResponse struct {
 	TotalCount int              `json:"totalCount"`
 }
 
-type TopicSummary struct {
-	Topic string `json:"topic"`
-	Count int    `json:"count"`
+type UpdateKnowledgeInput struct {
+	ID       string   `json:"id"`
+	Title    string   `json:"title"`
+	Claim    string   `json:"claim"`
+	Tags     []string `json:"tags"`
+	Message  string   `json:"message"`
+	TicketID *string  `json:"ticketID,omitempty"`
 }
 
-type UpdateKnowledgeInput struct {
-	Topic   string `json:"topic"`
-	Slug    string `json:"slug"`
-	Name    string `json:"name"`
-	Content string `json:"content"`
+type UpdateKnowledgeTagInput struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
 }
 
 type UpdateTagInput struct {
@@ -211,63 +214,6 @@ type User struct {
 	ID   string  `json:"id"`
 	Name string  `json:"name"`
 	Icon *string `json:"icon,omitempty"`
-}
-
-type MemorySortField string
-
-const (
-	MemorySortFieldScore      MemorySortField = "SCORE"
-	MemorySortFieldCreatedAt  MemorySortField = "CREATED_AT"
-	MemorySortFieldLastUsedAt MemorySortField = "LAST_USED_AT"
-)
-
-var AllMemorySortField = []MemorySortField{
-	MemorySortFieldScore,
-	MemorySortFieldCreatedAt,
-	MemorySortFieldLastUsedAt,
-}
-
-func (e MemorySortField) IsValid() bool {
-	switch e {
-	case MemorySortFieldScore, MemorySortFieldCreatedAt, MemorySortFieldLastUsedAt:
-		return true
-	}
-	return false
-}
-
-func (e MemorySortField) String() string {
-	return string(e)
-}
-
-func (e *MemorySortField) UnmarshalGQL(v any) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = MemorySortField(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid MemorySortField", str)
-	}
-	return nil
-}
-
-func (e MemorySortField) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
-}
-
-func (e *MemorySortField) UnmarshalJSON(b []byte) error {
-	s, err := strconv.Unquote(string(b))
-	if err != nil {
-		return err
-	}
-	return e.UnmarshalGQL(s)
-}
-
-func (e MemorySortField) MarshalJSON() ([]byte, error) {
-	var buf bytes.Buffer
-	e.MarshalGQL(&buf)
-	return buf.Bytes(), nil
 }
 
 type ReprocessJobStatus string

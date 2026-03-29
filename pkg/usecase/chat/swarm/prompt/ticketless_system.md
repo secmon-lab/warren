@@ -43,26 +43,11 @@ The following messages provide context from the Slack channel:
 
 ## Available Sub-Agents
 {{ .subagents_description }}
-{{ if .memory_context }}
-
-## Past Insights (Agent Memory)
-{{ .memory_context }}
-{{ end }}
 {{ if .user_prompt }}
 
 ## User System Prompt
 {{ .user_prompt }}
 {{ end }}
-{{ if .knowledges }}
-
-## Domain Knowledge
-{{ range .knowledges }}
-
-### {{ .Name }}
-
-{{ .Content }}
-{{ end }}
-{{- end }}
 
 ## Asking Users for Information
 

@@ -15,7 +15,7 @@ import (
 	cbService "github.com/secmon-lab/warren/pkg/service/circuitbreaker"
 	"github.com/secmon-lab/warren/pkg/service/command"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
-	"github.com/secmon-lab/warren/pkg/service/memory"
+
 	"github.com/secmon-lab/warren/pkg/service/notifier"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/tag"
@@ -30,7 +30,6 @@ type UseCases struct {
 	// services and adapters
 	slackService    *slackService.Service
 	tagService      *tag.Service
-	memoryService   *memory.Service
 	hitlService     *hitlService.Service
 	cbService       *cbService.Service
 	llmClient       gollem.LLMClient
@@ -86,12 +85,6 @@ func WithSlackService(slackService *slackService.Service) Option {
 func WithTagService(tagService *tag.Service) Option {
 	return func(u *UseCases) {
 		u.tagService = tagService
-	}
-}
-
-func WithMemoryService(memoryService *memory.Service) Option {
-	return func(u *UseCases) {
-		u.memoryService = memoryService
 	}
 }
 

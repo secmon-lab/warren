@@ -16,7 +16,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat"
-	"github.com/secmon-lab/warren/pkg/usecase/chat/swarm"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/slackctx"
 )
@@ -93,8 +92,7 @@ func (x *UseCases) ChatFromCLI(ctx context.Context, t *ticket.Ticket, message st
 }
 
 // buildChatContext fetches all data needed for chat execution and assembles a ChatContext.
-func (x *UseCases) buildChatContext(ctx context.Context, t *ticket.Ticket, slackHistory []slack.HistoryMessage, message string) (chatModel.ChatContext, error) {
-	logger := logging.From(ctx)
+func (x *UseCases) buildChatContext(ctx context.Context, t *ticket.Ticket, slackHistory []slack.HistoryMessage, _ string) (chatModel.ChatContext, error) {
 	ticketless := t.ID == ""
 
 	chatCtx := chatModel.ChatContext{
@@ -111,15 +109,7 @@ func (x *UseCases) buildChatContext(ctx context.Context, t *ticket.Ticket, slack
 		chatCtx.Alerts = alerts
 	}
 
-	// Search agent memories
-	if x.memoryService != nil {
-		memories, memErr := x.memoryService.SearchAndSelectMemories(ctx, message, 16)
-		if memErr != nil {
-			logger.Warn("failed to search agent memories", "error", memErr)
-		} else if len(memories) > 0 {
-			chatCtx.MemoryContext = swarm.FormatMemories(memories)
-		}
-	}
+	// Agent Memory search is removed — knowledge is now accessed via tool search (knowledge v2).
 
 	// Build tools
 	allTools := make([]gollem.ToolSet, 0, len(x.tools)+1)
@@ -142,15 +132,7 @@ func (x *UseCases) buildChatContext(ctx context.Context, t *ticket.Ticket, slack
 		chatCtx.ThreadComments = chatpkg.CollectThreadComments(ctx, x.repository, t.ID, nil)
 	}
 
-	// Collect domain knowledges (skip for ticketless without topic)
-	if !ticketless && t.Topic != "" {
-		knowledges, err := x.repository.GetKnowledges(ctx, t.Topic)
-		if err != nil {
-			logger.Warn("failed to get knowledges", "error", err, "topic", t.Topic)
-		} else {
-			chatCtx.Knowledges = knowledges
-		}
-	}
+	// Knowledge is now accessed via tool search (knowledge v2), not prompt injection.
 
 	// Load history (skip for ticketless)
 	if !ticketless {

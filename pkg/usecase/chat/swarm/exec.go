@@ -10,6 +10,9 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
+	"github.com/secmon-lab/warren/pkg/domain/types"
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
+	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -235,7 +238,80 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	markCompleted()
 	msg.Trace(taskCtx, "Completed")
 
+	// Trigger technique knowledge introspection in background
+	c.triggerTechniqueIntrospection(ctx, result)
+
 	return result
+}
+
+// triggerTechniqueIntrospection runs background knowledge introspection for a completed task.
+func (c *SwarmChat) triggerTechniqueIntrospection(ctx context.Context, result *TaskResult) {
+	logger := logging.From(ctx)
+
+	if c.knowledgeService == nil {
+		logger.Debug("technique introspection skipped: knowledge service not configured")
+		return
+	}
+	if result == nil {
+		logger.Debug("technique introspection skipped: nil task result")
+		return
+	}
+	if result.Result == "" {
+		logger.Debug("technique introspection skipped: empty task result",
+			"task_id", result.TaskID,
+			"task_title", result.Title,
+		)
+		return
+	}
+
+	logger.Info("triggering technique introspection",
+		"task_id", result.TaskID,
+		"task_title", result.Title,
+		"result_length", len(result.Result),
+	)
+
+	tool := knowledgeTool.New(c.knowledgeService, types.KnowledgeCategoryTechnique, knowledgeTool.ModeReadWrite)
+	input := &svcknowledge.IntrospectionInput{
+		Category:         types.KnowledgeCategoryTechnique,
+		ExecutionSummary: result.Result,
+	}
+
+	if err := c.knowledgeService.RunIntrospection(ctx, c.llmClient, tool, input); err != nil {
+		logger.Error("failed to trigger technique introspection", "error", err)
+	}
+}
+
+// triggerFactIntrospection runs background knowledge introspection for a completed session.
+func (c *SwarmChat) triggerFactIntrospection(ctx context.Context, summary string, t *ticket.Ticket) {
+	logger := logging.From(ctx)
+
+	if c.knowledgeService == nil {
+		logger.Debug("fact introspection skipped: knowledge service not configured")
+		return
+	}
+	if summary == "" {
+		logger.Debug("fact introspection skipped: empty session summary")
+		return
+	}
+
+	logger.Info("triggering fact introspection",
+		"summary_length", len(summary),
+		"has_ticket", t != nil,
+	)
+
+	tool := knowledgeTool.New(c.knowledgeService, types.KnowledgeCategoryFact, knowledgeTool.ModeReadWrite)
+	input := &svcknowledge.IntrospectionInput{
+		Category:         types.KnowledgeCategoryFact,
+		ExecutionSummary: summary,
+	}
+	if t != nil {
+		input.Ticket = t
+		input.TicketID = t.ID
+	}
+
+	if err := c.knowledgeService.RunIntrospection(ctx, c.llmClient, tool, input); err != nil {
+		logger.Error("failed to trigger fact introspection", "error", err)
+	}
 }
 
 // setupTaskMessageRouting creates task-specific msg routing with title-prefixed trace.

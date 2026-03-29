@@ -437,7 +437,7 @@ func (c *PlanExecChat) buildTicketlessSystemPrompt(ctx context.Context, tools []
 		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
 	}
 
-	return GenerateTicketlessSystemPrompt(ctx, slackHistory, additionalInstructions, nil, string(userID), c.userSystemPrompt)
+	return GenerateTicketlessSystemPrompt(ctx, slackHistory, additionalInstructions, string(userID), c.userSystemPrompt)
 }
 
 // buildSystemPrompt generates the system prompt with all context from ChatContext.
@@ -472,7 +472,7 @@ func (c *PlanExecChat) buildSystemPrompt(ctx context.Context, target *ticket.Tic
 		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
 	}
 
-	return GenerateChatSystemPrompt(ctx, target, len(chatCtx.Alerts), additionalInstructions, chatCtx.Knowledges, string(userID), chatCtx.ThreadComments, c.userSystemPrompt, chatCtx.SlackHistory)
+	return GenerateChatSystemPrompt(ctx, target, len(chatCtx.Alerts), additionalInstructions, string(userID), chatCtx.ThreadComments, c.userSystemPrompt, chatCtx.SlackHistory)
 }
 
 // buildAgentOption holds optional configuration for buildAgent.

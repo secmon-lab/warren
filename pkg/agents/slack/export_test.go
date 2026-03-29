@@ -5,8 +5,6 @@ import (
 
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	agentmemory "github.com/secmon-lab/warren/pkg/domain/model/memory"
-	"github.com/secmon-lab/warren/pkg/service/memory"
 )
 
 // Export for testing
@@ -20,7 +18,6 @@ func NewAgentForTest(llmClient gollem.LLMClient, repo interfaces.Repository, sla
 		internalTool: &internalTool{
 			slackClient: slackClient,
 		},
-		memoryService: memory.New("slack_search", llmClient, repo),
 	}
 }
 
@@ -67,9 +64,4 @@ func ExportedBuildSystemPrompt() (string, error) {
 // ExportedNewPromptTemplate is exported for testing
 func ExportedNewPromptTemplate() (*gollem.PromptTemplate, error) {
 	return newPromptTemplate()
-}
-
-// ExportedFormatMemoryContext is exported for testing
-func ExportedFormatMemoryContext(memories []*agentmemory.AgentMemory) string {
-	return formatMemoryContext(memories)
 }

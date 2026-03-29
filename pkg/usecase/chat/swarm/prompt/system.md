@@ -59,11 +59,6 @@ The following recent messages from the Slack channel provide additional context:
 
 ## Available Sub-Agents
 {{ .subagents_description }}
-{{ if .memory_context }}
-
-## Past Insights (Agent Memory)
-{{ .memory_context }}
-{{ end }}
 {{ if .user_prompt }}
 
 ## User System Prompt
@@ -77,18 +72,6 @@ The following messages were posted in this ticket's Slack thread by team members
 {{ range .thread_comments }}
 *{{ .User.Name }}* ({{ .CreatedAt.Format "2006-01-02 15:04:05" }}):
 {{ .Comment }}
-{{ end }}
-{{ end }}
-{{ if .knowledges }}
-
-## Domain Knowledge
-
-The following domain knowledge is available for topic '{{ .topic }}':
-{{ range .knowledges }}
-
-### {{ .Name }}
-
-{{ .Content }}
 {{ end }}
 {{ end }}
 

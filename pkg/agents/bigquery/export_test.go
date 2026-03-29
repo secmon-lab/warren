@@ -6,8 +6,6 @@ import (
 
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	agentmemory "github.com/secmon-lab/warren/pkg/domain/model/memory"
-	"github.com/secmon-lab/warren/pkg/service/memory"
 )
 
 // Expose internal types and functions for testing
@@ -23,7 +21,6 @@ func NewAgentForTest(config *Config, llmClient gollem.LLMClient, repo interfaces
 			projectID:                 projectID,
 			impersonateServiceAccount: impersonateServiceAccount,
 		},
-		memoryService: memory.New("bigquery", llmClient, repo),
 	}
 }
 
@@ -77,11 +74,6 @@ func ExportedBuildSystemPrompt(config *Config) (string, error) {
 // ExportedNewPromptTemplate is exported for testing
 func ExportedNewPromptTemplate() (*gollem.PromptTemplate, error) {
 	return newPromptTemplate()
-}
-
-// ExportedFormatMemoryContext is exported for testing
-func ExportedFormatMemoryContext(memories []*agentmemory.AgentMemory) string {
-	return formatMemoryContext(memories)
 }
 
 // ExportedBuildPromptHint is exported for testing

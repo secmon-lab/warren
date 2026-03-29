@@ -57,7 +57,7 @@ func TestGraphQLQueries(t *testing.T) {
 		}
 		gt.NoError(t, repo.PutTicket(context.Background(), *ticketObj))
 		gt.NoError(t, repo.PutAlert(context.Background(), *alertObj))
-		server := httptest.NewServer(graphqlHandler(repo, nil, nil))
+		server := httptest.NewServer(graphqlHandler(repo, nil, nil, nil))
 		defer server.Close()
 
 		req := graphqlRequest{
@@ -115,7 +115,7 @@ func TestGraphQLQueries(t *testing.T) {
 		}
 		gt.NoError(t, repo.PutTicket(context.Background(), *ticketObj))
 		gt.NoError(t, repo.PutAlert(context.Background(), *alertObj))
-		server := httptest.NewServer(graphqlHandler(repo, nil, nil))
+		server := httptest.NewServer(graphqlHandler(repo, nil, nil, nil))
 		defer server.Close()
 
 		req := graphqlRequest{
@@ -170,7 +170,7 @@ func TestGraphQLQueries(t *testing.T) {
 			CreatedAt: time.Now(),
 		}
 		gt.NoError(t, repo.PutAlert(context.Background(), *alertNoTicket))
-		server := httptest.NewServer(graphqlHandler(repo, nil, nil))
+		server := httptest.NewServer(graphqlHandler(repo, nil, nil, nil))
 		defer server.Close()
 
 		req := graphqlRequest{
@@ -234,7 +234,7 @@ func TestGraphQLQueries(t *testing.T) {
 		}
 		gt.NoError(t, repo.PutTicketComment(context.Background(), comment))
 
-		server := httptest.NewServer(graphqlHandler(repo, nil, nil))
+		server := httptest.NewServer(graphqlHandler(repo, nil, nil, nil))
 		defer server.Close()
 
 		req := graphqlRequest{
@@ -482,7 +482,7 @@ func TestDataLoaderIntegration(t *testing.T) {
 		gt.NoError(t, err)
 
 		// Create HTTP server with DataLoader middleware
-		server := httptest.NewServer(graphqlHandler(repo, slackService, nil))
+		server := httptest.NewServer(graphqlHandler(repo, slackService, nil, nil))
 		defer server.Close()
 
 		// Send GraphQL query for activity feed
@@ -642,7 +642,7 @@ func TestDataLoaderIntegration(t *testing.T) {
 		gt.NoError(t, repo.PutAlert(ctx, alert1))
 		gt.NoError(t, repo.PutAlert(ctx, alert2))
 
-		server := httptest.NewServer(graphqlHandler(repo, slackService, nil))
+		server := httptest.NewServer(graphqlHandler(repo, slackService, nil, nil))
 		defer server.Close()
 
 		// Query ticket with its alerts
@@ -705,7 +705,7 @@ func TestDataLoaderIntegration(t *testing.T) {
 		slackService, err := setupMockSlackService()
 		gt.NoError(t, err)
 
-		server := httptest.NewServer(graphqlHandler(repo, slackService, nil))
+		server := httptest.NewServer(graphqlHandler(repo, slackService, nil, nil))
 		defer server.Close()
 
 		// Query activities to trigger DataLoader usage
@@ -777,7 +777,7 @@ func TestDataLoaderIntegration(t *testing.T) {
 		slackService, err := slack_service.New(mockClient, "test-channel")
 		gt.NoError(t, err)
 
-		server := httptest.NewServer(graphqlHandler(repo, slackService, nil))
+		server := httptest.NewServer(graphqlHandler(repo, slackService, nil, nil))
 		defer server.Close()
 
 		// Query activities to trigger user loading which will cause Slack API error
