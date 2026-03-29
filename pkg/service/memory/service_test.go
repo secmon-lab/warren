@@ -36,7 +36,7 @@ func newMockLLMClient() gollem.LLMClient {
 		},
 		NewSessionFunc: func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					reflectionJSON := `{
 						"new_claims": ["Test claim from execution"],
 						"helpful_memories": [],

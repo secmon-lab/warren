@@ -3,7 +3,6 @@ package chat
 import (
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 )
@@ -14,10 +13,8 @@ import (
 type ChatContext struct {
 	Ticket         *ticket.Ticket
 	Alerts         []*alert.Alert
-	MemoryContext  string
 	Tools          []gollem.ToolSet
 	ThreadComments []ticket.Comment
-	Knowledges     []*knowledge.Knowledge
 	History        *gollem.History
 	SlackHistory   []slack.HistoryMessage
 }

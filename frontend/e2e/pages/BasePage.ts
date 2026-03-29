@@ -41,7 +41,6 @@ export class BasePage {
       alerts: this.page.getByRole("link", { name: "Alerts" }),
       queue: this.page.getByRole("link", { name: "Queue" }),
       knowledge: this.page.getByRole("link", { name: "Knowledge" }),
-      memory: this.page.getByRole("link", { name: "Memory" }),
       diagnosis: this.page.getByRole("link", { name: "Diagnosis" }),
       settings: this.page.getByRole("link", { name: "Settings" }),
     };
@@ -54,7 +53,6 @@ export class BasePage {
       | "alerts"
       | "queue"
       | "knowledge"
-      | "memory"
       | "diagnosis"
       | "settings"
   ) {

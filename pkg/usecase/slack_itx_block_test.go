@@ -67,7 +67,7 @@ func TestSlackActionAckAlert(t *testing.T) {
 	llmMock := &gollem_mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &gollem_mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					t.Fatal("LLM should not be called for single alert ticket - metadata should be inherited")
 					return nil, nil
 				},
@@ -183,7 +183,7 @@ func TestSlackActionAckList(t *testing.T) {
 	llmMock := &gollem_mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &gollem_mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					llmCallCount++
 					switch llmCallCount {
 					case 1:
@@ -683,7 +683,7 @@ func TestSlackActionAckAlert_MultipleAlertLists(t *testing.T) {
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					// Return appropriate JSON response for ticket metadata
 					return &gollem.Response{
 						Texts: []string{`{"title": "Test Ticket", "description": "Test Description", "summary": "Test Summary"}`},
@@ -832,7 +832,7 @@ func TestSlackActionAckAlert_SingleAlertList(t *testing.T) {
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					// Return appropriate JSON response for ticket metadata
 					return &gollem.Response{
 						Texts: []string{`{"title": "Test Ticket", "description": "Test Description", "summary": "Test Summary"}`},
@@ -934,7 +934,7 @@ func TestSlackActionAckAlert_UpdatesAlertList(t *testing.T) {
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					t.Fatal("LLM should not be called for single alert ticket - metadata should be inherited")
 					return nil, nil
 				},

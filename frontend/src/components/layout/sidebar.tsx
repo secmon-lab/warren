@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   Settings,
   BookOpen,
-  Brain,
   Stethoscope,
   Inbox,
 } from "lucide-react";
@@ -37,11 +36,6 @@ const navigation = [
     name: "Knowledge",
     href: "/knowledge",
     icon: BookOpen,
-  },
-  {
-    name: "Memory",
-    href: "/memory",
-    icon: Brain,
   },
   {
     name: "Diagnosis",

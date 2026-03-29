@@ -13,10 +13,13 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/tool/base"
+	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
@@ -235,7 +238,101 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	markCompleted()
 	msg.Trace(taskCtx, "Completed")
 
+	// Trigger technique knowledge reflection in background
+	c.triggerTechniqueReflection(ctx, taskCtx, result)
+
 	return result
+}
+
+// triggerTechniqueReflection runs background knowledge reflection for a completed task.
+func (c *SwarmChat) triggerTechniqueReflection(ctx context.Context, taskCtx context.Context, result *TaskResult) {
+	logger := logging.From(ctx)
+
+	if c.knowledgeService == nil {
+		logger.Debug("technique reflection skipped: knowledge service not configured")
+		return
+	}
+	if result == nil {
+		logger.Debug("technique reflection skipped: nil task result")
+		return
+	}
+	if result.Result == "" {
+		logger.Debug("technique reflection skipped: empty task result",
+			"task_id", result.TaskID,
+			"task_title", result.Title,
+		)
+		return
+	}
+
+	logger.Info("triggering technique reflection",
+		"task_id", result.TaskID,
+		"task_title", result.Title,
+		"result_length", len(result.Result),
+	)
+
+	tool := knowledgeTool.New(c.knowledgeService, types.KnowledgeCategoryTechnique, knowledgeTool.ModeReadWrite)
+	input := &svcknowledge.ReflectionInput{
+		Category:         types.KnowledgeCategoryTechnique,
+		ExecutionSummary: result.Result,
+		OnComplete: func(bgCtx context.Context, traceID string) {
+			suffix := "reflection done"
+			if traceID != "" {
+				suffix = fmt.Sprintf("reflection ID `%s`", traceID)
+			}
+			// Use bgCtx (non-cancelled) with taskCtx's msg routing
+			msg.Trace(msg.CopyTo(bgCtx, taskCtx), "Completed (%s)", suffix)
+		},
+	}
+
+	if err := c.knowledgeService.RunReflection(ctx, c.llmClient, tool, input); err != nil {
+		logger.Error("failed to trigger technique reflection", "error", err)
+	}
+}
+
+// triggerFactReflection runs background knowledge reflection for a completed session.
+func (c *SwarmChat) triggerFactReflection(ctx context.Context, summary string, t *ticket.Ticket) {
+	logger := logging.From(ctx)
+
+	if c.knowledgeService == nil {
+		logger.Debug("fact reflection skipped: knowledge service not configured")
+		return
+	}
+	if summary == "" {
+		logger.Debug("fact reflection skipped: empty session summary")
+		return
+	}
+
+	logger.Info("triggering fact reflection",
+		"summary_length", len(summary),
+		"has_ticket", t != nil,
+	)
+
+	tool := knowledgeTool.New(c.knowledgeService, types.KnowledgeCategoryFact, knowledgeTool.ModeReadWrite)
+	input := &svcknowledge.ReflectionInput{
+		Category:         types.KnowledgeCategoryFact,
+		ExecutionSummary: summary,
+		OnComplete: func(bgCtx context.Context, traceID string) {
+			if c.slackService == nil || t == nil || t.SlackThread == nil {
+				return
+			}
+			threadSvc := c.slackService.NewThread(*t.SlackThread)
+			suffix := "reflection done"
+			if traceID != "" {
+				suffix = fmt.Sprintf("reflection ID `%s`", traceID)
+			}
+			if err := threadSvc.PostContextBlock(bgCtx, fmt.Sprintf("📝 Fact knowledge %s", suffix)); err != nil {
+				logging.From(bgCtx).Warn("failed to post fact reflection result", "error", err)
+			}
+		},
+	}
+	if t != nil {
+		input.Ticket = t
+		input.TicketID = t.ID
+	}
+
+	if err := c.knowledgeService.RunReflection(ctx, c.llmClient, tool, input); err != nil {
+		logger.Error("failed to trigger fact reflection", "error", err)
+	}
 }
 
 // setupTaskMessageRouting creates task-specific msg routing with title-prefixed trace.

@@ -54,16 +54,23 @@ The following recent messages from the Slack channel provide additional context:
 {{ .Text }}
 {{ end }}
 {{ end }}
+## Knowledge Base
+
+Before starting your investigation, **search the knowledge base** using `knowledge_search` for relevant prior knowledge. Use `knowledge_tag_list` first to see available tags, then search with relevant tags and keywords from the alert (e.g., IP addresses, domain names, process names, service names).
+
+The knowledge base may contain:
+- Known false positive patterns and their conditions
+- Infrastructure details (server roles, IP ranges, scheduled jobs)
+- Previously observed behaviors for specific hosts or processes
+- Investigation techniques and tool usage tips
+
+Incorporate any relevant knowledge into your analysis to avoid redundant investigation and leverage past findings.
+
 ## Available Tools
 {{ .tools_description }}
 
 ## Available Sub-Agents
 {{ .subagents_description }}
-{{ if .memory_context }}
-
-## Past Insights (Agent Memory)
-{{ .memory_context }}
-{{ end }}
 {{ if .user_prompt }}
 
 ## User System Prompt
@@ -77,18 +84,6 @@ The following messages were posted in this ticket's Slack thread by team members
 {{ range .thread_comments }}
 *{{ .User.Name }}* ({{ .CreatedAt.Format "2006-01-02 15:04:05" }}):
 {{ .Comment }}
-{{ end }}
-{{ end }}
-{{ if .knowledges }}
-
-## Domain Knowledge
-
-The following domain knowledge is available for topic '{{ .topic }}':
-{{ range .knowledges }}
-
-### {{ .Name }}
-
-{{ .Content }}
 {{ end }}
 {{ end }}
 

@@ -57,16 +57,6 @@ The following messages provide context from the Slack channel:
 {{ .Text }}
 {{ end }}
 {{- end }}
-{{ if .knowledges }}
-
-## Domain Knowledge
-{{ range .knowledges }}
-
-### {{ .Name }}
-
-{{ .Content }}
-{{ end }}
-{{- end }}
 {{ if .user_system_prompt }}
 
 ## User System Prompt

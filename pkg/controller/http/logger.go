@@ -32,10 +32,20 @@ func (w *statusResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return hijacker.Hijack()
 }
 
-func loggingMiddleware(next http.Handler) http.Handler {
+// requestIDMiddleware generates a request ID and attaches it to the context.
+// This is separated from loggingMiddleware so request IDs are always available
+// even when HTTP logging is disabled.
+func requestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, reqID := request_id.Generate(r.Context())
 		logger := logging.From(ctx).With("request_id", reqID)
+		next.ServeHTTP(w, r.WithContext(logging.With(ctx, logger)))
+	})
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.From(r.Context())
 
 		// Prepare debug attributes before handling request
 		var debugAttrs []any
@@ -52,7 +62,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 		// Handle the request
 		sw := &statusResponseWriter{ResponseWriter: w}
-		next.ServeHTTP(sw, r.WithContext(logging.With(ctx, logger)))
+		next.ServeHTTP(sw, r)
 
 		// Basic attributes for INFO level
 		infoAttrs := []any{

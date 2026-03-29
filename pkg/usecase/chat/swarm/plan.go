@@ -30,7 +30,7 @@ func (c *SwarmChat) plan(ctx context.Context, session gollem.Session, pc *planni
 	logger.Debug("executing planning phase")
 
 	// Generate plan via LLM
-	resp, err := session.GenerateContent(ctx, gollem.Text(planPrompt))
+	resp, err := session.Generate(ctx, []gollem.Input{gollem.Text(planPrompt)})
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to generate plan")
 	}
@@ -87,7 +87,7 @@ func (c *SwarmChat) replan(ctx context.Context, session gollem.Session, pc *plan
 		}
 	}
 
-	resp, err := replanSession.GenerateContent(ctx, gollem.Text(replanPrompt))
+	resp, err := replanSession.Generate(ctx, []gollem.Input{gollem.Text(replanPrompt)})
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to generate replan")
 	}
@@ -141,7 +141,7 @@ func (c *SwarmChat) generateFinalResponse(ctx context.Context, session gollem.Se
 		}
 	}
 
-	resp, err := finalSession.GenerateContent(ctx, gollem.Text(finalPrompt))
+	resp, err := finalSession.Generate(ctx, []gollem.Input{gollem.Text(finalPrompt)})
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to generate final response")
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	slack_model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
@@ -40,8 +41,10 @@ type Server struct {
 	slackService    *slack.Service        // for GraphQL resolver
 	authUC          AuthUseCase           // for authentication
 	enableGraphiQL  bool                  // GraphiQL enable flag
-	noAuthorization bool                  // no-authorization flag
-	asyncAlertHook  *AsyncAlertHookConfig // async alert hook configuration
+	noAuthorization  bool                  // no-authorization flag
+	asyncAlertHook   *AsyncAlertHookConfig // async alert hook configuration
+	knowledgeSvc      *svcknowledge.Service // for knowledge GraphQL resolvers
+	disableHTTPLogger bool                   // disable HTTP access logging
 }
 
 type Options func(*Server)
@@ -73,6 +76,18 @@ func WithGraphiQL(enabled bool) Options {
 func WithAuthUseCase(authUC AuthUseCase) Options {
 	return func(s *Server) {
 		s.authUC = authUC
+	}
+}
+
+func WithKnowledgeService(svc *svcknowledge.Service) Options {
+	return func(s *Server) {
+		s.knowledgeSvc = svc
+	}
+}
+
+func WithDisableHTTPLogger(disable bool) Options {
+	return func(s *Server) {
+		s.disableHTTPLogger = disable
 	}
 }
 
@@ -129,7 +144,10 @@ func New(uc UseCase, opts ...Options) *Server {
 		opt(s)
 	}
 
-	r.Use(loggingMiddleware)
+	r.Use(requestIDMiddleware)
+	if !s.disableHTTPLogger {
+		r.Use(loggingMiddleware)
+	}
 	r.Use(panicRecoveryMiddleware)
 	r.Use(withAuthHTTPRequest)
 	r.Use(validateGoogleIAPToken)
@@ -163,7 +181,7 @@ func New(uc UseCase, opts ...Options) *Server {
 
 	// GraphQL endpoint
 	if s.repo != nil {
-		graphqlHandler := graphqlHandler(s.repo, s.slackService, uc)
+		graphqlHandler := graphqlHandler(s.repo, s.slackService, uc, s.knowledgeSvc)
 
 		r.Route("/graphql", func(r chi.Router) {
 			// Apply authentication middleware to GraphQL
@@ -282,7 +300,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // GraphQL handler
-func graphqlHandler(repo interfaces.Repository, slackService *slack.Service, uc UseCase) http.Handler {
+func graphqlHandler(repo interfaces.Repository, slackService *slack.Service, uc UseCase, knowledgeSvc *svcknowledge.Service) http.Handler {
 	var useCases *usecase.UseCases
 	if uc != nil {
 		// Type assertion to convert interface to concrete type
@@ -292,7 +310,11 @@ func graphqlHandler(repo interfaces.Repository, slackService *slack.Service, uc 
 			panic("uc must be of type *usecase.UseCases")
 		}
 	}
-	resolver := graphql.NewResolver(repo, slackService, useCases)
+	var resolverOpts []graphql.ResolverOption
+	if knowledgeSvc != nil {
+		resolverOpts = append(resolverOpts, graphql.WithKnowledgeService(knowledgeSvc))
+	}
+	resolver := graphql.NewResolver(repo, slackService, useCases, resolverOpts...)
 	srv := handler.New(
 		graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}),
 	)

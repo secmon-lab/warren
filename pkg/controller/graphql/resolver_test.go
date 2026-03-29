@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/usecase"
 )
 
@@ -279,64 +280,64 @@ func TestCreateTicket(t *testing.T) {
 
 func TestKnowledgeResolver(t *testing.T) {
 	repo := repository.NewMemory()
-	resolver := NewResolver(repo, nil, nil)
+	knowledgeSvc := svcknowledge.New(repo, nil)
+	resolver := NewResolver(repo, nil, nil, WithKnowledgeService(knowledgeSvc))
 	ctx := context.Background()
 
-	// Create test knowledges
-	knowledges := []struct {
-		topic   types.KnowledgeTopic
-		slug    types.KnowledgeSlug
-		name    string
-		content string
-	}{
-		{types.KnowledgeTopic("security"), types.KnowledgeSlug("incident-response"), "Incident Response", "How to respond to security incidents"},
-		{types.KnowledgeTopic("security"), types.KnowledgeSlug("password-policy"), "Password Policy", "Password requirements for all systems"},
-		{types.KnowledgeTopic("development"), types.KnowledgeSlug("coding-standards"), "Coding Standards", "Development best practices"},
-	}
-
 	now := time.Now()
-	for _, k := range knowledges {
-		knowledgeObj := &knowledge.Knowledge{
-			Slug:      k.slug,
-			Name:      k.name,
-			Topic:     k.topic,
-			Content:   k.content,
-			CommitID:  "test-commit-id",
+	knowledges := []*knowledge.Knowledge{
+		{
+			ID:        types.KnowledgeID("k-1"),
+			Category:  types.KnowledgeCategory("fact"),
+			Title:     "Incident Response",
+			Claim:     "How to respond to security incidents",
 			Author:    types.UserID("test-user"),
 			CreatedAt: now,
 			UpdatedAt: now,
-			State:     types.KnowledgeStateActive,
-		}
-		_ = repo.PutKnowledge(ctx, knowledgeObj)
+		},
+		{
+			ID:        types.KnowledgeID("k-2"),
+			Category:  types.KnowledgeCategory("fact"),
+			Title:     "Password Policy",
+			Claim:     "Password requirements for all systems",
+			Author:    types.UserID("test-user"),
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		{
+			ID:        types.KnowledgeID("k-3"),
+			Category:  types.KnowledgeCategory("technique"),
+			Title:     "Coding Standards",
+			Claim:     "Development best practices",
+			Author:    types.UserID("test-user"),
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
 	}
 
-	t.Run("ListKnowledgeTopics", func(t *testing.T) {
-		got, err := resolver.Query().KnowledgeTopics(ctx)
-		gt.NoError(t, err)
-		gt.Array(t, got).Length(2)
+	for _, k := range knowledges {
+		gt.NoError(t, repo.PutKnowledge(ctx, k))
+	}
 
-		// Check topics are returned
-		topicMap := make(map[string]int)
-		for _, ts := range got {
-			topicMap[ts.Topic] = ts.Count
-		}
-		gt.Value(t, topicMap["security"]).Equal(2)
-		gt.Value(t, topicMap["development"]).Equal(1)
+	t.Run("ListAllKnowledges", func(t *testing.T) {
+		got, err := resolver.Query().Knowledges(ctx, nil, nil, nil)
+		gt.NoError(t, err)
+		gt.Array(t, got).Length(3)
 	})
 
-	t.Run("GetKnowledgesByTopic", func(t *testing.T) {
-		got, err := resolver.Query().KnowledgesByTopic(ctx, "security")
+	t.Run("ListKnowledgesByCategory", func(t *testing.T) {
+		cat := "fact"
+		got, err := resolver.Query().Knowledges(ctx, &cat, nil, nil)
 		gt.NoError(t, err)
 		gt.Array(t, got).Length(2)
 
-		// Check knowledge fields
-		gt.Value(t, got[0].Topic).Equal("security")
+		gt.Value(t, got[0].Category).Equal("fact")
 		gt.Value(t, got[0].AuthorID).Equal("test-user")
-		gt.Value(t, got[0].State).Equal("active")
 	})
 
-	t.Run("GetKnowledgesByTopic_NoKnowledges", func(t *testing.T) {
-		got, err := resolver.Query().KnowledgesByTopic(ctx, "nonexistent")
+	t.Run("ListKnowledges_NoResults", func(t *testing.T) {
+		cat := "nonexistent"
+		got, err := resolver.Query().Knowledges(ctx, &cat, nil, nil)
 		gt.NoError(t, err)
 		gt.Array(t, got).Length(0)
 	})

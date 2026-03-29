@@ -88,7 +88,7 @@ func TestSwarmChat_DirectResponse(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				return &gollem.Response{
 					Texts: []string{`{"message": "The answer is 42.", "tasks": []}`},
 				}, nil
@@ -115,7 +115,7 @@ func TestSwarmChat_SinglePhaseWithTasks(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				mu.Lock()
 				callCount++
 				cc := callCount
@@ -172,7 +172,7 @@ func TestSwarmChat_MaxPhasesLimit(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				for _, inp := range input {
 					if _, ok := inp.(gollem.Text); ok {
 						return &gollem.Response{
@@ -217,7 +217,7 @@ func TestSwarmChat_ParallelExecution(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				mu.Lock()
 				callCount++
 				cc := callCount
@@ -272,7 +272,7 @@ func TestSwarmChat_ErrorIsolation(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				mu.Lock()
 				callCount++
 				cc := callCount
@@ -404,7 +404,7 @@ func TestSwarmChat_MultiPhaseReplan(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				mu.Lock()
 				callCount++
 				cc := callCount
@@ -605,7 +605,7 @@ func TestSwarmChat_LatestHistorySavedOnDirectResponse(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				return &gollem.Response{
 					Texts: []string{`{"message": "Direct response.", "tasks": []}`},
 				}, nil
@@ -639,7 +639,7 @@ func TestSwarmChat_LatestHistorySavedAfterReplan(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				mu.Lock()
 				callCount++
 				cc := callCount
@@ -695,7 +695,7 @@ func TestSwarmChat_LatestHistorySavedOnAbort(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				mu.Lock()
 				callCount++
 				cc := callCount
@@ -751,7 +751,7 @@ func TestSwarmChat_LatestHistorySavedOnReplanError(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				mu.Lock()
 				callCount++
 				cc := callCount
@@ -828,7 +828,7 @@ func TestSwarmChat_BudgetMiddlewareNotAccumulated(t *testing.T) {
 			ssn := newMockSession()
 			localCallCount := 0
 
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				localCallCount++
 
 				switch {

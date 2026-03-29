@@ -9,7 +9,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	agentModel "github.com/secmon-lab/warren/pkg/domain/model/agent"
-	"github.com/secmon-lab/warren/pkg/service/memory"
+
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
@@ -95,7 +95,6 @@ func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, rep
 			projectID:                 f.projectID,
 			impersonateServiceAccount: f.impersonateServiceAccount,
 		},
-		memoryService: memory.New("bigquery", llmClient, repo),
 	}
 
 	// Log configuration

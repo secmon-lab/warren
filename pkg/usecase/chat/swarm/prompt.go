@@ -12,9 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
-	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -45,12 +43,10 @@ type planningContext struct {
 	alerts         []*alert.Alert
 	tools          []gollem.ToolSet
 	subAgents      []*agent.SubAgent
-	memoryContext  string
 	userPrompt     string
 	lang           lang.Lang
 	requesterID    string
 	threadComments []ticket.Comment
-	knowledges     []*knowledge.Knowledge
 	slackHistory   []model.HistoryMessage
 }
 
@@ -64,12 +60,10 @@ func generateSystemPrompt(ctx context.Context, pc *planningContext) (string, err
 		"alert_count":           alertCount,
 		"tools_description":     describeTools(ctx, pc.tools),
 		"subagents_description": describeSubAgents(pc.subAgents),
-		"memory_context":        pc.memoryContext,
 		"user_prompt":           pc.userPrompt,
 		"lang":                  pc.lang,
 		"requester_id":          pc.requesterID,
 		"thread_comments":       pc.threadComments,
-		"knowledges":            pc.knowledges,
 		"topic":                 pc.ticket.Topic,
 		"history_messages":      pc.slackHistory,
 	})
@@ -112,15 +106,13 @@ func generateFinalPrompt(ctx context.Context, pc *planningContext, allResults []
 
 // ticketlessPlanningContext holds the shared context for ticketless planning operations.
 type ticketlessPlanningContext struct {
-	message       string
-	tools         []gollem.ToolSet
-	subAgents     []*agent.SubAgent
-	memoryContext string
-	userPrompt    string
-	lang          lang.Lang
-	requesterID   string
-	knowledges    []*knowledge.Knowledge
-	history       []model.HistoryMessage
+	message     string
+	tools       []gollem.ToolSet
+	subAgents   []*agent.SubAgent
+	userPrompt  string
+	lang        lang.Lang
+	requesterID string
+	history     []model.HistoryMessage
 }
 
 // generateTicketlessSystemPrompt generates the system prompt for ticketless chat.
@@ -129,11 +121,9 @@ func generateTicketlessSystemPrompt(ctx context.Context, pc *ticketlessPlanningC
 		"history_messages":      pc.history,
 		"tools_description":     describeTools(ctx, pc.tools),
 		"subagents_description": describeSubAgents(pc.subAgents),
-		"memory_context":        pc.memoryContext,
 		"user_prompt":           pc.userPrompt,
 		"lang":                  pc.lang,
 		"requester_id":          pc.requesterID,
-		"knowledges":            pc.knowledges,
 	})
 }
 
@@ -232,18 +222,6 @@ func formatCompletedResults(allResults []*phaseResult) string {
 	}
 	if b.Len() == 0 {
 		return "(no results yet)"
-	}
-	return b.String()
-}
-
-// FormatMemories formats agent memories for inclusion in planning prompt.
-func FormatMemories(memories []*memory.AgentMemory) string {
-	if len(memories) == 0 {
-		return ""
-	}
-	var b strings.Builder
-	for _, m := range memories {
-		fmt.Fprintf(&b, "- **%s**: %s\n", m.Query, m.Claim)
 	}
 	return b.String()
 }

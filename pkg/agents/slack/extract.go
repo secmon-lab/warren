@@ -80,7 +80,7 @@ func (a *agent) extractRecords(ctx context.Context, originalRequest string, sess
 	log.Debug("Requesting message extraction", "request", extractionRequest)
 
 	// Request message extraction
-	resp, err := extractSession.GenerateContent(ctx, gollem.Text(extractionRequest))
+	resp, err := extractSession.Generate(ctx, []gollem.Input{gollem.Text(extractionRequest)})
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to generate content for extraction")
 	}

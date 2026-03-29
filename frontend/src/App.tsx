@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { ApolloProvider } from "@apollo/client";
 import { apolloClient } from "@/lib/apollo-client";
 import { AuthProvider } from "@/contexts/auth-context";
@@ -13,12 +13,11 @@ import TicketDetailPage from "@/pages/TicketDetailPage";
 import AlertsPage from "@/pages/AlertsPage";
 import AlertDetailPage from "@/pages/AlertDetailPage";
 import KnowledgePage from "@/pages/KnowledgePage";
-import KnowledgeTopicPage from "@/pages/KnowledgeTopicPage";
+import KnowledgeDetailPage from "@/pages/KnowledgeDetailPage";
+import KnowledgeEditPage from "@/pages/KnowledgeEditPage";
+import KnowledgeTagsPage from "@/pages/KnowledgeTagsPage";
 import SessionDetailPage from "@/pages/SessionDetailPage";
 import SettingsPage from "@/pages/SettingsPage";
-import AgentMemoryListPage from "@/pages/AgentMemoryListPage";
-import AgentMemoriesPage from "@/pages/AgentMemoriesPage";
-import AgentMemoryDetailPage from "@/pages/AgentMemoryDetailPage";
 import DiagnosisPage from "@/pages/DiagnosisPage";
 import DiagnosisDetailPage from "@/pages/DiagnosisDetailPage";
 import QueuedAlertsPage from "@/pages/QueuedAlertsPage";
@@ -33,12 +32,14 @@ function AuthenticatedApp() {
         <Route path="/tickets/:id" element={<TicketDetailPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/alerts/:id" element={<AlertDetailPage />} />
-        <Route path="/knowledge" element={<KnowledgePage />} />
-        <Route path="/knowledge/:topic" element={<KnowledgeTopicPage />} />
+        <Route path="/knowledge" element={<Navigate to="/knowledge/fact" replace />} />
+        <Route path="/knowledge/new" element={<KnowledgeEditPage />} />
+        <Route path="/knowledge/tags" element={<KnowledgeTagsPage />} />
+        <Route path="/knowledge/fact" element={<KnowledgePage />} />
+        <Route path="/knowledge/technique" element={<KnowledgePage />} />
+        <Route path="/knowledge/:id" element={<KnowledgeDetailPage />} />
+        <Route path="/knowledge/:id/edit" element={<KnowledgeEditPage />} />
         <Route path="/sessions/:id" element={<SessionDetailPage />} />
-        <Route path="/memory" element={<AgentMemoryListPage />} />
-        <Route path="/memory/:agentId" element={<AgentMemoriesPage />} />
-        <Route path="/memory/:agentId/:memoryId" element={<AgentMemoryDetailPage />} />
         <Route path="/diagnosis" element={<DiagnosisPage />} />
         <Route path="/diagnosis/:id" element={<DiagnosisDetailPage />} />
         <Route path="/queue" element={<QueuedAlertsPage />} />
