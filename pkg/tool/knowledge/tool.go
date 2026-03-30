@@ -39,7 +39,7 @@ type Tool struct {
 var _ interfaces.Tool = &Tool{}
 
 // New creates a new knowledge v2 tool.
-// category is fixed per agent phase (e.g., "fact" for root agent, "technique" for child agent).
+// category is fixed per use case (e.g., "fact" for investigation context, "technique" for analysis procedures).
 func New(svc *svcknowledge.Service, category types.KnowledgeCategory, mode Mode) *Tool {
 	return &Tool{
 		svc:      svc,
