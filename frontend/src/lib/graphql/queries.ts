@@ -1029,3 +1029,37 @@ export const DISCARD_QUEUED_ALERTS = gql`
     discardQueuedAlerts(ids: $ids)
   }
 `;
+
+export const DISCARD_QUEUED_ALERTS_BY_FILTER = gql`
+  mutation DiscardQueuedAlertsByFilter($keyword: String) {
+    discardQueuedAlertsByFilter(keyword: $keyword)
+  }
+`;
+
+export const REPROCESS_QUEUED_ALERTS_BY_FILTER = gql`
+  mutation ReprocessQueuedAlertsByFilter($keyword: String) {
+    reprocessQueuedAlertsByFilter(keyword: $keyword) {
+      id
+      status
+      totalCount
+      completedCount
+      failedCount
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const GET_REPROCESS_BATCH_JOB = gql`
+  query GetReprocessBatchJob($id: ID!) {
+    reprocessBatchJob(id: $id) {
+      id
+      status
+      totalCount
+      completedCount
+      failedCount
+      createdAt
+      updatedAt
+    }
+  }
+`;

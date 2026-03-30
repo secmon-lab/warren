@@ -296,14 +296,27 @@ type ReprocessJob {
   updatedAt: String!
 }
 
+type ReprocessBatchJob {
+  id: ID!
+  status: ReprocessJobStatus!
+  totalCount: Int!
+  completedCount: Int!
+  failedCount: Int!
+  createdAt: String!
+  updatedAt: String!
+}
+
 extend type Query {
   queuedAlerts(keyword: String, offset: Int, limit: Int): QueuedAlertsResponse!
   reprocessJob(id: ID!): ReprocessJob
+  reprocessBatchJob(id: ID!): ReprocessBatchJob
 }
 
 extend type Mutation {
   reprocessQueuedAlert(id: ID!): ReprocessJob!
   discardQueuedAlerts(ids: [ID!]!): Boolean!
+  discardQueuedAlertsByFilter(keyword: String): Int!
+  reprocessQueuedAlertsByFilter(keyword: String): ReprocessBatchJob!
 }
 
 # Knowledge: topic-based knowledge store

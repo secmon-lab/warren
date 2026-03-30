@@ -18,10 +18,10 @@ import (
 
 // Resolver serves as dependency injection point for the application.
 type Resolver struct {
-	repo           interfaces.Repository
-	slackService   *slack.Service
-	mrkdwnConv     *mrkdwn.Converter
-	uc             *usecase.UseCases
+	repo         interfaces.Repository
+	slackService *slack.Service
+	mrkdwnConv   *mrkdwn.Converter
+	uc           *usecase.UseCases
 	knowledgeSvc *svcknowledge.Service
 }
 

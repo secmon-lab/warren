@@ -2,7 +2,6 @@ import { useQuery, useMutation, useLazyQuery } from "@apollo/client";
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Pagination,
@@ -15,8 +14,10 @@ import {
 import {
   GET_QUEUED_ALERTS,
   REPROCESS_QUEUED_ALERT,
-  DISCARD_QUEUED_ALERTS,
   GET_REPROCESS_JOB,
+  DISCARD_QUEUED_ALERTS_BY_FILTER,
+  REPROCESS_QUEUED_ALERTS_BY_FILTER,
+  GET_REPROCESS_BATCH_JOB,
 } from "@/lib/graphql/queries";
 import { Search, Trash2, RefreshCw, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { useConfirm } from "@/hooks/use-confirm";
@@ -41,14 +42,15 @@ export default function QueuedAlertsPage() {
   const confirm = useConfirm();
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchKeyword, setSearchKeyword] = useState("");
   const [appliedKeyword, setAppliedKeyword] = useState("");
   const [reprocessingJobId, setReprocessingJobId] = useState<string | null>(null);
+  const [batchJobId, setBatchJobId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const ITEMS_PER_PAGE = 20;
 
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const batchPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const {
     data,
@@ -65,6 +67,10 @@ export default function QueuedAlertsPage() {
   });
 
   const [pollJob] = useLazyQuery(GET_REPROCESS_JOB, {
+    fetchPolicy: "network-only",
+  });
+
+  const [pollBatchJob] = useLazyQuery(GET_REPROCESS_BATCH_JOB, {
     fetchPolicy: "network-only",
   });
 
@@ -100,15 +106,13 @@ export default function QueuedAlertsPage() {
     },
   });
 
-  const [discardAlerts, { loading: discarding }] = useMutation(DISCARD_QUEUED_ALERTS, {
-    onCompleted: () => {
-      const count = selectedIds.size;
-      setSelectedIds(new Set());
+  const [discardByFilter, { loading: discarding }] = useMutation(DISCARD_QUEUED_ALERTS_BY_FILTER, {
+    onCompleted: (result) => {
+      const count = result.discardQueuedAlertsByFilter;
       setSearchKeyword("");
       setAppliedKeyword("");
       setCurrentPage(1);
       toast({ title: "Alerts discarded", description: `${count} alert(s) have been discarded.` });
-      // Delay refetch to ensure state updates (keyword reset) are applied
       setTimeout(() => refetch(), 0);
     },
     onError: (err) => {
@@ -116,10 +120,42 @@ export default function QueuedAlertsPage() {
     },
   });
 
+  const [reprocessByFilter, { loading: reprocessingAll }] = useMutation(REPROCESS_QUEUED_ALERTS_BY_FILTER, {
+    onCompleted: (result) => {
+      const job = result.reprocessQueuedAlertsByFilter;
+      setBatchJobId(job.id);
+      toast({ title: "Batch reprocessing started", description: `Reprocessing ${job.totalCount} alert(s) in the background.` });
+
+      batchPollIntervalRef.current = setInterval(async () => {
+        const { data: jobData } = await pollBatchJob({ variables: { id: job.id } });
+        if (jobData?.reprocessBatchJob) {
+          const batchJob = jobData.reprocessBatchJob;
+          if (batchJob.status === "COMPLETED") {
+            clearInterval(batchPollIntervalRef.current!);
+            batchPollIntervalRef.current = null;
+            setBatchJobId(null);
+            const failMsg = batchJob.failedCount > 0 ? ` (${batchJob.failedCount} failed)` : "";
+            toast({
+              title: "Batch reprocessing completed",
+              description: `${batchJob.completedCount} alert(s) reprocessed successfully${failMsg}.`,
+            });
+            refetch();
+          }
+        }
+      }, 2000);
+    },
+    onError: (err) => {
+      toast({ title: "Failed to start batch reprocessing", description: err.message, variant: "destructive" });
+    },
+  });
+
   useEffect(() => {
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
+      }
+      if (batchPollIntervalRef.current) {
+        clearInterval(batchPollIntervalRef.current);
       }
     };
   }, []);
@@ -131,7 +167,6 @@ export default function QueuedAlertsPage() {
   const handleSearch = useCallback(() => {
     setAppliedKeyword(searchKeyword);
     setCurrentPage(1);
-    setSelectedIds(new Set());
   }, [searchKeyword]);
 
   const handleKeyDown = useCallback(
@@ -143,38 +178,32 @@ export default function QueuedAlertsPage() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    setSelectedIds(new Set());
   };
 
-  const toggleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const toggleSelectAll = useCallback(() => {
-    if (selectedIds.size === alerts.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(alerts.map((a) => a.id)));
-    }
-  }, [selectedIds.size, alerts]);
-
-  const handleDiscard = useCallback(async () => {
-    const count = selectedIds.size;
+  const handleDiscardAll = useCallback(async () => {
+    const filterDesc = appliedKeyword ? ` matching "${appliedKeyword}"` : "";
     const confirmed = await confirm({
-      title: "Discard Queued Alerts",
-      description: `Are you sure you want to discard ${count} queued alert(s)? They will be permanently deleted.`,
-      confirmText: "Discard",
+      title: "Discard All Queued Alerts",
+      description: `Are you sure you want to discard all ${totalCount} queued alert(s)${filterDesc}? They will be permanently deleted.`,
+      confirmText: "Discard All",
       cancelText: "Cancel",
       variant: "destructive",
     });
     if (!confirmed) return;
-    discardAlerts({ variables: { ids: Array.from(selectedIds) } });
-  }, [selectedIds, confirm, discardAlerts]);
+    discardByFilter({ variables: { keyword: appliedKeyword || undefined } });
+  }, [appliedKeyword, totalCount, confirm, discardByFilter]);
+
+  const handleReprocessAll = useCallback(async () => {
+    const filterDesc = appliedKeyword ? ` matching "${appliedKeyword}"` : "";
+    const confirmed = await confirm({
+      title: "Reprocess All Queued Alerts",
+      description: `Are you sure you want to reprocess all ${totalCount} queued alert(s)${filterDesc}? They will be sent through the processing pipeline.`,
+      confirmText: "Reprocess All",
+      cancelText: "Cancel",
+    });
+    if (!confirmed) return;
+    reprocessByFilter({ variables: { keyword: appliedKeyword || undefined } });
+  }, [appliedKeyword, totalCount, confirm, reprocessByFilter]);
 
   const handleReprocess = useCallback(
     async (id: string) => {
@@ -215,6 +244,8 @@ export default function QueuedAlertsPage() {
       return data.length > 120 ? data.slice(0, 120) + "..." : data;
     }
   }, []);
+
+  const isBusy = reprocessingJobId !== null || batchJobId !== null || discarding || reprocessingAll;
 
   if (loading) {
     return (
@@ -260,27 +291,40 @@ export default function QueuedAlertsPage() {
         </Button>
       </div>
 
-      {/* Action bar */}
-      {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2 bg-muted/50 border rounded-lg">
-          <span className="text-sm font-medium">{selectedIds.size} selected</span>
-          <div className="flex gap-2 ml-auto">
+      {/* Total count and bulk actions */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          {totalCount} queued alert{totalCount !== 1 ? "s" : ""}
+          {appliedKeyword && (
+            <span> matching &ldquo;{appliedKeyword}&rdquo;</span>
+          )}
+        </div>
+        {totalCount > 0 && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReprocessAll}
+              disabled={isBusy}
+            >
+              {batchJobId !== null ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-1" />
+              )}
+              Reprocess All ({totalCount})
+            </Button>
             <Button
               variant="destructive"
               size="sm"
-              onClick={handleDiscard}
-              disabled={discarding}
+              onClick={handleDiscardAll}
+              disabled={isBusy}
             >
               <Trash2 className="h-4 w-4 mr-1" />
-              {discarding ? "Discarding..." : "Discard"}
+              {discarding ? "Discarding..." : `Discard All (${totalCount})`}
             </Button>
           </div>
-        </div>
-      )}
-
-      {/* Total count */}
-      <div className="text-sm text-muted-foreground">
-        {totalCount} queued alert{totalCount !== 1 ? "s" : ""}
+        )}
       </div>
 
       {alerts.length === 0 ? (
@@ -291,15 +335,6 @@ export default function QueuedAlertsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {/* Select all */}
-          <div className="flex items-center gap-3 px-4 py-2">
-            <Checkbox
-              checked={alerts.length > 0 && selectedIds.size === alerts.length}
-              onCheckedChange={toggleSelectAll}
-            />
-            <span className="text-sm text-muted-foreground">Select all on this page</span>
-          </div>
-
           {alerts.map((qa) => {
             const isExpanded = expandedIds.has(qa.id);
             return (
@@ -309,12 +344,6 @@ export default function QueuedAlertsPage() {
               >
                 <div className="px-4 py-3">
                   <div className="flex items-start gap-3">
-                    <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selectedIds.has(qa.id)}
-                        onCheckedChange={() => toggleSelect(qa.id)}
-                      />
-                    </div>
                     <div
                       className="flex-1 min-w-0 cursor-pointer"
                       onClick={() => toggleExpand(qa.id)}
@@ -346,7 +375,7 @@ export default function QueuedAlertsPage() {
                           e.stopPropagation();
                           handleReprocess(qa.id);
                         }}
-                        disabled={reprocessingJobId !== null}
+                        disabled={isBusy}
                       >
                         {reprocessingJobId !== null ? (
                           <Loader2 className="h-4 w-4 mr-1 animate-spin" />

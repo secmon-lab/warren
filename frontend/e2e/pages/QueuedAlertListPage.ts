@@ -25,4 +25,32 @@ export class QueuedAlertListPage extends BasePage {
   get noQueuedAlertsMessage() {
     return this.page.getByText("No queued alerts");
   }
+
+  get alertCount() {
+    return this.page.locator("text=/\\d+ queued alerts?/");
+  }
+
+  get discardAllButton() {
+    return this.page.getByRole("button", { name: /Discard All/ });
+  }
+
+  get reprocessAllButton() {
+    return this.page.getByRole("button", { name: /Reprocess All/ });
+  }
+
+  get confirmDialogTitle() {
+    return this.page.getByRole("heading", { level: 2 });
+  }
+
+  get confirmDialogDescription() {
+    return this.page.locator("[role=alertdialog] p, [role=dialog] p");
+  }
+
+  get confirmButton() {
+    return this.page.getByRole("button", { name: /Discard All|Reprocess All/ });
+  }
+
+  get cancelButton() {
+    return this.page.getByRole("button", { name: "Cancel" });
+  }
 }

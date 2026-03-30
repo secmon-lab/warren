@@ -571,6 +571,16 @@ func (r *mutationResolver) DiscardQueuedAlerts(ctx context.Context, ids []string
 	return true, nil
 }
 
+// DiscardQueuedAlertsByFilter is the resolver for the discardQueuedAlertsByFilter field.
+func (r *mutationResolver) DiscardQueuedAlertsByFilter(ctx context.Context, keyword *string) (int, error) {
+	return r.uc.DiscardQueuedAlertsByFilter(ctx, keyword)
+}
+
+// ReprocessQueuedAlertsByFilter is the resolver for the reprocessQueuedAlertsByFilter field.
+func (r *mutationResolver) ReprocessQueuedAlertsByFilter(ctx context.Context, keyword *string) (*alert.ReprocessBatchJob, error) {
+	return r.uc.ReprocessQueuedAlertsByFilter(ctx, keyword)
+}
+
 // CreateKnowledge is the resolver for the createKnowledge field.
 func (r *mutationResolver) CreateKnowledge(ctx context.Context, input graphql1.CreateKnowledgeInput) (*graphql1.Knowledge, error) {
 	svc := r.knowledgeSvc
@@ -1343,6 +1353,16 @@ func (r *queryResolver) ReprocessJob(ctx context.Context, id string) (*alert.Rep
 	return job, nil
 }
 
+// ReprocessBatchJob is the resolver for the reprocessBatchJob field.
+func (r *queryResolver) ReprocessBatchJob(ctx context.Context, id string) (*alert.ReprocessBatchJob, error) {
+	batchJobID := types.ReprocessBatchJobID(id)
+	job, err := r.repo.GetReprocessBatchJob(ctx, batchJobID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get reprocess batch job", goerr.V("id", id))
+	}
+	return job, nil
+}
+
 // Knowledges is the resolver for the knowledges field.
 func (r *queryResolver) Knowledges(ctx context.Context, category *string, tags []string, keyword *string) ([]*graphql1.Knowledge, error) {
 	if r.knowledgeSvc == nil {
@@ -1475,6 +1495,37 @@ func (r *queuedAlertResolver) Data(ctx context.Context, obj *alert.QueuedAlert) 
 // CreatedAt is the resolver for the createdAt field.
 func (r *queuedAlertResolver) CreatedAt(ctx context.Context, obj *alert.QueuedAlert) (string, error) {
 	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
+}
+
+// ID is the resolver for the id field.
+func (r *reprocessBatchJobResolver) ID(ctx context.Context, obj *alert.ReprocessBatchJob) (string, error) {
+	return string(obj.ID), nil
+}
+
+// Status is the resolver for the status field.
+func (r *reprocessBatchJobResolver) Status(ctx context.Context, obj *alert.ReprocessBatchJob) (graphql1.ReprocessJobStatus, error) {
+	switch obj.Status {
+	case types.ReprocessJobStatusPending:
+		return graphql1.ReprocessJobStatusPending, nil
+	case types.ReprocessJobStatusRunning:
+		return graphql1.ReprocessJobStatusRunning, nil
+	case types.ReprocessJobStatusCompleted:
+		return graphql1.ReprocessJobStatusCompleted, nil
+	case types.ReprocessJobStatusFailed:
+		return graphql1.ReprocessJobStatusFailed, nil
+	default:
+		return graphql1.ReprocessJobStatusPending, nil
+	}
+}
+
+// CreatedAt is the resolver for the createdAt field.
+func (r *reprocessBatchJobResolver) CreatedAt(ctx context.Context, obj *alert.ReprocessBatchJob) (string, error) {
+	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
+}
+
+// UpdatedAt is the resolver for the updatedAt field.
+func (r *reprocessBatchJobResolver) UpdatedAt(ctx context.Context, obj *alert.ReprocessBatchJob) (string, error) {
+	return obj.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
 }
 
 // ID is the resolver for the id field.
@@ -1733,6 +1784,11 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 // QueuedAlert returns QueuedAlertResolver implementation.
 func (r *Resolver) QueuedAlert() QueuedAlertResolver { return &queuedAlertResolver{r} }
 
+// ReprocessBatchJob returns ReprocessBatchJobResolver implementation.
+func (r *Resolver) ReprocessBatchJob() ReprocessBatchJobResolver {
+	return &reprocessBatchJobResolver{r}
+}
+
 // ReprocessJob returns ReprocessJobResolver implementation.
 func (r *Resolver) ReprocessJob() ReprocessJobResolver { return &reprocessJobResolver{r} }
 
@@ -1750,6 +1806,7 @@ type knowledgeResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type queuedAlertResolver struct{ *Resolver }
+type reprocessBatchJobResolver struct{ *Resolver }
 type reprocessJobResolver struct{ *Resolver }
 type sessionResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }

@@ -246,6 +246,142 @@ func TestService_ReprocessAlert_NonExistent(t *testing.T) {
 	gt.Error(t, err)
 }
 
+func TestService_DiscardAlertsByFilter_All(t *testing.T) {
+	svc, repo := newTestService(1)
+	ctx := t.Context()
+
+	_, err := svc.EnqueueAlert(ctx, "s1", nil, "t1", "")
+	gt.NoError(t, err)
+	_, err = svc.EnqueueAlert(ctx, "s2", nil, "t2", "")
+	gt.NoError(t, err)
+
+	count, err := repo.CountQueuedAlerts(ctx)
+	gt.NoError(t, err)
+	gt.Value(t, count).Equal(2)
+
+	// Discard all (no keyword)
+	deleted, err := svc.DiscardAlertsByFilter(ctx, nil)
+	gt.NoError(t, err)
+	gt.Value(t, deleted).Equal(2)
+
+	count, err = repo.CountQueuedAlerts(ctx)
+	gt.NoError(t, err)
+	gt.Value(t, count).Equal(0)
+}
+
+func TestService_DiscardAlertsByFilter_WithKeyword(t *testing.T) {
+	svc, repo := newTestService(1)
+	ctx := t.Context()
+
+	_, err := svc.EnqueueAlert(ctx, "guardduty", nil, "GuardDuty Alert", "")
+	gt.NoError(t, err)
+	_, err = svc.EnqueueAlert(ctx, "cloudtrail", nil, "CloudTrail Alert", "")
+	gt.NoError(t, err)
+
+	keyword := "guardduty"
+	deleted, err := svc.DiscardAlertsByFilter(ctx, &keyword)
+	gt.NoError(t, err)
+	gt.Value(t, deleted).Equal(1)
+
+	count, err := repo.CountQueuedAlerts(ctx)
+	gt.NoError(t, err)
+	gt.Value(t, count).Equal(1)
+}
+
+func TestService_DiscardAlertsByFilter_NoMatch(t *testing.T) {
+	svc, _ := newTestService(1)
+	ctx := t.Context()
+
+	_, err := svc.EnqueueAlert(ctx, "s1", nil, "t1", "")
+	gt.NoError(t, err)
+
+	keyword := "nonexistent"
+	deleted, err := svc.DiscardAlertsByFilter(ctx, &keyword)
+	gt.NoError(t, err)
+	gt.Value(t, deleted).Equal(0)
+}
+
+func TestService_ReprocessAlertsByFilter(t *testing.T) {
+	svc, repo := newTestService(1)
+	ctx := t.Context()
+
+	_, err := svc.EnqueueAlert(ctx, "guardduty", map[string]any{"a": 1}, "Alert 1", "")
+	gt.NoError(t, err)
+	_, err = svc.EnqueueAlert(ctx, "cloudtrail", map[string]any{"b": 2}, "Alert 2", "")
+	gt.NoError(t, err)
+
+	processed := make(chan types.AlertSchema, 2)
+	job, err := svc.ReprocessAlertsByFilter(ctx, nil, func(bgCtx context.Context, schema types.AlertSchema, data any) error {
+		processed <- schema
+		return nil
+	})
+	gt.NoError(t, err)
+	gt.Value(t, job.TotalCount).Equal(2)
+	gt.Value(t, job.Status).Equal(types.ReprocessJobStatusPending)
+
+	// Wait for both to complete
+	for i := 0; i < 2; i++ {
+		select {
+		case <-processed:
+		case <-time.After(5 * time.Second):
+			t.Fatal("reprocess callback not called within timeout")
+		}
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	gotJob, err := repo.GetReprocessBatchJob(ctx, job.ID)
+	gt.NoError(t, err)
+	gt.Value(t, gotJob.Status).Equal(types.ReprocessJobStatusCompleted)
+	gt.Value(t, gotJob.CompletedCount).Equal(2)
+	gt.Value(t, gotJob.FailedCount).Equal(0)
+
+	count, err := repo.CountQueuedAlerts(ctx)
+	gt.NoError(t, err)
+	gt.Value(t, count).Equal(0)
+}
+
+func TestService_ReprocessAlertsByFilter_PartialFailure(t *testing.T) {
+	svc, repo := newTestService(1)
+	ctx := t.Context()
+
+	_, err := svc.EnqueueAlert(ctx, "will-succeed", nil, "Success", "")
+	gt.NoError(t, err)
+	_, err = svc.EnqueueAlert(ctx, "will-fail", nil, "Fail", "")
+	gt.NoError(t, err)
+
+	done := make(chan bool, 2)
+	job, err := svc.ReprocessAlertsByFilter(ctx, nil, func(bgCtx context.Context, schema types.AlertSchema, data any) error {
+		defer func() { done <- true }()
+		if schema == "will-fail" {
+			return context.DeadlineExceeded
+		}
+		return nil
+	})
+	gt.NoError(t, err)
+
+	for i := 0; i < 2; i++ {
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("reprocess callback not called within timeout")
+		}
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	gotJob, err := repo.GetReprocessBatchJob(ctx, job.ID)
+	gt.NoError(t, err)
+	gt.Value(t, gotJob.Status).Equal(types.ReprocessJobStatusCompleted)
+	gt.Value(t, gotJob.CompletedCount).Equal(1)
+	gt.Value(t, gotJob.FailedCount).Equal(1)
+
+	// The failed one should still be in the queue
+	count, err := repo.CountQueuedAlerts(ctx)
+	gt.NoError(t, err)
+	gt.Value(t, count).Equal(1)
+}
+
 func TestService_EndToEnd_CheckThenAcquire(t *testing.T) {
 	svc, repo := newTestService(2)
 
