@@ -16,7 +16,6 @@ import (
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
-	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
@@ -172,13 +171,6 @@ func describeTools(ctx context.Context, toolSets []interfaces.ToolSet) string {
 		fmt.Fprintf(&b, "- `%s` — %s\n", ts.ID(), ts.Description())
 		if len(toolNames) > 0 {
 			fmt.Fprintf(&b, "  Tools: %s\n", strings.Join(toolNames, ", "))
-		}
-
-		additionalPrompt, err := ts.Prompt(ctx)
-		if err != nil {
-			errutil.Handle(ctx, goerr.Wrap(err, "failed to get prompt from tool set", goerr.V("id", ts.ID())))
-		} else if additionalPrompt != "" {
-			fmt.Fprintf(&b, "  %s\n", additionalPrompt)
 		}
 	}
 	if b.Len() == 0 {
