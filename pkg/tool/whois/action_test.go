@@ -128,5 +128,5 @@ func TestWhois_Flags(t *testing.T) {
 
 func TestWhois_Name(t *testing.T) {
 	action := &whois.Action{}
-	gt.Value(t, action.Name()).Equal("whois")
+	gt.Value(t, action.ID()).Equal("whois")
 }

@@ -28,8 +28,12 @@ func (x *Action) Helper() *cli.Command {
 	return nil
 }
 
-func (x *Action) Name() string {
+func (x *Action) ID() string {
 	return "ipdb"
+}
+
+func (x *Action) Description() string {
+	return "AbuseIPDB IP address reputation and abuse reports"
 }
 
 func (x *Action) Flags() []cli.Flag {

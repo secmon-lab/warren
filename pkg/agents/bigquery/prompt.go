@@ -7,7 +7,6 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
 )
 
 //go:embed prompt/base.md
@@ -36,20 +35,6 @@ func init() {
 type promptData struct {
 	Tables   []TableConfig
 	Runbooks map[string]interface{}
-}
-
-// newPromptTemplate creates a PromptTemplate for the SubAgent
-func newPromptTemplate() (*gollem.PromptTemplate, error) {
-	return gollem.NewPromptTemplate(
-		"{{.query}}",
-		map[string]*gollem.Parameter{
-			"query": {
-				Type:        gollem.TypeString,
-				Description: "ONLY specify the conditions for data retrieval (e.g., 'records containing package name X from the last 7 days', 'login events in the past week'). Do NOT include analysis instructions, interpretation requests, or questions - ONLY data retrieval conditions.",
-				Required:    true,
-			},
-		},
-	)
 }
 
 // promptHintData represents the data for tool_description.md template

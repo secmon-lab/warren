@@ -112,9 +112,11 @@ func (x *UseCases) buildChatContext(ctx context.Context, t *ticket.Ticket, slack
 
 	// Agent Memory search is removed — knowledge is now accessed via tool search (knowledge v2).
 
-	// Build tools
+	// Build tools (convert interfaces.ToolSet to gollem.ToolSet for ChatContext)
 	allTools := make([]gollem.ToolSet, 0, len(x.tools)+1)
-	allTools = append(allTools, x.tools...)
+	for _, ts := range x.tools {
+		allTools = append(allTools, ts)
+	}
 	if !ticketless {
 		slackUpdateFunc := func(ctx context.Context, updatedTicket *ticket.Ticket) error {
 			if x.slackService == nil || !updatedTicket.HasSlackThread() || updatedTicket.Finding == nil {

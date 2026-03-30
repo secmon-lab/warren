@@ -7,7 +7,6 @@ type TaskPlan struct {
 	Description        string   `json:"description"`
 	AcceptanceCriteria string   `json:"acceptance_criteria"`
 	Tools              []string `json:"tools"`
-	SubAgents          []string `json:"sub_agents"`
 }
 
 // PlanResult represents the LLM planning response.

@@ -197,16 +197,11 @@ func (uc *UseCases) reviewSingleTicket(ctx context.Context, t *ticket.Ticket) er
 
 	// Add existing tools
 	if len(uc.tools) > 0 {
-		options = append(options, gollem.WithToolSets(uc.tools...))
-	}
-
-	// Add sub-agents
-	if len(uc.subAgents) > 0 {
-		gollemSubAgents := make([]*gollem.SubAgent, len(uc.subAgents))
-		for i, sa := range uc.subAgents {
-			gollemSubAgents[i] = sa.Inner()
+		gollemToolSets := make([]gollem.ToolSet, len(uc.tools))
+		for i, ts := range uc.tools {
+			gollemToolSets[i] = ts
 		}
-		options = append(options, gollem.WithSubAgents(gollemSubAgents...))
+		options = append(options, gollem.WithToolSets(gollemToolSets...))
 	}
 
 	// Add slack_post_message tool

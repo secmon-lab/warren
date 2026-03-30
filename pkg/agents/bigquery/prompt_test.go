@@ -30,27 +30,6 @@ func TestBuildSystemPrompt(t *testing.T) {
 	gt.S(t, prompt).Contains("test-table")
 }
 
-func TestNewPromptTemplate(t *testing.T) {
-	template, err := bqagent.ExportedNewPromptTemplate()
-	gt.NoError(t, err)
-	gt.V(t, template).NotNil()
-
-	// Check that template has expected parameters
-	params := template.Parameters()
-	gt.V(t, len(params)).NotEqual(0)
-
-	// Check query parameter exists and is required
-	queryParam, hasQuery := params["query"]
-	gt.True(t, hasQuery)
-	gt.V(t, queryParam).NotNil()
-	gt.True(t, queryParam.Required)
-	gt.V(t, queryParam.Type).Equal("string")
-
-	// Check that _memory_context is NOT in parameters (internal only)
-	_, hasMemoryContext := params["_memory_context"]
-	gt.False(t, hasMemoryContext)
-}
-
 func TestBuildPromptHint(t *testing.T) {
 	t.Run("with tables and limits", func(t *testing.T) {
 		config := &bqagent.Config{
@@ -130,8 +109,8 @@ func TestDynamicDescription(t *testing.T) {
 		},
 	}
 
-	a := bqagent.NewAgentForTest(config, nil, nil, "test-project", "")
-	desc := a.Description()
+	ts := bqagent.NewToolSetForTest(config, "test-project", "")
+	desc := ts.Description()
 	gt.S(t, desc).Contains("proj-a.ds-a.tbl-a")
 	gt.S(t, desc).Contains("proj-b.ds-b.tbl-b")
 	gt.S(t, desc).Contains("Available tables:")

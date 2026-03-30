@@ -34,8 +34,12 @@ func (x *Action) Helper() *cli.Command {
 	return nil
 }
 
-func (x *Action) Name() string {
+func (x *Action) ID() string {
 	return "urlscan"
+}
+
+func (x *Action) Description() string {
+	return "URL scanning and analysis via urlscan.io"
 }
 
 func (x *Action) Flags() []cli.Flag {

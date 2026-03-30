@@ -37,8 +37,12 @@ func (x *Action) Helper() *cli.Command {
 	return nil
 }
 
-func (x *Action) Name() string {
+func (x *Action) ID() string {
 	return "github"
+}
+
+func (x *Action) Description() string {
+	return "GitHub code and issue search"
 }
 
 func (x *Action) Flags() []cli.Flag {

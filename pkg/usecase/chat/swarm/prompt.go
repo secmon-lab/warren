@@ -10,14 +10,14 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
-	"github.com/secmon-lab/warren/pkg/utils/logging"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 //go:embed prompt/system.md
@@ -43,8 +43,7 @@ type planningContext struct {
 	message        string
 	ticket         *ticket.Ticket
 	alerts         []*alert.Alert
-	tools          []gollem.ToolSet
-	subAgents      []*agent.SubAgent
+	tools          []interfaces.ToolSet
 	userPrompt     string
 	lang           lang.Lang
 	requesterID    string
@@ -57,17 +56,16 @@ func generateSystemPrompt(ctx context.Context, pc *planningContext) (string, err
 	ticketJSON, alertJSON, alertCount := marshalContext(pc)
 
 	return prompt.GenerateWithStruct(ctx, systemPromptTemplate, map[string]any{
-		"ticket_json":           ticketJSON,
-		"alert_json":            alertJSON,
-		"alert_count":           alertCount,
-		"tools_description":     describeTools(ctx, pc.tools),
-		"subagents_description": describeSubAgents(pc.subAgents),
-		"user_prompt":           pc.userPrompt,
-		"lang":                  pc.lang,
-		"requester_id":          pc.requesterID,
-		"thread_comments":       pc.threadComments,
-		"topic":                 pc.ticket.Topic,
-		"history_messages":      pc.slackHistory,
+		"ticket_json":       ticketJSON,
+		"alert_json":        alertJSON,
+		"alert_count":       alertCount,
+		"tools_description": describeTools(ctx, pc.tools),
+		"user_prompt":       pc.userPrompt,
+		"lang":              pc.lang,
+		"requester_id":      pc.requesterID,
+		"thread_comments":   pc.threadComments,
+		"topic":             pc.ticket.Topic,
+		"history_messages":  pc.slackHistory,
 	})
 }
 
@@ -121,8 +119,7 @@ func generateFinalPrompt(ctx context.Context, pc *planningContext, allResults []
 // ticketlessPlanningContext holds the shared context for ticketless planning operations.
 type ticketlessPlanningContext struct {
 	message     string
-	tools       []gollem.ToolSet
-	subAgents   []*agent.SubAgent
+	tools       []interfaces.ToolSet
 	userPrompt  string
 	lang        lang.Lang
 	requesterID string
@@ -132,12 +129,11 @@ type ticketlessPlanningContext struct {
 // generateTicketlessSystemPrompt generates the system prompt for ticketless chat.
 func generateTicketlessSystemPrompt(ctx context.Context, pc *ticketlessPlanningContext) (string, error) {
 	return prompt.GenerateWithStruct(ctx, ticketlessSystemPromptTemplate, map[string]any{
-		"history_messages":      pc.history,
-		"tools_description":     describeTools(ctx, pc.tools),
-		"subagents_description": describeSubAgents(pc.subAgents),
-		"user_prompt":           pc.userPrompt,
-		"lang":                  pc.lang,
-		"requester_id":          pc.requesterID,
+		"history_messages":  pc.history,
+		"tools_description": describeTools(ctx, pc.tools),
+		"user_prompt":       pc.userPrompt,
+		"lang":              pc.lang,
+		"requester_id":      pc.requesterID,
 	})
 }
 
@@ -161,44 +157,32 @@ func marshalContext(pc *planningContext) (string, string, int) {
 	return string(ticketJSON), string(alertJSON), alertCount
 }
 
-// describeTools generates a text description of available tools.
-func describeTools(ctx context.Context, toolSets []gollem.ToolSet) string {
+// describeTools generates a text description of available tools grouped by ToolSet.
+func describeTools(ctx context.Context, toolSets []interfaces.ToolSet) string {
 	var b strings.Builder
 	for _, ts := range toolSets {
 		specs, err := ts.Specs(ctx)
 		if err != nil {
 			continue
 		}
+		var toolNames []string
 		for _, spec := range specs {
-			fmt.Fprintf(&b, "- `%s`: %s\n", spec.Name, spec.Description)
+			toolNames = append(toolNames, spec.Name)
+		}
+		fmt.Fprintf(&b, "- `%s` — %s\n", ts.ID(), ts.Description())
+		if len(toolNames) > 0 {
+			fmt.Fprintf(&b, "  Tools: %s\n", strings.Join(toolNames, ", "))
 		}
 
-		if tool, ok := ts.(interfaces.Tool); ok {
-			additionalPrompt, err := tool.Prompt(ctx)
-			if err == nil && additionalPrompt != "" {
-				fmt.Fprintf(&b, "  Additional: %s\n", additionalPrompt)
-			}
+		additionalPrompt, err := ts.Prompt(ctx)
+		if err != nil {
+			errutil.Handle(ctx, goerr.Wrap(err, "failed to get prompt from tool set", goerr.V("id", ts.ID())))
+		} else if additionalPrompt != "" {
+			fmt.Fprintf(&b, "  %s\n", additionalPrompt)
 		}
 	}
 	if b.Len() == 0 {
 		return "(no tools available)"
-	}
-	return b.String()
-}
-
-// describeSubAgents generates a text description of available sub-agents.
-func describeSubAgents(subAgents []*agent.SubAgent) string {
-	if len(subAgents) == 0 {
-		return "(no sub-agents available)"
-	}
-	var b strings.Builder
-	for _, sa := range subAgents {
-		inner := sa.Inner()
-		spec := inner.Spec()
-		fmt.Fprintf(&b, "- `%s`: %s\n", spec.Name, spec.Description)
-		if hint := sa.PromptHint(); hint != "" {
-			fmt.Fprintf(&b, "  Hint: %s\n", hint)
-		}
 	}
 	return b.String()
 }
@@ -256,13 +240,7 @@ var taskSchema = &gollem.Parameter{
 		"tools": {
 			Type:        gollem.TypeArray,
 			Items:       &gollem.Parameter{Type: gollem.TypeString},
-			Description: "Tool names to make available for this task",
-			Required:    true,
-		},
-		"sub_agents": {
-			Type:        gollem.TypeArray,
-			Items:       &gollem.Parameter{Type: gollem.TypeString},
-			Description: "Sub-agent names to make available for this task (e.g. falcon, bigquery, slack)",
+			Description: "ToolSet names to make available for this task",
 			Required:    true,
 		},
 	},

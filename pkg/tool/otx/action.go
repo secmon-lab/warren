@@ -28,8 +28,12 @@ func (x *Action) Helper() *cli.Command {
 	return nil
 }
 
-func (x *Action) Name() string {
+func (x *Action) ID() string {
 	return "otx"
+}
+
+func (x *Action) Description() string {
+	return "AlienVault OTX threat intelligence lookups for IPs, domains, and file hashes"
 }
 
 func (x *Action) Flags() []cli.Flag {

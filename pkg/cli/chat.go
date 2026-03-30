@@ -132,23 +132,12 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to get tool sets")
 			}
 
-			// Initialize all configured agents
-			subAgents, err := agents.ConfigureAll(ctx, llmClient, repo)
+			// Initialize all configured agents and merge into tool sets
+			agentToolSets, err := agents.ConfigureAll(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to configure agents")
 			}
-
-			// Add MCP tool sets if configured
-			mcpToolSets, err := mcpCfg.CreateMCPToolSets(ctx)
-			if err != nil {
-				return goerr.Wrap(err, "failed to create MCP tool sets")
-			}
-			if len(mcpToolSets) > 0 {
-				allToolSets = append(allToolSets, mcpToolSets...)
-				logging.From(ctx).Info("MCP tool sets configured",
-					"servers", mcpCfg.GetServerNames(),
-					"count", len(mcpToolSets))
-			}
+			allToolSets = append(allToolSets, agentToolSets...)
 
 			// Show ticket information
 			fmt.Printf("\n🎫 Ticket Information:\n")
@@ -182,7 +171,6 @@ func cmdChat() *cli.Command {
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(allToolSets),
-				usecase.WithSubAgents(subAgents),
 				usecase.WithNoAuthorization(noAuthorization),
 				usecase.WithUserSystemPrompt(userSystemPrompt),
 			}
