@@ -110,7 +110,7 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	msg.Trace(taskCtx, "Starting...")
 
 	// Generate task system prompt
-	taskPrompt, err := generateTaskPrompt(ctx, task)
+	taskPrompt, err := generateTaskPrompt(ctx, task, c.knowledgeService)
 	if err != nil {
 		result.Error = err
 		msg.Trace(taskCtx, "❌ Failed to generate prompt: %s", err.Error())
@@ -126,6 +126,13 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	baseAction := base.New(c.repository, target.ID, base.WithLLMClient(c.llmClient))
 	if filtered := filterToolSets(ctx, []gollem.ToolSet{baseAction}, task.Tools); len(filtered) > 0 {
 		filteredTools = append(filteredTools, baseAction)
+	}
+
+	// Always include knowledge tool (search-only) for child agents so they can
+	// leverage prior knowledge without requiring the root agent to plan it explicitly.
+	if c.knowledgeService != nil {
+		kt := knowledgeTool.New(c.knowledgeService, types.KnowledgeCategoryFact, knowledgeTool.ModeSearchOnly)
+		filteredTools = append(filteredTools, kt)
 	}
 
 	// Filter sub-agents for this task
