@@ -162,6 +162,33 @@ func (r *Memory) GetReprocessJob(ctx context.Context, id types.ReprocessJobID) (
 	return &jobCopy, nil
 }
 
+// PutReprocessBatchJob saves a reprocess batch job
+func (r *Memory) PutReprocessBatchJob(ctx context.Context, job *alert.ReprocessBatchJob) error {
+	r.throttleMu.Lock()
+	defer r.throttleMu.Unlock()
+
+	jobCopy := *job
+	r.reprocessBatchJobs[job.ID] = &jobCopy
+	return nil
+}
+
+// GetReprocessBatchJob retrieves a reprocess batch job by ID
+func (r *Memory) GetReprocessBatchJob(ctx context.Context, id types.ReprocessBatchJobID) (*alert.ReprocessBatchJob, error) {
+	r.throttleMu.RLock()
+	defer r.throttleMu.RUnlock()
+
+	job, ok := r.reprocessBatchJobs[id]
+	if !ok {
+		return nil, r.eb.Wrap(goerr.New("reprocess batch job not found"),
+			"not found",
+			goerr.T(errutil.TagNotFound),
+			goerr.V("id", id))
+	}
+
+	jobCopy := *job
+	return &jobCopy, nil
+}
+
 // countActiveSlots removes expired buckets and returns the total count of active slots.
 // Must be called with throttleMu held.
 func (r *Memory) countActiveSlots(now time.Time, window time.Duration) int {

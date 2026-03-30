@@ -241,6 +241,10 @@ type Repository interface {
 	PutReprocessJob(ctx context.Context, job *alert.ReprocessJob) error
 	GetReprocessJob(ctx context.Context, id types.ReprocessJobID) (*alert.ReprocessJob, error)
 
+	// Reprocess batch job management
+	PutReprocessBatchJob(ctx context.Context, job *alert.ReprocessBatchJob) error
+	GetReprocessBatchJob(ctx context.Context, id types.ReprocessBatchJobID) (*alert.ReprocessBatchJob, error)
+
 	// Alert throttle management (sliding window rate limiting)
 	// CheckAlertThrottle checks whether throttle slots are available (read-only).
 	// Does NOT consume a slot. Used for optimistic early rejection before pipeline.

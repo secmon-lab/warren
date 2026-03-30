@@ -19,12 +19,12 @@ type QueuedAlert struct {
 
 // ReprocessJob represents a background job for reprocessing a queued alert.
 type ReprocessJob struct {
-	ID             types.ReprocessJobID     `json:"id"`
-	QueuedAlertID  types.QueuedAlertID      `json:"queued_alert_id"`
-	Status         types.ReprocessJobStatus `json:"status"`
-	Error          string                   `json:"error,omitempty"`
-	CreatedAt      time.Time                `json:"created_at"`
-	UpdatedAt      time.Time                `json:"updated_at"`
+	ID            types.ReprocessJobID     `json:"id"`
+	QueuedAlertID types.QueuedAlertID      `json:"queued_alert_id"`
+	Status        types.ReprocessJobStatus `json:"status"`
+	Error         string                   `json:"error,omitempty"`
+	CreatedAt     time.Time                `json:"created_at"`
+	UpdatedAt     time.Time                `json:"updated_at"`
 }
 
 // AlertThrottle holds the sliding window state for alert rate limiting.

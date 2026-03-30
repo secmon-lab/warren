@@ -37,6 +37,7 @@ type ResolverRoot interface {
 	Mutation() MutationResolver
 	Query() QueryResolver
 	QueuedAlert() QueuedAlertResolver
+	ReprocessBatchJob() ReprocessBatchJobResolver
 	ReprocessJob() ReprocessJobResolver
 	Session() SessionResolver
 	Ticket() TicketResolver
@@ -186,33 +187,35 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		ArchiveTicket          func(childComplexity int, id string) int
-		ArchiveTickets         func(childComplexity int, ids []string) int
-		BindAlertsToTicket     func(childComplexity int, ticketID string, alertIds []string) int
-		CreateKnowledge        func(childComplexity int, input graphql1.CreateKnowledgeInput) int
-		CreateKnowledgeTag     func(childComplexity int, input graphql1.CreateKnowledgeTagInput) int
-		CreateTag              func(childComplexity int, name string) int
-		CreateTicket           func(childComplexity int, title string, description string, isTest *bool) int
-		CreateTicketFromAlerts func(childComplexity int, alertIds []string, title *string, description *string) int
-		DeclineAlerts          func(childComplexity int, ids []string) int
-		DeleteKnowledge        func(childComplexity int, id string, reason string) int
-		DeleteKnowledgeTag     func(childComplexity int, id string) int
-		DeleteTag              func(childComplexity int, id string) int
-		DiscardQueuedAlerts    func(childComplexity int, ids []string) int
-		FixDiagnosis           func(childComplexity int, id string) int
-		MergeKnowledgeTags     func(childComplexity int, oldID string, newID string) int
-		ReopenTicket           func(childComplexity int, id string) int
-		ReprocessQueuedAlert   func(childComplexity int, id string) int
-		ResolveTicket          func(childComplexity int, id string, conclusion string, reason string) int
-		RunDiagnosis           func(childComplexity int) int
-		UnarchiveTicket        func(childComplexity int, id string) int
-		UpdateAlertTags        func(childComplexity int, alertID string, tagIds []string) int
-		UpdateKnowledge        func(childComplexity int, input graphql1.UpdateKnowledgeInput) int
-		UpdateKnowledgeTag     func(childComplexity int, input graphql1.UpdateKnowledgeTagInput) int
-		UpdateTag              func(childComplexity int, input graphql1.UpdateTagInput) int
-		UpdateTicket           func(childComplexity int, id string, title string, description *string) int
-		UpdateTicketConclusion func(childComplexity int, id string, conclusion string, reason string) int
-		UpdateTicketTags       func(childComplexity int, ticketID string, tagIds []string) int
+		ArchiveTicket                 func(childComplexity int, id string) int
+		ArchiveTickets                func(childComplexity int, ids []string) int
+		BindAlertsToTicket            func(childComplexity int, ticketID string, alertIds []string) int
+		CreateKnowledge               func(childComplexity int, input graphql1.CreateKnowledgeInput) int
+		CreateKnowledgeTag            func(childComplexity int, input graphql1.CreateKnowledgeTagInput) int
+		CreateTag                     func(childComplexity int, name string) int
+		CreateTicket                  func(childComplexity int, title string, description string, isTest *bool) int
+		CreateTicketFromAlerts        func(childComplexity int, alertIds []string, title *string, description *string) int
+		DeclineAlerts                 func(childComplexity int, ids []string) int
+		DeleteKnowledge               func(childComplexity int, id string, reason string) int
+		DeleteKnowledgeTag            func(childComplexity int, id string) int
+		DeleteTag                     func(childComplexity int, id string) int
+		DiscardQueuedAlerts           func(childComplexity int, ids []string) int
+		DiscardQueuedAlertsByFilter   func(childComplexity int, keyword *string) int
+		FixDiagnosis                  func(childComplexity int, id string) int
+		MergeKnowledgeTags            func(childComplexity int, oldID string, newID string) int
+		ReopenTicket                  func(childComplexity int, id string) int
+		ReprocessQueuedAlert          func(childComplexity int, id string) int
+		ReprocessQueuedAlertsByFilter func(childComplexity int, keyword *string) int
+		ResolveTicket                 func(childComplexity int, id string, conclusion string, reason string) int
+		RunDiagnosis                  func(childComplexity int) int
+		UnarchiveTicket               func(childComplexity int, id string) int
+		UpdateAlertTags               func(childComplexity int, alertID string, tagIds []string) int
+		UpdateKnowledge               func(childComplexity int, input graphql1.UpdateKnowledgeInput) int
+		UpdateKnowledgeTag            func(childComplexity int, input graphql1.UpdateKnowledgeTagInput) int
+		UpdateTag                     func(childComplexity int, input graphql1.UpdateTagInput) int
+		UpdateTicket                  func(childComplexity int, id string, title string, description *string) int
+		UpdateTicketConclusion        func(childComplexity int, id string, conclusion string, reason string) int
+		UpdateTicketTags              func(childComplexity int, ticketID string, tagIds []string) int
 	}
 
 	Query struct {
@@ -230,6 +233,7 @@ type ComplexityRoot struct {
 		KnowledgeTags          func(childComplexity int) int
 		Knowledges             func(childComplexity int, category *string, tags []string, keyword *string) int
 		QueuedAlerts           func(childComplexity int, keyword *string, offset *int, limit *int) int
+		ReprocessBatchJob      func(childComplexity int, id string) int
 		ReprocessJob           func(childComplexity int, id string) int
 		Session                func(childComplexity int, id string) int
 		SessionMessages        func(childComplexity int, sessionID string) int
@@ -254,6 +258,16 @@ type ComplexityRoot struct {
 	QueuedAlertsResponse struct {
 		Alerts     func(childComplexity int) int
 		TotalCount func(childComplexity int) int
+	}
+
+	ReprocessBatchJob struct {
+		CompletedCount func(childComplexity int) int
+		CreatedAt      func(childComplexity int) int
+		FailedCount    func(childComplexity int) int
+		ID             func(childComplexity int) int
+		Status         func(childComplexity int) int
+		TotalCount     func(childComplexity int) int
+		UpdatedAt      func(childComplexity int) int
 	}
 
 	ReprocessJob struct {
@@ -389,6 +403,8 @@ type MutationResolver interface {
 	FixDiagnosis(ctx context.Context, id string) (*graphql1.Diagnosis, error)
 	ReprocessQueuedAlert(ctx context.Context, id string) (*alert.ReprocessJob, error)
 	DiscardQueuedAlerts(ctx context.Context, ids []string) (bool, error)
+	DiscardQueuedAlertsByFilter(ctx context.Context, keyword *string) (int, error)
+	ReprocessQueuedAlertsByFilter(ctx context.Context, keyword *string) (*alert.ReprocessBatchJob, error)
 	CreateKnowledge(ctx context.Context, input graphql1.CreateKnowledgeInput) (*graphql1.Knowledge, error)
 	UpdateKnowledge(ctx context.Context, input graphql1.UpdateKnowledgeInput) (*graphql1.Knowledge, error)
 	DeleteKnowledge(ctx context.Context, id string, reason string) (bool, error)
@@ -419,6 +435,7 @@ type QueryResolver interface {
 	DiagnosisIssues(ctx context.Context, diagnosisID string, offset *int, limit *int, status *string, ruleID *string) (*graphql1.DiagnosisIssuesResponse, error)
 	QueuedAlerts(ctx context.Context, keyword *string, offset *int, limit *int) (*graphql1.QueuedAlertsResponse, error)
 	ReprocessJob(ctx context.Context, id string) (*alert.ReprocessJob, error)
+	ReprocessBatchJob(ctx context.Context, id string) (*alert.ReprocessBatchJob, error)
 	Knowledges(ctx context.Context, category *string, tags []string, keyword *string) ([]*graphql1.Knowledge, error)
 	Knowledge(ctx context.Context, id string) (*graphql1.Knowledge, error)
 	KnowledgeLogs(ctx context.Context, knowledgeID string) ([]*graphql1.KnowledgeLog, error)
@@ -430,6 +447,13 @@ type QueuedAlertResolver interface {
 
 	Data(ctx context.Context, obj *alert.QueuedAlert) (string, error)
 	CreatedAt(ctx context.Context, obj *alert.QueuedAlert) (string, error)
+}
+type ReprocessBatchJobResolver interface {
+	ID(ctx context.Context, obj *alert.ReprocessBatchJob) (string, error)
+	Status(ctx context.Context, obj *alert.ReprocessBatchJob) (graphql1.ReprocessJobStatus, error)
+
+	CreatedAt(ctx context.Context, obj *alert.ReprocessBatchJob) (string, error)
+	UpdatedAt(ctx context.Context, obj *alert.ReprocessBatchJob) (string, error)
 }
 type ReprocessJobResolver interface {
 	ID(ctx context.Context, obj *alert.ReprocessJob) (string, error)
@@ -1183,6 +1207,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DiscardQueuedAlerts(childComplexity, args["ids"].([]string)), true
+	case "Mutation.discardQueuedAlertsByFilter":
+		if e.ComplexityRoot.Mutation.DiscardQueuedAlertsByFilter == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_discardQueuedAlertsByFilter_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DiscardQueuedAlertsByFilter(childComplexity, args["keyword"].(*string)), true
 	case "Mutation.fixDiagnosis":
 		if e.ComplexityRoot.Mutation.FixDiagnosis == nil {
 			break
@@ -1227,6 +1262,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.ReprocessQueuedAlert(childComplexity, args["id"].(string)), true
+	case "Mutation.reprocessQueuedAlertsByFilter":
+		if e.ComplexityRoot.Mutation.ReprocessQueuedAlertsByFilter == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_reprocessQueuedAlertsByFilter_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ReprocessQueuedAlertsByFilter(childComplexity, args["keyword"].(*string)), true
 	case "Mutation.resolveTicket":
 		if e.ComplexityRoot.Mutation.ResolveTicket == nil {
 			break
@@ -1468,6 +1514,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.QueuedAlerts(childComplexity, args["keyword"].(*string), args["offset"].(*int), args["limit"].(*int)), true
+	case "Query.reprocessBatchJob":
+		if e.ComplexityRoot.Query.ReprocessBatchJob == nil {
+			break
+		}
+
+		args, err := ec.field_Query_reprocessBatchJob_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ReprocessBatchJob(childComplexity, args["id"].(string)), true
 	case "Query.reprocessJob":
 		if e.ComplexityRoot.Query.ReprocessJob == nil {
 			break
@@ -1628,6 +1685,49 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.QueuedAlertsResponse.TotalCount(childComplexity), true
+
+	case "ReprocessBatchJob.completedCount":
+		if e.ComplexityRoot.ReprocessBatchJob.CompletedCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReprocessBatchJob.CompletedCount(childComplexity), true
+	case "ReprocessBatchJob.createdAt":
+		if e.ComplexityRoot.ReprocessBatchJob.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReprocessBatchJob.CreatedAt(childComplexity), true
+	case "ReprocessBatchJob.failedCount":
+		if e.ComplexityRoot.ReprocessBatchJob.FailedCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReprocessBatchJob.FailedCount(childComplexity), true
+	case "ReprocessBatchJob.id":
+		if e.ComplexityRoot.ReprocessBatchJob.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReprocessBatchJob.ID(childComplexity), true
+	case "ReprocessBatchJob.status":
+		if e.ComplexityRoot.ReprocessBatchJob.Status == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReprocessBatchJob.Status(childComplexity), true
+	case "ReprocessBatchJob.totalCount":
+		if e.ComplexityRoot.ReprocessBatchJob.TotalCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReprocessBatchJob.TotalCount(childComplexity), true
+	case "ReprocessBatchJob.updatedAt":
+		if e.ComplexityRoot.ReprocessBatchJob.UpdatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReprocessBatchJob.UpdatedAt(childComplexity), true
 
 	case "ReprocessJob.createdAt":
 		if e.ComplexityRoot.ReprocessJob.CreatedAt == nil {
@@ -2370,14 +2470,27 @@ type ReprocessJob {
   updatedAt: String!
 }
 
+type ReprocessBatchJob {
+  id: ID!
+  status: ReprocessJobStatus!
+  totalCount: Int!
+  completedCount: Int!
+  failedCount: Int!
+  createdAt: String!
+  updatedAt: String!
+}
+
 extend type Query {
   queuedAlerts(keyword: String, offset: Int, limit: Int): QueuedAlertsResponse!
   reprocessJob(id: ID!): ReprocessJob
+  reprocessBatchJob(id: ID!): ReprocessBatchJob
 }
 
 extend type Mutation {
   reprocessQueuedAlert(id: ID!): ReprocessJob!
   discardQueuedAlerts(ids: [ID!]!): Boolean!
+  discardQueuedAlertsByFilter(keyword: String): Int!
+  reprocessQueuedAlertsByFilter(keyword: String): ReprocessBatchJob!
 }
 
 # Knowledge: topic-based knowledge store
@@ -2633,6 +2746,17 @@ func (ec *executionContext) field_Mutation_deleteTag_args(ctx context.Context, r
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_discardQueuedAlertsByFilter_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "keyword", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["keyword"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_discardQueuedAlerts_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2690,6 +2814,17 @@ func (ec *executionContext) field_Mutation_reprocessQueuedAlert_args(ctx context
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_reprocessQueuedAlertsByFilter_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "keyword", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["keyword"] = arg0
 	return args, nil
 }
 
@@ -3010,6 +3145,17 @@ func (ec *executionContext) field_Query_queuedAlerts_args(ctx context.Context, r
 		return nil, err
 	}
 	args["limit"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_reprocessBatchJob_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -7694,6 +7840,104 @@ func (ec *executionContext) fieldContext_Mutation_discardQueuedAlerts(ctx contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_discardQueuedAlertsByFilter(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_discardQueuedAlertsByFilter,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DiscardQueuedAlertsByFilter(ctx, fc.Args["keyword"].(*string))
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_discardQueuedAlertsByFilter(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_discardQueuedAlertsByFilter_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_reprocessQueuedAlertsByFilter(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_reprocessQueuedAlertsByFilter,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ReprocessQueuedAlertsByFilter(ctx, fc.Args["keyword"].(*string))
+		},
+		nil,
+		ec.marshalNReprocessBatchJob2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessBatchJob,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_reprocessQueuedAlertsByFilter(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ReprocessBatchJob_id(ctx, field)
+			case "status":
+				return ec.fieldContext_ReprocessBatchJob_status(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_ReprocessBatchJob_totalCount(ctx, field)
+			case "completedCount":
+				return ec.fieldContext_ReprocessBatchJob_completedCount(ctx, field)
+			case "failedCount":
+				return ec.fieldContext_ReprocessBatchJob_failedCount(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ReprocessBatchJob_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ReprocessBatchJob_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ReprocessBatchJob", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_reprocessQueuedAlertsByFilter_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_createKnowledge(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9106,6 +9350,63 @@ func (ec *executionContext) fieldContext_Query_reprocessJob(ctx context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_reprocessBatchJob(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_reprocessBatchJob,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ReprocessBatchJob(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalOReprocessBatchJob2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessBatchJob,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_reprocessBatchJob(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ReprocessBatchJob_id(ctx, field)
+			case "status":
+				return ec.fieldContext_ReprocessBatchJob_status(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_ReprocessBatchJob_totalCount(ctx, field)
+			case "completedCount":
+				return ec.fieldContext_ReprocessBatchJob_completedCount(ctx, field)
+			case "failedCount":
+				return ec.fieldContext_ReprocessBatchJob_failedCount(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ReprocessBatchJob_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ReprocessBatchJob_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ReprocessBatchJob", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_reprocessBatchJob_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_knowledges(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9648,6 +9949,209 @@ func (ec *executionContext) fieldContext_QueuedAlertsResponse_totalCount(_ conte
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReprocessBatchJob_id(ctx context.Context, field graphql.CollectedField, obj *alert.ReprocessBatchJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReprocessBatchJob_id,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.ReprocessBatchJob().ID(ctx, obj)
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReprocessBatchJob_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReprocessBatchJob",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReprocessBatchJob_status(ctx context.Context, field graphql.CollectedField, obj *alert.ReprocessBatchJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReprocessBatchJob_status,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.ReprocessBatchJob().Status(ctx, obj)
+		},
+		nil,
+		ec.marshalNReprocessJobStatus2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐReprocessJobStatus,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReprocessBatchJob_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReprocessBatchJob",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ReprocessJobStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReprocessBatchJob_totalCount(ctx context.Context, field graphql.CollectedField, obj *alert.ReprocessBatchJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReprocessBatchJob_totalCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReprocessBatchJob_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReprocessBatchJob",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReprocessBatchJob_completedCount(ctx context.Context, field graphql.CollectedField, obj *alert.ReprocessBatchJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReprocessBatchJob_completedCount,
+		func(ctx context.Context) (any, error) {
+			return obj.CompletedCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReprocessBatchJob_completedCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReprocessBatchJob",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReprocessBatchJob_failedCount(ctx context.Context, field graphql.CollectedField, obj *alert.ReprocessBatchJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReprocessBatchJob_failedCount,
+		func(ctx context.Context) (any, error) {
+			return obj.FailedCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReprocessBatchJob_failedCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReprocessBatchJob",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReprocessBatchJob_createdAt(ctx context.Context, field graphql.CollectedField, obj *alert.ReprocessBatchJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReprocessBatchJob_createdAt,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.ReprocessBatchJob().CreatedAt(ctx, obj)
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReprocessBatchJob_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReprocessBatchJob",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReprocessBatchJob_updatedAt(ctx context.Context, field graphql.CollectedField, obj *alert.ReprocessBatchJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReprocessBatchJob_updatedAt,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.ReprocessBatchJob().UpdatedAt(ctx, obj)
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReprocessBatchJob_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReprocessBatchJob",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -14794,6 +15298,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "discardQueuedAlertsByFilter":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_discardQueuedAlertsByFilter(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "reprocessQueuedAlertsByFilter":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_reprocessQueuedAlertsByFilter(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createKnowledge":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createKnowledge(ctx, field)
@@ -15332,6 +15850,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "reprocessBatchJob":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_reprocessBatchJob(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "knowledges":
 			field := field
 
@@ -15652,6 +16189,199 @@ func (ec *executionContext) _QueuedAlertsResponse(ctx context.Context, sel ast.S
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var reprocessBatchJobImplementors = []string{"ReprocessBatchJob"}
+
+func (ec *executionContext) _ReprocessBatchJob(ctx context.Context, sel ast.SelectionSet, obj *alert.ReprocessBatchJob) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, reprocessBatchJobImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ReprocessBatchJob")
+		case "id":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ReprocessBatchJob_id(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "status":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ReprocessBatchJob_status(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "totalCount":
+			out.Values[i] = ec._ReprocessBatchJob_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "completedCount":
+			out.Values[i] = ec._ReprocessBatchJob_completedCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "failedCount":
+			out.Values[i] = ec._ReprocessBatchJob_failedCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "createdAt":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ReprocessBatchJob_createdAt(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "updatedAt":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ReprocessBatchJob_updatedAt(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -17692,6 +18422,20 @@ func (ec *executionContext) marshalNQueuedAlertsResponse2ᚖgithubᚗcomᚋsecmo
 	return ec._QueuedAlertsResponse(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNReprocessBatchJob2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessBatchJob(ctx context.Context, sel ast.SelectionSet, v alert.ReprocessBatchJob) graphql.Marshaler {
+	return ec._ReprocessBatchJob(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNReprocessBatchJob2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessBatchJob(ctx context.Context, sel ast.SelectionSet, v *alert.ReprocessBatchJob) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ReprocessBatchJob(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNReprocessJob2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessJob(ctx context.Context, sel ast.SelectionSet, v alert.ReprocessJob) graphql.Marshaler {
 	return ec._ReprocessJob(ctx, sel, &v)
 }
@@ -18246,6 +18990,13 @@ func (ec *executionContext) marshalOKnowledge2ᚖgithubᚗcomᚋsecmonᚑlabᚋw
 		return graphql.Null
 	}
 	return ec._Knowledge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOReprocessBatchJob2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessBatchJob(ctx context.Context, sel ast.SelectionSet, v *alert.ReprocessBatchJob) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ReprocessBatchJob(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOReprocessJob2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessJob(ctx context.Context, sel ast.SelectionSet, v *alert.ReprocessJob) graphql.Marshaler {

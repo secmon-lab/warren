@@ -33,3 +33,14 @@ const (
 	ReprocessJobStatusCompleted ReprocessJobStatus = "completed"
 	ReprocessJobStatusFailed    ReprocessJobStatus = "failed"
 )
+
+// ReprocessBatchJobID represents a unique identifier for a reprocess batch job
+type ReprocessBatchJobID string
+
+func (x ReprocessBatchJobID) String() string {
+	return string(x)
+}
+
+func NewReprocessBatchJobID() ReprocessBatchJobID {
+	return ReprocessBatchJobID(uuid.New().String())
+}

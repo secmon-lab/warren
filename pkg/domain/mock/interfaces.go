@@ -2824,6 +2824,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetRefineGroupFunc: func(ctx context.Context, groupID types.RefineGroupID) (*refine.Group, error) {
 //				panic("mock out the GetRefineGroup method")
 //			},
+//			GetReprocessBatchJobFunc: func(ctx context.Context, id types.ReprocessBatchJobID) (*alert.ReprocessBatchJob, error) {
+//				panic("mock out the GetReprocessBatchJob method")
+//			},
 //			GetReprocessJobFunc: func(ctx context.Context, id types.ReprocessJobID) (*alert.ReprocessJob, error) {
 //				panic("mock out the GetReprocessJob method")
 //			},
@@ -2952,6 +2955,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			PutRefineGroupFunc: func(ctx context.Context, group *refine.Group) error {
 //				panic("mock out the PutRefineGroup method")
+//			},
+//			PutReprocessBatchJobFunc: func(ctx context.Context, job *alert.ReprocessBatchJob) error {
+//				panic("mock out the PutReprocessBatchJob method")
 //			},
 //			PutReprocessJobFunc: func(ctx context.Context, job *alert.ReprocessJob) error {
 //				panic("mock out the PutReprocessJob method")
@@ -3194,6 +3200,9 @@ type RepositoryMock struct {
 	// GetRefineGroupFunc mocks the GetRefineGroup method.
 	GetRefineGroupFunc func(ctx context.Context, groupID types.RefineGroupID) (*refine.Group, error)
 
+	// GetReprocessBatchJobFunc mocks the GetReprocessBatchJob method.
+	GetReprocessBatchJobFunc func(ctx context.Context, id types.ReprocessBatchJobID) (*alert.ReprocessBatchJob, error)
+
 	// GetReprocessJobFunc mocks the GetReprocessJob method.
 	GetReprocessJobFunc func(ctx context.Context, id types.ReprocessJobID) (*alert.ReprocessJob, error)
 
@@ -3322,6 +3331,9 @@ type RepositoryMock struct {
 
 	// PutRefineGroupFunc mocks the PutRefineGroup method.
 	PutRefineGroupFunc func(ctx context.Context, group *refine.Group) error
+
+	// PutReprocessBatchJobFunc mocks the PutReprocessBatchJob method.
+	PutReprocessBatchJobFunc func(ctx context.Context, job *alert.ReprocessBatchJob) error
 
 	// PutReprocessJobFunc mocks the PutReprocessJob method.
 	PutReprocessJobFunc func(ctx context.Context, job *alert.ReprocessJob) error
@@ -3816,6 +3828,13 @@ type RepositoryMock struct {
 			// GroupID is the groupID argument value.
 			GroupID types.RefineGroupID
 		}
+		// GetReprocessBatchJob holds details about calls to the GetReprocessBatchJob method.
+		GetReprocessBatchJob []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID types.ReprocessBatchJobID
+		}
 		// GetReprocessJob holds details about calls to the GetReprocessJob method.
 		GetReprocessJob []struct {
 			// Ctx is the ctx argument value.
@@ -4141,6 +4160,13 @@ type RepositoryMock struct {
 			// Group is the group argument value.
 			Group *refine.Group
 		}
+		// PutReprocessBatchJob holds details about calls to the PutReprocessBatchJob method.
+		PutReprocessBatchJob []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Job is the job argument value.
+			Job *alert.ReprocessBatchJob
+		}
 		// PutReprocessJob holds details about calls to the PutReprocessJob method.
 		PutReprocessJob []struct {
 			// Ctx is the ctx argument value.
@@ -4381,6 +4407,7 @@ type RepositoryMock struct {
 	lockGetOrCreateTagByName            sync.RWMutex
 	lockGetQueuedAlert                  sync.RWMutex
 	lockGetRefineGroup                  sync.RWMutex
+	lockGetReprocessBatchJob            sync.RWMutex
 	lockGetReprocessJob                 sync.RWMutex
 	lockGetSession                      sync.RWMutex
 	lockGetSessionMessages              sync.RWMutex
@@ -4424,6 +4451,7 @@ type RepositoryMock struct {
 	lockPutKnowledgeTag                 sync.RWMutex
 	lockPutQueuedAlert                  sync.RWMutex
 	lockPutRefineGroup                  sync.RWMutex
+	lockPutReprocessBatchJob            sync.RWMutex
 	lockPutReprocessJob                 sync.RWMutex
 	lockPutSession                      sync.RWMutex
 	lockPutSessionMessage               sync.RWMutex
@@ -6736,6 +6764,46 @@ func (mock *RepositoryMock) GetRefineGroupCalls() []struct {
 	return calls
 }
 
+// GetReprocessBatchJob calls GetReprocessBatchJobFunc.
+func (mock *RepositoryMock) GetReprocessBatchJob(ctx context.Context, id types.ReprocessBatchJobID) (*alert.ReprocessBatchJob, error) {
+	callInfo := struct {
+		Ctx context.Context
+		ID  types.ReprocessBatchJobID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockGetReprocessBatchJob.Lock()
+	mock.calls.GetReprocessBatchJob = append(mock.calls.GetReprocessBatchJob, callInfo)
+	mock.lockGetReprocessBatchJob.Unlock()
+	if mock.GetReprocessBatchJobFunc == nil {
+		var (
+			reprocessBatchJobOut *alert.ReprocessBatchJob
+			errOut               error
+		)
+		return reprocessBatchJobOut, errOut
+	}
+	return mock.GetReprocessBatchJobFunc(ctx, id)
+}
+
+// GetReprocessBatchJobCalls gets all the calls that were made to GetReprocessBatchJob.
+// Check the length with:
+//
+//	len(mockedRepository.GetReprocessBatchJobCalls())
+func (mock *RepositoryMock) GetReprocessBatchJobCalls() []struct {
+	Ctx context.Context
+	ID  types.ReprocessBatchJobID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  types.ReprocessBatchJobID
+	}
+	mock.lockGetReprocessBatchJob.RLock()
+	calls = mock.calls.GetReprocessBatchJob
+	mock.lockGetReprocessBatchJob.RUnlock()
+	return calls
+}
+
 // GetReprocessJob calls GetReprocessJobFunc.
 func (mock *RepositoryMock) GetReprocessJob(ctx context.Context, id types.ReprocessJobID) (*alert.ReprocessJob, error) {
 	callInfo := struct {
@@ -8492,6 +8560,45 @@ func (mock *RepositoryMock) PutRefineGroupCalls() []struct {
 	mock.lockPutRefineGroup.RLock()
 	calls = mock.calls.PutRefineGroup
 	mock.lockPutRefineGroup.RUnlock()
+	return calls
+}
+
+// PutReprocessBatchJob calls PutReprocessBatchJobFunc.
+func (mock *RepositoryMock) PutReprocessBatchJob(ctx context.Context, job *alert.ReprocessBatchJob) error {
+	callInfo := struct {
+		Ctx context.Context
+		Job *alert.ReprocessBatchJob
+	}{
+		Ctx: ctx,
+		Job: job,
+	}
+	mock.lockPutReprocessBatchJob.Lock()
+	mock.calls.PutReprocessBatchJob = append(mock.calls.PutReprocessBatchJob, callInfo)
+	mock.lockPutReprocessBatchJob.Unlock()
+	if mock.PutReprocessBatchJobFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutReprocessBatchJobFunc(ctx, job)
+}
+
+// PutReprocessBatchJobCalls gets all the calls that were made to PutReprocessBatchJob.
+// Check the length with:
+//
+//	len(mockedRepository.PutReprocessBatchJobCalls())
+func (mock *RepositoryMock) PutReprocessBatchJobCalls() []struct {
+	Ctx context.Context
+	Job *alert.ReprocessBatchJob
+} {
+	var calls []struct {
+		Ctx context.Context
+		Job *alert.ReprocessBatchJob
+	}
+	mock.lockPutReprocessBatchJob.RLock()
+	calls = mock.calls.PutReprocessBatchJob
+	mock.lockPutReprocessBatchJob.RUnlock()
 	return calls
 }
 
