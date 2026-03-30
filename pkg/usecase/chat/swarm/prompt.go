@@ -16,6 +16,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 )
 
 //go:embed prompt/system.md
@@ -86,12 +88,24 @@ func generateReplanPrompt(ctx context.Context, pc *planningContext, allResults [
 }
 
 // generateTaskPrompt generates the system prompt for a task agent.
-func generateTaskPrompt(ctx context.Context, task TaskPlan) (string, error) {
-	return prompt.Generate(ctx, taskPromptTemplate, map[string]any{
+// If knowledgeSvc is non-nil, it fetches available tags and embeds them in the prompt.
+func generateTaskPrompt(ctx context.Context, task TaskPlan, knowledgeSvc *svcknowledge.Service) (string, error) {
+	data := map[string]any{
 		"title":               task.Title,
 		"description":         task.Description,
 		"acceptance_criteria": task.AcceptanceCriteria,
-	})
+	}
+
+	if knowledgeSvc != nil {
+		tags, err := knowledgeSvc.ListTags(ctx)
+		if err != nil {
+			logging.From(ctx).Warn("failed to list knowledge tags for task prompt", "error", err)
+		} else if len(tags) > 0 {
+			data["knowledge_tags"] = tags
+		}
+	}
+
+	return prompt.GenerateWithStruct(ctx, taskPromptTemplate, data)
 }
 
 // generateFinalPrompt generates the final response user message prompt.

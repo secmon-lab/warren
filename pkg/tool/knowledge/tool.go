@@ -24,6 +24,9 @@ const (
 	ModeReadOnly Mode = iota
 	// ModeReadWrite provides search + save + delete + tag management (for reflection agent).
 	ModeReadWrite
+	// ModeSearchOnly provides search only (for child task agent).
+	// Tag list is provided via prompt, so knowledge_tag_list is not needed.
+	ModeSearchOnly
 )
 
 // Tool provides knowledge_* tool commands for LLM agents.
@@ -72,7 +75,9 @@ func (x *Tool) Prompt(_ context.Context) (string, error) {
 	}
 
 	sb.WriteString("\n**IMPORTANT**: Before starting your work, use `knowledge_search` to check if relevant knowledge exists.\n")
-	sb.WriteString("Specify at least one tag when searching. Use `knowledge_tag_list` to see available tags.\n")
+	if x.mode != ModeSearchOnly {
+		sb.WriteString("Specify at least one tag when searching. Use `knowledge_tag_list` to see available tags.\n")
+	}
 	return sb.String(), nil
 }
 
@@ -92,24 +97,30 @@ const (
 )
 
 func (x *Tool) Specs(_ context.Context) ([]gollem.ToolSpec, error) {
-	specs := []gollem.ToolSpec{
-		{
-			Name:        cmdSearch,
-			Description: "Search for knowledge. Returns relevant entries matching the query, filtered by tags.",
-			Parameters: map[string]*gollem.Parameter{
-				"query": {
-					Type:        gollem.TypeString,
-					Description: "Natural language query to search for",
-					Required:    true,
-				},
-				"tags": {
-					Type:        gollem.TypeArray,
-					Items:       &gollem.Parameter{Type: gollem.TypeString},
-					Description: "Tag IDs to filter by (at least one required)",
-					Required:    true,
-				},
+	searchSpec := gollem.ToolSpec{
+		Name:        cmdSearch,
+		Description: "Search for knowledge. Returns relevant entries matching the query, filtered by tags.",
+		Parameters: map[string]*gollem.Parameter{
+			"query": {
+				Type:        gollem.TypeString,
+				Description: "Natural language query to search for",
+				Required:    true,
+			},
+			"tags": {
+				Type:        gollem.TypeArray,
+				Items:       &gollem.Parameter{Type: gollem.TypeString},
+				Description: "Tag IDs to filter by (at least one required)",
+				Required:    true,
 			},
 		},
+	}
+
+	if x.mode == ModeSearchOnly {
+		return []gollem.ToolSpec{searchSpec}, nil
+	}
+
+	specs := []gollem.ToolSpec{
+		searchSpec,
 		{
 			Name:        cmdTagList,
 			Description: "List all available knowledge tags with their IDs and descriptions.",
