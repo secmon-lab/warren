@@ -65,4 +65,3 @@ func TestNewPromptTemplate(t *testing.T) {
 		gt.S(t, rendered).Contains("find messages about security alerts")
 	})
 }
-

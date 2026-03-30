@@ -45,6 +45,10 @@ func (m *mockThreadService) PostContextBlock(ctx context.Context, text string) e
 	return nil
 }
 
+func (m *mockThreadService) PostSectionBlock(ctx context.Context, text string) error {
+	return nil
+}
+
 func (m *mockThreadService) PostDivider(ctx context.Context) error {
 	return nil
 }

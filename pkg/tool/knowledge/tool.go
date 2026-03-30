@@ -10,8 +10,8 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	knowledgeModel "github.com/secmon-lab/warren/pkg/domain/model/knowledge"
-	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/urfave/cli/v3"
 )
@@ -49,9 +49,9 @@ func (x *Tool) Name() string {
 	return "knowledge"
 }
 
-func (x *Tool) Flags() []cli.Flag    { return nil }
+func (x *Tool) Flags() []cli.Flag                 { return nil }
 func (x *Tool) Configure(_ context.Context) error { return nil }
-func (x *Tool) Helper() *cli.Command { return nil }
+func (x *Tool) Helper() *cli.Command              { return nil }
 
 func (x *Tool) LogValue() slog.Value {
 	return slog.GroupValue(
@@ -78,17 +78,17 @@ func (x *Tool) Prompt(_ context.Context) (string, error) {
 
 // Tool command names
 const (
-	cmdSearch     = "knowledge_search"
-	cmdSave       = "knowledge_save"
-	cmdDelete     = "knowledge_delete"
-	cmdList       = "knowledge_list"
-	cmdGet        = "knowledge_get"
-	cmdHistory    = "knowledge_history"
-	cmdTagList    = "knowledge_tag_list"
-	cmdTagCreate  = "knowledge_tag_create"
-	cmdTagUpdate  = "knowledge_tag_update"
-	cmdTagDelete  = "knowledge_tag_delete"
-	cmdTagMerge   = "knowledge_tag_merge"
+	cmdSearch    = "knowledge_search"
+	cmdSave      = "knowledge_save"
+	cmdDelete    = "knowledge_delete"
+	cmdList      = "knowledge_list"
+	cmdGet       = "knowledge_get"
+	cmdHistory   = "knowledge_history"
+	cmdTagList   = "knowledge_tag_list"
+	cmdTagCreate = "knowledge_tag_create"
+	cmdTagUpdate = "knowledge_tag_update"
+	cmdTagDelete = "knowledge_tag_delete"
+	cmdTagMerge  = "knowledge_tag_merge"
 )
 
 func (x *Tool) Specs(_ context.Context) ([]gollem.ToolSpec, error) {
@@ -425,13 +425,13 @@ func (x *Tool) get(ctx context.Context, args map[string]any) (map[string]any, er
 	}
 
 	return map[string]any{
-		"found":     true,
-		"id":        k.ID.String(),
-		"category":  string(k.Category),
-		"title":     k.Title,
-		"claim":     k.Claim,
-		"tags":      k.Tags,
-		"author":    k.Author.String(),
+		"found":      true,
+		"id":         k.ID.String(),
+		"category":   string(k.Category),
+		"title":      k.Title,
+		"claim":      k.Claim,
+		"tags":       k.Tags,
+		"author":     k.Author.String(),
 		"updated_at": k.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}, nil
 }

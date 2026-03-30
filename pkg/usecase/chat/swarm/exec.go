@@ -83,8 +83,8 @@ func (c *SwarmChat) postTaskResult(ctx context.Context, task TaskPlan, result *T
 		}
 		blockText = prefix + truncateResult(escapeSlackMrkdwn(result.Result), maxResultLen)
 	}
-	if err := threadSvc.PostContextBlock(ctx, blockText); err != nil {
-		logging.From(ctx).Error("failed to post task completion context block", "error", err)
+	if err := threadSvc.PostSectionBlock(ctx, blockText); err != nil {
+		logging.From(ctx).Error("failed to post task completion section block", "error", err)
 	}
 }
 

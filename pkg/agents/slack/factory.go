@@ -40,10 +40,10 @@ func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, rep
 	slackClient := slackSDK.New(f.oauthToken)
 
 	a := &agent{
-		slackClient:   slackClient,
-		llmClient:     llmClient,
-		repo:          repo,
-		internalTool:  &internalTool{slackClient: slackClient},
+		slackClient:  slackClient,
+		llmClient:    llmClient,
+		repo:         repo,
+		internalTool: &internalTool{slackClient: slackClient},
 	}
 
 	logging.From(ctx).Info("Slack Search Agent configured")

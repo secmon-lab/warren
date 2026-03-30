@@ -64,9 +64,9 @@ func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, rep
 	tp := newTokenProvider(f.clientID, f.clientSecret, baseURL)
 
 	a := &agent{
-		llmClient:     llmClient,
-		repo:          repo,
-		internalTool:  newInternalTool(tp, baseURL),
+		llmClient:    llmClient,
+		repo:         repo,
+		internalTool: newInternalTool(tp, baseURL),
 	}
 
 	logging.From(ctx).Info("CrowdStrike Falcon Agent configured",
