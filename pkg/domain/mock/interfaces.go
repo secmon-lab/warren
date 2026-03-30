@@ -966,6 +966,9 @@ func (mock *SlackClientMock) UploadFileContextCalls() []struct {
 //			PostResolveDetailsFunc: func(ctx context.Context, ticketMoqParam *ticket.Ticket) error {
 //				panic("mock out the PostResolveDetails method")
 //			},
+//			PostSectionBlockFunc: func(ctx context.Context, text string) error {
+//				panic("mock out the PostSectionBlock method")
+//			},
 //			PostSessionActionsFunc: func(ctx context.Context, ticketID types.TicketID, ticketStatus types.TicketStatus, sessionURL string) error {
 //				panic("mock out the PostSessionActions method")
 //			},
@@ -1044,6 +1047,9 @@ type SlackThreadServiceMock struct {
 
 	// PostResolveDetailsFunc mocks the PostResolveDetails method.
 	PostResolveDetailsFunc func(ctx context.Context, ticketMoqParam *ticket.Ticket) error
+
+	// PostSectionBlockFunc mocks the PostSectionBlock method.
+	PostSectionBlockFunc func(ctx context.Context, text string) error
 
 	// PostSessionActionsFunc mocks the PostSessionActions method.
 	PostSessionActionsFunc func(ctx context.Context, ticketID types.TicketID, ticketStatus types.TicketStatus, sessionURL string) error
@@ -1183,6 +1189,13 @@ type SlackThreadServiceMock struct {
 			// TicketMoqParam is the ticketMoqParam argument value.
 			TicketMoqParam *ticket.Ticket
 		}
+		// PostSectionBlock holds details about calls to the PostSectionBlock method.
+		PostSectionBlock []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Text is the text argument value.
+			Text string
+		}
 		// PostSessionActions holds details about calls to the PostSessionActions method.
 		PostSessionActions []struct {
 			// Ctx is the ctx argument value.
@@ -1254,6 +1267,7 @@ type SlackThreadServiceMock struct {
 	lockPostFinding              sync.RWMutex
 	lockPostLinkToTicket         sync.RWMutex
 	lockPostResolveDetails       sync.RWMutex
+	lockPostSectionBlock         sync.RWMutex
 	lockPostSessionActions       sync.RWMutex
 	lockPostTicket               sync.RWMutex
 	lockPostTicketList           sync.RWMutex
@@ -1915,6 +1929,45 @@ func (mock *SlackThreadServiceMock) PostResolveDetailsCalls() []struct {
 	mock.lockPostResolveDetails.RLock()
 	calls = mock.calls.PostResolveDetails
 	mock.lockPostResolveDetails.RUnlock()
+	return calls
+}
+
+// PostSectionBlock calls PostSectionBlockFunc.
+func (mock *SlackThreadServiceMock) PostSectionBlock(ctx context.Context, text string) error {
+	callInfo := struct {
+		Ctx  context.Context
+		Text string
+	}{
+		Ctx:  ctx,
+		Text: text,
+	}
+	mock.lockPostSectionBlock.Lock()
+	mock.calls.PostSectionBlock = append(mock.calls.PostSectionBlock, callInfo)
+	mock.lockPostSectionBlock.Unlock()
+	if mock.PostSectionBlockFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PostSectionBlockFunc(ctx, text)
+}
+
+// PostSectionBlockCalls gets all the calls that were made to PostSectionBlock.
+// Check the length with:
+//
+//	len(mockedSlackThreadService.PostSectionBlockCalls())
+func (mock *SlackThreadServiceMock) PostSectionBlockCalls() []struct {
+	Ctx  context.Context
+	Text string
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Text string
+	}
+	mock.lockPostSectionBlock.RLock()
+	calls = mock.calls.PostSectionBlock
+	mock.lockPostSectionBlock.RUnlock()
 	return calls
 }
 

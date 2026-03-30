@@ -32,19 +32,19 @@ type AsyncAlertHookConfig struct {
 }
 
 type Server struct {
-	router          *chi.Mux
-	slackCtrl       *slack_controller.Controller
-	websocketCtrl   *websocket_controller.Handler // for WebSocket chat
-	policy          interfaces.PolicyClient
-	verifier        slack_model.PayloadVerifier
-	repo            interfaces.Repository // for GraphQL
-	slackService    *slack.Service        // for GraphQL resolver
-	authUC          AuthUseCase           // for authentication
-	enableGraphiQL  bool                  // GraphiQL enable flag
-	noAuthorization  bool                  // no-authorization flag
-	asyncAlertHook   *AsyncAlertHookConfig // async alert hook configuration
+	router            *chi.Mux
+	slackCtrl         *slack_controller.Controller
+	websocketCtrl     *websocket_controller.Handler // for WebSocket chat
+	policy            interfaces.PolicyClient
+	verifier          slack_model.PayloadVerifier
+	repo              interfaces.Repository // for GraphQL
+	slackService      *slack.Service        // for GraphQL resolver
+	authUC            AuthUseCase           // for authentication
+	enableGraphiQL    bool                  // GraphiQL enable flag
+	noAuthorization   bool                  // no-authorization flag
+	asyncAlertHook    *AsyncAlertHookConfig // async alert hook configuration
 	knowledgeSvc      *svcknowledge.Service // for knowledge GraphQL resolvers
-	disableHTTPLogger bool                   // disable HTTP access logging
+	disableHTTPLogger bool                  // disable HTTP access logging
 }
 
 type Options func(*Server)

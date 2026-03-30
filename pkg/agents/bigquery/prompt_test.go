@@ -136,4 +136,3 @@ func TestDynamicDescription(t *testing.T) {
 	gt.S(t, desc).Contains("proj-b.ds-b.tbl-b")
 	gt.S(t, desc).Contains("Available tables:")
 }
-
