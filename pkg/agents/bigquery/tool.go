@@ -47,17 +47,17 @@ Available tables:%s
 
 Important guidelines:
 - Always specify the full table name as project.dataset.table
-- Use LIMIT to restrict the number of rows returned (results limited to 100 rows max)
+- Results are limited to 1000 rows max. Queries returning more than 1000 rows will be truncated
 - Scan size limit: %s (queries exceeding this will fail)
 - For time-based queries, use proper date/time functions and partitioning fields when available
-- Select only fields needed for the analysis to minimize scan size
+- Select only the fields needed for analysis to minimize scan size (DO NOT use SELECT *)
 - Use WHERE clauses to filter data efficiently
+- DO NOT use OFFSET for pagination. If results are truncated, use COUNT/GROUP BY to aggregate or add stricter WHERE filters
 
 Best practices:
 - Start with schema inspection if unfamiliar with table structure
-- Use COUNT(*) first to estimate result size before full SELECT
 - Apply time range filters to reduce scan size
-- Use LIMIT even for aggregated queries to prevent excessive results`,
+- Use LIMIT to restrict rows appropriately`,
 				tableDescriptions,
 				humanize.Bytes(t.config.ScanSizeLimit),
 			),
@@ -261,9 +261,9 @@ func (t *internalTool) executeQuery(ctx context.Context, args map[string]any) (m
 	}
 	log.Debug("Result iterator created", "job_id", job.ID(), "schema_fields", len(it.Schema))
 
-	// Collect rows (limit to 100 rows)
+	// Collect rows (limit to 1000 rows as a safety cap)
 	var rows []map[string]any
-	limit := 100
+	limit := 1000
 	log.Debug("Collecting rows", "limit", limit)
 	for len(rows) < limit {
 		var row []bigquery.Value
@@ -294,14 +294,20 @@ func (t *internalTool) executeQuery(ctx context.Context, args map[string]any) (m
 	msg.Trace(ctx, "✅ Query completed: %d rows retrieved, scan size: %s (query_id: %s)",
 		len(rows), humanize.Bytes(uint64(totalBytes)), queryID)
 
+	hasMore := len(rows) >= limit
+	note := "Query completed successfully."
+	if hasMore {
+		note = fmt.Sprintf("Limited to %d rows. There are more results. Do NOT paginate with OFFSET. Instead, use COUNT/GROUP BY to aggregate the data, or add more specific WHERE filters to narrow the results.", limit)
+	}
+
 	return map[string]any{
 		"query_id":         queryID,
 		"rows":             rows,
 		"total_rows":       len(rows),
 		"bytes_processed":  totalBytes,
 		"execution_status": "completed",
-		"has_more":         len(rows) >= limit,
-		"note":             fmt.Sprintf("Limited to %d rows. Query completed successfully.", limit),
+		"has_more":         hasMore,
+		"note":             note,
 	}, nil
 }
 
