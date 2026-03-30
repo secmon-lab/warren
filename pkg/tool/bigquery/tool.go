@@ -77,8 +77,12 @@ type ColumnConfig struct {
 	Fields       []ColumnConfig `yaml:"fields" json:"fields"` // for RECORD type
 }
 
-func (x *Action) Name() string {
+func (x *Action) ID() string {
 	return "bigquery"
+}
+
+func (x *Action) Description() string {
+	return "BigQuery SQL data queries and schema inspection"
 }
 
 func (x *Action) Flags() []cli.Flag {

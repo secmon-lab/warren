@@ -56,8 +56,12 @@ func (x *Action) Helper() *cli.Command {
 	return nil
 }
 
-func (x *Action) Name() string {
+func (x *Action) ID() string {
 	return "webfetch"
+}
+
+func (x *Action) Description() string {
+	return "Web page content fetching"
 }
 
 func (x *Action) Flags() []cli.Flag {

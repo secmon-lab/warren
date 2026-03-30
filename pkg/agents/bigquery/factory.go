@@ -6,15 +6,12 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	agentModel "github.com/secmon-lab/warren/pkg/domain/model/agent"
-
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
 
-// Factory implements agents.AgentFactory interface.
+// Factory implements agents.ToolSetFactory interface.
 type Factory struct {
 	configPath                string
 	projectID                 string
@@ -23,7 +20,7 @@ type Factory struct {
 	impersonateServiceAccount string
 }
 
-// Flags implements agents.AgentFactory
+// Flags implements agents.ToolSetFactory
 func (f *Factory) Flags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
@@ -64,8 +61,8 @@ func (f *Factory) Flags() []cli.Flag {
 	}
 }
 
-// Configure implements agents.AgentFactory
-func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) (*agentModel.SubAgent, error) {
+// Configure implements agents.ToolSetFactory
+func (f *Factory) Configure(ctx context.Context) (interfaces.ToolSet, error) {
 	if f.configPath == "" {
 		return nil, nil
 	}
@@ -85,18 +82,6 @@ func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, rep
 		cfg.ScanSizeLimit = limit
 	}
 
-	// Create internal agent
-	a := &agent{
-		config:    cfg,
-		llmClient: llmClient,
-		repo:      repo,
-		internalTool: &internalTool{
-			config:                    cfg,
-			projectID:                 f.projectID,
-			impersonateServiceAccount: f.impersonateServiceAccount,
-		},
-	}
-
 	// Log configuration
 	scanLimit := humanize.Bytes(cfg.ScanSizeLimit)
 	var tables []string
@@ -110,17 +95,15 @@ func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, rep
 		"scan_limit", scanLimit,
 		"runbooks", len(cfg.Runbooks))
 
-	// Build prompt hint for parent agent
-	promptHint, err := buildPromptHint(cfg)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to build prompt hint")
+	// Create and return toolSet
+	ts := &toolSet{
+		config: cfg,
+		tool: &internalTool{
+			config:                    cfg,
+			projectID:                 f.projectID,
+			impersonateServiceAccount: f.impersonateServiceAccount,
+		},
 	}
 
-	// Create and return SubAgent with prompt hint
-	subAgent, err := a.subAgent()
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create bigquery sub-agent")
-	}
-
-	return agentModel.NewSubAgent(subAgent, promptHint), nil
+	return ts, nil
 }

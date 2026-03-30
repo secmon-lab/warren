@@ -304,7 +304,6 @@ func cmdServe() *cli.Command {
 				return goerr.Wrap(err, "failed to create MCP tool sets")
 			}
 			if len(mcpToolSets) > 0 {
-				toolSets = append(toolSets, mcpToolSets...)
 				logging.From(ctx).Info("MCP tool sets configured",
 					"servers", mcpCfg.GetServerNames(),
 					"count", len(mcpToolSets))
@@ -317,11 +316,12 @@ func cmdServe() *cli.Command {
 			// Create tag service
 			tagService := tag.New(repo)
 
-			// Initialize all configured agents
-			subAgents, err := agents.ConfigureAll(ctx, llmClient, repo)
+			// Initialize all configured agents and merge into tool sets
+			agentToolSets, err := agents.ConfigureAll(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to configure agents")
 			}
+			toolSets = append(toolSets, agentToolSets...)
 
 			// Configure user system prompt
 			userSystemPrompt, err := userSystemPromptCfg.Configure()
@@ -353,7 +353,6 @@ func cmdServe() *cli.Command {
 				usecase.WithRepository(repo),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(toolSets),
-				usecase.WithSubAgents(subAgents),
 				usecase.WithStrictAlert(strictAlert),
 				usecase.WithNoAuthorization(noAuthorization),
 				usecase.WithTagService(tagService),
@@ -399,9 +398,15 @@ func cmdServe() *cli.Command {
 
 			// Configure chat strategy
 			if chatStrategy == "swarm" {
+				// Merge all tool sets: configured tools + MCP tools
+				allSwarmTools := make([]interfaces.ToolSet, 0, len(toolSets)+len(mcpToolSets))
+				allSwarmTools = append(allSwarmTools, toolSets...)
+				for _, mts := range mcpToolSets {
+					allSwarmTools = append(allSwarmTools, interfaces.WrapToolSet(mts, "mcp", "MCP external tool"))
+				}
+
 				swarmOpts := []swarm.Option{
-					swarm.WithTools(toolSets),
-					swarm.WithSubAgents(subAgents),
+					swarm.WithTools(allSwarmTools),
 					swarm.WithStorageClient(storageClient),
 					swarm.WithNoAuthorization(noAuthorization),
 					swarm.WithUserSystemPrompt(userSystemPrompt),

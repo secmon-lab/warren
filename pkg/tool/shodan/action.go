@@ -28,8 +28,12 @@ func (x *Action) Helper() *cli.Command {
 	return nil
 }
 
-func (x *Action) Name() string {
+func (x *Action) ID() string {
 	return "shodan"
+}
+
+func (x *Action) Description() string {
+	return "Shodan internet-facing asset and service search"
 }
 
 func (x *Action) Flags() []cli.Flag {

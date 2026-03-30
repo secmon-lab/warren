@@ -81,8 +81,12 @@ func WithLLMClient(client gollem.LLMClient) func(*Warren) {
 	}
 }
 
-func (x *Warren) Name() string {
+func (x *Warren) ID() string {
 	return "warren"
+}
+
+func (x *Warren) Description() string {
+	return "Warren ticket operations including alerts, findings, and comments"
 }
 
 func (x *Warren) Flags() []cli.Flag {

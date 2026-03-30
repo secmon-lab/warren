@@ -9,7 +9,6 @@ import (
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/repository"
 	cbService "github.com/secmon-lab/warren/pkg/service/circuitbreaker"
@@ -39,8 +38,7 @@ type UseCases struct {
 	storageClient   interfaces.StorageClient
 	policyClient    interfaces.PolicyClient
 
-	tools           []gollem.ToolSet
-	subAgents       []*agent.SubAgent
+	tools           []interfaces.ToolSet
 	traceRepository trace.Repository
 	knowledgeSvc    *svcknowledge.Service
 
@@ -114,15 +112,9 @@ func WithRepository(repository interfaces.Repository) Option {
 	}
 }
 
-func WithTools(tools []gollem.ToolSet) Option {
+func WithTools(tools []interfaces.ToolSet) Option {
 	return func(u *UseCases) {
 		u.tools = append(u.tools, tools...)
-	}
-}
-
-func WithSubAgents(subAgents []*agent.SubAgent) Option {
-	return func(u *UseCases) {
-		u.subAgents = append(u.subAgents, subAgents...)
 	}
 }
 
@@ -244,7 +236,6 @@ func New(opts ...Option) *UseCases {
 		chatOpts := []chatUC.Option{
 			chatUC.WithSlackService(u.slackService),
 			chatUC.WithTools(u.tools),
-			chatUC.WithSubAgents(u.subAgents),
 			chatUC.WithStorageClient(u.storageClient),
 			chatUC.WithStoragePrefix(u.storagePrefix),
 			chatUC.WithNoAuthorization(u.noAuthorization),

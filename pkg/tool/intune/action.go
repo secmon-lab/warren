@@ -43,8 +43,12 @@ func sanitizeODataValue(s string) string {
 
 var _ interfaces.Tool = &Action{}
 
-func (x *Action) Name() string {
+func (x *Action) ID() string {
 	return "intune"
+}
+
+func (x *Action) Description() string {
+	return "Microsoft Intune device compliance and management lookup"
 }
 
 func (x *Action) Helper() *cli.Command {

@@ -12,7 +12,6 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
@@ -21,7 +20,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
-	"github.com/secmon-lab/warren/pkg/service/llm"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/usecase/chat"
@@ -44,8 +42,7 @@ type SwarmChat struct {
 	storageClient       interfaces.StorageClient
 	slackService        *slackService.Service
 	knowledgeService    *svcknowledge.Service
-	tools               []gollem.ToolSet
-	subAgents           []*agent.SubAgent
+	tools               []interfaces.ToolSet
 	storagePrefix       string
 	noAuthorization     bool
 	frontendURL         string
@@ -66,13 +63,8 @@ func WithSlackService(svc *slackService.Service) Option {
 }
 
 // WithTools sets the tool sets available to the agent.
-func WithTools(tools []gollem.ToolSet) Option {
+func WithTools(tools []interfaces.ToolSet) Option {
 	return func(c *SwarmChat) { c.tools = append(c.tools, tools...) }
-}
-
-// WithSubAgents sets the sub-agents available to the agent.
-func WithSubAgents(subAgents []*agent.SubAgent) Option {
-	return func(c *SwarmChat) { c.subAgents = append(c.subAgents, subAgents...) }
 }
 
 // WithStorageClient sets the storage client for history persistence.
@@ -142,20 +134,6 @@ func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient in
 	}
 	for _, opt := range opts {
 		opt(c)
-	}
-
-	// Inject cross-cutting middleware into all sub-agents once at construction time.
-	// - CompactionMiddleware: prevents "prompt is too long" errors when sub-agents
-	//   accumulate large tool results (e.g. falcon_search_events returning ~1MB).
-	// - Budget middleware: context-aware tracker per task (avoids accumulation bug).
-	subAgentOpts := []gollem.Option{
-		gollem.WithContentBlockMiddleware(llm.NewCompactionMiddleware(c.llmClient, logging.Default())),
-	}
-	if c.budgetStrategy != nil {
-		subAgentOpts = append(subAgentOpts, gollem.WithToolMiddleware(newContextAwareBudgetMiddleware()))
-	}
-	for _, sa := range c.subAgents {
-		gollem.WithSubAgentOptions(subAgentOpts...)(sa.Inner())
 	}
 
 	return c
@@ -263,8 +241,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 		message:        message,
 		ticket:         target,
 		alerts:         chatCtx.Alerts,
-		tools:          chatCtx.Tools,
-		subAgents:      c.subAgents,
+		tools:          c.tools,
 		userPrompt:     c.userSystemPrompt,
 		lang:           lang.From(ctx),
 		requesterID:    string(types.UserID(user.FromContext(ctx))),
@@ -277,8 +254,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 	if ticketless {
 		tlpc := &ticketlessPlanningContext{
 			message:     message,
-			tools:       chatCtx.Tools,
-			subAgents:   c.subAgents,
+			tools:       c.tools,
 			userPrompt:  c.userSystemPrompt,
 			lang:        lang.From(ctx),
 			requesterID: string(types.UserID(user.FromContext(ctx))),

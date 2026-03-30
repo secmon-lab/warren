@@ -48,8 +48,12 @@ func New(svc *svcknowledge.Service, category types.KnowledgeCategory, mode Mode)
 	}
 }
 
-func (x *Tool) Name() string {
+func (x *Tool) ID() string {
 	return "knowledge"
+}
+
+func (x *Tool) Description() string {
+	return "Knowledge base search for prior findings and investigation techniques"
 }
 
 func (x *Tool) Flags() []cli.Flag                 { return nil }

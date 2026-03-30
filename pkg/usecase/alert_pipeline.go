@@ -281,7 +281,11 @@ func (uc *UseCases) executePromptTask(ctx context.Context, alert *alert.Alert, t
 
 	// Add tools if available
 	if len(uc.tools) > 0 {
-		options = append(options, gollem.WithToolSets(uc.tools...))
+		gollemToolSets := make([]gollem.ToolSet, len(uc.tools))
+		for i, ts := range uc.tools {
+			gollemToolSets[i] = ts
+		}
+		options = append(options, gollem.WithToolSets(gollemToolSets...))
 		logger.Debug("agent has tools available",
 			"task_id", task.ID,
 			"tools_count", len(uc.tools))
@@ -296,18 +300,6 @@ func (uc *UseCases) executePromptTask(ctx context.Context, alert *alert.Alert, t
 	if task.Format == types.GenAIContentFormatJSON {
 		options = append(options, gollem.WithContentType(gollem.ContentTypeJSON))
 		logger.Debug("using JSON content type", "task_id", task.ID)
-	}
-
-	// Add sub-agents if available
-	if len(uc.subAgents) > 0 {
-		gollemSubAgents := make([]*gollem.SubAgent, len(uc.subAgents))
-		for i, sa := range uc.subAgents {
-			gollemSubAgents[i] = sa.Inner()
-		}
-		options = append(options, gollem.WithSubAgents(gollemSubAgents...))
-		logger.Debug("agent has sub-agents available",
-			"task_id", task.ID,
-			"sub_agents_count", len(gollemSubAgents))
 	}
 
 	// Create agent

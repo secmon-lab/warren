@@ -22,8 +22,12 @@ type Action struct {
 	baseURL string
 }
 
-func (x *Action) Name() string {
+func (x *Action) ID() string {
 	return "vt"
+}
+
+func (x *Action) Description() string {
+	return "VirusTotal threat intelligence for IPs, domains, file hashes, and URLs"
 }
 
 var _ interfaces.Tool = &Action{}

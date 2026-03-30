@@ -68,9 +68,6 @@ Incorporate any relevant knowledge into your analysis to avoid redundant investi
 
 ## Available Tools
 {{ .tools_description }}
-
-## Available Sub-Agents
-{{ .subagents_description }}
 {{ if .user_prompt }}
 
 ## User System Prompt

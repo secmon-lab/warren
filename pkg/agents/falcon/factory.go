@@ -3,25 +3,21 @@ package falcon
 import (
 	"context"
 
-	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	agentModel "github.com/secmon-lab/warren/pkg/domain/model/agent"
-
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
 
 const defaultBaseURL = "https://api.crowdstrike.com"
 
-// Factory implements agents.AgentFactory interface for CrowdStrike Falcon.
+// Factory implements agents.ToolSetFactory interface for CrowdStrike Falcon.
 type Factory struct {
 	clientID     string
 	clientSecret string
 	baseURL      string
 }
 
-// Flags implements agents.AgentFactory.
+// Flags implements agents.ToolSetFactory.
 func (f *Factory) Flags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
@@ -49,9 +45,9 @@ func (f *Factory) Flags() []cli.Flag {
 	}
 }
 
-// Configure implements agents.AgentFactory.
+// Configure implements agents.ToolSetFactory.
 // Returns (nil, nil) if client_id or client_secret is not set.
-func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) (*agentModel.SubAgent, error) {
+func (f *Factory) Configure(ctx context.Context) (interfaces.ToolSet, error) {
 	if f.clientID == "" || f.clientSecret == "" {
 		return nil, nil
 	}
@@ -63,22 +59,13 @@ func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, rep
 
 	tp := newTokenProvider(f.clientID, f.clientSecret, baseURL)
 
-	a := &agent{
-		llmClient:    llmClient,
-		repo:         repo,
-		internalTool: newInternalTool(tp, baseURL),
-	}
-
 	logging.From(ctx).Info("CrowdStrike Falcon Agent configured",
 		"base_url", baseURL,
 		"client_id", f.clientID,
 		"client_secret_length", len(f.clientSecret),
 	)
 
-	subAgent, err := a.subAgent()
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create falcon sub-agent")
-	}
-
-	return agentModel.NewSubAgent(subAgent, ""), nil
+	return &toolSet{
+		internal: newInternalTool(tp, baseURL),
+	}, nil
 }

@@ -44,9 +44,6 @@ Before starting your work, **search the knowledge base** using `knowledge_search
 
 ## Available Tools
 {{ .tools_description }}
-
-## Available Sub-Agents
-{{ .subagents_description }}
 {{ if .user_prompt }}
 
 ## User System Prompt
