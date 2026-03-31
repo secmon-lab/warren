@@ -98,13 +98,25 @@ func (c *SwarmChat) executePlannerAgent(ctx context.Context, planSession gollem.
 		return nil, err
 	}
 
-	// Sync agent's conversation history back to planning session
+	// Sync only the NEW messages from the agent back to the planning session.
+	// The agent was initialized with the existing planSession history, so we must
+	// skip those initial messages to avoid duplicating them.
 	agentHistory, err := agent.Session().History()
 	if err != nil {
 		logging.From(ctx).Warn("failed to get agent history after planning", "error", err)
 	} else if agentHistory != nil {
-		if err := planSession.AppendHistory(agentHistory); err != nil {
-			logging.From(ctx).Warn("failed to append agent history to planning session", "error", err)
+		initialLen := 0
+		if history != nil {
+			initialLen = len(history.Messages)
+		}
+		if len(agentHistory.Messages) > initialLen {
+			newHistory := &gollem.History{
+				Version:  agentHistory.Version,
+				Messages: agentHistory.Messages[initialLen:],
+			}
+			if err := planSession.AppendHistory(newHistory); err != nil {
+				logging.From(ctx).Warn("failed to append agent history to planning session", "error", err)
+			}
 		}
 	}
 
