@@ -55,16 +55,18 @@ The following recent messages from the Slack channel provide additional context:
 {{ end }}
 {{ end }}
 ## Knowledge Base
+{{ if .knowledge_tags }}
+Use `knowledge_search` to search for relevant prior knowledge before planning. The knowledge base may contain known false positive patterns, infrastructure details, previously observed behaviors, and investigation techniques.
 
-Before starting your investigation, **search the knowledge base** using `knowledge_search` for relevant prior knowledge. Use `knowledge_tag_list` first to see available tags, then search with relevant tags and keywords from the alert (e.g., IP addresses, domain names, process names, service names).
+If the search results alone are sufficient to answer the user's question, respond directly in the `message` field without creating any tasks (set `tasks` to an empty array).
 
-The knowledge base may contain:
-- Known false positive patterns and their conditions
-- Infrastructure details (server roles, IP ranges, scheduled jobs)
-- Previously observed behaviors for specific hosts or processes
-- Investigation techniques and tool usage tips
-
-Incorporate any relevant knowledge into your analysis to avoid redundant investigation and leverage past findings.
+### Available Tags
+{{ range .knowledge_tags }}- `{{ .ID }}`: {{ .Name }}{{ if .Description }} — {{ .Description }}{{ end }}
+{{ end }}
+Specify at least one tag when searching. Use tags and keywords from the alert (e.g., IP addresses, domain names, process names, service names).
+{{ else }}
+No knowledge base is configured.
+{{ end }}
 
 ## Available Tools
 {{ .tools_description }}

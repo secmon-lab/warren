@@ -7,11 +7,15 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
+	"github.com/secmon-lab/warren/pkg/domain/types"
+	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 // plan executes the planning phase and returns a structured plan.
-func (c *SwarmChat) plan(ctx context.Context, session gollem.Session, pc *planningContext) (*PlanResult, error) {
+// If a knowledge service is configured, the planner runs as a gollem Agent with
+// knowledge_search tool so it can look up prior findings before creating the plan.
+func (c *SwarmChat) plan(ctx context.Context, session gollem.Session, pc *planningContext, systemPrompt string) (*PlanResult, error) {
 	logger := logging.From(ctx)
 
 	// Generate planning prompt
@@ -29,13 +33,24 @@ func (c *SwarmChat) plan(ctx context.Context, session gollem.Session, pc *planni
 
 	logger.Debug("executing planning phase")
 
-	// Generate plan via LLM
-	resp, err := session.Generate(ctx, []gollem.Input{gollem.Text(planPrompt)})
+	var texts []string
+
+	if c.knowledgeService != nil {
+		// Agent mode: planner can call knowledge_search before generating the plan
+		texts, err = c.executePlannerAgent(ctx, session, systemPrompt, planPrompt, planSchema)
+	} else {
+		// Direct mode: generate plan JSON without tool calls
+		var resp *gollem.Response
+		resp, err = session.Generate(ctx, []gollem.Input{gollem.Text(planPrompt)})
+		if err == nil {
+			texts = resp.Texts
+		}
+	}
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to generate plan")
 	}
 
-	result, err := parsePlanResult(resp.Texts)
+	result, err := parsePlanResult(texts)
 	if err != nil {
 		return nil, err
 	}
@@ -45,6 +60,71 @@ func (c *SwarmChat) plan(ctx context.Context, session gollem.Session, pc *planni
 		"has_message", result.Message != "")
 
 	return result, nil
+}
+
+// executePlannerAgent runs the planner as a gollem Agent with knowledge tool,
+// then appends the agent's conversation history back to the planning session.
+func (c *SwarmChat) executePlannerAgent(ctx context.Context, planSession gollem.Session, systemPrompt string, userPrompt string, schema *gollem.Parameter) ([]string, error) {
+	// Build agent options
+	opts := []gollem.Option{
+		gollem.WithSystemPrompt(systemPrompt),
+		gollem.WithContentType(gollem.ContentTypeJSON),
+		gollem.WithResponseSchema(schema),
+		gollem.WithResponseMode(gollem.ResponseModeBlocking),
+	}
+
+	// Add knowledge tool
+	kt := knowledgeTool.New(c.knowledgeService, types.KnowledgeCategoryFact, knowledgeTool.ModeSearchOnly)
+	opts = append(opts, gollem.WithToolSets(kt))
+
+	// Carry over existing conversation history
+	history, err := planSession.History()
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get planning session history")
+	}
+	if history != nil {
+		opts = append(opts, gollem.WithHistory(history))
+	}
+
+	// Add trace handler if available
+	handler := trace.HandlerFrom(ctx)
+	if handler != nil {
+		opts = append(opts, gollem.WithTrace(handler))
+	}
+
+	agent := gollem.New(c.llmClient, opts...)
+	resp, err := agent.Execute(ctx, gollem.Text(userPrompt))
+	if err != nil {
+		return nil, err
+	}
+
+	// Sync only the NEW messages from the agent back to the planning session.
+	// The agent was initialized with the existing planSession history, so we must
+	// skip those initial messages to avoid duplicating them.
+	agentHistory, err := agent.Session().History()
+	if err != nil {
+		logging.From(ctx).Warn("failed to get agent history after planning", "error", err)
+	} else if agentHistory != nil {
+		initialLen := 0
+		if history != nil {
+			initialLen = len(history.Messages)
+		}
+		if len(agentHistory.Messages) > initialLen {
+			newHistory := &gollem.History{
+				Version:  agentHistory.Version,
+				Messages: agentHistory.Messages[initialLen:],
+			}
+			if err := planSession.AppendHistory(newHistory); err != nil {
+				logging.From(ctx).Warn("failed to append agent history to planning session", "error", err)
+			}
+		}
+	}
+
+	if resp == nil || resp.IsEmpty() {
+		return nil, nil
+	}
+
+	return resp.Texts, nil
 }
 
 // replan evaluates completed results and determines next steps.
@@ -66,33 +146,45 @@ func (c *SwarmChat) replan(ctx context.Context, session gollem.Session, pc *plan
 
 	logger.Debug("executing replan phase", "phase", currentPhase)
 
-	// Switch session to replan schema for this call
-	replanSession, err := c.llmClient.NewSession(ctx,
-		gollem.WithSessionContentType(gollem.ContentTypeJSON),
-		gollem.WithSessionResponseSchema(replanSchema),
-		gollem.WithSessionSystemPrompt(systemPrompt),
-	)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create replan session")
-	}
+	var texts []string
 
-	// Copy history from planning session
-	history, err := session.History()
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get history from planning session")
-	}
-	if history != nil {
-		if err := replanSession.AppendHistory(history); err != nil {
-			logger.Warn("failed to append history to replan session", "error", err)
+	if c.knowledgeService != nil {
+		// Agent mode: replan with knowledge search
+		texts, err = c.executePlannerAgent(ctx, session, systemPrompt, replanPrompt, replanSchema)
+	} else {
+		// Direct mode: create a replan session and generate
+		var replanSession gollem.Session
+		replanSession, err = c.llmClient.NewSession(ctx,
+			gollem.WithSessionContentType(gollem.ContentTypeJSON),
+			gollem.WithSessionResponseSchema(replanSchema),
+			gollem.WithSessionSystemPrompt(systemPrompt),
+		)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to create replan session")
+		}
+
+		// Copy history from planning session
+		history, hErr := session.History()
+		if hErr != nil {
+			return nil, goerr.Wrap(hErr, "failed to get history from planning session")
+		}
+		if history != nil {
+			if aErr := replanSession.AppendHistory(history); aErr != nil {
+				logger.Warn("failed to append history to replan session", "error", aErr)
+			}
+		}
+
+		var resp *gollem.Response
+		resp, err = replanSession.Generate(ctx, []gollem.Input{gollem.Text(replanPrompt)})
+		if err == nil {
+			texts = resp.Texts
 		}
 	}
-
-	resp, err := replanSession.Generate(ctx, []gollem.Input{gollem.Text(replanPrompt)})
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to generate replan")
 	}
 
-	result, err := parseReplanResult(resp.Texts)
+	result, err := parseReplanResult(texts)
 	if err != nil {
 		return nil, err
 	}
