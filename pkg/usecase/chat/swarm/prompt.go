@@ -11,6 +11,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	knowledgeModel "github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -40,15 +41,16 @@ var finalPromptTemplate string
 
 // planningContext holds the shared context for planning operations.
 type planningContext struct {
-	message        string
-	ticket         *ticket.Ticket
-	alerts         []*alert.Alert
-	tools          []interfaces.ToolSet
-	userPrompt     string
-	lang           lang.Lang
-	requesterID    string
-	threadComments []ticket.Comment
-	slackHistory   []model.HistoryMessage
+	message          string
+	ticket           *ticket.Ticket
+	alerts           []*alert.Alert
+	tools            []interfaces.ToolSet
+	userPrompt       string
+	lang             lang.Lang
+	requesterID      string
+	threadComments   []ticket.Comment
+	slackHistory     []model.HistoryMessage
+	knowledgeService *svcknowledge.Service
 }
 
 // generateSystemPrompt generates the shared system prompt containing static context.
@@ -66,6 +68,7 @@ func generateSystemPrompt(ctx context.Context, pc *planningContext) (string, err
 		"thread_comments":   pc.threadComments,
 		"topic":             pc.ticket.Topic,
 		"history_messages":  pc.slackHistory,
+		"knowledge_tags":    fetchKnowledgeTags(ctx, pc.knowledgeService),
 	})
 }
 
@@ -118,12 +121,13 @@ func generateFinalPrompt(ctx context.Context, pc *planningContext, allResults []
 
 // ticketlessPlanningContext holds the shared context for ticketless planning operations.
 type ticketlessPlanningContext struct {
-	message     string
-	tools       []interfaces.ToolSet
-	userPrompt  string
-	lang        lang.Lang
-	requesterID string
-	history     []model.HistoryMessage
+	message          string
+	tools            []interfaces.ToolSet
+	userPrompt       string
+	lang             lang.Lang
+	requesterID      string
+	history          []model.HistoryMessage
+	knowledgeService *svcknowledge.Service
 }
 
 // generateTicketlessSystemPrompt generates the system prompt for ticketless chat.
@@ -134,6 +138,7 @@ func generateTicketlessSystemPrompt(ctx context.Context, pc *ticketlessPlanningC
 		"user_prompt":       pc.userPrompt,
 		"lang":              pc.lang,
 		"requester_id":      pc.requesterID,
+		"knowledge_tags":    fetchKnowledgeTags(ctx, pc.knowledgeService),
 	})
 }
 
@@ -222,6 +227,20 @@ func formatCompletedResults(allResults []*phaseResult) string {
 		return "(no results yet)"
 	}
 	return b.String()
+}
+
+// fetchKnowledgeTags retrieves all knowledge tags for embedding in the planner prompt.
+// Returns nil if the knowledge service is not configured or an error occurs.
+func fetchKnowledgeTags(ctx context.Context, svc *svcknowledge.Service) []*knowledgeModel.KnowledgeTag {
+	if svc == nil {
+		return nil
+	}
+	tags, err := svc.ListTags(ctx)
+	if err != nil {
+		logging.From(ctx).Warn("failed to list knowledge tags for planning", "error", err)
+		return nil
+	}
+	return tags
 }
 
 // Schema definitions for structured LLM responses.

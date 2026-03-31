@@ -238,27 +238,29 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 
 	// Build planning context from ChatContext
 	planCtx := &planningContext{
-		message:        message,
-		ticket:         target,
-		alerts:         chatCtx.Alerts,
-		tools:          c.tools,
-		userPrompt:     c.userSystemPrompt,
-		lang:           lang.From(ctx),
-		requesterID:    string(types.UserID(user.FromContext(ctx))),
-		threadComments: chatCtx.ThreadComments,
-		slackHistory:   chatCtx.SlackHistory,
+		message:          message,
+		ticket:           target,
+		alerts:           chatCtx.Alerts,
+		tools:            c.tools,
+		userPrompt:       c.userSystemPrompt,
+		lang:             lang.From(ctx),
+		requesterID:      string(types.UserID(user.FromContext(ctx))),
+		threadComments:   chatCtx.ThreadComments,
+		slackHistory:     chatCtx.SlackHistory,
+		knowledgeService: c.knowledgeService,
 	}
 
 	// Generate system prompt once (shared across plan/replan/final sessions)
 	var systemPrompt string
 	if ticketless {
 		tlpc := &ticketlessPlanningContext{
-			message:     message,
-			tools:       c.tools,
-			userPrompt:  c.userSystemPrompt,
-			lang:        lang.From(ctx),
-			requesterID: string(types.UserID(user.FromContext(ctx))),
-			history:     chatCtx.SlackHistory,
+			message:          message,
+			tools:            c.tools,
+			userPrompt:       c.userSystemPrompt,
+			lang:             lang.From(ctx),
+			requesterID:      string(types.UserID(user.FromContext(ctx))),
+			history:          chatCtx.SlackHistory,
+			knowledgeService: c.knowledgeService,
 		}
 		var err error
 		systemPrompt, err = generateTicketlessSystemPrompt(ctx, tlpc)
@@ -289,7 +291,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 	}
 
 	// Planning phase
-	planResult, err := c.plan(ctx, planSession, planCtx)
+	planResult, err := c.plan(ctx, planSession, planCtx, systemPrompt)
 	if err != nil {
 		if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
 			return abortErr

@@ -39,8 +39,16 @@ The following messages provide context from the Slack channel:
 {{- end }}
 
 ## Knowledge Base
+{{ if .knowledge_tags }}
+Use `knowledge_search` to search for relevant prior knowledge before planning. If the search results alone are sufficient to answer the user's question, respond directly in the `message` field without creating any tasks.
 
-Before starting your work, **search the knowledge base** using `knowledge_search` for relevant prior knowledge. Use `knowledge_tag_list` first to see available tags, then search with relevant tags and keywords from the user's question.
+### Available Tags
+{{ range .knowledge_tags }}- `{{ .ID }}`: {{ .Name }}{{ if .Description }} — {{ .Description }}{{ end }}
+{{ end }}
+Specify at least one tag when searching.
+{{ else }}
+No knowledge base is configured.
+{{ end }}
 
 ## Available Tools
 {{ .tools_description }}
