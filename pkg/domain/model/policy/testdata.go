@@ -104,7 +104,7 @@ func test(ctx context.Context, queryFunc QueryFunc, testData *TestData, shouldDe
 				return nil
 			}
 
-			err := queryFunc(ctx, "data.ingest."+schema.String()+".alerts", testData, &resp, opaq.WithPrintHook(hook))
+			err := queryFunc(ctx, "data.ingest."+schema.String(), testData, &resp, opaq.WithPrintHook(hook))
 			if err != nil {
 				if errors.Is(err, opaq.ErrNoEvalResult) {
 					if shouldDetect {
