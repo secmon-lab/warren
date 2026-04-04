@@ -527,3 +527,24 @@ func (uc *UseCases) DiscardQueuedAlerts(ctx context.Context, ids []types.QueuedA
 
 	return uc.cbService.DiscardAlerts(ctx, ids)
 }
+
+// DiscardQueuedAlertsByFilter removes all queued alerts matching the keyword filter.
+func (uc *UseCases) DiscardQueuedAlertsByFilter(ctx context.Context, keyword *string) (int, error) {
+	if uc.cbService == nil {
+		return 0, goerr.New("circuit breaker service not configured")
+	}
+
+	return uc.cbService.DiscardAlertsByFilter(ctx, keyword)
+}
+
+// ReprocessQueuedAlertsByFilter creates a batch job to reprocess all queued alerts matching the keyword filter.
+func (uc *UseCases) ReprocessQueuedAlertsByFilter(ctx context.Context, keyword *string) (*alert.ReprocessBatchJob, error) {
+	if uc.cbService == nil {
+		return nil, goerr.New("circuit breaker service not configured")
+	}
+
+	return uc.cbService.ReprocessAlertsByFilter(ctx, keyword, func(bgCtx context.Context, schema types.AlertSchema, data any) error {
+		_, err := uc.HandleAlert(bgCtx, schema, data)
+		return err
+	})
+}

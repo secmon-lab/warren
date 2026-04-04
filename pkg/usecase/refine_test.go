@@ -23,7 +23,7 @@ func newMockLLMWithResponse(responseJSON string) *mock.LLMClientMock {
 	return &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{responseJSON},
 					}, nil
@@ -41,7 +41,7 @@ func newMockLLMWithSequence(responses []string) *mock.LLMClientMock {
 			idx := int(callCount.Add(1)) - 1
 			response := responses[idx%len(responses)]
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{response},
 					}, nil
@@ -227,7 +227,7 @@ func TestRefine_ConsolidateUnboundAlerts_WithGroups(t *testing.T) {
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					idx := int(callCount.Add(1))
 					var response string
 					if idx <= 3 {
@@ -292,7 +292,7 @@ func TestRefine_ConsolidateUnboundAlerts_NoGroups(t *testing.T) {
 	llmMock := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &mock.LLMSessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					idx := int(callCount.Add(1))
 					var response string
 					if idx <= 2 {

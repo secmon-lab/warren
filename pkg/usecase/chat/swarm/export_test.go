@@ -7,11 +7,12 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
+	knowledgeModel "github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	hitlSvc "github.com/secmon-lab/warren/pkg/service/hitl"
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 )
 
 // NewBudgetTracker exposes newBudgetTracker for testing.
@@ -50,13 +51,8 @@ func WithBudgetTracker(ctx context.Context, tracker *BudgetTracker) context.Cont
 }
 
 // FilterToolSets exposes filterToolSets for testing.
-func FilterToolSets(ctx context.Context, allTools []gollem.ToolSet, allowedNames []string) []gollem.ToolSet {
-	return filterToolSets(ctx, allTools, allowedNames)
-}
-
-// FilterSubAgents exposes filterSubAgents for testing.
-func FilterSubAgents(allAgents []*agent.SubAgent, allowedNames []string) []*agent.SubAgent {
-	return filterSubAgents(allAgents, allowedNames)
+func FilterToolSets(allTools []interfaces.ToolSet, allowedIDs []string) []interfaces.ToolSet {
+	return filterToolSets(allTools, allowedIDs)
 }
 
 // StartSessionMonitor exposes startSessionMonitor for testing.
@@ -118,4 +114,9 @@ func ExecHandleQuestion(ctx context.Context, repo interfaces.Repository, present
 		Answer:   result.ResponseAnswer(),
 		Comment:  result.ResponseComment(),
 	}, nil
+}
+
+// FetchKnowledgeTags exposes fetchKnowledgeTags for testing.
+func FetchKnowledgeTags(ctx context.Context, svc *svcknowledge.Service) []*knowledgeModel.KnowledgeTag {
+	return fetchKnowledgeTags(ctx, svc)
 }

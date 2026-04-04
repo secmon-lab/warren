@@ -28,8 +28,12 @@ func (x *Action) Helper() *cli.Command {
 	return nil
 }
 
-func (x *Action) Name() string {
+func (x *Action) ID() string {
 	return "abusech"
+}
+
+func (x *Action) Description() string {
+	return "MalwareBazaar malware hash lookup via abuse.ch"
 }
 
 func (x *Action) Flags() []cli.Flag {

@@ -17,7 +17,7 @@ Current phase: {{ .current_phase }}
 4. If more information is needed, create new tasks for the next phase (all will run in parallel)
 5. If sufficient information is gathered (all acceptance criteria met), return an empty tasks array to proceed to final response generation
 6. If any tasks failed, decide whether to retry with a different approach or proceed without that information
-7. Each new task must specify which tools and sub-agents it needs
+7. Each new task must specify which ToolSet names it needs
 8. If execution is difficult (e.g., all approaches have failed, results are inconclusive), try a different approach or proceed with the best available information.
 
 # Asking the Security Operator (Question)
@@ -42,8 +42,7 @@ Each task must have:
 - `id`: Unique identifier
 - `title`: Short descriptive title
 - `description`: Detailed instructions
-- `tools`: Array of tool names
-- `sub_agents`: Array of sub-agent names
+- `tools`: Array of ToolSet names
 
 # Budget-Exceeded Tasks
 

@@ -699,23 +699,19 @@ export const DECLINE_ALERTS = gql`
   }
 `;
 
-export const GET_KNOWLEDGE_TOPICS = gql`
-  query GetKnowledgeTopics {
-    knowledgeTopics {
-      topic
-      count
-    }
-  }
-`;
-
-export const GET_KNOWLEDGES_BY_TOPIC = gql`
-  query GetKnowledgesByTopic($topic: String!) {
-    knowledgesByTopic(topic: $topic) {
-      slug
-      name
-      topic
-      content
-      commitID
+// Knowledge queries
+export const GET_KNOWLEDGES = gql`
+  query GetKnowledges($category: String, $tags: [ID!], $keyword: String) {
+    knowledges(category: $category, tags: $tags, keyword: $keyword) {
+      id
+      category
+      title
+      claim
+      tags {
+        id
+        name
+        description
+      }
       authorID
       author {
         id
@@ -724,7 +720,62 @@ export const GET_KNOWLEDGES_BY_TOPIC = gql`
       }
       createdAt
       updatedAt
-      state
+    }
+  }
+`;
+
+export const GET_KNOWLEDGE = gql`
+  query GetKnowledge($id: ID!) {
+    knowledge(id: $id) {
+      id
+      category
+      title
+      claim
+      tags {
+        id
+        name
+        description
+      }
+      authorID
+      author {
+        id
+        name
+        icon
+      }
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const GET_KNOWLEDGE_LOGS = gql`
+  query GetKnowledgeLogs($knowledgeID: ID!) {
+    knowledgeLogs(knowledgeID: $knowledgeID) {
+      id
+      knowledgeID
+      title
+      claim
+      authorID
+      author {
+        id
+        name
+        icon
+      }
+      ticketID
+      message
+      createdAt
+    }
+  }
+`;
+
+export const GET_KNOWLEDGE_TAGS = gql`
+  query GetKnowledgeTags {
+    knowledgeTags {
+      id
+      name
+      description
+      createdAt
+      updatedAt
     }
   }
 `;
@@ -732,20 +783,16 @@ export const GET_KNOWLEDGES_BY_TOPIC = gql`
 export const CREATE_KNOWLEDGE = gql`
   mutation CreateKnowledge($input: CreateKnowledgeInput!) {
     createKnowledge(input: $input) {
-      slug
-      name
-      topic
-      content
-      commitID
-      authorID
-      author {
+      id
+      category
+      title
+      claim
+      tags {
         id
         name
-        icon
       }
       createdAt
       updatedAt
-      state
     }
   }
 `;
@@ -753,27 +800,55 @@ export const CREATE_KNOWLEDGE = gql`
 export const UPDATE_KNOWLEDGE = gql`
   mutation UpdateKnowledge($input: UpdateKnowledgeInput!) {
     updateKnowledge(input: $input) {
-      slug
-      name
-      topic
-      content
-      commitID
-      authorID
-      author {
+      id
+      category
+      title
+      claim
+      tags {
         id
         name
-        icon
       }
       createdAt
       updatedAt
-      state
     }
   }
 `;
 
-export const ARCHIVE_KNOWLEDGE = gql`
-  mutation ArchiveKnowledge($topic: String!, $slug: String!) {
-    archiveKnowledge(topic: $topic, slug: $slug)
+export const DELETE_KNOWLEDGE = gql`
+  mutation DeleteKnowledge($id: ID!, $reason: String!) {
+    deleteKnowledge(id: $id, reason: $reason)
+  }
+`;
+
+export const CREATE_KNOWLEDGE_TAG = gql`
+  mutation CreateKnowledgeTag($input: CreateKnowledgeTagInput!) {
+    createKnowledgeTag(input: $input) {
+      id
+      name
+      description
+    }
+  }
+`;
+
+export const UPDATE_KNOWLEDGE_TAG = gql`
+  mutation UpdateKnowledgeTag($input: UpdateKnowledgeTagInput!) {
+    updateKnowledgeTag(input: $input) {
+      id
+      name
+      description
+    }
+  }
+`;
+
+export const DELETE_KNOWLEDGE_TAG = gql`
+  mutation DeleteKnowledgeTag($id: ID!) {
+    deleteKnowledgeTag(id: $id)
+  }
+`;
+
+export const MERGE_KNOWLEDGE_TAGS = gql`
+  mutation MergeKnowledgeTags($oldID: ID!, $newID: ID!) {
+    mergeKnowledgeTags(oldID: $oldID, newID: $newID)
   }
 `;
 
@@ -832,67 +907,6 @@ export const GET_SESSION_MESSAGES = gql`
   }
 `;
 
-export const LIST_AGENT_SUMMARIES = gql`
-  query ListAgentSummaries($offset: Int, $limit: Int, $keyword: String) {
-    listAgentSummaries(offset: $offset, limit: $limit, keyword: $keyword) {
-      agents {
-        agentID
-        memoriesCount
-        latestMemoryAt
-      }
-      totalCount
-    }
-  }
-`;
-
-export const LIST_AGENT_MEMORIES = gql`
-  query ListAgentMemories(
-    $agentID: String!
-    $offset: Int
-    $limit: Int
-    $sortBy: MemorySortField
-    $sortOrder: SortOrder
-    $keyword: String
-    $minScore: Float
-    $maxScore: Float
-  ) {
-    listAgentMemories(
-      agentID: $agentID
-      offset: $offset
-      limit: $limit
-      sortBy: $sortBy
-      sortOrder: $sortOrder
-      keyword: $keyword
-      minScore: $minScore
-      maxScore: $maxScore
-    ) {
-      memories {
-        id
-        agentID
-        query
-        claim
-        score
-        createdAt
-        lastUsedAt
-      }
-      totalCount
-    }
-  }
-`;
-
-export const GET_AGENT_MEMORY = gql`
-  query GetAgentMemory($agentID: String!, $memoryID: ID!) {
-    getAgentMemory(agentID: $agentID, memoryID: $memoryID) {
-      id
-      agentID
-      query
-      claim
-      score
-      createdAt
-      lastUsedAt
-    }
-  }
-`;
 
 export const GET_DIAGNOSES = gql`
   query GetDiagnoses($offset: Int, $limit: Int) {
@@ -1013,5 +1027,39 @@ export const REPROCESS_QUEUED_ALERT = gql`
 export const DISCARD_QUEUED_ALERTS = gql`
   mutation DiscardQueuedAlerts($ids: [ID!]!) {
     discardQueuedAlerts(ids: $ids)
+  }
+`;
+
+export const DISCARD_QUEUED_ALERTS_BY_FILTER = gql`
+  mutation DiscardQueuedAlertsByFilter($keyword: String) {
+    discardQueuedAlertsByFilter(keyword: $keyword)
+  }
+`;
+
+export const REPROCESS_QUEUED_ALERTS_BY_FILTER = gql`
+  mutation ReprocessQueuedAlertsByFilter($keyword: String) {
+    reprocessQueuedAlertsByFilter(keyword: $keyword) {
+      id
+      status
+      totalCount
+      completedCount
+      failedCount
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const GET_REPROCESS_BATCH_JOB = gql`
+  query GetReprocessBatchJob($id: ID!) {
+    reprocessBatchJob(id: $id) {
+      id
+      status
+      totalCount
+      completedCount
+      failedCount
+      createdAt
+      updatedAt
+    }
   }
 `;

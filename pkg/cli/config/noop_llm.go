@@ -24,6 +24,17 @@ func (n *noopLLMClient) GenerateEmbedding(_ context.Context, dimension int, inpu
 
 type noopSession struct{}
 
+func (n *noopSession) Generate(_ context.Context, _ []gollem.Input, _ ...gollem.GenerateOption) (*gollem.Response, error) {
+	return &gollem.Response{Texts: []string{"LLM is disabled"}}, nil
+}
+
+func (n *noopSession) Stream(_ context.Context, _ []gollem.Input, _ ...gollem.GenerateOption) (<-chan *gollem.Response, error) {
+	ch := make(chan *gollem.Response, 1)
+	ch <- &gollem.Response{Texts: []string{"LLM is disabled"}}
+	close(ch)
+	return ch, nil
+}
+
 func (n *noopSession) GenerateContent(_ context.Context, _ ...gollem.Input) (*gollem.Response, error) {
 	return &gollem.Response{Texts: []string{"LLM is disabled"}}, nil
 }

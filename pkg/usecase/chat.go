@@ -15,8 +15,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
+	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
 	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat"
-	"github.com/secmon-lab/warren/pkg/usecase/chat/swarm"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/slackctx"
 )
@@ -93,8 +93,7 @@ func (x *UseCases) ChatFromCLI(ctx context.Context, t *ticket.Ticket, message st
 }
 
 // buildChatContext fetches all data needed for chat execution and assembles a ChatContext.
-func (x *UseCases) buildChatContext(ctx context.Context, t *ticket.Ticket, slackHistory []slack.HistoryMessage, message string) (chatModel.ChatContext, error) {
-	logger := logging.From(ctx)
+func (x *UseCases) buildChatContext(ctx context.Context, t *ticket.Ticket, slackHistory []slack.HistoryMessage, _ string) (chatModel.ChatContext, error) {
 	ticketless := t.ID == ""
 
 	chatCtx := chatModel.ChatContext{
@@ -111,19 +110,13 @@ func (x *UseCases) buildChatContext(ctx context.Context, t *ticket.Ticket, slack
 		chatCtx.Alerts = alerts
 	}
 
-	// Search agent memories
-	if x.memoryService != nil {
-		memories, memErr := x.memoryService.SearchAndSelectMemories(ctx, message, 16)
-		if memErr != nil {
-			logger.Warn("failed to search agent memories", "error", memErr)
-		} else if len(memories) > 0 {
-			chatCtx.MemoryContext = swarm.FormatMemories(memories)
-		}
-	}
+	// Agent Memory search is removed — knowledge is now accessed via tool search (knowledge v2).
 
-	// Build tools
+	// Build tools (convert interfaces.ToolSet to gollem.ToolSet for ChatContext)
 	allTools := make([]gollem.ToolSet, 0, len(x.tools)+1)
-	allTools = append(allTools, x.tools...)
+	for _, ts := range x.tools {
+		allTools = append(allTools, ts)
+	}
 	if !ticketless {
 		slackUpdateFunc := func(ctx context.Context, updatedTicket *ticket.Ticket) error {
 			if x.slackService == nil || !updatedTicket.HasSlackThread() || updatedTicket.Finding == nil {
@@ -135,21 +128,17 @@ func (x *UseCases) buildChatContext(ctx context.Context, t *ticket.Ticket, slack
 		baseAction := base.New(x.repository, t.ID, base.WithSlackUpdate(slackUpdateFunc), base.WithLLMClient(x.llmClient))
 		allTools = append(allTools, baseAction)
 	}
+	// Add knowledge search tool if knowledge service is configured
+	if x.knowledgeSvc != nil {
+		factTool := knowledgeTool.New(x.knowledgeSvc, types.KnowledgeCategoryFact, knowledgeTool.ModeReadOnly)
+		allTools = append(allTools, factTool)
+	}
+
 	chatCtx.Tools = allTools
 
 	// Collect thread comments (skip for ticketless)
 	if !ticketless {
 		chatCtx.ThreadComments = chatpkg.CollectThreadComments(ctx, x.repository, t.ID, nil)
-	}
-
-	// Collect domain knowledges (skip for ticketless without topic)
-	if !ticketless && t.Topic != "" {
-		knowledges, err := x.repository.GetKnowledges(ctx, t.Topic)
-		if err != nil {
-			logger.Warn("failed to get knowledges", "error", err, "topic", t.Topic)
-		} else {
-			chatCtx.Knowledges = knowledges
-		}
 	}
 
 	// Load history (skip for ticketless)
@@ -184,7 +173,7 @@ func (x *UseCases) generateInitialTicketComment(ctx context.Context, ticketData 
 		return "", goerr.Wrap(err, "failed to create LLM session")
 	}
 
-	response, err := session.GenerateContent(ctx, gollem.Text(commentPrompt))
+	response, err := session.Generate(ctx, []gollem.Input{gollem.Text(commentPrompt)})
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to generate comment")
 	}

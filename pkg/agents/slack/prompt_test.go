@@ -5,7 +5,6 @@ import (
 
 	"github.com/m-mizutani/gt"
 	slackagent "github.com/secmon-lab/warren/pkg/agents/slack"
-	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 )
 
 func TestBuildSystemPrompt(t *testing.T) {
@@ -64,58 +63,5 @@ func TestNewPromptTemplate(t *testing.T) {
 		gt.NoError(t, err)
 		gt.S(t, rendered).NotContains("Current Slack Context")
 		gt.S(t, rendered).Contains("find messages about security alerts")
-	})
-}
-
-func TestFormatMemoryContext(t *testing.T) {
-	t.Run("empty memories", func(t *testing.T) {
-		result := slackagent.ExportedFormatMemoryContext(nil)
-		gt.V(t, result).Equal("")
-
-		result = slackagent.ExportedFormatMemoryContext([]*memory.AgentMemory{})
-		gt.V(t, result).Equal("")
-	})
-
-	t.Run("single memory", func(t *testing.T) {
-		memories := []*memory.AgentMemory{
-			{
-				ID:      "mem-1",
-				AgentID: "slack_search",
-				Claim:   "Test claim A",
-			},
-		}
-		result := slackagent.ExportedFormatMemoryContext(memories)
-		gt.V(t, result).NotEqual("")
-		gt.S(t, result).Contains("Past Experiences")
-		gt.S(t, result).Contains("Experience A")
-		gt.S(t, result).Contains("Test claim A")
-	})
-
-	t.Run("multiple memories", func(t *testing.T) {
-		memories := []*memory.AgentMemory{
-			{
-				ID:      "mem-1",
-				AgentID: "slack_search",
-				Claim:   "First claim",
-			},
-			{
-				ID:      "mem-2",
-				AgentID: "slack_search",
-				Claim:   "Second claim",
-			},
-			{
-				ID:      "mem-3",
-				AgentID: "slack_search",
-				Claim:   "Third claim",
-			},
-		}
-		result := slackagent.ExportedFormatMemoryContext(memories)
-		gt.V(t, result).NotEqual("")
-		gt.S(t, result).Contains("Experience A")
-		gt.S(t, result).Contains("Experience B")
-		gt.S(t, result).Contains("Experience C")
-		gt.S(t, result).Contains("First claim")
-		gt.S(t, result).Contains("Second claim")
-		gt.S(t, result).Contains("Third claim")
 	})
 }

@@ -331,6 +331,75 @@ func TestReprocessJobCRUD(t *testing.T) {
 	})
 }
 
+func TestReprocessBatchJobCRUD(t *testing.T) {
+	testFn := func(t *testing.T, repo interfaces.Repository) {
+		ctx := t.Context()
+		now := time.Now()
+
+		job := &alert.ReprocessBatchJob{
+			ID:             types.NewReprocessBatchJobID(),
+			Status:         types.ReprocessJobStatusPending,
+			TotalCount:     5,
+			CompletedCount: 0,
+			FailedCount:    0,
+			CreatedAt:      now,
+			UpdatedAt:      now,
+		}
+
+		// Put
+		gt.NoError(t, repo.PutReprocessBatchJob(ctx, job))
+
+		// Get
+		got, err := repo.GetReprocessBatchJob(ctx, job.ID)
+		gt.NoError(t, err)
+		gt.Value(t, got.ID).Equal(job.ID)
+		gt.Value(t, got.Status).Equal(types.ReprocessJobStatusPending)
+		gt.Value(t, got.TotalCount).Equal(5)
+		gt.Value(t, got.CompletedCount).Equal(0)
+		gt.Value(t, got.FailedCount).Equal(0)
+
+		// Update progress
+		job.Status = types.ReprocessJobStatusRunning
+		job.CompletedCount = 3
+		job.FailedCount = 1
+		job.UpdatedAt = now.Add(time.Second)
+		gt.NoError(t, repo.PutReprocessBatchJob(ctx, job))
+
+		got, err = repo.GetReprocessBatchJob(ctx, job.ID)
+		gt.NoError(t, err)
+		gt.Value(t, got.Status).Equal(types.ReprocessJobStatusRunning)
+		gt.Value(t, got.CompletedCount).Equal(3)
+		gt.Value(t, got.FailedCount).Equal(1)
+
+		// Update to completed
+		job.Status = types.ReprocessJobStatusCompleted
+		job.CompletedCount = 4
+		job.FailedCount = 1
+		job.UpdatedAt = now.Add(2 * time.Second)
+		gt.NoError(t, repo.PutReprocessBatchJob(ctx, job))
+
+		got, err = repo.GetReprocessBatchJob(ctx, job.ID)
+		gt.NoError(t, err)
+		gt.Value(t, got.Status).Equal(types.ReprocessJobStatusCompleted)
+		gt.Value(t, got.CompletedCount).Equal(4)
+		gt.Value(t, got.FailedCount).Equal(1)
+
+		// Get non-existent
+		_, err = repo.GetReprocessBatchJob(ctx, types.ReprocessBatchJobID("non-existent"))
+		gt.Error(t, err)
+	}
+
+	t.Run("Memory", func(t *testing.T) {
+		repo := repository.NewMemory()
+		testFn(t, repo)
+	})
+
+	t.Run("Firestore", func(t *testing.T) {
+		repo := newFirestoreClient(t)
+		testFn(t, repo)
+	})
+}
+
 func TestCheckAlertThrottle_BasicAllowAndDeny(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()

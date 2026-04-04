@@ -17,10 +17,11 @@ import (
 )
 
 const (
-	collectionQueuedAlerts  = "queued_alerts"
-	collectionReprocessJobs = "reprocess_jobs"
-	collectionThrottle      = "throttle"
-	docAlertThrottle        = "alert"
+	collectionQueuedAlerts       = "queued_alerts"
+	collectionReprocessJobs      = "reprocess_jobs"
+	collectionReprocessBatchJobs = "reprocess_batch_jobs"
+	collectionThrottle           = "throttle"
+	docAlertThrottle             = "alert"
 )
 
 // PutQueuedAlert saves a queued alert to Firestore
@@ -173,6 +174,35 @@ func (r *Firestore) GetReprocessJob(ctx context.Context, id types.ReprocessJobID
 	var job alert.ReprocessJob
 	if err := doc.DataTo(&job); err != nil {
 		return nil, r.eb.Wrap(err, "failed to decode reprocess job", goerr.V("id", id))
+	}
+	return &job, nil
+}
+
+// PutReprocessBatchJob saves a reprocess batch job
+func (r *Firestore) PutReprocessBatchJob(ctx context.Context, job *alert.ReprocessBatchJob) error {
+	_, err := r.db.Collection(collectionReprocessBatchJobs).Doc(string(job.ID)).Set(ctx, job)
+	if err != nil {
+		return r.eb.Wrap(err, "failed to put reprocess batch job", goerr.V("id", job.ID))
+	}
+	return nil
+}
+
+// GetReprocessBatchJob retrieves a reprocess batch job by ID
+func (r *Firestore) GetReprocessBatchJob(ctx context.Context, id types.ReprocessBatchJobID) (*alert.ReprocessBatchJob, error) {
+	doc, err := r.db.Collection(collectionReprocessBatchJobs).Doc(string(id)).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, r.eb.Wrap(goerr.New("reprocess batch job not found"),
+				"not found",
+				goerr.T(errutil.TagNotFound),
+				goerr.V("id", id))
+		}
+		return nil, r.eb.Wrap(err, "failed to get reprocess batch job", goerr.V("id", id))
+	}
+
+	var job alert.ReprocessBatchJob
+	if err := doc.DataTo(&job); err != nil {
+		return nil, r.eb.Wrap(err, "failed to decode reprocess batch job", goerr.V("id", id))
 	}
 	return &job, nil
 }

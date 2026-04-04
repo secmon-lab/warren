@@ -52,10 +52,11 @@ type Memory struct {
 	hitl *hitlStore
 
 	// Circuit breaker / throttle management
-	throttleMu     sync.RWMutex
-	queuedAlerts   map[types.QueuedAlertID]*alert.QueuedAlert
-	reprocessJobs  map[types.ReprocessJobID]*alert.ReprocessJob
-	alertThrottle  *alert.AlertThrottle
+	throttleMu         sync.RWMutex
+	queuedAlerts       map[types.QueuedAlertID]*alert.QueuedAlert
+	reprocessJobs      map[types.ReprocessJobID]*alert.ReprocessJob
+	reprocessBatchJobs map[types.ReprocessBatchJobID]*alert.ReprocessBatchJob
+	alertThrottle      *alert.AlertThrottle
 
 	// Call counter for tracking method invocations
 	callCounts map[string]int
@@ -68,26 +69,27 @@ var _ interfaces.Repository = &Memory{}
 
 func New() *Memory {
 	return &Memory{
-		alerts:          make(map[types.AlertID]*alert.Alert),
-		lists:           make(map[types.AlertListID]*alert.List),
-		histories:       make(map[types.TicketID][]*ticket.History),
-		tickets:         make(map[types.TicketID]*ticket.Ticket),
-		ticketComments:  make(map[types.TicketID][]ticket.Comment),
-		tokens:          make(map[auth.TokenID]*auth.Token),
-		activities:      make(map[types.ActivityID]*activity.Activity),
-		tagsV2:          make(map[string]*tag.Tag),
-		notices:         make(map[types.NoticeID]*notice.Notice),
-		refineGroups:    make(map[types.RefineGroupID]*refine.Group),
-		agentMemories:   make(map[types.AgentMemoryID]*memory.AgentMemory),
-		diagnoses:       make(map[types.DiagnosisID]*diagnosis.Diagnosis),
-		diagnosisIssues: make(map[types.DiagnosisID]map[string]*diagnosis.Issue),
-		session:         newSessionStore(),
-		knowledge:       newKnowledgeStore(),
-		hitl:            newHITLStore(),
-		queuedAlerts:    make(map[types.QueuedAlertID]*alert.QueuedAlert),
-		reprocessJobs:   make(map[types.ReprocessJobID]*alert.ReprocessJob),
-		callCounts:      make(map[string]int),
-		eb:              goerr.NewBuilder(goerr.TV(errutil.RepositoryKey, "memory")),
+		alerts:             make(map[types.AlertID]*alert.Alert),
+		lists:              make(map[types.AlertListID]*alert.List),
+		histories:          make(map[types.TicketID][]*ticket.History),
+		tickets:            make(map[types.TicketID]*ticket.Ticket),
+		ticketComments:     make(map[types.TicketID][]ticket.Comment),
+		tokens:             make(map[auth.TokenID]*auth.Token),
+		activities:         make(map[types.ActivityID]*activity.Activity),
+		tagsV2:             make(map[string]*tag.Tag),
+		notices:            make(map[types.NoticeID]*notice.Notice),
+		refineGroups:       make(map[types.RefineGroupID]*refine.Group),
+		agentMemories:      make(map[types.AgentMemoryID]*memory.AgentMemory),
+		diagnoses:          make(map[types.DiagnosisID]*diagnosis.Diagnosis),
+		diagnosisIssues:    make(map[types.DiagnosisID]map[string]*diagnosis.Issue),
+		session:            newSessionStore(),
+		knowledge:          newKnowledgeStore(),
+		hitl:               newHITLStore(),
+		queuedAlerts:       make(map[types.QueuedAlertID]*alert.QueuedAlert),
+		reprocessJobs:      make(map[types.ReprocessJobID]*alert.ReprocessJob),
+		reprocessBatchJobs: make(map[types.ReprocessBatchJobID]*alert.ReprocessBatchJob),
+		callCounts:         make(map[string]int),
+		eb:                 goerr.NewBuilder(goerr.TV(errutil.RepositoryKey, "memory")),
 	}
 }
 

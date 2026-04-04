@@ -966,6 +966,9 @@ func (mock *SlackClientMock) UploadFileContextCalls() []struct {
 //			PostResolveDetailsFunc: func(ctx context.Context, ticketMoqParam *ticket.Ticket) error {
 //				panic("mock out the PostResolveDetails method")
 //			},
+//			PostSectionBlockFunc: func(ctx context.Context, text string) error {
+//				panic("mock out the PostSectionBlock method")
+//			},
 //			PostSessionActionsFunc: func(ctx context.Context, ticketID types.TicketID, ticketStatus types.TicketStatus, sessionURL string) error {
 //				panic("mock out the PostSessionActions method")
 //			},
@@ -1044,6 +1047,9 @@ type SlackThreadServiceMock struct {
 
 	// PostResolveDetailsFunc mocks the PostResolveDetails method.
 	PostResolveDetailsFunc func(ctx context.Context, ticketMoqParam *ticket.Ticket) error
+
+	// PostSectionBlockFunc mocks the PostSectionBlock method.
+	PostSectionBlockFunc func(ctx context.Context, text string) error
 
 	// PostSessionActionsFunc mocks the PostSessionActions method.
 	PostSessionActionsFunc func(ctx context.Context, ticketID types.TicketID, ticketStatus types.TicketStatus, sessionURL string) error
@@ -1183,6 +1189,13 @@ type SlackThreadServiceMock struct {
 			// TicketMoqParam is the ticketMoqParam argument value.
 			TicketMoqParam *ticket.Ticket
 		}
+		// PostSectionBlock holds details about calls to the PostSectionBlock method.
+		PostSectionBlock []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Text is the text argument value.
+			Text string
+		}
 		// PostSessionActions holds details about calls to the PostSessionActions method.
 		PostSessionActions []struct {
 			// Ctx is the ctx argument value.
@@ -1254,6 +1267,7 @@ type SlackThreadServiceMock struct {
 	lockPostFinding              sync.RWMutex
 	lockPostLinkToTicket         sync.RWMutex
 	lockPostResolveDetails       sync.RWMutex
+	lockPostSectionBlock         sync.RWMutex
 	lockPostSessionActions       sync.RWMutex
 	lockPostTicket               sync.RWMutex
 	lockPostTicketList           sync.RWMutex
@@ -1915,6 +1929,45 @@ func (mock *SlackThreadServiceMock) PostResolveDetailsCalls() []struct {
 	mock.lockPostResolveDetails.RLock()
 	calls = mock.calls.PostResolveDetails
 	mock.lockPostResolveDetails.RUnlock()
+	return calls
+}
+
+// PostSectionBlock calls PostSectionBlockFunc.
+func (mock *SlackThreadServiceMock) PostSectionBlock(ctx context.Context, text string) error {
+	callInfo := struct {
+		Ctx  context.Context
+		Text string
+	}{
+		Ctx:  ctx,
+		Text: text,
+	}
+	mock.lockPostSectionBlock.Lock()
+	mock.calls.PostSectionBlock = append(mock.calls.PostSectionBlock, callInfo)
+	mock.lockPostSectionBlock.Unlock()
+	if mock.PostSectionBlockFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PostSectionBlockFunc(ctx, text)
+}
+
+// PostSectionBlockCalls gets all the calls that were made to PostSectionBlock.
+// Check the length with:
+//
+//	len(mockedSlackThreadService.PostSectionBlockCalls())
+func (mock *SlackThreadServiceMock) PostSectionBlockCalls() []struct {
+	Ctx  context.Context
+	Text string
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Text string
+	}
+	mock.lockPostSectionBlock.RLock()
+	calls = mock.calls.PostSectionBlock
+	mock.lockPostSectionBlock.RUnlock()
 	return calls
 }
 
@@ -2659,9 +2712,6 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			AcquireAlertThrottleSlotFunc: func(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error) {
 //				panic("mock out the AcquireAlertThrottleSlot method")
 //			},
-//			ArchiveKnowledgeFunc: func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) error {
-//				panic("mock out the ArchiveKnowledge method")
-//			},
 //			BatchGetAlertsFunc: func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
 //				panic("mock out the BatchGetAlerts method")
 //			},
@@ -2682,9 +2732,6 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			BindAlertsToTicketFunc: func(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error {
 //				panic("mock out the BindAlertsToTicket method")
-//			},
-//			CalculateKnowledgeSizeFunc: func(ctx context.Context, topic types.KnowledgeTopic) (int, error) {
-//				panic("mock out the CalculateKnowledgeSize method")
 //			},
 //			CheckAlertThrottleFunc: func(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error) {
 //				panic("mock out the CheckAlertThrottle method")
@@ -2718,6 +2765,12 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			DeleteAgentMemoriesBatchFunc: func(ctx context.Context, agentID string, memoryIDs []types.AgentMemoryID) (int, error) {
 //				panic("mock out the DeleteAgentMemoriesBatch method")
+//			},
+//			DeleteKnowledgeFunc: func(ctx context.Context, id types.KnowledgeID) error {
+//				panic("mock out the DeleteKnowledge method")
+//			},
+//			DeleteKnowledgeTagFunc: func(ctx context.Context, id types.KnowledgeTagID) error {
+//				panic("mock out the DeleteKnowledgeTag method")
 //			},
 //			DeleteQueuedAlertsFunc: func(ctx context.Context, ids []types.QueuedAlertID) error {
 //				panic("mock out the DeleteQueuedAlerts method")
@@ -2794,14 +2847,14 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetHITLRequestFunc: func(ctx context.Context, id types.HITLRequestID) (*hitl.Request, error) {
 //				panic("mock out the GetHITLRequest method")
 //			},
-//			GetKnowledgeFunc: func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) (*knowledge.Knowledge, error) {
+//			GetKnowledgeFunc: func(ctx context.Context, id types.KnowledgeID) (*knowledge.Knowledge, error) {
 //				panic("mock out the GetKnowledge method")
 //			},
-//			GetKnowledgeByCommitFunc: func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug, commitID string) (*knowledge.Knowledge, error) {
-//				panic("mock out the GetKnowledgeByCommit method")
+//			GetKnowledgeLogFunc: func(ctx context.Context, knowledgeID types.KnowledgeID, logID types.KnowledgeLogID) (*knowledge.KnowledgeLog, error) {
+//				panic("mock out the GetKnowledgeLog method")
 //			},
-//			GetKnowledgesFunc: func(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.Knowledge, error) {
-//				panic("mock out the GetKnowledges method")
+//			GetKnowledgeTagFunc: func(ctx context.Context, id types.KnowledgeTagID) (*knowledge.KnowledgeTag, error) {
+//				panic("mock out the GetKnowledgeTag method")
 //			},
 //			GetLatestAlertByThreadFunc: func(ctx context.Context, thread slack.Thread) (*alert.Alert, error) {
 //				panic("mock out the GetLatestAlertByThread method")
@@ -2823,6 +2876,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			GetRefineGroupFunc: func(ctx context.Context, groupID types.RefineGroupID) (*refine.Group, error) {
 //				panic("mock out the GetRefineGroup method")
+//			},
+//			GetReprocessBatchJobFunc: func(ctx context.Context, id types.ReprocessBatchJobID) (*alert.ReprocessBatchJob, error) {
+//				panic("mock out the GetReprocessBatchJob method")
 //			},
 //			GetReprocessJobFunc: func(ctx context.Context, id types.ReprocessJobID) (*alert.ReprocessJob, error) {
 //				panic("mock out the GetReprocessJob method")
@@ -2887,6 +2943,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			ListAllAgentIDsFunc: func(ctx context.Context) ([]*interfaces.AgentSummary, error) {
 //				panic("mock out the ListAllAgentIDs method")
 //			},
+//			ListAllKnowledgesFunc: func(ctx context.Context) ([]*knowledge.Knowledge, error) {
+//				panic("mock out the ListAllKnowledges method")
+//			},
 //			ListAllTagsFunc: func(ctx context.Context) ([]*tag.Tag, error) {
 //				panic("mock out the ListAllTags method")
 //			},
@@ -2896,11 +2955,17 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			ListDiagnosisIssuesFunc: func(ctx context.Context, diagnosisID types.DiagnosisID, offset int, limit int, status *diagnosis.IssueStatus, ruleID *diagnosis.RuleID) ([]*diagnosis.Issue, int, error) {
 //				panic("mock out the ListDiagnosisIssues method")
 //			},
-//			ListKnowledgeSlugsFunc: func(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.SlugInfo, error) {
-//				panic("mock out the ListKnowledgeSlugs method")
+//			ListKnowledgeLogsFunc: func(ctx context.Context, knowledgeID types.KnowledgeID) ([]*knowledge.KnowledgeLog, error) {
+//				panic("mock out the ListKnowledgeLogs method")
 //			},
-//			ListKnowledgeTopicsFunc: func(ctx context.Context) ([]*knowledge.TopicSummary, error) {
-//				panic("mock out the ListKnowledgeTopics method")
+//			ListKnowledgeTagsFunc: func(ctx context.Context) ([]*knowledge.KnowledgeTag, error) {
+//				panic("mock out the ListKnowledgeTags method")
+//			},
+//			ListKnowledgesByCategoryAndTagsFunc: func(ctx context.Context, category types.KnowledgeCategory, tagIDs []types.KnowledgeTagID) ([]*knowledge.Knowledge, error) {
+//				panic("mock out the ListKnowledgesByCategoryAndTags method")
+//			},
+//			ListLegacyKnowledgesFunc: func(ctx context.Context) ([]*interfaces.LegacyKnowledge, error) {
+//				panic("mock out the ListLegacyKnowledges method")
 //			},
 //			ListPendingDiagnosisIssuesFunc: func(ctx context.Context, diagnosisID types.DiagnosisID) ([]*diagnosis.Issue, error) {
 //				panic("mock out the ListPendingDiagnosisIssues method")
@@ -2932,11 +2997,20 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			PutKnowledgeFunc: func(ctx context.Context, k *knowledge.Knowledge) error {
 //				panic("mock out the PutKnowledge method")
 //			},
+//			PutKnowledgeLogFunc: func(ctx context.Context, log *knowledge.KnowledgeLog) error {
+//				panic("mock out the PutKnowledgeLog method")
+//			},
+//			PutKnowledgeTagFunc: func(ctx context.Context, tagMoqParam *knowledge.KnowledgeTag) error {
+//				panic("mock out the PutKnowledgeTag method")
+//			},
 //			PutQueuedAlertFunc: func(ctx context.Context, qa *alert.QueuedAlert) error {
 //				panic("mock out the PutQueuedAlert method")
 //			},
 //			PutRefineGroupFunc: func(ctx context.Context, group *refine.Group) error {
 //				panic("mock out the PutRefineGroup method")
+//			},
+//			PutReprocessBatchJobFunc: func(ctx context.Context, job *alert.ReprocessBatchJob) error {
+//				panic("mock out the PutReprocessBatchJob method")
 //			},
 //			PutReprocessJobFunc: func(ctx context.Context, job *alert.ReprocessJob) error {
 //				panic("mock out the PutReprocessJob method")
@@ -3014,9 +3088,6 @@ type RepositoryMock struct {
 	// AcquireAlertThrottleSlotFunc mocks the AcquireAlertThrottleSlot method.
 	AcquireAlertThrottleSlotFunc func(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error)
 
-	// ArchiveKnowledgeFunc mocks the ArchiveKnowledge method.
-	ArchiveKnowledgeFunc func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) error
-
 	// BatchGetAlertsFunc mocks the BatchGetAlerts method.
 	BatchGetAlertsFunc func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
 
@@ -3037,9 +3108,6 @@ type RepositoryMock struct {
 
 	// BindAlertsToTicketFunc mocks the BindAlertsToTicket method.
 	BindAlertsToTicketFunc func(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error
-
-	// CalculateKnowledgeSizeFunc mocks the CalculateKnowledgeSize method.
-	CalculateKnowledgeSizeFunc func(ctx context.Context, topic types.KnowledgeTopic) (int, error)
 
 	// CheckAlertThrottleFunc mocks the CheckAlertThrottle method.
 	CheckAlertThrottleFunc func(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error)
@@ -3073,6 +3141,12 @@ type RepositoryMock struct {
 
 	// DeleteAgentMemoriesBatchFunc mocks the DeleteAgentMemoriesBatch method.
 	DeleteAgentMemoriesBatchFunc func(ctx context.Context, agentID string, memoryIDs []types.AgentMemoryID) (int, error)
+
+	// DeleteKnowledgeFunc mocks the DeleteKnowledge method.
+	DeleteKnowledgeFunc func(ctx context.Context, id types.KnowledgeID) error
+
+	// DeleteKnowledgeTagFunc mocks the DeleteKnowledgeTag method.
+	DeleteKnowledgeTagFunc func(ctx context.Context, id types.KnowledgeTagID) error
 
 	// DeleteQueuedAlertsFunc mocks the DeleteQueuedAlerts method.
 	DeleteQueuedAlertsFunc func(ctx context.Context, ids []types.QueuedAlertID) error
@@ -3150,13 +3224,13 @@ type RepositoryMock struct {
 	GetHITLRequestFunc func(ctx context.Context, id types.HITLRequestID) (*hitl.Request, error)
 
 	// GetKnowledgeFunc mocks the GetKnowledge method.
-	GetKnowledgeFunc func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) (*knowledge.Knowledge, error)
+	GetKnowledgeFunc func(ctx context.Context, id types.KnowledgeID) (*knowledge.Knowledge, error)
 
-	// GetKnowledgeByCommitFunc mocks the GetKnowledgeByCommit method.
-	GetKnowledgeByCommitFunc func(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug, commitID string) (*knowledge.Knowledge, error)
+	// GetKnowledgeLogFunc mocks the GetKnowledgeLog method.
+	GetKnowledgeLogFunc func(ctx context.Context, knowledgeID types.KnowledgeID, logID types.KnowledgeLogID) (*knowledge.KnowledgeLog, error)
 
-	// GetKnowledgesFunc mocks the GetKnowledges method.
-	GetKnowledgesFunc func(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.Knowledge, error)
+	// GetKnowledgeTagFunc mocks the GetKnowledgeTag method.
+	GetKnowledgeTagFunc func(ctx context.Context, id types.KnowledgeTagID) (*knowledge.KnowledgeTag, error)
 
 	// GetLatestAlertByThreadFunc mocks the GetLatestAlertByThread method.
 	GetLatestAlertByThreadFunc func(ctx context.Context, thread slack.Thread) (*alert.Alert, error)
@@ -3178,6 +3252,9 @@ type RepositoryMock struct {
 
 	// GetRefineGroupFunc mocks the GetRefineGroup method.
 	GetRefineGroupFunc func(ctx context.Context, groupID types.RefineGroupID) (*refine.Group, error)
+
+	// GetReprocessBatchJobFunc mocks the GetReprocessBatchJob method.
+	GetReprocessBatchJobFunc func(ctx context.Context, id types.ReprocessBatchJobID) (*alert.ReprocessBatchJob, error)
 
 	// GetReprocessJobFunc mocks the GetReprocessJob method.
 	GetReprocessJobFunc func(ctx context.Context, id types.ReprocessJobID) (*alert.ReprocessJob, error)
@@ -3242,6 +3319,9 @@ type RepositoryMock struct {
 	// ListAllAgentIDsFunc mocks the ListAllAgentIDs method.
 	ListAllAgentIDsFunc func(ctx context.Context) ([]*interfaces.AgentSummary, error)
 
+	// ListAllKnowledgesFunc mocks the ListAllKnowledges method.
+	ListAllKnowledgesFunc func(ctx context.Context) ([]*knowledge.Knowledge, error)
+
 	// ListAllTagsFunc mocks the ListAllTags method.
 	ListAllTagsFunc func(ctx context.Context) ([]*tag.Tag, error)
 
@@ -3251,11 +3331,17 @@ type RepositoryMock struct {
 	// ListDiagnosisIssuesFunc mocks the ListDiagnosisIssues method.
 	ListDiagnosisIssuesFunc func(ctx context.Context, diagnosisID types.DiagnosisID, offset int, limit int, status *diagnosis.IssueStatus, ruleID *diagnosis.RuleID) ([]*diagnosis.Issue, int, error)
 
-	// ListKnowledgeSlugsFunc mocks the ListKnowledgeSlugs method.
-	ListKnowledgeSlugsFunc func(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.SlugInfo, error)
+	// ListKnowledgeLogsFunc mocks the ListKnowledgeLogs method.
+	ListKnowledgeLogsFunc func(ctx context.Context, knowledgeID types.KnowledgeID) ([]*knowledge.KnowledgeLog, error)
 
-	// ListKnowledgeTopicsFunc mocks the ListKnowledgeTopics method.
-	ListKnowledgeTopicsFunc func(ctx context.Context) ([]*knowledge.TopicSummary, error)
+	// ListKnowledgeTagsFunc mocks the ListKnowledgeTags method.
+	ListKnowledgeTagsFunc func(ctx context.Context) ([]*knowledge.KnowledgeTag, error)
+
+	// ListKnowledgesByCategoryAndTagsFunc mocks the ListKnowledgesByCategoryAndTags method.
+	ListKnowledgesByCategoryAndTagsFunc func(ctx context.Context, category types.KnowledgeCategory, tagIDs []types.KnowledgeTagID) ([]*knowledge.Knowledge, error)
+
+	// ListLegacyKnowledgesFunc mocks the ListLegacyKnowledges method.
+	ListLegacyKnowledgesFunc func(ctx context.Context) ([]*interfaces.LegacyKnowledge, error)
 
 	// ListPendingDiagnosisIssuesFunc mocks the ListPendingDiagnosisIssues method.
 	ListPendingDiagnosisIssuesFunc func(ctx context.Context, diagnosisID types.DiagnosisID) ([]*diagnosis.Issue, error)
@@ -3287,11 +3373,20 @@ type RepositoryMock struct {
 	// PutKnowledgeFunc mocks the PutKnowledge method.
 	PutKnowledgeFunc func(ctx context.Context, k *knowledge.Knowledge) error
 
+	// PutKnowledgeLogFunc mocks the PutKnowledgeLog method.
+	PutKnowledgeLogFunc func(ctx context.Context, log *knowledge.KnowledgeLog) error
+
+	// PutKnowledgeTagFunc mocks the PutKnowledgeTag method.
+	PutKnowledgeTagFunc func(ctx context.Context, tagMoqParam *knowledge.KnowledgeTag) error
+
 	// PutQueuedAlertFunc mocks the PutQueuedAlert method.
 	PutQueuedAlertFunc func(ctx context.Context, qa *alert.QueuedAlert) error
 
 	// PutRefineGroupFunc mocks the PutRefineGroup method.
 	PutRefineGroupFunc func(ctx context.Context, group *refine.Group) error
+
+	// PutReprocessBatchJobFunc mocks the PutReprocessBatchJob method.
+	PutReprocessBatchJobFunc func(ctx context.Context, job *alert.ReprocessBatchJob) error
 
 	// PutReprocessJobFunc mocks the PutReprocessJob method.
 	PutReprocessJobFunc func(ctx context.Context, job *alert.ReprocessJob) error
@@ -3373,15 +3468,6 @@ type RepositoryMock struct {
 			// Limit is the limit argument value.
 			Limit int
 		}
-		// ArchiveKnowledge holds details about calls to the ArchiveKnowledge method.
-		ArchiveKnowledge []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Topic is the topic argument value.
-			Topic types.KnowledgeTopic
-			// Slug is the slug argument value.
-			Slug types.KnowledgeSlug
-		}
 		// BatchGetAlerts holds details about calls to the BatchGetAlerts method.
 		BatchGetAlerts []struct {
 			// Ctx is the ctx argument value.
@@ -3434,13 +3520,6 @@ type RepositoryMock struct {
 			AlertIDs []types.AlertID
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
-		}
-		// CalculateKnowledgeSize holds details about calls to the CalculateKnowledgeSize method.
-		CalculateKnowledgeSize []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Topic is the topic argument value.
-			Topic types.KnowledgeTopic
 		}
 		// CheckAlertThrottle holds details about calls to the CheckAlertThrottle method.
 		CheckAlertThrottle []struct {
@@ -3520,6 +3599,20 @@ type RepositoryMock struct {
 			AgentID string
 			// MemoryIDs is the memoryIDs argument value.
 			MemoryIDs []types.AgentMemoryID
+		}
+		// DeleteKnowledge holds details about calls to the DeleteKnowledge method.
+		DeleteKnowledge []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID types.KnowledgeID
+		}
+		// DeleteKnowledgeTag holds details about calls to the DeleteKnowledgeTag method.
+		DeleteKnowledgeTag []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID types.KnowledgeTagID
 		}
 		// DeleteQueuedAlerts holds details about calls to the DeleteQueuedAlerts method.
 		DeleteQueuedAlerts []struct {
@@ -3714,28 +3807,24 @@ type RepositoryMock struct {
 		GetKnowledge []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Topic is the topic argument value.
-			Topic types.KnowledgeTopic
-			// Slug is the slug argument value.
-			Slug types.KnowledgeSlug
+			// ID is the id argument value.
+			ID types.KnowledgeID
 		}
-		// GetKnowledgeByCommit holds details about calls to the GetKnowledgeByCommit method.
-		GetKnowledgeByCommit []struct {
+		// GetKnowledgeLog holds details about calls to the GetKnowledgeLog method.
+		GetKnowledgeLog []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Topic is the topic argument value.
-			Topic types.KnowledgeTopic
-			// Slug is the slug argument value.
-			Slug types.KnowledgeSlug
-			// CommitID is the commitID argument value.
-			CommitID string
+			// KnowledgeID is the knowledgeID argument value.
+			KnowledgeID types.KnowledgeID
+			// LogID is the logID argument value.
+			LogID types.KnowledgeLogID
 		}
-		// GetKnowledges holds details about calls to the GetKnowledges method.
-		GetKnowledges []struct {
+		// GetKnowledgeTag holds details about calls to the GetKnowledgeTag method.
+		GetKnowledgeTag []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Topic is the topic argument value.
-			Topic types.KnowledgeTopic
+			// ID is the id argument value.
+			ID types.KnowledgeTagID
 		}
 		// GetLatestAlertByThread holds details about calls to the GetLatestAlertByThread method.
 		GetLatestAlertByThread []struct {
@@ -3791,6 +3880,13 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// GroupID is the groupID argument value.
 			GroupID types.RefineGroupID
+		}
+		// GetReprocessBatchJob holds details about calls to the GetReprocessBatchJob method.
+		GetReprocessBatchJob []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID types.ReprocessBatchJobID
 		}
 		// GetReprocessJob holds details about calls to the GetReprocessJob method.
 		GetReprocessJob []struct {
@@ -3955,6 +4051,11 @@ type RepositoryMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
+		// ListAllKnowledges holds details about calls to the ListAllKnowledges method.
+		ListAllKnowledges []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// ListAllTags holds details about calls to the ListAllTags method.
 		ListAllTags []struct {
 			// Ctx is the ctx argument value.
@@ -3984,15 +4085,29 @@ type RepositoryMock struct {
 			// RuleID is the ruleID argument value.
 			RuleID *diagnosis.RuleID
 		}
-		// ListKnowledgeSlugs holds details about calls to the ListKnowledgeSlugs method.
-		ListKnowledgeSlugs []struct {
+		// ListKnowledgeLogs holds details about calls to the ListKnowledgeLogs method.
+		ListKnowledgeLogs []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Topic is the topic argument value.
-			Topic types.KnowledgeTopic
+			// KnowledgeID is the knowledgeID argument value.
+			KnowledgeID types.KnowledgeID
 		}
-		// ListKnowledgeTopics holds details about calls to the ListKnowledgeTopics method.
-		ListKnowledgeTopics []struct {
+		// ListKnowledgeTags holds details about calls to the ListKnowledgeTags method.
+		ListKnowledgeTags []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
+		// ListKnowledgesByCategoryAndTags holds details about calls to the ListKnowledgesByCategoryAndTags method.
+		ListKnowledgesByCategoryAndTags []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Category is the category argument value.
+			Category types.KnowledgeCategory
+			// TagIDs is the tagIDs argument value.
+			TagIDs []types.KnowledgeTagID
+		}
+		// ListLegacyKnowledges holds details about calls to the ListLegacyKnowledges method.
+		ListLegacyKnowledges []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
@@ -4070,6 +4185,20 @@ type RepositoryMock struct {
 			// K is the k argument value.
 			K *knowledge.Knowledge
 		}
+		// PutKnowledgeLog holds details about calls to the PutKnowledgeLog method.
+		PutKnowledgeLog []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Log is the log argument value.
+			Log *knowledge.KnowledgeLog
+		}
+		// PutKnowledgeTag holds details about calls to the PutKnowledgeTag method.
+		PutKnowledgeTag []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TagMoqParam is the tagMoqParam argument value.
+			TagMoqParam *knowledge.KnowledgeTag
+		}
 		// PutQueuedAlert holds details about calls to the PutQueuedAlert method.
 		PutQueuedAlert []struct {
 			// Ctx is the ctx argument value.
@@ -4083,6 +4212,13 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Group is the group argument value.
 			Group *refine.Group
+		}
+		// PutReprocessBatchJob holds details about calls to the PutReprocessBatchJob method.
+		PutReprocessBatchJob []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Job is the job argument value.
+			Job *alert.ReprocessBatchJob
 		}
 		// PutReprocessJob holds details about calls to the PutReprocessJob method.
 		PutReprocessJob []struct {
@@ -4268,122 +4404,129 @@ type RepositoryMock struct {
 			ID types.HITLRequestID
 		}
 	}
-	lockAcquireAlertThrottleSlot       sync.RWMutex
-	lockArchiveKnowledge               sync.RWMutex
-	lockBatchGetAlerts                 sync.RWMutex
-	lockBatchGetDiagnosisIssueCounts   sync.RWMutex
-	lockBatchGetTickets                sync.RWMutex
-	lockBatchPutAlerts                 sync.RWMutex
-	lockBatchSaveAgentMemories         sync.RWMutex
-	lockBatchUpdateTicketsStatus       sync.RWMutex
-	lockBindAlertsToTicket             sync.RWMutex
-	lockCalculateKnowledgeSize         sync.RWMutex
-	lockCheckAlertThrottle             sync.RWMutex
-	lockCountActivities                sync.RWMutex
-	lockCountAlertsWithoutTicket       sync.RWMutex
-	lockCountDeclinedAlerts            sync.RWMutex
-	lockCountDiagnosisIssues           sync.RWMutex
-	lockCountQueuedAlerts              sync.RWMutex
-	lockCountTicketComments            sync.RWMutex
-	lockCountTicketsByStatus           sync.RWMutex
-	lockCreateNotice                   sync.RWMutex
-	lockCreateTagWithID                sync.RWMutex
-	lockDeleteAgentMemoriesBatch       sync.RWMutex
-	lockDeleteQueuedAlerts             sync.RWMutex
-	lockDeleteSession                  sync.RWMutex
-	lockDeleteTagByID                  sync.RWMutex
-	lockDeleteToken                    sync.RWMutex
-	lockFindNearestAlerts              sync.RWMutex
-	lockFindNearestTickets             sync.RWMutex
-	lockFindNearestTicketsWithSpan     sync.RWMutex
-	lockGetActivities                  sync.RWMutex
-	lockGetAgentMemory                 sync.RWMutex
-	lockGetAlert                       sync.RWMutex
-	lockGetAlertList                   sync.RWMutex
-	lockGetAlertListByThread           sync.RWMutex
-	lockGetAlertListsInThread          sync.RWMutex
-	lockGetAlertWithoutEmbedding       sync.RWMutex
-	lockGetAlertWithoutTicket          sync.RWMutex
-	lockGetAlertsBySpan                sync.RWMutex
-	lockGetAlertsByThread              sync.RWMutex
-	lockGetAlertsWithInvalidEmbedding  sync.RWMutex
-	lockGetAllAlerts                   sync.RWMutex
-	lockGetAllTickets                  sync.RWMutex
-	lockGetDeclinedAlerts              sync.RWMutex
-	lockGetDiagnosis                   sync.RWMutex
-	lockGetDiagnosisIssue              sync.RWMutex
-	lockGetDiagnosisIssueCounts        sync.RWMutex
-	lockGetHITLRequest                 sync.RWMutex
-	lockGetKnowledge                   sync.RWMutex
-	lockGetKnowledgeByCommit           sync.RWMutex
-	lockGetKnowledges                  sync.RWMutex
-	lockGetLatestAlertByThread         sync.RWMutex
-	lockGetLatestAlertListInThread     sync.RWMutex
-	lockGetLatestHistory               sync.RWMutex
-	lockGetNotice                      sync.RWMutex
-	lockGetOrCreateTagByName           sync.RWMutex
-	lockGetQueuedAlert                 sync.RWMutex
-	lockGetRefineGroup                 sync.RWMutex
-	lockGetReprocessJob                sync.RWMutex
-	lockGetSession                     sync.RWMutex
-	lockGetSessionMessages             sync.RWMutex
-	lockGetSessionsByTicket            sync.RWMutex
-	lockGetTagByID                     sync.RWMutex
-	lockGetTagByName                   sync.RWMutex
-	lockGetTagsByIDs                   sync.RWMutex
-	lockGetTicket                      sync.RWMutex
-	lockGetTicketByThread              sync.RWMutex
-	lockGetTicketComments              sync.RWMutex
-	lockGetTicketCommentsPaginated     sync.RWMutex
-	lockGetTicketUnpromptedComments    sync.RWMutex
-	lockGetTicketsBySpan               sync.RWMutex
-	lockGetTicketsByStatus             sync.RWMutex
-	lockGetTicketsByStatusAndSpan      sync.RWMutex
-	lockGetTicketsWithInvalidEmbedding sync.RWMutex
-	lockGetToken                       sync.RWMutex
-	lockIsTagNameExists                sync.RWMutex
-	lockListAgentMemories              sync.RWMutex
-	lockListAgentMemoriesWithOptions   sync.RWMutex
-	lockListAllAgentIDs                sync.RWMutex
-	lockListAllTags                    sync.RWMutex
-	lockListDiagnoses                  sync.RWMutex
-	lockListDiagnosisIssues            sync.RWMutex
-	lockListKnowledgeSlugs             sync.RWMutex
-	lockListKnowledgeTopics            sync.RWMutex
-	lockListPendingDiagnosisIssues     sync.RWMutex
-	lockListQueuedAlerts               sync.RWMutex
-	lockPutActivity                    sync.RWMutex
-	lockPutAlert                       sync.RWMutex
-	lockPutAlertList                   sync.RWMutex
-	lockPutDiagnosis                   sync.RWMutex
-	lockPutDiagnosisIssue              sync.RWMutex
-	lockPutHITLRequest                 sync.RWMutex
-	lockPutHistory                     sync.RWMutex
-	lockPutKnowledge                   sync.RWMutex
-	lockPutQueuedAlert                 sync.RWMutex
-	lockPutRefineGroup                 sync.RWMutex
-	lockPutReprocessJob                sync.RWMutex
-	lockPutSession                     sync.RWMutex
-	lockPutSessionMessage              sync.RWMutex
-	lockPutTicket                      sync.RWMutex
-	lockPutTicketComment               sync.RWMutex
-	lockPutTicketCommentsPrompted      sync.RWMutex
-	lockPutToken                       sync.RWMutex
-	lockRemoveTagFromAllAlerts         sync.RWMutex
-	lockRemoveTagFromAllTickets        sync.RWMutex
-	lockRemoveTagIDFromAllAlerts       sync.RWMutex
-	lockRemoveTagIDFromAllTickets      sync.RWMutex
-	lockSaveAgentMemory                sync.RWMutex
-	lockSearchAlerts                   sync.RWMutex
-	lockSearchMemoriesByEmbedding      sync.RWMutex
-	lockSearchQueuedAlerts             sync.RWMutex
-	lockUnbindAlertFromTicket          sync.RWMutex
-	lockUpdateAlertStatus              sync.RWMutex
-	lockUpdateHITLRequestStatus        sync.RWMutex
-	lockUpdateMemoryScoreBatch         sync.RWMutex
-	lockUpdateNotice                   sync.RWMutex
-	lockUpdateTag                      sync.RWMutex
-	lockWatchHITLRequest               sync.RWMutex
+	lockAcquireAlertThrottleSlot        sync.RWMutex
+	lockBatchGetAlerts                  sync.RWMutex
+	lockBatchGetDiagnosisIssueCounts    sync.RWMutex
+	lockBatchGetTickets                 sync.RWMutex
+	lockBatchPutAlerts                  sync.RWMutex
+	lockBatchSaveAgentMemories          sync.RWMutex
+	lockBatchUpdateTicketsStatus        sync.RWMutex
+	lockBindAlertsToTicket              sync.RWMutex
+	lockCheckAlertThrottle              sync.RWMutex
+	lockCountActivities                 sync.RWMutex
+	lockCountAlertsWithoutTicket        sync.RWMutex
+	lockCountDeclinedAlerts             sync.RWMutex
+	lockCountDiagnosisIssues            sync.RWMutex
+	lockCountQueuedAlerts               sync.RWMutex
+	lockCountTicketComments             sync.RWMutex
+	lockCountTicketsByStatus            sync.RWMutex
+	lockCreateNotice                    sync.RWMutex
+	lockCreateTagWithID                 sync.RWMutex
+	lockDeleteAgentMemoriesBatch        sync.RWMutex
+	lockDeleteKnowledge                 sync.RWMutex
+	lockDeleteKnowledgeTag              sync.RWMutex
+	lockDeleteQueuedAlerts              sync.RWMutex
+	lockDeleteSession                   sync.RWMutex
+	lockDeleteTagByID                   sync.RWMutex
+	lockDeleteToken                     sync.RWMutex
+	lockFindNearestAlerts               sync.RWMutex
+	lockFindNearestTickets              sync.RWMutex
+	lockFindNearestTicketsWithSpan      sync.RWMutex
+	lockGetActivities                   sync.RWMutex
+	lockGetAgentMemory                  sync.RWMutex
+	lockGetAlert                        sync.RWMutex
+	lockGetAlertList                    sync.RWMutex
+	lockGetAlertListByThread            sync.RWMutex
+	lockGetAlertListsInThread           sync.RWMutex
+	lockGetAlertWithoutEmbedding        sync.RWMutex
+	lockGetAlertWithoutTicket           sync.RWMutex
+	lockGetAlertsBySpan                 sync.RWMutex
+	lockGetAlertsByThread               sync.RWMutex
+	lockGetAlertsWithInvalidEmbedding   sync.RWMutex
+	lockGetAllAlerts                    sync.RWMutex
+	lockGetAllTickets                   sync.RWMutex
+	lockGetDeclinedAlerts               sync.RWMutex
+	lockGetDiagnosis                    sync.RWMutex
+	lockGetDiagnosisIssue               sync.RWMutex
+	lockGetDiagnosisIssueCounts         sync.RWMutex
+	lockGetHITLRequest                  sync.RWMutex
+	lockGetKnowledge                    sync.RWMutex
+	lockGetKnowledgeLog                 sync.RWMutex
+	lockGetKnowledgeTag                 sync.RWMutex
+	lockGetLatestAlertByThread          sync.RWMutex
+	lockGetLatestAlertListInThread      sync.RWMutex
+	lockGetLatestHistory                sync.RWMutex
+	lockGetNotice                       sync.RWMutex
+	lockGetOrCreateTagByName            sync.RWMutex
+	lockGetQueuedAlert                  sync.RWMutex
+	lockGetRefineGroup                  sync.RWMutex
+	lockGetReprocessBatchJob            sync.RWMutex
+	lockGetReprocessJob                 sync.RWMutex
+	lockGetSession                      sync.RWMutex
+	lockGetSessionMessages              sync.RWMutex
+	lockGetSessionsByTicket             sync.RWMutex
+	lockGetTagByID                      sync.RWMutex
+	lockGetTagByName                    sync.RWMutex
+	lockGetTagsByIDs                    sync.RWMutex
+	lockGetTicket                       sync.RWMutex
+	lockGetTicketByThread               sync.RWMutex
+	lockGetTicketComments               sync.RWMutex
+	lockGetTicketCommentsPaginated      sync.RWMutex
+	lockGetTicketUnpromptedComments     sync.RWMutex
+	lockGetTicketsBySpan                sync.RWMutex
+	lockGetTicketsByStatus              sync.RWMutex
+	lockGetTicketsByStatusAndSpan       sync.RWMutex
+	lockGetTicketsWithInvalidEmbedding  sync.RWMutex
+	lockGetToken                        sync.RWMutex
+	lockIsTagNameExists                 sync.RWMutex
+	lockListAgentMemories               sync.RWMutex
+	lockListAgentMemoriesWithOptions    sync.RWMutex
+	lockListAllAgentIDs                 sync.RWMutex
+	lockListAllKnowledges               sync.RWMutex
+	lockListAllTags                     sync.RWMutex
+	lockListDiagnoses                   sync.RWMutex
+	lockListDiagnosisIssues             sync.RWMutex
+	lockListKnowledgeLogs               sync.RWMutex
+	lockListKnowledgeTags               sync.RWMutex
+	lockListKnowledgesByCategoryAndTags sync.RWMutex
+	lockListLegacyKnowledges            sync.RWMutex
+	lockListPendingDiagnosisIssues      sync.RWMutex
+	lockListQueuedAlerts                sync.RWMutex
+	lockPutActivity                     sync.RWMutex
+	lockPutAlert                        sync.RWMutex
+	lockPutAlertList                    sync.RWMutex
+	lockPutDiagnosis                    sync.RWMutex
+	lockPutDiagnosisIssue               sync.RWMutex
+	lockPutHITLRequest                  sync.RWMutex
+	lockPutHistory                      sync.RWMutex
+	lockPutKnowledge                    sync.RWMutex
+	lockPutKnowledgeLog                 sync.RWMutex
+	lockPutKnowledgeTag                 sync.RWMutex
+	lockPutQueuedAlert                  sync.RWMutex
+	lockPutRefineGroup                  sync.RWMutex
+	lockPutReprocessBatchJob            sync.RWMutex
+	lockPutReprocessJob                 sync.RWMutex
+	lockPutSession                      sync.RWMutex
+	lockPutSessionMessage               sync.RWMutex
+	lockPutTicket                       sync.RWMutex
+	lockPutTicketComment                sync.RWMutex
+	lockPutTicketCommentsPrompted       sync.RWMutex
+	lockPutToken                        sync.RWMutex
+	lockRemoveTagFromAllAlerts          sync.RWMutex
+	lockRemoveTagFromAllTickets         sync.RWMutex
+	lockRemoveTagIDFromAllAlerts        sync.RWMutex
+	lockRemoveTagIDFromAllTickets       sync.RWMutex
+	lockSaveAgentMemory                 sync.RWMutex
+	lockSearchAlerts                    sync.RWMutex
+	lockSearchMemoriesByEmbedding       sync.RWMutex
+	lockSearchQueuedAlerts              sync.RWMutex
+	lockUnbindAlertFromTicket           sync.RWMutex
+	lockUpdateAlertStatus               sync.RWMutex
+	lockUpdateHITLRequestStatus         sync.RWMutex
+	lockUpdateMemoryScoreBatch          sync.RWMutex
+	lockUpdateNotice                    sync.RWMutex
+	lockUpdateTag                       sync.RWMutex
+	lockWatchHITLRequest                sync.RWMutex
 }
 
 // AcquireAlertThrottleSlot calls AcquireAlertThrottleSlotFunc.
@@ -4427,49 +4570,6 @@ func (mock *RepositoryMock) AcquireAlertThrottleSlotCalls() []struct {
 	mock.lockAcquireAlertThrottleSlot.RLock()
 	calls = mock.calls.AcquireAlertThrottleSlot
 	mock.lockAcquireAlertThrottleSlot.RUnlock()
-	return calls
-}
-
-// ArchiveKnowledge calls ArchiveKnowledgeFunc.
-func (mock *RepositoryMock) ArchiveKnowledge(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) error {
-	callInfo := struct {
-		Ctx   context.Context
-		Topic types.KnowledgeTopic
-		Slug  types.KnowledgeSlug
-	}{
-		Ctx:   ctx,
-		Topic: topic,
-		Slug:  slug,
-	}
-	mock.lockArchiveKnowledge.Lock()
-	mock.calls.ArchiveKnowledge = append(mock.calls.ArchiveKnowledge, callInfo)
-	mock.lockArchiveKnowledge.Unlock()
-	if mock.ArchiveKnowledgeFunc == nil {
-		var (
-			errOut error
-		)
-		return errOut
-	}
-	return mock.ArchiveKnowledgeFunc(ctx, topic, slug)
-}
-
-// ArchiveKnowledgeCalls gets all the calls that were made to ArchiveKnowledge.
-// Check the length with:
-//
-//	len(mockedRepository.ArchiveKnowledgeCalls())
-func (mock *RepositoryMock) ArchiveKnowledgeCalls() []struct {
-	Ctx   context.Context
-	Topic types.KnowledgeTopic
-	Slug  types.KnowledgeSlug
-} {
-	var calls []struct {
-		Ctx   context.Context
-		Topic types.KnowledgeTopic
-		Slug  types.KnowledgeSlug
-	}
-	mock.lockArchiveKnowledge.RLock()
-	calls = mock.calls.ArchiveKnowledge
-	mock.lockArchiveKnowledge.RUnlock()
 	return calls
 }
 
@@ -4754,46 +4854,6 @@ func (mock *RepositoryMock) BindAlertsToTicketCalls() []struct {
 	mock.lockBindAlertsToTicket.RLock()
 	calls = mock.calls.BindAlertsToTicket
 	mock.lockBindAlertsToTicket.RUnlock()
-	return calls
-}
-
-// CalculateKnowledgeSize calls CalculateKnowledgeSizeFunc.
-func (mock *RepositoryMock) CalculateKnowledgeSize(ctx context.Context, topic types.KnowledgeTopic) (int, error) {
-	callInfo := struct {
-		Ctx   context.Context
-		Topic types.KnowledgeTopic
-	}{
-		Ctx:   ctx,
-		Topic: topic,
-	}
-	mock.lockCalculateKnowledgeSize.Lock()
-	mock.calls.CalculateKnowledgeSize = append(mock.calls.CalculateKnowledgeSize, callInfo)
-	mock.lockCalculateKnowledgeSize.Unlock()
-	if mock.CalculateKnowledgeSizeFunc == nil {
-		var (
-			nOut   int
-			errOut error
-		)
-		return nOut, errOut
-	}
-	return mock.CalculateKnowledgeSizeFunc(ctx, topic)
-}
-
-// CalculateKnowledgeSizeCalls gets all the calls that were made to CalculateKnowledgeSize.
-// Check the length with:
-//
-//	len(mockedRepository.CalculateKnowledgeSizeCalls())
-func (mock *RepositoryMock) CalculateKnowledgeSizeCalls() []struct {
-	Ctx   context.Context
-	Topic types.KnowledgeTopic
-} {
-	var calls []struct {
-		Ctx   context.Context
-		Topic types.KnowledgeTopic
-	}
-	mock.lockCalculateKnowledgeSize.RLock()
-	calls = mock.calls.CalculateKnowledgeSize
-	mock.lockCalculateKnowledgeSize.RUnlock()
 	return calls
 }
 
@@ -5236,6 +5296,84 @@ func (mock *RepositoryMock) DeleteAgentMemoriesBatchCalls() []struct {
 	mock.lockDeleteAgentMemoriesBatch.RLock()
 	calls = mock.calls.DeleteAgentMemoriesBatch
 	mock.lockDeleteAgentMemoriesBatch.RUnlock()
+	return calls
+}
+
+// DeleteKnowledge calls DeleteKnowledgeFunc.
+func (mock *RepositoryMock) DeleteKnowledge(ctx context.Context, id types.KnowledgeID) error {
+	callInfo := struct {
+		Ctx context.Context
+		ID  types.KnowledgeID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockDeleteKnowledge.Lock()
+	mock.calls.DeleteKnowledge = append(mock.calls.DeleteKnowledge, callInfo)
+	mock.lockDeleteKnowledge.Unlock()
+	if mock.DeleteKnowledgeFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.DeleteKnowledgeFunc(ctx, id)
+}
+
+// DeleteKnowledgeCalls gets all the calls that were made to DeleteKnowledge.
+// Check the length with:
+//
+//	len(mockedRepository.DeleteKnowledgeCalls())
+func (mock *RepositoryMock) DeleteKnowledgeCalls() []struct {
+	Ctx context.Context
+	ID  types.KnowledgeID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  types.KnowledgeID
+	}
+	mock.lockDeleteKnowledge.RLock()
+	calls = mock.calls.DeleteKnowledge
+	mock.lockDeleteKnowledge.RUnlock()
+	return calls
+}
+
+// DeleteKnowledgeTag calls DeleteKnowledgeTagFunc.
+func (mock *RepositoryMock) DeleteKnowledgeTag(ctx context.Context, id types.KnowledgeTagID) error {
+	callInfo := struct {
+		Ctx context.Context
+		ID  types.KnowledgeTagID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockDeleteKnowledgeTag.Lock()
+	mock.calls.DeleteKnowledgeTag = append(mock.calls.DeleteKnowledgeTag, callInfo)
+	mock.lockDeleteKnowledgeTag.Unlock()
+	if mock.DeleteKnowledgeTagFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.DeleteKnowledgeTagFunc(ctx, id)
+}
+
+// DeleteKnowledgeTagCalls gets all the calls that were made to DeleteKnowledgeTag.
+// Check the length with:
+//
+//	len(mockedRepository.DeleteKnowledgeTagCalls())
+func (mock *RepositoryMock) DeleteKnowledgeTagCalls() []struct {
+	Ctx context.Context
+	ID  types.KnowledgeTagID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  types.KnowledgeTagID
+	}
+	mock.lockDeleteKnowledgeTag.RLock()
+	calls = mock.calls.DeleteKnowledgeTag
+	mock.lockDeleteKnowledgeTag.RUnlock()
 	return calls
 }
 
@@ -6264,15 +6402,13 @@ func (mock *RepositoryMock) GetHITLRequestCalls() []struct {
 }
 
 // GetKnowledge calls GetKnowledgeFunc.
-func (mock *RepositoryMock) GetKnowledge(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug) (*knowledge.Knowledge, error) {
+func (mock *RepositoryMock) GetKnowledge(ctx context.Context, id types.KnowledgeID) (*knowledge.Knowledge, error) {
 	callInfo := struct {
-		Ctx   context.Context
-		Topic types.KnowledgeTopic
-		Slug  types.KnowledgeSlug
+		Ctx context.Context
+		ID  types.KnowledgeID
 	}{
-		Ctx:   ctx,
-		Topic: topic,
-		Slug:  slug,
+		Ctx: ctx,
+		ID:  id,
 	}
 	mock.lockGetKnowledge.Lock()
 	mock.calls.GetKnowledge = append(mock.calls.GetKnowledge, callInfo)
@@ -6284,7 +6420,7 @@ func (mock *RepositoryMock) GetKnowledge(ctx context.Context, topic types.Knowle
 		)
 		return knowledgeOut, errOut
 	}
-	return mock.GetKnowledgeFunc(ctx, topic, slug)
+	return mock.GetKnowledgeFunc(ctx, id)
 }
 
 // GetKnowledgeCalls gets all the calls that were made to GetKnowledge.
@@ -6292,14 +6428,12 @@ func (mock *RepositoryMock) GetKnowledge(ctx context.Context, topic types.Knowle
 //
 //	len(mockedRepository.GetKnowledgeCalls())
 func (mock *RepositoryMock) GetKnowledgeCalls() []struct {
-	Ctx   context.Context
-	Topic types.KnowledgeTopic
-	Slug  types.KnowledgeSlug
+	Ctx context.Context
+	ID  types.KnowledgeID
 } {
 	var calls []struct {
-		Ctx   context.Context
-		Topic types.KnowledgeTopic
-		Slug  types.KnowledgeSlug
+		Ctx context.Context
+		ID  types.KnowledgeID
 	}
 	mock.lockGetKnowledge.RLock()
 	calls = mock.calls.GetKnowledge
@@ -6307,91 +6441,87 @@ func (mock *RepositoryMock) GetKnowledgeCalls() []struct {
 	return calls
 }
 
-// GetKnowledgeByCommit calls GetKnowledgeByCommitFunc.
-func (mock *RepositoryMock) GetKnowledgeByCommit(ctx context.Context, topic types.KnowledgeTopic, slug types.KnowledgeSlug, commitID string) (*knowledge.Knowledge, error) {
+// GetKnowledgeLog calls GetKnowledgeLogFunc.
+func (mock *RepositoryMock) GetKnowledgeLog(ctx context.Context, knowledgeID types.KnowledgeID, logID types.KnowledgeLogID) (*knowledge.KnowledgeLog, error) {
 	callInfo := struct {
-		Ctx      context.Context
-		Topic    types.KnowledgeTopic
-		Slug     types.KnowledgeSlug
-		CommitID string
+		Ctx         context.Context
+		KnowledgeID types.KnowledgeID
+		LogID       types.KnowledgeLogID
 	}{
-		Ctx:      ctx,
-		Topic:    topic,
-		Slug:     slug,
-		CommitID: commitID,
+		Ctx:         ctx,
+		KnowledgeID: knowledgeID,
+		LogID:       logID,
 	}
-	mock.lockGetKnowledgeByCommit.Lock()
-	mock.calls.GetKnowledgeByCommit = append(mock.calls.GetKnowledgeByCommit, callInfo)
-	mock.lockGetKnowledgeByCommit.Unlock()
-	if mock.GetKnowledgeByCommitFunc == nil {
+	mock.lockGetKnowledgeLog.Lock()
+	mock.calls.GetKnowledgeLog = append(mock.calls.GetKnowledgeLog, callInfo)
+	mock.lockGetKnowledgeLog.Unlock()
+	if mock.GetKnowledgeLogFunc == nil {
 		var (
-			knowledgeOut *knowledge.Knowledge
-			errOut       error
+			knowledgeLogOut *knowledge.KnowledgeLog
+			errOut          error
 		)
-		return knowledgeOut, errOut
+		return knowledgeLogOut, errOut
 	}
-	return mock.GetKnowledgeByCommitFunc(ctx, topic, slug, commitID)
+	return mock.GetKnowledgeLogFunc(ctx, knowledgeID, logID)
 }
 
-// GetKnowledgeByCommitCalls gets all the calls that were made to GetKnowledgeByCommit.
+// GetKnowledgeLogCalls gets all the calls that were made to GetKnowledgeLog.
 // Check the length with:
 //
-//	len(mockedRepository.GetKnowledgeByCommitCalls())
-func (mock *RepositoryMock) GetKnowledgeByCommitCalls() []struct {
-	Ctx      context.Context
-	Topic    types.KnowledgeTopic
-	Slug     types.KnowledgeSlug
-	CommitID string
+//	len(mockedRepository.GetKnowledgeLogCalls())
+func (mock *RepositoryMock) GetKnowledgeLogCalls() []struct {
+	Ctx         context.Context
+	KnowledgeID types.KnowledgeID
+	LogID       types.KnowledgeLogID
 } {
 	var calls []struct {
-		Ctx      context.Context
-		Topic    types.KnowledgeTopic
-		Slug     types.KnowledgeSlug
-		CommitID string
+		Ctx         context.Context
+		KnowledgeID types.KnowledgeID
+		LogID       types.KnowledgeLogID
 	}
-	mock.lockGetKnowledgeByCommit.RLock()
-	calls = mock.calls.GetKnowledgeByCommit
-	mock.lockGetKnowledgeByCommit.RUnlock()
+	mock.lockGetKnowledgeLog.RLock()
+	calls = mock.calls.GetKnowledgeLog
+	mock.lockGetKnowledgeLog.RUnlock()
 	return calls
 }
 
-// GetKnowledges calls GetKnowledgesFunc.
-func (mock *RepositoryMock) GetKnowledges(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.Knowledge, error) {
+// GetKnowledgeTag calls GetKnowledgeTagFunc.
+func (mock *RepositoryMock) GetKnowledgeTag(ctx context.Context, id types.KnowledgeTagID) (*knowledge.KnowledgeTag, error) {
 	callInfo := struct {
-		Ctx   context.Context
-		Topic types.KnowledgeTopic
+		Ctx context.Context
+		ID  types.KnowledgeTagID
 	}{
-		Ctx:   ctx,
-		Topic: topic,
+		Ctx: ctx,
+		ID:  id,
 	}
-	mock.lockGetKnowledges.Lock()
-	mock.calls.GetKnowledges = append(mock.calls.GetKnowledges, callInfo)
-	mock.lockGetKnowledges.Unlock()
-	if mock.GetKnowledgesFunc == nil {
+	mock.lockGetKnowledgeTag.Lock()
+	mock.calls.GetKnowledgeTag = append(mock.calls.GetKnowledgeTag, callInfo)
+	mock.lockGetKnowledgeTag.Unlock()
+	if mock.GetKnowledgeTagFunc == nil {
 		var (
-			knowledgesOut []*knowledge.Knowledge
-			errOut        error
+			knowledgeTagOut *knowledge.KnowledgeTag
+			errOut          error
 		)
-		return knowledgesOut, errOut
+		return knowledgeTagOut, errOut
 	}
-	return mock.GetKnowledgesFunc(ctx, topic)
+	return mock.GetKnowledgeTagFunc(ctx, id)
 }
 
-// GetKnowledgesCalls gets all the calls that were made to GetKnowledges.
+// GetKnowledgeTagCalls gets all the calls that were made to GetKnowledgeTag.
 // Check the length with:
 //
-//	len(mockedRepository.GetKnowledgesCalls())
-func (mock *RepositoryMock) GetKnowledgesCalls() []struct {
-	Ctx   context.Context
-	Topic types.KnowledgeTopic
+//	len(mockedRepository.GetKnowledgeTagCalls())
+func (mock *RepositoryMock) GetKnowledgeTagCalls() []struct {
+	Ctx context.Context
+	ID  types.KnowledgeTagID
 } {
 	var calls []struct {
-		Ctx   context.Context
-		Topic types.KnowledgeTopic
+		Ctx context.Context
+		ID  types.KnowledgeTagID
 	}
-	mock.lockGetKnowledges.RLock()
-	calls = mock.calls.GetKnowledges
-	mock.lockGetKnowledges.RUnlock()
+	mock.lockGetKnowledgeTag.RLock()
+	calls = mock.calls.GetKnowledgeTag
+	mock.lockGetKnowledgeTag.RUnlock()
 	return calls
 }
 
@@ -6684,6 +6814,46 @@ func (mock *RepositoryMock) GetRefineGroupCalls() []struct {
 	mock.lockGetRefineGroup.RLock()
 	calls = mock.calls.GetRefineGroup
 	mock.lockGetRefineGroup.RUnlock()
+	return calls
+}
+
+// GetReprocessBatchJob calls GetReprocessBatchJobFunc.
+func (mock *RepositoryMock) GetReprocessBatchJob(ctx context.Context, id types.ReprocessBatchJobID) (*alert.ReprocessBatchJob, error) {
+	callInfo := struct {
+		Ctx context.Context
+		ID  types.ReprocessBatchJobID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockGetReprocessBatchJob.Lock()
+	mock.calls.GetReprocessBatchJob = append(mock.calls.GetReprocessBatchJob, callInfo)
+	mock.lockGetReprocessBatchJob.Unlock()
+	if mock.GetReprocessBatchJobFunc == nil {
+		var (
+			reprocessBatchJobOut *alert.ReprocessBatchJob
+			errOut               error
+		)
+		return reprocessBatchJobOut, errOut
+	}
+	return mock.GetReprocessBatchJobFunc(ctx, id)
+}
+
+// GetReprocessBatchJobCalls gets all the calls that were made to GetReprocessBatchJob.
+// Check the length with:
+//
+//	len(mockedRepository.GetReprocessBatchJobCalls())
+func (mock *RepositoryMock) GetReprocessBatchJobCalls() []struct {
+	Ctx context.Context
+	ID  types.ReprocessBatchJobID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  types.ReprocessBatchJobID
+	}
+	mock.lockGetReprocessBatchJob.RLock()
+	calls = mock.calls.GetReprocessBatchJob
+	mock.lockGetReprocessBatchJob.RUnlock()
 	return calls
 }
 
@@ -7560,6 +7730,42 @@ func (mock *RepositoryMock) ListAllAgentIDsCalls() []struct {
 	return calls
 }
 
+// ListAllKnowledges calls ListAllKnowledgesFunc.
+func (mock *RepositoryMock) ListAllKnowledges(ctx context.Context) ([]*knowledge.Knowledge, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockListAllKnowledges.Lock()
+	mock.calls.ListAllKnowledges = append(mock.calls.ListAllKnowledges, callInfo)
+	mock.lockListAllKnowledges.Unlock()
+	if mock.ListAllKnowledgesFunc == nil {
+		var (
+			knowledgesOut []*knowledge.Knowledge
+			errOut        error
+		)
+		return knowledgesOut, errOut
+	}
+	return mock.ListAllKnowledgesFunc(ctx)
+}
+
+// ListAllKnowledgesCalls gets all the calls that were made to ListAllKnowledges.
+// Check the length with:
+//
+//	len(mockedRepository.ListAllKnowledgesCalls())
+func (mock *RepositoryMock) ListAllKnowledgesCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockListAllKnowledges.RLock()
+	calls = mock.calls.ListAllKnowledges
+	mock.lockListAllKnowledges.RUnlock()
+	return calls
+}
+
 // ListAllTags calls ListAllTagsFunc.
 func (mock *RepositoryMock) ListAllTags(ctx context.Context) ([]*tag.Tag, error) {
 	callInfo := struct {
@@ -7698,79 +7904,159 @@ func (mock *RepositoryMock) ListDiagnosisIssuesCalls() []struct {
 	return calls
 }
 
-// ListKnowledgeSlugs calls ListKnowledgeSlugsFunc.
-func (mock *RepositoryMock) ListKnowledgeSlugs(ctx context.Context, topic types.KnowledgeTopic) ([]*knowledge.SlugInfo, error) {
+// ListKnowledgeLogs calls ListKnowledgeLogsFunc.
+func (mock *RepositoryMock) ListKnowledgeLogs(ctx context.Context, knowledgeID types.KnowledgeID) ([]*knowledge.KnowledgeLog, error) {
 	callInfo := struct {
-		Ctx   context.Context
-		Topic types.KnowledgeTopic
+		Ctx         context.Context
+		KnowledgeID types.KnowledgeID
 	}{
-		Ctx:   ctx,
-		Topic: topic,
+		Ctx:         ctx,
+		KnowledgeID: knowledgeID,
 	}
-	mock.lockListKnowledgeSlugs.Lock()
-	mock.calls.ListKnowledgeSlugs = append(mock.calls.ListKnowledgeSlugs, callInfo)
-	mock.lockListKnowledgeSlugs.Unlock()
-	if mock.ListKnowledgeSlugsFunc == nil {
+	mock.lockListKnowledgeLogs.Lock()
+	mock.calls.ListKnowledgeLogs = append(mock.calls.ListKnowledgeLogs, callInfo)
+	mock.lockListKnowledgeLogs.Unlock()
+	if mock.ListKnowledgeLogsFunc == nil {
 		var (
-			slugInfosOut []*knowledge.SlugInfo
-			errOut       error
+			knowledgeLogsOut []*knowledge.KnowledgeLog
+			errOut           error
 		)
-		return slugInfosOut, errOut
+		return knowledgeLogsOut, errOut
 	}
-	return mock.ListKnowledgeSlugsFunc(ctx, topic)
+	return mock.ListKnowledgeLogsFunc(ctx, knowledgeID)
 }
 
-// ListKnowledgeSlugsCalls gets all the calls that were made to ListKnowledgeSlugs.
+// ListKnowledgeLogsCalls gets all the calls that were made to ListKnowledgeLogs.
 // Check the length with:
 //
-//	len(mockedRepository.ListKnowledgeSlugsCalls())
-func (mock *RepositoryMock) ListKnowledgeSlugsCalls() []struct {
-	Ctx   context.Context
-	Topic types.KnowledgeTopic
+//	len(mockedRepository.ListKnowledgeLogsCalls())
+func (mock *RepositoryMock) ListKnowledgeLogsCalls() []struct {
+	Ctx         context.Context
+	KnowledgeID types.KnowledgeID
 } {
 	var calls []struct {
-		Ctx   context.Context
-		Topic types.KnowledgeTopic
+		Ctx         context.Context
+		KnowledgeID types.KnowledgeID
 	}
-	mock.lockListKnowledgeSlugs.RLock()
-	calls = mock.calls.ListKnowledgeSlugs
-	mock.lockListKnowledgeSlugs.RUnlock()
+	mock.lockListKnowledgeLogs.RLock()
+	calls = mock.calls.ListKnowledgeLogs
+	mock.lockListKnowledgeLogs.RUnlock()
 	return calls
 }
 
-// ListKnowledgeTopics calls ListKnowledgeTopicsFunc.
-func (mock *RepositoryMock) ListKnowledgeTopics(ctx context.Context) ([]*knowledge.TopicSummary, error) {
+// ListKnowledgeTags calls ListKnowledgeTagsFunc.
+func (mock *RepositoryMock) ListKnowledgeTags(ctx context.Context) ([]*knowledge.KnowledgeTag, error) {
 	callInfo := struct {
 		Ctx context.Context
 	}{
 		Ctx: ctx,
 	}
-	mock.lockListKnowledgeTopics.Lock()
-	mock.calls.ListKnowledgeTopics = append(mock.calls.ListKnowledgeTopics, callInfo)
-	mock.lockListKnowledgeTopics.Unlock()
-	if mock.ListKnowledgeTopicsFunc == nil {
+	mock.lockListKnowledgeTags.Lock()
+	mock.calls.ListKnowledgeTags = append(mock.calls.ListKnowledgeTags, callInfo)
+	mock.lockListKnowledgeTags.Unlock()
+	if mock.ListKnowledgeTagsFunc == nil {
 		var (
-			topicSummarysOut []*knowledge.TopicSummary
+			knowledgeTagsOut []*knowledge.KnowledgeTag
 			errOut           error
 		)
-		return topicSummarysOut, errOut
+		return knowledgeTagsOut, errOut
 	}
-	return mock.ListKnowledgeTopicsFunc(ctx)
+	return mock.ListKnowledgeTagsFunc(ctx)
 }
 
-// ListKnowledgeTopicsCalls gets all the calls that were made to ListKnowledgeTopics.
+// ListKnowledgeTagsCalls gets all the calls that were made to ListKnowledgeTags.
 // Check the length with:
 //
-//	len(mockedRepository.ListKnowledgeTopicsCalls())
-func (mock *RepositoryMock) ListKnowledgeTopicsCalls() []struct {
+//	len(mockedRepository.ListKnowledgeTagsCalls())
+func (mock *RepositoryMock) ListKnowledgeTagsCalls() []struct {
 	Ctx context.Context
 } {
 	var calls []struct {
 		Ctx context.Context
 	}
-	mock.lockListKnowledgeTopics.RLock()
-	calls = mock.calls.ListKnowledgeTopics
-	mock.lockListKnowledgeTopics.RUnlock()
+	mock.lockListKnowledgeTags.RLock()
+	calls = mock.calls.ListKnowledgeTags
+	mock.lockListKnowledgeTags.RUnlock()
+	return calls
+}
+
+// ListKnowledgesByCategoryAndTags calls ListKnowledgesByCategoryAndTagsFunc.
+func (mock *RepositoryMock) ListKnowledgesByCategoryAndTags(ctx context.Context, category types.KnowledgeCategory, tagIDs []types.KnowledgeTagID) ([]*knowledge.Knowledge, error) {
+	callInfo := struct {
+		Ctx      context.Context
+		Category types.KnowledgeCategory
+		TagIDs   []types.KnowledgeTagID
+	}{
+		Ctx:      ctx,
+		Category: category,
+		TagIDs:   tagIDs,
+	}
+	mock.lockListKnowledgesByCategoryAndTags.Lock()
+	mock.calls.ListKnowledgesByCategoryAndTags = append(mock.calls.ListKnowledgesByCategoryAndTags, callInfo)
+	mock.lockListKnowledgesByCategoryAndTags.Unlock()
+	if mock.ListKnowledgesByCategoryAndTagsFunc == nil {
+		var (
+			knowledgesOut []*knowledge.Knowledge
+			errOut        error
+		)
+		return knowledgesOut, errOut
+	}
+	return mock.ListKnowledgesByCategoryAndTagsFunc(ctx, category, tagIDs)
+}
+
+// ListKnowledgesByCategoryAndTagsCalls gets all the calls that were made to ListKnowledgesByCategoryAndTags.
+// Check the length with:
+//
+//	len(mockedRepository.ListKnowledgesByCategoryAndTagsCalls())
+func (mock *RepositoryMock) ListKnowledgesByCategoryAndTagsCalls() []struct {
+	Ctx      context.Context
+	Category types.KnowledgeCategory
+	TagIDs   []types.KnowledgeTagID
+} {
+	var calls []struct {
+		Ctx      context.Context
+		Category types.KnowledgeCategory
+		TagIDs   []types.KnowledgeTagID
+	}
+	mock.lockListKnowledgesByCategoryAndTags.RLock()
+	calls = mock.calls.ListKnowledgesByCategoryAndTags
+	mock.lockListKnowledgesByCategoryAndTags.RUnlock()
+	return calls
+}
+
+// ListLegacyKnowledges calls ListLegacyKnowledgesFunc.
+func (mock *RepositoryMock) ListLegacyKnowledges(ctx context.Context) ([]*interfaces.LegacyKnowledge, error) {
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockListLegacyKnowledges.Lock()
+	mock.calls.ListLegacyKnowledges = append(mock.calls.ListLegacyKnowledges, callInfo)
+	mock.lockListLegacyKnowledges.Unlock()
+	if mock.ListLegacyKnowledgesFunc == nil {
+		var (
+			legacyKnowledgesOut []*interfaces.LegacyKnowledge
+			errOut              error
+		)
+		return legacyKnowledgesOut, errOut
+	}
+	return mock.ListLegacyKnowledgesFunc(ctx)
+}
+
+// ListLegacyKnowledgesCalls gets all the calls that were made to ListLegacyKnowledges.
+// Check the length with:
+//
+//	len(mockedRepository.ListLegacyKnowledgesCalls())
+func (mock *RepositoryMock) ListLegacyKnowledgesCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockListLegacyKnowledges.RLock()
+	calls = mock.calls.ListLegacyKnowledges
+	mock.lockListLegacyKnowledges.RUnlock()
 	return calls
 }
 
@@ -8174,6 +8460,84 @@ func (mock *RepositoryMock) PutKnowledgeCalls() []struct {
 	return calls
 }
 
+// PutKnowledgeLog calls PutKnowledgeLogFunc.
+func (mock *RepositoryMock) PutKnowledgeLog(ctx context.Context, log *knowledge.KnowledgeLog) error {
+	callInfo := struct {
+		Ctx context.Context
+		Log *knowledge.KnowledgeLog
+	}{
+		Ctx: ctx,
+		Log: log,
+	}
+	mock.lockPutKnowledgeLog.Lock()
+	mock.calls.PutKnowledgeLog = append(mock.calls.PutKnowledgeLog, callInfo)
+	mock.lockPutKnowledgeLog.Unlock()
+	if mock.PutKnowledgeLogFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutKnowledgeLogFunc(ctx, log)
+}
+
+// PutKnowledgeLogCalls gets all the calls that were made to PutKnowledgeLog.
+// Check the length with:
+//
+//	len(mockedRepository.PutKnowledgeLogCalls())
+func (mock *RepositoryMock) PutKnowledgeLogCalls() []struct {
+	Ctx context.Context
+	Log *knowledge.KnowledgeLog
+} {
+	var calls []struct {
+		Ctx context.Context
+		Log *knowledge.KnowledgeLog
+	}
+	mock.lockPutKnowledgeLog.RLock()
+	calls = mock.calls.PutKnowledgeLog
+	mock.lockPutKnowledgeLog.RUnlock()
+	return calls
+}
+
+// PutKnowledgeTag calls PutKnowledgeTagFunc.
+func (mock *RepositoryMock) PutKnowledgeTag(ctx context.Context, tagMoqParam *knowledge.KnowledgeTag) error {
+	callInfo := struct {
+		Ctx         context.Context
+		TagMoqParam *knowledge.KnowledgeTag
+	}{
+		Ctx:         ctx,
+		TagMoqParam: tagMoqParam,
+	}
+	mock.lockPutKnowledgeTag.Lock()
+	mock.calls.PutKnowledgeTag = append(mock.calls.PutKnowledgeTag, callInfo)
+	mock.lockPutKnowledgeTag.Unlock()
+	if mock.PutKnowledgeTagFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutKnowledgeTagFunc(ctx, tagMoqParam)
+}
+
+// PutKnowledgeTagCalls gets all the calls that were made to PutKnowledgeTag.
+// Check the length with:
+//
+//	len(mockedRepository.PutKnowledgeTagCalls())
+func (mock *RepositoryMock) PutKnowledgeTagCalls() []struct {
+	Ctx         context.Context
+	TagMoqParam *knowledge.KnowledgeTag
+} {
+	var calls []struct {
+		Ctx         context.Context
+		TagMoqParam *knowledge.KnowledgeTag
+	}
+	mock.lockPutKnowledgeTag.RLock()
+	calls = mock.calls.PutKnowledgeTag
+	mock.lockPutKnowledgeTag.RUnlock()
+	return calls
+}
+
 // PutQueuedAlert calls PutQueuedAlertFunc.
 func (mock *RepositoryMock) PutQueuedAlert(ctx context.Context, qa *alert.QueuedAlert) error {
 	callInfo := struct {
@@ -8249,6 +8613,45 @@ func (mock *RepositoryMock) PutRefineGroupCalls() []struct {
 	mock.lockPutRefineGroup.RLock()
 	calls = mock.calls.PutRefineGroup
 	mock.lockPutRefineGroup.RUnlock()
+	return calls
+}
+
+// PutReprocessBatchJob calls PutReprocessBatchJobFunc.
+func (mock *RepositoryMock) PutReprocessBatchJob(ctx context.Context, job *alert.ReprocessBatchJob) error {
+	callInfo := struct {
+		Ctx context.Context
+		Job *alert.ReprocessBatchJob
+	}{
+		Ctx: ctx,
+		Job: job,
+	}
+	mock.lockPutReprocessBatchJob.Lock()
+	mock.calls.PutReprocessBatchJob = append(mock.calls.PutReprocessBatchJob, callInfo)
+	mock.lockPutReprocessBatchJob.Unlock()
+	if mock.PutReprocessBatchJobFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutReprocessBatchJobFunc(ctx, job)
+}
+
+// PutReprocessBatchJobCalls gets all the calls that were made to PutReprocessBatchJob.
+// Check the length with:
+//
+//	len(mockedRepository.PutReprocessBatchJobCalls())
+func (mock *RepositoryMock) PutReprocessBatchJobCalls() []struct {
+	Ctx context.Context
+	Job *alert.ReprocessBatchJob
+} {
+	var calls []struct {
+		Ctx context.Context
+		Job *alert.ReprocessBatchJob
+	}
+	mock.lockPutReprocessBatchJob.RLock()
+	calls = mock.calls.PutReprocessBatchJob
+	mock.lockPutReprocessBatchJob.RUnlock()
 	return calls
 }
 
@@ -9699,6 +10102,9 @@ func (mock *LLMClientMock) NewSessionCalls() []struct {
 //			CountTokenFunc: func(ctx context.Context, input ...gollem.Input) (int, error) {
 //				panic("mock out the CountToken method")
 //			},
+//			GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
+//				panic("mock out the Generate method")
+//			},
 //			GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
 //				panic("mock out the GenerateContent method")
 //			},
@@ -9707,6 +10113,9 @@ func (mock *LLMClientMock) NewSessionCalls() []struct {
 //			},
 //			HistoryFunc: func() (*gollem.History, error) {
 //				panic("mock out the History method")
+//			},
+//			StreamFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (<-chan *gollem.Response, error) {
+//				panic("mock out the Stream method")
 //			},
 //		}
 //
@@ -9721,6 +10130,9 @@ type LLMSessionMock struct {
 	// CountTokenFunc mocks the CountToken method.
 	CountTokenFunc func(ctx context.Context, input ...gollem.Input) (int, error)
 
+	// GenerateFunc mocks the Generate method.
+	GenerateFunc func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error)
+
 	// GenerateContentFunc mocks the GenerateContent method.
 	GenerateContentFunc func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error)
 
@@ -9729,6 +10141,9 @@ type LLMSessionMock struct {
 
 	// HistoryFunc mocks the History method.
 	HistoryFunc func() (*gollem.History, error)
+
+	// StreamFunc mocks the Stream method.
+	StreamFunc func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (<-chan *gollem.Response, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -9743,6 +10158,15 @@ type LLMSessionMock struct {
 			Ctx context.Context
 			// Input is the input argument value.
 			Input []gollem.Input
+		}
+		// Generate holds details about calls to the Generate method.
+		Generate []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Input is the input argument value.
+			Input []gollem.Input
+			// Opts is the opts argument value.
+			Opts []gollem.GenerateOption
 		}
 		// GenerateContent holds details about calls to the GenerateContent method.
 		GenerateContent []struct {
@@ -9761,12 +10185,23 @@ type LLMSessionMock struct {
 		// History holds details about calls to the History method.
 		History []struct {
 		}
+		// Stream holds details about calls to the Stream method.
+		Stream []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Input is the input argument value.
+			Input []gollem.Input
+			// Opts is the opts argument value.
+			Opts []gollem.GenerateOption
+		}
 	}
 	lockAppendHistory   sync.RWMutex
 	lockCountToken      sync.RWMutex
+	lockGenerate        sync.RWMutex
 	lockGenerateContent sync.RWMutex
 	lockGenerateStream  sync.RWMutex
 	lockHistory         sync.RWMutex
+	lockStream          sync.RWMutex
 }
 
 // AppendHistory calls AppendHistoryFunc.
@@ -9841,6 +10276,50 @@ func (mock *LLMSessionMock) CountTokenCalls() []struct {
 	mock.lockCountToken.RLock()
 	calls = mock.calls.CountToken
 	mock.lockCountToken.RUnlock()
+	return calls
+}
+
+// Generate calls GenerateFunc.
+func (mock *LLMSessionMock) Generate(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		Input []gollem.Input
+		Opts  []gollem.GenerateOption
+	}{
+		Ctx:   ctx,
+		Input: input,
+		Opts:  opts,
+	}
+	mock.lockGenerate.Lock()
+	mock.calls.Generate = append(mock.calls.Generate, callInfo)
+	mock.lockGenerate.Unlock()
+	if mock.GenerateFunc == nil {
+		var (
+			responseOut *gollem.Response
+			errOut      error
+		)
+		return responseOut, errOut
+	}
+	return mock.GenerateFunc(ctx, input, opts...)
+}
+
+// GenerateCalls gets all the calls that were made to Generate.
+// Check the length with:
+//
+//	len(mockedLLMSession.GenerateCalls())
+func (mock *LLMSessionMock) GenerateCalls() []struct {
+	Ctx   context.Context
+	Input []gollem.Input
+	Opts  []gollem.GenerateOption
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Input []gollem.Input
+		Opts  []gollem.GenerateOption
+	}
+	mock.lockGenerate.RLock()
+	calls = mock.calls.Generate
+	mock.lockGenerate.RUnlock()
 	return calls
 }
 
@@ -9952,6 +10431,50 @@ func (mock *LLMSessionMock) HistoryCalls() []struct {
 	mock.lockHistory.RLock()
 	calls = mock.calls.History
 	mock.lockHistory.RUnlock()
+	return calls
+}
+
+// Stream calls StreamFunc.
+func (mock *LLMSessionMock) Stream(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (<-chan *gollem.Response, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		Input []gollem.Input
+		Opts  []gollem.GenerateOption
+	}{
+		Ctx:   ctx,
+		Input: input,
+		Opts:  opts,
+	}
+	mock.lockStream.Lock()
+	mock.calls.Stream = append(mock.calls.Stream, callInfo)
+	mock.lockStream.Unlock()
+	if mock.StreamFunc == nil {
+		var (
+			responseChOut <-chan *gollem.Response
+			errOut        error
+		)
+		return responseChOut, errOut
+	}
+	return mock.StreamFunc(ctx, input, opts...)
+}
+
+// StreamCalls gets all the calls that were made to Stream.
+// Check the length with:
+//
+//	len(mockedLLMSession.StreamCalls())
+func (mock *LLMSessionMock) StreamCalls() []struct {
+	Ctx   context.Context
+	Input []gollem.Input
+	Opts  []gollem.GenerateOption
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Input []gollem.Input
+		Opts  []gollem.GenerateOption
+	}
+	mock.lockStream.RLock()
+	calls = mock.calls.Stream
+	mock.lockStream.RUnlock()
 	return calls
 }
 

@@ -58,7 +58,7 @@ func TestHandleAlert_NoSimilarAlert(t *testing.T) {
 	llmMock := &gollem_mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &gollem_mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{
 							`{"title": "test title", "description": "test description"}`,
@@ -610,7 +610,7 @@ func TestHandleAlert_DefaultPolicyMode(t *testing.T) {
 	llmMock := &gollem_mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &gollem_mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{
 							`{"title": "Test Alert", "description": "Test Description"}`,
@@ -715,7 +715,7 @@ func TestHandleAlert_ExistingPolicyUnchanged(t *testing.T) {
 	llmMock := &gollem_mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &gollem_mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{
 							`{"title": "Policy Alert", "description": "Policy Description"}`,
@@ -801,7 +801,7 @@ func TestHandleAlert_PolicyWithTags(t *testing.T) {
 	llmMock := &gollem_mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &gollem_mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{
 							`{"title": "test title", "description": "test description"}`,
@@ -925,7 +925,7 @@ func TestHandleAlert_PolicyWithNewAndExistingTags(t *testing.T) {
 	llmMock := &gollem_mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &gollem_mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{
 							`{"title": "test title", "description": "test description"}`,
@@ -1050,7 +1050,7 @@ func TestHandleAlert_PolicyTagDuplicationPrevention(t *testing.T) {
 	llmMock := &gollem_mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			return &gollem_mock.SessionMock{
-				GenerateContentFunc: func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+				GenerateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					return &gollem.Response{
 						Texts: []string{
 							`{"title": "test title", "description": "test description"}`,

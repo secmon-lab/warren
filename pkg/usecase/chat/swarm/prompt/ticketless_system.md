@@ -38,31 +38,25 @@ The following messages provide context from the Slack channel:
 {{ end }}
 {{- end }}
 
+## Knowledge Base
+{{ if .knowledge_tags }}
+Use `knowledge_search` to search for relevant prior knowledge before planning. If the search results alone are sufficient to answer the user's question, respond directly in the `message` field without creating any tasks.
+
+### Available Tags
+{{ range .knowledge_tags }}- `{{ .ID }}`: {{ .Name }}{{ if .Description }} — {{ .Description }}{{ end }}
+{{ end }}
+Specify at least one tag when searching.
+{{ else }}
+No knowledge base is configured.
+{{ end }}
+
 ## Available Tools
 {{ .tools_description }}
-
-## Available Sub-Agents
-{{ .subagents_description }}
-{{ if .memory_context }}
-
-## Past Insights (Agent Memory)
-{{ .memory_context }}
-{{ end }}
 {{ if .user_prompt }}
 
 ## User System Prompt
 {{ .user_prompt }}
 {{ end }}
-{{ if .knowledges }}
-
-## Domain Knowledge
-{{ range .knowledges }}
-
-### {{ .Name }}
-
-{{ .Content }}
-{{ end }}
-{{- end }}
 
 ## Asking Users for Information
 

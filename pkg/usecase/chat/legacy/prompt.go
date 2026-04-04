@@ -8,7 +8,6 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
-	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -26,7 +25,7 @@ var ticketlessSystemPromptTemplate string
 var toolCallToTextPromptTemplate string
 
 // GenerateChatSystemPrompt generates the chat system prompt from template and parameters.
-func GenerateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertCount int, additionalInstructions string, knowledges []*knowledge.Knowledge, requesterID string, threadComments []ticket.Comment, userSystemPrompt string, historyMessages []model.HistoryMessage) (string, error) {
+func GenerateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertCount int, additionalInstructions string, requesterID string, threadComments []ticket.Comment, userSystemPrompt string, historyMessages []model.HistoryMessage) (string, error) {
 	ticketJSON, err := json.MarshalIndent(target, "", "  ")
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to marshal ticket to JSON")
@@ -36,7 +35,6 @@ func GenerateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertC
 		"ticket_json":             "```json\n" + string(ticketJSON) + "\n```",
 		"total":                   alertCount,
 		"additional_instructions": additionalInstructions,
-		"knowledges":              knowledges,
 		"topic":                   target.Topic,
 		"lang":                    lang.From(ctx),
 		"requester_id":            requesterID,
@@ -47,11 +45,10 @@ func GenerateChatSystemPrompt(ctx context.Context, target *ticket.Ticket, alertC
 }
 
 // GenerateTicketlessSystemPrompt generates the system prompt for ticketless chat.
-func GenerateTicketlessSystemPrompt(ctx context.Context, historyMessages []model.HistoryMessage, additionalInstructions string, knowledges []*knowledge.Knowledge, requesterID string, userSystemPrompt string) (string, error) {
+func GenerateTicketlessSystemPrompt(ctx context.Context, historyMessages []model.HistoryMessage, additionalInstructions string, requesterID string, userSystemPrompt string) (string, error) {
 	return prompt.GenerateWithStruct(ctx, ticketlessSystemPromptTemplate, map[string]any{
 		"history_messages":        historyMessages,
 		"additional_instructions": additionalInstructions,
-		"knowledges":              knowledges,
 		"lang":                    lang.From(ctx),
 		"requester_id":            requesterID,
 		"user_system_prompt":      userSystemPrompt,
@@ -86,7 +83,7 @@ func ToolCallToText(ctx context.Context, llmClient gollem.LLMClient, spec *golle
 		return defaultMsg
 	}
 
-	response, err := session.GenerateContent(ctx, gollem.Text(p))
+	response, err := session.Generate(ctx, []gollem.Input{gollem.Text(p)})
 	if err != nil {
 		errutil.Handle(ctx, eb.Wrap(err, "failed to generate content"))
 		return defaultMsg

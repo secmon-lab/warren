@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"strings"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
@@ -19,8 +19,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
-	"github.com/secmon-lab/warren/pkg/service/llm"
-	"github.com/secmon-lab/warren/pkg/service/memory"
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/usecase/chat"
@@ -42,9 +41,8 @@ type SwarmChat struct {
 	policyClient        interfaces.PolicyClient
 	storageClient       interfaces.StorageClient
 	slackService        *slackService.Service
-	memoryService       *memory.Service
-	tools               []gollem.ToolSet
-	subAgents           []*agent.SubAgent
+	knowledgeService    *svcknowledge.Service
+	tools               []interfaces.ToolSet
 	storagePrefix       string
 	noAuthorization     bool
 	frontendURL         string
@@ -65,13 +63,8 @@ func WithSlackService(svc *slackService.Service) Option {
 }
 
 // WithTools sets the tool sets available to the agent.
-func WithTools(tools []gollem.ToolSet) Option {
+func WithTools(tools []interfaces.ToolSet) Option {
 	return func(c *SwarmChat) { c.tools = append(c.tools, tools...) }
-}
-
-// WithSubAgents sets the sub-agents available to the agent.
-func WithSubAgents(subAgents []*agent.SubAgent) Option {
-	return func(c *SwarmChat) { c.subAgents = append(c.subAgents, subAgents...) }
 }
 
 // WithStorageClient sets the storage client for history persistence.
@@ -104,9 +97,9 @@ func WithTraceRepository(repo trace.Repository) Option {
 	return func(c *SwarmChat) { c.traceRepository = repo }
 }
 
-// WithMemoryService sets the memory service for agent memory integration.
-func WithMemoryService(svc *memory.Service) Option {
-	return func(c *SwarmChat) { c.memoryService = svc }
+// WithKnowledgeService sets the knowledge v2 service for reflection.
+func WithKnowledgeService(svc *svcknowledge.Service) Option {
+	return func(c *SwarmChat) { c.knowledgeService = svc }
 }
 
 // WithMaxPhases sets the maximum number of execution phases.
@@ -141,20 +134,6 @@ func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient in
 	}
 	for _, opt := range opts {
 		opt(c)
-	}
-
-	// Inject cross-cutting middleware into all sub-agents once at construction time.
-	// - CompactionMiddleware: prevents "prompt is too long" errors when sub-agents
-	//   accumulate large tool results (e.g. falcon_search_events returning ~1MB).
-	// - Budget middleware: context-aware tracker per task (avoids accumulation bug).
-	subAgentOpts := []gollem.Option{
-		gollem.WithContentBlockMiddleware(llm.NewCompactionMiddleware(c.llmClient, logging.Default())),
-	}
-	if c.budgetStrategy != nil {
-		subAgentOpts = append(subAgentOpts, gollem.WithToolMiddleware(newContextAwareBudgetMiddleware()))
-	}
-	for _, sa := range c.subAgents {
-		gollem.WithSubAgentOptions(subAgentOpts...)(sa.Inner())
 	}
 
 	return c
@@ -259,33 +238,29 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 
 	// Build planning context from ChatContext
 	planCtx := &planningContext{
-		message:        message,
-		ticket:         target,
-		alerts:         chatCtx.Alerts,
-		tools:          chatCtx.Tools,
-		subAgents:      c.subAgents,
-		memoryContext:  chatCtx.MemoryContext,
-		userPrompt:     c.userSystemPrompt,
-		lang:           lang.From(ctx),
-		requesterID:    string(types.UserID(user.FromContext(ctx))),
-		threadComments: chatCtx.ThreadComments,
-		knowledges:     chatCtx.Knowledges,
-		slackHistory:   chatCtx.SlackHistory,
+		message:          message,
+		ticket:           target,
+		alerts:           chatCtx.Alerts,
+		tools:            c.tools,
+		userPrompt:       c.userSystemPrompt,
+		lang:             lang.From(ctx),
+		requesterID:      string(types.UserID(user.FromContext(ctx))),
+		threadComments:   chatCtx.ThreadComments,
+		slackHistory:     chatCtx.SlackHistory,
+		knowledgeService: c.knowledgeService,
 	}
 
 	// Generate system prompt once (shared across plan/replan/final sessions)
 	var systemPrompt string
 	if ticketless {
 		tlpc := &ticketlessPlanningContext{
-			message:       message,
-			tools:         chatCtx.Tools,
-			subAgents:     c.subAgents,
-			memoryContext: chatCtx.MemoryContext,
-			userPrompt:    c.userSystemPrompt,
-			lang:          lang.From(ctx),
-			requesterID:   string(types.UserID(user.FromContext(ctx))),
-			knowledges:    chatCtx.Knowledges,
-			history:       chatCtx.SlackHistory,
+			message:          message,
+			tools:            c.tools,
+			userPrompt:       c.userSystemPrompt,
+			lang:             lang.From(ctx),
+			requesterID:      string(types.UserID(user.FromContext(ctx))),
+			history:          chatCtx.SlackHistory,
+			knowledgeService: c.knowledgeService,
 		}
 		var err error
 		systemPrompt, err = generateTicketlessSystemPrompt(ctx, tlpc)
@@ -316,7 +291,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 	}
 
 	// Planning phase
-	planResult, err := c.plan(ctx, planSession, planCtx)
+	planResult, err := c.plan(ctx, planSession, planCtx, systemPrompt)
 	if err != nil {
 		if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
 			return abortErr
@@ -477,11 +452,32 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 
 	msg.Notify(ctx, "💬 %s", finalResp)
 
+	// Trigger fact knowledge reflection in background
+	c.triggerFactReflection(ctx, buildReflectionSummary(allResults), target)
+
 	if !ticketless {
 		logger.Debug("swarm executeSwarm: completed, saving history")
 		return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
 	}
 	return nil
+}
+
+// buildReflectionSummary aggregates all task results into a text summary for reflection.
+func buildReflectionSummary(allResults []*phaseResult) string {
+	var sb strings.Builder
+	for _, pr := range allResults {
+		for i, r := range pr.results {
+			if r == nil || r.Result == "" {
+				continue
+			}
+			title := ""
+			if i < len(pr.tasks) {
+				title = pr.tasks[i].Title
+			}
+			fmt.Fprintf(&sb, "## Task: %s\n%s\n\n", title, r.Result)
+		}
+	}
+	return sb.String()
 }
 
 // phaseResult stores the results of a single phase execution.

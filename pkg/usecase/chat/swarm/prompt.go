@@ -10,14 +10,15 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
+	knowledgeModel "github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
-	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
 //go:embed prompt/system.md
@@ -40,18 +41,16 @@ var finalPromptTemplate string
 
 // planningContext holds the shared context for planning operations.
 type planningContext struct {
-	message        string
-	ticket         *ticket.Ticket
-	alerts         []*alert.Alert
-	tools          []gollem.ToolSet
-	subAgents      []*agent.SubAgent
-	memoryContext  string
-	userPrompt     string
-	lang           lang.Lang
-	requesterID    string
-	threadComments []ticket.Comment
-	knowledges     []*knowledge.Knowledge
-	slackHistory   []model.HistoryMessage
+	message          string
+	ticket           *ticket.Ticket
+	alerts           []*alert.Alert
+	tools            []interfaces.ToolSet
+	userPrompt       string
+	lang             lang.Lang
+	requesterID      string
+	threadComments   []ticket.Comment
+	slackHistory     []model.HistoryMessage
+	knowledgeService *svcknowledge.Service
 }
 
 // generateSystemPrompt generates the shared system prompt containing static context.
@@ -59,19 +58,17 @@ func generateSystemPrompt(ctx context.Context, pc *planningContext) (string, err
 	ticketJSON, alertJSON, alertCount := marshalContext(pc)
 
 	return prompt.GenerateWithStruct(ctx, systemPromptTemplate, map[string]any{
-		"ticket_json":           ticketJSON,
-		"alert_json":            alertJSON,
-		"alert_count":           alertCount,
-		"tools_description":     describeTools(ctx, pc.tools),
-		"subagents_description": describeSubAgents(pc.subAgents),
-		"memory_context":        pc.memoryContext,
-		"user_prompt":           pc.userPrompt,
-		"lang":                  pc.lang,
-		"requester_id":          pc.requesterID,
-		"thread_comments":       pc.threadComments,
-		"knowledges":            pc.knowledges,
-		"topic":                 pc.ticket.Topic,
-		"history_messages":      pc.slackHistory,
+		"ticket_json":       ticketJSON,
+		"alert_json":        alertJSON,
+		"alert_count":       alertCount,
+		"tools_description": describeTools(ctx, pc.tools),
+		"user_prompt":       pc.userPrompt,
+		"lang":              pc.lang,
+		"requester_id":      pc.requesterID,
+		"thread_comments":   pc.threadComments,
+		"topic":             pc.ticket.Topic,
+		"history_messages":  pc.slackHistory,
+		"knowledge_tags":    fetchKnowledgeTags(ctx, pc.knowledgeService),
 	})
 }
 
@@ -92,12 +89,24 @@ func generateReplanPrompt(ctx context.Context, pc *planningContext, allResults [
 }
 
 // generateTaskPrompt generates the system prompt for a task agent.
-func generateTaskPrompt(ctx context.Context, task TaskPlan) (string, error) {
-	return prompt.Generate(ctx, taskPromptTemplate, map[string]any{
+// If knowledgeSvc is non-nil, it fetches available tags and embeds them in the prompt.
+func generateTaskPrompt(ctx context.Context, task TaskPlan, knowledgeSvc *svcknowledge.Service) (string, error) {
+	data := map[string]any{
 		"title":               task.Title,
 		"description":         task.Description,
 		"acceptance_criteria": task.AcceptanceCriteria,
-	})
+	}
+
+	if knowledgeSvc != nil {
+		tags, err := knowledgeSvc.ListTags(ctx)
+		if err != nil {
+			logging.From(ctx).Warn("failed to list knowledge tags for task prompt", "error", err)
+		} else if len(tags) > 0 {
+			data["knowledge_tags"] = tags
+		}
+	}
+
+	return prompt.GenerateWithStruct(ctx, taskPromptTemplate, data)
 }
 
 // generateFinalPrompt generates the final response user message prompt.
@@ -112,28 +121,24 @@ func generateFinalPrompt(ctx context.Context, pc *planningContext, allResults []
 
 // ticketlessPlanningContext holds the shared context for ticketless planning operations.
 type ticketlessPlanningContext struct {
-	message       string
-	tools         []gollem.ToolSet
-	subAgents     []*agent.SubAgent
-	memoryContext string
-	userPrompt    string
-	lang          lang.Lang
-	requesterID   string
-	knowledges    []*knowledge.Knowledge
-	history       []model.HistoryMessage
+	message          string
+	tools            []interfaces.ToolSet
+	userPrompt       string
+	lang             lang.Lang
+	requesterID      string
+	history          []model.HistoryMessage
+	knowledgeService *svcknowledge.Service
 }
 
 // generateTicketlessSystemPrompt generates the system prompt for ticketless chat.
 func generateTicketlessSystemPrompt(ctx context.Context, pc *ticketlessPlanningContext) (string, error) {
 	return prompt.GenerateWithStruct(ctx, ticketlessSystemPromptTemplate, map[string]any{
-		"history_messages":      pc.history,
-		"tools_description":     describeTools(ctx, pc.tools),
-		"subagents_description": describeSubAgents(pc.subAgents),
-		"memory_context":        pc.memoryContext,
-		"user_prompt":           pc.userPrompt,
-		"lang":                  pc.lang,
-		"requester_id":          pc.requesterID,
-		"knowledges":            pc.knowledges,
+		"history_messages":  pc.history,
+		"tools_description": describeTools(ctx, pc.tools),
+		"user_prompt":       pc.userPrompt,
+		"lang":              pc.lang,
+		"requester_id":      pc.requesterID,
+		"knowledge_tags":    fetchKnowledgeTags(ctx, pc.knowledgeService),
 	})
 }
 
@@ -157,44 +162,32 @@ func marshalContext(pc *planningContext) (string, string, int) {
 	return string(ticketJSON), string(alertJSON), alertCount
 }
 
-// describeTools generates a text description of available tools.
-func describeTools(ctx context.Context, toolSets []gollem.ToolSet) string {
+// describeTools generates a text description of available tools grouped by ToolSet.
+func describeTools(ctx context.Context, toolSets []interfaces.ToolSet) string {
 	var b strings.Builder
 	for _, ts := range toolSets {
 		specs, err := ts.Specs(ctx)
 		if err != nil {
 			continue
 		}
+		var toolNames []string
 		for _, spec := range specs {
-			fmt.Fprintf(&b, "- `%s`: %s\n", spec.Name, spec.Description)
+			toolNames = append(toolNames, spec.Name)
+		}
+		fmt.Fprintf(&b, "- `%s` — %s\n", ts.ID(), ts.Description())
+		if len(toolNames) > 0 {
+			fmt.Fprintf(&b, "  Tools: %s\n", strings.Join(toolNames, ", "))
 		}
 
-		if tool, ok := ts.(interfaces.Tool); ok {
-			additionalPrompt, err := tool.Prompt(ctx)
-			if err == nil && additionalPrompt != "" {
-				fmt.Fprintf(&b, "  Additional: %s\n", additionalPrompt)
-			}
+		additionalPrompt, err := ts.Prompt(ctx)
+		if err != nil {
+			errutil.Handle(ctx, goerr.Wrap(err, "failed to get prompt from tool set", goerr.V("id", ts.ID())))
+		} else if additionalPrompt != "" {
+			fmt.Fprintf(&b, "  %s\n", additionalPrompt)
 		}
 	}
 	if b.Len() == 0 {
 		return "(no tools available)"
-	}
-	return b.String()
-}
-
-// describeSubAgents generates a text description of available sub-agents.
-func describeSubAgents(subAgents []*agent.SubAgent) string {
-	if len(subAgents) == 0 {
-		return "(no sub-agents available)"
-	}
-	var b strings.Builder
-	for _, sa := range subAgents {
-		inner := sa.Inner()
-		spec := inner.Spec()
-		fmt.Fprintf(&b, "- `%s`: %s\n", spec.Name, spec.Description)
-		if hint := sa.PromptHint(); hint != "" {
-			fmt.Fprintf(&b, "  Hint: %s\n", hint)
-		}
 	}
 	return b.String()
 }
@@ -236,16 +229,18 @@ func formatCompletedResults(allResults []*phaseResult) string {
 	return b.String()
 }
 
-// FormatMemories formats agent memories for inclusion in planning prompt.
-func FormatMemories(memories []*memory.AgentMemory) string {
-	if len(memories) == 0 {
-		return ""
+// fetchKnowledgeTags retrieves all knowledge tags for embedding in the planner prompt.
+// Returns nil if the knowledge service is not configured or an error occurs.
+func fetchKnowledgeTags(ctx context.Context, svc *svcknowledge.Service) []*knowledgeModel.KnowledgeTag {
+	if svc == nil {
+		return nil
 	}
-	var b strings.Builder
-	for _, m := range memories {
-		fmt.Fprintf(&b, "- **%s**: %s\n", m.Query, m.Claim)
+	tags, err := svc.ListTags(ctx)
+	if err != nil {
+		logging.From(ctx).Warn("failed to list knowledge tags for planning", "error", err)
+		return nil
 	}
-	return b.String()
+	return tags
 }
 
 // Schema definitions for structured LLM responses.
@@ -264,13 +259,7 @@ var taskSchema = &gollem.Parameter{
 		"tools": {
 			Type:        gollem.TypeArray,
 			Items:       &gollem.Parameter{Type: gollem.TypeString},
-			Description: "Tool names to make available for this task",
-			Required:    true,
-		},
-		"sub_agents": {
-			Type:        gollem.TypeArray,
-			Items:       &gollem.Parameter{Type: gollem.TypeString},
-			Description: "Sub-agent names to make available for this task (e.g. falcon, bigquery, slack)",
+			Description: "ToolSet names to make available for this task",
 			Required:    true,
 		},
 	},

@@ -146,6 +146,21 @@ func TestAttachFile(t *testing.T) {
 	gt.NoError(t, newThread.AttachFile(context.Background(), "test", "test.txt", []byte("test")))
 }
 
+func TestPostSectionBlock(t *testing.T) {
+	svc := newSlackService(t)
+
+	dummyAlert := genDummyAlert()
+	thread, err := svc.PostAlert(context.Background(), &dummyAlert)
+	gt.NoError(t, err).Required()
+
+	newThread := svc.NewThread(model.Thread{
+		ChannelID: thread.ChannelID(),
+		ThreadID:  thread.ThreadID(),
+	})
+
+	gt.NoError(t, newThread.PostSectionBlock(context.Background(), "📋 *[Test Task]*\n\nThis is a test task result that should be collapsed in Slack."))
+}
+
 func TestIsBotUser(t *testing.T) {
 	svc := newSlackService(t)
 

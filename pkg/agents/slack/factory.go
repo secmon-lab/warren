@@ -3,22 +3,18 @@ package slack
 import (
 	"context"
 
-	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	agentModel "github.com/secmon-lab/warren/pkg/domain/model/agent"
-	"github.com/secmon-lab/warren/pkg/service/memory"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	slackSDK "github.com/slack-go/slack"
 	"github.com/urfave/cli/v3"
 )
 
-// Factory implements agents.AgentFactory interface.
+// Factory implements agents.ToolSetFactory interface.
 type Factory struct {
 	oauthToken string
 }
 
-// Flags implements agents.AgentFactory
+// Flags implements agents.ToolSetFactory
 func (f *Factory) Flags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
@@ -31,29 +27,20 @@ func (f *Factory) Flags() []cli.Flag {
 	}
 }
 
-// Configure implements agents.AgentFactory
-func (f *Factory) Configure(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) (*agentModel.SubAgent, error) {
+// Configure implements agents.ToolSetFactory.
+// Returns (nil, nil) if the OAuth token is not set.
+func (f *Factory) Configure(ctx context.Context) (interfaces.ToolSet, error) {
 	if f.oauthToken == "" {
 		return nil, nil
 	}
 
 	slackClient := slackSDK.New(f.oauthToken)
 
-	a := &agent{
-		slackClient:   slackClient,
-		llmClient:     llmClient,
-		repo:          repo,
-		internalTool:  &internalTool{slackClient: slackClient},
-		memoryService: memory.New("slack_search", llmClient, repo),
+	ts := &toolSet{
+		tool: &internalTool{slackClient: slackClient},
 	}
 
 	logging.From(ctx).Info("Slack Search Agent configured")
 
-	subAgent, err := a.subAgent()
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create slack sub-agent")
-	}
-
-	// Slack agent has no config-dependent prompt hint
-	return agentModel.NewSubAgent(subAgent, ""), nil
+	return ts, nil
 }

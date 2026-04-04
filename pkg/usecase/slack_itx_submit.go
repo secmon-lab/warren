@@ -247,7 +247,7 @@ func (uc *UseCases) generateResolveMessage(ctx context.Context, ticket *ticket.T
 	}
 
 	// Generate content
-	response, err := session.GenerateContent(ctx, gollem.Text(resolvePrompt))
+	response, err := session.Generate(ctx, []gollem.Input{gollem.Text(resolvePrompt)})
 	if err != nil || len(response.Texts) == 0 || response.Texts[0] == "" {
 		// Fallback to default message if generation fails
 		return "🎉 Great work! Ticket resolved successfully 🎯"

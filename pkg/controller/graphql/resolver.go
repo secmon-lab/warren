@@ -6,6 +6,7 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/mrkdwn"
@@ -21,21 +22,36 @@ type Resolver struct {
 	slackService *slack.Service
 	mrkdwnConv   *mrkdwn.Converter
 	uc           *usecase.UseCases
+	knowledgeSvc *svcknowledge.Service
+}
+
+// ResolverOption configures a Resolver.
+type ResolverOption func(*Resolver)
+
+// WithKnowledgeService sets the knowledge service.
+func WithKnowledgeService(svc *svcknowledge.Service) ResolverOption {
+	return func(r *Resolver) {
+		r.knowledgeSvc = svc
+	}
 }
 
 // NewResolver creates a new resolver instance.
-func NewResolver(repo interfaces.Repository, slackService *slack.Service, uc *usecase.UseCases) *Resolver {
+func NewResolver(repo interfaces.Repository, slackService *slack.Service, uc *usecase.UseCases, opts ...ResolverOption) *Resolver {
 	var mrkdwnConv *mrkdwn.Converter
 	if slackService != nil {
 		mrkdwnConv = mrkdwn.NewConverter(slackService)
 	}
 
-	return &Resolver{
+	r := &Resolver{
 		repo:         repo,
 		slackService: slackService,
 		mrkdwnConv:   mrkdwnConv,
 		uc:           uc,
 	}
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
 }
 
 // createTagGetter creates a common tag getter function for resolving tag names

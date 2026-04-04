@@ -9,145 +9,207 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
-func TestKnowledgeValidate(t *testing.T) {
-	now := time.Now()
-	validKnowledge := &knowledge.Knowledge{
-		Slug:      "test-slug",
-		Name:      "Test Knowledge",
-		Topic:     "test-topic",
-		Content:   "Test content",
-		CommitID:  "abc123",
-		Author:    types.SystemUserID,
-		CreatedAt: now,
-		UpdatedAt: now,
-		State:     types.KnowledgeStateActive,
+func validKnowledge() *knowledge.Knowledge {
+	return &knowledge.Knowledge{
+		ID:        types.NewKnowledgeID(),
+		Category:  types.KnowledgeCategoryFact,
+		Title:     "svchost.exe",
+		Claim:     "Windows service host process.",
+		Tags:      []types.KnowledgeTagID{types.NewKnowledgeTagID()},
+		Author:    "user-1",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
+}
 
+func TestKnowledgeValidate(t *testing.T) {
 	t.Run("valid knowledge", func(t *testing.T) {
-		err := validKnowledge.Validate()
-		gt.NoError(t, err)
+		k := validKnowledge()
+		gt.NoError(t, k.Validate())
 	})
 
-	t.Run("empty slug", func(t *testing.T) {
-		k := *validKnowledge
-		k.Slug = ""
-		err := k.Validate()
-		gt.Error(t, err)
+	t.Run("empty ID", func(t *testing.T) {
+		k := validKnowledge()
+		k.ID = ""
+		gt.Error(t, k.Validate())
 	})
 
-	t.Run("empty name", func(t *testing.T) {
-		k := *validKnowledge
-		k.Name = ""
-		err := k.Validate()
-		gt.Error(t, err)
+	t.Run("invalid category", func(t *testing.T) {
+		k := validKnowledge()
+		k.Category = "invalid"
+		gt.Error(t, k.Validate())
 	})
 
-	t.Run("name too long", func(t *testing.T) {
-		k := *validKnowledge
-		k.Name = string(make([]byte, 101))
-		err := k.Validate()
-		gt.Error(t, err)
+	t.Run("empty title", func(t *testing.T) {
+		k := validKnowledge()
+		k.Title = ""
+		gt.Error(t, k.Validate())
 	})
 
-	t.Run("empty topic", func(t *testing.T) {
-		k := *validKnowledge
-		k.Topic = ""
-		err := k.Validate()
-		gt.Error(t, err)
-	})
-
-	t.Run("empty content", func(t *testing.T) {
-		k := *validKnowledge
-		k.Content = ""
-		err := k.Validate()
-		gt.Error(t, err)
-	})
-
-	t.Run("empty commit_id", func(t *testing.T) {
-		k := *validKnowledge
-		k.CommitID = ""
-		err := k.Validate()
-		gt.Error(t, err)
+	t.Run("empty claim", func(t *testing.T) {
+		k := validKnowledge()
+		k.Claim = ""
+		gt.Error(t, k.Validate())
 	})
 
 	t.Run("empty author", func(t *testing.T) {
-		k := *validKnowledge
+		k := validKnowledge()
 		k.Author = ""
-		err := k.Validate()
-		gt.Error(t, err)
+		gt.Error(t, k.Validate())
 	})
 
-	t.Run("invalid state", func(t *testing.T) {
-		k := *validKnowledge
-		k.State = "invalid"
-		err := k.Validate()
-		gt.Error(t, err)
-	})
-}
-
-func TestGenerateCommitID(t *testing.T) {
-	now := time.Now()
-	author := types.SystemUserID
-	content := "Test content"
-
-	t.Run("deterministic", func(t *testing.T) {
-		id1 := knowledge.GenerateCommitID(now, author, content)
-		id2 := knowledge.GenerateCommitID(now, author, content)
-		gt.Equal(t, id1, id2)
+	t.Run("zero created_at", func(t *testing.T) {
+		k := validKnowledge()
+		k.CreatedAt = time.Time{}
+		gt.Error(t, k.Validate())
 	})
 
-	t.Run("different time produces different ID", func(t *testing.T) {
-		id1 := knowledge.GenerateCommitID(now, author, content)
-		id2 := knowledge.GenerateCommitID(now.Add(time.Second), author, content)
-		gt.NotEqual(t, id1, id2)
+	t.Run("zero updated_at", func(t *testing.T) {
+		k := validKnowledge()
+		k.UpdatedAt = time.Time{}
+		gt.Error(t, k.Validate())
 	})
 
-	t.Run("different author produces different ID", func(t *testing.T) {
-		id1 := knowledge.GenerateCommitID(now, author, content)
-		id2 := knowledge.GenerateCommitID(now, "user123", content)
-		gt.NotEqual(t, id1, id2)
+	t.Run("invalid tag ID", func(t *testing.T) {
+		k := validKnowledge()
+		k.Tags = []types.KnowledgeTagID{""}
+		gt.Error(t, k.Validate())
 	})
 
-	t.Run("different content produces different ID", func(t *testing.T) {
-		id1 := knowledge.GenerateCommitID(now, author, content)
-		id2 := knowledge.GenerateCommitID(now, author, "Different content")
-		gt.NotEqual(t, id1, id2)
+	t.Run("fact category", func(t *testing.T) {
+		k := validKnowledge()
+		k.Category = types.KnowledgeCategoryFact
+		gt.NoError(t, k.Validate())
 	})
 
-	t.Run("ID is hex string", func(t *testing.T) {
-		id := knowledge.GenerateCommitID(now, author, content)
-		gt.Equal(t, len(id), 64) // SHA256 produces 64 hex characters
+	t.Run("technique category", func(t *testing.T) {
+		k := validKnowledge()
+		k.Category = types.KnowledgeCategoryTechnique
+		gt.NoError(t, k.Validate())
 	})
 }
 
-func TestKnowledgeSize(t *testing.T) {
-	k := &knowledge.Knowledge{
-		Content: "Test content",
+func TestKnowledgeLogValidate(t *testing.T) {
+	validLog := func() *knowledge.KnowledgeLog {
+		return &knowledge.KnowledgeLog{
+			ID:          types.NewKnowledgeLogID(),
+			KnowledgeID: types.NewKnowledgeID(),
+			Title:       "svchost.exe",
+			Claim:       "Windows service host process.",
+			Author:      "user-1",
+			Message:     "Initial creation",
+			CreatedAt:   time.Now(),
+		}
 	}
 
-	size := k.Size()
-	gt.Equal(t, size, len("Test content"))
+	t.Run("valid log", func(t *testing.T) {
+		l := validLog()
+		gt.NoError(t, l.Validate())
+	})
+
+	t.Run("empty ID", func(t *testing.T) {
+		l := validLog()
+		l.ID = ""
+		gt.Error(t, l.Validate())
+	})
+
+	t.Run("empty knowledge ID", func(t *testing.T) {
+		l := validLog()
+		l.KnowledgeID = ""
+		gt.Error(t, l.Validate())
+	})
+
+	t.Run("empty title", func(t *testing.T) {
+		l := validLog()
+		l.Title = ""
+		gt.Error(t, l.Validate())
+	})
+
+	t.Run("empty claim", func(t *testing.T) {
+		l := validLog()
+		l.Claim = ""
+		gt.Error(t, l.Validate())
+	})
+
+	t.Run("empty message", func(t *testing.T) {
+		l := validLog()
+		l.Message = ""
+		gt.Error(t, l.Validate())
+	})
+
+	t.Run("with ticket ID", func(t *testing.T) {
+		l := validLog()
+		l.TicketID = "ticket-123"
+		gt.NoError(t, l.Validate())
+	})
+
+	t.Run("without ticket ID", func(t *testing.T) {
+		l := validLog()
+		l.TicketID = ""
+		gt.NoError(t, l.Validate())
+	})
 }
 
-func TestUserIDHelpers(t *testing.T) {
-	t.Run("IsSystem returns true for system user", func(t *testing.T) {
-		gt.True(t, types.SystemUserID.IsSystem())
+func TestKnowledgeTagValidate(t *testing.T) {
+	validTag := func() *knowledge.KnowledgeTag {
+		return &knowledge.KnowledgeTag{
+			ID:        types.NewKnowledgeTagID(),
+			Name:      "crowdstrike",
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+	}
+
+	t.Run("valid tag", func(t *testing.T) {
+		tag := validTag()
+		gt.NoError(t, tag.Validate())
 	})
 
-	t.Run("IsSystem returns false for other users", func(t *testing.T) {
-		user := types.UserID("user123")
-		gt.False(t, user.IsSystem())
+	t.Run("empty ID", func(t *testing.T) {
+		tag := validTag()
+		tag.ID = ""
+		gt.Error(t, tag.Validate())
+	})
+
+	t.Run("empty name", func(t *testing.T) {
+		tag := validTag()
+		tag.Name = ""
+		gt.Error(t, tag.Validate())
+	})
+
+	t.Run("with description", func(t *testing.T) {
+		tag := validTag()
+		tag.Description = "CrowdStrike Falcon EDR"
+		gt.NoError(t, tag.Validate())
+	})
+
+	t.Run("zero created_at", func(t *testing.T) {
+		tag := validTag()
+		tag.CreatedAt = time.Time{}
+		gt.Error(t, tag.Validate())
+	})
+
+	t.Run("zero updated_at", func(t *testing.T) {
+		tag := validTag()
+		tag.UpdatedAt = time.Time{}
+		gt.Error(t, tag.Validate())
 	})
 }
 
-func TestKnowledgeStateHelpers(t *testing.T) {
-	t.Run("IsActive returns true for active state", func(t *testing.T) {
-		gt.True(t, types.KnowledgeStateActive.IsActive())
-		gt.False(t, types.KnowledgeStateArchived.IsActive())
+func TestKnowledgeCategoryValidate(t *testing.T) {
+	t.Run("fact is valid", func(t *testing.T) {
+		gt.NoError(t, types.KnowledgeCategoryFact.Validate())
 	})
 
-	t.Run("IsArchived returns true for archived state", func(t *testing.T) {
-		gt.True(t, types.KnowledgeStateArchived.IsArchived())
-		gt.False(t, types.KnowledgeStateActive.IsArchived())
+	t.Run("technique is valid", func(t *testing.T) {
+		gt.NoError(t, types.KnowledgeCategoryTechnique.Validate())
+	})
+
+	t.Run("empty is invalid", func(t *testing.T) {
+		gt.Error(t, types.KnowledgeCategory("").Validate())
+	})
+
+	t.Run("unknown is invalid", func(t *testing.T) {
+		gt.Error(t, types.KnowledgeCategory("other").Validate())
 	})
 }

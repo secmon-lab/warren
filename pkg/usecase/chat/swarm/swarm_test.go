@@ -13,8 +13,8 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opaq"
 	adapter "github.com/secmon-lab/warren/pkg/adapter/storage"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
-	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
@@ -88,7 +88,7 @@ func TestSwarmChat_DirectResponse(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				return &gollem.Response{
 					Texts: []string{`{"message": "The answer is 42.", "tasks": []}`},
 				}, nil
@@ -115,7 +115,7 @@ func TestSwarmChat_SinglePhaseWithTasks(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				mu.Lock()
 				callCount++
 				cc := callCount
@@ -172,7 +172,7 @@ func TestSwarmChat_MaxPhasesLimit(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				for _, inp := range input {
 					if _, ok := inp.(gollem.Text); ok {
 						return &gollem.Response{
@@ -217,7 +217,7 @@ func TestSwarmChat_ParallelExecution(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				mu.Lock()
 				callCount++
 				cc := callCount
@@ -272,7 +272,7 @@ func TestSwarmChat_ErrorIsolation(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				mu.Lock()
 				callCount++
 				cc := callCount
@@ -324,73 +324,35 @@ func TestSwarmChat_ErrorIsolation(t *testing.T) {
 }
 
 func TestSwarmChat_ToolFiltering(t *testing.T) {
-	ctx := setupTestContext(t)
-
-	// Create mock tool sets with different spec names
+	// Create mock tool sets with different IDs
 	toolA := &mockToolSet{name: "tool_alpha"}
 	toolB := &mockToolSet{name: "tool_beta"}
 	toolC := &mockToolSet{name: "tool_gamma"}
 
-	allTools := []gollem.ToolSet{toolA, toolB, toolC}
+	allTools := []interfaces.ToolSet{toolA, toolB, toolC}
 
 	// Filter for only tool_alpha and tool_gamma
-	filtered := swarm.FilterToolSets(ctx, allTools, []string{"tool_alpha", "tool_gamma"})
+	filtered := swarm.FilterToolSets(allTools, []string{"tool_alpha", "tool_gamma"})
 	gt.A(t, filtered).Length(2)
 
 	// Verify the right tools are included
-	var names []string
+	var ids []string
 	for _, ts := range filtered {
-		specs, err := ts.Specs(ctx)
-		gt.NoError(t, err)
-		for _, s := range specs {
-			names = append(names, s.Name)
-		}
+		ids = append(ids, ts.ID())
 	}
-	gt.V(t, len(names)).Equal(2)
-	gt.True(t, containsString(names, "tool_alpha"))
-	gt.True(t, containsString(names, "tool_gamma"))
-	gt.True(t, !containsString(names, "tool_beta"))
+	gt.V(t, len(ids)).Equal(2)
+	gt.True(t, containsString(ids, "tool_alpha"))
+	gt.True(t, containsString(ids, "tool_gamma"))
+	gt.True(t, !containsString(ids, "tool_beta"))
 }
 
 func TestSwarmChat_ToolFilteringEmptyAllowList(t *testing.T) {
-	ctx := setupTestContext(t)
-
 	toolA := &mockToolSet{name: "tool_alpha"}
-	allTools := []gollem.ToolSet{toolA}
+	allTools := []interfaces.ToolSet{toolA}
 
 	// Empty allow list returns nil
-	filtered := swarm.FilterToolSets(ctx, allTools, []string{})
+	filtered := swarm.FilterToolSets(allTools, []string{})
 	gt.True(t, filtered == nil)
-}
-
-func TestSwarmChat_SubAgentFiltering(t *testing.T) {
-	// Create mock sub-agents
-	saFalcon := agent.NewSubAgent(
-		gollem.NewSubAgent("falcon", "CrowdStrike Falcon", func() (*gollem.Agent, error) { return nil, nil }),
-		"hint",
-	)
-	saBigQuery := agent.NewSubAgent(
-		gollem.NewSubAgent("bigquery", "BigQuery", func() (*gollem.Agent, error) { return nil, nil }),
-		"hint",
-	)
-	saSlack := agent.NewSubAgent(
-		gollem.NewSubAgent("slack", "Slack", func() (*gollem.Agent, error) { return nil, nil }),
-		"hint",
-	)
-
-	all := []*agent.SubAgent{saFalcon, saBigQuery, saSlack}
-
-	// Filter for only falcon and slack
-	filtered := swarm.FilterSubAgents(all, []string{"falcon", "slack"})
-	gt.A(t, filtered).Length(2)
-
-	var names []string
-	for _, sa := range filtered {
-		names = append(names, sa.Inner().Spec().Name)
-	}
-	gt.True(t, containsString(names, "falcon"))
-	gt.True(t, containsString(names, "slack"))
-	gt.True(t, !containsString(names, "bigquery"))
 }
 
 func TestSwarmChat_MultiPhaseReplan(t *testing.T) {
@@ -404,7 +366,7 @@ func TestSwarmChat_MultiPhaseReplan(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				mu.Lock()
 				callCount++
 				cc := callCount
@@ -509,6 +471,18 @@ func (m *mockToolSet) Run(_ context.Context, _ string, _ map[string]any) (map[st
 	return nil, nil
 }
 
+func (m *mockToolSet) ID() string {
+	return m.name
+}
+
+func (m *mockToolSet) Description() string {
+	return "Mock tool: " + m.name
+}
+
+func (m *mockToolSet) Prompt(_ context.Context) (string, error) {
+	return "", nil
+}
+
 func containsString(slice []string, s string) bool {
 	for _, v := range slice {
 		if v == s {
@@ -605,7 +579,7 @@ func TestSwarmChat_LatestHistorySavedOnDirectResponse(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				return &gollem.Response{
 					Texts: []string{`{"message": "Direct response.", "tasks": []}`},
 				}, nil
@@ -639,7 +613,7 @@ func TestSwarmChat_LatestHistorySavedAfterReplan(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				mu.Lock()
 				callCount++
 				cc := callCount
@@ -695,7 +669,7 @@ func TestSwarmChat_LatestHistorySavedOnAbort(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				mu.Lock()
 				callCount++
 				cc := callCount
@@ -751,7 +725,7 @@ func TestSwarmChat_LatestHistorySavedOnReplanError(t *testing.T) {
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
 			ssn := newMockSession()
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				mu.Lock()
 				callCount++
 				cc := callCount
@@ -828,7 +802,7 @@ func TestSwarmChat_BudgetMiddlewareNotAccumulated(t *testing.T) {
 			ssn := newMockSession()
 			localCallCount := 0
 
-			ssn.GenerateContentFunc = func(ctx context.Context, input ...gollem.Input) (*gollem.Response, error) {
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 				localCallCount++
 
 				switch {
@@ -916,7 +890,7 @@ func TestSwarmChat_BudgetMiddlewareNotAccumulated(t *testing.T) {
 		swarm.WithNoAuthorization(true),
 		swarm.WithMaxPhases(3),
 		swarm.WithBudgetStrategy(budgetStrategy),
-		swarm.WithTools([]gollem.ToolSet{testToolSet}),
+		swarm.WithTools([]interfaces.ToolSet{testToolSet}),
 	)
 
 	err := chatUC.Execute(ctx, "Analyze with budget", chatModel.ChatContext{Ticket: testTicket})
@@ -986,8 +960,19 @@ func (m *trackingToolSet) Run(_ context.Context, _ string, _ map[string]any) (ma
 	return map[string]any{"result": "ok"}, nil
 }
 
+func (m *trackingToolSet) ID() string {
+	return m.name
+}
+
+func (m *trackingToolSet) Description() string {
+	return "Tracking tool: " + m.name
+}
+
+func (m *trackingToolSet) Prompt(_ context.Context) (string, error) {
+	return "", nil
+}
+
 // Ensure imports are used.
 var (
 	_ = goerr.New
-	_ = agent.NewSubAgent
 )

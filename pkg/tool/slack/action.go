@@ -38,8 +38,12 @@ func (x *Action) Helper() *cli.Command {
 	return nil
 }
 
-func (x *Action) Name() string {
+func (x *Action) ID() string {
 	return "slack_message_search"
+}
+
+func (x *Action) Description() string {
+	return "Slack message search"
 }
 
 func (x *Action) Flags() []cli.Flag {

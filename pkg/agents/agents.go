@@ -4,18 +4,16 @@ import (
 	"context"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/agents/bigquery"
 	"github.com/secmon-lab/warren/pkg/agents/falcon"
 	"github.com/secmon-lab/warren/pkg/agents/slack"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/urfave/cli/v3"
 )
 
 // All is the list of all available agent factories.
 // To add a new agent, simply append its Factory to this list.
-var All = []AgentFactory{
+var All = []ToolSetFactory{
 	&bigquery.Factory{},
 	&falcon.Factory{},
 	&slack.Factory{},
@@ -30,21 +28,21 @@ func AllFlags() []cli.Flag {
 	return flags
 }
 
-// ConfigureAll initializes all configured agents and returns a slice of SubAgents.
+// ConfigureAll initializes all configured agents and returns a slice of ToolSets.
 // Agents that are not configured will return nil and be skipped.
-func ConfigureAll(ctx context.Context, llmClient gollem.LLMClient, repo interfaces.Repository) ([]*agent.SubAgent, error) {
-	var subAgents []*agent.SubAgent
+func ConfigureAll(ctx context.Context) ([]interfaces.ToolSet, error) {
+	var toolSets []interfaces.ToolSet
 
 	for _, factory := range All {
-		sa, err := factory.Configure(ctx, llmClient, repo)
+		ts, err := factory.Configure(ctx)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to configure agent")
 		}
 
-		if sa != nil {
-			subAgents = append(subAgents, sa)
+		if ts != nil {
+			toolSets = append(toolSets, ts)
 		}
 	}
 
-	return subAgents, nil
+	return toolSets, nil
 }

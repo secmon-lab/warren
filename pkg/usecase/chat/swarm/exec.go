@@ -7,16 +7,20 @@ import (
 	"sync"
 	"unicode/utf8"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
-	"github.com/secmon-lab/warren/pkg/domain/model/agent"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
+	"github.com/secmon-lab/warren/pkg/domain/types"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/tool/base"
+	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
@@ -80,8 +84,8 @@ func (c *SwarmChat) postTaskResult(ctx context.Context, task TaskPlan, result *T
 		}
 		blockText = prefix + truncateResult(escapeSlackMrkdwn(result.Result), maxResultLen)
 	}
-	if err := threadSvc.PostContextBlock(ctx, blockText); err != nil {
-		logging.From(ctx).Error("failed to post task completion context block", "error", err)
+	if err := threadSvc.PostSectionBlock(ctx, blockText); err != nil {
+		logging.From(ctx).Error("failed to post task completion section block", "error", err)
 	}
 }
 
@@ -107,47 +111,63 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	msg.Trace(taskCtx, "Starting...")
 
 	// Generate task system prompt
-	taskPrompt, err := generateTaskPrompt(ctx, task)
+	taskPrompt, err := generateTaskPrompt(ctx, task, c.knowledgeService)
 	if err != nil {
 		result.Error = err
 		msg.Trace(taskCtx, "❌ Failed to generate prompt: %s", err.Error())
 		return result
 	}
 
-	// Filter tools for this task (all tools including base must be explicitly planned)
-	filteredTools := filterToolSets(ctx, c.tools, task.Tools)
+	// Filter tools for this task by ToolSet ID
+	filteredTools := filterToolSets(c.tools, task.Tools)
 
-	// Add base action tool only if any warren_* tools are in the task's tool list
+	// Add base action tool only if its ToolSet ID is in the task's tool list
 	// Note: SlackUpdate (PostFinding) is intentionally omitted in swarm mode.
 	// Individual task results are posted as context blocks instead.
 	baseAction := base.New(c.repository, target.ID, base.WithLLMClient(c.llmClient))
-	if filtered := filterToolSets(ctx, []gollem.ToolSet{baseAction}, task.Tools); len(filtered) > 0 {
+	if filtered := filterToolSets([]interfaces.ToolSet{baseAction}, task.Tools); len(filtered) > 0 {
 		filteredTools = append(filteredTools, baseAction)
 	}
 
-	// Filter sub-agents for this task
-	filteredSubAgents := filterSubAgents(c.subAgents, task.SubAgents)
-	gollemSubAgents := make([]*gollem.SubAgent, len(filteredSubAgents))
+	// Always include knowledge tool (search-only) for child agents so they can
+	// leverage prior knowledge without requiring the root agent to plan it explicitly.
+	if c.knowledgeService != nil {
+		kt := knowledgeTool.New(c.knowledgeService, types.KnowledgeCategoryFact, knowledgeTool.ModeSearchOnly)
+		filteredTools = append(filteredTools, kt)
+	}
+
+	// Collect additional prompts from filtered ToolSets
+	var toolPrompts []string
+	for _, ts := range filteredTools {
+		p, err := ts.Prompt(ctx)
+		if err != nil {
+			errutil.Handle(ctx, goerr.Wrap(err, "failed to get prompt from tool set", goerr.V("id", ts.ID())))
+			continue
+		}
+		if p != "" {
+			toolPrompts = append(toolPrompts, p)
+		}
+	}
+	if len(toolPrompts) > 0 {
+		taskPrompt += "\n\n# Additional Tool Instructions\n\n" + strings.Join(toolPrompts, "\n\n")
+	}
+
+	// Convert filtered interfaces.ToolSet to []gollem.ToolSet for gollem
+	gollemToolSets := make([]gollem.ToolSet, len(filteredTools))
+	for i, ts := range filteredTools {
+		gollemToolSets[i] = ts
+	}
 
 	// Setup budget tracker.
-	// The context-aware budget middleware was already injected into sub-agents
-	// at construction time (swarm.New). Here we just create a per-task tracker
-	// and store it in the context so both the parent agent's middleware and the
-	// sub-agents' context-aware middleware share the same tracker.
 	var tracker *BudgetTracker
 	if c.budgetStrategy != nil {
 		tracker = newBudgetTracker(c.budgetStrategy)
 		taskCtx = withBudgetTracker(taskCtx, tracker)
 	}
 
-	for i, sa := range filteredSubAgents {
-		gollemSubAgents[i] = sa.Inner()
-	}
-
 	// Build agent options
 	agentOpts := []gollem.Option{
-		gollem.WithToolSets(filteredTools...),
-		gollem.WithSubAgents(gollemSubAgents...),
+		gollem.WithToolSets(gollemToolSets...),
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithSystemPrompt(taskPrompt),
 	}
@@ -235,7 +255,101 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	markCompleted()
 	msg.Trace(taskCtx, "Completed")
 
+	// Trigger technique knowledge reflection in background
+	c.triggerTechniqueReflection(ctx, taskCtx, result)
+
 	return result
+}
+
+// triggerTechniqueReflection runs background knowledge reflection for a completed task.
+func (c *SwarmChat) triggerTechniqueReflection(ctx context.Context, taskCtx context.Context, result *TaskResult) {
+	logger := logging.From(ctx)
+
+	if c.knowledgeService == nil {
+		logger.Debug("technique reflection skipped: knowledge service not configured")
+		return
+	}
+	if result == nil {
+		logger.Debug("technique reflection skipped: nil task result")
+		return
+	}
+	if result.Result == "" {
+		logger.Debug("technique reflection skipped: empty task result",
+			"task_id", result.TaskID,
+			"task_title", result.Title,
+		)
+		return
+	}
+
+	logger.Info("triggering technique reflection",
+		"task_id", result.TaskID,
+		"task_title", result.Title,
+		"result_length", len(result.Result),
+	)
+
+	tool := knowledgeTool.New(c.knowledgeService, types.KnowledgeCategoryTechnique, knowledgeTool.ModeReadWrite)
+	input := &svcknowledge.ReflectionInput{
+		Category:         types.KnowledgeCategoryTechnique,
+		ExecutionSummary: result.Result,
+		OnComplete: func(bgCtx context.Context, traceID string) {
+			suffix := "reflection done"
+			if traceID != "" {
+				suffix = fmt.Sprintf("reflection ID `%s`", traceID)
+			}
+			// Use bgCtx (non-cancelled) with taskCtx's msg routing
+			msg.Trace(msg.CopyTo(bgCtx, taskCtx), "Completed (%s)", suffix)
+		},
+	}
+
+	if err := c.knowledgeService.RunReflection(ctx, c.llmClient, tool, input); err != nil {
+		logger.Error("failed to trigger technique reflection", "error", err)
+	}
+}
+
+// triggerFactReflection runs background knowledge reflection for a completed session.
+func (c *SwarmChat) triggerFactReflection(ctx context.Context, summary string, t *ticket.Ticket) {
+	logger := logging.From(ctx)
+
+	if c.knowledgeService == nil {
+		logger.Debug("fact reflection skipped: knowledge service not configured")
+		return
+	}
+	if summary == "" {
+		logger.Debug("fact reflection skipped: empty session summary")
+		return
+	}
+
+	logger.Info("triggering fact reflection",
+		"summary_length", len(summary),
+		"has_ticket", t != nil,
+	)
+
+	tool := knowledgeTool.New(c.knowledgeService, types.KnowledgeCategoryFact, knowledgeTool.ModeReadWrite)
+	input := &svcknowledge.ReflectionInput{
+		Category:         types.KnowledgeCategoryFact,
+		ExecutionSummary: summary,
+		OnComplete: func(bgCtx context.Context, traceID string) {
+			if c.slackService == nil || t == nil || t.SlackThread == nil {
+				return
+			}
+			threadSvc := c.slackService.NewThread(*t.SlackThread)
+			suffix := "reflection done"
+			if traceID != "" {
+				suffix = fmt.Sprintf("reflection ID `%s`", traceID)
+			}
+			if err := threadSvc.PostContextBlock(bgCtx, fmt.Sprintf("📝 Fact knowledge %s", suffix)); err != nil {
+				logging.From(bgCtx).Warn("failed to post fact reflection result", "error", err)
+			}
+		},
+	}
+	if t != nil {
+		input.Ticket = t
+		input.TicketID = t.ID
+	}
+
+	if err := c.knowledgeService.RunReflection(ctx, c.llmClient, tool, input); err != nil {
+		logger.Error("failed to trigger fact reflection", "error", err)
+	}
 }
 
 // setupTaskMessageRouting creates task-specific msg routing with title-prefixed trace.
@@ -283,49 +397,21 @@ func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Se
 	return msg.With(ctx, notifyFunc, taskTraceFunc, warnFunc), markCompleted, ubm
 }
 
-// filterToolSets filters tool sets to only include tools matching the given names.
-func filterToolSets(ctx context.Context, allTools []gollem.ToolSet, allowedNames []string) []gollem.ToolSet {
-	if len(allowedNames) == 0 {
+// filterToolSets filters tool sets to only include those matching the given IDs.
+func filterToolSets(allTools []interfaces.ToolSet, allowedIDs []string) []interfaces.ToolSet {
+	if len(allowedIDs) == 0 {
 		return nil
 	}
 
-	nameSet := make(map[string]bool, len(allowedNames))
-	for _, name := range allowedNames {
-		nameSet[name] = true
+	idSet := make(map[string]bool, len(allowedIDs))
+	for _, id := range allowedIDs {
+		idSet[id] = true
 	}
 
-	var filtered []gollem.ToolSet
+	var filtered []interfaces.ToolSet
 	for _, ts := range allTools {
-		specs, err := ts.Specs(ctx)
-		if err != nil {
-			continue
-		}
-		for _, spec := range specs {
-			if nameSet[spec.Name] {
-				filtered = append(filtered, ts)
-				break
-			}
-		}
-	}
-	return filtered
-}
-
-// filterSubAgents filters sub-agents to only include those matching the given names.
-func filterSubAgents(allAgents []*agent.SubAgent, allowedNames []string) []*agent.SubAgent {
-	if len(allowedNames) == 0 {
-		return nil
-	}
-
-	nameSet := make(map[string]bool, len(allowedNames))
-	for _, name := range allowedNames {
-		nameSet[name] = true
-	}
-
-	var filtered []*agent.SubAgent
-	for _, sa := range allAgents {
-		spec := sa.Inner().Spec()
-		if nameSet[spec.Name] {
-			filtered = append(filtered, sa)
+		if idSet[ts.ID()] {
+			filtered = append(filtered, ts)
 		}
 	}
 	return filtered

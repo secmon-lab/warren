@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/tool/abusech"
 	"github.com/secmon-lab/warren/pkg/tool/bigquery"
@@ -88,13 +87,13 @@ func (x toolList) Flags() []cli.Flag {
 func (x toolList) LogValue() slog.Value {
 	var attrs []slog.Attr
 	for _, tool := range x {
-		attrs = append(attrs, slog.Any(tool.Name(), tool.LogValue()))
+		attrs = append(attrs, slog.Any(tool.ID(), tool.LogValue()))
 	}
 	return slog.GroupValue(attrs...)
 }
 
-func (x toolList) ToolSets(ctx context.Context) ([]gollem.ToolSet, error) {
-	toolSets := []gollem.ToolSet{}
+func (x toolList) ToolSets(ctx context.Context) ([]interfaces.ToolSet, error) {
+	toolSets := []interfaces.ToolSet{}
 	for _, tool := range x {
 		if err := tool.Configure(ctx); err != nil {
 			if err == errutil.ErrActionUnavailable {

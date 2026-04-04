@@ -30,7 +30,7 @@ func TestAction_Run_MissingURL(t *testing.T) {
 
 func TestAction_Name(t *testing.T) {
 	action := &webfetch.Action{}
-	gt.Value(t, action.Name()).Equal("webfetch")
+	gt.Value(t, action.ID()).Equal("webfetch")
 }
 
 func TestAction_Configure(t *testing.T) {

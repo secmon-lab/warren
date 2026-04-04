@@ -24,7 +24,6 @@ func AuthorizeAgentRequest(ctx context.Context, policyClient interfaces.PolicyCl
 	logger := logging.From(ctx)
 
 	if noAuthz {
-		logger.Debug("agent authorization check bypassed due to --no-authorization flag")
 		return nil
 	}
 

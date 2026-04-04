@@ -11,7 +11,6 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -41,8 +40,7 @@ type PlanExecChat struct {
 	// optional dependencies
 	storageClient interfaces.StorageClient
 	slackService  *slackService.Service
-	tools         []gollem.ToolSet
-	subAgents     []*agent.SubAgent
+	tools         []interfaces.ToolSet
 
 	// swappable components
 	strategyFactory StrategyFactory
@@ -73,16 +71,9 @@ func WithSlackService(svc *slackService.Service) Option {
 }
 
 // WithTools sets the tool sets available to the agent.
-func WithTools(tools []gollem.ToolSet) Option {
+func WithTools(tools []interfaces.ToolSet) Option {
 	return func(c *PlanExecChat) {
 		c.tools = append(c.tools, tools...)
-	}
-}
-
-// WithSubAgents sets the sub-agents available to the agent.
-func WithSubAgents(subAgents []*agent.SubAgent) Option {
-	return func(c *PlanExecChat) {
-		c.subAgents = append(c.subAgents, subAgents...)
 	}
 }
 
@@ -334,7 +325,13 @@ func (c *PlanExecChat) executeAgent(ctx context.Context, ssn *session.Session, m
 	target := chatCtx.Ticket
 	ticketless := chatCtx.IsTicketless()
 
-	tools := chatCtx.Tools
+	// Convert gollem.ToolSet to interfaces.ToolSet (ChatContext uses gollem.ToolSet to avoid import cycles)
+	tools := make([]interfaces.ToolSet, 0, len(chatCtx.Tools))
+	for _, ts := range chatCtx.Tools {
+		if wts, ok := ts.(interfaces.ToolSet); ok {
+			tools = append(tools, wts)
+		}
+	}
 	history := chatCtx.History
 	storageSvc := storage.New(c.storageClient, storage.WithPrefix(c.storagePrefix))
 
@@ -407,28 +404,20 @@ func (c *PlanExecChat) executeAgent(ctx context.Context, ssn *session.Session, m
 }
 
 // buildTicketlessSystemPrompt generates the system prompt for ticketless chat.
-func (c *PlanExecChat) buildTicketlessSystemPrompt(ctx context.Context, tools []gollem.ToolSet, slackHistory []slack.HistoryMessage) (string, error) {
+func (c *PlanExecChat) buildTicketlessSystemPrompt(ctx context.Context, tools []interfaces.ToolSet, slackHistory []slack.HistoryMessage) (string, error) {
 	logger := logging.From(ctx)
 	userID := types.UserID(user.FromContext(ctx))
 
 	// Collect tool prompts
 	var toolPrompts []string
-	for _, toolSet := range tools {
-		if tool, ok := toolSet.(interfaces.Tool); ok {
-			additionalPrompt, err := tool.Prompt(ctx)
-			if err != nil {
-				logger.Warn("failed to get prompt from tool", "tool", tool, "error", err)
-				continue
-			}
-			if additionalPrompt != "" {
-				toolPrompts = append(toolPrompts, additionalPrompt)
-			}
+	for _, ts := range tools {
+		additionalPrompt, err := ts.Prompt(ctx)
+		if err != nil {
+			logger.Warn("failed to get prompt from tool", "tool", ts.ID(), "error", err)
+			continue
 		}
-	}
-
-	for _, sa := range c.subAgents {
-		if ph := sa.PromptHint(); ph != "" {
-			toolPrompts = append(toolPrompts, ph)
+		if additionalPrompt != "" {
+			toolPrompts = append(toolPrompts, additionalPrompt)
 		}
 	}
 
@@ -437,33 +426,25 @@ func (c *PlanExecChat) buildTicketlessSystemPrompt(ctx context.Context, tools []
 		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
 	}
 
-	return GenerateTicketlessSystemPrompt(ctx, slackHistory, additionalInstructions, nil, string(userID), c.userSystemPrompt)
+	return GenerateTicketlessSystemPrompt(ctx, slackHistory, additionalInstructions, string(userID), c.userSystemPrompt)
 }
 
 // buildSystemPrompt generates the system prompt with all context from ChatContext.
-func (c *PlanExecChat) buildSystemPrompt(ctx context.Context, target *ticket.Ticket, _ *session.Session, tools []gollem.ToolSet, chatCtx *chatModel.ChatContext) (string, error) {
+func (c *PlanExecChat) buildSystemPrompt(ctx context.Context, target *ticket.Ticket, _ *session.Session, tools []interfaces.ToolSet, chatCtx *chatModel.ChatContext) (string, error) {
 	logger := logging.From(ctx)
 	userID := types.UserID(user.FromContext(ctx))
 
 	// Collect additional prompts from tools
 	var toolPrompts []string
-	for _, toolSet := range tools {
-		if tool, ok := toolSet.(interfaces.Tool); ok {
-			additionalPrompt, err := tool.Prompt(ctx)
-			if err != nil {
-				msg.Notify(ctx, "⚠️ Tool initialization warning: %s", err.Error())
-				logger.Warn("failed to get prompt from tool", "tool", tool, "error", err)
-				continue
-			}
-			if additionalPrompt != "" {
-				toolPrompts = append(toolPrompts, additionalPrompt)
-			}
+	for _, ts := range tools {
+		additionalPrompt, err := ts.Prompt(ctx)
+		if err != nil {
+			msg.Notify(ctx, "⚠️ Tool initialization warning: %s", err.Error())
+			logger.Warn("failed to get prompt from tool", "tool", ts.ID(), "error", err)
+			continue
 		}
-	}
-
-	for _, sa := range c.subAgents {
-		if ph := sa.PromptHint(); ph != "" {
-			toolPrompts = append(toolPrompts, ph)
+		if additionalPrompt != "" {
+			toolPrompts = append(toolPrompts, additionalPrompt)
 		}
 	}
 
@@ -472,7 +453,7 @@ func (c *PlanExecChat) buildSystemPrompt(ctx context.Context, target *ticket.Tic
 		additionalInstructions = "# Available Tools and Resources\n\n" + strings.Join(toolPrompts, "\n\n")
 	}
 
-	return GenerateChatSystemPrompt(ctx, target, len(chatCtx.Alerts), additionalInstructions, chatCtx.Knowledges, string(userID), chatCtx.ThreadComments, c.userSystemPrompt, chatCtx.SlackHistory)
+	return GenerateChatSystemPrompt(ctx, target, len(chatCtx.Alerts), additionalInstructions, string(userID), chatCtx.ThreadComments, c.userSystemPrompt, chatCtx.SlackHistory)
 }
 
 // buildAgentOption holds optional configuration for buildAgent.
@@ -481,7 +462,7 @@ type buildAgentOption struct {
 }
 
 // buildAgent constructs the gollem agent with strategy, tools, and middleware.
-func (c *PlanExecChat) buildAgent(ctx context.Context, strategy gollem.Strategy, history *gollem.History, tools []gollem.ToolSet, systemPrompt string, requestID string, opts ...buildAgentOption) *gollem.Agent {
+func (c *PlanExecChat) buildAgent(ctx context.Context, strategy gollem.Strategy, history *gollem.History, tools []interfaces.ToolSet, systemPrompt string, requestID string, opts ...buildAgentOption) *gollem.Agent {
 	logger := logging.From(ctx)
 
 	var opt buildAgentOption
@@ -489,16 +470,15 @@ func (c *PlanExecChat) buildAgent(ctx context.Context, strategy gollem.Strategy,
 		opt = opts[0]
 	}
 
-	gollemSubAgents := make([]*gollem.SubAgent, len(c.subAgents))
-	for i, sa := range c.subAgents {
-		gollemSubAgents[i] = sa.Inner()
+	gollemToolSets := make([]gollem.ToolSet, len(tools))
+	for i, ts := range tools {
+		gollemToolSets[i] = ts
 	}
 
 	agentOpts := []gollem.Option{
 		gollem.WithStrategy(strategy),
 		gollem.WithHistory(history),
-		gollem.WithToolSets(tools...),
-		gollem.WithSubAgents(gollemSubAgents...),
+		gollem.WithToolSets(gollemToolSets...),
 		gollem.WithResponseMode(gollem.ResponseModeBlocking),
 		gollem.WithSystemPrompt(systemPrompt),
 	}

@@ -24,6 +24,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/circuitbreaker"
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/service/prompt"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -59,6 +60,7 @@ func cmdServe() *cli.Command {
 		enableGraphQL       bool
 		enableGraphiQL      bool
 		noAuthorization     bool
+		disableHTTPLogger   bool
 		disableLLM          bool
 		strictAlert         bool
 		wsAllowedOrigins    []string
@@ -111,6 +113,13 @@ func cmdServe() *cli.Command {
 				Category:    "Security",
 				Sources:     cli.EnvVars("WARREN_NO_AUTHORIZATION"),
 				Destination: &noAuthorization,
+			},
+			&cli.BoolFlag{
+				Name:        "disable-http-logger",
+				Usage:       "Disable HTTP access logging (both access log and detailed access log)",
+				Category:    "Logging",
+				Sources:     cli.EnvVars("WARREN_DISABLE_HTTP_LOGGER"),
+				Destination: &disableHTTPLogger,
 			},
 			&cli.BoolFlag{
 				Name:        "disable-llm",
@@ -295,7 +304,6 @@ func cmdServe() *cli.Command {
 				return goerr.Wrap(err, "failed to create MCP tool sets")
 			}
 			if len(mcpToolSets) > 0 {
-				toolSets = append(toolSets, mcpToolSets...)
 				logging.From(ctx).Info("MCP tool sets configured",
 					"servers", mcpCfg.GetServerNames(),
 					"count", len(mcpToolSets))
@@ -308,11 +316,12 @@ func cmdServe() *cli.Command {
 			// Create tag service
 			tagService := tag.New(repo)
 
-			// Initialize all configured agents
-			subAgents, err := agents.ConfigureAll(ctx, llmClient, repo)
+			// Initialize all configured agents and merge into tool sets
+			agentToolSets, err := agents.ConfigureAll(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to configure agents")
 			}
+			toolSets = append(toolSets, agentToolSets...)
 
 			// Configure user system prompt
 			userSystemPrompt, err := userSystemPromptCfg.Configure()
@@ -320,17 +329,47 @@ func cmdServe() *cli.Command {
 				return goerr.Wrap(err, "failed to configure user system prompt")
 			}
 
+			// Configure trace repository if trace bucket is set
+			var safeTraceRepo trace.Repository
+			if traceCfg.IsConfigured() {
+				traceRepo, err := traceCfg.Configure(ctx)
+				if err != nil {
+					return goerr.Wrap(err, "failed to configure trace repository")
+				}
+				safeTraceRepo = traceAdapter.NewSafe(traceRepo, logging.From(ctx))
+				logging.From(ctx).Info("Trace recording enabled", "trace", traceCfg.LogValue())
+			}
+
+			// Create knowledge service for reflection and GraphQL
+			var knowledgeOpts []svcknowledge.ServiceOption
+			if safeTraceRepo != nil {
+				knowledgeOpts = append(knowledgeOpts, svcknowledge.WithTraceRepository(safeTraceRepo))
+			}
+			knowledgeSvc := svcknowledge.New(repo, embeddingAdapter, knowledgeOpts...)
+
 			ucOptions := []usecase.Option{
 				usecase.WithLLMClient(llmClient),
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(repo),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(toolSets),
-				usecase.WithSubAgents(subAgents),
 				usecase.WithStrictAlert(strictAlert),
 				usecase.WithNoAuthorization(noAuthorization),
 				usecase.WithTagService(tagService),
 				usecase.WithUserSystemPrompt(userSystemPrompt),
+				usecase.WithKnowledgeService(knowledgeSvc),
+			}
+
+			if safeTraceRepo != nil {
+				ucOptions = append(ucOptions, usecase.WithTraceRepository(safeTraceRepo))
+			}
+
+			if cbCfg.Enabled {
+				cbSvc := circuitbreaker.New(repo, cbCfg.ToConfig())
+				ucOptions = append(ucOptions, usecase.WithCircuitBreaker(cbSvc))
+				logging.From(ctx).Info("Circuit breaker enabled",
+					"window", cbCfg.Window,
+					"limit", cbCfg.Limit)
 			}
 
 			// Add storage prefix if configured
@@ -357,32 +396,17 @@ func cmdServe() *cli.Command {
 				ucOptions = append(ucOptions, usecase.WithFrontendURL(webUICfg.GetFrontendURL()))
 			}
 
-			// Configure trace repository if trace bucket is set
-			var safeTraceRepo trace.Repository
-			if traceCfg.IsConfigured() {
-				traceRepo, err := traceCfg.Configure(ctx)
-				if err != nil {
-					return goerr.Wrap(err, "failed to configure trace repository")
-				}
-				safeTraceRepo = traceAdapter.NewSafe(traceRepo, logging.From(ctx))
-				ucOptions = append(ucOptions, usecase.WithTraceRepository(safeTraceRepo))
-				logging.From(ctx).Info("Trace recording enabled", "trace", traceCfg.LogValue())
-			}
-
-			// Configure circuit breaker if enabled
-			if cbCfg.Enabled {
-				cbSvc := circuitbreaker.New(repo, cbCfg.ToConfig())
-				ucOptions = append(ucOptions, usecase.WithCircuitBreaker(cbSvc))
-				logging.From(ctx).Info("Circuit breaker enabled",
-					"window", cbCfg.Window,
-					"limit", cbCfg.Limit)
-			}
-
 			// Configure chat strategy
 			if chatStrategy == "swarm" {
+				// Merge all tool sets: configured tools + MCP tools
+				allSwarmTools := make([]interfaces.ToolSet, 0, len(toolSets)+len(mcpToolSets))
+				allSwarmTools = append(allSwarmTools, toolSets...)
+				for _, mts := range mcpToolSets {
+					allSwarmTools = append(allSwarmTools, interfaces.WrapToolSet(mts, "mcp", "MCP external tool"))
+				}
+
 				swarmOpts := []swarm.Option{
-					swarm.WithTools(toolSets),
-					swarm.WithSubAgents(subAgents),
+					swarm.WithTools(allSwarmTools),
 					swarm.WithStorageClient(storageClient),
 					swarm.WithNoAuthorization(noAuthorization),
 					swarm.WithUserSystemPrompt(userSystemPrompt),
@@ -399,6 +423,8 @@ func cmdServe() *cli.Command {
 				if safeTraceRepo != nil {
 					swarmOpts = append(swarmOpts, swarm.WithTraceRepository(safeTraceRepo))
 				}
+
+				swarmOpts = append(swarmOpts, swarm.WithKnowledgeService(knowledgeSvc))
 
 				// Configure budget strategy
 				switch budgetStrategy {
@@ -426,6 +452,13 @@ func cmdServe() *cli.Command {
 			// Build HTTP server options
 			serverOptions := []server.Options{
 				server.WithPolicy(policyClient),
+				server.WithKnowledgeService(knowledgeSvc),
+				server.WithDisableHTTPLogger(disableHTTPLogger),
+			}
+
+			if disableHTTPLogger {
+				logging.From(ctx).Warn("HTTP access logging is DISABLED",
+					"flag", "--disable-http-logger")
 			}
 
 			// Add no-authorization option if specified

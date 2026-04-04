@@ -44,8 +44,12 @@ func (x *Action) Helper() *cli.Command {
 	return nil
 }
 
-func (x *Action) Name() string {
+func (x *Action) ID() string {
 	return "whois"
+}
+
+func (x *Action) Description() string {
+	return "WHOIS domain and IP registration lookups"
 }
 
 func (x *Action) Flags() []cli.Flag {

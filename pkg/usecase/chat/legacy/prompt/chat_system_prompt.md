@@ -193,20 +193,6 @@ The following messages were posted in this ticket's Slack thread by team members
 {{ end }}
 {{- end }}
 
-{{- if .knowledges }}
------------------------
-
-# Domain Knowledge
-
-The following domain knowledge is available for topic '{{ .topic }}':
-{{ range .knowledges }}
-
-## {{ .Name }}
-
-{{ .Content }}
-{{ end }}
-{{- end }}
-
 {{ if .user_system_prompt }}
 -----------------------
 

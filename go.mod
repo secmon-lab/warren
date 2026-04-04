@@ -21,7 +21,7 @@ require (
 	github.com/m-mizutani/clog v0.2.1
 	github.com/m-mizutani/fireconf v0.2.1
 	github.com/m-mizutani/goerr/v2 v2.0.1
-	github.com/m-mizutani/gollem v0.23.3-0.20260328055806-802966196296
+	github.com/m-mizutani/gollem v0.23.3-0.20260329022535-dec6dc7fecdc
 	github.com/m-mizutani/gt v0.2.1
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.2.1
@@ -74,8 +74,8 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
-	github.com/go-git/go-billy/v5 v5.6.2 // indirect
-	github.com/go-git/go-git/v5 v5.16.5 // indirect
+	github.com/go-git/go-billy/v5 v5.8.0 // indirect
+	github.com/go-git/go-git/v5 v5.17.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

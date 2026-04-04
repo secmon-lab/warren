@@ -9,13 +9,13 @@ import (
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/domain/model/agent"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/repository"
 	cbService "github.com/secmon-lab/warren/pkg/service/circuitbreaker"
 	"github.com/secmon-lab/warren/pkg/service/command"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
-	"github.com/secmon-lab/warren/pkg/service/memory"
+
+	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/service/notifier"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/tag"
@@ -30,7 +30,6 @@ type UseCases struct {
 	// services and adapters
 	slackService    *slackService.Service
 	tagService      *tag.Service
-	memoryService   *memory.Service
 	hitlService     *hitlService.Service
 	cbService       *cbService.Service
 	llmClient       gollem.LLMClient
@@ -39,9 +38,9 @@ type UseCases struct {
 	storageClient   interfaces.StorageClient
 	policyClient    interfaces.PolicyClient
 
-	tools           []gollem.ToolSet
-	subAgents       []*agent.SubAgent
+	tools           []interfaces.ToolSet
 	traceRepository trace.Repository
+	knowledgeSvc    *svcknowledge.Service
 
 	// use cases
 	ChatUC interfaces.ChatUseCase
@@ -89,12 +88,6 @@ func WithTagService(tagService *tag.Service) Option {
 	}
 }
 
-func WithMemoryService(memoryService *memory.Service) Option {
-	return func(u *UseCases) {
-		u.memoryService = memoryService
-	}
-}
-
 func WithEmbeddingClient(embeddingClient interfaces.EmbeddingClient) Option {
 	return func(u *UseCases) {
 		u.embeddingClient = embeddingClient
@@ -119,15 +112,9 @@ func WithRepository(repository interfaces.Repository) Option {
 	}
 }
 
-func WithTools(tools []gollem.ToolSet) Option {
+func WithTools(tools []interfaces.ToolSet) Option {
 	return func(u *UseCases) {
 		u.tools = append(u.tools, tools...)
-	}
-}
-
-func WithSubAgents(subAgents []*agent.SubAgent) Option {
-	return func(u *UseCases) {
-		u.subAgents = append(u.subAgents, subAgents...)
 	}
 }
 
@@ -198,6 +185,12 @@ func WithCircuitBreaker(service *cbService.Service) Option {
 	}
 }
 
+func WithKnowledgeService(svc *svcknowledge.Service) Option {
+	return func(u *UseCases) {
+		u.knowledgeSvc = svc
+	}
+}
+
 // WithChatUseCase sets a custom ChatUseCase implementation, overriding the default PlanExecChat.
 func WithChatUseCase(chatUseCase interfaces.ChatUseCase) Option {
 	return func(u *UseCases) {
@@ -243,7 +236,6 @@ func New(opts ...Option) *UseCases {
 		chatOpts := []chatUC.Option{
 			chatUC.WithSlackService(u.slackService),
 			chatUC.WithTools(u.tools),
-			chatUC.WithSubAgents(u.subAgents),
 			chatUC.WithStorageClient(u.storageClient),
 			chatUC.WithStoragePrefix(u.storagePrefix),
 			chatUC.WithNoAuthorization(u.noAuthorization),
