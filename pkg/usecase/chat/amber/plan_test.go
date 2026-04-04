@@ -49,7 +49,7 @@ func TestAmberChat_PlanWithKnowledgeService(t *testing.T) {
 				// The agent's first session (plan) should return a direct plan
 				// (without function calls, since no knowledge entries exist).
 				if sc == 1 {
-					// This is the planSession created by executeSwarm (not used in agent mode)
+					// This is the planSession created by executeAmber (not used in agent mode)
 					return &gollem.Response{
 						Texts: []string{`{"message": "Direct response.", "tasks": []}`},
 					}, nil

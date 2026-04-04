@@ -176,7 +176,7 @@ func (c *AmberChat) Execute(ctx context.Context, message string, chatCtx chatMod
 	logger.Debug("amber execute: authorized, starting execution")
 
 	// Phase 5: Main execution
-	if err := c.executeSwarm(ctx, ssn, message, &finalStatus, &chatCtx); err != nil {
+	if err := c.executeAmber(ctx, ssn, message, &finalStatus, &chatCtx); err != nil {
 		// Session abort and context cancellation are expected outcomes
 		// when a user aborts the session, not errors to report.
 		if errors.Is(err, ErrSessionAborted) || errors.Is(err, context.Canceled) {
@@ -187,8 +187,8 @@ func (c *AmberChat) Execute(ctx context.Context, message string, chatCtx chatMod
 	return nil
 }
 
-// executeSwarm orchestrates the amber execution: plan → parallel exec → replan → loop → final response.
-func (c *AmberChat) executeSwarm(ctx context.Context, ssn *session.Session, message string, finalStatus *types.SessionStatus, chatCtx *chatModel.ChatContext) error {
+// executeAmber orchestrates the amber execution: plan → parallel exec → replan → loop → final response.
+func (c *AmberChat) executeAmber(ctx context.Context, ssn *session.Session, message string, finalStatus *types.SessionStatus, chatCtx *chatModel.ChatContext) error {
 	target := chatCtx.Ticket
 	ticketless := chatCtx.IsTicketless()
 	logger := logging.From(ctx)
@@ -206,7 +206,7 @@ func (c *AmberChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 	if requestID == "" {
 		requestID = "unknown"
 	}
-	logger.Debug("amber executeSwarm: start", "has_trace_repo", c.traceRepository != nil, "request_id", requestID)
+	logger.Debug("amber executeAmber: start", "has_trace_repo", c.traceRepository != nil, "request_id", requestID)
 	if c.traceRepository != nil {
 		recorder = trace.New(
 			trace.WithTraceID(requestID),
@@ -216,14 +216,14 @@ func (c *AmberChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 		ctx = trace.WithHandler(ctx, recorder)
 		defer func() {
 			traceData := recorder.Trace()
-			logger.Debug("amber executeSwarm: finishing trace",
+			logger.Debug("amber executeAmber: finishing trace",
 				"has_trace", traceData != nil,
 				"request_id", requestID,
 			)
 			if err := recorder.Finish(cleanupCtx); err != nil {
 				logger.Error("failed to finish trace", "error", err)
 			}
-			logger.Debug("amber executeSwarm: trace finished")
+			logger.Debug("amber executeAmber: trace finished")
 		}()
 	}
 
@@ -456,7 +456,7 @@ func (c *AmberChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 	c.triggerFactReflection(ctx, buildReflectionSummary(allResults), target)
 
 	if !ticketless {
-		logger.Debug("amber executeSwarm: completed, saving history")
+		logger.Debug("amber executeAmber: completed, saving history")
 		return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
 	}
 	return nil
