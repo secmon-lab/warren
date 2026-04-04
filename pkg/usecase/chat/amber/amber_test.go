@@ -1,4 +1,4 @@
-package swarm_test
+package amber_test
 
 import (
 	"context"
@@ -22,7 +22,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	storage_svc "github.com/secmon-lab/warren/pkg/service/storage"
-	"github.com/secmon-lab/warren/pkg/usecase/chat/swarm"
+	"github.com/secmon-lab/warren/pkg/usecase/chat/amber"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
@@ -80,7 +80,7 @@ func setupTicketAndAlert(t *testing.T, ctx context.Context, repo *repository.Mem
 	return &testTicket
 }
 
-func TestSwarmChat_DirectResponse(t *testing.T) {
+func TestAmberChat_DirectResponse(t *testing.T) {
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
 	testTicket := setupTicketAndAlert(t, ctx, repo)
@@ -97,15 +97,15 @@ func TestSwarmChat_DirectResponse(t *testing.T) {
 		},
 	}
 
-	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
-		swarm.WithNoAuthorization(true),
+	chatUC := amber.New(repo, mockLLM, newMockPolicyClient(t),
+		amber.WithNoAuthorization(true),
 	)
 
 	err := chatUC.Execute(ctx, "What is the meaning of life?", chatModel.ChatContext{Ticket: testTicket})
 	gt.NoError(t, err)
 }
 
-func TestSwarmChat_SinglePhaseWithTasks(t *testing.T) {
+func TestAmberChat_SinglePhaseWithTasks(t *testing.T) {
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
 	testTicket := setupTicketAndAlert(t, ctx, repo)
@@ -156,15 +156,15 @@ func TestSwarmChat_SinglePhaseWithTasks(t *testing.T) {
 		},
 	}
 
-	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
-		swarm.WithNoAuthorization(true),
+	chatUC := amber.New(repo, mockLLM, newMockPolicyClient(t),
+		amber.WithNoAuthorization(true),
 	)
 
 	err := chatUC.Execute(ctx, "Analyze this alert", chatModel.ChatContext{Ticket: testTicket})
 	gt.NoError(t, err)
 }
 
-func TestSwarmChat_MaxPhasesLimit(t *testing.T) {
+func TestAmberChat_MaxPhasesLimit(t *testing.T) {
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
 	testTicket := setupTicketAndAlert(t, ctx, repo)
@@ -197,16 +197,16 @@ func TestSwarmChat_MaxPhasesLimit(t *testing.T) {
 		},
 	}
 
-	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
-		swarm.WithNoAuthorization(true),
-		swarm.WithMaxPhases(2),
+	chatUC := amber.New(repo, mockLLM, newMockPolicyClient(t),
+		amber.WithNoAuthorization(true),
+		amber.WithMaxPhases(2),
 	)
 
 	err := chatUC.Execute(ctx, "Do something", chatModel.ChatContext{Ticket: testTicket})
 	gt.NoError(t, err)
 }
 
-func TestSwarmChat_ParallelExecution(t *testing.T) {
+func TestAmberChat_ParallelExecution(t *testing.T) {
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
 	testTicket := setupTicketAndAlert(t, ctx, repo)
@@ -253,15 +253,15 @@ func TestSwarmChat_ParallelExecution(t *testing.T) {
 		},
 	}
 
-	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
-		swarm.WithNoAuthorization(true),
+	chatUC := amber.New(repo, mockLLM, newMockPolicyClient(t),
+		amber.WithNoAuthorization(true),
 	)
 
 	err := chatUC.Execute(ctx, "Analyze all indicators", chatModel.ChatContext{Ticket: testTicket})
 	gt.NoError(t, err)
 }
 
-func TestSwarmChat_ErrorIsolation(t *testing.T) {
+func TestAmberChat_ErrorIsolation(t *testing.T) {
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
 	testTicket := setupTicketAndAlert(t, ctx, repo)
@@ -314,8 +314,8 @@ func TestSwarmChat_ErrorIsolation(t *testing.T) {
 		},
 	}
 
-	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
-		swarm.WithNoAuthorization(true),
+	chatUC := amber.New(repo, mockLLM, newMockPolicyClient(t),
+		amber.WithNoAuthorization(true),
 	)
 
 	// Execute should complete without error even though one task failed
@@ -323,7 +323,7 @@ func TestSwarmChat_ErrorIsolation(t *testing.T) {
 	gt.NoError(t, err)
 }
 
-func TestSwarmChat_ToolFiltering(t *testing.T) {
+func TestAmberChat_ToolFiltering(t *testing.T) {
 	ctx := setupTestContext(t)
 
 	// Create mock tool sets with different spec names
@@ -334,7 +334,7 @@ func TestSwarmChat_ToolFiltering(t *testing.T) {
 	allTools := []gollem.ToolSet{toolA, toolB, toolC}
 
 	// Filter for only tool_alpha and tool_gamma
-	filtered := swarm.FilterToolSets(ctx, allTools, []string{"tool_alpha", "tool_gamma"})
+	filtered := amber.FilterToolSets(ctx, allTools, []string{"tool_alpha", "tool_gamma"})
 	gt.A(t, filtered).Length(2)
 
 	// Verify the right tools are included
@@ -352,18 +352,18 @@ func TestSwarmChat_ToolFiltering(t *testing.T) {
 	gt.True(t, !containsString(names, "tool_beta"))
 }
 
-func TestSwarmChat_ToolFilteringEmptyAllowList(t *testing.T) {
+func TestAmberChat_ToolFilteringEmptyAllowList(t *testing.T) {
 	ctx := setupTestContext(t)
 
 	toolA := &mockToolSet{name: "tool_alpha"}
 	allTools := []gollem.ToolSet{toolA}
 
 	// Empty allow list returns nil
-	filtered := swarm.FilterToolSets(ctx, allTools, []string{})
+	filtered := amber.FilterToolSets(ctx, allTools, []string{})
 	gt.True(t, filtered == nil)
 }
 
-func TestSwarmChat_SubAgentFiltering(t *testing.T) {
+func TestAmberChat_SubAgentFiltering(t *testing.T) {
 	// Create mock sub-agents
 	saFalcon := agent.NewSubAgent(
 		gollem.NewSubAgent("falcon", "CrowdStrike Falcon", func() (*gollem.Agent, error) { return nil, nil }),
@@ -381,7 +381,7 @@ func TestSwarmChat_SubAgentFiltering(t *testing.T) {
 	all := []*agent.SubAgent{saFalcon, saBigQuery, saSlack}
 
 	// Filter for only falcon and slack
-	filtered := swarm.FilterSubAgents(all, []string{"falcon", "slack"})
+	filtered := amber.FilterSubAgents(all, []string{"falcon", "slack"})
 	gt.A(t, filtered).Length(2)
 
 	var names []string
@@ -393,7 +393,7 @@ func TestSwarmChat_SubAgentFiltering(t *testing.T) {
 	gt.True(t, !containsString(names, "bigquery"))
 }
 
-func TestSwarmChat_MultiPhaseReplan(t *testing.T) {
+func TestAmberChat_MultiPhaseReplan(t *testing.T) {
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
 	testTicket := setupTicketAndAlert(t, ctx, repo)
@@ -456,15 +456,15 @@ func TestSwarmChat_MultiPhaseReplan(t *testing.T) {
 		},
 	}
 
-	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
-		swarm.WithNoAuthorization(true),
+	chatUC := amber.New(repo, mockLLM, newMockPolicyClient(t),
+		amber.WithNoAuthorization(true),
 	)
 
 	err := chatUC.Execute(ctx, "Run multi-phase analysis", chatModel.ChatContext{Ticket: testTicket})
 	gt.NoError(t, err)
 }
 
-func TestSwarmChat_AuthorizationDenied(t *testing.T) {
+func TestAmberChat_AuthorizationDenied(t *testing.T) {
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
 	testTicket := setupTicketAndAlert(t, ctx, repo)
@@ -488,7 +488,7 @@ func TestSwarmChat_AuthorizationDenied(t *testing.T) {
 		},
 	}
 
-	chatUC := swarm.New(repo, mockLLM, denyPolicy)
+	chatUC := amber.New(repo, mockLLM, denyPolicy)
 
 	err := chatUC.Execute(ctx, "Analyze this", chatModel.ChatContext{Ticket: testTicket})
 	gt.NoError(t, err)
@@ -529,8 +529,8 @@ func TestStartSessionMonitor_AbortDetection(t *testing.T) {
 	}
 	gt.NoError(t, repo.PutSession(ctx, ssn))
 
-	chatUC := swarm.New(repo, nil, nil,
-		swarm.WithMonitorPollInterval(10*time.Millisecond),
+	chatUC := amber.New(repo, nil, nil,
+		amber.WithMonitorPollInterval(10*time.Millisecond),
 	)
 
 	monitorCtx, stop := chatUC.StartSessionMonitor(ctx, ssn.ID)
@@ -565,7 +565,7 @@ func TestStartSessionMonitor_NormalCompletion(t *testing.T) {
 	}
 	gt.NoError(t, repo.PutSession(ctx, ssn))
 
-	chatUC := swarm.New(repo, nil, nil)
+	chatUC := amber.New(repo, nil, nil)
 
 	monitorCtx, stop := chatUC.StartSessionMonitor(ctx, ssn.ID)
 
@@ -584,7 +584,7 @@ func TestStartSessionMonitor_DBErrorContinuesMonitoring(t *testing.T) {
 	// This simulates a DB error scenario where session is not found
 	nonExistentID := types.NewSessionID()
 
-	chatUC := swarm.New(repo, nil, nil)
+	chatUC := amber.New(repo, nil, nil)
 
 	monitorCtx, stop := chatUC.StartSessionMonitor(ctx, nonExistentID)
 	defer stop()
@@ -596,7 +596,7 @@ func TestStartSessionMonitor_DBErrorContinuesMonitoring(t *testing.T) {
 	stop()
 }
 
-func TestSwarmChat_LatestHistorySavedOnDirectResponse(t *testing.T) {
+func TestAmberChat_LatestHistorySavedOnDirectResponse(t *testing.T) {
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
 	testTicket := setupTicketAndAlert(t, ctx, repo)
@@ -614,9 +614,9 @@ func TestSwarmChat_LatestHistorySavedOnDirectResponse(t *testing.T) {
 		},
 	}
 
-	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
-		swarm.WithNoAuthorization(true),
-		swarm.WithStorageClient(mockStorage),
+	chatUC := amber.New(repo, mockLLM, newMockPolicyClient(t),
+		amber.WithNoAuthorization(true),
+		amber.WithStorageClient(mockStorage),
 	)
 
 	gt.NoError(t, chatUC.Execute(ctx, "Hello", chatModel.ChatContext{Ticket: testTicket}))
@@ -628,7 +628,7 @@ func TestSwarmChat_LatestHistorySavedOnDirectResponse(t *testing.T) {
 	gt.V(t, latest).NotNil()
 }
 
-func TestSwarmChat_LatestHistorySavedAfterReplan(t *testing.T) {
+func TestAmberChat_LatestHistorySavedAfterReplan(t *testing.T) {
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
 	testTicket := setupTicketAndAlert(t, ctx, repo)
@@ -670,9 +670,9 @@ func TestSwarmChat_LatestHistorySavedAfterReplan(t *testing.T) {
 		},
 	}
 
-	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
-		swarm.WithNoAuthorization(true),
-		swarm.WithStorageClient(mockStorage),
+	chatUC := amber.New(repo, mockLLM, newMockPolicyClient(t),
+		amber.WithNoAuthorization(true),
+		amber.WithStorageClient(mockStorage),
 	)
 
 	gt.NoError(t, chatUC.Execute(ctx, "Analyze", chatModel.ChatContext{Ticket: testTicket}))
@@ -684,7 +684,7 @@ func TestSwarmChat_LatestHistorySavedAfterReplan(t *testing.T) {
 	gt.V(t, latest).NotNil()
 }
 
-func TestSwarmChat_LatestHistorySavedOnAbort(t *testing.T) {
+func TestAmberChat_LatestHistorySavedOnAbort(t *testing.T) {
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
 	testTicket := setupTicketAndAlert(t, ctx, repo)
@@ -723,10 +723,10 @@ func TestSwarmChat_LatestHistorySavedOnAbort(t *testing.T) {
 		},
 	}
 
-	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
-		swarm.WithNoAuthorization(true),
-		swarm.WithStorageClient(mockStorage),
-		swarm.WithMonitorPollInterval(10*time.Millisecond),
+	chatUC := amber.New(repo, mockLLM, newMockPolicyClient(t),
+		amber.WithNoAuthorization(true),
+		amber.WithStorageClient(mockStorage),
+		amber.WithMonitorPollInterval(10*time.Millisecond),
 	)
 
 	// Execute — plan succeeds and latest is saved,
@@ -740,7 +740,7 @@ func TestSwarmChat_LatestHistorySavedOnAbort(t *testing.T) {
 	gt.V(t, latest).NotNil()
 }
 
-func TestSwarmChat_LatestHistorySavedOnReplanError(t *testing.T) {
+func TestAmberChat_LatestHistorySavedOnReplanError(t *testing.T) {
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
 	testTicket := setupTicketAndAlert(t, ctx, repo)
@@ -786,9 +786,9 @@ func TestSwarmChat_LatestHistorySavedOnReplanError(t *testing.T) {
 		},
 	}
 
-	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
-		swarm.WithNoAuthorization(true),
-		swarm.WithStorageClient(mockStorage),
+	chatUC := amber.New(repo, mockLLM, newMockPolicyClient(t),
+		amber.WithNoAuthorization(true),
+		amber.WithStorageClient(mockStorage),
 	)
 
 	// Execute completes (replan error is logged, proceeds to final response)
@@ -801,7 +801,7 @@ func TestSwarmChat_LatestHistorySavedOnReplanError(t *testing.T) {
 	gt.V(t, latest).NotNil()
 }
 
-func TestSwarmChat_BudgetMiddlewareNotAccumulated(t *testing.T) {
+func TestAmberChat_BudgetMiddlewareNotAccumulated(t *testing.T) {
 	// Regression test: verify that budget middleware is NOT accumulated across tasks.
 	// Before the fix, each executeTask call would append a new budget middleware
 	// to the shared SubAgent instance, causing stale trackers from previous tasks
@@ -912,11 +912,11 @@ func TestSwarmChat_BudgetMiddlewareNotAccumulated(t *testing.T) {
 		},
 	}
 
-	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
-		swarm.WithNoAuthorization(true),
-		swarm.WithMaxPhases(3),
-		swarm.WithBudgetStrategy(budgetStrategy),
-		swarm.WithTools([]gollem.ToolSet{testToolSet}),
+	chatUC := amber.New(repo, mockLLM, newMockPolicyClient(t),
+		amber.WithNoAuthorization(true),
+		amber.WithMaxPhases(3),
+		amber.WithBudgetStrategy(budgetStrategy),
+		amber.WithTools([]gollem.ToolSet{testToolSet}),
 	)
 
 	err := chatUC.Execute(ctx, "Analyze with budget", chatModel.ChatContext{Ticket: testTicket})
@@ -952,18 +952,18 @@ type recordingBudgetStrategy struct {
 	initialBudget   float64
 	beforeCost      float64
 	hardLimitMargin int
-	calls           []swarm.ToolCallContext
+	calls           []amber.ToolCallContext
 }
 
 func (s *recordingBudgetStrategy) InitialBudget() float64 { return s.initialBudget }
-func (s *recordingBudgetStrategy) BeforeToolCall(ctx swarm.ToolCallContext) float64 {
+func (s *recordingBudgetStrategy) BeforeToolCall(ctx amber.ToolCallContext) float64 {
 	s.mu.Lock()
 	s.calls = append(s.calls, ctx)
 	s.mu.Unlock()
 	return s.beforeCost
 }
-func (s *recordingBudgetStrategy) AfterToolCall(_ swarm.ToolCallContext) float64 { return 0 }
-func (s *recordingBudgetStrategy) ShouldExit(state swarm.BudgetState) bool {
+func (s *recordingBudgetStrategy) AfterToolCall(_ amber.ToolCallContext) float64 { return 0 }
+func (s *recordingBudgetStrategy) ShouldExit(state amber.BudgetState) bool {
 	return state.CallsAfterSoft > s.hardLimitMargin
 }
 

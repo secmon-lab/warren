@@ -1,4 +1,4 @@
-package swarm
+package amber
 
 import (
 	"context"
@@ -35,8 +35,8 @@ import (
 
 const defaultMaxPhases = 10
 
-// SwarmChat implements interfaces.ChatUseCase with parallel task execution.
-type SwarmChat struct {
+// AmberChat implements interfaces.ChatUseCase with parallel task execution.
+type AmberChat struct {
 	repository          interfaces.Repository
 	llmClient           gollem.LLMClient
 	policyClient        interfaces.PolicyClient
@@ -56,83 +56,83 @@ type SwarmChat struct {
 	hitlTools           []string
 }
 
-// Option configures a SwarmChat.
-type Option func(*SwarmChat)
+// Option configures a AmberChat.
+type Option func(*AmberChat)
 
 // WithSlackService sets the Slack service for message routing.
 func WithSlackService(svc *slackService.Service) Option {
-	return func(c *SwarmChat) { c.slackService = svc }
+	return func(c *AmberChat) { c.slackService = svc }
 }
 
 // WithTools sets the tool sets available to the agent.
 func WithTools(tools []gollem.ToolSet) Option {
-	return func(c *SwarmChat) { c.tools = append(c.tools, tools...) }
+	return func(c *AmberChat) { c.tools = append(c.tools, tools...) }
 }
 
 // WithSubAgents sets the sub-agents available to the agent.
 func WithSubAgents(subAgents []*agent.SubAgent) Option {
-	return func(c *SwarmChat) { c.subAgents = append(c.subAgents, subAgents...) }
+	return func(c *AmberChat) { c.subAgents = append(c.subAgents, subAgents...) }
 }
 
 // WithStorageClient sets the storage client for history persistence.
 func WithStorageClient(client interfaces.StorageClient) Option {
-	return func(c *SwarmChat) { c.storageClient = client }
+	return func(c *AmberChat) { c.storageClient = client }
 }
 
 // WithStoragePrefix sets the storage prefix for history paths.
 func WithStoragePrefix(prefix string) Option {
-	return func(c *SwarmChat) { c.storagePrefix = prefix }
+	return func(c *AmberChat) { c.storagePrefix = prefix }
 }
 
 // WithNoAuthorization disables policy-based authorization checks.
 func WithNoAuthorization(noAuthz bool) Option {
-	return func(c *SwarmChat) { c.noAuthorization = noAuthz }
+	return func(c *AmberChat) { c.noAuthorization = noAuthz }
 }
 
 // WithFrontendURL sets the frontend URL for session links.
 func WithFrontendURL(url string) Option {
-	return func(c *SwarmChat) { c.frontendURL = url }
+	return func(c *AmberChat) { c.frontendURL = url }
 }
 
 // WithUserSystemPrompt sets the user system prompt.
 func WithUserSystemPrompt(prompt string) Option {
-	return func(c *SwarmChat) { c.userSystemPrompt = prompt }
+	return func(c *AmberChat) { c.userSystemPrompt = prompt }
 }
 
 // WithTraceRepository sets the trace repository for execution tracing.
 func WithTraceRepository(repo trace.Repository) Option {
-	return func(c *SwarmChat) { c.traceRepository = repo }
+	return func(c *AmberChat) { c.traceRepository = repo }
 }
 
 // WithMemoryService sets the memory service for agent memory integration.
 func WithMemoryService(svc *memory.Service) Option {
-	return func(c *SwarmChat) { c.memoryService = svc }
+	return func(c *AmberChat) { c.memoryService = svc }
 }
 
 // WithMaxPhases sets the maximum number of execution phases.
 func WithMaxPhases(n int) Option {
-	return func(c *SwarmChat) { c.maxPhases = n }
+	return func(c *AmberChat) { c.maxPhases = n }
 }
 
 // WithMonitorPollInterval sets the session monitor polling interval.
 func WithMonitorPollInterval(d time.Duration) Option {
-	return func(c *SwarmChat) { c.monitorPollInterval = d }
+	return func(c *AmberChat) { c.monitorPollInterval = d }
 }
 
 // WithBudgetStrategy sets the budget strategy for task execution.
 // When nil (default), budget tracking is disabled and tools execute without limits.
 func WithBudgetStrategy(s BudgetStrategy) Option {
-	return func(c *SwarmChat) { c.budgetStrategy = s }
+	return func(c *AmberChat) { c.budgetStrategy = s }
 }
 
 // WithHITLTools sets the tool names that require human approval before execution.
 func WithHITLTools(tools []string) Option {
-	return func(c *SwarmChat) { c.hitlTools = tools }
+	return func(c *AmberChat) { c.hitlTools = tools }
 }
 
-// New creates a new SwarmChat with the given dependencies and options.
-func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient interfaces.PolicyClient, opts ...Option) *SwarmChat {
-	c := &SwarmChat{
+// New creates a new AmberChat with the given dependencies and options.
+func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient interfaces.PolicyClient, opts ...Option) *AmberChat {
+	c := &AmberChat{
 		repository:          repo,
 		llmClient:           llmClient,
 		policyClient:        policyClient,
@@ -162,10 +162,10 @@ func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient in
 
 // Execute processes a chat message using parallel task execution.
 // The ChatContext must be pre-built by the caller with all necessary data.
-func (c *SwarmChat) Execute(ctx context.Context, message string, chatCtx chatModel.ChatContext) error {
+func (c *AmberChat) Execute(ctx context.Context, message string, chatCtx chatModel.ChatContext) error {
 	target := chatCtx.Ticket
 	logger := logging.From(ctx)
-	logger.Debug("swarm execute: start",
+	logger.Debug("amber execute: start",
 		"ticket_id", target.ID,
 		"request_id", request_id.FromContext(ctx),
 	)
@@ -173,11 +173,11 @@ func (c *SwarmChat) Execute(ctx context.Context, message string, chatCtx chatMod
 	// Phase 1: Session setup
 	ssn, ctx := c.createSession(ctx, target, message)
 	logger = logging.From(ctx) // refresh logger with session_id
-	logger.Debug("swarm execute: session created", "session_id", ssn.ID)
+	logger.Debug("amber execute: session created", "session_id", ssn.ID)
 
 	// Phase 2: Message routing setup
 	ctx = c.setupMessageRouting(ctx, ssn, target)
-	logger.Debug("swarm execute: message routing set up")
+	logger.Debug("amber execute: message routing set up")
 
 	// Phase 3: Session status tracking
 	ctx = c.setupStatusCheck(ctx, ssn)
@@ -191,12 +191,12 @@ func (c *SwarmChat) Execute(ctx context.Context, message string, chatCtx chatMod
 		return err
 	}
 	if !authorized {
-		logger.Debug("swarm execute: not authorized, returning")
+		logger.Debug("amber execute: not authorized, returning")
 		return nil
 	}
-	logger.Debug("swarm execute: authorized, starting swarm")
+	logger.Debug("amber execute: authorized, starting execution")
 
-	// Phase 5: Swarm execution
+	// Phase 5: Main execution
 	if err := c.executeSwarm(ctx, ssn, message, &finalStatus, &chatCtx); err != nil {
 		// Session abort and context cancellation are expected outcomes
 		// when a user aborts the session, not errors to report.
@@ -208,8 +208,8 @@ func (c *SwarmChat) Execute(ctx context.Context, message string, chatCtx chatMod
 	return nil
 }
 
-// executeSwarm orchestrates the swarm execution: plan → parallel exec → replan → loop → final response.
-func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, message string, finalStatus *types.SessionStatus, chatCtx *chatModel.ChatContext) error {
+// executeSwarm orchestrates the amber execution: plan → parallel exec → replan → loop → final response.
+func (c *AmberChat) executeSwarm(ctx context.Context, ssn *session.Session, message string, finalStatus *types.SessionStatus, chatCtx *chatModel.ChatContext) error {
 	target := chatCtx.Ticket
 	ticketless := chatCtx.IsTicketless()
 	logger := logging.From(ctx)
@@ -227,7 +227,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 	if requestID == "" {
 		requestID = "unknown"
 	}
-	logger.Debug("swarm executeSwarm: start", "has_trace_repo", c.traceRepository != nil, "request_id", requestID)
+	logger.Debug("amber executeSwarm: start", "has_trace_repo", c.traceRepository != nil, "request_id", requestID)
 	if c.traceRepository != nil {
 		recorder = trace.New(
 			trace.WithTraceID(requestID),
@@ -237,14 +237,14 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 		ctx = trace.WithHandler(ctx, recorder)
 		defer func() {
 			traceData := recorder.Trace()
-			logger.Debug("swarm executeSwarm: finishing trace",
+			logger.Debug("amber executeSwarm: finishing trace",
 				"has_trace", traceData != nil,
 				"request_id", requestID,
 			)
 			if err := recorder.Finish(cleanupCtx); err != nil {
 				logger.Error("failed to finish trace", "error", err)
 			}
-			logger.Debug("swarm executeSwarm: trace finished")
+			logger.Debug("amber executeSwarm: trace finished")
 		}()
 	}
 
@@ -478,7 +478,7 @@ func (c *SwarmChat) executeSwarm(ctx context.Context, ssn *session.Session, mess
 	msg.Notify(ctx, "💬 %s", finalResp)
 
 	if !ticketless {
-		logger.Debug("swarm executeSwarm: completed, saving history")
+		logger.Debug("amber executeSwarm: completed, saving history")
 		return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
 	}
 	return nil
@@ -501,7 +501,7 @@ type questionResult struct {
 }
 
 // handleQuestion asks a question to the user via HITL service and returns the result.
-func (c *SwarmChat) handleQuestion(ctx context.Context, q *Question, target *ticket.Ticket, ssn *session.Session) (*questionResult, error) {
+func (c *AmberChat) handleQuestion(ctx context.Context, q *Question, target *ticket.Ticket, ssn *session.Session) (*questionResult, error) {
 	logger := logging.From(ctx)
 	logger.Info("asking question to user",
 		"question", q.Question,
@@ -554,7 +554,7 @@ func (c *SwarmChat) handleQuestion(ctx context.Context, q *Question, target *tic
 }
 
 // createSession creates and persists a new chat session.
-func (c *SwarmChat) createSession(ctx context.Context, target *ticket.Ticket, message string) (*session.Session, context.Context) {
+func (c *AmberChat) createSession(ctx context.Context, target *ticket.Ticket, message string) (*session.Session, context.Context) {
 	userID := types.UserID(user.FromContext(ctx))
 	slackURL := slackctx.SlackURL(ctx)
 
@@ -574,7 +574,7 @@ func (c *SwarmChat) createSession(ctx context.Context, target *ticket.Ticket, me
 }
 
 // setupMessageRouting configures Slack/CLI message routing functions in the context.
-func (c *SwarmChat) setupMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket) context.Context {
+func (c *AmberChat) setupMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket) context.Context {
 	if c.slackService != nil && target.SlackThread != nil {
 		notifyFunc, traceFunc, warnFunc := c.setupSlackMessageFuncs(ctx, ssn, target)
 		ctx = msg.With(ctx, notifyFunc, traceFunc, warnFunc)
@@ -602,7 +602,7 @@ func (c *SwarmChat) setupMessageRouting(ctx context.Context, ssn *session.Sessio
 }
 
 // setupSlackMessageFuncs creates Slack message routing functions for notify, trace, and warn.
-func (c *SwarmChat) setupSlackMessageFuncs(ctx context.Context, sess *session.Session, target *ticket.Ticket) (msg.NotifyFunc, msg.TraceFunc, msg.WarnFunc) {
+func (c *AmberChat) setupSlackMessageFuncs(ctx context.Context, sess *session.Session, target *ticket.Ticket) (msg.NotifyFunc, msg.TraceFunc, msg.WarnFunc) {
 	threadSvc := c.slackService.NewThread(*target.SlackThread)
 
 	notifyFunc := func(ctx context.Context, message string) {
@@ -643,7 +643,7 @@ func (c *SwarmChat) setupSlackMessageFuncs(ctx context.Context, sess *session.Se
 }
 
 // setupStatusCheck embeds a session abort check function in the context.
-func (c *SwarmChat) setupStatusCheck(ctx context.Context, ssn *session.Session) context.Context {
+func (c *AmberChat) setupStatusCheck(ctx context.Context, ssn *session.Session) context.Context {
 	statusCheckFunc := func(ctx context.Context) error {
 		s, err := c.repository.GetSession(ctx, ssn.ID)
 		if err != nil {
@@ -658,7 +658,7 @@ func (c *SwarmChat) setupStatusCheck(ctx context.Context, ssn *session.Session) 
 }
 
 // finishSession updates session status and posts session actions on completion.
-func (c *SwarmChat) finishSession(ctx context.Context, ssn *session.Session, target *ticket.Ticket, finalStatus *types.SessionStatus) {
+func (c *AmberChat) finishSession(ctx context.Context, ssn *session.Session, target *ticket.Ticket, finalStatus *types.SessionStatus) {
 	logger := logging.From(ctx)
 	if r := recover(); r != nil {
 		*finalStatus = types.SessionStatusAborted
@@ -695,7 +695,7 @@ func (c *SwarmChat) finishSession(ctx context.Context, ssn *session.Session, tar
 }
 
 // authorize checks policy-based authorization for agent execution.
-func (c *SwarmChat) authorize(ctx context.Context, message string) (bool, error) {
+func (c *AmberChat) authorize(ctx context.Context, message string) (bool, error) {
 	if err := chat.AuthorizeAgentRequest(ctx, c.policyClient, c.noAuthorization, message); err != nil {
 		if errors.Is(err, chat.ErrAgentAuthPolicyNotDefined) {
 			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nAgent execution policy is not defined. Please configure the `auth.agent` policy or use `--no-authorization` flag for development.\n\nSee: https://docs.warren.secmon-lab.com/policy.md#agent-execution-authorization")
@@ -712,7 +712,7 @@ func (c *SwarmChat) authorize(ctx context.Context, message string) (bool, error)
 
 // saveLatestHistory saves the current planning session history as the latest snapshot.
 // Errors are handled via errutil but do not interrupt execution.
-func (c *SwarmChat) saveLatestHistory(ctx context.Context, planSession gollem.Session, ticketID types.TicketID, storageSvc *storage.Service) {
+func (c *AmberChat) saveLatestHistory(ctx context.Context, planSession gollem.Session, ticketID types.TicketID, storageSvc *storage.Service) {
 	history, err := planSession.History()
 	if err != nil {
 		errutil.Handle(ctx, goerr.Wrap(err, "failed to get history for latest save"))
@@ -727,7 +727,7 @@ func (c *SwarmChat) saveLatestHistory(ctx context.Context, planSession gollem.Se
 }
 
 // saveSessionHistory extracts history from a gollem Session and saves it via the shared SaveHistory function.
-func (c *SwarmChat) saveSessionHistory(ctx context.Context, planSession gollem.Session, ticketID types.TicketID, storageSvc *storage.Service) error {
+func (c *AmberChat) saveSessionHistory(ctx context.Context, planSession gollem.Session, ticketID types.TicketID, storageSvc *storage.Service) error {
 	newHistory, err := planSession.History()
 	if err != nil {
 		return goerr.Wrap(err, "failed to get history from planning session")
@@ -751,7 +751,7 @@ func checkAborted(ctx context.Context, cleanupCtx context.Context, finalStatus *
 // and cancels the context when the session is aborted. This enables immediate
 // cancellation of in-flight operations (LLM calls, tool executions) when abort
 // is requested, complementing the existing checkpoint-based status checks.
-func (c *SwarmChat) startSessionMonitor(ctx context.Context, sessionID types.SessionID) (context.Context, func()) {
+func (c *AmberChat) startSessionMonitor(ctx context.Context, sessionID types.SessionID) (context.Context, func()) {
 	ctx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 

@@ -6,21 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
-	"github.com/m-mizutani/gollem/llm/gemini"
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
-	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -384,21 +380,6 @@ func TestChatAgentAuthorization(t *testing.T) {
 	})
 }
 
-func newLLMClient(t *testing.T) gollem.LLMClient {
-	projectID, ok := os.LookupEnv("TEST_GEMINI_PROJECT_ID")
-	if !ok {
-		t.Skip("TEST_GEMINI_PROJECT_ID is not set")
-	}
-	location, ok := os.LookupEnv("TEST_GEMINI_LOCATION")
-	if !ok {
-		t.Skip("TEST_GEMINI_LOCATION is not set")
-	}
-
-	client, err := gemini.New(t.Context(), projectID, location, gemini.WithModel("gemini-2.5-flash"))
-	gt.NoError(t, err)
-	return client
-}
-
 // mockTestWriter is a simple mock implementation for io.WriteCloser used in tests
 type mockTestWriter struct{}
 
@@ -408,37 +389,6 @@ func (m *mockTestWriter) Write(p []byte) (n int, err error) {
 
 func (m *mockTestWriter) Close() error {
 	return nil
-}
-
-func TestToolCallToText(t *testing.T) {
-	llmClient := newLLMClient(t)
-
-	spec := &gollem.ToolSpec{
-		Name:        "random_number",
-		Description: "Generate a random number",
-		Parameters: map[string]*gollem.Parameter{
-			"min": {
-				Type:     "integer",
-				Required: true,
-			},
-			"max": {
-				Type:     "integer",
-				Required: true,
-			},
-		},
-	}
-	call := &gollem.FunctionCall{
-		Name: "random_number",
-		Arguments: map[string]any{
-			"min": 1,
-			"max": 100,
-		},
-	}
-
-	ctx := lang.With(t.Context(), lang.Japanese)
-	message := usecase.ToolCallToText(ctx, llmClient, spec, call)
-	t.Log("[message]", message)
-	gt.S(t, message).NotContains("⚡ Execute Tool")
 }
 
 // TestChatErrorNotifications validates that error notifications are properly sent
@@ -619,14 +569,14 @@ func TestChatErrorNotifications(t *testing.T) {
 			AlertIDs: []types.AlertID{},
 		}
 
-		// This should return an error due to agent execution failure
+		// This should return an error due to plan creation failure
 		err := uc.ChatFromCLI(ctx, targetTicket, "test query")
 		gt.Error(t, err)
-		gt.S(t, err.Error()).Contains("failed to execute agent")
+		gt.S(t, err.Error()).Contains("failed to generate plan")
 
-		// Execution failure sends notification about the failure
+		// Planning failure sends notification about the failure
 		gt.A(t, notifiedMessages).Length(1)
-		gt.S(t, notifiedMessages[0]).Contains("💥 Execution failed")
+		gt.S(t, notifiedMessages[0]).Contains("Planning failed")
 	})
 
 	t.Run("History save failure triggers notification", func(t *testing.T) {
@@ -1022,156 +972,6 @@ func TestAuthorizeAgentRequest(t *testing.T) {
 		err = uc.AuthorizeAgentRequest(ctxWithUser, "test message")
 		gt.Error(t, err)
 		gt.S(t, err.Error()).Contains("agent request not authorized")
-	})
-}
-
-func TestGenerateChatSystemPrompt(t *testing.T) {
-	t.Run("renders all template variables", func(t *testing.T) {
-		ctx := lang.With(t.Context(), lang.Japanese)
-		target := &ticket.Ticket{
-			ID:    types.NewTicketID(),
-			Topic: "aws-guardduty",
-		}
-
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 5, "", nil, "U12345678", nil, "", nil)
-		gt.NoError(t, err)
-
-		// Verify requester_id is rendered in mention format
-		gt.S(t, result).Contains("<@U12345678>")
-
-		// Verify lang is rendered
-		gt.S(t, result).Contains("ja")
-
-		// Verify alert count is rendered
-		gt.S(t, result).Contains("5 alerts total")
-
-		// Verify ticket JSON is embedded
-		gt.S(t, result).Contains(string(target.ID))
-
-		// Verify key sections exist
-		gt.S(t, result).Contains("Fundamental Principle")
-		gt.S(t, result).Contains("Facts vs. Hypotheses")
-		gt.S(t, result).Contains("Confirmation Bias")
-		gt.S(t, result).Contains("Severity Assessment Discipline")
-		gt.S(t, result).Contains("Asking Users for Information")
-	})
-
-	t.Run("renders with knowledges", func(t *testing.T) {
-		ctx := lang.With(t.Context(), lang.English)
-		target := &ticket.Ticket{
-			ID:    types.NewTicketID(),
-			Topic: "aws-guardduty",
-		}
-		knowledges := []*knowledge.Knowledge{
-			{
-				Name:    "GuardDuty Basics",
-				Content: "GuardDuty monitors AWS accounts for suspicious activity.",
-			},
-		}
-
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 3, "", knowledges, "U99999999", nil, "", nil)
-		gt.NoError(t, err)
-
-		gt.S(t, result).Contains("Domain Knowledge")
-		gt.S(t, result).Contains("GuardDuty Basics")
-		gt.S(t, result).Contains("GuardDuty monitors AWS accounts")
-	})
-
-	t.Run("renders with additional instructions", func(t *testing.T) {
-		ctx := lang.With(t.Context(), lang.English)
-		target := &ticket.Ticket{
-			ID: types.NewTicketID(),
-		}
-
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "Use BigQuery for log analysis", nil, "UABC", nil, "", nil)
-		gt.NoError(t, err)
-
-		gt.S(t, result).Contains("Additional Instructions")
-		gt.S(t, result).Contains("Use BigQuery for log analysis")
-	})
-
-	t.Run("renders with empty requester_id", func(t *testing.T) {
-		ctx := lang.With(t.Context(), lang.English)
-		target := &ticket.Ticket{
-			ID: types.NewTicketID(),
-		}
-
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "", nil, "", nil)
-		gt.NoError(t, err)
-
-		// Should render without error even with empty requester_id
-		gt.S(t, result).Contains("Asking Users for Information")
-		// Empty mention renders as <@>
-		gt.S(t, result).Contains("<@>")
-	})
-
-	t.Run("renders with thread comments", func(t *testing.T) {
-		ctx := lang.With(t.Context(), lang.English)
-		target := &ticket.Ticket{
-			ID: types.NewTicketID(),
-		}
-
-		comments := []ticket.Comment{
-			{
-				Comment:   "I checked the logs and found suspicious activity",
-				User:      &slack.User{ID: "U001", Name: "Alice"},
-				CreatedAt: time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC),
-			},
-			{
-				Comment:   "The IP belongs to a known VPN provider",
-				User:      &slack.User{ID: "U002", Name: "Bob"},
-				CreatedAt: time.Date(2025, 1, 15, 10, 35, 0, 0, time.UTC),
-			},
-		}
-
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", comments, "", nil)
-		gt.NoError(t, err)
-
-		gt.S(t, result).Contains("Recent Thread Conversations")
-		gt.S(t, result).Contains("Alice")
-		gt.S(t, result).Contains("I checked the logs and found suspicious activity")
-		gt.S(t, result).Contains("Bob")
-		gt.S(t, result).Contains("The IP belongs to a known VPN provider")
-		gt.S(t, result).Contains("2025-01-15 10:30:00")
-	})
-
-	t.Run("hides thread comments section when empty", func(t *testing.T) {
-		ctx := lang.With(t.Context(), lang.English)
-		target := &ticket.Ticket{
-			ID: types.NewTicketID(),
-		}
-
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, "", nil)
-		gt.NoError(t, err)
-
-		gt.S(t, result).NotContains("Recent Thread Conversations")
-	})
-
-	t.Run("renders with user system prompt", func(t *testing.T) {
-		ctx := lang.With(t.Context(), lang.English)
-		target := &ticket.Ticket{
-			ID: types.NewTicketID(),
-		}
-
-		userPrompt := "## Environment\nThis is a production environment.\n\n## Response Policy\nAlways escalate critical findings."
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, userPrompt, nil)
-		gt.NoError(t, err)
-
-		gt.S(t, result).Contains("User System Prompt")
-		gt.S(t, result).Contains("This is a production environment.")
-		gt.S(t, result).Contains("Always escalate critical findings.")
-	})
-
-	t.Run("hides user system prompt section when empty", func(t *testing.T) {
-		ctx := lang.With(t.Context(), lang.English)
-		target := &ticket.Ticket{
-			ID: types.NewTicketID(),
-		}
-
-		result, err := usecase.GenerateChatSystemPrompt(ctx, target, 0, "", nil, "U001", nil, "", nil)
-		gt.NoError(t, err)
-
-		gt.S(t, result).NotContains("User System Prompt")
 	})
 }
 

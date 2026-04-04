@@ -162,22 +162,17 @@ Sub-agents are specialized AI agents that handle complex, multi-step operations.
 
 ## Chat Strategy
 
-Warren supports two chat execution strategies:
-
-| Strategy | Description |
-|----------|-------------|
-| `legacy` (default) | Sequential plan-and-execute. Stable, proven approach. |
-| `swarm` | Parallel task execution with phased planning. Faster for multi-tool investigations. |
+Warren uses the `amber` chat execution strategy by default. It parallelizes independent tasks for faster multi-tool investigations.
 
 Configure via `--chat-strategy` flag or `WARREN_CHAT_STRATEGY` environment variable:
 
 ```bash
-warren serve --chat-strategy swarm
+warren serve --chat-strategy amber
 ```
 
-### Swarm Strategy Details
+### Amber Strategy Details
 
-The swarm strategy parallelizes independent tasks:
+The amber strategy parallelizes independent tasks:
 
 1. **Planning**: LLM creates a structured plan with independent tasks
 2. **Phase Execution**: All tasks in a phase run in parallel (separate goroutines)

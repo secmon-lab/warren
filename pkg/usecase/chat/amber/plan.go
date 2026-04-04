@@ -1,4 +1,4 @@
-package swarm
+package amber
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 )
 
 // plan executes the planning phase and returns a structured plan.
-func (c *SwarmChat) plan(ctx context.Context, session gollem.Session, pc *planningContext) (*PlanResult, error) {
+func (c *AmberChat) plan(ctx context.Context, session gollem.Session, pc *planningContext) (*PlanResult, error) {
 	logger := logging.From(ctx)
 
 	// Generate planning prompt
@@ -48,7 +48,7 @@ func (c *SwarmChat) plan(ctx context.Context, session gollem.Session, pc *planni
 }
 
 // replan evaluates completed results and determines next steps.
-func (c *SwarmChat) replan(ctx context.Context, session gollem.Session, pc *planningContext, allResults []*phaseResult, currentPhase int, systemPrompt string) (*ReplanResult, error) {
+func (c *AmberChat) replan(ctx context.Context, session gollem.Session, pc *planningContext, allResults []*phaseResult, currentPhase int, systemPrompt string) (*ReplanResult, error) {
 	logger := logging.From(ctx)
 
 	// Generate replan prompt
@@ -105,7 +105,7 @@ func (c *SwarmChat) replan(ctx context.Context, session gollem.Session, pc *plan
 }
 
 // generateFinalResponse generates the final response after all tasks are done.
-func (c *SwarmChat) generateFinalResponse(ctx context.Context, session gollem.Session, pc *planningContext, allResults []*phaseResult, systemPrompt string) (string, error) {
+func (c *AmberChat) generateFinalResponse(ctx context.Context, session gollem.Session, pc *planningContext, allResults []*phaseResult, systemPrompt string) (string, error) {
 	logger := logging.From(ctx)
 
 	finalPrompt, err := generateFinalPrompt(ctx, pc, allResults)

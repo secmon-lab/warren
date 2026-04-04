@@ -1,4 +1,4 @@
-package swarm
+package amber
 
 import (
 	"context"
@@ -60,7 +60,7 @@ func FilterSubAgents(allAgents []*agent.SubAgent, allowedNames []string) []*agen
 }
 
 // StartSessionMonitor exposes startSessionMonitor for testing.
-func (c *SwarmChat) StartSessionMonitor(ctx context.Context, sessionID types.SessionID) (context.Context, func()) {
+func (c *AmberChat) StartSessionMonitor(ctx context.Context, sessionID types.SessionID) (context.Context, func()) {
 	return c.startSessionMonitor(ctx, sessionID)
 }
 

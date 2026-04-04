@@ -11,7 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	chatcommon "github.com/secmon-lab/warren/pkg/usecase/chat"
-	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat/legacy"
+	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat/amber"
 )
 
 // Export private types and functions for testing
@@ -73,12 +73,6 @@ func (ac *TestAuthCache) TestHasCachedToken(tokenID auth.TokenID) bool {
 func (uc *AuthUseCase) TestGetCache() *TestAuthCache {
 	return uc.cache
 }
-
-// ToolCallToText exports the chat package's ToolCallToText for testing
-var ToolCallToText = chatpkg.ToolCallToText
-
-// GenerateChatSystemPrompt exports the chat package's GenerateChatSystemPrompt for testing
-var GenerateChatSystemPrompt = chatpkg.GenerateChatSystemPrompt
 
 // CollectThreadComments exports the chat package's CollectThreadComments for testing
 func (uc *UseCases) CollectThreadComments(ctx context.Context, ticketID types.TicketID, currentSession *session.Session) []ticket.Comment {

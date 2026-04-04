@@ -16,7 +16,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat"
-	"github.com/secmon-lab/warren/pkg/usecase/chat/swarm"
+	"github.com/secmon-lab/warren/pkg/usecase/chat/amber"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/slackctx"
 )
@@ -117,7 +117,7 @@ func (x *UseCases) buildChatContext(ctx context.Context, t *ticket.Ticket, slack
 		if memErr != nil {
 			logger.Warn("failed to search agent memories", "error", memErr)
 		} else if len(memories) > 0 {
-			chatCtx.MemoryContext = swarm.FormatMemories(memories)
+			chatCtx.MemoryContext = amber.FormatMemories(memories)
 		}
 	}
 

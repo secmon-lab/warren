@@ -1,4 +1,4 @@
-package swarm
+package amber
 
 // TaskPlan represents a single task in the parallel execution plan.
 type TaskPlan struct {
