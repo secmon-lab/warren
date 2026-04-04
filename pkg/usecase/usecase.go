@@ -19,7 +19,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/notifier"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/tag"
-	chatUC "github.com/secmon-lab/warren/pkg/usecase/chat/legacy"
+	chatUC "github.com/secmon-lab/warren/pkg/usecase/chat/amber"
 )
 
 var (
@@ -243,7 +243,7 @@ func New(opts ...Option) *UseCases {
 			chatUC.WithUserSystemPrompt(u.userSystemPrompt),
 			chatUC.WithTraceRepository(u.traceRepository),
 		}
-		u.ChatUC = chatUC.NewPlanExecChat(u.repository, u.llmClient, u.policyClient, chatOpts...)
+		u.ChatUC = chatUC.New(u.repository, u.llmClient, u.policyClient, chatOpts...)
 	}
 
 	// Initialize tag use case if tag service is available

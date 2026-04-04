@@ -1,4 +1,4 @@
-package swarm
+package amber
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 // plan executes the planning phase and returns a structured plan.
 // If a knowledge service is configured, the planner runs as a gollem Agent with
 // knowledge_search tool so it can look up prior findings before creating the plan.
-func (c *SwarmChat) plan(ctx context.Context, session gollem.Session, pc *planningContext, systemPrompt string) (*PlanResult, error) {
+func (c *AmberChat) plan(ctx context.Context, session gollem.Session, pc *planningContext, systemPrompt string) (*PlanResult, error) {
 	logger := logging.From(ctx)
 
 	// Generate planning prompt
@@ -64,7 +64,7 @@ func (c *SwarmChat) plan(ctx context.Context, session gollem.Session, pc *planni
 
 // executePlannerAgent runs the planner as a gollem Agent with knowledge tool,
 // then appends the agent's conversation history back to the planning session.
-func (c *SwarmChat) executePlannerAgent(ctx context.Context, planSession gollem.Session, systemPrompt string, userPrompt string, schema *gollem.Parameter) ([]string, error) {
+func (c *AmberChat) executePlannerAgent(ctx context.Context, planSession gollem.Session, systemPrompt string, userPrompt string, schema *gollem.Parameter) ([]string, error) {
 	// Build agent options
 	opts := []gollem.Option{
 		gollem.WithSystemPrompt(systemPrompt),
@@ -128,7 +128,7 @@ func (c *SwarmChat) executePlannerAgent(ctx context.Context, planSession gollem.
 }
 
 // replan evaluates completed results and determines next steps.
-func (c *SwarmChat) replan(ctx context.Context, session gollem.Session, pc *planningContext, allResults []*phaseResult, currentPhase int, systemPrompt string) (*ReplanResult, error) {
+func (c *AmberChat) replan(ctx context.Context, session gollem.Session, pc *planningContext, allResults []*phaseResult, currentPhase int, systemPrompt string) (*ReplanResult, error) {
 	logger := logging.From(ctx)
 
 	// Generate replan prompt
@@ -197,7 +197,7 @@ func (c *SwarmChat) replan(ctx context.Context, session gollem.Session, pc *plan
 }
 
 // generateFinalResponse generates the final response after all tasks are done.
-func (c *SwarmChat) generateFinalResponse(ctx context.Context, session gollem.Session, pc *planningContext, allResults []*phaseResult, systemPrompt string) (string, error) {
+func (c *AmberChat) generateFinalResponse(ctx context.Context, session gollem.Session, pc *planningContext, allResults []*phaseResult, systemPrompt string) (string, error) {
 	logger := logging.From(ctx)
 
 	finalPrompt, err := generateFinalPrompt(ctx, pc, allResults)
