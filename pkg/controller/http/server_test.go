@@ -44,7 +44,7 @@ var slackInteractionJSON []byte
 //go:embed testdata/slack_mention.json
 var slackMentionJSON []byte
 
-//go:embed testdata/sns.pem
+//go:embed testdata/sns.pem.txt
 var snsPem []byte
 
 func TestValidateGoogleIDToken(t *testing.T) {

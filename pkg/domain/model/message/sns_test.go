@@ -16,7 +16,7 @@ import (
 //go:embed testdata/sns.har
 var snsHar []byte
 
-//go:embed testdata/sns.pem
+//go:embed testdata/sns.pem.txt
 var snsPem []byte
 
 func TestSNSVerify(t *testing.T) {
