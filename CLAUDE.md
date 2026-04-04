@@ -118,7 +118,7 @@ The application follows Domain-Driven Design (DDD) with clean architecture:
 - All pipeline events are emitted through `Notifier` interface for real-time monitoring
 
 #### Chat Strategy Naming Convention
-Chat strategies are named after minerals in alphabetical order: `amber` (A), `beryl` (B), `calcite` (C), etc. Each strategy is a separate package under `pkg/usecase/chat/<mineral>/` implementing the `interfaces.ChatUseCase` interface. The current default strategy is `amber`. When adding a new strategy, use the next mineral in alphabetical sequence.
+Chat strategies are named after wildflowers in alphabetical order: `aster` (A), `bluebell` (B), `clover` (C), `daisy` (D), etc. Each strategy is a separate package under `pkg/usecase/chat/<flower>/` implementing the `interfaces.ChatUseCase` interface. The current default strategy is `aster`. When adding a new strategy, use the next wildflower in alphabetical sequence.
 
 #### Command System
 - `pkg/service/command/` - Slack command processing (list, aggregate, ticket)

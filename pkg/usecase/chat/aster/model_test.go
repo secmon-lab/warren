@@ -1,11 +1,11 @@
-package amber_test
+package aster_test
 
 import (
 	"encoding/json"
 	"testing"
 
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/usecase/chat/amber"
+	"github.com/secmon-lab/warren/pkg/usecase/chat/aster"
 )
 
 func TestReplanResult_WithQuestion(t *testing.T) {
@@ -19,7 +19,7 @@ func TestReplanResult_WithQuestion(t *testing.T) {
 		}
 	}`
 
-	var result amber.ReplanResult
+	var result aster.ReplanResult
 	gt.NoError(t, json.Unmarshal([]byte(raw), &result)).Required()
 	gt.Value(t, result.Message).Equal("Need to ask about internal IP")
 	gt.Value(t, result.Question != nil).Equal(true)
@@ -35,7 +35,7 @@ func TestReplanResult_WithoutQuestion(t *testing.T) {
 		"tasks": [{"id": "t1", "title": "Check logs", "description": "desc", "tools": ["bigquery"], "sub_agents": []}]
 	}`
 
-	var result amber.ReplanResult
+	var result aster.ReplanResult
 	gt.NoError(t, json.Unmarshal([]byte(raw), &result)).Required()
 	gt.Value(t, result.Question == nil).Equal(true)
 	gt.Array(t, result.Tasks).Length(1).Required()
@@ -45,7 +45,7 @@ func TestReplanResult_WithoutQuestion(t *testing.T) {
 func TestReplanResult_EmptyTasksNoQuestion(t *testing.T) {
 	raw := `{"message": "Done", "tasks": []}`
 
-	var result amber.ReplanResult
+	var result aster.ReplanResult
 	gt.NoError(t, json.Unmarshal([]byte(raw), &result)).Required()
 	gt.Value(t, result.Question == nil).Equal(true)
 	gt.Array(t, result.Tasks).Length(0)
@@ -62,7 +62,7 @@ func TestReplanResult_QuestionAndTasks_QuestionTakesPriority(t *testing.T) {
 		}
 	}`
 
-	var result amber.ReplanResult
+	var result aster.ReplanResult
 	gt.NoError(t, json.Unmarshal([]byte(raw), &result)).Required()
 	// Both are parsed, but the caller should prioritize question
 	gt.Value(t, result.Question != nil).Equal(true)

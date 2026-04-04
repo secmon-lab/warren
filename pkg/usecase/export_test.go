@@ -11,7 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	chatcommon "github.com/secmon-lab/warren/pkg/usecase/chat"
-	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat/amber"
+	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat/aster"
 )
 
 // Export private types and functions for testing

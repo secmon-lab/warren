@@ -1,4 +1,4 @@
-package amber_test
+package aster_test
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository/memory"
 	hitlSvc "github.com/secmon-lab/warren/pkg/service/hitl"
-	"github.com/secmon-lab/warren/pkg/usecase/chat/amber"
+	"github.com/secmon-lab/warren/pkg/usecase/chat/aster"
 )
 
 type testPresenter struct {
@@ -38,7 +38,7 @@ func TestHITLMiddleware_Approved(t *testing.T) {
 	svc := hitlSvc.New(repo, hitlSvc.WithTimeout(10*time.Second))
 	presenter := &testPresenter{}
 
-	mw := amber.NewHITLMiddleware(amber.NewHITLConfig(
+	mw := aster.NewHITLMiddleware(aster.NewHITLConfig(
 		map[string]bool{"web_fetch": true},
 		svc, presenter, "U12345", types.NewSessionID(), nil,
 	))
@@ -73,7 +73,7 @@ func TestHITLMiddleware_Denied(t *testing.T) {
 	svc := hitlSvc.New(repo, hitlSvc.WithTimeout(10*time.Second))
 	presenter := &testPresenter{}
 
-	mw := amber.NewHITLMiddleware(amber.NewHITLConfig(
+	mw := aster.NewHITLMiddleware(aster.NewHITLConfig(
 		map[string]bool{"web_fetch": true},
 		svc, presenter, "U12345", types.NewSessionID(), nil,
 	))
@@ -107,7 +107,7 @@ func TestHITLMiddleware_NonHITLTool_PassesThrough(t *testing.T) {
 	svc := hitlSvc.New(repo)
 	presenter := &testPresenter{}
 
-	mw := amber.NewHITLMiddleware(amber.NewHITLConfig(
+	mw := aster.NewHITLMiddleware(aster.NewHITLConfig(
 		map[string]bool{"web_fetch": true},
 		svc, presenter, "U12345", types.NewSessionID(), nil,
 	))
@@ -131,7 +131,7 @@ func TestHITLMiddleware_NoPresenter_BlocksExecution(t *testing.T) {
 	repo := memory.New()
 	svc := hitlSvc.New(repo)
 
-	mw := amber.NewHITLMiddleware(amber.NewHITLConfig(
+	mw := aster.NewHITLMiddleware(aster.NewHITLConfig(
 		map[string]bool{"web_fetch": true},
 		svc, nil, "U12345", types.NewSessionID(), nil,
 	))
@@ -156,7 +156,7 @@ func TestHITLMiddleware_Timeout(t *testing.T) {
 	svc := hitlSvc.New(repo, hitlSvc.WithTimeout(500*time.Millisecond))
 	presenter := &testPresenter{}
 
-	mw := amber.NewHITLMiddleware(amber.NewHITLConfig(
+	mw := aster.NewHITLMiddleware(aster.NewHITLConfig(
 		map[string]bool{"web_fetch": true},
 		svc, presenter, "U12345", types.NewSessionID(), nil,
 	))
@@ -182,7 +182,7 @@ func TestHandleQuestion_AnswerFlow(t *testing.T) {
 	presenter := &testPresenter{}
 	sessionID := types.NewSessionID()
 
-	q := &amber.Question{
+	q := &aster.Question{
 		Question: "Is 10.0.0.5 an internal IP?",
 		Options:  []string{"Yes, VPN GW", "No", "None of the above"},
 		Reason:   "Cannot determine from tool output",
@@ -202,7 +202,7 @@ func TestHandleQuestion_AnswerFlow(t *testing.T) {
 		})
 	}()
 
-	result, err := amber.ExecHandleQuestion(t.Context(), repo, presenter, q, sessionID, "U12345")
+	result, err := aster.ExecHandleQuestion(t.Context(), repo, presenter, q, sessionID, "U12345")
 	gt.NoError(t, err).Required()
 	gt.Value(t, result.Question).Equal("Is 10.0.0.5 an internal IP?")
 	gt.Array(t, result.Options).Length(3).Required()
@@ -214,12 +214,12 @@ func TestHandleQuestion_NilPresenter_Fails(t *testing.T) {
 	repo := memory.New()
 	sessionID := types.NewSessionID()
 
-	q := &amber.Question{
+	q := &aster.Question{
 		Question: "Is this allowed?",
 		Options:  []string{"Yes", "No"},
 		Reason:   "Policy unclear",
 	}
 
-	_, err := amber.ExecHandleQuestion(t.Context(), repo, nil, q, sessionID, "U12345")
+	_, err := aster.ExecHandleQuestion(t.Context(), repo, nil, q, sessionID, "U12345")
 	gt.Error(t, err)
 }

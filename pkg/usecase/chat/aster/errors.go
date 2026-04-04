@@ -1,4 +1,4 @@
-package amber
+package aster
 
 import (
 	"github.com/m-mizutani/goerr/v2"
