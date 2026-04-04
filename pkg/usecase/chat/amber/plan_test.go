@@ -1,4 +1,4 @@
-package swarm_test
+package amber_test
 
 import (
 	"context"
@@ -11,10 +11,10 @@ import (
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/repository"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
-	"github.com/secmon-lab/warren/pkg/usecase/chat/swarm"
+	"github.com/secmon-lab/warren/pkg/usecase/chat/amber"
 )
 
-func TestSwarmChat_PlanWithKnowledgeService(t *testing.T) {
+func TestAmberChat_PlanWithKnowledgeService(t *testing.T) {
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
 	testTicket := setupTicketAndAlert(t, ctx, repo)
@@ -49,7 +49,7 @@ func TestSwarmChat_PlanWithKnowledgeService(t *testing.T) {
 				// The agent's first session (plan) should return a direct plan
 				// (without function calls, since no knowledge entries exist).
 				if sc == 1 {
-					// This is the planSession created by executeSwarm (not used in agent mode)
+					// This is the planSession created by executeAmber (not used in agent mode)
 					return &gollem.Response{
 						Texts: []string{`{"message": "Direct response.", "tasks": []}`},
 					}, nil
@@ -63,9 +63,9 @@ func TestSwarmChat_PlanWithKnowledgeService(t *testing.T) {
 		},
 	}
 
-	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
-		swarm.WithKnowledgeService(knowledgeSvc),
-		swarm.WithNoAuthorization(true),
+	chatUC := amber.New(repo, mockLLM, newMockPolicyClient(t),
+		amber.WithKnowledgeService(knowledgeSvc),
+		amber.WithNoAuthorization(true),
 	)
 
 	err := chatUC.Execute(ctx, "Analyze this alert", chatModel.ChatContext{Ticket: testTicket})
@@ -77,9 +77,9 @@ func TestSwarmChat_PlanWithKnowledgeService(t *testing.T) {
 	mu.Unlock()
 }
 
-func TestSwarmChat_PlanWithoutKnowledgeService(t *testing.T) {
+func TestAmberChat_PlanWithoutKnowledgeService(t *testing.T) {
 	// This tests the fallback path (no knowledge service) still works.
-	// Existing TestSwarmChat_DirectResponse already covers this, but this
+	// Existing TestAmberChat_DirectResponse already covers this, but this
 	// explicitly verifies only one session is created.
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
@@ -104,8 +104,8 @@ func TestSwarmChat_PlanWithoutKnowledgeService(t *testing.T) {
 		},
 	}
 
-	chatUC := swarm.New(repo, mockLLM, newMockPolicyClient(t),
-		swarm.WithNoAuthorization(true),
+	chatUC := amber.New(repo, mockLLM, newMockPolicyClient(t),
+		amber.WithNoAuthorization(true),
 	)
 
 	err := chatUC.Execute(ctx, "Analyze this alert", chatModel.ChatContext{Ticket: testTicket})
@@ -119,7 +119,7 @@ func TestSwarmChat_PlanWithoutKnowledgeService(t *testing.T) {
 
 func TestFetchKnowledgeTags_NilService(t *testing.T) {
 	ctx := setupTestContext(t)
-	tags := swarm.FetchKnowledgeTags(ctx, nil)
+	tags := amber.FetchKnowledgeTags(ctx, nil)
 	gt.V(t, tags).Nil()
 }
 
@@ -137,7 +137,7 @@ func TestFetchKnowledgeTags_WithService(t *testing.T) {
 	_, err := knowledgeSvc.CreateTag(ctx, "test-tag", "A test tag")
 	gt.NoError(t, err)
 
-	tags := swarm.FetchKnowledgeTags(ctx, knowledgeSvc)
+	tags := amber.FetchKnowledgeTags(ctx, knowledgeSvc)
 	gt.A(t, tags).Length(1)
 	gt.V(t, tags[0].Name).Equal("test-tag")
 }

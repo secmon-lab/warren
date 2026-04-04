@@ -117,6 +117,9 @@ The application follows Domain-Driven Design (DDD) with clean architecture:
 - `HandleAlert()` - Complete alert handling including DB save and Slack posting
 - All pipeline events are emitted through `Notifier` interface for real-time monitoring
 
+#### Chat Strategy Naming Convention
+Chat strategies are named after minerals in alphabetical order: `amber` (A), `beryl` (B), `calcite` (C), etc. Each strategy is a separate package under `pkg/usecase/chat/<mineral>/` implementing the `interfaces.ChatUseCase` interface. The current default strategy is `amber`. When adding a new strategy, use the next mineral in alphabetical sequence.
+
 #### Command System
 - `pkg/service/command/` - Slack command processing (list, aggregate, ticket)
 - Commands: `l`/`ls`/`list`, `a`/`aggr`/`aggregate`, `t`/`ticket`

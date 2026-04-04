@@ -70,7 +70,7 @@ func TestVerifySNSRequest(t *testing.T) {
 	})
 
 	t.Run("subscription confirmation", func(t *testing.T) {
-		certPath := filepath.Join("testdata", "sns.pem")
+		certPath := filepath.Join("testdata", "sns.pem.txt")
 		certData, err := os.ReadFile(certPath)
 		gt.NoError(t, err)
 
@@ -122,7 +122,7 @@ func TestVerifySNSRequest(t *testing.T) {
 	})
 
 	t.Run("with valid SNS message", func(t *testing.T) {
-		certPath := filepath.Join("testdata", "sns.pem")
+		certPath := filepath.Join("testdata", "sns.pem.txt")
 		certData, err := os.ReadFile(certPath)
 		gt.NoError(t, err)
 
@@ -212,7 +212,7 @@ func TestAlertSNSVerification(t *testing.T) {
 	gt.NoError(t, err)
 
 	t.Run("with valid SNS message", func(t *testing.T) {
-		certPath := filepath.Join("testdata", "sns.pem")
+		certPath := filepath.Join("testdata", "sns.pem.txt")
 		certData, err := os.ReadFile(certPath)
 		gt.NoError(t, err)
 

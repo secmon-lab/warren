@@ -1,4 +1,4 @@
-package swarm
+package amber
 
 import (
 	"context"
@@ -31,7 +31,7 @@ import (
 // executePhase runs all tasks in parallel and waits for all to complete.
 // All task messages are posted upfront as "waiting" before any execution begins.
 // Each task's result context block is posted immediately upon completion.
-func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *ticket.Ticket, ssn *session.Session) []*TaskResult {
+func (c *AmberChat) executePhase(ctx context.Context, tasks []TaskPlan, target *ticket.Ticket, ssn *session.Session) []*TaskResult {
 	results := make([]*TaskResult, len(tasks))
 
 	// Pre-create all task message routings (posts "waiting" messages to Slack)
@@ -63,7 +63,7 @@ func (c *SwarmChat) executePhase(ctx context.Context, tasks []TaskPlan, target *
 }
 
 // postTaskResult posts a single task result context block to Slack.
-func (c *SwarmChat) postTaskResult(ctx context.Context, task TaskPlan, result *TaskResult, target *ticket.Ticket) {
+func (c *AmberChat) postTaskResult(ctx context.Context, task TaskPlan, result *TaskResult, target *ticket.Ticket) {
 	if c.slackService == nil || target.SlackThread == nil {
 		return
 	}
@@ -90,7 +90,7 @@ func (c *SwarmChat) postTaskResult(ctx context.Context, task TaskPlan, result *T
 }
 
 // postDivider posts a divider to the Slack thread if available.
-func (c *SwarmChat) postDivider(ctx context.Context, target *ticket.Ticket) {
+func (c *AmberChat) postDivider(ctx context.Context, target *ticket.Ticket) {
 	if c.slackService == nil || target.SlackThread == nil {
 		return
 	}
@@ -101,7 +101,7 @@ func (c *SwarmChat) postDivider(ctx context.Context, target *ticket.Ticket) {
 }
 
 // executeTask executes a single task with its own agent and trace context.
-func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *ticket.Ticket, ssn *session.Session, taskCtx context.Context, markCompleted func(), updatableBlockMsg *slackService.UpdatableBlockMessage) *TaskResult {
+func (c *AmberChat) executeTask(ctx context.Context, task TaskPlan, target *ticket.Ticket, ssn *session.Session, taskCtx context.Context, markCompleted func(), updatableBlockMsg *slackService.UpdatableBlockMessage) *TaskResult {
 	logger := logging.From(ctx)
 	result := &TaskResult{
 		TaskID: task.ID,
@@ -122,7 +122,7 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 	filteredTools := filterToolSets(c.tools, task.Tools)
 
 	// Add base action tool only if its ToolSet ID is in the task's tool list
-	// Note: SlackUpdate (PostFinding) is intentionally omitted in swarm mode.
+	// Note: SlackUpdate (PostFinding) is intentionally omitted in amber mode.
 	// Individual task results are posted as context blocks instead.
 	baseAction := base.New(c.repository, target.ID, base.WithLLMClient(c.llmClient))
 	if filtered := filterToolSets([]interfaces.ToolSet{baseAction}, task.Tools); len(filtered) > 0 {
@@ -262,7 +262,7 @@ func (c *SwarmChat) executeTask(ctx context.Context, task TaskPlan, target *tick
 }
 
 // triggerTechniqueReflection runs background knowledge reflection for a completed task.
-func (c *SwarmChat) triggerTechniqueReflection(ctx context.Context, taskCtx context.Context, result *TaskResult) {
+func (c *AmberChat) triggerTechniqueReflection(ctx context.Context, taskCtx context.Context, result *TaskResult) {
 	logger := logging.From(ctx)
 
 	if c.knowledgeService == nil {
@@ -307,7 +307,7 @@ func (c *SwarmChat) triggerTechniqueReflection(ctx context.Context, taskCtx cont
 }
 
 // triggerFactReflection runs background knowledge reflection for a completed session.
-func (c *SwarmChat) triggerFactReflection(ctx context.Context, summary string, t *ticket.Ticket) {
+func (c *AmberChat) triggerFactReflection(ctx context.Context, summary string, t *ticket.Ticket) {
 	logger := logging.From(ctx)
 
 	if c.knowledgeService == nil {
@@ -356,7 +356,7 @@ func (c *SwarmChat) triggerFactReflection(ctx context.Context, summary string, t
 // The initial "Waiting..." message is posted immediately so all task messages appear upfront.
 // Returns the new context, a function to mark the task as completed (changes emoji),
 // and an UpdatableBlockMessage for HITL integration (nil if Slack is not configured).
-func (c *SwarmChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket, taskTitle string) (context.Context, func(), *slackService.UpdatableBlockMessage) {
+func (c *AmberChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket, taskTitle string) (context.Context, func(), *slackService.UpdatableBlockMessage) {
 	if c.slackService == nil || target.SlackThread == nil {
 		return ctx, func() {}, nil
 	}

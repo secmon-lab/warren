@@ -28,7 +28,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/prompt"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
-	"github.com/secmon-lab/warren/pkg/usecase/chat/swarm"
+	"github.com/secmon-lab/warren/pkg/usecase/chat/amber"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
@@ -145,10 +145,10 @@ func cmdServe() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:        "chat-strategy",
-				Usage:       "Chat execution strategy: 'legacy' (plan & execute) or 'swarm' (parallel task execution)",
+				Usage:       "Chat execution strategy (default: 'amber')",
 				Category:    "Chat",
 				Sources:     cli.EnvVars("WARREN_CHAT_STRATEGY"),
-				Value:       "legacy",
+				Value:       "amber",
 				Destination: &chatStrategy,
 			},
 			&cli.StringFlag{
@@ -397,39 +397,39 @@ func cmdServe() *cli.Command {
 			}
 
 			// Configure chat strategy
-			if chatStrategy == "swarm" {
+			if chatStrategy == "amber" {
 				// Merge all tool sets: configured tools + MCP tools
-				allSwarmTools := make([]interfaces.ToolSet, 0, len(toolSets)+len(mcpToolSets))
-				allSwarmTools = append(allSwarmTools, toolSets...)
+				allAmberTools := make([]interfaces.ToolSet, 0, len(toolSets)+len(mcpToolSets))
+				allAmberTools = append(allAmberTools, toolSets...)
 				for _, mts := range mcpToolSets {
-					allSwarmTools = append(allSwarmTools, interfaces.WrapToolSet(mts, "mcp", "MCP external tool"))
+					allAmberTools = append(allAmberTools, interfaces.WrapToolSet(mts, "mcp", "MCP external tool"))
 				}
 
-				swarmOpts := []swarm.Option{
-					swarm.WithTools(allSwarmTools),
-					swarm.WithStorageClient(storageClient),
-					swarm.WithNoAuthorization(noAuthorization),
-					swarm.WithUserSystemPrompt(userSystemPrompt),
+				amberOpts := []amber.Option{
+					amber.WithTools(allAmberTools),
+					amber.WithStorageClient(storageClient),
+					amber.WithNoAuthorization(noAuthorization),
+					amber.WithUserSystemPrompt(userSystemPrompt),
 				}
 				if slackSvc != nil {
-					swarmOpts = append(swarmOpts, swarm.WithSlackService(slackSvc))
+					amberOpts = append(amberOpts, amber.WithSlackService(slackSvc))
 				}
 				if webUICfg.GetFrontendURL() != "" {
-					swarmOpts = append(swarmOpts, swarm.WithFrontendURL(webUICfg.GetFrontendURL()))
+					amberOpts = append(amberOpts, amber.WithFrontendURL(webUICfg.GetFrontendURL()))
 				}
 				if storageCfg.IsConfigured() && storageCfg.Prefix() != "" {
-					swarmOpts = append(swarmOpts, swarm.WithStoragePrefix(storageCfg.Prefix()))
+					amberOpts = append(amberOpts, amber.WithStoragePrefix(storageCfg.Prefix()))
 				}
 				if safeTraceRepo != nil {
-					swarmOpts = append(swarmOpts, swarm.WithTraceRepository(safeTraceRepo))
+					amberOpts = append(amberOpts, amber.WithTraceRepository(safeTraceRepo))
 				}
 
-				swarmOpts = append(swarmOpts, swarm.WithKnowledgeService(knowledgeSvc))
+				amberOpts = append(amberOpts, amber.WithKnowledgeService(knowledgeSvc))
 
 				// Configure budget strategy
 				switch budgetStrategy {
 				case "default":
-					swarmOpts = append(swarmOpts, swarm.WithBudgetStrategy(swarm.NewDefaultBudgetStrategy()))
+					amberOpts = append(amberOpts, amber.WithBudgetStrategy(amber.NewDefaultBudgetStrategy()))
 					logging.From(ctx).Info("Budget strategy: default (action budget enabled)")
 				case "none":
 					// budgetStrategy remains nil (budget disabled)
@@ -438,13 +438,13 @@ func cmdServe() *cli.Command {
 				}
 
 				// Configure HITL tools that require human approval
-				swarmOpts = append(swarmOpts, swarm.WithHITLTools([]string{"web_fetch"}))
+				amberOpts = append(amberOpts, amber.WithHITLTools([]string{"web_fetch"}))
 
-				swarmChat := swarm.New(repo, llmClient, policyClient, swarmOpts...)
-				ucOptions = append(ucOptions, usecase.WithChatUseCase(swarmChat))
-				logging.From(ctx).Info("Chat strategy: swarm (parallel task execution)")
+				amberChat := amber.New(repo, llmClient, policyClient, amberOpts...)
+				ucOptions = append(ucOptions, usecase.WithChatUseCase(amberChat))
+				logging.From(ctx).Info("Chat strategy: amber")
 			} else {
-				logging.From(ctx).Info("Chat strategy: legacy (plan & execute)")
+				return goerr.New("unknown chat strategy", goerr.V("strategy", chatStrategy))
 			}
 
 			uc := usecase.New(ucOptions...)

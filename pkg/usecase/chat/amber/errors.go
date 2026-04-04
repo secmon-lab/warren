@@ -1,4 +1,4 @@
-package legacy
+package amber
 
 import (
 	"github.com/m-mizutani/goerr/v2"
