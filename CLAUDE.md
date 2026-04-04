@@ -60,19 +60,6 @@ Pipeline stages in `pkg/usecase/alert_pipeline.go`:
 - When refactoring, ensure existing tests still pass and add tests if coverage gaps are found
 - Do NOT consider a task complete until tests are written and passing
 
-### Frontend Test Requirements
-- **EVERY frontend feature addition or modification MUST include corresponding E2E tests**
-- E2E tests are located in `frontend/e2e/tests/` using Playwright
-- Page Objects are in `frontend/e2e/pages/` — add or update them as needed
-- Use semantic locators (`getByRole`, `getByText`, `data-testid`) instead of CSS class selectors
-- Do NOT use `waitForLoadState("networkidle")` — rely on Playwright's auto-waiting
-- Do NOT consider a frontend task complete until E2E tests covering the new/changed behavior are written
-
-### Frontend Date Format
-- ALWAYS use `YYYY/MM/DD` format. NEVER use `MM/DD/YYYY` or locale-dependent formats like `toLocaleDateString()`
-  - Use: `date.toISOString().split('T')[0].replace(/-/g, '/')`
-  - Do NOT use: `date.toLocaleDateString()`
-
 ### Error Handling
 - Use `github.com/m-mizutani/goerr/v2` for error handling
 - Must wrap errors with `goerr.Wrap` to maintain error context
@@ -102,16 +89,6 @@ Pipeline stages in `pkg/usecase/alert_pipeline.go`:
   - GOOD: Check each expected ID explicitly with `gt.True(t, deleteMap[id])`
 - Test files should have `package {name}_test`. Do not use same package name
 - Test file name convention is: `xyz.go` -> `xyz_test.go`. Other test file names (e.g., `xyz_e2e_test.go`) are not allowed
-- Repository Tests Location:
-  - NEVER create test files in `pkg/repository/firestore/` or `pkg/repository/memory/` subdirectories
-  - ALL repository tests MUST be placed directly in `pkg/repository/*_test.go`
-  - Use `runRepositoryTest()` helper to test against both memory and firestore implementations
-- Repository Tests Best Practices:
-  - Always use random IDs (e.g., using `time.Now().UnixNano()`) to avoid test conflicts
-  - Never use hardcoded IDs like "msg-001", "user-001" as they cause test failures when running in parallel
-  - Always verify ALL fields of returned values, not just checking for nil/existence
-  - Compare expected values properly - don't just check if something exists, verify it matches what was saved
-  - For timestamp comparisons, use tolerance (e.g., `< time.Second`) to account for storage precision
 - Test Skip Policy:
   - **NEVER use `t.Skip()` for anything other than missing environment variables**
   - If a test requires infrastructure (like Firestore index), fix the infrastructure, don't skip the test
@@ -124,24 +101,11 @@ Before creating or modifying tests:
 2. Does the test file name match exactly? (`xyz.go` -> `xyz_test.go`)
 3. Are all tests for a source file in ONE test file?
 4. No standalone feature/e2e/integration test files?
-5. For repository tests: placed in `pkg/repository/*_test.go`, NOT in firestore/ or memory/ subdirectories?
 
 ### Code Visibility
 - Do not expose unnecessary methods, structs, and variables
 - Assume that exposed items will be changed. Never expose fields that would be problematic if changed
 - Use `export_test.go` for items that need to be exposed for testing purposes
-
-### Alert Processing Rules
-- **Alerts are immutable** and can be linked to at most one ticket
-- `ProcessAlertPipeline()` is pure (no side effects); `HandleAlert()` includes DB save and Slack posting — new processing logic should respect this separation
-- All pipeline events are emitted through `Notifier` interface for real-time monitoring
-
-### Notifier Design Rule
-- Notifier uses **type-safe event methods** — each event type has its own dedicated method (e.g., `NotifyIngestPolicyResult`, `NotifyError`)
-- **Do NOT add a generic `Notify(event)` method** — always add a new typed method for new event types
-
-### Chat Strategy Naming Convention
-Chat strategies are named after wildflowers in alphabetical order: `aster` (A), `bluebell` (B), `clover` (C), `daisy` (D), etc. Each strategy is a separate package under `pkg/usecase/chat/<flower>/` implementing the `interfaces.ChatUseCase` interface. The current default strategy is `aster`. When adding a new strategy, use the next wildflower in alphabetical sequence.
 
 ### Pre-commit Checks
 When making changes, before finishing the task, always:
