@@ -1,4 +1,4 @@
-package amber
+package aster
 
 import (
 	"context"
@@ -56,7 +56,7 @@ func FilterToolSets(allTools []interfaces.ToolSet, allowedIDs []string) []interf
 }
 
 // StartSessionMonitor exposes startSessionMonitor for testing.
-func (c *AmberChat) StartSessionMonitor(ctx context.Context, sessionID types.SessionID) (context.Context, func()) {
+func (c *AsterChat) StartSessionMonitor(ctx context.Context, sessionID types.SessionID) (context.Context, func()) {
 	return c.startSessionMonitor(ctx, sessionID)
 }
 

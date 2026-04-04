@@ -1,4 +1,4 @@
-package amber_test
+package aster_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gt"
-	"github.com/secmon-lab/warren/pkg/usecase/chat/amber"
+	"github.com/secmon-lab/warren/pkg/usecase/chat/aster"
 )
 
 // mockBudgetStrategy is a configurable budget strategy for testing.
@@ -19,22 +19,22 @@ type mockBudgetStrategy struct {
 }
 
 func (s *mockBudgetStrategy) InitialBudget() float64                         { return s.initialBudget }
-func (s *mockBudgetStrategy) BeforeToolCall(_ amber.ToolCallContext) float64 { return s.beforeCost }
-func (s *mockBudgetStrategy) AfterToolCall(_ amber.ToolCallContext) float64  { return s.afterCost }
-func (s *mockBudgetStrategy) ShouldExit(state amber.BudgetState) bool {
+func (s *mockBudgetStrategy) BeforeToolCall(_ aster.ToolCallContext) float64 { return s.beforeCost }
+func (s *mockBudgetStrategy) AfterToolCall(_ aster.ToolCallContext) float64  { return s.afterCost }
+func (s *mockBudgetStrategy) ShouldExit(state aster.BudgetState) bool {
 	return state.CallsAfterSoft > s.hardLimitMargin
 }
 
 func TestDefaultBudgetStrategy_InitialBudget(t *testing.T) {
-	s := amber.NewDefaultBudgetStrategy()
+	s := aster.NewDefaultBudgetStrategy()
 	gt.Equal(t, s.InitialBudget(), 100.0)
 }
 
 func TestDefaultBudgetStrategy_BeforeToolCall(t *testing.T) {
-	s := amber.NewDefaultBudgetStrategy()
+	s := aster.NewDefaultBudgetStrategy()
 
 	t.Run("sub-agent tool costs 0", func(t *testing.T) {
-		cost := s.BeforeToolCall(amber.ToolCallContext{
+		cost := s.BeforeToolCall(aster.ToolCallContext{
 			ToolName:  "query_bigquery",
 			CallCount: 1,
 		})
@@ -42,7 +42,7 @@ func TestDefaultBudgetStrategy_BeforeToolCall(t *testing.T) {
 	})
 
 	t.Run("bigquery_query costs 15", func(t *testing.T) {
-		cost := s.BeforeToolCall(amber.ToolCallContext{
+		cost := s.BeforeToolCall(aster.ToolCallContext{
 			ToolName:  "bigquery_query",
 			CallCount: 1,
 		})
@@ -50,7 +50,7 @@ func TestDefaultBudgetStrategy_BeforeToolCall(t *testing.T) {
 	})
 
 	t.Run("bigquery_list_datasets costs 3", func(t *testing.T) {
-		cost := s.BeforeToolCall(amber.ToolCallContext{
+		cost := s.BeforeToolCall(aster.ToolCallContext{
 			ToolName:  "bigquery_list_datasets",
 			CallCount: 1,
 		})
@@ -58,7 +58,7 @@ func TestDefaultBudgetStrategy_BeforeToolCall(t *testing.T) {
 	})
 
 	t.Run("bigquery_get_table_schema costs 3", func(t *testing.T) {
-		cost := s.BeforeToolCall(amber.ToolCallContext{
+		cost := s.BeforeToolCall(aster.ToolCallContext{
 			ToolName:  "bigquery_get_table_schema",
 			CallCount: 1,
 		})
@@ -66,7 +66,7 @@ func TestDefaultBudgetStrategy_BeforeToolCall(t *testing.T) {
 	})
 
 	t.Run("default tool costs 6.25", func(t *testing.T) {
-		cost := s.BeforeToolCall(amber.ToolCallContext{
+		cost := s.BeforeToolCall(aster.ToolCallContext{
 			ToolName:  "vt_ip_lookup",
 			CallCount: 1,
 		})
@@ -75,7 +75,7 @@ func TestDefaultBudgetStrategy_BeforeToolCall(t *testing.T) {
 
 	t.Run("time cost delta is included", func(t *testing.T) {
 		// At 210 seconds elapsed, time cost cumulative = 50.0
-		cost := s.BeforeToolCall(amber.ToolCallContext{
+		cost := s.BeforeToolCall(aster.ToolCallContext{
 			ToolName:    "vt_ip_lookup",
 			Elapsed:     210 * time.Second,
 			PrevElapsed: 0,
@@ -86,7 +86,7 @@ func TestDefaultBudgetStrategy_BeforeToolCall(t *testing.T) {
 	})
 
 	t.Run("time cost delta from prev elapsed", func(t *testing.T) {
-		cost := s.BeforeToolCall(amber.ToolCallContext{
+		cost := s.BeforeToolCall(aster.ToolCallContext{
 			ToolName:    "vt_ip_lookup",
 			Elapsed:     210 * time.Second,
 			PrevElapsed: 105 * time.Second,
@@ -98,8 +98,8 @@ func TestDefaultBudgetStrategy_BeforeToolCall(t *testing.T) {
 }
 
 func TestDefaultBudgetStrategy_AfterToolCall(t *testing.T) {
-	s := amber.NewDefaultBudgetStrategy()
-	cost := s.AfterToolCall(amber.ToolCallContext{
+	s := aster.NewDefaultBudgetStrategy()
+	cost := s.AfterToolCall(aster.ToolCallContext{
 		ToolName: "bigquery_query",
 		Result:   map[string]any{"rows": 100},
 	})
@@ -107,12 +107,12 @@ func TestDefaultBudgetStrategy_AfterToolCall(t *testing.T) {
 }
 
 func TestDefaultBudgetStrategy_ShouldExit(t *testing.T) {
-	s := amber.NewDefaultBudgetStrategy()
+	s := aster.NewDefaultBudgetStrategy()
 
 	// 3 calls after soft: should not exit yet
-	gt.B(t, s.ShouldExit(amber.BudgetState{CallsAfterSoft: 3})).False()
+	gt.B(t, s.ShouldExit(aster.BudgetState{CallsAfterSoft: 3})).False()
 	// 4 calls after soft: should exit
-	gt.B(t, s.ShouldExit(amber.BudgetState{CallsAfterSoft: 4})).True()
+	gt.B(t, s.ShouldExit(aster.BudgetState{CallsAfterSoft: 4})).True()
 }
 
 func TestBudgetTracker_BasicConsumption(t *testing.T) {
@@ -122,18 +122,18 @@ func TestBudgetTracker_BasicConsumption(t *testing.T) {
 		afterCost:       0.0,
 		hardLimitMargin: 3,
 	}
-	tracker := amber.NewBudgetTracker(strategy)
+	tracker := aster.NewBudgetTracker(strategy)
 
 	// First call: 100 - 10 = 90 remaining
 	status := tracker.TestBeforeToolCall("tool1", 0)
-	gt.Equal(t, status, amber.BudgetOK)
+	gt.Equal(t, status, aster.BudgetOK)
 	gt.Equal(t, tracker.Remaining(), 90.0)
 
 	// 5th call: 100 - 50 = 50 remaining
 	for i := 0; i < 4; i++ {
 		status = tracker.TestBeforeToolCall("tool1", 0)
 	}
-	gt.Equal(t, status, amber.BudgetOK)
+	gt.Equal(t, status, aster.BudgetOK)
 	gt.Equal(t, tracker.Remaining(), 50.0)
 }
 
@@ -144,7 +144,7 @@ func TestBudgetTracker_AfterToolCallConsumption(t *testing.T) {
 		afterCost:       5.0,
 		hardLimitMargin: 3,
 	}
-	tracker := amber.NewBudgetTracker(strategy)
+	tracker := aster.NewBudgetTracker(strategy)
 
 	// Before: 100 - 10 = 90
 	tracker.TestBeforeToolCall("tool1", 0)
@@ -162,15 +162,15 @@ func TestBudgetTracker_SoftLimit(t *testing.T) {
 		afterCost:       0.0,
 		hardLimitMargin: 2,
 	}
-	tracker := amber.NewBudgetTracker(strategy)
+	tracker := aster.NewBudgetTracker(strategy)
 
 	// Call 1: 20 - 10 = 10 → OK
 	status := tracker.TestBeforeToolCall("tool1", 0)
-	gt.Equal(t, status, amber.BudgetOK)
+	gt.Equal(t, status, aster.BudgetOK)
 
 	// Call 2: 10 - 10 = 0 → SoftLimit
 	status = tracker.TestBeforeToolCall("tool1", 0)
-	gt.Equal(t, status, amber.BudgetSoftLimit)
+	gt.Equal(t, status, aster.BudgetSoftLimit)
 }
 
 func TestBudgetTracker_HardLimit(t *testing.T) {
@@ -180,25 +180,25 @@ func TestBudgetTracker_HardLimit(t *testing.T) {
 		afterCost:       0.0,
 		hardLimitMargin: 2,
 	}
-	tracker := amber.NewBudgetTracker(strategy)
+	tracker := aster.NewBudgetTracker(strategy)
 
 	// Call 1: OK
 	tracker.TestBeforeToolCall("tool1", 0)
 	// Call 2: SoftLimit (budget = 0)
 	status := tracker.TestBeforeToolCall("tool1", 0)
-	gt.Equal(t, status, amber.BudgetSoftLimit)
+	gt.Equal(t, status, aster.BudgetSoftLimit)
 
 	// Call 3: SoftLimit (1st after soft, margin=2)
 	status = tracker.TestBeforeToolCall("tool1", 0)
-	gt.Equal(t, status, amber.BudgetSoftLimit)
+	gt.Equal(t, status, aster.BudgetSoftLimit)
 
 	// Call 4: SoftLimit (2nd after soft, margin=2)
 	status = tracker.TestBeforeToolCall("tool1", 0)
-	gt.Equal(t, status, amber.BudgetSoftLimit)
+	gt.Equal(t, status, aster.BudgetSoftLimit)
 
 	// Call 5: HardLimit (3rd after soft, > margin=2)
 	status = tracker.TestBeforeToolCall("tool1", 0)
-	gt.Equal(t, status, amber.BudgetHardLimit)
+	gt.Equal(t, status, aster.BudgetHardLimit)
 }
 
 func TestBudgetTracker_GenerateHandoverInfo(t *testing.T) {
@@ -208,7 +208,7 @@ func TestBudgetTracker_GenerateHandoverInfo(t *testing.T) {
 		afterCost:       0.0,
 		hardLimitMargin: 1,
 	}
-	tracker := amber.NewBudgetTracker(strategy)
+	tracker := aster.NewBudgetTracker(strategy)
 
 	tracker.TestBeforeToolCall("vt_ip_lookup", 10*time.Second)
 	tracker.TestBeforeToolCall("bigquery_query", 30*time.Second)
@@ -227,11 +227,11 @@ func TestBudgetTracker_CustomAfterToolCallStrategy(t *testing.T) {
 		afterCost:       20.0,
 		hardLimitMargin: 2,
 	}
-	tracker := amber.NewBudgetTracker(strategy)
+	tracker := aster.NewBudgetTracker(strategy)
 
 	// Before: 100 - 5 = 95
 	status := tracker.TestBeforeToolCall("tool1", 0)
-	gt.Equal(t, status, amber.BudgetOK)
+	gt.Equal(t, status, aster.BudgetOK)
 	gt.Equal(t, tracker.Remaining(), 95.0)
 
 	// After: 95 - 20 = 75
@@ -246,8 +246,8 @@ func TestBudgetToolMiddleware_OK(t *testing.T) {
 		afterCost:       0.0,
 		hardLimitMargin: 3,
 	}
-	tracker := amber.NewBudgetTracker(strategy)
-	mw := amber.NewBudgetToolMiddleware(tracker)
+	tracker := aster.NewBudgetTracker(strategy)
+	mw := aster.NewBudgetToolMiddleware(tracker)
 
 	handler := mw(func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
 		return &gollem.ToolExecResponse{
@@ -270,8 +270,8 @@ func TestBudgetToolMiddleware_SoftLimit(t *testing.T) {
 		afterCost:       0.0,
 		hardLimitMargin: 2,
 	}
-	tracker := amber.NewBudgetTracker(strategy)
-	mw := amber.NewBudgetToolMiddleware(tracker)
+	tracker := aster.NewBudgetTracker(strategy)
+	mw := aster.NewBudgetToolMiddleware(tracker)
 
 	handler := mw(func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
 		return &gollem.ToolExecResponse{
@@ -294,14 +294,14 @@ func TestBudgetToolMiddleware_SharedTrackerAcrossParentAndSubAgent(t *testing.T)
 		afterCost:       0.0,
 		hardLimitMargin: 1,
 	}
-	tracker := amber.NewBudgetTracker(strategy)
+	tracker := aster.NewBudgetTracker(strategy)
 
 	// Create two middleware instances from the same tracker,
 	// simulating the pattern in exec.go where:
 	// - parentMW is added to the parent agent (line 171)
 	// - subAgentMW is injected into sub-agents' child agents (line 131)
-	parentMW := amber.NewBudgetToolMiddleware(tracker)
-	subAgentMW := amber.NewBudgetToolMiddleware(tracker)
+	parentMW := aster.NewBudgetToolMiddleware(tracker)
+	subAgentMW := aster.NewBudgetToolMiddleware(tracker)
 
 	passthrough := func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
 		return &gollem.ToolExecResponse{
@@ -371,8 +371,8 @@ func TestContextAwareBudgetMiddleware_ReadsTrackerFromContext(t *testing.T) {
 		afterCost:       0.0,
 		hardLimitMargin: 3,
 	}
-	tracker := amber.NewBudgetTracker(strategy)
-	mw := amber.NewContextAwareBudgetMiddleware()
+	tracker := aster.NewBudgetTracker(strategy)
+	mw := aster.NewContextAwareBudgetMiddleware()
 
 	handler := mw(func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
 		return &gollem.ToolExecResponse{
@@ -380,7 +380,7 @@ func TestContextAwareBudgetMiddleware_ReadsTrackerFromContext(t *testing.T) {
 		}, nil
 	})
 
-	ctx := amber.WithBudgetTracker(context.Background(), tracker)
+	ctx := aster.WithBudgetTracker(context.Background(), tracker)
 	resp, err := handler(ctx, &gollem.ToolExecRequest{
 		Tool: &gollem.FunctionCall{Name: "test_tool"},
 	})
@@ -391,7 +391,7 @@ func TestContextAwareBudgetMiddleware_ReadsTrackerFromContext(t *testing.T) {
 }
 
 func TestContextAwareBudgetMiddleware_NoTrackerInContext(t *testing.T) {
-	mw := amber.NewContextAwareBudgetMiddleware()
+	mw := aster.NewContextAwareBudgetMiddleware()
 
 	toolCalled := false
 	handler := mw(func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
@@ -421,7 +421,7 @@ func TestContextAwareBudgetMiddleware_DifferentTrackersPerTask(t *testing.T) {
 		hardLimitMargin: 0, // hard limit immediately after soft
 	}
 
-	mw := amber.NewContextAwareBudgetMiddleware()
+	mw := aster.NewContextAwareBudgetMiddleware()
 
 	passthrough := func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
 		return &gollem.ToolExecResponse{
@@ -431,8 +431,8 @@ func TestContextAwareBudgetMiddleware_DifferentTrackersPerTask(t *testing.T) {
 	handler := mw(passthrough)
 
 	// === Task 1: exhaust the budget ===
-	tracker1 := amber.NewBudgetTracker(strategy)
-	ctx1 := amber.WithBudgetTracker(context.Background(), tracker1)
+	tracker1 := aster.NewBudgetTracker(strategy)
+	ctx1 := aster.WithBudgetTracker(context.Background(), tracker1)
 
 	// Call 1: 20 - 10 = 10 (OK)
 	resp, err := handler(ctx1, &gollem.ToolExecRequest{
@@ -462,8 +462,8 @@ func TestContextAwareBudgetMiddleware_DifferentTrackersPerTask(t *testing.T) {
 	gt.V(t, resp.Result["error"]).NotNil()
 
 	// === Task 2: new tracker, same middleware — should work fine ===
-	tracker2 := amber.NewBudgetTracker(strategy)
-	ctx2 := amber.WithBudgetTracker(context.Background(), tracker2)
+	tracker2 := aster.NewBudgetTracker(strategy)
+	ctx2 := aster.WithBudgetTracker(context.Background(), tracker2)
 
 	// This call must succeed with the fresh tracker, NOT be blocked by tracker1
 	toolCalled = false
@@ -489,8 +489,8 @@ func TestBudgetToolMiddleware_HardLimit(t *testing.T) {
 		afterCost:       0.0,
 		hardLimitMargin: 0,
 	}
-	tracker := amber.NewBudgetTracker(strategy)
-	mw := amber.NewBudgetToolMiddleware(tracker)
+	tracker := aster.NewBudgetTracker(strategy)
+	mw := aster.NewBudgetToolMiddleware(tracker)
 
 	toolCalled := false
 	handler := mw(func(_ context.Context, _ *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {

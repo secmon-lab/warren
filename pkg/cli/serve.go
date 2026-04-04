@@ -28,7 +28,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/prompt"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
-	"github.com/secmon-lab/warren/pkg/usecase/chat/amber"
+	"github.com/secmon-lab/warren/pkg/usecase/chat/aster"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
@@ -145,10 +145,10 @@ func cmdServe() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:        "chat-strategy",
-				Usage:       "Chat execution strategy (default: 'amber')",
+				Usage:       "Chat execution strategy (default: 'aster')",
 				Category:    "Chat",
 				Sources:     cli.EnvVars("WARREN_CHAT_STRATEGY"),
-				Value:       "amber",
+				Value:       "aster",
 				Destination: &chatStrategy,
 			},
 			&cli.StringFlag{
@@ -397,39 +397,39 @@ func cmdServe() *cli.Command {
 			}
 
 			// Configure chat strategy
-			if chatStrategy == "amber" {
+			if chatStrategy == "aster" {
 				// Merge all tool sets: configured tools + MCP tools
-				allAmberTools := make([]interfaces.ToolSet, 0, len(toolSets)+len(mcpToolSets))
-				allAmberTools = append(allAmberTools, toolSets...)
+				allTools := make([]interfaces.ToolSet, 0, len(toolSets)+len(mcpToolSets))
+				allTools = append(allTools, toolSets...)
 				for _, mts := range mcpToolSets {
-					allAmberTools = append(allAmberTools, interfaces.WrapToolSet(mts, "mcp", "MCP external tool"))
+					allTools = append(allTools, interfaces.WrapToolSet(mts, "mcp", "MCP external tool"))
 				}
 
-				amberOpts := []amber.Option{
-					amber.WithTools(allAmberTools),
-					amber.WithStorageClient(storageClient),
-					amber.WithNoAuthorization(noAuthorization),
-					amber.WithUserSystemPrompt(userSystemPrompt),
+				asterOpts := []aster.Option{
+					aster.WithTools(allTools),
+					aster.WithStorageClient(storageClient),
+					aster.WithNoAuthorization(noAuthorization),
+					aster.WithUserSystemPrompt(userSystemPrompt),
 				}
 				if slackSvc != nil {
-					amberOpts = append(amberOpts, amber.WithSlackService(slackSvc))
+					asterOpts = append(asterOpts, aster.WithSlackService(slackSvc))
 				}
 				if webUICfg.GetFrontendURL() != "" {
-					amberOpts = append(amberOpts, amber.WithFrontendURL(webUICfg.GetFrontendURL()))
+					asterOpts = append(asterOpts, aster.WithFrontendURL(webUICfg.GetFrontendURL()))
 				}
 				if storageCfg.IsConfigured() && storageCfg.Prefix() != "" {
-					amberOpts = append(amberOpts, amber.WithStoragePrefix(storageCfg.Prefix()))
+					asterOpts = append(asterOpts, aster.WithStoragePrefix(storageCfg.Prefix()))
 				}
 				if safeTraceRepo != nil {
-					amberOpts = append(amberOpts, amber.WithTraceRepository(safeTraceRepo))
+					asterOpts = append(asterOpts, aster.WithTraceRepository(safeTraceRepo))
 				}
 
-				amberOpts = append(amberOpts, amber.WithKnowledgeService(knowledgeSvc))
+				asterOpts = append(asterOpts, aster.WithKnowledgeService(knowledgeSvc))
 
 				// Configure budget strategy
 				switch budgetStrategy {
 				case "default":
-					amberOpts = append(amberOpts, amber.WithBudgetStrategy(amber.NewDefaultBudgetStrategy()))
+					asterOpts = append(asterOpts, aster.WithBudgetStrategy(aster.NewDefaultBudgetStrategy()))
 					logging.From(ctx).Info("Budget strategy: default (action budget enabled)")
 				case "none":
 					// budgetStrategy remains nil (budget disabled)
@@ -438,11 +438,11 @@ func cmdServe() *cli.Command {
 				}
 
 				// Configure HITL tools that require human approval
-				amberOpts = append(amberOpts, amber.WithHITLTools([]string{"web_fetch"}))
+				asterOpts = append(asterOpts, aster.WithHITLTools([]string{"web_fetch"}))
 
-				amberChat := amber.New(repo, llmClient, policyClient, amberOpts...)
-				ucOptions = append(ucOptions, usecase.WithChatUseCase(amberChat))
-				logging.From(ctx).Info("Chat strategy: amber")
+				asterChat := aster.New(repo, llmClient, policyClient, asterOpts...)
+				ucOptions = append(ucOptions, usecase.WithChatUseCase(asterChat))
+				logging.From(ctx).Info("Chat strategy: aster")
 			} else {
 				return goerr.New("unknown chat strategy", goerr.V("strategy", chatStrategy))
 			}
