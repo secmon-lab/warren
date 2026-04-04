@@ -35,9 +35,10 @@ The application follows Domain-Driven Design (DDD) with clean architecture:
 ### Alert Processing Pipeline
 Pipeline stages in `pkg/usecase/alert_pipeline.go`:
 1. **Ingest Policy Evaluation** - Transform raw alert data into Alert objects
-2. **Metadata Generation** - Fill missing titles/descriptions using LLM
-3. **Enrich Policy Evaluation** - Execute enrichment tasks (query/agent)
-4. **Triage Policy Evaluation** - Apply final metadata and determine publish type
+2. **Tag Conversion** - Convert tag names to tag IDs
+3. **Metadata Generation** - Fill missing titles/descriptions using LLM
+4. **Enrich Policy Evaluation** - Execute enrichment tasks (query/agent)
+5. **Triage Policy Evaluation** - Apply final metadata and determine publish type
 
 ### Application Modes
 `serve` (HTTP/Slack/GraphQL), `run` (CLI), `chat` (interactive), `tool` (utilities), `test` (testing)
@@ -136,7 +137,7 @@ Before creating or modifying tests:
 - All pipeline events are emitted through `Notifier` interface for real-time monitoring
 
 ### Notifier Design Rule
-- Notifier uses **type-safe event methods** — each event type has its own dedicated method (e.g., `NotifyAlertPolicyResult`, `NotifyError`)
+- Notifier uses **type-safe event methods** — each event type has its own dedicated method (e.g., `NotifyIngestPolicyResult`, `NotifyError`)
 - **Do NOT add a generic `Notify(event)` method** — always add a new typed method for new event types
 
 ### Chat Strategy Naming Convention
