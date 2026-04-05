@@ -156,7 +156,7 @@ Visit http://127.0.0.1:8080 to access the dashboard.
 | **Concepts** | [Core Concepts](./doc/concepts.md) — Alerts, tickets, pipeline, clustering |
 | **Operations** | [Alert Investigation](./doc/operation/alert-investigation.md) · [Policy Guide](./doc/operation/policy.md) · [Knowledge Management](./doc/operation/knowledge.md) · [MCP Integration](./doc/operation/mcp.md) |
 | **Deployment** | [GCP Setup](./doc/deployment/gcp.md) · [Slack Integration](./doc/deployment/slack.md) |
-| **Reference** | [Configuration](./doc/reference/configuration.md) · [API & Webhooks](./doc/reference/api.md) |
+| **Reference** | [Configuration](./doc/reference/configuration.md) · [API & Webhooks](./doc/reference/api.md) · [Chat Strategies](./doc/strategy/README.md) |
 
 ## License
 
