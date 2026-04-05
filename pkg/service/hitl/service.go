@@ -22,6 +22,16 @@ type Presenter interface {
 	Present(ctx context.Context, req *hitl.Request) error
 }
 
+// noOpPresenter is a presenter that does nothing.
+// Used when no transport-specific presenter is available (e.g., non-Slack environments).
+// The HITL request is still saved to the repository and can be answered via Web UI or API.
+type noOpPresenter struct{}
+
+func (noOpPresenter) Present(_ context.Context, _ *hitl.Request) error { return nil }
+
+// NoOpPresenter returns a Presenter that does nothing on Present.
+func NoOpPresenter() Presenter { return noOpPresenter{} }
+
 // Service manages the HITL request lifecycle.
 // It is transport-agnostic: presentation is delegated to a Presenter.
 type Service struct {

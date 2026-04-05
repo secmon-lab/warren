@@ -186,6 +186,27 @@ func (c *BluebellChat) generateFinalResponse(ctx context.Context, session gollem
 		return "", goerr.New("no response from final LLM")
 	}
 
+	// Sync final session's new messages back to the planning session so the
+	// final response is included in saved history for multi-turn conversations.
+	finalHistory, err := finalSession.History()
+	if err != nil {
+		logger.Warn("failed to get final session history", "error", err)
+	} else if finalHistory != nil {
+		initialLen := 0
+		if history != nil {
+			initialLen = len(history.Messages)
+		}
+		if len(finalHistory.Messages) > initialLen {
+			newHistory := &gollem.History{
+				Version:  finalHistory.Version,
+				Messages: finalHistory.Messages[initialLen:],
+			}
+			if err := session.AppendHistory(newHistory); err != nil {
+				logger.Warn("failed to append final history to planning session", "error", err)
+			}
+		}
+	}
+
 	logger.Debug("final response generated")
 	return resp.Texts[0], nil
 }

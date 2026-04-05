@@ -171,9 +171,11 @@ func (c *BluebellChat) Execute(ctx context.Context, message string, chatCtx chat
 
 	authorized, err := c.authorize(ctx, message)
 	if err != nil {
+		finalStatus = types.SessionStatusAborted
 		return err
 	}
 	if !authorized {
+		finalStatus = types.SessionStatusAborted
 		logger.Debug("bluebell execute: not authorized, returning")
 		return nil
 	}
@@ -511,11 +513,13 @@ func (c *BluebellChat) handleQuestion(ctx context.Context, q *Question, target *
 		presenter = slackService.NewQuestionPresenter(ubm, "Correlating ...", user.FromContext(ctx))
 	}
 
-	if presenter == nil {
-		return nil, goerr.New("question requires a presenter but none is available")
-	}
-
 	msg.Notify(ctx, "❓ %s", q.Reason)
+
+	// Use a no-op presenter when Slack is not available, so the HITL request
+	// is still saved to the repository and can be answered via Web UI or API.
+	if presenter == nil {
+		presenter = hitlService.NoOpPresenter()
+	}
 
 	result, err := hitlSvc.RequestAndWait(ctx, hitlReq, presenter)
 	if err != nil {

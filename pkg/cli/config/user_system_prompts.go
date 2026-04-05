@@ -143,9 +143,14 @@ func parsePromptFile(filePath string) (*PromptEntry, error) {
 // Frontmatter is delimited by "---" lines at the start of the file.
 func splitFrontmatter(data []byte) ([]byte, string, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(data))
+	// Expand buffer for large prompt files (default 64KB may be insufficient).
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 	// First line must be "---"
 	if !scanner.Scan() {
+		if err := scanner.Err(); err != nil {
+			return nil, "", goerr.Wrap(err, "failed to read file")
+		}
 		return nil, "", goerr.New("empty file")
 	}
 	if strings.TrimSpace(scanner.Text()) != "---" {
@@ -163,6 +168,9 @@ func splitFrontmatter(data []byte) ([]byte, string, error) {
 		}
 		fmLines = append(fmLines, line)
 	}
+	if err := scanner.Err(); err != nil {
+		return nil, "", goerr.Wrap(err, "failed to read frontmatter")
+	}
 	if !found {
 		return nil, "", goerr.New("frontmatter closing delimiter '---' not found")
 	}
@@ -173,6 +181,9 @@ func splitFrontmatter(data []byte) ([]byte, string, error) {
 	var bodyLines []string
 	for scanner.Scan() {
 		bodyLines = append(bodyLines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, "", goerr.Wrap(err, "failed to read file body")
 	}
 
 	return fm, strings.Join(bodyLines, "\n"), nil
