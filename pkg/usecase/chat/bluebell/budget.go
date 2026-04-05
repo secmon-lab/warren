@@ -197,7 +197,6 @@ func withBudgetTracker(ctx context.Context, tracker *BudgetTracker) context.Cont
 	return context.WithValue(ctx, budgetTrackerCtxKeyType{}, tracker)
 }
 
-
 // subAgentToolNames contains tool names for sub-agent invocations.
 // These have zero cost because their internal tool calls are tracked individually.
 var subAgentToolNames = map[string]bool{
