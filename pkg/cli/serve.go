@@ -26,8 +26,10 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/circuitbreaker"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/service/prompt"
+	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
+	chatuc "github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/usecase/chat/aster"
 	"github.com/secmon-lab/warren/pkg/usecase/chat/bluebell"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
@@ -57,30 +59,30 @@ func generateFrontendURL(addr string) string {
 
 func cmdServe() *cli.Command {
 	var (
-		addr                 string
-		enableGraphQL        bool
-		enableGraphiQL       bool
-		noAuthorization      bool
-		disableHTTPLogger    bool
-		disableLLM           bool
-		strictAlert          bool
-		wsAllowedOrigins     []string
-		webUICfg             config.WebUI
-		policyCfg            config.Policy
-		genaiCfg             config.GenAI
-		sentryCfg            config.Sentry
-		slackCfg             config.Slack
-		llmCfg               config.LLMCfg
-		firestoreCfg         config.Firestore
-		storageCfg           config.Storage
-		mcpCfg               config.MCPConfig
-		asyncCfg             config.AsyncAlertHook
-		traceCfg             config.Trace
-		userSystemPromptCfg  config.UserSystemPrompt
-		strategyPromptsCfg config.StrategySystemPrompts
-		cbCfg                config.CircuitBreaker
-		chatStrategy         string
-		budgetStrategy       string
+		addr                string
+		enableGraphQL       bool
+		enableGraphiQL      bool
+		noAuthorization     bool
+		disableHTTPLogger   bool
+		disableLLM          bool
+		strictAlert         bool
+		wsAllowedOrigins    []string
+		webUICfg            config.WebUI
+		policyCfg           config.Policy
+		genaiCfg            config.GenAI
+		sentryCfg           config.Sentry
+		slackCfg            config.Slack
+		llmCfg              config.LLMCfg
+		firestoreCfg        config.Firestore
+		storageCfg          config.Storage
+		mcpCfg              config.MCPConfig
+		asyncCfg            config.AsyncAlertHook
+		traceCfg            config.Trace
+		userSystemPromptCfg config.UserSystemPrompt
+		strategyPromptsCfg  config.StrategySystemPrompts
+		cbCfg               config.CircuitBreaker
+		chatStrategy        string
+		budgetStrategy      string
 	)
 
 	flags := joinFlags(
@@ -412,14 +414,10 @@ func cmdServe() *cli.Command {
 				asterOpts := []aster.Option{
 					aster.WithTools(allTools),
 					aster.WithStorageClient(storageClient),
-					aster.WithNoAuthorization(noAuthorization),
 					aster.WithUserSystemPrompt(userSystemPrompt),
 				}
 				if slackSvc != nil {
 					asterOpts = append(asterOpts, aster.WithSlackService(slackSvc))
-				}
-				if webUICfg.GetFrontendURL() != "" {
-					asterOpts = append(asterOpts, aster.WithFrontendURL(webUICfg.GetFrontendURL()))
 				}
 				if storageCfg.IsConfigured() && storageCfg.Prefix() != "" {
 					asterOpts = append(asterOpts, aster.WithStoragePrefix(storageCfg.Prefix()))
@@ -444,8 +442,9 @@ func cmdServe() *cli.Command {
 				// Configure HITL tools that require human approval
 				asterOpts = append(asterOpts, aster.WithHITLTools([]string{"web_fetch"}))
 
-				asterChat := aster.New(repo, llmClient, policyClient, asterOpts...)
-				ucOptions = append(ucOptions, usecase.WithChatUseCase(asterChat))
+				asterStrategy := aster.New(repo, llmClient, asterOpts...)
+				commonOpts := buildChatUseCaseOpts(repo, policyClient, slackSvc, noAuthorization, webUICfg.GetFrontendURL())
+				ucOptions = append(ucOptions, usecase.WithChatUseCase(chatuc.NewUseCase(asterStrategy, commonOpts...)))
 				logging.From(ctx).Info("Chat strategy: aster")
 
 			case "bluebell":
@@ -468,16 +467,12 @@ func cmdServe() *cli.Command {
 				bluebellOpts := []bluebell.Option{
 					bluebell.WithTools(allTools),
 					bluebell.WithStorageClient(storageClient),
-					bluebell.WithNoAuthorization(noAuthorization),
 					bluebell.WithUserSystemPrompt(userSystemPrompt),
 					bluebell.WithKnowledgeService(knowledgeSvc),
 					bluebell.WithPromptEntries(promptEntries),
 				}
 				if slackSvc != nil {
 					bluebellOpts = append(bluebellOpts, bluebell.WithSlackService(slackSvc))
-				}
-				if webUICfg.GetFrontendURL() != "" {
-					bluebellOpts = append(bluebellOpts, bluebell.WithFrontendURL(webUICfg.GetFrontendURL()))
 				}
 				if storageCfg.IsConfigured() && storageCfg.Prefix() != "" {
 					bluebellOpts = append(bluebellOpts, bluebell.WithStoragePrefix(storageCfg.Prefix()))
@@ -498,11 +493,12 @@ func cmdServe() *cli.Command {
 
 				bluebellOpts = append(bluebellOpts, bluebell.WithHITLTools([]string{"web_fetch"}))
 
-				bluebellChat, err := bluebell.New(repo, llmClient, policyClient, bluebellOpts...)
+				bluebellStrategy, err := bluebell.New(repo, llmClient, bluebellOpts...)
 				if err != nil {
 					return goerr.Wrap(err, "failed to create bluebell chat strategy")
 				}
-				ucOptions = append(ucOptions, usecase.WithChatUseCase(bluebellChat))
+				commonOpts := buildChatUseCaseOpts(repo, policyClient, slackSvc, noAuthorization, webUICfg.GetFrontendURL())
+				ucOptions = append(ucOptions, usecase.WithChatUseCase(chatuc.NewUseCase(bluebellStrategy, commonOpts...)))
 				logging.From(ctx).Info("Chat strategy: bluebell",
 					"prompt_entries", len(promptEntries))
 
@@ -635,4 +631,20 @@ func cmdServe() *cli.Command {
 			}
 		},
 	}
+}
+
+// buildChatUseCaseOpts constructs the common options for chat.UseCase.
+func buildChatUseCaseOpts(repo interfaces.Repository, policyClient interfaces.PolicyClient, slackSvc *slackService.Service, noAuthz bool, frontendURL string) []chatuc.Option {
+	opts := []chatuc.Option{
+		chatuc.WithRepository(repo),
+		chatuc.WithPolicyClient(policyClient),
+		chatuc.WithNoAuthorization(noAuthz),
+	}
+	if slackSvc != nil {
+		opts = append(opts, chatuc.WithSlackService(slackSvc))
+	}
+	if frontendURL != "" {
+		opts = append(opts, chatuc.WithFrontendURL(frontendURL))
+	}
+	return opts
 }

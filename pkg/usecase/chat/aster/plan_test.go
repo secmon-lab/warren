@@ -11,6 +11,7 @@ import (
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/repository"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
+	"github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/usecase/chat/aster"
 )
 
@@ -63,12 +64,12 @@ func TestAsterChat_PlanWithKnowledgeService(t *testing.T) {
 		},
 	}
 
-	chatUC := aster.New(repo, mockLLM, newMockPolicyClient(t),
+	chatUC := aster.New(repo, mockLLM,
 		aster.WithKnowledgeService(knowledgeSvc),
-		aster.WithNoAuthorization(true),
 	)
+	ssn := newDummySession(testTicket.ID)
 
-	err := chatUC.Execute(ctx, "Analyze this alert", chatModel.ChatContext{Ticket: testTicket})
+	err := chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "Analyze this alert", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}})
 	gt.NoError(t, err)
 
 	// Verify that multiple sessions were created (planSession + agent's internal session)
@@ -104,11 +105,10 @@ func TestAsterChat_PlanWithoutKnowledgeService(t *testing.T) {
 		},
 	}
 
-	chatUC := aster.New(repo, mockLLM, newMockPolicyClient(t),
-		aster.WithNoAuthorization(true),
-	)
+	chatUC := aster.New(repo, mockLLM)
+	ssn := newDummySession(testTicket.ID)
 
-	err := chatUC.Execute(ctx, "Analyze this alert", chatModel.ChatContext{Ticket: testTicket})
+	err := chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "Analyze this alert", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}})
 	gt.NoError(t, err)
 
 	// Without knowledge service, only one session should be created (planSession).

@@ -62,8 +62,7 @@ func TestResolveIntent_ZeroCandidates(t *testing.T) {
 
 	mockLLM := newSelectorMockLLM(`{"prompt_id":"default","intent":"test"}`)
 
-	chat, err := bluebell.New(repo, mockLLM, newMockPolicyClient(t),
-		bluebell.WithNoAuthorization(true),
+	chat, err := bluebell.New(repo, mockLLM,
 		bluebell.WithKnowledgeService(knowledgeSvc),
 		// No WithPromptEntries — zero candidates
 	)
@@ -98,8 +97,7 @@ func TestResolveIntent_SingleCandidate(t *testing.T) {
 		{ID: "infra", Description: "Infrastructure incident investigation"},
 	}
 
-	chat, err := bluebell.New(repo, mockLLM, newMockPolicyClient(t),
-		bluebell.WithNoAuthorization(true),
+	chat, err := bluebell.New(repo, mockLLM,
 		bluebell.WithKnowledgeService(knowledgeSvc),
 		bluebell.WithPromptEntries(entries),
 	)
@@ -137,8 +135,7 @@ func TestResolveIntent_MultipleCandidates(t *testing.T) {
 		{ID: "infra", Description: "Infrastructure incident investigation"},
 	}
 
-	chat, err := bluebell.New(repo, mockLLM, newMockPolicyClient(t),
-		bluebell.WithNoAuthorization(true),
+	chat, err := bluebell.New(repo, mockLLM,
 		bluebell.WithKnowledgeService(knowledgeSvc),
 		bluebell.WithPromptEntries(entries),
 	)
@@ -177,8 +174,7 @@ func TestResolveIntent_UnknownPromptID_Fallback(t *testing.T) {
 		{ID: "infra", Description: "Infrastructure incident investigation"},
 	}
 
-	chat, err := bluebell.New(repo, mockLLM, newMockPolicyClient(t),
-		bluebell.WithNoAuthorization(true),
+	chat, err := bluebell.New(repo, mockLLM,
 		bluebell.WithKnowledgeService(knowledgeSvc),
 		bluebell.WithPromptEntries(entries),
 	)
@@ -214,8 +210,7 @@ func TestResolveIntent_InvalidJSON_Fallback(t *testing.T) {
 		{ID: "infra", Description: "Infrastructure incident investigation"},
 	}
 
-	chat, err := bluebell.New(repo, mockLLM, newMockPolicyClient(t),
-		bluebell.WithNoAuthorization(true),
+	chat, err := bluebell.New(repo, mockLLM,
 		bluebell.WithKnowledgeService(knowledgeSvc),
 		bluebell.WithPromptEntries(entries),
 	)
@@ -250,8 +245,7 @@ func TestResolveIntent_DefaultPromptID_Accepted(t *testing.T) {
 		{ID: "security", Description: "Security threat investigation"},
 	}
 
-	chat, err := bluebell.New(repo, mockLLM, newMockPolicyClient(t),
-		bluebell.WithNoAuthorization(true),
+	chat, err := bluebell.New(repo, mockLLM,
 		bluebell.WithKnowledgeService(knowledgeSvc),
 		bluebell.WithPromptEntries(entries),
 	)

@@ -2,7 +2,6 @@ package aster_test
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"sync"
 	"testing"
@@ -11,7 +10,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gt"
-	"github.com/m-mizutani/opaq"
 	adapter "github.com/secmon-lab/warren/pkg/adapter/storage"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
@@ -22,21 +20,16 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	storage_svc "github.com/secmon-lab/warren/pkg/service/storage"
+	"github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/usecase/chat/aster"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-func newMockPolicyClient(t *testing.T) *mock.PolicyClientMock {
-	return &mock.PolicyClientMock{
-		QueryFunc: func(ctx context.Context, query string, input, result any, opts ...opaq.QueryOption) error {
-			if query == "data.auth.agent" {
-				gt.NoError(t, json.Unmarshal([]byte(`{"allow":true}`), &result))
-			}
-			return nil
-		},
-		SourcesFunc: func() map[string]string {
-			return map[string]string{}
-		},
+func newDummySession(ticketID types.TicketID) *session.Session {
+	return &session.Session{
+		ID:       types.NewSessionID(),
+		TicketID: ticketID,
+		Status:   types.SessionStatusRunning,
 	}
 }
 
@@ -97,11 +90,10 @@ func TestAsterChat_DirectResponse(t *testing.T) {
 		},
 	}
 
-	chatUC := aster.New(repo, mockLLM, newMockPolicyClient(t),
-		aster.WithNoAuthorization(true),
-	)
+	chatUC := aster.New(repo, mockLLM)
+	ssn := newDummySession(testTicket.ID)
 
-	err := chatUC.Execute(ctx, "What is the meaning of life?", chatModel.ChatContext{Ticket: testTicket})
+	err := chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "What is the meaning of life?", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}})
 	gt.NoError(t, err)
 }
 
@@ -156,11 +148,10 @@ func TestAsterChat_SinglePhaseWithTasks(t *testing.T) {
 		},
 	}
 
-	chatUC := aster.New(repo, mockLLM, newMockPolicyClient(t),
-		aster.WithNoAuthorization(true),
-	)
+	chatUC := aster.New(repo, mockLLM)
+	ssn := newDummySession(testTicket.ID)
 
-	err := chatUC.Execute(ctx, "Analyze this alert", chatModel.ChatContext{Ticket: testTicket})
+	err := chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "Analyze this alert", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}})
 	gt.NoError(t, err)
 }
 
@@ -197,12 +188,12 @@ func TestAsterChat_MaxPhasesLimit(t *testing.T) {
 		},
 	}
 
-	chatUC := aster.New(repo, mockLLM, newMockPolicyClient(t),
-		aster.WithNoAuthorization(true),
+	chatUC := aster.New(repo, mockLLM,
 		aster.WithMaxPhases(2),
 	)
+	ssn := newDummySession(testTicket.ID)
 
-	err := chatUC.Execute(ctx, "Do something", chatModel.ChatContext{Ticket: testTicket})
+	err := chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "Do something", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}})
 	gt.NoError(t, err)
 }
 
@@ -253,11 +244,10 @@ func TestAsterChat_ParallelExecution(t *testing.T) {
 		},
 	}
 
-	chatUC := aster.New(repo, mockLLM, newMockPolicyClient(t),
-		aster.WithNoAuthorization(true),
-	)
+	chatUC := aster.New(repo, mockLLM)
+	ssn := newDummySession(testTicket.ID)
 
-	err := chatUC.Execute(ctx, "Analyze all indicators", chatModel.ChatContext{Ticket: testTicket})
+	err := chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "Analyze all indicators", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}})
 	gt.NoError(t, err)
 }
 
@@ -314,12 +304,11 @@ func TestAsterChat_ErrorIsolation(t *testing.T) {
 		},
 	}
 
-	chatUC := aster.New(repo, mockLLM, newMockPolicyClient(t),
-		aster.WithNoAuthorization(true),
-	)
+	chatUC := aster.New(repo, mockLLM)
+	ssn := newDummySession(testTicket.ID)
 
 	// Execute should complete without error even though one task failed
-	err := chatUC.Execute(ctx, "Test error isolation", chatModel.ChatContext{Ticket: testTicket})
+	err := chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "Test error isolation", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}})
 	gt.NoError(t, err)
 }
 
@@ -418,41 +407,10 @@ func TestAsterChat_MultiPhaseReplan(t *testing.T) {
 		},
 	}
 
-	chatUC := aster.New(repo, mockLLM, newMockPolicyClient(t),
-		aster.WithNoAuthorization(true),
-	)
+	chatUC := aster.New(repo, mockLLM)
+	ssn := newDummySession(testTicket.ID)
 
-	err := chatUC.Execute(ctx, "Run multi-phase analysis", chatModel.ChatContext{Ticket: testTicket})
-	gt.NoError(t, err)
-}
-
-func TestAsterChat_AuthorizationDenied(t *testing.T) {
-	ctx := setupTestContext(t)
-	repo := repository.NewMemory()
-	testTicket := setupTicketAndAlert(t, ctx, repo)
-
-	denyPolicy := &mock.PolicyClientMock{
-		QueryFunc: func(ctx context.Context, query string, input, result any, opts ...opaq.QueryOption) error {
-			if query == "data.auth.agent" {
-				gt.NoError(t, json.Unmarshal([]byte(`{"allow":false}`), &result))
-			}
-			return nil
-		},
-		SourcesFunc: func() map[string]string {
-			return map[string]string{}
-		},
-	}
-
-	mockLLM := &mock.LLMClientMock{
-		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
-			t.Fatal("LLM should not be called when authorization is denied")
-			return nil, nil
-		},
-	}
-
-	chatUC := aster.New(repo, mockLLM, denyPolicy)
-
-	err := chatUC.Execute(ctx, "Analyze this", chatModel.ChatContext{Ticket: testTicket})
+	err := chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "Run multi-phase analysis", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}})
 	gt.NoError(t, err)
 }
 
@@ -503,7 +461,7 @@ func TestStartSessionMonitor_AbortDetection(t *testing.T) {
 	}
 	gt.NoError(t, repo.PutSession(ctx, ssn))
 
-	chatUC := aster.New(repo, nil, nil,
+	chatUC := aster.New(repo, nil,
 		aster.WithMonitorPollInterval(10*time.Millisecond),
 	)
 
@@ -539,7 +497,7 @@ func TestStartSessionMonitor_NormalCompletion(t *testing.T) {
 	}
 	gt.NoError(t, repo.PutSession(ctx, ssn))
 
-	chatUC := aster.New(repo, nil, nil)
+	chatUC := aster.New(repo, nil)
 
 	monitorCtx, stop := chatUC.StartSessionMonitor(ctx, ssn.ID)
 
@@ -558,7 +516,7 @@ func TestStartSessionMonitor_DBErrorContinuesMonitoring(t *testing.T) {
 	// This simulates a DB error scenario where session is not found
 	nonExistentID := types.NewSessionID()
 
-	chatUC := aster.New(repo, nil, nil)
+	chatUC := aster.New(repo, nil)
 
 	monitorCtx, stop := chatUC.StartSessionMonitor(ctx, nonExistentID)
 	defer stop()
@@ -588,12 +546,12 @@ func TestAsterChat_LatestHistorySavedOnDirectResponse(t *testing.T) {
 		},
 	}
 
-	chatUC := aster.New(repo, mockLLM, newMockPolicyClient(t),
-		aster.WithNoAuthorization(true),
+	chatUC := aster.New(repo, mockLLM,
 		aster.WithStorageClient(mockStorage),
 	)
+	ssn := newDummySession(testTicket.ID)
 
-	gt.NoError(t, chatUC.Execute(ctx, "Hello", chatModel.ChatContext{Ticket: testTicket}))
+	gt.NoError(t, chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "Hello", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}}))
 
 	// Verify latest.json was saved
 	storageSvc := storage_svc.New(mockStorage)
@@ -644,12 +602,12 @@ func TestAsterChat_LatestHistorySavedAfterReplan(t *testing.T) {
 		},
 	}
 
-	chatUC := aster.New(repo, mockLLM, newMockPolicyClient(t),
-		aster.WithNoAuthorization(true),
+	chatUC := aster.New(repo, mockLLM,
 		aster.WithStorageClient(mockStorage),
 	)
+	ssn := newDummySession(testTicket.ID)
 
-	gt.NoError(t, chatUC.Execute(ctx, "Analyze", chatModel.ChatContext{Ticket: testTicket}))
+	gt.NoError(t, chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "Analyze", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}}))
 
 	// Verify latest.json was saved (saved after plan, replan, and final response)
 	storageSvc := storage_svc.New(mockStorage)
@@ -697,15 +655,15 @@ func TestAsterChat_LatestHistorySavedOnAbort(t *testing.T) {
 		},
 	}
 
-	chatUC := aster.New(repo, mockLLM, newMockPolicyClient(t),
-		aster.WithNoAuthorization(true),
+	chatUC := aster.New(repo, mockLLM,
 		aster.WithStorageClient(mockStorage),
 		aster.WithMonitorPollInterval(10*time.Millisecond),
 	)
+	ssn := newDummySession(testTicket.ID)
 
 	// Execute — plan succeeds and latest is saved,
 	// but replan may fail or be aborted
-	_ = chatUC.Execute(ctx, "Slow analysis", chatModel.ChatContext{Ticket: testTicket})
+	_ = chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "Slow analysis", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}})
 
 	// Verify latest.json was saved at least after the planning phase
 	storageSvc := storage_svc.New(mockStorage)
@@ -760,13 +718,13 @@ func TestAsterChat_LatestHistorySavedOnReplanError(t *testing.T) {
 		},
 	}
 
-	chatUC := aster.New(repo, mockLLM, newMockPolicyClient(t),
-		aster.WithNoAuthorization(true),
+	chatUC := aster.New(repo, mockLLM,
 		aster.WithStorageClient(mockStorage),
 	)
+	ssn := newDummySession(testTicket.ID)
 
 	// Execute completes (replan error is logged, proceeds to final response)
-	_ = chatUC.Execute(ctx, "Test replan error", chatModel.ChatContext{Ticket: testTicket})
+	_ = chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "Test replan error", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}})
 
 	// Verify latest.json was saved at least after the planning phase
 	storageSvc := storage_svc.New(mockStorage)
@@ -886,14 +844,14 @@ func TestAsterChat_BudgetMiddlewareNotAccumulated(t *testing.T) {
 		},
 	}
 
-	chatUC := aster.New(repo, mockLLM, newMockPolicyClient(t),
-		aster.WithNoAuthorization(true),
+	chatUC := aster.New(repo, mockLLM,
 		aster.WithMaxPhases(3),
 		aster.WithBudgetStrategy(budgetStrategy),
 		aster.WithTools([]interfaces.ToolSet{testToolSet}),
 	)
+	ssn := newDummySession(testTicket.ID)
 
-	err := chatUC.Execute(ctx, "Analyze with budget", chatModel.ChatContext{Ticket: testTicket})
+	err := chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "Analyze with budget", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}})
 	gt.NoError(t, err)
 
 	mu.Lock()

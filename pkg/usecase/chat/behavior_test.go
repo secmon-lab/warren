@@ -18,6 +18,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
+	chatuc "github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/usecase/chat/aster"
 	"github.com/secmon-lab/warren/pkg/usecase/chat/bluebell"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
@@ -131,47 +132,42 @@ type chatUCFactory struct {
 	knowledgeSvc *svcknowledge.Service
 }
 
-func (f *chatUCFactory) build(t *testing.T, strategy string) interfaces.ChatUseCase {
+func (f *chatUCFactory) buildStrategy(t *testing.T, strategy string) chatuc.Strategy {
 	t.Helper()
 	switch strategy {
 	case "aster":
-		opts := []aster.Option{aster.WithNoAuthorization(false)}
-		return aster.New(f.repo, f.llm, f.policy, opts...)
+		return aster.New(f.repo, f.llm)
 	case "bluebell":
 		if f.knowledgeSvc == nil {
 			f.knowledgeSvc = svcknowledge.New(f.repo, newMockEmbeddingClient())
 		}
-		uc, err := bluebell.New(f.repo, f.llm, f.policy,
-			bluebell.WithNoAuthorization(false),
+		s, err := bluebell.New(f.repo, f.llm,
 			bluebell.WithKnowledgeService(f.knowledgeSvc),
 		)
 		gt.NoError(t, err)
-		return uc
+		return s
 	default:
 		t.Fatalf("unknown strategy: %s", strategy)
 		return nil
 	}
 }
 
+func (f *chatUCFactory) build(t *testing.T, strategy string) interfaces.ChatUseCase {
+	t.Helper()
+	return chatuc.NewUseCase(f.buildStrategy(t, strategy),
+		chatuc.WithRepository(f.repo),
+		chatuc.WithPolicyClient(f.policy),
+		chatuc.WithNoAuthorization(false),
+	)
+}
+
 func (f *chatUCFactory) buildNoAuthz(t *testing.T, strategy string) interfaces.ChatUseCase {
 	t.Helper()
-	switch strategy {
-	case "aster":
-		return aster.New(f.repo, f.llm, f.policy, aster.WithNoAuthorization(true))
-	case "bluebell":
-		if f.knowledgeSvc == nil {
-			f.knowledgeSvc = svcknowledge.New(f.repo, newMockEmbeddingClient())
-		}
-		uc, err := bluebell.New(f.repo, f.llm, f.policy,
-			bluebell.WithNoAuthorization(true),
-			bluebell.WithKnowledgeService(f.knowledgeSvc),
-		)
-		gt.NoError(t, err)
-		return uc
-	default:
-		t.Fatalf("unknown strategy: %s", strategy)
-		return nil
-	}
+	return chatuc.NewUseCase(f.buildStrategy(t, strategy),
+		chatuc.WithRepository(f.repo),
+		chatuc.WithPolicyClient(f.policy),
+		chatuc.WithNoAuthorization(true),
+	)
 }
 
 // --- characterization tests ---

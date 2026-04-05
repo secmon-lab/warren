@@ -2,9 +2,7 @@ package aster
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"math/rand/v2"
 	"strings"
 	"time"
 
@@ -27,25 +25,20 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/request_id"
-	ssnutil "github.com/secmon-lab/warren/pkg/utils/session"
-	"github.com/secmon-lab/warren/pkg/utils/slackctx"
 	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 const defaultMaxPhases = 10
 
-// AsterChat implements interfaces.ChatUseCase with parallel task execution.
+// AsterChat implements chat.Strategy with parallel task execution.
 type AsterChat struct {
 	repository          interfaces.Repository
 	llmClient           gollem.LLMClient
-	policyClient        interfaces.PolicyClient
 	storageClient       interfaces.StorageClient
 	slackService        *slackService.Service
 	knowledgeService    *svcknowledge.Service
 	tools               []interfaces.ToolSet
 	storagePrefix       string
-	noAuthorization     bool
-	frontendURL         string
 	userSystemPrompt    string
 	traceRepository     trace.Repository
 	maxPhases           int
@@ -75,16 +68,6 @@ func WithStorageClient(client interfaces.StorageClient) Option {
 // WithStoragePrefix sets the storage prefix for history paths.
 func WithStoragePrefix(prefix string) Option {
 	return func(c *AsterChat) { c.storagePrefix = prefix }
-}
-
-// WithNoAuthorization disables policy-based authorization checks.
-func WithNoAuthorization(noAuthz bool) Option {
-	return func(c *AsterChat) { c.noAuthorization = noAuthz }
-}
-
-// WithFrontendURL sets the frontend URL for session links.
-func WithFrontendURL(url string) Option {
-	return func(c *AsterChat) { c.frontendURL = url }
 }
 
 // WithUserSystemPrompt sets the user system prompt.
@@ -124,11 +107,10 @@ func WithHITLTools(tools []string) Option {
 }
 
 // New creates a new AsterChat with the given dependencies and options.
-func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient interfaces.PolicyClient, opts ...Option) *AsterChat {
+func New(repo interfaces.Repository, llmClient gollem.LLMClient, opts ...Option) *AsterChat {
 	c := &AsterChat{
 		repository:          repo,
 		llmClient:           llmClient,
-		policyClient:        policyClient,
 		maxPhases:           defaultMaxPhases,
 		monitorPollInterval: 10 * time.Second,
 	}
@@ -139,56 +121,14 @@ func New(repo interfaces.Repository, llmClient gollem.LLMClient, policyClient in
 	return c
 }
 
-// Execute processes a chat message using parallel task execution.
-// The ChatContext must be pre-built by the caller with all necessary data.
-func (c *AsterChat) Execute(ctx context.Context, message string, chatCtx chatModel.ChatContext) error {
-	target := chatCtx.Ticket
-	logger := logging.From(ctx)
-	logger.Debug("aster execute: start",
-		"ticket_id", target.ID,
-		"request_id", request_id.FromContext(ctx),
-	)
-
-	// Phase 1: Session setup
-	ssn, ctx := c.createSession(ctx, target, message)
-	logger = logging.From(ctx) // refresh logger with session_id
-	logger.Debug("aster execute: session created", "session_id", ssn.ID)
-
-	// Phase 2: Message routing setup
-	ctx = c.setupMessageRouting(ctx, ssn, target)
-	logger.Debug("aster execute: message routing set up")
-
-	// Phase 3: Session status tracking
-	ctx = c.setupStatusCheck(ctx, ssn)
-
-	finalStatus := types.SessionStatusCompleted
-	defer c.finishSession(ctx, ssn, target, &finalStatus)
-
-	// Phase 4: Authorization
-	authorized, err := c.authorize(ctx, message)
-	if err != nil {
-		return err
-	}
-	if !authorized {
-		logger.Debug("aster execute: not authorized, returning")
-		return nil
-	}
-	logger.Debug("aster execute: authorized, starting execution")
-
-	// Phase 5: Main execution
-	if err := c.executeAster(ctx, ssn, message, &finalStatus, &chatCtx); err != nil {
-		// Session abort and context cancellation are expected outcomes
-		// when a user aborts the session, not errors to report.
-		if errors.Is(err, ErrSessionAborted) || errors.Is(err, context.Canceled) {
-			return nil
-		}
-		return err
-	}
-	return nil
+// Execute implements chat.Strategy. It receives a RunContext with a pre-initialized
+// Warren session and delegates to the aster execution loop.
+func (c *AsterChat) Execute(ctx context.Context, rc *chat.RunContext) error {
+	return c.executeAster(ctx, rc.Session, rc.Message, rc.ChatCtx)
 }
 
-// executeAster orchestrates the amber execution: plan → parallel exec → replan → loop → final response.
-func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, message string, finalStatus *types.SessionStatus, chatCtx *chatModel.ChatContext) error {
+// executeAster orchestrates the aster execution: plan → parallel exec → replan → loop → final response.
+func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, message string, chatCtx *chatModel.ChatContext) error {
 	target := chatCtx.Ticket
 	ticketless := chatCtx.IsTicketless()
 	logger := logging.From(ctx)
@@ -293,10 +233,9 @@ func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, mess
 	// Planning phase
 	planResult, err := c.plan(ctx, planSession, planCtx, systemPrompt)
 	if err != nil {
-		if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
+		if abortErr := checkAborted(ctx, cleanupCtx); abortErr != nil {
 			return abortErr
 		}
-		*finalStatus = types.SessionStatusAborted
 		msg.Notify(ctx, "💥 Planning failed: %s", err.Error())
 		return goerr.Wrap(err, "planning failed")
 	}
@@ -375,7 +314,7 @@ func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, mess
 		})
 
 		// Check for context cancellation (abort detected by monitor)
-		if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
+		if abortErr := checkAborted(ctx, cleanupCtx); abortErr != nil {
 			if !ticketless {
 				c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
 			}
@@ -388,7 +327,7 @@ func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, mess
 			if !ticketless {
 				c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
 			}
-			if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
+			if abortErr := checkAborted(ctx, cleanupCtx); abortErr != nil {
 				return abortErr
 			}
 			logger.Error("replan failed", "error", err, "phase", phase)
@@ -439,10 +378,9 @@ func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, mess
 		if !ticketless {
 			c.saveLatestHistory(cleanupCtx, planSession, target.ID, storageSvc)
 		}
-		if abortErr := checkAborted(ctx, cleanupCtx, finalStatus); abortErr != nil {
+		if abortErr := checkAborted(ctx, cleanupCtx); abortErr != nil {
 			return abortErr
 		}
-		*finalStatus = types.SessionStatusAborted
 		msg.Notify(ctx, "💥 Failed to generate final response: %s", err.Error())
 		return goerr.Wrap(err, "failed to generate final response")
 	}
@@ -549,163 +487,6 @@ func (c *AsterChat) handleQuestion(ctx context.Context, q *Question, target *tic
 	}, nil
 }
 
-// createSession creates and persists a new chat session.
-func (c *AsterChat) createSession(ctx context.Context, target *ticket.Ticket, message string) (*session.Session, context.Context) {
-	userID := types.UserID(user.FromContext(ctx))
-	slackURL := slackctx.SlackURL(ctx)
-
-	ssn := session.NewSession(ctx, target.ID, userID, message, slackURL)
-	if err := c.repository.PutSession(ctx, ssn); err != nil {
-		logging.From(ctx).Error("failed to save session", "error", err)
-	}
-
-	logger := logging.From(ctx).With("session_id", ssn.ID, "request_id", request_id.FromContext(ctx))
-	ctx = logging.With(ctx, logger)
-
-	if target.SlackThread != nil {
-		ctx = slackctx.WithThread(ctx, *target.SlackThread)
-	}
-
-	return ssn, ctx
-}
-
-// setupMessageRouting configures Slack/CLI message routing functions in the context.
-func (c *AsterChat) setupMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket) context.Context {
-	if c.slackService != nil && target.SlackThread != nil {
-		notifyFunc, traceFunc, warnFunc := c.setupSlackMessageFuncs(ctx, ssn, target)
-		ctx = msg.With(ctx, notifyFunc, traceFunc, warnFunc)
-
-		// Post request ID as a context block immediately
-		requestID := request_id.FromContext(ctx)
-		if requestID == "" {
-			requestID = "unknown"
-		}
-		verbs := []string{
-			"Investigating", "Analyzing", "Processing", "Inspecting",
-			"Examining", "Scanning", "Assessing", "Evaluating",
-			"Reviewing", "Probing", "Surveying", "Diagnosing",
-			"Exploring", "Scrutinizing", "Correlating", "Parsing",
-			"Decoding", "Interpreting", "Triaging", "Resolving",
-		}
-		verb := verbs[rand.IntN(len(verbs))] // #nosec G404 -- not security-sensitive, just picking a random UI verb
-		threadSvc := c.slackService.NewThread(*target.SlackThread)
-		if err := threadSvc.PostContextBlock(ctx, fmt.Sprintf("%s ... (ID: `%s`)", verb, requestID)); err != nil {
-			logging.From(ctx).Error("failed to post request ID", "error", err)
-		}
-	}
-
-	return ctx
-}
-
-// setupSlackMessageFuncs creates Slack message routing functions for notify, trace, and warn.
-func (c *AsterChat) setupSlackMessageFuncs(ctx context.Context, sess *session.Session, target *ticket.Ticket) (msg.NotifyFunc, msg.TraceFunc, msg.WarnFunc) {
-	threadSvc := c.slackService.NewThread(*target.SlackThread)
-
-	notifyFunc := func(ctx context.Context, message string) {
-		m := session.NewMessage(ctx, sess.ID, session.MessageTypeResponse, message)
-		if err := c.repository.PutSessionMessage(ctx, m); err != nil {
-			errutil.Handle(ctx, err)
-		}
-		if err := threadSvc.PostComment(ctx, message); err != nil {
-			errutil.Handle(ctx, err)
-		}
-	}
-
-	var traceUpdateFunc func(context.Context, string)
-	traceFunc := func(ctx context.Context, message string) {
-		m := session.NewMessage(ctx, sess.ID, session.MessageTypeTrace, message)
-		if err := c.repository.PutSessionMessage(ctx, m); err != nil {
-			errutil.Handle(ctx, err)
-		}
-
-		if traceUpdateFunc == nil {
-			traceUpdateFunc = threadSvc.NewUpdatableMessage(ctx, message)
-		} else {
-			traceUpdateFunc(ctx, message)
-		}
-	}
-
-	warnFunc := func(ctx context.Context, message string) {
-		m := session.NewMessage(ctx, sess.ID, session.MessageTypeWarning, message)
-		if err := c.repository.PutSessionMessage(ctx, m); err != nil {
-			errutil.Handle(ctx, err)
-		}
-		if err := threadSvc.PostComment(ctx, message); err != nil {
-			errutil.Handle(ctx, err)
-		}
-	}
-
-	return notifyFunc, traceFunc, warnFunc
-}
-
-// setupStatusCheck embeds a session abort check function in the context.
-func (c *AsterChat) setupStatusCheck(ctx context.Context, ssn *session.Session) context.Context {
-	statusCheckFunc := func(ctx context.Context) error {
-		s, err := c.repository.GetSession(ctx, ssn.ID)
-		if err != nil {
-			return goerr.Wrap(err, "failed to get session status")
-		}
-		if s != nil && s.Status == types.SessionStatusAborted {
-			return ErrSessionAborted
-		}
-		return nil
-	}
-	return ssnutil.WithStatusCheck(ctx, statusCheckFunc)
-}
-
-// finishSession updates session status and posts session actions on completion.
-func (c *AsterChat) finishSession(ctx context.Context, ssn *session.Session, target *ticket.Ticket, finalStatus *types.SessionStatus) {
-	logger := logging.From(ctx)
-	if r := recover(); r != nil {
-		*finalStatus = types.SessionStatusAborted
-		ssn.UpdateStatus(ctx, *finalStatus)
-		if err := c.repository.PutSession(ctx, ssn); err != nil {
-			logger.Error("failed to update session status on panic", "error", err, "status", *finalStatus)
-		}
-		panic(r)
-	}
-
-	ssn.UpdateStatus(ctx, *finalStatus)
-	if err := c.repository.PutSession(ctx, ssn); err != nil {
-		logger.Error("failed to update final session status", "error", err, "status", *finalStatus)
-	}
-
-	// Skip session actions for ticketless chat (no ticket to act on)
-	if target.ID != "" && *finalStatus == types.SessionStatusCompleted && c.slackService != nil && target.SlackThread != nil {
-		threadSvc := c.slackService.NewThread(*target.SlackThread)
-
-		var sessionURL string
-		if c.frontendURL != "" {
-			sessionURL = fmt.Sprintf("%s/sessions/%s", c.frontendURL, ssn.ID)
-		}
-
-		currentTicket, err := c.repository.GetTicket(ctx, target.ID)
-		if err != nil {
-			logger.Error("failed to get ticket for session actions", "error", err, "ticket_id", target.ID)
-		} else if currentTicket != nil {
-			if err := threadSvc.PostSessionActions(ctx, target.ID, currentTicket.Status, sessionURL); err != nil {
-				logger.Error("failed to post session actions to Slack", "error", err, "session_id", ssn.ID)
-			}
-		}
-	}
-}
-
-// authorize checks policy-based authorization for agent execution.
-func (c *AsterChat) authorize(ctx context.Context, message string) (bool, error) {
-	if err := chat.AuthorizeAgentRequest(ctx, c.policyClient, c.noAuthorization, message); err != nil {
-		if errors.Is(err, chat.ErrAgentAuthPolicyNotDefined) {
-			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nAgent execution policy is not defined. Please configure the `auth.agent` policy or use `--no-authorization` flag for development.\n\nSee: https://docs.warren.secmon-lab.com/policy.md#agent-execution-authorization")
-		} else if errors.Is(err, chat.ErrAgentAuthDenied) {
-			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nYou are not authorized to execute agent requests. Please contact your administrator if you believe this is an error.")
-		} else {
-			msg.Notify(ctx, "🚫 *Authorization Failed*\n\nFailed to check authorization. Please contact your administrator.")
-			return false, goerr.Wrap(err, "failed to evaluate agent auth")
-		}
-		return false, nil
-	}
-	return true, nil
-}
-
 // saveLatestHistory saves the current planning session history as the latest snapshot.
 // Errors are handled via errutil but do not interrupt execution.
 func (c *AsterChat) saveLatestHistory(ctx context.Context, planSession gollem.Session, ticketID types.TicketID, storageSvc *storage.Service) {
@@ -732,13 +513,12 @@ func (c *AsterChat) saveSessionHistory(ctx context.Context, planSession gollem.S
 }
 
 // checkAborted checks if the context has been cancelled (e.g. by the session
-// monitor detecting an abort) and, if so, sets finalStatus and notifies via
-// cleanupCtx. Returns ErrSessionAborted when aborted, nil otherwise.
-func checkAborted(ctx context.Context, cleanupCtx context.Context, finalStatus *types.SessionStatus) error {
+// monitor detecting an abort) and, if so, notifies via cleanupCtx.
+// Returns chat.ErrSessionAborted when aborted, nil otherwise.
+func checkAborted(ctx context.Context, cleanupCtx context.Context) error {
 	if ctx.Err() != nil {
-		*finalStatus = types.SessionStatusAborted
 		msg.Notify(cleanupCtx, "🛑 Execution aborted by user request.")
-		return ErrSessionAborted
+		return chat.ErrSessionAborted
 	}
 	return nil
 }
