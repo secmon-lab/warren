@@ -86,6 +86,8 @@ Template usage: `{{ if .Context.Ticket }}...{{ end }}` to branch on ticket prese
 |-------|------|-------------|
 | `Requester.ID` | `string` | Slack user ID of the requester, used for `<@ID>` mentions in questions |
 
+For a complete working example of how these variables are used in a template, see the [default system.md](../../pkg/usecase/chat/bluebell/prompt/system.md).
+
 ### Context Handling in Selector
 
 The selector receives:
