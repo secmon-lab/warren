@@ -738,7 +738,7 @@ func checkAborted(ctx context.Context, cleanupCtx context.Context, finalStatus *
 // startSessionMonitor starts a background goroutine that polls session status
 // and cancels the context when the session is aborted.
 func (c *BluebellChat) startSessionMonitor(ctx context.Context, sessionID types.SessionID) (context.Context, func()) {
-	ctx, cancel := context.WithCancel(ctx) // #nosec G601 -- cancel is called in the stop() closure returned below
+	ctx, cancel := context.WithCancel(ctx) // #nosec G118 -- cancel is called in the stop() closure returned below
 	done := make(chan struct{})
 
 	go func() {
