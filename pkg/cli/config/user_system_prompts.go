@@ -64,7 +64,7 @@ func (x *UserSystemPrompts) Configure() ([]PromptEntry, error) {
 		)
 	}
 
-	var prompts []PromptEntry
+	prompts := make([]PromptEntry, 0, len(entries))
 	seenIDs := make(map[string]string) // id -> filePath
 
 	for _, entry := range entries {
