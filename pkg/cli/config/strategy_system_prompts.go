@@ -15,6 +15,7 @@ import (
 // PromptEntry represents a user-defined system prompt loaded from a markdown file.
 type PromptEntry struct {
 	ID          string // frontmatter id (required, unique)
+	Name        string // frontmatter name (required, human-readable display name)
 	Description string // frontmatter description (required)
 	Content     string // markdown body after frontmatter
 	FilePath    string // source file path (for debugging/logging)
@@ -23,28 +24,29 @@ type PromptEntry struct {
 // promptFrontmatter is the YAML frontmatter structure in prompt files.
 type promptFrontmatter struct {
 	ID          string `yaml:"id"`
+	Name        string `yaml:"name"`
 	Description string `yaml:"description"`
 }
 
-// UserSystemPrompts holds CLI configuration for loading multiple user system prompt files.
-type UserSystemPrompts struct {
+// StrategySystemPrompts holds CLI configuration for loading multiple user system prompt files.
+type StrategySystemPrompts struct {
 	dirPath string
 }
 
-// NewUserSystemPrompts creates a UserSystemPrompts with the given directory path.
+// NewStrategySystemPrompts creates a StrategySystemPrompts with the given directory path.
 // This is primarily for testing; in production, use Flags() to configure via CLI.
-func NewUserSystemPrompts(dirPath string) *UserSystemPrompts {
-	return &UserSystemPrompts{dirPath: dirPath}
+func NewStrategySystemPrompts(dirPath string) *StrategySystemPrompts {
+	return &StrategySystemPrompts{dirPath: dirPath}
 }
 
 // Flags returns CLI flags for user system prompts configuration.
-func (x *UserSystemPrompts) Flags() []cli.Flag {
+func (x *StrategySystemPrompts) Flags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
-			Name:        "user-system-prompts",
-			Usage:       "Path to a directory containing user system prompt files (markdown with YAML frontmatter)",
+			Name:        "strategy-system-prompts",
+			Usage:       "Path to a directory containing strategy system prompt files (markdown with YAML frontmatter)",
 			Destination: &x.dirPath,
-			Sources:     cli.EnvVars("WARREN_USER_SYSTEM_PROMPTS"),
+			Sources:     cli.EnvVars("WARREN_STRATEGY_SYSTEM_PROMPTS"),
 		},
 	}
 }
@@ -52,7 +54,7 @@ func (x *UserSystemPrompts) Flags() []cli.Flag {
 // Configure reads all .md files in the configured directory and returns parsed PromptEntry slice.
 // Returns empty slice if no directory is configured.
 // Returns error if the directory doesn't exist, files are malformed, or ids are duplicated.
-func (x *UserSystemPrompts) Configure() ([]PromptEntry, error) {
+func (x *StrategySystemPrompts) Configure() ([]PromptEntry, error) {
 	if x.dirPath == "" {
 		return nil, nil
 	}
@@ -125,6 +127,11 @@ func parsePromptFile(filePath string) (*PromptEntry, error) {
 			goerr.V("path", filePath),
 		)
 	}
+	if meta.Name == "" {
+		return nil, goerr.New("prompt file missing required 'name' in frontmatter",
+			goerr.V("path", filePath),
+		)
+	}
 	if meta.Description == "" {
 		return nil, goerr.New("prompt file missing required 'description' in frontmatter",
 			goerr.V("path", filePath),
@@ -133,6 +140,7 @@ func parsePromptFile(filePath string) (*PromptEntry, error) {
 
 	return &PromptEntry{
 		ID:          meta.ID,
+		Name:        meta.Name,
 		Description: meta.Description,
 		Content:     strings.TrimSpace(body),
 		FilePath:    filePath,

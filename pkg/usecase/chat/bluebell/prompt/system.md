@@ -1,5 +1,6 @@
 ---
-id: system
+id: default
+name: Security Investigation
 description: >
   Base system prompt for bluebell strategy. Provides investigation context
   including ticket/alert data, tools, knowledge base, and resolved intent.
@@ -78,6 +79,11 @@ No knowledge base is configured.
 
 ## Available Tools
 {{ .Tools.Description }}
+{{ if .UserSystemPrompt }}
+
+## User System Prompt
+{{ .UserSystemPrompt }}
+{{ end }}
 {{ if .ResolvedIntent }}
 
 ## Investigation Directive

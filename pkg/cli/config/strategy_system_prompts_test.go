@@ -20,6 +20,7 @@ func TestUserSystemPrompts_LoadMultipleFiles(t *testing.T) {
 	dir := t.TempDir()
 	writePromptFile(t, dir, "security.md", `---
 id: security-investigation
+name: Security Investigation
 description: Security threat investigation
 ---
 
@@ -27,13 +28,14 @@ Investigate security threats thoroughly.
 `)
 	writePromptFile(t, dir, "infra.md", `---
 id: infra-incident
+name: Infrastructure Incident
 description: Infrastructure incident investigation
 ---
 
 Focus on availability and performance.
 `)
 
-	cfg := config.NewUserSystemPrompts(dir)
+	cfg := config.NewStrategySystemPrompts(dir)
 	prompts, err := cfg.Configure()
 	gt.NoError(t, err)
 	gt.A(t, prompts).Length(2)
@@ -43,8 +45,10 @@ Focus on availability and performance.
 		byID[p.ID] = p
 	}
 
+	gt.V(t, byID["security-investigation"].Name).Equal("Security Investigation")
 	gt.V(t, byID["security-investigation"].Description).Equal("Security threat investigation")
 	gt.V(t, byID["security-investigation"].Content).Equal("Investigate security threats thoroughly.")
+	gt.V(t, byID["infra-incident"].Name).Equal("Infrastructure Incident")
 	gt.V(t, byID["infra-incident"].Description).Equal("Infrastructure incident investigation")
 	gt.V(t, byID["infra-incident"].Content).Equal("Focus on availability and performance.")
 }
@@ -53,6 +57,7 @@ func TestUserSystemPrompts_ExtraFrontmatterFieldsIgnored(t *testing.T) {
 	dir := t.TempDir()
 	writePromptFile(t, dir, "extra.md", `---
 id: with-extra
+name: Extra Fields
 description: Has extra fields
 author: someone
 version: 2
@@ -61,11 +66,12 @@ version: 2
 Content here.
 `)
 
-	cfg := config.NewUserSystemPrompts(dir)
+	cfg := config.NewStrategySystemPrompts(dir)
 	prompts, err := cfg.Configure()
 	gt.NoError(t, err)
 	gt.A(t, prompts).Length(1)
 	gt.V(t, prompts[0].ID).Equal("with-extra")
+	gt.V(t, prompts[0].Name).Equal("Extra Fields")
 	gt.V(t, prompts[0].Description).Equal("Has extra fields")
 	gt.V(t, prompts[0].Content).Equal("Content here.")
 }
@@ -73,28 +79,46 @@ Content here.
 func TestUserSystemPrompts_MissingID(t *testing.T) {
 	dir := t.TempDir()
 	writePromptFile(t, dir, "no-id.md", `---
+name: No ID
 description: Missing id field
 ---
 
 Content.
 `)
 
-	cfg := config.NewUserSystemPrompts(dir)
+	cfg := config.NewStrategySystemPrompts(dir)
 	_, err := cfg.Configure()
 	gt.V(t, err).NotNil()
 	gt.True(t, strings.Contains(err.Error(), "missing required 'id'"))
+}
+
+func TestUserSystemPrompts_MissingName(t *testing.T) {
+	dir := t.TempDir()
+	writePromptFile(t, dir, "no-name.md", `---
+id: no-name
+description: Missing name field
+---
+
+Content.
+`)
+
+	cfg := config.NewStrategySystemPrompts(dir)
+	_, err := cfg.Configure()
+	gt.V(t, err).NotNil()
+	gt.True(t, strings.Contains(err.Error(), "missing required 'name'"))
 }
 
 func TestUserSystemPrompts_MissingDescription(t *testing.T) {
 	dir := t.TempDir()
 	writePromptFile(t, dir, "no-desc.md", `---
 id: no-description
+name: No Description
 ---
 
 Content.
 `)
 
-	cfg := config.NewUserSystemPrompts(dir)
+	cfg := config.NewStrategySystemPrompts(dir)
 	_, err := cfg.Configure()
 	gt.V(t, err).NotNil()
 	gt.True(t, strings.Contains(err.Error(), "missing required 'description'"))
@@ -104,6 +128,7 @@ func TestUserSystemPrompts_DuplicateIDs(t *testing.T) {
 	dir := t.TempDir()
 	writePromptFile(t, dir, "first.md", `---
 id: duplicate-id
+name: First
 description: First file
 ---
 
@@ -111,13 +136,14 @@ First content.
 `)
 	writePromptFile(t, dir, "second.md", `---
 id: duplicate-id
+name: Second
 description: Second file
 ---
 
 Second content.
 `)
 
-	cfg := config.NewUserSystemPrompts(dir)
+	cfg := config.NewStrategySystemPrompts(dir)
 	_, err := cfg.Configure()
 	gt.V(t, err).NotNil()
 	gt.True(t, strings.Contains(err.Error(), "duplicate prompt id"))
@@ -133,14 +159,14 @@ description: broken
 Content.
 `)
 
-	cfg := config.NewUserSystemPrompts(dir)
+	cfg := config.NewStrategySystemPrompts(dir)
 	_, err := cfg.Configure()
 	gt.V(t, err).NotNil()
 	gt.True(t, strings.Contains(err.Error(), "failed to parse YAML frontmatter"))
 }
 
 func TestUserSystemPrompts_NonExistentDirectory(t *testing.T) {
-	cfg := config.NewUserSystemPrompts("/nonexistent/path/to/prompts")
+	cfg := config.NewStrategySystemPrompts("/nonexistent/path/to/prompts")
 	_, err := cfg.Configure()
 	gt.V(t, err).NotNil()
 	gt.True(t, strings.Contains(err.Error(), "failed to read user system prompts directory"))
@@ -149,7 +175,7 @@ func TestUserSystemPrompts_NonExistentDirectory(t *testing.T) {
 func TestUserSystemPrompts_EmptyDirectory(t *testing.T) {
 	dir := t.TempDir()
 
-	cfg := config.NewUserSystemPrompts(dir)
+	cfg := config.NewStrategySystemPrompts(dir)
 	prompts, err := cfg.Configure()
 	gt.NoError(t, err)
 	gt.V(t, len(prompts)).Equal(0)
@@ -159,6 +185,7 @@ func TestUserSystemPrompts_NonMdFilesIgnored(t *testing.T) {
 	dir := t.TempDir()
 	writePromptFile(t, dir, "valid.md", `---
 id: valid
+name: Valid Prompt
 description: Valid prompt
 ---
 
@@ -167,7 +194,7 @@ Content.
 	writePromptFile(t, dir, "readme.txt", "not a prompt")
 	writePromptFile(t, dir, "config.yaml", "key: value")
 
-	cfg := config.NewUserSystemPrompts(dir)
+	cfg := config.NewStrategySystemPrompts(dir)
 	prompts, err := cfg.Configure()
 	gt.NoError(t, err)
 	gt.A(t, prompts).Length(1)
@@ -175,7 +202,7 @@ Content.
 }
 
 func TestUserSystemPrompts_EmptyDirPath(t *testing.T) {
-	cfg := config.NewUserSystemPrompts("")
+	cfg := config.NewStrategySystemPrompts("")
 	prompts, err := cfg.Configure()
 	gt.NoError(t, err)
 	gt.V(t, prompts == nil).Equal(true)
@@ -188,7 +215,7 @@ func TestUserSystemPrompts_NoFrontmatterDelimiter(t *testing.T) {
 No frontmatter here.
 `)
 
-	cfg := config.NewUserSystemPrompts(dir)
+	cfg := config.NewStrategySystemPrompts(dir)
 	_, err := cfg.Configure()
 	gt.V(t, err).NotNil()
 	gt.True(t, strings.Contains(err.Error(), "does not start with frontmatter delimiter"))
@@ -201,7 +228,7 @@ id: unclosed
 description: Missing closing delimiter
 `)
 
-	cfg := config.NewUserSystemPrompts(dir)
+	cfg := config.NewStrategySystemPrompts(dir)
 	_, err := cfg.Configure()
 	gt.V(t, err).NotNil()
 	gt.True(t, strings.Contains(err.Error(), "closing delimiter '---' not found"))

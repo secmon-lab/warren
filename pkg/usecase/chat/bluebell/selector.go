@@ -15,18 +15,13 @@ import (
 )
 
 //go:embed prompt/selector.md
-var selectorPromptRaw string
-
 var selectorPromptTemplate string
-
-func init() {
-	selectorPromptTemplate = stripFrontmatter(selectorPromptRaw)
-}
 
 // ResolvedIntent is the output of the intent resolver.
 type ResolvedIntent struct {
-	PromptID string `json:"prompt_id"` // selected prompt id (or "default")
-	Intent   string `json:"intent"`    // situation-specific investigation directive
+	PromptID   string `json:"prompt_id"` // selected prompt id (or "default")
+	PromptName string `json:"-"`         // human-readable name (set from PromptEntry, not from LLM)
+	Intent     string `json:"intent"`    // situation-specific investigation directive
 }
 
 // selectorSchema defines the JSON response schema for the selector LLM call.
@@ -122,11 +117,12 @@ func (c *BluebellChat) resolveIntentForSinglePrompt(ctx context.Context, selecto
 	if err != nil {
 		logger.Warn("failed to parse selector result for single prompt, using fallback",
 			"error", err, "prompt_id", entry.ID)
-		return &ResolvedIntent{PromptID: entry.ID, Intent: entry.Description}, nil
+		return &ResolvedIntent{PromptID: entry.ID, PromptName: entry.Name, Intent: entry.Description}, nil
 	}
 
-	// Ensure the prompt_id matches the single candidate
+	// Ensure the prompt_id and name match the single candidate
 	resolved.PromptID = entry.ID
+	resolved.PromptName = entry.Name
 	return resolved, nil
 }
 
@@ -156,11 +152,12 @@ func (c *BluebellChat) resolveIntentWithSelection(ctx context.Context, selectorP
 		return nil, nil
 	}
 
-	// Validate the selected prompt_id exists
+	// Validate the selected prompt_id exists and set name
 	if resolved.PromptID != "default" {
 		found := false
 		for _, e := range entries {
 			if e.ID == resolved.PromptID {
+				resolved.PromptName = e.Name
 				found = true
 				break
 			}

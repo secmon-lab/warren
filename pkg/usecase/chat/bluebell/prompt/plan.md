@@ -1,10 +1,3 @@
----
-id: plan
-description: >
-  Planning prompt. Generates an initial task decomposition from the user message.
-  Used as user message with the system prompt as session context.
----
-
 Create an execution plan for the following user request.
 
 ## User Message

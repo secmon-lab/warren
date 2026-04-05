@@ -1,10 +1,3 @@
----
-id: final
-description: >
-  Final response prompt. Synthesizes all task results into a coherent
-  security assessment with actionable conclusions.
----
-
 Based on all completed task results, provide a comprehensive final response to the user's original question.
 
 Respond in **{{ .lang }}**.

@@ -1,10 +1,3 @@
----
-id: replan
-description: >
-  Replanning prompt. Reviews completed task results and decides next steps:
-  more tasks, ask a question, or proceed to final response.
----
-
 Previous task phases have completed. Review the results and decide what to do next.
 
 # Original User Message

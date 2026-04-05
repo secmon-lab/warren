@@ -55,6 +55,8 @@ type BluebellChat struct {
 	budgetStrategy      BudgetStrategy
 	hitlTools           []string
 
+	userSystemPrompt string // static user system prompt (--user-system-prompt, environment info etc.)
+
 	// bluebell-specific: user-defined prompt entries for intent resolution
 	promptEntries []config.PromptEntry
 }
@@ -90,6 +92,11 @@ func WithNoAuthorization(noAuthz bool) Option {
 // WithFrontendURL sets the frontend URL for session links.
 func WithFrontendURL(url string) Option {
 	return func(c *BluebellChat) { c.frontendURL = url }
+}
+
+// WithUserSystemPrompt sets the static user system prompt (environment info, etc.).
+func WithUserSystemPrompt(prompt string) Option {
+	return func(c *BluebellChat) { c.userSystemPrompt = prompt }
 }
 
 // WithTraceRepository sets the trace repository for execution tracing.
@@ -248,7 +255,11 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 		// Post context block showing which prompt was selected
 		if c.slackService != nil && target.SlackThread != nil {
 			threadSvc := c.slackService.NewThread(*target.SlackThread)
-			if postErr := threadSvc.PostContextBlock(ctx, fmt.Sprintf("📋 Prompt: %s", resolved.PromptID)); postErr != nil {
+			promptLabel := resolved.PromptName
+			if promptLabel == "" {
+				promptLabel = resolved.PromptID
+			}
+			if postErr := threadSvc.PostContextBlock(ctx, fmt.Sprintf("📋 Prompt: %s", promptLabel)); postErr != nil {
 				logging.From(ctx).Error("failed to post prompt selection", "error", postErr)
 			}
 		}
@@ -260,6 +271,7 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 		ticket:           target,
 		alerts:           chatCtx.Alerts,
 		tools:            c.tools,
+		userSystemPrompt: c.userSystemPrompt,
 		resolvedIntent:   resolvedIntent,
 		lang:             lang.From(ctx),
 		requesterID:      string(types.UserID(user.FromContext(ctx))),

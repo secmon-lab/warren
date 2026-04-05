@@ -1,10 +1,3 @@
----
-id: selector
-description: >
-  Intent resolver prompt. Performs XY problem detection, prompt selection,
-  and situation-specific intent resolution in a single LLM call.
----
-
 You are an intent resolver for a security operations system. Your task is to:
 1. Select the most appropriate investigation prompt
 2. Generate a situation-specific investigation directive based on the selected prompt

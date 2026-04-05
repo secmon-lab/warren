@@ -25,32 +25,22 @@ import (
 var systemPromptRaw string
 
 //go:embed prompt/plan.md
-var planPromptRaw string
+var planPromptTemplate string
 
 //go:embed prompt/replan.md
-var replanPromptRaw string
+var replanPromptTemplate string
 
 //go:embed prompt/task.md
-var taskPromptRaw string
+var taskPromptTemplate string
 
 //go:embed prompt/final.md
-var finalPromptRaw string
+var finalPromptTemplate string
 
-// Stripped templates (frontmatter removed at init).
-var (
-	systemPromptTemplate  string
-	planPromptTemplate    string
-	replanPromptTemplate  string
-	taskPromptTemplate    string
-	finalPromptTemplate   string
-)
+// systemPromptTemplate has frontmatter stripped (system.md is the only prompt file with frontmatter).
+var systemPromptTemplate string
 
 func init() {
 	systemPromptTemplate = stripFrontmatter(systemPromptRaw)
-	planPromptTemplate = stripFrontmatter(planPromptRaw)
-	replanPromptTemplate = stripFrontmatter(replanPromptRaw)
-	taskPromptTemplate = stripFrontmatter(taskPromptRaw)
-	finalPromptTemplate = stripFrontmatter(finalPromptRaw)
 }
 
 // stripFrontmatter removes YAML frontmatter (---...---) from the beginning of a string.
@@ -70,12 +60,13 @@ func stripFrontmatter(s string) string {
 // SystemPromptData is the data passed to system.md template.
 // Field names map directly to template variables (e.g., {{ .Context.Ticket }}).
 type SystemPromptData struct {
-	Context        ContextData
-	Tools          ToolsData
-	Knowledge      KnowledgeData
-	ResolvedIntent string // situation-specific investigation directive from intent resolver
-	Lang           lang.Lang
-	Requester      Requester
+	Context          ContextData
+	Tools            ToolsData
+	Knowledge        KnowledgeData
+	UserSystemPrompt string // user-provided static system prompt (--user-system-prompt, environment info etc.)
+	ResolvedIntent   string // situation-specific investigation directive from intent resolver
+	Lang             lang.Lang
+	Requester        Requester
 }
 
 // ContextData holds the investigation target context.
@@ -125,6 +116,7 @@ type planningContext struct {
 	ticket           *ticket.Ticket
 	alerts           []*alert.Alert
 	tools            []interfaces.ToolSet
+	userSystemPrompt string
 	resolvedIntent   string
 	lang             lang.Lang
 	requesterID      string
@@ -143,8 +135,9 @@ func generateSystemPrompt(ctx context.Context, pc *planningContext) (string, err
 		Knowledge: KnowledgeData{
 			Tags: fetchKnowledgeTags(ctx, pc.knowledgeService),
 		},
-		ResolvedIntent: pc.resolvedIntent,
-		Lang:           pc.lang,
+		UserSystemPrompt: pc.userSystemPrompt,
+		ResolvedIntent:   pc.resolvedIntent,
+		Lang:             pc.lang,
 		Requester: Requester{
 			ID: pc.requesterID,
 		},

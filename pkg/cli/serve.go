@@ -77,7 +77,7 @@ func cmdServe() *cli.Command {
 		asyncCfg             config.AsyncAlertHook
 		traceCfg             config.Trace
 		userSystemPromptCfg  config.UserSystemPrompt
-		userSystemPromptsCfg config.UserSystemPrompts
+		strategyPromptsCfg config.StrategySystemPrompts
 		cbCfg                config.CircuitBreaker
 		chatStrategy         string
 		budgetStrategy       string
@@ -176,7 +176,7 @@ func cmdServe() *cli.Command {
 		agents.AllFlags(),
 		traceCfg.Flags(),
 		userSystemPromptCfg.Flags(),
-		userSystemPromptsCfg.Flags(),
+		strategyPromptsCfg.Flags(),
 		cbCfg.Flags(),
 	)
 
@@ -454,7 +454,7 @@ func cmdServe() *cli.Command {
 				}
 
 				// Load user-defined prompt entries
-				promptEntries, err := userSystemPromptsCfg.Configure()
+				promptEntries, err := strategyPromptsCfg.Configure()
 				if err != nil {
 					return goerr.Wrap(err, "failed to configure user system prompts")
 				}
@@ -469,6 +469,7 @@ func cmdServe() *cli.Command {
 					bluebell.WithTools(allTools),
 					bluebell.WithStorageClient(storageClient),
 					bluebell.WithNoAuthorization(noAuthorization),
+					bluebell.WithUserSystemPrompt(userSystemPrompt),
 					bluebell.WithKnowledgeService(knowledgeSvc),
 					bluebell.WithPromptEntries(promptEntries),
 				}
