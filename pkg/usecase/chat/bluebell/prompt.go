@@ -55,7 +55,7 @@ func init() {
 
 // stripFrontmatter removes YAML frontmatter (---...---) from the beginning of a string.
 func stripFrontmatter(s string) string {
-	lines := strings.SplitN(s, "\n", -1)
+	lines := strings.Split(s, "\n")
 	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
 		return s
 	}
