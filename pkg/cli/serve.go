@@ -29,6 +29,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/usecase/chat/aster"
+	"github.com/secmon-lab/warren/pkg/usecase/chat/bluebell"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/urfave/cli/v3"
 )
@@ -56,29 +57,30 @@ func generateFrontendURL(addr string) string {
 
 func cmdServe() *cli.Command {
 	var (
-		addr                string
-		enableGraphQL       bool
-		enableGraphiQL      bool
-		noAuthorization     bool
-		disableHTTPLogger   bool
-		disableLLM          bool
-		strictAlert         bool
-		wsAllowedOrigins    []string
-		webUICfg            config.WebUI
-		policyCfg           config.Policy
-		genaiCfg            config.GenAI
-		sentryCfg           config.Sentry
-		slackCfg            config.Slack
-		llmCfg              config.LLMCfg
-		firestoreCfg        config.Firestore
-		storageCfg          config.Storage
-		mcpCfg              config.MCPConfig
-		asyncCfg            config.AsyncAlertHook
-		traceCfg            config.Trace
-		userSystemPromptCfg config.UserSystemPrompt
-		cbCfg               config.CircuitBreaker
-		chatStrategy        string
-		budgetStrategy      string
+		addr                 string
+		enableGraphQL        bool
+		enableGraphiQL       bool
+		noAuthorization      bool
+		disableHTTPLogger    bool
+		disableLLM           bool
+		strictAlert          bool
+		wsAllowedOrigins     []string
+		webUICfg             config.WebUI
+		policyCfg            config.Policy
+		genaiCfg             config.GenAI
+		sentryCfg            config.Sentry
+		slackCfg             config.Slack
+		llmCfg               config.LLMCfg
+		firestoreCfg         config.Firestore
+		storageCfg           config.Storage
+		mcpCfg               config.MCPConfig
+		asyncCfg             config.AsyncAlertHook
+		traceCfg             config.Trace
+		userSystemPromptCfg  config.UserSystemPrompt
+		userSystemPromptsCfg config.UserSystemPrompts
+		cbCfg                config.CircuitBreaker
+		chatStrategy         string
+		budgetStrategy       string
 	)
 
 	flags := joinFlags(
@@ -174,6 +176,7 @@ func cmdServe() *cli.Command {
 		agents.AllFlags(),
 		traceCfg.Flags(),
 		userSystemPromptCfg.Flags(),
+		userSystemPromptsCfg.Flags(),
 		cbCfg.Flags(),
 	)
 
@@ -397,7 +400,8 @@ func cmdServe() *cli.Command {
 			}
 
 			// Configure chat strategy
-			if chatStrategy == "aster" {
+			switch chatStrategy {
+			case "aster":
 				// Merge all tool sets: configured tools + MCP tools
 				allTools := make([]interfaces.ToolSet, 0, len(toolSets)+len(mcpToolSets))
 				allTools = append(allTools, toolSets...)
@@ -443,7 +447,65 @@ func cmdServe() *cli.Command {
 				asterChat := aster.New(repo, llmClient, policyClient, asterOpts...)
 				ucOptions = append(ucOptions, usecase.WithChatUseCase(asterChat))
 				logging.From(ctx).Info("Chat strategy: aster")
-			} else {
+
+			case "bluebell":
+				if knowledgeSvc == nil {
+					return goerr.New("bluebell strategy requires knowledge service to be configured")
+				}
+
+				// Load user-defined prompt entries
+				promptEntries, err := userSystemPromptsCfg.Configure()
+				if err != nil {
+					return goerr.Wrap(err, "failed to configure user system prompts")
+				}
+
+				allTools := make([]interfaces.ToolSet, 0, len(toolSets)+len(mcpToolSets))
+				allTools = append(allTools, toolSets...)
+				for _, mts := range mcpToolSets {
+					allTools = append(allTools, interfaces.WrapToolSet(mts, "mcp", "MCP external tool"))
+				}
+
+				bluebellOpts := []bluebell.Option{
+					bluebell.WithTools(allTools),
+					bluebell.WithStorageClient(storageClient),
+					bluebell.WithNoAuthorization(noAuthorization),
+					bluebell.WithKnowledgeService(knowledgeSvc),
+					bluebell.WithPromptEntries(promptEntries),
+				}
+				if slackSvc != nil {
+					bluebellOpts = append(bluebellOpts, bluebell.WithSlackService(slackSvc))
+				}
+				if webUICfg.GetFrontendURL() != "" {
+					bluebellOpts = append(bluebellOpts, bluebell.WithFrontendURL(webUICfg.GetFrontendURL()))
+				}
+				if storageCfg.IsConfigured() && storageCfg.Prefix() != "" {
+					bluebellOpts = append(bluebellOpts, bluebell.WithStoragePrefix(storageCfg.Prefix()))
+				}
+				if safeTraceRepo != nil {
+					bluebellOpts = append(bluebellOpts, bluebell.WithTraceRepository(safeTraceRepo))
+				}
+
+				switch budgetStrategy {
+				case "default":
+					bluebellOpts = append(bluebellOpts, bluebell.WithBudgetStrategy(bluebell.NewDefaultBudgetStrategy()))
+					logging.From(ctx).Info("Budget strategy: default (action budget enabled)")
+				case "none":
+					// budgetStrategy remains nil (budget disabled)
+				default:
+					return goerr.New("unknown budget strategy", goerr.V("strategy", budgetStrategy))
+				}
+
+				bluebellOpts = append(bluebellOpts, bluebell.WithHITLTools([]string{"web_fetch"}))
+
+				bluebellChat, err := bluebell.New(repo, llmClient, policyClient, bluebellOpts...)
+				if err != nil {
+					return goerr.Wrap(err, "failed to create bluebell chat strategy")
+				}
+				ucOptions = append(ucOptions, usecase.WithChatUseCase(bluebellChat))
+				logging.From(ctx).Info("Chat strategy: bluebell",
+					"prompt_entries", len(promptEntries))
+
+			default:
 				return goerr.New("unknown chat strategy", goerr.V("strategy", chatStrategy))
 			}
 

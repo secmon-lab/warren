@@ -52,7 +52,7 @@ func Generate(ctx context.Context, tmpl string, data map[string]any) (string, er
 
 // GenerateWithStruct generates a prompt with data passed directly to template without JSON marshaling.
 // This allows direct field access in templates (e.g., {{ .ticket.Title }})
-func GenerateWithStruct(ctx context.Context, tmpl string, data map[string]any) (string, error) {
+func GenerateWithStruct(ctx context.Context, tmpl string, data any) (string, error) {
 	builtTemplate, err := template.New("prompt").Parse(tmpl)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to parse template")
