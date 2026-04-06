@@ -234,23 +234,17 @@ func New(opts ...Option) *UseCases {
 
 	// Initialize chat use case (only if not already set via WithChatUseCase)
 	if u.ChatUC == nil {
-		asterStrategy := aster.New(u.repository, u.llmClient,
+		asterOpts := []aster.Option{
 			aster.WithTools(u.tools),
 			aster.WithStorageClient(u.storageClient),
 			aster.WithStoragePrefix(u.storagePrefix),
 			aster.WithUserSystemPrompt(u.userSystemPrompt),
 			aster.WithTraceRepository(u.traceRepository),
-		)
-		if u.slackService != nil {
-			asterStrategy = aster.New(u.repository, u.llmClient,
-				aster.WithSlackService(u.slackService),
-				aster.WithTools(u.tools),
-				aster.WithStorageClient(u.storageClient),
-				aster.WithStoragePrefix(u.storagePrefix),
-				aster.WithUserSystemPrompt(u.userSystemPrompt),
-				aster.WithTraceRepository(u.traceRepository),
-			)
 		}
+		if u.slackService != nil {
+			asterOpts = append(asterOpts, aster.WithSlackService(u.slackService))
+		}
+		asterStrategy := aster.New(u.repository, u.llmClient, asterOpts...)
 		commonOpts := []chatuc.Option{
 			chatuc.WithRepository(u.repository),
 			chatuc.WithPolicyClient(u.policyClient),
