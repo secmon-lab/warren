@@ -188,7 +188,10 @@ func TestResolveIntent_UnknownPromptID_Fallback(t *testing.T) {
 	}
 
 	resolved := bluebell.ExportResolveIntent(ctx, chat, "test", chatCtx)
-	gt.V(t, resolved == nil).Equal(true) // fallback to nil
+	gt.V(t, resolved).NotNil()
+	gt.V(t, resolved.PromptID).Equal("default")   // falls back to default
+	gt.V(t, resolved.Intent).Equal("something")    // intent is preserved from LLM response
+	gt.V(t, resolved.PromptName).Equal("")          // name cleared on fallback
 }
 
 func TestResolveIntent_InvalidJSON_Fallback(t *testing.T) {
@@ -224,7 +227,9 @@ func TestResolveIntent_InvalidJSON_Fallback(t *testing.T) {
 	}
 
 	resolved := bluebell.ExportResolveIntent(ctx, chat, "test", chatCtx)
-	gt.V(t, resolved == nil).Equal(true) // fallback to nil
+	gt.V(t, resolved).NotNil()
+	gt.V(t, resolved.PromptID).Equal("default") // falls back to default
+	gt.V(t, resolved.Intent).Equal("")           // empty intent on parse failure
 }
 
 func TestResolveIntent_DefaultPromptID_Accepted(t *testing.T) {

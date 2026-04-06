@@ -83,53 +83,18 @@ func (c *BluebellChat) resolveIntent(ctx context.Context, message string, chatCt
 		return nil, goerr.Wrap(err, "failed to generate selector prompt")
 	}
 
-	switch len(c.promptEntries) {
-	case 0:
-		// No prompt entries: run resolver only (XY Detection + Intent Resolution)
-		logger.Debug("intent resolution: no prompt entries, running resolver only")
-		return c.resolveIntentDefault(ctx, selectorPrompt)
-	case 1:
-		// Single candidate: skip selection but still resolve intent
-		logger.Debug("intent resolution: single prompt entry", "prompt_id", c.promptEntries[0].ID)
+	logger.Debug("intent resolution: starting", "prompt_entries", len(c.promptEntries))
+
+	// For single candidate, skip selection but still resolve intent
+	if len(c.promptEntries) == 1 {
 		return c.resolveIntentForSinglePrompt(ctx, selectorPrompt, c.promptEntries[0])
-	default:
-		// Multiple candidates: selection + intent resolution in one LLM call
-		logger.Debug("intent resolution: multiple prompt entries", "count", len(c.promptEntries))
-		return c.resolveIntentWithSelection(ctx, selectorPrompt, c.promptEntries)
-	}
-}
-
-// resolveIntentDefault resolves intent without prompt selection (0 entries).
-// Runs XY Problem Detection and Intent Resolution only.
-func (c *BluebellChat) resolveIntentDefault(ctx context.Context, selectorPrompt string) (*ResolvedIntent, error) {
-	logger := logging.From(ctx)
-
-	session, err := c.llmClient.NewSession(ctx,
-		gollem.WithSessionContentType(gollem.ContentTypeJSON),
-		gollem.WithSessionResponseSchema(selectorSchema),
-		gollem.WithSessionSystemPrompt(selectorPrompt),
-	)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to create resolver session")
 	}
 
-	resp, err := session.Generate(ctx, []gollem.Input{
-		gollem.Text("Detect XY problem and resolve the investigation intent."),
-	})
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to generate intent resolution")
-	}
-
-	resolved, err := parseSelectorResult(resp.Texts)
-	if err != nil {
-		logger.Warn("failed to parse resolver result for default, using empty intent", "error", err)
-		return &ResolvedIntent{PromptID: "default", Intent: ""}, nil
-	}
-
-	// Force prompt_id to "default" (no entries to select from)
-	resolved.PromptID = "default"
-	logger.Debug("intent resolved", "prompt_id", "default")
-	return resolved, nil
+	// 0 or 2+ candidates: run selector + intent resolution in one LLM call.
+	// When 0 entries, the template omits the prompt selection step and the LLM
+	// returns "default"; resolveIntentWithSelection handles this via the
+	// prompt_id == "default" pass-through.
+	return c.resolveIntentWithSelection(ctx, selectorPrompt, c.promptEntries)
 }
 
 // resolveIntentForSinglePrompt resolves intent for a single prompt candidate (no selection needed).
@@ -188,7 +153,7 @@ func (c *BluebellChat) resolveIntentWithSelection(ctx context.Context, selectorP
 	resolved, err := parseSelectorResult(resp.Texts)
 	if err != nil {
 		logger.Warn("failed to parse selector result, falling back to default", "error", err)
-		return nil, nil
+		return &ResolvedIntent{PromptID: "default", Intent: ""}, nil
 	}
 
 	// Validate the selected prompt_id exists and set name
@@ -204,7 +169,8 @@ func (c *BluebellChat) resolveIntentWithSelection(ctx context.Context, selectorP
 		if !found {
 			logger.Warn("selector returned unknown prompt_id, falling back to default",
 				"prompt_id", resolved.PromptID)
-			return nil, nil
+			resolved.PromptID = "default"
+			resolved.PromptName = ""
 		}
 	}
 
