@@ -203,9 +203,9 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 			threadSvc := c.slackService.NewThread(*target.SlackThread)
 			promptLabel := resolved.PromptName
 			if promptLabel == "" {
-				promptLabel = resolved.PromptID
+				promptLabel = "(default)"
 			}
-			if postErr := threadSvc.PostContextBlock(ctx, fmt.Sprintf("📋 Prompt: %s", promptLabel)); postErr != nil {
+			if postErr := threadSvc.PostContextBlock(ctx, fmt.Sprintf("📋 Prompt: `%s`", promptLabel)); postErr != nil {
 				logging.From(ctx).Error("failed to post prompt selection", "error", postErr)
 			}
 		}

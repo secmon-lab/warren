@@ -14,13 +14,17 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
+	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
+	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/usecase/chat/bluebell"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+
+	slack "github.com/slack-go/slack"
 )
 
 func newDummySession(ticketID types.TicketID) *session.Session {
@@ -355,6 +359,241 @@ func TestBluebellChat_ErrorIsolation(t *testing.T) {
 		ChatCtx: &chatModel.ChatContext{Ticket: testTicket},
 	})
 	gt.NoError(t, err)
+}
+
+// newTestSlackService creates a slack.Service with a mock client for testing.
+// The returned postedMessages slice captures all PostMessageContext calls.
+func newTestSlackService(t *testing.T) (*slackService.Service, *[]slack.MsgOption) {
+	t.Helper()
+	var mu sync.Mutex
+	var postedOptions []slack.MsgOption
+
+	slackMock := &mock.SlackClientMock{
+		PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack.MsgOption) (string, string, error) {
+			mu.Lock()
+			postedOptions = append(postedOptions, options...)
+			mu.Unlock()
+			return channelID, "1234567890.123456", nil
+		},
+		UpdateMessageContextFunc: func(ctx context.Context, channelID, timestamp string, options ...slack.MsgOption) (string, string, string, error) {
+			return channelID, timestamp, "", nil
+		},
+		AuthTestFunc: func() (*slack.AuthTestResponse, error) {
+			return &slack.AuthTestResponse{
+				UserID:       "U123",
+				TeamID:       "T123",
+				Team:         "test-team",
+				EnterpriseID: "",
+				BotID:        "B123",
+			}, nil
+		},
+		GetTeamInfoFunc: func() (*slack.TeamInfo, error) {
+			return &slack.TeamInfo{
+				Domain: "test-workspace",
+			}, nil
+		},
+	}
+
+	svc, err := slackService.New(slackMock, "C1234567890")
+	gt.NoError(t, err)
+	return svc, &postedOptions
+}
+
+func setupTicketWithSlackThread(t *testing.T, ctx context.Context, repo *repository.Memory) *ticket.Ticket {
+	t.Helper()
+	testTicket := ticket.Ticket{
+		ID:       types.NewTicketID(),
+		Status:   types.TicketStatusOpen,
+		AlertIDs: []types.AlertID{types.NewAlertID()},
+		SlackThread: &slackModel.Thread{
+			ChannelID: "C1234567890",
+			ThreadID:  "1234567890.000000",
+		},
+	}
+	gt.NoError(t, repo.PutTicket(ctx, testTicket))
+
+	testAlert := alert.Alert{
+		ID:     testTicket.AlertIDs[0],
+		Schema: "test.alert",
+		Data:   map[string]any{"test": "data"},
+	}
+	gt.NoError(t, repo.PutAlert(ctx, testAlert))
+
+	return &testTicket
+}
+
+func TestBluebellChat_ContextBlock_ZeroEntries(t *testing.T) {
+	ctx := setupTestContext(t)
+	repo := repository.NewMemory()
+	testTicket := setupTicketWithSlackThread(t, ctx, repo)
+	knowledgeSvc := svcknowledge.New(repo, newMockEmbeddingClient())
+	slackSvc, postedOptions := newTestSlackService(t)
+
+	var mu sync.Mutex
+	sessionCount := 0
+	mockLLM := &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			mu.Lock()
+			sessionCount++
+			sc := sessionCount
+			mu.Unlock()
+
+			ssn := newMockSession()
+			if sc == 1 {
+				// Resolver session (0 entries: resolver only)
+				ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{`{"prompt_id":"default","intent":"Investigate root cause of the alert."}`},
+					}, nil
+				}
+			} else {
+				// Planning session
+				ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{`{"message": "Direct response.", "tasks": []}`},
+					}, nil
+				}
+			}
+			return ssn, nil
+		},
+	}
+
+	chatUC, err := bluebell.New(repo, mockLLM,
+		bluebell.WithKnowledgeService(knowledgeSvc),
+		bluebell.WithSlackService(slackSvc),
+		// No WithPromptEntries — 0 entries, resolver still runs
+	)
+	gt.NoError(t, err)
+
+	err = chatUC.Execute(ctx, &chat.RunContext{
+		Session: newDummySession(testTicket.ID),
+		Message: "Investigate this alert",
+		ChatCtx: &chatModel.ChatContext{Ticket: testTicket},
+	})
+	gt.NoError(t, err)
+
+	// Verify context block with "(default)" was posted
+	found := false
+	for _, opt := range *postedOptions {
+		rendered := renderMsgOption(opt)
+		if strings.Contains(rendered, "Prompt:") && strings.Contains(rendered, "(default)") {
+			found = true
+			break
+		}
+	}
+	gt.True(t, found)
+}
+
+func TestBluebellChat_ContextBlock_WithPromptEntry(t *testing.T) {
+	ctx := setupTestContext(t)
+	repo := repository.NewMemory()
+	testTicket := setupTicketWithSlackThread(t, ctx, repo)
+	knowledgeSvc := svcknowledge.New(repo, newMockEmbeddingClient())
+	slackSvc, postedOptions := newTestSlackService(t)
+
+	entries := []config.PromptEntry{
+		{ID: "security", Name: "Security Investigation", Description: "Security threat investigation"},
+	}
+
+	var mu sync.Mutex
+	sessionCount := 0
+	mockLLM := &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			mu.Lock()
+			sessionCount++
+			sc := sessionCount
+			mu.Unlock()
+
+			ssn := newMockSession()
+			if sc == 1 {
+				// Selector session
+				ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{`{"prompt_id":"security","intent":"Investigate credential compromise."}`},
+					}, nil
+				}
+			} else {
+				// Planning session
+				ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
+					return &gollem.Response{
+						Texts: []string{`{"message": "Direct response.", "tasks": []}`},
+					}, nil
+				}
+			}
+			return ssn, nil
+		},
+	}
+
+	chatUC, err := bluebell.New(repo, mockLLM,
+		bluebell.WithKnowledgeService(knowledgeSvc),
+		bluebell.WithSlackService(slackSvc),
+		bluebell.WithPromptEntries(entries),
+	)
+	gt.NoError(t, err)
+
+	err = chatUC.Execute(ctx, &chat.RunContext{
+		Session: newDummySession(testTicket.ID),
+		Message: "Check suspicious login",
+		ChatCtx: &chatModel.ChatContext{Ticket: testTicket},
+	})
+	gt.NoError(t, err)
+
+	// Verify context block with prompt name was posted
+	found := false
+	for _, opt := range *postedOptions {
+		rendered := renderMsgOption(opt)
+		if strings.Contains(rendered, "Prompt:") && strings.Contains(rendered, "Security Investigation") {
+			found = true
+			break
+		}
+	}
+	gt.True(t, found)
+}
+
+func TestBluebellChat_ContextBlock_NoSlackThread(t *testing.T) {
+	ctx := setupTestContext(t)
+	repo := repository.NewMemory()
+	// Ticket WITHOUT SlackThread
+	testTicket := setupTicketAndAlert(t, ctx, repo)
+	knowledgeSvc := svcknowledge.New(repo, newMockEmbeddingClient())
+	slackSvc, postedOptions := newTestSlackService(t)
+
+	mockLLM := &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			ssn := newMockSession()
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
+				return &gollem.Response{
+					Texts: []string{`{"message": "Direct response.", "tasks": []}`},
+				}, nil
+			}
+			return ssn, nil
+		},
+	}
+
+	chatUC, err := bluebell.New(repo, mockLLM,
+		bluebell.WithKnowledgeService(knowledgeSvc),
+		bluebell.WithSlackService(slackSvc),
+	)
+	gt.NoError(t, err)
+
+	err = chatUC.Execute(ctx, &chat.RunContext{
+		Session: newDummySession(testTicket.ID),
+		Message: "Test without slack thread",
+		ChatCtx: &chatModel.ChatContext{Ticket: testTicket},
+	})
+	gt.NoError(t, err)
+
+	// No context block should be posted (no SlackThread)
+	for _, opt := range *postedOptions {
+		rendered := renderMsgOption(opt)
+		gt.V(t, strings.Contains(rendered, "Prompt:")).Equal(false)
+	}
+}
+
+// renderMsgOption extracts the blocks JSON from a slack.MsgOption for test assertions.
+func renderMsgOption(opt slack.MsgOption) string {
+	_, values, _ := slack.UnsafeApplyMsgOptions("", "", "", opt)
+	return values.Get("blocks")
 }
 
 func TestBluebellChat_Ticketless(t *testing.T) {
