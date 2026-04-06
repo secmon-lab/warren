@@ -2,7 +2,6 @@ package bluebell_test
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"sync"
 	"testing"
@@ -10,31 +9,25 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gt"
-	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
+	"github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/usecase/chat/bluebell"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
-func newMockPolicyClient(t *testing.T) *mock.PolicyClientMock {
-	t.Helper()
-	return &mock.PolicyClientMock{
-		QueryFunc: func(ctx context.Context, query string, input, result any, opts ...opaq.QueryOption) error {
-			if query == "data.auth.agent" {
-				gt.NoError(t, json.Unmarshal([]byte(`{"allow":true}`), &result))
-			}
-			return nil
-		},
-		SourcesFunc: func() map[string]string {
-			return map[string]string{}
-		},
+func newDummySession(ticketID types.TicketID) *session.Session {
+	return &session.Session{
+		ID:       types.NewSessionID(),
+		TicketID: ticketID,
+		Status:   types.SessionStatusRunning,
 	}
 }
 
@@ -96,9 +89,8 @@ func setupTicketAndAlert(t *testing.T, ctx context.Context, repo *repository.Mem
 func TestBluebellChat_NewRequiresKnowledgeService(t *testing.T) {
 	repo := repository.NewMemory()
 	mockLLM := &mock.LLMClientMock{}
-	mockPolicy := newMockPolicyClient(t)
 
-	_, err := bluebell.New(repo, mockLLM, mockPolicy)
+	_, err := bluebell.New(repo, mockLLM)
 	gt.V(t, err).NotNil()
 	gt.True(t, strings.Contains(err.Error(), "requires knowledge service"))
 }
@@ -121,13 +113,16 @@ func TestBluebellChat_DirectResponse(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM, newMockPolicyClient(t),
-		bluebell.WithNoAuthorization(true),
+	chatUC, err := bluebell.New(repo, mockLLM,
 		bluebell.WithKnowledgeService(knowledgeSvc),
 	)
 	gt.NoError(t, err)
 
-	err = chatUC.Execute(ctx, "What is the meaning of life?", chatModel.ChatContext{Ticket: testTicket})
+	err = chatUC.Execute(ctx, &chat.RunContext{
+		Session: newDummySession(testTicket.ID),
+		Message: "What is the meaning of life?",
+		ChatCtx: &chatModel.ChatContext{Ticket: testTicket},
+	})
 	gt.NoError(t, err)
 }
 
@@ -182,13 +177,16 @@ func TestBluebellChat_SinglePhaseWithTasks(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM, newMockPolicyClient(t),
-		bluebell.WithNoAuthorization(true),
+	chatUC, err := bluebell.New(repo, mockLLM,
 		bluebell.WithKnowledgeService(knowledgeSvc),
 	)
 	gt.NoError(t, err)
 
-	err = chatUC.Execute(ctx, "Analyze this alert", chatModel.ChatContext{Ticket: testTicket})
+	err = chatUC.Execute(ctx, &chat.RunContext{
+		Session: newDummySession(testTicket.ID),
+		Message: "Analyze this alert",
+		ChatCtx: &chatModel.ChatContext{Ticket: testTicket},
+	})
 	gt.NoError(t, err)
 }
 
@@ -234,14 +232,17 @@ func TestBluebellChat_WithPromptEntries_IntentInjected(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM, newMockPolicyClient(t),
-		bluebell.WithNoAuthorization(true),
+	chatUC, err := bluebell.New(repo, mockLLM,
 		bluebell.WithKnowledgeService(knowledgeSvc),
 		bluebell.WithPromptEntries(entries),
 	)
 	gt.NoError(t, err)
 
-	err = chatUC.Execute(ctx, "Check this alert", chatModel.ChatContext{Ticket: testTicket})
+	err = chatUC.Execute(ctx, &chat.RunContext{
+		Session: newDummySession(testTicket.ID),
+		Message: "Check this alert",
+		ChatCtx: &chatModel.ChatContext{Ticket: testTicket},
+	})
 	gt.NoError(t, err)
 }
 
@@ -278,14 +279,17 @@ func TestBluebellChat_MaxPhasesLimit(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM, newMockPolicyClient(t),
-		bluebell.WithNoAuthorization(true),
+	chatUC, err := bluebell.New(repo, mockLLM,
 		bluebell.WithKnowledgeService(knowledgeSvc),
 		bluebell.WithMaxPhases(2),
 	)
 	gt.NoError(t, err)
 
-	err = chatUC.Execute(ctx, "Do something", chatModel.ChatContext{Ticket: testTicket})
+	err = chatUC.Execute(ctx, &chat.RunContext{
+		Session: newDummySession(testTicket.ID),
+		Message: "Do something",
+		ChatCtx: &chatModel.ChatContext{Ticket: testTicket},
+	})
 	gt.NoError(t, err)
 }
 
@@ -340,13 +344,16 @@ func TestBluebellChat_ErrorIsolation(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM, newMockPolicyClient(t),
-		bluebell.WithNoAuthorization(true),
+	chatUC, err := bluebell.New(repo, mockLLM,
 		bluebell.WithKnowledgeService(knowledgeSvc),
 	)
 	gt.NoError(t, err)
 
-	err = chatUC.Execute(ctx, "Test error isolation", chatModel.ChatContext{Ticket: testTicket})
+	err = chatUC.Execute(ctx, &chat.RunContext{
+		Session: newDummySession(testTicket.ID),
+		Message: "Test error isolation",
+		ChatCtx: &chatModel.ChatContext{Ticket: testTicket},
+	})
 	gt.NoError(t, err)
 }
 
@@ -367,15 +374,18 @@ func TestBluebellChat_Ticketless(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM, newMockPolicyClient(t),
-		bluebell.WithNoAuthorization(true),
+	chatUC, err := bluebell.New(repo, mockLLM,
 		bluebell.WithKnowledgeService(knowledgeSvc),
 	)
 	gt.NoError(t, err)
 
 	// Ticketless: empty ticket
-	err = chatUC.Execute(ctx, "General question", chatModel.ChatContext{
-		Ticket: &ticket.Ticket{},
+	err = chatUC.Execute(ctx, &chat.RunContext{
+		Session: newDummySession(""),
+		Message: "General question",
+		ChatCtx: &chatModel.ChatContext{
+			Ticket: &ticket.Ticket{},
+		},
 	})
 	gt.NoError(t, err)
 }

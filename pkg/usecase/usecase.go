@@ -19,7 +19,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/notifier"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/tag"
-	chatUC "github.com/secmon-lab/warren/pkg/usecase/chat/aster"
+	chatuc "github.com/secmon-lab/warren/pkg/usecase/chat"
+	"github.com/secmon-lab/warren/pkg/usecase/chat/aster"
 )
 
 var (
@@ -233,17 +234,27 @@ func New(opts ...Option) *UseCases {
 
 	// Initialize chat use case (only if not already set via WithChatUseCase)
 	if u.ChatUC == nil {
-		chatOpts := []chatUC.Option{
-			chatUC.WithSlackService(u.slackService),
-			chatUC.WithTools(u.tools),
-			chatUC.WithStorageClient(u.storageClient),
-			chatUC.WithStoragePrefix(u.storagePrefix),
-			chatUC.WithNoAuthorization(u.noAuthorization),
-			chatUC.WithFrontendURL(u.frontendURL),
-			chatUC.WithUserSystemPrompt(u.userSystemPrompt),
-			chatUC.WithTraceRepository(u.traceRepository),
+		asterOpts := []aster.Option{
+			aster.WithTools(u.tools),
+			aster.WithStorageClient(u.storageClient),
+			aster.WithStoragePrefix(u.storagePrefix),
+			aster.WithUserSystemPrompt(u.userSystemPrompt),
+			aster.WithTraceRepository(u.traceRepository),
 		}
-		u.ChatUC = chatUC.New(u.repository, u.llmClient, u.policyClient, chatOpts...)
+		if u.slackService != nil {
+			asterOpts = append(asterOpts, aster.WithSlackService(u.slackService))
+		}
+		asterStrategy := aster.New(u.repository, u.llmClient, asterOpts...)
+		commonOpts := []chatuc.Option{
+			chatuc.WithRepository(u.repository),
+			chatuc.WithPolicyClient(u.policyClient),
+			chatuc.WithNoAuthorization(u.noAuthorization),
+			chatuc.WithFrontendURL(u.frontendURL),
+		}
+		if u.slackService != nil {
+			commonOpts = append(commonOpts, chatuc.WithSlackService(u.slackService))
+		}
+		u.ChatUC = chatuc.NewUseCase(asterStrategy, commonOpts...)
 	}
 
 	// Initialize tag use case if tag service is available

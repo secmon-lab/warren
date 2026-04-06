@@ -1,10 +1,8 @@
 package aster
 
 import (
-	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/usecase/chat"
 )
 
-var (
-	// ErrSessionAborted is returned when a session is aborted by user request
-	ErrSessionAborted = goerr.New("session aborted by user")
-)
+// ErrSessionAborted is an alias for chat.ErrSessionAborted for backward compatibility.
+var ErrSessionAborted = chat.ErrSessionAborted
