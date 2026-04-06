@@ -55,11 +55,10 @@ type promptSummary struct {
 }
 
 // resolveIntent performs prompt selection and intent resolution.
-// Returns nil if no prompt entries are configured (default behavior).
+// When no prompt entries are configured, it still runs the resolver
+// (XY Problem Detection + Intent Resolution) without prompt selection.
 func (c *BluebellChat) resolveIntent(ctx context.Context, message string, chatCtx *chatModel.ChatContext) (*ResolvedIntent, error) {
-	if len(c.promptEntries) == 0 {
-		return nil, nil
-	}
+	logger := logging.From(ctx)
 
 	// Build selector template data — only id + description, NOT Content
 	summaries := make([]promptSummary, len(c.promptEntries))
@@ -76,7 +75,7 @@ func (c *BluebellChat) resolveIntent(ctx context.Context, message string, chatCt
 	tmplData := selectorTemplateData{
 		Message: message,
 		Context: ctxData,
-		Prompts: summaries,
+		Prompts: summaries, // empty when 0 entries — template adapts via {{ if .Prompts }}
 	}
 
 	selectorPrompt, err := prompt.GenerateWithStruct(ctx, selectorPromptTemplate, tmplData)
@@ -84,12 +83,17 @@ func (c *BluebellChat) resolveIntent(ctx context.Context, message string, chatCt
 		return nil, goerr.Wrap(err, "failed to generate selector prompt")
 	}
 
+	logger.Debug("intent resolution: starting", "prompt_entries", len(c.promptEntries))
+
 	// For single candidate, skip selection but still resolve intent
 	if len(c.promptEntries) == 1 {
 		return c.resolveIntentForSinglePrompt(ctx, selectorPrompt, c.promptEntries[0])
 	}
 
-	// Multiple candidates: selection + intent resolution in one LLM call
+	// 0 or 2+ candidates: run selector + intent resolution in one LLM call.
+	// When 0 entries, the template omits the prompt selection step and the LLM
+	// returns "default"; resolveIntentWithSelection handles this via the
+	// prompt_id == "default" pass-through.
 	return c.resolveIntentWithSelection(ctx, selectorPrompt, c.promptEntries)
 }
 
@@ -149,7 +153,7 @@ func (c *BluebellChat) resolveIntentWithSelection(ctx context.Context, selectorP
 	resolved, err := parseSelectorResult(resp.Texts)
 	if err != nil {
 		logger.Warn("failed to parse selector result, falling back to default", "error", err)
-		return nil, nil
+		return &ResolvedIntent{PromptID: "default", Intent: ""}, nil
 	}
 
 	// Validate the selected prompt_id exists and set name
@@ -165,7 +169,8 @@ func (c *BluebellChat) resolveIntentWithSelection(ctx context.Context, selectorP
 		if !found {
 			logger.Warn("selector returned unknown prompt_id, falling back to default",
 				"prompt_id", resolved.PromptID)
-			return nil, nil
+			resolved.PromptID = "default"
+			resolved.PromptName = ""
 		}
 	}
 
