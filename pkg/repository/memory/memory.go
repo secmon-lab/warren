@@ -9,7 +9,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	"github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
-	"github.com/secmon-lab/warren/pkg/domain/model/memory"
+
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/refine"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"
@@ -19,11 +19,11 @@ import (
 )
 
 type Memory struct {
-	mu          sync.RWMutex
-	activityMu  sync.RWMutex
-	tagMu       sync.RWMutex
-	noticeMu    sync.RWMutex
-	memoryMu    sync.RWMutex
+	mu         sync.RWMutex
+	activityMu sync.RWMutex
+	tagMu      sync.RWMutex
+	noticeMu   sync.RWMutex
+
 	diagnosisMu sync.RWMutex
 
 	alerts         map[types.AlertID]*alert.Alert
@@ -36,8 +36,6 @@ type Memory struct {
 	tagsV2         map[string]*tag.Tag // New ID-based tags
 	notices        map[types.NoticeID]*notice.Notice
 	refineGroups   map[types.RefineGroupID]*refine.Group
-	agentMemories  map[types.AgentMemoryID]*memory.AgentMemory
-
 	// Diagnosis management
 	diagnoses       map[types.DiagnosisID]*diagnosis.Diagnosis
 	diagnosisIssues map[types.DiagnosisID]map[string]*diagnosis.Issue
@@ -69,17 +67,17 @@ var _ interfaces.Repository = &Memory{}
 
 func New() *Memory {
 	return &Memory{
-		alerts:             make(map[types.AlertID]*alert.Alert),
-		lists:              make(map[types.AlertListID]*alert.List),
-		histories:          make(map[types.TicketID][]*ticket.History),
-		tickets:            make(map[types.TicketID]*ticket.Ticket),
-		ticketComments:     make(map[types.TicketID][]ticket.Comment),
-		tokens:             make(map[auth.TokenID]*auth.Token),
-		activities:         make(map[types.ActivityID]*activity.Activity),
-		tagsV2:             make(map[string]*tag.Tag),
-		notices:            make(map[types.NoticeID]*notice.Notice),
-		refineGroups:       make(map[types.RefineGroupID]*refine.Group),
-		agentMemories:      make(map[types.AgentMemoryID]*memory.AgentMemory),
+		alerts:         make(map[types.AlertID]*alert.Alert),
+		lists:          make(map[types.AlertListID]*alert.List),
+		histories:      make(map[types.TicketID][]*ticket.History),
+		tickets:        make(map[types.TicketID]*ticket.Ticket),
+		ticketComments: make(map[types.TicketID][]ticket.Comment),
+		tokens:         make(map[auth.TokenID]*auth.Token),
+		activities:     make(map[types.ActivityID]*activity.Activity),
+		tagsV2:         make(map[string]*tag.Tag),
+		notices:        make(map[types.NoticeID]*notice.Notice),
+		refineGroups:   make(map[types.RefineGroupID]*refine.Group),
+
 		diagnoses:          make(map[types.DiagnosisID]*diagnosis.Diagnosis),
 		diagnosisIssues:    make(map[types.DiagnosisID]map[string]*diagnosis.Issue),
 		session:            newSessionStore(),
