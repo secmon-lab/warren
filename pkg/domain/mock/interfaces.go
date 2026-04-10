@@ -15,7 +15,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
 	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
-	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/refine"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
@@ -2724,9 +2723,6 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			BatchPutAlertsFunc: func(ctx context.Context, alerts alert.Alerts) error {
 //				panic("mock out the BatchPutAlerts method")
 //			},
-//			BatchSaveAgentMemoriesFunc: func(ctx context.Context, memories []*memory.AgentMemory) error {
-//				panic("mock out the BatchSaveAgentMemories method")
-//			},
 //			BatchUpdateTicketsStatusFunc: func(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error {
 //				panic("mock out the BatchUpdateTicketsStatus method")
 //			},
@@ -2763,9 +2759,6 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			CreateTagWithIDFunc: func(ctx context.Context, tagMoqParam *tag.Tag) error {
 //				panic("mock out the CreateTagWithID method")
 //			},
-//			DeleteAgentMemoriesBatchFunc: func(ctx context.Context, agentID string, memoryIDs []types.AgentMemoryID) (int, error) {
-//				panic("mock out the DeleteAgentMemoriesBatch method")
-//			},
 //			DeleteKnowledgeFunc: func(ctx context.Context, id types.KnowledgeID) error {
 //				panic("mock out the DeleteKnowledge method")
 //			},
@@ -2795,9 +2788,6 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			GetActivitiesFunc: func(ctx context.Context, offset int, limit int) ([]*activity.Activity, error) {
 //				panic("mock out the GetActivities method")
-//			},
-//			GetAgentMemoryFunc: func(ctx context.Context, agentID string, id types.AgentMemoryID) (*memory.AgentMemory, error) {
-//				panic("mock out the GetAgentMemory method")
 //			},
 //			GetAlertFunc: func(ctx context.Context, alertID types.AlertID) (*alert.Alert, error) {
 //				panic("mock out the GetAlert method")
@@ -2934,15 +2924,6 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			IsTagNameExistsFunc: func(ctx context.Context, name string) (bool, error) {
 //				panic("mock out the IsTagNameExists method")
 //			},
-//			ListAgentMemoriesFunc: func(ctx context.Context, agentID string) ([]*memory.AgentMemory, error) {
-//				panic("mock out the ListAgentMemories method")
-//			},
-//			ListAgentMemoriesWithOptionsFunc: func(ctx context.Context, agentID string, opts interfaces.AgentMemoryListOptions) ([]*memory.AgentMemory, int, error) {
-//				panic("mock out the ListAgentMemoriesWithOptions method")
-//			},
-//			ListAllAgentIDsFunc: func(ctx context.Context) ([]*interfaces.AgentSummary, error) {
-//				panic("mock out the ListAllAgentIDs method")
-//			},
 //			ListAllKnowledgesFunc: func(ctx context.Context) ([]*knowledge.Knowledge, error) {
 //				panic("mock out the ListAllKnowledges method")
 //			},
@@ -3045,14 +3026,8 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			RemoveTagIDFromAllTicketsFunc: func(ctx context.Context, tagID string) error {
 //				panic("mock out the RemoveTagIDFromAllTickets method")
 //			},
-//			SaveAgentMemoryFunc: func(ctx context.Context, mem *memory.AgentMemory) error {
-//				panic("mock out the SaveAgentMemory method")
-//			},
 //			SearchAlertsFunc: func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
 //				panic("mock out the SearchAlerts method")
-//			},
-//			SearchMemoriesByEmbeddingFunc: func(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error) {
-//				panic("mock out the SearchMemoriesByEmbedding method")
 //			},
 //			SearchQueuedAlertsFunc: func(ctx context.Context, keyword string, offset int, limit int) ([]*alert.QueuedAlert, int, error) {
 //				panic("mock out the SearchQueuedAlerts method")
@@ -3065,9 +3040,6 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			UpdateHITLRequestStatusFunc: func(ctx context.Context, id types.HITLRequestID, status hitl.Status, respondedBy string, response map[string]any) error {
 //				panic("mock out the UpdateHITLRequestStatus method")
-//			},
-//			UpdateMemoryScoreBatchFunc: func(ctx context.Context, agentID string, updates map[types.AgentMemoryID]struct{Score float64; LastUsedAt time.Time}) error {
-//				panic("mock out the UpdateMemoryScoreBatch method")
 //			},
 //			UpdateNoticeFunc: func(ctx context.Context, noticeMoqParam *notice.Notice) error {
 //				panic("mock out the UpdateNotice method")
@@ -3099,9 +3071,6 @@ type RepositoryMock struct {
 
 	// BatchPutAlertsFunc mocks the BatchPutAlerts method.
 	BatchPutAlertsFunc func(ctx context.Context, alerts alert.Alerts) error
-
-	// BatchSaveAgentMemoriesFunc mocks the BatchSaveAgentMemories method.
-	BatchSaveAgentMemoriesFunc func(ctx context.Context, memories []*memory.AgentMemory) error
 
 	// BatchUpdateTicketsStatusFunc mocks the BatchUpdateTicketsStatus method.
 	BatchUpdateTicketsStatusFunc func(ctx context.Context, ticketIDs []types.TicketID, status types.TicketStatus) error
@@ -3139,9 +3108,6 @@ type RepositoryMock struct {
 	// CreateTagWithIDFunc mocks the CreateTagWithID method.
 	CreateTagWithIDFunc func(ctx context.Context, tagMoqParam *tag.Tag) error
 
-	// DeleteAgentMemoriesBatchFunc mocks the DeleteAgentMemoriesBatch method.
-	DeleteAgentMemoriesBatchFunc func(ctx context.Context, agentID string, memoryIDs []types.AgentMemoryID) (int, error)
-
 	// DeleteKnowledgeFunc mocks the DeleteKnowledge method.
 	DeleteKnowledgeFunc func(ctx context.Context, id types.KnowledgeID) error
 
@@ -3171,9 +3137,6 @@ type RepositoryMock struct {
 
 	// GetActivitiesFunc mocks the GetActivities method.
 	GetActivitiesFunc func(ctx context.Context, offset int, limit int) ([]*activity.Activity, error)
-
-	// GetAgentMemoryFunc mocks the GetAgentMemory method.
-	GetAgentMemoryFunc func(ctx context.Context, agentID string, id types.AgentMemoryID) (*memory.AgentMemory, error)
 
 	// GetAlertFunc mocks the GetAlert method.
 	GetAlertFunc func(ctx context.Context, alertID types.AlertID) (*alert.Alert, error)
@@ -3310,15 +3273,6 @@ type RepositoryMock struct {
 	// IsTagNameExistsFunc mocks the IsTagNameExists method.
 	IsTagNameExistsFunc func(ctx context.Context, name string) (bool, error)
 
-	// ListAgentMemoriesFunc mocks the ListAgentMemories method.
-	ListAgentMemoriesFunc func(ctx context.Context, agentID string) ([]*memory.AgentMemory, error)
-
-	// ListAgentMemoriesWithOptionsFunc mocks the ListAgentMemoriesWithOptions method.
-	ListAgentMemoriesWithOptionsFunc func(ctx context.Context, agentID string, opts interfaces.AgentMemoryListOptions) ([]*memory.AgentMemory, int, error)
-
-	// ListAllAgentIDsFunc mocks the ListAllAgentIDs method.
-	ListAllAgentIDsFunc func(ctx context.Context) ([]*interfaces.AgentSummary, error)
-
 	// ListAllKnowledgesFunc mocks the ListAllKnowledges method.
 	ListAllKnowledgesFunc func(ctx context.Context) ([]*knowledge.Knowledge, error)
 
@@ -3421,14 +3375,8 @@ type RepositoryMock struct {
 	// RemoveTagIDFromAllTicketsFunc mocks the RemoveTagIDFromAllTickets method.
 	RemoveTagIDFromAllTicketsFunc func(ctx context.Context, tagID string) error
 
-	// SaveAgentMemoryFunc mocks the SaveAgentMemory method.
-	SaveAgentMemoryFunc func(ctx context.Context, mem *memory.AgentMemory) error
-
 	// SearchAlertsFunc mocks the SearchAlerts method.
 	SearchAlertsFunc func(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error)
-
-	// SearchMemoriesByEmbeddingFunc mocks the SearchMemoriesByEmbedding method.
-	SearchMemoriesByEmbeddingFunc func(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error)
 
 	// SearchQueuedAlertsFunc mocks the SearchQueuedAlerts method.
 	SearchQueuedAlertsFunc func(ctx context.Context, keyword string, offset int, limit int) ([]*alert.QueuedAlert, int, error)
@@ -3441,12 +3389,6 @@ type RepositoryMock struct {
 
 	// UpdateHITLRequestStatusFunc mocks the UpdateHITLRequestStatus method.
 	UpdateHITLRequestStatusFunc func(ctx context.Context, id types.HITLRequestID, status hitl.Status, respondedBy string, response map[string]any) error
-
-	// UpdateMemoryScoreBatchFunc mocks the UpdateMemoryScoreBatch method.
-	UpdateMemoryScoreBatchFunc func(ctx context.Context, agentID string, updates map[types.AgentMemoryID]struct {
-		Score      float64
-		LastUsedAt time.Time
-	}) error
 
 	// UpdateNoticeFunc mocks the UpdateNotice method.
 	UpdateNoticeFunc func(ctx context.Context, noticeMoqParam *notice.Notice) error
@@ -3495,13 +3437,6 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Alerts is the alerts argument value.
 			Alerts alert.Alerts
-		}
-		// BatchSaveAgentMemories holds details about calls to the BatchSaveAgentMemories method.
-		BatchSaveAgentMemories []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Memories is the memories argument value.
-			Memories []*memory.AgentMemory
 		}
 		// BatchUpdateTicketsStatus holds details about calls to the BatchUpdateTicketsStatus method.
 		BatchUpdateTicketsStatus []struct {
@@ -3591,15 +3526,6 @@ type RepositoryMock struct {
 			// TagMoqParam is the tagMoqParam argument value.
 			TagMoqParam *tag.Tag
 		}
-		// DeleteAgentMemoriesBatch holds details about calls to the DeleteAgentMemoriesBatch method.
-		DeleteAgentMemoriesBatch []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// AgentID is the agentID argument value.
-			AgentID string
-			// MemoryIDs is the memoryIDs argument value.
-			MemoryIDs []types.AgentMemoryID
-		}
 		// DeleteKnowledge holds details about calls to the DeleteKnowledge method.
 		DeleteKnowledge []struct {
 			// Ctx is the ctx argument value.
@@ -3681,15 +3607,6 @@ type RepositoryMock struct {
 			Offset int
 			// Limit is the limit argument value.
 			Limit int
-		}
-		// GetAgentMemory holds details about calls to the GetAgentMemory method.
-		GetAgentMemory []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// AgentID is the agentID argument value.
-			AgentID string
-			// ID is the id argument value.
-			ID types.AgentMemoryID
 		}
 		// GetAlert holds details about calls to the GetAlert method.
 		GetAlert []struct {
@@ -4030,27 +3947,6 @@ type RepositoryMock struct {
 			// Name is the name argument value.
 			Name string
 		}
-		// ListAgentMemories holds details about calls to the ListAgentMemories method.
-		ListAgentMemories []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// AgentID is the agentID argument value.
-			AgentID string
-		}
-		// ListAgentMemoriesWithOptions holds details about calls to the ListAgentMemoriesWithOptions method.
-		ListAgentMemoriesWithOptions []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// AgentID is the agentID argument value.
-			AgentID string
-			// Opts is the opts argument value.
-			Opts interfaces.AgentMemoryListOptions
-		}
-		// ListAllAgentIDs holds details about calls to the ListAllAgentIDs method.
-		ListAllAgentIDs []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-		}
 		// ListAllKnowledges holds details about calls to the ListAllKnowledges method.
 		ListAllKnowledges []struct {
 			// Ctx is the ctx argument value.
@@ -4299,13 +4195,6 @@ type RepositoryMock struct {
 			// TagID is the tagID argument value.
 			TagID string
 		}
-		// SaveAgentMemory holds details about calls to the SaveAgentMemory method.
-		SaveAgentMemory []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Mem is the mem argument value.
-			Mem *memory.AgentMemory
-		}
 		// SearchAlerts holds details about calls to the SearchAlerts method.
 		SearchAlerts []struct {
 			// Ctx is the ctx argument value.
@@ -4316,17 +4205,6 @@ type RepositoryMock struct {
 			Op string
 			// Value is the value argument value.
 			Value any
-			// Limit is the limit argument value.
-			Limit int
-		}
-		// SearchMemoriesByEmbedding holds details about calls to the SearchMemoriesByEmbedding method.
-		SearchMemoriesByEmbedding []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// AgentID is the agentID argument value.
-			AgentID string
-			// Embedding is the embedding argument value.
-			Embedding []float32
 			// Limit is the limit argument value.
 			Limit int
 		}
@@ -4370,18 +4248,6 @@ type RepositoryMock struct {
 			// Response is the response argument value.
 			Response map[string]any
 		}
-		// UpdateMemoryScoreBatch holds details about calls to the UpdateMemoryScoreBatch method.
-		UpdateMemoryScoreBatch []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// AgentID is the agentID argument value.
-			AgentID string
-			// Updates is the updates argument value.
-			Updates map[types.AgentMemoryID]struct {
-				Score      float64
-				LastUsedAt time.Time
-			}
-		}
 		// UpdateNotice holds details about calls to the UpdateNotice method.
 		UpdateNotice []struct {
 			// Ctx is the ctx argument value.
@@ -4409,7 +4275,6 @@ type RepositoryMock struct {
 	lockBatchGetDiagnosisIssueCounts    sync.RWMutex
 	lockBatchGetTickets                 sync.RWMutex
 	lockBatchPutAlerts                  sync.RWMutex
-	lockBatchSaveAgentMemories          sync.RWMutex
 	lockBatchUpdateTicketsStatus        sync.RWMutex
 	lockBindAlertsToTicket              sync.RWMutex
 	lockCheckAlertThrottle              sync.RWMutex
@@ -4422,7 +4287,6 @@ type RepositoryMock struct {
 	lockCountTicketsByStatus            sync.RWMutex
 	lockCreateNotice                    sync.RWMutex
 	lockCreateTagWithID                 sync.RWMutex
-	lockDeleteAgentMemoriesBatch        sync.RWMutex
 	lockDeleteKnowledge                 sync.RWMutex
 	lockDeleteKnowledgeTag              sync.RWMutex
 	lockDeleteQueuedAlerts              sync.RWMutex
@@ -4433,7 +4297,6 @@ type RepositoryMock struct {
 	lockFindNearestTickets              sync.RWMutex
 	lockFindNearestTicketsWithSpan      sync.RWMutex
 	lockGetActivities                   sync.RWMutex
-	lockGetAgentMemory                  sync.RWMutex
 	lockGetAlert                        sync.RWMutex
 	lockGetAlertList                    sync.RWMutex
 	lockGetAlertListByThread            sync.RWMutex
@@ -4479,9 +4342,6 @@ type RepositoryMock struct {
 	lockGetTicketsWithInvalidEmbedding  sync.RWMutex
 	lockGetToken                        sync.RWMutex
 	lockIsTagNameExists                 sync.RWMutex
-	lockListAgentMemories               sync.RWMutex
-	lockListAgentMemoriesWithOptions    sync.RWMutex
-	lockListAllAgentIDs                 sync.RWMutex
 	lockListAllKnowledges               sync.RWMutex
 	lockListAllTags                     sync.RWMutex
 	lockListDiagnoses                   sync.RWMutex
@@ -4516,14 +4376,11 @@ type RepositoryMock struct {
 	lockRemoveTagFromAllTickets         sync.RWMutex
 	lockRemoveTagIDFromAllAlerts        sync.RWMutex
 	lockRemoveTagIDFromAllTickets       sync.RWMutex
-	lockSaveAgentMemory                 sync.RWMutex
 	lockSearchAlerts                    sync.RWMutex
-	lockSearchMemoriesByEmbedding       sync.RWMutex
 	lockSearchQueuedAlerts              sync.RWMutex
 	lockUnbindAlertFromTicket           sync.RWMutex
 	lockUpdateAlertStatus               sync.RWMutex
 	lockUpdateHITLRequestStatus         sync.RWMutex
-	lockUpdateMemoryScoreBatch          sync.RWMutex
 	lockUpdateNotice                    sync.RWMutex
 	lockUpdateTag                       sync.RWMutex
 	lockWatchHITLRequest                sync.RWMutex
@@ -4729,45 +4586,6 @@ func (mock *RepositoryMock) BatchPutAlertsCalls() []struct {
 	mock.lockBatchPutAlerts.RLock()
 	calls = mock.calls.BatchPutAlerts
 	mock.lockBatchPutAlerts.RUnlock()
-	return calls
-}
-
-// BatchSaveAgentMemories calls BatchSaveAgentMemoriesFunc.
-func (mock *RepositoryMock) BatchSaveAgentMemories(ctx context.Context, memories []*memory.AgentMemory) error {
-	callInfo := struct {
-		Ctx      context.Context
-		Memories []*memory.AgentMemory
-	}{
-		Ctx:      ctx,
-		Memories: memories,
-	}
-	mock.lockBatchSaveAgentMemories.Lock()
-	mock.calls.BatchSaveAgentMemories = append(mock.calls.BatchSaveAgentMemories, callInfo)
-	mock.lockBatchSaveAgentMemories.Unlock()
-	if mock.BatchSaveAgentMemoriesFunc == nil {
-		var (
-			errOut error
-		)
-		return errOut
-	}
-	return mock.BatchSaveAgentMemoriesFunc(ctx, memories)
-}
-
-// BatchSaveAgentMemoriesCalls gets all the calls that were made to BatchSaveAgentMemories.
-// Check the length with:
-//
-//	len(mockedRepository.BatchSaveAgentMemoriesCalls())
-func (mock *RepositoryMock) BatchSaveAgentMemoriesCalls() []struct {
-	Ctx      context.Context
-	Memories []*memory.AgentMemory
-} {
-	var calls []struct {
-		Ctx      context.Context
-		Memories []*memory.AgentMemory
-	}
-	mock.lockBatchSaveAgentMemories.RLock()
-	calls = mock.calls.BatchSaveAgentMemories
-	mock.lockBatchSaveAgentMemories.RUnlock()
 	return calls
 }
 
@@ -5255,50 +5073,6 @@ func (mock *RepositoryMock) CreateTagWithIDCalls() []struct {
 	return calls
 }
 
-// DeleteAgentMemoriesBatch calls DeleteAgentMemoriesBatchFunc.
-func (mock *RepositoryMock) DeleteAgentMemoriesBatch(ctx context.Context, agentID string, memoryIDs []types.AgentMemoryID) (int, error) {
-	callInfo := struct {
-		Ctx       context.Context
-		AgentID   string
-		MemoryIDs []types.AgentMemoryID
-	}{
-		Ctx:       ctx,
-		AgentID:   agentID,
-		MemoryIDs: memoryIDs,
-	}
-	mock.lockDeleteAgentMemoriesBatch.Lock()
-	mock.calls.DeleteAgentMemoriesBatch = append(mock.calls.DeleteAgentMemoriesBatch, callInfo)
-	mock.lockDeleteAgentMemoriesBatch.Unlock()
-	if mock.DeleteAgentMemoriesBatchFunc == nil {
-		var (
-			nOut   int
-			errOut error
-		)
-		return nOut, errOut
-	}
-	return mock.DeleteAgentMemoriesBatchFunc(ctx, agentID, memoryIDs)
-}
-
-// DeleteAgentMemoriesBatchCalls gets all the calls that were made to DeleteAgentMemoriesBatch.
-// Check the length with:
-//
-//	len(mockedRepository.DeleteAgentMemoriesBatchCalls())
-func (mock *RepositoryMock) DeleteAgentMemoriesBatchCalls() []struct {
-	Ctx       context.Context
-	AgentID   string
-	MemoryIDs []types.AgentMemoryID
-} {
-	var calls []struct {
-		Ctx       context.Context
-		AgentID   string
-		MemoryIDs []types.AgentMemoryID
-	}
-	mock.lockDeleteAgentMemoriesBatch.RLock()
-	calls = mock.calls.DeleteAgentMemoriesBatch
-	mock.lockDeleteAgentMemoriesBatch.RUnlock()
-	return calls
-}
-
 // DeleteKnowledge calls DeleteKnowledgeFunc.
 func (mock *RepositoryMock) DeleteKnowledge(ctx context.Context, id types.KnowledgeID) error {
 	callInfo := struct {
@@ -5714,50 +5488,6 @@ func (mock *RepositoryMock) GetActivitiesCalls() []struct {
 	mock.lockGetActivities.RLock()
 	calls = mock.calls.GetActivities
 	mock.lockGetActivities.RUnlock()
-	return calls
-}
-
-// GetAgentMemory calls GetAgentMemoryFunc.
-func (mock *RepositoryMock) GetAgentMemory(ctx context.Context, agentID string, id types.AgentMemoryID) (*memory.AgentMemory, error) {
-	callInfo := struct {
-		Ctx     context.Context
-		AgentID string
-		ID      types.AgentMemoryID
-	}{
-		Ctx:     ctx,
-		AgentID: agentID,
-		ID:      id,
-	}
-	mock.lockGetAgentMemory.Lock()
-	mock.calls.GetAgentMemory = append(mock.calls.GetAgentMemory, callInfo)
-	mock.lockGetAgentMemory.Unlock()
-	if mock.GetAgentMemoryFunc == nil {
-		var (
-			agentMemoryOut *memory.AgentMemory
-			errOut         error
-		)
-		return agentMemoryOut, errOut
-	}
-	return mock.GetAgentMemoryFunc(ctx, agentID, id)
-}
-
-// GetAgentMemoryCalls gets all the calls that were made to GetAgentMemory.
-// Check the length with:
-//
-//	len(mockedRepository.GetAgentMemoryCalls())
-func (mock *RepositoryMock) GetAgentMemoryCalls() []struct {
-	Ctx     context.Context
-	AgentID string
-	ID      types.AgentMemoryID
-} {
-	var calls []struct {
-		Ctx     context.Context
-		AgentID string
-		ID      types.AgentMemoryID
-	}
-	mock.lockGetAgentMemory.RLock()
-	calls = mock.calls.GetAgentMemory
-	mock.lockGetAgentMemory.RUnlock()
 	return calls
 }
 
@@ -7609,127 +7339,6 @@ func (mock *RepositoryMock) IsTagNameExistsCalls() []struct {
 	return calls
 }
 
-// ListAgentMemories calls ListAgentMemoriesFunc.
-func (mock *RepositoryMock) ListAgentMemories(ctx context.Context, agentID string) ([]*memory.AgentMemory, error) {
-	callInfo := struct {
-		Ctx     context.Context
-		AgentID string
-	}{
-		Ctx:     ctx,
-		AgentID: agentID,
-	}
-	mock.lockListAgentMemories.Lock()
-	mock.calls.ListAgentMemories = append(mock.calls.ListAgentMemories, callInfo)
-	mock.lockListAgentMemories.Unlock()
-	if mock.ListAgentMemoriesFunc == nil {
-		var (
-			agentMemorysOut []*memory.AgentMemory
-			errOut          error
-		)
-		return agentMemorysOut, errOut
-	}
-	return mock.ListAgentMemoriesFunc(ctx, agentID)
-}
-
-// ListAgentMemoriesCalls gets all the calls that were made to ListAgentMemories.
-// Check the length with:
-//
-//	len(mockedRepository.ListAgentMemoriesCalls())
-func (mock *RepositoryMock) ListAgentMemoriesCalls() []struct {
-	Ctx     context.Context
-	AgentID string
-} {
-	var calls []struct {
-		Ctx     context.Context
-		AgentID string
-	}
-	mock.lockListAgentMemories.RLock()
-	calls = mock.calls.ListAgentMemories
-	mock.lockListAgentMemories.RUnlock()
-	return calls
-}
-
-// ListAgentMemoriesWithOptions calls ListAgentMemoriesWithOptionsFunc.
-func (mock *RepositoryMock) ListAgentMemoriesWithOptions(ctx context.Context, agentID string, opts interfaces.AgentMemoryListOptions) ([]*memory.AgentMemory, int, error) {
-	callInfo := struct {
-		Ctx     context.Context
-		AgentID string
-		Opts    interfaces.AgentMemoryListOptions
-	}{
-		Ctx:     ctx,
-		AgentID: agentID,
-		Opts:    opts,
-	}
-	mock.lockListAgentMemoriesWithOptions.Lock()
-	mock.calls.ListAgentMemoriesWithOptions = append(mock.calls.ListAgentMemoriesWithOptions, callInfo)
-	mock.lockListAgentMemoriesWithOptions.Unlock()
-	if mock.ListAgentMemoriesWithOptionsFunc == nil {
-		var (
-			agentMemorysOut []*memory.AgentMemory
-			nOut            int
-			errOut          error
-		)
-		return agentMemorysOut, nOut, errOut
-	}
-	return mock.ListAgentMemoriesWithOptionsFunc(ctx, agentID, opts)
-}
-
-// ListAgentMemoriesWithOptionsCalls gets all the calls that were made to ListAgentMemoriesWithOptions.
-// Check the length with:
-//
-//	len(mockedRepository.ListAgentMemoriesWithOptionsCalls())
-func (mock *RepositoryMock) ListAgentMemoriesWithOptionsCalls() []struct {
-	Ctx     context.Context
-	AgentID string
-	Opts    interfaces.AgentMemoryListOptions
-} {
-	var calls []struct {
-		Ctx     context.Context
-		AgentID string
-		Opts    interfaces.AgentMemoryListOptions
-	}
-	mock.lockListAgentMemoriesWithOptions.RLock()
-	calls = mock.calls.ListAgentMemoriesWithOptions
-	mock.lockListAgentMemoriesWithOptions.RUnlock()
-	return calls
-}
-
-// ListAllAgentIDs calls ListAllAgentIDsFunc.
-func (mock *RepositoryMock) ListAllAgentIDs(ctx context.Context) ([]*interfaces.AgentSummary, error) {
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	mock.lockListAllAgentIDs.Lock()
-	mock.calls.ListAllAgentIDs = append(mock.calls.ListAllAgentIDs, callInfo)
-	mock.lockListAllAgentIDs.Unlock()
-	if mock.ListAllAgentIDsFunc == nil {
-		var (
-			agentSummarysOut []*interfaces.AgentSummary
-			errOut           error
-		)
-		return agentSummarysOut, errOut
-	}
-	return mock.ListAllAgentIDsFunc(ctx)
-}
-
-// ListAllAgentIDsCalls gets all the calls that were made to ListAllAgentIDs.
-// Check the length with:
-//
-//	len(mockedRepository.ListAllAgentIDsCalls())
-func (mock *RepositoryMock) ListAllAgentIDsCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	mock.lockListAllAgentIDs.RLock()
-	calls = mock.calls.ListAllAgentIDs
-	mock.lockListAllAgentIDs.RUnlock()
-	return calls
-}
-
 // ListAllKnowledges calls ListAllKnowledgesFunc.
 func (mock *RepositoryMock) ListAllKnowledges(ctx context.Context) ([]*knowledge.Knowledge, error) {
 	callInfo := struct {
@@ -9088,45 +8697,6 @@ func (mock *RepositoryMock) RemoveTagIDFromAllTicketsCalls() []struct {
 	return calls
 }
 
-// SaveAgentMemory calls SaveAgentMemoryFunc.
-func (mock *RepositoryMock) SaveAgentMemory(ctx context.Context, mem *memory.AgentMemory) error {
-	callInfo := struct {
-		Ctx context.Context
-		Mem *memory.AgentMemory
-	}{
-		Ctx: ctx,
-		Mem: mem,
-	}
-	mock.lockSaveAgentMemory.Lock()
-	mock.calls.SaveAgentMemory = append(mock.calls.SaveAgentMemory, callInfo)
-	mock.lockSaveAgentMemory.Unlock()
-	if mock.SaveAgentMemoryFunc == nil {
-		var (
-			errOut error
-		)
-		return errOut
-	}
-	return mock.SaveAgentMemoryFunc(ctx, mem)
-}
-
-// SaveAgentMemoryCalls gets all the calls that were made to SaveAgentMemory.
-// Check the length with:
-//
-//	len(mockedRepository.SaveAgentMemoryCalls())
-func (mock *RepositoryMock) SaveAgentMemoryCalls() []struct {
-	Ctx context.Context
-	Mem *memory.AgentMemory
-} {
-	var calls []struct {
-		Ctx context.Context
-		Mem *memory.AgentMemory
-	}
-	mock.lockSaveAgentMemory.RLock()
-	calls = mock.calls.SaveAgentMemory
-	mock.lockSaveAgentMemory.RUnlock()
-	return calls
-}
-
 // SearchAlerts calls SearchAlertsFunc.
 func (mock *RepositoryMock) SearchAlerts(ctx context.Context, path string, op string, value any, limit int) (alert.Alerts, error) {
 	callInfo := struct {
@@ -9176,54 +8746,6 @@ func (mock *RepositoryMock) SearchAlertsCalls() []struct {
 	mock.lockSearchAlerts.RLock()
 	calls = mock.calls.SearchAlerts
 	mock.lockSearchAlerts.RUnlock()
-	return calls
-}
-
-// SearchMemoriesByEmbedding calls SearchMemoriesByEmbeddingFunc.
-func (mock *RepositoryMock) SearchMemoriesByEmbedding(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error) {
-	callInfo := struct {
-		Ctx       context.Context
-		AgentID   string
-		Embedding []float32
-		Limit     int
-	}{
-		Ctx:       ctx,
-		AgentID:   agentID,
-		Embedding: embedding,
-		Limit:     limit,
-	}
-	mock.lockSearchMemoriesByEmbedding.Lock()
-	mock.calls.SearchMemoriesByEmbedding = append(mock.calls.SearchMemoriesByEmbedding, callInfo)
-	mock.lockSearchMemoriesByEmbedding.Unlock()
-	if mock.SearchMemoriesByEmbeddingFunc == nil {
-		var (
-			agentMemorysOut []*memory.AgentMemory
-			errOut          error
-		)
-		return agentMemorysOut, errOut
-	}
-	return mock.SearchMemoriesByEmbeddingFunc(ctx, agentID, embedding, limit)
-}
-
-// SearchMemoriesByEmbeddingCalls gets all the calls that were made to SearchMemoriesByEmbedding.
-// Check the length with:
-//
-//	len(mockedRepository.SearchMemoriesByEmbeddingCalls())
-func (mock *RepositoryMock) SearchMemoriesByEmbeddingCalls() []struct {
-	Ctx       context.Context
-	AgentID   string
-	Embedding []float32
-	Limit     int
-} {
-	var calls []struct {
-		Ctx       context.Context
-		AgentID   string
-		Embedding []float32
-		Limit     int
-	}
-	mock.lockSearchMemoriesByEmbedding.RLock()
-	calls = mock.calls.SearchMemoriesByEmbedding
-	mock.lockSearchMemoriesByEmbedding.RUnlock()
 	return calls
 }
 
@@ -9406,61 +8928,6 @@ func (mock *RepositoryMock) UpdateHITLRequestStatusCalls() []struct {
 	mock.lockUpdateHITLRequestStatus.RLock()
 	calls = mock.calls.UpdateHITLRequestStatus
 	mock.lockUpdateHITLRequestStatus.RUnlock()
-	return calls
-}
-
-// UpdateMemoryScoreBatch calls UpdateMemoryScoreBatchFunc.
-func (mock *RepositoryMock) UpdateMemoryScoreBatch(ctx context.Context, agentID string, updates map[types.AgentMemoryID]struct {
-	Score      float64
-	LastUsedAt time.Time
-}) error {
-	callInfo := struct {
-		Ctx     context.Context
-		AgentID string
-		Updates map[types.AgentMemoryID]struct {
-			Score      float64
-			LastUsedAt time.Time
-		}
-	}{
-		Ctx:     ctx,
-		AgentID: agentID,
-		Updates: updates,
-	}
-	mock.lockUpdateMemoryScoreBatch.Lock()
-	mock.calls.UpdateMemoryScoreBatch = append(mock.calls.UpdateMemoryScoreBatch, callInfo)
-	mock.lockUpdateMemoryScoreBatch.Unlock()
-	if mock.UpdateMemoryScoreBatchFunc == nil {
-		var (
-			errOut error
-		)
-		return errOut
-	}
-	return mock.UpdateMemoryScoreBatchFunc(ctx, agentID, updates)
-}
-
-// UpdateMemoryScoreBatchCalls gets all the calls that were made to UpdateMemoryScoreBatch.
-// Check the length with:
-//
-//	len(mockedRepository.UpdateMemoryScoreBatchCalls())
-func (mock *RepositoryMock) UpdateMemoryScoreBatchCalls() []struct {
-	Ctx     context.Context
-	AgentID string
-	Updates map[types.AgentMemoryID]struct {
-		Score      float64
-		LastUsedAt time.Time
-	}
-} {
-	var calls []struct {
-		Ctx     context.Context
-		AgentID string
-		Updates map[types.AgentMemoryID]struct {
-			Score      float64
-			LastUsedAt time.Time
-		}
-	}
-	mock.lockUpdateMemoryScoreBatch.RLock()
-	calls = mock.calls.UpdateMemoryScoreBatch
-	mock.lockUpdateMemoryScoreBatch.RUnlock()
 	return calls
 }
 

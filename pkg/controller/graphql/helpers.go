@@ -39,7 +39,6 @@ func toGraphQLSession(s *session.Session) *graphql1.Session {
 	}
 }
 
-// memoryToGraphQL converts domain AgentMemory to GraphQL AgentMemory
 // authFromContext extracts the user ID from the context for knowledge operations.
 // Falls back to system user.
 func authFromContext(_ context.Context) types.UserID {

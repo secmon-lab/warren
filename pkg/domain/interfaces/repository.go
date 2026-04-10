@@ -10,7 +10,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
 	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
-	"github.com/secmon-lab/warren/pkg/domain/model/memory"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
 	"github.com/secmon-lab/warren/pkg/domain/model/refine"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
@@ -19,13 +18,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
-
-// AgentSummary contains summary information about an agent's memories
-type AgentSummary struct {
-	AgentID        string
-	Count          int
-	LatestMemoryAt time.Time
-}
 
 // LegacyKnowledge represents an old-format knowledge entry for migration.
 // Old knowledge was stored in: topics/{topic}/knowledges/{slug}/commits/{commitID}/
@@ -38,17 +30,6 @@ type LegacyKnowledge struct {
 	State     string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-}
-
-// AgentMemoryListOptions contains filtering, sorting, and pagination options for listing agent memories
-type AgentMemoryListOptions struct {
-	Offset   int
-	Limit    int
-	SortBy   string  // "score", "created_at", "last_used_at"
-	SortDesc bool    // true for descending, false for ascending
-	Keyword  *string // filter by query or claim content
-	MinScore *float64
-	MaxScore *float64
 }
 
 type Repository interface {
@@ -142,39 +123,6 @@ type Repository interface {
 	CreateNotice(ctx context.Context, notice *notice.Notice) error
 	GetNotice(ctx context.Context, id types.NoticeID) (*notice.Notice, error)
 	UpdateNotice(ctx context.Context, notice *notice.Notice) error
-
-	// For agent memory management
-	// Note: Agent memories are stored in subcollection: agents/{agentID}/memories/{memoryID}
-	SaveAgentMemory(ctx context.Context, mem *memory.AgentMemory) error
-	GetAgentMemory(ctx context.Context, agentID string, id types.AgentMemoryID) (*memory.AgentMemory, error)
-	SearchMemoriesByEmbedding(ctx context.Context, agentID string, embedding []float32, limit int) ([]*memory.AgentMemory, error)
-
-	// BatchSaveAgentMemories saves multiple agent memories efficiently in a batch
-	// Uses batch write operations to minimize round trips to the database
-	BatchSaveAgentMemories(ctx context.Context, memories []*memory.AgentMemory) error
-
-	// Memory scoring methods
-	// UpdateMemoryScoreBatch updates quality scores and last used timestamps for multiple agent memories
-	UpdateMemoryScoreBatch(ctx context.Context, agentID string, updates map[types.AgentMemoryID]struct {
-		Score      float64
-		LastUsedAt time.Time
-	}) error
-
-	// DeleteAgentMemoriesBatch deletes multiple agent memories in a batch
-	// Returns the number of successfully deleted memories
-	DeleteAgentMemoriesBatch(ctx context.Context, agentID string, memoryIDs []types.AgentMemoryID) (int, error)
-
-	// ListAgentMemories lists all memories for an agent (for pruning)
-	// Results are ordered by CreatedAt DESC
-	ListAgentMemories(ctx context.Context, agentID string) ([]*memory.AgentMemory, error)
-
-	// ListAgentMemoriesWithOptions lists memories with filtering, sorting, and pagination
-	// Returns memories and total count (before pagination)
-	ListAgentMemoriesWithOptions(ctx context.Context, agentID string, opts AgentMemoryListOptions) ([]*memory.AgentMemory, int, error)
-
-	// ListAllAgentIDs returns all agent IDs that have memories with their counts and latest memory timestamp
-	// Used for the agent summary list in the UI
-	ListAllAgentIDs(ctx context.Context) ([]*AgentSummary, error)
 
 	// Refine group management
 	PutRefineGroup(ctx context.Context, group *refine.Group) error
