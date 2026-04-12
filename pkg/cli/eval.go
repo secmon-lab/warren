@@ -242,7 +242,7 @@ func cmdEvalRun() *cli.Command {
 			// Write output
 			var w io.Writer = os.Stdout
 			if outputPath != "" {
-				f, err := os.Create(outputPath) // #nosec G304 -- path from CLI flag
+				f, err := os.Create(filepath.Clean(outputPath))
 				if err != nil {
 					return goerr.Wrap(err, "failed to create output file",
 						goerr.V("path", outputPath))
