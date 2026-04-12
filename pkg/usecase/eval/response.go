@@ -44,7 +44,7 @@ func NewResponseStore(responsesDir string) (*ResponseStore, error) {
 			continue
 		}
 
-		data, err := os.ReadFile(filepath.Join(responsesDir, entry.Name())) // #nosec G304 -- path from scenario dir
+		data, err := os.ReadFile(filepath.Clean(filepath.Join(responsesDir, entry.Name())))
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to read response file",
 				goerr.V("file", entry.Name()))

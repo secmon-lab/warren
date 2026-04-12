@@ -196,7 +196,7 @@ func (r *Runner) buildEvalResult(ctx context.Context, runID string, startTime ti
 // loadGollemTrace loads a gollem trace JSON file from the traces directory.
 func loadGollemTrace(tracesDir, traceID string) *gollemTrace.Trace {
 	filePath := filepath.Join(tracesDir, traceID+".json")
-	data, err := os.ReadFile(filePath) // #nosec G304 -- path from scenario dir + trace ID
+	data, err := os.ReadFile(filepath.Clean(filePath))
 	if err != nil {
 		return nil
 	}
