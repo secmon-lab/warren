@@ -2,10 +2,17 @@ package eval
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	gollemTrace "github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/eval"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -13,6 +20,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/usecase/eval/mock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/request_id"
 )
 
@@ -94,6 +102,10 @@ func (r *Runner) RunCLI(ctx context.Context) (*eval.EvalResult, error) {
 	// Generate request ID and use it as both run ID and gollem trace ID
 	ctx, runID := request_id.Generate(ctx)
 
+	// Capture msg.Notify/Trace/Warn output for evaluation
+	capture := newMessageCapture()
+	ctx = msg.With(ctx, capture.notifyFunc(), capture.traceFunc(), capture.warnFunc())
+
 	logger.Info("eval: starting CLI run",
 		"scenario", r.scenario.Name,
 		"run_id", runID,
@@ -107,7 +119,7 @@ func (r *Runner) RunCLI(ctx context.Context) (*eval.EvalResult, error) {
 
 	if len(alerts) == 0 {
 		logger.Warn("eval: HandleAlert produced no alerts, skipping chat phase")
-		return r.buildEvalResult(ctx, runID, startTime)
+		return r.buildEvalResult(ctx, runID, startTime, capture.agentOutput())
 	}
 
 	// Find the ticket for the first alert
@@ -135,7 +147,7 @@ func (r *Runner) RunCLI(ctx context.Context) (*eval.EvalResult, error) {
 	}
 
 	// Step 3: Build eval result
-	return r.buildEvalResult(ctx, runID, startTime)
+	return r.buildEvalResult(ctx, runID, startTime, capture.agentOutput())
 }
 
 // RunSlack executes the scenario in Slack simulation mode:
@@ -150,7 +162,8 @@ func (r *Runner) RunSlack(_ context.Context) (*eval.EvalResult, error) {
 	return nil, goerr.New("slack simulation mode is not yet implemented; requires serve command infrastructure (CoreDeps extraction)")
 }
 
-func (r *Runner) buildEvalResult(ctx context.Context, runID string, startTime time.Time) (*eval.EvalResult, error) {
+func (r *Runner) buildEvalResult(ctx context.Context, runID string, startTime time.Time, agentOutput string) (*eval.EvalResult, error) {
+	logger := logging.From(ctx)
 	records := r.recorder.Records()
 
 	var totalTokens int64
@@ -164,13 +177,75 @@ func (r *Runner) buildEvalResult(ctx context.Context, runID string, startTime ti
 		StartTime:    startTime,
 		EndTime:      time.Now(),
 		ToolCalls:    records,
+		AgentOutput:  agentOutput,
 		TotalTokens:  totalTokens,
 	}
 
-	evalResult, err := Evaluate(ctx, trace, r.scenario.Expectations, r.llmClient)
-	if err != nil {
-		return nil, goerr.Wrap(err, "evaluation failed")
+	// Try to load gollem trace for agent-based evaluation
+	gollemTraceData := loadGollemTrace(filepath.Join(r.scenarioDir, "traces"), runID)
+	if gollemTraceData != nil {
+		logger.Info("eval: using agent-based evaluation with gollem trace", "trace_id", runID)
+		return EvaluateWithAgent(ctx, trace, gollemTraceData, r.scenario.Expectations, agentOutput, r.llmClient)
 	}
 
-	return evalResult, nil
+	// Fallback to basic evaluation
+	logger.Info("eval: gollem trace not found, using basic evaluation")
+	return Evaluate(ctx, trace, r.scenario.Expectations, r.llmClient)
+}
+
+// loadGollemTrace loads a gollem trace JSON file from the traces directory.
+func loadGollemTrace(tracesDir, traceID string) *gollemTrace.Trace {
+	filePath := filepath.Join(tracesDir, traceID+".json")
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil
+	}
+
+	var t gollemTrace.Trace
+	if err := json.Unmarshal(data, &t); err != nil {
+		return nil
+	}
+
+	return &t
+}
+
+// messageCapture collects msg.Notify/Trace/Warn messages during eval execution.
+type messageCapture struct {
+	mu       sync.Mutex
+	messages []string
+}
+
+func newMessageCapture() *messageCapture {
+	return &messageCapture{}
+}
+
+func (c *messageCapture) append(prefix, message string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.messages = append(c.messages, fmt.Sprintf("[%s] %s", prefix, message))
+}
+
+func (c *messageCapture) notifyFunc() msg.NotifyFunc {
+	return func(_ context.Context, message string) {
+		c.append("notify", message)
+	}
+}
+
+func (c *messageCapture) traceFunc() msg.TraceFunc {
+	return func(_ context.Context, message string) {
+		c.append("trace", message)
+	}
+}
+
+func (c *messageCapture) warnFunc() msg.WarnFunc {
+	return func(_ context.Context, message string) {
+		c.append("warn", message)
+	}
+}
+
+// agentOutput returns all captured messages joined as a single string.
+func (c *messageCapture) agentOutput() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return strings.Join(c.messages, "\n")
 }
