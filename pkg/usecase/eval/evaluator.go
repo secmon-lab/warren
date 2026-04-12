@@ -268,8 +268,7 @@ func evaluateEfficiency(trace *eval.Trace, exp *eval.EfficiencyExpectation) *eva
 	}
 	seen := make(map[callKey]int)
 	for _, tc := range trace.ToolCalls {
-		argsJSON, _ := json.Marshal(tc.Args)
-		key := callKey{tool: tc.ToolName, args: string(argsJSON)}
+		key := callKey{tool: tc.ToolName, args: argsHash(tc.Args)}
 		seen[key]++
 	}
 	for _, count := range seen {

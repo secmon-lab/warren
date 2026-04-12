@@ -16,7 +16,7 @@ import (
 func LoadScenario(scenarioDir string) (*eval.Scenario, error) {
 	scenarioPath := filepath.Join(scenarioDir, "scenario.yaml")
 
-	data, err := os.ReadFile(scenarioPath)
+	data, err := os.ReadFile(scenarioPath) // #nosec G304 -- path from CLI flag
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to read scenario file",
 			goerr.V("path", scenarioPath),
@@ -41,7 +41,7 @@ func LoadScenario(scenarioDir string) (*eval.Scenario, error) {
 func ValidateScenarioDir(scenarioDir string) []string {
 	// Load and parse
 	scenarioPath := filepath.Join(scenarioDir, "scenario.yaml")
-	data, err := os.ReadFile(scenarioPath)
+	data, err := os.ReadFile(scenarioPath) // #nosec G304 -- path from CLI flag
 	if err != nil {
 		return []string{fmt.Sprintf("cannot read scenario.yaml: %v", err)}
 	}
@@ -85,7 +85,7 @@ func validateResponseFiles(responsesDir string) []string {
 		}
 
 		filePath := filepath.Join(responsesDir, entry.Name())
-		data, err := os.ReadFile(filePath)
+		data, err := os.ReadFile(filePath) // #nosec G304 -- path from scenario dir
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("responses/%s: cannot read file: %v", entry.Name(), err))
 			continue

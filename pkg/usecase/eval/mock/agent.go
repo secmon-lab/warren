@@ -132,18 +132,30 @@ func parseJSONResponse(text string) (map[string]any, error) {
 }
 
 // stripCodeFence removes markdown code fences (```json ... ```) from the text.
+// Handles both multi-line and single-line fences.
 func stripCodeFence(text string) string {
-	if strings.HasPrefix(text, "```") {
-		lines := strings.Split(text, "\n")
-		if len(lines) >= 2 {
-			// Remove first line (```json) and last line (```)
-			start := 1
-			end := len(lines)
-			if strings.TrimSpace(lines[end-1]) == "```" {
-				end--
-			}
-			text = strings.Join(lines[start:end], "\n")
+	text = strings.TrimSpace(text)
+	if !strings.HasPrefix(text, "```") {
+		return text
+	}
+
+	// Single-line: ```json {"key": "value"} ```
+	if !strings.Contains(text, "\n") {
+		text = strings.TrimPrefix(text, "```")
+		text = strings.TrimSuffix(text, "```")
+		text, _ = strings.CutPrefix(text, "json")
+		return strings.TrimSpace(text)
+	}
+
+	// Multi-line
+	lines := strings.Split(text, "\n")
+	if len(lines) >= 2 {
+		start := 1
+		end := len(lines)
+		if strings.TrimSpace(lines[end-1]) == "```" {
+			end--
 		}
+		text = strings.Join(lines[start:end], "\n")
 	}
 	return strings.TrimSpace(text)
 }

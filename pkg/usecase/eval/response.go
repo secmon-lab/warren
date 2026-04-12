@@ -44,7 +44,7 @@ func NewResponseStore(responsesDir string) (*ResponseStore, error) {
 			continue
 		}
 
-		data, err := os.ReadFile(filepath.Join(responsesDir, entry.Name()))
+		data, err := os.ReadFile(filepath.Join(responsesDir, entry.Name())) // #nosec G304 -- path from scenario dir
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to read response file",
 				goerr.V("file", entry.Name()))
@@ -93,7 +93,7 @@ func (s *ResponseStore) Save(toolName string, args map[string]any, response map[
 		return goerr.Wrap(err, "failed to marshal response file")
 	}
 
-	if err := os.WriteFile(filePath, data, 0o640); err != nil {
+	if err := os.WriteFile(filePath, data, 0o600); err != nil {
 		return goerr.Wrap(err, "failed to write response file",
 			goerr.V("path", filePath))
 	}
