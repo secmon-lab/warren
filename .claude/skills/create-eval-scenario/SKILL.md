@@ -129,7 +129,19 @@ At minimum, create:
 1. **Ingest policy** (`policy/ingest.rego`) — transforms raw alert data into Warren Alert objects
    - Package: `data.ingest.<schema_name>` (must match `alert.schema` in scenario.yaml)
    - Input: the alert data from `alert.data`
-   - Output: array of alert objects with title, description, attributes
+   - Output: array of alert objects with title, description
+   - **CRITICAL: Always pass through the full raw data via `"data": input`** so the agent has access to all IoCs (IPs, hashes, domains, etc.). Without this, the agent will lack concrete indicators and ask questions instead of investigating.
+   
+   Example:
+   ```rego
+   alerts contains {
+       "title": title,
+       "description": description,
+       "data": input,
+   } if {
+       # ... conditions and formatting ...
+   }
+   ```
 
 2. **Triage policy** (`policy/triage.rego`) — determines publish type and metadata
    - Package: `data.triage`
