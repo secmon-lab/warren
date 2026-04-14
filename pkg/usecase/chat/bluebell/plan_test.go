@@ -1,4 +1,4 @@
-package aster_test
+package bluebell_test
 
 import (
 	"context"
@@ -14,110 +14,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/repository"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/usecase/chat"
-	"github.com/secmon-lab/warren/pkg/usecase/chat/aster"
+	"github.com/secmon-lab/warren/pkg/usecase/chat/bluebell"
 )
-
-func TestAsterChat_PlanWithKnowledgeService(t *testing.T) {
-	ctx := setupTestContext(t)
-	repo := repository.NewMemory()
-	testTicket := setupTicketAndAlert(t, ctx, repo)
-
-	embeddingMock := &mock.EmbeddingClientMock{
-		EmbeddingsFunc: func(ctx context.Context, texts []string, dimensionality int) ([][]float32, error) {
-			result := make([][]float32, len(texts))
-			for i := range texts {
-				result[i] = make([]float32, dimensionality)
-			}
-			return result, nil
-		},
-	}
-	knowledgeSvc := svcknowledge.New(repo, embeddingMock)
-
-	// The mock LLM must handle multiple NewSession calls:
-	// 1. The planner agent creates its own session internally (for plan)
-	// 2. The replan/final phases also create sessions
-	// The planner agent may call knowledge_search, then return a plan JSON.
-	var mu sync.Mutex
-	sessionCount := 0
-
-	mockLLM := &mock.LLMClientMock{
-		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
-			mu.Lock()
-			sessionCount++
-			sc := sessionCount
-			mu.Unlock()
-
-			ssn := newMockSession()
-			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
-				// The agent's first session (plan) should return a direct plan
-				// (without function calls, since no knowledge entries exist).
-				if sc == 1 {
-					// This is the planSession created by executeAster (not used in agent mode)
-					return &gollem.Response{
-						Texts: []string{`{"message": "Direct response.", "tasks": []}`},
-					}, nil
-				}
-				// Agent-created session
-				return &gollem.Response{
-					Texts: []string{`{"message": "Analyzed with knowledge.", "tasks": []}`},
-				}, nil
-			}
-			return ssn, nil
-		},
-	}
-
-	chatUC := aster.New(repo, mockLLM,
-		aster.WithKnowledgeService(knowledgeSvc),
-	)
-	ssn := newDummySession(testTicket.ID)
-
-	err := chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "Analyze this alert", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}})
-	gt.NoError(t, err)
-
-	// Verify that multiple sessions were created (planSession + agent's internal session)
-	mu.Lock()
-	gt.N(t, sessionCount).Greater(1)
-	mu.Unlock()
-}
-
-func TestAsterChat_PlanWithoutKnowledgeService(t *testing.T) {
-	// This tests the fallback path (no knowledge service) still works.
-	// Existing TestAsterChat_DirectResponse already covers this, but this
-	// explicitly verifies only one session is created.
-	ctx := setupTestContext(t)
-	repo := repository.NewMemory()
-	testTicket := setupTicketAndAlert(t, ctx, repo)
-
-	var mu sync.Mutex
-	sessionCount := 0
-
-	mockLLM := &mock.LLMClientMock{
-		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
-			mu.Lock()
-			sessionCount++
-			mu.Unlock()
-
-			ssn := newMockSession()
-			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
-				return &gollem.Response{
-					Texts: []string{`{"message": "Direct response.", "tasks": []}`},
-				}, nil
-			}
-			return ssn, nil
-		},
-	}
-
-	chatUC := aster.New(repo, mockLLM)
-	ssn := newDummySession(testTicket.ID)
-
-	err := chatUC.Execute(ctx, &chat.RunContext{Session: ssn, Message: "Analyze this alert", ChatCtx: &chatModel.ChatContext{Ticket: testTicket}})
-	gt.NoError(t, err)
-
-	// Without knowledge service, only one session should be created (planSession).
-	mu.Lock()
-	gt.V(t, sessionCount).Equal(1)
-	mu.Unlock()
-}
 
 // mockTraceRepo captures saved traces for assertion.
 type mockTraceRepo struct {
@@ -141,10 +39,12 @@ func (r *mockTraceRepo) last() *gollemtrace.Trace {
 	return r.traces[len(r.traces)-1]
 }
 
-// traceAwareSession wraps a generate function and records LLM call spans via trace handler.
+// traceAwareSession wraps a mock session and records LLM call spans via trace handler.
 // This simulates what real LLM clients (vertex_client, etc.) do internally.
 type traceAwareSession struct {
-	generateFunc func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error)
+	generateFunc   func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error)
+	historyFunc    func() (*gollem.History, error)
+	appendHistFunc func(h *gollem.History) error
 }
 
 func (s *traceAwareSession) Generate(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
@@ -160,7 +60,9 @@ func (s *traceAwareSession) Generate(ctx context.Context, input []gollem.Input, 
 				InputTokens:  100,
 				OutputTokens: 50,
 				Request:      &gollemtrace.LLMRequest{},
-				Response:     &gollemtrace.LLMResponse{Texts: resp.Texts},
+				Response: &gollemtrace.LLMResponse{
+					Texts: resp.Texts,
+				},
 			}
 		}
 		h.EndLLMCall(ctx, data, err)
@@ -181,39 +83,39 @@ func (s *traceAwareSession) GenerateStream(_ context.Context, _ ...gollem.Input)
 }
 
 func (s *traceAwareSession) History() (*gollem.History, error) {
+	if s.historyFunc != nil {
+		return s.historyFunc()
+	}
 	return &gollem.History{
 		Version:  gollem.HistoryVersion,
 		Messages: []gollem.Message{{Role: gollem.RoleUser}},
 	}, nil
 }
 
-func (s *traceAwareSession) AppendHistory(_ *gollem.History) error { return nil }
+func (s *traceAwareSession) AppendHistory(h *gollem.History) error {
+	if s.appendHistFunc != nil {
+		return s.appendHistFunc(h)
+	}
+	return nil
+}
 
 func (s *traceAwareSession) CountToken(_ context.Context, _ ...gollem.Input) (int, error) {
 	return 0, nil
 }
 
-func TestAsterChat_PlannerTraceNotOverwritten(t *testing.T) {
+func TestBluebellChat_PlannerTraceNotOverwritten(t *testing.T) {
 	// Verify that executePlannerAgent creates child spans (via AsChildAgent)
 	// rather than overwriting the root trace. When tasks are executed, the task
 	// spans should persist across replan calls.
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
 	testTicket := setupTicketAndAlert(t, ctx, repo)
-
-	embeddingMock := &mock.EmbeddingClientMock{
-		EmbeddingsFunc: func(ctx context.Context, texts []string, dimensionality int) ([][]float32, error) {
-			result := make([][]float32, len(texts))
-			for i := range texts {
-				result[i] = make([]float32, dimensionality)
-			}
-			return result, nil
-		},
-	}
-	knowledgeSvc := svcknowledge.New(repo, embeddingMock)
+	knowledgeSvc := svcknowledge.New(repo, newMockEmbeddingClient())
 
 	var mu sync.Mutex
 	sessionCount := 0
+
+	planJSON := `{"message": "Analyzing.", "tasks": [{"id": "t1", "title": "Check IP", "description": "Look up IP", "tools": []}]}`
 
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
@@ -222,36 +124,46 @@ func TestAsterChat_PlannerTraceNotOverwritten(t *testing.T) {
 			sc := sessionCount
 			mu.Unlock()
 
-			return &traceAwareSession{
+			ssn := &traceAwareSession{
 				generateFunc: func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
 					switch {
-					case sc <= 2:
+					// Session 1: intent resolver → return selector JSON
+					case sc == 1:
 						return &gollem.Response{
-							Texts: []string{`{"message": "Analyzing.", "tasks": [{"id": "t1", "title": "Check IP", "description": "Look up IP", "tools": [], "sub_agents": []}]}`},
+							Texts: []string{`{"prompt_id":"default","intent":"Investigate the alert."}`},
 						}, nil
-					case sc == 3:
+					// Session 2: planSession (created by executeBluebell, not used in agent mode)
+					// Session 3: planner agent's internal session → return plan with a task
+					case sc <= 3:
+						return &gollem.Response{
+							Texts: []string{planJSON},
+						}, nil
+					// Session 4: task agent's session → return task result
+					case sc == 4:
 						return &gollem.Response{
 							Texts: []string{"IP is benign."},
 						}, nil
+					// Session 5+: replan agent / final response → no more tasks
 					default:
 						return &gollem.Response{
 							Texts: []string{`{"tasks": []}`},
 						}, nil
 					}
 				},
-			}, nil
+			}
+			return ssn, nil
 		},
 	}
 
 	traceRepo := &mockTraceRepo{}
-	chatUC := aster.New(repo, mockLLM,
-		aster.WithKnowledgeService(knowledgeSvc),
-		aster.WithTraceRepository(traceRepo),
+	chatUC, err := bluebell.New(repo, mockLLM,
+		bluebell.WithKnowledgeService(knowledgeSvc),
+		bluebell.WithTraceRepository(traceRepo),
 	)
-	ssn := newDummySession(testTicket.ID)
+	gt.NoError(t, err)
 
-	err := chatUC.Execute(ctx, &chat.RunContext{
-		Session: ssn,
+	err = chatUC.Execute(ctx, &chat.RunContext{
+		Session: newDummySession(testTicket.ID),
 		Message: "Analyze this alert",
 		ChatCtx: &chatModel.ChatContext{Ticket: testTicket},
 	})
@@ -283,7 +195,7 @@ func TestAsterChat_PlannerTraceNotOverwritten(t *testing.T) {
 	// Verify "replan-phase-1" child span also exists alongside "planning" and task spans.
 	gt.V(t, findSpan(trace.RootSpan, "replan-phase-1", gollemtrace.SpanKindAgentExecute)).NotNil()
 
-	// Verify LLM call spans are recorded (plan + task + replan + final = at least 3).
+	// Verify LLM call spans are recorded (plan + task + replan + final = at least 4).
 	llmCalls := collectSpans(trace.RootSpan, gollemtrace.SpanKindLLMCall)
 	gt.N(t, len(llmCalls)).GreaterOrEqual(3)
 
@@ -341,29 +253,4 @@ func collectSpans(root *gollemtrace.Span, kind gollemtrace.SpanKind) []*gollemtr
 		result = append(result, collectSpans(child, kind)...)
 	}
 	return result
-}
-
-func TestFetchKnowledgeTags_NilService(t *testing.T) {
-	ctx := setupTestContext(t)
-	tags := aster.FetchKnowledgeTags(ctx, nil)
-	gt.V(t, tags).Nil()
-}
-
-func TestFetchKnowledgeTags_WithService(t *testing.T) {
-	ctx := setupTestContext(t)
-	repo := repository.NewMemory()
-	embeddingMock := &mock.EmbeddingClientMock{
-		EmbeddingsFunc: func(ctx context.Context, texts []string, dimensionality int) ([][]float32, error) {
-			return make([][]float32, len(texts)), nil
-		},
-	}
-	knowledgeSvc := svcknowledge.New(repo, embeddingMock)
-
-	// Create a tag
-	_, err := knowledgeSvc.CreateTag(ctx, "test-tag", "A test tag")
-	gt.NoError(t, err)
-
-	tags := aster.FetchKnowledgeTags(ctx, knowledgeSvc)
-	gt.A(t, tags).Length(1)
-	gt.V(t, tags[0].Name).Equal("test-tag")
 }
