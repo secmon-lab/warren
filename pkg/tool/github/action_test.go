@@ -2,9 +2,11 @@ package github_test
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v74/github"
 	"github.com/m-mizutani/gt"
@@ -320,6 +322,243 @@ func TestConfigureValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGitHubListCommits(t *testing.T) {
+	commitDate := time.Date(2024, 6, 15, 10, 30, 0, 0, time.UTC)
+
+	mockedHTTPClient := mock.NewMockedHTTPClient(
+		mock.WithRequestMatch(
+			mock.GetReposCommitsByOwnerByRepo,
+			[]*github.RepositoryCommit{
+				{
+					SHA:     github.Ptr("abc123def456"),
+					HTMLURL: github.Ptr("https://github.com/test/repo/commit/abc123def456"),
+					Commit: &github.Commit{
+						Message: github.Ptr("Fix security vulnerability in auth handler"),
+						Author: &github.CommitAuthor{
+							Name: github.Ptr("Test User"),
+							Date: &github.Timestamp{Time: commitDate},
+						},
+					},
+					Author: &github.User{
+						Login: github.Ptr("testuser"),
+					},
+					Files: []*github.CommitFile{
+						{Filename: github.Ptr("auth.go")},
+						{Filename: github.Ptr("auth_test.go")},
+					},
+				},
+				{
+					SHA:     github.Ptr("789xyz"),
+					HTMLURL: github.Ptr("https://github.com/test/repo/commit/789xyz"),
+					Commit: &github.Commit{
+						Message: github.Ptr("Initial commit"),
+						Author: &github.CommitAuthor{
+							Name: github.Ptr("Another User"),
+							Date: &github.Timestamp{Time: commitDate.Add(-24 * time.Hour)},
+						},
+					},
+					Author: &github.User{
+						Login: github.Ptr("anotheruser"),
+					},
+				},
+			},
+		),
+	)
+
+	client := github.NewClient(mockedHTTPClient)
+
+	action := &githubtool.Action{}
+	action.SetGitHubClient(client)
+	action.SetConfigs([]*githubtool.RepositoryConfig{
+		{
+			Owner:       "test",
+			Repository:  "repo",
+			Description: "Test repository",
+		},
+	})
+
+	ctx := context.Background()
+	args := map[string]any{
+		"owner":    "test",
+		"repo":     "repo",
+		"per_page": float64(10),
+	}
+
+	result, err := action.Run(ctx, "github_list_commits", args)
+	gt.NoError(t, err)
+	gt.NotNil(t, result)
+
+	// Validate results
+	gt.S(t, result["repository"].(string)).Equal("test/repo")
+	gt.Number(t, result["count"].(int)).Equal(2)
+
+	commits := gt.Cast[[]githubtool.CommitResult](t, result["commits"])
+	gt.A(t, commits).Length(2)
+
+	// Check first commit
+	gt.S(t, commits[0].SHA).Equal("abc123def456")
+	gt.S(t, commits[0].Message).Equal("Fix security vulnerability in auth handler")
+	gt.S(t, commits[0].Author).Equal("testuser")
+	gt.S(t, commits[0].HTMLURL).Equal("https://github.com/test/repo/commit/abc123def456")
+	gt.Number(t, commits[0].FilesChanged).Equal(2)
+
+	// Check second commit
+	gt.S(t, commits[1].SHA).Equal("789xyz")
+	gt.S(t, commits[1].Author).Equal("anotheruser")
+	gt.Number(t, commits[1].FilesChanged).Equal(0)
+}
+
+func TestGitHubListCommitsUnauthorizedRepo(t *testing.T) {
+	mockedHTTPClient := mock.NewMockedHTTPClient()
+	client := github.NewClient(mockedHTTPClient)
+
+	action := &githubtool.Action{}
+	action.SetGitHubClient(client)
+	action.SetConfigs([]*githubtool.RepositoryConfig{
+		{
+			Owner:      "allowed",
+			Repository: "repo",
+		},
+	})
+
+	ctx := context.Background()
+	args := map[string]any{
+		"owner": "unauthorized",
+		"repo":  "secret-repo",
+	}
+
+	_, err := action.Run(ctx, "github_list_commits", args)
+	gt.Error(t, err)
+	gt.S(t, err.Error()).Contains("repository not in configured list")
+}
+
+func TestGitHubGetBlame(t *testing.T) {
+	blameResponse := githubtool.GraphQLBlameResponse{
+		Data: githubtool.GraphQLBlameData{
+			Repository: githubtool.GraphQLRepository{
+				Object: &githubtool.GraphQLObject{
+					Blame: &githubtool.GraphQLBlame{
+						Ranges: []githubtool.GraphQLBlameRange{
+							{
+								StartingLine: 1,
+								EndingLine:   10,
+								Commit: githubtool.GraphQLCommitRef{
+									OID:     "abc123",
+									Message: "Initial commit",
+									Author: githubtool.GraphQLCommitAuthor{
+										Name: "testuser",
+										Date: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+									},
+								},
+							},
+							{
+								StartingLine: 11,
+								EndingLine:   25,
+								Commit: githubtool.GraphQLCommitRef{
+									OID:     "def456",
+									Message: "Add error handling",
+									Author: githubtool.GraphQLCommitAuthor{
+										Name: "anotheruser",
+										Date: time.Date(2024, 3, 15, 12, 0, 0, 0, time.UTC),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	graphQLEndpoint := mock.EndpointPattern{
+		Pattern: "/graphql",
+		Method:  "POST",
+	}
+
+	mockedHTTPClient := mock.NewMockedHTTPClient(
+		mock.WithRequestMatchHandler(
+			graphQLEndpoint,
+			http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(mock.MustMarshal(blameResponse))
+			}),
+		),
+	)
+
+	client := github.NewClient(mockedHTTPClient)
+
+	action := &githubtool.Action{}
+	action.SetGitHubClient(client)
+	action.SetHTTPClient(mockedHTTPClient)
+	action.SetConfigs([]*githubtool.RepositoryConfig{
+		{
+			Owner:         "test",
+			Repository:    "repo",
+			Description:   "Test repository",
+			DefaultBranch: "main",
+		},
+	})
+
+	ctx := context.Background()
+	args := map[string]any{
+		"owner": "test",
+		"repo":  "repo",
+		"path":  "src/main.go",
+	}
+
+	result, err := action.Run(ctx, "github_get_blame", args)
+	gt.NoError(t, err)
+	gt.NotNil(t, result)
+
+	// Validate results
+	gt.S(t, result["repository"].(string)).Equal("test/repo")
+	gt.S(t, result["path"].(string)).Equal("src/main.go")
+	gt.S(t, result["ref"].(string)).Equal("main")
+	gt.Number(t, result["count"].(int)).Equal(2)
+
+	ranges := gt.Cast[[]githubtool.BlameRange](t, result["ranges"])
+	gt.A(t, ranges).Length(2)
+
+	// Check first range
+	gt.Number(t, ranges[0].StartLine).Equal(1)
+	gt.Number(t, ranges[0].EndLine).Equal(10)
+	gt.S(t, ranges[0].CommitSHA).Equal("abc123")
+	gt.S(t, ranges[0].CommitMessage).Equal("Initial commit")
+	gt.S(t, ranges[0].Author).Equal("testuser")
+
+	// Check second range
+	gt.Number(t, ranges[1].StartLine).Equal(11)
+	gt.Number(t, ranges[1].EndLine).Equal(25)
+	gt.S(t, ranges[1].CommitSHA).Equal("def456")
+	gt.S(t, ranges[1].Author).Equal("anotheruser")
+}
+
+func TestGitHubGetBlameUnauthorizedRepo(t *testing.T) {
+	mockedHTTPClient := mock.NewMockedHTTPClient()
+	client := github.NewClient(mockedHTTPClient)
+
+	action := &githubtool.Action{}
+	action.SetGitHubClient(client)
+	action.SetHTTPClient(mockedHTTPClient)
+	action.SetConfigs([]*githubtool.RepositoryConfig{
+		{
+			Owner:      "allowed",
+			Repository: "repo",
+		},
+	})
+
+	ctx := context.Background()
+	args := map[string]any{
+		"owner": "unauthorized",
+		"repo":  "secret-repo",
+		"path":  "main.go",
+	}
+
+	_, err := action.Run(ctx, "github_get_blame", args)
+	gt.Error(t, err)
+	gt.S(t, err.Error()).Contains("repository not in configured list")
 }
 
 func TestGitHubIntegration(t *testing.T) {

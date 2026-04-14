@@ -140,7 +140,7 @@ Warren's AI agent has access to the following tools during investigation. Tools 
 
 | Tool | Description | Details |
 |------|-------------|---------|
-| GitHub | Code search, issue search, file content | [README](../../pkg/tool/github/README.md) |
+| GitHub | Code search, issue search, file content, commit history, file blame | [README](../../pkg/tool/github/README.md) |
 | Microsoft Intune | Device compliance, sign-in history | [README](../../pkg/tool/intune/README.md) |
 
 ### Other Tools

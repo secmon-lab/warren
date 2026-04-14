@@ -51,3 +51,31 @@ type ContentResult struct {
 	HTMLURL    string `json:"html_url"`
 	Size       int    `json:"size"`
 }
+
+// CommitResult represents a commit in the list commits response
+type CommitResult struct {
+	SHA          string    `json:"sha"`
+	Message      string    `json:"message"`
+	Author       string    `json:"author"`
+	Date         time.Time `json:"date"`
+	HTMLURL      string    `json:"html_url"`
+	FilesChanged int       `json:"files_changed"`
+}
+
+// BlameRange represents a blame range for a set of lines
+type BlameRange struct {
+	StartLine     int       `json:"start_line"`
+	EndLine       int       `json:"end_line"`
+	CommitSHA     string    `json:"commit_sha"`
+	CommitMessage string    `json:"commit_message"`
+	Author        string    `json:"author"`
+	Date          time.Time `json:"date"`
+}
+
+// BlameResult represents the full blame result for a file
+type BlameResult struct {
+	Repository string       `json:"repository"`
+	Path       string       `json:"path"`
+	Ref        string       `json:"ref"`
+	Ranges     []BlameRange `json:"ranges"`
+}

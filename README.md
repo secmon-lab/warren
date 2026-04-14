@@ -124,7 +124,7 @@ Visit http://127.0.0.1:8080 to access the dashboard.
 
 ### Code & Device Tools
 
-- [**GitHub App**](./pkg/tool/github/README.md) — code search, issue search, file content retrieval
+- [**GitHub App**](./pkg/tool/github/README.md) — code search, issue search, file content retrieval, commit history, file blame
 - [**Microsoft Intune**](./pkg/tool/intune/README.md) — device compliance status, sign-in history
 - [**Slack Message Search**](./pkg/tool/slack/README.md) — search workspace messages for context
 
