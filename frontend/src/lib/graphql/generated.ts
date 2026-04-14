@@ -71,6 +71,11 @@ export type AlertsResponse = {
   totalCount: Scalars['Int']['output'];
 };
 
+export type ArchiveAllResolvedResult = {
+  __typename?: 'ArchiveAllResolvedResult';
+  archivedCount: Scalars['Int']['output'];
+};
+
 export type Comment = {
   __typename?: 'Comment';
   content: Scalars['String']['output'];
@@ -192,6 +197,7 @@ export type KnowledgeTag = {
 
 export type Mutation = {
   __typename?: 'Mutation';
+  archiveAllResolvedTickets: ArchiveAllResolvedResult;
   archiveTicket: Ticket;
   archiveTickets: Array<Ticket>;
   bindAlertsToTicket: Ticket;
@@ -205,10 +211,12 @@ export type Mutation = {
   deleteKnowledgeTag: Scalars['Boolean']['output'];
   deleteTag: Scalars['Boolean']['output'];
   discardQueuedAlerts: Scalars['Boolean']['output'];
+  discardQueuedAlertsByFilter: Scalars['Int']['output'];
   fixDiagnosis: Diagnosis;
   mergeKnowledgeTags: Scalars['Boolean']['output'];
   reopenTicket: Ticket;
   reprocessQueuedAlert: ReprocessJob;
+  reprocessQueuedAlertsByFilter: ReprocessBatchJob;
   resolveTicket: Ticket;
   runDiagnosis: Diagnosis;
   unarchiveTicket: Ticket;
@@ -293,6 +301,11 @@ export type MutationDiscardQueuedAlertsArgs = {
 };
 
 
+export type MutationDiscardQueuedAlertsByFilterArgs = {
+  keyword?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type MutationFixDiagnosisArgs = {
   id: Scalars['ID']['input'];
 };
@@ -311,6 +324,11 @@ export type MutationReopenTicketArgs = {
 
 export type MutationReprocessQueuedAlertArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type MutationReprocessQueuedAlertsByFilterArgs = {
+  keyword?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -382,6 +400,7 @@ export type Query = {
   knowledgeTags: Array<KnowledgeTag>;
   knowledges: Array<Knowledge>;
   queuedAlerts: QueuedAlertsResponse;
+  reprocessBatchJob?: Maybe<ReprocessBatchJob>;
   reprocessJob?: Maybe<ReprocessJob>;
   session?: Maybe<Session>;
   sessionMessages: Array<SessionMessage>;
@@ -455,6 +474,11 @@ export type QueryQueuedAlertsArgs = {
   keyword?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryReprocessBatchJobArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -536,6 +560,17 @@ export type QueuedAlertsResponse = {
   __typename?: 'QueuedAlertsResponse';
   alerts: Array<QueuedAlert>;
   totalCount: Scalars['Int']['output'];
+};
+
+export type ReprocessBatchJob = {
+  __typename?: 'ReprocessBatchJob';
+  completedCount: Scalars['Int']['output'];
+  createdAt: Scalars['String']['output'];
+  failedCount: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  status: ReprocessJobStatus;
+  totalCount: Scalars['Int']['output'];
+  updatedAt: Scalars['String']['output'];
 };
 
 export type ReprocessJob = {
@@ -759,6 +794,11 @@ export type ArchiveTicketsMutationVariables = Exact<{
 
 
 export type ArchiveTicketsMutation = { __typename?: 'Mutation', archiveTickets: Array<{ __typename?: 'Ticket', id: string, status: string, title: string, description: string, resolvedAt?: string | null, archivedAt?: string | null, isTest: boolean, createdAt: string, updatedAt: string, assignee?: { __typename?: 'User', id: string, name: string } | null }> };
+
+export type ArchiveAllResolvedTicketsMutationVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ArchiveAllResolvedTicketsMutation = { __typename?: 'Mutation', archiveAllResolvedTickets: { __typename?: 'ArchiveAllResolvedResult', archivedCount: number } };
 
 export type UnarchiveTicketMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -1068,6 +1108,27 @@ export type DiscardQueuedAlertsMutationVariables = Exact<{
 
 
 export type DiscardQueuedAlertsMutation = { __typename?: 'Mutation', discardQueuedAlerts: boolean };
+
+export type DiscardQueuedAlertsByFilterMutationVariables = Exact<{
+  keyword?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type DiscardQueuedAlertsByFilterMutation = { __typename?: 'Mutation', discardQueuedAlertsByFilter: number };
+
+export type ReprocessQueuedAlertsByFilterMutationVariables = Exact<{
+  keyword?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ReprocessQueuedAlertsByFilterMutation = { __typename?: 'Mutation', reprocessQueuedAlertsByFilter: { __typename?: 'ReprocessBatchJob', id: string, status: ReprocessJobStatus, totalCount: number, completedCount: number, failedCount: number, createdAt: string, updatedAt: string } };
+
+export type GetReprocessBatchJobQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type GetReprocessBatchJobQuery = { __typename?: 'Query', reprocessBatchJob?: { __typename?: 'ReprocessBatchJob', id: string, status: ReprocessJobStatus, totalCount: number, completedCount: number, failedCount: number, createdAt: string, updatedAt: string } | null };
 
 
 export const GetTicketsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTickets"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"assigneeID"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"statuses"},"value":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}},{"kind":"Argument","name":{"kind":"Name","value":"assigneeID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"assigneeID"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"commentsCount"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
@@ -1486,6 +1547,32 @@ export function useArchiveTicketsMutation(baseOptions?: Apollo.MutationHookOptio
 export type ArchiveTicketsMutationHookResult = ReturnType<typeof useArchiveTicketsMutation>;
 export type ArchiveTicketsMutationResult = Apollo.MutationResult<ArchiveTicketsMutation>;
 export type ArchiveTicketsMutationOptions = Apollo.BaseMutationOptions<ArchiveTicketsMutation, ArchiveTicketsMutationVariables>;
+export const ArchiveAllResolvedTicketsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ArchiveAllResolvedTickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"archiveAllResolvedTickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"archivedCount"}}]}}]}}]} as unknown as DocumentNode;
+export type ArchiveAllResolvedTicketsMutationFn = Apollo.MutationFunction<ArchiveAllResolvedTicketsMutation, ArchiveAllResolvedTicketsMutationVariables>;
+
+/**
+ * __useArchiveAllResolvedTicketsMutation__
+ *
+ * To run a mutation, you first call `useArchiveAllResolvedTicketsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useArchiveAllResolvedTicketsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [archiveAllResolvedTicketsMutation, { data, loading, error }] = useArchiveAllResolvedTicketsMutation({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useArchiveAllResolvedTicketsMutation(baseOptions?: Apollo.MutationHookOptions<ArchiveAllResolvedTicketsMutation, ArchiveAllResolvedTicketsMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ArchiveAllResolvedTicketsMutation, ArchiveAllResolvedTicketsMutationVariables>(ArchiveAllResolvedTicketsDocument, options);
+      }
+export type ArchiveAllResolvedTicketsMutationHookResult = ReturnType<typeof useArchiveAllResolvedTicketsMutation>;
+export type ArchiveAllResolvedTicketsMutationResult = Apollo.MutationResult<ArchiveAllResolvedTicketsMutation>;
+export type ArchiveAllResolvedTicketsMutationOptions = Apollo.BaseMutationOptions<ArchiveAllResolvedTicketsMutation, ArchiveAllResolvedTicketsMutationVariables>;
 export const UnarchiveTicketDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UnarchiveTicket"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"unarchiveTicket"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"resolvedAt"}},{"kind":"Field","name":{"kind":"Name","value":"archivedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
 export type UnarchiveTicketMutationFn = Apollo.MutationFunction<UnarchiveTicketMutation, UnarchiveTicketMutationVariables>;
 
@@ -2800,3 +2887,94 @@ export function useDiscardQueuedAlertsMutation(baseOptions?: Apollo.MutationHook
 export type DiscardQueuedAlertsMutationHookResult = ReturnType<typeof useDiscardQueuedAlertsMutation>;
 export type DiscardQueuedAlertsMutationResult = Apollo.MutationResult<DiscardQueuedAlertsMutation>;
 export type DiscardQueuedAlertsMutationOptions = Apollo.BaseMutationOptions<DiscardQueuedAlertsMutation, DiscardQueuedAlertsMutationVariables>;
+export const DiscardQueuedAlertsByFilterDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DiscardQueuedAlertsByFilter"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"discardQueuedAlertsByFilter"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}}]}]}}]} as unknown as DocumentNode;
+export type DiscardQueuedAlertsByFilterMutationFn = Apollo.MutationFunction<DiscardQueuedAlertsByFilterMutation, DiscardQueuedAlertsByFilterMutationVariables>;
+
+/**
+ * __useDiscardQueuedAlertsByFilterMutation__
+ *
+ * To run a mutation, you first call `useDiscardQueuedAlertsByFilterMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDiscardQueuedAlertsByFilterMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [discardQueuedAlertsByFilterMutation, { data, loading, error }] = useDiscardQueuedAlertsByFilterMutation({
+ *   variables: {
+ *      keyword: // value for 'keyword'
+ *   },
+ * });
+ */
+export function useDiscardQueuedAlertsByFilterMutation(baseOptions?: Apollo.MutationHookOptions<DiscardQueuedAlertsByFilterMutation, DiscardQueuedAlertsByFilterMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<DiscardQueuedAlertsByFilterMutation, DiscardQueuedAlertsByFilterMutationVariables>(DiscardQueuedAlertsByFilterDocument, options);
+      }
+export type DiscardQueuedAlertsByFilterMutationHookResult = ReturnType<typeof useDiscardQueuedAlertsByFilterMutation>;
+export type DiscardQueuedAlertsByFilterMutationResult = Apollo.MutationResult<DiscardQueuedAlertsByFilterMutation>;
+export type DiscardQueuedAlertsByFilterMutationOptions = Apollo.BaseMutationOptions<DiscardQueuedAlertsByFilterMutation, DiscardQueuedAlertsByFilterMutationVariables>;
+export const ReprocessQueuedAlertsByFilterDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ReprocessQueuedAlertsByFilter"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"reprocessQueuedAlertsByFilter"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"completedCount"}},{"kind":"Field","name":{"kind":"Name","value":"failedCount"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+export type ReprocessQueuedAlertsByFilterMutationFn = Apollo.MutationFunction<ReprocessQueuedAlertsByFilterMutation, ReprocessQueuedAlertsByFilterMutationVariables>;
+
+/**
+ * __useReprocessQueuedAlertsByFilterMutation__
+ *
+ * To run a mutation, you first call `useReprocessQueuedAlertsByFilterMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useReprocessQueuedAlertsByFilterMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [reprocessQueuedAlertsByFilterMutation, { data, loading, error }] = useReprocessQueuedAlertsByFilterMutation({
+ *   variables: {
+ *      keyword: // value for 'keyword'
+ *   },
+ * });
+ */
+export function useReprocessQueuedAlertsByFilterMutation(baseOptions?: Apollo.MutationHookOptions<ReprocessQueuedAlertsByFilterMutation, ReprocessQueuedAlertsByFilterMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ReprocessQueuedAlertsByFilterMutation, ReprocessQueuedAlertsByFilterMutationVariables>(ReprocessQueuedAlertsByFilterDocument, options);
+      }
+export type ReprocessQueuedAlertsByFilterMutationHookResult = ReturnType<typeof useReprocessQueuedAlertsByFilterMutation>;
+export type ReprocessQueuedAlertsByFilterMutationResult = Apollo.MutationResult<ReprocessQueuedAlertsByFilterMutation>;
+export type ReprocessQueuedAlertsByFilterMutationOptions = Apollo.BaseMutationOptions<ReprocessQueuedAlertsByFilterMutation, ReprocessQueuedAlertsByFilterMutationVariables>;
+export const GetReprocessBatchJobDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetReprocessBatchJob"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"reprocessBatchJob"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"completedCount"}},{"kind":"Field","name":{"kind":"Name","value":"failedCount"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
+
+/**
+ * __useGetReprocessBatchJobQuery__
+ *
+ * To run a query within a React component, call `useGetReprocessBatchJobQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetReprocessBatchJobQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetReprocessBatchJobQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useGetReprocessBatchJobQuery(baseOptions: Apollo.QueryHookOptions<GetReprocessBatchJobQuery, GetReprocessBatchJobQueryVariables> & ({ variables: GetReprocessBatchJobQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetReprocessBatchJobQuery, GetReprocessBatchJobQueryVariables>(GetReprocessBatchJobDocument, options);
+      }
+export function useGetReprocessBatchJobLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetReprocessBatchJobQuery, GetReprocessBatchJobQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetReprocessBatchJobQuery, GetReprocessBatchJobQueryVariables>(GetReprocessBatchJobDocument, options);
+        }
+// @ts-ignore
+export function useGetReprocessBatchJobSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetReprocessBatchJobQuery, GetReprocessBatchJobQueryVariables>): Apollo.UseSuspenseQueryResult<GetReprocessBatchJobQuery, GetReprocessBatchJobQueryVariables>;
+export function useGetReprocessBatchJobSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetReprocessBatchJobQuery, GetReprocessBatchJobQueryVariables>): Apollo.UseSuspenseQueryResult<GetReprocessBatchJobQuery | undefined, GetReprocessBatchJobQueryVariables>;
+export function useGetReprocessBatchJobSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetReprocessBatchJobQuery, GetReprocessBatchJobQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetReprocessBatchJobQuery, GetReprocessBatchJobQueryVariables>(GetReprocessBatchJobDocument, options);
+        }
+export type GetReprocessBatchJobQueryHookResult = ReturnType<typeof useGetReprocessBatchJobQuery>;
+export type GetReprocessBatchJobLazyQueryHookResult = ReturnType<typeof useGetReprocessBatchJobLazyQuery>;
+export type GetReprocessBatchJobSuspenseQueryHookResult = ReturnType<typeof useGetReprocessBatchJobSuspenseQuery>;
+export type GetReprocessBatchJobQueryResult = Apollo.QueryResult<GetReprocessBatchJobQuery, GetReprocessBatchJobQueryVariables>;

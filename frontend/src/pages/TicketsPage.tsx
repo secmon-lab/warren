@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "@apollo/client";
+import { useQuery, useLazyQuery, useMutation } from "@apollo/client";
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useConfirm } from "@/hooks/use-confirm";
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/pagination";
 import { UserWithAvatar } from "@/components/ui/user-name";
 import { CreateTicketModal } from "@/components/CreateTicketModal";
-import { GET_TICKETS, GET_TAGS, ARCHIVE_TICKETS } from "@/lib/graphql/queries";
+import { GET_TICKETS, GET_TAGS, ARCHIVE_ALL_RESOLVED_TICKETS } from "@/lib/graphql/queries";
 import { Ticket, TicketStatus, TagMetadata } from "@/lib/types";
 import { AlertCircle, MessageSquare, Plus, Tag, Archive, CircleDot, CheckCircle2, ArchiveIcon, Search, X } from "lucide-react";
 import { generateTagColor } from "@/lib/tag-colors";
@@ -95,7 +95,8 @@ export default function TicketsPage() {
   const { data: tagsData } = useQuery(GET_TAGS);
   const tagsByName = new Map((tagsData?.tags || []).map((t: TagMetadata) => [t.name, t]));
 
-  const [archiveTickets, { loading: archiving }] = useMutation(ARCHIVE_TICKETS);
+  const [archiveAllResolved, { loading: archiving }] = useMutation(ARCHIVE_ALL_RESOLVED_TICKETS);
+  const [fetchResolvedCount] = useLazyQuery(GET_TICKETS, { fetchPolicy: "network-only" });
 
   const tickets: Ticket[] = ticketsData?.tickets?.tickets || [];
   const resolvedTickets = tickets.filter(t => t.status === "resolved");
@@ -146,16 +147,20 @@ export default function TicketsPage() {
   };
 
   const handleArchiveAllResolved = async () => {
-    const ids = resolvedTickets.map(t => t.id);
-    if (ids.length === 0) return;
+    // Fetch the total count of all resolved tickets from the server
+    const { data } = await fetchResolvedCount({
+      variables: { statuses: ["resolved"], offset: 0, limit: 1 },
+    });
+    const totalResolved = data?.tickets?.totalCount ?? 0;
+    if (totalResolved === 0) return;
     const ok = await confirm({
       title: "Archive All Resolved",
-      description: `Archive ${ids.length} resolved ticket${ids.length > 1 ? "s" : ""}? This cannot be undone easily.`,
+      description: `Archive ${totalResolved} resolved ticket${totalResolved > 1 ? "s" : ""}? This cannot be undone easily.`,
       confirmText: "Archive",
       variant: "destructive",
     });
     if (!ok) return;
-    await archiveTickets({ variables: { ids } });
+    await archiveAllResolved();
     await refetch();
   };
 
@@ -221,9 +226,10 @@ export default function TicketsPage() {
               size="sm"
               onClick={handleArchiveAllResolved}
               disabled={archiving}
-              className="h-8 text-xs flex items-center gap-1.5">
+              className="h-8 text-xs flex items-center gap-1.5"
+              data-testid="archive-all-resolved-button">
               <Archive className="h-3.5 w-3.5" />
-              Archive All Resolved ({resolvedTickets.length})
+              Archive All Resolved
             </Button>
           )}
         </div>

@@ -38,6 +38,10 @@ export class TicketListPage extends BasePage {
     return this.page.getByRole("button", { name: "Search" });
   }
 
+  get archiveAllResolvedButton() {
+    return this.page.getByTestId("archive-all-resolved-button");
+  }
+
   ticketItems() {
     return this.page.locator("[data-testid^='ticket-item-']");
   }
