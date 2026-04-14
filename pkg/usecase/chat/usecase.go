@@ -172,11 +172,7 @@ func (u *UseCase) setupMessageRouting(ctx context.Context, ssn *session.Session,
 		notifyFunc, traceFunc, warnFunc := u.setupSlackMessageFuncs(ctx, ssn, target)
 		ctx = msg.With(ctx, notifyFunc, traceFunc, warnFunc)
 
-		// Post request ID as a context block immediately
-		requestID := request_id.FromContext(ctx)
-		if requestID == "" {
-			requestID = "unknown"
-		}
+		// Post a brief status indicator as a context block immediately
 		verbs := []string{
 			"Investigating", "Analyzing", "Processing", "Inspecting",
 			"Examining", "Scanning", "Assessing", "Evaluating",
@@ -186,8 +182,8 @@ func (u *UseCase) setupMessageRouting(ctx context.Context, ssn *session.Session,
 		}
 		verb := verbs[rand.IntN(len(verbs))] // #nosec G404 -- not security-sensitive, just picking a random UI verb
 		threadSvc := u.slackService.NewThread(*target.SlackThread)
-		if err := threadSvc.PostContextBlock(ctx, fmt.Sprintf("%s ... (ID: `%s`)", verb, requestID)); err != nil {
-			logging.From(ctx).Error("failed to post request ID", "error", err)
+		if err := threadSvc.PostContextBlock(ctx, fmt.Sprintf("%s ...", verb)); err != nil {
+			logging.From(ctx).Error("failed to post status", "error", err)
 		}
 	}
 

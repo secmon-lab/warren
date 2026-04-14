@@ -472,11 +472,11 @@ func TestBluebellChat_ContextBlock_ZeroEntries(t *testing.T) {
 	})
 	gt.NoError(t, err)
 
-	// Verify context block with "(default)" was posted
+	// Verify context block with "Executing as (default)" was posted
 	found := false
 	for _, opt := range *postedOptions {
 		rendered := renderMsgOption(opt)
-		if strings.Contains(rendered, "Prompt:") && strings.Contains(rendered, "(default)") {
+		if strings.Contains(rendered, " as ") && strings.Contains(rendered, "(default)") {
 			found = true
 			break
 		}
@@ -542,7 +542,7 @@ func TestBluebellChat_ContextBlock_WithPromptEntry(t *testing.T) {
 	found := false
 	for _, opt := range *postedOptions {
 		rendered := renderMsgOption(opt)
-		if strings.Contains(rendered, "Prompt:") && strings.Contains(rendered, "Security Investigation") {
+		if strings.Contains(rendered, " as ") && strings.Contains(rendered, "Security Investigation") {
 			found = true
 			break
 		}
@@ -586,7 +586,7 @@ func TestBluebellChat_ContextBlock_NoSlackThread(t *testing.T) {
 	// No context block should be posted (no SlackThread)
 	for _, opt := range *postedOptions {
 		rendered := renderMsgOption(opt)
-		gt.V(t, strings.Contains(rendered, "Prompt:")).Equal(false)
+		gt.V(t, strings.Contains(rendered, " as ")).Equal(false)
 	}
 }
 

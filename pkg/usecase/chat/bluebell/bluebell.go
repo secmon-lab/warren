@@ -3,6 +3,7 @@ package bluebell
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"strings"
 	"time"
 
@@ -198,15 +199,25 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 	var resolvedIntent string
 	if resolved != nil {
 		resolvedIntent = resolved.Intent
-		// Post context block showing which prompt was selected
+		// Post context blocks showing execution status and intent
 		if c.slackService != nil && target.SlackThread != nil {
 			threadSvc := c.slackService.NewThread(*target.SlackThread)
 			promptLabel := resolved.PromptName
 			if promptLabel == "" {
 				promptLabel = "(default)"
 			}
-			if postErr := threadSvc.PostContextBlock(ctx, fmt.Sprintf("📋 Prompt: `%s`", promptLabel)); postErr != nil {
-				logging.From(ctx).Error("failed to post prompt selection", "error", postErr)
+			verbs := []string{
+				"Executing as", "Running as", "Processing as", "Operating as",
+				"Engaging as", "Launching as", "Activating as", "Invoking as",
+			}
+			verb := verbs[rand.IntN(len(verbs))] // #nosec G404 -- not security-sensitive, just picking a random UI verb
+			if postErr := threadSvc.PostContextBlock(ctx, fmt.Sprintf("%s `%s` ... (ID: `%s`)", verb, promptLabel, requestID)); postErr != nil {
+				logging.From(ctx).Error("failed to post execution status", "error", postErr)
+			}
+			if resolvedIntent != "" {
+				if postErr := threadSvc.PostContextBlock(ctx, fmt.Sprintf("💬 %s", resolvedIntent)); postErr != nil {
+					logging.From(ctx).Error("failed to post intent", "error", postErr)
+				}
 			}
 		}
 	}
