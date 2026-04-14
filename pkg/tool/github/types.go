@@ -54,12 +54,11 @@ type ContentResult struct {
 
 // CommitResult represents a commit in the list commits response
 type CommitResult struct {
-	SHA          string    `json:"sha"`
-	Message      string    `json:"message"`
-	Author       string    `json:"author"`
-	Date         time.Time `json:"date"`
-	HTMLURL      string    `json:"html_url"`
-	FilesChanged int       `json:"files_changed"`
+	SHA     string    `json:"sha"`
+	Message string    `json:"message"`
+	Author  string    `json:"author"`
+	Date    time.Time `json:"date"`
+	HTMLURL string    `json:"html_url"`
 }
 
 // BlameRange represents a blame range for a set of lines

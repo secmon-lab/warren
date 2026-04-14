@@ -402,12 +402,10 @@ func TestGitHubListCommits(t *testing.T) {
 	gt.S(t, commits[0].Message).Equal("Fix security vulnerability in auth handler")
 	gt.S(t, commits[0].Author).Equal("testuser")
 	gt.S(t, commits[0].HTMLURL).Equal("https://github.com/test/repo/commit/abc123def456")
-	gt.Number(t, commits[0].FilesChanged).Equal(2)
 
 	// Check second commit
 	gt.S(t, commits[1].SHA).Equal("789xyz")
 	gt.S(t, commits[1].Author).Equal("anotheruser")
-	gt.Number(t, commits[1].FilesChanged).Equal(0)
 }
 
 func TestGitHubListCommitsUnauthorizedRepo(t *testing.T) {

@@ -100,8 +100,6 @@ func (x *Action) runListCommits(ctx context.Context, args map[string]any) (map[s
 			cr.Author = *commit.Author.Login
 		}
 
-		cr.FilesChanged = len(commit.Files)
-
 		results = append(results, cr)
 	}
 

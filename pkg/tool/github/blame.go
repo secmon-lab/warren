@@ -138,6 +138,7 @@ func (x *Action) runGetBlame(ctx context.Context, args map[string]any) (map[stri
 		return nil, goerr.Wrap(err, "failed to create GraphQL request")
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("User-Agent", "warren")
 
 	resp, err := x.httpClient.Do(httpReq)
 	if err != nil {
@@ -180,10 +181,10 @@ func (x *Action) runGetBlame(ctx context.Context, args map[string]any) (map[stri
 	// Convert to BlameResult
 	ranges := make([]BlameRange, 0, len(gqlResp.Data.Repository.Object.Blame.Ranges))
 	for _, r := range gqlResp.Data.Repository.Object.Blame.Ranges {
-		// Truncate long commit messages
+		// Truncate long commit messages (UTF-8 safe)
 		message := r.Commit.Message
-		if len(message) > 200 {
-			message = message[:200] + "..."
+		if runes := []rune(message); len(runes) > 200 {
+			message = string(runes[:200]) + "..."
 		}
 
 		ranges = append(ranges, BlameRange{
