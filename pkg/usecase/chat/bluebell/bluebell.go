@@ -3,6 +3,7 @@ package bluebell
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"strings"
 	"time"
 
@@ -209,7 +210,12 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 			if requestID == "" {
 				requestID = "unknown"
 			}
-			if postErr := threadSvc.PostContextBlock(ctx, fmt.Sprintf("Executing as `%s` ... (ID: `%s`)", promptLabel, requestID)); postErr != nil {
+			verbs := []string{
+				"Executing as", "Running as", "Processing as", "Operating as",
+				"Engaging as", "Launching as", "Activating as", "Invoking as",
+			}
+			verb := verbs[rand.IntN(len(verbs))] // #nosec G404 -- not security-sensitive, just picking a random UI verb
+			if postErr := threadSvc.PostContextBlock(ctx, fmt.Sprintf("%s `%s` ... (ID: `%s`)", verb, promptLabel, requestID)); postErr != nil {
 				logging.From(ctx).Error("failed to post execution status", "error", postErr)
 			}
 			if resolvedIntent != "" {
