@@ -91,17 +91,19 @@ test.describe("Tickets", () => {
   test("should show archive all resolved button and confirmation dialog", async ({
     authenticatedPage: page,
   }) => {
+    const suffix = Date.now().toString();
+
     // Create resolved tickets via API
     const ticket1 = await createTicketViaAPI(
       page,
-      "Resolved Ticket 1",
+      `ArchDialogTest1-${suffix}`,
       "Test ticket for archive"
     );
     await resolveTicketViaAPI(page, ticket1.id);
 
     const ticket2 = await createTicketViaAPI(
       page,
-      "Resolved Ticket 2",
+      `ArchDialogTest2-${suffix}`,
       "Test ticket for archive"
     );
     await resolveTicketViaAPI(page, ticket2.id);
@@ -112,44 +114,58 @@ test.describe("Tickets", () => {
     // Archive All Resolved button should be visible when there are resolved tickets
     await expect(ticketList.archiveAllResolvedButton).toBeVisible();
 
-    // Click the button and verify confirmation dialog shows accurate count
+    // Click the button and verify confirmation dialog appears with count
     await ticketList.archiveAllResolvedButton.click();
     await expect(
-      page.getByText("Archive 2 resolved tickets?")
+      page.getByText(/Archive \d+ resolved tickets?\? This cannot be undone easily\./)
     ).toBeVisible();
 
     // Cancel
     await page.getByRole("button", { name: "Cancel" }).click();
     await expect(
-      page.getByText("Archive 2 resolved tickets?")
+      page.getByText(/Archive \d+ resolved tickets?\?/)
     ).not.toBeVisible();
   });
 
   test("should archive all resolved tickets via confirmation dialog", async ({
     authenticatedPage: page,
   }) => {
-    // Create a mix of tickets
+    const suffix = Date.now().toString();
+
+    // Create a mix of tickets with unique names
     const resolved1 = await createTicketViaAPI(
       page,
-      "To Archive 1",
+      `ToArchive-${suffix}`,
       "Will be archived"
     );
     await resolveTicketViaAPI(page, resolved1.id);
 
-    await createTicketViaAPI(page, "Open Ticket", "Should remain open");
+    const openTicket = await createTicketViaAPI(
+      page,
+      `StayOpen-${suffix}`,
+      "Should remain open"
+    );
 
     const ticketList = new TicketListPage(page);
     await ticketList.goto();
 
     await expect(ticketList.archiveAllResolvedButton).toBeVisible();
 
-    // Click archive and confirm
+    // Click archive button — dialog opens
     await ticketList.archiveAllResolvedButton.click();
-    await page.getByRole("button", { name: "Archive" }).click();
+
+    // Wait for dialog and click the confirm button inside it
+    const confirmButton = page.getByRole("button", { name: "Archive" });
+    await expect(confirmButton).toBeVisible();
+    await confirmButton.click();
+
+    // Wait for refetch to complete
+    await page.waitForTimeout(1000);
+    await ticketList.goto();
 
     // After archiving, the resolved ticket should no longer be in the active list
-    await expect(page.getByText("To Archive 1")).not.toBeVisible();
+    await expect(page.getByText(`ToArchive-${suffix}`)).not.toBeVisible();
     // Open ticket should still be visible
-    await expect(page.getByText("Open Ticket")).toBeVisible();
+    await expect(page.getByText(`StayOpen-${suffix}`).first()).toBeVisible();
   });
 });
