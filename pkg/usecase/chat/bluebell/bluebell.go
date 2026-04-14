@@ -206,10 +206,6 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 			if promptLabel == "" {
 				promptLabel = "(default)"
 			}
-			requestID := request_id.FromContext(ctx)
-			if requestID == "" {
-				requestID = "unknown"
-			}
 			verbs := []string{
 				"Executing as", "Running as", "Processing as", "Operating as",
 				"Engaging as", "Launching as", "Activating as", "Invoking as",
