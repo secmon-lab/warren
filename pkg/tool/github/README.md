@@ -1,6 +1,6 @@
-# GitHub Code Search
+# GitHub
 
-Search code, issues, and pull requests across configured GitHub repositories using a GitHub App for authentication.
+Search code, issues, and pull requests, list commit history, and get file blame across configured GitHub repositories using a GitHub App for authentication.
 
 ## Configuration
 
@@ -18,6 +18,8 @@ Search code, issues, and pull requests across configured GitHub repositories usi
 | `github_code_search` | Search for code across repositories. Supports filters: `language`, `path`, `filename`, `repo_filter` |
 | `github_issue_search` | Search issues and pull requests. Supports filters: `state`, `labels`, `author`, `type`, `repo_filter` |
 | `github_get_content` | Get file content from a specific repository by owner, repo, path, and ref |
+| `github_list_commits` | List commits for a repository. Supports filters: `sha`, `path`, `author`, `per_page`, `page` |
+| `github_get_blame` | Get git blame for a file, showing which commit last modified each line. Uses GraphQL API |
 
 ## Setup
 

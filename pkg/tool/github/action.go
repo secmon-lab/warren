@@ -42,7 +42,7 @@ func (x *Action) ID() string {
 }
 
 func (x *Action) Description() string {
-	return "GitHub code and issue search"
+	return "GitHub code and issue search, commit history, and file blame"
 }
 
 func (x *Action) Flags() []cli.Flag {
@@ -306,6 +306,81 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				},
 			},
 		},
+		{
+			Name:        "github_list_commits",
+			Description: "List commits for a repository. Supports filtering by file path, author, and branch/SHA. Useful for understanding change history and identifying who changed what and when.",
+			Parameters: map[string]*gollem.Parameter{
+				"owner": {
+					Type:        gollem.TypeString,
+					Description: "Repository owner (organization or username)",
+					Required:    true,
+					Pattern:     "^[a-zA-Z0-9][a-zA-Z0-9-]*$",
+					MinLength:   github.Ptr(1),
+					MaxLength:   github.Ptr(39),
+				},
+				"repo": {
+					Type:        gollem.TypeString,
+					Description: "Repository name",
+					Required:    true,
+					Pattern:     "^[a-zA-Z0-9_.-]+$",
+					MinLength:   github.Ptr(1),
+					MaxLength:   github.Ptr(100),
+				},
+				"sha": {
+					Type:        gollem.TypeString,
+					Description: "SHA or branch to start listing commits from. Defaults to the default branch.",
+				},
+				"path": {
+					Type:        gollem.TypeString,
+					Description: "Only commits containing this file path will be returned (e.g., 'src/main.go')",
+				},
+				"author": {
+					Type:        gollem.TypeString,
+					Description: "GitHub login or email address to filter commits by author",
+				},
+				"per_page": {
+					Type:        gollem.TypeInteger,
+					Description: "Number of commits per page (default: 30, max: 100)",
+				},
+				"page": {
+					Type:        gollem.TypeInteger,
+					Description: "Page number for pagination (default: 1)",
+				},
+			},
+		},
+		{
+			Name:        "github_get_blame",
+			Description: "Get git blame information for a file, showing which commit last modified each line. Useful for identifying who wrote specific code and when.",
+			Parameters: map[string]*gollem.Parameter{
+				"owner": {
+					Type:        gollem.TypeString,
+					Description: "Repository owner (organization or username)",
+					Required:    true,
+					Pattern:     "^[a-zA-Z0-9][a-zA-Z0-9-]*$",
+					MinLength:   github.Ptr(1),
+					MaxLength:   github.Ptr(39),
+				},
+				"repo": {
+					Type:        gollem.TypeString,
+					Description: "Repository name",
+					Required:    true,
+					Pattern:     "^[a-zA-Z0-9_.-]+$",
+					MinLength:   github.Ptr(1),
+					MaxLength:   github.Ptr(100),
+				},
+				"path": {
+					Type:        gollem.TypeString,
+					Description: "File path in the repository (e.g., 'src/main.go')",
+					Required:    true,
+					MinLength:   github.Ptr(1),
+				},
+				"ref": {
+					Type:        gollem.TypeString,
+					Description: "Git reference: branch name, tag, or commit SHA. Defaults to the repository's default branch.",
+					Pattern:     "^[a-zA-Z0-9/_.-]+$",
+				},
+			},
+		},
 	}, nil
 }
 
@@ -322,6 +397,10 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 		return x.runIssueSearch(ctx, args)
 	case "github_get_content":
 		return x.runGetContent(ctx, args)
+	case "github_list_commits":
+		return x.runListCommits(ctx, args)
+	case "github_get_blame":
+		return x.runGetBlame(ctx, args)
 	default:
 		return nil, goerr.New("unknown tool name", goerr.V("name", name))
 	}
@@ -349,7 +428,7 @@ func (x *Action) Prompt(ctx context.Context) (string, error) {
 	}
 
 	sb.WriteString("\n")
-	sb.WriteString("Use the GitHub tools to search code, issues/PRs, or retrieve file contents from these repositories.\n")
+	sb.WriteString("Use the GitHub tools to search code, issues/PRs, retrieve file contents, list commit history, or get file blame from these repositories.\n")
 
 	return sb.String(), nil
 }

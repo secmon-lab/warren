@@ -27,15 +27,7 @@ func (x *Action) runGetContent(ctx context.Context, args map[string]any) (map[st
 	}
 
 	// Check if the repository is in our configured list
-	allowed := false
-	for _, config := range x.configs {
-		if config.Owner == owner && config.Repository == repo {
-			allowed = true
-			break
-		}
-	}
-
-	if !allowed {
+	if !x.isAllowedRepo(owner, repo) {
 		return nil, goerr.New("repository not in configured list",
 			goerr.V("owner", owner),
 			goerr.V("repo", repo))
