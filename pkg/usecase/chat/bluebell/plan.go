@@ -70,9 +70,11 @@ func (c *BluebellChat) executePlannerAgent(ctx context.Context, planSession goll
 		opts = append(opts, gollem.WithHistory(history))
 	}
 
+	// Use AsChildAgent so that gollem's Agent.Execute maps StartAgentExecute to
+	// StartChildAgent, avoiding overwrite of the root trace held by the Recorder.
 	handler := trace.HandlerFrom(ctx)
 	if handler != nil {
-		opts = append(opts, gollem.WithTrace(handler))
+		opts = append(opts, gollem.WithTrace(trace.AsChildAgent(handler, "planner")))
 	}
 
 	agent := gollem.New(c.llmClient, opts...)
