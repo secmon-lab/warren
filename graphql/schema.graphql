@@ -159,11 +159,16 @@ type Query {
   availableTagColorNames: [String!]!
 }
 
+type ArchiveAllResolvedResult {
+  archivedCount: Int!
+}
+
 type Mutation {
   resolveTicket(id: ID!, conclusion: String!, reason: String!): Ticket!
   reopenTicket(id: ID!): Ticket!
   archiveTicket(id: ID!): Ticket!
   archiveTickets(ids: [ID!]!): [Ticket!]!
+  archiveAllResolvedTickets: ArchiveAllResolvedResult!
   unarchiveTicket(id: ID!): Ticket!
   updateTicketConclusion(id: ID!, conclusion: String!, reason: String!): Ticket!
   updateTicket(id: ID!, title: String!, description: String): Ticket!

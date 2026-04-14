@@ -240,6 +240,15 @@ func (r *mutationResolver) ArchiveTickets(ctx context.Context, ids []string) ([]
 	return tickets, nil
 }
 
+// ArchiveAllResolvedTickets is the resolver for the archiveAllResolvedTickets field.
+func (r *mutationResolver) ArchiveAllResolvedTickets(ctx context.Context) (*graphql1.ArchiveAllResolvedResult, error) {
+	count, err := r.uc.ArchiveAllResolvedTickets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &graphql1.ArchiveAllResolvedResult{ArchivedCount: count}, nil
+}
+
 // UnarchiveTicket is the resolver for the unarchiveTicket field.
 func (r *mutationResolver) UnarchiveTicket(ctx context.Context, id string) (*ticket.Ticket, error) {
 	updatedTicket, err := r.uc.UnarchiveTicket(ctx, types.TicketID(id))

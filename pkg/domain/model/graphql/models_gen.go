@@ -43,6 +43,10 @@ type AlertsResponse struct {
 	TotalCount int            `json:"totalCount"`
 }
 
+type ArchiveAllResolvedResult struct {
+	ArchivedCount int `json:"archivedCount"`
+}
+
 type CommentsResponse struct {
 	Comments   []*ticket.Comment `json:"comments"`
 	TotalCount int               `json:"totalCount"`

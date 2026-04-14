@@ -4,14 +4,17 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
+	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/utils/clock"
 )
 
 func TestCreateManualTicket(t *testing.T) {
@@ -562,4 +565,127 @@ func TestSourceLogic(t *testing.T) {
 		gt.Value(t, ticket.Metadata.TitleSource).Equal(types.SourceAI)
 		gt.Value(t, ticket.Metadata.DescriptionSource).Equal(types.SourceAI)
 	})
+}
+
+func TestArchiveAllResolvedTickets(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+	resolvedAt := now.Add(-time.Hour)
+
+	// Create test tickets: 3 resolved, 1 open, 1 archived
+	testTickets := []ticket.Ticket{
+		{
+			ID:         types.TicketID("t1"),
+			Status:     types.TicketStatusResolved,
+			ResolvedAt: &resolvedAt,
+			CreatedAt:  now.Add(-2 * time.Hour),
+			UpdatedAt:  now.Add(-time.Hour),
+		},
+		{
+			ID:         types.TicketID("t2"),
+			Status:     types.TicketStatusResolved,
+			ResolvedAt: &resolvedAt,
+			CreatedAt:  now.Add(-3 * time.Hour),
+			UpdatedAt:  now.Add(-time.Hour),
+		},
+		{
+			ID:        types.TicketID("t3"),
+			Status:    types.TicketStatusOpen,
+			CreatedAt: now.Add(-4 * time.Hour),
+			UpdatedAt: now.Add(-time.Hour),
+		},
+		{
+			ID:         types.TicketID("t4"),
+			Status:     types.TicketStatusArchived,
+			ArchivedAt: &resolvedAt,
+			CreatedAt:  now.Add(-5 * time.Hour),
+			UpdatedAt:  now.Add(-time.Hour),
+		},
+		{
+			ID:         types.TicketID("t5"),
+			Status:     types.TicketStatusResolved,
+			ResolvedAt: &resolvedAt,
+			CreatedAt:  now.Add(-6 * time.Hour),
+			UpdatedAt:  now.Add(-time.Hour),
+		},
+	}
+	for _, tk := range testTickets {
+		gt.NoError(t, repo.PutTicket(ctx, tk))
+	}
+
+	uc := New(WithRepository(repo))
+	count, err := uc.ArchiveAllResolvedTickets(ctx)
+	gt.NoError(t, err)
+	gt.Equal(t, count, 3)
+
+	// Verify all 3 resolved tickets are now archived
+	for _, id := range []types.TicketID{"t1", "t2", "t5"} {
+		tk, err := repo.GetTicket(ctx, id)
+		gt.NoError(t, err)
+		gt.Equal(t, tk.Status, types.TicketStatusArchived)
+		gt.V(t, tk.ArchivedAt).NotNil()
+		gt.Equal(t, *tk.ArchivedAt, now)
+	}
+
+	// Verify open ticket is untouched
+	openTk, err := repo.GetTicket(ctx, types.TicketID("t3"))
+	gt.NoError(t, err)
+	gt.Equal(t, openTk.Status, types.TicketStatusOpen)
+
+	// Verify already-archived ticket retains its original ArchivedAt
+	archivedTk, err := repo.GetTicket(ctx, types.TicketID("t4"))
+	gt.NoError(t, err)
+	gt.Equal(t, archivedTk.Status, types.TicketStatusArchived)
+	gt.Equal(t, *archivedTk.ArchivedAt, resolvedAt)
+}
+
+func TestArchiveAllResolvedTicketsNoResolved(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+	gt.NoError(t, repo.PutTicket(ctx, ticket.Ticket{
+		ID:        types.TicketID("t1"),
+		Status:    types.TicketStatusOpen,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}))
+
+	uc := New(WithRepository(repo))
+	count, err := uc.ArchiveAllResolvedTickets(ctx)
+	gt.NoError(t, err)
+	gt.Equal(t, count, 0)
+}
+
+func TestArchiveAllResolvedTicketsBackfillsResolvedAt(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	ctx = clock.With(ctx, func() time.Time { return now })
+
+	repo := repository.NewMemory()
+
+	// Ticket with nil ResolvedAt (legacy data)
+	gt.NoError(t, repo.PutTicket(ctx, ticket.Ticket{
+		ID:        types.TicketID("t1"),
+		Status:    types.TicketStatusResolved,
+		CreatedAt: now.Add(-time.Hour),
+		UpdatedAt: now.Add(-time.Hour),
+	}))
+
+	uc := New(WithRepository(repo))
+	count, err := uc.ArchiveAllResolvedTickets(ctx)
+	gt.NoError(t, err)
+	gt.Equal(t, count, 1)
+
+	tk, err := repo.GetTicket(ctx, types.TicketID("t1"))
+	gt.NoError(t, err)
+	gt.Equal(t, tk.Status, types.TicketStatusArchived)
+	gt.V(t, tk.ResolvedAt).NotNil()
+	gt.Equal(t, *tk.ResolvedAt, now)
+	gt.V(t, tk.ArchivedAt).NotNil()
+	gt.Equal(t, *tk.ArchivedAt, now)
 }

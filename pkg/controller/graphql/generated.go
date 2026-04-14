@@ -92,6 +92,10 @@ type ComplexityRoot struct {
 		TotalCount func(childComplexity int) int
 	}
 
+	ArchiveAllResolvedResult struct {
+		ArchivedCount func(childComplexity int) int
+	}
+
 	Comment struct {
 		Content   func(childComplexity int) int
 		CreatedAt func(childComplexity int) int
@@ -187,6 +191,7 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
+		ArchiveAllResolvedTickets     func(childComplexity int) int
 		ArchiveTicket                 func(childComplexity int, id string) int
 		ArchiveTickets                func(childComplexity int, ids []string) int
 		BindAlertsToTicket            func(childComplexity int, ticketID string, alertIds []string) int
@@ -387,6 +392,7 @@ type MutationResolver interface {
 	ReopenTicket(ctx context.Context, id string) (*ticket.Ticket, error)
 	ArchiveTicket(ctx context.Context, id string) (*ticket.Ticket, error)
 	ArchiveTickets(ctx context.Context, ids []string) ([]*ticket.Ticket, error)
+	ArchiveAllResolvedTickets(ctx context.Context) (*graphql1.ArchiveAllResolvedResult, error)
 	UnarchiveTicket(ctx context.Context, id string) (*ticket.Ticket, error)
 	UpdateTicketConclusion(ctx context.Context, id string, conclusion string, reason string) (*ticket.Ticket, error)
 	UpdateTicket(ctx context.Context, id string, title string, description *string) (*ticket.Ticket, error)
@@ -686,6 +692,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.AlertsResponse.TotalCount(childComplexity), true
+
+	case "ArchiveAllResolvedResult.archivedCount":
+		if e.ComplexityRoot.ArchiveAllResolvedResult.ArchivedCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ArchiveAllResolvedResult.ArchivedCount(childComplexity), true
 
 	case "Comment.content":
 		if e.ComplexityRoot.Comment.Content == nil {
@@ -1064,6 +1077,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.KnowledgeTag.UpdatedAt(childComplexity), true
 
+	case "Mutation.archiveAllResolvedTickets":
+		if e.ComplexityRoot.Mutation.ArchiveAllResolvedTickets == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Mutation.ArchiveAllResolvedTickets(childComplexity), true
 	case "Mutation.archiveTicket":
 		if e.ComplexityRoot.Mutation.ArchiveTicket == nil {
 			break
@@ -2333,11 +2352,16 @@ type Query {
   availableTagColorNames: [String!]!
 }
 
+type ArchiveAllResolvedResult {
+  archivedCount: Int!
+}
+
 type Mutation {
   resolveTicket(id: ID!, conclusion: String!, reason: String!): Ticket!
   reopenTicket(id: ID!): Ticket!
   archiveTicket(id: ID!): Ticket!
   archiveTickets(ids: [ID!]!): [Ticket!]!
+  archiveAllResolvedTickets: ArchiveAllResolvedResult!
   unarchiveTicket(id: ID!): Ticket!
   updateTicketConclusion(id: ID!, conclusion: String!, reason: String!): Ticket!
   updateTicket(id: ID!, title: String!, description: String): Ticket!
@@ -4465,6 +4489,35 @@ func (ec *executionContext) _AlertsResponse_totalCount(ctx context.Context, fiel
 func (ec *executionContext) fieldContext_AlertsResponse_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "AlertsResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ArchiveAllResolvedResult_archivedCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.ArchiveAllResolvedResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ArchiveAllResolvedResult_archivedCount,
+		func(ctx context.Context) (any, error) {
+			return obj.ArchivedCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ArchiveAllResolvedResult_archivedCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ArchiveAllResolvedResult",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -6744,6 +6797,39 @@ func (ec *executionContext) fieldContext_Mutation_archiveTickets(ctx context.Con
 	if fc.Args, err = ec.field_Mutation_archiveTickets_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_archiveAllResolvedTickets(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_archiveAllResolvedTickets,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Mutation().ArchiveAllResolvedTickets(ctx)
+		},
+		nil,
+		ec.marshalNArchiveAllResolvedResult2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐArchiveAllResolvedResult,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_archiveAllResolvedTickets(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "archivedCount":
+				return ec.fieldContext_ArchiveAllResolvedResult_archivedCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ArchiveAllResolvedResult", field.Name)
+		},
 	}
 	return fc, nil
 }
@@ -14255,6 +14341,45 @@ func (ec *executionContext) _AlertsResponse(ctx context.Context, sel ast.Selecti
 	return out
 }
 
+var archiveAllResolvedResultImplementors = []string{"ArchiveAllResolvedResult"}
+
+func (ec *executionContext) _ArchiveAllResolvedResult(ctx context.Context, sel ast.SelectionSet, obj *graphql1.ArchiveAllResolvedResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, archiveAllResolvedResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ArchiveAllResolvedResult")
+		case "archivedCount":
+			out.Values[i] = ec._ArchiveAllResolvedResult_archivedCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var commentImplementors = []string{"Comment"}
 
 func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, obj *ticket.Comment) graphql.Marshaler {
@@ -15182,6 +15307,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "archiveTickets":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_archiveTickets(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "archiveAllResolvedTickets":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_archiveAllResolvedTickets(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -18052,6 +18184,20 @@ func (ec *executionContext) marshalNAlertsResponse2ᚖgithubᚗcomᚋsecmonᚑla
 		return graphql.Null
 	}
 	return ec._AlertsResponse(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNArchiveAllResolvedResult2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐArchiveAllResolvedResult(ctx context.Context, sel ast.SelectionSet, v graphql1.ArchiveAllResolvedResult) graphql.Marshaler {
+	return ec._ArchiveAllResolvedResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNArchiveAllResolvedResult2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐArchiveAllResolvedResult(ctx context.Context, sel ast.SelectionSet, v *graphql1.ArchiveAllResolvedResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ArchiveAllResolvedResult(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {

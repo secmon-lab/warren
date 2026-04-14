@@ -332,6 +332,14 @@ export const ARCHIVE_TICKETS = gql`
   }
 `;
 
+export const ARCHIVE_ALL_RESOLVED_TICKETS = gql`
+  mutation ArchiveAllResolvedTickets {
+    archiveAllResolvedTickets {
+      archivedCount
+    }
+  }
+`;
+
 export const UNARCHIVE_TICKET = gql`
   mutation UnarchiveTicket($id: ID!) {
     unarchiveTicket(id: $id) {

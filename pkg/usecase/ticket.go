@@ -581,6 +581,48 @@ func (uc *UseCases) ArchiveTickets(ctx context.Context, ticketIDs []types.Ticket
 	return tickets, nil
 }
 
+// ArchiveAllResolvedTickets fetches all resolved tickets from the repository
+// and archives them. Returns the number of archived tickets.
+func (uc *UseCases) ArchiveAllResolvedTickets(ctx context.Context) (int, error) {
+	// Fetch all resolved tickets without pagination (offset=0, limit=0 means no limit).
+	resolved, err := uc.repository.GetTicketsByStatus(ctx, []types.TicketStatus{types.TicketStatusResolved}, "", "", 0, 0)
+	if err != nil {
+		return 0, goerr.Wrap(err, "failed to get resolved tickets")
+	}
+
+	if len(resolved) == 0 {
+		return 0, nil
+	}
+
+	now := clock.Now(ctx)
+	for _, t := range resolved {
+		if t.ResolvedAt == nil {
+			t.ResolvedAt = &now
+		}
+		t.Status = types.TicketStatusArchived
+		t.ArchivedAt = &now
+		t.UpdatedAt = now
+	}
+
+	for _, t := range resolved {
+		if err := uc.repository.PutTicket(ctx, *t); err != nil {
+			return 0, goerr.Wrap(err, "failed to save archived ticket", goerr.V("ticket_id", t.ID))
+		}
+	}
+
+	for _, t := range resolved {
+		if !t.HasSlackThread() || !uc.IsSlackEnabled() {
+			continue
+		}
+		if err := uc.syncTicketToSlack(ctx, t); err != nil {
+			msg.Trace(ctx, "💥 Failed to sync archived ticket to Slack: %s", err.Error())
+		}
+	}
+
+	msg.Trace(ctx, "🎫 Archived all %d resolved tickets", len(resolved))
+	return len(resolved), nil
+}
+
 // UnarchiveTicket moves an archived ticket back to resolved state.
 // Clears ArchivedAt but preserves ResolvedAt.
 func (uc *UseCases) UnarchiveTicket(ctx context.Context, ticketID types.TicketID) (*ticket.Ticket, error) {
