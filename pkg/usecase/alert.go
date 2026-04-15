@@ -409,7 +409,7 @@ func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.N
 	}
 
 	if err := uc.slackService.PostNoticeThreadDetails(ctx, resolvedChannelID, timestamp, alertData, llmResponse); err != nil {
-		return "", goerr.Wrap(err, "failed to post notice thread details", goerr.V("channel", resolvedChannelID))
+		return "", goerr.Wrap(err, "failed to post notice thread details", goerr.V("channel", resolvedChannelID), goerr.V("notice_id", notice.ID))
 	}
 
 	return timestamp, nil
