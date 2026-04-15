@@ -355,16 +355,16 @@ func (uc *UseCases) handleNotice(ctx context.Context, alert *alert.Alert, channe
 	if uc.slackService != nil {
 		slackTS, err := uc.sendSimpleNotification(ctx, notice, channel, llmResponse, notifier)
 		if err != nil {
-			logger.Warn("failed to send simple notification", "error", err, "notice_id", notice.ID)
-		} else {
-			// Update notice with Slack timestamp
-			notice.SlackTS = slackTS
-			if err := uc.repository.UpdateNotice(ctx, notice); err != nil {
-				if data, jsonErr := json.Marshal(notice); jsonErr == nil {
-					logger.Warn("failed to update notice with slack timestamp", "error", err, "notice", string(data))
-				} else {
-					logger.Warn("failed to update notice with slack timestamp", "error", err, "notice_id", notice.ID)
-				}
+			return goerr.Wrap(err, "failed to send notice to Slack", goerr.V("notice_id", notice.ID))
+		}
+
+		// Update notice with Slack timestamp
+		notice.SlackTS = slackTS
+		if err := uc.repository.UpdateNotice(ctx, notice); err != nil {
+			if data, jsonErr := json.Marshal(notice); jsonErr == nil {
+				logger.Warn("failed to update notice with slack timestamp", "error", err, "notice", string(data))
+			} else {
+				logger.Warn("failed to update notice with slack timestamp", "error", err, "notice_id", notice.ID)
 			}
 		}
 	}
@@ -403,13 +403,13 @@ func (uc *UseCases) sendSimpleNotification(ctx context.Context, notice *notice.N
 		mainMessage = "🔔 Security Notice"
 	}
 
-	timestamp, err := uc.slackService.PostNotice(ctx, targetChannel, mainMessage, notice.ID)
+	resolvedChannelID, timestamp, err := uc.slackService.PostNotice(ctx, targetChannel, mainMessage, notice.ID)
 	if err != nil {
 		return "", goerr.Wrap(err, "failed to post notice to Slack", goerr.V("channel", targetChannel))
 	}
 
-	if err := uc.slackService.PostNoticeThreadDetails(ctx, targetChannel, timestamp, alertData, llmResponse); err != nil {
-		logging.From(ctx).Warn("failed to post notice thread details", "error", err, "channel", targetChannel)
+	if err := uc.slackService.PostNoticeThreadDetails(ctx, resolvedChannelID, timestamp, alertData, llmResponse); err != nil {
+		return "", goerr.Wrap(err, "failed to post notice thread details", goerr.V("channel", resolvedChannelID))
 	}
 
 	return timestamp, nil

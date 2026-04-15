@@ -1442,7 +1442,7 @@ func (x *Service) ToTicketURL(ticketID string) string {
 }
 
 // PostNotice posts a notice message to Slack with an escalate button
-func (x *Service) PostNotice(ctx context.Context, channelID, message string, noticeID fmt.Stringer) (string, error) {
+func (x *Service) PostNotice(ctx context.Context, channelID, message string, noticeID fmt.Stringer) (string, string, error) {
 	// Use default channel if channelID is empty
 	if channelID == "" {
 		channelID = x.channelID
@@ -1472,16 +1472,16 @@ func (x *Service) PostNotice(ctx context.Context, channelID, message string, not
 		},
 	}
 
-	_, timestamp, err := x.client.PostMessageContext(ctx, channelID,
+	resolvedChannelID, timestamp, err := x.client.PostMessageContext(ctx, channelID,
 		slack.MsgOptionBlocks(blocks...),
 	)
 	if err != nil {
-		return "", goerr.Wrap(err, "failed to post notice to Slack",
+		return "", "", goerr.Wrap(err, "failed to post notice to Slack",
 			goerr.V("channel", channelID),
 			goerr.V("notice_id", noticeID))
 	}
 
-	return timestamp, nil
+	return resolvedChannelID, timestamp, nil
 }
 
 // PostNoticeThreadDetails posts detailed information about the notice in a thread
