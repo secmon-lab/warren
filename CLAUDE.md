@@ -117,7 +117,9 @@ When making changes, before finishing the task, always:
 **NEVER run `go build` to verify code.** Use `go vet ./...` instead to check for compile errors.
 
 ### Language
-All comment and character literal in source code must be in English
+- All comment and character literal in source code must be in English
+- All git commit messages must be in English
+- All PR titles and descriptions must be in English
 
 ### Directory
 - When you are mentioned about `tmp` directory, you SHOULD NOT see `/tmp`. You need to check `./tmp` directory from root of the repository.
