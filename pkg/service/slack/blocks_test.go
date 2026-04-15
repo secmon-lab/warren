@@ -107,6 +107,54 @@ func TestBuildResolveTicketModalViewRequest_WithTags(t *testing.T) {
 		gt.V(t, multiSelect.Options[0].Text.Text).Equal("double check")
 		gt.V(t, multiSelect.Options[1].Value).Equal("tag-2")
 		gt.V(t, multiSelect.Options[2].Value).Equal("tag-3")
+
+		// No initial options when ticket has no tags
+		gt.V(t, len(multiSelect.InitialOptions)).Equal(0)
+	}
+	gt.V(t, found).Equal(true)
+}
+
+func TestBuildResolveTicketModalViewRequest_WithExistingTags(t *testing.T) {
+	tk := &ticket.Ticket{
+		ID: types.TicketID("ticket-1"),
+		Metadata: ticket.Metadata{
+			Title: "Test Ticket",
+		},
+		TagIDs: map[string]bool{
+			"tag-1": true,
+			"tag-3": true,
+		},
+	}
+	availableTags := []*tag.Tag{
+		{ID: "tag-1", Name: "double check"},
+		{ID: "tag-2", Name: "debug"},
+		{ID: "tag-3", Name: "refine"},
+	}
+
+	result := buildResolveTicketModalViewRequest(model.CallbackSubmitResolveTicket, tk, availableTags)
+
+	// Find the tags input block
+	var found bool
+	for _, block := range result.Blocks.BlockSet {
+		inputBlock, ok := block.(*slack_sdk.InputBlock)
+		if !ok {
+			continue
+		}
+		if inputBlock.BlockID != model.BlockIDTicketTags.String() {
+			continue
+		}
+		found = true
+
+		multiSelect, ok := inputBlock.Element.(*slack_sdk.MultiSelectBlockElement)
+		gt.V(t, ok).Equal(true)
+
+		// All 3 tags should be available as options
+		gt.V(t, len(multiSelect.Options)).Equal(3)
+
+		// 2 tags should be pre-selected (tag-1 and tag-3)
+		gt.V(t, len(multiSelect.InitialOptions)).Equal(2)
+		gt.V(t, multiSelect.InitialOptions[0].Value).Equal("tag-1")
+		gt.V(t, multiSelect.InitialOptions[1].Value).Equal("tag-3")
 	}
 	gt.V(t, found).Equal(true)
 }

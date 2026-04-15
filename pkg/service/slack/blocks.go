@@ -456,26 +456,34 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 	// Add tag selection if tags are available
 	if len(availableTags) > 0 {
 		tagOptions := make([]*slack.OptionBlockObject, 0, len(availableTags))
+		var initialOptions []*slack.OptionBlockObject
 		for _, tag := range availableTags {
-			tagOptions = append(tagOptions,
-				slack.NewOptionBlockObject(
-					tag.ID,
-					slack.NewTextBlockObject(slack.PlainTextType, tag.Name, false, false),
-					nil,
-				),
+			option := slack.NewOptionBlockObject(
+				tag.ID,
+				slack.NewTextBlockObject(slack.PlainTextType, tag.Name, false, false),
+				nil,
 			)
+			tagOptions = append(tagOptions, option)
+			if ticket.TagIDs[tag.ID] {
+				initialOptions = append(initialOptions, option)
+			}
+		}
+
+		tagElement := slack.NewOptionsMultiSelectBlockElement(
+			slack.OptTypeStatic,
+			slack.NewTextBlockObject(slack.PlainTextType, "Select tags", false, false),
+			model.BlockActionIDTicketTags.String(),
+			tagOptions...,
+		)
+		if len(initialOptions) > 0 {
+			tagElement.InitialOptions = initialOptions
 		}
 
 		blockSet = append(blockSet, slack.NewInputBlock(
 			model.BlockIDTicketTags.String(),
 			slack.NewTextBlockObject(slack.PlainTextType, "Tags", false, false),
 			slack.NewTextBlockObject(slack.PlainTextType, "Select tags for this ticket", false, false),
-			slack.NewOptionsMultiSelectBlockElement(
-				slack.OptTypeStatic,
-				slack.NewTextBlockObject(slack.PlainTextType, "Select tags", false, false),
-				model.BlockActionIDTicketTags.String(),
-				tagOptions...,
-			),
+			tagElement,
 		).WithOptional(true))
 	}
 
