@@ -21,6 +21,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
 	"github.com/secmon-lab/warren/pkg/service/circuitbreaker"
+	notifierSvc "github.com/secmon-lab/warren/pkg/service/notifier"
 	slack_svc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
@@ -1271,6 +1272,120 @@ func TestHandleNotice(t *testing.T) {
 		gt.Equal(t, uploadCalls[0].Params.Channel, "test-channel")
 	})
 
+	t.Run("uses resolved channel ID for file upload", func(t *testing.T) {
+		// Simulate Slack resolving a channel name to a channel ID.
+		// PostMessageContext accepts channel names but UploadFileContext
+		// (files.completeUploadExternal) requires the resolved channel ID.
+		repoMock := &mock.RepositoryMock{
+			CreateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+			UpdateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+		}
+
+		slackMock := &mock.SlackClientMock{
+			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+				// Simulate Slack resolving "#channel-name" to "C_RESOLVED_ID"
+				return "C_RESOLVED_ID", "test-timestamp", nil
+			},
+			UploadFileContextFunc: func(ctx context.Context, params slack_sdk.UploadFileParameters) (*slack_sdk.FileSummary, error) {
+				return &slack_sdk.FileSummary{}, nil
+			},
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "test-user",
+				}, nil
+			},
+			GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
+				return &slack_sdk.TeamInfo{
+					Domain: "test-workspace",
+				}, nil
+			},
+		}
+
+		slackSvc, err := slack_svc.New(slackMock, "#channel-name")
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithRepository(repoMock),
+			usecase.WithSlackService(slackSvc),
+		)
+		testAlert := &alert.Alert{
+			ID: types.NewAlertID(),
+			Metadata: alert.Metadata{
+				Title: "Channel Resolution Test",
+			},
+			Data:   map[string]interface{}{"key": "value"},
+			Schema: "test.schema",
+		}
+
+		err = uc.HandleNotice(ctx, testAlert, "#channel-name", &mock.NotifierMock{})
+		gt.NoError(t, err)
+
+		// Verify file upload uses the RESOLVED channel ID, not the original channel name
+		uploadCalls := slackMock.UploadFileContextCalls()
+		gt.Array(t, uploadCalls).Length(1)
+		gt.Equal(t, uploadCalls[0].Params.Channel, "C_RESOLVED_ID")
+
+		// Verify thread details message also uses the resolved channel ID
+		postCalls := slackMock.PostMessageContextCalls()
+		gt.Array(t, postCalls).Length(2)
+		// Second PostMessage (thread details) should use resolved channel ID
+		gt.Equal(t, postCalls[1].ChannelID, "C_RESOLVED_ID")
+	})
+
+	t.Run("returns error when file upload fails", func(t *testing.T) {
+		repoMock := &mock.RepositoryMock{
+			CreateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+			UpdateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+		}
+
+		slackMock := &mock.SlackClientMock{
+			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+				return channelID, "test-timestamp", nil
+			},
+			UploadFileContextFunc: func(ctx context.Context, params slack_sdk.UploadFileParameters) (*slack_sdk.FileSummary, error) {
+				return nil, fmt.Errorf("upload failed: invalid channel")
+			},
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "test-user",
+				}, nil
+			},
+			GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
+				return &slack_sdk.TeamInfo{
+					Domain: "test-workspace",
+				}, nil
+			},
+		}
+
+		slackSvc, err := slack_svc.New(slackMock, "#test-channel")
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithRepository(repoMock),
+			usecase.WithSlackService(slackSvc),
+		)
+		testAlert := &alert.Alert{
+			ID: types.NewAlertID(),
+			Metadata: alert.Metadata{
+				Title: "Upload Failure Test",
+			},
+			Data:   map[string]interface{}{"key": "value"},
+			Schema: "test.schema",
+		}
+
+		// Error should be propagated, not swallowed
+		err = uc.HandleNotice(ctx, testAlert, "test-channel", &mock.NotifierMock{})
+		gt.Error(t, err)
+	})
+
 	t.Run("uses default channel when no channels specified", func(t *testing.T) {
 		// Create fresh mocks for this test
 		repoMock := &mock.RepositoryMock{
@@ -1326,6 +1441,66 @@ func TestHandleNotice(t *testing.T) {
 		// Verify file upload was called (since testAlert has Data nil, this won't be called)
 		uploadCalls := slackMock.UploadFileContextCalls()
 		gt.Array(t, uploadCalls).Length(0)
+	})
+
+	t.Run("uses resolved channel ID via SlackNotifier path", func(t *testing.T) {
+		// Test the SlackNotifier path (used in the real HandleAlert flow)
+		// where PublishNotice is called instead of the fallback path.
+		repoMock := &mock.RepositoryMock{
+			CreateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+			UpdateNoticeFunc: func(ctx context.Context, notice *notice.Notice) error {
+				return nil
+			},
+		}
+
+		slackMock := &mock.SlackClientMock{
+			PostMessageContextFunc: func(ctx context.Context, channelID string, options ...slack_sdk.MsgOption) (string, string, error) {
+				// Simulate Slack resolving channel name to channel ID
+				return "C_RESOLVED_VIA_NOTIFIER", "ts-123", nil
+			},
+			UploadFileContextFunc: func(ctx context.Context, params slack_sdk.UploadFileParameters) (*slack_sdk.FileSummary, error) {
+				return &slack_sdk.FileSummary{}, nil
+			},
+			AuthTestFunc: func() (*slack_sdk.AuthTestResponse, error) {
+				return &slack_sdk.AuthTestResponse{
+					UserID: "test-user",
+				}, nil
+			},
+			GetTeamInfoFunc: func() (*slack_sdk.TeamInfo, error) {
+				return &slack_sdk.TeamInfo{
+					Domain: "test-workspace",
+				}, nil
+			},
+		}
+
+		slackSvc, err := slack_svc.New(slackMock, "#alerts")
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithRepository(repoMock),
+			usecase.WithSlackService(slackSvc),
+		)
+		testAlert := &alert.Alert{
+			ID: types.NewAlertID(),
+			Metadata: alert.Metadata{
+				Title: "SlackNotifier Path Test",
+			},
+			Data:   map[string]any{"raw": "payload"},
+			Schema: "test.schema",
+		}
+
+		// Pass a real SlackNotifier (same as what HandleAlert creates internally)
+		slackNotifier := notifierSvc.NewSlackNotifier()
+		err = uc.HandleNotice(ctx, testAlert, "#alerts", slackNotifier)
+		gt.NoError(t, err)
+
+		// Verify file upload uses resolved channel ID
+		uploadCalls := slackMock.UploadFileContextCalls()
+		gt.Array(t, uploadCalls).Length(1)
+		gt.Equal(t, uploadCalls[0].Params.Channel, "C_RESOLVED_VIA_NOTIFIER")
+		gt.Equal(t, uploadCalls[0].Params.ThreadTimestamp, "ts-123")
 	})
 }
 

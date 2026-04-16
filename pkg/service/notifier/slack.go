@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/event"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -330,7 +331,7 @@ func (n *SlackNotifier) PublishAlert(ctx context.Context, slackService SlackServ
 
 // SlackServiceNotice is an interface for posting notices to Slack
 type SlackServiceNotice interface {
-	PostNotice(ctx context.Context, channelID, message string, noticeID fmt.Stringer) (string, error)
+	PostNotice(ctx context.Context, channelID, message string, noticeID fmt.Stringer) (string, string, error)
 	PostNoticeThreadDetails(ctx context.Context, channelID, threadTS string, alert *alert.Alert, llmResponse *alert.GenAIResponse) error
 	NewThread(thread slack.Thread) interfaces.SlackThreadService
 }
@@ -350,20 +351,22 @@ func (n *SlackNotifier) PublishNotice(ctx context.Context, slackService SlackSer
 		mainMessage = "🔔 Security Notice"
 	}
 
-	// Post main notice message
-	timestamp, err := slackService.PostNotice(ctx, channel, mainMessage, notice.ID)
+	// Post main notice message and get the resolved channel ID
+	resolvedChannelID, timestamp, err := slackService.PostNotice(ctx, channel, mainMessage, notice.ID)
 	if err != nil {
 		return "", err
 	}
 
-	// Post detailed information in thread
-	if err := slackService.PostNoticeThreadDetails(ctx, channel, timestamp, alertData, llmResponse); err != nil {
-		logger.Warn("failed to post notice thread details", "error", err, "channel", channel)
+	// Post detailed information in thread using resolved channel ID
+	if err := slackService.PostNoticeThreadDetails(ctx, resolvedChannelID, timestamp, alertData, llmResponse); err != nil {
+		return "", goerr.Wrap(err, "failed to post notice thread details",
+			goerr.V("channel", resolvedChannelID),
+			goerr.V("notice_id", notice.ID))
 	}
 
-	// Create thread service
+	// Create thread service using resolved channel ID
 	thread := slackService.NewThread(slack.Thread{
-		ChannelID: channel,
+		ChannelID: resolvedChannelID,
 		ThreadID:  timestamp,
 	})
 
