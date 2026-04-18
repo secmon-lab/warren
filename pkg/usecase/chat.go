@@ -3,13 +3,16 @@ package usecase
 import (
 	"context"
 	_ "embed"
+	"errors"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
+	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -17,6 +20,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
 	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/slackctx"
 )
@@ -41,8 +45,18 @@ func (x *UseCases) ChatFromWebSocket(ctx context.Context, ticketID types.TicketI
 }
 
 // ChatFromSlack processes a chat message from a Slack app mention.
-// It resolves the ticket from the Slack thread (or creates a ticketless context),
-// fetches Slack history, builds a ChatContext, and delegates to ChatUC.
+//
+// chat-session-redesign Phase 2 wrapping: before delegating to ChatUC.Execute,
+// the Slack Session is resolved (or created with a deterministic ID so
+// repeated mentions on the same thread reuse it), the Session activity lock
+// is acquired so simultaneous mentions are serialized, and a Turn is
+// recorded for the mention. The existing Execute code path is retained; it
+// still creates its internal "session.Session" (legacy) for backwards
+// compatibility with aster/bluebell, and Phase 3+ will unify the two.
+//
+// If the Session lock is already held when a new mention arrives, the
+// function posts a short "please wait" context block to the thread and
+// returns without starting a second AI run.
 func (x *UseCases) ChatFromSlack(ctx context.Context, slackMsg *slack.Message, mentionMessage string) error {
 	logger := logging.From(ctx)
 
@@ -60,6 +74,58 @@ func (x *UseCases) ChatFromSlack(ctx context.Context, slackMsg *slack.Message, m
 	existingTicket, err := x.repository.GetTicketByThread(ctx, slackMsg.Thread())
 	if err != nil {
 		return goerr.Wrap(err, "failed to get ticket by slack thread")
+	}
+
+	var ticketIDPtr *types.TicketID
+	if existingTicket != nil {
+		tid := existingTicket.ID
+		ticketIDPtr = &tid
+	}
+
+	// Resolve (or create) the Slack Session + Turn + Lock. This wraps the
+	// existing Execute call so that lock contention is enforced; the legacy
+	// Session handling inside Execute is untouched.
+	slackSess, _, err := x.sessionResolver.ResolveSlackSession(ctx, ticketIDPtr, slackMsg.Thread(), types.UserID(slackUserID(slackMsg)))
+	if err != nil {
+		logger.Warn("failed to resolve slack session; continuing without session lock", "error", err)
+	}
+
+	var releaseLock func()
+	if slackSess != nil {
+		lock, acquired, lockErr := x.lockService.TryAcquire(ctx, slackSess.ID)
+		if lockErr != nil {
+			logger.Warn("failed to acquire slack session lock; continuing", "error", lockErr)
+		} else if !acquired {
+			// Another mention is already running on this thread.
+			if x.slackService != nil {
+				threadSvc := x.slackService.NewThread(slackMsg.Thread())
+				if postErr := threadSvc.PostContextBlock(ctx, "⏳ Another chat is still running on this thread. Please wait for it to finish."); postErr != nil {
+					errutil.Handle(ctx, goerr.Wrap(postErr, "failed to post busy notice"))
+				}
+			}
+			return nil
+		} else if lock != nil {
+			turn := sessModel.NewTurn(ctx, slackSess.ID)
+			if putErr := x.repository.PutTurn(ctx, turn); putErr != nil {
+				errutil.Handle(ctx, goerr.Wrap(putErr, "failed to persist slack turn"))
+			}
+			releaseLock = func() {
+				// Close the Turn first so observers see terminal state
+				// before the lock is released.
+				turn.Close(ctx, sessModel.TurnStatusCompleted)
+				if updErr := x.repository.UpdateTurnStatus(ctx, turn.ID, turn.Status, turn.EndedAt); updErr != nil {
+					errutil.Handle(ctx, goerr.Wrap(updErr, "failed to update slack turn status"))
+				}
+				if relErr := lock.Release(ctx); relErr != nil {
+					if !errors.Is(relErr, interfaces.ErrLockNotHeld) {
+						errutil.Handle(ctx, goerr.Wrap(relErr, "failed to release slack session lock"))
+					}
+				}
+			}
+		}
+	}
+	if releaseLock != nil {
+		defer releaseLock()
 	}
 
 	if existingTicket != nil {
@@ -80,6 +146,19 @@ func (x *UseCases) ChatFromSlack(ctx context.Context, slackMsg *slack.Message, m
 		return err
 	}
 	return x.ChatUC.Execute(ctx, mentionMessage, chatCtx)
+}
+
+// slackUserID extracts the sender's Slack user id for Session attribution.
+// Returns an empty string when the message carries no user (rare, e.g.
+// system-generated events).
+func slackUserID(m *slack.Message) string {
+	if m == nil {
+		return ""
+	}
+	if u := m.User(); u != nil {
+		return u.ID
+	}
+	return ""
 }
 
 // ChatFromCLI processes a chat message from the CLI.

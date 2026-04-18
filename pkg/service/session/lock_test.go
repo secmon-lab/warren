@@ -104,14 +104,18 @@ func TestLockService_TTLExpiry_AllowsTakeover(t *testing.T) {
 	gt.V(t, ok2).Equal(true)
 }
 
-func TestLockService_RejectsEmptyRequestID(t *testing.T) {
+func TestLockService_AutoGeneratesHolderWhenRequestIDMissing(t *testing.T) {
 	repo := repository.NewMemory()
 	seedSession(t, repo, "sid_1")
 	svc := sessSvc.NewLockService(repo)
 
-	_, ok, err := svc.TryAcquire(context.Background(), "sid_1")
-	gt.Error(t, err)
-	gt.V(t, ok).Equal(false)
+	lock, ok, err := svc.TryAcquire(context.Background(), "sid_1")
+	gt.NoError(t, err)
+	gt.V(t, ok).Equal(true)
+	// A holder was auto-generated so Release/Refresh have something to
+	// authenticate with.
+	gt.V(t, lock.HolderID() != "").Equal(true)
+	gt.V(t, lock.HolderID() != "(unknown)").Equal(true)
 }
 
 func TestLockService_ConcurrentAcquire_OnlyOneWinner(t *testing.T) {

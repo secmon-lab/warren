@@ -60,7 +60,9 @@ func NewLockService(repo interfaces.Repository, opts ...LockServiceOption) *Lock
 func (s *LockService) TryAcquire(ctx context.Context, sessionID types.SessionID) (*Lock, bool, error) {
 	holder := request_id.FromContext(ctx)
 	if holder == "" || holder == "(unknown)" {
-		return nil, false, goerr.New("TryAcquire requires a request_id in context")
+		// Auto-generate a holder so callers without request_id
+		// plumbing (Slack events, CLI) can still take locks.
+		ctx, holder = request_id.Generate(ctx)
 	}
 	acquired, err := s.repo.AcquireSessionLock(ctx, sessionID, holder, s.ttl)
 	if err != nil {
