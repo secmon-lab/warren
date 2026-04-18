@@ -266,6 +266,20 @@ func (r *Memory) GetTicketSessionMessages(ctx context.Context, ticketID types.Ti
 	return out, nil
 }
 
+// AllSessions returns a snapshot copy of every Session stored in memory.
+// Test-only: used by migration job tests that need to enumerate sessions
+// without going through a listAll abstraction.
+func (r *Memory) AllSessions() []*session.Session {
+	r.session.mu.RLock()
+	defer r.session.mu.RUnlock()
+	out := make([]*session.Session, 0, len(r.session.sessions))
+	for _, s := range r.session.sessions {
+		copied := *s
+		out = append(out, &copied)
+	}
+	return out
+}
+
 func sessionBelongsTo(s *session.Session, ticketID types.TicketID) bool {
 	if s.TicketIDPtr != nil && *s.TicketIDPtr == ticketID {
 		return true
