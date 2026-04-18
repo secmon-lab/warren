@@ -8,11 +8,9 @@ Analyze the structured data of the given security alert and generate the corresp
 
 ## Available Tags
 
-The following tags are registered in the system. Use them to classify this alert by selecting the most relevant ones by name. Do NOT invent new tag names — only pick from this list. If no tag is a good fit, leave `tags` empty.
+The following tags are registered in the system. Use them to classify this alert by selecting the most relevant ones by name. Do NOT invent new tag names — only pick from the list below. If no tag is a good fit, leave `tags` empty.
 
-```json
 {{ .available_tags }}
-```
 
 ## Output
 

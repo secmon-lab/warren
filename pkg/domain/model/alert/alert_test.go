@@ -88,6 +88,24 @@ func TestAlert_FillMetadata_TagInference(t *testing.T) {
 	gt.True(t, strings.Contains(receivedPrompt, "Network-related events"))
 }
 
+func TestFormatAvailableTags(t *testing.T) {
+	t.Run("empty input yields an explicit no-tags notice", func(t *testing.T) {
+		got := alert.FormatAvailableTags(nil)
+		gt.True(t, strings.Contains(got, "No tags are registered"))
+		gt.True(t, strings.Contains(got, "empty array"))
+	})
+
+	t.Run("nil and empty-name entries are skipped, the rest become a bullet list", func(t *testing.T) {
+		got := alert.FormatAvailableTags([]*tag.Tag{
+			nil,
+			{ID: "x", Name: ""},
+			{ID: tag.NewID(), Name: "malware", Description: "Malware-related events"},
+			{ID: tag.NewID(), Name: "network"}, // description empty -> name only
+		})
+		gt.Equal(t, got, "- `malware`: Malware-related events\n- `network`\n")
+	})
+}
+
 func TestMergeInferredTags(t *testing.T) {
 	t.Run("no inferred tags returns existing unchanged", func(t *testing.T) {
 		existing := []string{"a", "b"}

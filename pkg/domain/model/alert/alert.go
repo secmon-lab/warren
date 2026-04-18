@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -265,6 +266,35 @@ func (x *Alert) CosineSimilarity(other []float32) float64 {
 //go:embed prompt/alert_meta.md
 var alertMetaPrompt string
 
+// formatAvailableTags renders the available tags as a markdown bullet list
+// ready for injection into the metadata prompt. When there are no tags it
+// returns a short notice that instructs the LLM to leave the tags field
+// empty, so the prompt is unambiguous regardless of system state.
+func formatAvailableTags(tags []*tag.Tag) string {
+	var b strings.Builder
+	any := false
+	for _, t := range tags {
+		if t == nil || t.Name == "" {
+			continue
+		}
+		if !any {
+			any = true
+		}
+		b.WriteString("- `")
+		b.WriteString(t.Name)
+		b.WriteString("`")
+		if t.Description != "" {
+			b.WriteString(": ")
+			b.WriteString(t.Description)
+		}
+		b.WriteString("\n")
+	}
+	if !any {
+		return "_No tags are registered in the system. Return an empty array for `tags`._"
+	}
+	return b.String()
+}
+
 // mergeInferredTags merges LLM-inferred tag names into the existing tag name
 // list. Only names present in the allowed set are added, duplicates are
 // removed, and the original order of existing names is preserved.
@@ -293,23 +323,18 @@ func (x *Alert) FillMetadata(ctx context.Context, llmClient gollem.LLMClient, av
 		logger.Info("fill metadata", "alert", x.Data)
 
 		availableTagNameSet := make(map[string]bool, len(availableTags))
-		tagCandidates := make([]map[string]string, 0, len(availableTags))
 		for _, t := range availableTags {
 			if t == nil || t.Name == "" {
 				continue
 			}
 			availableTagNameSet[t.Name] = true
-			tagCandidates = append(tagCandidates, map[string]string{
-				"name":        t.Name,
-				"description": t.Description,
-			})
 		}
 
 		prompt, err := prompt.Generate(ctx, alertMetaPrompt, map[string]any{
 			"alert":          x.Data,
 			"schema":         prompt.ToSchema(Metadata{}),
 			"lang":           lang.From(ctx).Name(),
-			"available_tags": tagCandidates,
+			"available_tags": formatAvailableTags(availableTags),
 		})
 		if err != nil {
 			return err
