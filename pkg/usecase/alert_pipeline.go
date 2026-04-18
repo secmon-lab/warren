@@ -14,6 +14,7 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/domain/model/policy"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
+	"github.com/secmon-lab/warren/pkg/domain/model/tag"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	policySvc "github.com/secmon-lab/warren/pkg/service/policy"
 	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
@@ -35,11 +36,12 @@ type AlertPipelineResult struct {
 // This is a pure function without side effects (no DB save, no Slack notification).
 //
 // Pipeline stages:
-// 1. Ingest Policy Evaluation - transforms raw data into Alert objects
-// 2. Tag Conversion - converts tag names to tag IDs
-// 3. Metadata Generation - fills missing titles/descriptions using LLM
-// 4. Enrich Policy Evaluation - executes enrichment tasks (query/agent)
-// 5. Triage Policy Evaluation - applies final metadata and determines publish type
+//  1. Ingest Policy Evaluation - transforms raw data into Alert objects
+//  2. Metadata Generation - fills missing titles/descriptions using LLM and
+//     infers tags from the set of existing tags
+//  3. Tag Conversion - converts tag names (from policy + LLM inference) to tag IDs
+//  4. Enrich Policy Evaluation - executes enrichment tasks (query/agent)
+//  5. Triage Policy Evaluation - applies final metadata and determines publish type
 //
 // All pipeline events are emitted through the notifier for real-time monitoring.
 // The notifier receives type-safe events for each stage of processing.
@@ -72,6 +74,19 @@ func (uc *UseCases) ProcessAlertPipeline(
 		return []*AlertPipelineResult{}, nil
 	}
 
+	// Fetch available tags once for LLM-based tag inference in metadata generation.
+	// Failures here do not abort the pipeline; tag inference is simply skipped.
+	var availableTags []*tag.Tag
+	if uc.tagService != nil {
+		tags, tagErr := uc.tagService.ListAllTags(ctx)
+		if tagErr != nil {
+			logging.From(ctx).Warn("failed to list tags for metadata generation; tag inference skipped",
+				"error", tagErr)
+		} else {
+			availableTags = tags
+		}
+	}
+
 	// Process each alert through enrich and commit policies
 	var results []*AlertPipelineResult
 	for _, processedAlert := range alerts {
@@ -80,7 +95,20 @@ func (uc *UseCases) ProcessAlertPipeline(
 			processedAlert.Topic = types.KnowledgeTopic(schema)
 		}
 
-		// Step 1.5: Convert metadata tags (names) to tag IDs
+		// Step 1.5: Fill metadata (generate title/description if missing) and
+		// infer tags from the available tag set. LLM may append new tag names
+		// to processedAlert.Tags; these are converted to IDs in the next step.
+		if uc.llmClient != nil {
+			if err := processedAlert.FillMetadata(ctx, uc.llmClient, availableTags); err != nil {
+				notifier.NotifyError(ctx, &event.ErrorEvent{
+					Error:   err,
+					Message: "Failed to generate alert metadata",
+				})
+				return nil, goerr.Wrap(err, "failed to fill alert metadata")
+			}
+		}
+
+		// Step 1.6: Convert metadata tag names (policy-provided + LLM-inferred) to tag IDs
 		if len(processedAlert.Tags) > 0 && uc.tagService != nil {
 			tags, err := uc.tagService.ConvertNamesToTags(ctx, processedAlert.Tags)
 			if err != nil {
@@ -95,17 +123,6 @@ func (uc *UseCases) ProcessAlertPipeline(
 			}
 			for _, tagID := range tags {
 				processedAlert.TagIDs[tagID] = true
-			}
-		}
-
-		// Step 1.6: Fill metadata (generate title/description if missing)
-		if uc.llmClient != nil {
-			if err := processedAlert.FillMetadata(ctx, uc.llmClient); err != nil {
-				notifier.NotifyError(ctx, &event.ErrorEvent{
-					Error:   err,
-					Message: "Failed to generate alert metadata",
-				})
-				return nil, goerr.Wrap(err, "failed to fill alert metadata")
 			}
 		}
 
