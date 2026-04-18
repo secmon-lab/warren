@@ -17,6 +17,7 @@ import (
 	diagnosismodel "github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
 	knowledgeModel "github.com/secmon-lab/warren/pkg/domain/model/knowledge"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -1213,19 +1214,55 @@ func (r *queryResolver) SessionMessages(ctx context.Context, sessionID string) (
 		return nil, goerr.Wrap(err, "failed to get session messages", goerr.V("sessionID", sessionID))
 	}
 
-	// Convert to GraphQL model
 	result := make([]*graphql1.SessionMessage, len(messages))
 	for i, m := range messages {
-		result[i] = &graphql1.SessionMessage{
-			ID:        string(m.ID),
-			SessionID: string(m.SessionID),
-			Type:      string(m.Type),
-			Content:   m.Content,
-			CreatedAt: m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt: m.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		}
+		result[i] = toGraphQLSessionMessage(m)
 	}
 
+	return result, nil
+}
+
+// TicketSessionMessages is the resolver for the ticketSessionMessages field.
+// chat-session-redesign Phase 3.4: superset of the legacy ticketComments
+// query. Filters are optional; omit them to return every message across
+// every Session attached to the ticket.
+func (r *queryResolver) TicketSessionMessages(ctx context.Context, ticketID string, source *string, typeArg *string, offset *int, limit *int) ([]*graphql1.SessionMessage, error) {
+	var sourceFilter *session.SessionSource
+	if source != nil && *source != "" {
+		s := session.SessionSource(*source)
+		if !s.Valid() {
+			return nil, goerr.New("invalid source value", goerr.V("source", *source))
+		}
+		sourceFilter = &s
+	}
+	var typeFilter *session.MessageType
+	if typeArg != nil && *typeArg != "" {
+		mt := session.MessageType(*typeArg)
+		if !mt.Valid() {
+			return nil, goerr.New("invalid type value", goerr.V("type", *typeArg))
+		}
+		typeFilter = &mt
+	}
+
+	limitVal := 0
+	if limit != nil {
+		limitVal = *limit
+	}
+	offsetVal := 0
+	if offset != nil {
+		offsetVal = *offset
+	}
+
+	msgs, err := r.repo.GetTicketSessionMessages(ctx, types.TicketID(ticketID), sourceFilter, typeFilter, limitVal, offsetVal)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get ticket session messages",
+			goerr.V("ticketID", ticketID))
+	}
+
+	result := make([]*graphql1.SessionMessage, len(msgs))
+	for i, m := range msgs {
+		result[i] = toGraphQLSessionMessage(m)
+	}
 	return result, nil
 }
 

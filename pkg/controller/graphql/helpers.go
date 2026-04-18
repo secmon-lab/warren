@@ -9,6 +9,37 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
+// toGraphQLSessionMessage converts a domain session.Message to its
+// GraphQL representation including chat-session-redesign fields (TurnID,
+// TicketID, Author).
+func toGraphQLSessionMessage(m *session.Message) *graphql1.SessionMessage {
+	out := &graphql1.SessionMessage{
+		ID:        string(m.ID),
+		SessionID: string(m.SessionID),
+		Type:      string(m.Type),
+		Content:   m.Content,
+		CreatedAt: m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt: m.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+	if m.TurnID != nil {
+		turn := string(*m.TurnID)
+		out.TurnID = &turn
+	}
+	if m.TicketID != nil {
+		tid := string(*m.TicketID)
+		out.TicketID = &tid
+	}
+	if m.Author != nil {
+		out.Author = &graphql1.MessageAuthor{
+			UserID:      string(m.Author.UserID),
+			DisplayName: m.Author.DisplayName,
+			SlackUserID: m.Author.SlackUserID,
+			Email:       m.Author.Email,
+		}
+	}
+	return out
+}
+
 // toGraphQLSession converts a domain session.Session to a GraphQL Session
 func toGraphQLSession(s *session.Session) *graphql1.Session {
 	var userID, query, slackURL, intent *string

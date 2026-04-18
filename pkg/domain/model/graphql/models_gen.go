@@ -140,6 +140,13 @@ type KnowledgeTag struct {
 	UpdatedAt   string `json:"updatedAt"`
 }
 
+type MessageAuthor struct {
+	UserID      string  `json:"userID"`
+	DisplayName string  `json:"displayName"`
+	SlackUserID *string `json:"slackUserID,omitempty"`
+	Email       *string `json:"email,omitempty"`
+}
+
 type Mutation struct {
 }
 
@@ -165,12 +172,15 @@ type Session struct {
 }
 
 type SessionMessage struct {
-	ID        string `json:"id"`
-	SessionID string `json:"sessionID"`
-	Type      string `json:"type"`
-	Content   string `json:"content"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	ID        string         `json:"id"`
+	SessionID string         `json:"sessionID"`
+	TurnID    *string        `json:"turnID,omitempty"`
+	TicketID  *string        `json:"ticketID,omitempty"`
+	Type      string         `json:"type"`
+	Content   string         `json:"content"`
+	Author    *MessageAuthor `json:"author,omitempty"`
+	CreatedAt string         `json:"createdAt"`
+	UpdatedAt string         `json:"updatedAt"`
 }
 
 type TagMetadata struct {

@@ -190,6 +190,13 @@ type ComplexityRoot struct {
 		UpdatedAt   func(childComplexity int) int
 	}
 
+	MessageAuthor struct {
+		DisplayName func(childComplexity int) int
+		Email       func(childComplexity int) int
+		SlackUserID func(childComplexity int) int
+		UserID      func(childComplexity int) int
+	}
+
 	Mutation struct {
 		ArchiveAllResolvedTickets     func(childComplexity int) int
 		ArchiveTicket                 func(childComplexity int, id string) int
@@ -247,6 +254,7 @@ type ComplexityRoot struct {
 		Tags                   func(childComplexity int) int
 		Ticket                 func(childComplexity int, id string) int
 		TicketComments         func(childComplexity int, ticketID string, offset *int, limit *int) int
+		TicketSessionMessages  func(childComplexity int, ticketID string, source *string, typeArg *string, offset *int, limit *int) int
 		TicketSessions         func(childComplexity int, ticketID string) int
 		Tickets                func(childComplexity int, statuses []string, keyword *string, assigneeID *string, offset *int, limit *int) int
 		UnboundAlerts          func(childComplexity int, threshold *float64, keyword *string, ticketID *string, offset *int, limit *int) int
@@ -298,10 +306,13 @@ type ComplexityRoot struct {
 	}
 
 	SessionMessage struct {
+		Author    func(childComplexity int) int
 		Content   func(childComplexity int) int
 		CreatedAt func(childComplexity int) int
 		ID        func(childComplexity int) int
 		SessionID func(childComplexity int) int
+		TicketID  func(childComplexity int) int
+		TurnID    func(childComplexity int) int
 		Type      func(childComplexity int) int
 		UpdatedAt func(childComplexity int) int
 	}
@@ -436,6 +447,7 @@ type QueryResolver interface {
 	TicketSessions(ctx context.Context, ticketID string) ([]*graphql1.Session, error)
 	Session(ctx context.Context, id string) (*graphql1.Session, error)
 	SessionMessages(ctx context.Context, sessionID string) ([]*graphql1.SessionMessage, error)
+	TicketSessionMessages(ctx context.Context, ticketID string, source *string, typeArg *string, offset *int, limit *int) ([]*graphql1.SessionMessage, error)
 	Diagnoses(ctx context.Context, offset *int, limit *int) (*graphql1.DiagnosesResponse, error)
 	Diagnosis(ctx context.Context, id string) (*graphql1.Diagnosis, error)
 	DiagnosisIssues(ctx context.Context, diagnosisID string, offset *int, limit *int, status *string, ruleID *string) (*graphql1.DiagnosisIssuesResponse, error)
@@ -1077,6 +1089,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.KnowledgeTag.UpdatedAt(childComplexity), true
 
+	case "MessageAuthor.displayName":
+		if e.ComplexityRoot.MessageAuthor.DisplayName == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageAuthor.DisplayName(childComplexity), true
+	case "MessageAuthor.email":
+		if e.ComplexityRoot.MessageAuthor.Email == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageAuthor.Email(childComplexity), true
+	case "MessageAuthor.slackUserID":
+		if e.ComplexityRoot.MessageAuthor.SlackUserID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageAuthor.SlackUserID(childComplexity), true
+	case "MessageAuthor.userID":
+		if e.ComplexityRoot.MessageAuthor.UserID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageAuthor.UserID(childComplexity), true
+
 	case "Mutation.archiveAllResolvedTickets":
 		if e.ComplexityRoot.Mutation.ArchiveAllResolvedTickets == nil {
 			break
@@ -1627,6 +1664,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.TicketComments(childComplexity, args["ticketId"].(string), args["offset"].(*int), args["limit"].(*int)), true
+	case "Query.ticketSessionMessages":
+		if e.ComplexityRoot.Query.TicketSessionMessages == nil {
+			break
+		}
+
+		args, err := ec.field_Query_ticketSessionMessages_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.TicketSessionMessages(childComplexity, args["ticketId"].(string), args["source"].(*string), args["type"].(*string), args["offset"].(*int), args["limit"].(*int)), true
 	case "Query.ticketSessions":
 		if e.ComplexityRoot.Query.TicketSessions == nil {
 			break
@@ -1846,6 +1894,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Session.UserID(childComplexity), true
 
+	case "SessionMessage.author":
+		if e.ComplexityRoot.SessionMessage.Author == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SessionMessage.Author(childComplexity), true
 	case "SessionMessage.content":
 		if e.ComplexityRoot.SessionMessage.Content == nil {
 			break
@@ -1870,6 +1924,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.SessionMessage.SessionID(childComplexity), true
+	case "SessionMessage.ticketID":
+		if e.ComplexityRoot.SessionMessage.TicketID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SessionMessage.TicketID(childComplexity), true
+	case "SessionMessage.turnID":
+		if e.ComplexityRoot.SessionMessage.TurnID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SessionMessage.TurnID(childComplexity), true
 	case "SessionMessage.type":
 		if e.ComplexityRoot.SessionMessage.Type == nil {
 			break
@@ -2403,16 +2469,36 @@ type Session {
 type SessionMessage {
   id: ID!
   sessionID: ID!
+  turnID: ID
+  ticketID: ID
   type: String!
   content: String!
+  author: MessageAuthor
   createdAt: String!
   updatedAt: String!
+}
+
+type MessageAuthor {
+  userID: String!
+  displayName: String!
+  slackUserID: String
+  email: String
 }
 
 extend type Query {
   ticketSessions(ticketId: ID!): [Session!]!
   session(id: ID!): Session
   sessionMessages(sessionId: ID!): [SessionMessage!]!
+  # chat-session-redesign Phase 3.4: unified replacement for the legacy
+  # ticketComments query. Returns messages across every Session bound
+  # to the ticket with optional source/type filters.
+  ticketSessionMessages(
+    ticketId: ID!
+    source: String
+    type: String
+    offset: Int
+    limit: Int
+  ): [SessionMessage!]!
 }
 
 enum SortOrder {
@@ -3286,6 +3372,37 @@ func (ec *executionContext) field_Query_ticketComments_args(ctx context.Context,
 		return nil, err
 	}
 	args["limit"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_ticketSessionMessages_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "ticketId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["ticketId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "source", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["source"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "type", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["type"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg4
 	return args, nil
 }
 
@@ -6453,6 +6570,122 @@ func (ec *executionContext) fieldContext_KnowledgeTag_updatedAt(_ context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _MessageAuthor_userID(ctx context.Context, field graphql.CollectedField, obj *graphql1.MessageAuthor) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MessageAuthor_userID,
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_MessageAuthor_userID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageAuthor",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessageAuthor_displayName(ctx context.Context, field graphql.CollectedField, obj *graphql1.MessageAuthor) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MessageAuthor_displayName,
+		func(ctx context.Context) (any, error) {
+			return obj.DisplayName, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_MessageAuthor_displayName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageAuthor",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessageAuthor_slackUserID(ctx context.Context, field graphql.CollectedField, obj *graphql1.MessageAuthor) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MessageAuthor_slackUserID,
+		func(ctx context.Context) (any, error) {
+			return obj.SlackUserID, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_MessageAuthor_slackUserID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageAuthor",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessageAuthor_email(ctx context.Context, field graphql.CollectedField, obj *graphql1.MessageAuthor) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MessageAuthor_email,
+		func(ctx context.Context) (any, error) {
+			return obj.Email, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_MessageAuthor_email(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageAuthor",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_resolveTicket(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9155,10 +9388,16 @@ func (ec *executionContext) fieldContext_Query_sessionMessages(ctx context.Conte
 				return ec.fieldContext_SessionMessage_id(ctx, field)
 			case "sessionID":
 				return ec.fieldContext_SessionMessage_sessionID(ctx, field)
+			case "turnID":
+				return ec.fieldContext_SessionMessage_turnID(ctx, field)
+			case "ticketID":
+				return ec.fieldContext_SessionMessage_ticketID(ctx, field)
 			case "type":
 				return ec.fieldContext_SessionMessage_type(ctx, field)
 			case "content":
 				return ec.fieldContext_SessionMessage_content(ctx, field)
+			case "author":
+				return ec.fieldContext_SessionMessage_author(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_SessionMessage_createdAt(ctx, field)
 			case "updatedAt":
@@ -9175,6 +9414,67 @@ func (ec *executionContext) fieldContext_Query_sessionMessages(ctx context.Conte
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_sessionMessages_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_ticketSessionMessages(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_ticketSessionMessages,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().TicketSessionMessages(ctx, fc.Args["ticketId"].(string), fc.Args["source"].(*string), fc.Args["type"].(*string), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+		},
+		nil,
+		ec.marshalNSessionMessage2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐSessionMessageᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_ticketSessionMessages(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_SessionMessage_id(ctx, field)
+			case "sessionID":
+				return ec.fieldContext_SessionMessage_sessionID(ctx, field)
+			case "turnID":
+				return ec.fieldContext_SessionMessage_turnID(ctx, field)
+			case "ticketID":
+				return ec.fieldContext_SessionMessage_ticketID(ctx, field)
+			case "type":
+				return ec.fieldContext_SessionMessage_type(ctx, field)
+			case "content":
+				return ec.fieldContext_SessionMessage_content(ctx, field)
+			case "author":
+				return ec.fieldContext_SessionMessage_author(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_SessionMessage_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_SessionMessage_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SessionMessage", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_ticketSessionMessages_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -10773,6 +11073,64 @@ func (ec *executionContext) fieldContext_SessionMessage_sessionID(_ context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _SessionMessage_turnID(ctx context.Context, field graphql.CollectedField, obj *graphql1.SessionMessage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_SessionMessage_turnID,
+		func(ctx context.Context) (any, error) {
+			return obj.TurnID, nil
+		},
+		nil,
+		ec.marshalOID2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_SessionMessage_turnID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionMessage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SessionMessage_ticketID(ctx context.Context, field graphql.CollectedField, obj *graphql1.SessionMessage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_SessionMessage_ticketID,
+		func(ctx context.Context) (any, error) {
+			return obj.TicketID, nil
+		},
+		nil,
+		ec.marshalOID2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_SessionMessage_ticketID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionMessage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SessionMessage_type(ctx context.Context, field graphql.CollectedField, obj *graphql1.SessionMessage) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -10826,6 +11184,45 @@ func (ec *executionContext) fieldContext_SessionMessage_content(_ context.Contex
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SessionMessage_author(ctx context.Context, field graphql.CollectedField, obj *graphql1.SessionMessage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_SessionMessage_author,
+		func(ctx context.Context) (any, error) {
+			return obj.Author, nil
+		},
+		nil,
+		ec.marshalOMessageAuthor2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMessageAuthor,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_SessionMessage_author(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionMessage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "userID":
+				return ec.fieldContext_MessageAuthor_userID(ctx, field)
+			case "displayName":
+				return ec.fieldContext_MessageAuthor_displayName(ctx, field)
+			case "slackUserID":
+				return ec.fieldContext_MessageAuthor_slackUserID(ctx, field)
+			case "email":
+				return ec.fieldContext_MessageAuthor_email(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MessageAuthor", field.Name)
 		},
 	}
 	return fc, nil
@@ -15264,6 +15661,54 @@ func (ec *executionContext) _KnowledgeTag(ctx context.Context, sel ast.Selection
 	return out
 }
 
+var messageAuthorImplementors = []string{"MessageAuthor"}
+
+func (ec *executionContext) _MessageAuthor(ctx context.Context, sel ast.SelectionSet, obj *graphql1.MessageAuthor) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, messageAuthorImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MessageAuthor")
+		case "userID":
+			out.Values[i] = ec._MessageAuthor_userID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "displayName":
+			out.Values[i] = ec._MessageAuthor_displayName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "slackUserID":
+			out.Values[i] = ec._MessageAuthor_slackUserID(ctx, field, obj)
+		case "email":
+			out.Values[i] = ec._MessageAuthor_email(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -15866,6 +16311,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_sessionMessages(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "ticketSessionMessages":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_ticketSessionMessages(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -16874,6 +17341,10 @@ func (ec *executionContext) _SessionMessage(ctx context.Context, sel ast.Selecti
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "turnID":
+			out.Values[i] = ec._SessionMessage_turnID(ctx, field, obj)
+		case "ticketID":
+			out.Values[i] = ec._SessionMessage_ticketID(ctx, field, obj)
 		case "type":
 			out.Values[i] = ec._SessionMessage_type(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -16884,6 +17355,8 @@ func (ec *executionContext) _SessionMessage(ctx context.Context, sel ast.Selecti
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "author":
+			out.Values[i] = ec._SessionMessage_author(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._SessionMessage_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -19136,6 +19609,13 @@ func (ec *executionContext) marshalOKnowledge2ᚖgithubᚗcomᚋsecmonᚑlabᚋw
 		return graphql.Null
 	}
 	return ec._Knowledge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOMessageAuthor2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMessageAuthor(ctx context.Context, sel ast.SelectionSet, v *graphql1.MessageAuthor) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._MessageAuthor(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOReprocessBatchJob2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessBatchJob(ctx context.Context, sel ast.SelectionSet, v *alert.ReprocessBatchJob) graphql.Marshaler {

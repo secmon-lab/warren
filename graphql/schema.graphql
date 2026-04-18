@@ -210,16 +210,36 @@ type Session {
 type SessionMessage {
   id: ID!
   sessionID: ID!
+  turnID: ID
+  ticketID: ID
   type: String!
   content: String!
+  author: MessageAuthor
   createdAt: String!
   updatedAt: String!
+}
+
+type MessageAuthor {
+  userID: String!
+  displayName: String!
+  slackUserID: String
+  email: String
 }
 
 extend type Query {
   ticketSessions(ticketId: ID!): [Session!]!
   session(id: ID!): Session
   sessionMessages(sessionId: ID!): [SessionMessage!]!
+  # chat-session-redesign Phase 3.4: unified replacement for the legacy
+  # ticketComments query. Returns messages across every Session bound
+  # to the ticket with optional source/type filters.
+  ticketSessionMessages(
+    ticketId: ID!
+    source: String
+    type: String
+    offset: Int
+    limit: Int
+  ): [SessionMessage!]!
 }
 
 enum SortOrder {
